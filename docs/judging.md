@@ -2064,6 +2064,14 @@ system-audio path. Unlisted, never public, until you say so.
    back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
    one. A wrong key on one destination should fail that one alone, once, with the
    platform's words, while the others stream.
+9. The panel (37x-4d), instead of the console: + Panel → Live Show. Add the unlisted YouTube
+   broadcast (paste its key; the field should empty and say "Key kept"), press **For tests**
+   on it, and **Test**: the same picture as step 1. Add a second destination, leave it on,
+   and press **Go live**: it should ask "Go live to …? Press again" and do nothing until the
+   second press (use the unlisted one turned on, not a public key). While live, each row
+   should show its Mb/s and seconds behind; on the phone remote a red Live chip with the
+   clock on Draw and Controls, and two taps on it should stop the stream on the Mac. After
+   a stream, the line under the buttons should name the upload the stream carried.
 
 ## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
 

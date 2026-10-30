@@ -91,6 +91,17 @@ stop the stream (§37x-4's phone version).
    wait on their follower counts.
 3. Test streams are **unlisted** YouTube broadcasts; the first public one is the owner's.
 
+## The Live Show panel (37x-4d, 2026-10-30)
+
+In the Mac app, + Panel → Live Show (Pro). Each destination is added by its platform, a name,
+its shape and its key; the key goes to the keychain store and the panel shows only that it is
+kept. "For tests" marks the unlisted broadcast Test streams to; Go live streams to every
+destination that is on and not for tests, after a second press that names them. The upload
+line compares what the destinations will push (each one its own copy of its encode, plus
+160 kbps of sound, with 20% headroom) against what the last stream measured. The panel, the
+console below and the phone remote's Stop act on one stream (`src/lib/liveShow.ts`); the
+phone can stop a stream and never start one. `npm run liveshow` drives it.
+
 ## What is built (37x-4b, 2026-10-29)
 
 The encoder and its destinations, with no panel yet (37x-4d): in the Mac app's console,

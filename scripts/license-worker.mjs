@@ -500,7 +500,7 @@ let bobProToken = '';
 
 // ── 9. Test-mode orders mint nothing; live product ids come from settings ──
 {
-  const lsOrder = (email, orderId, { test, productId = 1450530, name = 'ChromaGlass Home', status = 'paid', event = 'order_created' } = {}) => ({
+  const lsOrder = (email, orderId, { test, productId = 1450525, name = 'ChromaGlass Home', status = 'paid', event = 'order_created' } = {}) => ({
     meta: { event_name: event, ...(test === 'meta' ? { test_mode: true } : {}) },
     data: {
       id: orderId,
@@ -826,7 +826,7 @@ let bobProToken = '';
 // ── 13. Only products we sell, only paid orders, only a Home can be upgraded ──
 // The security audit of 2026-10-28, findings 5 and 6. Each line below failed on the Worker before.
 {
-  const lsOrder = (email, orderId, { productId = 1450530, name = 'ChromaGlass Home', status = 'paid', event = 'order_created' } = {}) => ({
+  const lsOrder = (email, orderId, { productId = 1450525, name = 'ChromaGlass Home', status = 'paid', event = 'order_created' } = {}) => ({
     meta: { event_name: event },
     data: {
       id: orderId,

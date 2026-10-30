@@ -622,23 +622,7 @@ function copyBytes(desc: AllowSharedBufferSource): Uint8Array {
   return new Uint8Array(v.buffer.slice(v.byteOffset, v.byteOffset + v.byteLength));
 }
 
-// --- The Mac app's transport and its console -----------------------------------
-
-interface NativeLive {
-  start(req: LiveStartRequest): Promise<{ ok: boolean; error?: string; state?: LiveTransportState | null }>;
-  config(cfg: unknown): Promise<unknown>;
-  packet(p: LivePacket): void;
-  stop(): Promise<unknown>;
-  state(): Promise<LiveTransportState | null>;
-  onEvent(fn: (e: { event: string; detail: unknown; state: LiveTransportState | null }) => void): () => void;
-  keys: { set(name: string, key: string): Promise<boolean>; list(): Promise<{ name: string; set: string | null }[]>; remove(name: string): Promise<boolean> };
-}
-
-/** The Mac app's bridge to its RTMPS client (desktop/preload.cjs), or null outside the app. */
-export function nativeLive(): NativeLive | null {
-  const w = globalThis as unknown as { __CHROMAGLASS_NATIVE__?: { live?: NativeLive } };
-  return w.__CHROMAGLASS_NATIVE__?.live ?? null;
-}
+// --- The console's plan (the Mac app's console and panel are lib/liveShow.ts) ---
 
 /** A destination as the console takes it: a portrait one goes to the vertical encode. */
 export interface LiveConsoleDestination { name?: string; url: string; keyName?: string; key?: string; orientation?: 'landscape' | 'portrait' }
@@ -678,49 +662,4 @@ export function liveConsolePlan(o: LiveConsoleOptions): { outputs: LiveOutputSpe
   }
   const destinations = asked.map((d) => ({ name: d.name ?? d.keyName, url: d.url, keyName: d.keyName, key: d.key, output: d.orientation === 'portrait' ? 'portrait' : 'landscape' }));
   return { outputs, destinations };
-}
-
-/**
- * `window.__cgLive` in the Mac app (37x-4b: "driven first from the console
- * and the check"; the panel is 37x-4d): `start({ url, keyName })` for one
- * destination or `start({ destinations: [{ name, url, keyName, orientation }] })`
- * for several (37x-4c), `stop()`, `state()` (with each destination's health
- * under `transport.destinations`), `probe({ width, height, fps })`,
- * `keys.set(name, key)`, `keys.list()`, `keys.remove(name)`.
- * `allowed` is the Pro gate, asked at each start.
- */
-export function installLiveConsole(deps: { canvas: () => HTMLCanvasElement | null; audio: () => MediaStream | null; allowed: () => boolean }): void {
-  const native = nativeLive();
-  if (!native) return;
-  let current: LiveEncoder | null = null;
-  const transport: LiveTransport = {
-    start: (req) => native.start(req),
-    config: (cfg) => native.config(cfg),
-    packet: (p) => native.packet(p),
-    stop: () => native.stop(),
-    state: () => native.state(),
-  };
-  native.onEvent((e) => {
-    if (current) current['transportState'] = e.state;
-    // One destination lost or refused is the session's to retry; only the whole session ending stops the encode.
-    if ((e.event === 'failed' || e.event === 'closed') && current && current.state().phase === 'live') void current.stop();
-  });
-  const api = {
-    async start(o: LiveConsoleOptions): Promise<LiveState> {
-      if (!deps.allowed()) throw new Error('the live show is a Pro feature');
-      if (current && (current.state().phase === 'live' || current.state().phase === 'starting')) throw new Error('already live: stop() first');
-      const canvas = deps.canvas();
-      if (!canvas) throw new Error('no plate to stream');
-      const { outputs, destinations } = liveConsolePlan(o);
-      current = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration });
-      await current.start();
-      return current.state();
-    },
-    stop: () => current ? current.stop() : Promise.resolve(null),
-    state: () => current ? current.refresh() : Promise.resolve(null),
-    /** Each encoder hint timed at a size (the check's diagnostic; `probeVideoEncoder`). */
-    probe: (o: { width?: number; height?: number; fps?: number } = {}) => probeVideoEncoders(o.width ?? 1920, o.height ?? Math.round((o.width ?? 1920) * 9 / 16), o.fps ?? 30),
-    keys: native.keys,
-  };
-  (globalThis as unknown as { __cgLive?: unknown }).__cgLive = api;
 }

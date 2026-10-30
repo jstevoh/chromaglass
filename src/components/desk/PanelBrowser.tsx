@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { SETTINGS_CATEGORIES, SECTION_BY_ID, sectionMatches } from '../../lib/settingsMap';
 import { PINNABLE } from '../../lib/deskPins';
 import { PANELS, whereIs, type DeskLayout } from '../../lib/deskLayout';
+import { liveAvailable } from '../../lib/liveShow';
 
 /**
  * The panel browser (⌘P), Desk v2's way to every panel.
@@ -40,6 +41,8 @@ export function PanelBrowser({ layout, at, onDock, onFloat, onStage, onClose }: 
     const q = query.trim().toLowerCase();
     return PANELS
       .filter(p => {
+        // The Live Show streams from the Mac app only (PLAN 37x-4d): not offered where it cannot.
+        if (p.id === 'live' && !liveAvailable()) return false;
         if (!q) return true;
         const sec = SECTION_BY_ID.get(p.id);
         return sec ? sectionMatches(sec, q) : q.split(/\s+/).every(w => p.name.toLowerCase().includes(w));

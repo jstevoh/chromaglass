@@ -6672,6 +6672,43 @@ review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1
 of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
 `npm run wgsl` now compiles the splat kernels too, which it never had.
 
+
+## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
+
+14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
+bottom of the frame up; a canvas's run down"), and the video pour and an uploaded picture
+did not, so if that comment was right both landed upside down. It was. On the owner's Mac
+(Apple GPU, Metal), a still plate, a pour and a photograph straight after, beside its source:
+the word "TOP RAT" over "bottom" through `pourText` stood the right way up; an uploaded
+picture of the same two words, pink above and blue below, landed with the blue on top and
+every letter upside down (a vertical flip, not a mirror: the words still read left to right);
+and a cartoon frame (Jack Frost, 240 s in: an orange sky above, pumpkins below) poured with
+the pumpkins at the top and the sky's light at the bottom. The pictures, before and after,
+desktop and phone, are on the branch `antigravity/14ab-13-pictures`.
+
+The grid's rows count up the plate and every pour but the text's laid a source's first row
+on the grid's first: `pourPictureCpu`, the solver's `videoSample` pass and the CPU loop. Each
+is turned where its rows are taken, at no cost a frame. The upload draws its picture turned
+over once, as `pourText` does (`uprightPicture` in `lib/videoFlow.ts`, called by
+`usePour.ts`). The solver's copy of a video's frame turns it (`flipY: true` on
+`copyExternalImageToTexture` in `pourVideo`, `gpu/fluid/inputs.ts`). The CPU loop
+(`pourVideoFrameCpu`, the WebGL solver's way) reads the grid's row y from the frame's row
+S−1−y, and the cell above from the row before, so the flow it reads is turned with the dye.
+Antigravity's first fix drew every video frame again onto a canvas of its own turned over,
+a full-size draw a frame on the path 14ab exists to lighten; the review moved it into the
+copy and the loop's read, and the frame loop's call is as it was.
+
+`npm run videoflow` holds it (24 lines, 5 new): a title card with a known top (a bright band
+across its top third, a dim one across its bottom third, a blob rising two rows between two
+frames) poured through the loop and through the solver's pass lands its brightest cells
+above the middle of its dye (`up` +0.334 and +0.332 of the dyed rows' height) and its rise
+as flow up the plate; an uploaded picture of it through `uprightPicture` lands +0.333. Each
+against the card turned over (−0.334, −0.332) and the upload read as it came (−0.333). On the
+code before the fix the four video lines go red (20 of 24, `up` −0.334 and −0.332): the
+other twenty hold the pass and the loop to each other, which a frame turned the same wrong
+way on both passes. The lines run on the Mac's `--video` shard too, so Metal's turned copy
+is asked as well as SwiftShader's.
+
 ## Moved in the third pass (2026-10-29, 19m)
 
 When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the
@@ -9948,6 +9985,36 @@ model cannot reach one, the PR says what it reached and asks.
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
 
 ### 37. Marketing and social media (asked 2026-10-29)
+
+#### 37x-4d. The Live Show panel and the Pro gate
+
+  - **37x-4d. The Live Show panel and the Pro gate (shipped 2026-10-30).** The owner asked
+    for "a Live Show panel in the Mac app, Pro only" to stream to every popular platform at
+    once; 37x-4b and 4c built the stream and drove it from the console. The panel
+    (`src/components/LiveShowPanel.tsx`, in + Panel as "Live Show", in Play) adds each
+    destination by its platform (the server filled in for YouTube, Twitch and Facebook,
+    pasted for the rest; Instagram and TikTok at 9:16), a name and its key, in a password
+    field emptied the moment the key goes to the keychain store (`desktop/keys.js`), so the
+    page can only say "Key kept" and when. A destination marked "For tests" (an unlisted
+    YouTube broadcast) is streamed by Test and never by Go live, which asks once more,
+    naming where it goes, before the one press that cannot be taken back; Stop does not
+    ask. While on air each destination has its line (kbps, seconds behind, dropping,
+    retrying, refused). The upload warning sums what the destinations will push (each its
+    own copy of its encode, at `render.ts`'s rate, plus the sound) with the research's 20%
+    headroom, against what the last stream measured: the sum acknowledged while all kept
+    up, and the sum while one was a second behind by the server's count
+    (`src/lib/liveShow.ts`), since there is no server of ours to time an upload against.
+    The panel, `window.__cgLive` and the phone share one controller in `liveShow.ts`, so two
+    encoders can never race for the main process's one session. Pro by `canUseProFeature`
+    (the panel says it is Pro on a free key and has no Go live); not offered on the website,
+    which has no RTMPS client. The phone: the remote's state carries the stream (a test or
+    live, its clock, where, whether one is in trouble), shown as a red chip on Draw and on
+    Controls, and Stop is two taps (`live-stop`); the phone cannot start a stream.
+    Check: `npm run liveshow` (32 lines: the sums against numbers worked by hand, then the
+    built app with a stand-in for the Mac app's bridge and the page's real encoder: the key
+    once to the store and nowhere in the page or its storage, Go live to the three that are
+    on with two encodes and no key, Test to the test one only, the dropping line, the
+    phone's chip and its Stop, the upload measured as enough at 24 Mb/s and short at 3).
 
 #### 37x-4c. Several destinations, and a vertical one
 

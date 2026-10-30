@@ -125,7 +125,7 @@ async function handleWebhook(request, env, cors) {
   const lsItem = lsAttr.first_order_item || {};
   const lsProductId = Number(lsItem.product_id || 0);
   // Lemon Squeezy numbers a store's live products afresh, apart from its test-mode copies
-  // (1450530 Home, 1450531 Pro, 1450532 Upgrade), so the live ones (1479217 Home, 1479219 Pro,
+  // (1450525 Home, 1450531 Pro, 1450532 Upgrade), so the live ones (1479217 Home, 1479219 Pro,
   // 1479218 Upgrade) are built in beside them, so a deploy that forgets the settings cannot hold
   // every paid order, and a later store can add its own as Worker settings
   // (`LS_HOME_PRODUCT_IDS`, `LS_PRO_PRODUCT_IDS`, `LS_UPGRADE_PRODUCT_IDS`, comma separated). A Lemon Squeezy order files a key only for a
@@ -135,6 +135,10 @@ async function handleWebhook(request, env, cors) {
   // (the security audit, finding 5). An order for a product we do not know answers 200 so the
   // store does not retry, files nothing, and is held for the owner (`holdOrder`). Our own direct
   // JSON (no `data.attributes`, signed with the same secret) names its tier itself and is untouched.
+  // The test Home id was written as 1450530 when the list went in; the store's test Home is
+  // 1450525 (read from the dashboard and from its own order_created of 2026-10-24, whose
+  // `first_order_item.product_id` is 1450525), so every paid test Home order was being held as
+  // an unknown product. The live ids were read from the dashboard the same day and match.
   const isLs = Boolean(body.data && typeof body.data === 'object' && body.data.attributes);
   const lsStatus = String(lsAttr.status || '').toLowerCase();
   const productKind = !isLs
@@ -143,7 +147,7 @@ async function handleWebhook(request, env, cors) {
       ? 'upgrade'
       : productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, [1450531, 1479219])
         ? 'pro'
-        : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, [1450530, 1479217])
+        : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, [1450525, 1479217])
           ? 'home'
           : 'unknown';
   const rawEvent = String(body.event || body.meta?.event_name || '');

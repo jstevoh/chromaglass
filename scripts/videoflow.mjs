@@ -50,6 +50,12 @@
  *     cell by cell (an ImageBitmap of it on SwiftShader, which loses its GPU
  *     instance copying from the element; the element itself on the Mac);
  *   - and the time `pourVideo` takes on the CPU.
+ * Which way up (PLAN 14ab-13): a title card with a known top, poured through
+ * the loop and through the solver's pass, lands its top at the top of the
+ * plate and its rising blob as flow up it; an uploaded picture of it, through
+ * the app's `uprightPicture`, lands its top band above its bottom one. Each
+ * with the card turned over as its control, which lands the other way.
+ *
  * The frames carry a moving bright band along the top row and right-hand
  * column, which the loop leaves alone, so a kernel writing the edge is seen.
  * Controls: the second frame poured as a first is seen in the flow; the
@@ -214,6 +220,81 @@ console.log(`  the loop's two frames: dye in ${cells(refTwo.dye, 4, 3)} cells, f
 check('without the solver\'s pass the frame goes through the loop, and the step sends the rows it covers', cpuWay.every((w) => w === 'cpu') && refTwo.bytes > AREA * 36 / 2 && cells(refTwo.vel, 4, 0) > 100 && cells(refTwo.dye, 4, 3) > 1000 && edge(refTwo.dye) + edge(refTwo.vel) === 0,
   `${cpuWay.join(',')}, ${MB(refTwo.bytes)} of ${MB(AREA * 36)}`);
 check('the next video\'s first frame is fresh: dye and no flow from the last video\'s frame', nextVideoDye && !nextVideoFlow, `dye ${nextVideoDye}, flow ${nextVideoFlow}`);
+
+// ── Which way up (PLAN 14ab-13) ───────────────────────────────────────
+/*
+  The grid's rows count up the plate and a frame's count down it. The text
+  pour turns its canvas over before it pours, and on the owner's Mac (Metal,
+  photographed beside each source) its words stood the right way up; an
+  uploaded picture and a poured cartoon frame, which were not turned, landed
+  upside down. So "the right way up" here is the text pour's: a frame's top
+  lands at the grid's high rows.
+
+  The frame is a title card with a known top: a bright band across its top
+  third, a dim one (still over the key) across its bottom third, dark glass
+  between, and a soft blob in the middle that rises two rows up the picture
+  between the two frames. Read on what the plate is handed, the dye's
+  brightest cells (each pours by its brightness) sit above the middle of all
+  the dyed cells (`up`, as a share of the dyed rows' height: +1/3 for this
+  card the right way up, −1/3 upside down), and the blob's rise is flow up
+  the plate (vy > 0). Controls: the same card turned over before it is poured
+  lands the other way on every line, so the measure sees a frame laid the
+  wrong way, which every other line of this check would not (the solver's
+  pass and the loop are held to each other, and a frame both turned the same
+  wrong way agrees with itself).
+*/
+function card(rise) {
+  const d = new Uint8ClampedArray(AREA * 4);
+  for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) {
+    const q = Math.exp(-((x - L / 2) ** 2 + (y - (L / 2 - rise)) ** 2) / (2 * 9 * 9));
+    const v = y < L / 3 ? 230 : y >= (2 * L) / 3 ? 60 : Math.round(6 + 120 * q);
+    const i = (y * L + x) * 4;
+    d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255;
+  }
+  return d;
+}
+/** A frame's rows the other way round: the control, and what the pour handed the plate before 14ab-13. */
+const turned = (d, W = L, H = L) => { const o = new Uint8ClampedArray(d.length); for (let y = 0; y < H; y++) o.set(d.subarray(y * W * 4, (y + 1) * W * 4), (H - 1 - y) * W * 4); return o; };
+const cards = [card(0), card(2)];
+const cardsTurned = cards.map((c) => turned(c));
+/**
+ * Which way up a pour landed, on any N×N dye and flow (RGBA, the amount in
+ * the dye's alpha, vy in the flow's second): `up`, the brightest dyed cells'
+ * mean row less all the dyed cells', over the dyed rows' height; `vy`, the
+ * flow's sum. Kept as source so the page runs the same measure.
+ */
+const wayUpSrc = `(dye, vel) => {
+  const N = Math.round(Math.sqrt(dye.length / 4));
+  let top = 0;
+  for (let i = 0; i < N * N; i++) top = Math.max(top, dye[i * 4 + 3]);
+  let n = 0, sy = 0, nb = 0, sb = 0, y0 = N, y1 = -1, vy = 0;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const i = y * N + x, a = dye[i * 4 + 3];
+    if (vel) vy += vel[i * 4 + 1];
+    if (a <= top * 1e-3) continue;
+    n++; sy += y; y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    if (a >= 0.8 * top) { nb++; sb += y; }
+  }
+  return { up: n && nb ? (sb / nb - sy / n) / (y1 - y0 + 1) : 0, vy: vel ? vy : null, cells: n };
+}`;
+const wayUp = (0, eval)(wayUpSrc);
+const sayWay = (w) => `up ${w.up >= 0 ? '+' : ''}${w.up.toFixed(3)}${w.vy === null ? '' : `, flow up the plate ${w.vy >= 0 ? '+' : ''}${w.vy.toExponential(2)} in all`}, ${w.cells} cells dyed`;
+/** The app's call on a solver with no pass of its own (the WebGL one), recording what the loop hands it. */
+function cardOnLoop(frs) {
+  const dye = new Float32Array(AREA * 4), vel = new Float32Array(AREA * 4);
+  const plate = {
+    size: L, pourVideoFrame: () => false,
+    addDensity(x, y, a) { dye[(y * L + x) * 4 + 3] += a; },
+    addVelocity(x, y, vx, vy) { vel[(y * L + x) * 4] += vx; vel[(y * L + x) * 4 + 1] += vy; },
+  };
+  const state = { source: null, prev: null };
+  const ways = frs.map((_, k) => pourVideoFrame(plate, video('card.mp4', k), state, (src) => frs[src.k]));
+  return { ...wayUp(dye, vel), ways };
+}
+const loopUp = cardOnLoop(cards), loopTurned = cardOnLoop(cardsTurned);
+console.log(`  which way up, the loop: the card ${sayWay(loopUp)}; turned over ${sayWay(loopTurned)}`);
+check('the loop lays a frame\'s top at the top of the plate, and its rise as flow up it (14ab-13)', loopUp.ways.every((w) => w === 'cpu') && loopUp.up > 0.2 && loopUp.vy > 0, sayWay(loopUp));
+check('control: the card turned over lands the other way on both', loopTurned.up < -0.2 && loopTurned.vy < 0, sayWay(loopTurned));
 
 // ── With the pass ─────────────────────────────────────────────────────
 const gpu = open(true);
@@ -401,6 +482,50 @@ if (!nodeOnly) {
       check('control: the last frame alone is not the two frames\' sum', r.lastAlone.dye.off > 1000, say(r.lastAlone));
       console.log(`  pourVideo's CPU time a call: first two ${r.firstCalls.map((x) => x.toFixed(1)).join(', ')} ms (the kernels built), then a median of ${r.median.toFixed(2)} ms (SwiftShader's copy of a canvas included; a video's is a copy on the GPU)`);
     }
+    /*
+      Which way up on the real solver (PLAN 14ab-13): the card poured as a
+      canvas through `pourVideo` (its copy turns the frame over, `flipY`),
+      read on the deltas the fold takes. And an uploaded picture, through the
+      app's own `uprightPicture` and `pourPictureCpu` (the upload's whole
+      path below the file picker, the CPU's writes recorded): its top band
+      above its bottom one, and as it was before 14ab-13 (the canvas read as
+      it came) upside down. Runs on the Mac's `--video` shard too, so Metal's
+      copy is asked as well as SwiftShader's.
+    */
+    const appBundle = await build({
+      stdin: { contents: "export { uprightPicture, pourPictureCpu } from './src/lib/videoFlow';", resolveDir: process.cwd(), loader: 'ts' },
+      bundle: true, platform: 'browser', format: 'iife', globalName: 'videoFlowApp', write: false, logLevel: 'warning',
+    });
+    await page.addScriptTag({ content: appBundle.outputFiles[0].text });
+    const wr = await page.evaluate(async ({ cards, cardsTurned, wayUpSrc, L }) => {
+      const { canvas, fresh, flushGpu, deltas } = window.vfh;
+      const wayUp = (0, eval)(wayUpSrc);
+      const onSolver = async (frs) => {
+        const s = await fresh();
+        const poured = frs.map((f, k) => s.pourVideo(canvas(f, L), k === 0));
+        flushGpu(s);
+        const d = await deltas(s);
+        s.device.destroy();
+        return { ...wayUp(d.dye, d.vel), poured: poured.every(Boolean) };
+      };
+      const gpu = await onSolver(cards), gpuTurned = await onSolver(cardsTurned);
+      const { uprightPicture, pourPictureCpu } = window.videoFlowApp;
+      const upload = (img) => {
+        const dye = new Float32Array(L * L * 4);
+        pourPictureCpu({ addDensity(x, y, a) { dye[(y * L + x) * 4 + 3] += a; }, addVelocity() {} }, img, L);
+        return wayUp(dye, null);
+      };
+      const pic = canvas(cards[0], L);
+      const uploaded = upload(uprightPicture(pic, L, L));
+      const asItCame = upload(pic.getContext('2d').getImageData(0, 0, L, L));
+      return { gpu, gpuTurned, uploaded, asItCame };
+    }, { cards: cards.map(arr), cardsTurned: cardsTurned.map(arr), wayUpSrc, L });
+    console.log(`  which way up, the solver's pass: the card ${sayWay(wr.gpu)}; turned over ${sayWay(wr.gpuTurned)}`);
+    console.log(`  an uploaded picture of it: ${sayWay(wr.uploaded)}; read as it came (before 14ab-13) ${sayWay(wr.asItCame)}`);
+    check('the solver\'s pass lays a frame\'s top at the top of the plate, and its rise as flow up it (14ab-13)', wr.gpu.poured && wr.gpu.up > 0.2 && wr.gpu.vy > 0, sayWay(wr.gpu));
+    check('control: the card turned over lands the other way on the solver too', wr.gpuTurned.up < -0.2 && wr.gpuTurned.vy < 0, sayWay(wr.gpuTurned));
+    check('an uploaded picture lands the right way up (`uprightPicture`); read as it came it lands upside down', wr.uploaded.up > 0.2 && wr.asItCame.up < -0.2, `${sayWay(wr.uploaded)}; as it came ${sayWay(wr.asItCame)}`);
+
     /*
       From a <video>, as the app pours: the first frame of a stream of the
       canvas, played, through the video's own size and its copy. A video's

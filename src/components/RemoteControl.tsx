@@ -14,6 +14,7 @@ import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { MixerPanel } from './MixerPanel';
+import { LiveRemoteChip } from './LiveRemoteChip';
 import { Slider } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
@@ -615,7 +616,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       className="min-h-screen bg-[#0a0a0a] text-white"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)',   // clear of the fixed transport bar
+        paddingBottom: `calc(env(safe-area-inset-bottom) + ${state?.live ? '10rem' : '6.5rem'})`,   // clear of the fixed transport bar, and the live chip on it
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
         touchAction: 'manipulation',
@@ -999,6 +1000,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
         data-testid="remote-transport"
       >
+        {state?.live && (
+          <div className="mx-auto mb-3 flex max-w-6xl">
+            <LiveRemoteChip live={state.live} action={action} className="flex-1" />
+          </div>
+        )}
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <button
             aria-pressed={!!state?.blackout}
