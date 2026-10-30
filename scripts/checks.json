@@ -1164,7 +1164,9 @@
         "stand-in laptop running the real picture sender on a painted 4:3",
         "canvas. Asked for only on Draw, painted the right way up at 8 a second",
         "or more, the frame in the wall's shape, and dimmed when it stops; and",
-        "the WebGPU show's way, the frame read on the GPU, on SwiftShader."
+        "the WebGPU show's way, the frame read on the GPU, on SwiftShader, at",
+        "14 frames a second with each read held four frames (a starved Mac's",
+        "trip, PLAN 8-draw-a-4) still 8 a second."
       ]
     },
     {

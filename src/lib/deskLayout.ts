@@ -205,6 +205,58 @@ export function whereIs(l: DeskLayout, id: string): Where {
 /** Every panel that is out, docked or floating, in reading order. */
 export const openPanels = (l: DeskLayout): string[] => [...l.left, ...l.right, ...l.deck, ...l.floating.map(f => f.id)];
 
+/*
+  One control, one place on a tab.
+
+  The owner (2026-10-29): "why are there repeated controls in the rides and
+  the recipe groups?" On the Perform tab that ships, Speed, Turbulence, Soap
+  Bursts, Beat Press and Evolve Speed were each drawn twice, once on the
+  Rides and once on the Recipe, Zoom three times (the Macro panel too), and
+  Swirl twice (the Recipe and Fluid Physics). Each strip was right on the
+  desk it was made for: the Rides were Gig's and the Recipe Build's, and the
+  two never met until a tab could hold both. The Recipe already left Random
+  evolve and All settings to the Rides for the same reason (`RecipeBody`);
+  this is that rule carried to every control.
+
+  Which copy stays, in order:
+    1. The Rides keep all of theirs. They are the strip chosen for the hand
+       mid-set, faders in every case, and the one a controller's faders are
+       learned to; a ride that went because a panel opened somewhere else
+       would be a fader on the controller moving nothing anyone can see.
+    2. The Recipe keeps the rest of its own. It is chosen too, control by
+       control, and a control picked onto it with Choose has to appear there:
+       giving it up to a section panel would answer a pick with a gap.
+    3. A section's knobs panel (Fluid Physics, Macro) draws what neither
+       strip has. It is the whole section, so it is the one that can lose a
+       knob and still say plainly what it is.
+  Nothing is taken off a strip: the stored lists are untouched, and closing
+  the panel that holds a control brings it back to the one that gave it up.
+  A folded panel still counts as out, as the Recipe's Random evolve already
+  did, so folding one never makes another reflow under the hand; the line
+  under the panel that gave a control up says which panel to open.
+
+  It returns each of `keys` that panel `id` leaves out, with the panel that
+  draws it instead.
+*/
+export function drawnElsewhere(
+  l: DeskLayout,
+  id: string,
+  keys: readonly string[],
+  rideKeys: readonly string[],
+  recipeKeys: readonly string[],
+): Map<string, string> {
+  const held = new Map<string, string>();
+  if (id === 'rides') return held;
+  const out = new Set(openPanels(l));
+  const rides = out.has('rides') ? new Set(rideKeys) : new Set<string>();
+  const recipe = id !== 'recipe' && out.has('recipe') ? new Set(recipeKeys) : new Set<string>();
+  for (const k of keys) {
+    if (rides.has(k)) held.set(k, 'rides');
+    else if (recipe.has(k)) held.set(k, 'recipe');
+  }
+  return held;
+}
+
 // ── Changing one ─────────────────────────────────────────────────────
 
 /** Take a panel out of wherever it is. Its collapsed state goes with it. */

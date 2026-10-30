@@ -83,6 +83,7 @@ import {
 import { MIX_SOURCE_INFO, fadeKey } from '../src/lib/mixer.ts';
 import { MIN_BEAT_CONFIDENCE } from '../src/lib/barGrid.ts';
 import { build } from 'esbuild';
+import { appSource } from './appSource.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (p) => readFileSync(join(root, p), 'utf8');
@@ -515,7 +516,9 @@ console.log('\n The wiring (read from the source)');
   inside a string (a URL's // follows a colon or a quote).
 */
 const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
-const app = code(src('src/App.tsx'));
+const app = code(appSource(src));
+/** The source from a marker on, `n` characters of it: one statement of App's to read. */
+const around = (from, n = 700) => app.slice(app.indexOf(from), app.indexOf(from) + n);
 const midi = src('src/lib/midi.ts');
 const proto = src('src/lib/remoteProtocol.ts');
 const missingPad = FADE_ROWS.filter(id => !new RegExp(`case 'mix-fade-${id}':\\s+fadeRow\\('${id}'\\)`).test(app));
@@ -532,19 +535,19 @@ const onBeat = FADE_ROWS.filter(id => !notOnBeat.includes(`'mix-fade-${id}'`));
 check('each pad is named on the MIDI sheet and is not fired on a beat (a fade turned round every kick hangs half-way)',
   missingMidi.length === 0 && onBeat.length === 0, [...missingMidi, ...onBeat.map(id => `${id} on a beat`)].join(', '));
 const update = app.slice(app.indexOf('const updateSettings ='), app.indexOf('const applyPreset ='));
-const ride = app.slice(app.indexOf('const rideSetting ='), app.indexOf('const rideSetting =') + 600);
+const ride = around('const rideSetting =', 600);
 check('both of the hand\'s ways into the settings tell the fades (a slider or the remote, a MIDI fader)',
   /handOnLevels\(Object\.keys\(newSettings\)\)/.test(update) && /rowFades\.handOn\(\[String\(key\)\]\)/.test(ride));
 const prepare = app.slice(app.indexOf('prepare: () =>'), app.indexOf('const songRender ='));
 check('a render drops the fades on its way in and out, as it drops the other timed walks',
   (prepare.match(/rowFades\.clear\(\)/g) ?? []).length === 2);
 const lookFadeSrc = app.slice(app.indexOf('const fadeSettingsTo ='), app.indexOf('const sendLook ='));
-const presetSrc = app.slice(app.indexOf('const applyPreset ='), app.indexOf('const applyPreset =') + 300);
-const userPresetSrc = app.slice(app.indexOf('const applyUserPreset ='), app.indexOf('const applyUserPreset =') + 500);
-const luckySrc = app.slice(app.indexOf('const triggerLucky ='), app.indexOf('const triggerLucky =') + 600);
-const newSrc = app.slice(app.indexOf('const newLook ='), app.indexOf('const newLook =') + 500);
-const revertSrc = app.slice(app.indexOf('const revertLook ='), app.indexOf('const revertLook =') + 800);
-const sendSrc = app.slice(app.indexOf('const sendLook ='), app.indexOf('/** Go: the armed look'));
+const presetSrc = around('const applyPreset =', 300);
+const userPresetSrc = around('const applyUserPreset =', 500);
+const luckySrc = around('const triggerLucky =', 600);
+const newSrc = around('const newLook =', 500);
+const revertSrc = around('const revertLook =', 800);
+const sendSrc = app.slice(app.indexOf('const sendLook ='), app.indexOf('const goLook ='));
 check('every look that comes in stops a take on the gel and the lumia (a preset, a saved look, Lucky), and New drops every take',
   [presetSrc, userPresetSrc, luckySrc].every(s => /lookTakesLevels\(\)/.test(s))
   && /rowFades\.clear\(\)/.test(newSrc) && /rowFades\.forget\(FADE_ROWS\)/.test(newSrc) && /setRowFading\(\{\}\)/.test(newSrc));
@@ -561,7 +564,7 @@ const ringCalls = fadeCalls.filter(c => /,\s*true\);$/.test(c));
 const lvSrc = code(src('src/components/LiquidVisualizer.tsx'));
 check('a Go, a Back and Send to wall dip the ring for the handoff, and the unattended changes do not; the handoff swaps at the middle the dip is centred on',
   ringCalls.length === 2 && /\[\], true\)/.test(ringCalls[0]) && /true, blackoutRef/.test(ringCalls[1])
-  && /lookFadeStep\(false, true\)/.test(app.slice(app.indexOf('const sendDraftToWall'), app.indexOf('const sendDraftToWall') + 3000))
+  && /lookFadeStep\(false, true\)/.test(around('const sendDraftToWall', 3000))
   && /if \(h\.dosed === 1 && p >= 0\.5\) \{/.test(lvSrc),
   `${fadeCalls.length} fadeSettingsTo calls, ${ringCalls.length} with the ring`);
 check('a hand on the wall\'s ferrofluid slider mid-fade, or a magnet or bottle in the hand, is not overwritten with the amount 0.6 while a look is changing',
@@ -583,7 +586,6 @@ check('a Back fades to the look a Go and Lucky left, through the Back\'s step, h
   one by one, and then every literal write of a wall key looked for a mark
   within a few lines of it, so a new writer that forgets is red here.
 */
-const around = (from, n = 700) => app.slice(app.indexOf(from), app.indexOf(from) + n);
 const writers = {
   'a hand, the remote, a stage or a song through handOnLevels': /laterWrites\.mark\(list, showNow\(\)\)/.test(around('const handOnLevels =', 300)),
   'a MIDI fader': /laterWrites\.mark\(\[String\(key\)\], showNow\(\)\)/.test(ride),
@@ -606,10 +608,10 @@ check('a Go and a new song\'s look lay each step down through lookStep (a Back t
   && /const taken = back \? \[\.\.\.rowFades\.levelsTakenSince\(started\), \.\.\.laterWrites\.since\(started\), \.\.\.hold\] : rowFades\.levelsTakenSince\(started\)/.test(lookFadeSrc)
   && !/setSettings\((to|blendLooks|keepRoom)/.test(lookFadeSrc) && !/prev => (keepRoom|blendLooks)/.test(lookFadeSrc)
   && /lookTakesLevels\(\)/.test(lookFadeSrc) && /lookTakesLevels\(\)/.test(presetSrc) && /rowFades\.handOn\(LOOK_LEVEL_KEYS\)/.test(app));
-const glideSrc = app.slice(app.indexOf('const glideSetting = useCallback'), app.indexOf('const glideSetting = useCallback') + 900);
+const glideSrc = around('const glideSetting = useCallback', 900);
 check('a song\'s glide and a sequence stage\'s writes stop a take on the levels they write, and a take stops a glide',
   /handOnLevels\(\[String\(key\)/.test(glideSrc) && /applySettings: \(patch\) => \{ handOnLevels\(Object\.keys\(patch\)\)/.test(app)
-  && /glidesRef\.current\.get\(levelKey\)/.test(app.slice(app.indexOf('const fadeRow ='), app.indexOf('const fadeRow =') + 1500)));
+  && /glidesRef\.current\.get\(levelKey\)/.test(around('const fadeRow =', 1500)));
 check('a new look forgets where its gel and lumia were taken out from; a render leaves no button lit; the bars are counted at fadeTempo',
   /rowFades\.forget\(\['gel', 'lumia'\]\)/.test(app) && (prepare.match(/setRowFading\(\{\}\)/g) ?? []).length === 2 && /fadeTempo\(tempoRef\.current\?\.bpm/.test(app));
 const mounts = {
