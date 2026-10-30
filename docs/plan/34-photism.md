@@ -107,12 +107,12 @@ a grid of generic stock thumbnails: ours are the plate itself.
     page, and an OSC setting lights the controller's ring. All 33 lines green: no
     claim on `/pro` was found broken. The plate's colours on the fixture and the blackout on the rig
     need a plate that reports its dye, so they run on the Mac (`RIG_PLATE=1` elsewhere). The
-    programs themselves are `docs/judging.md` §94, one sitting with free versions.
+    programs themselves are `docs/judging.md` §93, one sitting with free versions.
   - **34a-7g. Resolume sends its own OSC addresses.** Its OSC output mirrors Resolume's address space
     (`/composition/layers/1/video/opacity`); reaching `/chromaglass/setting/<key>` takes a custom
     output address per control (Shortcuts → Edit OSC), which `/pro` does not say. Either a line on
     the page with the steps, or let the server take a small map of another program's addresses
-    onto ours (as `ARTNET_IN` does for channels). Judging §94 step 2 says which.
+    onto ours (as `ARTNET_IN` does for channels). Judging §93 step 2 says which.
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
