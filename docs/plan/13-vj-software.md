@@ -90,6 +90,10 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      - **13.5-link-gate.** Link is not behind the licence yet. #586 (34a-7a, open when
        this shipped) gates OSC and Art-Net as Pro in the show server; Link belongs under
        the same gate (`setLink` in `server/remote-server.js`), once that lands.
+     - **13.5-link-rescan.** The peer opens its sockets on the interfaces up when Link is
+       switched on; Ableton's library rescans every thirty seconds. A Mac that joins the
+       Wi-Fi after Link is on finds only loopback until Link is switched off and on.
+       Rescan on a timer, as the library does.
      - **13.5-link-menu.** A Show menu item in the Mac app beside OSC's, for an operator
        who never opens Settings → Sound.
    - **13.5-osc**: OSC *out* for the plate's colour, the sound bands and the beat, the
