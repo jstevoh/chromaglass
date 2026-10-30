@@ -6428,7 +6428,7 @@ cells (the app caps bubbles at 13); it marks `fillHole`'s own reach now, and the
 a bubble of 38 cells. It also had each frame's control seen alone, the multiplier laid in
 the lab, and a second breath, so the breath's grid goes by rows in both halves.
 
-## 14ab-2. The video pour's dye and flow on the GPU (shipped 2026-10-30, #PRNUM)
+## 14ab-2. The video pour's dye and flow on the GPU (shipped 2026-10-30, #584)
 
 14ab-2. A poured video was drawn into a 192² canvas every frame and read back with
 `getImageData`, copied whole (147 KB) to be the next frame's reference, and each of its

@@ -265,7 +265,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 
 - ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Story in
   `docs/plan-shipped.md` §14ab-1 (moved 2026-10-29, 19m).
-- ~~**14ab-2** *The video pour's optical flow is a CPU loop*~~ **Shipped** (#PRNUM, `npm run videoflow`: no loop and no rows sent while a video pours, the deltas the CPU loop's to 1.7e-7). Story in `docs/plan-shipped.md` §14ab-2.
+- ~~**14ab-2** *The video pour's optical flow is a CPU loop*~~ **Shipped** (#584, `npm run videoflow`: no loop and no rows sent while a video pours, the deltas the CPU loop's to 1.7e-7). Story in `docs/plan-shipped.md` §14ab-2.
 - ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped.md` §14ab-3.
 - ~~**14ab-4** *A CPU pour uploads the whole grid every step*~~ **Shipped** (#579, `npm run frameuploads`: a cell after a cell 1.33 MB → 14 KB, the flush 318 → 18 µs). Story in `docs/plan-shipped.md` §14ab-4.
 - ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped.md` §14ab-5.
