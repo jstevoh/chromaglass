@@ -48,8 +48,8 @@ const lum = (d: ArrayLike<number>, i: number) => VIDEO_LUMA[0] * d[i] + VIDEO_LU
 
 /**
  * One frame, on the CPU. `data` is the frame drawn at S×S, RGBA, its rows
- * counting down as a canvas's do (and laid on the grid's rows as they come,
- * as the pour always has); `prev` the last frame's, or null for a first frame,
+ * laid on the grid's rows as they come (the app hands it a frame already turned
+ * over, `uprightFrame`, so its first row is the plate's bottom); `prev` the last frame's, or null for a first frame,
  * which pours dye and no flow. The edge cells are left alone: the gradient
  * there would reach off the frame.
  */
@@ -77,7 +77,12 @@ export interface VideoPourPlate extends VideoFlowTarget {
 }
 
 /** Which video the last frame poured was of, and (for the loop) that frame. */
-export interface VideoPourState { source: unknown; prev: Uint8ClampedArray | null }
+export interface VideoPourState {
+  source: unknown;
+  prev: Uint8ClampedArray | null;
+  /** The canvas `uprightFrame` turns each frame on, kept so it is made once. */
+  upright?: HTMLCanvasElement;
+}
 
 /** A video is its address while it plays one; another source is itself. */
 const sourceOf = (src: object) => ('currentSrc' in src && src.currentSrc) || src;
@@ -100,8 +105,10 @@ export function pourVideoFrame(
   src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap,
   state: VideoPourState,
   read: (src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, S: number) => Uint8ClampedArray | null,
+  /** The video `src` was made from, when `src` is its turned frame (`uprightFrame`): its address says which video this is. */
+  of: object = src,
 ): 'gpu' | 'cpu' | 'none' {
-  const source = sourceOf(src);
+  const source = sourceOf(of);
   const fresh = state.source !== source;
   if (plate.pourVideoFrame(src, fresh)) {
     state.source = source;
@@ -116,11 +123,42 @@ export function pourVideoFrame(
 }
 
 /**
+ * A video's frame the right way up for the plate.
+ *
+ * The plate's rows run from the bottom of the frame up and a video's run down,
+ * and both the solver's pass (`videoSample`) and the loop above lay the frame's
+ * rows on the grid's as they come, so a poured video landed upside down (PLAN
+ * 14ab-13, in pictures on a GPU: a cartoon's sky pouring at the bottom of the
+ * plate). The fix is made here, in the frame handed over, and not in the
+ * solver's pass, which is not this change's to touch: the frame is drawn
+ * turned over onto a canvas of its own size, kept in the pour's state so it is
+ * made once. A canvas cannot be sampled before its first draw, so it is null
+ * when there is no frame to draw yet (a video with no size).
+ */
+export function uprightFrame(
+  src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap,
+  state: VideoPourState,
+): HTMLCanvasElement | null {
+  const w = 'videoWidth' in src ? src.videoWidth : src.width;
+  const h = 'videoHeight' in src ? src.videoHeight : src.height;
+  if (!w || !h) return null;
+  const c = state.upright ?? (state.upright = document.createElement('canvas'));
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  const g = c.getContext('2d');
+  if (!g) return null;
+  g.setTransform(1, 0, 0, -1, 0, h);
+  g.drawImage(src, 0, 0, w, h);
+  return c;
+}
+
+/**
  * A still picture poured as dye on the CPU (`injectImage`): into the middle of
  * the grid, x 0.19–0.81 and y 0.31–0.69, each cell the pixel at its corner,
  * brighter pixels pouring more, a transparent one nothing. Moved here from
  * FluidSimulation with 14ab-2, as it was, beside the video's loop: the two
- * pictures the CPU pours.
+ * pictures the CPU pours. `img`'s first row lands on the grid's first row, the
+ * plate's bottom, so a picture read off a canvas is drawn turned over first
+ * (`usePour`'s upload, and `pourText`), as `uprightFrame` turns a video's.
  */
 export function pourPictureCpu(target: VideoFlowTarget, img: ImageData, S: number): void {
   const w = img.width, h = img.height, d = img.data;

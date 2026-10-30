@@ -6554,6 +6554,32 @@ review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1
 of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
 `npm run wgsl` now compiles the splat kernels too, which it never had.
 
+
+## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591)
+
+14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
+bottom of the frame up; a canvas's run down"), and the video pour and an uploaded picture
+did not, so if that comment was right both landed upside down. It was. On the owner's Mac
+(Apple GPU, Metal), a still plate, a pour and a photograph straight after, beside its source:
+the word "TOP RAT" over "bottom" through `pourText` stood the right way up; an uploaded
+picture of the same two words, pink above and blue below, landed with the blue on top and
+every letter upside down (a vertical flip, not a mirror: the words still read left to right);
+and a cartoon frame (Jack Frost, 240 s in: an orange sky above, pumpkins below) poured with
+the pumpkins at the top and the sky's light at the bottom.
+
+The grid's rows count up the plate and both pours (`pourPictureCpu`, and the solver's
+`videoSample` pass and the loop's) laid a source's first row on the grid's first. They are
+turned over where the source is made, not in the solver (`src/gpu/` was another thread's that
+day): the upload draws its picture with `translate(0, h)` and `scale(1, -1)`, as `pourText`
+does (`usePour.ts`), and the frame loop hands the plate a video's frame drawn the same way
+onto a canvas of its own (`uprightFrame` in `lib/videoFlow.ts`, kept in the pour's state),
+with `pourVideoFrame` told which video it came from so a new cartoon is still fresh by its
+address. The video's flow is worked out from the turned frames, so its motion is turned with
+its dye. The brief for this item named `usePour.ts`'s `pourVideo` for the video, but that
+only hands the element over once and the frame loop reads it, so the frame's one seam
+outside the solver is the loop's call. Pictures after the fix, desktop and phone layout, are
+on #591. An orientation check is owed to Claude.
+
 ## Moved in the third pass (2026-10-29, 19m)
 
 When `PLAN.md` became an index with one file a section under `docs/plan/` (19m), the

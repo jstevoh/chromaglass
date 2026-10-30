@@ -27,6 +27,12 @@ export function usePour({
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+      // The plate's rows run from the bottom of the frame up; a canvas's run down, and
+      // `injectImage` lays the rows it is given on the plate's as they come (as the
+      // text pour's canvas is turned before it, `pourText`). Drawn upside down here,
+      // the picture lands the right way up (PLAN 14ab-13: it landed upside down).
+      ctx.translate(0, img.height);
+      ctx.scale(1, -1);
       ctx.drawImage(img, 0, 0);
       const imageData = ctx.getImageData(0, 0, img.width, img.height);
       visualizerRef.current?.injectImage(imageData);
