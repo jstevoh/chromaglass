@@ -1664,8 +1664,6 @@ const DROP_INVERT: f32 = 3.0;
 const DROP_REACH: f32 = 0.06;
 /** Radius of the biggest drop the field makes, plate uv: about eight cells of 192 (drops, 18/18, tops out near seven). */
 const DROP_BIGGEST: f32 = 0.045;
-/** The biggest radius the cone fit (dropLens) takes for a drop, plate uv: the closeup lays beads at up to 12.5 cells (MACRO_BEAD_SCALE), 0.065, and a clean read of the dome has no wall to be fooled by, so the cap above is not its to apply. */
-const DROP_FIT_MAX: f32 = 0.08;
 /*
   The projector. A ray crossing a round surface u of the way out meets it at
   a slope u/sqrt(1 - u^2), and two refractions bend it by about
@@ -1724,10 +1722,6 @@ const DROP_MAG: f32 = 1.23;
 const DROP_HALF_GAP: f32 = 0.016;
 /** Half the gap where the last dropLens call found a drop (it reads it only there). */
 var<private> dropRho: f32 = DROP_HALF_GAP;
-/** One screen pixel in plate uv, set where the frame reads it (dropLens' edge). */
-var<private> dropPx: f32 = 0.001;
-/** How much of this pixel the last drop covers, from the dome's cone (dropLens). */
-var<private> dropEdge: f32 = 0.0;
 /** Half the gap at uv, in plate uv. */
 fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
@@ -1764,6 +1758,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
 ${TRANSMIT_WGSL}
 ${DROP_LENS_WGSL}
 ${THIN_FILM_WGSL}
+
 /*
   How near this pixel is to the air of a bubble, 0 beyond the reach of the
   dye's relief and 1 inside it (33b). A hole in the dye is the bubble's own
@@ -2442,7 +2437,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   let dropCam = smoothstep(0.4, 0.6, macroAmt);
   if (U.beads > 0.001) {
-    dropPx = max(length(dpdx(fuvSurf)), length(dpdy(fuvSurf)));
     drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
@@ -3546,7 +3540,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
     let bm = beadAt(fuvSurf);
-    let inner = dropEdge;
+    let inner = bm.r;
     let ring = bm.g;
     let r = drop.z;
     let R = drop.w;

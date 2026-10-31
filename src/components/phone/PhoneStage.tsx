@@ -14,6 +14,7 @@ import { ToolGlyph } from '../ui/ToolGlyph';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { PIN_RANGE } from '../../lib/deskPins';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
@@ -628,7 +629,7 @@ export function PhoneStage(p: PhoneStageProps) {
               label="Magnet · size"
               value={p.magnetSize}
               min={0}
-              max={1}
+              max={PIN_RANGE.get('magnetSize')?.max ?? 1}
               step={0.05}
               onChange={p.onMagnetSize}
               display={`${Math.round(p.magnetSize * 100)}%`}
@@ -1095,7 +1096,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
-            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}
+            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={PIN_RANGE.get('automateRate')?.max ?? 1} step={0.01} onChange={p.onEvolveSpeed}
               display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
           </div>
           {/*
