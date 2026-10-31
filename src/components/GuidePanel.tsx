@@ -306,7 +306,7 @@ const SECTIONS: Section[] = [
           ['Beat Squeeze', <>Each kick presses a thin sheet laid on the liquid where the kick lands. The dent is as wide as the sheet bends over the liquid while it is held: wide on a thin oil, a fingertip on syrup. Let go, the colour runs back in, fingering where Fingering is up. On a look that may move the frame (Frame Sway) it is the whole glass pressed instead.</>],
           ['Slosh', <>Tip the plate one way and then back (Gravity and Tilt Direction, or the phone's tilt) and the liquid piles to the low side, runs back past the middle and mixes. Only your hand drives it, never the sound; thin liquid rings, thick liquid creeps.</>],
           ['Boundary Glow', <>A bright line where two distinct dyes meet — the oil-water interface, without a multi-fluid solve.</>],
-          ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness defaults to zero: flat, evenly lit matte dye is the projected look, and a specular highlight makes it read as glossy 3D spheres instead.</>],
+          ['Saturation / Glossiness / Post Blur', <>The final grade. Glossiness steepens the liquid's surface as the lens sees it: zero is the real surface, and up from there its slopes bend more of the lamp out of the lens, so ripples and edges darken. Lit from beneath, nothing on the plate shines.</>],
         ]} />
         <H>Camera: two render styles</H>
         <P>
@@ -595,9 +595,7 @@ const SECTIONS: Section[] = [
         <H>The lens gates the camera's controls</H>
         <P>
           Focus, Aperture, Bloom, Chromatic Aberration and Refraction are what the lens does,
-          and do nothing with <Em>Lens</Em> at zero. Glossiness fights the projected look by
-          design: at anything above zero the dye reads as lit 3D spheres rather than as flat
-          backlit colour.
+          and do nothing with <Em>Lens</Em> at zero.
         </P>
 
         <H>Grid resolution is not a quality slider</H>

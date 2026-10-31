@@ -838,6 +838,22 @@
       ]
     },
     {
+      "name": "Nothing on the plate makes light",
+      "shard": "lab2",
+      "run": "npm run nolight",
+      "why": [
+        "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
+        "satellite droplets, Glossiness, the gel and the dish's wall each leave",
+        "no pixel brighter than the same plate without them, and each still",
+        "darkens some; the projectors' rims nothing over the lamp; the oil",
+        "nothing in focus and a lens out of it, its caustic turning over as",
+        "Focus passes the middle; and two times of the clock draw the same",
+        "plate (no grain). The lab on SwiftShader, beside lampzero, about two",
+        "minutes: the real plate shader on a lab plate, any adapter that",
+        "computes, so it has no need of the Mac."
+      ]
+    },
+    {
       "name": "Looks on a lit stage",
       "shard": "browser",
       "run": "npm run litstage -- --controls",
