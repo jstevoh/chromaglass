@@ -21,45 +21,48 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## The top picks
 
-- **38a. The lamp is a condenser, not a wandering painted glow** (S, nil frame cost;
-  High). *Now:* the hot spot multiplies the finished picture by
-  `mix(0.78, 1.25, exp(-3.5·d²))` with a warm tint (`src/gpu/wgsl/plate.ts:3308-3319`); a
-  second lamp *multiplies* a bluish 1.25× Gaussian on top; both centres drift by noise up
-  to a third of the plate when Lamp Motion is up (`LiquidVisualizer.tsx:5207-5213`); and
-  the lamp ground is divided by 1.28125 to stop the peak clipping (`plate.ts:2514`). The
-  heat's own hot spot is another shape again, 1/(1+2.5r²) (`fluid/dye.ts:231-235`), so the
-  warmth and the light disagree about where the lamp is. *Real:* an overhead projector's
-  Fresnel condenser images the bulb into the lens's pupil, so the stage is lit nearly flat,
-  falling off as the lens's cos⁴ of field angle and the condenser's edge, with a soft fixed
-  image of the filament at most; a second lamp *adds* light; and nothing in the picture
-  moves unless the liquid does. A brightness that slides across the whole frame is the
-  kind of whole-frame motion the owner already took out of the sound (frameSway 0).
-  *Build:* one irradiance map E(x) from the condenser (cos⁴ and an edge), shared by the
-  lamp ground and the heat source, a second lamp added in light, Lamp Motion retired or
-  turned into a real thing that moves (a hand-held second lamp). *Measure:* the plate with
-  no liquid is flat to the cos⁴ law and still from frame to frame; the heat's peak and the
-  light's peak are the same point.
+- ~~**38a. The lamp is a condenser, not a wandering painted glow**~~ — **Shipped, this PR**
+  (the Hot-Spot is the projector's lamp lever: the bulb's image off the lens's aperture,
+  `src/gpu/wgsl/lampField.ts`; the heat lit evenly; `npm run lampfield` 9/9, 1 of 7 on the old
+  plate; story in `docs/plan-shipped.md` §38a). Left from it: 38a-2, 38a-3.
 
-- **38b. Bubbles that never appear or vanish by a clock** (S for the fades, M for the rim;
-  High: every music look pops bubbles). Sharpens **18i**, which named the timers but not
-  these. *Now:* `timedPops = true` (`src/lib/bubbles.ts:144`), lives drawn 9–23 s (`:261`),
-  8–18 s for the straw's satellites (`:331`), 0.8–1.6 s for daughters (`:216`), all scaled by
-  `lifeScale = 0.5 + bubbleAmt`; each bubble fades in over 0.35 s and out over 1.2 s like a
-  sprite (`:582-583`); its age over its life is packed (`:599`, `wgsl/air.ts:80`) and the
-  plate thins and darkens its film by it (`plate.ts:3448, 3518, 3533`). A pop throws two or
-  three daughters with 35–65 cell/s kicks by Culick's rim retraction (`:198-232`), which is a
-  free soap bubble's physics: an air pocket between two glasses has no film to retract.
-  Small bubbles also melt away by a ripening 1,400× too fast to be gas through oil
-  (`RIPEN 1.4`, `:84-88`; real Lifshitz–Slyozov ripening of mm pockets takes hours), and a
-  bubble under 0.6 cells is deleted (`:534`); a stretched one splits by a 0.3/s dice roll
-  (`:537-552`) rather than at a critical capillary number; and each one wobbles at a drawn
-  1.2–2.4 rad/s (`:181, :433-435`) where a mm pocket in oil between glasses is overdamped
-  (Re ≪ 1) and only follows what pushes it. *Real:* a pocket enters as volume (a pour, the
-  straw, a press that traps air) and leaves only by the open rim, by merging, by being
-  engulfed, or by dissolving over hours. *Build:* timers, fades, age-as-colour, the daughters
-  and the wobble out; leaving at the rim as the dye already does (18g-1); breakup at a
-  critical Ca from the bubble's own stretch. *Measure:* `npm run pops` and a still plate
-  where the bubble count holds for a minute with nothing pushing.
+- **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
+  every look, so the Mac's eyes first). 38a keeps Hot-Spot 0 an ideal projector, lit evenly,
+  so no look changed. A real one is not: the head's lens dims the frame's corners as cos⁴ of
+  the field angle (a 355 mm head over the 0.133 m frame: about 9% at the corners), and the
+  lamp below the condenser lights the stage as cos³ of its own angle. Both belong in
+  `lampField` as the default, applied to the light and (the stage's half) to the heat, and
+  Lamp Warmth's painted vignette (`plate.ts`, the Lamp warmth block: a smoothstep that
+  darkens corners by up to 45% with the warmth) goes in the same PR, since that is what it
+  was standing in for. *Measure:* `npm run lampfield`'s law with the cos⁴ term; the warm
+  looks' corners against the vignette's, judged on the Mac.
+
+- **38a-3. Lamp Motion has nothing real left to move** (S; Low). After 38a it moves only the
+  light the gloss and the bubbles' rims are lit from (`lampDir`, the lit-from-above shading
+  38h takes out). When 38h lands, Lamp Motion and the plate rock's push on the lamp
+  (`lampRock`) move nothing a projector has: retire the slider (its MIDI, desk pin and
+  the two looks that set it, Crowd Plate with its `dirX` patch and Soap Film), or give it a real
+  thing that moves, such as the gel wheel's hand.
+
+- ~~**38b. Bubbles that never appear or vanish by a clock**~~ **Shipped** (#603, with 38g and
+  38n): no timers, fades, age-as-colour, daughters or wobble; a pocket inflates at a breath's
+  rate, leaves at the open round rim (area falling at π·bσ/3μ), by a merge, under a drop, or by
+  dissolving at Henry's law's rate, which is years; breakup at a critical deformation from
+  the strain. `npm run bubblephysics` 24/24. Story in `docs/plan-shipped.md` §38b.
+- **38b-2. An Air Dissolves dial** (S; Low, the owner's call). `BubbleField.dissolve` scales
+  air's diffusivity past nature (1 is real, nil on a show's clock; 3e7 melts a 2-cell pocket in
+  about 90 s, the small first). A setting for it, with its desk, phone and MIDI, would give a
+  music look back the turnover its timers gave it, by the real law. Not built: the owner sees
+  the plate fill and empty only by the rim and merges first.
+- **38b-3. Music air reaches the rim** (S; Medium). With no clock a look's bubbles hold at its
+  Bubbles count (`room` in `LiquidVisualizer.tsx`) and new ones come only as old ones leave,
+  so how fast they turn over is now how fast the flow takes them to the rim and how often they
+  merge. On the Mac: count the kick bubbles a minute on a music look, before and after; if the
+  plate goes still, 38b-2 is the answer, not a clock.
+  The deploy after #603 found it first: `npm run kickbubbles` counted 11 chances with room
+  on Classic in a minute where its floor is 15 (the room no longer empties itself); the
+  check now lets the look's bubbles go every eight seconds, since it measures the kick's
+  odds, not a bubble's life.
 
 - **38c. Soap is conserved: no decay, no grid-rate spreading** (S, nil; High on the soap and
   milk looks). Sharpens **18d-5** (which owes the σ(Γ) law, not these). *Now:* the mix update
@@ -127,21 +130,18 @@ written first. Line numbers are as read on main at d07ac31.
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
 
-- **38g. Bubbles that merge, crowd and stretch like pockets in a gap** (M, CPU only, nil
-  frame cost; Medium-High for the straw's rafts and dense froth). The research's ranked
-  items 6, 7 and 10 (`drops/research/bubbles-and-drops.md` in the project's shared files),
-  #163 shipped them for drops but not for air. *Now:* once two bubbles' film has drained
-  they become one disc at once with a fixed 0.18 stretch (`bubbles.ts:462-477`), and every
-  stretch relaxes at τ ≈ 1.4 s whatever the size (`:427-430`); crowding pushes each pair
-  apart to 0.98 of their radii, half each whatever their sizes (`:488-505`), and every
-  bubble is drawn as a disc, so no facet or Plateau border can form. *Real:* the neck grows
-  as (γ/η)·t, then t^¼ (Yokota and Okumura 2011); a pancake's shape relaxes at
-  τ₂ ≈ 2μR³/(b²γ) (Paterson 1981), milliseconds at 1 mm and nearly half a second at 5 mm, so
-  big merged pockets stay long and small ones snap round; crowded pockets push with
-  stiffness γ/R (Durian's bubble model), so small ones stay round and big ones facet, the
-  wall between unequal ones an arc of curvature 1/R_s − 1/R_b, jamming near an area
-  fraction of 0.84. The drops' wall arcs (`dropWall` in `beads.ts`) are the model to reuse.
-  *Measure:* relaxation time against R³ at three sizes; facets on a jammed raft.
+- ~~**38g. Bubbles that merge, crowd and stretch like pockets in a gap**~~ **Shipped** (#603):
+  the merged pocket starts as long as the pair was end to end and rounds off at Paterson's
+  τ₂ = 2μR³/(b²σ) (times at 10, 15, 20 cells within 1% of the law); the neck's (σ/μ)·t growth
+  is a millisecond, inside the step; strain stretches a pocket to ε·τ₂; crowding by Durian's
+  stiffness σb/R̃ against each pocket's drag 6πμR²/b, so a pressed pair of 14-cell pockets
+  overlaps 6% of its radius where 3-cell ones stay round. Story in `docs/plan-shipped.md` §38g.
+- **38g-2. Facets and Plateau borders drawn** (M, GPU; Medium-High for the straw's rafts).
+  The air field still draws every pocket as a disc (`gpu/wgsl/air.ts`), so two big ones
+  pressed together overlap rather than meet in a wall, and a stretched one is drawn round
+  (`packedShape` is read by no shader). The wall between unequal pockets is an arc of
+  curvature 1/R_s − 1/R_b (`dropWall` in `beads.ts`); the stretch is an ellipse; a pocket
+  stretched past SPLIT_D necks before it tears. *Measure:* facets on a jammed raft in the lab.
 
 - **38h. Nothing on a lit-from-below plate makes light** (S each, nil; Medium). Several
   places still paint light a transmission projector cannot throw, though the block's own
@@ -221,15 +221,20 @@ written first. Line numbers are as read on main at d07ac31.
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at
   0 and 1 for the owner to pick, as 18b-1 did for the lamp.
 
-- **38n. Bubbles move by the look's own liquids** (S; Medium: bubbles in glycerine against
-  water). Sharpens **18i** and **18d-3**. The speed ratio is max(1, 1.5/(1 + 2.26·Ca^⅔)), the
-  1.5 a named tuning for Taylor–Saffman's 2 and floored at 1; mineral oil's μ 0.017 and σ
-  0.030 are hard-wired "pending 18d" (`bubbles.ts:61, 389-405`); tilt drifts every bubble at
-  −tilt·900 cells/s whatever its size or the liquid (`:414`); the drops' λ is 1.5 "solved
-  back from 0.8" (`beads.ts:206`). Real: U = 2U/(1 + λ) with λ the poured liquids' ratio;
-  buoyant drift Δρ·g·b²/(12μ). Each bubble's film thickness and glint come from a random id
-  (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
-  0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.
+- ~~**38n. Bubbles move by the look's own liquids**~~ **Shipped** (#603): μ from the look's
+  Thickness (or its Viscosity word with Thin Gap off), σ and air's solubility from water or
+  oil; Taylor–Saffman's 2/(1 + 2.26·Ca^⅔) with no tuned 1.5 and no floor; buoyant climb
+  Δρ·g·sinθ·b²/(12μ); the film Bretherton's 1.337·Ca^⅔·(b/2) for the pocket's own speed, kept
+  when it stops, packed where the film's age was. Story in `docs/plan-shipped.md` §38n.
+- **38n-2. The film's colour at its real thickness** (S, GPU; Medium, the owner's eyes). A
+  pocket moving at a millimetre a second in the default oil lays a film of tens of microns,
+  far past interference (the table ends at 1.26 µm), so a real pocket between glasses shows
+  no thin-film colour. The plate still maps the film's log thickness onto the old 0.35–1
+  colour range: the order follows the flow, the scale is a look. Either Iridescence names
+  that scale as a dial past nature, or the film goes through the Airy table at its real
+  thickness and bubbles go clear.
+- **38n-3. The rock tilts the air too** (S; Low). Bubbles climb by the hold's tilt only
+  (`plateSin(tilt, 0)`); the solver also takes the rock's swing (`plateSin(hold, swing)`).
 
 - **38o. The soap film's named shortcuts become items** (M each; Medium: the lace).
   §32's notes (lines 51–59) name five shortcuts with no open ids: in-plane gravity on a flat
@@ -260,6 +265,44 @@ written first. Line numbers are as read on main at d07ac31.
   (a guess to confirm with the owner's own glass). Looks would not change (forces are read as
   terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
   labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
+
+  The owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." So 2 mm in the
+  middle at rest (a few millilitres under a top glass about 15 cm across is 1–3 mm; 2 mm is
+  the middle, a judgement and not a measurement), in two parts:
+
+  - **Part 1, one number (shipped, this PR, at 6 mm).** `DISH_GAP_METRES`
+    (`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
+    *gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
+    same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
+    the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
+    rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
+    h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
+    rest gap and greps `src/` for a gap made a length by the plate's width.
+  - **Part 2, 2 mm** (M; Medium-High on the water looks). Set the number, then retune what
+    the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
+    CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
+    of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
+    water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
+    `airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
+    (`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
+    under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
+    `magnetgain` need their windows on τ (#605 has them). Its leftovers, each its own item:
+  - **38r-1. Does a sandwich slosh?** (S to decide, M to build). `lib/slosh.ts` solves a
+    6 mm layer with a free surface (`SLOSH_REST_DEPTH`): between two glasses there is none,
+    and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
+    under it. Either the tilt's slosh is the open dish's, or on the sandwich it is the thin
+    gap's creeping flow. The owner's call.
+  - **38r-2. A drop is a pancake past half the real gap** (S). `DROP_HALF_GAP`
+    (`wgsl/plate.ts`) is 0.016 of the plate, half the 6 mm; half of 2 mm is 0.005, at which
+    the common bead touches both glasses, and `lib/beads.ts`'s merge time is in units of it.
+    Moves with 14ab-6 (#601), `npm run droplens` re-read.
+  - **38r-3. A Gap dial** (S). At 2 mm water's drag time is a third of a second, not three:
+    a push fades nine times sooner. If a look wants the old glide, the honest dial is the
+    gap itself, not a stand-in for inertia.
+  - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
+    three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
+    half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
+    would slide the picture the same.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

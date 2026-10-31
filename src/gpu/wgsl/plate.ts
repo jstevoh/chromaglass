@@ -26,6 +26,8 @@ import { SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
 import { filmTableWgsl } from '../../lib/filmTable';
 import { FERRO_DROP_WGSL } from './ferroDrop';
+import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
+import { DROP_LENS_WGSL } from './dropLens';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -517,6 +519,7 @@ fn thinFilmColour(t: f32) -> vec3f {
 // where it is thinnest, then silver, straw, purple, blue, green-gold,
 // orange, magenta, and paler orders after, washing out to grey.
 ${filmTableWgsl()}
+${LAMP_FIELD_WGSL}
 
 // Read one of the two tables at t rainbow periods, one period being one
 // interference order of soap (FILM_NM_PER_T nm), linearly between entries.
@@ -1710,6 +1713,8 @@ const DROP_INVERT: f32 = 3.0;
 const DROP_REACH: f32 = 0.06;
 /** Radius of the biggest drop the field makes, plate uv: about eight cells of 192 (drops, 18/18, tops out near seven). */
 const DROP_BIGGEST: f32 = 0.045;
+/** The biggest radius the cone fit (dropLens) takes for a drop, plate uv: the closeup lays beads at up to 12.5 cells (MACRO_BEAD_SCALE), 0.065, and a clean read of the dome has no wall to be fooled by, so the cap above is not its to apply. */
+const DROP_FIT_MAX: f32 = 0.08;
 /*
   The projector. A ray crossing a round surface u of the way out meets it at
   a slope u/sqrt(1 - u^2), and two refractions bend it by about
@@ -1768,6 +1773,10 @@ const DROP_MAG: f32 = 1.23;
 const DROP_HALF_GAP: f32 = 0.016;
 /** Half the gap where the last dropLens call found a drop (it reads it only there). */
 var<private> dropRho: f32 = DROP_HALF_GAP;
+/** One screen pixel in plate uv, set where the frame reads it (dropLens' edge). */
+var<private> dropPx: f32 = 0.001;
+/** How much of this pixel the last drop covers, from the dome's cone (dropLens). */
+var<private> dropEdge: f32 = 0.0;
 /** Half the gap at uv, in plate uv. */
 fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
@@ -1801,56 +1810,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
   let f = dropFlat(R, rho);
   return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
-fn dropLens(uv: vec2f, cam: f32) -> vec4f {
-  // One texel of the plate either way; the height is the plate's in both shapes.
-  let px = 1.0 / f32(textureDimensions(beadTex).y);
-  let m = beadAt(uv);
-  if (m.r < 0.02) { return vec4f(0.0, 0.0, -1.0, 0.0); }
-  // The gap, read only under a drop: four packed texels, too many for every
-  // pixel of every look with beads.
-  let rho = dropHalfGap(uv);
-  dropRho = rho;
-  let h = clamp(m.b / m.r, 0.0, 1.0);
-  let hx = beadAt(uv + vec2f(px, 0.0)); let hx2 = beadAt(uv - vec2f(px, 0.0));
-  let hy = beadAt(uv + vec2f(0.0, px)); let hy2 = beadAt(uv - vec2f(0.0, px));
-  let g = vec2f(hx.b - hx2.b, hy.b - hy2.b) / (2.0 * px * max(m.r, 0.05));
-  let g2 = dot(g, g);
-  let r = clamp(1.0 - h, 0.0, 1.0);
-  if (g2 < 1.0) { return vec4f(0.0, 0.0, r, 0.0); }
-  /*
-    No drop is bigger than DROP_BIGGEST. Where the taps straddle the wall
-    between two drops of a size, the dome is nearly level across them, the
-    size it implies runs up to the whole plate, and a push of three radii
-    read the plate from up to three plate-widths away: eight in a hundred
-    fragments of a crowd at 3x sampled farther than any drop can see, most
-    within a texel of a wall (a copy of this arithmetic run on the drops
-    check's crowd). Held to the biggest drop, a wall shows a nearby patch.
-  */
-  let R = min(inverseSqrt(g2), DROP_BIGGEST);
-  // toC runs from here to the centre, r radii long.
-  let toC = normalize(g) * r * R;
-  /*
-    The push comes in with the mask's coverage rather than at a threshold.
-    The outermost texels of a drop are its antialiasing, and there both the
-    dome and the coverage are a few steps of eight bits, so the centre they
-    point at can be anywhere; pushed in full, those texels showed a patch of
-    plate from well outside the drop, a staircase of odd pixels round every
-    rim at 3x. Faded in over the edge they show the plate beside them, as
-    the coverage there says most of the texel is.
-  */
-  let band = dropBand(r, R, rho);
-  let cover = smoothstep(0.02, 0.6, m.r);
-  // The camera's push: past the centre, in radii.
-  let turned = (DROP_INVERT + DROP_REACH / max(R, px)) * band;
-  // The projector's: toward the centre by r(1 - 1/M) radii, which puts the
-  // sample at centre + (here - centre)/M, upright; a ball's whole round top,
-  // a pancake's flat none of it (it is a window), fading out across the
-  // flat as the drop flattens.
-  let upright = r * (1.0 - 1.0 / DROP_MAG) * (1.0 - smoothstep(0.0, 0.5, dropFlat(R, rho)));
-  let push = mix(upright, turned, cam) * cover;
-  return vec4f(toC * (push / max(r, 1e-3)), r, R);
-}
-
+${DROP_LENS_WGSL}
 /*
   How near this pixel is to the air of a bubble, 0 beyond the reach of the
   dye's relief and 1 inside it (33b). A hole in the dye is the bubble's own
@@ -2500,18 +2460,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // stack has under the front plate, bottom up. Anything of the three that is
   // higher is laid over the glass (mixSourcesAt), and the glass is lit without it.
   bgColor = mixLamp(bgColor, uv);
-  /*
-    And the lamp ground (lampBg): the same rows over the lamp at full, as
-    bright as the hot-spot (below) leaves its brightest point. The hot-spot
-    multiplies the whole picture by up to 1.28 over the lamp, which on a
-    white ground burnt the middle out, clear liquid and pale washes alike:
-    the check that twice the dye lets through the square of what once does
-    read the clipped lamp there and failed by 0.07 (npm run lamp). So the
-    lamp is set down by the hot-spot's peak, here, on the lamp's own term
-    only: divided at the hot-spot instead, the paint's half of a fader was
-    divided too, and halfway was not half of each (3 bytes off).
-  */
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
+  // And the lamp ground (lampBg): the same rows over the lamp at full. The
+  // hot-spot (lampField.ts) never lifts a point above it, so nothing divides it.
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2541,6 +2492,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   let dropCam = smoothstep(0.4, 0.6, macroAmt);
   if (U.beads > 0.001) {
+    dropPx = max(length(dpdx(fuvSurf)), length(dpdy(fuvSurf)));
     drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
@@ -2961,7 +2913,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
-          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);
+          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005));
           pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 
@@ -3306,17 +3258,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     auxH = max(auxH, fluid1.a);
   }
 
-  // ── The lamp's hot-spot ──────────────────────────────────────────
+  // ── The lamp's hot-spot: the lamp off its mark, through the lens's aperture (lampField.ts, PLAN 38a) ──
+  // On the stage, not the plate: the dish turns, the lamp does not. Metres from the axis, y up the frame.
   if (U.lamp.w > 0.001) {
-    let dl = length(fuvBase - U.lamp.xy);
-    let glow = exp(-dl * dl * 3.5);
-    let pool = mix(vec3f(1.0), vec3f(1.05, 0.98, 0.9), glow * 0.5) * mix(0.78, 1.25, glow);
-    outColor *= mix(vec3f(1.0), pool, U.lamp.w);
-    if (U.lamp2.w > 0.001) {
-      let d2 = length(fuvBase - U.lamp2.xy);
-      let glow2 = exp(-d2 * d2 * 3.5);
-      outColor *= mix(vec3f(1.0), mix(vec3f(1.0), vec3f(0.9, 0.97, 1.12) * 1.25, glow2), U.lamp2.w * U.lamp.w);
-    }
+    let stage = ((uvScreen - 0.5) * U.resolution / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom) + U.camCenter - 0.5) * ${STAGE_METRES.toFixed(4)};
+    outColor *= lampField(stage, U.lamp.w, U.lamp2.w);
   }
 
   // ── Satellite droplets ───────────────────────────────────────────
@@ -3379,7 +3325,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let h = sqrt(max(0.0, 1.0 - rr * rr));
       let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
       /*
-        Its size, film age and number: packed whole, so read unfiltered —
+        Its size, film and number: packed whole, so read unfiltered —
         and from the largest of the four texels round the point, since just
         past a small bubble's rim the filtered coverage is still there while
         the nearest texel is already empty, and read from that the rim was
@@ -3389,7 +3335,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
       // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
       let R = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
-      let age = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
+      let film = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
       let id = (floor(look) - floor(look / 8.0) * 8.0 + 0.5) / 8.0;
       let k1 = fract(id * 7.13 + 0.17);
       let k2 = fract(id * 13.71 + 0.53);
@@ -3439,16 +3385,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       c = mix(outColor, c, smoothstep(0.0, 0.2, h));
 
       // The film: interference colour, strongest at a glancing angle (the
-      // rim), thicker at the bottom where it drains to, thinner with age
-      // until it goes dark just before it breaks.
+      // rim), as thick as the pocket's own speed laid it (Bretherton,
+      // bubbles.ts), so the variety follows the flow. A pocket between
+      // glasses never thins to black and breaks: that was a soap bubble's.
       let F = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.2);
       // Radially, from the height, which is smooth at any size; the drainage
       // toward the bottom only as a gentle lean, since which way is "down"
       // across a bubble three cells wide is too coarse to draw colour from.
-      let thick = mix(0.35, 1.0, k2) * (1.0 - 0.85 * age) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
+      let thick = mix(0.35, 1.0, film) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
       let filmP = thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0);
       let filmC = filmColourAt(filmP, filmP);
-      let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+      let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3);
       // A second lamp to the side is the one light that can put a glint on
       // an air pocket seen from beneath (below, as the projector throws it).
       var side = vec3f(0.0);
@@ -3515,7 +3462,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
         cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
         let cp0 = cp;
-        let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+        let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3);
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
         // With Film Physics up, the projector's film is the one it really
         // throws: the light through the film, 1 - R, which for soap is 92 to
@@ -3530,7 +3477,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         cp = cp * (1.0 - AIR_DARK * blackB) + side;
       }
       c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
-      c *= 1.0 - 0.35 * smoothstep(0.85, 1.0, age) * F;
 
       // The rim: a glint where it faces the lamp, a thin meniscus line where
       // it faces away, each its own weight — not one dark ring on them all.
@@ -3603,7 +3549,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
     let bm = beadAt(fuvSurf);
-    let inner = bm.r;
+    let inner = dropEdge;
     let ring = bm.g;
     let r = drop.z;
     let R = drop.w;

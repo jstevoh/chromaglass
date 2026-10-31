@@ -1,4 +1,5 @@
 import { sheetReach } from './sheet.ts';
+import { DISH_GAP_METRES } from './turntable.ts';
 /**
  * A hand on the top glass, and the glass coming back up (PLAN.md §10 step 4,
  * roadmap G in docs/bubbles-plan.md).
@@ -458,7 +459,7 @@ export const DENT_REACH = 2.28;
  * held `hold` seconds, at a gap `gapMetres` deep, on a plate `plateMetres`
  * across: where the solved sheet's held dent crosses zero (lib/sheet.ts sheetReach).
  */
-export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = 0.006, plateMetres = 0.2, density = 1000): number {
+export function dentRadius(nu: number, hold = KICK_HOLD, gapMetres = DISH_GAP_METRES, plateMetres = 0.2, density = 1000): number {
   return sheetReach(nu, hold, gapMetres, density, SHEET_D) / plateMetres;
 }
 /**
