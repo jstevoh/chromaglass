@@ -1566,6 +1566,20 @@
       ]
     },
     {
+      "name": "The heat lifts and cools the liquid in watts and seconds",
+      "shard": "plate",
+      "run": "npm run plume",
+      "timeout": 8,
+      "why": [
+        "The lamp's heat as a force and a loss (PLAN 38f, 38t): a warm patch on a",
+        "standing thin gap rises at Darcy's speed from water's real density and",
+        "viscosity, the lamp heats at I·a/C and Heat Decay's air and radiation",
+        "cool it, both in real seconds at any Speed (before, a half float rounded",
+        "Classic's cooling away and the plate never cooled), and Updraft is a",
+        "boundary layer's steady stress and cooling, not a noise."
+      ]
+    },
+    {
       "name": "The rock lifts the oil, not the frame",
       "shard": "plate",
       "run": "npm run oillift",

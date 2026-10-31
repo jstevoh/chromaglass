@@ -49,7 +49,8 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { writeHeatSim, updraftStress } from './fluid/heat';
+import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, HEAT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidReads } from './fluid/reads';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
@@ -278,6 +279,8 @@ export class WebGPUFluid extends FluidReads {
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
       for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      // The heat's carry and its mean for the lift (PLAN 38f): behind the show too; the heat waits for them.
+      for (const name of HEAT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
       for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
     } else {
@@ -318,6 +321,10 @@ export class WebGPUFluid extends FluidReads {
    */
   /** The oil lift's kernels' sources, once each: the step asks whether they are built on every rocked step of an oil look. */
   private static liftSources = new Map<string, string>();
+  // And the heat's (PLAN 38f): its carry with the liquid and its mean on the dish for the lift.
+  private static heatReady(pipelines: { hasCompute(name: string, code: string): boolean }, name: string): boolean {
+    return pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
+  }
   private static liftCode(name: string): string {
     let code = WebGPUFluid.liftSources.get(name);
     if (!code) WebGPUFluid.liftSources.set(name, code = kernel(name, 'rgba16float'));
@@ -379,10 +386,10 @@ export class WebGPUFluid extends FluidReads {
       PLAN 18g: on a thin gap, colour leaves by flushing over the open rim.
       p.evapFactor is retained as a named safety cap (regulator) and for evaporation.
     */
-    f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
+    f[16] = thin ? 1 : fin(p.damping, 0.99); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     const upright = Math.max(0, Math.min(1, fin(p.plateUpright, 0)));
-    f[22] = fin(p.currentDamp, 0.98); f[23] = upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
+    f[22] = fin(p.currentDamp, 0.98); f[23] = thin ? 0 : upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
     f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
@@ -400,7 +407,8 @@ export class WebGPUFluid extends FluidReads {
     }
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     f[49] = p.surfaceClear ? 1 : 0;
-    f[50] = fin(p.dimmer, 1) * LAMP_HEATING;
+    // The heat in watts and real seconds, and its lift (PLAN 38f, fluid/heat.ts).
+    writeHeatSim(f, p, thin, upright, disp, WebGPUFluid.heatReady(this.pipelines, 'hsHeatMean'));
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -783,7 +791,7 @@ export class WebGPUFluid extends FluidReads {
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
       const args = this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
-        gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
+        gx, gy, buoy * DYE_WEIGHT * perSecond, thin ? 0 : buoy * HEAT_LIFT * perSecond]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
         wgsl/fluid.ts): φ round the ring, from this step's oil, for the
@@ -814,7 +822,9 @@ export class WebGPUFluid extends FluidReads {
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
-    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
+    // The heat's lift (writeSim, hsBody), wherever the plate stands or is tipped and Buoyancy is up (PLAN 38f).
+    const heatLift = thin && (this.simF[52] !== 0 || this.simF[53] !== 0);
+    const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn || heatLift);
     if (thinBody) {
       /*
         The breath is laid as its stress, in pascals (lib/breath.ts), and
@@ -827,6 +837,8 @@ export class WebGPUFluid extends FluidReads {
       const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
       const breathScale = breath ? (h0 / (2 * LIQUID_DENSITY * NU_REF)) * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
       const breathTex = breath ?? this.blank('rgba');
+      // Updraft's stress (PLAN 38t, fluid/heat.ts).
+      const updraft = updraftStress(p.air, disp, seconds);
       /*
         The oil's lift up the tipped plate (PLAN 27f-5, hsBody): wherever the
         mix holds oil, which it does only while the look's Oil Tension is on.
@@ -860,8 +872,9 @@ export class WebGPUFluid extends FluidReads {
             lift = -OIL_LIFT * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
           }
         }
+        if (heatLift) this.hsRun(pass, 'hsHeatMean', `hsHeatMean:${this.vel.read.label}`, this.arg('heat mean', [0, 0, 0, 0]), [this.vel.read, this.hsOilMean!], 64);
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
-          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
+          this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, updraft, REST_GAP, breathScale,
             rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, lift * p.rockX, lift * p.rockY]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();
@@ -958,6 +971,14 @@ export class WebGPUFluid extends FluidReads {
           this.run(pass, 'driftOff', this.velRide, [this.velForced], this.arg('drift off', [(wx + fx) * toVel, (wy + fy) * toVel, 0, 0]));
         }
       });
+      // The heat goes with the liquid (hsHeatCarry, PLAN 38f): built behind the show, and until then it stays put as it did.
+      if (WebGPUFluid.heatReady(this.pipelines, 'hsHeatCarry')) {
+        stage('heat carry', (pass) => {
+          this.hsRun(pass, 'hsHeatCarry', `hsHeatCarry:${this.vel.read.label}:${this.velForced.label}`, this.arg('heat carry', [disp, 0, 0, 0]),
+            [this.vel.read, this.velForced, this.vel.write]);
+          this.vel.swap();
+        });
+      }
     } else {
       stage('project 1', (pass) => this.project(pass));
       stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
@@ -1654,7 +1675,7 @@ export class WebGPUFluid extends FluidReads {
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], none);
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read, this.squeeze.read], none);
       this.vel.swap();
     });
 
@@ -1745,6 +1766,8 @@ export class WebGPUFluid extends FluidReads {
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
         for (const [key, code] of WebGPUFluid.driftBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        // The heat's carry and its mean (PLAN 38f), behind as the drift's: until then the heat stays put and lifts nothing.
+        for (const name of HEAT_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
       })();
     }
     return this.hsBuilding;

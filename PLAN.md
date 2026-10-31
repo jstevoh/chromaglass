@@ -231,7 +231,7 @@ style (§31).
   **25c**, **25f** (after 18f and 18d).
 - **6.10** The realism audit's top picks (§38), each its own thread, in its order: **38a** the lamp
   as a condenser, **38c** soap conserved, **38e** oil's σ, **38b** bubbles without clocks, **38h**
-  nothing on the plate makes light, then **38d**, **38f**, **38g**, **38i**, **38j**; **38r** (the rest
+  nothing on the plate makes light, then **38d**, ~~**38f**~~ (and ~~38t~~), **38g**, **38i**, **38j**; **38r** (the rest
   gap) is read before 38d and 38i.
 
 ### Wave 7. Reach

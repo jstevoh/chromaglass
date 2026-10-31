@@ -151,11 +151,6 @@ export const OIL_CELLS = 0.5;
 export const SOAP_PULL = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
-/**
- * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
- * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
- */
-export const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 export const LAMP_HEAT = 6;
 /** Vorticity confinement's push, as a fraction of the local spin, per step. */
@@ -437,15 +432,6 @@ export const NU_REF = thinGapViscosity(THIN_GAP_THICKNESS);
 */
 export const DRIP_WEIGHT = 0.5;
 /*
-  Updraft's shear, over the old push it is made from. The old push was only
-  on the colour, and a pool pushed while the clear liquid round it is not
-  goes at about half the push (Darcy's: the liquid round it has to get out
-  of its way); the draught's shear is on all of it, so it is halved to move
-  a pool as fast as it went (lab, by hand against main: a pool 0.0179 at
-  the full push against 0.0096 before).
-*/
-export const AIR_SHEAR = 0.5;
-/*
   Plate Rock's tilt, as the dye's weight down the tilted plate (PLAN 27a).
 
   A hand rocking the clock glass tips the plate a few degrees. Flat on the
@@ -513,8 +499,94 @@ export const ROCK_FALL = 12;
 export const LIFT_MOST = 256;
 export const LIFT_SWEEPS = 8;
 export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
+export const HEAT_KERNELS = ['hsHeatCarry', 'hsHeatMean'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 / (12 * NU_REF);
+/*
+  The lamp's heat, in kelvin, watts and seconds (PLAN 38f; `npm run plume`
+  measures every number here against the law worked out in SI).
+
+  What it replaced. The lamp warmed the plate at 0.24 K/s, worked out for a
+  millimetre of water with no glass, and on the look's clock (Speed × 0.2 a
+  step), so a fast look heated fast; Heat Decay cooled it by
+  heatDecay^(4·dt), on the same clock; and the temperature is a half float,
+  so at the app's step (dt about 0.003) Classic's cooling took 3e-4 of the
+  heat a step, under half the field's last bit, and the plate rounded back
+  to its own temperature every step: it warmed until the lamp's step was
+  under that bit too, and never cooled.
+
+  What it is. The sandwich (water over the gap, two glasses) is one
+  temperature through its depth, as src/lib/lampBoil.ts has it: across a few
+  millimetres of water and glass the depth evens out in seconds to a minute,
+  and the heating and the cooling below take minutes. A square metre of it
+  holds C = ρc_water·h + 2·ρc_glass·t per kelvin (6 mm and two 2 mm glasses:
+  33 kJ/m²K), wherever the gap is h (decayVel reads it off the squeeze). The
+  lamp puts LAMP_IRRADIANCE times the share the dye takes into it (the
+  projector's heat filter in: a kilowatt a square metre at the stage, which
+  is where 18f's 0.24 K/s came from); the air takes h_air·ΔT off each face
+  and each face radiates εσ((T_room + ΔT)⁴ − T_room⁴). Heat Decay is the air:
+  h_air = HEAT_AIR·(−ln v) a face, chosen so Classic's 0.98 keeps the time
+  it took on Classic's clock (145 W/m²K: about 115 s with the radiation), a
+  projector's fan blowing hard; Lava Lamp's 0.995 is 36, a gentle draught;
+  0.998 is 14, still air; 0.9 is 760, past any fan (a setting may ramp past
+  real; the law under it stays). Updraft adds the forced air of its own
+  boundary layer on the top face (UPDRAFT_SPEED, decayVel).
+
+  ΔT is stored over the room's HEAT_ROOM, as the field always was (18f's
+  tempVisc reads it as kelvin). The lift is water's real density (Kell 1975,
+  as lampBoil's waterDensity): B = 1 − ρ(T)/ρ(T_room), and the liquid it
+  lifts rises between the glasses at B g h₀²/12ν_ref, HEAT_RISE per unit B,
+  read as every body force on a thin gap is (hsBody, hsPrep), along the
+  plate's up wherever the plate stands or is tipped. Water's expansion
+  triples between 20 °C and 90 °C, so a hot plume rises harder than a
+  straight line says. Buoyancy is a multiple of that: HEAT_BUOY_REAL (the
+  dial's default) is water's own.
+*/
+export const HEAT_ROOM = 20;
+export const RHOC_WATER = 4.18e6;
+export const RHOC_GLASS = 2500 * 840;
+export const GLASS_METRES = 2e-3;
+export const LAMP_IRRADIANCE = 1000;
+export const HEAT_AIR = 7200;
+export const HEAT_EMISSIVITY = 0.9;
+export const STEFAN_BOLTZMANN = 5.670e-8;
+export const HEAT_BUOY_REAL = 0.45;
+export const HEAT_RISE = 9.81 * (REST_GAP * PLATE_METRES) ** 2 / (12 * NU_REF);
+/*
+  Updraft as air (PLAN 38t), where it was a noise, snoise(p·0.05 − t)·4dt
+  plus a uniform 8dt up the plate. The dial is the air's speed over the
+  glass, UPDRAFT_SPEED at full (a desk fan's few metres a second). Air
+  moving over a surface grows a laminar boundary layer from the edge it
+  comes over (Blasius): at x from that edge its stress on the surface is
+  τ = 0.332 ρ_air U^1.5 √(ν_air/x), and its heat transfer
+  h = 0.332 k_air Pr^⅓ √(U/ν_air x)/x, both strongest where the air comes
+  in and falling as x^-½ (Re_x stays under the 5e5 of a turbulent layer
+  across any dish: 4e4 at 3 m/s over 0.2 m). The stress is read as the
+  Blow's is (lib/breath.ts, PLAN 15g, which treats the liquid's face as the
+  air's): the column's mean goes at τh/2μ. A stress the same everywhere on
+  a closed sandwich is pushed back by its own pressure and moves nothing; on
+  the solver's open rim it would slide the whole picture out of the dish, so
+  the dish's mean of it (UPDRAFT_MEAN, worked out once below) is taken off:
+  what moves the liquid is the stress's unevenness, strong near the edge it
+  comes in at, which a draught over a closed dish does.
+*/
+export const UPDRAFT_SPEED = 3;
+export const AIR_DENSITY = 1.2;
+export const AIR_NU = 1.5e-5;
+export const AIR_K = 0.026;
+export const AIR_PR = 0.71;
+/** √(PLATE_METRES/x) over the dish, x from the rim the air comes in at (toward −v), on a fine grid: the stress's dish mean per unit. */
+export const UPDRAFT_MEAN = (() => {
+  const n = 512;
+  let s = 0, c = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const u = (i + 0.5) / n - 0.5, v = (j + 0.5) / n - 0.5;
+    if (u * u + v * v >= 0.25) continue;
+    const lead = Math.sqrt(0.25 - u * u);
+    s += 1 / Math.sqrt(Math.max(lead - v, 1 / n)); c++;
+  }
+  return s / c;
+})();
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
@@ -672,4 +744,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, heatSeconds at 51, heatLift at 52..53, airCool at 54, a pad at 55

@@ -111,21 +111,34 @@ written first. Line numbers are as read on main at d07ac31.
   break-up time against Rayleigh–Plateau in a gap, and a drop's rounding time against
   h²σ/(12μR) for two oils.
 
-- **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
-  (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).
-  Sharpens **18a-4** (the current into the field) for the heat path, and **36e-2**. *Now:*
-  heat buoyancy and the lamp's pull still ride the half-resolution current, eased 0.98 a
-  step with no dt and capped at 0.002 of the plate a step (`wgsl/fluid/forces.ts:252-260`,
-  `fluid.ts:385-386`), although `fluid.ts:926-934` already moved the rock to `hsBody`; so a
-  plume can never outrun the cap. Cooling is a per-look dial, `heatDecay^(4·dt)` with looks
-  at 0.90–0.998 (`wgsl/fluid/dye.ts:219-221`, `src/presets.ts:49, 160, 227, 348`), a time
-  constant from 2.4 s to 125 s; `LAMP_HEATING` 0.24 K/s is derived for a 1 mm layer while
-  the rest gap is 6 mm (`constants.ts:156, 394-401`); and temperature is clamped 0–50 with
-  no unit (`thinGap.ts:589`, `forces.ts:253`). *Real:* ρgβΔT is a body force in the Darcy
-  solve, like the dye's weight already is (18a-2); the layer loses heat to the glass
-  (τ ≈ h²/κ, seconds) and the glass to the air and by radiation, which
-  `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
-  against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
+- ~~**38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**~~
+  **Shipped (this PR)**: the heat in kelvin, watts and real seconds (C(h) of water and two
+  glasses, the lamp's kilowatt, Heat Decay as the air on both faces plus radiation), carried
+  with the liquid on a thin gap, lifting as a body force from Kell's density up a standing or
+  tipped plate, and rounded at random to its half float so a plate cools at all (`npm run plume`;
+  story in `docs/plan-shipped.md` §38f). Left open from it:
+  - **38f-2. Lava Lamp's own lamp and the colour's weight in units.** The lamp under a standing
+    plate (`LAMP_HEAT`, 6 K/s into the wax band, mixForce) and the dye's weight on it
+    (`DYE_WEIGHT`, a per-step pull with no unit) are still tuned numbers; the heat it puts in
+    now lifts at Darcy's speed. The bulb's watts into the band over C(h), and the colour's
+    weight as a Δρ like ROCK_FALL's, would put the whole lamp in SI.
+  - **38f-3. The glass as a temperature of its own.** The sandwich is one temperature through
+    its depth, and the liquid carries all of it (hsHeatCarry): right while a plume rises over
+    seconds, but the water trades heat with the glass in about a minute across 6 mm (seven
+    seconds across 2 mm), and a warm patch that has moved on leaves warm glass behind. A second
+    field for the glass (fixed in place, exchanging k/(h/2) with the liquid, losing to the air)
+    is lampBoil's two-temperature model.
+  - **38f-4. The area cord's Heat in watts.** `areaHeat` puts 1.5 K/s into a spot, tuned when
+    the plate cooled in 12 s; it now cools in about two minutes, so a held full cord climbs to
+    the clamp. A hot-air gun's flux over C(h) is the real number.
+  - **38f-5. The lamp's heat in two bands.** Only the dye's visible share heats; lampBoil's
+    infrared absorbed by the water through its depth (with the heat filter out, 36e) is not on
+    the GPU yet.
+  - **38f-6. The old plate's heat.** While the thin gap's pipelines build, or with Thin Gap off,
+    the heat still lifts through the capped current (`currentBuoy`) and Updraft is still the
+    noise (forcesB). Small, since every look opens thin.
+  - **38f-7. Water's viscosity by Vogel.** tempVisc is exp(−0.02 ΔT), within 1% of Vogel to
+    30 K over the room and 10% off by 70 K; lampBoil's waterViscosity is the curve.
 
 - **38g. Bubbles that merge, crowd and stretch like pockets in a gap** (M, CPU only, nil
   frame cost; Medium-High for the straw's rafts and dense froth). The research's ranked
@@ -271,10 +284,11 @@ written first. Line numbers are as read on main at d07ac31.
   0 (`fluid.ts:1008-1009`; real D is never below about 4e-10, tiny on a show's time, so this
   is bookkeeping). All belong to **18d-3** and **18d-4**'s one-table-per-bottle.
 
-- **38t. Updraft is noise between two glasses** (S; Low-Medium). `snoise(p·0.05 − t)·air·4dt`
-  plus a uniform −8dt (`thinGap.ts:348-353`, `forces.ts:224-228`). A draught has no free
-  surface to shear between two glasses; a fan acts on an open dish's surface or by cooling
-  the glass (38f). Either an open-dish surface shear or a cooling, not a noise.
+- ~~**38t. Updraft is noise between two glasses**~~ **Shipped (this PR)**: Updraft is the
+  air's speed (3 m/s at full); its laminar boundary layer's stress 0.332 ρ U^1.5 √(ν/x) from
+  the rim it comes over, less the dish's mean, read as the Blow's is, and its forced cooling
+  on the top face (`npm run plume` lines 6–7; story in `docs/plan-shipped.md` §38t). Its looks
+  are calmer, steady where they wobbled: judging §97.
 
 Also found, left with their owners: the ferrofluid's dye is moved by two exchanges that
 tell it where the black went (`phaseDisplace`, `wgsl/fluid/phase.ts:330-370`) rather than

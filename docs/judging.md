@@ -2189,3 +2189,25 @@ holds the arithmetic and the plate in the lab; only a real plate says whether it
    flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
 5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
    snare and hats touching places of their own as well.
+
+## 97. The lamp's heat lifts and cools the liquid; Updraft is air (PLAN 38f, 38t)
+
+The heat is in kelvin, watts and seconds now: the lamp warms the sandwich at about 0.02 K/s
+through dark dye, Heat Decay is the air on the glass (Classic's cools in about two minutes) and
+the plate actually cools (before, at the app's step, a half float rounded the cooling away and
+the plate never cooled). On a standing or tipped plate warm liquid rises between the glasses
+at Darcy's speed from water's real density. Updraft is a draught's steady boundary layer, not a
+noise. `npm run plume` holds every number in the lab; only a real plate says how it looks.
+
+1. Load **Lava Lamp** and watch two minutes. The wax should still sink in mushroom heads and
+   rise again off the lamp at the bottom; the rising wax should now go as fast as its heat says
+   (it rose at a fixed cap before), so hot plumes should look faster and cooler ones slower.
+2. Load **Acid Trip**, **Solar Flare**, **Cyberpunk Neon** and **Stardust Collapse** (Updraft
+   0.3 to 0.5). The drifting wobble of the old noise is gone: the liquid should move most near the
+   top rim the air comes over, steadily, and the middle should be calmer than before.
+3. Any look with dark dye under the lamp for several minutes: nothing should be visible from the
+   heat on a level plate beyond a slightly runnier liquid where the dye is darkest.
+4. Bad: Lava Lamp's wax stalling at the bottom or racing off the top; an Updraft look gone
+   lifeless; a whole picture sliding.
+5. Decide: whether the Updraft looks want their Updraft raised (the dial is the air's speed,
+   3 m/s at full), and whether Lava Lamp's Buoyancy should sit above water's own 0.45.

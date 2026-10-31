@@ -38,11 +38,18 @@ try {
   // ── 1, 2: Beer-Lambert absorption & lamp dimmer ──
   const heating = await page.evaluate(async () => {
     const N = 128;
+    /*
+      Two seconds of the lamp (PLAN 38f): it heats at I·a/C in real seconds,
+      a kilowatt a square metre into the sandwich's 33 kJ/m²K, about
+      0.02 K/s through this dye (`npm run plume` holds the rate to the law).
+      Half a second, as this was written for 18f's 0.24 K/s into a bare
+      millimetre, is 0.009 K, under the bar it asks for "heats" by.
+    */
     // Test A: Lamp on (dimmer: 1), pool of dark dye in center
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.25, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(30, { dimmer: 1.0, dt: 1 / 60 });
+    await lab.step(120, { dimmer: 1.0, dt: 1 / 60 });
     const vA = await lab.field('vel');
     const midIdx = (Math.floor(N * 0.5) + Math.floor(N * 0.5) * N) * 4;
     const cornerIdx = (Math.floor(N * 0.1) + Math.floor(N * 0.1) * N) * 4;
@@ -53,7 +60,7 @@ try {
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.25, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(30, { dimmer: 0.0, dt: 1 / 60 });
+    await lab.step(120, { dimmer: 0.0, dt: 1 / 60 });
     const vB = await lab.field('vel');
     const tempCenterB = vB[midIdx + 2];
 
@@ -61,7 +68,7 @@ try {
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.25, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(30, { dimmer: 0.5, dt: 1 / 60 });
+    await lab.step(120, { dimmer: 0.5, dt: 1 / 60 });
     const vC = await lab.field('vel');
     const tempCenterC = vC[midIdx + 2];
 
@@ -93,22 +100,23 @@ try {
     const vA = await lab.field('vel');
     const tempA = vA[mid + 2];
 
-    // Run B: 120 steps at dt = 1/120 (total time = 1.0s)
+    // Run B: 120 steps at dt = 1/120 (total time = 1.0s). The heat runs on
+    // the step's real seconds since PLAN 38f (magnetSeconds), so a step of
+    // half the time says so there too, as the app's frame loop does.
     await lab.create(N, N);
     lab.vel(0.5, 0.5, 0.25, [0, 0, 10.0, 0]);
     lab.flush();
-    await lab.step(120, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 120, diff: 0, nu: 0, advection: 0 });
+    await lab.step(120, { thinGap: 1, dimmer: 0.0, heatDecay: 0.98, dt: 1 / 120, magnetSeconds: 1 / 120, diff: 0, nu: 0, advection: 0 });
     const vB = await lab.field('vel');
     const tempB = vB[mid + 2];
 
-    const theory = 9.9765625 * Math.pow(0.98, 4.0);
-    return { tempA, tempB, theory, ratio: tempA / Math.max(tempB, 1e-6) };
+    return { tempA, tempB, ratio: tempA / Math.max(tempB, 1e-6) };
   });
 
   check(
     'Newton cooling is per second (dt-independent)',
     Math.abs(cooling.ratio - 1.0) < 0.05,
-    `60 steps at 1/60s: ${cooling.tempA.toFixed(4)}, 120 steps at 1/120s: ${cooling.tempB.toFixed(4)}, theory ${cooling.theory.toFixed(4)}, ratio ${cooling.ratio.toFixed(4)} (per-step would be 3.36x)`
+    `60 steps at 1/60s: ${cooling.tempA.toFixed(4)}, 120 steps at 1/120s: ${cooling.tempB.toFixed(4)}, ratio ${cooling.ratio.toFixed(4)} (per-step would be 3.36x)`
   );
 
   // ── 4: Thermal buoyancy is zero on level plate, active on upright plate ──
@@ -246,14 +254,14 @@ try {
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.25, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(30, { dimmer: 1.0, dt: 1 / 60 });
+    await lab.step(120, { dimmer: 1.0, dt: 1 / 60 });
     const tempDark = (await lab.field('vel'))[midIdx + 2];
 
     // Pale dye: absorbances [0.05, 0.05, 0.05], same density 1.0
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.25, [0.05, 0.05, 0.05], 1.0);
     lab.flush();
-    await lab.step(30, { dimmer: 1.0, dt: 1 / 60 });
+    await lab.step(120, { dimmer: 1.0, dt: 1 / 60 });
     const tempPale = (await lab.field('vel'))[midIdx + 2];
 
     return { tempDark, tempPale, ratio: tempDark / Math.max(tempPale, 1e-6) };

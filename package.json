@@ -212,6 +212,7 @@
     "rides": "node scripts/rides.mjs",
     "sheet": "node scripts/sheet.mjs",
     "oillift": "node scripts/oillift.mjs",
+    "plume": "node scripts/plume.mjs",
     "rimhold": "node scripts/rimhold.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
