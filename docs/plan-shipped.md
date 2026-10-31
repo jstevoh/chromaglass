@@ -6106,8 +6106,6 @@ larger in mean radius (bar 1.4 to 1.8) and 343 of 332 (bar 60%). The lab, `macro
 a dozen glass-like lens beads, three of them a fifth of the frame. Pictures in the project's
 shared files, `macro-closeup-33g/`. Not measured: how it looks on the owner's GPU.
 
-*33g-2b (2026-10-30, the owner: "Why do the beads have dimples on the top and ragged edges?", then "make the macro view look as accurate as possible").* Found in the lab on a flat plate with one bead at 5x. **The rim:** the outermost pixel of a bead strayed from a circle by 1.26, 1.24 and 1.22 px for a droplet (2 cells), the common bead (4.5) and a pool (7), a quarter of a mask texel, because the contour of the bilinear coverage of a 512 mask wanders by a third of a texel; the lens now takes the distance to the edge from the dome's cone read at one clean texel three texels in (`dropLens`, now `gpu/wgsl/dropLens.ts`) and the edge coverage from that, and the stray is 0.42, 0.32 and 0.37 px (0.06 of a texel), 0.53 px for a 12-cell bead, and the same on the drops' wide mask. A droplet of one to two cells keeps its whole dark outline: a first version of the step (three texels in, always) landed past the centre of a drop of four texels' radius and erased 60% of the outline of a 1.5-cell one, so a read that lands above 0.6 of the dome's height is refused and the drop keeps the old estimate (capping the step by the pixel's own size estimate was tried and cost every drop from two cells up its roundness: that estimate is the noise). The pools also come out 6 percent smaller, the true size: the coverage contour had stood half a texel proud. **The dimple:** a bead wider than the gap (3 cells) is a pancake, a flat window with the bend in its half-round edge, and the bend was in proportion to the band, so the map from the window to the band crossed the drop's own centre a little outside the window: a ring of one colour with a pin inside it. The bend now follows the band to a power that goes from 1 (a ball) to 6 (a pancake flat over 0.4 of its radius), so the window is clear and the bend is a sliver at the contact, as the report says (item 1.3 and the closeup comment in plate.ts). `npm run droplens` 32/32 on SwiftShader (11 new lines: roundness for seven drop sizes over both masks, the three droplets' outlines, and the sizes). Pictures in the project's shared files, `macro-closeup-33g/`. Not measured: the owner's GPU, and a mid-sized bead (3 to 4 cells), whose fold ring a real lens has too.
-
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
@@ -10179,6 +10177,72 @@ model cannot reach one, the PR says what it reached and asks.
     `live` line: the page's stream through the app's IPC to a listener, 72 frames in 4 s
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
+
+### 38. Realism audit: what still imitates, after §18 (asked 2026-10-30)
+
+#### 38h. Nothing on a lit-from-below plate makes light
+
+  - **38h (shipped 2026-10-31).** The audit (`docs/plan/38-realism-audit.md`) found six
+    places where the plate shader painted light a transmission projector cannot throw, though
+    the beads' own note already said "a plate lit from beneath shows transmitted light only".
+    Each now takes its light from what passes through, and `npm run nolight` asks it of the
+    real plate shader in the lab, each case against the same plate with the one thing off
+    on a grey wash that passes 60% of the lamp, so added light cannot clip (0/8 on main
+    before, 8/8 after):
+    - *The satellite droplets* carried a white dot of a lamp above them, exp(−14·hd²), and a
+      dome lit toward and away from the lamp. A ball of oil lit from beneath is a lens: the
+      big drops' law (`dropLens`, DROP_CORE 0.71) gives a dark band over its outer three
+      tenths on the projector and, to a camera focused past it, a gathered middle and a
+      contact line. On main a droplet stood 115 levels over the plate; now 0.
+    - *The oil* was 8% brighter than the water wherever it lay, at any focus. A lens gathers
+      light only on a plane past itself, so the oil block draws the shadowgraph
+      1 − Δz·∇²OPL from the oil's own optical path, (n_oil − n_water) × depth, with the
+      derive pass's stencil, Δz and gain: nothing at Focus's middle (10 levels over its water
+      on main, 0 now), a bright inner and dark outer caustic at 0.8 that turns over at 0.2
+      (1203 of 1203 pixels; 19 of 918 on main). It is drawn on both sides of the oil's edge, eight reads of the
+      view a pixel, only while Focus is off its middle (no look ships so).
+    - *The gel* multiplied the lamp by 1.5 over a floor of 0.10, so it brightened a white
+      lamp by half and lit a black one (83 levels over the plate on main). It is a filter now,
+      Beer–Lambert: each band passes the gel's colour to the power Gel Wheel, never more
+      than all of it, under the glass and over the lens alike (`gelFilter`).
+    - *Glossiness* lit the dye from a point above: Lambert toward `lampDir`, a Blinn highlight
+      for the camera, a Schlick sheen added everywhere. A dye surface under a projector
+      reflects nothing into the lens; its relief bends the light, which the pupil law
+      (`refractionOptics`) and the meniscus already draw. Glossiness is now a gain on the
+      slope those read, 1 + 3g times the field's surface (`reliefGain`), so 0 is the real
+      surface and 1 a surface four times as steep, and flat dye is never lit or darkened.
+      A level stretch of dye moved 15 levels under it on main, 1 now. The setting's key,
+      range and MIDI stay; its help and the guide say what it is now.
+    - *The dish's rim* (Dish Vignette) and *the projectors' rims* (Dish Spread) added a warm
+      glow of 0.35 and 0.16. The glass wall bends the lamp out of the pupil as a meniscus
+      does, so each is a dark line taking the drop band's 0.85 (the dish's rim 1.61 times the
+      plate just inside it on main, 0.18 now; the spread rims 196 against a lamp of 168, now
+      165 against 165).
+    - *Grain* of 3% was added to the plate every frame when no camera was on; a lamp through
+      liquid onto a wall has none, and the camera's and the film stock's grain is the post
+      chain's. Two times of the clock now draw the same plate (8 levels apart on main).
+      Taking it off showed what it had hidden: on a lamp-ground look the pigment's grain
+      reached the lamp as its share of the *opacity* (grainedDepth, 1 on any body near
+      opaque), not as more or less dye, which Beer–Lambert puts in the exponent, T^grain, as
+      `throughScaled`'s own note says. So Chemical Clock's and Lava Lamp's grain was 0.04 of
+      a level in their bodies and `npm run grainedge` line 2 had passed on the plate grain's
+      luma-scaled noise moving with it (main with only that grain taken out reads 0.041,
+      the same). The front plate's lamp now takes the grain as dye (`lampGrain0`): 0.107 and
+      0.131, twice the grain 2.3 times the texture. The back plate's lamp still takes the
+      opacity's factor (38h-4).
+      The gel's 1.5 gain and floor had carried `npm run mixer` too. As a filter it is now
+      coverage (half the level, half the change: 0.52), and it has no light to colour on a
+      painted ground, so the gel's shots are on the lamp ground. Its order line read 3.1 a
+      channel, under a bar of 4: the lab's wheel and lumia are the same warm dyes, and a
+      yellow gel passes a yellow lumia. The wheel is turned three quarters for that pair
+      (the lab's new `gelAngle`), under the pink and red that stop the lumia's green: 11.3.
+      And one rim pixel of the back plate, (109, 6), rounded to the same byte with the
+      plate and without, and read as "off the plate" while its grade moved it by 1; the
+      footprint now drops a pixel whose neighbours the plate moves.
+    New code went beside `plate.ts` in `src/gpu/wgsl/plateTransmit.ts`; `plate.ts` shrank by
+    about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
+    line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
+    term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §99).
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 

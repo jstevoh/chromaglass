@@ -56,7 +56,7 @@ export const CONTROL_HELP: Record<string, string> = {
   blobSurfaceTension: 'How hard two colours hold apart at their edge, so they bead up instead of blending.',
   layerScaleVariety: 'Shows the second layer magnified and drifting, so one frame carries two scales of pattern.',
   boundaryContrast: 'A bright line where two colours meet.',
-  glossiness: 'Specular shine on the liquid. Zero is flat back-lit dye.',
+  glossiness: 'How steep the liquid\'s surface reads to the lens. Zero is the real surface; up, ripples and edges bend more light away.',
   colourBody: 'How solid the colour reads. Zero is the dye\'s own thin tint, one is an opaque body of colour.',
   postBlurRadius: 'A final soft blur over the picture that makes the shapes run together.',
   melodyWalk: 'Each note of a tune lets go of a drop, low notes at one side of the plate and high ones at the other. Zero lays none.',

@@ -14,13 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nature. Off is nature's rate, where a bubble stays all night; up, the small ones melt
   first, from minutes at the bottom of the dial to seconds at the top. Every look keeps it off.
 
-### Fixed — round rims and clear windows on the closeup's beads (PLAN 33g-2b)
-
-- A bead's edge is a true circle at 5x (it scalloped by a quarter of a mask texel) and a big
-  bead is a clear window with a thin rim, not a flat patch ringed round a pin. The edge,
-  radius and centre of every bead are read from its dome's cone, and the bend of a flat bead
-  is held to its rim.
-
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a
