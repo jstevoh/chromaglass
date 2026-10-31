@@ -651,6 +651,15 @@ const api = {
       */
       film?: CanvasImageSource; mark?: CanvasImageSource; backPlate?: boolean; backRotation?: number;
       /*
+        The gel wheel's turn, in turns (0 by default: held still, as it always
+        was). The lab's wheel is the harmony's first four dyes, a warm set, and
+        so is the lumia (its first two), so at rest the bare glass lies under
+        segments that pass most of what the lumia carries. The mixer's check of
+        the gel's order turns it to lay a segment that blocks the lumia there
+        (PLAN 38h).
+      */
+      gelAngle?: number;
+      /*
         Projectors' own sources (PLAN.md §16b). Each is the plate's display
         drawn again with that source's uniforms, after the wall's draw and in
         the same encoder, as the app's frame does: the source reuses what the
@@ -698,7 +707,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
