@@ -10260,3 +10260,22 @@ The audit's text, as written:
   buoyant drift Δρ·g·b²/(12μ). Each bubble's film thickness and glint come from a random id
   (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
   0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.
+
+## 38b-2. Bubble Melt, air dissolving past nature (2026-10-31)
+
+Asked by the owner: "Let's add a bubble dial for them to melt away", answering the open
+38b-2 question, with the standing rule that a dial scales a physical quantity past real
+and never swaps the law. With #603 a pocket of air between the glasses dissolves only at
+Henry's law's rate, 2π·D·L·(Δp/p₀)/ln(R_plate/R) in area, which is years for a millimetre
+pocket. Bubble Melt (`bubbleMelt`, default 0) is a factor on D alone: exactly 1 at 0, then
+10^(6 + 3v), because even a fully degassed liquid (Δp/p₀ from 3e-4 to 1) is only about
+3,000× nature and still days, so the dial's first step lands where the smallest pockets go
+in about a minute and its travel is three decades on a log scale. Melt times at the 6 mm
+gap: a 1 mm radius pocket in about 8 minutes at the bottom, 15 s at the middle, a 2 mm one
+in under 3 s at the top; the small go first and each speeds up as its Laplace pressure
+climbs. `liquid()` sets it from the settings each frame, so nothing in the frame loop
+changed. On the sheet under Bubbles (and so the phone's settings sheet), pinnable as a
+look control, MIDI-learnable, a patch target. Checks: `npm run bubblephysics` 27/27, its
+three new lines: off is exactly nature; melt time × factor constant across the dial within
+5% (measured 0.3%); a 1 mm pocket at the middle melts on the law's own integral (14.50 s
+against 14.48 s).

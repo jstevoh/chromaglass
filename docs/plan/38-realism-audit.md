@@ -45,11 +45,10 @@ written first. Line numbers are as read on main at d07ac31.
   rate, leaves at the open round rim (area falling at π·bσ/3μ), by a merge, under a drop, or by
   dissolving at Henry's law's rate, which is years; breakup at a critical deformation from
   the strain. `npm run bubblephysics` 24/24. Story in `docs/plan-shipped.md` §38b.
-- **38b-2. An Air Dissolves dial** (S; Low, the owner's call). `BubbleField.dissolve` scales
-  air's diffusivity past nature (1 is real, nil on a show's clock; 3e7 melts a 2-cell pocket in
-  about 90 s, the small first). A setting for it, with its desk, phone and MIDI, would give a
-  music look back the turnover its timers gave it, by the real law. Not built: the owner sees
-  the plate fill and empty only by the rim and merges first.
+- ~~**38b-2. An Air Dissolves dial**~~ **Shipped** as **Bubble Melt** (the owner, 2026-10-31:
+  "a bubble dial for them to melt away"): a factor on air's diffusivity in the Henry's-law
+  shrink, 1 at 0, then 10^(6 + 3v) (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
+  MIDI, patches, the phone. `npm run bubblephysics` 27/27. Story in `docs/plan-shipped.md` §38b-2.
 - **38b-3. Music air reaches the rim** (S; Medium). With no clock a look's bubbles hold at its
   Bubbles count (`room` in `LiquidVisualizer.tsx`) and new ones come only as old ones leave,
   so how fast they turn over is now how fast the flow takes them to the rim and how often they

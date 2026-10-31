@@ -693,6 +693,8 @@ export interface VisualizerSettings {
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
+  /** How fast trapped air dissolves into the liquid (PLAN 38b-2): 0 is nature's rate, nil on a show's clock; up, Henry's law with air's diffusivity scaled a million to a billion times, the small bubbles melting first (lib/bubbles.ts meltFactor). */
+  bubbleMelt?: number;
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
@@ -1067,6 +1069,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   projectorFocus: 0.5,
   lacing: 0,
   bubbles: 0.2,
+  bubbleMelt: 0,            // nature's rate: a pocket between the glasses stays (PLAN 38b)
   plateRock: 0.45,
   frameSway: 0,             // the frame holds still; the music moves the liquid (lib/plateRock.ts)
   layerScaleVariety: 0.5,
