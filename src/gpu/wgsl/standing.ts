@@ -94,6 +94,7 @@
  *    overlap, each acts on the layer in turn.
  */
 import { SPIKE_PITCH } from './spikes';
+import { DISH_GAP_METRES, DISH_METRES } from '../../lib/turntable';
 
 /*
   How deep a full cell's layer is, in l_c (standing.ts has why 0.3); the
@@ -109,8 +110,8 @@ export const FILM_H0 = 0.3;
 export const PHASE_VIEW_TOP = 8;
 /*
   The most a cell can hold under the film, as a share of full: the layer
-  reaching the top glass. The plate is two glasses 0.03 of its width apart
-  (fluid.ts, REST_GAP: 6 mm on the 0.2 m plate), 4.7 l_c, so a column of
+  reaching the top glass. The plate is two glasses 6 mm apart in the middle
+  (lib/turntable.ts DISH_GAP_METRES, PLAN 38r), 4.7 l_c, so a column of
   ferrofluid can stand 15.6 times a full cell's depth before it touches the
   glass above. phaseRelax caps the plate's cells at this under the film,
   where it caps them at full everywhere else. The cap is not what shapes a
@@ -123,7 +124,7 @@ export const PHASE_VIEW_TOP = 8;
   the plate went to NaN; it is also what refills a cell the flow's limiter
   takes below empty there, as it does everywhere else.
 */
-export const FILM_TOP = (0.03 / (SPIKE_PITCH / (2 * Math.PI)) - 0.03) / FILM_H0;
+export const FILM_TOP = (DISH_GAP_METRES / DISH_METRES / (SPIKE_PITCH / (2 * Math.PI)) - 0.03) / FILM_H0;
 
 /*
   The noise every real layer has, as a pressure on it, in the film's units

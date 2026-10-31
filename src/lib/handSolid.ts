@@ -28,6 +28,7 @@
  * of the plate the hands lay on, so two hands overlapping share the cells
  * at their mean velocity and the solver takes the ratio.
  */
+import { DISH_GAP_FIELD_UV, DISH_REST_GAP } from './turntable';
 
 /*
   How hard a hand holds the liquid it touches (hsPrep, wgsl/thinGap.ts): the
@@ -45,7 +46,7 @@ export const HAND_GRIP = 40;
  * not stop at its skin: in a thin layer the drag a solid puts on the liquid
  * beside it reaches out over the Brinkman screening length, h/√12 for a gap
  * h (the in-plane viscosity against the glass's drag), about 1.7 mm in the
- * plate's 6 mm middle. So χ ramps from 1 to 0 over two of those, ending at
+ * plate's 6 mm middle (lib/turntable.ts DISH_GAP_METRES). So χ ramps from 1 to 0 over two of those, ending at
  * the finger's radius. It was the numbers' reason too, while the carries
  * crossed faces rebuilt from the cells' velocities (PLAN 18a-8): a hard edge
  * (a cell and a half, the first try) is a forty-fold jump in the liquid's
@@ -56,7 +57,7 @@ export const HAND_GRIP = 40;
  * physics' alone.
  */
 export function handEdge(L: number): number {
-  return (2 * 0.03 * L) / Math.sqrt(12);
+  return (2 * DISH_GAP_FIELD_UV * DISH_REST_GAP * L) / Math.sqrt(12);
 }
 
 /**

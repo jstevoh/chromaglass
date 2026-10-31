@@ -80,6 +80,32 @@ try {
     `dimmer 0: ${heating.tempCenterB.toFixed(4)} K, dimmer 0.5: ${heating.tempCenterC.toFixed(4)} K (${(heating.tempCenterC / Math.max(heating.tempCenterA, 1e-6)).toFixed(3)}x of dimmer 1)`
   );
 
+  // ── 2b: The stage is lit evenly (PLAN 38a) ──
+  /*
+    The condenser lights the liquid evenly; the hot-spot is light the lens's
+    aperture turns away after the liquid (src/gpu/wgsl/lampField.ts). So two
+    equal dark pools, one on the axis and two off it, warm alike. The old
+    1 / (1 + 2.5 r²), centred on the plate, warmed the one at (0.25, 0.25)
+    to 0.77 of the middle one; the control is that they warm at all.
+  */
+  const even = await page.evaluate(async () => {
+    const N = 128;
+    const at = (x, y) => (Math.floor(N * x) + Math.floor(N * y) * N) * 4 + 2;
+    await lab.create(N, N);
+    lab.dye(0.5, 0.5, 0.08, [1, 1, 1], 1.0);
+    lab.dye(0.25, 0.25, 0.08, [1, 1, 1], 1.0);
+    lab.dye(0.12, 0.5, 0.08, [1, 1, 1], 1.0);
+    lab.flush();
+    await lab.step(30, { dimmer: 1.0, dt: 1 / 60 });
+    const v = await lab.field('vel');
+    return { mid: v[at(0.5, 0.5)], off: v[at(0.25, 0.25)], rim: v[at(0.12, 0.5)] };
+  });
+  check(
+    'the lamp lights the liquid evenly: a dark pool off the axis warms as one on it does',
+    even.mid > 0.03 && Math.abs(even.off / even.mid - 1) < 0.03 && Math.abs(even.rim / even.mid - 1) < 0.03,
+    `on the axis ${even.mid.toFixed(4)} K, at (0.25, 0.25) ${even.off.toFixed(4)} K (${(even.off / Math.max(even.mid, 1e-6)).toFixed(3)}x), at (0.12, 0.5) near the rim ${even.rim.toFixed(4)} K (${(even.rim / Math.max(even.mid, 1e-6)).toFixed(3)}x)`
+  );
+
   // ── 3: Newton cooling is per-second, not per-step ──
   const cooling = await page.evaluate(async () => {
     const N = 128;
