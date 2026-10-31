@@ -118,17 +118,28 @@ Left, each its own plan item:
   in `docs/plan-shipped.md` §15g-7; `npm run tools` now counts the glass the hand presses in a
   Blow stroke and asks for none; the touch path shares the fix, and a bubble's squeeze on its
   footprint is counted as the bubble's, not the hand's.
-- **15g-8 The stroke's straw on GitHub's runners.** On those runners the stroke's "keeps it
-  rather than erasing it" line (the pool's loss held to a tenth plus five) swings from a gain
-  to a loss of 11% across eight pull requests of one morning (2026-10-30; pools of 235 to 367,
-  8 to 28 straw steps), and #550's shard read a loss of 20% on the stroke back twice running,
-  22 straw steps each time, while the owner's Mac at twice the steps keeps or gains (608 → 597,
-  610 → 670). The check's moves are 0.68 of a cell at the plate's scale and the hand's cell is
-  floored, so a move lands on a new cell two times in three; a frame or two with none, on a
-  runner whose frames are 50 to 80 ms, is a hand held still (BLOW_STRAW_FRAMES) and the straw's
-  bubble takes the dye under it. Whether the loss follows the straw count or the step count is
-  to be read before the bar is trusted on those runners; a stroke paced by the plate's own steps
-  (so many cells a step, not a move every 100 ms of wall clock) is the likely shape of the fix.
+- ~~**15g-8 The stroke's straw on GitHub's runners.**~~ **Shipped** (#636): the check's Blow
+  stroke moved 0.68 of a cell a move, so one move in three was no move, and a runner with
+  50–80 ms frames held the Blow still long enough to blow the straw 18 to 27 times a stroke. It is
+  paced by the plate now (a move each cell and a quarter, the next after 120 ms or two frames):
+  0 straw steps on GitHub's Mac, the pool kept 356 → 356 and 277 → 279. Story in
+  `docs/plan-shipped.md` §15g-8. What the straw does to the dye when it does blow is 15g-8b.
+  - **15g-8b A bubble's dye accounting across the readback mirror.** On a thin gap the GPU
+    multiplies the dye under every bubble away each step (`airExclude`) and the CPU puts it back as
+    a ring from the readback mirror (`depositBubbleRims`, H6). It conserves only when the mirror,
+    the bubble list and the GPU agree on which cells were covered since the last deposit; a slow
+    machine blowing the straw (a new bubble each hold, on dye drifting in the breath) swings the
+    plate's colour ±15–20% either way. Tried in #636 and taken out of it: the air carrying the
+    liquid under it out across the cell faces in flux form (`airDisplace`, the diff in the owner's
+    handoff folder `air-push-15g8/`). It conserves exactly (lab: a bubble put down whole 0.00%,
+    growing 0.00%, moving −0.31%, against −16%, −31%, −27% for the multiply alone), but the liquid
+    it pushes stops at the first cell with no air and piles in a ring a cell or two wide, 3–4× the
+    plate's depth, where a real incompressible layer shifts the liquid round it outward and leaves
+    no ring. The ring is seen: `npm run holeline`'s "no glow round a hole" (7.45 levels against 6)
+    and, on the Mac, `npm run airlens`'s window and pin-point (the window ×1.10 middle to edge).
+    The real fix moves the outer liquid too: the displacement the divergence source already asks
+    for, carried in flux form where the air arrives so the semi-Lagrangian carry does not leave its
+    copy in the middle (the reason a push or a multiply is needed at all).
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event

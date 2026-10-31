@@ -128,6 +128,72 @@ try {
     if (stay) { await snap('stroked'); await settle(stay); }
     await page.mouse.up();
   };
+  /*
+    The Blow's stroke, paced by the plate rather than by the wall clock
+    (PLAN 15g-8). It returns the moves it made.
+
+    The Blow is a straw (a bubble on the end of it) once the hand has been
+    held BLOW_DIR_HOLD_MS (150) since its last move *and* BLOW_STRAW_FRAMES
+    (3) frames have gone by with no move (src/sim/tools.ts). The plain
+    stroke above moves the pointer thirty times, ms/30 of wall clock apart,
+    and both halves of that let a slow runner hold it still mid-stroke:
+    each move was 0.68 of a cell at the plate's scale and the hand's cell
+    is floored, so one move in three landed on the cell before and was no
+    move at all; and a runner whose frames take 50 to 80 ms drew three
+    frames in the gap. GitHub's Macs blew 18 to 27 straw steps a stroke
+    (#623's shard: 22, 18, 24), the owner's Mac 0 to 2. The straw's bubbles
+    took the pool's dye on the GPU and the CPU put back a different amount
+    from a mirror frames behind, which was the swing of "keeps it" (that
+    accounting is PLAN 15g-8b; this is so the stroke measures the wind it
+    says it does, on any runner). GitHub's Mac with this: 0 straw steps a
+    stroke, the pool 356 → 356 and 277 → 279.
+
+    So: as many moves as the stroke has whole cells and a quarter in it
+    (measured on the plate before the press, from the pointer's own cell),
+    so every move lands on a new cell; and the next move comes after 120 ms
+    or two of the plate's frames, whichever is later. On a fast machine
+    that is 120 ms, inside the 150 ms the breath holds its direction; on a
+    runner drawing 12 frames a second it is two frames, so no third frame
+    ever goes by without a move. Nothing about the wind or the bar changes:
+    it is the same distance, blown as wind the whole way.
+  */
+  const pacedStroke = async (t, from, to) => {
+    await tool(t);
+    await settle(300);   // as stroke() does
+    const cell = async (at) => { await page.mouse.move(...screen(...at)); return page.evaluate(() => window.chromaglassDebug().pointer()); };
+    const a = await cell(from), b = await cell(to);
+    await page.mouse.move(...screen(...from));
+    const cells = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!(cells > 2)) throw new Error(`the Blow's stroke spans ${cells} cells of the plate; too short to pace`);
+    const n = Math.floor(cells / 1.25);
+    /*
+      The plate's own frame count, asserted to be one: a hook that went
+      missing would read NaN, NaN - f0 < 2 is false, and the pacing would
+      fall back to the clock alone without a word. And a deadline on each
+      wait: a plate that stops drawing (a lost device) fails here, with the
+      frames it got, rather than hanging the check until the job is killed.
+      The last move waits like the others, so its cell's wind is laid on two
+      frames before the release, as the old stroke's wait after its last move
+      did.
+    */
+    const frames = async () => {
+      const f = await page.evaluate(() => window.chromaglassDebug().frames);
+      if (!Number.isFinite(f)) throw new Error(`the plate's frame count reads ${f}; the Blow's stroke cannot be paced by it`);
+      return f;
+    };
+    await page.mouse.down();
+    for (let i = 1; i <= n; i++) {
+      const f0 = await frames(), t0 = Date.now();
+      await page.mouse.move(...screen(from[0] + (to[0] - from[0]) * i / n, from[1] + (to[1] - from[1]) * i / n));
+      let f = f0;
+      while (Date.now() - t0 < 120 || (f = await frames()) - f0 < 2) {
+        if (Date.now() - t0 > 10000) throw new Error(`the plate drew ${f - f0} frame(s) in 10 s after the Blow's move ${i} of ${n}`);
+        await settle(4);
+      }
+    }
+    await page.mouse.up();
+    return n;
+  };
   /** Lay a pool of dye at a point to work on, and let it settle. */
   /*
     `TOOLS_POOL_MS` exists for §0's thin-pool fault, and for nothing else.
@@ -590,7 +656,14 @@ try {
         const w0p = await snap('wind0');
         const t0 = Date.now();
         /*
-          The stroke takes 3000 ms of waiting (4.1 to 4.6 s with its 30 pointer
+          Paced by the plate now (pacedStroke above, PLAN 15g-8): a move a cell
+          and a quarter long every 120 ms or two frames, whichever is later, so
+          no runner holds the Blow still long enough to blow the straw. What
+          follows is why the stroke was made long, and it still holds: the
+          paced stroke takes about two seconds on a fast machine and more on a
+          slow one, as many frames as it needs.
+
+          The stroke took 3000 ms of waiting (4.1 to 4.6 s with its 30 pointer
           round trips), not 1500 (2.6 to 3.3 s). What the Blow's push follows is the
           solver steps the wind is laid on, not the pool or the clock: over the
           28 strokes of 14 Mac runs it correlates 0.73 with the wind steps (-0.22
@@ -606,7 +679,7 @@ try {
           the straw is a hand held still for three frames). Twice the time gave
           about twice the wind steps and a push six to twenty times the bar's.
         */
-        await stroke('blow', from, to, 3000);
+        const moves = await pacedStroke('blow', from, to);
         const strokeMs = Date.now() - t0;
         await settle(700);
         await snap('wind1');
@@ -626,7 +699,7 @@ try {
           earlyAlong: toward(sign, early.cx, early.cy), lateAlong: toward(sign, late.cx, late.cy),
           stepsOk: before.steps > 0 && early.steps > 0 && late.steps > 0 && strokeSteps > 0,
           wind: d('wind'), straw: d('straw'), carried: d('carried'), directed: d('directed'), carries: d('carries'), aired: d('aired'),
-          readings: rb1 - rb0, pressed: pc1 - pc0, strokeMs, poolX: wa.cx - from[0], poolY: wa.cy - from[1],
+          readings: rb1 - rb0, pressed: pc1 - pc0, strokeMs, moves, poolX: wa.cx - from[0], poolY: wa.cy - from[1],
           strawFirst: (steps1?.strawFirst ?? NaN) - (steps0?.strawFirst ?? NaN),
         };
       };
@@ -643,11 +716,11 @@ try {
         stroke, out to the right again after both, says whether it is the
         way or the order; and for each, the wind steps that had a way to go,
         the carries that found a fresh reading, the readings that landed,
-        how long the 30 moves took and where the pool's middle sat.
+        how long the moves took (how many: a cell and a quarter each) and where the pool's middle sat.
       */
       const again = await windRun(C, [C[0] + half, C[1]], 1);
       for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
-        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, ${r.pressed} cells of glass pressed by the hand, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
+        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, ${r.pressed} cells of glass pressed by the hand, ${r.moves} moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
       }
       /*
         The plate's own drift, signed, at its rate toward where the stroke
@@ -725,9 +798,20 @@ try {
         its carries off one. Whether it moved the colour is the line after
         next, from the colour itself.
       */
+      /*
+        And the stroke ran as wind its whole length: at least two wind steps a
+        move, which is what pacedStroke waits for, so a stroke whose moves the
+        plate never stepped between reads red here and not as a quiet pass of
+        "keeps it" on a stroke that blew nothing. The paced stroke is shorter
+        in time than the 3000 ms one (on GitHub's Mac 61 and 62 wind steps a
+        stroke against the old 92 to 112, which carried 18 to 27 straw steps
+        in them), and it pushes more, not less: +4.80%, +6.50% and +4.09%
+        against the old +1.55% and +2.97%, because no straw step interrupts
+        the wind. The push line's bar scales with the stroke's steps as before.
+      */
       const reached = (r) => (r.directed > 0 && r.aired >= r.directed) || r.carried > 1;
-      check('Blow drawn across a pool is the wind, and the wind reaches the liquid', wind > straw && reached(fwd) && back.wind > back.straw && reached(back),
-        `${wind} wind steps against ${straw} straw, ${aired} as air on the film, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.aired}, ${back.carried.toFixed(1)}`);
+      check('Blow drawn across a pool is the wind, and the wind reaches the liquid', wind > straw && wind >= 2 * fwd.moves && reached(fwd) && back.wind > back.straw && back.wind >= 2 * back.moves && reached(back),
+        `${wind} wind steps against ${straw} straw (at least two a move: ${fwd.moves} moves), ${aired} as air on the film, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.aired}, ${back.carried.toFixed(1)}`);
       /*
         And no straw where it was pressed. A straw step blows a real bubble,
         whose air takes the dye under it off the plate while it sits there
