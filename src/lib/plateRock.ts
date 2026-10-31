@@ -295,9 +295,16 @@ export const HOLD_TILT = 0.004;
 export function plateSin(hold: number, swing: number): number {
   return hold * 10 + swing * CUR_ROCK;
 }
-/** The solver's rock for a step (FluidSimulation's params): the plate's sinθ each way, and the slider's past-real gain (rockPast). */
-export function rockStep(holdX: number, holdY: number, swingX: number, swingY: number, R?: number): { rockX: number; rockY: number; rockGain: number } {
-  return { rockX: plateSin(holdX, swingX), rockY: plateSin(holdY, swingY), rockGain: rockPast(R) };
+/**
+ * The solver's rock for a step (FluidSimulation's params): the plate's sinθ
+ * each way, and the slider's past-real gain, rockPast(R), which the frame loop
+ * sets on every plate beside the swing it hands them all (FluidSimulation's
+ * rockGain). Not the plate's own settings: one Plate Rock tips the whole
+ * stack, so a patch aimed at one plate's Plate Rock would change its slide
+ * and not its swing.
+ */
+export function rockStep(holdX: number, holdY: number, swingX: number, swingY: number, gain = 1): { rockX: number; rockY: number; rockGain: number } {
+  return { rockX: plateSin(holdX, swingX), rockY: plateSin(holdY, swingY), rockGain: gain };
 }
 const G = 9.81;
 /** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (DISH_GAP_METRES in the middle). */

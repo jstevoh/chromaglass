@@ -139,15 +139,15 @@ export class FluidSimulation {
    * sitting there, including after it has mixed into something else.
    */
   meanColor: [number, number, number] = [0, 0, 0];
-  /** Plate tilt this step — a uniform acceleration, set by the show each step. */
+  /** Plate tilt this step, a uniform acceleration set by the show. */
   tiltX = 0;
   tiltY = 0;
-  /** The plate's rock as the render loop last set it (not scaled to a tilt): drives the current. */
   /** How far a dropped liquid falls, 0–1 (set each frame from Drop Height), and the plate's Fingering for its splash. */
   dropHeight = 0;
   dropFingering = 0;
-  rockX = 0;
-  rockY = 0;
+  /** The rock as the frame loop set it (not a tilt), and its gain past real (rockPast,
+   PLAN 38r-9). */
+  rockX = 0; rockY = 0; rockGain = 1;
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
   coverX = 0;
   coverY = 0;
@@ -3427,7 +3427,7 @@ export class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      ...rockStep(this.tiltX, this.tiltY, this.rockX, this.rockY, settings.plateRock),
+      ...rockStep(this.tiltX, this.tiltY, this.rockX, this.rockY, this.rockGain),
       coverX: this.coverX,
       coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,

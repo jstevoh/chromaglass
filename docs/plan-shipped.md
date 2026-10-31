@@ -10342,3 +10342,82 @@ Gaussian took 7%, and their middle is no longer lifted.
 *Measured:* `npm run lampfield`, 9/9 (on the old plate 1 of its first 7: the law worst 0.165 and 0.813 off,
 the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
 gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.
+
+
+## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
+
+*Asked:* the owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." The rest gap had
+been 6 mm (`REST_GAP` 0.03 of a 0.2 m plate); a show's sandwich, a few millilitres under a top
+glass about 15 cm across, is 1 to 3 mm. 2 mm is the middle, a judgement and not a measurement.
+
+*Part 1 (#613), one number at 6 mm:* `DISH_GAP_METRES`
+(`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
+*gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
+same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
+the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
+rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
+h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
+rest gap and greps `src/` for a gap made a length by the plate's width.
+
+*Part 2 (#641), 2 mm:* `DISH_GAP_METRES` 0.006 → 0.002, then everything the thinner film changes
+retuned on the physics, never on a bar (the owner chose the real pace everywhere, the rhythm
+sheet included, 2026-10-31 12:26Z). What it changes: water's drag time 3 s → 0.33 s; every Darcy
+speed under a force a ninth (h²); the sheet's lubrication M = h³/12μ 27 times slower. The colour's
+weight down a rocked plate (`ROCK_FALL` 12 → 1.33) and the oil's tension on a thin gap
+(`OIL_TENSION_GAP`) now carry h² as the oil's lift already did; the Blow's breath is 14 m/s
+(38r-8). The oil's Cahn–Hilliard relaxation and its overfull share stop at the open rim
+(`RIM_SIDE`, `wgsl/fluid/oil.ts`), which was 18g-7's slow loss on the diagonal (a tilted lens's
+oil past the rim 1.71 → 0.03 at 27 s). PR #605 had tried it in one go; its CI numbers and the
+checks it moved are #641's body, every bar and input named under Check changes.
+
+(M; Medium-High on the water looks). Set the number, then retune what
+the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
+CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
+of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
+water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
+`airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
+(`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
+under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
+`magnetgain` need their windows on τ (#605 has them). All are retuned in #641.
+
+*38r-6:* (S to decide, M to
+build). The glycerine line (|∇·(hu)| under 0.005 of the flux) reads 0.0059 at 2 mm, and
+it is not liquid lost: six V-cycles for two move it by 0.3%, a flat plate reads it too,
+and it goes away with no dye laid (0.00054) or with the look's Spin off (0.00056).
+Spin's stir (forcesB) is a curl noise masked by the dye, `min(1, d)` where `d > 0.05`,
+a force with a one-cell step at every pool's edge; glycerine takes a step's force whole
+at kΔt 50 (0.85 of it at the 6 mm gap's 5.6: the same stir on a liquid with that kΔt in
+the 2 mm gap, Thickness 0.68, reads 0.0049), and the check's central difference of the
+cell velocities reads the grid-scale pressure that step leaves as a divergence (the
+solve conserves its own face fluxes). It peaks at 50 steps as the pools slump their
+edges sharp and falls to 0.0012 by five seconds. Either read the solve's own fluxes
+(hsP and the mobility through a lab readback) or give Spin's mask the width a real
+stir has. Shipped: Spin's mask blurred [1 4 1].
+
+*38r-7:* (M). Its film drains a twenty-seventh as fast
+(h³/12μ), so `npm run sheet` reads five lines red on this branch with no retune
+(water keeps 4.7% of its dent a fifth of a second after the lift against under 1%, the
+oil 20.8% against 10%; the dish's slowest mode 0.750 a frame against 0.947; the mean
+gap 5.4% of a dent down kicked twice a second against 2%; the oil quiet at 15.3 s
+against 21.7): the paces in the check's header are the 6 mm dent's. The sheet's own
+metres are now the film's (`gapMetres`, this PR), which changes nothing it lays.
+`rides` reads the sheet's ring at three quarters of the dent's zero (19 cells of 25 on
+the lab's 192, as 30 of 40 was), since a 2 mm dent is narrower. Shipped: the check's waits on the film's own clock
+(SLOW = (6 mm/h₀)³), `SHEET_NODE=1 npm run sheet` 11/11 (6/11 at 2 mm before the retune).
+
+*38r-8:* (S, shipped this PR). τh/2μ goes as the gap, so
+the 8 m/s breath the Blow was tuned at moved the 2 mm film a third as far (`tools` read
++0.03% for +0.15%); the breath is set where it moves the film as the 6 mm one did,
+1.18 Pa (lib/breath.ts says why that and not C_f). The surface tears at Amount 0.39
+now, not 0.67 (`blowrange` reads the gentle breaths at 0.35). 15g-6's recording would
+settle the number either way.
+
+*38r-9:* at 2 mm full Plate Rock slid a pool a ninth as far as at 6 mm (rides, Mac: 0.105 against a
+third of the stir, 0.29). The owner judged the half slide fine and every dial runs gentle to
+extreme (2026-10-31), so above the default 0.45 the rock's pull on the colour and the oil's lift
+climbs geometrically to `ROCK_PAST` = (6 mm/h₀)² = 9 at full, the 6 mm gap's Darcy pace;
+`rockStep` (`lib/plateRock.ts`) hands the solver rockX, rockY and rockGain, and `hsBody` multiplies
+both by it. The default stays real; `rides` reads its "default over 0.4 of full" at the real pace.
+
+*Judged:* the owner, from the 2 mm films (the sheet's dents, Plate Rock's slide), 2026-10-31
+16:39Z: "That looks fine".

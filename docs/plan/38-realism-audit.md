@@ -260,33 +260,11 @@ written first. Line numbers are as read on main at d07ac31.
   the dye's opacity (`camera.ts:104-118`). Real: cos⁴ vignette, bloom as the lens's PSF on
   linear light with no threshold, and a disc kernel of radius A·|z − z_f|/z_f per layer.
 
-- **38r. The rest gap** (S to read, retune if it moves; Low-Medium). `REST_GAP` 0.03 of a
-  0.2 m plate is 6 mm (`constants.ts:389-401`); a show's glass sandwich is more like 1–3 mm
-  (a guess to confirm with the owner's own glass). Looks would not change (forces are read as
-  terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
-  labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
-
-  The owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." So 2 mm in the
-  middle at rest (a few millilitres under a top glass about 15 cm across is 1–3 mm; 2 mm is
-  the middle, a judgement and not a measurement), in two parts:
-
-  - **Part 1, one number (shipped, this PR, at 6 mm).** `DISH_GAP_METRES`
-    (`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
-    *gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
-    same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
-    the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
-    rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
-    h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
-    rest gap and greps `src/` for a gap made a length by the plate's width.
-  - **Part 2, 2 mm** (M; Medium-High on the water looks). Set the number, then retune what
-    the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
-    CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
-    of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
-    water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
-    `airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
-    (`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
-    under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
-    `magnetgain` need their windows on τ (#605 has them). Its leftovers, each its own item:
+- ~~**38r. The rest gap**~~ (shipped: part 1 at 6 mm, #613; part 2, 2 mm, #641, with 38r-6,
+  38r-7, 38r-8 and 38r-9). `DISH_GAP_METRES` (`src/lib/turntable.ts`) is the gap's one number,
+  2 mm in the middle at rest, and every reader of h₀ follows it; the owner chose the real 2 mm
+  pace everywhere and judged the films 2026-10-31 ("That looks fine"). Story in
+  `docs/plan-shipped.md` §38r. Its leftovers:
   - **38r-1. Does a sandwich slosh?** (S to decide, M to build). `lib/slosh.ts` solves a
     6 mm layer with a free surface (`SLOSH_REST_DEPTH`): between two glasses there is none,
     and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
@@ -299,38 +277,20 @@ written first. Line numbers are as read on main at d07ac31.
   - **38r-3. A Gap dial** (S). At 2 mm water's drag time is a third of a second, not three:
     a push fades nine times sooner. If a look wants the old glide, the honest dial is the
     gap itself, not a stand-in for inertia.
+    (2026-10-31: the owner chose Liquid amount and Cover weight over a bare Gap dial, so the
+    gap is a result of the plate's volume, 38r-5, written in by its own thread.)
   - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
     three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
     half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
     would slide the picture the same.
-  - **38r-6. `thingap` 5 reads the Spin's edge, not the solve's residual** (S to decide, M to
-    build). The glycerine line (|∇·(hu)| under 0.005 of the flux) reads 0.0059 at 2 mm, and
-    it is not liquid lost: six V-cycles for two move it by 0.3%, a flat plate reads it too,
-    and it goes away with no dye laid (0.00054) or with the look's Spin off (0.00056).
-    Spin's stir (forcesB) is a curl noise masked by the dye, `min(1, d)` where `d > 0.05`,
-    a force with a one-cell step at every pool's edge; glycerine takes a step's force whole
-    at kΔt 50 (0.85 of it at the 6 mm gap's 5.6: the same stir on a liquid with that kΔt in
-    the 2 mm gap, Thickness 0.68, reads 0.0049), and the check's central difference of the
-    cell velocities reads the grid-scale pressure that step leaves as a divergence (the
-    solve conserves its own face fluxes). It peaks at 50 steps as the pools slump their
-    edges sharp and falls to 0.0012 by five seconds. Either read the solve's own fluxes
-    (hsP and the mobility through a lab readback) or give Spin's mask the width a real
-    stir has; until then the line is red on this branch.
-  - **38r-7. The rhythm sheet at 2 mm** (M). Its film drains a twenty-seventh as fast
-    (h³/12μ), so `npm run sheet` reads five lines red on this branch with no retune
-    (water keeps 4.7% of its dent a fifth of a second after the lift against under 1%, the
-    oil 20.8% against 10%; the dish's slowest mode 0.750 a frame against 0.947; the mean
-    gap 5.4% of a dent down kicked twice a second against 2%; the oil quiet at 15.3 s
-    against 21.7): the paces in the check's header are the 6 mm dent's. The sheet's own
-    metres are now the film's (`gapMetres`, this PR), which changes nothing it lays.
-    `rides` reads the sheet's ring at three quarters of the dent's zero (19 cells of 25 on
-    the lab's 192, as 30 of 40 was), since a 2 mm dent is narrower.
-  - **38r-8. The Blow's breath is 14 m/s** (S, shipped this PR). τh/2μ goes as the gap, so
-    the 8 m/s breath the Blow was tuned at moved the 2 mm film a third as far (`tools` read
-    +0.03% for +0.15%); the breath is set where it moves the film as the 6 mm one did,
-    1.18 Pa (lib/breath.ts says why that and not C_f). The surface tears at Amount 0.39
-    now, not 0.67 (`blowrange` reads the gentle breaths at 0.35). 15g-6's recording would
-    settle the number either way.
+  - ~~**38r-6**~~ `thingap` 5 read the Spin's one-cell mask edge, not the solve's residual:
+    Spin's stir mask is blurred [1 4 1] over a cell's neighbours (#641). Story in §38r.
+  - ~~**38r-7**~~ The rhythm sheet at 2 mm: its waits are on the film's own clock (#641).
+  - ~~**38r-8**~~ The Blow's breath is 14 m/s (#641).
+  - ~~**38r-9**~~ Plate Rock past real above the default: `rockPast` in `lib/plateRock.ts`,
+    1 up to the default 0.45, then geometrically to `ROCK_PAST` = (6 mm/h₀)² = 9 at full,
+    the 6 mm gap's Darcy pace, so the dial still runs gentle to extreme at the real gap (#641).
+    The default stays real.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);
