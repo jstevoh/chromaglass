@@ -93,8 +93,8 @@ const { page, close } = await openLab();
 try {
   const r = await page.evaluate(async () => {
     const out = {};
-    // The plate's rest gap in metres, and the drag rate a Thickness gives there (fluid.ts).
-    const H = 0.03 * 0.2;
+    // The plate's rest gap in metres (2 mm since PLAN 38r), and the drag rate a Thickness gives there (fluid.ts).
+    const H = lab.REST_GAP_METRES;
     const nuOf = (t) => 1e-6 * Math.pow(10, 3 * t);
     const kOf = (t, gap = H) => 12 * nuOf(t) / (gap * gap);
     const SECONDS = 1 / 60;
@@ -231,7 +231,7 @@ try {
       }
     }
     // λ for each thin run: h·c inside against outside, c = 1/(1 + kΔt).
-    const lambdaOf = (t) => (0.004 / (1 + kOf(t, 0.004 * 0.2) * SECONDS)) / (0.03 / (1 + kOf(t) * SECONDS));
+    const lambdaOf = (t) => (0.004 / (1 + kOf(t, 0.004 * lab.GAP_METRES) * SECONDS)) / (0.03 / (1 + kOf(t) * SECONDS));
     dent.lambda = { thin: lambdaOf(0.45), water: lambdaOf(0) };
     out.dent = dent;
 

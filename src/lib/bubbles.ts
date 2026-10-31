@@ -310,8 +310,8 @@ export class BubbleField {
       const uMps = speed * (DISH_METRES / N);
       const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
       // Effective meniscus neck gap b_eff ≈ 0.091 cells (0.095 mm) is a tuned shortcut:
-      // about 63x smaller than the real 6 mm plate gap (DISH_REST_GAP * DISH_METRES).
-      // If the physical 6 mm gap (b ≈ 5.76 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 0.5 lobes,
+      // about 21x smaller than the real 2 mm plate gap (DISH_GAP_METRES; 63x the 6 mm
+      // before PLAN 38r). If the physical 2 mm gap (b ≈ 1.9 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 1.5 lobes,
       // meaning a bubble on a 192 grid would never form more than 1 finger.
       // b_eff is set in cells (moves with grid size) to produce 6-18 visible Saffman-Taylor
       // lobes on the discrete grid. Lobe count scales as m ∝ R * sqrt(Ca) between the clamps.
@@ -391,7 +391,7 @@ export class BubbleField {
       // An inviscid bubble spanning a Hele-Shaw cell in potential Darcy flow has theoretical
       // speedup U_bubble / U_mean = 2.0 before film drag (matching beads.ts's 2U/(1+λ) at λ=0).
       // Between parallel plates, planar Poiseuille centerline velocity is 1.5 U_mean.
-      // Here, 1.5 is retained as a tuned shortcut: real light show bubbles spanning the 6 mm gap
+      // Here, 1.5 is retained as a tuned shortcut: real light show bubbles spanning the 2 mm gap
       // with finite lubricating films and viscous liquid caps drift at ~1.35-1.45x, avoiding
       // excessive bubble runaway that alters show pacing.
       // The thin wetting film left on the plates has thickness h_f / b ≈ 1.34 (Ca/2)^(2/3) ≈ 0.84 Ca^(2/3)

@@ -2167,3 +2167,23 @@ from the same reading of the protocol, so only Live can say the two agree.
 6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
+
+## 96. The glass sandwich at 2 mm (PLAN 38r)
+
+The glasses are 2 mm apart at rest now, not 6, which is what a real overhead-projector
+sandwich holds. The forces were kept where the looks were tuned, so most looks should look
+the same; what should change is how long the liquid keeps going after it is pushed.
+
+1. A water look with Auto Spin or music sway (any look whose Thickness is near 0): spin the
+   dish. The water used to stay put for a second or two while the glass went round; now it
+   catches up in about a third of a second. Good if it reads as water between close glasses;
+   bad if the spin now looks like the whole picture turning stiffly (then 38r-3, a Gap dial).
+2. Plate Rock at full on the default look: the colour still swings with the kicks; the oil's
+   own rise up the tilt is nine times slower (it was barely visible before). Good if nothing
+   looks stuck.
+3. Beat Squeeze or Bass Boost: the kick's dent is about 1.7 times narrower. Good if the kick
+   still reads on the wall.
+4. Ferro Maze and Magnet Garden: the tallest peaks now reach the top glass and flatten there.
+   Good if they look like ferrofluid pressed under glass; bad if they look clipped by a line.
+5. A held Dropper pours over three times the area a second (the same volume in a thinner
+   gap). Good if a pour still reads as a pour and not a flood.

@@ -50,6 +50,7 @@ import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader } from './frame.mjs';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const PORT = 4364;
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
@@ -67,7 +68,7 @@ const check = (name, ok, detail = '') => {
 
 // The drag times, as lib/turntable.ts works them out, and the bed's drag on
 // the dish, as the frame's flywheel does (its Plate Pressure read off the page).
-const TAU = { thin: (0.006 ** 2) / (12 * 1e-6), thick: (0.006 ** 2) / (12 * 2e-5) };
+const TAU = { thin: (DISH_GAP_METRES ** 2) / (12 * 1e-6), thick: (DISH_GAP_METRES ** 2) / (12 * 2e-5) };
 const DRAG = 0.05;
 const bedOf = (viscosity, press) => (0.04 + DRAG * 1.2) * (viscosity === 'thin' ? 0.8 : 1.7) * (1 + press * 0.8);
 

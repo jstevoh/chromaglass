@@ -255,11 +255,31 @@ written first. Line numbers are as read on main at d07ac31.
   the dye's opacity (`camera.ts:104-118`). Real: cos⁴ vignette, bloom as the lens's PSF on
   linear light with no threshold, and a disc kernel of radius A·|z − z_f|/z_f per layer.
 
-- **38r. The rest gap** (S to read, retune if it moves; Low-Medium). `REST_GAP` 0.03 of a
-  0.2 m plate is 6 mm (`constants.ts:389-401`); a show's glass sandwich is more like 1–3 mm
-  (a guess to confirm with the owner's own glass). Looks would not change (forces are read as
-  terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
-  labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
+- ~~**38r. The rest gap**~~ — **Shipped, this PR** (2 mm at rest in the middle, one
+  number, `DISH_GAP_METRES` in `src/lib/turntable.ts`; the gap field stays 0.03 at rest in
+  gap units, and every reader of it as a length goes through `DISH_GAP_FIELD_METRES`;
+  `npm run gap` holds nine readers to their SI physics at 2 mm; story in
+  `docs/plan-shipped.md` §38r). What it left:
+
+  - **38r-1. Does a sandwich slosh?** (S to decide, M to build; Medium on Plate Rock's
+    looks). `lib/slosh.ts` still solves a 6 mm layer with a free surface
+    (`SLOSH_REST_DEPTH`): a slosh is a free surface's wave, and between two glasses there is
+    none, and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the
+    water under it. Either the tilt's slosh is the open dish's (no top glass, its own
+    depth, said on the desk), or on the sandwich it is the thin gap's creeping flow and the
+    slosh goes. The owner's call; until then it is named in the file as the old gap.
+  - **38r-2. A drop is a pancake past half the real gap** (S; Medium on the macro view).
+    `DROP_HALF_GAP` (`wgsl/plate.ts`) is 0.016 of the plate, half the old 6 mm; half the
+    real 2 mm is 0.005, at which the common three-cell bead touches both glasses, as an oil
+    drop in a 2 mm sandwich does, and `lib/beads.ts`'s merge time is in units of it. It is
+    the bead's whole shape and the macro view's lens, so it moves with 14ab-6's thread
+    (#601), with `npm run droplens` re-read on the new radius.
+  - **38r-3. A Gap dial** (S; Medium on the water looks). At 2 mm water's drag time is a
+    third of a second, not three, so a spun dish of water catches the glass nine times
+    sooner and a water look's music sway comes through at 0.97 of the dish's, not 0.39
+    (`npm run turntable` line 13); every push fades nine times sooner. If a look wants the
+    old long glide, the honest dial is the gap itself (physical, 0.27–4 mm in the
+    squeeze's range and past it if the owner wants), not a stand-in for inertia.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

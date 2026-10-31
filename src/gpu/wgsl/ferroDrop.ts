@@ -70,6 +70,7 @@
  */
 import { SPIKES_WGSL, SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
+import { DISH_GAP_FIELD_UV } from '../../lib/turntable';
 
 const W = '@compute @workgroup_size(8, 8)';
 
@@ -340,9 +341,13 @@ fn plateSeen(uv: vec2f, bg: vec3f) -> vec3f {
   The dye: the water over the drop is the gap less the drop's height, and
   the light goes down through it and back up, so the reflection is filtered
   by the column's dye to the power 2(1 − h/gap): the top of a tall drop is
-  the clearest, its foot the most coloured.
+  the clearest, its foot the most coloured. \`gapUnits\` is the plate's view
+  of the gap, in gap units (0.03 at rest); in l_c it is that times the plate
+  widths in a unit (lib/turntable.ts DISH_GAP_FIELD_UV: 2 mm at rest, PLAN
+  38r) over LC_UV.
 */
-fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapLc: f32) -> vec3f {
+fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
+  let gapLc = gapUnits * ${DISH_GAP_FIELD_UV} / LC_UV;
   let e = 0.5 / U.gridSize;
   let h = dropHeight(fuv);
   let hx = (dropHeight(fuv + vec2f(e, 0.0)) - dropHeight(fuv - vec2f(e, 0.0))) / (2.0 * e) * LC_UV;

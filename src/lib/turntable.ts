@@ -13,9 +13,9 @@
  *     between two glasses, dragged round by them through its viscosity. In a
  *     thin gap the depth-averaged flow feels the walls as a drag 12ν/h² (plane
  *     Poiseuille flow between two plates moving together), so the liquid
- *     relative to the dish decays as e^(−t/τ) with τ = h²/12ν. That is about
- *     three seconds for water in the plate's 6 mm middle, a tenth of a second
- *     for a light oil, and a millisecond for glycerine: spin a dish of water
+ *     relative to the dish decays as e^(−t/τ) with τ = h²/12ν. That is a third
+ *     of a second for water in the plate's 2 mm middle, a hundredth for a
+ *     light oil, and a tenth of a millisecond for glycerine: spin a dish of water
  *     and the water stays put for a moment while the glass goes round under
  *     it, as coffee does when the cup is turned; spin a dish of oil and the
  *     oil goes with it at once.
@@ -45,12 +45,42 @@
 /**
  * The plate's real size (PLAN §18a's numbers, which the thin-gap solver in
  * #220 uses too, so the two agree when both are in): an overhead projector's
- * stage takes a clock glass of about eight inches, 0.2 m, and the gap field is
- * in plate widths, 0.03 in the middle at rest, so the rest gap is 6 mm.
+ * stage takes a clock glass of about eight inches, 0.2 m.
  */
 export const DISH_METRES = 0.2;
+/*
+  The glass sandwich's gap at rest in the middle, in metres: 2 mm (PLAN 38r).
+  The one number every reader of the gap in metres takes, through
+  DISH_GAP_FIELD_METRES below: the drag 12ν/h², the Darcy speeds, the slump,
+  the pour's dome, the cover's shear, the sheet's film, the milk's depth, the
+  ferrofluid's room under the top glass, a drop's pancake radius.
+
+  Why 2 mm. It was 6 mm (0.03 of the plate's width), which is a dish with a
+  glass resting on a deep layer, not a sandwich. No source the audit found
+  gives a number for nested clock glasses on an overhead projector: the
+  accounts say "a few drops" of oil and colours spread by the top glass,
+  held there by surface tension (the liquid light show's histories). A few
+  millilitres under a top glass of about 15 cm across is 1–3 mm; 2 mm is
+  the middle of that, a judgement and not a measurement. The squeeze's
+  floor is then 0.27 mm (a film pressed by hand thins to that and below,
+  slowing as h³: Stefan) and its ceiling 4 mm.
+*/
+export const DISH_GAP_METRES = 0.002;
+/*
+  The gap field's number at rest (the squeeze texture's red, gapRest): 0.03.
+  It is in *gap units*, h₀/0.03, so a press, a kick's dent, a lift and every
+  check written in those numbers since #220 reads the same at any rest gap;
+  it was plate widths while the rest gap was 0.03 of the plate. Every reader
+  of the field that needs the gap as a length multiplies by
+  DISH_GAP_FIELD_METRES (or DISH_GAP_FIELD_UV for plate widths), never by
+  the plate's width.
+*/
 export const DISH_REST_GAP = 0.03;
-/** The narrowest and widest the squeeze lets the gap go, in plate widths (gapRest, squeezeUpdate). */
+/** Metres per unit of the gap field: the rest gap in metres over its number. */
+export const DISH_GAP_FIELD_METRES = DISH_GAP_METRES / DISH_REST_GAP;
+/** Plate widths per unit of the gap field (a third, at 2 mm on 0.2 m). */
+export const DISH_GAP_FIELD_UV = DISH_GAP_FIELD_METRES / DISH_METRES;
+/** The narrowest and widest the squeeze lets the gap go, in gap units (gapRest, squeezeUpdate): 0.27 mm and 4 mm. */
 export const DISH_GAP_RANGE = [0.004, 0.06] as const;
 /** The open circular rim of the dish (radius in plate uv coordinates from centre). Liquid and dye reaching it spill into the overflow trough (PLAN 18a, 18c, 18g). */
 export const OPEN_RIM = 0.5;
@@ -105,9 +135,9 @@ export function thicknessViscosity(thickness: number): number {
   return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
 }
 
-/** The drag time h²/12ν, seconds, for a gap in plate widths. */
+/** The drag time h²/12ν, seconds, for a gap in gap units (the field's). */
 export function dragSeconds(nu: number, gap = DISH_REST_GAP): number {
-  const h = gap * DISH_METRES;
+  const h = gap * DISH_GAP_FIELD_METRES;
   return (h * h) / (12 * Math.max(1e-9, nu));
 }
 

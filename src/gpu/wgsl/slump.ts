@@ -67,7 +67,8 @@
  * has K = 0, and the harmonic mean would hold the front still forever).
  *
  * The shortcuts (PLAN 18m-1, 18m-1a). A pool poured to the dye's cap of six
- * units (2.13 mm deep in a 6 mm gap) is past where the viscous Poiseuille law
+ * units (2.13 mm, a column filling the 2 mm gap; the worst cell is at half the
+ * gap, 1 mm) is past where the viscous Poiseuille law
  * holds (its Reynolds number in water is near 30): in that slumping regime a
  * gravity current's front runs at its Froude speed Fr √(g′η(1 − η/b)) with
  * Fr = 1.19 (Huppert and Simpson 1980, J. Fluid Mech. 99). Each cell in
@@ -91,8 +92,8 @@ export function slumpKernels(HEAD: string, W: string): Record<string, string> {
   return {
     /*
       K Δt/Δx² for each cell, one substep's: A.a.x is g′Δt/(3νΔx²) in 1/m³,
-      A.a.y DYE_LAYER (metres per unit), A.a.z the plate's width in metres
-      (the gap field is in plate widths), A.a.w 1/(−ln DYE_FLOOR). The mix's
+      A.a.y DYE_LAYER (metres per unit), A.a.z the metres in a unit of the
+      gap field (GAP_METRES: the field is in gap units, 0.03 at rest), A.a.w 1/(−ln DYE_FLOOR). The mix's
       oil share is read where the look has a mix (a 1×1 blank, all water,
       where it has not).
     */
