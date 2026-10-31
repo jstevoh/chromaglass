@@ -39,4 +39,4 @@ About 160 files, grouped; a name is its file.
 
 ## Checks
 
-`npm run quick`. Looks, set list: `desk`, `setlist`, `panel`. Areas: `areacords`, `plate`. Sound: `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. Patch bay: `soundcords`, `scene`. Mixer: `mixer`, `rowfade`, `remotemix`. Projector: `map`, `beams`, `wallpattern`. Bridges: `applink`, `phonelink`. `governor`: `rungs`. `crashLog`: `crash`. `feedback`, `feedbackScrub`: `feedback-worker`, `phone`. `cartoons`: `cartoons`. `deltaRows`: `frameuploads`. `videoFlow`: `videoflow`.
+`npm run quick`. Looks, set list: `desk`, `setlist`, `panel`. Areas: `areacords`, `plate`. Sound: `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. Patch bay: `soundcords`, `scene`. Mixer: `mixer`, `rowfade`, `remotemix`. Projector: `map`, `beams`, `wallpattern`. Bridges: `applink`, `phonelink`. `governor`: `rungs`. `crashLog`: `crash`. `feedback`, `feedbackScrub`: `feedback-worker`, `feedbackpane`. `cartoons`: `cartoons`. `deltaRows`: `frameuploads`. `videoFlow`: `videoflow`.

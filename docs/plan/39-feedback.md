@@ -4,7 +4,7 @@ Asked 2026-10-30: "a feedback panel in settings. It should send me an email with
 feedback as well as collect it all in a single database with all of the relevant related
 logs data so I can track feedback over time."
 
-## ~~39a. Settings → Feedback, mailed and kept~~ — **Shipped, this PR** (the pane under the rail's seven groups and on the phone's More sheet, `src/components/settings/FeedbackPane.tsx`; the note, its context and the consented log and picture, `src/lib/feedback.ts`, scrubbed by `src/lib/feedbackScrub.ts`; the Worker with one D1 table and a Resend mail, `server/feedback-worker.js`, `server/feedback-schema.sql`, `wrangler.feedback.toml`; `npm run feedback-worker` 24/24; `npm run phone` adds the sheet and the strip's row; story in `docs/plan-shipped.md` §39a)
+## ~~39a. Settings → Feedback, mailed and kept~~ — **Shipped, this PR** (the pane under the rail's seven groups and on the phone's More sheet, `src/components/settings/FeedbackPane.tsx`; the note, its context and the consented log and picture, `src/lib/feedback.ts`, scrubbed by `src/lib/feedbackScrub.ts`; the Worker with one D1 table and a Resend mail, `server/feedback-worker.js`, `server/feedback-schema.sql`, `wrangler.feedback.toml`; `npm run feedback-worker` 31/31; `npm run feedbackpane` 11/11, the desk's rail and the phone's sheet and strip; story in `docs/plan-shipped.md` §39a)
 
 ## 39b. Switch it on (the owner's account steps)
 

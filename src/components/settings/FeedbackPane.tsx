@@ -43,7 +43,7 @@ export function FeedbackPane({ card, title }: {
     if (!ready) return;
     setState({ kind: 'sending' });
     try {
-      const body = await buildFeedback({ topic, message, replyTo: account ? null : replyTo, logs: !!FEEDBACK_URL && logs, picture: !!FEEDBACK_URL && picture });
+      const body = await buildFeedback({ topic, message, replyTo: account ?? replyTo, logs: !!FEEDBACK_URL && logs, picture: !!FEEDBACK_URL && picture });
       if (!FEEDBACK_URL) {
         // No Worker on this build: the same note as an email, without the log.
         window.location.href = feedbackMailto(body);
@@ -62,7 +62,7 @@ export function FeedbackPane({ card, title }: {
   const showPreview = async () => {
     if (preview !== null) { setPreview(null); return; }
     // The picture is shown as its size, not 150 kB of base64.
-    const body = await buildFeedback({ topic, message: message || '(your note)', replyTo: account ? null : replyTo, logs, picture });
+    const body = await buildFeedback({ topic, message: message || '(your note)', replyTo: account ?? replyTo, logs, picture });
     const pic = body.picture ? { ...body.picture, dataUrl: `(a JPEG, ${Math.round(body.picture.dataUrl.length * 0.75 / 1024)} kB)` } : null;
     setPreview(JSON.stringify({ ...body, picture: pic }, null, 2));
   };
@@ -122,11 +122,11 @@ export function FeedbackPane({ card, title }: {
 
       {FEEDBACK_URL ? (<>
       <div className="mb-1">
-        <Toggle label="Include the app's recent log and this look's settings" on={logs} onChange={setLogs} testId="feedback-logs" />
-        <Toggle label="Include a picture of the plate" on={picture} onChange={setPicture} testId="feedback-picture" />
+        <Toggle label="Include the app's recent log and this look's settings" on={logs} onChange={(v) => { setLogs(v); setPreview(null); }} testId="feedback-logs" />
+        <Toggle label="Include a picture of the plate" on={picture} onChange={(v) => { setPicture(v); setPreview(null); }} testId="feedback-picture" />
       </div>
       <p className="mb-4 text-[11px] leading-relaxed text-white/40">
-        Always sent: the app's version, this browser, the look's name and your plan. Never sent: passwords,
+        Always sent: the app's version, this browser and screen, the graphics card, the look's name, whether Evolve and a projector are on, and your plan. Never sent: passwords,
         licence keys, stream keys or sign-in tokens; they are taken out of the log first.{' '}
         <button type="button" onClick={showPreview} className="underline decoration-white/25 underline-offset-2 hover:text-white" data-testid="feedback-preview-toggle">
           {preview === null ? 'See what is sent' : 'Hide it'}

@@ -62,6 +62,12 @@ export const MAX_BYTES = 1536 * 1024;
 export const MAX_MESSAGE = 5000;
 /** Entries per address per hour. Ten notes in an hour is a person with a lot to say; more is a script. */
 export const RATE_PER_HOUR = 10;
+/**
+ * Entries per hour from everyone. A launch day is a few dozen notes; past
+ * this a script spread over many addresses (an IPv6 block is billions) is
+ * filling the database at up to 1.5 MB a row, and is refused with 503.
+ */
+export const ALL_PER_HOUR = 60;
 /** Mails a day, under the provider's free 100. Past it an entry is still kept, and says `emailed = 'off: daily cap'`. */
 export const MAIL_PER_DAY = 80;
 const MAX_DAYS = 366;
@@ -123,9 +129,8 @@ async function receive(request, env, ctx, cors) {
   const now = Date.now();
   const ipHash = await hashIp(request.headers.get('CF-Connecting-IP') || 'unknown', env);
   const hourAgo = new Date(now - 3600_000).toISOString();
-  const recent = await env.FEEDBACK_DB.prepare('SELECT COUNT(*) AS n FROM feedback WHERE ip_hash = ? AND at > ?')
-    .bind(ipHash, hourAgo).first();
-  if ((recent?.n ?? 0) >= RATE_PER_HOUR) return json({ error: 'too many' }, 429, cors);
+  // A cheap early no, before reading a body; the limit that holds is after the insert.
+  if (await countSince(env, hourAgo, ipHash) >= RATE_PER_HOUR) return json({ error: 'too many' }, 429, cors);
 
   const text = await readCapped(request, MAX_BYTES);
   if (text == null) return json({ error: 'too large' }, 413, cors);
@@ -144,15 +149,27 @@ async function receive(request, env, ctx, cors) {
   const at = new Date(now).toISOString();
   const pic = body.picture && typeof body.picture === 'object' ? decodeJpegDataUrl(body.picture.dataUrl) : null;
   const app = obj(body.app);
-  const context = { ...body, picture: pic ? { bytes: pic.length, width: num(body.picture.width), height: num(body.picture.height) } : null };
-  const replyTo = !who && isEmail(body.replyTo) ? body.replyTo.trim() : null;
+  // Only the parts the page sends, and scrubbed again here: a stale or a
+  // hostile client is not trusted to have taken the credentials out, and a
+  // field it adds (a `uid`, an `email`) is not kept or mailed.
+  const context = scrub({
+    kind: body.kind, version: body.version, at: body.at, topic: body.topic, message: body.message, replyTo: body.replyTo ?? null,
+    app: body.app ?? null, env: body.env ?? null, snapshot: body.snapshot ?? null, diagnostics: body.diagnostics ?? null,
+  });
+  context.picture = pic ? { bytes: pic.length, width: num(body.picture.width), height: num(body.picture.height) } : null;
+  // The account's address only when the token says Firebase proved it: an
+  // account can be made with anyone's address and a password.
+  const email = who?.emailVerified ? who.email : null;
+  // A typed address, or the page's cached one when its token did not come
+  // through; kept apart from `email` and marked unverified in the mail.
+  const replyTo = !email && isEmail(body.replyTo) ? body.replyTo.trim() : null;
 
   const row = {
     id, at,
     topic: body.topic,
-    message: body.message.trim(),
+    message: scrubText(body.message.trim()),
     uid: who?.uid ?? null,
-    email: who?.email ?? null,
+    email,
     reply_to: replyTo,
     app_version: clip(str(app.version), 40) || null,
     build: clip(str(app.build), 64) || null,
@@ -174,9 +191,28 @@ async function receive(request, env, ctx, cors) {
     pic, ipHash,
   ).run();
 
-  const mailing = mail(env, row, context, pic, now, new URL(request.url).origin).then(
-    (state) => env.FEEDBACK_DB.prepare('UPDATE feedback SET emailed = ? WHERE id = ?').bind(state, id).run(),
-  ).catch(() => {});
+  /*
+    The limits that hold. Counting and then inserting is a race: fifty posts
+    at once all count nine and all insert (measured against the check's
+    database with 5 ms on each call: 50 of 50 taken). Inserting and then
+    counting is not, because D1 writes one at a time and a row's rowid says
+    where it fell in that order: each request counts the rows at or before
+    its own, so the first ten of a burst see one to ten and stay, and every
+    later one sees eleven or more and takes its row back out. (Counting every
+    row instead kept none of a burst of forty: each saw all forty.)
+  */
+  const mine = await countSince(env, hourAgo, ipHash, id);
+  const all = await countSince(env, hourAgo, null, id);
+  // ALL_PER_HOUR can be raised in the Worker's vars without a deploy of the code, for a launch day.
+  if (mine > RATE_PER_HOUR || all > (Number(env.ALL_PER_HOUR) || ALL_PER_HOUR)) {
+    await env.FEEDBACK_DB.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();
+    return mine > RATE_PER_HOUR ? json({ error: 'too many' }, 429, cors) : json({ error: 'busy' }, 503, cors);
+  }
+
+  const mailing = mail(env, row, context, pic, now, new URL(request.url).origin)
+    .catch(() => 'failed network')
+    .then((state) => env.FEEDBACK_DB.prepare('UPDATE feedback SET emailed = ? WHERE id = ?').bind(state, id).run())
+    .catch(() => {});
   if (ctx?.waitUntil) ctx.waitUntil(mailing);
   else await mailing;
 
@@ -205,10 +241,14 @@ export function invalid(b) {
  */
 async function mail(env, row, context, pic, now, origin) {
   if (!env.RESEND_API_KEY) return 'off';
+  // A slot claimed before it is counted, for the same reason as the hourly
+  // limit: count-then-send lets a burst all see room.
+  await env.FEEDBACK_DB.prepare("UPDATE feedback SET emailed = 'sending' WHERE id = ?").bind(row.id).run();
   const dayStart = `${dayOf(now)}T00:00:00.000Z`;
-  const sent = await env.FEEDBACK_DB.prepare("SELECT COUNT(*) AS n FROM feedback WHERE at >= ? AND emailed = 'sent'")
-    .bind(dayStart).first();
-  if ((sent?.n ?? 0) >= MAIL_PER_DAY) return 'off: daily cap';
+  const sent = await env.FEEDBACK_DB.prepare(
+    "SELECT COUNT(*) AS n FROM feedback WHERE at >= ? AND emailed IN ('sent', 'sending') AND rowid <= (SELECT rowid FROM feedback WHERE id = ?)",
+  ).bind(dayStart, row.id).first();
+  if ((sent?.n ?? 0) > MAIL_PER_DAY) return 'off: daily cap';
 
   const msg = composeMail(row, origin);
   const attachments = [];
@@ -235,7 +275,7 @@ export function composeMail(row, origin = 'https://<the feedback Worker>') {
   const firstLine = row.message.split('\n')[0].replace(/\s+/g, ' ').trim();
   // A subject is one line: a sender's newline must not become a header.
   const subject = `[ChromaGlass] ${TOPIC_NAME[row.topic] ?? row.topic}: ${clip(firstLine, 70)}`.replace(/[\r\n]+/g, ' ');
-  const from = row.email ? `${row.email} (signed in)` : row.reply_to ? `${row.reply_to} (typed, not verified)` : 'not signed in, no address';
+  const from = row.email ? `${row.email} (signed in)` : row.reply_to ? `${row.reply_to} (given, not verified)` : 'not signed in, no address';
   const where = [
     row.shell === 'mac' ? `Mac app ${row.app_version ?? ''}`.trim() : 'browser',
     row.phone ? 'phone layout' : null,
@@ -268,18 +308,24 @@ async function list(env, days) {
             picture IS NOT NULL AS has_picture, status, emailed
        FROM feedback WHERE at >= ? ORDER BY at DESC LIMIT 1000`,
   ).bind(since).all();
+  // Counted over the whole window, not the page of 1000.
+  const counts = await env.FEEDBACK_DB.prepare('SELECT topic, COUNT(*) AS n FROM feedback WHERE at >= ? GROUP BY topic').bind(since).all();
   const byTopic = {};
-  for (const r of results) byTopic[r.topic] = (byTopic[r.topic] ?? 0) + 1;
-  return { days, total: results.length, byTopic, entries: results };
+  let total = 0;
+  for (const r of counts.results) { byTopic[r.topic] = r.n; total += r.n; }
+  return { days, total, byTopic, entries: results };
 }
 
 async function one(env, id, cors) {
-  const r = await env.FEEDBACK_DB.prepare('SELECT * FROM feedback WHERE id = ?').bind(id).first();
+  // Every column but the address hash and the picture's bytes, which has its own route.
+  const r = await env.FEEDBACK_DB.prepare(
+    `SELECT id, at, topic, message, uid, email, reply_to, app_version, build, shell, phone, tier, look, page, user_agent, country,
+            has_logs, context, picture IS NOT NULL AS has_picture, status, emailed FROM feedback WHERE id = ?`,
+  ).bind(id).first();
   if (!r) return json({ error: 'not found' }, 404, cors);
-  const { picture: pic, ip_hash: _ip, context, ...rest } = r;
-  let parsed = null;
-  try { parsed = JSON.parse(context); } catch { /* stored by this Worker; never expected */ }
-  return json({ ...rest, has_picture: pic != null, context: parsed }, 200, cors);
+  let context = null;
+  try { context = JSON.parse(r.context); } catch { /* stored by this Worker; never expected */ }
+  return json({ ...r, has_picture: r.has_picture === 1, context }, 200, cors);
 }
 
 async function picture(env, id, cors) {
@@ -317,9 +363,34 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-/** A salted hash of the address, enough to count an hour's entries from one place and nothing more. */
+/** Rows since `since`, from one address or from everyone, and up to and including row `upTo` when given. */
+async function countSince(env, since, ipHash, upTo = null) {
+  const where = ['at > ?'];
+  const args = [since];
+  if (ipHash) { where.push('ip_hash = ?'); args.push(ipHash); }
+  if (upTo) { where.push('rowid <= (SELECT rowid FROM feedback WHERE id = ?)'); args.push(upTo); }
+  const r = await env.FEEDBACK_DB.prepare(`SELECT COUNT(*) AS n FROM feedback WHERE ${where.join(' AND ')}`).bind(...args).first();
+  return Number(r?.n ?? 0);
+}
+
+/**
+ * A salted hash of the address, enough to count an hour's entries from one
+ * place and nothing more. An IPv6 address by its /64, which is one
+ * connection's block: counted by the full address, one machine has 2^64 of
+ * them. The salt is the Worker's secret (IP_SALT, else the reading token),
+ * because with a public salt the 2^32 IPv4 addresses hash back in minutes.
+ */
+export function ipKey(ip) {
+  if (!ip.includes(':')) return ip;
+  const [head] = ip.split('::');
+  const groups = ip.includes('::')
+    ? [...head.split(':').filter(Boolean), ...Array(8).fill('0')].slice(0, 4)
+    : ip.split(':').slice(0, 4);
+  return `${groups.map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
+
 async function hashIp(ip, env) {
-  const bytes = new TextEncoder().encode(`${env.IP_SALT || 'chromaglass-feedback'}|${ip}`);
+  const bytes = new TextEncoder().encode(`${env.IP_SALT || env.FEEDBACK_TOKEN || 'chromaglass-feedback'}|${ipKey(ip)}`);
   const d = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
   return [...d.slice(0, 12)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
@@ -353,6 +424,36 @@ function decodeJpegDataUrl(u) {
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   if (bytes.length < 3 || bytes[0] !== 0xff || bytes[1] !== 0xd8 || bytes[2] !== 0xff) return null;
   return bytes;
+}
+
+/*
+  The page's scrub (src/lib/feedbackScrub.ts), again here. The Worker may not
+  import src/ (server/README.md), so this is a copy, and the check runs both
+  on the same dirty sample and fails if they ever answer differently.
+*/
+const SECRET_FIELD = /(token|secret|password|passwd|authorization|(api|access|private|session|show|relay|display|stream|licen[cs]e)_?key|^key)$/i;
+const SECRET_TEXT = [
+  [/eyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,}/g, '[token]'],
+  [/\bcg1\.[\w.-]{8,}/g, '[licence key]'],
+  [/\bBearer\s+[\w.~+/=-]+/gi, 'Bearer [removed]'],
+  [/(rtmps?:\/\/[^\s"'<>]+\/)[^/\s"'<>]+/gi, '$1[removed]'],
+  [/([?&#][\w-]*(?:key|token|secret|auth|sig|signature|password|code)=)[^&#\s"'<>]+/gi, '$1[removed]'],
+];
+export function scrubText(s) {
+  let out = s;
+  for (const [re, to] of SECRET_TEXT) out = out.replace(re, to);
+  return out;
+}
+export function scrub(v, depth = 0) {
+  if (typeof v === 'string') return scrubText(v);
+  if (v === null || typeof v !== 'object') return v;
+  if (depth > 12) return '[too deep]';
+  if (Array.isArray(v)) return v.map((x) => scrub(x, depth + 1));
+  const out = {};
+  for (const [k, x] of Object.entries(v)) {
+    out[k] = SECRET_FIELD.test(k) && x != null && x !== '' ? '[removed]' : scrub(x, depth + 1);
+  }
+  return out;
 }
 
 function toBase64(bytes) {

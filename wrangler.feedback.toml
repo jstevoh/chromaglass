@@ -7,7 +7,7 @@
 #   npx wrangler d1 execute chromaglass-feedback --remote --file server/feedback-schema.sql
 #   npx wrangler secret put FEEDBACK_TOKEN -c wrangler.feedback.toml   # for reading entries
 #   npx wrangler secret put RESEND_API_KEY -c wrangler.feedback.toml   # for the mail
-#   npx wrangler secret put IP_SALT -c wrangler.feedback.toml          # any random string
+#   npx wrangler secret put IP_SALT -c wrangler.feedback.toml          # any random string: the address hashes' salt
 # The mail's sender is chromaglass.art verified at Resend: its records are a
 # DKIM name and an MX and SPF on send.chromaglass.art, added at the DNS host
 # beside the forwarder's root MX, which they do not touch.

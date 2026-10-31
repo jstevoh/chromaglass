@@ -27,7 +27,7 @@ import { isSignedInCached } from './authFlag';
 import { isDesktopApp } from './platform';
 import { getEffectiveTier } from './tierGates';
 import { wantsPhoneLayout } from './phone';
-import { scrub } from './feedbackScrub';
+import { consented } from './feedbackScrub';
 
 export const FEEDBACK_URL: string | undefined = import.meta.env?.VITE_FEEDBACK_URL || undefined;
 export const SUPPORT_EMAIL = 'support@chromaglass.art';
@@ -98,12 +98,7 @@ export async function buildFeedback(opts: {
       // The path only: a query can carry a show's key.
       page: location.pathname,
     },
-    env: scrub(report.env) as Record<string, unknown>,
-    snapshot: scrub(report.snapshot),
-    diagnostics: opts.logs ? scrub({
-      url: report.url, debug: report.debug, look: report.look, log: report.log, previous: report.previous, history: report.history,
-    }) as FeedbackBody['diagnostics'] : null,
-    picture: opts.picture ? report.screenshot : null,
+    ...(consented(report, opts) as Pick<FeedbackBody, 'env' | 'snapshot' | 'diagnostics' | 'picture'>),
   };
 }
 

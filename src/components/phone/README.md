@@ -26,4 +26,4 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 
 ## Checks
 
-`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Cartoons: `cartoons`. Feedback: `feedback-worker`. Areas and cords: `areacords`.
+`npm run phone` (with `PW_WEBGPU=1` for the fingers) and `npm run layout`. The mixer on the phone: `mixer`, `rowfade`, `remotemix`. Cartoons: `cartoons`. Feedback: `feedbackpane`, `feedback-worker`. Areas and cords: `areacords`.

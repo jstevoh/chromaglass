@@ -25,7 +25,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `cloud-sync.js`: Pro cloud sync store.
 - `fingerprint-worker.js`: song ID proxy.
 - `feedback-schema.sql`: the feedback table, run once against D1.
-- `firebase-token.js`: `verifyFirebaseToken` (the licence, shows and feedback Workers).
+- `firebase-token.js`: `verifyFirebaseToken` (the shows and feedback Workers): `{ uid, aud, email, emailVerified }`, `emailVerified` added for feedback.
 - `server-license.js`: local key storage for show server and Mac app.
 - `license-key.js`, `license-worker.js`, `remote-server.js`, `report-worker.js`: above.
 
