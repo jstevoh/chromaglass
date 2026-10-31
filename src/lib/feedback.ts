@@ -29,7 +29,7 @@ import { getEffectiveTier } from './tierGates';
 import { wantsPhoneLayout } from './phone';
 import { consented } from './feedbackScrub';
 
-export const FEEDBACK_URL: string | undefined = import.meta.env?.VITE_FEEDBACK_URL || undefined;
+export const FEEDBACK_URL: string | undefined = import.meta.env.VITE_FEEDBACK_URL || undefined;
 export const SUPPORT_EMAIL = 'support@chromaglass.art';
 export const FEEDBACK_MAX = 5000;
 /** The pane's name where the settings panel keeps which place is open, and what `focusSection` names to open the sheet at it. */
@@ -90,7 +90,7 @@ export async function buildFeedback(opts: {
     replyTo: opts.replyTo?.trim() || null,
     app: {
       version: await macVersion(),
-      build: import.meta.env?.VITE_BUILD_SHA || null,
+      build: import.meta.env.VITE_BUILD_SHA || null,
       shell: isDesktopApp() ? 'mac' : 'browser',
       phone: onPhone(),
       tier: getEffectiveTier(),
@@ -107,8 +107,12 @@ export async function buildFeedback(opts: {
  * loaded only then (it is the Firebase SDK), the same way `accountShows`
  * reaches it, and the token goes in a header the Worker verifies.
  */
+// `import.meta.env.X` written plainly, never `import.meta.env?.X`: Vite
+// replaces the plain form at build, so a build with no Firebase key drops
+// the import below and carries no Firebase at all (`npm run signin` 1a). The
+// optional chain hid it from that replacement and put the SDK back in.
 async function idToken(): Promise<string | null> {
-  if (!import.meta.env?.VITE_FIREBASE_API_KEY || !isSignedInCached()) return null;
+  if (!import.meta.env.VITE_FIREBASE_API_KEY || !isSignedInCached()) return null;
   try { return await (await import('./firebaseAuth')).getCurrentIdToken(); } catch { return null; }
 }
 
