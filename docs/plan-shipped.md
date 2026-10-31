@@ -2754,6 +2754,39 @@ on the software plate: 531 cells by the bubble, none by the hand, over a stroke 
 straw steps). The straw's swing on GitHub's runners is 15g-8; the other
 tools' press and stir are 15g-9.
 
+### 15g-8. The stroke's straw on GitHub's runners: the bubbles' dye accounting across a stale mirror (shipped)
+
+On GitHub's Macs the tools check's Blow stroke, "keeps it rather than erasing it" (the pool's
+loss held to a tenth plus five), read +13%, −6.6%, −15%, +16% and −20% across #550 and #623,
+and red on every head of #618 (the glass peel, which leaves the gap at rest and so took away
+what had been hiding it). The owner's Mac kept or gained. Those runners blew the straw 18 to 27
+times a stroke, the owner's Mac 0 to 2.
+
+Two causes, one in the solver and one in the check. **The solver**: on a thin gap the GPU
+multiplied the dye under every bubble away each step (`airExclude`, dye *= 1 − air) and the CPU
+put the same mass back as a ring round the rim from the readback mirror
+(`FluidSimulation.depositBubbleRims`, H6). That conserved only when the mirror, the bubble list
+and the GPU agreed on which cells had been covered since the last deposit, and a straw blowing
+a small new bubble on every hold, on dye drifting in the breath's flow, under a mirror frames
+behind, is exactly when they do not. **The check**: its thirty moves were 0.68 of a cell at the
+plate's scale and the hand's cell is floored, so one move in three was no move, and a runner
+whose frames take 50 to 80 ms drew the three still frames the straw waits for in the gap.
+
+**The solver now**: the liquid under the air leaves the way a meniscus sends it, out from the
+bubble's centre across the cell faces in flux form (`airDisplace`, `src/gpu/wgsl/fluid/gap.ts`;
+`AIR_DISPLACE_PASSES` 4 a step), split by where in its bubble each cell is (the air field carries
+it) and a twentieth to every face so the very centre empties too. Each face's flux is what one
+cell sends and its neighbour receives: nothing made or lost on any step, at any frame rate, with
+no mirror in it. The flow's source for air arriving (the divergence pass) is unchanged; the push
+does what a semi-Lagrangian carry cannot, empty the middle. The CPU keeps only the popped hole's
+fill (`fillBubbleHoles`). Lab, software WebGPU, Classic on a thin gap, a pool of 579, 90 steps:
+a bubble put down whole −16.18% on main (the multiply with no deposit) → 0.00%; one growing at
+the straw's pace −30.75% → 0.00%; one moving across the pool −26.62% → −0.31%; the dye under it
+0.000 in all. **The check now** (`pacedStroke` in `scripts/tools.mjs`): as many moves as the
+stroke has whole cells and a quarter in it, measured from the pointer's own cell before the
+press, the next after 120 ms or two of the plate's frames, whichever is later; the same
+distance, the same bar.
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
