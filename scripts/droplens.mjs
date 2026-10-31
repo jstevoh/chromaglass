@@ -441,6 +441,45 @@ try {
       out.dyed = { c, p, seam };
     }
     /*
+      The outline at the zoom a performer parks on (PLAN 33g-2b). The mask is
+      512 across the whole plate, so at 5x one of its texels is ten screen
+      pixels or more and the contour of a bilinear read of its antialiased
+      coverage wanders by a third of a texel with the texel's period: a rim
+      of scallops, ragged on every big bead. A flat plate, so nothing but the
+      drop is drawn; the outline is the outermost pixel that differs from the
+      frame with no beads, read at every third of a degree round the drop's
+      middle, and what is measured is how far it strays from a circle, in
+      parts of the radius. Three sizes: a droplet (two cells), the common
+      bead (four and a half) and a merged pool (seven).
+    */
+    {
+      await plate(() => A);
+      const cam = { zoom: 5, ...CAMERA.cam, cx: 0.5, cy: 0.5 };
+      const off = await lab.render(S, { beads: 0, ...CAMERA.set }, cam);
+      out.round = [];
+      for (const cells of [2, 4.5, 7]) {
+        const on = await lab.render(S, { beads: 0.8, ...CAMERA.set }, { ...cam, beadMask: mask([{ x: 0.5 * N, y: 0.5 * N, r: cells }]) });
+        const differs = (x, y) => {
+          if (x < 0 || y < 0 || x >= S || y >= S) return false;
+          const i = (Math.round(y) * S + Math.round(x)) * 4;
+          return Math.abs(on[i] - off[i]) + Math.abs(on[i + 1] - off[i + 1]) + Math.abs(on[i + 2] - off[i + 2]) > 24;
+        };
+        // The drop is laid at the frame's middle: the centre is known, not found
+        // (found from the pixels it moves with the bright crescent, and reads
+        // as a wobble that is only the centre's error).
+        const cx = S / 2 - 0.5, cy = S / 2 - 0.5, edge = [];
+        for (let a = 0; a < 360; a += 1 / 3) {
+          const t = a * Math.PI / 180;
+          let far = 0;
+          for (let r = 2; r < S / 2; r += 0.25) if (differs(cx + Math.cos(t) * r, cy + Math.sin(t) * r)) far = r;
+          edge.push(far);
+        }
+        const mean = edge.reduce((p, c) => p + c, 0) / edge.length;
+        const sd = Math.sqrt(edge.reduce((p, c) => p + (c - mean) ** 2, 0) / edge.length);
+        out.round.push({ cells, mean, sd });
+      }
+    }
+    /*
       The second plate turns the line over: A below y = 0.5, B above. The
       same small drop across it asks the lens's other axis, which the first
       plate's middle row cannot see. Then a big drop, seven cells (a merged
@@ -602,6 +641,16 @@ try {
   check('where two drops press together, neither shows the far side of the plate in the closeup',
     m.pairApart && m.pair.rings.changed > 500 && m.pair.drops.changed > 500 && m.pair.rings.b === 0 && m.pair.drops.b === 0,
     `pixels of the dye beyond 0.22: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);
+  // One texel of the mask at 5x, in frame pixels: the plate's 512 texels over a frame five times closer.
+  const TEXEL5 = 5 * 512 / 512;
+  for (const q of m.round) {
+    check(`at 5x the outline of a ${q.cells}-cell drop is round, to under a seventh of a mask texel`,
+      q.sd <= TEXEL5 / 7,
+      `the outermost pixel strays ${q.sd.toFixed(2)} px (${(q.sd / TEXEL5).toFixed(3)} of a texel, ${(100 * q.sd / q.mean).toFixed(2)}% of the ${q.mean.toFixed(1)} px radius); the coverage's own contour strayed 1.2 px`);
+  }
+  check('and the three are in the sizes they were laid (2 : 4.5 : 7)',
+    Math.abs(m.round[1].mean / m.round[0].mean / (4.5 / 2) - 1) < 0.1 && Math.abs(m.round[2].mean / m.round[1].mean / (7 / 4.5) - 1) < 0.1,
+    `radii ${m.round.map((q) => q.mean.toFixed(1)).join(' : ')} px`);
   check('a dyed drop is its dye in the middle', m.dyed.c[1] - m.dyed.p[1] > 40,
     `green ${m.dyed.p[1]} → ${m.dyed.c[1]} (the plate ${m.dyed.p.join(',')}, the drop ${m.dyed.c.join(',')})`);
   check('and the wide mask\'s seam is not a drop', m.dyed.seam === 0, `${m.dyed.seam} pixels changed at the plate's right edge`);
