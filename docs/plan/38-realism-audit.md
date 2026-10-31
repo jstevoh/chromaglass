@@ -47,7 +47,7 @@ written first. Line numbers are as read on main at d07ac31.
   the strain. `npm run bubblephysics` 24/24. Story in `docs/plan-shipped.md` §38b.
 - ~~**38b-2. An Air Dissolves dial**~~ **Shipped** as **Bubble Melt** (the owner, 2026-10-31:
   "a bubble dial for them to melt away"): a factor on air's diffusivity in the Henry's-law
-  shrink, 1 at 0, then 10^(8 + 3v) (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
+  shrink, 1 at 0, then 10^(6 + 5v), very gentle to very extreme (`meltFactor`, `lib/bubbles.ts`); Settings → Look, desks,
   MIDI, patches, the phone. `npm run bubblephysics` 27/27. Story in `docs/plan-shipped.md` §38b-2.
 - **38b-3. Music air reaches the rim** (S; Medium). With no clock a look's bubbles hold at its
   Bubbles count (`room` in `LiquidVisualizer.tsx`) and new ones come only as old ones leave,

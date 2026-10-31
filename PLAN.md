@@ -418,6 +418,10 @@ file's split.
   and files.
 - Every new setting is MIDI-learnable, reachable from the phone, and defaults to the
   current behaviour so a preset made today still looks the same tomorrow.
+- Every dial runs from very gentle to very extreme (the owner, 2026-10-31: "very gentle
+  options and very extreme options ... a general principle for all dials"): its first step
+  barely there, its top past nature, the physics at the core either way. Bubble Melt
+  (38b-2) is the first built to it; an audit of the rest is its own thread.
 - Every feature ships its phone version in the same PR, not after (the owner, 2026-09-27).
 - This plan is kept current: every PR that ships a batch step marks it shipped here,
   and anything found along the way that should be fixed or added goes in as an item,

@@ -114,25 +114,29 @@ const G = 9.81;
   the real one is nil on a show's clock: a 1 mm pocket in the default oil
   takes years. Even a fully degassed liquid, the most a real plate could do
   (the drive Δp/p₀ going from the Laplace pressure's 3e-4 to 1), is only
-  about 3,000 times that, still days. So the first step of the dial lands
-  at a hundred million and the rest of its travel is three more decades on
-  a log scale, set by what a show actually has: the music's and the straw's
-  bubbles are born at two cells' radius or more (`spawn`), 2 mm at 192², the
-  straw blows them to 8 mm, and the flow carries most of them to the rim in
-  5 to 30 s, so a melt slower than that is never seen. At the bottom a 2 mm
-  pocket melts in about 28 s, while it is still on the plate; at the middle
-  (3e9) in under a second, 3 mm in 2 s, 4 mm in 4.5 s; at the top (1e11)
-  even the straw's 8 mm one is gone in a fraction of a second. It was two
-  decades lower first (10^(6 + 3v)), and filmed on the owner's Mac
-  (2026-10-31) only 0.9 melted anything a viewer could see in 40 s.
+  about 3,000 times that, still days. So the dial's first step jumps to a
+  million and its travel is five decades on a log scale, from very gentle
+  to very extreme, as the owner asked every dial to run (2026-10-31). What
+  a show has sets the ends: the music's and the straw's bubbles are born
+  at two cells' radius or more (`spawn`), 2 mm at 192², the straw blows
+  them to 8 mm, and the flow carries most of them to the rim in 5 to 30 s.
+  At the first step (0.05, 1.8e6) a 2 mm pocket takes about 25 minutes, a
+  slow thinning over a set; at 0.25 (1.8e7) about 2.5 minutes, the small
+  ones going while they are still on the plate; at the middle (3e8) 9 s,
+  4 mm in 45 s; at 0.75 (5.6e9) 2 mm in half a second and the straw's 8 mm
+  in 11 s; at the top (1e11) even that one is gone in a fraction of a
+  second and no bubble lives to be seen. Filmed on the owner's Mac
+  (2026-10-31): the first mapping, 10^(6 + 3v), melted nothing visible
+  below 0.9; the second, 10^(8 + 3v), went from a gradual melt at 0.25 to
+  an empty plate at 0.9, all of it strong, with nothing gentle.
   Those times are at today's 6 mm gap; at 38r's 2 mm the Laplace pressure
   2σ/b triples and a millimetre pocket goes about a quarter sooner, by the
   same law. `npm run bubblephysics` holds the dial to these times.
 */
-export const MELT_FLOOR = 1e8;
-export const MELT_DECADES = 3;
+export const MELT_FLOOR = 1e6;
+export const MELT_DECADES = 5;
 
-/** The Bubble Melt dial (0–1) as the factor on air's diffusivity: 1 at 0, then 10^(8 + 3v). */
+/** The Bubble Melt dial (0–1) as the factor on air's diffusivity: 1 at 0, then 10^(6 + 5v). */
 export function meltFactor(v: number | undefined): number {
   const x = Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : 0;
   return x > 0 ? MELT_FLOOR * Math.pow(10, MELT_DECADES * x) : 1;
