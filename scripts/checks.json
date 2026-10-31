@@ -1033,6 +1033,20 @@
       ]
     },
     {
+      "name": "The soap is kept",
+      "shard": "lab2",
+      "run": "npm run soap",
+      "why": [
+        "The mix's soap is conserved and spreads in metres and seconds (PLAN 38c,",
+        "scripts/soap.mjs): a closed plate keeps it to 1% over a minute, a drop on",
+        "a plate already soaped does next to nothing against the same drop on",
+        "clean water, the spread is the same at 128 and 256 and is what its caps",
+        "in m/s and m²/s say, and the thin gap's rim takes only what is past it.",
+        "The lab alone, about five minutes on SwiftShader, so it is here and not",
+        "on the Mac."
+      ]
+    },
+    {
       "name": "A bubble's middle is the plate",
       "shard": "lab2",
       "run": "npm run bubblelook",

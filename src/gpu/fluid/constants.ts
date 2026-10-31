@@ -148,7 +148,6 @@ export const OIL_TENSION = 4e-4;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
-export const SOAP_PULL = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
 /**
