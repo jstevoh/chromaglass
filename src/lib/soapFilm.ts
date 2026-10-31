@@ -41,12 +41,13 @@
      values, so every cell's step change lies inside the face flux interval
      C4 checks, and total thickness is conserved to machine precision).
 
-  3. Evaporation and Newton-black rupture:
-     Evaporation removes a constant `evap` nm/s from the film. Once a cell
-     thins below 30 nm (the transition to a common/Newton black film where
-     disjoining pressure arrests further thinning near bilayer contact), it
-     is marked ruptured, relaxes exponentially toward 8 nm over a 0.5 s time
-     constant, and cannot refill above 30 nm from neighbouring thicker film.
+  3. The frame's Plateau border and black spots (32f, 32g; `npm run soapfilm`
+     C8, C9): the film drains into its frame's border by marginal
+     regeneration, which draws out fresh film of Frankel's thickness
+     (drainToBorder below), and a cell that has thinned goes black on Vrij's
+     clock for the van der Waals instability, handing its liquid to a rim
+     (blackSpots below). Optional uniform evaporation (`evap` nm/s) is a real
+     loss to the air. A black cell is not refilled by the flow.
 
   4. Reflected colour at viewing angle on a dark ground (32b):
      `soapFilmRgb` maps each cell's thickness h to sRGB 0..1 through Airy's
@@ -69,15 +70,15 @@
      integral and camera gamut mapping).
 
   Named shortcuts (PLAN.md §32):
-  - (a) Gravity acts along +y in the plane of the film (`yhat`), representing a
+  - (a) (PLAN 32h) Gravity acts along +y in the plane of the film (`yhat`), representing a
     vertical film in a frame even though the Hele-Shaw plate lies flat.
-  - (b) `zeta = 1.5` (with `dx = 1e-3` m) compresses minutes of real drainage
+  - (b) (PLAN 32i) `zeta = 1.5` (with `dx = 1e-3` m) compresses minutes of real drainage
     into ~30 s of show time so a 1600 nm patch traverses a 64-row film in 30 s.
-  - (c) Evaporation is spatially uniform (`evap` nm/s) rather than coupled to
-    Plateau-border suction curvature.
-  - (d) Rupture below 30 nm is a smooth 0.5 s relaxation to the 8 nm Newton
-    black equilibrium rather than stochastic hole nucleation.
-  - (e) Explicit Marangoni surfactant concentration transport is omitted; its
+  - (c) and (d), uniform evaporation standing in for the frame and rupture as
+    a 0.5 s relaxation to 8 nm that deleted the liquid, are replaced by the
+    border and the black spots (PLAN 32f, 32g); what is still short of the
+    real law there is 32f-1, 32f-2 and 32g-1 to 32g-3.
+  - (e) (PLAN 32j) Explicit Marangoni surfactant concentration transport is omitted; its
     inextensibility constraint is carried directly by `div u = 0`.
   - (f) Angled reflectance (`cosI < 1`) keeps normal-incidence Fresnel
     amplitudes r01, r12 = (n_a - n_b) / (n_a + n_b) (no s/p polarisation split);
@@ -105,6 +106,11 @@ export interface SoapFilmStepOptions {
   g?: number;
   evap?: number;
   zeta?: number;
+  /** The frame's Plateau border radius, metres; absent or 0, a film with no border (a closed box). */
+  border?: number;
+  sigma?: number;
+  mu?: number;
+  hamaker?: number;
 }
 
 export interface SoapFilmRgbOptions {
@@ -128,6 +134,10 @@ export interface SoapFilm {
   v: Float64Array;
   p: Float64Array;
   ruptured: Uint8Array;
+  /** Vrij's clock: the fraction of its rupture time each cell has spent at its thickness. */
+  age: Float64Array;
+  /** Thickness the frame's border has taken, nm summed over cells: sum(h) + drained is conserved. */
+  drained: number;
   rhs: Float64Array;
   sx: Float64Array;
   sy: Float64Array;
@@ -140,7 +150,12 @@ const RHO_WATER = 1000; // kg/m^3, so RHO_WATER * 9.81 = 9810 N/m^3
 const DEFAULT_ZETA = 1.5;
 const BLACK_THRESHOLD_NM = 30;
 const NEWTON_BLACK_NM = 8;
-const BLACK_RELAX_TAU = 0.5;
+// Physical constants of a soap solution's film, the step's defaults: surface
+// tension, the liquid's viscosity, and the Hamaker constant of water across a
+// film in air (Israelachvili, Intermolecular and Surface Forces, table 13.2).
+const SIGMA = 0.025; // N/m
+const MU = 1e-3; // Pa s
+const HAMAKER = 3.7e-20; // J
 
 const minmod = (a: number, b: number): number => {
   if (a * b <= 0) return 0;
@@ -194,6 +209,8 @@ export function createSoapFilm(opts: SoapFilmOptions = {}): SoapFilm {
     v: new Float64Array(n),
     p: new Float64Array(n),
     ruptured,
+    age: new Float64Array(n),
+    drained: 0,
     rhs: new Float64Array(n),
     sx: new Float64Array(n),
     sy: new Float64Array(n),
@@ -214,10 +231,14 @@ export function stepSoapFilm(f: SoapFilm, dt: number, opts: SoapFilmStepOptions 
   const g = opts.g ?? 9.81;
   const evap = opts.evap ?? 0;
   const zeta = opts.zeta ?? DEFAULT_ZETA;
+  const border = opts.border ?? 0;
+  const sigma = opts.sigma ?? SIGMA;
+  const mu = opts.mu ?? MU;
+  const hamaker = opts.hamaker ?? HAMAKER;
 
-  for (let i = 0; i < n; i++) {
-    if (h[i] < BLACK_THRESHOLD_NM) ruptured[i] = 1;
-  }
+  // Black is no longer a threshold read at the start of a step: a cell goes
+  // black when Vrij's clock runs out (blackSpots below), so a film written
+  // thin is black only if createSoapFilm or a caller marked it so.
 
   // Mean thickness hbar for the buoyancy drive rho * g * (h - hbar).
   let hSum = 0;
@@ -372,7 +393,7 @@ export function stepSoapFilm(f: SoapFilm, dt: number, opts: SoapFilmStepOptions 
           const cR = row + i;
           // If a ruptured cell borders a face, do not let advection refill the
           // ruptured cell past 30 nm.
-          if (evap > 0 && (ruptured[cL] || ruptured[cR])) {
+          if (ruptured[cL] || ruptured[cR]) {
             if (ruptured[cR] && vel > 0) { fx[uRow + i] = 0; continue; }
             if (ruptured[cL] && vel < 0) { fx[uRow + i] = 0; continue; }
           }
@@ -395,7 +416,7 @@ export function stepSoapFilm(f: SoapFilm, dt: number, opts: SoapFilmStepOptions 
           const vel = vf[row + i];
           const cN = rowAbove + i;
           const cS = row + i;
-          if (evap > 0 && (ruptured[cN] || ruptured[cS])) {
+          if (ruptured[cN] || ruptured[cS]) {
             if (ruptured[cS] && vel > 0) { fy[row + i] = 0; continue; }
             if (ruptured[cN] && vel < 0) { fy[row + i] = 0; continue; }
           }
@@ -418,22 +439,172 @@ export function stepSoapFilm(f: SoapFilm, dt: number, opts: SoapFilmStepOptions 
     }
   }
 
-  // Evaporation and relaxation of Newton-black film (< 30 nm) toward 8 nm over 0.5 s.
+  if (border > 0 && g !== 0) drainToBorder(f, dt, border, Math.abs(g), zeta, sigma, mu);
+
+  // Evaporation, a real loss to the air, the same everywhere on a film in
+  // still air; it no longer stands in for the frame's suction (that is
+  // drainToBorder) and it never thins a film past Newton black.
   if (evap > 0) {
-    const decay = Math.exp(-dt / BLACK_RELAX_TAU);
     for (let i = 0; i < n; i++) {
-      if (ruptured[i] || h[i] < BLACK_THRESHOLD_NM) {
-        ruptured[i] = 1;
-        const clamped = Math.min(h[i], BLACK_THRESHOLD_NM - 0.1);
-        h[i] = NEWTON_BLACK_NM + (clamped - NEWTON_BLACK_NM) * decay;
-      } else {
-        h[i] = Math.max(NEWTON_BLACK_NM, h[i] - evap * dt);
-        if (h[i] < BLACK_THRESHOLD_NM) {
-          ruptured[i] = 1;
-          h[i] = NEWTON_BLACK_NM + (h[i] - NEWTON_BLACK_NM) * decay;
-        }
-      }
+      if (!ruptured[i]) h[i] = Math.max(NEWTON_BLACK_NM, h[i] - evap * dt);
     }
+  }
+
+  blackSpots(f, dt, sigma, mu, hamaker);
+}
+
+/*
+  Marginal regeneration at the frame (PLAN 32f, replacing shortcut c's uniform
+  evaporation as what drains the film; judged by `npm run soapfilm` C8).
+
+  The frame wears a Plateau border, a meniscus whose curvature sucks thick
+  film in and pulls thin film out (Mysels, Shinoda and Frankel 1959), and the
+  thin film's thickness is Frankel's law for surfaces the surfactant makes
+  rigid: h_f = 2.68 r Ca^(2/3), Ca = mu V / sigma. What sets V here is the
+  film's own buoyancy: the fresh thin film leaves the border at the Darcy
+  speed of a patch h_f thick in film h_c thick, V = rho g (h_c - h_f) / zeta,
+  the law the rest of the film already moves by. The two together fix h_f
+  (solved by bisection: the left side rises in h_f, the right falls), and the
+  border takes V (h_c - h_f) per metre of frame per second. Over a cell of
+  width dx that is a relaxation of h_c toward h_f at the rate V / dx for
+  each side of the cell on the frame, taken exactly (exp), side by side.
+
+  The border is not the same all round. It is one body of liquid in
+  hydrostatic balance, so its Laplace pressure sigma / r falls by rho g z
+  with the height z above the bottom: r(z) = 1 / (1/r0 + rho g z / sigma),
+  r0 the bottom border's radius (the `border` option). On a 64 mm film with
+  r0 = 1 mm the top border is 38 um: tight, and sucking hard, which is why a
+  hanging film goes black from the top. The sides grade between the two.
+
+  The volume goes to f.drained, so sum(h) + drained is what is conserved.
+*/
+function drainToBorder(f: SoapFilm, dt: number, r0: number, g: number, zeta: number, sigma: number, mu: number): void {
+  const { nx, ny, dx, h, ruptured } = f;
+  const k = (mu * RHO_WATER * Math.abs(g) * 1e-9) / (zeta * sigma);
+  const lift = (RHO_WATER * Math.abs(g)) / sigma;
+  // Height above the bottom border of a row's centre, the bottom being +y
+  // when g > 0 and row 0 when g < 0; the top border sits a full film above.
+  const height = (j: number) => (g > 0 ? ny - 0.5 - j : j + 0.5) * dx;
+  const radius = (z: number) => 1 / (1 / r0 + lift * z);
+  const rTop = radius(ny * dx);
+  const relax = (c: number, r: number) => {
+    const hc = h[c];
+    if (hc <= NEWTON_BLACK_NM) return;
+    const frankel = 2.68 * r * 1e9;
+    let lo = NEWTON_BLACK_NM, hi = hc;
+    for (let it = 0; it < 40; it++) {
+      const x = 0.5 * (lo + hi);
+      if (x < frankel * Math.pow(k * (hc - x), 2 / 3)) lo = x; else hi = x;
+    }
+    const hf = 0.5 * (lo + hi);
+    const V = (RHO_WATER * Math.abs(g) * (hc - hf) * 1e-9) / zeta;
+    const next = hf + (hc - hf) * Math.exp((-V * dt) / dx);
+    f.drained += hc - next;
+    h[c] = next;
+  };
+  for (let j = 0; j < ny; j++) {
+    const upper = g > 0 ? j === 0 : j === ny - 1;
+    const lower = g > 0 ? j === ny - 1 : j === 0;
+    const rSide = radius(height(j));
+    for (let i = 0; i < nx; i++) {
+      const left = i === 0, right = i === nx - 1;
+      if (!upper && !lower && !left && !right) { i = nx - 2; continue; }
+      const c = j * nx + i;
+      if (ruptured[c]) continue;
+      if (upper) relax(c, rTop);
+      if (lower) relax(c, r0);
+      if (left) relax(c, rSide);
+      if (right) relax(c, rSide);
+    }
+  }
+}
+
+/*
+  Black spots (PLAN 32g, replacing shortcut d's 0.5 s relaxation; judged by
+  `npm run soapfilm` C9).
+
+  A thin film is unstable to the van der Waals pull between its two faces: a
+  thermal ripple on it grows at Vrij's rate (1966), the linear growth of the
+  thin-film equation with immobile surfaces under the disjoining pressure
+  -A / (6 pi h^3), whose fastest mode takes tau = 96 pi^2 sigma mu h^5 / A^2.
+  Each cell keeps that clock, f.age += dt / tau(h): at 40 nm it runs out in
+  about 2 s, at 60 nm in 13, at 300 nm in eleven hours, so where the film goes
+  black is set by how thin it has got, steeply, and not by a threshold. In a
+  soap film the ripple does not open a hole: it stops at Newton black, 8 nm,
+  where the surfactant's two layers touch, and the liquid it held is pushed
+  out of the spot into a rim (Mysels' black spots). So when a cell's clock
+  runs out it goes to 8 nm and hands h - 8 to the neighbours that are not
+  black, and nothing is lost.
+
+  Two neighbours never turn on the same step: a cell turns only if its clock is
+  the largest among its film neighbours (the index breaks a tie), so each
+  turning cell's neighbours are all still film and can take its liquid. A thin
+  region therefore goes black from its thinnest cell outward, one cell a
+  step, pushing its liquid ahead of it into the thick film at its edge, where
+  the clock is young: the rim. That front's speed is the grid's (one cell a
+  step), not the physical spot's (32g-1). The clock sits on the grid rather
+  than travelling with the film; it matters only where the film is thinner
+  than about 60 nm, which is where it barely moves.
+*/
+function blackSpots(f: SoapFilm, dt: number, sigma: number, mu: number, A: number): void {
+  const { nx, ny, h, ruptured, age, rhs, sx: turn } = f;
+  const n = nx * ny;
+  const c5 = (96 * Math.PI * Math.PI * sigma * mu) / (A * A);
+  for (let c = 0; c < n; c++) {
+    if (ruptured[c]) continue;
+    const m = h[c] * 1e-9;
+    age[c] += dt / (c5 * m * m * m * m * m);
+  }
+  // rhs and sx are free scratch here: the share each turning cell hands each
+  // neighbour, and which cells turn.
+  rhs.fill(0);
+  turn.fill(0);
+  let any = false;
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const c = j * nx + i;
+      if (ruptured[c] || age[c] < 1) continue;
+      const a = age[c];
+      let film = 0, top = true;
+      const look = (nb: number) => {
+        if (ruptured[nb]) return;
+        film++;
+        if (age[nb] > a || (age[nb] === a && nb > c)) top = false;
+      };
+      if (i > 0) look(c - 1);
+      if (i < nx - 1) look(c + 1);
+      if (j > 0) look(c - nx);
+      if (j < ny - 1) look(c + nx);
+      if (!top || film === 0) continue;
+      rhs[c] = Math.max(0, h[c] - NEWTON_BLACK_NM) / film;
+      turn[c] = 1;
+      any = true;
+    }
+  }
+  if (!any) return;
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const c = j * nx + i;
+      if (turn[c] || ruptured[c]) continue;
+      let gain = 0, from = 0;
+      const take = (nb: number) => { if (turn[nb]) { gain += rhs[nb]; if (age[nb] > from) from = age[nb]; } };
+      if (i > 0) take(c - 1);
+      if (i < nx - 1) take(c + 1);
+      if (j > 0) take(c - nx);
+      if (j < ny - 1) take(c + nx);
+      if (from === 0) continue;
+      h[c] += gain;
+      // The spot's edge runs on through film that is itself unstable: a
+      // neighbour whose own clock has run out takes the turning cell's clock,
+      // so it turns next and passes the liquid on outward, instead of being
+      // left behind as an island when its thinner neighbours turn round it.
+      // Film whose clock has not run out (the thick film at the spot's edge)
+      // keeps its own: that is where the liquid stops, the rim.
+      if (age[c] >= 1 && from > age[c]) age[c] = from;
+    }
+  }
+  for (let c = 0; c < n; c++) {
+    if (turn[c]) { h[c] = NEWTON_BLACK_NM; ruptured[c] = 1; }
   }
 }
 

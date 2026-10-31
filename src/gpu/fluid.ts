@@ -55,7 +55,7 @@ import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
-export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
+export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, STEFAN_FILM, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
 export type { FieldStats } from './fluid/constants';
 
 export class WebGPUFluid extends FluidReads {
@@ -593,7 +593,8 @@ export class WebGPUFluid extends FluidReads {
         this.phaseGapPrimed = false;
       }
       if (!deltasApplied) {
-        this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze no delta', [0, 0, 0, 0]));
+        // A.a.y the thin gap, for the glass's suction on its way up (PLAN 38l), as the delta's update has it.
+        this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze no delta', [0, this.thinLive ? 1 : 0, 0, 0]));
         this.squeeze.swap();
       }
       /*
