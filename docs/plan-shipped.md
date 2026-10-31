@@ -7740,13 +7740,16 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
     crosses it. The caps that keep the explicit flux stable are in m/s and m²/s, with
     as many substeps (up to 8) as the grid and step need: at 384² and 60 Hz every
     number is the old one, so the looks keep their pull. The front's real speed is
-    38c-1. `npm run soap` (9 lines, lab, SwiftShader in about five minutes): a stirred,
-    bursting closed plate keeps its soap to 0.00% over a minute (the fade left a
-    millionth); with Soap Bursts at 0 the soap's second moment moves 0.000003 in a minute
-    (the old diffusion, 0.0117); a drop on a plate soaped ten seconds before moves 0.0%
-    of the dye under it, against 99.5% on clean water; a burst's spread is 1.477e-3 at
-    128² and 1.463e-3 at 256², against 4·D_cap·t's 1.562e-3; the rim takes all 8.6e-3
-    outside it and keeps the 0.01713 inside.
+    38c-1. `npm run soap` (11 lines, lab, SwiftShader in about six minutes; its
+    first version's gaps found by the check-skeptic and closed): a stirred, bursting
+    closed plate keeps its soap to 0.00% over a minute (the fade left a millionth);
+    with Soap Bursts at 0 the soap's second moment moves 0.000003 in a minute (the old
+    diffusion, 0.0234), and soapPlan hands the solver D·t/dx² exactly at three grids
+    and steps; a drop on soap adds its whole dome (0.00565), and moves 0.0% of the dye
+    under it, against 99.5% on clean water; a burst's soap spreads 1.477e-3 at 128²,
+    1.463e-3 at 256² and 1.476e-3 at 60 Hz against 20 Hz (4·D_cap·t 1.562e-3), and
+    the dye it carries 3.239e-3, 3.438e-3 and 3.236e-3; on a thin gap soap pushed
+    over the rim leaves (0.00566 to 4e-7) and a pool against it keeps all 0.00565.
 
 ### QA list: what the owner found playing it
 
