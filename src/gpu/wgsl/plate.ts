@@ -1878,9 +1878,11 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
 }
 
 /*
-  Refraction optics across plate liquid interfaces (PLAN 18e):
-  Hairline dark rims from light deflected outside the projector pupil (aperture loss),
-  and shadowgraph Becke line intensity doublets under projector defocus.
+  Refraction optics across plate liquid interfaces (PLAN 18e): hairline dark
+  rims from light deflected outside the projector pupil (aperture loss). The
+  Becke doublets under defocus are not here: they are the whole column's
+  shadowgraph, dye, oil and pour as one term (defocusShadow, plateTransmit.ts,
+  PLAN 38h-3).
 
   Named shortcuts:
   1. Small-angle deflection θ ≈ |∇density| · 0.35 (from the air-masked slope g0 on Layer 0,
@@ -1894,9 +1896,7 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
   3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
      weighted by reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye
      boundary.
-  4. The shadowgraph transport 1 - Δz · ∇²OPL is divided by local OPL, scaled by
-     boundaryContrast * 2 and masked by an edge-deflection smoothstep; at default
-     projectorFocus = 0.5, Δz = 0 so the Becke term is 1 until the slider moves.
+  4. (The shadowgraph, once here and masked to the dye's edges, is defocusShadow's.)
   5. Layer 1 keeps a painted boundary line (edge1 * boundaryContrast * 1.6 from
      |∇density|, gated on fluid1.a > 0.03) alongside refractionOptics(near1):
      with both dishes at Δz = 0 at default focus, aperture loss alone darkens edges and
@@ -1910,33 +1910,21 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      shelf's table gives a dye one. It is what gives a dye-only look its Becke lines.
      The poured liquids' indices are real (the species field, PLAN 18d-9): glycerine
      reads 1.4746 because the shelf says so, and npm run derive measures it so.
-  7. A clear poured liquid's edge (glycerine into water, no dye) reaches ∇²OPL, but
-     this function returns early where the dye's gradient is flat (gLen, from note 1),
-     so that edge draws no line yet. PLAN 18e-2: deflect by ∇OPL, not the dye's slope.
+  7. A clear poured liquid's edge (glycerine into water, no dye) or an oil drop's
+     deflects nothing here, which reads the dye's slope (note 1): it draws its
+     Becke lines out of focus but no rim in focus. PLAN 18e-2: deflect by ∇OPL.
 */
-fn refractionOptics(near: vec4f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
-  let grad = near.xy;
+fn refractionOptics(grad: vec2f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
   let gLen = length(grad);
-  let strength = max(reliefK, max(edgeK, abs(U.projectorFocus - 0.5)));
-  if (strength <= 0.005 || (gLen <= 0.005 && bEdge <= 0.005)) {
+  if (max(reliefK, edgeK) <= 0.005 || (gLen <= 0.005 && bEdge <= 0.005)) {
     return 1.0;
   }
-  let lap = near.z;
-  let opl = max(1.0, near.w);
-
   let na = DROP_NA;
   let theta = gLen * 0.35;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
   let uB = clamp((bEdge * edgeK * 1.1) / (2.0 * na), 0.0, 1.0);
   let uBound = smoothstep(0.25, 1.0, uB) * 0.78;
-  let aperture = 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 0.85);
-
-  let deltaZ = (U.projectorFocus - 0.5) * 1.5;
-  let shadowGain = max(1.0, U.boundaryContrast * 2.0);
-  let edgeDeflect = smoothstep(0.005, 0.05, max(gLen, bEdge));
-  let shadow = clamp(1.0 - deltaZ * (lap / opl) * shadowGain * edgeDeflect, 0.2, 2.5);
-
-  return aperture * shadow;
+  return 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 0.85);
 }
 `;
 
@@ -2581,7 +2569,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       var bEdge0 = 0.0;
       if (U.boundaryContrast > 0.005) { bEdge0 = boundaryEdge(layer0, fuv0); }
       let reliefK0 = select(0.0, U.edgeRelief * plateAmt, plateOn && U.edgeRelief > 0.005);
-      fluid0 = vec4f(fluid0.rgb * refractionOptics(vec4f(g0, near0.zw), bEdge0, reliefK0, edgeK), fluid0.a);
+      fluid0 = vec4f(fluid0.rgb * refractionOptics(g0, bEdge0, reliefK0, edgeK), fluid0.a);
     } else if (U.boundaryContrast > 0.005) {
       var edge0 = boundaryLine(near0.z);
       if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
@@ -2977,21 +2965,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     */
     /*
       Oil in water: where the two meet the light bends away, so a real oil
-      drop on a projector is ringed by a thin dark line (the meniscus). Its
-      body is a weak lens, and was drawn 8% brighter than the water wherever
-      it lay, at any focus (PLAN 38h). A lens brightens nothing in focus: it
-      gathers light only on a plane past itself, the shadowgraph's
-      1 - Δz·∇²OPL that refractionOptics draws for the dye, with the same Δz
-      and gain. So the body is lit by its own optical path, (n_oil - n_water)
-      times the oil's depth, at the derive pass's scale (below): bright in the middle and dark at the
-      rim when the lens is focused past the plate, the other way round short
-      of it, and nothing at Focus's middle. Drawn on both sides of the oil's
-      edge, since the caustic lies across it: gated on the oil, it was cut
-      off at the edge in a staircase. So it costs twenty-four reads of the view on
-      every pixel while Focus is off its middle, which no look ships with.
-      Where dye crosses the oil's edge refractionOptics already takes the
-      oil's share of ∇²OPL (until 18e-2 makes the two one term), so there
-      the shadow is counted twice, along the dye's edge only.
+      drop on a projector is ringed by a thin dark line (the meniscus); the
+      camera's and the derive-less plate's is drawn here (the projector's
+      waits on 18e-2). Its body is a weak lens, which brightens nothing in
+      focus (PLAN 38h): out of focus it is the column's shadowgraph, with the
+      dye's, the pour's and the gap's, one term (defocusShadow, PLAN 38h-3).
     */
     if (view.oil > 0.004) {
       if (isCamera || U.derivedOn <= 0.5) {
@@ -3002,36 +2980,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         outColor = outColor * (1.0 - 0.55 * rim);
       }
     }
-    let dz = (U.projectorFocus - 0.5) * 1.5;
-    if (abs(dz) > 0.001 && !isCamera) {
-      /*
-        Out of focus the wall sees the plate through the lens's defocus
-        disc, so the caustic is the Laplacian seen through that blur, not
-        cell by cell: read off the view grid's bilinear facets, the first
-        version drew its rings in stair-steps a cell wide, and the hard
-        clamp turned them into flat black and white bands with stepped
-        edges (the owner, on the Mac's pictures: "really pixelated at the
-        edge ... super digital"). So the Laplacian is the difference of two
-        ring means (sixteen taps and eight: with eight and four the rings
-        came out blotched where the taps fell on the facets), 4 (mean over radius R - mean over R/3) / (R² - R²/9),
-        with R the derive pass's spacing widened as the disc grows with Δz,
-        which averages over the facets as the defocus does; scaled to the
-        derive pass's 9-tap stencil (50 e² ∇²). And the transport is
-        exp(-Δz ∇²OPL/n), the linear law's own first order, positive as
-        light must be and without the clamp's kinks.
-      */
-      let e = 3.0 / U.logicalGrid;
-      let R = e * (1.0 + 4.0 * abs(dz));
-      var outer = 0.0;
-      var inner = 0.0;
-      for (var k = 0; k < 16; k++) {
-        let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
-        outer += viewAt(fuvBase + d * R).oil;
-        if (k % 2 == 1) { inner += viewAt(fuvBase + d * (R / 3.0)).oil; }
-      }
-      let lapOil = (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e * (N_OIL - N_WATER);
-      outColor *= clamp(exp(-dz * (lapOil / N_WATER) * max(1.0, U.boundaryContrast * 2.0)), 0.2, 2.5);
-    }
+    if (!isCamera && U.derivedOn > 0.5) { outColor *= defocusShadow(derived0, fuv0); }
     /*
       A pH indicator in the dye (red cabbage's anthocyanin). The indicator
       is the dye: acid and base do not lay a colour over it, they change
@@ -3159,7 +3108,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
     if (sharp1 && fluid1.a > 0.03) {
       if (!isCamera && U.derivedOn > 0.5) {
-        fluid1 = vec4f(fluid1.rgb * refractionOptics(near1, 0.0, 0.0, 0.0), fluid1.a);
+        // The back plate's shadowgraph on its own dye, until 18e-1 puts it at its own height.
+        fluid1 = vec4f(fluid1.rgb * defocusShadow(derived1, fuv1), fluid1.a);
         // Painted shortcut (see refractionOptics note 5, PLAN 18e-1 / 31a):
         // keeps the upper dish's boundary brightness until 31a separates the
         // two dishes' focal heights Δz in the projector cone.

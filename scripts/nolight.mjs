@@ -39,6 +39,16 @@
  *        Focus 0.2 the same pixels the other way, which a flat gain cannot do
  *   8.   no grain: the same plate drawn at two times of the clock is the same
  *        picture, byte for byte
+ *   9.   the shadowgraph is the whole column's, one term (PLAN 38h-3): a clear
+ *        pour of glycerine, no dye in it and no oil, is a lens out of focus
+ *        as line 7 asks of the oil, and brightens nothing in focus. And the
+ *        same lens as the oil's: the two drops are the same size and step
+ *        the index about as far (glycerine 0.142 over water, the oil 0.8 of
+ *        0.137), so the pixels each turns past 2 levels at 0.8 are within a
+ *        quarter of each other. The dye's shadowgraph and the oil's were
+ *        drawn apart, the dye's only where the dye itself sloped and the
+ *        oil's from the oil alone, so on main the pour drew its lens only
+ *        where the wash happened to slope: 301 px against the oil's 1944
  *
  * Every number asked is printed. Run against main before this change it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
@@ -57,11 +67,13 @@ const check = (name, ok, detail = '') => {
 const N = 128, SIZE = 256, SLACK = 1, DARK = 8, DOES = 0.002;
 /** Where the oil goes: the wash, away from the pools, so the plate under it is the lamp through the wash alone. */
 const OIL = { x: 0.72, y: 0.28, r: 0.09 };
+/** Where the clear pour goes (line 9): the wash's far corner from the oil and the pools. */
+const POUR = { x: 0.72, y: 0.72, r: 0.09 };
 
 const { page, close } = await openLab();
 let r;
 try {
-  r = await page.evaluate(async ({ N, SIZE, OIL, DARK }) => {
+  r = await page.evaluate(async ({ N, SIZE, OIL, POUR, DARK }) => {
     await lab.create(N);
     /*
       The grade at 1, a plain transfer. Saturation Boost pushes each channel
@@ -127,8 +139,13 @@ try {
     out.oilFocus = await shot({ projectorFocus: 0.5 });
     out.oil8 = await shot({ projectorFocus: 0.8 });
     out.oil2 = await shot({ projectorFocus: 0.2 });
+    // A clear pour, no dye in it, onto the wash away from the oil and the pools: glycerine, n 1.4746.
+    lab.addSpecies(POUR.x, POUR.y, POUR.r, 50, 'glycerine', false);
+    out.pourFocus = await shot({ projectorFocus: 0.5 });
+    out.pour8 = await shot({ projectorFocus: 0.8 });
+    out.pour2 = await shot({ projectorFocus: 0.2 });
     return out;
-  }, { N, SIZE, OIL, DARK });
+  }, { N, SIZE, OIL, POUR, DARK });
 } finally {
   await close();
 }
@@ -249,6 +266,25 @@ const oilThere = up8 > 20 && down8 > 20;
 {
   const d = compare(r.later, r.plain), e = compare(r.plain, r.later);
   check('8. no grain: two times of the clock draw the same plate', d.over <= 0 && e.over <= 0, `the most a channel moved: ${Math.max(d.over, e.over, 0)} levels`);
+}
+
+{
+  const inPour = (u, v) => Math.hypot(u - POUR.x, (1 - v) - POUR.y) < POUR.r * 1.3;
+  let up = 0, down = 0, turn = 0, seen = 0;
+  for (let i = 0; i < P; i++) {
+    const x = i % SIZE, y = Math.floor(i / SIZE);
+    if (!inPour(x / SIZE, y / SIZE)) continue;
+    const g8 = r.pour8[4 * i + 1] - r.oil8[4 * i + 1];
+    const g2 = r.pour2[4 * i + 1] - r.oil2[4 * i + 1];
+    if (g8 > 2) up++;
+    if (g8 < -2) down++;
+    if (Math.abs(g8) > 2 && Math.abs(g2) > 2) { seen++; if (Math.sign(g8) !== Math.sign(g2)) turn++; }
+  }
+  const d = compare(r.pourFocus, r.oilFocus, inPour);
+  const ratio = (up + down) / Math.max(1, up8 + down8);
+  check(`9. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8, the other way at 0.2, over 90%), the oil's own lens within a quarter, and in focus brightens nothing (by over ${SLACK})`,
+    up > 20 && down > 20 && seen > 20 && turn / seen > 0.9 && ratio > 0.75 && ratio < 1 / 0.75 && d.over <= SLACK,
+    `${up} px brighter, ${down} darker at 0.8 (the oil's ${up8 + down8}, ${ratio.toFixed(2)} of it); ${turn} of ${seen} turn over at 0.2; in focus brightest by ${d.over} levels`);
 }
 
 const failed = checks.filter((c) => !c.ok).length;

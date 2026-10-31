@@ -10324,6 +10324,21 @@ model cannot reach one, the PR says what it reached and asks.
     about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
     line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
     term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §99).
+  - **38h-3 (shipped 2026-10-31).** The shadowgraph was two terms. `refractionOptics` drew the
+    dye's from the derive pass's ∇²OPL, masked to the dye's own slope and only over dye; the
+    oil block drew the oil's from the oil alone (38h's ring means). So where dye crossed an
+    oil drop's edge the oil's share was counted twice (in the lab at Focus 0.8 a black arc at
+    10 and a clipped one at 255 along the dye's edge), and a clear pour that moves only the
+    index (glycerine, Δn 0.14) drew its lens only where the dye happened to slope. Now one
+    function, `defocusShadow` (`src/gpu/wgsl/plateTransmit.ts`), takes the oil block's ring-mean
+    Laplacian at the defocus disc's scale off the derive pass's `.w`, the whole column's
+    optical path n·h (dye stand-in, oil, pour, film, gap), divided by water's index, and
+    multiplies the light through the front plate (the back plate's own dye, until 18e-1).
+    Averaging the derive pass's `.z` (∇²OPL) over the disc was tried first and speckled a
+    fresh pour's stair-stepped rim. `npm run nolight` line 9 (new): a clear pour is a lens out
+    of focus, within a quarter of the oil's of the same size (0.95 of it; main 0.15), and
+    brightens nothing in focus; 9/9, main 8/9. Nothing changes at Focus's middle, which every
+    look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
