@@ -153,6 +153,23 @@ phone's remote, in the same PR. Lens flares and light leaks stay out (Not copied
   old presets reads as Classic overhead / today's camera. Ships with whichever of 31f-2 or
   31f-3 lands first. *Measure:* `npm run panel`, `npm run desk`, `npm run phone`, and the
   `setting-auditor` agent.
+- **31f-5. Your own Lens Types (Pro).** *The owner, 2026-10-31: "just like liquids, let
+  pro users create new lens types based on customizing key variables".* As a liquid is
+  made from its properties (`lib/liquidFile.ts`, `*.liquids.json`), a Lens Type is made
+  from 31f-1's numbers: a `*.lenses.json` file (`"format": "chromaglass.lenses"`), a name,
+  and any of focal length, f-number, the angle mapping, distortion k1/k2, falloff, blade
+  count and anamorphic squeeze, Petzval radius, the glass's index and Abbe number, and for
+  a prism its facets, apex angle and index; a field left out is the Classic overhead's
+  value, and a number out of range is held to its range (which may run past real lenses,
+  as the dials do), not refused. A Lens Designer on the Design desk starts from any
+  built-in type and shows each change on the plate as it is made; the phone's remote edits
+  the same numbers through the same lib functions. Making, editing and importing a lens
+  is Pro, asked through `tierGates` like custom liquids (the owner's same-day rule,
+  built in its own thread); own lenses travel in presets, set lists, the show kit and
+  Pro's cloud sync beside own liquids. *Measure:* a node check that a file round-trips,
+  out-of-range numbers clamp, a missing field reads as Classic overhead, and a Free or
+  Home licence cannot save or import one; `npm run panel`, `npm run desk`,
+  `npm run phone`, and the `setting-auditor` agent.
 
 **Not copied.** Sprites and overlays (Lens Flare, Atmospheric Glow, Orbs, Smoke & Fog,
 Light Leaks): pictures laid over the plate, where a show's glow is the lamp through the
