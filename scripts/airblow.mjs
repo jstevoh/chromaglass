@@ -47,8 +47,11 @@
  *   4. And keeps its colour to 0.5% (the carries kept 99.4% of a puff's;
  *      the old eraser lost 21%), the pool left alone to 0.1%.
  *   5. A pool of ferrofluid and a drop of oil under the same wind are
- *      carried along by the flow alone, each at least half as far as the
- *      colour, none of either made or lost (0.5%).
+ *      carried along by the flow alone, the ferrofluid at least half as far
+ *      as the colour; the drop as one body, at least a third as far as the
+ *      free colour and half as far as the colour inside it, which goes with
+ *      it, neither drawn out where the free colour doubles its spread
+ *      (PLAN 38e-6); none of either made or lost (0.5%).
  *   6. The Amount's range (PLAN.md QA-20): a gentle breath (Amount 0.25, a
  *      sixteenth of the stress) moves the pool under a tenth of what the
  *      default does, a gale (Amount 2.5) at least three times as far.
@@ -89,16 +92,23 @@ try {
     await lab.step(30, over);
     const read = async () => {
       const d = await lab.field('dye');
-      let t = 0, mx = 0;
-      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { const v = d[(i + j * L) * 4 + 3]; t += v; mx += v * (i + 0.5) / L; }
-      let m = 0, fx = 0;
+      // A field's amount, its middle along x and its spread about it (the root mean square, of the plate).
+      const moments = (data, n, stride, at) => {
+        let m = 0, mx = 0;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = data[(x + y * n) * stride + at]; m += v; mx += v * (x + 0.5) / n; }
+        const cx = m > 0 ? mx / m : 0;
+        let xx = 0;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = data[(x + y * n) * stride + at]; const dx = (x + 0.5) / n - cx; xx += v * dx * dx; }
+        return { m, cx, sx: m > 0 ? Math.sqrt(xx / m) : 0 };
+      };
+      const c = moments(d, L, 4, 3);
+      let f = { m: 0, cx: 0, sx: 0 };
       if (liquid !== 'none') {
-        const f = liquid === 'oil' ? await s.readChemistry('mix') : await lab.phase();
-        const n = f.n, stride = liquid === 'oil' ? 4 : 1;
-        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = f.data[(x + y * n) * stride]; m += v; fx += v * (x + 0.5) / n; }
-        if (!(m > 0)) throw new Error(`no ${liquid} on the plate to measure`);
+        const r = liquid === 'oil' ? await s.readChemistry('mix') : await lab.phase();
+        f = moments(r.data, r.n, liquid === 'oil' ? 4 : 1, 0);
+        if (!(f.m > 0)) throw new Error(`no ${liquid} on the plate to measure`);
       }
-      return { dye: t, cx: mx / t, mass: m, fx: m > 0 ? fx / m : 0 };
+      return { dye: c.m, cx: c.cx, sx: c.sx, mass: f.m, fx: f.cx, fsx: f.sx };
     };
     const t0 = await read();
     const R = lab.BLOW_RADIUS * L / 128;
@@ -239,9 +249,61 @@ try {
   {
     const moved = (k) => got[k].t1.fx - got[k].t0.fx;
     const kept = (k) => Math.abs(got[k].t1.mass / got[k].t0.mass - 1) < 0.005;
-    check('a pool of ferrofluid and a drop of oil under the same wind are carried along by the flow, none made or lost',
-      need('ferro', 'oil', 'right') && moved('ferro') >= 0.5 * along('right') && moved('oil') >= 0.5 * along('right') && kept('ferro') && kept('oil'),
-      need('ferro', 'oil', 'right') ? `the ferrofluid ${pc(moved('ferro'))} (${pc(got.ferro.t1.mass / got.ferro.t0.mass - 1)} made or lost), the oil ${pc(moved('oil'))} (${pc(got.oil.t1.mass / got.oil.t0.mass - 1)}), against the colour's ${pc(along('right'))}` : 'not run');
+    /*
+      The oil is a drop, and a drop is not a pool (PLAN 38e-6). The breath
+      is a jet half the drop's width, drawn from the drop's middle out past
+      its edge. A pool of colour has nothing holding it together, so the
+      jet draws a tongue of it out and carries the tongue the whole stroke:
+      the colour's middle goes 2.5% of the plate, its spread along x
+      doubles (2.50% → 5.04% on 192²) and it leans the wind's way (skew
+      1.1). A drop with its own surface tension is pushed as one body: the
+      jet pushes the oil under it forward, the oil round that flows back
+      inside the drop (between two glasses a push on part of a body is a
+      dipole, whose flow over the body is half the push's), and the tension
+      keeps the body round (its spread 3.01% → 3.11%, skew 0.16). So its
+      middle goes about half as far as a free pool's, and the colour inside
+      it rides with it: in the drop's own run the colour went 1.53% and the
+      oil 1.17% (384²: 1.65% and 1.21%), at three times the tension 1.41%
+      and 1.09%, where with next to no tension (0.01) the colour went 2.40%
+      and the oil 1.62%, drawn into the same tongue (its spread
+      3.01% → 4.64%). A drop at
+      rest, round or a teardrop, does not move at all (0.00%), so the force
+      has no net part of its own: what held the oil was the drop holding
+      together, and the half-cell cap the force had until 38e was what had
+      let the jet carve it like a pool (+2.07% against +2.93%).
+
+      So the drop is measured against the colour inside it, which the same
+      flow carries in the same substeps, and not against a pool of colour
+      without it; the colour's middle still leads the oil's by a quarter or
+      so because the colour is laid as a soft disc (its spread 2.50%) and
+      the oil as a full one (3.01%), so the jet, which starts in the
+      middle, moves more of the colour's share than of the oil's. And the
+      drop has to go the wind's way as a body for its share: at least a
+      third of the free pool's, where the dipole's half times the two
+      discs' shares puts it at 0.43 (384², and the Mac the same), and stay
+      one body, its spread along x grown by under a quarter (384²: 2.4%)
+      where the free pool's grows by half or more (117%). The colour
+      inside it has the same two bars (it went a third of the free pool's
+      at least, 1.65% against 0.93%, its spread +12%), so the pair cannot
+      pass by both sitting still, and the breath has to have been laid on
+      every step of both runs. Controls on 384²: with next to no tension
+      (0.01) the oil went +1.75% with its colour's +2.69%, past both
+      floors, and its spread +61%, drawn out like the pool; with the
+      half-cell cap put back on the force the oil went +2.07% with its
+      colour's +2.93%, past the old bar, its spread +50%. Only the spread
+      bar tells a drop from a pool, so it is the one that counts here. The
+      spread is taken along x, the jet's own line; a drop torn across it
+      would show in its mass or its colour. The ferrofluid is measured as
+      it was.
+    */
+    const ride = got.oil ? got.oil.t1.cx - got.oil.t0.cx : 0;
+    const spread = (k, f) => got[k].t1[f] / got[k].t0[f] - 1;
+    const body = (k) => moved(k) >= along('right') / 3 && spread(k, 'fsx') < 0.25;
+    check('a pool of ferrofluid and a drop of oil under the same wind are carried along by the flow, none made or lost; the drop as one body, with its colour inside it',
+      need('ferro', 'oil', 'right') && along('right') >= 0.005 && got.ferro.laid === 90 && got.oil.laid === 90 &&
+        moved('ferro') >= 0.5 * along('right') && kept('ferro') && kept('oil') &&
+        moved('oil') >= 0.5 * ride && ride >= along('right') / 3 && body('oil') && spread('oil', 'sx') < 0.25 && spread('right', 'sx') >= 0.5,
+      need('ferro', 'oil', 'right') ? `the ferrofluid ${pc(moved('ferro'))} (${pc(got.ferro.t1.mass / got.ferro.t0.mass - 1)} made or lost) against the colour's ${pc(along('right'))}; the oil ${pc(moved('oil'))} (${pc(got.oil.t1.mass / got.oil.t0.mass - 1)}) with its colour's ${pc(ride)}, their spreads along x ${pc(spread('oil', 'fsx'))} and ${pc(spread('oil', 'sx'))} where the free colour's ${pc(spread('right', 'sx'))}` : 'not run');
   }
   // 6.
   {

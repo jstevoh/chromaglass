@@ -79,11 +79,11 @@ export interface LiquidBehaviour {
     as what it is dissolved in. The clear liquid itself is the look's
     Thickness (thinGapViscosity in src/gpu/fluid.ts).
 
-    Only the viscosity is read so far: a miscible bottle carries it into
-    the GPU's species field (src/lib/liquidProps.ts), and the thin gap's
-    drag takes it from there. The density, tension and index ride along in
-    the same field for 18d's next pieces (the tilt's buoyancy, alcohol's
-    Marangoni burst, edges from refraction) and nothing reads them yet.
+    A miscible bottle carries its viscosity into the GPU's species field
+    (src/lib/liquidProps.ts), and the thin gap's drag takes it from there;
+    an oil's interface with water sets the plate's oil tension (PLAN 38e).
+    The density and index ride along in the same field for 18d's next
+    pieces (the tilt's buoyancy, edges from refraction).
   */
   /** Dynamic viscosity, mPa·s (water 1.0). */
   viscosity?: number;
@@ -91,6 +91,13 @@ export interface LiquidBehaviour {
   density?: number;
   /** Surface tension against air, mN/m (water 72.8). */
   tension?: number;
+  /**
+   * For a liquid that will not mix with water, the tension of its interface
+   * with water, mN/m: what rounds an oil drop between the glasses (PLAN 38e,
+   * lib/liquidProps.ts interfacialTension, which falls back to Antonow's
+   * rule on `tension` for a bottle without it).
+   */
+  interfacial?: number;
   /** Refractive index (water 1.333). */
   index?: number;
   /**

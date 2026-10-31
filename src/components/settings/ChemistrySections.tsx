@@ -169,7 +169,7 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           label="Oil Tension"
           value={settings.oilTension ?? 0}
           min={0}
-          max={1}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ oilTension: v })}
           settingKey="oilTension"

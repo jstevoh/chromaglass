@@ -11,6 +11,8 @@ import { SPLAT_FLOATS, type SplatList } from '../splats';
 import type { SolverCarry } from '../solverTypes';
 import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
+import { OIL_SIGMA, interfacialTension } from '../../lib/liquidProps';
+import type { LiquidBehaviour } from '../../types';
 import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGBA32, type FieldCarry } from './constants';
 import { FluidPasses } from './passes';
 
@@ -595,7 +597,7 @@ export class FluidInputs extends FluidPasses {
     this.submit(enc);
   }
 
-  addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void {
+  addMix(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number; sigma?: number; of?: LiquidBehaviour }): void {
     const m = this.ensureMix();
     const enc = this.device.createCommandEncoder({ label: 'add mix' });
     const pass = enc.beginComputePass({ label: 'add mix' });
@@ -605,7 +607,11 @@ export class FluidInputs extends FluidPasses {
       this.arg('mix splat', [x, y, radius, 1, what.oil ?? 0, what.soap ?? 0, what.acid ?? 0, 0]));
     // Flat to its edge (mixSplat), so a disc's worth; the clamp at full is not counted.
     // A negative oil cuts a hole (a compound drop's, oilLay.ts), and is taken off.
-    this.oilPoured = Math.max(0, this.oilPoured + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
+    const was = this.oilPoured;
+    this.oilPoured = Math.max(0, was + Math.max(-1, Math.min(1, what.oil ?? 0)) * Math.PI * radius * radius);
+    // The oil's tension, the plate's oil averaged by what each pour covers (oilSigma); a hole leaves it as it was.
+    const added = this.oilPoured - was;
+    if (added > 0) this.oilSigma = (this.oilSigma * was + (what.sigma ?? interfacialTension(what.of)) * added) / this.oilPoured;
     m.swap();
     pass.end();
     this.submit(enc);
@@ -708,6 +714,7 @@ export class FluidInputs extends FluidPasses {
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
+    this.oilSigma = OIL_SIGMA;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
     // Gray–Scott too: it was left out, so a look's coral kept growing, and
@@ -772,6 +779,7 @@ export class FluidInputs extends FluidPasses {
       rxn: copy(this.rxn, this.rxnLive),
       lies: copy(this.lies, this.liesLive),
       oilPoured: this.oilPoured,
+      oilSigma: this.oilSigma,
       destroy: () => { for (const t of made.splice(0)) t.destroy(); },
     };
     this.submit(enc);
@@ -811,6 +819,7 @@ export class FluidInputs extends FluidPasses {
       m.swap();
       this.mixLive = true;
       this.oilPoured = carry.oilPoured;
+      this.oilSigma = carry.oilSigma;
       this.oilDyeStale = true;
     }
     pass.end();

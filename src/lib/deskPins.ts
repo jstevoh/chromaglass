@@ -227,7 +227,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'squish' },
   { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1, section: 'master' },
   { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 1, section: 'physics' },
-  { key: 'oilTension', label: "Oil Tension", min: 0, max: 1, section: 'oil' },
+  // Times the oil's own tension against water (PLAN 38e): 1 is real, past it a look pushed further.
+  { key: 'oilTension', label: "Oil Tension", min: 0, max: 3, section: 'oil' },
   { key: 'surfactantFlow', label: "Soap Bursts", min: 0, max: 1, section: 'oil' },
   { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 1, section: 'physics' },
   { key: 'plateUpright', label: "Gravity", min: 0, max: 1, section: 'tilt' },

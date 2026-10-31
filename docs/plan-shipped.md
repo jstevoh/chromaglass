@@ -7825,6 +7825,66 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   a time); a round tray clicks one slot when the look on stage changes (`slideTray.ts`, `SlideMount`,
   `SlideTray`). Held by `npm run panel`. Judging §82. Story in `docs/plan-shipped.md` §35.
 
+### 38. Realism audit: what still imitates, after §18
+
+- **38e. Oil's surface tension in newtons a metre, and no cap** (shipped 2026-10-31,
+  `npm run oiltension`). The tension was a 0–1 dial times `OIL_TENSION` 4e-4 plate widths,
+  set in the lab, and the capillary force was capped at half a cell a step (`OIL_CELLS`).
+  Now each bottle that will not mix carries its tension against water (`interfacial`:
+  sunflower 27 mN/m, a 50 cSt silicone 37; Antonow's |γ_w − γ_o| for a designed bottle
+  with only its tension against air, `lib/liquidProps.ts` `interfacialTension`), the
+  plate's oil takes the mean of what is poured by what each covers (`oilSigma`, carried
+  with the oil), and the force's σ is `oilMobility(σ)` = h₀²σ/(12μ_ref L³) in the flow's
+  units, with h₀ = REST_GAP·PLATE_METRES (so 38r's gap change reaches it). The old number
+  was this at σ = 0.024 and the 6 mm gap, so the looks keep their rounding (+12% at
+  sunflower's 27). Oil Tension is now "times the oil's own", 0 to 3 (desk, MIDI, the phone's
+  remote, cords' depths a third of what they were so their swing is the same).
+  The cap: measured in the lab on a 128 grid, a thread 0.036 of the plate wide stood at
+  aspect 6.1 after two seconds capped, 4.9 uncapped, 3.9 with eight steps to the frame's
+  one; counted at the old full force with an edge four cells wide the cap held back every
+  drop under a tenth of the plate on 128 and every drop on the Mac's 768. Uncapped on a thin
+  gap the step stays stable (the drag time ρh²/12μ makes the sharpest ripple ring, not run
+  away): 8 and 32 times the old full force on 256², one round settled body. Sub-steps were
+  not needed. The old plate (Thin Gap off) keeps the cap (38e-3). Measured
+  (`npm run oiltension`, SwiftShader, 128²): an oval drop of R 0.103 relaxes at 1.09/s
+  against the law's h²σ/4μR³ = 1.23/s; silicone over sunflower 1.45 against their ratio
+  1.37; a thread at twice the dial reaches in 0.75 s the aspect it reaches in 1.5 s at the
+  oil's own (4.65 and 4.51); at three times real on 192² one body, its settled flow 2.8
+  times the real tension's (the diffuse edge's own current, linear in σ) and falling. With the
+  cap put back on the thin gap (a scratch build) part 3 fails: the thread at 5.94 after 1.5 s
+  against 4.51, twice the dial 58% off half the time; part 1 fails the old 4e-4 (0.79 of the
+  law against its floor of 0.84). The cap had also been holding Film Hold's crowd
+  (`npm run filmhold`): uncapped, the blur's waist between two drops a film apart (a
+  curvature up to about one over a cell) pulled harder than the film's push (`FILM_PUSH`,
+  0.55 at the two or three cells a film is drawn as), and the splodascope's 35 drops kept 19
+  in six seconds (main 31; 29 with the cap put back, 21 uncapped at the old σ, so the cap and
+  not σ). A held film's faces are its drops' own surfaces, never a neck that tight, so in a
+  film (where `filmSqueeze` finds oil on both sides of the cell along one of four lines, the
+  cells whose water mixMu already charges for) the concave part of the blur's curvature is
+  taken back out of the force (σ times Film Hold, thin gap only): 35 → 31, the control
+  35 → 4, the lone drop untouched to the bit. Gated by the push's one ray instead it kept 28
+  (the ray misses a neck's saddle), by the four lines' weight 22, ungated 32 but the lone
+  drop moved 1.6e-3.
+  The breath (38e-6, `npm run airblow` part 5): uncapped, a drop of oil at Oil Tension 0.5
+  was carried +1.20% of the plate where a pool of colour went +2.75% (bar: half; capped
+  +2.07% against +2.93%). Not a net force: in the lab a round drop and a teardrop at rest
+  moved 0.00%, and the lag saturates with the tension (192²: oil +1.17% at 0.5, +1.09% at
+  three times real, +1.62% at 0.01). The breath is a jet half the drop's width drawn from its
+  middle out past its edge: it draws a free pool of colour into a tongue (the colour's spread
+  along x 2.50% → 5.04%, skew 1.1) and carries the tongue the whole stroke, where a drop
+  with tension is pushed as one body (spread 3.01% → 3.11%), the push on part of a body
+  between two glasses being a dipole whose flow over the body is half the push's, and the
+  colour inside the drop rides with it (+1.53% with the oil's +1.17%; 384² +1.65% and +1.21%). The cap had let the
+  jet carve the drop like a pool. The check now measures the drop against the colour in its
+  own run (at least half of it; 0.73), as a body going the wind's way (at least a third of
+  the free pool's; 0.43) that stays one body (its spread grown under a quarter where the free
+  pool's grows by half or more), none made or lost; the colour inside it held to the same.
+  Controls on 384²: at Oil Tension 0.01 the oil's spread grows 61%, with the cap put back
+  50% (+2.07% with its colour's +2.93%, the old bar passed), so the spread bar is what tells
+  a drop from a pool. Found: 38e-1 (one
+  σ a plate), 38e-2 (threads narrower than the gap), 38e-3 (the old plate's cap), 38e-4,
+  38e-7 (the breath on a drop as shear from above).
+
 ### QA list: what the owner found playing it
 
 - ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were

@@ -8,6 +8,7 @@
 import type { SolverCarry } from '../solverTypes';
 import { SOLVER_VEL_FORMAT } from '../wgsl/pack';
 import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thicknessViscosity } from '../../lib/turntable';
+import { OIL_TENSION_MOST } from '../../lib/liquidProps';
 
 /*
   How many bubbles the air field has room for.
@@ -32,6 +33,8 @@ export interface FieldCarry extends SolverCarry {
   readonly lies: GPUTexture | null;
   /** Oil Bodies' tally of the oil poured: the oil is carried, so its tally is. */
   readonly oilPoured: number;
+  /** And the oil's tension against water, N/m (oilSigma): the oil's, so carried with it. */
+  readonly oilSigma: number;
 }
 
 /** What the app used to scan the whole field for (see `measure`). */
@@ -131,21 +134,14 @@ export const PHASE_COMPRESS = 1;
   mixForce), set in the lab (scripts/lab.mjs) so each effect is plainly
   there at full and gone at zero.
 
-  OIL_TENSION is σ for the capillary force (σ κ ∇c̃, see mixForce), in
-  plate widths: κ and ∇c̃ are taken in cells, so the step multiplies it by
-  N² and a drop rounds up in the same time on a 256 grid as on a 512. At
-  full a drop a tenth of the plate across goes from a smear to round in
-  about a second, which is how an oil drop on a real dish behaves; the
-  Korteweg force it replaced (−σ c ∇μ) had its own σ and no N², and a
-  second-derivative field under it that did not scale either.
+  The oil's surface tension is no longer one of them: see oilMobility,
+  after REST_GAP and NU_REF, which it is made of.
 */
-export const OIL_TENSION = 4e-4;
 /*
-  The most the oil's surface tension may move the liquid in a step, in cells
-  (see mixForce). A drop rounding up is a slow thing, a second or so for a
-  drop a tenth of the plate across, which is a fraction of a cell a step on
-  any grid; the cap is there for the moment a fresh pour is breaking up,
-  when the force is at its largest and least real.
+  The most the oil's surface tension may move the liquid in a step, in
+  cells (see mixForce), on the old plate only (Thin Gap off), where a force
+  is a step's velocity with no drag to answer it and the plate clamps every
+  cell besides. On a thin gap there is no cap (oilMobility says why).
 */
 export const OIL_CELLS = 0.5;
 export const SOAP_PULL = 0.5;
@@ -521,6 +517,51 @@ export const LIFT_SWEEPS = 8;
 export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
+/*
+  The oil's surface tension in newtons a metre (PLAN 38e): what mixForce's
+  σ is, in the flow's units, for a tension σ between the oil and the water.
+
+  Between two glasses a curved interface is a jump in pressure σκ
+  (Young–Laplace), and the liquid answers a pressure gradient as Darcy
+  says, u = (h²/12μ)(f − ∇p). So the capillary force σκ∇c (mixForce) is
+  read, as every body force on a thin gap is (hsPrep), as the speed it
+  drives the reference liquid to at the rest gap: h₀²σκ∇c/12μ_ref, with
+  h₀ = REST_GAP_METRES, the gap itself and not a number typed for it, so a
+  gap that changes (PLAN 38r) changes the tension's reach as h². In
+  plate widths, with κ and ∇c taken per plate width, that is
+  oilMobility(σ)·κ∇c plate widths a second, and mixForce takes κ and ∇c in
+  cells, so the host multiplies by N² and a drop rounds in the same time on
+  every grid. A slightly oval drop of radius R then relaxes at
+  λ = h²σ/(4μR³) (both liquids the reference's viscosity, PLAN 18d-3), which
+  is what `npm run oiltension` measures it against.
+
+  It was a dial times OIL_TENSION, 4e-4 "set in the lab so each effect is
+  plainly there at full": the same number as this at σ = 0.024 N/m and the
+  6 mm gap, as it happens, so the looks keep their rounding (the shelf's
+  sunflower oil is 0.027) and the dial now says how many times the oil's
+  own tension it is (OIL_TENSION_MOST). And it was capped at OIL_CELLS a
+  step, "for the moment a fresh pour is breaking up": the capillary force
+  is all at the interface, a few cells wide, so its terminal speed there is
+  the drop's flow times R over the edge's width, and the cap bit on every
+  edge thinner than that ratio allowed. Measured in the lab on a 128 grid
+  (scratch, 2026-10-30): a thread of oil 0.036 of the plate wide, still at
+  aspect 6.1 after two seconds capped and 4.9 uncapped, 3.9 with eight
+  steps to the frame's one. And on a finer grid the edge is finer and the
+  cap, in cells, tighter: counted at the old full force with an edge four
+  cells wide, it held back every drop under about a tenth of the plate
+  across on a 128 grid, and on the Mac's 768 every drop there was, so a
+  look's tension there was the cap's and not the dial's. The drag is what keeps the step stable without it: a
+  force's speed is reached over the drag time ρh²/12μ (hsPrep), so the
+  grid's sharpest capillary ripple rings rather than runs away, and an oil
+  drop at 32 times the old full force on a 256 grid stays one round body
+  with its flow settled (scratch), and at the dial's top on 192 its flow
+  falls away (the check's fourth part).
+*/
+export function oilMobility(sigma: number): number {
+  const h = REST_GAP_METRES;
+  return (h * h * sigma) / (12 * LIQUID_DENSITY * NU_REF) / PLATE_METRES ** 3;
+}
+export { OIL_TENSION_MOST };
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).

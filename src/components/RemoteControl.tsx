@@ -801,6 +801,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             and thickening it is a pour, worth a thumb from across the room.
           */}
           <Slider label="Clear Film" field="clearFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
+          {/*
+            Oil Tension, as the desk has it (PLAN 38e): how many times the
+            oil's own tension against water the plate's is, 1 the real oil,
+            up to three times it for a look pushed further.
+          */}
+          <Slider label="Oil Tension" field="oilTension" step={0.05} format={(v) => (v > 0.001 ? `${v.toFixed(2)}× real` : 'Off')} value={value('oilTension') as number | undefined} {...sliderProps} connected={connected} />
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />

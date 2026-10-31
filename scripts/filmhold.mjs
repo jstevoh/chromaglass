@@ -43,7 +43,9 @@
  *      Not asked of a body with a notch in it: the water deep in a notch is
  *      thin between oil, and the hold acts there as a real film's would.
  *
- * Measured (SwiftShader, 2026-10-25): held 35 → 31 bodies, the control
+ * Measured (SwiftShader, 2026-10-31, the force uncapped on a thin gap, PLAN
+ * 38e, and the waist's pull taken back in a film): held 35 → 31, the control
+ * 35 → 4. Before that (2026-10-25, capped): held 35 → 31 bodies, the control
  * 35 → 3; oil 9377.6 → 9377.6; over zero 9422.0 → 9378.5 against the
  * control's 9417.9 → 9378.0, emptiest cell −0.014 against −0.000; the lone
  * drop 0 in every cell. At the app's own grids the hold keeps more: 35 of

@@ -2201,9 +2201,9 @@ try {
   // can only be seen here is whether the shapes actually *mask*: that the
   // frame goes dark where no surface lands, that a gap between two of them
   // stays a gap, and that a circle is a circle rather than the rectangle it is
-  // cut from. Every claim is a ratio against the same cells with no surfaces
-  // on, so a plate that happens to be dark in one corner cannot pass or fail
-  // one of these on its own.
+  // cut from. Each is a ratio against the bare frame, over what the shape
+  // shows: the whole plate squeezed in, so its inside is held to the whole
+  // frame's mean, not its middle (PLAN 38e).
   {
     const quad = (x0, y0, x1, y1) => [x0, y0, x1, y0, x1, y1, x0, y1];
     const surf = (shape, x0, y0, x1, y1, extra = {}) => ({
@@ -2225,11 +2225,11 @@ try {
     check('outside a shape the projector goes dark',
       outsideAfter < 0.01 && outsideAfter < outsideBefore * 0.1,
       `${outsideBefore.toFixed(3)} -> ${outsideAfter.toFixed(3)}`);
-    const insideBefore = region(bare, 0.43, 0.43, 0.57, 0.57);
+    const wholeBefore = meanOver(bare, () => true);
     const insideAfter = region(one, 0.43, 0.43, 0.57, 0.57);
     check('and inside it the picture is still there',
-      insideAfter > insideBefore * 0.3 && insideAfter > 0.01,
-      `${insideBefore.toFixed(3)} -> ${insideAfter.toFixed(3)}`);
+      insideAfter > wholeBefore * 0.3 && insideAfter > 0.01,
+      `${wholeBefore.toFixed(3)} -> ${insideAfter.toFixed(3)}`);
 
     // Two shapes with wall between them: the wall stays wall.
     await withOutput({

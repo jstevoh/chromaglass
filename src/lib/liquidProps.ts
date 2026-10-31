@@ -33,7 +33,7 @@ import type { LiquidBehaviour } from '../types';
 import { DISH_METRES, DISH_GAP_METRES } from './turntable.ts';
 
 /** What speciesOf reads of a bottle: its behaviour, or the deposit made from it (lib/liquidPhase.ts). */
-type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index' | 'scatter'>;
+type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index' | 'scatter' | 'tension' | 'interfacial'>;
 
 /** Water's kinematic viscosity, m²/s: Thickness 0 (thinGapViscosity). */
 export const WATER_NU = 1e-6;
@@ -130,4 +130,37 @@ export function pourShare(radius: number, amount: number, seconds?: number): num
   const r = radius * DISH_METRES;
   const dome = (Math.PI * r * r) / 2 * DISH_GAP_METRES;
   return Math.min(1, (amount * HELD_POUR * Math.max(0, seconds)) / dome);
+}
+
+/*
+  The oil's surface tension against the water it floats in, N/m (PLAN 38e):
+  the σ of the capillary force that rounds a drop and pulls a thread in
+  (mixForce in src/gpu/wgsl/fluid/capillary.ts, whose speed is h²σκ/12μ
+  between the glasses). What matters is the tension of the oil's interface
+  with water, not with air: a bottle that will not mix carries it as
+  `interfacial`, measured (sunflower oil about 27 mN/m, a 50 cSt silicone
+  oil about 37). A bottle made in the Liquid Designer may carry only its
+  tension against air, and then the interface's is Antonow's rule, the
+  difference of the two liquids' own, |γ_w − γ_o|: right for an oil with no
+  polar part (paraffin, 72.8 − 30 = 43 against a measured 40 to 50) and
+  high for a vegetable oil, whose polar traces sit at the interface, which
+  is why the shelf's bottles carry the measured number instead. A bottle
+  with neither is the shelf's Oil.
+*/
+/** Water's surface tension against air, N/m. */
+export const WATER_SIGMA = 0.0728;
+/** The shelf's Oil (sunflower) against water, N/m: what any oil without a number of its own is. */
+export const OIL_SIGMA = 0.027;
+/**
+ * The top of Oil Tension, the dial that says how many times the oil's own
+ * tension the plate's is: 1 is the oil's, and three times it is a look
+ * pushed past what oil and water do (the owner, 2026-10-30: settings may go
+ * past real, the physics under them may not).
+ */
+export const OIL_TENSION_MOST = 3;
+/** σ of a bottle's interface with water, N/m (the comment above says from what). */
+export function interfacialTension(what: Poured | undefined): number {
+  if (what?.interfacial && what.interfacial > 0) return what.interfacial * 1e-3;
+  if (what?.tension && what.tension > 0) return Math.max(0.001, Math.abs(WATER_SIGMA - what.tension * 1e-3));
+  return OIL_SIGMA;
 }
