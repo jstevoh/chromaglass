@@ -14,6 +14,7 @@
  *   public/icon-maskable-512.png    full bleed, burst inside Android's safe circle
  *   public/apple-touch-icon.png     full bleed; iOS rounds the corners itself
  *   ios/…/AppIcon-512@2x.png        the iPhone app's icon, 1024 full bleed
+ *   desktop/resources/icon.icns     the Mac app's icon, on macOS's own grid (PLAN 13-icon)
  *   public/og-card.png              what a shared link unfurls into
  *   src/assets/brand/lockup.svg     mark and name, for the headers
  *   src/assets/brand/mark.svg       the dish alone, where the name will not fit
@@ -81,6 +82,36 @@ try {
     await page.screenshot({ path: file, omitBackground: true, clip: { x: 0, y: 0, width: w, height: h } });
     console.log(`  ${file}  ${w}×${h}  ${(fs.statSync(file).size / 1024).toFixed(1)} KB`);
   }
+
+  // The Mac app's icon (PLAN 13-icon). It was the website's 512 tile, which
+  // electron-builder scaled into an .icns: a flat square edge to edge in the
+  // Dock, where every other app sits on macOS's grid with a margin and a
+  // shadow. An .icns is a list of PNGs by size, each under a four-letter type
+  // (Apple's "icns" format: the magic, the file's length, then type, length
+  // and data for each), so it is written here from the same drawing as every
+  // other icon, with no Mac tool. The smallest sizes are drawn without the
+  // glow and filaments, which at 16 and 32 pixels are only a smear.
+  console.log('ICNS');
+  const png = {};
+  for (const size of [16, 32, 64, 128, 256, 512, 1024]) {
+    const svg = icon({ shape: 'mac', detail: size <= 32 ? 'low' : 'high' }).replace('<svg ', `<svg width="${size}" height="${size}" `);
+    await page.setViewportSize({ width: size, height: size });
+    await page.setContent(`<html><body style="margin:0;background:transparent">${svg}</body></html>`);
+    png[size] = await page.screenshot({ omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
+  }
+  const types = [['icp4', 16], ['icp5', 32], ['icp6', 64], ['ic07', 128], ['ic08', 256], ['ic09', 512], ['ic10', 1024], ['ic11', 32], ['ic12', 64], ['ic13', 256], ['ic14', 512]];
+  const entries = types.map(([type, size]) => {
+    const head = Buffer.alloc(8);
+    head.write(type, 0, 'ascii');
+    head.writeUInt32BE(8 + png[size].length, 4);
+    return Buffer.concat([head, png[size]]);
+  });
+  const head = Buffer.alloc(8);
+  head.write('icns', 0, 'ascii');
+  head.writeUInt32BE(8 + entries.reduce((n, e) => n + e.length, 0), 4);
+  const file = 'desktop/resources/icon.icns';
+  fs.writeFileSync(file, Buffer.concat([head, ...entries]));
+  console.log(`  ${file}  ${types.length} sizes  ${(fs.statSync(file).size / 1024).toFixed(1)} KB`);
 } finally {
   await browser.close();
 }

@@ -63,15 +63,17 @@
   Measure with `npm run map` (the lab, `PW_WEBGPU=1`): a pinned surface at a half and a
   quarter of its size, a fixed picture panned a fraction of a texel a frame, and how
   much each wall pixel flickers beyond the pan itself (shimmer) before and after, and the outline's width in wall pixels. Unbuilt; nothing to judge yet.
-- **1i. Thin Film's fringes are faceted at the grid's cells** (found 2026-10-30 from 38m's
-  pictures; the owner: "the edges are super pixelated"). The fringe phase is the dye amount
-  times 16 (`plate.ts`, the `U.thinFilm` block): six or more fringes across an edge only a few
-  cells wide, read from `fluid0.a` through the texture's bilinear filter. Bilinear is
-  continuous but its slope jumps at every cell edge, and at sixteen periods per unit of dye
-  those jumps show as polygon corners in every ring (measured on the lab's 192-cell plate at
-  zoom 1.3: rings stepped every 4 px, one cell). Both Film Physics settings show it; it is the
-  sampling, not the colour. Fix: read the film's amount through a smooth reconstruction
-  (bicubic B-spline, the four-tap form 33's bubble edge also wants) only where `thin > 0`, so
-  the cost falls on the fringes. *Measure:* a `look` crop of a dye edge with Thin Film 1 at
-  zoom 1.3 and 3, before and after, and the rings' curvature jump at cell edges. Waits for
-  the lighting threads to leave `plate.ts`.
+- **1i. Thin Film's fringes were faceted at the grid's cells** (shipped 2026-10-31). Story in
+  `docs/plan-shipped.md` §1i; `npm run filmrings`.
+- **1j. The gooey blur reads the dye bilinear, so the dye's own edge has a corner at every
+  texel** (found 2026-10-31 building 1i). `blurAlpha` takes plain bilinear taps a fraction of
+  a cell apart, and the gooey edge's contrast (1.2 + 4 × Gooey) steepens the result two to
+  three times, so the opacity's slope jumps at every texel for every look with Gooey on (1i's
+  probe: the film's second difference 3 to 13 times its median on texel centres). Thin Film's rings
+  showed it sixteen-fold and 1i reads them smooth where the blur is under half a cell
+  between taps; past that (blurAlpha's wide form, Gooey × Post Blur of about 0.25 and up at
+  the lab's grid-to-picture ratio, no shipped look yet: the highest is 0.21) the rings keep
+  their corners (`npm run filmrings` prints 4.0 at zoom 1.3 and 12 at zoom 3 for Gooey 0.9 ×
+  Post Blur 0.6). The edge itself, the relief and the boundary line read the same opacity. Fix: the same B-spline in `blurAlpha`'s narrow form
+  (under a cell it is the blur anyway), measured with 1i's probe on `fluid0.a` and a `look`
+  crop of a dye edge at zoom 3; the cost is on every dye pixel, so time it on the Mac first.

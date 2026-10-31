@@ -13,6 +13,7 @@ Start with the [full guide](guide.md): every feature, control and setup, and how
 **Plans by area**
 - Physics and look: [physics-plan.md](physics-plan.md), [bubbles-plan.md](bubbles-plan.md), [filters-plan.md](filters-plan.md), [webgpu-plan.md](webgpu-plan.md), [plan-comet.md](plan-comet.md)
 - Presets and sound: [presets-plan.md](presets-plan.md), [sound-patches.md](sound-patches.md), [liquid-format.md](liquid-format.md), [tool-by-liquid.md](tool-by-liquid.md)
+- Playing the show from Resolume, TouchDesigner or a desk: [osc.md](osc.md), every OSC address with starter maps
 - Stage and rig: [rig-plan.md](rig-plan.md), [two-projectors.md](two-projectors.md), [slide-plan.md](slide-plan.md)
 - Reliability: [stability-plan.md](stability-plan.md), [crash-plan.md](crash-plan.md)
 - CI on the owner's Mac: [mac-runner.md](mac-runner.md)

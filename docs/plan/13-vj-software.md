@@ -57,10 +57,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    against the plate's own frame. *Not started.*
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
-4. **Control, written up** (one PR): the OSC address space documented where a VJ
-   finds it (the show server's page and `docs/`), plus a starter Resolume OSC map and
-   a TouchDesigner OSC Out example that play presets, actions and settings. Works
-   on the website with `npm run show` too. *Not started.*
+4. ~~**Control, written up**~~ **Shipped** (2026-10-31): `docs/osc.md`, every address with a starter Resolume map and a TouchDesigner script (`docs/osc/chromaglass_touchdesigner.py`), held to the code by `npm run rig`. Story in `docs/plan-shipped.md` §13.4. **Owed:** the maps tried in Resolume and TouchDesigner, the owner's sitting in `docs/judging.md` §93.
    - **13.4-ipad** (from §30): the same write-up for playing the show from an iPad in
      AUM, with no new code. The iPad joins a network MIDI session, which a Mac shows to
      Chrome as a Web MIDI port; AUM's MIDI matrix then sends clock, notes, CC and Program
@@ -222,8 +219,7 @@ network):
   the port), which needs `relayInfo()` to learn the relay's address another way.
 - Built for Apple silicon only. An Intel Mac needs an `x64` (or universal) target in
   `desktop/electron-builder.config.cjs`, about doubling the build.
-- The icon is the website's (`public/icon-512.png`), a flat square in the Dock. A
-  Mac icon has its own shape and shadow (a 1024 px `.icns`).
+- ~~**13-icon**~~ **Shipped** (2026-10-31): the Mac app's own `.icns`, drawn on macOS's grid by `npm run brand`. Story in `docs/plan-shipped.md` §13-icon. **Owed:** how it sits in the Dock beside the other apps, on the owner's Mac after the next release.
 - **13-update** (**shipped** ad hoc, asked 2026-10-25; the story is in
   `docs/plan-shipped.md` §13) Story in `docs/plan-shipped.md` §13-update (moved 2026-10-29,
   19m).
@@ -233,10 +229,7 @@ network):
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
     and reports an error.
-  - **13-version**: a release is `<major>.<minor>.<run number>` (1.3.N) while the site
-    packed inside keeps `package.json`'s 1.3.0, so the About box and anything the page
-    reports (the cast hello's version, 14k) disagree with the release by name. Pass the
-    release's version to the site's build, or bump `package.json` in the release.
+  - ~~**13-version**~~ **Shipped** (2026-10-31): the site inside a release is built with the release's version. Story in `docs/plan-shipped.md` §13-version.
   - **13-exit** (found 2026-10-25): the first launch from /Applications on the owner's
     Mac exited by itself after a few seconds, with no crash report; the second has
     stayed up. The app writes nothing about why it quits. Write the main process's
