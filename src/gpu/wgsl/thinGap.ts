@@ -18,7 +18,8 @@
  * the second being only that liquid is conserved: where the glasses close, the
  * liquid between them has to leave sideways. The drag term is the glass itself,
  * the shear across the gap, and its time ρh²/12μ is the plate's memory: about
- * three seconds for water in a 6 mm gap, a tenth of a second for a light oil,
+ * a third of a second for water in the plate's 2 mm gap (PLAN 38r; three
+ * seconds in the 6 mm gap it had before), a hundredth for a light oil,
  * nothing at all for glycerine. That is what decides how long a push lasts, and
  * the clamp was standing in for it.
  *
@@ -60,12 +61,15 @@
  * Re·h/L. For the oils and anything thicker it is under a tenth at the plate's
  * speeds, so the drag has taken a push long before the push has carried itself
  * anywhere, and dropping the carry costs nothing a person can see. For water in
- * the 6 mm middle of the plate it is near 2, so a deep-gapped water look keeps
- * less inertia than real water would. That is a shortcut kept for the step's
+ * the 2 mm middle of the plate it is near 0.2 (it was near 2 in the 6 mm gap
+ * before PLAN 38r: it goes as h²), so even a water look loses little; a
+ * plate opened past rest (the ceiling is 4 mm, near 0.9) keeps less inertia
+ * than real water would. That is a shortcut kept for the step's
  * time (an advection and a projection, the largest part of it), and PLAN §18a
  * has it as its own item to measure on the Water looks.
  * The ferrofluid's share of the carry is taken (phaseMomentum, wgsl/fluid.ts):
- * its drag time in the rest gap is 0.6 s, so a drop dragged at the hand's speed
+ * its drag time in the rest gap is 0.07 s (0.6 s in the 6 mm gap before
+ * PLAN 38r), so a drop dragged at the hand's speed
  * outran its own momentum and fell behind the magnet (PLAN 29c).
  *
  * And the rim is open. The old projection was a closed box, so every source
@@ -474,8 +478,8 @@ fn at(q: vec2i, m: i32) -> vec2f {
       velocity halved).
       k = A.a.x / h², with h in gap units: A.a.x is 12ν/G², the liquid's
       kinematic viscosity over G², G the metres in a unit of the gap field
-      (lib/turntable.ts DISH_GAP_FIELD_METRES, PLAN 38r: a fifth of a
-      metre at the 6 mm rest gap, the plate's width, as it was written), so the drag is in real seconds whatever
+      (lib/turntable.ts DISH_GAP_FIELD_METRES, a fifteenth of a metre at
+      the 2 mm rest gap: PLAN 38r), so the drag is in real seconds whatever
       grid or look clock the plate runs at.
 
       Three snapshots of the velocity: \`prev\` before any of this step's

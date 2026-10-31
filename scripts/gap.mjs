@@ -88,7 +88,7 @@ await build({
 const L = await import(`../${out}`);
 
 // The sandwich, in SI, from the millimetres and the liquids' data alone.
-const H0 = 0.006;           // m, the rest gap in the middle (2 mm is 38r's second part)
+const H0 = 0.002;           // m, the rest gap in the middle (PLAN 38r: a real sandwich, 1–3 mm)
 const MM = `${H0 * 1000} mm`;
 const W = 0.2;              // m, the clock glass
 const G = 9.81;

@@ -46,8 +46,10 @@
  *      meter reads a frame that does move: Glass Smear, the glass slid, on
  *      the same sheet reads the quarter of the smear the liquid goes at.
  *   4. The rim holds a lens. A lens sent up into the dish's rim and held
- *      there by a steady 6° tilt keeps 98.5% of its oil over six seconds (the
- *      first cut kept 12% in three), and in its last second there moves
+ *      there by a steady 6° tilt keeps 98.5% of its oil over six readings
+ *      (a second apart in the 6 mm dish, nine at 2 mm: the journey goes as
+ *      h², RIM_STEPS; the first cut kept 12% in three seconds), and over the
+ *      last of them moves
  *      under 15% of its free speed. Run at a hundredth of the looks' Oil Tension, because a lens
  *      touching the open rim drained through it with no rock at all, by its
  *      own surface tension, when this was written (66% left after six
@@ -80,13 +82,25 @@ const PLATE = 0.2;                  // the clock glass, 8 inches (fluid.ts PLATE
 const GAP = DISH_GAP_METRES;        // the rest gap at the middle (lib/turntable.ts, PLAN 38r)
 const SIN = 0.1;                    // the tilt: about 6°, a firm lean
 const R = 0.06;                     // the lens's radius, in plates
+/*
+  The rim's hold (4) is read over the journey it was written on: six
+  readings a second apart in the 6 mm dish, in which the lens, sent from
+  0.02 short of the rim, reached it in the first second and was pressed
+  into it over the other five. Every speed on the tilted plate goes as h²
+  (the lens's lift, and the squash into the rim is the same Darcy flow),
+  so at 2 mm the same journey takes nine times as long: six seconds saw
+  the lens cover 2.4 of its 4 mm and read its arrival, 0.33 mm/s, as a
+  lens the rim had not held. The readings are a second times (6 mm / h)²
+  apart, 9 s at 2 mm, and "its last second" below is the last reading.
+*/
+const RIM_STEPS = Math.round(60 * (0.006 / GAP) ** 2);
 
 const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 let r;
 try {
-  r = await page.evaluate(async ({ SIN, R }) => {
+  r = await page.evaluate(async ({ SIN, R, RIM_STEPS }) => {
     const N = 128, out = {};
     // Clock Glass's and Oil & Water's own liquid: Oil Tension 0.9, Oil Bodies on, no diffusion.
     const T = { thinGap: 1, gapThickness: 0.45, gapSpring: 0, oilTension: 0.9, oilBodies: 1, diff: 0 };
@@ -183,7 +197,7 @@ try {
       await lab.create(N, N);
       lens(R + 0.02, 0.5);
       const trace = [await oil()];
-      for (let k = 0; k < 6; k++) { await lab.step(60, over); trace.push(await oil()); }
+      for (let k = 0; k < 6; k++) { await lab.step(RIM_STEPS, over); trace.push(await oil()); }
       return trace;
     };
     out.rim = await rim({ ...rock, oilTension: 0.009 });
@@ -192,7 +206,7 @@ try {
     out.seconds = lab.stepSeconds;
     out.nu = lab.thinGapViscosity(0.45);
     return out;
-  }, { SIN, R });
+  }, { SIN, R, RIM_STEPS });
 } finally {
   await close();
 }
@@ -241,13 +255,14 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
 // 4.
 {
   const t = r.rim, a = t[0], end = t[t.length - 1], before = t[t.length - 2];
-  const last = speed(before, end);
+  const rimSeconds = RIM_STEPS * r.seconds;
+  const last = (end.x - before.x) * PLATE / rimSeconds;   // m/s over the last reading
   const reached = end.x - R < 0.03;
   check('the rim holds a lens: sent up into it, it keeps its oil and stops as a whole',
     reached && end.amount > 0.985 * a.amount && Math.abs(last) < 0.15 * Math.abs(lens),
-    `its centroid ${a.x.toFixed(3)} → ${end.x.toFixed(3)} (the rim at 0, the lens ${R} across its radius), ${(100 * end.amount / a.amount).toFixed(1)}% of its oil kept, its last second ${mms(-last).toFixed(3)} mm/s against ${mms(-lens).toFixed(2)} free; by second ${t.slice(1).map((s) => s.x.toFixed(3)).join(', ')}`);
+    `its centroid ${a.x.toFixed(3)} → ${end.x.toFixed(3)} (the rim at 0, the lens ${R} across its radius), ${(100 * end.amount / a.amount).toFixed(1)}% of its oil kept, its last ${rimSeconds.toFixed(0)} s ${mms(-last).toFixed(3)} mm/s against ${mms(-lens).toFixed(2)} free; every ${rimSeconds.toFixed(0)} s ${t.slice(1).map((s) => s.x.toFixed(3)).join(', ')}`);
   const d = r.drain;
-  console.log(`      (the same lens at the looks' own Oil Tension, the plate level: ${(100 * d[d.length - 1].amount / d[0].amount).toFixed(1)}% of its oil left in the dish after six seconds, against 66% when the open rim drained it by its own surface tension; PLAN 18g-6)`);
+  console.log(`      (the same lens at the looks' own Oil Tension, the plate level: ${(100 * d[d.length - 1].amount / d[0].amount).toFixed(1)}% of its oil left in the dish after ${(6 * rimSeconds).toFixed(0)} seconds, against 66% when the open rim drained it by its own surface tension in six; PLAN 18g-6)`);
 }
 // 5.
 {

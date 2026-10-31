@@ -138,8 +138,16 @@ export const PHASE_COMPRESS = 1;
   about a second, which is how an oil drop on a real dish behaves; the
   Korteweg force it replaced (−σ c ∇μ) had its own σ and no N², and a
   second-derivative field under it that did not scale either.
+
+  Between two glasses the tension moves the oil as Darcy moves it, h²/12μ
+  times σ∇κ, so it carries the gap's h² as every body force here does
+  (OIL_LIFT below): 4e-4 was set in the lab on the 6 mm gap, and on the 2 mm
+  one (PLAN 38r) a drop rounds nine times slower. Kept at 4e-4 the half
+  sheets in `npm run oillift` settled off the rim at 0.017 mm/s against a
+  lens that now rises nine times slower too (0.71 mm/s), over the frame's 2%
+  of it. PLAN 38e (σ in N/m from each bottle) replaces the 4e-4 itself.
 */
-export const OIL_TENSION = 4e-4;
+export const OIL_TENSION = 4e-4 * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The most the oil's surface tension may move the liquid in a step, in cells
   (see mixForce). A drop rounding up is a slow thing, a second or so for a
@@ -390,19 +398,18 @@ export const MAX_SPEED = 0.002;
 
   The drag between two glasses is 12ν/h², which needs the gap in metres.
   The plate is a clock glass of about eight inches, 0.2 m, on an overhead
-  projector's stage, and the glasses are 6 mm apart in the middle at rest
-  (lib/turntable.ts DISH_GAP_METRES, the one number: PLAN 38r). The gap
-  field is in gap units, 0.03 at rest (REST_GAP), so the tightest the
-  squeeze allows (0.004) is 0.8 mm; a field value is a length only through
-  GAP_METRES, metres per unit, never through the plate's width (the two
-  are the same number only while the gap is 6 mm). The same
+  projector's stage, and the glasses are 2 mm apart in the middle at rest
+  (lib/turntable.ts DISH_GAP_METRES, PLAN 38r: it was 6 mm). The gap field
+  is in gap units, 0.03 at rest (REST_GAP), so the tightest the squeeze
+  allows (0.004) is 0.27 mm; a field value is a length only through
+  GAP_METRES, metres per unit, never through the plate's width. The same
   0.03 is the unit the mobility is written in, so M is about c on an open
   plate. The turntable's dish, because hsPrep reads the clear liquid's
   viscosity back out of 12ν/G² with that G (PLAN 18d) and the two must agree.
 */
 export const PLATE_METRES = DISH_METRES;
 export const REST_GAP = DISH_REST_GAP;
-/** The rest gap in metres, and metres per unit of the gap field. */
+/** The rest gap in metres (2 mm), and metres per unit of the gap field. */
 export const REST_GAP_METRES = DISH_GAP_METRES;
 export const GAP_METRES = DISH_GAP_FIELD_METRES;
 /*
@@ -478,27 +485,42 @@ export const AIR_SHEAR = 0.5;
   dye over the mean falls on a plate stood straight up, in the flow's
   per-step speeds, read against the reference liquid as every body force
   is. Its size: dyed water in a light mineral oil (Δρ about 150 kg/m³) in
-  the plate's 6 mm middle, tipped fifteen degrees, would slide at about a
-  quarter of the plate a second; colour in the same liquid (Δρ of ten or
-  so) at a fiftieth. ROCK_FALL puts a pool at 0.73 in the flow's speeds at
-  twelve degrees (`npm run rides`), about 6% of the plate a second at the
-  default Speed, between the two, so a kick at full Plate Rock swings a pool
-  a few percent of the plate and the spring brings it back. With forty
+  the plate's 2 mm middle, tipped fifteen degrees, would slide at about 3%
+  of the plate a second (it was a quarter in the 6 mm gap the plate had
+  before PLAN 38r: Darcy goes as h²); colour in the same liquid (Δρ of ten
+  or so) at a fifteenth of that. ROCK_FALL puts a pool at 0.73 in the flow's
+  speeds at twelve degrees (`npm run rides`), about 6% of the plate a second
+  at the default Speed, so a kick at full Plate Rock swings a pool a few
+  percent of the plate and the spring brings it back: about twice what
+  dyed water would do in a real 2 mm sandwich, which is a dial past nature
+  (the owner, 10-30: settings may ramp past real, on the real law). Kept
+  where the looks were tuned rather than cut to the real speed, at which a
+  rocked plate barely moves. With forty
   pools rocked as the app rocks them the colour moved 0.43 against 0.028
   before, where a look's own stir moves it 0.79.
+
+  That was on the 6 mm gap. Its 12 is a weight through Darcy's h² as the
+  oil's lift is (OIL_LIFT, which carries REST_GAP_METRES²), so it carries the
+  gap's h² too: held at 12 on the 2 mm gap the colour's weight stood nine
+  times its old share against the oil's lift, a dye as heavy against the oil
+  as Δρ 400 kg/m³ (dyed water is 150), and Clock Glass's coloured lens rose at
+  21% of a plain one's (`npm run oillift`, bar 80%). On 2 mm a rocked pool
+  slides a ninth as far, as a real sandwich does; a look that wants the old
+  swing turns Plate Rock past real (PLAN 38r-3, 38r-8).
 */
-export const ROCK_FALL = 12;
+export const ROCK_FALL = 12 * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The oil rising up the same tipped plate (PLAN 27f-5, hsBody). Unlike the
   colour's weight this is not tuned: a light mineral oil is 12% lighter than
   the water (SPIN_OIL_LIGHT, the centrifuge's own), and between two glasses a
   column of it, tipped by θ, rises through the reference liquid at Darcy's
   Δρ g sinθ h₀² / 12μ_ref at the rest gap, which is how hsPrep reads a body
-  force: 6 mm, 22 cSt, so 0.16 m/s per unit of sinθ, a column's speed with
-  nothing round it to push aside. A round lens has the water to push round
+  force: 2 mm, 22 cSt, so 1.8 cm/s per unit of sinθ (it was 0.16 m/s in the
+  6 mm gap before PLAN 38r), a column's speed with nothing round it to push
+  aside. A round lens has the water to push round
   it (in a liquid of its own thickness it goes at half that, Hele-Shaw's
   inclusion), and on the default Plate Rock's leans of a few degrees it rises
-  a few millimetres a lean. This is that free speed in m/s per unit sinθ; the
+  a fraction of a millimetre a lean. This is that free speed in m/s per unit sinθ; the
   step turns it into the flow's per-step speed as the breath's is turned.
   `npm run oillift` measures the lens against the same formula worked out in
   SI there, and the frame against moving.
@@ -532,8 +554,10 @@ export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_
   radius at 1.4 units in its middle (8 mm on the 0.2 m plate) holds
   1.4·πr²/2 = 1.41e-4 unit·m², and a drop from a dropper is 0.05 mL (twenty
   to the millilitre), so a unit is 5e-8/1.41e-4 = 0.36 mm of the liquid. The
-  dye's cap of six units is then 2.1 mm, a third of the plate's 6 mm middle,
-  and a look's pale wash of a few tenths a film a tenth of a millimetre deep,
+  dye's cap of six units is then 2.1 mm, a little more than the plate's 2 mm
+  middle (PLAN 38r; it was a third of the 6 mm gap before): a pool poured
+  that thick is a column from glass to glass, which slumps only as it thins
+  (wgsl/slump.ts, the exchange flow's (1 − η/b)³), and a look's pale wash of a few tenths a film a tenth of a millimetre deep,
   which (at the cube) barely moves: pools slump, washes and threads stay.
 */
 export const DYE_LAYER = 3.55e-4;
@@ -542,9 +566,10 @@ export const DYE_LAYER = 3.55e-4;
   18m-1a)"): a face moves at most SLUMP_FACE of the difference across it in
   a substep (¼ is the edge of stability on a square grid), in at most
   SLUMP_SUBSTEPS substeps a step. At 1024² with Heavy dye at 1 (g′ = 1.47 m/s²)
-  a cell at DYE_CAP (2.13 mm in a 6 mm gap) has an inertial bound of 4.57 a
-  frame at 60 Hz, which asks for ceil(4.57 / 0.24) = 20 substeps (15 at 768²;
-  6 in water at Dye Weight 0 on 768²; 2 on the default light-oil Thickness).
+  the worst cell (half the gap deep, 1 mm, where η³(1 − η/b)³ peaks; slumpPlan)
+  has an inertial bound of about 2.8 a frame at 60 Hz, which asks for
+  ceil(2.8 / 0.24) = 12 substeps. In the 6 mm gap before PLAN 38r a cell at
+  DYE_CAP (2.13 mm) asked for 20, which is why the cap is 20.
 */
 export const SLUMP_FACE = 0.24;
 export const SLUMP_SUBSTEPS = 20;
@@ -588,10 +613,14 @@ export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
   Darcy's speed for a force f between the glasses is f·h²/12μ, so the pull
   of Ferrotec's EFH1 (χ 2.64 by its sheet) under an N52 rod comes to
   GAIN_phys = (χ/2μ₀)(SPIKE_B_REF·Br)² h₀² / (12 ρ ν_ref L² MAGNET_E),
-  5.8e-5 seconds. This is 0.10 of it (0.22 at the χ of 1.2 some papers
-  give the same fluid).
+  6.4e-6 seconds at the 2 mm rest gap. This is 0.93 of it (2.1 at the χ
+  of 1.2 some papers give the same fluid).
 
-  Kept at a tenth of the real pull, and why. Nearer a magnet than 0.3 of
+  It was a tenth of the real pull while the gap was 6 mm (PLAN 38r): the
+  real pull goes as h₀², so the 2 mm sandwich's is a ninth of what the 6 mm
+  dish's was, and the gain the looks were tuned on is now the real one. What
+  follows is why it was held below the 6 mm pull, kept because it says what
+  the gain does and does not set. Nearer a magnet than 0.3 of
   the plate the pull asks for more than a step can carry at any gain the
   plate has had: the hand's magnet asks 7.8 plate widths a second at
   this gain, against the 0.375 that MAGNET_CELLS allows on 384², so

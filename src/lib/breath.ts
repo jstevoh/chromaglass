@@ -55,8 +55,25 @@
   dish). C_f is the skin friction of a wall jet at a breath's Reynolds
   numbers (U·r/ν_air about 3×10³), about 0.01. So τ = ½ · 1.2 · 0.01 · 8²
   ≈ 0.38 Pa at the jet's middle, at the tool's default Amount; the Amount
-  scales the stress (how hard one blows). On the default liquid in the 6 mm
-  middle of the plate that drives the column at τh/2μ ≈ 5 cm/s.
+  scales the stress (how hard one blows).
+
+  Why 14 m/s and not the 8 this was tuned at (PLAN 38r). The column goes at
+  τh/2μ, as the gap: the 6 mm plate the Blow was tuned on took 8 m/s
+  (0.38 Pa) to 5 cm/s, and the 2 mm sandwich the plate is now takes the
+  same breath to 1.7 cm/s, a third of the push, which is the "tool getting
+  weaker" of the paragraph below over again. The breath is the same kind
+  of number it was, a firm breath set by how far it moves a pool and not a
+  measurement (15g-6), so it is set where it moves the 2 mm film as it
+  moved the 6 mm one: the stress three times over, the speed √3 of it,
+  14 m/s, 1.18 Pa, 5.3 cm/s on the default liquid. That is a firm breath
+  from closer, a couple of centimetres rather than a few, inside what lips
+  blow at. What moves with it: the surface tears at the same 5.4 m/s
+  (AIR_TAKEN_FROM, below), which is now Amount 0.39 of a firm breath and not
+  0.67, so a Blow at Amount 0.5 lays bubbles where it laid none; the
+  lowest settings (0.25 and under) still lay none, which is what QA-20
+  asked (`npm run blowrange` holds the gentle breaths at 0.05, 0.25 and
+  0.35). The straw's volume and the wind's spawns are shares of a firm
+  breath's and do not move.
 
   Why 8 and not the gentler 6 m/s this was first written with: at 6 the
   Mac's `npm run tools` read a stroke moving its pool 0.13% to 0.51% of the
@@ -72,7 +89,7 @@
   the app's slower runner gave the 6 m/s Blow about 0.6 of the lab's.
 */
 export const AIR_DENSITY = 1.2;
-export const BREATH_SPEED = 8;
+export const BREATH_SPEED = 14;
 export const WALL_JET_FRICTION = 0.01;
 export const BREATH_STRESS = 0.5 * AIR_DENSITY * WALL_JET_FRICTION * BREATH_SPEED * BREATH_SPEED;
 

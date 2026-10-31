@@ -987,7 +987,7 @@ export class WebGPUFluid extends FluidReads {
       the Poiseuille parabolic velocity profile across the gap (u(z) = 1.5 ū (1 - 4z²/h²))
       shears dye columns into parabolic sheets with variance σ² ≈ 0.2 |ū|² (Δt)².
       On show timescales (t ≪ h²/Dm ≈ 25 hours), diffusion has not homogenized
-      across the 6 mm gap, so the flow is in the pre-asymptotic, unsteady shear
+      across the 2 mm gap (h²/Dm ≈ 3 hours there), so the flow is in the pre-asymptotic, unsteady shear
       dispersion regime rather than the asymptotic Taylor–Aris limit.
 
       In that pre-asymptotic regime, the parabolic shear is kinematically
