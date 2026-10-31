@@ -30,7 +30,7 @@ ones.
 - **Your presets and sequences as files** — save the current look as a plain JSON preset file (every setting named, plus the dyes the plate may use and how the automation injects), load anyone's preset file from a file chooser, and keep a library of your own presets apart from the built-ins, listed under *Yours* in the preset menu. Sequences save and load the same way, and a sequence file carries any of your presets its stages use, so it arrives whole. Either kind of file can be **made for a song** (title and artist, ISRC when known): a preset made for a song is applied whenever that song is identified, and a sequence made for a song starts when it is identified, at the right point in it, and stops when the song ends or the next one begins
 - **Show Sequencer** — a script for how the show evolves over a song or a set instead of dice: stages that adopt a preset, glide chosen settings over a transition, open the palette from one dye to the full set, and hand over on a clock or when the song changes section. Five built-in sequences (Slow Build, Verse / Chorus, Fillmore East, Set Journey, Light Show Night), an editor for your own, and a transport on the phone. With **Pacing** up, each stage plays as a scene of a light show: swells opened by a pour, a press or a dye change, rests between them, and from halfway a fade to near-black at the stage's end
 - **The photograph** — a second render style: a lit paper backdrop in two colours, dye as transmission over it, every drop a dome with a dark meniscus, a softbox crescent and a rim that catches the sky, hundreds of satellite droplets on the glass, interference colour where the oil runs thinnest; then a camera pass over the finished plate with real refraction through drops and bubbles, a focal plane with depth of field, bloom, chromatic aberration, a filmic roll-off, vignette and grain (Settings → Camera). Presets Oil on Water, Colorful Cosmos and Sunny Side Up
-- **One lamp for everything** — a projector lamp under the plate that every material is lit from: bubbles shaded as lenses (dark rim toward the lamp, a caustic arc on the far side, the lamp's reflection on the lamp side, the plate magnified inside), dye rims bright toward the lamp and shadowed away from it, a hot-spot that falls away toward the rim, the lamp wandering and following the plate's rock, an optional second cooler lamp from the other side, and thin-film iridescence round bubble rims (Settings → Lamp & Light)
+- **One lamp for everything** — a projector lamp under the plate that every material is lit from: bubbles shaded as lenses (dark rim toward the lamp, a caustic arc on the far side, the lamp's reflection on the lamp side, the plate magnified inside), dye rims bright toward the lamp and shadowed away from it, a hot-spot that is the projector's lamp lever (on its mark the plate is lit evenly; off it the lens's aperture clips the corners, with the condenser's coloured edge, and nothing of it moves), the light the gloss catches wandering and following the plate's rock, an optional second cooler bulb whose light adds to one side, and thin-film iridescence round bubble rims (Settings → Lamp & Light)
 - **The show over minutes** — a hue journey that walks the preset's dyes one at a time (a set drifts its colours, never jumps), a rhythm plate pressed and rocked on every kick, the glass let go again after each, a slower background loop on the plates behind the live one, a kaleidoscope mirror rig (2, 4, 6 or 8 folds, in Settings → Kaleidoscope) and the round edge of a projected dish (Settings → Show)
 - **A mixer for everything on the wall** — the LED ring, the gel wheel, the lumia, the front and back plates, the film and the logo in one stack you reorder (the logo under the film, the film between the plates, the LED ring or the lumia raised from the lamp to a beam of its own, the gel from over the lamp to over the lens), each with its own level, brightness, contrast, saturation and hue; on the Perform desk, in Settings → Mixer, on the phone's Mix sheet and on the remote, every control MIDI-learnable, with a pad to walk each source up the stack, and each row laid in by its own way or by screen, add, multiply or key, and each taken out and brought back over its own fade time in bars from a button or a pad. Measured by `npm run mixer` and `npm run rowfade`
 - **Multi-layer compositing** — Up to 5 independent fluid layers with configurable blend modes (screen, lighter, exclusion, multiply, overlay)
@@ -665,6 +665,21 @@ npm run show
 That pulls main, installs, builds, and starts the show server in the same window (Ctrl+C stops it). It does not publish, because pushes to `main` already deploy themselves — so a show-night run has nothing to re-publish, and no way to put a local working tree over what was released.
 
 `npm run ship` is the same thing with a deploy in the middle, for publishing from this machine when something has to be live that isn't on `main` yet. The pieces are also separate: `npm run update` (pull, install, build), `npm run deploy` (publish the build), `npm run remote` (the show server).
+
+## Feedback
+
+Settings → Feedback (the last row of the rail; on a phone, More → Feedback, or the end of
+the Settings strip; or "Send feedback" in the command palette) sends a note to
+support@chromaglass.art and keeps it in the feedback database. Pick what it is about,
+write it, and Send. Two switches, both on and both yours to turn off before sending, add
+the app's recent log with this look's settings, and a picture of the plate; "See what is
+sent" shows exactly what will leave. Passwords, licence keys, stream keys and sign-in
+tokens are taken out of the log first. Signed in, the answer comes to your account's
+address; otherwise type one if you would like an answer.
+
+On a build with no feedback service (`VITE_FEEDBACK_URL` unset), Send opens your mail
+app with the note in it instead, without the log. Setting the service up, and reading
+what has come in: `wrangler.feedback.toml`.
 
 ## Deploying
 

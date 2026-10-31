@@ -21,24 +21,28 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## The top picks
 
-- **38a. The lamp is a condenser, not a wandering painted glow** (S, nil frame cost;
-  High). *Now:* the hot spot multiplies the finished picture by
-  `mix(0.78, 1.25, exp(-3.5·d²))` with a warm tint (`src/gpu/wgsl/plate.ts:3308-3319`); a
-  second lamp *multiplies* a bluish 1.25× Gaussian on top; both centres drift by noise up
-  to a third of the plate when Lamp Motion is up (`LiquidVisualizer.tsx:5207-5213`); and
-  the lamp ground is divided by 1.28125 to stop the peak clipping (`plate.ts:2514`). The
-  heat's own hot spot is another shape again, 1/(1+2.5r²) (`fluid/dye.ts:231-235`), so the
-  warmth and the light disagree about where the lamp is. *Real:* an overhead projector's
-  Fresnel condenser images the bulb into the lens's pupil, so the stage is lit nearly flat,
-  falling off as the lens's cos⁴ of field angle and the condenser's edge, with a soft fixed
-  image of the filament at most; a second lamp *adds* light; and nothing in the picture
-  moves unless the liquid does. A brightness that slides across the whole frame is the
-  kind of whole-frame motion the owner already took out of the sound (frameSway 0).
-  *Build:* one irradiance map E(x) from the condenser (cos⁴ and an edge), shared by the
-  lamp ground and the heat source, a second lamp added in light, Lamp Motion retired or
-  turned into a real thing that moves (a hand-held second lamp). *Measure:* the plate with
-  no liquid is flat to the cos⁴ law and still from frame to frame; the heat's peak and the
-  light's peak are the same point.
+- ~~**38a. The lamp is a condenser, not a wandering painted glow**~~ — **Shipped, this PR**
+  (the Hot-Spot is the projector's lamp lever: the bulb's image off the lens's aperture,
+  `src/gpu/wgsl/lampField.ts`; the heat lit evenly; `npm run lampfield` 9/9, 1 of 7 on the old
+  plate; story in `docs/plan-shipped.md` §38a). Left from it: 38a-2, 38a-3.
+
+- **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
+  every look, so the Mac's eyes first). 38a keeps Hot-Spot 0 an ideal projector, lit evenly,
+  so no look changed. A real one is not: the head's lens dims the frame's corners as cos⁴ of
+  the field angle (a 355 mm head over the 0.133 m frame: about 9% at the corners), and the
+  lamp below the condenser lights the stage as cos³ of its own angle. Both belong in
+  `lampField` as the default, applied to the light and (the stage's half) to the heat, and
+  Lamp Warmth's painted vignette (`plate.ts`, the Lamp warmth block: a smoothstep that
+  darkens corners by up to 45% with the warmth) goes in the same PR, since that is what it
+  was standing in for. *Measure:* `npm run lampfield`'s law with the cos⁴ term; the warm
+  looks' corners against the vignette's, judged on the Mac.
+
+- **38a-3. Lamp Motion has nothing real left to move** (S; Low). After 38a it moves only the
+  light the gloss and the bubbles' rims are lit from (`lampDir`, the lit-from-above shading
+  38h takes out). When 38h lands, Lamp Motion and the plate rock's push on the lamp
+  (`lampRock`) move nothing a projector has: retire the slider (its MIDI, desk pin and
+  the two looks that set it, Crowd Plate with its `dirX` patch and Soap Film), or give it a real
+  thing that moves, such as the gel wheel's hand.
 
 - ~~**38b. Bubbles that never appear or vanish by a clock**~~ **Shipped** (#603, with 38g and
   38n): no timers, fades, age-as-colour, daughters or wobble; a pocket inflates at a breath's
@@ -55,6 +59,10 @@ written first. Line numbers are as read on main at d07ac31.
   so how fast they turn over is now how fast the flow takes them to the rim and how often they
   merge. On the Mac: count the kick bubbles a minute on a music look, before and after; if the
   plate goes still, 38b-2 is the answer, not a clock.
+  The deploy after #603 found it first: `npm run kickbubbles` counted 11 chances with room
+  on Classic in a minute where its floor is 15 (the room no longer empties itself); the
+  check now lets the look's bubbles go every eight seconds, since it measures the kick's
+  odds, not a bubble's life.
 
 - **38c. Soap is conserved: no decay, no grid-rate spreading** (S, nil; High on the soap and
   milk looks). Sharpens **18d-5** (which owes the σ(Γ) law, not these). *Now:* the mix update
@@ -257,6 +265,44 @@ written first. Line numbers are as read on main at d07ac31.
   (a guess to confirm with the owner's own glass). Looks would not change (forces are read as
   terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
   labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
+
+  The owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." So 2 mm in the
+  middle at rest (a few millilitres under a top glass about 15 cm across is 1–3 mm; 2 mm is
+  the middle, a judgement and not a measurement), in two parts:
+
+  - **Part 1, one number (shipped, this PR, at 6 mm).** `DISH_GAP_METRES`
+    (`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
+    *gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
+    same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
+    the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
+    rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
+    h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
+    rest gap and greps `src/` for a gap made a length by the plate's width.
+  - **Part 2, 2 mm** (M; Medium-High on the water looks). Set the number, then retune what
+    the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
+    CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
+    of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
+    water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
+    `airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
+    (`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
+    under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
+    `magnetgain` need their windows on τ (#605 has them). Its leftovers, each its own item:
+  - **38r-1. Does a sandwich slosh?** (S to decide, M to build). `lib/slosh.ts` solves a
+    6 mm layer with a free surface (`SLOSH_REST_DEPTH`): between two glasses there is none,
+    and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
+    under it. Either the tilt's slosh is the open dish's, or on the sandwich it is the thin
+    gap's creeping flow. The owner's call.
+  - **38r-2. A drop is a pancake past half the real gap** (S). `DROP_HALF_GAP`
+    (`wgsl/plate.ts`) is 0.016 of the plate, half the 6 mm; half of 2 mm is 0.005, at which
+    the common bead touches both glasses, and `lib/beads.ts`'s merge time is in units of it.
+    Moves with 14ab-6 (#601), `npm run droplens` re-read.
+  - **38r-3. A Gap dial** (S). At 2 mm water's drag time is a third of a second, not three:
+    a push fades nine times sooner. If a look wants the old glide, the honest dial is the
+    gap itself, not a stand-in for inertia.
+  - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
+    three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
+    half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
+    would slide the picture the same.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

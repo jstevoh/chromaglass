@@ -27,6 +27,7 @@ import { FILM_H0, PHASE_VIEW_TOP } from './standing';
 import { filmTableWgsl } from '../../lib/filmTable';
 import { FERRO_DROP_WGSL } from './ferroDrop';
 import { PH_WGSL } from '../../lib/phIndicator';
+import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 
 /** Bindings every plate shader shares. */
@@ -519,6 +520,7 @@ fn thinFilmColour(t: f32) -> vec3f {
 // where it is thinnest, then silver, straw, purple, blue, green-gold,
 // orange, magenta, and paler orders after, washing out to grey.
 ${filmTableWgsl()}
+${LAMP_FIELD_WGSL}
 
 // Read one of the two tables at t rainbow periods, one period being one
 // interference order of soap (FILM_NM_PER_T nm), linearly between entries.
@@ -2459,18 +2461,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // stack has under the front plate, bottom up. Anything of the three that is
   // higher is laid over the glass (mixSourcesAt), and the glass is lit without it.
   bgColor = mixLamp(bgColor, uv);
-  /*
-    And the lamp ground (lampBg): the same rows over the lamp at full, as
-    bright as the hot-spot (below) leaves its brightest point. The hot-spot
-    multiplies the whole picture by up to 1.28 over the lamp, which on a
-    white ground burnt the middle out, clear liquid and pale washes alike:
-    the check that twice the dye lets through the square of what once does
-    read the clipped lamp there and failed by 0.07 (npm run lamp). So the
-    lamp is set down by the hot-spot's peak, here, on the lamp's own term
-    only: divided at the hot-spot instead, the paint's half of a fader was
-    divided too, and halfway was not half of each (3 bytes off).
-  */
-  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv) / mix(1.0, 1.28125, U.lamp.w); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
+  // And the lamp ground (lampBg): the same rows over the lamp at full. The
+  // hot-spot (lampField.ts) never lifts a point above it, so nothing divides it.
+  if (U.lampGround > 0.001) { lampBg = mixLamp(vec3f(1.0), uv); if (U.twoProjectors > 0.5 && U.layerCount > 1) { lampBg *= 0.5; } }
 
   // ── Gooey blur parameters ─────────────────────────────────────────
   let fluidScale = max(U.resolution.x, U.resolution.y) * 1.5 / 128.0;
@@ -2921,7 +2914,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
-          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);
+          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005));
           pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 
@@ -3265,17 +3258,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     auxH = max(auxH, fluid1.a);
   }
 
-  // ── The lamp's hot-spot ──────────────────────────────────────────
+  // ── The lamp's hot-spot: the lamp off its mark, through the lens's aperture (lampField.ts, PLAN 38a) ──
+  // On the stage, not the plate: the dish turns, the lamp does not. Metres from the axis, y up the frame.
   if (U.lamp.w > 0.001) {
-    let dl = length(fuvBase - U.lamp.xy);
-    let glow = exp(-dl * dl * 3.5);
-    let pool = mix(vec3f(1.0), vec3f(1.05, 0.98, 0.9), glow * 0.5) * mix(0.78, 1.25, glow);
-    outColor *= mix(vec3f(1.0), pool, U.lamp.w);
-    if (U.lamp2.w > 0.001) {
-      let d2 = length(fuvBase - U.lamp2.xy);
-      let glow2 = exp(-d2 * d2 * 3.5);
-      outColor *= mix(vec3f(1.0), mix(vec3f(1.0), vec3f(0.9, 0.97, 1.12) * 1.25, glow2), U.lamp2.w * U.lamp.w);
-    }
+    let stage = ((uvScreen - 0.5) * U.resolution / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom) + U.camCenter - 0.5) * ${STAGE_METRES.toFixed(4)};
+    outColor *= lampField(stage, U.lamp.w, U.lamp2.w);
   }
 
   // ── Satellite droplets ───────────────────────────────────────────
