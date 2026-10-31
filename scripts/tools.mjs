@@ -585,6 +585,8 @@ try {
         const before = await idleWindow(2500);
         const steps0 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
         const rb0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
+        // Cells of glass the hand pressed (applySquish counts them by presser): a Blow stroke should press none (below).
+        const pc0 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.pressedCells?.hand ?? NaN);
         const w0p = await snap('wind0');
         const t0 = Date.now();
         /*
@@ -610,6 +612,7 @@ try {
         await snap('wind1');
         const steps1 = await page.evaluate(() => window.chromaglassDebug().blowSteps);
         const rb1 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.readbacks ?? NaN);
+        const pc1 = await page.evaluate(() => window.chromaglassDebug().fluids?.[0]?.pressedCells?.hand ?? NaN);
         const strokeSteps = await page.evaluate(() => window.__toolSnaps.wind1.step - window.__toolSnaps.wind0.step);
         const wa = await measure('wind0', w0p), wb = await measure('wind1', w0p);
         // In two halves, printed: whether the drift after dies away.
@@ -623,7 +626,7 @@ try {
           earlyAlong: toward(sign, early.cx, early.cy), lateAlong: toward(sign, late.cx, late.cy),
           stepsOk: before.steps > 0 && early.steps > 0 && late.steps > 0 && strokeSteps > 0,
           wind: d('wind'), straw: d('straw'), carried: d('carried'), directed: d('directed'), carries: d('carries'), aired: d('aired'),
-          readings: rb1 - rb0, strokeMs, poolX: wa.cx - from[0], poolY: wa.cy - from[1],
+          readings: rb1 - rb0, pressed: pc1 - pc0, strokeMs, poolX: wa.cx - from[0], poolY: wa.cy - from[1],
           strawFirst: (steps1?.strawFirst ?? NaN) - (steps0?.strawFirst ?? NaN),
         };
       };
@@ -644,7 +647,7 @@ try {
       */
       const again = await windRun(C, [C[0] + half, C[1]], 1);
       for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
-        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
+        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, ${r.pressed} cells of glass pressed by the hand, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
       }
       /*
         The plate's own drift, signed, at its rate toward where the stroke
@@ -740,6 +743,38 @@ try {
       */
       check('and blows no straw where it was pressed', strawFirst === 0 && wind > 0 && back.strawFirst === 0 && back.wind > 0,
         `${Number.isFinite(strawFirst) ? strawFirst : 'no count of'} straw step(s) before the stroke's first move, ${Number.isFinite(back.strawFirst) ? back.strawFirst : 'no count of'} the other way`);
+      /*
+        And presses no glass along the way. The pointer handler pressed the
+        glass under the pointer (applySquish, a bowl 24 cells across) and
+        stirred along the move on every pointer event with the button down,
+        whatever the tool; the Drop, the Finger and the Magnet were taken out
+        of it one by one as each was found copying or scattering the colour,
+        and the Blow was not, so a Blow stroke was the breath once a solver
+        step and a press once a pointer event besides. The pointer leads the
+        pool it blows across, so each press squeezed the pool's liquid back
+        the way the stroke came, against the breath, and the gap it closed
+        along the stroke opened again over the gap's memory for seconds
+        after, drawing the liquid toward the stroke's end: the drift in the
+        two windows after read +0.2% to +0.35% toward the stroke on every Mac
+        run, the strokes that pushed nothing included, where the breath's
+        own flow is still within half a second (the lab). The stroke's 30
+        presses came whatever the pace, and its steps of breath with the
+        runner's: the CI Macs step 12 to 23 times a second, so a stroke of
+        fixed wall time got 38 to 71 against a fast machine's 180, and the
+        push read -0.07% to +1.6% against +0.15% (PLAN 15g-7, QA-20b). In the
+        lab at the app's own step, geometry and pool, 30 moves over 45
+        steps: the breath alone +1.74%, flat after 0.4 s; with the press on
+        each move -0.32%, then +0.75% of creep in the 2.5 s after. Counted by
+        the solver (pressedCells.hand, as `npm run squeeze` reads the kicks'),
+        not inferred from the colour, and asked of a stroke that ran as a Blow
+        (wind steps), or a tool pick that missed would press nothing either.
+        The hand's count alone: a bubble's standing squeeze on its footprint
+        is the bubble's (pressedCells.bubble), the straw's included, which a
+        runner slow enough to hold the Blow still between moves blows
+        mid-stroke (15g-8).
+      */
+      check('and presses no glass along the way', fwd.pressed === 0 && wind > 0 && back.pressed === 0 && back.wind > 0,
+        `${Number.isFinite(fwd.pressed) ? fwd.pressed : 'no count of'} cell(s) of glass pressed by the hand in the stroke, ${Number.isFinite(back.pressed) ? back.pressed : 'no count of'} the other way`);
       const pushed = (r, name) => !r.stepsOk
         ? `${name}: the plate did not step through every window (${r.before.steps}, ${r.strokeSteps}, ${r.early.steps}, ${r.late.steps} steps)`
         : `${name}: ${pct(r.along)} over ${r.strokeSteps} steps against ${pct(r.idle)} over ${r.before.steps} left alone before (${pct(r.bar)} to beat), from a pool of ${r.wa.total.toFixed(0)} (${r.wb.total.toFixed(0)} after); after it ${pct(r.earlyAlong)} over ${r.early.steps} then ${pct(r.lateAlong)} over ${r.late.steps} (printed, not judged)`;
