@@ -40,7 +40,7 @@
  * drift in silence.
  */
 
-import { LEARNABLE_SETTINGS } from './midi.ts';
+import { LEARNABLE_SETTINGS, curveOf, travelOf, handValueAt } from './midi.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { LAMP_WARMTH_MAX } from './lampKelvin.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
@@ -74,6 +74,12 @@ export interface DeskSpec {
    * size of one. Every surface that can move it lands on a step.
    */
   step?: number;
+  /**
+   * Set only on a dial widened past where the looks live: the width its
+   * travel had before, which Evolve's wander is still a fifth of (see
+   * `wanderSpan` on `LEARNABLE_SETTINGS` in `midi.ts`).
+   */
+  wanderSpan?: number;
 }
 
 /** Where each of the MIDI forty is shown in the panel. */
@@ -176,12 +182,12 @@ const FROM_MIDI: DeskSpec[] = LEARNABLE_SETTINGS.map(s => ({ ...s, section: SECT
  */
 const FROM_PANEL: DeskSpec[] = [
   { key: 'sensitivity', label: "Sensitivity", min: 0.1, max: 3, section: 'audio-input' },
-  { key: 'bassBoost', label: "Bass Boost", min: 1, max: 3, section: 'audio-input' },
+  { key: 'bassBoost', label: "Bass Boost", min: 0.25, max: 5, section: 'audio-input', wanderSpan: 2 },
   { key: 'beatPrediction', label: "Beat Prediction", min: 0, max: 1, section: 'audio-input' },
   { key: 'turbulenceDetail', label: "Turbulence Detail", min: 1, max: 4, section: 'look', step: 1 },
-  { key: 'grainScale', label: "Grain Fineness", min: 60, max: 900, section: 'look' },
+  { key: 'grainScale', label: "Grain Fineness", min: 20, max: 1200, section: 'look', wanderSpan: 840 },
   { key: 'blobSurfaceTension', label: "Blob Surface Tension", min: 0, max: 1, section: 'look' },
-  { key: 'layerScaleVariety', label: "Layer Scale Variety", min: 0, max: 1, section: 'look' },
+  { key: 'layerScaleVariety', label: "Layer Scale Variety", min: 0, max: 2, section: 'look', wanderSpan: 1 },
   { key: 'boundaryContrast', label: "Boundary Glow", min: 0, max: 1, section: 'look' },
   { key: 'glossiness', label: "Glossiness", min: 0, max: 1, section: 'look' },
   { key: 'colourBody', label: "Colour Body", min: 0, max: 1, section: 'look' },
@@ -192,40 +198,40 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'thinFilm', label: "Thin Film", min: 0, max: 1, section: 'camera' },
   { key: 'sceneDeadzone', label: "Deadzone", min: 0, max: 1, section: 'room' },
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
-  { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
+  { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 30, section: 'lamp', wanderSpan: 3 },
   { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: LAMP_WARMTH_MAX, section: 'lamp' },
   // Film stock (F1): what the whole show is photographed on, as against the
   // `film*` settings, which drive the projector that plays video through dye.
   { key: 'stock', label: "Film Stock", min: 0, max: 1, section: 'stock' },
-  { key: 'stockGrain', label: "Grain", min: 0, max: 1, section: 'stock' },
-  { key: 'stockGrainSize', label: "Grain Size", min: 1, max: 6, section: 'stock' },
-  { key: 'stockWeave', label: "Gate Weave", min: 0, max: 3, section: 'stock' },
+  { key: 'stockGrain', label: "Grain", min: 0, max: 3, section: 'stock', wanderSpan: 1 },
+  { key: 'stockGrainSize', label: "Grain Size", min: 1, max: 16, section: 'stock', wanderSpan: 5 },
+  { key: 'stockWeave', label: "Gate Weave", min: 0, max: 12, section: 'stock', wanderSpan: 3 },
   { key: 'stockGate', label: "Gate Edge", min: 0, max: 1, section: 'stock' },
   { key: 'transmission', label: "Light Through Dye", min: 0, max: 1, section: 'lamp' },
   { key: 'exposure', label: "Exposure", min: 0, max: 1, section: 'lamp' },
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
   { key: 'filmKey', label: "Film Key", min: 0, max: 0.9, section: 'film' },
-  { key: 'macroHold', label: "Shot Length", min: 1, max: 15, section: 'macro' },
+  { key: 'macroHold', label: "Shot Length", min: 1, max: 60, section: 'macro', wanderSpan: 14 },
   { key: 'macroAimX', label: "Macro Aim Across", min: 0, max: 1, section: 'macro' },
   { key: 'macroAimY', label: "Macro Aim Up", min: 0, max: 1, section: 'macro' },
-  { key: 'macroCells', label: "Paint Cells", min: 0, max: 1, section: 'macro' },
-  { key: 'macroCellScale', label: "Cell Size", min: 0.15, max: 1.5, section: 'macro' },
+  { key: 'macroCells', label: "Paint Cells", min: 0, max: 2, section: 'macro', wanderSpan: 1 },
+  { key: 'macroCellScale', label: "Cell Size", min: 0.15, max: 3, section: 'macro', wanderSpan: 1.35 },
   { key: 'macroLacing', label: "Macro Lacing", min: 0, max: 1, section: 'macro' },
   { key: 'macroDepth', label: "Depth / Focus", min: 0, max: 1, section: 'macro' },
-  { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 1, section: 'macro' },
+  { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 2.5, section: 'macro', wanderSpan: 1 },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
   { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
   { key: 'phaseAmount', label: "Ferrofluid", min: 0, max: 1, section: 'ferro' },
   { key: 'phaseScale', label: "Domain Size", min: 0, max: 1, section: 'ferro' },
   { key: 'phaseSharp', label: "Phase Edge", min: 0, max: 1, section: 'ferro' },
-  { key: 'magnetStrength', label: "Magnet Strength", min: 0, max: 1, section: 'ferro' },
+  { key: 'magnetStrength', label: "Magnet Strength", min: 0, max: 3, section: 'ferro', wanderSpan: 1 },
   { key: 'magnetHeight', label: "Magnet Height", min: 0.02, max: 1, section: 'ferro' },
   { key: 'magnetX', label: "Magnet Across", min: 0, max: 1, section: 'ferro' },
   { key: 'magnetY', label: "Magnet Up", min: 0, max: 1, section: 'ferro' },
   { key: 'magnetWalk', label: "Magnet Walk", min: 0, max: 1, section: 'ferro' },
   { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'squish' },
   { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'squish' },
-  { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1, section: 'master' },
+  { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1.6, section: 'master', wanderSpan: 1 },
   { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 1, section: 'physics' },
   { key: 'oilTension', label: "Oil Tension", min: 0, max: 1, section: 'oil' },
   { key: 'surfactantFlow', label: "Soap Bursts", min: 0, max: 1, section: 'oil' },
@@ -241,9 +247,9 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'spectralOptics', label: "Spectral Mix", min: 0, max: 1, section: 'lamp' },
   { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'squish' },
   { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
-  { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },
+  { key: 'rainDrip', label: "Rain Drip", min: 0, max: 2, section: 'squish', wanderSpan: 1 },
   { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'oil' },
-  { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.08, section: 'physics' },
+  { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.5, section: 'physics', wanderSpan: 0.08 },
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'physics' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
@@ -281,8 +287,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'markX', label: "Logo Across", min: 0, max: 1, section: 'mark' },
   { key: 'markY', label: "Logo Up", min: 0, max: 1, section: 'mark' },
   { key: 'layerCount', label: "Layers", min: 1, max: 2, section: 'layers', step: 1 },
-  { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'spin' },
-  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 1, section: 'spin' },
+  { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1.3, section: 'spin', wanderSpan: 1 },
+  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 2, section: 'spin', wanderSpan: 1 },
   { key: 'spinDrag', label: "Plate Drag", min: 0, max: 1, section: 'spin' },
   { key: 'spinDirection', label: "Spin Direction", min: -1, max: 1, section: 'spin', step: 1 },
   { key: 'spinWander', label: "Spin Wander", min: 0, max: 1, section: 'spin' },
@@ -297,6 +303,24 @@ const FROM_PANEL: DeskSpec[] = [
 export const PINNABLE: DeskSpec[] = [...FROM_MIDI, ...FROM_PANEL];
 
 export const PIN_RANGE = new Map<string, DeskSpec>(PINNABLE.map(s => [String(s.key), s]));
+
+/**
+ * A setting's value as how far along its own control it sits (0 to 1), and back.
+ *
+ * For a surface that draws its own native slider rather than one of the
+ * shared ones (the Design sheet's Evolve Speed), so that it still takes the
+ * registry's range and the setting's curve instead of a copy of either: when
+ * Evolve Speed went on to 3 (PLAN 27h-1), that sheet was the one place left
+ * stopping at 1 on a straight throw.
+ */
+export function travelOfKey(key: keyof VisualizerSettings, value: number | undefined): number {
+  const s = PIN_RANGE.get(String(key));
+  return s ? travelOf(value ?? s.min, s.min, s.max, curveOf(key)) : value ?? 0;
+}
+export function valueOfKey(key: keyof VisualizerSettings, at: number): number {
+  const s = PIN_RANGE.get(String(key));
+  return s ? handValueAt(at, s.min, s.max, curveOf(key)) : at;
+}
 
 /**
  * Where a value lands on a control that only takes whole steps; on any other
