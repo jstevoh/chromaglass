@@ -279,8 +279,8 @@ export class WebGPUFluid extends FluidReads {
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
       for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
-      // The heat's mean for its lift (PLAN 38f): behind the show, and built on the frame where a standing or tipped plate first asks, as the oil's lift is.
-      for (const name of HEAT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      // The heat's mean for its lift (PLAN 38f): waited for, since a standing plate's first thin step asks for it (the oil's lift waits only for a rock; npm run startup caught it built on the first frame).
+      for (const name of HEAT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), true);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
       for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
     } else {
@@ -1752,10 +1752,10 @@ export class WebGPUFluid extends FluidReads {
         for (const [key, code] of WebGPUFluid.thinBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
         // And the oil's (carryPlan), which only a look with the mix asks for.
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
+        // The heat's mean for its lift (PLAN 38f), which a standing plate's first thin step asks for.
+        for (const name of HEAT_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
         this.hsReady = true;
         for (const [key, code] of WebGPUFluid.driftBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
-        // The heat's mean for its lift (PLAN 38f), behind as the drift's.
-        for (const name of HEAT_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
       })();
     }
     return this.hsBuilding;

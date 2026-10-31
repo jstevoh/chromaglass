@@ -563,30 +563,21 @@ export const HEAT_RISE = 9.81 * (REST_GAP * PLATE_METRES) ** 2 / (12 * NU_REF);
   in and falling as x^-½ (Re_x stays under the 5e5 of a turbulent layer
   across any dish: 4e4 at 3 m/s over 0.2 m). The stress is read as the
   Blow's is (lib/breath.ts, PLAN 15g, which treats the liquid's face as the
-  air's): the column's mean goes at τh/2μ. A stress the same everywhere on
-  a closed sandwich is pushed back by its own pressure and moves nothing; on
-  the solver's open rim it would slide the whole picture out of the dish, so
-  the dish's mean of it (UPDRAFT_MEAN, worked out once below) is taken off:
-  what moves the liquid is the stress's unevenness, strong near the edge it
-  comes in at, which a draught over a closed dish does.
+  air's): the column's mean goes at τh/2μ. The whole stress drives it, on
+  the solver's open rim as the old uniform push did: the dish's mean goes
+  with the air, as h/μ (npm run forces, PLAN 18a-2), and the stress's
+  unevenness, strongest near the edge the air comes in at, shears it on top
+  of that. A first cut took the dish's mean of the stress off, so that only
+  the unevenness moved the liquid, as on a closed sandwich whose own
+  pressure pushes a uniform stress back; that sent the middle against the
+  air and the dish's mean nowhere in particular (forces read +0.0044 where
+  the draught goes −v), and it is not the plate the solver has.
 */
 export const UPDRAFT_SPEED = 3;
 export const AIR_DENSITY = 1.2;
 export const AIR_NU = 1.5e-5;
 export const AIR_K = 0.026;
 export const AIR_PR = 0.71;
-/** √(PLATE_METRES/x) over the dish, x from the rim the air comes in at (toward −v), on a fine grid: the stress's dish mean per unit. */
-export const UPDRAFT_MEAN = (() => {
-  const n = 512;
-  let s = 0, c = 0;
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const u = (i + 0.5) / n - 0.5, v = (j + 0.5) / n - 0.5;
-    if (u * u + v * v >= 0.25) continue;
-    const lead = Math.sqrt(0.25 - u * u);
-    s += 1 / Math.sqrt(Math.max(lead - v, 1 / n)); c++;
-  }
-  return s / c;
-})();
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).

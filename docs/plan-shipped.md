@@ -10188,9 +10188,9 @@ and 9.13/ks at half the real seconds a step; still air (radiation alone) 3.98 ag
 
 **Shipped (this PR).** Updraft was snoise(p·0.05 − t)·air·4dt plus a uniform 8dt up the plate.
 It is the air's speed now (3 m/s at full): its laminar boundary layer's stress
-0.332 ρ U^1.5 √(ν_air/x) from the rim the air comes over, less the dish's mean (a uniform stress
-on a closed sandwich moves nothing; through the open rim it would slide the picture), read as the
-Blow's stress (τh/2μ), and its forced cooling 0.332 k Pr^⅓ √(U/νx)/x on the top face. Measured:
+0.332 ρ U^1.5 √(ν_air/x) from the rim the air comes over, the whole of it, so the dish's mean
+still goes with the air as h/μ as `npm run forces` asks (a first cut took the dish's mean off and
+sent the middle against the air), read as the Blow's stress (τh/2μ), and its forced cooling 0.332 k Pr^⅓ √(U/νx)/x on the top face. Measured:
 the flow changed 0.00% in half a second (22.5% on main), Updraft 1 against 0.25 moved it 8.00
 times (4.00 on main), and the top face cooled at 7.56 and 3.57 per 10 ks a tenth of the plate and
 half of it in from the edge, against 7.27 and 3.25. Its looks go calmer and steady: judging §98.

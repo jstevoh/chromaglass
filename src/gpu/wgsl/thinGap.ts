@@ -85,7 +85,7 @@
 import { HAND_GRIP } from '../../lib/handSolid';
 import { DISH_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
-import { HEAT_ROOM, UPDRAFT_MEAN } from '../fluid/constants';
+import { HEAT_ROOM } from '../fluid/constants';
 import { waterDensity } from '../../lib/lampBoil';
 
 // Water's density at the room's temperature (Kell 1975), the heat's lightness's reference (HEAT_LIGHT).
@@ -201,12 +201,12 @@ fn heatLight(dT: f32) -> f32 {
   /*
     Updraft's stress over the dish (PLAN 38t), per unit of its value a
     plate's width in: √(W/x), x from the rim the air comes over, along −v.
-    Past the rim, the dish's mean, so it adds nothing there.
+    Past the rim, nothing.
   */
   const UPDRAFT_AT = /* wgsl */ `
 fn updraftAt(uv: vec2f, n: f32) -> f32 {
   let d = uv - vec2f(0.5);
-  if (dot(d, d) >= 0.25) { return ${UPDRAFT_MEAN.toFixed(5)}; }
+  if (dot(d, d) >= 0.25) { return 0.0; }
   return inverseSqrt(max(sqrt(0.25 - d.x * d.x) - d.y, 1.0 / n));
 }
 `;
@@ -328,8 +328,7 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       B g h²/12μ, as fast as the heat says (`npm run plume`).
 
       Updraft (PLAN 38t): a boundary layer's stress τ ∝ x^-½ from the rim
-      the air comes over (toward −v), less the dish's mean of it
-      (UPDRAFT_MEAN), read as the breath's stress is. It was a noise,
+      the air comes over (toward −v), read as the breath's stress is. It was a noise,
       snoise(p·0.05 − t), plus a uniform push up the plate.
 
       A.a = (Rain Drip's weight, Updraft's stress a plate's width in from its
@@ -399,7 +398,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.xy + S.heatLift * (heatLight(v.z) - oilMean[1]), v.z, v.w);
   }
   if (S.air > 0.1) {
-    let tau = A.a.y * (updraftAt(uvOf(id), S.n) - ${UPDRAFT_MEAN.toFixed(5)});
+    let tau = A.a.y * updraftAt(uvOf(id), S.n);
     v = vec4f(v.xy - vec2f(0.0, tau) / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
   }
   if (A.a.w > 0.0) {

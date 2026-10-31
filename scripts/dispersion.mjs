@@ -182,8 +182,16 @@ try {
     lab.dye(0.5, 0.5, 0.08, [1, 0, 0], 1.0);
     lab.flush();
   });
+  /*
+    The lamp off (dimmer 0): it warms the dyed spot at I·a/C (PLAN 38f),
+    0.019 K/s through this dye, 0.028 K over the 1.5 s, which filled the
+    peak back up as fast as κ drained it (0.034 K) and read as no spread at
+    all. Before 38f its warming was rounded away by the half float, so the
+    lamp was on here without anyone meaning it. What this asks is the
+    diffusion alone.
+  */
   // Step 1 initial step so velForced is populated
-  await page.evaluate(() => lab.step(1, { diff: 0, heatDecay: 1.0, advection: 0 }));
+  await page.evaluate(() => lab.step(1, { diff: 0, heatDecay: 1.0, advection: 0, dimmer: 0 }));
   const readHeatAndDye = () => page.evaluate(async () => {
     const v = await lab.field('vel');
     const d = await lab.field('dye');
@@ -202,7 +210,7 @@ try {
 
   const hd0 = await readHeatAndDye();
   // Step 90 steps with dye diffusion strictly 0, heatDecay 1.0 (thermal diffusion alone)
-  await page.evaluate(() => lab.step(90, { diff: 0, heatDecay: 1.0, advection: 0 }));
+  await page.evaluate(() => lab.step(90, { diff: 0, heatDecay: 1.0, advection: 0, dimmer: 0 }));
   const hd1 = await readHeatAndDye();
 
   const heatSpread = (hd0.peakTemp - hd1.peakTemp) / hd0.peakTemp;
