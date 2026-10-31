@@ -108,10 +108,24 @@ const open = async (width, height, touch, look) => {
   await page.waitForTimeout(1500);
   return { ctx, page };
 };
-const settingsOf = (page) => page.evaluate(() => {
-  const s = window.chromaglassSettings?.();
-  return s ? { u: s.plateUpright ?? 0, d: s.tiltDirection ?? 180, slosh: s.slosh ?? 0 } : null;
-});
+/*
+  No fallbacks: a field renamed or missing would read as "unchanged" and pass
+  every let-go line (the check-skeptic's third finding), so it throws instead.
+*/
+const settingsOf = async (page) => {
+  const s = await page.evaluate(() => window.chromaglassSettings?.() ?? null);
+  const v = s && { u: s.plateUpright, d: s.tiltDirection, slosh: s.slosh };
+  if (!v || ![v.u, v.d, v.slosh].every((x) => typeof x === 'number' && Number.isFinite(x))) throw new Error(`the settings hook gave ${JSON.stringify(v)}`);
+  return v;
+};
+/*
+  Every look ships Tilt Direction 180, so a pad that put back 180 rather than
+  what it took would pass a let-go line that compares against the look's own
+  (the check-skeptic's control: letGo hard-wired to 180, 16/16). So each look
+  is first turned to a direction no look has and no drag ends on, and the
+  let-go lines ask for that one back.
+*/
+const turnTo = async (page, deg) => { await page.evaluate((d) => window.chromaglassSettings?.({ tiltDirection: d }), deg); await page.waitForTimeout(300); };
 /**
   Hold the pad's dot at (fx, fy) of `travel` px from the middle (the pad's own
   radius if not given: the desk's keycap pad reads past its rim), read the
@@ -150,6 +164,7 @@ try {
     });
     check('the desk: the Tip pad is out on the Perform tab, in the Tools panel, seen without opening or scrolling anything',
       seen.pad && seen.inTools && seen.onScreen && seen.w >= 36, `pad ${seen.pad}, in Tools ${seen.inTools}, on screen ${seen.onScreen}, ${seen.w} px`);
+    await turnTo(page, 37);
     const before = await settingsOf(page);
     const right = await drag(page, 'tip-pad', 0.95, 0, DESK_REACH);
     check('dragged to the right edge it stands the plate up toward the right (Gravity past 0.6, Tilt Direction 90)',
@@ -157,7 +172,7 @@ try {
     check('and with Slosh off, the grab turns it to half, where it stays',
       before.slosh < 0.05 && right.held.slosh === TIP_SLOSH && right.after.slosh === TIP_SLOSH, `Slosh ${before.slosh} → ${right.held.slosh} → ${right.after.slosh}`);
     check('let go, the dish is the look\'s own again, exactly',
-      right.after.u === before.u && right.after.d === before.d, `Gravity ${before.u}/${before.d}° → ${right.after.u}/${right.after.d}°`);
+      before.d === 37 && right.after.u === before.u && right.after.d === before.d, `Gravity ${before.u}/${before.d}° → ${right.after.u}/${right.after.d}°`);
     const top = await drag(page, 'tip-pad', 0, -0.95, DESK_REACH);
     check('dragged to the top, Tilt Direction reads 0', !!top.held && top.held.u > 0.6 && near(top.held.d, 0, 4), `Gravity ${top.held?.u}, direction ${top.held?.d}`);
     // The keys: focus the pad, hold the left arrow, let it go.
@@ -169,23 +184,28 @@ try {
     await page.waitForTimeout(200);
     const keyAfter = await settingsOf(page);
     check('the left arrow held tips it left, and let go lays it back',
-      keyHeld.u > 0.4 && near(keyHeld.d, 270, 4) && keyAfter.u === before.u && keyAfter.d === before.d,
+      keyHeld.u > 0.4 && near(keyHeld.d, 270, 4) && keyAfter.u === before.u && keyAfter.d === 37,
       `held ${keyHeld.u}/${keyHeld.d}°, after ${keyAfter.u}/${keyAfter.d}°`);
     await ctx.close();
   }
   // ── 2. A look whose dish stands up ──
   {
     const { ctx, page } = await open(1440, 900, false, 'lava-lamp');
+    await turnTo(page, 150);
     const before = await settingsOf(page);
+    // Where the dot rests, in the pad's radii from its middle (x right, y down), against where padDot puts a plate stood up at 150°.
     const dot = await page.evaluate(() => {
       const pad = document.querySelector('[data-testid="tip-pad"]');
       const d = pad?.lastElementChild?.getBoundingClientRect(), p = pad?.getBoundingClientRect();
-      return d && p ? Math.round(((d.top + d.height / 2) - (p.top + p.height / 2)) / (p.height / 2) * 100) / 100 : null;
+      const k = (v) => Math.round(v * 100) / 100;
+      return d && p ? { x: k(((d.left + d.width / 2) - (p.left + p.width / 2)) / (p.width / 2)), y: k(((d.top + d.height / 2) - (p.top + p.height / 2)) / (p.height / 2)) } : null;
     });
+    const want = padDot(1, 150, 1);
     const left = await drag(page, 'tip-pad', -0.95, 0, DESK_REACH);
-    check('Lava Lamp: the dot rests toward the bottom (Gravity 1, Tilt Direction 180), and after a tip the dish stands as it did',
-      before.u === 1 && dot !== null && dot > 0.8 && near(left.held.d, 270, 4) && left.after.u === 1 && left.after.d === before.d,
-      `before ${before.u}/${before.d}°, dot ${dot} of the radius below the middle, held ${left.held.u}/${left.held.d}°, after ${left.after.u}/${left.after.d}°`);
+    check('Lava Lamp (Gravity 1, turned to 150°): the dot rests where the plate is tipped, and after a tip the dish stands as it did',
+      before.u === 1 && before.d === 150 && dot !== null && Math.hypot(dot.x - want.x, dot.y - want.y) < 0.1
+        && near(left.held.d, 270, 4) && left.after.u === 1 && left.after.d === 150,
+      `before ${before.u}/${before.d}°, dot at ${dot?.x}, ${dot?.y} (want ${want.x.toFixed(2)}, ${want.y.toFixed(2)}), held ${left.held.u}/${left.held.d}°, after ${left.after.u}/${left.after.d}°`);
     await ctx.close();
   }
   // ── 3. The phone ──
@@ -196,10 +216,29 @@ try {
     const b = await page.getByTestId('phone-tip-pad').first().boundingBox().catch(() => null);
     check('the phone: the Motion sheet has the Tip pad, at a thumb\'s size', !!b && b.width >= 110, b ? `${Math.round(b.width)} px` : 'no pad');
     if (b) {
+      /*
+        A thumb, not a mouse: touch events through the DevTools protocol, so the
+        pad's touch-action is what decides whether the sheet scrolls under the
+        drag and cancels it (the check-skeptic's second finding: a mouse ignores
+        touch-action, so dropping it from the pad would have stayed green).
+      */
+      const cdp = await ctx.newCDPSession(page);
+      const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+      const thumb = async (fx, fy) => {
+        const cx = b.x + b.width / 2, cy = b.y + b.height / 2, r = b.width / 2;
+        await touch('touchStart', cx, cy);
+        for (let i = 1; i <= 8; i++) { await touch('touchMove', cx + (fx * r * i) / 8, cy + (fy * r * i) / 8); await page.waitForTimeout(30); }
+        await page.waitForTimeout(250);
+        const held = await settingsOf(page);
+        await touch('touchEnd');
+        await page.waitForTimeout(300);
+        return { held, after: await settingsOf(page) };
+      };
+      await turnTo(page, 37);
       const before = await settingsOf(page);
-      const down = await drag(page, 'phone-tip-pad', 0, 0.95);
-      check('and it tips the same plate the same way: dragged down, Tilt Direction 180, and let go, the look\'s own again',
-        down.held.u > 0.6 && near(down.held.d, 180, 4) && down.held.slosh === TIP_SLOSH && down.after.u === before.u && down.after.d === before.d,
+      const down = await thumb(0, 0.95);
+      check('and under a thumb it tips the same plate the same way: dragged down, Tilt Direction 180, and let go, the look\'s own again',
+        down.held.u > 0.6 && near(down.held.d, 180, 4) && down.held.slosh === TIP_SLOSH && down.after.u === before.u && down.after.d === 37,
         `held ${down.held.u}/${down.held.d}° Slosh ${down.held.slosh}, after ${down.after.u}/${down.after.d}°`);
     }
     await ctx.close();
