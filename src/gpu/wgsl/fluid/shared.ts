@@ -164,15 +164,27 @@ fn capDye(d: vec4f) -> vec4f {
   exact. Both neighbours are exact halves (a multiple of the bit, under the
   next power of two), so the store keeps whichever is picked, however the
   hardware rounds. The draw is the cell, a salt and the step's time.
+
+  The bit and its inverse are built from the float's own exponent field, not
+  exp2(floor(log2(a))) and a division. Those are allowed to be approximate,
+  and on the Mac's Metal they are fast-math: a bit a hair off a power of two
+  puts lo a hair off a half, and a store that does not round to nearest keeps
+  the half below. npm run heat's cooling line read 8.95 K after 60 steps at
+  1/60 s and 8.02 after 120 at 1/120 on CI's Mac (ratio 1.12), about 0.017 K,
+  two bits, lost each step, where software WebGPU read 9.88 both. A power of
+  two made from its bits, and a multiply by its exact inverse, are exact on
+  any hardware, so lo and lo + bit are halves whatever the store does.
 */
 fn halfRound(x: f32, q: vec2i, salt: u32) -> f32 {
   let a = abs(x);
   if (a < 6.1e-5 || a > 65000.0) { return x; }
-  let bit = exp2(floor(log2(a)) - 10.0);
-  let lo = floor(a / bit) * bit;
+  let e = (bitcast<u32>(a) >> 23u) & 0xffu;
+  let bit = bitcast<f32>((e - 10u) << 23u);
+  let inv = bitcast<f32>((264u - e) << 23u);
+  let lo = floor(a * inv) * bit;
   var h = (u32(q.x + 4096) * 1664525u) ^ (u32(q.y + 4096) * 1013904223u) ^ (salt * 2654435761u) ^ bitcast<u32>(S.time);
   h = h ^ (h >> 16u); h = h * 0x7feb352du; h = h ^ (h >> 15u); h = h * 0x846ca68bu; h = h ^ (h >> 16u);
-  let up = f32(h >> 8u) / 16777216.0 < (a - lo) / bit;
+  let up = f32(h >> 8u) / 16777216.0 < (a - lo) * inv;
   return sign(x) * select(lo, lo + bit, up);
 }
 `;
