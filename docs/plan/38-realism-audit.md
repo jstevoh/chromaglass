@@ -153,12 +153,17 @@ written first. Line numbers are as read on main at d07ac31.
     building 38h. The meniscus (`meniscus` in `plate.ts`) still brightens the rim's side that
     faces `lampDir` and adds a camera highlight toward it; the air bubbles' pass adds a
     specular `spec + spec2` toward the lamp and the second lamp (the bubbles block, "shine");
-    the rings' rim adds `ring · 0.15` (the beads block); the macro's paint glint
+    the rings' rim adds `ring · 0.15` and coloured drops add their dye as light, `glowC`
+    (the beads block); the macro's paint glint
     (`glint = 1 − exp(−spec·1.6)`); and on the camera and non-derived path the boundary line
     adds `edge0 · edgeK · 0.25` of white. Each is a lamp seen from above or light added at an
     edge; each should take its light from the pupil law the drops use (and the camera's
     wider lens), as 38h did. Once they go, `lampDir` and Lamp Motion drive nothing but the
-    hot spot, which is 38a-3's to retire.
+    hot spot, which is 38a-3's to retire. Not light from above but light added all the
+    same: Saturation Boost (1.35 by default) pushes each channel from the pixel's grey, so
+    under a red gel a cyan pool's red rises 55 levels past what the gel passed; whether the
+    projected path's grade may lift a band past its input is the owner's call, and
+    `npm run nolight` asks its lines at a grade of 1 meanwhile.
   - **38h-3. The oil's shadowgraph and the dye's are one term** (with **18e-2**). 38h draws
     the oil's out-of-focus lens from its own ∇²OPL in the oil block, on both sides of its edge;
     where dye crosses the oil's edge `refractionOptics` already takes the oil's share of the
