@@ -27,6 +27,8 @@
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
 import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
+import { magnetDepth, magnetRadiusAt } from '../lib/magnetSize';
+import { SPIKE_ONSET, fieldOnAxis } from './wgsl/spikes';
 
 export interface Opening {
   /** Vorticity confinement (galaxy): the curl and the push it gives. */
@@ -74,6 +76,14 @@ export interface Opening {
   spin: boolean;
   /** The chemistry (Turing patterns). */
   chemistry: boolean;
+  /**
+   * The standing film (wgsl/standing.ts), when the look's own magnet is past
+   * the spikes' onset on its axis. Added with PLAN 38k, whose real onset
+   * (4 mT, where it was 22) put Magnet Garden's and Ferro Paint's own
+   * magnets past it: \`npm run startup\` on Metal found Magnet Garden asking
+   * for the film's pipelines in its first steps with no list naming them.
+   */
+  film: boolean;
   /**
    * The plate stood up (Plate Upright), or the dye given weight (Dye
    * Weight): the mix's push on the flow (mixSmooth, mixForce) runs from the
@@ -152,6 +162,8 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     thinGap: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5,
     spin: lookOpensSpinning(s),
     chemistry: on(s.chemistry),
+    film: on(s.phaseAmount) && on(s.magnetStrength)
+      && fieldOnAxis(s.magnetStrength!, magnetDepth(s.magnetHeight, s.phaseScale), magnetRadiusAt(s.magnetSize)) > SPIKE_ONSET,
     gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
     slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
       && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
