@@ -47,11 +47,11 @@ const LC = SPIKE_PITCH / (2 * Math.PI);
   1.7 l_c high and 11 l_c (0.07 of the plate) in radius.
 
   The film takes none of it (PULL_SHARE 0): since PLAN 9t-2 the pull acts
-  under the film through the plate's own flow, on the layer's mean
-  (wgsl/fluid/phaseForces.ts, layerMean, which has why there and not
-  here: over a dome the pull is a tilt, which moves the layer as a whole,
-  and the plate's is the real one where the film's, at the held lift, is a
-  ninth of it). Before 9t-2 nothing pulled the layer under the window, and
+  under the film through the plate's own flow, on each cell's share as
+  everywhere (wgsl/fluid/phaseForces.ts, phaseForce, which has why there
+  and not here: over a dome the pull is a tilt, which moves the layer as a
+  whole, and the plate's is the real one where the film's, at the held
+  lift, is a ninth of it). Before 9t-2 nothing pulled the layer under the window, and
   at the liquid's real onset (PLAN 38k) a dragged drop was left behind.
   Each share of it tried in the film, in the lab on 384² with the hand's
   Magnet over a pool 0.12 across for four seconds:

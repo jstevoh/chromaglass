@@ -108,11 +108,14 @@ Open, from building 9i:
     as bars along the grid. A finer film grid under the magnet (the patch at twice the
     plate's cells) would let it rise.
   - **9t-2. No pull under the film** (**built, in the PR with 38k-7, Mac CI owed**: the
-    plate's pull now acts under the window on the layer's mean, `layerMean` in
-    `wgsl/fluid/phaseForces.ts`, and the window carries each cell's own share at the
-    layer's mean speed, `boxVel`/`boxFlux` in `wgsl/fluid/phase.ts`, where it carried a
-    blurred mean that smeared a moving drop; cloud lab, ferrodrag's drag: lag 2.65 R
-    against #625's 7.4 R, the drop whole, bar 2 R). Was: the magnet's Kelvin pull is in the film's
+    plate's pull now acts under the window as everywhere, on each cell's own share
+    (`phaseForce` in `wgsl/fluid/phaseForces.ts`; a first cut on the layer's mean over
+    a dome's box spread the drop's force over its rim and left it 2.65 R behind), the
+    flux step's payback (`phaseCompress`) runs under the window too, and the window
+    carries each cell's own share at the layer's mean speed, `boxVel`/`boxFlux` in
+    `wgsl/fluid/phase.ts`, where it carried a blurred mean that smeared a moving drop;
+    cloud lab, ferrodrag's drag: lag 1.71 R and level against #625's 7.4 R and main's
+    1.79 R, bar 2 R). Was: the magnet's Kelvin pull is in the film's
     pressure, worked out from the liquid's susceptibility (EFH1, χ0 2.6), and scaled to
     nothing: at the whole of it the pool gathered into one heap with no domes on it (the
     lift being held low, 9t-1), and at a tenth or a quarter its gathering front set the

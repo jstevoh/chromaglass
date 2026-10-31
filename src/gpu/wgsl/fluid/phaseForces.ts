@@ -59,6 +59,7 @@ export const PHASE_FORCE_KERNELS: Record<string, string> = {
   phaseForce: `${HEAD}${MAGNET_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var phase: texture_2d<f32>;
+// The standing layer, bound and no longer read (the pull runs on under it: below).
 @group(0) @binding(4) var stand: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
 fn ph(p: vec2i, n: f32) -> f32 { return clamp(textureLoad(phase, clampP(p, n), 0).r, 0.0, 1.0); }
@@ -68,11 +69,8 @@ fn phs(p: vec2i, n: f32) -> f32 {
   return t / 9.0;
 }
 /*
-  Under a standing layer (STAND_ASIDE), the pull acts on the layer as a
-  whole: its share is the layer's mean over a seven-cell box round the cell
-  (a dome's spacing, the box the advection takes the flow's mean over
-  there: phase.ts, boxVel), counting a dome's cells past full at what they hold,
-  and at most full. PLAN 9t-2.
+  Under a standing layer (STAND_ASIDE) the pull runs on as it does
+  everywhere else, on the cell's own three-by-three share. PLAN 9t-2.
 
   What was wrong. The pull stepped aside under the film's window, for the
   film to pull the layer in its own pressure (wgsl/standing.ts, kelvin),
@@ -98,20 +96,21 @@ fn phs(p: vec2i, n: f32) -> f32 {
   plate: the force that carries a drop to the window's edge carries it on
   under the window, and the film stands the domes up on what it brings.
 
-  What it brings is a mound. Pulled inward faster than the layer's own
-  weight spreads it, the pool piles under the magnet, past full, up to the
-  top glass (phaseRelax's ceiling, FILM_TOP), as a real layer does under a
-  magnet a few times past its onset (its pull there is 60 times the
-  pressure of a capillary length of it, and the gap is four). The mean,
-  not the cell's own share: on the cell's own the force would differ dome
-  to dome and its curl, which the projection keeps, would stir the domes
-  apart at their own scale.
+  Why the cell's own share and not the layer's mean round it. The first
+  cut took the mean over a seven-cell box (a dome's spacing), so the force
+  would not differ dome to dome and stir the domes apart by its curl. But
+  a dragged drop is eight cells across, and the box spread its force
+  density over the rim and outside it: the drop's inside was pulled less
+  than the liquid there is, and in the lab (handoff probe, 384², a 14 mT
+  magnet drawn 0.3 of the plate in 180 steps) it fell 2.65 radii behind and
+  the gap kept growing, against main's 1.79 before the film ran there. On
+  the cell's own share it is 1.95, and with phaseCompress (below) running
+  under the window too 1.71, level from step 90. The force density μ0 M ∇H
+  is the liquid's own at each point; a field that tilts over five
+  capillary lengths has almost no curl over one, so the domes' stir the
+  box was meant to stop is the field's curvature times a dome's share, and
+  npm run standing, spikes and fingers say whether it shows.
 */
-fn layerMean(p: vec2i, n: f32) -> f32 {
-  var t = 0.0;
-  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) { t += max(textureLoad(phase, clampP(p + vec2i(i, j), n), 0).r, 0.0); } }
-  return min(t / 49.0, 1.0);
-}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -131,11 +130,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // it. And no floor at 1: in water the ferrofluid is the thicker liquid
   // and the ratio is under 1, and the factor is still the mixed drag over
   // the ferrofluid's (1e-6 is the drag's own floor).
-  // Under a standing layer, the layer's mean round the cell instead: see layerMean.
-  var share = phs(p, n);
-  let st = textureLoad(stand, p, 0).r;
-  if (st > 0.0) { share = mix(share, layerMean(p, n), st); }
-  var f = share * pow(max(A.b.z, 1e-6), 1.0 - ph(p, n)) * gpsi * A.b.x;
+  // The same under a standing layer: see above.
+  var f = phs(p, n) * pow(max(A.b.z, 1e-6), 1.0 - ph(p, n)) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
@@ -436,8 +432,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
     Under Thin Gap the field is a share of the gap (phaseAdvect), so what
     crosses a face is a volume, the exchange times the thinner gap, and
-    each cell divides by its own (as phaseGrid). Stepped aside under a
-    standing layer (STAND_ASIDE), whose film shapes the layer there.
+    each cell divides by its own (as phaseGrid).
+
+    Not stepped aside under a standing layer (STAND_ASIDE), though the film
+    shapes the layer there. This is not a second law of the liquid's motion
+    but the advection's own accuracy: it pays back what the flux step's
+    limiter withheld, and the flux step runs under the window too (PLAN
+    9t-2), so its payback belongs wherever it runs. Stepped aside, a drop
+    dragged under the window smeared at its trailing edge as the limiter
+    spread it, and the lab's drag fell 1.95 radii behind instead of 1.71.
 
     A.a = (C_α, the flow's displacement per unit velocity this step,
     volume form on, the substeps the step ran when not in volume form: in
@@ -448,11 +451,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var blur: texture_2d<f32>;
 @group(0) @binding(4) var vel: texture_2d<f32>;
 @group(0) @binding(5) var sq: texture_2d<f32>;
+// The standing layer, bound and no longer read (the compression runs under it: above).
 @group(0) @binding(6) var stand: texture_2d<f32>;
 @group(0) @binding(7) var dst: texture_storage_2d<r32float, write>;
 // The phase's substeps this step (phasePlan): 1/m and m.
 @group(0) @binding(8) var<storage, read> psub: array<f32>;
-${STAND_ASIDE}
 fn raw(p: vec2i) -> f32 { return textureLoad(src, p, 0).r; }
 // The [1 2 1]²-blurred field (phaseBlur), read at the grid's edge as its edge cell.
 fn sm(p: vec2i, n: i32) -> f32 { return textureLoad(blur, clamp(p, vec2i(0), vec2i(n - 1)), 0).r; }
@@ -496,7 +499,7 @@ fn compress(p: vec2i, e: vec2i, n: i32) -> f32 {
   let hi = max(clamp(a, 0.0, 1.0), clamp(b, 0.0, 1.0));
   let amount = min(A.a.x * deficit * normal, 0.25 * min(lo, 1.0 - hi));
   let toFuller = select(-amount, amount, sp > sq2);
-  return aside(p, q, S.n) * toFuller * min(gapOf(p), gapOf(q));
+  return toFuller * min(gapOf(p), gapOf(q));
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
