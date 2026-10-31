@@ -12,7 +12,7 @@ and video standards on each." With it, a standing rule: every feature ships its 
 version in the same PR (see the operating rules below).
 
 1. ~~**The sources there are, in one stack**~~ *shipped* (#176). Story in `docs/plan-shipped.md` §11.1 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the film between the plates, the LED beam, whether 0–200 % is the right travel).
-2. ~~**The other pictures as rows**~~ *shipped* (#189). Story in `docs/plan-shipped.md` §11.2 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the lumia as a beam; the gel's 1.5 gain went in 38h, the gel is a filter now, judged in §98).
+2. ~~**The other pictures as rows**~~ *shipped* (#189). Story in `docs/plan-shipped.md` §11.2 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the lumia as a beam; the gel's 1.5 gain went in 38h, the gel is a filter now, judged in §99).
 3. ~~**A blend per row**~~ *shipped* (#193). Story in `docs/plan-shipped.md` §11.3 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13 (the key's edge on a real film; Add over a bright plate).
 4. ~~**Crossfade a row**~~ *shipped* (#195). Story in `docs/plan-shipped.md` §11.4 (moved 2026-10-29, 19m-2). **Owed:** the Mac look in `docs/judging.md` §13, and a film coming in from a pad filmed by hand (`film.yml`) to show no hard cut in its motion table.
 6. **A row per projector** (rig-plan R1). Once a rig has more than one live plate,
