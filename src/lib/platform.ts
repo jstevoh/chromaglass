@@ -453,8 +453,8 @@ export interface EngineStatus {
   /**
    * Under `?debug` only: every GPU pass, costliest first, in ms a frame
    * (`gpuPasses.ts`, PLAN.md 14ab-16). Absent when the page is not asking (the show never
-   * builds the list), null when this GPU gives no timestamps at all, empty
-   * until the first ones land.
+   * builds the list) or there is no GPU renderer yet, null when this GPU gives
+   * no timestamps at all, empty until the first ones land.
    */
   gpuPasses?: GpuPassTime[] | null;
 }

@@ -19,7 +19,8 @@ export const PASSES_SHOWN = 8;
  * The same component in the laptop's Settings, the desk's Simulation panel
  * and the phone's More → Settings, since all three are the one SettingsPanel.
  *
- * `passes` undefined: nothing asked (not a `?debug` page), draw nothing. Null:
+ * `passes` undefined: nothing asked (not a `?debug` page, or no GPU renderer
+ * yet), draw nothing. Null:
  * this GPU grants no timestamps, and the readout says so rather than showing an
  * empty list that would read as a frame that cost nothing. Empty: the first
  * readings have not come back yet.

@@ -392,7 +392,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   `applySplats` with `gpu/splats.ts` is code nothing runs.
 - ~~**14ab-13** *Is a poured video upside down?*~~ **Shipped** (#591, finished in #596): it was, and an uploaded picture too; both turned where their rows are taken (`flipY` in the solver's copy, the loop's row read, `uprightPicture` for an upload), `npm run videoflow` asks which way up. Story in `docs/plan-shipped.md` §14ab-13.
 - ~~**14ab-16** *Which GPU pass a frame's time is in, on the screen.*~~ **Shipped** (`npm run
-  passtimes`): `?debug`'s readout under the grid lists every timed pass, costliest first, in ms
+  passtimes`, `npm run passtimesapp`): `?debug`'s readout under the grid lists every timed pass, costliest first, in ms
   a frame (the solver's scaled by the steps a frame takes), on the laptop, the desk and the
   phone; `&stages` splits the step. Story in `docs/plan-shipped.md` §14ab-16.
 - **14ab-17** (open, found with 14ab-16) *No Mac CI runner has timestamps*, so neither the

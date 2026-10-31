@@ -3055,7 +3055,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // The label changes rarely; the frame time ticks over once a second.
           if (!prev || prev.label !== status.label || prev.steppedDown !== status.steppedDown || now - engineStatusAtRef.current > 1) {
             // `?debug`'s pass list, built here once a second and never by the show (PLAN.md 14ab-16).
-            if (DEBUG_PAGE) status.gpuPasses = renderer?.gpuPasses?.(stepsPerSecRef.current * governor.frameMs / 1000) ?? null;
+            if (DEBUG_PAGE) status.gpuPasses = renderer?.gpuPasses?.(stepsPerSecRef.current, governor.frameMs);
             engineStatusRef.current = status;
             engineStatusAtRef.current = now;
             onEngineStatusRef.current?.(status);
@@ -6873,7 +6873,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // What the GPU spent, from the profilers (`gpu/gpuTimes.ts`, PLAN.md 14ab-16).
         gpuFrameMs: (steps: number) => frameGpuMs(stage, fluidsRef.current, steps),
         gpuStepMs: () => (stage ? solverStepMs(fluidsRef.current) : 0),
-        gpuPasses: (spf: number) => framePasses(stage, fluidsRef.current, spf),
+        gpuPasses: (sps: number, frameMs: number) => framePasses(stage, fluidsRef.current, sps, frameMs),
         debug: () => ({
           webgpu: stage && {
             label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,

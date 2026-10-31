@@ -6818,8 +6818,12 @@ reads the maps (and now holds the governor's `gpuFrameMs`/`gpuStepMs` sums, move
 visualizer). The visualizer builds the list once a second, only on a `?debug` page
 (`DEBUG_PAGE`), into `EngineStatus.gpuPasses`; `settings/GpuPassReadout.tsx` draws it under the
 frame split, eight rows and the rest summed, "no timestamps" where the GPU gives none. Nothing
-new runs in the frame. `npm run passtimes` holds the arithmetic and the words (23 lines; three
-mutations, no scaling, scaling the drawing, no sort, each fail it).
+new runs in the frame. `npm run passtimes` holds the arithmetic and the words with plain objects
+(34 lines; three mutations, no scaling, scaling the drawing, no sort, each fail it), and
+`npm run passtimesapp` the wiring on software WebGPU at a phone's size (the status carries the list,
+the phone's Settings → Simulation draws it inside the screen; the readout unmounted fails 2 lines,
+the status line gone fails 3). Both from the check-skeptic's control, which cut the wiring and kept
+the first version of `passtimes` green.
 
 ## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
 

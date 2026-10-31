@@ -8,7 +8,8 @@
  * node check cannot make them; the profiler that takes them has its own test
  * in `gpu/selftest.ts` (a `?debug` page, "timestamps granted but no pass time
  * came back"). What can go wrong between those numbers and the screen is the
- * arithmetic and the words, and that is what this checks:
+ * arithmetic and the words, and that is what this checks (the wiring, from
+ * the visualizer to the phone's screen, is `npm run passtimesapp`):
  *
  *   1. a solver pass is per step and the drawing's per frame, so the solver's
  *      are scaled by the steps a frame takes: at two steps a frame a 1.2 ms
@@ -20,9 +21,15 @@
  *      number;
  *   3. a pass that stopped running (its entry decayed toward zero in the
  *      profiler) is left out, and one that is cheap but running is kept;
- *   4. no timestamps reads as no timestamps, not as an empty frame: null in,
- *      null out, and the readout says so in words;
- *   5. the readout, rendered: its total is the sum, the rows are in the
+ *   4. no timestamps reads as no timestamps, not as an empty frame: a stage
+ *      profiler that is not timing (a device without 'timestamp-query' still
+ *      has one, with an empty map) gives null, and the readout says so in
+ *      words;
+ *   5. the loop's steps a second and frame interval turned into steps a
+ *      frame (sixty at 33.3 ms is two), and the list's total equal to the
+ *      governor's frame cost (`frameGpuMs`) for the same steps, so the two
+ *      readings of one set of profilers cannot drift apart;
+ *   6. the readout, rendered: its total is the sum, the rows are in the
  *      list's order, past eight they are summed into "N more", the
  *      `&stages` hint shows only while the solver is one whole pass, and a
  *      page that did not ask (not `?debug`) draws nothing.
@@ -30,7 +37,7 @@
 
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { gpuPassTimes, gpuPassTotal, PASS_FLOOR_MS } from '../src/lib/gpuPasses.ts';
+import { framePasses, frameGpuMs, gpuPassTotal, solverStepMs, stepsPerFrame, PASS_FLOOR_MS } from '../src/lib/gpuPasses.ts';
 import { GpuPassReadout, PASSES_SHOWN } from '../src/components/settings/GpuPassReadout.tsx';
 
 let failed = 0;
@@ -39,7 +46,17 @@ const line = (ok, what, got) => {
   if (!ok) failed++;
 };
 const near = (a, b) => Math.abs(a - b) < 1e-9;
-const labels = (list) => list.map((p) => p.label).join(', ');
+const labels = (list) => (list ? list.map((p) => p.label).join(', ') : String(list));
+
+/*
+  The app hands \`framePasses\` the stage's profiler and finds each layer's
+  solver profiler with an \`instanceof\` (\`gpu/gpuTimes.ts\`). Here a profiler is
+  a plain { enabled, ms } and a layer is its solver's map or null (a layer
+  with no GPU solver), which is all the arithmetic reads.
+*/
+const clockOf = (layer) => (layer ? { ms: layer } : null);
+const stage = (ms, enabled = true) => ({ enabled, ms });
+const gpuPassTimes = (drawingMs, layers, spf) => framePasses(drawingMs ? stage(drawingMs) : null, layers, clockOf, spf);
 
 const drawing = new Map([['plate', 1.5], ['camera', 0.4], ['finish', 0.2]]);
 const solver = new Map([['project 1', 1.2], ['squeeze', 0.3], ['advect dye', 0.1]]);
@@ -73,15 +90,23 @@ const solver = new Map([['project 1', 1.2], ['squeeze', 0.3], ['advect dye', 0.1
 
 // 3. Decayed entries.
 {
-  const stale = new Map([['plate', 1.5], ['dye diffuse', 1.31 * 0.9 ** 400], ['grain', 0.004]]);
+  // 1.31 ms decaying by 0.9 a frame (GpuProfiler.afterSubmit) is under a microsecond after 71 frames, 1.2 s.
+  const stale = new Map([['plate', 1.5], ['dye diffuse', 1.31 * 0.9 ** 400], ['just under', 0.0009], ['just over', 0.0011], ['grain', 0.004]]);
   const list = gpuPassTimes(stale, [], 1);
   line(!list.some((p) => p.label === 'dye diffuse'), 'a pass that stopped four hundred frames ago is not listed', labels(list));
-  line(list.some((p) => p.label === 'grain'), `a cheap pass that is running (4 µs, over the ${PASS_FLOOR_MS * 1000} µs floor) is`, labels(list));
+  line(!list.some((p) => p.label === 'just under') && list.some((p) => p.label === 'just over'),
+    `the floor is ${PASS_FLOOR_MS * 1000} µs: 0.9 µs is left out and 1.1 µs kept`, labels(list));
+  line(list.some((p) => p.label === 'grain'), 'a cheap pass that is running (4 µs) is listed', labels(list));
+  const solverStale = gpuPassTimes(new Map([['plate', 1]]), [new Map([['viscosity', 0.0006]])], 2);
+  line(solverStale.some((p) => p.label === 'viscosity'), 'the floor is on the frame\'s cost: 0.6 µs a step at two steps a frame is 1.2 µs, and listed', labels(solverStale));
 }
 
 // 4. No timestamps.
 {
-  line(gpuPassTimes(null, [solver], 1) === null, 'no timestamps in, null out');
+  line(framePasses(stage(new Map(), false), [solver], clockOf, 1) === null,
+    'a stage profiler that is not timing (no timestamp-query: an empty map) gives null, not an empty list');
+  line(framePasses(stage(new Map(), true), [], clockOf, 1)?.length === 0, 'a timing one with nothing back yet gives an empty list');
+  line(framePasses(null, [solver], clockOf, 1) === null, 'no stage yet gives null');
   const html = renderToStaticMarkup(React.createElement(GpuPassReadout, { passes: null }));
   line(/no timestamps/.test(html), 'and the readout says this GPU gives none', html.replace(/<[^>]+>/g, ' ').trim());
   const wait = renderToStaticMarkup(React.createElement(GpuPassReadout, { passes: [] }));
@@ -90,7 +115,22 @@ const solver = new Map([['project 1', 1.2], ['squeeze', 0.3], ['advect dye', 0.1
   line(off === '', 'a page that did not ask draws nothing');
 }
 
-// 5. The readout.
+// 5. Steps a frame, and the governor's number.
+{
+  line(near(stepsPerFrame(60, 1000 / 30), 2), 'sixty steps a second at 33.3 ms frames is two steps a frame', stepsPerFrame(60, 1000 / 30));
+  line(near(stepsPerFrame(30, 1000 / 60), 0.5), 'thirty at 16.7 ms is half a step', stepsPerFrame(30, 1000 / 60));
+  line(stepsPerFrame(NaN, 16.7) === 0 && stepsPerFrame(60, 0) === 0, 'no reading is no steps');
+  const back = new Map([['project 1', 0.9], ['squeeze', 0.25]]);
+  const layers = [solver, null, back];
+  for (const steps of [0.5, 1, 2]) {
+    const list = framePasses(stage(drawing), layers, clockOf, steps);
+    const gov = frameGpuMs(stage(drawing), layers, clockOf, steps);
+    line(near(gpuPassTotal(list), gov), `at ${steps} steps a frame the list's total is the governor's frame cost`, `${gpuPassTotal(list).toFixed(3)} and ${gov.toFixed(3)}`);
+  }
+  line(near(solverStepMs(layers, clockOf), 1.2 + 0.3 + 0.1 + 0.9 + 0.25), "one step is every layer's solver passes", solverStepMs(layers, clockOf).toFixed(3));
+}
+
+// 6. The readout.
 {
   const many = new Map(Array.from({ length: 11 }, (_, i) => [`pass ${i}`, 1 + i * 0.1]));
   const list = gpuPassTimes(many, [new Map([['solver step', 2]])], 2);

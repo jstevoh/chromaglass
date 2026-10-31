@@ -440,6 +440,18 @@
       ]
     },
     {
+      "name": "The GPU pass readout, in the app",
+      "shard": "lab2",
+      "run": "npm run passtimesapp",
+      "why": [
+        "The wiring npm run passtimes cannot reach (scripts/passtimesapp.mjs,",
+        "PLAN.md 14ab-16): on software WebGPU at a phone's size, a ?debug page's",
+        "engine status carries the pass list and Settings -> Simulation draws",
+        "it, saying what the status says, inside the screen. Lab2 for the",
+        "software WebGPU the page needs."
+      ]
+    },
+    {
       "name": "The liquids",
       "shard": "logic",
       "run": "npm run liquids",

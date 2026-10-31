@@ -209,12 +209,12 @@ export interface PlateRenderer {
   gpuStepMs?(): number;
   /**
    * Every GPU pass the profilers timed, costliest first, in ms a frame for a
-   * frame taking `stepsPerFrame` solver steps (PLAN 14ab-16): `?debug`'s
-   * readout under the grid. Null when this GPU gives no timestamps. A new
-   * array each call, so it is asked once a second and only under `?debug`,
-   * never by the frame.
+   * loop taking `stepsPerSec` steps a second at `frameMs` frames (PLAN 14ab-16):
+   * `?debug`'s readout under the grid. Null when this GPU gives no timestamps.
+   * A new array each call, so it is asked once a second and only under
+   * `?debug`, never by the frame.
    */
-  gpuPasses?(stepsPerFrame: number): GpuPassTime[] | null;
+  gpuPasses?(stepsPerSec: number, frameMs: number): GpuPassTime[] | null;
   /**
    * What `?debug` should show about this engine in particular. It is spread
    * into `chromaglassDebug()` at the top level, so a harness reaching for

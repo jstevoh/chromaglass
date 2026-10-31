@@ -50,31 +50,85 @@ export interface GpuPassTime {
 /** Below this a decayed entry is not a reading (ms): see the header. */
 export const PASS_FLOOR_MS = 0.001;
 
+/** A profiler as this file reads it: whether it is timing, and its smoothed ms per label. */
+export interface PassClock {
+  readonly enabled: boolean;
+  readonly ms: ReadonlyMap<string, number>;
+}
+
 /**
- * The frame's passes, costliest first.
- *
- * `drawing` is the stage's profiler map (ms a frame), or null when the device
- * has no timestamps, and then the answer is null: the readout says so rather
- * than showing an empty list that looks like a frame that cost nothing.
- * `solvers` is each layer's profiler map (ms a step), null for a layer with no
- * GPU solver; `stepsPerFrame` is the steps the loop is taking a frame.
+ * A layer's solver profiler, or null for a layer with no GPU solver. The
+ * caller says how to find it (`gpu/gpuTimes.ts`: an `instanceof` the solver
+ * class), so this file stays free of the GPU and a node check can drive it
+ * with plain objects.
  */
-export function gpuPassTimes(
-  drawing: ReadonlyMap<string, number> | null,
-  solvers: readonly (ReadonlyMap<string, number> | null)[],
+export type ClockOf<L> = (layer: L) => { readonly ms: ReadonlyMap<string, number> } | null;
+
+/**
+ * The steps a frame is taking, from the loop's steps a second and its frame
+ * interval in ms: sixty steps a second at 33.3 ms frames is two a frame. Not
+ * the frame's own count, which is a whole number that alternates (0, 1, 1, 2)
+ * on an uneven clock; the readout is smoothed, so its scale is too.
+ */
+export function stepsPerFrame(stepsPerSec: number, frameMs: number): number {
+  const s = stepsPerSec * frameMs / 1000;
+  return Number.isFinite(s) && s > 0 ? s : 0;
+}
+
+/**
+ * One solver step, every layer together (ms). The governor asks it every
+ * frame (`gpuStepMs`), so it is a plain loop that makes nothing.
+ */
+export function solverStepMs<L>(layers: readonly L[], clockOf: ClockOf<L>): number {
+  let ms = 0;
+  for (const layer of layers) {
+    const clock = clockOf(layer);
+    if (!clock) continue;
+    for (const v of clock.ms.values()) ms += v;
+  }
+  return ms;
+}
+
+/**
+ * What the GPU spent on a frame that took `steps` steps (ms): the drawing,
+ * plus one solver step per layer for each step. The governor's number, and
+ * what the readout's total must come to for the same steps.
+ */
+export function frameGpuMs<L>(drawing: PassClock | null, layers: readonly L[], clockOf: ClockOf<L>, steps: number): number {
+  if (!drawing) return 0;
+  let ms = 0;
+  for (const v of drawing.ms.values()) ms += v;
+  return steps > 0 ? ms + solverStepMs(layers, clockOf) * steps : ms;
+}
+
+/**
+ * The frame's passes, costliest first, in ms a frame.
+ *
+ * `drawing` is the stage's profiler, null before there is a stage. Null
+ * comes back when there is none or when it is not timing: a device without
+ * 'timestamp-query' still has a profiler, with an empty map, and an empty list
+ * would read as a frame that cost nothing (or as timings still on their way,
+ * for ever), so the readout says "no timestamps" instead. Each layer's solver
+ * passes are per step, so they are multiplied by `stepsPerFrame`.
+ */
+export function framePasses<L>(
+  drawing: PassClock | null,
+  layers: readonly L[],
+  clockOf: ClockOf<L>,
   stepsPerFrame: number,
 ): GpuPassTime[] | null {
-  if (!drawing) return null;
+  if (!drawing || !drawing.enabled) return null;
   const steps = Number.isFinite(stepsPerFrame) && stepsPerFrame > 0 ? stepsPerFrame : 0;
   const out: GpuPassTime[] = [];
-  for (const [label, ms] of drawing) if (ms >= PASS_FLOOR_MS) out.push({ label, ms });
-  let layer = 0;
-  for (const solver of solvers) {
-    if (!solver) continue;
-    layer++;
+  for (const [label, ms] of drawing.ms) if (ms >= PASS_FLOOR_MS) out.push({ label, ms });
+  let n = 0;
+  for (const layer of layers) {
+    const clock = clockOf(layer);
+    if (!clock) continue;
+    n++;
     // The first layer is the plate everyone means; only the ones behind it are named.
-    const tag = layer > 1 ? `L${layer} ` : '';
-    for (const [label, ms] of solver) {
+    const tag = n > 1 ? `L${n} ` : '';
+    for (const [label, ms] of clock.ms) {
       const perFrame = ms * steps;
       if (perFrame >= PASS_FLOOR_MS) out.push({ label: tag + label, ms: perFrame });
     }
