@@ -6825,6 +6825,15 @@ the phone's Settings → Simulation draws it inside the screen; the readout unmo
 the status line gone fails 3). Both from the check-skeptic's control, which cut the wiring and kept
 the first version of `passtimes` green.
 
+*Measured* on the owner's Mac (Apple M4, Metal), `npm run stages` on main at 7fc2a78e, Classic, two
+runs a grid alternating (the tables: the project's shared files, `stages-2026-10-31.md`). At 256²,
+sixty steps a second, one a frame: the solver 6.7–7.2 ms a step over both layers and the drawing
+5.3 ms a frame, about 12 of the frame's 16.7 ms. The costliest stages are the thin gap (0.87 ms
+front, 1.16 back) and the dye's advection (0.77, 0.73), then the mix (0.52) and the dye grid (0.45,
+0.28): those four are about two thirds of a step. The back plate is 40% of the solver. At 512²,
+thirty steps a second: 15.7–16.6 ms a step, the dye's advection first (2.34 front), then the mix
+(1.72) and the thin gap (1.43, 1.48 back); the drawing 3.5–3.7 ms a frame.
+
 ## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
 
 14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
