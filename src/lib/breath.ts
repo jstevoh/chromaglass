@@ -55,8 +55,9 @@
   dish). C_f is the skin friction of a wall jet at a breath's Reynolds
   numbers (U·r/ν_air about 3×10³), about 0.01. So τ = ½ · 1.2 · 0.01 · 8²
   ≈ 0.38 Pa at the jet's middle, at the tool's default Amount; the Amount
-  scales the stress (how hard one blows). On the default liquid in the 6 mm
-  middle of the plate that drives the column at τh/2μ ≈ 5 cm/s.
+  scales the stress (how hard one blows). On the default liquid in the 2 mm
+  middle of the plate that drives the column at τh/2μ ≈ 1.7 cm/s (5 cm/s
+  in the 6 mm gap before PLAN 38r).
 
   Why 8 and not the gentler 6 m/s this was first written with: at 6 the
   Mac's `npm run tools` read a stroke moving its pool 0.13% to 0.51% of the

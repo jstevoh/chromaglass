@@ -14,8 +14,9 @@
  *     thin gap the depth-averaged flow feels the walls as a drag 12ν/h² (plane
  *     Poiseuille flow between two plates moving together), so the liquid
  *     relative to the dish decays as e^(−t/τ) with τ = h²/12ν. That is about
- *     three seconds for water in the plate's 6 mm middle, a tenth of a second
- *     for a light oil, and a millisecond for glycerine: spin a dish of water
+ *     a third of a second for water in the plate's 2 mm middle (PLAN 38r;
+ *     three seconds in the 6 mm it had before), a hundredth of a second
+ *     for a light oil, and a tenth of a millisecond for glycerine: spin a dish of water
  *     and the water stays put for a moment while the glass goes round under
  *     it, as coffee does when the cup is turned; spin a dish of oil and the
  *     oil goes with it at once.
@@ -55,14 +56,15 @@ export const DISH_METRES = 0.2;
   the pour's dome, the cover's shear, the sheet's film, the milk's depth, the
   ferrofluid's room under the top glass, a drop's pancake radius.
 
-  6 mm, what the plate has had since PLAN §18a (0.03 of the plate's width).
-  That is a dish with a glass resting on a deep layer, not a sandwich: the
-  audit (PLAN 38r) puts a real one at 1–3 mm (a few millilitres under a top
-  glass about 15 cm across), and 38r's second part moves this to 2 mm and
-  retunes what the thinner film changes. Until then every reader below takes
-  the gap from here, and at 6 mm every one of them reads what it read before.
+  2 mm, a real glass sandwich (PLAN 38r): a few millilitres under a top
+  glass about 15 cm across stand 1–3 mm deep, and 2 mm is the middle of that,
+  a judgement and not a measurement of the owner's own glass. Until 38r's
+  second part it was 6 mm (0.03 of the plate's width, since PLAN §18a): a dish
+  with a glass resting on a deep layer, not a sandwich. Every h² hangs on it:
+  water's drag time is a third of a second here, not three, so a push fades
+  nine times sooner and every Darcy speed under a force is nine times slower.
 */
-export const DISH_GAP_METRES = 0.006;
+export const DISH_GAP_METRES = 0.002;
 /*
   The gap field's number at rest (the squeeze texture's red, gapRest): 0.03.
   It is in *gap units*, h₀/0.03, so a press, a kick's dent, a lift and every
@@ -75,9 +77,9 @@ export const DISH_GAP_METRES = 0.006;
 export const DISH_REST_GAP = 0.03;
 /** Metres per unit of the gap field: the rest gap in metres over its number. */
 export const DISH_GAP_FIELD_METRES = DISH_GAP_METRES / DISH_REST_GAP;
-/** Plate widths per unit of the gap field (one, at 6 mm on 0.2 m). */
+/** Plate widths per unit of the gap field (a third, at 2 mm on 0.2 m; one at the old 6 mm). */
 export const DISH_GAP_FIELD_UV = DISH_GAP_FIELD_METRES / DISH_METRES;
-/** The narrowest and widest the squeeze lets the gap go, in gap units (gapRest, squeezeUpdate): 0.8 mm and 12 mm at the 6 mm rest gap. */
+/** The narrowest and widest the squeeze lets the gap go, in gap units (gapRest, squeezeUpdate): 0.27 mm and 4 mm at the 2 mm rest gap. */
 export const DISH_GAP_RANGE = [0.004, 0.06] as const;
 /** The open circular rim of the dish (radius in plate uv coordinates from centre). Liquid and dye reaching it spill into the overflow trough (PLAN 18a, 18c, 18g). */
 export const OPEN_RIM = 0.5;

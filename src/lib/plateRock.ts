@@ -220,9 +220,9 @@ export function rockSwing(rock: { x: number; y: number }, R: number, swayX: numb
 
   m_A the cover's mass per area (2 mm of glass, 5 kg/m²), R_c the bowl's
   radius of curvature, and τ the film's shear drag
-  on it, which the liquid's viscosity sets: 1.4 s on the default light oil
-  in the 6 mm middle, so the glass swings a few times before it settles, and
-  three hundredths of a second in glycerine, so it creeps. It slides only as
+  on it, which the liquid's viscosity sets: 0.45 s on the default light oil
+  in the 2 mm middle (1.4 s in the 6 mm gap before PLAN 38r), so the glass swings a few times before it settles, and
+  a hundredth of a second in glycerine, so it creeps. It slides only as
   far as the gap between the two glasses' rims lets it (COVER_ROOM), where
   it stops dead: a glass against glass does not bounce.
 
