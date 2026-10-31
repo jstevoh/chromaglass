@@ -236,6 +236,11 @@ const count = () => Number(DB.raw.prepare('SELECT COUNT(*) AS n FROM feedback').
   check(`past ${ALL_PER_HOUR} an hour from everyone, a new address is refused and nothing is kept`, busy.status === 503 && count() === beforeBusy, `status ${busy.status}`);
   DB.raw.prepare("DELETE FROM feedback WHERE id LIKE 'busy-%'").run();
   const stored = DB.raw.prepare("SELECT ip_hash FROM feedback WHERE ip_hash IS NOT NULL LIMIT 1").get();
+  // An hour on, the hash goes (the privacy page's promise): age one row, then post another.
+  DB.raw.prepare("UPDATE feedback SET at = ? WHERE ip_hash IS NOT NULL AND id = (SELECT id FROM feedback WHERE ip_hash IS NOT NULL LIMIT 1)").run(new Date(Date.now() - 2 * 3600_000).toISOString());
+  await post(note());
+  const aged = Number(DB.raw.prepare('SELECT COUNT(*) AS n FROM feedback WHERE ip_hash IS NOT NULL AND at <= ?').get(new Date(Date.now() - 3600_000).toISOString()).n);
+  check('and an address\'s hash is dropped once its hour has passed', aged === 0, `${aged} older than an hour still hashed`);
   check('and the address is kept only as a hash', !!stored && !String(stored.ip_hash).includes('192.0.2') && /^[0-9a-f]{24}$/.test(stored.ip_hash), stored?.ip_hash);
 }
 

@@ -201,6 +201,9 @@ async function receive(request, env, ctx, cors) {
     later one sees eleven or more and takes its row back out. (Counting every
     row instead kept none of a burst of forty: each saw all forty.)
   */
+  // The privacy page says an address's hash is counted for an hour and then
+  // dropped: every note clears the hashes the hour has passed.
+  await env.FEEDBACK_DB.prepare('UPDATE feedback SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND at <= ?').bind(hourAgo).run();
   const mine = await countSince(env, hourAgo, ipHash, id);
   const all = await countSince(env, hourAgo, null, id);
   // ALL_PER_HOUR can be raised in the Worker's vars without a deploy of the code, for a launch day.

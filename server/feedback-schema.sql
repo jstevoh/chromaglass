@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS feedback (
   picture     BLOB,                       -- the plate as a JPEG, when they ticked it
   status      TEXT NOT NULL DEFAULT 'new',-- new | read | done
   emailed     TEXT,                       -- sent | failed <status> | off
-  ip_hash     TEXT                        -- for the rate limit; never the address itself
+  ip_hash     TEXT                        -- for the rate limit, cleared after an hour; never the address itself
 );
 
 CREATE INDEX IF NOT EXISTS feedback_at ON feedback (at);
