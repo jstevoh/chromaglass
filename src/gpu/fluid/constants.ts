@@ -146,8 +146,16 @@ export const PHASE_COMPRESS = 1;
   sheets in `npm run oillift` settled off the rim at 0.017 mm/s against a
   lens that now rises nine times slower too (0.71 mm/s), over the frame's 2%
   of it. PLAN 38e (σ in N/m from each bottle) replaces the 4e-4 itself.
+
+  Only between two glasses. The old open plate has no gap and no Darcy
+  drag for the h² to come from, so it keeps the 4e-4 it was set at: carried
+  there too, the strip of oil `npm run physics` lays on the old plate
+  rounded from an aspect of 5.58 to 4.87 in its 0.72 s against under 3.9
+  (the Mac's run on the first try of this, PLAN 38r part 2).
 */
-export const OIL_TENSION = 4e-4 * (DISH_GAP_METRES / 0.006) ** 2;
+export const OIL_TENSION = 4e-4;
+/** OIL_TENSION on a thin gap: the gap's h² against the 6 mm it was set on (above). */
+export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The most the oil's surface tension may move the liquid in a step, in cells
   (see mixForce). A drop rounding up is a slow thing, a second or so for a

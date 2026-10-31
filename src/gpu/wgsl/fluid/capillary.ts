@@ -10,6 +10,7 @@
 
 import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
+import { RIM_SIDE } from './oil';
 
 /*
   How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
@@ -169,13 +170,18 @@ export const CAPILLARY_KERNELS: Record<string, string> = {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(src, clampP(p, n), 0).r; }
+${RIM_SIDE}
+// ∇c·n = 0 at the open rim (RIM_SIDE in oil.ts says why): a neighbour across it reads as this cell.
+fn ccN(p: vec2i, e: vec2i, n: f32, c: f32) -> f32 {
+  return select(cc(p + e, n), c, rimSide(p, n) != rimSide(clampP(p + e, n), n));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   let m = textureLoad(src, p, 0);
   let c = m.r;
-  let lap = cc(p + vec2i(1, 0), n) + cc(p - vec2i(1, 0), n) + cc(p + vec2i(0, 1), n) + cc(p - vec2i(0, 1), n) - 4.0 * c;
+  let lap = ccN(p, vec2i(1, 0), n, c) + ccN(p, vec2i(-1, 0), n, c) + ccN(p, vec2i(0, 1), n, c) + ccN(p, vec2i(0, -1), n, c) - 4.0 * c;
   var mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
   // In the water only: an edge cell on the oil's side sees its own oil
   // both ways along the edge's tangent, and is not in a film.
