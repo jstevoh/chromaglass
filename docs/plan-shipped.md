@@ -3105,6 +3105,39 @@ the day they pass.
     Drop's opening builds 61 pipelines (Classic's 56 and these five), all ready, asks for all
     five in its first nine steps and none late, nothing on a frame; Classic 56, no slosh key.
 
+
+- **18a-13j, a hand can tip the dish (shipped 2026-10-31).**
+  - What was reported: the owner, 2026-10-31, "I still haven't been able to try the plate
+    sloshing. I never saw the control to do that." The slosh had been in since 18a-13, but
+    its dial sat in Tilt & Rock, a section no shipped tab puts out, at 0 on every look, and
+    a tip was then two more faders: Gravity raised, Tilt Direction dragged one way and back.
+    Only the phone's Tilt could tip the dish by hand.
+  - What changed: the Tip pad (`components/ui/TipPad.tsx`, the arithmetic in
+    `lib/tipPad.ts`), the dish seen from above with a dot. Drag the dot toward an edge and
+    that edge goes down; let go and Gravity and Tilt Direction are put back as the hand
+    found them, so the liquid sloshes back past the middle. It writes the two settings the
+    phone's Tilt writes, so the liquid's answer is the solver's, and a desk stays a thing
+    that changes settings. On the desk it fills the two keycaps the Tools panel's last row
+    left empty (40 px, read over 72 px of travel, the pointer held past its rim), so it is
+    on Perform and Gig with nothing opened or scrolled; it heads Tilt & Rock; on the phone
+    it is 128 px in the Motion sheet, hidden while Tilt is on. The arrow keys tip it too.
+  - Why settings and not the remote's held-phone path (`setExternalTilt`): that one reaches
+    the dish unturned (18a-13e), so on the twenty-nine looks whose dish turns a tip toward
+    the top would slop wherever the dish had turned to. Tilt Direction is the stage's and
+    is turned into the dish each step (`downhill`).
+  - Why a grab raises Slosh: at 0 a tip only sinks the heavy colour through the gap,
+    slowly, and a pad that seemed to do nothing would be the report again. A grab with the
+    dial under 0.05 puts it at 0.5, where judging §58 asks for the owner's eyes; it stays
+    there and the dial shows it. Gravity goes as the square of the reach past a 6% dead
+    zone: 0.15 of the way out leans 0.01, the rim stands the plate up.
+  - Measured (`npm run tippad`, 16 lines): the compass against the plate's and the phone's;
+    on the built app at 1440×900, the pad seen inside the Tools panel with nothing scrolled
+    (it was first drawn under the keys and sat below the panel's fold: that line went red,
+    and the drags at the pad's place read Gravity 0); dragged right, Gravity 0.9 at 90°,
+    Slosh 0 → 0.5; let go, 0/180° again exactly; Lava Lamp's 1/180° kept through a tip;
+    the phone's pad down, 0.9 at 180°.
+  - What it cannot see here: the liquid. The scheme is `npm run slosh`'s, the kernels
+    `sloshgpu`'s, the look at sixty frames the Mac's (judging §58, §64, and the owner's film).
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the

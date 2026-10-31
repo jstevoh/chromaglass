@@ -4,6 +4,7 @@ import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { LIT } from '../ui';
 import { StrobeRing } from '../ui/Playful';
+import { TipPad } from '../ui/TipPad';
 import { SPIN_AUTO_NAMES } from '../../lib/turntable';
 import { Slider, PinChips } from './controls';
 import { AUDIO_FEATURES } from './patchLists';
@@ -103,6 +104,11 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           <Waves size={12} /> Tilt & Rock
         </h3>
         {/* The dish tipped: held by a hand (Gravity, Tilt Direction), sloshed by the music (Slosh) and rocked on the beat (Plate Rock). PLAN 35c. */}
+        {/* And the hand itself, which moves the two faders under it and puts them back on letting go (PLAN 18a-13j). */}
+        <div className="col-span-full flex items-center gap-3">
+          <TipPad settings={settings} onSetting={onUpdate} size={84} testId="tilt-tip-pad" />
+          <p className="min-w-0 text-[12px] leading-snug text-muted">Drag the dot toward an edge: that edge goes down and the liquid runs to it. Let go and the dish lies back, and the liquid sloshes past the middle. A first grab turns Slosh up to half if it was off.</p>
+        </div>
         <Slider
           label="Gravity"
           value={settings.plateUpright ?? 0}
