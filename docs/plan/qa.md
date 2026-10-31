@@ -116,7 +116,7 @@ run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
   step), so 27a-1's plan held, but a step cost 1,080 ms against the tilt's 740: its
   drift shift (`driftShift`, one pass for every carried field) called `at` once per use,
   twenty-one times a cell, each a load of the field and one of the gap (a `select`
-  reads both sides). **Fixed (#623):** each of the seven cells it needs read once,
+  reads both sides). **Fixed (this PR):** each of the seven cells it needs read once,
   the gap only for the ferrofluid's volume, summed in the old order: on SwiftShader the field is
   the same to the bit (the lab's dye after 120 steps of the glass, 8879.708350418165 both),
   and a step with the glass costs 865 ms, the glass's own cost from 340 ms to 125.
