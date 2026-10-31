@@ -382,12 +382,26 @@ export class RhythmSheet {
     this.ui.fill(0);
     const w = this.toSpace(ur, this.ui);
     const R = radius * this.plateMetres, R2 = R * R;
+    /*
+      The dent's volume within the reach, summed on a lattice a quarter of the
+      sheet's cell, each point read as the plate reads the sheet (bilinear,
+      as step lays it). It was summed at the sheet's own nodes, 3.1 mm apart,
+      a node in or out of the circle whole: on the 6 mm gap the narrowest
+      dent (glycerine's) reached 24 mm and that missed 0.7% of its volume,
+      but on the 2 mm gap a kick's press is held for the same 0.18 s against
+      a film that drains 27 times slower, the dent reaches only 15 mm, five
+      nodes, and the sum missed 2.7%: `npm run sheet` read 97.3% of the
+      stamp pushed out in glycerine against its 2%. Once a kick, a few
+      thousand reads.
+    */
+    const q = this.dx / 4, x0 = Math.max(0, X - R), y0 = Math.max(0, Y - R);
+    const x1 = Math.min(this.plateMetres, X + R), y1 = Math.min(this.plateMetres, Y + R);
     let v = 0;
-    for (let j = 0; j < n / 2; j++) for (let i = 0; i < n / 2; i++) {
-      const dx = i * this.dx - X, dy = j * this.dx - Y;
-      if (dx * dx + dy * dy < R2) v += w[i + j * n];
+    for (let py = y0 + q / 2; py < y1; py += q) for (let px = x0 + q / 2; px < x1; px += q) {
+      const dx = px - X, dy = py - Y;
+      if (dx * dx + dy * dy < R2) v += this.sample(w, px / this.dx, py / this.dx);
     }
-    v *= this.dx * this.dx;
+    v *= q * q;
     const want = volume * this.gapMetres * this.plateMetres ** 2;
     const force = Math.min(want / Math.max(v, 1e-30), (Math.min(SHEET_DEEPEST, deepest) * this.gapMetres) / centre);
     this.load(X, Y, force, hold);
