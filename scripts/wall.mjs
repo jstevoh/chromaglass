@@ -2201,9 +2201,9 @@ try {
   // can only be seen here is whether the shapes actually *mask*: that the
   // frame goes dark where no surface lands, that a gap between two of them
   // stays a gap, and that a circle is a circle rather than the rectangle it is
-  // cut from. Every claim is a ratio against the same cells with no surfaces
-  // on, so a plate that happens to be dark in one corner cannot pass or fail
-  // one of these on its own.
+  // cut from. Each claim is a ratio against the bare frame, over what the
+  // shape shows: the whole plate squeezed in, so a shape's inside is held
+  // to the whole frame's mean, not its middle (PLAN 38e, Oil & Water).
   {
     const quad = (x0, y0, x1, y1) => [x0, y0, x1, y0, x1, y1, x0, y1];
     const surf = (shape, x0, y0, x1, y1, extra = {}) => ({
@@ -2225,26 +2225,11 @@ try {
     check('outside a shape the projector goes dark',
       outsideAfter < 0.01 && outsideAfter < outsideBefore * 0.1,
       `${outsideBefore.toFixed(3)} -> ${outsideAfter.toFixed(3)}`);
-    /*
-      What the shape shows is the whole plate squeezed into it (src 0..1),
-      so the picture it is held to is the whole bare frame's mean, not the
-      middle of the bare frame, which a first version read. The two are the
-      same picture only on a plate lit evenly: on Oil & Water, the look on
-      the plate here since the camera pass above, the bodies sit in the
-      middle (0.347) while the plate as a whole is 0.099, and once their own
-      tension held them together (PLAN 38e, the capped force had let them
-      spread) the squeezed whole came to 0.285 of the middle, under the 0.3
-      the bar asks, with the mask drawing exactly what it should. The ratio
-      and the floor are as they were; they are taken against the same
-      picture the shape shows. (Two frames, as the claims above: the liquid
-      moves between them, but a whole frame's mean moves far less than a
-      seventh of it does.)
-    */
     const wholeBefore = meanOver(bare, () => true);
     const insideAfter = region(one, 0.43, 0.43, 0.57, 0.57);
     check('and inside it the picture is still there',
       insideAfter > wholeBefore * 0.3 && insideAfter > 0.01,
-      `the whole frame ${wholeBefore.toFixed(3)} -> inside the shape ${insideAfter.toFixed(3)}`);
+      `${wholeBefore.toFixed(3)} -> ${insideAfter.toFixed(3)}`);
 
     // Two shapes with wall between them: the wall stays wall.
     await withOutput({
