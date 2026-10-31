@@ -321,6 +321,32 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
   reaches the Mac only when the owner runs setup again. A check that the installed copy
   matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
+- **19ah-6. Shipped (2026-10-30): pull requests from this repository's own branches take
+  the Mac too** (the owner's choice). `checks.yml` runs the same probe for a pull request
+  whose head is in this repository, a `Watchdog` that cancels such a run when the Mac falls
+  asleep under it, and routes the listed shards to `owner-mac`; the hook takes `checks.yml`
+  at a `refs/pull/N/merge` ref when the event payload's head repository is this one and
+  the author a person, and refuses forks, bots and `pull_request_target`. The
+  `mac-runner` environment lets in `refs/pull/*/merge` beside `main`, since GitHub matches a
+  pull request's run by its merge ref (its token only lists runners; a fork's run gets no
+  secrets and never starts the probe). The Mac runs unreviewed branch code as the owner's user, as the
+  sessions already do; `docs/mac-runner.md`. The hook on the Mac is copied by hand (19ah-5).
+- **19ah-7. Open: a pull request's run that stalled on a sleeping Mac is cancelled, not
+  re-run.** The run's token cannot start a pull request's run, so someone presses Re-run all
+  jobs. A token that may re-run, or the watchdog moving the queued shards itself, would
+  close it.
+- **19ah-8. Open: deploys and pull requests race for the one Mac.** Two probes in the same
+  minute can both see it idle; the second run's shards wait behind the first's. A deploy
+  that finds it busy with a pull request goes to GitHub's queue. Measure how often, then
+  decide whether a deploy should be preferred (a pull request taking only some shards, or
+  only when no deploy is due).
+- **19ah-9. Open: the hook's pull-request rule is held only to hand-written payloads.** Its
+  selftest feeds three-key JSON; the paths it reads (`.pull_request.head.repo.full_name`,
+  `.pull_request.user.type`) are on the PR API's object for 19ah-6's PR, but nothing yet
+  shows the runner passes `GITHUB_EVENT_PATH` to its job-started hook. It fails closed (a
+  shard sent to the Mac goes red at "Set up job"), so the first PR the Mac takes proves it;
+  then add a recorded, redacted payload as a fixture, and pin the path to
+  `$RUNNER_TEMP/_github_workflow/event.json` so no file left in the work folder can stand in.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 

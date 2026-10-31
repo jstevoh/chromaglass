@@ -219,15 +219,19 @@
       ]
     },
     {
-      "name": "The owner's Mac takes only main's deploys, and never holds one",
+      "name": "The owner's Mac takes only main's deploys and our own pull requests, and never holds one",
       "shard": "logic",
       "run": "npm run macguard",
       "why": [
         "The runner's job-started hook (scripts/macrunner-hook.sh) against every way",
-        "a job can arrive: main's push and run by hand taken; a branch, a pull",
-        "request, pull_request_target, workflow_run, a schedule, another workflow",
-        "on main and another repository refused. And the watchdog's stall rule",
-        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
+        "a job can arrive: main's push and run by hand, and a pull request's",
+        "checks.yml from a branch of this repository by a person, taken; a branch's",
+        "push, a fork's or a bot's pull request, a pull request's own workflow or",
+        "head ref, a missing or unreadable event payload, no jq,",
+        "pull_request_target, workflow_run, a schedule, another workflow on main and",
+        "another repository refused. And the watchdog's stall rule",
+        "(scripts/macwatch.mjs) against made-up runs, a deploy's and a pull",
+        "request's, between two shards included."
       ]
     },
     {
