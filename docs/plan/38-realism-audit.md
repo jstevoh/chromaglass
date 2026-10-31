@@ -258,6 +258,44 @@ written first. Line numbers are as read on main at d07ac31.
   terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
   labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
 
+  The owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." So 2 mm in the
+  middle at rest (a few millilitres under a top glass about 15 cm across is 1–3 mm; 2 mm is
+  the middle, a judgement and not a measurement), in two parts:
+
+  - **Part 1, one number (shipped, this PR, at 6 mm).** `DISH_GAP_METRES`
+    (`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
+    *gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
+    same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
+    the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
+    rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
+    h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
+    rest gap and greps `src/` for a gap made a length by the plate's width.
+  - **Part 2, 2 mm** (M; Medium-High on the water looks). Set the number, then retune what
+    the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
+    CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
+    of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
+    water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
+    `airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
+    (`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
+    under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
+    `magnetgain` need their windows on τ (#605 has them). Its leftovers, each its own item:
+  - **38r-1. Does a sandwich slosh?** (S to decide, M to build). `lib/slosh.ts` solves a
+    6 mm layer with a free surface (`SLOSH_REST_DEPTH`): between two glasses there is none,
+    and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
+    under it. Either the tilt's slosh is the open dish's, or on the sandwich it is the thin
+    gap's creeping flow. The owner's call.
+  - **38r-2. A drop is a pancake past half the real gap** (S). `DROP_HALF_GAP`
+    (`wgsl/plate.ts`) is 0.016 of the plate, half the 6 mm; half of 2 mm is 0.005, at which
+    the common bead touches both glasses, and `lib/beads.ts`'s merge time is in units of it.
+    Moves with 14ab-6 (#601), `npm run droplens` re-read.
+  - **38r-3. A Gap dial** (S). At 2 mm water's drag time is a third of a second, not three:
+    a push fades nine times sooner. If a look wants the old glide, the honest dial is the
+    gap itself, not a stand-in for inertia.
+  - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
+    three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
+    half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
+    would slide the picture the same.
+
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);
   the clear film's oil is 50× water whatever was poured (`OIL_REL_NU`, `thinGap.ts:577`); the

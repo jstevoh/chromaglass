@@ -70,7 +70,7 @@ const { page, close } = await openLab();
 try {
   const r = await page.evaluate(async () => {
     const DISH_M = 0.2, H0 = 0.03;
-    const drag = (nu, gap = H0) => (gap * DISH_M) ** 2 / (12 * nu);
+    const drag = (nu, gap = H0) => (gap * lab.GAP_METRES) ** 2 / (12 * nu);
     const THICK = 2e-5, WATER = 1e-6;
     // A plate at rest, with its gap laid at the look's curve (clear lays the dome).
     const fresh = async (curve = 0) => {
