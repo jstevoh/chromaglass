@@ -96,7 +96,8 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
 - **1.10** **S16** (G, S): a GPU rebuild keeps the film.
 - **1.11** **13-recmem** (B, M): Record streams to disk; a set-length take cannot run out of memory.
 - **1.12** **14i-guard, then 14r, then S21** (C, S then M then M): the flash guard in linear light,
-  by quarter-wall and the red rule; then the watchdog and a Rescue Go.
+  by quarter-wall and the red rule; then the watchdog and a Rescue Go. The three `wall` lines
+  are written, red on main (`scripts/wallflash.mjs`, `--owed=quarter,red,rung`).
 - **1.13** ~~**S15** wall half~~ (shipped 2026-10-10): a reload re-attaches the wall, dark meanwhile (`npm run rewall`).
   **S15-b** (B, M): the reloaded show resumes the set (its place, the stage, the armed look,
   the tempo, the Mixer's takes) from `sessionStorage`, with "resumed at …" on the desk and the

@@ -2395,6 +2395,19 @@
       ]
     },
     {
+      "name": "The Live Show streams the picture",
+      "shard": "fifth",
+      "run": "npm run liveshow -- --stack --owed=plate,stack",
+      "why": [
+        "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
+        "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
+        "mixer and a keystone on the wall, streamed and decoded, against the",
+        "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
+        "the Plate source's frames are black today and the Mixer stack source is",
+        "not built; printed as owed until the PR that fixes each takes its id out."
+      ]
+    },
+    {
       "name": "A drop lands only where it is dropped",
       "shard": "fifth",
       "run": "node scripts/mirror.mjs",
@@ -2438,10 +2451,13 @@
     {
       "name": "The wall",
       "shard": "tools",
-      "run": "npm run wall",
+      "run": "npm run wall -- --owed=quarter,red,rung",
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
-        "how many times a second the whole screen is allowed to change."
+        "how many times a second the whole screen is allowed to change.",
+        "--owed: the flash guard's lines by quarters, in light (PLAN.md 14r,",
+        "scripts/wallflash.mjs), are written ahead of the build and printed as",
+        "owed until it ships; the PR that ships one takes its id out."
       ]
     },
     {

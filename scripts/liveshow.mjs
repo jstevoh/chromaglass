@@ -38,6 +38,8 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
+import { engineQuery, installFrameReader } from './frame.mjs';
+import { filmFile, stackJudge, gridOfPixels, STACK_KEYSTONE } from './liveshowstack.mjs';
 import {
   cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS,
 } from '../src/lib/liveShow.ts';
@@ -131,7 +133,7 @@ const stop = (proc) => { try { process.kill(-proc.pid, 'SIGTERM'); } catch { pro
  * and reports each destination's health from `__liveStub.health`.
  */
 function stub(licence) {
-  const calls = { start: [], stop: 0, packets: 0, configs: [], empty: 0, firstVideo: null, keySets: [], keyValues: [] };
+  const calls = { start: [], stop: 0, packets: 0, configs: [], empty: 0, firstVideo: null, keySets: [], keyValues: [], keep: false, video: [], desc: {} };
   const keys = new Map();
   let req = null;
   const listeners = [];
@@ -150,9 +152,14 @@ function stub(licence) {
     ...(licence ? { license: licence } : {}),
     live: {
       start: async (r) => { calls.start.push(JSON.parse(JSON.stringify(r))); req = r; return { ok: true, state: stateOf() }; },
-      config: async (c) => { calls.configs.push(JSON.stringify(c, (k, v) => (v instanceof Uint8Array ? [...v] : v))); },
+      config: async (c) => {
+        calls.configs.push(JSON.stringify(c, (k, v) => (v instanceof Uint8Array ? [...v] : v)));
+        if (c?.video) calls.desc[c.output ?? 'landscape'] = c.video.slice();
+      },
       packet: (p) => {
         calls.packets++;
+        // Kept only for --stack, which decodes them (the panel's part counts them).
+        if (calls.keep && p?.kind === 'video' && p.data?.byteLength) calls.video.push({ ts: p.timestampMs, key: !!p.key, output: p.output ?? 'landscape', data: p.data.slice() });
         if (!p?.data?.byteLength) calls.empty++;
         if (p?.kind === 'video' && calls.firstVideo === null) calls.firstVideo = !!p.key;
       },
@@ -182,8 +189,11 @@ function stub(licence) {
   if (newer.length) finish();
 }
 
+const STACK = process.argv.includes('--stack');
 const server = await startServer();
-const browser = await launchChromium(chromium, { headless: true });
+const browser = await launchChromium(chromium, STACK
+  ? { headless: true, present: true, args: [`--use-file-for-fake-video-capture=${filmFile()}`] }
+  : { headless: true });
 const errors = [];
 const until = async (page, fn, arg, ms = 15_000) => {
   const t = Date.now();
@@ -206,10 +216,19 @@ const open = async (licence) => {
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
   page.on('pageerror', e => errors.push(e.message));
   if (licence !== undefined) await page.addInitScript(stub, licence);
-  await page.goto(`${BASE}/?debug&look=classic&dpr=0.35&key=${KEY}`, { waitUntil: 'networkidle' });
+  if (STACK) await installFrameReader(page);
+  await page.goto(`${BASE}/?debug&look=classic&${STACK ? engineQuery().slice(1) || 'dpr=0.35' : 'dpr=0.35'}&key=${KEY}`, { waitUntil: 'networkidle' });
   await until(page, () => !!document.querySelector('[data-testid="panel-browser-button"]'));
   return page;
 };
+
+if (STACK) {
+  try { await stackLines(); } catch (e) {
+    check('the run finished', false, String(e?.stack ?? e).split('\n').slice(0, 3).join(' | '));
+  } finally { await browser.close(); stop(server); }
+  check('no page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+  finish();
+}
 
 try {
   // ── The website does not offer it ───────────────────────────────
@@ -361,4 +380,184 @@ finish();
 function finish() {
   console.log(`\n${total - failed}/${total} passed`);
   process.exit(failed ? 1 : 0);
+}
+
+/*
+  --stack: the Mixer stack source (PLAN.md 37x-4d-1), written ahead of the
+  build for the Antigravity brief of 2026-10-31, red on main by design; CI
+  runs it as `npm run liveshow -- --stack --owed=plate,stack` until the PRs
+  that fix them take each id out of `--owed` (an owed line that passes is a
+  failure, so it cannot stay excused once it holds; an id this file does not
+  know is one too).
+
+  What was wrong (37x-4c's found item): the panel streams #liquid-canvas,
+  and with a projector set up that canvas carries the projector's pass, the
+  wall's keystone, masks and warp, so a stream of a show with a keystone on
+  the wall is a skewed picture. The source to offer is the same stack drawn
+  without the wall's geometry, at the stream's size.
+
+  And found writing this (PLAN.md 37x-4d-6): the stream's frames are black.
+  lib/liveStream.ts draws #liquid-canvas onto its staging canvas on its own
+  clock, and a presented WebGPU canvas read outside the frame task that drew
+  it answers black, not an error (CastDisplay.tsx and LiquidVisualizer.tsx
+  say so, and are why the projector window and the pad's picture are copied
+  inside that task). On SwiftShader, 2026-10-31: the plate read in its frame
+  was the film with the keystone, and the Plate source's decoded frame
+  (0, 0, 0) in every cell.
+
+  The film is the browser's fake camera playing a file written here
+  (scripts/liveshowstack.mjs): its left half blue, its right half orange, a
+  picture no plate makes, started from Settings, Film, Camera as `wall` does,
+  with every other row of the stack at 0 so the picture is the film alone.
+  The wall gets a keystone (its top edge pulled in a fifth from each side).
+  Then the lines, each frame as a 16 x 9 grid of mean colours:
+
+    control  the plate read in the frame task that drew it (`grabFrame`, as
+             every harness that photographs the app reads it): the film's
+             halves and the keystone's black wedges in two corners. So the
+             scene is what it says before any stream is asked about it, and
+             "square" below cannot pass on a wall with no keystone.
+    plate    a stream to one 16:9 destination through the stand-in bridge,
+             the Plate source (today's, the default), its last frame decoded
+             by Chromium's own decoder as a viewer's player would: the same
+             picture, the film with the keystone, as the canvas has it.
+    stack    the same with the Mixer stack source, chosen in the panel's
+             Source (`data-testid="live-source"`, a select, values `plate` and
+             `stack`, `plate` the default): 1920 x 1080, the film's halves
+             as the plate has them, every corner the film's and not black,
+             and each column the same colour at the top as at the bottom: the
+             frame is square.
+
+  Needs WebGPU (the projector's pass is src/gpu/output.ts): a Mac, or
+  `PW_WEBGPU=1` on Linux, where it presents into Xvfb at a few frames a
+  minute (about three and a half minutes in a cloud session). The panel's
+  other lines are the run without --stack.
+*/
+async function stackLines() {
+  const OWED_IDS = ['plate', 'stack'];
+  const flag = process.argv.find(a => a.startsWith('--owed='));
+  const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+  const unknown = [...owed].filter(id => !OWED_IDS.includes(id));
+  if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${OWED_IDS.join(', ')})`);
+  const due = (id, name, ok, detail) => {
+    if (!owed.has(id)) return check(name, ok, detail);
+    if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+    console.log(` owed ${name} — ${detail}`);
+  };
+  const STACK_LINE = 'with a film in the mixer and a keystone on the wall, the Mixer stack source\'s frames carry the film and are square';
+
+  const page = await open(null);
+  const gpu = await page.evaluate(async () => !!(await navigator.gpu?.requestAdapter?.()));
+  check('a WebGPU adapter, which the projector\'s pass needs', gpu, gpu ? '' : 'none: run on a Mac, or with PW_WEBGPU=1');
+  if (!gpu) return;
+  check('the Mac app offers the panel', await dock(page));
+  await until(page, () => !!document.querySelector('[data-testid="live-show"]'));
+  const shown = await until(page, () => (window.chromaglassDebug?.()?.webgpu?.frames ?? 0) > 2, undefined, 240_000);
+  check('the show is drawing', !!shown);
+
+  // The film alone, as `wall`'s film source is: every other row at 0.
+  await page.getByTestId('open-all-settings').click();
+  await page.getByTestId('settings-nav-film').click();
+  await page.getByTestId('film-camera').click();
+  const playing = await until(page, () => {
+    const v = window.chromaglassDebug?.().film?.video;
+    return window.chromaglassDebug?.().film?.kind === 'camera' && !!v && v.readyState >= 2 && v.videoWidth > 0;
+  }, undefined, 30_000);
+  await page.keyboard.press('Escape');
+  const alone = { camera: 0, stock: 0, frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0, lampGround: 0, filmMix: 1 };
+  if ((await page.evaluate(() => window.chromaglassSettings?.()?.filmBlend)) === 'multiply') alone.filmBlend = 'add';
+  await page.evaluate((p) => window.chromaglassSettings?.(p), alone);
+  const settled = await until(page, (p) => {
+    const now = window.chromaglassSettings?.();
+    return !!now && Object.entries(p).every(([k, v]) => now[k] === v);
+  }, alone);
+  check('a film playing, alone in the stack', !!playing && !!settled, `film playing ${!!playing}, rows set ${!!settled}`);
+
+  // The keystone, and drawn with: the render loop is holding it.
+  await page.evaluate((c) => window.chromaglassOutput?.(c), STACK_KEYSTONE);
+  const keyed = await until(page, (c) => {
+    const live = window.chromaglassDebug?.().outputConfig;
+    return !!live && live.corners.every((v, i) => Math.abs(v - c.corners[i]) < 1e-6);
+  }, STACK_KEYSTONE);
+  check('a keystone on the wall', !!keyed, JSON.stringify(STACK_KEYSTONE.corners));
+
+  // One 16:9 destination, and a stream of it, its last frame decoded.
+  await page.getByTestId('live-add').click();
+  await page.getByTestId('live-add-service').selectOption('youtube');
+  await page.getByTestId('live-add-key').fill(SECRET);
+  await page.getByTestId('live-add-save').click();
+  await page.waitForTimeout(250);
+  const stream = async () => {
+    await page.evaluate(() => { const c = window.__liveStub.calls; c.keep = true; c.video = []; });
+    // Go live asks once more (the panel's lines above) and forgets the ask
+    // after five seconds, which a software plate's page, a few frames a
+    // minute, can spend between two of Playwright's presses: so both presses
+    // from inside the page, the second as soon as the button asks.
+    await page.evaluate(async () => {
+      const go = () => document.querySelector('[data-testid="live-go"]');
+      go()?.click();
+      const t0 = performance.now();
+      while (!/again/i.test(go()?.textContent ?? '') && performance.now() - t0 < 4000) await new Promise(r => setTimeout(r, 20));
+      go()?.click();
+    });
+    const live = await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'live', undefined, 90_000);
+    if (!live) {
+      const said = await page.evaluate(() => ({ phase: document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase'), starts: window.__liveStub.calls.start.length, text: document.querySelector('[data-testid="live-show"]')?.textContent?.slice(150, 700), go: document.querySelector('[data-testid="live-go"]')?.textContent }));
+      return { error: `the stream did not go live: ${JSON.stringify(said)}` };
+    }
+    // Two keyframes in: the stream asks for one every two seconds, and the
+    // frames after the second are of a canvas drawn since Go live.
+    await until(page, () => window.__liveStub.calls.video.filter(v => v.key).length >= 2, undefined, 60_000);
+    await page.getByTestId('live-stop').click();
+    await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
+    return page.evaluate(async () => {
+      const { video, desc } = window.__liveStub.calls;
+      window.__liveStub.calls.keep = false;
+      const pk = video.filter(v => v.output === 'landscape');
+      let k = -1;
+      for (let i = pk.length - 1; i >= 0; i--) if (pk[i].key) { k = i; break; }
+      const d = desc.landscape;
+      if (k < 0 || !d) return { error: `${pk.length} packets, ${k < 0 ? 'no keyframe' : 'no decoder configuration'}` };
+      const hex = (n) => n.toString(16).padStart(2, '0');
+      let last = null, error = null;
+      const dec = new VideoDecoder({ output: (f) => { last?.close(); last = f; }, error: (e) => { error = String(e); } });
+      dec.configure({ codec: `avc1.${hex(d[1])}${hex(d[2])}${hex(d[3])}`, description: d });
+      for (const p of pk.slice(k)) dec.decode(new EncodedVideoChunk({ type: p.key ? 'key' : 'delta', timestamp: Math.round(p.ts * 1000), data: p.data }));
+      await dec.flush().catch((e) => { error ??= String(e); });
+      if (!last) return { error: error ?? 'nothing decoded' };
+      const w = last.displayWidth, h = last.displayHeight;
+      const c = new OffscreenCanvas(w, h);
+      const x = c.getContext('2d');
+      x.drawImage(last, 0, 0);
+      last.close();
+      const px = x.getImageData(0, 0, w, h).data;
+      const cols = 16, rows = 9, grid = [];
+      for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
+        const x0 = Math.floor((gx * w) / cols), x1 = Math.floor(((gx + 1) * w) / cols);
+        const y0 = Math.floor((gy * h) / rows), y1 = Math.floor(((gy + 1) * h) / rows);
+        let r = 0, g = 0, b = 0, n = 0;
+        for (let y = y0; y < y1; y += 2) for (let xx = x0; xx < x1; xx += 2) { const i = (y * w + xx) * 4; r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
+        grid.push([r / n, g / n, b / n]);
+      }
+      return { w, h, frames: pk.length - k, packets: pk.length, cols, rows, grid };
+    });
+  };
+
+  // The plate itself, read in the frame task that drew it (`grabFrame`, the
+  // one moment a presented WebGPU canvas can be read): the film, keystoned.
+  // So the scene is set before any stream is asked about it.
+  const shot = await page.evaluate(() => window.__cgFrame(320, 180));
+  const seen = shot ? gridOfPixels(shot, 320, 180) : { error: JSON.stringify(await page.evaluate(() => window.__cgFrameLast)) };
+  const g = stackJudge(seen);
+  check('control: the plate, read in its own frame, is the film with the wall\'s keystone on it, black in two corners', g.film && g.keystoned, g.detail);
+
+  const p = stackJudge(await stream(), seen);
+  due('plate', 'the Plate source\'s frames are the plate: the film, with the wall\'s keystone on it as the canvas has it', p.film && p.keystoned && p.same, p.detail);
+
+  const choice = await page.getByTestId('live-source').count();
+  if (!choice) { due('stack', STACK_LINE, false, 'the panel has no Source choice yet (data-testid="live-source")'); return; }
+  await page.getByTestId('live-source').selectOption('stack');
+  const s = stackJudge(await stream(), seen);
+  due('stack', STACK_LINE, s.film && s.square && s.same, s.detail);
+  await page.getByTestId('live-source').selectOption('plate');
 }

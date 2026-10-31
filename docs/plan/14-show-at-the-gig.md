@@ -415,3 +415,10 @@ count kept with its sum; the same gain on the Art-Net master. No control on the 
 by design; the guard's line on the desk and the phone names the rule that is holding.
 *Measure:* `npm run wall`'s traces with a quarter-wall flash of 0.4 at 5 Hz (counted), a
 full-wall red flash (counted by the red rule) and a 1.5× to 1× rung change (not counted).
+Written ahead of the build (2026-10-31, the Antigravity brief of that day), red on main:
+`scripts/wallflash.mjs`'s `tileTraces`, whose header is the contract (the guard's
+`sampleTiles(now, tiles)` entry beside `sample()`, per-tile linear R, G, B sums and pixel
+counts, `state.rule` and `state.counted`). CI runs `npm run wall -- --owed=quarter,red,rung`;
+the PR that ships a line takes its id out of the flag. A control beside each holds on main.
+The probe's own half (the count carried through the readback ring on the GPU) is read in
+review: the traces hand the guard readings as the probe will make them.

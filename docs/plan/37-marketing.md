@@ -424,7 +424,23 @@ rest is routine and the owner's calls.
       streams the plate without them. The source to offer is the projector's pass drawn
       without the wall's geometry (keystone, masks, warp) into a canvas of the stream's
       size: a GPU change to `src/gpu/output.ts`, measured with `mixer` and `wallpattern`
-      in the lab and the stream's frame time on the Mac, so a PR of its own.
+      in the lab and the stream's frame time on the Mac, so a PR of its own. The check is
+      written (2026-10-31), red on main: `npm run liveshow -- --stack`'s `stack` line (a
+      film of two known halves alone in the mixer, a keystone on the wall, the Mixer stack
+      source's last frame decoded: 1920x1080, the film's halves, every corner the film's,
+      square), with the panel's Source as `data-testid="live-source"` (values `plate`,
+      `stack`); CI's fifth Mac shard runs it with `--owed=plate,stack` until the builds land.
+    - *37x-4d-6. The stream's frames are black.* (Open; found writing 37x-4d-1's check.)
+      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
+      and a presented WebGPU canvas read outside the frame task that drew it answers black
+      (why the projector window and the pad's picture are copied inside that task:
+      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
+      plate read in its frame was the film with the keystone; the Plate source's decoded
+      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
+      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
+      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
+      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
+      --stack`, red on main; the Mac shard's run says whether Metal answers the same.
     - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
       account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
       new desk; and it would sit on the website's Perform too, where it cannot stream. It
