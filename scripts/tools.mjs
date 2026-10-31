@@ -166,13 +166,30 @@ try {
     const cells = Math.hypot(b.x - a.x, b.y - a.y);
     if (!(cells > 2)) throw new Error(`the Blow's stroke spans ${cells} cells of the plate; too short to pace`);
     const n = Math.floor(cells / 1.25);
-    const frames = () => page.evaluate(() => window.chromaglassDebug().frames);
+    /*
+      The plate's own frame count, asserted to be one: a hook that went
+      missing would read NaN, NaN - f0 < 2 is false, and the pacing would
+      fall back to the clock alone without a word. And a deadline on each
+      wait: a plate that stops drawing (a lost device) fails here, with the
+      frames it got, rather than hanging the check until the job is killed.
+      The last move waits like the others, so its cell's wind is laid on two
+      frames before the release, as the old stroke's wait after its last move
+      did.
+    */
+    const frames = async () => {
+      const f = await page.evaluate(() => window.chromaglassDebug().frames);
+      if (!Number.isFinite(f)) throw new Error(`the plate's frame count reads ${f}; the Blow's stroke cannot be paced by it`);
+      return f;
+    };
     await page.mouse.down();
     for (let i = 1; i <= n; i++) {
       const f0 = await frames(), t0 = Date.now();
       await page.mouse.move(...screen(from[0] + (to[0] - from[0]) * i / n, from[1] + (to[1] - from[1]) * i / n));
-      if (i === n) break;
-      while (Date.now() - t0 < 120 || (await frames()) - f0 < 2) await settle(4);
+      let f = f0;
+      while (Date.now() - t0 < 120 || (f = await frames()) - f0 < 2) {
+        if (Date.now() - t0 > 10000) throw new Error(`the plate drew ${f - f0} frame(s) in 10 s after the Blow's move ${i} of ${n}`);
+        await settle(4);
+      }
     }
     await page.mouse.up();
     return n;
@@ -781,9 +798,20 @@ try {
         its carries off one. Whether it moved the colour is the line after
         next, from the colour itself.
       */
+      /*
+        And the stroke ran as wind its whole length: at least two wind steps a
+        move, which is what pacedStroke waits for, so a stroke whose moves the
+        plate never stepped between reads red here and not as a quiet pass of
+        "keeps it" on a stroke that blew nothing. The paced stroke is shorter
+        in time than the 3000 ms one (on GitHub's Mac 61 and 62 wind steps a
+        stroke against the old 92 to 112, which carried 18 to 27 straw steps
+        in them), and it pushes more, not less: +4.80%, +6.50% and +4.09%
+        against the old +1.55% and +2.97%, because no straw step interrupts
+        the wind. The push line's bar scales with the stroke's steps as before.
+      */
       const reached = (r) => (r.directed > 0 && r.aired >= r.directed) || r.carried > 1;
-      check('Blow drawn across a pool is the wind, and the wind reaches the liquid', wind > straw && reached(fwd) && back.wind > back.straw && reached(back),
-        `${wind} wind steps against ${straw} straw, ${aired} as air on the film, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.aired}, ${back.carried.toFixed(1)}`);
+      check('Blow drawn across a pool is the wind, and the wind reaches the liquid', wind > straw && wind >= 2 * fwd.moves && reached(fwd) && back.wind > back.straw && back.wind >= 2 * back.moves && reached(back),
+        `${wind} wind steps against ${straw} straw (at least two a move: ${fwd.moves} moves), ${aired} as air on the film, ${carried.toFixed(1)} carried; the other way ${back.wind} against ${back.straw}, ${back.aired}, ${back.carried.toFixed(1)}`);
       /*
         And no straw where it was pressed. A straw step blows a real bubble,
         whose air takes the dye under it off the plate while it sits there
