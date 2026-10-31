@@ -944,6 +944,21 @@
       ]
     },
     {
+      "name": "The oil beads' mask drawn on the GPU",
+      "shard": "lab",
+      "run": "npm run beadmask",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The beads' mask is drawn by the plate from a list of the beads in compute passes",
+        "rather than drawn on the CPU and uploaded (PLAN.md 14ab-6, lib/beadPack.ts,",
+        "gpu/beadMask.ts, scripts/beadmask.mjs): the drops' mask is rasterDrops' to a level,",
+        "the rings' each pixel's share of bead, dome and rim, on one plate switched between",
+        "them; the bytes written across and the CPU's time a tenth of the picture's or less",
+        "(measured a twentieth and a thirtieth). Logic and numbers, the same on any adapter",
+        "that computes."
+      ]
+    },
+    {
       "name": "The slosh dish on the GPU",
       "shard": "lab",
       "run": "npm run sloshgpu",

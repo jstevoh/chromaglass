@@ -104,22 +104,30 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     heat on its soap well (area 1) heats Jellyfish's lowest bell. A cord should carry the
     look it was written for, or the fade should drop the outgoing look's area cords at once
     (they are hands, which a Go can let go of, not settings that must not jump).
-- **25i. Colour that answers the music** (direction C, 2026-10-24; after 25h). Once each
-  area has its own family (25h), the music picks which bottle pours next. (1) **By the
-  note**: a patch source that maps the lead note's pitch class (a fast reading: the
-  `note` source's pitch) to one of the area's bottles, the colour-organ idea behind
-  Wilfred's Lumia. First on Poster, 1969: the lead chooses between orange, ultramarine and
-  a third ink, still flat and hard-edged. (2) **By chemistry**: a hit is a drop of reagent
-  and the colour change is the reaction's own. Red Cabbage already simulates pH: the snare
-  drops acid in one area (pink), the kick base in another (green), and where they meet they
-  cancel to purple. Chemical Clock: each kick touches the gel in one of three areas and
-  starts a new wave centre there, as a touch sets off a real dish of the reaction. No hue
-  dial is turned in either: the colour is the bottle chosen or the chemistry. (3) **More
-  than five dyes**, only if (1) and (2) show three areas starved for colour: the dye count
-  is a GPU cost (each dye a channel in the dye's step), measured with `npm run stages`
-  before and after. *Measure:* a synthetic note sequence of known pitch classes pours the
-  mapped bottle each time (in the lab); on Red Cabbage, synthetic snare and kick bursts
-  move the pH inside their own areas at least 5x more than outside.
+- ~~**25i. Colour that answers the music**~~ (shipped: the lead's note picks Poster's kick
+  bottle, the hits on Red Cabbage and Chemical Clock are drops of a reagent and the colour is
+  the chemistry's; `npm run areacords`). Story in `docs/plan-shipped.md` §25. Open, found
+  building it:
+  - **25i-1. The note picks a bottle on Poster alone.** The `noteClass` reading is in the patch
+    bay for any look, and the looks with a clear lead and an area family of three (Velvet's
+    pools, Lumia's veils) should be tried with it once the owner has seen Poster (judging §96).
+  - **25i-2. Chemical Clock's touches are the kick's own hand, which only the Mac reaches.**
+    Its three activator places are all on the bass, so the beat dose (`doseArea` in the
+    visualizer's loop) touches them in turn; the lab holds what one drop does to the gel and
+    node holds the turn, but the app's own kicks on the gel are the Mac's to measure (rings
+    started per kick in `watch.mjs`). The beat dose goes through Kick Bloom, so Kick Bloom 0
+    stops the touches too; a cord over several areas in turn would free them from it.
+  - **25i-3. More than five dyes (not built).** Built only if an area is starved for colour:
+    Poster's bass shape now borrows the ink shape's ultramarine and purple for its third and
+    second bottles, so the two shapes share two inks. A sixth dye in Poster's contract would
+    give the bass shape its own; measure `npm run stages` before and after (each dye a channel
+    in the dye's step).
+  - **25i-4. MIDI note-ons do not feed the note.** As 24.3-place-1: `noteClass` is read off
+    the microphone's `pitchFine`; a keyboard's note-on knows the note exactly and at once.
+  - **25i-5. The touch is the gel's activator; a silver wire is the other way in.** A drop of
+    bromous acid fires the gel (`bottles.ts` BZ Activator). A wire works by taking the bromide
+    (the inhibitor) out of a spot, which the two-variable Oregonator here does not carry; the
+    two look alike in a dish (a ring runs out), and the second needs a third species.
 - **25j. A lamp under each area** (direction D, 2026-10-24; after 25i). Each area sits over
   its own lamp whose brightness and warmth follow its band, and a gel can turn a step on a
   hit, as the old shows ran several projectors and colour wheels. Since 18f the plate's
