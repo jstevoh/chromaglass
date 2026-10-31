@@ -67,6 +67,7 @@ const out = 'node_modules/.cache/rides-lib.mjs';
 await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
 const { stirOf, stirBefore, kickDepth, KICK_RADII, kickPress, dentRadius, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK, restingHand, springKick, springStep,
   ROCK_LEVEL_AFTER, ROCK_LEVEL_MOVE, STRONG_BEAT, WEAK_BEAT,
+  rockPast, ROCK_PAST,
   stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity, RhythmSheet, stampedVolume, KICK_HOLD } = await import(`../${out}`);
 const { createNoise2D } = await import('simplex-noise');
 // The app's sway noise, on a fixed table (the app keys its own on the show's seed).
@@ -270,7 +271,9 @@ try {
   const SHEET_CELLS = Math.round(kickPress(thicknessViscosity(0.45), 0).radii[0] * 1.5);
   // The ring the sheet's dent is read on, three quarters of the way out to its zero (sheetKick, and why not the glass's 30).
   const SHEET_RING = Math.round(0.75 * SHEET_CELLS);
-  const r = await page.evaluate(async ({ KICK_RADII, SHEET, kicks, stirs, rocks, glasses }) => {
+  // The sheet's kicks at the default and at full (kickDepth × kickPress's share), as the lab presses them below.
+  const SHEET_KICKS = { def: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, full: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share };
+  const r = await page.evaluate(async ({ KICK_RADII, SHEET, kicks, stirs, rocks, glasses, HEAVY }) => {
     const res = {};
     const DEF = 0.45, THICK = 0.75;
     // The app's plate at the default Speed: its step and its glass (lift.mjs's APP_GLASS).
@@ -320,14 +323,14 @@ try {
         lab.flush();
       };
       // `tilt`: the plate's tilt a step, from tilts() in node (the app's own spring).
-      const run = async ({ tilt = null, oldRock = false, turb = 0 }) => {
+      const run = async ({ tilt = null, oldRock = false, turb = 0, gain = 1 }) => {
         await lab.create(N, N); seed();
         const mean = meanOf(await dyeA());
         await lab.step(2, app(N, mean));
         const snaps = [];
         let vsum = 0, vn = 0;
         for (let k = 0; k < 120; k++) {
-          const over = { ...app(N, mean), turbScale: turb, rockX: tilt ? tilt[k][0] : 0, rockY: tilt ? tilt[k][1] : 0 };
+          const over = { ...app(N, mean), turbScale: turb, rockX: tilt ? tilt[k][0] : 0, rockY: tilt ? tilt[k][1] : 0, rockGain: gain };
           /*
             The old reading: the same tilt through the lasting current on
             the old plate's terms. The lab can no longer route a thin gap's
@@ -346,11 +349,16 @@ try {
       const still = await run({});
       const tot = still.snaps[0].reduce((a, b) => a + b, 0);
       const moved = (o) => Math.max(...o.snaps.map((sn, i) => { let d = 0; for (let k = 0; k < sn.length; k++) d += Math.abs(sn[k] - still.snaps[i][k]); return d / tot; }));
-      const full = await run({ tilt: rocks.full }), half = await run({ tilt: rocks.def });
+      /*
+        Full Plate Rock as the app runs it, past real (lib/plateRock.ts
+        rockPast, PLAN 38r-9), and the same tilt at the real 2 mm gap's pace,
+        for the dial's shape below the default; the default is real.
+      */
+      const full = await run({ tilt: rocks.full, gain: rocks.fullGain }), fullReal = await run({ tilt: rocks.full }), half = await run({ tilt: rocks.def, gain: rocks.defGain });
       const before = await run({ tilt: rocks.before, oldRock: true }), beforeDef = await run({ tilt: rocks.beforeDef, oldRock: true });
       const sway = await run({ tilt: rocks.sway }), sway2 = await run({ tilt: rocks.sway2 });
       res.rockSpring = moved(await run({ tilt: rocks.spring }));
-      res.rockFull = moved(full); res.rockDefault = moved(half); res.rockBefore = moved(before); res.rockBeforeDefault = moved(beforeDef); res.sway = Math.max(moved(sway), moved(sway2));
+      res.rockFull = moved(full); res.rockFullReal = moved(fullReal); res.rockDefault = moved(half); res.rockBefore = moved(before); res.rockBeforeDefault = moved(beforeDef); res.sway = Math.max(moved(sway), moved(sway2));
       res.stir = {};
       for (const [name, s] of Object.entries(stirs)) { const o = await run({ turb: s }); res.stir[name] = { moved: moved(o), speed: o.speed }; }
     }
@@ -363,15 +371,21 @@ try {
         colour is red and blue in a checker of 32-cell squares, so a slide
         of the liquid shows as the red moving. `glass` is covers(): the
         tilt and the glass's slide a step, and where the liquid should be.
-        `heavy` makes the red the heavier colour (its weight half again the
-        blue's), the control that shows the same tilt does reach the plate.
+        `heavy` makes the red the heavier colour, the control that shows the
+        same tilt does reach the plate. Its weight over the blue's was 0.4 of
+        a unit of dye on the 6 mm gap, where it moved 0.08 or so; Darcy's h²
+        slides it a ninth as far on the 2 mm gap (0.009 on the Mac, #641 at
+        2d75f13, for the 0.05 asked), so the control's red weighs ROCK_PAST
+        (nine) times as much over the blue, 3.6 units: the control slides
+        as far as it did, and the even plate is held to a tenth of that as
+        it was.
       */
       const N = 192;
       const lay = (heavy) => {
         const d = new Array(N * N * 4).fill(0);
         for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
           const r = 0.5 + 0.5 * Math.sin(2 * Math.PI * i / 64) * Math.sin(2 * Math.PI * j / 64), k = (i + j * N) * 4;
-          d[k] = r; d[k + 2] = 1 - r; d[k + 3] = heavy ? 0.6 + 0.4 * r : 1;
+          d[k] = r; d[k + 2] = 1 - r; d[k + 3] = heavy ? 0.2 + 0.4 * HEAVY * r : 1;
         }
         lab.addDye(d); lab.flush();
       };
@@ -582,11 +596,12 @@ try {
     return res;
   }, {
     KICK_RADII,
+    HEAVY: ROCK_PAST,
     SHEET: { def: SHEET_CELLS, ring: Math.round(0.75 * SHEET_CELLS), nu: thicknessViscosity(0.45) },
     glasses: { springFull: covers({ R: 1, spring: true }), springDef: covers({ R: 0.45, spring: true }), full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
     kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), sheet: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, sheetFull: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share, before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
     stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
-    rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), spring: tilts({ R: 0.45, spring: true }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
+    rocks: { full: tilts({ R: 1 }), def: tilts({ R: 0.45 }), fullGain: rockPast(1), defGain: rockPast(0.45), spring: tilts({ R: 0.45, spring: true }), before: tilts({ R: 1, before: true }), beforeDef: tilts({ R: 0.45, before: true }), sway: tilts({ R: 0.45, sway: true, kicks: false }), sway2: tilts({ R: 0.45, sway: true, t0: 40, kicks: false }) },
   });
 
   // 1.
@@ -605,9 +620,20 @@ try {
     `${ratio.toFixed(2)}× slower`);
   // 2.
   const yard = r.stir['a look\'s 0.3'].moved;
+  /*
+    On the real 2 mm gap (PLAN 38r) Darcy's h² slides a rocked pool a ninth as
+    far as on the 6 mm one, and full Plate Rock read 0.105 against the stir's
+    0.871 (the Mac, #641 at 2d75f13). The default stays the real gap's (the
+    owner judged it so) and the dial goes past real above it, to the 6 mm
+    pace at full (lib/plateRock.ts rockPast, PLAN 38r-9). Every bar is as it
+    was: full at least a third of the stir, the default at least the
+    spring's, and the dial's shape (the default over 0.4 of full) read on
+    the same full tilt at the real pace, since past the default the dial is
+    meant to climb faster than the tilt; and the default must be real.
+  */
   check('at full Plate Rock, kicked as the app kicks it, the colour moves at least a third as much as a look\'s own stir, and at the default at least as far as the spring moved it',
-    r.rockFull >= yard / 3 && r.rockDefault > 0.4 * r.rockFull && r.rockDefault >= r.rockSpring,
-    `${r.rockFull.toFixed(3)} at full, ${r.rockDefault.toFixed(3)} at the default 0.45 (the spring shoved on every kick, 27a to 27f-2: ${r.rockSpring.toFixed(3)}), against the stir's ${yard.toFixed(3)}; before 27a, ${r.rockBefore.toFixed(3)} at full and ${r.rockBeforeDefault.toFixed(3)} at 0.45`);
+    r.rockFull >= yard / 3 && r.rockDefault > 0.4 * r.rockFullReal && r.rockDefault >= r.rockSpring && r.rockFull > r.rockFullReal && rockPast(0.45) === 1,
+    `${r.rockFull.toFixed(3)} at full (×${rockPast(1).toFixed(1)} past real; ${r.rockFullReal.toFixed(3)} at the real gap's pace), ${r.rockDefault.toFixed(3)} at the default 0.45 (×${rockPast(0.45).toFixed(2)}) (the spring shoved on every kick, 27a to 27f-2: ${r.rockSpring.toFixed(3)}), against the stir's ${yard.toFixed(3)}; before 27a, ${r.rockBefore.toFixed(3)} at full and ${r.rockBeforeDefault.toFixed(3)} at 0.45`);
   /*
     Between kicks the hand sways the glass (lib/plateRock.ts, ±0.35 of the
     swing), and on a thin gap a sway is a tilt the colour slides down. With
@@ -718,8 +744,25 @@ try {
     check('Beat Squeeze presses the rhythm sheet off the frame-moving looks: its dent as wide as the solved sheet reaches over the liquid, narrower the thicker',
       r1 < r45 && r45 < r0 && r0 < 0.5 && kickPress(thicknessViscosity(0.45), 0.35).radii === KICK_RADII,
       `a dent ${(128 * r1).toFixed(1)} cells of 128 in glycerine, ${(128 * r45).toFixed(1)} on the default oil, ${(128 * r0).toFixed(1)} in water; the glass's ${KICK_RADII[0]} on a look with Frame Sway`);
-    check('and the dent moves the colour inside it, 1.5 cells or more at the default and 4 or more at full',
-      r.sheetDefault.out >= 1.5 && r.sheetFull.out >= 4, `${k(r.sheetDefault)}; full ${k(r.sheetFull)} (a ring ${SHEET_RING} cells out in a dent of ${SHEET_CELLS} on the lab's 192)`);
+    /*
+      Full's bar was 4 cells beside the default's 1.5, a number with room
+      read off the 6 mm dent's ring (30 cells of 40). What a press moves the
+      ring by is the volume it pushes out past it, and the press's volume
+      is stampedVolume's Stefan film, which closes the gap less than in
+      proportion to the kick: full's kick is 3.29 times the default's and
+      its volume 2.17 times (the ratio is the film's, whatever the dent's
+      width). On the 2 mm dent the ring is 18 cells of 24 and reads 1.6 at
+      the default and 3.3 at full (the Mac, #641 at 2d75f13): 2.06 times,
+      the volume's ratio to 5%. So full's bar is the default's 1.5 carried
+      by that same ratio, and the ring is asked to go as the volume says,
+      to 15%: a full kick whose volume did not reach the ring, or a ring
+      that ran ahead of what was pressed, is red where a bare 4 was not.
+    */
+    const sheetVol = (a) => stampedVolume(a, kickPress(thicknessViscosity(0.45), 0).radii[0] / 128);
+    const volRatio = sheetVol(SHEET_KICKS.full) / sheetVol(SHEET_KICKS.def), outRatio = r.sheetFull.out / r.sheetDefault.out;
+    check(`and the dent moves the colour inside it, 1.5 cells or more at the default and at full as much more as its volume says (${(1.5 * volRatio).toFixed(2)}), to 15%`,
+      r.sheetDefault.out >= 1.5 && r.sheetFull.out >= 1.5 * volRatio && Math.abs(outRatio / volRatio - 1) < 0.15,
+      `${k(r.sheetDefault)}; full ${k(r.sheetFull)}, ${outRatio.toFixed(2)} times the default's where the pressed volume is ${volRatio.toFixed(2)} times (a ring ${SHEET_RING} cells out in a dent of ${SHEET_CELLS} on the lab's 192)`);
     /*
       What "local" can mean in a film that cannot be squeezed: what a press
       displaces has to go somewhere, so past the dent's edge the colour still

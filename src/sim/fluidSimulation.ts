@@ -148,6 +148,8 @@ export class FluidSimulation {
   dropFingering = 0;
   rockX = 0;
   rockY = 0;
+  /** Plate Rock past real (lib/plateRock.ts rockPast), set by the render loop from the slider: 1 up to the default. */
+  rockGain = 1;
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
   coverX = 0;
   coverY = 0;
@@ -3429,6 +3431,7 @@ export class FluidSimulation {
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
       rockX: plateSin(this.tiltX, this.rockX),
       rockY: plateSin(this.tiltY, this.rockY),
+      rockGain: this.rockGain,
       coverX: this.coverX,
       coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,

@@ -816,6 +816,8 @@ export class WebGPUFluid extends FluidReads {
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
+    // Plate Rock past the default, past real (lib/plateRock.ts rockPast, PLAN 38r-9): the colour's pull and the oil's lift alike.
+    const rockGain = Number.isFinite(p.rockGain) && p.rockGain! > 0 ? p.rockGain! : 1;
     const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
       /*
@@ -864,7 +866,7 @@ export class WebGPUFluid extends FluidReads {
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
           this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
-            rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, lift * p.rockX, lift * p.rockY]),
+            rockOn ? ROCK_FALL * rockGain * p.rockX : 0, rockOn ? ROCK_FALL * rockGain * p.rockY : 0, lift * rockGain * p.rockX, lift * rockGain * p.rockY]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();
       });
