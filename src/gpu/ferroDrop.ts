@@ -19,14 +19,12 @@
  */
 import { Disposer, PipelineCache } from './kit';
 import { groupOf } from './groupCache';
-import { DROP_KERNELS } from './wgsl/ferroDrop';
+import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
 import { SPIKE_ONSET, SPIKE_PITCH } from './wgsl/spikes';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { CHI0, LANGEVIN } from './standing';
 
 const LC_UV = SPIKE_PITCH / (2 * Math.PI);
-/* The plate's gap at rest (fluid.ts, REST_GAP), in l_c: the most a drop can stand before the top glass. */
-const GAP_LC = 0.03 / LC_UV;
 const WARM_SWEEPS = 24;
 const COLD_SWEEPS = 200;
 /*

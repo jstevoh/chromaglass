@@ -2961,7 +2961,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
-          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);
+          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005));
           pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 
