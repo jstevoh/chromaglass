@@ -11,7 +11,7 @@
 import { LiquidType } from '../types';
 import { LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
 import { type FluidSimulation } from './fluidSimulation';
-import { GRID_SCALE } from './constants';
+import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
 import { fluidSink, type AreaSink } from '../lib/areaCords';
 
@@ -178,3 +178,42 @@ export function pourLiquid(fluid: FluidSimulation, id: string, x: number, y: num
  * reagent's drop poured as that bottle (PLAN 25i).
  */
 export const areaSink = (fluid: FluidSimulation): AreaSink => fluidSink(fluid, GRID_SCALE, pourLiquid);
+
+/**
+ * The pointer's press and stir along a move with the button down, for the
+ * tools that still take them: a press of the glass under the pointer and a
+ * shove five times the move. Moved out of `components/LiquidVisualizer.tsx`
+ * (handleMouseMove) unchanged. `x, y` the pointer's cell on the plate,
+ * `dx, dy` the move in cells with the plate's uv counting up. Which tools
+ * do not take them, and why, is below; the Magnet and the Spin return before
+ * the button is read, and a button that is up never reaches here.
+ */
+export function stirAlongMove(fluid: Pick<FluidSimulation, 'applySquish' | 'addVelocity'>, tool: string, x: number, y: number, dx: number, dy: number): void {
+  if (!(x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1)) return;
+  /*
+    Not under the Finger either: it carries the dye it touches
+    (carryDye) and does not press the glass. A press here is a squeeze-
+    film source, a flow that spreads out from under it, and dye
+    advected through a spreading flow is copied over more plate than it
+    came from: a stroke is thirty of these, and npm run tools measured
+    the Finger adding dye (512 -> 1484 against +216 left alone) after
+    its own carry had been made to conserve.
+  */
+  /*
+    Nor under the Drop: it puts paint down and that is all. Reported
+    twice as a "press or blow" going off with every drop; whatever else
+    is found, a drop that also squeezes the film and shoves it along the
+    stroke is not a drop.
+  */
+  if (tool === 'dropper') return;
+  /*
+    And the Finger neither presses nor stirs: its carry moves the dye.
+    With the stir's vertical sign put right it pushed along the stroke,
+    and a push through the film spreads the dye it carries over more
+    plate than it came from, the same copying the press did (npm run
+    tools: 310 -> 459 against +57 left alone).
+  */
+  if (tool === 'finger') return;
+  fluid.applySquish(x, y, 8, 0.005);
+  fluid.addVelocity(x, y, dx * 5, dy * 5);
+}

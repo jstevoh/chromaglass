@@ -71,7 +71,7 @@ import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '..
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
@@ -7210,41 +7210,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         picture on the wall without anything having been clicked.
       */
       if (!isMouseDownRef.current) return;
-      if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        /*
-          Not under the Finger either: it carries the dye it touches
-          (carryDye) and does not press the glass. A press here is a squeeze-
-          film source, a flow that spreads out from under it, and dye
-          advected through a spreading flow is copied over more plate than it
-          came from: a stroke is thirty of these, and npm run tools measured
-          the Finger adding dye (512 -> 1484 against +216 left alone) after
-          its own carry had been made to conserve.
-        */
-        /*
-          Nor under the Drop: it puts paint down and that is all. Reported
-          twice as a "press or blow" going off with every drop; whatever else
-          is found, a drop that also squeezes the film and shoves it along the
-          stroke is not a drop.
-        */
-        if (activeToolRef.current === 'dropper') return;
-        /*
-          And the Finger neither presses nor stirs: its carry moves the dye.
-          With the stir's vertical sign put right it pushed along the stroke,
-          and a push through the film spreads the dye it carries over more
-          plate than it came from, the same copying the press did (npm run
-          tools: 310 -> 459 against +57 left alone).
-        */
-        if (activeToolRef.current === 'finger') return;
-        activeFluid.applySquish(x, y, 8, 0.005);
-        const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
-        // The plate's uv counts up and CSS counts down (getTransformedMousePos):
-        // unflipped, a stroke up the screen shoved the liquid down it.
-        const sx = e.movementX, sy = -e.movementY;
-        const mx = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale * 5;
-        const my = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale * 5;
-        activeFluid.addVelocity(x, y, mx, my);
-      }
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
+      // The plate's uv counts up and CSS counts down (getTransformedMousePos):
+      // unflipped, a stroke up the screen shoved the liquid down it.
+      const sx = e.movementX, sy = -e.movementY;
+      stirAlongMove(activeFluid, activeToolRef.current, x, y, (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale, (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale);
     };
 
     const handleMouseDown = (e: MouseEvent) => {
