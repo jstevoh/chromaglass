@@ -7784,7 +7784,15 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   times the real tension's (the diffuse edge's own current, linear in σ) and falling. With the
   cap put back on the thin gap (a scratch build) part 3 fails: the thread at 5.94 after 1.5 s
   against 4.51, twice the dial 58% off half the time; part 1 fails the old 4e-4 (0.79 of the
-  law against its floor of 0.84). Found: 38e-1 (one
+  law against its floor of 0.84). The cap had also been holding Film Hold's crowd
+  (`npm run filmhold`): uncapped, the blur's waist between two drops a film apart (a
+  curvature up to about one over a cell) pulled harder than the film's push (`FILM_PUSH`,
+  0.55 at the two or three cells a film is drawn as), and the splodascope's 35 drops kept 19
+  in six seconds (main 31; 29 with the cap put back, 21 uncapped at the old σ, so the cap and
+  not σ). A held film's faces are its drops' own surfaces, never a neck that tight, so in a
+  film (where `mixFilm`'s ray finds the other face) the concave part of the blur's curvature
+  is taken back out of the force (σ times Film Hold, thin gap only): 35 → 28, the control
+  35 → 4, the lone drop untouched to the bit. Found: 38e-1 (one
   σ a plate), 38e-2 (threads narrower than the gap), 38e-3 (the old plate's cap), 38e-4.
 
 ### QA list: what the owner found playing it

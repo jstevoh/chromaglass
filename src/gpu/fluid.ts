@@ -801,7 +801,7 @@ export class WebGPUFluid extends FluidReads {
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {
         this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
-          this.arg('mix film', [sigma * FILM_PUSH * hold, most, 0, 0]));
+          this.arg('mix film', [sigma * FILM_PUSH * hold, most, thin ? sigma * hold : 0, 0]));
         this.vel.swap();
       }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));

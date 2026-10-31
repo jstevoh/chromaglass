@@ -62,13 +62,16 @@ fn grad(p: vec2i, n: f32) -> vec2f {
 }
 // The edge's unit normal, fading to nothing where there is no edge to have one.
 fn nrm(p: vec2i, n: f32) -> vec2f { let g = grad(p, n); return g / sqrt(dot(g, g) + 0.0004); }
-// σ κ ∇c̃. The normal's divergence by central differences of the normals
+// κ = −∇·n̂, the normal's divergence by central differences of the normals
 // themselves, not a second derivative of c: that is the step that keeps the
-// grid out of it.
+// grid out of it. Positive where the oil is convex.
+fn curvature(p: vec2i, n: f32) -> f32 {
+  return -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
+}
+// σ κ ∇c̃.
 fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let g = grad(p, n);
-  let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
-  var f = A.a.x * kappa * g;
+  var f = A.a.x * curvature(p, n) * g;
   let l = length(f);
   if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
   return f;
@@ -390,7 +393,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     exp(−h / FILM_DECAY), times how much edge the cell holds (|∇c̃|).
 
     A.a.x = the push at h = 0 per unit of edge (σ's own scale times Film
-    Hold), A.a.y = the most a cell may add, as mixForce's.
+    Hold), A.a.y = the most a cell may add, as mixForce's, A.a.z = σ times
+    Film Hold for the waist's pull taken back (below; 0 on the old plate).
+
+    The waist's pull taken back (PLAN 38e). The push alone held the crowd
+    only while mixForce was capped (OIL_CELLS): the waist's curvature in
+    the blur is up to about one over a cell, and the push, FILM_PUSH at
+    h = 0, is 0.55 at the two or three cells a film is drawn as, so the
+    cap, which clipped the pull and the push alike, was what kept the pull
+    from winning. With the cap gone on the thin gap (oilMobility says why)
+    the lab's crowd of 35 kept 19 (npm run filmhold; 29 with the cap put
+    back, 21 with the cap gone and the old σ, so the cap and not σ's 12%).
+    The pull is the artefact itself, not a force a real film feels: the
+    faces of a held film are each its own drop's surface, flat or bowed
+    into the bigger drop by the smaller's 1/R (a drop ten cells across
+    bows it by a fifth of a cell's), never a neck as tight as the blur's. So in a film, where the ray above finds the other face,
+    the concave part of the blur's curvature is taken back out of the
+    force, and the push answers the drops' own Laplace pressure as a real
+    disjoining pressure does. A face's own convexity is left alone, and a
+    lone drop, whose ray finds no other face, is untouched (the check's
+    sixth part). Not on the old plate, whose capped pull the cap still
+    answers (PLAN 38e-3).
   */
   mixFilm: `${HEAD}${CAPILLARY}
 @group(0) @binding(2) var vel: texture_2d<f32>;
@@ -418,6 +441,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     }
     if (h > 0.0) {
       var f = A.a.x * exp(-h / ${FILM_DECAY.toFixed(2)}) * g;
+      // And the waist's pull taken back: a held film's faces are its drops' own (above).
+      f -= A.a.z * min(curvature(p, n), 0.0) * g;
       let l = length(f);
       if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
       v = vec4f(v.xy + f, v.zw);
