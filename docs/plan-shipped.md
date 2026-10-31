@@ -10372,7 +10372,7 @@ Gaussian took 7%, and their middle is no longer lifted.
 the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
 gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.
 
-## 38k. The magnets' field in tesla, and the liquid's onset worked out (#NEW, 2026-10-31)
+## 38k. The magnets' field in tesla, and the liquid's onset worked out (#630, 2026-10-31)
 
 The second realism audit found the onset of the ferrofluid's spikes was a share of the hand's
 magnet (0.18 → 0.35 by a smoothstep), set in the lab so that each look's own magnet gathered
