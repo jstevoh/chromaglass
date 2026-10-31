@@ -240,7 +240,8 @@ export function dialWindow(key: string, current: VisualizerSettings, anchor: Vis
   const spec = PIN_RANGE.get(key);
   if (!spec) return null;
   const { min, max } = spec;
-  const span = max - min;
+  // A widened dial wanders by its old width, not its new one (`wanderSpan`).
+  const span = spec.wanderSpan ?? max - min;
   const read = (s: VisualizerSettings) => {
     const v = s[key as keyof VisualizerSettings];
     return typeof v === 'number' && Number.isFinite(v) ? v : undefined;

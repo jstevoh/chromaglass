@@ -378,7 +378,24 @@ export const settingKeyOf = (midiKey: string | null | undefined): keyof Visualiz
 };
 
 export const curveOf = (key: keyof VisualizerSettings): number =>
-  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? 1;
+  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? PANEL_CURVES[key] ?? 1;
+
+/**
+ * The curve of a panel control MIDI does not learn, for the same reason.
+ *
+ * The owner, 2026-10-31: "very gentle options and very extreme options (which
+ * should be a general principle for all dials)". Widening a dial's top by four
+ * or ten times on a straight throw pushes the look's own value into the first
+ * few percent of the travel, where the gentle end has no room left: Gel Speed
+ * at 30 rpm put the looks' half a turn a minute at 1.7% of the slider. A curve
+ * gives the gentle end its travel back and leaves every stored value alone.
+ * Kept here rather than in `deskPins.ts`, which reads this file, so that every
+ * surface asks `curveOf` and nobody has two tables to keep together.
+ */
+export const PANEL_CURVES: Partial<Record<keyof VisualizerSettings, number>> = {
+  gelSpeed: 2, stockGrain: 2, stockGrainSize: 2, stockWeave: 2, grainScale: 2,
+  macroHold: 2, bassBoost: 2, evaporationRate: 3, spinImpulse: 1.5,
+};
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -397,8 +414,16 @@ export const valueAt = (t: number, min: number, max: number, curve = 1): number 
  * values readable and the travel smooth to the bottom.
  */
 export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
-  const v = valueAt(t, min, max, curve);
-  return v === 0 ? 0 : Number(v.toPrecision(3));
+  /*
+    The three figures are the distance above the bottom, not the value. Every
+    curved control started at 0 until Macro Zoom took a curve (PLAN 27h-1),
+    whose bottom is 1: there 1.8% of the travel is 1.005, three figures made
+    it 1.00, and the knob jumped back to the stop (`npm run rungs`, worst 1.8%
+    off). Measured from its own bottom a control keeps its fine end whatever
+    number that end is, and a bottom of 0 rounds exactly as before.
+  */
+  const above = valueAt(t, min, max, curve) - min;
+  return above === 0 ? min : min + Number(above.toPrecision(3));
 };
 
 /** The inverse: where a value sits on the control, 0..1. */
@@ -463,20 +488,27 @@ export const MIDI_BANKS = 4;
  * difference. `npm run panel` holds the two together now.
  *
  * `step` marks a control that only takes whole steps; see `deskPins.ts`.
+ *
+ * `wanderSpan` is the width the travel had before the dial was widened to its
+ * extreme (the owner, 2026-10-31: every dial from very gentle to very
+ * extreme). The hand and a fader reach `max`; Evolve's wander is still a
+ * fifth of this old width (`dialWindow`, `drift.ts`), so a slow drift moves a
+ * widened dial by what it always moved it by and never walks a look out to
+ * the far end on its own. The far end is the performer's to take.
  */
-export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number }[] = [
+export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number; wanderSpan?: number }[] = [
   { key: 'dimmer',          label: 'Dimmer',           min: 0, max: 1 },
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
-  { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
+  { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3, curve: 3 },
   { key: 'twoProjectors',   label: 'Two Projectors',   min: 0, max: 1, step: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
-  { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
+  { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
-  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 1.5 },
-  { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 1 },
+  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 4, curve: 1.5, wanderSpan: 1.5 },
+  { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 2, wanderSpan: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },
@@ -487,7 +519,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
   { key: 'bubbleMelt',      label: 'Bubble Melt',      min: 0, max: 1 },
-  { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
+  { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'projectorFocus',  label: 'Projector Focus',  min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
@@ -509,10 +541,10 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
+  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
-  { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
-  { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 10 },
+  { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
+  { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 30, curve: 2, wanderSpan: 10 },
   { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1 },
   { key: 'dishVignette',    label: 'Round Dish',       min: 0, max: 1 },
   { key: 'lumia',           label: 'Lumia',            min: 0, max: 1 },
@@ -553,7 +585,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
   // The Magnet's size (lib/magnetSize.ts): a knob to grow the hedgehog under a held magnet.
-  { key: 'magnetSize',      label: 'Magnet Size',      min: 0, max: 1 },
+  { key: 'magnetSize',      label: 'Magnet Size',      min: 0, max: 1.5, wanderSpan: 1 },
   // The film's colours, the rainbow to a real soap film's. A fader because
   // the mix between them is a look of its own, not only the two ends.
   { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },

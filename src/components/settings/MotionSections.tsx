@@ -134,7 +134,7 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           label="Plate Rock"
           value={settings.plateRock ?? 0.45}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ plateRock: v })}
           settingKey="plateRock"
@@ -167,7 +167,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           label="Rotation Speed"
           value={settings.rotationSpeed}
           min={0}
-          max={1.0}
+          max={1.3}
           step={0.05}
           onChange={(v: number) => onUpdate({ rotationSpeed: v })}
           settingKey="rotationSpeed"
@@ -339,7 +339,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           label="Flick Strength"
           value={settings.spinImpulse ?? 0.5}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ spinImpulse: v })}
           settingKey="spinImpulse"
@@ -432,7 +432,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Evaporation Rate"
           value={settings.evaporationRate}
           min={0}
-          max={0.08}
+          max={0.5}
           step={0.0005}
           onChange={(v: number) => onUpdate({ evaporationRate: v })}
           settingKey="evaporationRate"
@@ -494,7 +494,7 @@ export const AutomationSection = ({ c }: { c: SectionCtx }) => {
           label="Evolve Speed"
           value={settings.automateRate}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ automateRate: v })}
           settingKey="automateRate"
