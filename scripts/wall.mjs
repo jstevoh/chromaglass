@@ -2201,9 +2201,9 @@ try {
   // can only be seen here is whether the shapes actually *mask*: that the
   // frame goes dark where no surface lands, that a gap between two of them
   // stays a gap, and that a circle is a circle rather than the rectangle it is
-  // cut from. Each claim is a ratio against the bare frame, over what the
-  // shape shows: the whole plate squeezed in, so a shape's inside is held
-  // to the whole frame's mean, not its middle (PLAN 38e, Oil & Water).
+  // cut from. Each is a ratio against the bare frame, over what the shape
+  // shows: the whole plate squeezed in, so its inside is held to the whole
+  // frame's mean, not its middle (PLAN 38e).
   {
     const quad = (x0, y0, x1, y1) => [x0, y0, x1, y0, x1, y1, x0, y1];
     const surf = (shape, x0, y0, x1, y1, extra = {}) => ({
