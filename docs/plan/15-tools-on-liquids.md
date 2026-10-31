@@ -108,18 +108,32 @@ Left, each its own plan item:
   the Mac (at 6 m/s `npm run tools` read a third of it), not a measurement. A phone
   recording of a real breath across a dish of oil (`npm run watch`) would set the speed
   the colour goes at, against the lab's 2.72% of the plate over a 1.5 s stroke.
-- **15g-7 Blow's stroke to the right moves less than to the left in the app.** On
-  `npm run tools` (Mac) the rightward stroke has read weaker since the carries (145.9
-  carried against 352.4, 4 October) and with the air (+0.13% against +1.15% on #300,
-  6 m/s), where the lab's airblow reads the two alike (2.72%, 2.82%). Something in the
-  app pushes colour left during a Blow stroke, or the stroke to the right runs fewer
-  steps of breath; the check prints both (wind steps, aired, readings) to find which.
-  And on GitHub's runners the stroke's "keeps it rather than erasing it" line (the pool's loss
-  held to a tenth plus five) swings from a gain to a loss of 11% across eight pull requests of one
-  morning (2026-10-30; pools of 235 to 367, 8 to 28 straw steps), and #550's shard read a loss of
-  20% on the stroke back twice running, 22 straw steps each time, while the owner's Mac at twice
-  the steps keeps or gains (608 → 597, 610 → 670). Whether the loss follows the straw count or the
-  step count is to be read before the bar is trusted on those runners.
+- ~~**15g-7 Blow's stroke to the right moves less than to the left in the app.**~~
+  **Shipped** (this PR): the pointer handler pressed the glass under the pointer (a bowl 24
+  cells across) and stirred along the move on every pointer event with the button down, for
+  every tool but the Magnet, the Spin, the Drop and the Finger, and the Blow was never taken
+  out of it. The pointer leads the pool it blows across, so each press sent the pool's liquid
+  back against the breath, and the gap it closed crept open for seconds after; thirty presses
+  a stroke whatever the pace against the breath's steps, which came with the runner's. Story
+  in `docs/plan-shipped.md` §15g-7; `npm run tools` now counts the glass a Blow stroke
+  presses and asks for none.
+- **15g-8 The stroke's straw on GitHub's runners.** On those runners the stroke's "keeps it
+  rather than erasing it" line (the pool's loss held to a tenth plus five) swings from a gain
+  to a loss of 11% across eight pull requests of one morning (2026-10-30; pools of 235 to 367,
+  8 to 28 straw steps), and #550's shard read a loss of 20% on the stroke back twice running,
+  22 straw steps each time, while the owner's Mac at twice the steps keeps or gains (608 → 597,
+  610 → 670). The check's moves are 0.68 of a cell at the plate's scale and the hand's cell is
+  floored, so a move lands on a new cell two times in three; a frame or two with none, on a
+  runner whose frames are 50 to 80 ms, is a hand held still (BLOW_STRAW_FRAMES) and the straw's
+  bubble takes the dye under it. Whether the loss follows the straw count or the step count is
+  to be read before the bar is trusted on those runners; a stroke paced by the plate's own steps
+  (so many cells a step, not a move every 100 ms of wall clock) is the likely shape of the fix.
+- **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
+  Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
+  24-cell bowl and shove the liquid five times the move on each pointer event
+  (`src/sim/tools.ts` stirAlongMove), thirty a stroke whatever the pace. Whether each wants it
+  is its own question, measured as the Blow's was: the lab at the app's step with and without
+  it, and `npm run tools`' pressed-cell count per stroke.
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 

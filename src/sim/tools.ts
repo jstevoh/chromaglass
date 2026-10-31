@@ -214,6 +214,38 @@ export function stirAlongMove(fluid: Pick<FluidSimulation, 'applySquish' | 'addV
     tools: 310 -> 459 against +57 left alone).
   */
   if (tool === 'finger') return;
+  /*
+    Nor under the Blow. On a thin gap the moving Blow is the breath's stress
+    on the film, laid once a solver step for as long as the stroke goes on
+    (fluidSimulation.ts blowWind, PLAN 15g); this press came besides, once a
+    pointer event, a bowl 24 cells across (about 440 cells a press) pressed into the glass at the
+    pointer, and the stir with it. The pointer leads the pool it blows
+    across, so each press squeezed the pool's liquid back the way the stroke
+    came, against the breath, and the gap it closed along the stroke opened
+    again over the gap's memory for seconds after, drawing the liquid toward
+    the stroke's end. The presses came thirty a stroke whatever the pace and
+    the breath's steps with the runner's: the CI Macs step 12 to 23 times a
+    second, so `npm run tools`' stroke of fixed wall time got 38 to 71 steps
+    of breath against the owner's machine's 180, and its "pushes the colour
+    along, whichever way it blows" read -0.07% to +1.6% of the plate against
+    +0.15% to beat, red on 13 of 187 Mac runs in the week to 2026-10-24
+    (PLAN 15g-7, QA-20b; #465 then doubled the stroke's time, and the line
+    went red once in 354), with the drift in the two windows after the
+    stroke +0.2% to +0.35% toward it on every run, the ones that pushed
+    nothing included, where the breath's own flow is spent within half a
+    second. The lab at the app's own step, parameters, geometry and pool
+    (the owner's handoff folder, blowlab5.mjs), thirty moves over 45 solver
+    steps: the breath alone moved the pool's middle +1.74% of the plate and
+    sat still after 0.4 s; with this press on each move it read -0.32%
+    during the stroke and crept +0.75% in the 2.5 s after; the press alone
+    -0.80% then +1.1%; the stir with the press the same as the press
+    (-0.32%). Over 88 steps, the 3000 ms stroke's on those Macs, the press
+    left +0.72% of the breath's own, then +0.9% of creep. The straw (a Blow
+    held still) is the bubble's, not a press, and the Press tool keeps its
+    own squish; `npm run tools` counts the glass a Blow stroke presses and
+    asks for none.
+  */
+  if (tool === 'blow') return;
   fluid.applySquish(x, y, 8, 0.005);
   fluid.addVelocity(x, y, dx * 5, dy * 5);
 }
