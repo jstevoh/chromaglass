@@ -1,7 +1,6 @@
 /*
   The heat's numbers for a step, in watts and real seconds (PLAN 38f, 38t):
-  what `WebGPUFluid.writeSim` puts in the Sim for decayVel, hsBody and
-  hsHeatCarry. Moved beside fluid.ts so it stays under its size (19ai-10).
+  what `WebGPUFluid.writeSim` puts in the Sim for decayVel and hsBody. Moved beside fluid.ts so it stays under its size (19ai-10).
   The physics and every constant's reason are in constants.ts's note on
   LAMP_IRRADIANCE; `npm run plume` measures them.
 */
@@ -15,9 +14,9 @@ const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'numb
  * lamp's flux (50), the step's real seconds (51), the lift (52, 53) and
  * Updraft's forced air (54). `up` is the plate's up already in f[34], f[35].
  * The lift is a thin gap's alone (the old plate's current carries its
- * own), and waits for hsHeatMean to be built (`liftReady`).
+ * own).
  */
-export function writeHeatSim(f: Float32Array, p: GpuStepParams, thin: boolean, upright: number, disp: number, liftReady: boolean): void {
+export function writeHeatSim(f: Float32Array, p: GpuStepParams, thin: boolean, upright: number, disp: number): void {
   const seconds = Math.max(0, Math.min(0.1, fin(p.magnetSeconds, 1 / 60)));
   f[17] = 2 * HEAT_AIR * -Math.log(Math.max(0.001, Math.min(1, fin(p.heatDecay, 0.98))));
   f[50] = fin(p.dimmer, 1) * LAMP_IRRADIANCE;
@@ -28,7 +27,7 @@ export function writeHeatSim(f: Float32Array, p: GpuStepParams, thin: boolean, u
     Buoyancy's multiple of water's own expansion, in the flow's per-step
     speed per unit of lightness as hsBody reads every body force.
   */
-  const lift = thin && liftReady ? Math.max(0, fin(p.buoyancy, 0)) / HEAT_BUOY_REAL * HEAT_RISE * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
+  const lift = thin ? Math.max(0, fin(p.buoyancy, 0)) / HEAT_BUOY_REAL * HEAT_RISE * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
   f[52] = lift * (upright * f[34] - fin(p.rockX, 0));
   f[53] = lift * (upright * f[35] - fin(p.rockY, 0));
   const air = fin(p.air, 0);

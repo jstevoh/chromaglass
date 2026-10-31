@@ -214,12 +214,34 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     face's radiation. The air's loss is taken exactly over the step (it is
     linear); the radiation, a few W/m²K, explicitly. The result is rounded
     to a half at random (halfRound), or a slow change would be lost.
+
+    And on a thin gap the heat is first carried by the liquid. The thin step
+    skips the velocity's self-advection (wgsl/thinGap.ts's header, "What the
+    step no longer does"), so nothing moved the temperature, which rides in
+    the velocity's z: a warm patch stayed where it was laid whatever the
+    liquid did, and its lift could only ever stir the current. Here it goes
+    with the flow the dye rides (\`flow\`, velForced), backtraced over the
+    step's displacement and read between the four cells it lands among. The
+    heat a cell holds is h·T, and the solve makes the flow keep
+    ∇·(hu) = 0 (or the press's own ∂h/∂t), so ∂(hT)/∂t + ∇·(huT) = 0 is
+    DT/Dt = 0: the temperature itself is what is carried, at the liquid's
+    speed. The glasses hold some of the heat and do not flow; over the
+    seconds a plume takes, the water across a few millimetres has not traded
+    much of it with them (h²/κ is a minute across 6 mm), so the liquid
+    carries its own, the shortcut PLAN 38f-3 names. Done here, in the pass
+    that already reads and writes the velocity, and not in a kernel of its
+    own: a kernel built behind the show joins the step whenever its build
+    lands, which made two renders of one seed differ (the render check,
+    239 of 240 frames), and one waited for at the opening costs the show's
+    first frame its build.
   */
   decayVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
 @group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var flow: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
+fn tAt(c: vec2i) -> f32 { return textureLoad(vel, clampP(c, S.n), 0).z; }
 
 // Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
 fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
@@ -245,7 +267,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let lead = sqrt(max(0.25 - d.x * d.x, 0.0));
     air += S.airCool * inverseSqrt(max(lead - d.y, 1.0 / S.n));
   }
-  var temp = v.z * exp(-air * dt / cap);
+  var t0 = v.z;
+  if (S.thinGap > 0.5) {
+    let at = clamp(uvOf(id) - textureLoad(flow, q, 0).xy * S.disp, vec2f(0.5 / S.n), vec2f(1.0 - 0.5 / S.n)) * S.n - 0.5;
+    let c0 = vec2i(floor(at));
+    let f = at - vec2f(c0);
+    let t = mix(mix(tAt(c0), tAt(c0 + vec2i(1, 0)), f.x), mix(tAt(c0 + vec2i(0, 1)), tAt(c0 + vec2i(1, 1)), f.x), f.y);
+    if (finite4(vec4f(t))) { t0 = t; }
+  }
+  var temp = t0 * exp(-air * dt / cap);
   let tk = ${(HEAT_ROOM + 273.15).toFixed(2)};
   let tw = max(tk + temp, 1.0);
   temp -= 2.0 * ${(HEAT_EMISSIVITY * STEFAN_BOLTZMANN).toExponential(4)} * (tw * tw * tw * tw - tk * tk * tk * tk) * dt / cap;

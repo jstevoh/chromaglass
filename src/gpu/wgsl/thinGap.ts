@@ -443,41 +443,6 @@ var<workgroup> sums: array<vec2f, 256>;
   if (t == 0u) { oilMean[1] = sums[0].y / max(sums[0].x, 1.0); }
 }`,
 
-    /*
-      The heat carried by the liquid on a thin gap (PLAN 38f). The thin step
-      skips the velocity's self-advection (the header's "What the step no
-      longer does"), so nothing moved the temperature, which rides in the
-      velocity's z: a warm patch stayed where it was laid whatever the
-      liquid did, and its lift could only ever stir the current. Here it goes
-      with the flow the dye rides (\`flow\`), backtraced and read between the
-      four cells it lands among. The heat a cell holds is h·T, and the solve
-      makes the flow keep ∇·(hu) = 0 (or the press's own ∂h/∂t), so
-      ∂(hT)/∂t + ∇·(huT) = 0 is DT/Dt = 0: the temperature itself is what is
-      carried, at the liquid's speed. The glasses hold some of the heat and do
-      not flow; over the seconds a plume takes, the water across a few
-      millimetres has not traded much of its heat with them (h²/κ is a minute
-      across 6 mm), so the liquid carries its own, the shortcut PLAN 38f-3
-      names (the glass as a temperature of its own). Rounded at random to the
-      half it is stored in (halfRound), so a slow drift is not lost.
-      A.a = (the step's displacement per unit of flow, 0, 0, 0).
-    */
-    hsHeatCarry: `${HEAD}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var flow: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
-fn tAt(c: vec2i) -> f32 { return textureLoad(vel, clampP(c, S.n), 0).z; }
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let q = vec2i(id.xy);
-  let v = textureLoad(vel, q, 0);
-  let u = textureLoad(flow, q, 0).xy;
-  let at = clamp(uvOf(id) - u * A.a.x, vec2f(0.5 / S.n), vec2f(1.0 - 0.5 / S.n)) * S.n - 0.5;
-  let c0 = vec2i(floor(at));
-  let f = at - vec2f(c0);
-  let t = mix(mix(tAt(c0), tAt(c0 + vec2i(1, 0)), f.x), mix(tAt(c0 + vec2i(0, 1)), tAt(c0 + vec2i(1, 1)), f.x), f.y);
-  textureStore(dst, q, safeVel(vec4f(v.xy, select(v.z, halfRound(t, q, 2u), finite4(vec4f(t))), v.w)));
-}`,
-
     hsOilMean: `${HEAD}
 @group(0) @binding(2) var mixT: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;

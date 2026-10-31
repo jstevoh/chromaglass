@@ -10130,11 +10130,11 @@ Decay is the air on both faces, h = 7200·(−ln v) W/m²K (Classic's 0.98 is 14
 radiation, about what it had on Classic's clock), and each face radiates εσ(T⁴ − T_room⁴); all
 in real seconds (decayVel, `fluid/heat.ts`). A stored value is rounded to its half at random
 (`halfRound` in the shared head), so a slow change is kept on average. On a thin gap the heat is
-carried with the flow the dye rides (`hsHeatCarry`), and lifts as a body force in hsBody:
+carried with the flow the dye rides (in decayVel, so no kernel joins the step whenever its build lands: the first cut had one, and two renders of a seed differed), and lifts as a body force in hsBody:
 water's lightness from Kell's density over the dish's mean of it (`hsHeatMean`), along the
 plate's up as far as it stands or is tipped, at B g h₀²/12ν_ref (`HEAT_RISE`), times Buoyancy
 over 0.45 (the default is water's own). The current's buoyancy and mixForce's heat lift are zero
-on a thin gap. Both new kernels build behind the show, and the heat waits for them.
+on a thin gap. hsHeatMean builds behind the show and, if a standing or tipped plate asks first, on that frame, as the oil lift's kernels do.
 
 Measured (`npm run plume`, lab, 128², SwiftShader): a soft patch 30 K warm on a standing plate
 rose at 4.97 mm/s against 5.08 from Darcy with Kell's density and Vogel's viscosity (0.98), 10 K

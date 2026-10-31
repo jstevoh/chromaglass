@@ -123,7 +123,7 @@ written first. Line numbers are as read on main at d07ac31.
     now lifts at Darcy's speed. The bulb's watts into the band over C(h), and the colour's
     weight as a Δρ like ROCK_FALL's, would put the whole lamp in SI.
   - **38f-3. The glass as a temperature of its own.** The sandwich is one temperature through
-    its depth, and the liquid carries all of it (hsHeatCarry): right while a plume rises over
+    its depth, and the liquid carries all of it (decayVel): right while a plume rises over
     seconds, but the water trades heat with the glass in about a minute across 6 mm (seven
     seconds across 2 mm), and a warm patch that has moved on leaves warm glass behind. A second
     field for the glass (fixed in place, exchanging k/(h/2) with the liquid, losing to the air)

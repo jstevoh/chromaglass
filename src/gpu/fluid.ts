@@ -279,7 +279,7 @@ export class WebGPUFluid extends FluidReads {
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
       for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
-      // The heat's carry and its mean for the lift (PLAN 38f): behind the show too; the heat waits for them.
+      // The heat's mean for its lift (PLAN 38f): behind the show, and built on the frame where a standing or tipped plate first asks, as the oil's lift is.
       for (const name of HEAT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
       for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
@@ -321,10 +321,6 @@ export class WebGPUFluid extends FluidReads {
    */
   /** The oil lift's kernels' sources, once each: the step asks whether they are built on every rocked step of an oil look. */
   private static liftSources = new Map<string, string>();
-  // And the heat's (PLAN 38f): its carry with the liquid and its mean on the dish for the lift.
-  private static heatReady(pipelines: { hasCompute(name: string, code: string): boolean }, name: string): boolean {
-    return pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
-  }
   private static liftCode(name: string): string {
     let code = WebGPUFluid.liftSources.get(name);
     if (!code) WebGPUFluid.liftSources.set(name, code = kernel(name, 'rgba16float'));
@@ -408,7 +404,7 @@ export class WebGPUFluid extends FluidReads {
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     f[49] = p.surfaceClear ? 1 : 0;
     // The heat in watts and real seconds, and its lift (PLAN 38f, fluid/heat.ts).
-    writeHeatSim(f, p, thin, upright, disp, WebGPUFluid.heatReady(this.pipelines, 'hsHeatMean'));
+    writeHeatSim(f, p, thin, upright, disp);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -971,14 +967,6 @@ export class WebGPUFluid extends FluidReads {
           this.run(pass, 'driftOff', this.velRide, [this.velForced], this.arg('drift off', [(wx + fx) * toVel, (wy + fy) * toVel, 0, 0]));
         }
       });
-      // The heat goes with the liquid (hsHeatCarry, PLAN 38f): built behind the show, and until then it stays put as it did.
-      if (WebGPUFluid.heatReady(this.pipelines, 'hsHeatCarry')) {
-        stage('heat carry', (pass) => {
-          this.hsRun(pass, 'hsHeatCarry', `hsHeatCarry:${this.vel.read.label}:${this.velForced.label}`, this.arg('heat carry', [disp, 0, 0, 0]),
-            [this.vel.read, this.velForced, this.vel.write]);
-          this.vel.swap();
-        });
-      }
     } else {
       stage('project 1', (pass) => this.project(pass));
       stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
@@ -1675,7 +1663,7 @@ export class WebGPUFluid extends FluidReads {
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read, this.squeeze.read], none);
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read, this.squeeze.read, this.velForced], none);
       this.vel.swap();
     });
 
@@ -1766,7 +1754,7 @@ export class WebGPUFluid extends FluidReads {
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;
         for (const [key, code] of WebGPUFluid.driftBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
-        // The heat's carry and its mean (PLAN 38f), behind as the drift's: until then the heat stays put and lifts nothing.
+        // The heat's mean for its lift (PLAN 38f), behind as the drift's.
         for (const name of HEAT_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
       })();
     }

@@ -499,7 +499,7 @@ export const ROCK_FALL = 12;
 export const LIFT_MOST = 256;
 export const LIFT_SWEEPS = 8;
 export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
-export const HEAT_KERNELS = ['hsHeatCarry', 'hsHeatMean'];
+export const HEAT_KERNELS = ['hsHeatMean'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 / (12 * NU_REF);
 /*
