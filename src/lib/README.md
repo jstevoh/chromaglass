@@ -35,7 +35,7 @@ About 160 files, grouped; a name is its file.
 
 **Mac and iPhone bridges.** appLink: iPhone app link. castProtocol: casting. macApp: Mac download. padPicture: remote's picture. remoteProtocol: phone remote.
 
-**App infrastructure.** bench: grid sweep. checkHooks: the checks' `?debug` doors. crashLog: black box. feedback: Settings → Feedback's note and its send (PLAN 39a); feedbackScrub: what a note must not carry. platform: where it runs. showPath: site paths. unhandled: exhaustive switch.
+**App infrastructure.** bench: grid sweep. checkHooks: the checks' `?debug` doors. crashLog: black box. feedback: Settings → Feedback's note and its send (PLAN 39a); feedbackScrub: what a note must not carry. platform: where it runs (`EngineStatus.gpuPasses`, from gpuPasses: the GPU pass readout's list). showPath: site paths. unhandled: exhaustive switch.
 
 ## Checks
 

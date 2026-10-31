@@ -46,6 +46,15 @@ export const STAGE_TIMINGS = (() => {
 })();
 
 /**
+ * `?debug`: the page is being looked at by someone measuring it. The
+ * visualizer builds the GPU pass list for the Simulation readout only then
+ * (PLAN.md 14ab-16), so the show never makes it. Read once, like `?stages`.
+ */
+export const DEBUG_PAGE = (() => {
+  try { return new URLSearchParams(window.location.search).has('debug'); } catch { return false; }
+})();
+
+/**
  * `?prepare=0`: open the show without building its pipelines ahead
  * (`gpu/prepare.ts`), as it opened before, each one built on the frame that
  * first asks. `npm run startup` opens the show once this way as its control.

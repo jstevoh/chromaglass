@@ -9,6 +9,7 @@
  * (`governor.ts`) measures the real frame rate and moves from there.
  */
 
+import type { GpuPassTime } from './gpuPasses';
 import { isPhoneApp } from './appLink';
 import { canUseProFeature } from './tierGates';
 
@@ -449,4 +450,11 @@ export interface EngineStatus {
    * what is costing you, or whether the grid was never the problem.
    */
   otherMs: number;
+  /**
+   * Under `?debug` only: every GPU pass, costliest first, in ms a frame
+   * (`gpuPasses.ts`, PLAN.md 14ab-16). Absent when the page is not asking (the show never
+   * builds the list), null when this GPU gives no timestamps at all, empty
+   * until the first ones land.
+   */
+  gpuPasses?: GpuPassTime[] | null;
 }

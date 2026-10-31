@@ -136,6 +136,7 @@
     "stages": "npm run build && node scripts/stages.mjs",
     "ab": "npm run build && node scripts/ab.mjs",
     "ladder": "npm run build && node scripts/ladder.mjs",
+    "passtimes": "esbuild scripts/passtimes.mjs --bundle --platform=node --format=esm --jsx=automatic --packages=external --log-level=warning --outfile=node_modules/.cache/passtimes.mjs && node node_modules/.cache/passtimes.mjs",
     "cadence": "esbuild scripts/cadence.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/cadence.mjs && node node_modules/.cache/cadence.mjs",
     "rungs": "esbuild scripts/rungs.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/rungs.mjs && node node_modules/.cache/rungs.mjs",
     "spin": "npm run build && node scripts/spin.mjs",

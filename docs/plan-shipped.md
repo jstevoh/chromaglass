@@ -6801,6 +6801,26 @@ rings 1.0–1.6 ms → 0.07 ms; the bytes across 2.10 MB → 95 KB and 1.05 MB �
 same field a frame both ways, waited out on the GPU: drops 16.5 → 1.6 ms a frame, rings 3.0 → 0.6,
 the bead pass alone 0.50 ms for 502 drops by timestamp query (14ab-15).
 
+## 14ab-16. Which GPU pass a frame's time is in, on the screen (shipped 2026-10-31)
+
+*Asked:* the owner, on a suggestion to use WebGPU timestamp queries: time each pass of the fluid,
+show it in the perf readout on the laptop and the phone, and measure the costliest on the Mac.
+
+*Found:* the timings were already taken. The stage and every solver keep a `GpuProfiler`
+(`gpu/kit.ts`) whenever the device grants 'timestamp-query', because the governor reads the
+frame's GPU cost from them (14aa-3), and `?stages` (H0) opens a pass per solver stage. What they
+reached was `chromaglassDebug().webgpu` and `npm run stages`; nothing on the screen.
+
+*Built:* `lib/gpuPasses.ts` turns the profilers' maps into one list in ms a frame, the solver's
+passes multiplied by the steps a frame takes (a 1.2 ms solve at two steps a frame costs 2.4 and
+outranks a 1.5 ms plate pass), decayed entries of stopped passes dropped. `gpu/gpuTimes.ts`
+reads the maps (and now holds the governor's `gpuFrameMs`/`gpuStepMs` sums, moved from the
+visualizer). The visualizer builds the list once a second, only on a `?debug` page
+(`DEBUG_PAGE`), into `EngineStatus.gpuPasses`; `settings/GpuPassReadout.tsx` draws it under the
+frame split, eight rows and the rest summed, "no timestamps" where the GPU gives none. Nothing
+new runs in the frame. `npm run passtimes` holds the arithmetic and the words (23 lines; three
+mutations, no scaling, scaling the drawing, no sort, each fail it).
+
 ## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
 
 14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the

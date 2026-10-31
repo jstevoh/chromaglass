@@ -14,6 +14,7 @@ import type { PostTest } from '../gpu/post';
 import { type OutputConfig } from '../lib/outputConfig';
 import { type MacroShot } from '../lib/macroCamera';
 import { type GpuClass } from '../lib/platform';
+import { type GpuPassTime } from '../lib/gpuPasses';
 import { type SongEvent, type SongShapeState } from '../lib/songShape';
 import { type BarNow } from '../lib/barGrid';
 import { type FluidSimulation } from './fluidSimulation';
@@ -206,6 +207,14 @@ export interface PlateRenderer {
    * 14aa-3). Absent where `gpuFrameMs` is, 0 until the first timings land.
    */
   gpuStepMs?(): number;
+  /**
+   * Every GPU pass the profilers timed, costliest first, in ms a frame for a
+   * frame taking `stepsPerFrame` solver steps (PLAN 14ab-16): `?debug`'s
+   * readout under the grid. Null when this GPU gives no timestamps. A new
+   * array each call, so it is asked once a second and only under `?debug`,
+   * never by the frame.
+   */
+  gpuPasses?(stepsPerFrame: number): GpuPassTime[] | null;
   /**
    * What `?debug` should show about this engine in particular. It is spread
    * into `chromaglassDebug()` at the top level, so a harness reaching for

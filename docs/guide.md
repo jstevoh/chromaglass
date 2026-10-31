@@ -454,6 +454,19 @@ For testing, `?sim=auto|<size>`, `?tier=hosted|local|native` and
 still keeps up with wall-clock time, and `?debug` exposes
 `window.chromaglassDebug()` with the live solver state and governor.
 
+### Which GPU pass the time is in — `?debug`
+
+On a `?debug` page, Settings → Simulation shows, under the grid's frame rate, what
+the GPU spent on a frame and on which pass, costliest first: the plate, the camera,
+the finish, the solver's step, each in milliseconds a frame and as a share of the
+whole. The solver's passes run once a step, so they are counted as many times as a
+frame takes steps. Add `&stages` to split the solver's step into its own stages
+(squeeze, viscosity, the pressure solves, the advection, the dye), which costs a
+little and makes the total read slightly high: read the order and the shares. The
+numbers are the GPU's own timestamps, so a browser or GPU that gives none says so;
+Chrome rounds them to a tenth of a millisecond, which the smoothing averages out.
+The desk's Simulation panel and the phone's More → Settings → Simulation show the same list.
+
 ### What a frame costs on your machine — `?bench`
 
 Open any ChromaGlass URL with **`?bench`** on the end and it measures itself:

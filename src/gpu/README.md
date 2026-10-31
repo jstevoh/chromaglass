@@ -25,6 +25,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.
 - `ferroDrop.ts`: the closeup's ferrofluid drop.
 - `fluid/`: the solver's class chain, six files.
+- `gpuTimes.ts`: `solverStepMs`, `frameGpuMs`, `framePasses`: the profilers' timestamps as a frame's cost and a pass list.
 - `groupCache.ts`: `groupOf`, `viewOf`: bind groups and views made once.
 - `opening.ts`: pipelines the opening look needs.
 - `output.ts`: projector pass: mirror, keystone, blanking, grade.

@@ -428,6 +428,18 @@
       ]
     },
     {
+      "name": "The GPU pass readout",
+      "shard": "logic",
+      "run": "npm run passtimes",
+      "why": [
+        "What ?debug shows under the grid, pass by pass, from the timestamp",
+        "queries (scripts/passtimes.mjs, PLAN.md 14ab-16): the solver's passes",
+        "scaled to a frame by the steps it takes so the order is the frame's,",
+        "stopped passes left out, and no timestamps said in words, not shown",
+        "as a frame that cost nothing."
+      ]
+    },
+    {
       "name": "The liquids",
       "shard": "logic",
       "run": "npm run liquids",

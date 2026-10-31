@@ -33,7 +33,7 @@ the component.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
-- `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
+- `stepping.ts`: the step's pinned grid, timings, `?prepare=0`, `?debug` (`DEBUG_PAGE`) and recovery switches,
   `resolveSimResolution`.
 - `tools.ts`: the hands' settle and hold, Blow's straw, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`).
 
