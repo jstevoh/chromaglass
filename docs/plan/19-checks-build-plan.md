@@ -222,6 +222,15 @@ from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) 
 side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
 [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
+- **19k-7** (S): `npm run scene`'s two cost bars red on a PR that changed nothing it runs
+  (#540, 2026-10-28, twice on one head): the worst frame 22.5 ms against 20 (the still room's
+  cold first push; 18.7 on the run before, 13.7 on another PR's that day, 11 to 15 when the bar
+  was set), and once the strobe room's median 2.01 ms against 2. The cost is
+  `process.cpuUsage()`, the whole process's, so the optimiser compiling on V8's background
+  threads during the first push is counted as the analysis's own. Measure the push's thread
+  alone (a worker, or `performance.now()` with the first push timed separately), or warm one
+  push before the timed ones and keep the 20 ms bar for the warm stalls it was set for; and
+  print the reading on the FAIL line, which today says only that it failed.
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
   wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the

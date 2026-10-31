@@ -410,3 +410,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   `soapgpu` failed, at its first pipeline ("soapTransport failed to build"). The compile gate
   should also create each kernel's pipeline and read `getCompilationInfo()`, so a reserved word
   or a binding over the stage's limit is red there, in seconds.
+- **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
+  rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
+  and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
+  of straw steps in the stroke move with the machine. On GitHub's Macs it went 301 → 242 on a
+  PR that does not touch the bubbles (run 41129450339, green on re-run) and 325 → 284 on #603,
+  where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
+  measure over a fixed number of plate steps, not wall time, so its bar means the same on
+  every runner.

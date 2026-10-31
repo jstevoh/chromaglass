@@ -1485,6 +1485,16 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   holes. Beads already on a plate keep their size until they retire, so switch looks, not
   only zoom, to see the full effect.
 
+  *(33g-2b, 2026-10-30.)* The beads' edges are drawn from the dome's exact cone now, and a
+  big bead (over about 3 cells across its radius) is a clear window with a thin rim and no
+  dimple. Look at Macro Bead and Lens Pools at 4x to 6x: the rims should be perfect circles
+  with a crisp dark line, a big bead should look like a flat disc of oil (the plate seen
+  through it as it is), and a small one a ball with a small upside-down picture. Say whether
+  a bead of three to four cells, where the two kinds meet, shows a ring that looks wrong
+  (the map folds there, as a real lens does), and whether the upside-down picture is what you
+  want or an upright, slightly magnified one (a camera looking at the dye a few radii under
+  the bead sees it upright; the macro photographs are of beads over a distant background).
+
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
@@ -2168,7 +2178,96 @@ from the same reading of the protocol, so only Live can say the two agree.
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
 
-## 96. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+## 96. Colour that answers the music (PLAN 25i)
+
+Three looks now take their colour from the music without a hue being turned. `npm run areacords`
+holds the arithmetic and the plate in the lab; only a real plate says whether it reads as music.
+
+1. Load **Poster, 1969** and play a song with a clear lead (a voice, a synth line, a piano) through
+   the microphone. The kick pours into the left shape; the colour of each pour should follow the
+   tune: notes C to D# orange, E to G ultramarine, G# to B purple. A tune that moves should leave
+   a run of colours in the shape; a held note, the same colour pour after pour.
+2. Load **Red Cabbage** with a song with drums. Each snare should bloom pink in the left well and
+   each kick turn the right well green, with no pink or green paint poured: the colour should come
+   up through the violet where the drop landed and spread as the liquid moves. Where the two
+   meet across the middle they should go back to violet.
+3. Load **Chemical Clock** with the same song. Each kick should start a ring in one of three
+   places (upper left, upper right, bottom), taking them in turn; a ring passing through a place
+   should hold back the next touch there until the gel recovers.
+4. Bad: Poster's colour changing on the drums rather than the tune, a pour that changes colour
+   halfway (a pour keeps the bottle it was picked up with), Red Cabbage's wells saturating to one
+   flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
+5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
+   snare and hats touching places of their own as well.
+6. After the fixes filmed on the Mac (25i-6): Poster's kick pours should now show in the left shape
+   on a plate already at its fill; Red Cabbage's acid well should stand on the left on every night
+   (the dish set square), its pink deepening to red only as far as vinegar goes and the green to
+   yellow-green, with a run of colours across each front; Chemical Clock's gel should keep turning
+   while the song plays, a ring from each kick's place and from the bottom place on each snare.
+
+## 97. The oil beads drawn on the GPU (PLAN 14ab-6)
+
+The beads' mask is drawn by the plate now, not by a canvas and an upload. `npm run beadmask`
+holds the drops to the CPU's drawing to a level, but the rings' edges were the canvas's
+antialiasing and are now each pixel's coverage, so an edge can sit a few levels apart.
+
+1. Fillmore with Oil Beads at 0.8 and Drops at 0, then Drops at 1, a minute of each with
+   music. The beads should look as they did: rings with a thin dark rim, drops with their
+   colours, walls and passengers. Nothing should flicker, lag a frame behind the flow, or
+   draw a bead where none is.
+2. The closeup at 3x on a crowd of rings: their rims should be as thin and even as before,
+   with no staircase of dark squares round the edge (droplens's old fault).
+3. The governor's readout with Drops at 1, before this change and after if you have the
+   last build: the frame should be cheaper, most on the busiest crowds.
+4. Bad: a stripe or square of mask missing (a tile the list did not reach), drops drawn
+   upside down against the flow, a passenger outside its drop.
+
+## 98. The projector's light: the lamp lever (PLAN 38a)
+
+`npm run lampfield` proves the law on a bare lab stage; only the Mac at 60 fps says how it
+looks on a moving plate. The Hot-Spot is now a projector's lamp lever: the plate is never
+brighter than the lamp, and nothing in the light moves.
+
+1. Any look, Hot-Spot 0: the plate looks as it did before this change, to the eye.
+2. A look that sets Hot-Spot (Sunburst at 0.8, the looks at 0.4 or 0.5): the middle is no
+   longer lifted and warm; the corners fall away a little at 0.4, a lot at 0.8. Raise Lamp
+   Motion to 1 on a still plate: the light on the stage stays put (only the gloss moves).
+3. Hot-Spot 1 on a light look with Lamp Ground up: a lit middle, dark sides, and a faint
+   coloured edge where it falls away (the condenser's glass), not a soft Gaussian.
+4. Second Lamp 1 with Hot-Spot 0.7: one side lit a little more and a little cooler, the
+   middle still white.
+5. Bad: a look that relied on the old lift now reads dim in the middle (say which), or the
+   edge colour reads as a painted ring rather than glass.
+
+## 99. Nothing on the plate makes light (PLAN 38h)
+
+`npm run nolight` shows each painted light gone in the lab; only the Mac at 60 fps shows
+whether the looks still read. Every change darkens or leaves alone; none brightens.
+Filmed before and after on the owner's Mac (2026-10-31) and judged from the phone page:
+"Looks great". One change came after the film: on the lamp-ground looks (Chemical Clock,
+Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
+
+1. Microdroplets up on any look (Settings → Look): the hundreds of tiny beads are now small
+   clear lenses with a dark ring, no white dot. In the closeup (camera), a brighter middle
+   and a thin contact line.
+2. A look with oil (Oil on Water, Clock Glass): at Focus's middle the oil's body is no longer
+   a touch brighter than the water. Turn Focus up and down: a bright and a dark caustic
+   round each oil body, swapping sides as Focus passes the middle.
+3. Gel Wheel up: the lamp goes the gel's colours and darker, never brighter than the bare
+   lamp; a deep red gel passes little green or blue.
+4. The looks with Glossiness set (twelve, 0.12 to 0.5; Ferro Paint highest, then Velvet
+   Underground and Splodascope): the dye no longer reads as lit domes; flat colour stays
+   flat and edges and ripples darken a little more. Glossiness 1 by hand is now four times
+   the real relief, the strongest it goes.
+5. Dish Vignette and Dish Spread: the rim is a thin dark line, not a warm bright one.
+6. No grain on the plate with the camera off; with the camera or a film stock on, the
+   grain is theirs as before. On Chemical Clock and Lava Lamp the dye's body keeps a fine
+   mottle of more and less pigment, which is the dye's own grain and not the plate's.
+7. Bad: a look that went dull or flat where it had sparkle the owner liked (say which, and
+   Glossiness can be turned up past where it was: it now steepens the real surface), black
+   doughnut droplets that read as dirt, a caustic ring that looks drawn.
+
+## 100. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
 
 `filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
 colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1

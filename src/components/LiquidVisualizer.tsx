@@ -7,9 +7,9 @@ import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { StepClock } from '../lib/stepClock';
 import { VisualizerSettings, LiquidType } from '../types';
-import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, pourRoomOf, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, WORKING_DYES, dyesOnPlate } from '../presetPlate';
-import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
+import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, layAngle, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -49,7 +49,7 @@ import { BeadField, beadPopulation } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
-import { AreaHands, fluidSink, type AreaSink } from '../lib/areaCords';
+import { AreaHands, type AreaSink } from '../lib/areaCords';
 import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
@@ -71,7 +71,7 @@ import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '..
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
@@ -1373,7 +1373,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
     fluidsRef.current[0]?.gpu?.clearChemistry?.();
-    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
+    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? layAngle(presetId, DICE.lay.angle()) : a));
     spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
     // The turntable likewise: a kept back plate keeps its dish turning.
     dishSpinRef.current = dishSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
@@ -4164,7 +4164,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // other look keeps `treble01 * 1.1` in the 50%-white mix it always had.
                   const clearPhase = activeFluid.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
                   const lookTarget = dyeLookTarget(activeFluid.seedMean, currentSettings.dyeBudget ?? 0.85, activeFluid.seedBudget);
-                  const pourRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - activeFluid.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
+                  const pourRoom = clearPhase ? 0 : pourRoomOf(activeFluid.meanDensity / Math.max(0.06, lookTarget));
                   const pourDt = Math.min(1, Math.max(0.04, activeFluid.dt / 0.05)) * pourRoom;
                   const sparseDark = isSparseDark(currentSettings.lampGround, lookTarget);
                   const contStyle = () => { const st = aStyle(); return sparseDark && (st === 'spray' || st === 'splatter') ? 'drop' : st; };
@@ -4372,8 +4372,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               plate the music plays, in its areas, every running step, read
               from the same sources the patch bay folds this frame. Apart from
               the music's hands above because a cord need not be on the sound
-              at all (the room, a film, an LFO), and its pours are held under
-              the look's fill as the music's are (28d-A's regulator).
+              at all (the room, a film, an LFO). The regulator on its pours
+              is AreaHands.lay's, by how full the plate is (28d-A).
             */
             if (isActiveRef.current && drainFrameRef.current === 0) {
               const hands = areaHandsRef.current;
@@ -4386,11 +4386,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m, band) => cordReading(patchCtx, m, patchNow, band), simStepS);
               const af = fluidsRef.current[activeLayerRef.current];
               if (af && acts.length > 0) {
-                const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);
-                const room = Math.max(0, Math.min(1, (1.0 - af.meanDensity / Math.max(0.06, target)) * 2.5));
+                const fill = af.meanDensity / Math.max(0.06, dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget));
                 let sink = areaSinksRef.current.get(af);
-                if (!sink) { sink = fluidSink(af, GRID_SCALE); areaSinksRef.current.set(af, sink); }
-                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], room);
+                if (!sink) { sink = areaSink(af); areaSinksRef.current.set(af, sink); }
+                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], fill);
               }
             }
             /*
@@ -4622,7 +4621,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // Fewer than it used to be, on purpose. A field of forty reads as
               // foam on a shower door; three or four reading as air trapped in
               // the oil is the thing the references actually show.
-              const room = bubbles.bubbles.filter((b) => !b.daughter).length < 3 + Math.round(14 * bubbleAmt);
+              const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
               /*
                 And only as hard as Sound Drive lets the music reach the
@@ -4666,12 +4665,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               const qk = particleFlowScale(lead, currentSettings);
+              bubbles.liquid(currentSettings);
               bubbles.step(simStepS, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
                 return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-              }, tiltX, tiltY, 0.5 + bubbleAmt, treble01 * 0.6);
+              }, tiltX, tiltY, treble01 * 0.6);
               // A bubble is air between the plates: the dye cannot sit under
               // it. A standing squeeze on each footprint keeps pumping the
               // dye out to the rim, so the field flows round the bubbles
@@ -5198,11 +5198,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // See the note in the fragment source.
         if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
 
-        // The lamp wanders slowly under the plate, and with Frame Sway up
-        // the plate's own rock moves it too — a tilted plate is lit from a
-        // new side. Off by default: the lamp jumping a twentieth of the plate
-        // on every kick lights the whole frame from somewhere else in time
-        // with the beat, which reads as the frame moving (lib/plateRock.ts).
+        // The gloss's light wanders slowly, and with Frame Sway up the
+        // plate's rock moves it too (lib/plateRock.ts); off by default, as a
+        // jump on every kick reads as the frame moving. The hot-spot stays on
+        // the stage's axis whatever this does (wgsl/lampField.ts, 38a).
         {
           const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
           const rock = rockRef.current;
@@ -5236,7 +5235,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
           // And the ones blown by hand on a look with none of its own.
-          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack() : 0;
           bubbleDebugRef.current = {
             count: Math.min(MAX_BUBBLES, count),
             strength: Math.min(0.9, 0.35 + bubbleAmt * 0.8),
@@ -5247,10 +5246,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The frame the effects run on.
         fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
-        // The beads' mask: redrawn only on the frames they moved, which is
-        // what `render()` answers with — null means the last upload still
-        // stands. Off, it is not drawn at all, and the shader is told 0.
-        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.render() : null;
+        // The beads, on the frames they moved (`moved()`; null: the last
+        // mask stands), drawn on the GPU (14ab-6). Off, the shader is told 0.
+        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.moved() : null;
 
         // ── The frame, handed to whatever draws it ────────────
         // The renderer reads the show's state through `view` and nothing
@@ -6565,7 +6563,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             .filter((f): f is NonNullable<typeof f> => !!f);
           if (fields.length && stage) {
             // The three pictures the page hands over, on the frames they
-            // change: the beads' mask when they moved, the mark on the
+            // change: the beads when they moved, the mark on the
             // frame it arrives, and the film's frame every frame it plays.
             // The uniforms are told about each of them in `plateUniforms`,
             // under the same conditions, or the shader would be drawing a
@@ -6576,7 +6574,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // frame the size of which changed between measuring and copying,
             // a cross-origin image — and a throw here used to end the loop.
             // A picture that will not upload is left out of this frame.
-            if (view.beadMask) upload('beads', () => plate.setSource('beads', view.beadMask!));
+            if (view.beadMask) upload('beads', () => plate.setBeads(view.beadMask!));
             const mk = view.mark;
             if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
             else if (mk.dirty) {

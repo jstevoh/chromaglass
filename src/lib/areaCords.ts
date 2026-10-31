@@ -38,13 +38,29 @@
  *   - **Pour** (`areaPour`): dye released into the area from
  *     one of its bottles, its own colour family (`PlateArea.dyes`), as much
  *     as the cord is open. Real dye, laid as every pour is, so it mixes and is
- *     carried as the plate's dye is; on the app it is held under the look's
- *     fill as every music pour is (the regulator, PLAN 28d-A).
+ *     carried as the plate's dye is. It is held under the look's fill as
+ *     every music pour is (the regulator, PLAN 28d-A), but a gated pour, a
+ *     bottle tipped on a hit, still lands on a full plate, which turns over
+ *     (`lay`, and `hitRoomOf` in lib/dyeTarget.ts).
  *   - **Bottle** (`areaHue`): which of the area's bottles its pours come from
  *     next. A pigment does not change colour where it lies, so this changes
  *     nothing on the plate by itself: it picks the bottle the next pour, kick
  *     ring or drop in that area is drawn from (`picked`, which the
- *     visualizer's areaCycle reads for the music's own hands there).
+ *     visualizer's areaCycle reads for the music's own hands there). On the
+ *     lead's note (`noteClass`, PLAN 25i) the note picks it, the colour
+ *     organ's way: each of the twelve has its bottle.
+ *
+ * ## An area of a reagent (PLAN 25i)
+ *
+ * Where an area's liquid is a reagent (Acid, Base, BZ Activator: what changes
+ * the colour by its chemistry, not by being coloured), its pour is a drop of
+ * that liquid, one a hit, as a pipette lets one go, and no dye at all: on Red
+ * Cabbage the snare's acid turns the indicator pink in its well and the kick's
+ * base turns it green in the other, and where they meet they cancel; a
+ * drop of activator in a BZ gel (Chemical Clock's places, which the kick's
+ * own hand touches in turn) fires it and a wave runs out. The colour is the chemistry's, and no hue is turned. It was the area's
+ * dye before, so Red Cabbage's snare poured pink cabbage juice into its acid
+ * well, a painted pink and not the indicator answering.
  *
  * A setting the solver reads (Turbulence, Viscosity, the Dimmer) is one number
  * per plate, a uniform in the shaders, and making each of them a field over
@@ -69,6 +85,9 @@
 import type { AreaTarget, SceneMapping } from '../types';
 import { areaFamily, type PlateArea } from './plateAreas.ts';
 import { BandRange } from './audioFeatures.ts';
+import { isClassFeature } from './hitSource.ts';
+import { DEFAULT_LIQUID_TYPES } from '../bottles.ts';
+import { hitRoomOf, pourRoomOf } from './dyeTarget.ts';
 
 /** The four things a hand does to one place, in the order the patch bay lists them. */
 export const AREA_TARGETS: readonly { key: AreaTarget; label: string; hint: string }[] = [
@@ -117,6 +136,20 @@ export const AREA_POUR_SPREAD = 1;
 export const AREA_CORE = 0.7;
 /** How far under the threshold a reading must fall to close the gate (0..1 of the reading). */
 export const GATE_HYSTERESIS = 0.05;
+
+/*
+  A reagent's drop, at a cord at full depth on a full hit: two of the
+  automation's doses (presetPlate.ts AUTO_DOSE, pourLiquid), a pipette
+  squeezed hard. Laid at the area's middle and then round it a little
+  further each hit (golden-angle steps out to half its radius), so a run of
+  hits works the well and does not stack every drop on one cell.
+*/
+export const AREA_DROP = 2;
+/** The liquids whose colour is their chemistry's: they pour as themselves, never as dye. */
+const REAGENTS: ReadonlySet<string> = new Set(DEFAULT_LIQUID_TYPES
+  .filter(l => (l.behaviour?.acid ?? 0) !== 0 || (l.behaviour?.bz ?? 0) > 0).map(l => l.id));
+/** Whether an area's pour is a drop of its reagent rather than its dye. */
+export const reagentArea = (a: PlateArea): boolean => REAGENTS.has(a.liquid);
 
 /** How much of an act lands at distance `d` from an area's middle, of radius `r`: whole inside AREA_CORE, eased to 0 at the rim. */
 export function areaWeight(d: number, r: number): number {
@@ -181,6 +214,8 @@ export interface AreaAct {
   amount: number;
   /** Its state's key: what the cord is, and its turn among cords alike. */
   key: string;
+  /** A pour cord whose gate opened this step: how big a drop (depth × the hit), else 0. */
+  drop: number;
 }
 
 /** Where an area's acts are laid: grid cells of a `size`-cell plate. */
@@ -191,6 +226,8 @@ export interface AreaSink {
   dye(x: number, y: number, amount: number, rgb: { r: number; g: number; b: number }): void;
   /** A paddle `r` cells in radius at (x, y), that moved (mx, my) cells this step. */
   paddle(x: number, y: number, r: number, mx: number, my: number): void;
+  /** A drop of a liquid (a bottle's id) at (x, y): `strength` of the automation's doses. */
+  liquid?(x: number, y: number, id: string, strength: number): void;
 }
 
 /** What of a plate an area's acts are laid through: the visualizer's FluidSimulation has all three. */
@@ -206,17 +243,24 @@ export interface AreaFluid {
  * by the same code the plate's loop runs. A paddle is the Finger's solid
  * (fingerDrag; its radius in the 128-cell units the tools take, `gridScale`
  * cells each), and like the automation's stroke it leaves a ferrofluid where
- * it is (`phase` false).
+ * it is (`phase` false). `pour` is how a bottle is poured on that plate
+ * (sim/tools.ts pourLiquid, which needs the window this file must not), for
+ * an area of a reagent.
  */
-export function fluidSink(f: AreaFluid, gridScale: number): AreaSink {
+export function fluidSink<F extends AreaFluid>(f: F, gridScale: number, pour?: (f: F, id: string, x: number, y: number, strength: number) => void): AreaSink {
   return {
+    liquid: pour && ((x, y, id, s) => pour(f, id, x, y, s)),
     heat: (x, y, k) => f.addTemp(x, y, k),
     dye: (x, y, amount, c) => f.addDensity(x, y, amount, c.r, c.g, c.b),
     paddle: (x, y, r, mx, my) => f.fingerDrag(Math.round(x), Math.round(y), r / gridScale, 0.1, mx, my, false, { x: mx, y: my }),
   };
 }
 
-interface CordState { gate: CordGate; band: BandRange; angle: number; dir: number; seen: boolean }
+interface CordState {
+  gate: CordGate; band: BandRange; angle: number; dir: number; seen: boolean;
+  /** The bottle a gated pour took up when its gate opened, which it pours from until the next opening. */
+  held: number | null;
+}
 const keyOf = (m: SceneMapping): string =>
   `${m.source ?? 'room'}|${m.source === 'bands' && m.band ? `${m.band[0]}-${m.band[1]}` : m.feature}|${m.setting}|${m.area}`;
 
@@ -261,13 +305,26 @@ export class AreaHands {
         twins.set(base, turn + 1);
         const k = turn ? `${base}#${turn}` : base;
         let s = this.state.get(k);
-        if (!s) { s = { gate: new CordGate(), band: new BandRange(), angle: 0, dir: 1, seen: true }; this.state.set(k, s); }
+        if (!s) { s = { gate: new CordGate(), band: new BandRange(), angle: 0, dir: 1, seen: true, held: null }; this.state.set(k, s); }
         s.seen = true;
+        const reading = read(m, s.band);
+        /*
+          A note's name is not a level (hitSource.ts noteClass): no gate, and
+          the class itself is the act, whatever the depth (which only says the
+          cord is on). With nothing heard, nothing: the area's hands go back
+          to turning through its family.
+        */
+        if (isClassFeature(m.feature)) {
+          if (reading !== null) this.acts.push({ cord: m, area, index: m.area!, target: m.setting as AreaTarget, amount: Math.max(0, Math.min(1, reading)), key: k, drop: 0 });
+          continue;
+        }
         const before = s.gate.fires;
-        const v = s.gate.step(read(m, s.band) ?? 0, dt, m);
+        const v = s.gate.step(reading ?? 0, dt, m);
+        const opened = s.gate.fires > before;
         // A gated paddle turns back on each hit: a hand folding, not a motor.
-        if (m.setting === 'areaStir' && gated(m) && s.gate.fires > before && before > 0) s.dir = -s.dir;
-        this.acts.push({ cord: m, area, index: m.area!, target: m.setting as AreaTarget, amount: v * m.depth, key: k });
+        if (m.setting === 'areaStir' && gated(m) && opened && before > 0) s.dir = -s.dir;
+        const drop = m.setting === 'areaPour' && opened ? Math.min(1, Math.abs(m.depth) * Math.max(0, reading ?? 0)) : 0;
+        this.acts.push({ cord: m, area, index: m.area!, target: m.setting as AreaTarget, amount: v * m.depth, key: k, drop });
       }
     }
     for (const [k, s] of this.state) if (!s.seen) this.state.delete(k);
@@ -317,9 +374,16 @@ export class AreaHands {
    * Lay this step's acts into `sink` on a `size`-cell plate, `dt` seconds of
    * them. `colour` turns an area and a bottle of its family into the dye's
    * colour (the look's dyes, a palette lock, the hue journey: the caller's).
-   * `pourScale` is the app's regulator on the pours (1 in the lab).
+   * `fill` is how full the plate is against the look's target (its mean dye
+   * over `lookTarget`; 0, an empty plate, by default), which the regulator
+   * holds the dye pours under: a held pour by `pourRoomOf`, a gated one, a
+   * bottle tipped on a hit, by `hitRoomOf` (lib/dyeTarget.ts has why the two
+   * differ). Read here, not by the caller, so `npm run areacords` runs the
+   * app's own regulator: its lab set the room to 1 and missed that Poster's
+   * kicks poured 2 to 10% of themselves.
    */
-  lay(sink: AreaSink, size: number, dt: number, colour: (area: PlateArea, k: number) => { r: number; g: number; b: number }, pourScale = 1): void {
+  lay(sink: AreaSink, size: number, dt: number, colour: (area: PlateArea, k: number) => { r: number; g: number; b: number }, fill = 0): void {
+    const held = pourRoomOf(fill), hit = hitRoomOf(fill);
     for (const a of this.acts) {
       const { area } = a;
       const cx = area.x * size, cy = area.y * size, R = area.r * size;
@@ -327,10 +391,25 @@ export class AreaHands {
         const k = AREA_HEAT_RATE * a.amount * dt;
         if (k === 0) continue;
         disc(cx, cy, R, size, (x, y, w) => sink.heat(x, y, k * w));
+      } else if (a.target === 'areaPour' && reagentArea(area)) {
+        if (!(a.drop > 0) || !sink.liquid) continue;
+        const n = this.state.get(a.key)?.gate.fires ?? 1;
+        const ang = n * 2.399963, d = R * 0.5 * Math.sqrt(((n - 1) % 6) / 6);
+        // Not under the dye's regulator: a reagent is not dye, and pourLiquid keeps its own headroom.
+        sink.liquid(cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, area.liquid, AREA_DROP * a.drop);
       } else if (a.target === 'areaPour') {
-        const k = AREA_POUR_RATE * Math.max(0, a.amount) * dt * pourScale;
+        const k = AREA_POUR_RATE * Math.max(0, a.amount) * dt * (gated(a.cord) ? hit : held);
         if (!(k > 0)) continue;
-        const rgb = colour(area, this.bottle(a.index, area));
+        /*
+          A gated pour is a bottle picked up on the hit and poured until the
+          next: the note may change during its release (PLAN 25i), and the
+          next note picks the next pour's bottle, not the colour of the one
+          already pouring. A cord with no gate pours what is picked now.
+        */
+        const s = this.state.get(a.key);
+        let b = this.bottle(a.index, area);
+        if (s && gated(a.cord)) { if (a.drop > 0 || s.held === null) s.held = b; else b = s.held; }
+        const rgb = colour(area, b);
         disc(cx, cy, R * AREA_POUR_SPREAD, size, (x, y, w) => sink.dye(x, y, k * w, rgb));
       } else if (a.target === 'areaStir') {
         const s = this.state.get(a.key);
