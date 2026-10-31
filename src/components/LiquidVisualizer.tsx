@@ -34,7 +34,8 @@ import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
-import { grabPadPicture, padPictureSender, padPictureWanted, tapPadPicture } from '../lib/padPicture';
+import { grabPadPicture, padPictureSender, padPictureWanted } from '../lib/padPicture';
+import { tapFrameCopies } from '../lib/frameTaps';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
@@ -5399,10 +5400,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (mirror) {
           try { mirror(canvas); } catch { /* the projector window went away mid-frame */ }
         }
-        // The remote's Draw, for the same reason and in the same place: a
-        // small copy of this frame while a pad is asking (lib/padPicture.ts).
-        // Not Preview's copy: the pad shows the wall, as the projector does.
-        if (!isDraftRef.current) tapPadPicture(canvas);
+        // The remote's Draw and the Live Show, for the same reason and in the
+        // same place (lib/frameTaps.ts). Not Preview's copy: both show the
+        // wall, as the projector does.
+        if (!isDraftRef.current) tapFrameCopies(canvas);
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
