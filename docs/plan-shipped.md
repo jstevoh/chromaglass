@@ -6693,6 +6693,44 @@ review (check-skeptic) found the first four of those gaps. `pourVideo` costs 0.1
 of the CPU a call on SwiftShader, a canvas's copy included; a video's is a copy on the GPU.
 `npm run wgsl` now compiles the splat kernels too, which it never had.
 
+## 14ab-6. The oil beads' mask drawn on the GPU (shipped 2026-10-30)
+
+14ab-6. On every frame the beads moved, which is every frame they are out, the page drew
+their mask on the CPU and uploaded it: the rings a 512² canvas with a radial gradient and a
+stroked rim per bead (1 to 1.6 ms of canvas calls in the lab), the drops `rasterDrops`, a
+loop over every pixel of every drop and every wall it shares into a 1024 × 512 picture, 16
+to 19 ms a frame on a cloud machine's CPU with 517 drops. Behind each, a 1.05 or 2.1 MB
+`copyExternalImageToTexture` sixty times a second.
+
+The page now writes the beads down as a list (`lib/beadPack.ts`: each bead's centre, radius,
+fade-in, rim, oval, colour and passenger, every wall between two drops as `dropWall` cuts it,
+and which beads reach each sixteen-pixel tile, in the beads' own order) and the plate draws
+the mask from it in compute passes at the head of its next draw (`gpu/beadMask.ts`,
+`wgsl/beadMask.ts`; `WebGPUPlate.setBeads`, called from the frame in place of
+`setSource('beads', …)`). The drops are rasterDrops' three steps, line for line: owner and
+colour per pixel, the holes the clamped walls leave filled from a neighbour twice over, the
+passenger drawn inside its host, with the colours held as bytes between the steps where the
+CPU's picture held them. The walls are found by a sweep across the plate that asks each pair
+once (rasterDrops asks all 330,000 both ways). The rings take each pixel's coverage as the
+distance to the edge plus a half, which is what rasterDrops does for drops; the canvas's own
+antialiasing was further from the beads' true coverage (up to 96 levels at an edge on
+SwiftShader, its rims 1.8% light). `BeadField.render` and `rasterDrops` stay, as the CPU's
+reference and for the checks that hand the plate a picture.
+
+`npm run beadmask` (node and lab, 25 lines, one check-skeptic pass whose six gaps were closed): the app's frame hands the plate the moved field (read in its source), the list holds every wall rasterDrops cuts and
+no other (1994 and 1950 walls on two crowds); the drops' mask on the real plate is
+rasterDrops' picture to a level in every channel of both halves, as full drops and at half
+Drops (ovals and passengers part way in), 0 pixels past one level of 85,459; the rings' is
+each pixel's share of bead, dome and rim counted on 8 × 8 points (sums to 0.07%, none past
+24 levels in the bead and dome, 27 in the rims; the canvas's beside it 1843 and 5773); the
+plate drawn through `draw` with the field is the plate drawn with the CPU's picture (2 values
+of 196,608 past 4 levels). All on one plate switched rings, drops, half drops and rings again,
+as the app's is, with the bytes counted where `setBeads` writes them at the queue. Controls: a pixel over and upside down read thousands of pixels
+apart, the plate with no beads 104,033 values. The frame's CPU: drops 16–19 ms → 0.4–0.6 ms,
+rings 1.0–1.6 ms → 0.07 ms; the bytes across 2.10 MB → 95 KB and 1.05 MB → 43 KB.
+`npm run wgsl` compiles the four kernels (149 → 153). On the owner's Mac (Apple M4, Metal), the
+same field a frame both ways, waited out on the GPU: drops 16.5 → 1.6 ms a frame, rings 3.0 → 0.6,
+the bead pass alone 0.50 ms for 502 drops by timestamp query (14ab-15).
 
 ## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
 
