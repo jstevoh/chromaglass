@@ -2220,9 +2220,10 @@ whether the looks still read. Every change darkens or leaves alone; none brighte
    round each oil body, swapping sides as Focus passes the middle.
 3. Gel Wheel up: the lamp goes the gel's colours and darker, never brighter than the bare
    lamp; a deep red gel passes little green or blue.
-4. The looks with Glossiness set (about a dozen, 0.12 to 1): the dye no longer reads as lit
-   domes; flat colour stays flat and edges and ripples darken a little more. The look at 1
-   is the strongest change.
+4. The looks with Glossiness set (twelve, 0.12 to 0.5; Ferro Paint highest, then Velvet
+   Underground and Splodascope): the dye no longer reads as lit domes; flat colour stays
+   flat and edges and ripples darken a little more. Glossiness 1 by hand is now four times
+   the real relief, the strongest it goes.
 5. Dish Vignette and Dish Spread: the rim is a thin dark line, not a warm bright one.
 6. No grain on the plate with the camera off; with the camera or a film stock on, the
    grain is theirs as before.
