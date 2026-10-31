@@ -190,6 +190,7 @@
     "airlens": "node scripts/airlens.mjs",
     "filmtable": "node scripts/filmtable.mjs",
     "filmlook": "node scripts/filmlook.mjs",
+    "filmrings": "node scripts/filmrings.mjs",
     "soapfilm": "node scripts/soapfilm.mjs",
     "boil": "node scripts/boil.mjs",
     "soapgpu": "PW_WEBGPU=1 node scripts/soapgpu.mjs",
