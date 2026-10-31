@@ -10211,6 +10211,63 @@ model cannot reach one, the PR says what it reached and asks.
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
 
+### 39. Feedback from inside the app (asked 2026-10-30)
+
+#### 39a. Settings → Feedback, mailed and kept
+
+Asked: "a feedback panel in settings. It should send me an email with the feedback as
+well as collect it all in a single database with all of the relevant related logs data
+so I can track feedback over time."
+
+**The pane.** Feedback is the last row of the Settings rail, under the seven groups and
+apart from them, because it is not a setting: it is not in `SETTINGS_SECTIONS`, so it is
+never a desk panel, never pinned and never a search hit, and its test id is not one the
+section checks count. The phone has it twice: at the end of the Settings strip (the same
+panel) and as a tile on More, which opens the same `FeedbackPane` in a phone sheet. The
+command palette has "Send feedback". A note is a topic (broke, idea, love, else), up to
+5,000 characters, and, if not signed in, an address to be answered at.
+
+**What it carries.** Always: the app's version (the Mac app's, from its updater), the
+site's commit (`VITE_BUILD_SHA`, new in `deploy.yml` and `desktop.yml`), Mac app or
+browser, phone layout or not, the tier, the look's name, the page's path (never its
+query, which can carry a show's key), and the browser and screen. With the sender's
+tick, both ticked by default and in sight before Send: the black box's log and the
+look's settings, and a picture of the plate, all from `crashLog.buildReport`, so a note
+and a crash report agree on what "the log" is. "See what is sent" shows the JSON as it
+will leave. Before it leaves, `feedbackScrub.ts` takes out tokens, licence keys, stream
+keys, credential-named URL parameters and fields; Keystone and Key Light stay.
+
+**Where it goes.** `server/feedback-worker.js`: one D1 table (`feedback-schema.sql`), a
+row a note, the facts in columns for SQL and the whole context as JSON beside them, the
+picture as JPEG bytes. The context is rebuilt from the fields the page sends and scrubbed
+again on the Worker, so a stale or hostile client's credentials or claims are not kept.
+The account is only what a Firebase ID token proves (the same verifier as the licence
+Worker), and its address only when the token says Firebase proved it, since anyone can
+make an account with someone else's address. Then a plain-text
+mail through Resend to support@ (which forwards to the owner), Reply-To the sender, the
+picture and the entry attached. The row is written before the mail, so a mail that fails
+costs the notice and not the note (`emailed` says sent, failed, off, or the day's cap of
+80, under Resend's free 100). Ten notes an hour from one address (an IPv6 address by its
+/64), sixty an hour from everyone, counted by a salted hash. The review found the first
+version's count-then-insert let a burst through (50 of 50 with 5 ms on each database
+call); a row is now inserted first and counts the rows at or before its own rowid, so
+exactly the first ten of a burst of forty stay. Reading needs `FEEDBACK_TOKEN`.
+
+**Why D1 and Resend.** The server side is Workers already, and D1 is a binding with no
+service account; Firestore from a Worker would need a Google key in its secrets. And
+Cloudflare's own mail needs the domain's MX on Cloudflare, where chromaglass.art's MX is
+the forwarder's.
+
+**Measured.** `npm run feedback-worker` 31/31 against SQLite built from the schema file,
+with a few milliseconds on each call for the burst. Six mutations each turned a check red:
+trusting a body's uid, recording a failed mail as sent, dropping the `?key=` scrub,
+counting the whole burst (1 of 40 kept), counting before the insert (40 of 40), and
+taking an unproved address as the account's. `npm run feedbackpane` 11/11, its own file because `phone.mjs` is over the size budget:
+the desk's rail row and pane, Send waiting for words, the mail-only build drawing no
+switches, and on a phone in three sizes the More sheet on screen with nothing covered,
+16 px type and 48 px topics (its first run, as a block in `phone.mjs`, found 13 px in all
+seven landscapes, which iOS zooms on focus), and the strip's Feedback row.
+
 ### QA list: what the owner found playing it (from 2026-10-04)
 
 #### QA-19. Interacting with settings switches to and maximizes the performance window

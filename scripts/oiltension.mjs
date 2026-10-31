@@ -70,7 +70,7 @@ const check = (name, ok, detail = '') => {
 };
 const bottle = (id) => DEFAULT_LIQUID_TYPES.find((b) => b.id === id).behaviour;
 const SUN = interfacialTension(bottle('oil')), SIL = interfacialTension(bottle('silicone'));
-const H = REST_GAP * PLATE_METRES, MU = 1000 * thicknessViscosity(0.45);
+const H = REST_GAP_METRES, MU = 1000 * thicknessViscosity(0.45);
 
 const { page, close } = await openLab();
 const gpuErrors = [];

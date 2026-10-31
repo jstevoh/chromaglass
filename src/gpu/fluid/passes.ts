@@ -12,7 +12,7 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
 import { FluidFields } from './fields';
 
 export class FluidPasses extends FluidFields {
@@ -232,7 +232,7 @@ export class FluidPasses extends FluidFields {
     const perStep = gPrime * seconds / (3 * nu * dx * dx);
     if (!(perStep > 0) || !Number.isFinite(perStep)) return null;
     const eta = DYE_CAP * DYE_LAYER;
-    const b = REST_GAP * PLATE_METRES;
+    const b = REST_GAP_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
     const open = 1 - e / b;
@@ -557,7 +557,7 @@ export class FluidPasses extends FluidFields {
       take out (driftCells, and why): hsPrep's drag, u = (u + kΔt·glass) /
       (1 + kΔt), at the rest gap, in whole cells a step.
     */
-    const kdt = 12 * nu / (PLATE_METRES * PLATE_METRES * REST_GAP * REST_GAP) * seconds;
+    const kdt = 12 * nu / (REST_GAP_METRES * REST_GAP_METRES) * seconds;
     this.glassFlow = [(this.glassFlow[0] + kdt * glassX) / (1 + kdt), (this.glassFlow[1] + kdt * glassY) / (1 + kdt)];
     this.glassCells = [this.glassFlow[0] * disp * this.N, this.glassFlow[1] * disp * this.N];
     const whole = (c: number) => Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, Math.round(c)));
@@ -570,7 +570,7 @@ export class FluidPasses extends FluidFields {
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
     this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}`,
-      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
+      this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
       [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film]);
     this.vel.swap();

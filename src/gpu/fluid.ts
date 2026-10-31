@@ -49,11 +49,11 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilMobility, OIL_TENSION_MOST, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilMobility, OIL_TENSION_MOST, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidReads } from './fluid/reads';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
-export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
+export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
 export type { FieldStats } from './fluid/constants';
 
 export class WebGPUFluid extends FluidReads {
@@ -825,7 +825,7 @@ export class WebGPUFluid extends FluidReads {
         flow's units, plate widths a step over the step's displacement
         (real seconds over the plate's width and disp, as hsPrep's hand).
       */
-      const h0 = REST_GAP * PLATE_METRES;
+      const h0 = REST_GAP_METRES;
       const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
       const breathScale = breath ? (h0 / (2 * LIQUID_DENSITY * NU_REF)) * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
       const breathTex = breath ?? this.blank('rgba');
@@ -1644,7 +1644,7 @@ export class WebGPUFluid extends FluidReads {
       const rate = this.ensureSlump();
       const oilMix = mix && this.mixLive ? mix.read : this.blank('rgba');
       this.run(pass, 'slumpRate', rate, [this.dye.read, this.squeeze.read, oilMix],
-        this.arg('slump rate', [slump!.rate, DYE_LAYER, PLATE_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
+        this.arg('slump rate', [slump!.rate, DYE_LAYER, GAP_METRES, 1 / -Math.log(DYE_FLOOR), slump!.inertRate, 0, 0, 0]));
       const args = this.arg('slump', [SLUMP_FACE, 0, 0, 0]);
       for (let k = 0; k < slump!.substeps; k++) {
         this.run(pass, 'slump', this.dye.write, [this.dye.read, rate], args);

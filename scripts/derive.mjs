@@ -88,9 +88,10 @@ try {
       99% of its radius), laid as though poured long ago, as npm run thick
       lays its pools: glycerine at the top left, syrup at the bottom left.
       Neither is the shader's number: each index is the bottle's own in the
-      shelf's table (src/types.ts), and the column is 9 mm deep, laid in the
+      shelf's table (src/types.ts), and the column is one and a half rest gaps
+      deep (9 mm at the 6 mm rest gap, lib/turntable.ts DISH_GAP_METRES), laid in the
       plate's view as the gap between the glasses (packView's last word, 0
-      to 0.06 of the dish in sixteen bits). The plate's clear liquid is water,
+      to 0.06 in gap units in sixteen bits). The plate's clear liquid is water,
       1.333. So the path through each, in the derive pass's unit (the 6 mm
       rest gap, DISH_REST_GAP, so a still column of water reads 1.333), is
       n · 9 mm / 6 mm, worked out here from those three numbers alone.
@@ -98,8 +99,8 @@ try {
       other's place (a mirror across the middle) fails too.
     */
     const indexOf = (id) => lab.liquids.find((l) => l.id === id).behaviour.index;
-    const depthMetres = 0.009;
-    const gapOfDish = depthMetres / lab.DISH_METRES;
+    const depthMetres = 1.5 * lab.DISH_GAP_METRES;
+    const gapOfDish = depthMetres / lab.GAP_METRES;
     const thickness = gapOfDish / lab.DISH_REST_GAP;
     const view = device.createTexture({ size: [n, n], format: 'rgba32uint', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
     const words = new Uint32Array(n * n * 4);
