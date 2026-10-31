@@ -190,16 +190,27 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## Smaller, each worth doing when its area is open
 
-- **38k. The spikes' onset and the magnets' field, in tesla** (S; Medium: which magnets
-  raise domes). Sharpens **29c-3**, **9u**, **9t-1**, **9t-3**. The onset is 0.18 → 0.35 of the
-  hand's magnet by a smoothstep (`wgsl/spikes.ts:49-50, 125`; `standing.ts:34` `LANGEVIN`
-  0.035 on the same scale). Real: Cowley–Rosensweig, μ0Mc² = 2(1 + 1/μr)·√(Δρgσ), and a
-  sudden (subcritical) jump, not a ramp. With it: the internal field, not the applied one
-  (a thin sheet in a normal field has H_in = H0 − M, so at χ 2.6 the layer feels about 0.28
-  of the field at low strength: `spikes.ts:104-106` and the film's lift use the applied B);
-  and several magnets add as *fields*, not energies (`shared.ts:406-414` sums |B_k|², its
-  comment says so; two like-poled fingers' fields add as vectors, up to twice between
-  them; `magnetDiscExact` already gives B_ρ and B_z, which 9v-tilt needs too).
+- ~~**38k. The spikes' onset and the magnets' field, in tesla**~~ **Shipped** (#PR). The
+  onset is Cowley and Rosensweig's field for EFH1 under water through the layer's inner
+  field, 4.0 mT (a share of 0.033, was the lab's 0.18 = 22 mT); several magnets add as
+  vectors. `npm run disc` 13/13. Closes **9u**. Story in `docs/plan-shipped.md` §38k.
+  - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
+    φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
+    from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%
+    and over) moves the onset, the pull (Kelvin's χ in `MAGNET_GAIN`) and the density.
+    Needs `SPIKE_ONSET` as a uniform (shared.ts's `spikeAmp`, the film's lift, `fluid.ts`'s
+    film gate) and `fluid.ts` is 99.6 KB, so a split first (19ai-10).
+  - **38k-2. The pitch and the tension are one number** (S; Low-Medium). The domes' pitch
+    (`SPIKE_PITCH`, 8 mm) sets l_c, so the onset reads σ = Δρ g l_c² = 3.3 mN/m for EFH1
+    under water: low for a hydrocarbon against water (10–30 mN/m without surfactant at the
+    interface). A measured σ would set the pitch (2π l_c, about 14 mm at 10 mN/m) and the
+    onset (5.3 mT) together; the pitch is the look's today.
+  - **38k-3. The film's patches step their own magnet's field** (S). The pull and the drop
+    add the magnets as vectors now; each standing patch (`wgsl/standing.ts`, `lift`) still
+    reads its own magnet alone, so two fingers' domes between them stand on half the field.
+  - **38k-4. The ramp past the onset** (S). `SPIKE_FULL` keeps the old proportion (1.94 ×
+    the onset): the solver's gate as domes arrive, not their height, which the film's
+    lift makes. The subcritical jump and its hysteresis are 9t-3's.
 
 - **38l. The glass springs back by the second, not by the frame** (M; Medium: every press
   and lift). Sharpens **18a-5**. `gap += (rest − gap)·gapSpring` with no dt

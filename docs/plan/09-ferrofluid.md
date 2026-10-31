@@ -150,18 +150,10 @@ Open, from building 9i:
     on a cold cache), and until then the pool only gathers. Starting the build at half
     the onset would build it on every Magnet Garden show, whose own magnet is there;
     starting it when the Magnet tool is picked would not.
-- **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
-  behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
-  share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls
-  the ferrofluid into one flat black pool where the hand let go. A real magnet strong
-  enough to pull a pool across the dish raises Rosensweig domes on it, and the pool
-  is never one flat disc. That is the pull against the lift: a thin-film lab of the
-  Rosensweig instability (2026-10-03, not yet in the repo) found the plate conserves
-  the ferrofluid's area where a real layer conserves its volume, so domes standing up
-  cannot open gaps, and its magnet case piled the pool 0.84 of a capillary length
-  deep before domes came, with the balance of pull and lift left open. It belongs to
-  the standing-domes plate PR that lab is for, not to a retune of the set-down
-  strength here.
+- ~~**9u. A set-down magnet still gathers a pool with no domes.**~~ **Closed by 38k**
+  (#PR): the onset is the liquid's, 0.033 of the hand's field, so the set-down magnet
+  (0.15) stands its pool up. Whether the film's balance of pull and lift looks right
+  there is the owner's to judge on the Mac (`docs/judging.md`).
 - **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
   (**shipped**). Story in `docs/plan-shipped.md` §9x (moved 2026-10-29, 19m).
   Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off

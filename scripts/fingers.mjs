@@ -29,8 +29,9 @@
  *   1. its edge goes out in fingers all round: at least seven fingers on
  *      the circles 0.06 and 0.09 out, no wide dark run, and spread round, in
  *      at least five of the twelve 30° sectors on the 0.09 circle. With no
- *      magnet, and under Magnet Garden's own magnet (held further off,
- *      below the spikes' onset), none on any circle
+ *      magnet, and under a magnet below the spikes' onset (0.8 of it, at
+ *      Magnet Garden's depth; until PLAN 38k Garden's own, which the real
+ *      onset now puts past it), none on any circle
  *   2. they reach: at least seven on the 0.12 circle
  *   3. they are drawn black with the dish lit between them: on the 0.09
  *      circle the fingers' mean brightness is under 15 % of full and the
@@ -84,7 +85,9 @@ const check = (name, ok, detail = '') => {
 
 // As spikes.mjs: the Magnet tool in the hand, and Magnet Garden's own.
 const HAND = { magnetStrength: 0.9, magnetHeight: 0.15 * 0.9, magnetSeconds: 1 / 60 };
-const FAR = { magnetStrength: 0.9, magnetHeight: 0.3 * 0.8, magnetSeconds: 1 / 60 };
+// The control under the onset (spikes.mjs has why it is no longer Magnet
+// Garden's own magnet, PLAN 38k): 0.8 of the onset on its axis, at Garden's depth.
+let FAR = { magnetStrength: 0, magnetHeight: 0.3 * 0.8, magnetSeconds: 1 / 60 };
 const STEPS = 360;
 const AT = { x: 0.5, y: 0.5 };
 // The pour: 0.9 deep at its middle, falling off as 1 − d² to its rim, so
@@ -98,6 +101,7 @@ const S = 420;
 const CIRCLES = [0.06, 0.09, 0.12, 0.15];
 
 const { page, close } = await openLab();
+FAR = { ...FAR, magnetStrength: await page.evaluate((h) => 0.8 * lab.SPIKE_ONSET / lab.fieldOnAxis(1, h), FAR.magnetHeight) };
 try {
   const run = (over, look) => page.evaluate(async ({ over, look, AT, POUR, STEPS, S }) => {
     await lab.create(384);
@@ -144,7 +148,7 @@ try {
   const cases = [
     ['Magnet Garden, no magnet', { ...GARDEN, magnetStrength: 0 }, 'magnet-garden'],
     ['Magnet Garden, the hand\'s magnet', { ...GARDEN, ...HAND }, 'magnet-garden'],
-    ['Magnet Garden, its own magnet', { ...GARDEN, ...FAR }, 'magnet-garden'],
+    ['Magnet Garden, a magnet under the onset', { ...GARDEN, ...FAR }, 'magnet-garden'],
   ];
   const got = {};
   for (const [name, over, look] of cases) {
@@ -161,13 +165,13 @@ try {
       `${on[1].sectors} of 12 sectors; drawn at ${(on[1].dark * 100).toFixed(0)}% against the gaps' ${(on[1].lit * 100).toFixed(0)}%; mass ${mass0.toFixed(0)} → ${mass.toFixed(0)} (${((Date.now() - t0) / 1000).toFixed(0)} s)`);
   }
   console.log('');
-  const none = got['Magnet Garden, no magnet'], own = got['Magnet Garden, its own magnet'];
+  const none = got['Magnet Garden, no magnet'], own = got['Magnet Garden, a magnet under the onset'];
   const garden = got['Magnet Garden, the hand\'s magnet'];
   const counts = (m) => m.on.map(c => c.fingers + c.wide).join('/');
   check('held close, the magnet pulls the pool\'s edge out in fingers all round',
     garden.on.slice(0, 2).every(c => c.fingers >= 7 && c.wide === 0) && garden.on[1].sectors >= 5 &&
       [none, own].every(m => m.on.every(c => c.fingers + c.wide === 0)),
-    `${counts(garden)} on the circles 0.06/0.09/0.12/0.15 out, in ${garden.on[1].sectors} sectors; ${counts(none)} with no magnet, ${counts(own)} under Magnet Garden's own`);
+    `${counts(garden)} on the circles 0.06/0.09/0.12/0.15 out, in ${garden.on[1].sectors} sectors; ${counts(none)} with no magnet, ${counts(own)} under a magnet at 0.8 of the onset`);
   check('and they reach out',
     garden.on[2].fingers >= 7,
     `${garden.on[2].fingers} 0.12 past the poured edge`);

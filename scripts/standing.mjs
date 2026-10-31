@@ -30,7 +30,7 @@
  *   3. the gaps open: within 0.08 of the magnet the plate is no longer
  *      covered (under 0.75 of it past half full, where it was all), and less
  *      of it the stronger the field, as the domes grow taller on the same
- *      volume: under the Magnet less than at 0.35, half way from the onset
+ *      volume: under the Magnet less than at 1.94 times the onset (0.35 of old), half way from the onset
  *      to it. Not just past the onset (0.25): there the layer is all but
  *      neutral, its growth going as G − 2, and six seconds left it flat
  *   4. turned down under the onset again, the domes lie back down into the
@@ -63,14 +63,21 @@ const N = 384;
 const AT = { x: 0.36, y: 0.65 };
 // The hand's height (LiquidVisualizer's magnetFor at the default Scale) and
 // strengths that put its field on its axis where asked, on spikes.ts's
-// scale: 0.8 is the Magnet tool, 0.35 part way past the onset (0.18), 0.144
-// under it (0.8 of the onset).
+// scale: 0.8 is the Magnet tool; the rest are shares of the onset, which is
+// the liquid's since PLAN 38k (0.033, read from the lab below): part way
+// past it at 1.94 times (0.35 when the onset was the lab's 0.18), just past
+// it at 1.11 (0.2), and under it at 0.8 (0.144). The film's lift is the same
+// function of the field over the onset as before (wgsl/standing.ts,
+// LIFT_ONSET), so each leg is the leg it was.
 const HEIGHT = 0.135;
 const REL3 = (HEIGHT / 0.13) ** 3;
 const at = (field) => ({ magnetX: AT.x, magnetY: AT.y, magnetHeight: HEIGHT, magnetStrength: field * REL3 });
+let ONSET = NaN;
+const of = (k) => k * ONSET;
 const RISE = 240;
 
 const { page, close } = await openLab();
+ONSET = await page.evaluate(() => lab.SPIKE_ONSET);
 try {
   /**
    * A pool on a dyed plate under the magnet, stepped in legs of
@@ -127,17 +134,17 @@ try {
   // under the onset for as long as it was held, read 32 steps in (half a
   // second; legs step in fours) and at the end.
   const DOWN = 2 * RISE;
-  const hand = await run([[at(0.8), RISE], [at(0.8), RISE], [at(0.144), 32], [at(0.144), DOWN - 32]]);
+  const hand = await run([[at(0.8), RISE], [at(0.8), RISE], [at(of(0.8)), 32], [at(of(0.8)), DOWN - 32]]);
   // Part way past the onset.
-  const weak = await run([[at(0.35), RISE * 1.5]]);
+  const weak = await run([[at(of(0.35 / 0.18)), RISE * 1.5]]);
   // Brought up to the onset and past it, then turned down under it before any dome rose:
   // the film is running (it stays on down to half the onset), and the layer is flat.
-  const under = await run([[at(0.2), 8], [at(0.144), RISE]]);
+  const under = await run([[at(of(0.2 / 0.18)), 8], [at(of(0.8)), RISE]]);
   console.log(`  near the magnet (within 0.08), the pool as poured: ${fmt(hand[0])}`);
   console.log(`  the Magnet (field 0.8): ${fmt(hand[1])}; as long again: ${fmt(hand[2])}`);
-  console.log(`  then turned down to 0.144, half a second in: ${fmt(hand[3])}; at the end: ${fmt(hand[4])} (the film ran ${hand[3].ran + hand[4].ran} of ${DOWN} steps)`);
-  console.log(`  part way past the onset (0.35): ${fmt(weak[1])}`);
-  console.log(`  under the onset (0.144) from the start: ${fmt(under[2])} (the film ran ${under[2].ran} of ${RISE} steps)\n`);
+  console.log(`  then turned down to 0.8 of the onset (${of(0.8).toFixed(4)}), half a second in: ${fmt(hand[3])}; at the end: ${fmt(hand[4])} (the film ran ${hand[3].ran + hand[4].ran} of ${DOWN} steps)`);
+  console.log(`  part way past the onset (${of(0.35 / 0.18).toFixed(4)}): ${fmt(weak[1])}`);
+  console.log(`  under the onset (${of(0.8).toFixed(4)}) from the start: ${fmt(under[2])} (the film ran ${under[2].ran} of ${RISE} steps)\n`);
 
   const u = under[2];
   /*
@@ -160,7 +167,7 @@ try {
   // the plate too.
   check('and the gaps open, wider the stronger the field',
     h.cover < 0.75 && w.cover < 0.95 && w.domes >= 2 && h.cover < w.cover - 0.03,
-    `covered within 0.08: ${hand[0].cover.toFixed(2)} as poured, ${w.cover.toFixed(2)} at 0.35 (${w.domes} domes), ${h.cover.toFixed(2)} under the Magnet`);
+    `covered within 0.08: ${hand[0].cover.toFixed(2)} as poured, ${w.cover.toFixed(2)} at 1.94 times the onset (${w.domes} domes), ${h.cover.toFixed(2)} under the Magnet`);
   const e = hand[3], d = hand[4];
   /*
     Down, not wiped: half a second in, a top still past full, so the domes

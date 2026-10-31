@@ -2216,3 +2216,17 @@ antialiasing and are now each pixel's coverage, so an edge can sit a few levels 
    last build: the frame should be cheaper, most on the busiest crowds.
 4. Bad: a stripe or square of mask missing (a tile the list did not reach), drops drawn
    upside down against the flow, a passenger outside its drop.
+
+## 98. The ferrofluid stands up at the real field (PLAN 38k)
+
+The spikes' onset is the field Cowley and Rosensweig give for the light-show ferrofluid under
+water, 4 mT, where it was 22 mT set by hand. So magnets that gathered a flat black pool now
+raise domes on it, as a real magnet strong enough to pull a pool across the dish does.
+
+1. Magnet Garden and Ferro Paint, a minute each, before and after: each look's own magnet
+   should now stand its pool up into domes with colour between them, not one flat black
+   disc. Say whether the look still reads as the look.
+2. Any ferrofluid look with the Magnet tool: drag it, let go, and watch where it stops. The
+   pool it leaves should stand in domes, not lie flat.
+3. On the phone, two fingers with the Magnet a little more than a magnet's width apart: the
+   ferrofluid between them should be pulled in a little more than before (their fields add).

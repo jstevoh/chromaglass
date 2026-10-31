@@ -10260,3 +10260,35 @@ The audit's text, as written:
   buoyant drift Δρ·g·b²/(12μ). Each bubble's film thickness and glint come from a random id
   (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
   0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.
+
+## 38k. The spikes' onset and the magnets' field, in tesla (#PR, 2026-10-31)
+
+The second realism audit found the onset of the ferrofluid's spikes was a share of the hand's
+magnet (0.18 → 0.35 by a smoothstep), set in the lab so that each look's own magnet gathered
+its pool flat and only the hand's raised domes; and that several magnets added their
+energies, |B₁|² + |B₂|², not their fields.
+
+- **The onset from the liquid** (`src/gpu/wgsl/spikes.ts`, `ferroOnsetTesla`). Cowley and
+  Rosensweig: a layer stands up at μ0 Mc² = 2 (1 + 1/μ̂) √(Δρ g σ). EFH1 (μ0Ms 44 mT, χ 2.64,
+  1210 kg/m³) under water, √(Δρ g σ) = Δρ g l_c with l_c the pitch's 1.27 mm: Mc 2.31 kA/m.
+  The layer feels its inner field, H_in = H0 − M (B is continuous through a sheet), so its
+  Langevin M is of H_in, 0.88 kA/m, and the applied field is μ0(H_in + Mc) = 4.0 mT, a share
+  of 0.033 (one share is `SPIKE_B_REF` of an N52 rod's 1.45 T, 123 mT). `SPIKE_FULL` keeps the
+  old proportion. The film's held lift (9t-1) is the old function of the field over the
+  onset (`LIFT_ONSET`), so G is 2 at the onset and 3.0 under the Magnet tool (was 2.8);
+  `LANGEVIN` and the drop's pull keep their numbers.
+- **What moved.** Magnet Garden's own magnet is 4.6× the onset and Ferro Paint's 3.0×: both
+  now raise domes, as a real magnet strong enough to pull a pool would (9u, closed). Ferro
+  Maze's is under it. The hand's set-down magnet raises domes where it was let go.
+- **Fields add** (`magnetDisc.ts`'s `magnetDiscFieldVec`, `spikes.ts`'s `magnetVec`):
+  `magnetsEnergy` and the drop's pull take |ΣB|. One magnet reads exactly as before.
+- **Checks.** `npm run disc` 13/13 (two new lines: the onset worked out on its own from
+  the sheet's numbers, by M instead of H, 4.00 mT against the solver's 4.00; and two
+  magnets' |ΣB| against Biot–Savart's vector sum, 0.00% at 8 points, where the energies'
+  sum was 27% off). Re-aimed, named in the PR's Check changes: `disc` 3's "every look's
+  own magnet raises none" (now prints each look's share of the onset and still asks both
+  looks are found; the dipole comparison held at 9v's 0.18, the contour it was written
+  for; the reach searched to 1.0, not 0.4); `spikes` 4 and `fingers` 1's control is a
+  magnet at 0.8 of the onset at Garden's depth, not Garden's own; `standing`'s legs are
+  shares of the onset (1.94×, 1.11×, 0.8×), the same legs as before on the film's scale.
+
