@@ -2266,3 +2266,17 @@ Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
 7. Bad: a look that went dull or flat where it had sparkle the owner liked (say which, and
    Glossiness can be turned up past where it was: it now steepens the real surface), black
    doughnut droplets that read as dirt, a caustic ring that looks drawn.
+
+## 100. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+
+`filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
+colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
+(right) in the project's shared files, `film-physics-38m/` (`contact.png` has all six).
+
+1. Open Soap Film, then turn Film Physics to 1 (Design desk, camera group). The thin dye's
+   fringes go from loud multi-hue rings to straw, gold, olive-grey and blue-grey: what a real
+   film shows, and quieter (saturation 0.137 to 0.116 on the lab's plate).
+2. Macro Bead, Lacing Run, Oil & Water: zoom to a bubble. Its film tint changes from lilac and
+   pink to the soap film's own colours; small on the projected plate, plain in the closeup.
+3. Pick per look: keep the rainbow, take the real colours, or something between. A look that
+   should be real by its name (Soap Film) is the first candidate for 1.

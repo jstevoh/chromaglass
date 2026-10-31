@@ -63,3 +63,15 @@
   Measure with `npm run map` (the lab, `PW_WEBGPU=1`): a pinned surface at a half and a
   quarter of its size, a fixed picture panned a fraction of a texel a frame, and how
   much each wall pixel flickers beyond the pan itself (shimmer) before and after, and the outline's width in wall pixels. Unbuilt; nothing to judge yet.
+- **1i. Thin Film's fringes are faceted at the grid's cells** (found 2026-10-30 from 38m's
+  pictures; the owner: "the edges are super pixelated"). The fringe phase is the dye amount
+  times 16 (`plate.ts`, the `U.thinFilm` block): six or more fringes across an edge only a few
+  cells wide, read from `fluid0.a` through the texture's bilinear filter. Bilinear is
+  continuous but its slope jumps at every cell edge, and at sixteen periods per unit of dye
+  those jumps show as polygon corners in every ring (measured on the lab's 192-cell plate at
+  zoom 1.3: rings stepped every 4 px, one cell). Both Film Physics settings show it; it is the
+  sampling, not the colour. Fix: read the film's amount through a smooth reconstruction
+  (bicubic B-spline, the four-tap form 33's bubble edge also wants) only where `thin > 0`, so
+  the cost falls on the fringes. *Measure:* a `look` crop of a dye edge with Thin Film 1 at
+  zoom 1.3 and 3, before and after, and the rings' curvature jump at cell edges. Waits for
+  the lighting threads to leave `plate.ts`.

@@ -405,6 +405,11 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   now; the header comes back (or the pointers move to the README) with the next edit there.
 - **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
   a pure move (docs/plan-shipped.md, 19ai-7).
+- **19ai-8. `npm run wgsl` passes a shader that will not build.** Found 2026-10-30 (32g): a
+  kernel naming a variable `from` (a WGSL reserved word) passed `npm run wgsl`, and only
+  `soapgpu` failed, at its first pipeline ("soapTransport failed to build"). The compile gate
+  should also create each kernel's pipeline and read `getCompilationInfo()`, so a reserved word
+  or a binding over the stage's limit is red there, in seconds.
 - **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
   rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
   and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share

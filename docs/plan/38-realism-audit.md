@@ -220,7 +220,8 @@ written first. Line numbers are as read on main at d07ac31.
   lifted glass is held by Stefan suction, F = 3πμR⁴ḣ/(2h³), and a bent one relaxes by its
   stiffness. The dt is a fix on its own (S) before the law.
 
-- **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
+- **38m. Film Physics is built and on in no look** — *pictures taken 2026-10-30: six looks at 0 and
+  at 1 in the project's shared files (`film-physics-38m/`), for the owner to pick; judging §100.* (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,
   #163) is gated by `filmPhysics`, default 0 and set by no preset (`types.ts:1093`). The
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at
@@ -241,7 +242,8 @@ written first. Line numbers are as read on main at d07ac31.
 - **38n-3. The rock tilts the air too** (S; Low). Bubbles climb by the hold's tilt only
   (`plateSin(tilt, 0)`); the solver also takes the rock's swing (`plateSin(hold, swing)`).
 
-- **38o. The soap film's named shortcuts become items** (M each; Medium: the lace).
+- **38o. The soap film's named shortcuts become items** — *numbered 2026-10-30 as 32f–32j; 32f
+  (the frame's border) and 32g (black spots) shipped, 32h–32j open.* (M each; Medium: the lace).
   §32's notes (lines 51–59) name five shortcuts with no open ids: in-plane gravity on a flat
   plate, ζ 1.5 compressing minutes into 30 s (`src/lib/soapFilm.ts:74`,
   `src/gpu/soapFilm.ts:34`), uniform evaporation, rupture as a 0.5 s relaxation to 8 nm, and
