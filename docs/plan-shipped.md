@@ -7835,8 +7835,26 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   taken back out of the force (σ times Film Hold, thin gap only): 35 → 31, the control
   35 → 4, the lone drop untouched to the bit. Gated by the push's one ray instead it kept 28
   (the ray misses a neck's saddle), by the four lines' weight 22, ungated 32 but the lone
-  drop moved 1.6e-3. Found: 38e-1 (one
-  σ a plate), 38e-2 (threads narrower than the gap), 38e-3 (the old plate's cap), 38e-4.
+  drop moved 1.6e-3.
+  The breath (38e-6, `npm run airblow` part 5): uncapped, a drop of oil at Oil Tension 0.5
+  was carried +1.20% of the plate where a pool of colour went +2.75% (bar: half; capped
+  +2.07% against +2.93%). Not a net force: in the lab a round drop and a teardrop at rest
+  moved 0.00%, and the lag saturates with the tension (192²: oil +1.17% at 0.5, +1.09% at
+  three times real, +1.62% at 0.01). The breath is a jet half the drop's width drawn from its
+  middle out past its edge: it draws a free pool of colour into a tongue (the colour's spread
+  along x 2.50% → 5.04%, skew 1.1) and carries the tongue the whole stroke, where a drop
+  with tension is pushed as one body (spread 3.01% → 3.11%), the push on part of a body
+  between two glasses being a dipole whose flow over the body is half the push's, and the
+  colour inside the drop rides with it (+1.53% with the oil's +1.17%; 384² +1.65% and +1.21%). The cap had let the
+  jet carve the drop like a pool. The check now measures the drop against the colour in its
+  own run (at least half of it; 0.73), as a body going the wind's way (at least a third of
+  the free pool's; 0.43) that stays one body (its spread grown under a quarter where the free
+  pool's grows by half or more), none made or lost; the colour inside it held to the same.
+  Controls on 384²: at Oil Tension 0.01 the oil's spread grows 61%, with the cap put back
+  50% (+2.07% with its colour's +2.93%, the old bar passed), so the spread bar is what tells
+  a drop from a pool. Found: 38e-1 (one
+  σ a plate), 38e-2 (threads narrower than the gap), 38e-3 (the old plate's cap), 38e-4,
+  38e-7 (the breath on a drop as shear from above).
 
 ### QA list: what the owner found playing it
 

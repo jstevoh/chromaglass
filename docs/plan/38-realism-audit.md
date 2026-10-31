@@ -120,14 +120,16 @@ written first. Line numbers are as read on main at d07ac31.
     the film's thickness at rest follows from the oil and the soap, and say what Film Hold
     scales (the surfactant's charge). The waist's concave pull is already taken back in a
     film (38e); the crowd keeps 31 of 35 at 192² over six seconds, as the capped plate did.
-  - **38e-6** An oil drop under the breath trails its own colour. `npm run airblow` part 5:
-    a drop of oil at Oil Tension 0.5 is carried +1.21% of the plate where the colour pool
-    goes +2.79% (bar: half); with the cap put back +2.07% against +2.93% (SwiftShader, and
-    the Mac's run the same, +1.20% against +2.75%). A circle's tension cannot slow its
-    translation (moving a circle changes no curvature, and ∮σκn ds = 0), so the uncapped
-    force has a net part over the drop that it should not: sum the capillary force over one
-    drop on the grid and find where it comes from (the blur's tails, the normal's
-    regularisation, the Cahn–Hilliard edge lagging the carry).
+  - ~~**38e-6**~~ An oil drop under the breath trails a pool of colour: shipped 2026-10-31
+    with 38e (the drop holds together under a jet half its width, the check measured it
+    against a free pool; `npm run airblow` part 5 now measures the drop as a body with its
+    own colour; the story is in `docs/plan-shipped.md`).
+  - **38e-7** The breath on a drop between two glasses. The jet's push is laid on the whole
+    column under it (hsBody), and a drop under it moves as a Darcy dipole, at about half the
+    free liquid's displacement. A real breath shears the film's free surface, and a drop of
+    oil floating in the film is sheared from above and dragged by the water round it:
+    measure a drop under a held breath against a filmed one on the owner's rig (34a-7's rig
+    check has the camera) before the push's share is trusted past the lab.
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).
