@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
-import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
+import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
@@ -392,9 +392,14 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     would put a third of the way along. The panel and the phone were right
     and the desk was wrong, which is the hardest kind of wrong to notice.
   */
-  const settingKey = settingKeyOf(midiKey);
   const bareSettingKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
-  const curve = settingKey ? curveOf(settingKey) : 1;
+  /*
+    The curve by the bare name, not `settingKey`, which is only a setting MIDI
+    can learn: a panel dial with a curve of its own (`PANEL_CURVES`, such as
+    Gel Speed's, widened to 30 rpm) pinned to a desk would otherwise ride a
+    straight throw with the look's value hard against the left stop.
+  */
+  const curve = bareSettingKey ? curveOf(bareSettingKey as keyof VisualizerSettings) : 1;
   const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
   const pct = at * 100;
   /*
@@ -566,11 +571,11 @@ const RING = 2 * Math.PI * 16;          // 100.53
 const SWEEP = RING * 0.75;              // 75.4
 
 export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40, help }: KnobProps) {
-  const settingKey = settingKeyOf(midiKey);
   // The setting's own name even where no controller can learn it (Gel Speed): its group and its pace are by name.
   const bareKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
   const pace = paceOf(bareKey);
-  const curve = settingKey ? curveOf(settingKey) : 1;
+  // By the bare name too, as the Slider's: a panel dial's own curve (`PANEL_CURVES`).
+  const curve = bareKey ? curveOf(bareKey as keyof VisualizerSettings) : 1;
   const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
   const valueAt = (t: number) => {
     const c = Math.max(0, Math.min(1, t));

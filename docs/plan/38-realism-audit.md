@@ -221,7 +221,7 @@ written first. Line numbers are as read on main at d07ac31.
   stiffness. The dt is a fix on its own (S) before the law.
 
 - **38m. Film Physics is built and on in no look** — *pictures taken 2026-10-30: six looks at 0 and
-  at 1 in the project's shared files (`film-physics-38m/`), for the owner to pick; judging §100.* (S, judging only; Medium for the soap and
+  at 1 in the project's shared files (`film-physics-38m/`), for the owner to pick; judging §101.* (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,
   #163) is gated by `filmPhysics`, default 0 and set by no preset (`types.ts:1093`). The
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at

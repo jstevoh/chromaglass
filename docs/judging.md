@@ -1485,16 +1485,6 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   holes. Beads already on a plate keep their size until they retire, so switch looks, not
   only zoom, to see the full effect.
 
-  *(33g-2b, 2026-10-30.)* The beads' edges are drawn from the dome's exact cone now, and a
-  big bead (over about 3 cells across its radius) is a clear window with a thin rim and no
-  dimple. Look at Macro Bead and Lens Pools at 4x to 6x: the rims should be perfect circles
-  with a crisp dark line, a big bead should look like a flat disc of oil (the plate seen
-  through it as it is), and a small one a ball with a small upside-down picture. Say whether
-  a bead of three to four cells, where the two kinds meet, shows a ring that looks wrong
-  (the map folds there, as a real lens does), and whether the upside-down picture is what you
-  want or an upright, slightly magnified one (a camera looking at the dye a few radii under
-  the bead sees it upright; the macro photographs are of beads over a distant background).
-
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
@@ -2267,7 +2257,24 @@ Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
    Glossiness can be turned up past where it was: it now steepens the real surface), black
    doughnut droplets that read as dirt, a caustic ring that looks drawn.
 
-## 100. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+## 100. Every dial from very gentle to very extreme (PLAN 27h-1)
+
+Twenty-five dials go further than they did (the list is in PLAN 27h-1). The looks have not
+moved: every look's own value is where it was, so a look should open exactly as before.
+
+1. Any look, each widened dial at its first step and at its top, with music. The first step
+   should be barely there; the top should be more than nature, never black, one flat colour or
+   frozen. Magnet Strength at 3 over ferrofluid should stand the spikes up full, which 1 never
+   did at the default height. Saturation at 0 is a grey plate.
+2. The curved dials (Gel Speed, Film Grain, Grain Size, Gate Weave, Grain Fineness, Shot Length,
+   Bass Boost, Evaporation, Flick Strength, Evolve Speed, Plate Rock, Kick Bloom, Hue Journey,
+   Macro Zoom): the look's own value should sit a third or so along the slider, not hard
+   against the left stop, on the panel, a pinned desk fader, the phone and a MIDI fader alike.
+3. Evolve on for five minutes: it should wander the widened dials no further than before.
+4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
+   plate that blows up at a top.
+
+## 101. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
 
 `filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
 colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
