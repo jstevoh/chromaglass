@@ -51,6 +51,32 @@ regulator will bite sooner; recheck every preset's `dyeBudget` in the same PR.
 **Fallback:** the settings default to 0, so a bad look is one slider away from the
 current behaviour.
 
+#### 1i. Thin Film's rings were faceted at the grid's cells (shipped 2026-10-31)
+
+Found from 38m's pictures (the owner: "the edges are super pixelated"). A thin-film ring is
+a contour of the film's amount at sixteen periods per unit, and on the gooey edge's contrast
+(1.2 + 4 × Gooey, 2.4 on Soap Film, 3 at the default) three times that again, so any corner
+in how the amount is read shows many times over. 1h said the dye is read through the
+Catmull-Rom `textureBicubic`; that is true only with no gooey blur. With it (every look) the
+opacity comes from `blurAlpha`, plain bilinear taps a fraction of a cell apart (a third of a
+cell on the lab's 640-pixel plate of 192 cells), whose slope jumps at every texel: a corner in
+every ring in every cell. Fixed in `src/gpu/wgsl/plateThinFilm.ts` (the Thin Film block moved
+out of plate.ts whole, which is over its size budget): where Thin Film draws, in focus and
+with a blur under a cell, the film's amount is read again through a four-tap cubic B-spline
+(C2), and the film is rebuilt from it by the same steps the decode made (the thickness times
+the two depths' ratio, the gooey contrast, the dark blend's scale), so the darkness, gap,
+speckle and grain carry over and only the read changes. Cost: nine taps (B-spline and the
+reference read) on Thin Film's pixels only. A wide blur and a defocused pixel are left as
+they were. *Measured* (`npm run filmrings`, the lab with the film's amount probed out of the
+display pass at sixteen bits; its second difference on each axis folded into eight bins of
+the cell, the bin on the texel centres over the median): defaults 2.8 → 1.15 at zoom 1.3 and
+13.4 → 1.2 at zoom 3; Soap Film 3.2 → 1.2 and 7.6 → 1.3; the film moves 0.007–0.017 at the
+95th percentile (a ring is 0.0625; a read blurred a cell further, run as a mutation, moved it
+0.033–0.050). The pictures' own luminance cannot see it (within 13 % of even both before and
+after: the rings' curvature drowns the corners), which is why the check reads the film. The
+check-skeptic's pass found the first version folding the rows the wrong way up at zoom 3
+(the display pass flips y), which had hidden most of the corner there.
+
 ### 2. Lacing
 
 `src/components/LiquidVisualizer.tsx` (fragment shader)
