@@ -5199,11 +5199,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // See the note in the fragment source.
         if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
 
-        // The lamp wanders slowly under the plate, and with Frame Sway up
-        // the plate's own rock moves it too — a tilted plate is lit from a
-        // new side. Off by default: the lamp jumping a twentieth of the plate
-        // on every kick lights the whole frame from somewhere else in time
-        // with the beat, which reads as the frame moving (lib/plateRock.ts).
+        // The gloss's light wanders slowly, and with Frame Sway up the
+        // plate's rock moves it too (lib/plateRock.ts); off by default, as a
+        // jump on every kick reads as the frame moving. The hot-spot stays on
+        // the stage's axis whatever this does (wgsl/lampField.ts, 38a).
         {
           const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
           const rock = rockRef.current;

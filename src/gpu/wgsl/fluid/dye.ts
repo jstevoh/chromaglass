@@ -228,11 +228,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let through = lampThrough(unit, d.a);
     absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
   }
-  // Central hotspot of the lamp (shortcut: 1 / (1 + 2.5 r²)):
-  let toCenter = uvOf(id) - vec2f(0.5);
-  let r2 = dot(toCenter, toCenter);
-  let hotspot = 1.0 / (1.0 + r2 * 2.5);
-  temp += S.lampHeat * hotspot * absorbed * S.dt;
+  // The same at every point of the stage (PLAN 38a): the condenser lights the
+  // liquid evenly, and the hot-spot is light the lens's aperture turns away
+  // after it has gone through the liquid (wgsl/lampField.ts). The old
+  // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
+  temp += S.lampHeat * absorbed * S.dt;
   v.z = temp;
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,

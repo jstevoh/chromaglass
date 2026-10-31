@@ -19,6 +19,8 @@ import { SquishSection, OilSection, FerroSection, ReactionsSection } from './set
 import { InteractionSection, LiquidsSection } from './settings/PourSections';
 import { ProjectorsSection, MappingSection, MarkSection, SimulationSection, LayersSection } from './settings/StageSections';
 import { PinContext } from './settings/controls';
+import { FeedbackPane } from './settings/FeedbackPane';
+import { FEEDBACK_PANE } from '../lib/feedback';
 import type { SectionCtx, SettingsPanelProps } from './settings/props';
 
 /*
@@ -346,6 +348,30 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </div>
             </div>
           ))}
+          {/*
+            Feedback, under the seven groups and apart from them: it is not a
+            setting, so it is not a row of `SETTINGS_SECTIONS` (no desk panel,
+            no pin, no search hit), and its test id is not `settings-nav-…`,
+            which the checks count as sections with markup. Not in the Stage
+            sheet, which is the room and the machine, and not while a search
+            has turned the rail into a result list.
+          */}
+          {scope !== 'stage' && !q && (
+            <div className="shrink-0 sm:mt-auto sm:border-t sm:border-white/[0.06] sm:pt-2" data-testid="rail-feedback">
+              <button
+                onClick={() => setSection(FEEDBACK_PANE)}
+                aria-current={section === FEEDBACK_PANE ? 'page' : undefined}
+                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:w-full ${
+                  section === FEEDBACK_PANE
+                    ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
+                    : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
+                }`}
+                data-testid="settings-feedback-nav"
+              >
+                Feedback
+              </button>
+            </div>
+          )}
         </nav>
 
         {/* ── What is in it ─────────────────────────────────── */}
@@ -390,6 +416,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {sections}
+      {!q && section === FEEDBACK_PANE && <FeedbackPane card={SECTION_CARD} title={SECTION_TITLE} />}
       {isTierGatingEnforced() && getEffectiveTier() !== 'pro' && (
         <section
           data-cg-app-tiles=""

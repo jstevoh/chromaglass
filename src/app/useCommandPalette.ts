@@ -5,6 +5,7 @@ import { PRESET_CONTRACTS } from '../presetPlate';
 import { PALETTE } from '../constants';
 import { makesText, type RecordChoice } from '../lib/recordChoice';
 import { openCrashReport } from '../components/CrashReportButton';
+import { FEEDBACK_PANE } from '../lib/feedback';
 import { SETTINGS_SECTIONS, sectionSearchText } from '../lib/settingsMap';
 import type { Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
@@ -140,6 +141,8 @@ export function useCommandPalette({
       { id: 'record-performance', name: perfLive ? 'Stop the take' : 'Record a take (your strokes and drops, replayable)', kind: 'Actions', kbd: 'T', run: togglePerformance },
       { id: 'record-studio',      name: 'Record options…', kind: 'Actions', run: () => setShowRecordPanel(true) },
       { id: 'report',    name: 'Report a problem — save what the show was doing', kind: 'Actions', run: openCrashReport },
+      // Settings → Feedback (PLAN 39a): not a section, so not one of the section rows below.
+      { id: 'feedback',  name: 'Send feedback — a bug, an idea, or what you love', kind: 'Actions', run: () => { setSettingsSection(FEEDBACK_PANE); setShowSettings(true); } },
       { id: 'lucky',     name: 'Randomise the look (replaces everything)', kind: 'Actions', run: triggerLucky },
       { id: 'hide',      name: 'Clean screen — hide all controls', kind: 'Actions', run: hideOverlays },
     ];

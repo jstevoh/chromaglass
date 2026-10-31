@@ -106,7 +106,9 @@ export async function verifyFirebaseToken(token, env = {}, now = Date.now()) {
   if (payload.aud !== project || payload.iss !== `https://securetoken.google.com/${project}`) return null;
   const uid = typeof payload.sub === 'string' ? payload.sub.trim() : '';
   if (!uid || uid.length > 128) return null;
-  const who = { uid, aud: project, email: typeof payload.email === 'string' ? payload.email : null };
+  // `emailVerified`: Firebase signs anyone up with any address and a password,
+  // so an address is the account's only when the token says it was proved.
+  const who = { uid, aud: project, email: typeof payload.email === 'string' ? payload.email : null, emailVerified: payload.email_verified === true };
 
   if (header.alg === 'none') return env.FIREBASE_AUTH_EMULATOR ? who : null;
   if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid) return null;
