@@ -412,6 +412,9 @@ export function coverRoom(sway: number | undefined): number {
  * full swing, for Plate Rock and Frame Sway (none by default; above).
  */
 export function lampRock(rock: { x: number; y: number }, plateRock: number | undefined, sway: number | undefined): [number, number] {
+  // Held at 1 although Plate Rock now runs to 3 (PLAN 27h-1): the plate's own tip
+  // goes on to its extreme, but the lamp is part of the frame, and the frame
+  // moving with the music is Frame Sway's to allow, at its own top.
   const k = (Number.isFinite(plateRock) ? Math.max(0, Math.min(1, plateRock as number)) : 0) * frameSway(sway);
   return [rock.x * 0.05 * k, rock.y * 0.05 * k];
 }

@@ -830,7 +830,7 @@ export interface VisualizerSettings {
    * and it becomes fine and busy. The other half of playing one.
    */
   kaleidoZoom: number;
-  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, a thin bright ring at it
+  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, its glass wall a thin dark line
   lightPlay: number;          // how much the lamp's direction shows: bubbles shaded as lenses with a caustic arc, dye rims lit on the lamp side and shadowed away from it
   lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
   lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
@@ -850,7 +850,7 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
-  glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
+  glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
   // Macro Closeup — magnified camera that chases a single bead of liquid

@@ -1,9 +1,9 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
-import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
@@ -225,12 +225,12 @@ const api = {
     const R = kickPress(nu, 0).radii[0] / 128;
     return l.sheet.pressVolume(x, y, stampedVolume(amount, R), R, hold, room ? kickRoom(x, y, curve) : undefined);
   },
-  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
-  sheetStep(dt = 1 / 60, spring = BASE.gapSpring) {
+  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step, on Plate Shape `curve`), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
+  sheetStep(dt = 1 / 60, spring = BASE.gapSpring, curve = 0) {
     const l = lab!;
     if (!l.sheet?.live) return 0;
     const out = new Float32Array(l.L * l.L);
-    const cells = l.sheet.step(l.L, dt, spring, out);
+    const cells = l.sheet.step(l.L, dt, spring, out, curve);
     if (cells > 0) l.sheetGap = out;
     return cells;
   },
@@ -546,7 +546,7 @@ const api = {
    * ramps on, for `npm run disc` to run the shader's own text against the
    * physics.
    */
-  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
   /**
    * The magnet's pull in the solver's own units, and the gap's, for `npm run
    * magnetgain` to derive what MAGNET_GAIN is in tesla, metres and seconds
@@ -554,7 +554,7 @@ const api = {
    * the gain and its guards, the reference liquid and the ferrofluid's
    * viscosities, the rest gap and the dish's width (gpu/fluid.ts).
    */
-  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES,
+  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /** The beads' list and the plate's GPU drawing of it, for `npm run beadmask` (PLAN 14ab-6). */
@@ -651,6 +651,15 @@ const api = {
       */
       film?: CanvasImageSource; mark?: CanvasImageSource; backPlate?: boolean; backRotation?: number;
       /*
+        The gel wheel's turn, in turns (0 by default: held still, as it always
+        was). The lab's wheel is the harmony's first four dyes, a warm set, and
+        so is the lumia (its first two), so at rest the bare glass lies under
+        segments that pass most of what the lumia carries. The mixer's check of
+        the gel's order turns it to lay a segment that blocks the lumia there
+        (PLAN 38h).
+      */
+      gelAngle?: number;
+      /*
         Projectors' own sources (PLAN.md §16b). Each is the plate's display
         drawn again with that source's uniforms, after the wall's draw and in
         the same encoder, as the app's frame does: the source reuses what the
@@ -698,7 +707,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,

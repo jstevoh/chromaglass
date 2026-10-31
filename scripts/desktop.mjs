@@ -316,6 +316,34 @@ try {
   check('network off: a request to the website is refused, and written down', probe === 'refused' && probeSeen,
     `the fetch was ${probe}; ${probeSeen ? 'in' : 'not in'} the refused list`);
 
+  // ── version (PLAN 13-version) ──────────────────────────────────────
+  // A release is 1.3.<run number> and its About box said so, while the page
+  // inside it was built calling itself package.json's 1.3.0. desktop.yml now
+  // builds the site with the release's version; this reads the version the
+  // page was built with out of the page the app serves and holds it to the
+  // app's own. Only on the packed app: from the repo, Electron's version is
+  // desktop/package.json's, which nothing ships.
+  if (!PACKAGED) {
+    skip('version: the page inside the app is built as the app\'s version', 'run from the repo, where the app\'s version is not a release\'s (add --packaged)');
+  } else {
+    const appVersion = await electronApp.evaluate(({ app }) => app.getVersion());
+    const pageVersion = await page.evaluate(() => document.querySelector('meta[name="chromaglass-version"]')?.getAttribute('content') ?? null).catch(() => null);
+    check('version: the page inside the app is built as the app\'s version', !!pageVersion && pageVersion === appVersion,
+      `the app is ${appVersion}, its page ${pageVersion ?? 'says no version'}`);
+  }
+
+  // The icon (PLAN 13-icon): the packed app carries the .icns drawn on macOS's
+  // grid, not the website's tile electron-builder used to scale into one.
+  if (!PACKAGED || !isMac) {
+    skip('icon: the packed app carries the Mac icon npm run brand drew', PACKAGED ? 'not a Mac build' : 'run from the repo, where nothing is packed (add --packaged)');
+  } else {
+    let shipped = null;
+    try { shipped = readFileSync(join(dirname(app.executablePath), '..', 'Resources', 'icon.icns')); } catch { /* not there */ }
+    const drawn = readFileSync(join(DESKTOP, 'resources', 'icon.icns'));
+    check('icon: the packed app carries the Mac icon npm run brand drew', !!shipped && shipped.equals(drawn),
+      shipped ? `${shipped.length} bytes in the app, ${drawn.length} drawn` : 'no Contents/Resources/icon.icns in the app');
+  }
+
   // ── show server ────────────────────────────────────────────────────
   const info = await page.evaluate(() => fetch('/remote-info.json', { cache: 'no-store' }).then((r) => r.json(), () => null));
   let keptKey = null;

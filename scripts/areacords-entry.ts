@@ -45,7 +45,7 @@ const api = {
    * |velocity| and temperature over the run sampled every `every` steps. `contract`
    * is the look's dyes (palette indices).
    */
-  async run(cfg: { L: number; seconds: number; areas: PlateArea[]; contract: number[]; cords: SceneMapping[]; bursts: Burst[]; over: Record<string, number>; every: number; pools: boolean; middle?: boolean; chem?: 'mix' | 'rxn'; snaps?: number[] }) {
+  async run(cfg: { L: number; seconds: number; areas: PlateArea[]; contract: number[]; cords: SceneMapping[]; bursts: Burst[]; over: Record<string, number>; every: number; pools: boolean; middle?: boolean; chem?: 'mix' | 'rxn'; snaps?: number[]; fill?: number }) {
     const { L, areas, contract, cords, bursts, over } = cfg;
     await lab.create(L, L);
     const dye = new Float32Array(L * L * 4), vel = new Float32Array(L * L * 4);
@@ -153,7 +153,7 @@ const api = {
         else reading[b.feature] = Math.max(reading[b.feature] ?? 0, v);
       }
       const acts = hands.step(cords, at, (m) => cordReading(ctx, m, 0), DT);
-      hands.lay(sink, L, DT, (a, k) => PALETTE_RGB[areaDye(a, contract, 0, k)]);
+      hands.lay(sink, L, DT, (a, k) => PALETTE_RGB[areaDye(a, contract, 0, k)], cfg.fill ?? 0);
       if (s % 6 === 0) trace.push({ t, env: acts.map(a => a.amount) });
       for (let i = 0; i < L * L; i++) if (paddleNow[i * 4 + 2] > 0) swept[i] = 1;
       lab.addDye(dye); lab.addVel(vel); dye.fill(0); vel.fill(0);

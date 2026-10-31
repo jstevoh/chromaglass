@@ -838,6 +838,22 @@
       ]
     },
     {
+      "name": "Nothing on the plate makes light",
+      "shard": "lab2",
+      "run": "npm run nolight",
+      "why": [
+        "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
+        "satellite droplets, Glossiness, the gel and the dish's wall each leave",
+        "no pixel brighter than the same plate without them, and each still",
+        "darkens some; the projectors' rims nothing over the lamp; the oil",
+        "nothing in focus and a lens out of it, its caustic turning over as",
+        "Focus passes the middle; and two times of the clock draw the same",
+        "plate (no grain). The lab on SwiftShader, beside lampzero, about two",
+        "minutes: the real plate shader on a lab plate, any adapter that",
+        "computes, so it has no need of the Mac."
+      ]
+    },
+    {
       "name": "Looks on a lit stage",
       "shard": "browser",
       "run": "npm run litstage -- --controls",
@@ -1029,6 +1045,15 @@
         "dark ground and the lamp ground, at five sizes. Pictures from the lab,",
         "which SwiftShader renders as the shader's text, so it sits beside",
         "holeline in the open shard."
+      ]
+    },
+    {
+      "name": "Thin Film's rings are round",
+      "shard": "lab2",
+      "run": "npm run filmrings",
+      "why": [
+        "Thin Film's rings read the film's amount through a B-spline (PLAN 1i): the film itself, probed",
+        "out of the display pass, has no corner at the texels where the old read had one in every cell."
       ]
     },
     {
@@ -1632,6 +1657,18 @@
         "oil rises at Hele-Shaw's speed worked out in SI, its colour does not",
         "hold it down, the rim holds it, and the picture as a whole does not",
         "move with the tilt (the first try slid it 4.2 mm/s every lean)."
+      ]
+    },
+    {
+      "name": "The glass peels back against the film's suction",
+      "shard": "plate",
+      "run": "npm run stefan",
+      "timeout": 3,
+      "why": [
+        "The glass comes back up as Stefan's law says a thin wet film lets it",
+        "(PLAN 38l): let go, its opening rate over what is left goes as the",
+        "film's depth cubed, at two depths, and is the same by the second at",
+        "60 and 120 frames a second. The spring before was one rate at any depth."
       ]
     },
     {
@@ -2450,6 +2487,19 @@
       ]
     },
     {
+      "name": "The Live Show streams the picture",
+      "shard": "fifth",
+      "run": "npm run liveshow -- --stack --owed=plate,stack",
+      "why": [
+        "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
+        "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
+        "mixer and a keystone on the wall, streamed and decoded, against the",
+        "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
+        "the Plate source's frames are black today and the Mixer stack source is",
+        "not built; printed as owed until the PR that fixes each takes its id out."
+      ]
+    },
+    {
       "name": "A drop lands only where it is dropped",
       "shard": "fifth",
       "run": "node scripts/mirror.mjs",
@@ -2493,10 +2543,13 @@
     {
       "name": "The wall",
       "shard": "tools",
-      "run": "npm run wall",
+      "run": "npm run wall -- --owed=quarter,red,rung",
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
-        "how many times a second the whole screen is allowed to change."
+        "how many times a second the whole screen is allowed to change.",
+        "--owed: the flash guard's lines by quarters, in light (PLAN.md 14r,",
+        "scripts/wallflash.mjs), are written ahead of the build and printed as",
+        "owed until it ships; the PR that ships one takes its id out."
       ]
     },
     {

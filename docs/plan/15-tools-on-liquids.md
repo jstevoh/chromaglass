@@ -108,18 +108,51 @@ Left, each its own plan item:
   the Mac (at 6 m/s `npm run tools` read a third of it), not a measurement. A phone
   recording of a real breath across a dish of oil (`npm run watch`) would set the speed
   the colour goes at, against the lab's 2.72% of the plate over a 1.5 s stroke.
-- **15g-7 Blow's stroke to the right moves less than to the left in the app.** On
-  `npm run tools` (Mac) the rightward stroke has read weaker since the carries (145.9
-  carried against 352.4, 4 October) and with the air (+0.13% against +1.15% on #300,
-  6 m/s), where the lab's airblow reads the two alike (2.72%, 2.82%). Something in the
-  app pushes colour left during a Blow stroke, or the stroke to the right runs fewer
-  steps of breath; the check prints both (wind steps, aired, readings) to find which.
-  And on GitHub's runners the stroke's "keeps it rather than erasing it" line (the pool's loss
-  held to a tenth plus five) swings from a gain to a loss of 11% across eight pull requests of one
-  morning (2026-10-30; pools of 235 to 367, 8 to 28 straw steps), and #550's shard read a loss of
-  20% on the stroke back twice running, 22 straw steps each time, while the owner's Mac at twice
-  the steps keeps or gains (608 → 597, 610 → 670). Whether the loss follows the straw count or the
-  step count is to be read before the bar is trusted on those runners.
+- ~~**15g-7 Blow's stroke to the right moves less than to the left in the app.**~~
+  **Shipped** (#623): the pointer handler pressed the glass under the pointer (a bowl 24
+  cells across) and stirred along the move on every pointer event with the button down, for
+  every tool but the Magnet, the Spin, the Drop and the Finger, and the Blow was never taken
+  out of it. The pointer leads the pool it blows across, so each press sent the pool's liquid
+  back against the breath, and the gap it closed crept open for seconds after; thirty presses
+  a stroke whatever the pace against the breath's steps, which came with the runner's. Story
+  in `docs/plan-shipped.md` §15g-7; `npm run tools` now counts the glass the hand presses in a
+  Blow stroke and asks for none; the touch path shares the fix, and a bubble's squeeze on its
+  footprint is counted as the bubble's, not the hand's.
+- ~~**15g-8 The stroke's straw on GitHub's runners.**~~ **Shipped** (#636): the check's Blow
+  stroke moved 0.68 of a cell a move, so one move in three was no move, and a runner with
+  50–80 ms frames held the Blow still long enough to blow the straw 18 to 27 times a stroke. It is
+  paced by the plate now (a move each cell and a quarter, the next after 120 ms or two frames):
+  0 straw steps on GitHub's Mac, the pool kept 356 → 356 and 277 → 279. Story in
+  `docs/plan-shipped.md` §15g-8. What the straw does to the dye when it does blow is 15g-8b.
+  - **15g-8b A bubble's dye accounting across the readback mirror.** On a thin gap the GPU
+    multiplies the dye under every bubble away each step (`airExclude`) and the CPU puts it back as
+    a ring from the readback mirror (`depositBubbleRims`, H6). It conserves only when the mirror,
+    the bubble list and the GPU agree on which cells were covered since the last deposit; a slow
+    machine blowing the straw (a new bubble each hold, on dye drifting in the breath) swings the
+    plate's colour ±15–20% either way. Tried in #636 and taken out of it: the air carrying the
+    liquid under it out across the cell faces in flux form (`airDisplace`, the diff in the owner's
+    handoff folder `air-push-15g8/`). It conserves exactly (lab: a bubble put down whole 0.00%,
+    growing 0.00%, moving −0.31%, against −16%, −31%, −27% for the multiply alone), but the liquid
+    it pushes stops at the first cell with no air and piles in a ring a cell or two wide, 3–4× the
+    plate's depth, where a real incompressible layer shifts the liquid round it outward and leaves
+    no ring. The ring is seen: `npm run holeline`'s "no glow round a hole" (7.45 levels against 6)
+    and, on the Mac, `npm run airlens`'s window and pin-point (the window ×1.10 middle to edge).
+    The real fix moves the outer liquid too: the displacement the divergence source already asks
+    for, carried in flux form where the air arrives so the semi-Lagrangian carry does not leave its
+    copy in the middle (the reason a push or a multiply is needed at all).
+- **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
+  Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
+  24-cell bowl and shove the liquid five times the move on each pointer event
+  (`src/sim/tools.ts` stirAlongMove), thirty a stroke whatever the pace. Whether each wants it
+  is its own question, measured as the Blow's was: the lab at the app's step with and without
+  it, and `npm run tools`' pressed-cell count per stroke.
+- **15g-10 The drop's splash presses as the hand.** `applySquish` with the `splash` stroke
+  (`src/sim/fluidSimulation.ts`, the drop's landing) takes the default presser, the hand, so a
+  drop falling during a Blow stroke would count in `npm run tools`' "presses no glass along
+  the way" as the hand's (none falls there: the section runs with Rain Drip 0, so it can only
+  ever be a false red, never a miss; found in #623's review). Give the splash its own presser
+  (`Presser` in `src/lib/squish.ts`) when `fluidSimulation.ts` has the bytes: it sits at its
+  size ceiling.
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 

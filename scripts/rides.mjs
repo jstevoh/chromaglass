@@ -64,11 +64,11 @@ const check = (name, ok, detail = '') => {
 
 // ── 4, the curve, in node ───────────────────────────────────────────
 const out = 'node_modules/.cache/rides-lib.mjs';
-await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume, STEFAN_FILM } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
 const { stirOf, stirBefore, kickDepth, KICK_RADII, kickPress, dentRadius, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK, restingHand, springKick, springStep,
   ROCK_LEVEL_AFTER, ROCK_LEVEL_MOVE, STRONG_BEAT, WEAK_BEAT,
   rockPast, ROCK_PAST,
-  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity, RhythmSheet, stampedVolume, KICK_HOLD } = await import(`../${out}`);
+  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity, RhythmSheet, stampedVolume, STEFAN_FILM, KICK_HOLD } = await import(`../${out}`);
 const { createNoise2D } = await import('simplex-noise');
 // The app's sway noise, on a fixed table (the app keys its own on the show's seed).
 let seedN = 11;
@@ -273,7 +273,7 @@ try {
   const SHEET_RING = Math.round(0.75 * SHEET_CELLS);
   // The sheet's kicks at the default and at full (kickDepth × kickPress's share), as the lab presses them below.
   const SHEET_KICKS = { def: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, full: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share };
-  const r = await page.evaluate(async ({ KICK_RADII, SHEET, kicks, stirs, rocks, glasses, HEAVY }) => {
+  const r = await page.evaluate(async ({ KICK_RADII, STEFAN_FILM, SHEET, kicks, stirs, rocks, glasses, HEAVY }) => {
     const res = {};
     const DEF = 0.45, THICK = 0.75;
     // The app's plate at the default Speed: its step and its glass (lift.mjs's APP_GLASS).
@@ -515,7 +515,17 @@ try {
         const r0 = await ring();
         for (const r of radii) lab.squish(96, 96, r, amount, 0, 'press', 0, true);
         lab.flush(over.dt);
-        await lab.step(9, over, true);   // held, KICK_HOLD
+        await lab.step(1, over, true);
+        /*
+          Held, KICK_HOLD (nine steps), as KickRelease holds it since 38l: the glass lifts against
+          the film's suction at (1/STEFAN_FILM)³ times Press Lift's rate near rest, and the hand
+          holding it down lays spring·amount/STEFAN_FILM³ a step in each disc to balance it. Let
+          alone it lifted through the hold and the default kick's ring went 3.6 cells, not 4.3.
+        */
+        for (let k = 1; k < 9; k++) {
+          for (const r of radii) lab.squish(96, 96, r, amount * over.gapSpring / STEFAN_FILM ** 3, 0, 'press', 0, true);
+          lab.flush(over.dt); await lab.step(1, over, true);
+        }
         const held = await ring();
         // Let go over a third of a second (KickRelease), in the shape it was pressed.
         for (let k = 0; k < 20; k++) { for (const r of radii) lab.squish(96, 96, r, -amount / 20, 0, 'press', 0, true); lab.flush(over.dt); await lab.step(1, over, true); }
@@ -595,7 +605,7 @@ try {
     }
     return res;
   }, {
-    KICK_RADII,
+    KICK_RADII, STEFAN_FILM,
     HEAVY: ROCK_PAST,
     SHEET: { def: SHEET_CELLS, ring: Math.round(0.75 * SHEET_CELLS), nu: thicknessViscosity(0.45) },
     glasses: { springFull: covers({ R: 1, spring: true }), springDef: covers({ R: 0.45, spring: true }), full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
