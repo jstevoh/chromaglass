@@ -6077,6 +6077,8 @@ larger in mean radius (bar 1.4 to 1.8) and 343 of 332 (bar 60%). The lab, `macro
 a dozen glass-like lens beads, three of them a fifth of the frame. Pictures in the project's
 shared files, `macro-closeup-33g/`. Not measured: how it looks on the owner's GPU.
 
+*33g-2b (2026-10-30, the owner: "Why do the beads have dimples on the top and ragged edges?", then "make the macro view look as accurate as possible").* Found in the lab on a flat plate with one bead at 5x. **The rim:** the outermost pixel of a bead strayed from a circle by 1.26, 1.24 and 1.22 px for a droplet (2 cells), the common bead (4.5) and a pool (7), a quarter of a mask texel, because the contour of the bilinear coverage of a 512 mask wanders by a third of a texel; the lens now takes the distance to the edge from the dome's cone read at one clean texel three texels in (`dropLens`, now `gpu/wgsl/dropLens.ts`) and the edge coverage from that, and the stray is 0.42, 0.32 and 0.37 px (0.06 of a texel), 0.53 px for a 12-cell bead, and the same on the drops' wide mask. A droplet of one to two cells keeps its whole dark outline: a first version of the step (three texels in, always) landed past the centre of a drop of four texels' radius and erased 60% of the outline of a 1.5-cell one, so a read that lands above 0.6 of the dome's height is refused and the drop keeps the old estimate (capping the step by the pixel's own size estimate was tried and cost every drop from two cells up its roundness: that estimate is the noise). The pools also come out 6 percent smaller, the true size: the coverage contour had stood half a texel proud. **The dimple:** a bead wider than the gap (3 cells) is a pancake, a flat window with the bend in its half-round edge, and the bend was in proportion to the band, so the map from the window to the band crossed the drop's own centre a little outside the window: a ring of one colour with a pin inside it. The bend now follows the band to a power that goes from 1 (a ball) to 6 (a pancake flat over 0.4 of its radius), so the window is clear and the bend is a sliver at the contact, as the report says (item 1.3 and the closeup comment in plate.ts). `npm run droplens` 32/32 on SwiftShader (11 new lines: roundness for seven drop sizes over both masks, the three droplets' outlines, and the sizes). Pictures in the project's shared files, `macro-closeup-33g/`. Not measured: the owner's GPU, and a mid-sized bead (3 to 4 cells), whose fold ring a real lens has too.
+
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
 and lacing's own contribution to the frame (the frame against the same frame with both
@@ -10153,7 +10155,7 @@ model cannot reach one, the PR says what it reached and asks.
 
 #### 38h. Nothing on a lit-from-below plate makes light
 
-  - **38h (shipped 2026-10-30).** The audit (`docs/plan/38-realism-audit.md`) found six
+  - **38h (shipped 2026-10-31).** The audit (`docs/plan/38-realism-audit.md`) found six
     places where the plate shader painted light a transmission projector cannot throw, though
     the beads' own note already said "a plate lit from beneath shows transmitted light only".
     Each now takes its light from what passes through, and `npm run nolight` asks it of the
@@ -10213,7 +10215,64 @@ model cannot reach one, the PR says what it reached and asks.
     New code went beside `plate.ts` in `src/gpu/wgsl/plateTransmit.ts`; `plate.ts` shrank by
     about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
     line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
-    term, with 18e-2). Owed: the owner's look on the Mac, `docs/judging.md` §98.
+    term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §98).
+
+### 39. Feedback from inside the app (asked 2026-10-30)
+
+#### 39a. Settings → Feedback, mailed and kept
+
+Asked: "a feedback panel in settings. It should send me an email with the feedback as
+well as collect it all in a single database with all of the relevant related logs data
+so I can track feedback over time."
+
+**The pane.** Feedback is the last row of the Settings rail, under the seven groups and
+apart from them, because it is not a setting: it is not in `SETTINGS_SECTIONS`, so it is
+never a desk panel, never pinned and never a search hit, and its test id is not one the
+section checks count. The phone has it twice: at the end of the Settings strip (the same
+panel) and as a tile on More, which opens the same `FeedbackPane` in a phone sheet. The
+command palette has "Send feedback". A note is a topic (broke, idea, love, else), up to
+5,000 characters, and, if not signed in, an address to be answered at.
+
+**What it carries.** Always: the app's version (the Mac app's, from its updater), the
+site's commit (`VITE_BUILD_SHA`, new in `deploy.yml` and `desktop.yml`), Mac app or
+browser, phone layout or not, the tier, the look's name, the page's path (never its
+query, which can carry a show's key), and the browser and screen. With the sender's
+tick, both ticked by default and in sight before Send: the black box's log and the
+look's settings, and a picture of the plate, all from `crashLog.buildReport`, so a note
+and a crash report agree on what "the log" is. "See what is sent" shows the JSON as it
+will leave. Before it leaves, `feedbackScrub.ts` takes out tokens, licence keys, stream
+keys, credential-named URL parameters and fields; Keystone and Key Light stay.
+
+**Where it goes.** `server/feedback-worker.js`: one D1 table (`feedback-schema.sql`), a
+row a note, the facts in columns for SQL and the whole context as JSON beside them, the
+picture as JPEG bytes. The context is rebuilt from the fields the page sends and scrubbed
+again on the Worker, so a stale or hostile client's credentials or claims are not kept.
+The account is only what a Firebase ID token proves (the same verifier as the licence
+Worker), and its address only when the token says Firebase proved it, since anyone can
+make an account with someone else's address. Then a plain-text
+mail through Resend to support@ (which forwards to the owner), Reply-To the sender, the
+picture and the entry attached. The row is written before the mail, so a mail that fails
+costs the notice and not the note (`emailed` says sent, failed, off, or the day's cap of
+80, under Resend's free 100). Ten notes an hour from one address (an IPv6 address by its
+/64), sixty an hour from everyone, counted by a salted hash. The review found the first
+version's count-then-insert let a burst through (50 of 50 with 5 ms on each database
+call); a row is now inserted first and counts the rows at or before its own rowid, so
+exactly the first ten of a burst of forty stay. Reading needs `FEEDBACK_TOKEN`.
+
+**Why D1 and Resend.** The server side is Workers already, and D1 is a binding with no
+service account; Firestore from a Worker would need a Google key in its secrets. And
+Cloudflare's own mail needs the domain's MX on Cloudflare, where chromaglass.art's MX is
+the forwarder's.
+
+**Measured.** `npm run feedback-worker` 31/31 against SQLite built from the schema file,
+with a few milliseconds on each call for the burst. Six mutations each turned a check red:
+trusting a body's uid, recording a failed mail as sent, dropping the `?key=` scrub,
+counting the whole burst (1 of 40 kept), counting before the insert (40 of 40), and
+taking an unproved address as the account's. `npm run feedbackpane` 11/11, its own file because `phone.mjs` is over the size budget:
+the desk's rail row and pane, Send waiting for words, the mail-only build drawing no
+switches, and on a phone in three sizes the More sheet on screen with nothing covered,
+16 px type and 48 px topics (its first run, as a block in `phone.mjs`, found 13 px in all
+seven landscapes, which iOS zooms on focus), and the strip's Feedback row.
 
 ### QA list: what the owner found playing it (from 2026-10-04)
 
@@ -10255,3 +10314,72 @@ model cannot reach one, the PR says what it reached and asks.
   green lands on yellow or blue. A real comic printed green as yellow and blue dots
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
+
+## 38b, 38g, 38n. Bubbles as pockets in a gap (#603, 2026-10-30)
+
+Asked by the owner after the second realism audit: "physics at its core", settings may
+ramp past real. `src/lib/bubbles.ts` rewritten round one fact: between two glasses a bubble
+is a pancake of air spanning the gap, with no film of its own, so nothing ends it on a
+clock. What went: lives of 9–23 s (8–18 for the straw's satellites, 0.8–1.6 for
+daughters) scaled by `0.5 + Bubbles`; the 0.35 s fade in and 1.2 s fade out; the film's age
+as colour and the darkening before a pop; Culick's spray of daughters (a free soap film's
+rim); the 1.2–2.4 rad/s wobble (a mm pocket in oil is overdamped); the treble's dice-roll
+pops; ripening at about a million times the real rate and the delete under 0.6 cells; the
+0.3/s split dice roll; the tuned 1.5 speed-up; −tilt·900 cells/s whatever the liquid; the
+fixed 0.18 merge stretch and 1.4 s relaxation; the half-each push to 0.98 of the radii.
+What came: inflation at a breath's rate; the open round rim (`OPEN_RIM`) with the area
+emptying at π·bσ/(3μ); Henry's-law dissolving through the plate (a 3 mm pocket in the
+default oil: 262 years, `dissolve` scales it); Taylor–Saffman's 2/(1 + 2.26·Ca^⅔);
+Paterson's τ₂ and stretch ε·τ₂ from the sampled strain, split at deformation 0.5 into
+two halves of the area; merged pockets as long as the pair; Durian crowding; μ from the
+Thickness, σ and solubility from water or oil; buoyant climb Δρ·g·sinθ·b²/(12μ); the
+Bretherton film packed where the age was (`gpu/wgsl/air.ts`, `plate.ts`).
+`npm run bubblephysics` 24/24 (was 11 checks, two of them the tuned 1.5 and the timers).
+The audit's text, as written:
+
+- **38b. Bubbles that never appear or vanish by a clock** (S for the fades, M for the rim;
+  High: every music look pops bubbles). Sharpens **18i**, which named the timers but not
+  these. *Now:* `timedPops = true` (`src/lib/bubbles.ts:144`), lives drawn 9–23 s (`:261`),
+  8–18 s for the straw's satellites (`:331`), 0.8–1.6 s for daughters (`:216`), all scaled by
+  `lifeScale = 0.5 + bubbleAmt`; each bubble fades in over 0.35 s and out over 1.2 s like a
+  sprite (`:582-583`); its age over its life is packed (`:599`, `wgsl/air.ts:80`) and the
+  plate thins and darkens its film by it (`plate.ts:3448, 3518, 3533`). A pop throws two or
+  three daughters with 35–65 cell/s kicks by Culick's rim retraction (`:198-232`), which is a
+  free soap bubble's physics: an air pocket between two glasses has no film to retract.
+  Small bubbles also melt away by a ripening 1,400× too fast to be gas through oil
+  (`RIPEN 1.4`, `:84-88`; real Lifshitz–Slyozov ripening of mm pockets takes hours), and a
+  bubble under 0.6 cells is deleted (`:534`); a stretched one splits by a 0.3/s dice roll
+  (`:537-552`) rather than at a critical capillary number; and each one wobbles at a drawn
+  1.2–2.4 rad/s (`:181, :433-435`) where a mm pocket in oil between glasses is overdamped
+  (Re ≪ 1) and only follows what pushes it. *Real:* a pocket enters as volume (a pour, the
+  straw, a press that traps air) and leaves only by the open rim, by merging, by being
+  engulfed, or by dissolving over hours. *Build:* timers, fades, age-as-colour, the daughters
+  and the wobble out; leaving at the rim as the dye already does (18g-1); breakup at a
+  critical Ca from the bubble's own stretch. *Measure:* `npm run pops` and a still plate
+  where the bubble count holds for a minute with nothing pushing.
+
+- **38g. Bubbles that merge, crowd and stretch like pockets in a gap** (M, CPU only, nil
+  frame cost; Medium-High for the straw's rafts and dense froth). The research's ranked
+  items 6, 7 and 10 (`drops/research/bubbles-and-drops.md` in the project's shared files),
+  #163 shipped them for drops but not for air. *Now:* once two bubbles' film has drained
+  they become one disc at once with a fixed 0.18 stretch (`bubbles.ts:462-477`), and every
+  stretch relaxes at τ ≈ 1.4 s whatever the size (`:427-430`); crowding pushes each pair
+  apart to 0.98 of their radii, half each whatever their sizes (`:488-505`), and every
+  bubble is drawn as a disc, so no facet or Plateau border can form. *Real:* the neck grows
+  as (γ/η)·t, then t^¼ (Yokota and Okumura 2011); a pancake's shape relaxes at
+  τ₂ ≈ 2μR³/(b²γ) (Paterson 1981), milliseconds at 1 mm and nearly half a second at 5 mm, so
+  big merged pockets stay long and small ones snap round; crowded pockets push with
+  stiffness γ/R (Durian's bubble model), so small ones stay round and big ones facet, the
+  wall between unequal ones an arc of curvature 1/R_s − 1/R_b, jamming near an area
+  fraction of 0.84. The drops' wall arcs (`dropWall` in `beads.ts`) are the model to reuse.
+  *Measure:* relaxation time against R³ at three sizes; facets on a jammed raft.
+
+- **38n. Bubbles move by the look's own liquids** (S; Medium: bubbles in glycerine against
+  water). Sharpens **18i** and **18d-3**. The speed ratio is max(1, 1.5/(1 + 2.26·Ca^⅔)), the
+  1.5 a named tuning for Taylor–Saffman's 2 and floored at 1; mineral oil's μ 0.017 and σ
+  0.030 are hard-wired "pending 18d" (`bubbles.ts:61, 389-405`); tilt drifts every bubble at
+  −tilt·900 cells/s whatever its size or the liquid (`:414`); the drops' λ is 1.5 "solved
+  back from 0.8" (`beads.ts:206`). Real: U = 2U/(1 + λ) with λ the poured liquids' ratio;
+  buoyant drift Δρ·g·b²/(12μ). Each bubble's film thickness and glint come from a random id
+  (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
+  0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.

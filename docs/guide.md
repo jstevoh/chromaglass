@@ -48,7 +48,7 @@ ones.
 - **Shift layers on the controller** — four banks, so nine faders reach forty settings; a binding on the base layer stays live on all of them, and changing layer drops every fader out of soft takeover so nothing jumps
 - **Light Show Look controls** — Multi-octave curl-noise turbulence, blob surface tension, dye-boundary glow, meniscus edge relief, trapped-air bubbles, plate rocking on the beat, a second layer at its own magnification, saturation grade, glossiness (default: flat matte backlit dye) and post-blur, all exposed in Settings
 - **The other projectors** — a Wilfred lumia layer (slow folded sheets of light under the plate), a rotating gel wheel over the lamp, a film projector that plays a video loop or a live camera through the dye, a reaction-diffusion "chemistry" mode that grows coral and cells on the plate the way Mark Boyle's Sensual Laboratory projected reactions, and a halogen grade for the sealed oil-wheel look — with presets Lumia, Sensual Laboratory and Oil Wheel
-- **Bubbles in the dye, not over it** — a bubble is air between the plates: a standing squeeze on its footprint keeps the dye pumping out to its rim so the field flows round it, dye dropped on a bubble bursts it into satellites, and dye or air landing nearby shoves the bubbles along the spreading front, from the dropper, the phone pad, replayed performances and automation alike
+- **Bubbles in the dye, not over it** — a bubble is air between the plates: a standing squeeze on its footprint keeps the dye pumping out to its rim so the field flows round it, dye dropped on a bubble takes it, and a bubble otherwise lives as a real pocket of air does (it arrives by inflating, leaves at the open rim or by merging, stretches and rounds off by the liquid's own viscosity and surface tension, and climbs a tilt), and dye or air landing nearby shoves the bubbles along the spreading front, from the dropper, the phone pad, replayed performances and automation alike
 - **Two projectionists** — the phone remote has a pad: a finger on it blows air or drops dye at that point of the laptop's plate, each phone works one layer, and tilting the phone rocks the plate
 - **Palette contracts** — each preset names the two to four dyes it may use, and everything that adds colour (seeding, automation, beat hits, the slow harmony rotation, a song's identity) stays inside them, the way a projected plate carries a few dyes rather than a rainbow
 - **Music intelligence** — Identifies the playing song (fingerprint proxy or manual tag), records the first listen and analyzes it offline into a song map (verse/chorus structure, pitch and energy curves, cached in IndexedDB), then drives visuals from known structure on every later listen
@@ -665,6 +665,21 @@ npm run show
 That pulls main, installs, builds, and starts the show server in the same window (Ctrl+C stops it). It does not publish, because pushes to `main` already deploy themselves — so a show-night run has nothing to re-publish, and no way to put a local working tree over what was released.
 
 `npm run ship` is the same thing with a deploy in the middle, for publishing from this machine when something has to be live that isn't on `main` yet. The pieces are also separate: `npm run update` (pull, install, build), `npm run deploy` (publish the build), `npm run remote` (the show server).
+
+## Feedback
+
+Settings → Feedback (the last row of the rail; on a phone, More → Feedback, or the end of
+the Settings strip; or "Send feedback" in the command palette) sends a note to
+support@chromaglass.art and keeps it in the feedback database. Pick what it is about,
+write it, and Send. Two switches, both on and both yours to turn off before sending, add
+the app's recent log with this look's settings, and a picture of the plate; "See what is
+sent" shows exactly what will leave. Passwords, licence keys, stream keys and sign-in
+tokens are taken out of the log first. Signed in, the answer comes to your account's
+address; otherwise type one if you would like an answer.
+
+On a build with no feedback service (`VITE_FEEDBACK_URL` unset), Send opens your mail
+app with the note in it instead, without the log. Setting the service up, and reading
+what has come in: `wrangler.feedback.toml`.
 
 ## Deploying
 

@@ -32,7 +32,7 @@ const check = (name, ok, detail = '') => {
   const at = { x: 110, y: 80 };
   for (let t = 0; t < 180; t++) {           // three seconds of breath
     f.blow(at.x, at.y, dt, 1);
-    f.step(dt, still, 0, 0, 1, 0);
+    f.step(dt, still, 0, 0, 0);
     const b = f.bubbles.find((q) => q.straw);
     if (t === 60) growingFing = b?.fing ?? 0;
   }
@@ -44,12 +44,12 @@ const check = (name, ok, detail = '') => {
   check('and stays at the straw', big && Math.hypot(big.x - at.x, big.y - at.y) < 1, big ? `${Math.hypot(big.x - at.x, big.y - at.y).toFixed(2)} cells off` : '');
   check('its rim breaks into fingers while it grows fast', growingFing > 0.25, `fingering ${growingFing.toFixed(2)} a second in`);
   check('and it sheds a ring of small ones', sats >= 3, `${sats} satellites`);
-  for (let t = 0; t < 240; t++) f.step(dt, still, 0, 0, 1, 0);   // let go for four seconds
+  for (let t = 0; t < 240; t++) f.step(dt, still, 0, 0, 0);   // let go for four seconds
   const after = f.bubbles.find((q) => q.straw && q.r > N * 0.04);
   check('let go, it stays on the plate and rounds off', after && after.fing < 0.1, after ? `fingering ${after.fing.toFixed(3)}` : 'gone');
   f.clearLooks();
   check('a look with no bubbles of its own keeps it', f.bubbles.some((q) => q.straw) && f.anyBlown);
-  f.blow(40, 150, dt, 1); f.step(dt, still, 0, 0, 1, 0);
+  f.blow(40, 150, dt, 1); f.step(dt, still, 0, 0, 0);
   check('moved and blown again, it is a second bubble', f.bubbles.filter((q) => q.straw).length >= 2);
 }
 

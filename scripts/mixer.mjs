@@ -318,7 +318,10 @@ const shots = await page.evaluate(async (controls) => {
       all of a yellow lumia: only the red segment's green differs between the
       orders, 3.1 a channel. The 1.5 gain the gel had made light in the
       channels it passed, and that is what read 4 and more. Turned, the bare
-      glass is under the pink and the red, which stop the lumia's green.
+      glass is under the pink and the red, which stop the lumia's green. The
+      control: with the gel's place in the lamp ignored, the line reads 0.0
+      (the pre-push review). It rests on the lab's harmony staying warm; a
+      wheel of other dyes wants the angle chosen again.
     */
     lampGelUnder: await shot({ gelWheel: 1, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1 }, { gelAngle: 0.75 }),
     lampGelOver: await shot({ gelWheel: 1, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1, mixOrder: 'led lumia gel front back film mark' }, { gelAngle: 0.75 }),

@@ -121,6 +121,17 @@
       ]
     },
     {
+      "name": "The glass gap, one number",
+      "shard": "logic",
+      "run": "npm run gap",
+      "why": [
+        "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
+        "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
+        "cover's shear, the sheet's film, a finger's edge, the ferrofluid's room)",
+        "held to its physics worked out in SI from the millimetres alone."
+      ]
+    },
+    {
       "name": "The slosh",
       "shard": "logic",
       "run": "npm run slosh",
@@ -720,6 +731,24 @@
       "run": "npm run map"
     },
     {
+      "name": "The feedback Worker",
+      "shard": "logic",
+      "run": "npm run feedback-worker",
+      "why": [
+        "Settings → Feedback's Worker (PLAN 39a), against a real SQLite",
+        "database built from server/feedback-schema.sql, the file D1 is made",
+        "from: a note is stored with the account only a verified token proves,",
+        "its log and its picture, and mailed to support@ with Reply-To the",
+        "sender; a forged token or a claimed uid is nobody; bad bodies are",
+        "refused without quoting them; one address is held to its hourly",
+        "limit even by forty at once with D1's latency, and everyone to an",
+        "hourly ceiling; an address Firebase has not proved is not the",
+        "account's; a failed or missing mail provider costs the mail and never",
+        "the entry; reading needs the token; and the page's scrub takes",
+        "tokens, licence and stream keys out of the log and leaves Keystone."
+      ]
+    },
+    {
       "name": "The report Worker",
       "shard": "logic",
       "run": "npm run report-worker",
@@ -1127,6 +1156,19 @@
         "the phone, a camera opened by the id picked, each choice remembered",
         "apart, an unplugged camera taken off and opened again when it is back.",
         "No GPU; the site the steps above built."
+      ]
+    },
+    {
+      "name": "Settings → Feedback on the desk and the phone",
+      "shard": "browser",
+      "run": "npm run feedbackpane",
+      "why": [
+        "PLAN 39a (scripts/feedbackpane.mjs, apart from phone.mjs, which may not",
+        "grow): the Settings rail ends in Feedback and opens the pane; Send waits",
+        "for words; a build with no Worker sends by mail and draws no switches;",
+        "on a phone in portrait and two landscapes, More → Feedback fits with",
+        "nothing covered, 16 px type (13 px was found in every landscape) and",
+        "48 px topics; and the phone's Settings strip ends in it too."
       ]
     },
     {
