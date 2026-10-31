@@ -4832,6 +4832,35 @@ which bottle pours next, and no hue dial is turned.
   laid; one drop of activator fires the gel to 0.81 in its place and 0.000 in the other two.
   Judging §96 owes the owner's eyes. Open: 25i-1 to 25i-5.
 
+### 25i-6. Three looks fixed after filming on the Mac (shipped)
+
+Filmed on the owner's Mac on 2026-10-31 with a test song (120 bpm, a saw lead walking all twelve
+notes), three of 25i's looks misbehaved.
+
+- **Poster, 1969: no kick pour showed**, before 25i or after. Its plate sits at its own fill target
+  (mean dye 0.50 to 0.52 against 0.522), and every area pour was held by the music pours' room,
+  `(1 − fill) × 2.5`, which is 0 to 0.1 there. A dish that is full still takes a bottle tipped
+  into it and turns over, so a gated pour now has `hitRoomOf` (lib/dyeTarget.ts): all of itself up
+  to the target, none at 15% over it, the regulator's evaporation taking the excess (25i-8 names the
+  shortcut). AreaHands.lay applies the regulator itself from the plate's fill, so the check runs
+  the app's own: `npm run areacords` lays Poster's kicks at fill 0.96 and 1.0 (1.00 of a free
+  plate's dye) and 1.2 (none), a held pour none at its target, and the lab's 8-of-8 bottle check now
+  runs at fill 1. Before, the room was 0 to 0.1 at the filmed fill.
+- **Red Cabbage: green on the left and pink on the right, going flat.** Two faults. Every look lays
+  its dish at an angle the night's seed draws, and the areas turn with it, so the acid well (left
+  in the look's words) stood wherever the dice put it; a look with areas is now set down square
+  (`layAngle`, lib/plateAreas.ts). And the indicator read the acidity, a share of a bottle in the
+  cell, as pH units in a straight line: four or five drops in one place reached pH 1, a crimson no
+  vinegar makes, and soda went on to pH 13 and yellow. The pH is now solved from the proton
+  balance of what was poured (lib/phIndicator.ts: acetic acid pKa 4.76, carbonate pKa 10.33, the
+  juice's buffer 2 mM at pKa 7), in the plate's shader and its TypeScript twin: vinegar undiluted
+  2.49, washing soda 12.10, a trace 6.93 / 7.07, ten times the acid 0.76 pH lower.
+- **Chemical Clock: no rings.** Its two sound patches turned BZ Reaction down by 0.58 with the
+  bass's harmony and 0.55 with the mid's; under a song that is nought, and at nought the gel is
+  neither stepped nor drawn. They are gone (nothing a band plays changes a dish's chemistry, and
+  `npm run areacords` now holds that no look carries a cord on a reaction's strength); the snare
+  drops activator in the third place instead, beside the kick's own touches in turn.
+
 ## 26. A reaction that prints: Turing stripes in black and white
 
 ### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)

@@ -184,7 +184,7 @@ bar grid together); **14e** (M, output latency and one lead per source); **10.2-
 re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering the
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), ~~**25i**
-colour that answers the music~~ (shipped), then **25j** a lamp under each area (D, M, with
+colour that answers the music~~ (shipped; ~~**25i-6** its three looks fixed after filming~~, shipped), then **25j** a lamp under each area (D, M, with
 14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
