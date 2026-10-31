@@ -72,6 +72,51 @@ export const sparseDark = (lampGround: number | undefined, target: number): bool
 export const dyeRoomOf = (mean: number, target: number): number =>
   Math.max(0, Math.min(1, 1 - (Number.isFinite(mean) ? mean : 0) / Math.max(0.06, target)));
 
+/**
+ * The share of a music pour the regulator lets through, by how full the plate
+ * is (`fill`, its mean dye over its target): all of it up to 60% of the
+ * target, none at it, in a straight line between (the 2.5 is that 40%). The
+ * continuous pours (the centre pulse, the bass ring, a held area pour) are
+ * held under the look's fill by it, as PLAN 28d-A names.
+ */
+export const pourRoomOf = (fill: number): number => Math.max(0, Math.min(1, (1 - (Number.isFinite(fill) ? fill : 0)) * 2.5));
+
+/**
+ * How far over its target a hit's pour may take a plate before it stops:
+ * 15%. See `hitRoomOf`.
+ */
+export const HIT_OVER = 1.15;
+
+/**
+ * The share of a hit's pour (an area pour behind a gate: a bottle tipped on
+ * the kick) the regulator lets through: all of it up to the target, then less
+ * in a straight line to none at `HIT_OVER` times it.
+ *
+ * It was `pourRoomOf`, as every music pour is. Poster, 1969 sits at its own
+ * target (filmed on the owner's Mac, 2026-10-31: mean dye 0.50 to 0.52
+ * against 0.522), where that is 0 to 0.1, so each kick's pour came out at 2
+ * to 10% of its strength and the bottle the lead's note picked never showed
+ * on the plate, before PLAN 25i and after it.
+ *
+ * What a dish that is already full does with one more pour is not refuse it.
+ * The dye lands, at its own colour, and the dish turns over: what flows away
+ * (here the regulator's evaporation, which rises with the square of how far
+ * over target the plate is) is the mix that was there. A held stream into a
+ * full dish would drown it, so the continuous pours keep their room; a hit is
+ * one bottle's worth at a time and the turnover catches up between hits.
+ * Poster's kick lays about 0.005 of mean dye (a disc 0.14 of the plate in
+ * radius, 6% of it), and a turnover that rises with the square of the excess
+ * settles the plate a little over its target, where a hit pours most of
+ * itself. `HIT_OVER` is the bound that keeps a fast drummer from filling the
+ * dish: 15% over, the regulator takes back 1.4% a step.
+ *
+ * Named shortcut (PLAN 28d-A, as `lookTarget`): the turnover is the
+ * regulator's evaporation, not volume leaving a dish; the volume model
+ * (PLAN 18c-2) is the honest answer for both.
+ */
+export const hitRoomOf = (fill: number): number =>
+  Math.max(0, Math.min(1, (HIT_OVER - (Number.isFinite(fill) ? fill : 0)) / (HIT_OVER - 1)));
+
 /** The bottle's level moves in twentieths: finer than that a 20 px bottle cannot show. */
 export const ROOM_STEP = 1 / 20;
 

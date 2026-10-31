@@ -230,6 +230,23 @@ export const plateAreas = (presetId: string | null | undefined): PlateArea[] | n
   (presetId && PRESET_AREAS[presetId]?.length ? PRESET_AREAS[presetId] : null);
 
 /**
+ * The angle a look's dish is set down at, radians: `drawn` (the plate's dice,
+ * a new one each night with the show's seed), or square for a look with areas.
+ *
+ * A look's areas are places on the glass and are laid in the plate's own
+ * frame, so the turned picture turns them with it, and the look's words
+ * (Red Cabbage's acid well on the left and its base well on the right,
+ * Poster's shape on the left) were true only on a night the dice came up
+ * near nought. Filmed on the owner's Mac, 2026-10-31, Red Cabbage's pink
+ * stood on the right and its green on the left: the chemistry was right
+ * and the dish was upside down. A projectionist sets a dish with places
+ * the way the plan has them, so a look with areas is set square; every
+ * other look keeps the dice's angle (still drawn, so nothing after it in
+ * the stream moves).
+ */
+export const layAngle = (presetId: string, drawn: number): number => (plateAreas(presetId) ? 0 : drawn);
+
+/**
  * The areas a band works in: those that claim it, else those that claim
  * `any`, else all of them. A look need not give every band a place; the
  * band then shares the look's general places rather than going to the middle.
