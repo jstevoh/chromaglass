@@ -269,9 +269,18 @@ check('a lens rises uphill at Hele-Shaw\'s speed, Δρ g sinθ h²/12μ halved f
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8');
   const vis = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
   const solver = readFileSync('src/sim/fluidSimulation.ts', 'utf8');
+  const rock = readFileSync('src/lib/plateRock.ts', 'utf8');
+  /*
+    Since PLAN 38r-9 the step's rock goes through plateRock's rockStep (the
+    sinθ each way, plateSin as before, and the slider's past-real gain), and
+    the lift is × that gain, so the same chain is read through it: the gain
+    is 1 at and below the default Plate Rock and multiplies the tilt, never
+    stands in for it, so the phone's tilt still lifts the oil.
+  */
   check('the phone\'s tilt lifts the oil too: the step lifts by its rockX, and the frame loop\'s rockX carries the phone\'s tilt',
-    /lift \* p\.rockX, lift \* p\.rockY/.test(fluid) && /const rockX = swingX \+ ext\.x/.test(vis) && /rockX: plateSin\(this\.tiltX, this\.rockX\)/.test(solver),
-    'fluid.ts hands hsBody lift × p.rockX; LiquidVisualizer: rockX = swingX + ext.x…; sim/fluidSimulation.ts: the step rockX = plateSin(tiltX, rockX)');
+    /lift \* rockGain \* p\.rockX, lift \* rockGain \* p\.rockY/.test(fluid) && /const rockX = swingX \+ ext\.x/.test(vis)
+      && /rockStep\(this\.tiltX, this\.tiltY, this\.rockX, this\.rockY/.test(solver) && /rockX: plateSin\(holdX, swingX\)/.test(rock),
+    'fluid.ts hands hsBody lift × rockGain × p.rockX; LiquidVisualizer: rockX = swingX + ext.x…; sim/fluidSimulation.ts: the step rockStep(tiltX, …, rockX, …), lib/plateRock.ts: rockX = plateSin(tiltX, rockX)');
 }
 
 const failed = checks.filter((c) => !c.ok);
