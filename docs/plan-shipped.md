@@ -10268,14 +10268,18 @@ Asked by the owner: "Let's add a bubble dial for them to melt away", answering t
 and never swaps the law. With #603 a pocket of air between the glasses dissolves only at
 Henry's law's rate, 2π·D·L·(Δp/p₀)/ln(R_plate/R) in area, which is years for a millimetre
 pocket. Bubble Melt (`bubbleMelt`, default 0) is a factor on D alone: exactly 1 at 0, then
-10^(6 + 3v), because even a fully degassed liquid (Δp/p₀ from 3e-4 to 1) is only about
-3,000× nature and still days, so the dial's first step lands where the smallest pockets go
-in about a minute and its travel is three decades on a log scale. Melt times at the 6 mm
-gap: a 1 mm radius pocket in about 8 minutes at the bottom, 15 s at the middle, a 2 mm one
-in under 3 s at the top; the small go first and each speeds up as its Laplace pressure
-climbs. `liquid()` sets it from the settings each frame, so nothing in the frame loop
+10^(8 + 3v), because even a fully degassed liquid (Δp/p₀ from 3e-4 to 1) is only about
+3,000× nature and still days, so the dial's first step jumps to 1e8 and its travel is three
+decades on a log scale. Melt times at the 6 mm gap, for the sizes a show has (the music's
+and the straw's bubbles start at 2 mm radius, and the flow takes most to the rim in 5–30
+s): 2 mm in about 28 s at the bottom, under a second at the middle (4 mm in 4.5 s), the
+straw's 8 mm in a fraction of a second at the top; the small go first and each speeds up as
+its Laplace pressure climbs. First built a decade lower; filmed
+on the owner's Mac (three 40 s takes on Classic, Bubbles 0.7, five straw bubbles of 1.8–8
+mm), the old middle shrank a 3 mm bubble only to 2.83 mm in 40 s while the flow took most
+bubbles to the rim inside 5–30 s, and only 0.9 melted them visibly (1.8 mm gone at 5 s,
+2 mm at 7 s, 3 mm at 17 s, smallest first, none popped), so the dial moved up two decades. `liquid()` sets it from the settings each frame, so nothing in the frame loop
 changed. On the sheet under Bubbles (and so the phone's settings sheet), pinnable as a
 look control, MIDI-learnable, a patch target. Checks: `npm run bubblephysics` 27/27, its
 three new lines: off is exactly nature; melt time × factor constant across the dial within
-5% (measured 0.3%); a 1 mm pocket at the middle melts on the law's own integral (14.50 s
-against 14.48 s).
+5%; 4 mm and 2 mm pockets at the middle melt on the law's own integral, the small first.

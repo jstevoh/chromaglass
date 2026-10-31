@@ -693,7 +693,7 @@ export interface VisualizerSettings {
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
   bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
-  /** How fast trapped air dissolves into the liquid (PLAN 38b-2): 0 is nature's rate, nil on a show's clock; up, Henry's law with air's diffusivity scaled a million to a billion times, the small bubbles melting first (lib/bubbles.ts meltFactor). */
+  /** How fast trapped air dissolves into the liquid (PLAN 38b-2): 0 is nature's rate, nil on a show's clock; up, Henry's law with air's diffusivity scaled 1e8 to 1e11 times, the small bubbles melting first (lib/bubbles.ts meltFactor). */
   bubbleMelt?: number;
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**

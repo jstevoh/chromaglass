@@ -115,20 +115,24 @@ const G = 9.81;
   takes years. Even a fully degassed liquid, the most a real plate could do
   (the drive Δp/p₀ going from the Laplace pressure's 3e-4 to 1), is only
   about 3,000 times that, still days. So the first step of the dial lands
-  at a million, where a pocket of half a millimetre's radius melts in about
-  a minute and one of a millimetre (a cell at 192², the music's size) in
-  eight, and the rest of its travel is three more decades on a log scale:
-  about 3e7 at the middle (1 mm in 15 s, 2 mm in a minute and a half, the
-  turnover a song's bubbles had from their old timers), 1e9 at the top (2 mm
-  gone in under three seconds).
+  at a hundred million and the rest of its travel is three more decades on
+  a log scale, set by what a show actually has: the music's and the straw's
+  bubbles are born at two cells' radius or more (`spawn`), 2 mm at 192², the
+  straw blows them to 8 mm, and the flow carries most of them to the rim in
+  5 to 30 s, so a melt slower than that is never seen. At the bottom a 2 mm
+  pocket melts in about 28 s, while it is still on the plate; at the middle
+  (3e9) in under a second, 3 mm in 2 s, 4 mm in 4.5 s; at the top (1e11)
+  even the straw's 8 mm one is gone in a fraction of a second. It was two
+  decades lower first (10^(6 + 3v)), and filmed on the owner's Mac
+  (2026-10-31) only 0.9 melted anything a viewer could see in 40 s.
   Those times are at today's 6 mm gap; at 38r's 2 mm the Laplace pressure
   2σ/b triples and a millimetre pocket goes about a quarter sooner, by the
   same law. `npm run bubblephysics` holds the dial to these times.
 */
-export const MELT_FLOOR = 1e6;
+export const MELT_FLOOR = 1e8;
 export const MELT_DECADES = 3;
 
-/** The Bubble Melt dial (0–1) as the factor on air's diffusivity: 1 at 0, then 10^(6 + 3v). */
+/** The Bubble Melt dial (0–1) as the factor on air's diffusivity: 1 at 0, then 10^(8 + 3v). */
 export function meltFactor(v: number | undefined): number {
   const x = Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : 0;
   return x > 0 ? MELT_FLOOR * Math.pow(10, MELT_DECADES * x) : 1;

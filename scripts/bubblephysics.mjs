@@ -269,11 +269,11 @@ const still = () => [0, 0];
   D: Henry's shrink is linear in D, so a pocket's melt time times the factor
   is the same at every setting, which a dial that also switched the law to
   a fade or a timer would fail. And at the middle the melt time of a pocket
-  of a millimetre's radius is the law's own integral, done here
+  of 4 mm radius is the law's own integral, done here
   with a step 167 times finer than the frame's, at two sizes so the small
   one is seen to go first on the dial's own path, and short enough to
   watch, which nature's is not. The factor itself is held to the dial's
-  mapping written out here again, 10^(6 + 3v), so a wrong floor or a
+  mapping written out here again, 10^(8 + 3v), so a wrong floor or a
   linear dial cannot hide behind a constant t·k.
 */
 {
@@ -297,11 +297,11 @@ const still = () => [0, 0];
   check('Bubble Melt off is nature\'s rate, and a look without it is the same',
     off === 1 && absent === 1, `factor ${off} at 0, ${absent} absent`);
 
-  const runs = [0.3, 0.6, 0.9].map((v) => ({ v, ...meltTime(v, 2) }));
+  const runs = [0.3, 0.6, 0.9].map((v) => ({ v, ...meltTime(v, 8) }));
   const tk = runs.map((r) => r.t * r.k);
   const spread = Math.max(...tk) / Math.min(...tk) - 1;
-  const mapped = runs.every((r) => Math.abs(r.k / 10 ** (6 + 3 * r.v) - 1) < 1e-9);
-  check('up, it scales air\'s diffusivity by 10^(6 + 3v) and nothing else: melt time × factor holds across the dial',
+  const mapped = runs.every((r) => Math.abs(r.k / 10 ** (8 + 3 * r.v) - 1) < 1e-9);
+  check('up, it scales air\'s diffusivity by 10^(8 + 3v) and nothing else: melt time × factor holds across the dial',
     mapped && runs.every((r) => Number.isFinite(r.t) && r.events === 0) && runs[0].t > runs[1].t && runs[1].t > runs[2].t && spread < 0.05,
     runs.map((r) => `${r.v}: ${r.t.toFixed(2)} s at ${r.k.toExponential(1)}`).join(', ') + `; t·k spread ${(spread * 100).toFixed(1)}%`);
 
@@ -318,12 +318,12 @@ const still = () => [0, 0];
     }
     return T;
   };
-  const mid = meltTime(0.5, 1e-3 / M), small = meltTime(0.5, 0.5e-3 / M);
-  const T = lawTime(1e-3, mid.k), Ts = lawTime(0.5e-3, small.k);
-  check('at the middle, pockets of 1 and ½ mm radius melt on the law\'s own clock, the small first, inside half a minute',
-    Math.abs(mid.k / 10 ** 7.5 - 1) < 1e-9 && Math.abs(mid.t / T - 1) < 0.03 && Math.abs(small.t / Ts - 1) < 0.03
+  const mid = meltTime(0.5, 4e-3 / M), small = meltTime(0.5, 2e-3 / M);
+  const T = lawTime(4e-3, mid.k), Ts = lawTime(2e-3, small.k);
+  check('at the middle, pockets of 4 and 2 mm radius (twice the music\'s smallest, and it) melt on the law\'s own clock, the small first, inside half a minute',
+    Math.abs(mid.k / 10 ** 9.5 - 1) < 1e-9 && Math.abs(mid.t / T - 1) < 0.03 && Math.abs(small.t / Ts - 1) < 0.03
       && small.t < mid.t / 3 && mid.t < 30 && mid.events === 0 && small.events === 0,
-    `1 mm ${mid.t.toFixed(2)} s (law ${T.toFixed(2)} s), ½ mm ${small.t.toFixed(2)} s (law ${Ts.toFixed(2)} s) at ${mid.k.toExponential(1)}× nature`);
+    `4 mm ${mid.t.toFixed(2)} s (law ${T.toFixed(2)} s), 2 mm ${small.t.toFixed(2)} s (law ${Ts.toFixed(2)} s) at ${mid.k.toExponential(1)}× nature`);
 }
 
 // ── 8. Paterson's τ₂ ─────────────────────────────────────────────────
