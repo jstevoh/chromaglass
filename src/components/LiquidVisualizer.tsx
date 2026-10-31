@@ -4622,7 +4622,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // Fewer than it used to be, on purpose. A field of forty reads as
               // foam on a shower door; three or four reading as air trapped in
               // the oil is the thing the references actually show.
-              const room = bubbles.bubbles.filter((b) => !b.daughter).length < 3 + Math.round(14 * bubbleAmt);
+              const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
               /*
                 And only as hard as Sound Drive lets the music reach the
@@ -4666,12 +4666,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               const qk = particleFlowScale(lead, currentSettings);
+              bubbles.liquid(currentSettings);
               bubbles.step(simStepS, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
                 return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-              }, tiltX, tiltY, 0.5 + bubbleAmt, treble01 * 0.6);
+              }, tiltX, tiltY, treble01 * 0.6);
               // A bubble is air between the plates: the dye cannot sit under
               // it. A standing squeeze on each footprint keeps pumping the
               // dye out to the rim, so the field flows round the bubbles
@@ -5236,7 +5237,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
           // And the ones blown by hand on a look with none of its own.
-          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack() : 0;
           bubbleDebugRef.current = {
             count: Math.min(MAX_BUBBLES, count),
             strength: Math.min(0.9, 0.35 + bubbleAmt * 0.8),
@@ -5247,10 +5248,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The frame the effects run on.
         fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
-        // The beads' mask: redrawn only on the frames they moved, which is
-        // what `render()` answers with — null means the last upload still
-        // stands. Off, it is not drawn at all, and the shader is told 0.
-        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.render() : null;
+        // The beads, on the frames they moved (`moved()`; null: the last
+        // mask stands), drawn on the GPU (14ab-6). Off, the shader is told 0.
+        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.moved() : null;
 
         // ── The frame, handed to whatever draws it ────────────
         // The renderer reads the show's state through `view` and nothing
@@ -6565,7 +6565,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             .filter((f): f is NonNullable<typeof f> => !!f);
           if (fields.length && stage) {
             // The three pictures the page hands over, on the frames they
-            // change: the beads' mask when they moved, the mark on the
+            // change: the beads when they moved, the mark on the
             // frame it arrives, and the film's frame every frame it plays.
             // The uniforms are told about each of them in `plateUniforms`,
             // under the same conditions, or the shader would be drawing a
@@ -6576,7 +6576,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // frame the size of which changed between measuring and copying,
             // a cross-origin image — and a throw here used to end the loop.
             // A picture that will not upload is left out of this frame.
-            if (view.beadMask) upload('beads', () => plate.setSource('beads', view.beadMask!));
+            if (view.beadMask) upload('beads', () => plate.setBeads(view.beadMask!));
             const mk = view.mark;
             if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
             else if (mk.dirty) {

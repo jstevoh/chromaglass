@@ -3379,7 +3379,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let h = sqrt(max(0.0, 1.0 - rr * rr));
       let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
       /*
-        Its size, film age and number: packed whole, so read unfiltered —
+        Its size, film and number: packed whole, so read unfiltered —
         and from the largest of the four texels round the point, since just
         past a small bubble's rim the filtered coverage is still there while
         the nearest texel is already empty, and read from that the rim was
@@ -3389,7 +3389,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
       // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
       let R = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
-      let age = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
+      let film = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
       let id = (floor(look) - floor(look / 8.0) * 8.0 + 0.5) / 8.0;
       let k1 = fract(id * 7.13 + 0.17);
       let k2 = fract(id * 13.71 + 0.53);
@@ -3439,16 +3439,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       c = mix(outColor, c, smoothstep(0.0, 0.2, h));
 
       // The film: interference colour, strongest at a glancing angle (the
-      // rim), thicker at the bottom where it drains to, thinner with age
-      // until it goes dark just before it breaks.
+      // rim), as thick as the pocket's own speed laid it (Bretherton,
+      // bubbles.ts), so the variety follows the flow. A pocket between
+      // glasses never thins to black and breaks: that was a soap bubble's.
       let F = pow(1.0 - clamp(n.z, 0.0, 1.0), 2.2);
       // Radially, from the height, which is smooth at any size; the drainage
       // toward the bottom only as a gentle lean, since which way is "down"
       // across a bubble three cells wide is too coarse to draw colour from.
-      let thick = mix(0.35, 1.0, k2) * (1.0 - 0.85 * age) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
+      let thick = mix(0.35, 1.0, film) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
       let filmP = thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0);
       let filmC = filmColourAt(filmP, filmP);
-      let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+      let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3);
       // A second lamp to the side is the one light that can put a glint on
       // an air pocket seen from beneath (below, as the projector throws it).
       var side = vec3f(0.0);
@@ -3515,7 +3516,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
         cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
         let cp0 = cp;
-        let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3) * (1.0 - smoothstep(0.8, 1.0, age));
+        let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3);
         cp = mix(cp, cp * (0.45 + 1.25 * filmC), clamp(iridP * 0.6, 0.0, 1.0));
         // With Film Physics up, the projector's film is the one it really
         // throws: the light through the film, 1 - R, which for soap is 92 to
@@ -3530,7 +3531,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         cp = cp * (1.0 - AIR_DARK * blackB) + side;
       }
       c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
-      c *= 1.0 - 0.35 * smoothstep(0.85, 1.0, age) * F;
 
       // The rim: a glint where it faces the lamp, a thin meniscus line where
       // it faces away, each its own weight — not one dark ring on them all.
