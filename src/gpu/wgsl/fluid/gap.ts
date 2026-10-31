@@ -191,11 +191,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   var sheetRate = 0.0;
   var owed = s.a;
-  var sheetHere = false;
   if (A.a.z > 0.5) {
     let dw = textureLoad(sheetT, vec2i(id.xy), 0).r;
     if (dw != 0.0) {
-      sheetHere = true;
       let want = gap + dw - owed;
       let g2 = max(0.004, want);
       owed = g2 - want;
@@ -267,17 +265,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     depths. The old plate keeps its spring, which its looks were tuned on:
     there the gap only shapes how long the film stays thin.
 
-    Not where the rhythm sheet lays its change: its solve is the
-    film draining under the kick already (lubrication, above), and it holds
-    its dent as the plate's plain spring will take it (lib/sheet.ts \`keep\`,
-    on its modes, the same everywhere). The suction on top made the gap and
-    the sheet's dent part by 7% of a dent (npm run sheet). Cell by cell, so
-    a hand's press beside a kick lifts by the suction as it does alone; a
-    hand pressing on the sheet's own cells lifts on the plain spring, the
-    shortcut PLAN 38l-2 names.
+    Where the rhythm sheet lays its change too: the sheet takes the same
+    law cell by cell on the dent it holds and on its own solve
+    (lib/sheet.ts step, on the one STEFAN_FILM), so the gap here stays
+    rest less the sheet's dent. Skipped here instead, with the sheet on one
+    plain share everywhere, a hand's press beside a kick lost 27% of its
+    memory (every cell carries a little of the sheet, a sum of sines); with
+    the suction here and the plain share there, the gap and the sheet's
+    dent parted by 7% of a dent (npm run sheet).
   */
   var spring = S.gapSpring;
-  if (A.a.y > 0.5 && !sheetHere) {
+  if (A.a.y > 0.5) {
     let x = clamp(gap / max(rest, 0.004), 0.0, 2.0) / ${STEFAN_FILM.toFixed(3)};
     spring = 1.0 - pow(clamp(1.0 - S.gapSpring, 0.0, 1.0), x * x * x);
   }

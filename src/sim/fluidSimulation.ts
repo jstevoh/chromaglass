@@ -2163,13 +2163,13 @@ export class FluidSimulation {
     // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
     // no dye, only the gap given back, which the shader never opens past rest.
     this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
-    // The rhythm sheet's own motion (pressKick): solved a step, its change laid as the gap's,
-    // with the spring the shader will give the gap this step taken on the sheet too (lib/sheet.ts).
+    // The rhythm sheet (pressKick): solved a step, its change laid as the gap's, the
+    // shader's spring taken on it too, at the plate's rest (lib/sheet.ts).
     if (this.sheet.live) {
       if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
       if (!this.sheetGap) this.sheetGap = new Float32Array(this.size * this.size);
       const depth = this.sheet.closed, cells = this.sheet.pressedCells;
-      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap) > 0) {
+      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap, this.lastStep?.plateCurve ?? 0) > 0) {
         this.sheetLaid = true;
         this.dirty = true;
         // As a stroke counts them (applySquish): the cells a held finger closes, and the depth.

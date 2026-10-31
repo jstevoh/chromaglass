@@ -237,12 +237,16 @@ written first. Line numbers are as read on main at d07ac31.
     rate goes as 1/μ, and neither the press's closing nor the lift reads the liquid under
     the palm: glycerine presses and lifts as water does. hsPrep's per-cell μ is there to
     read. Found building 38l.
-  - **38l-2. The kick's sheet lifts by the same law** (S–M; Low). While Beat Squeeze's
-    rhythm sheet is live the gap keeps the plain spring, because the sheet holds its dent
-    as that spring takes it (`lib/sheet.ts` decays its modes by one `keep`); the suction
-    on top parted the gap from the sheet's dent by 7% (`npm run sheet`). The sheet's own
-    solve could take the 1/h³ in its lubrication instead, and then the plate's suction
-    everywhere. Found building 38l.
+  - ~~**38l-2. The kick's sheet lifts by the same law**~~ — **Shipped, this PR** (the sheet
+    takes the suction's share cell by cell on the dent it holds and node by node on its own
+    solve, so the shader takes it everywhere; `npm run sheet` 18/18; story in
+    `docs/plan-shipped.md` §38l).
+  - **38l-3. The sheet's suction reads the plate's own gap** (S; Low). The sheet works out
+    each cell's share at rest less its own dent, not the plate's gap, which it cannot read
+    (the gap is on the GPU): where a hand presses on a kick's cells the plate's film is
+    thinner than the sheet thinks, so the sheet's part of the dent there lifts at the
+    shallower film's pace. Measured small (a hand press beside a live kick keeps its memory
+    to 0.04%), but on the same cells it is a shortcut. Found building 38l-2.
 
 - **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,

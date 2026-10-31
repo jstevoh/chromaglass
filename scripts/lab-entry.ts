@@ -224,12 +224,12 @@ const api = {
     const R = kickPress(nu, 0).radii[0] / 128;
     return l.sheet.pressVolume(x, y, stampedVolume(amount, R), R, hold, room ? kickRoom(x, y, curve) : undefined);
   },
-  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
-  sheetStep(dt = 1 / 60, spring = BASE.gapSpring) {
+  /** One step of the sheet (`dt` seconds, the gap's spring `spring` a step, on Plate Shape `curve`), its change laid for the next flush, as the app's liftStep lays it. Returns the cells laid. */
+  sheetStep(dt = 1 / 60, spring = BASE.gapSpring, curve = 0) {
     const l = lab!;
     if (!l.sheet?.live) return 0;
     const out = new Float32Array(l.L * l.L);
-    const cells = l.sheet.step(l.L, dt, spring, out);
+    const cells = l.sheet.step(l.L, dt, spring, out, curve);
     if (cells > 0) l.sheetGap = out;
     return cells;
   },
