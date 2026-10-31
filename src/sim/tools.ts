@@ -240,12 +240,14 @@ export function stirAlongMove(fluid: Pick<FluidSimulation, 'applySquish' | 'addV
     during the stroke and crept +0.75% in the 2.5 s after; the press alone
     -0.80% then +1.1%; the stir with the press the same as the press
     (-0.32%). Over 88 steps, the 3000 ms stroke's on those Macs, the press
-    left +0.72% of the breath's own, then +0.9% of creep. The straw (a Blow
-    held still) is the bubble's, not a press, and the Press tool keeps its
-    own squish; `npm run tools` counts the glass a Blow stroke presses and
-    asks for none.
+    left +0.72% of the breath's own, then +0.9% of creep. The straw's bubble
+    (a Blow held still) presses the plate as every bubble does, counted as
+    the bubble's (lib/squish.ts Presser), and the Press tool keeps its own
+    squish; `npm run tools` counts the glass the hand presses in a Blow
+    stroke and asks for none.
   */
   if (tool === 'blow') return;
   fluid.applySquish(x, y, 8, 0.005);
-  fluid.addVelocity(x, y, dx * 5, dy * 5);
+  // A touch passes no move (its handler never stirred): no stir, and no row marked for nothing.
+  if (dx || dy) fluid.addVelocity(x, y, dx * 5, dy * 5);
 }

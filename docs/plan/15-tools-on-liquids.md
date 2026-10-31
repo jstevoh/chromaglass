@@ -115,8 +115,9 @@ Left, each its own plan item:
   out of it. The pointer leads the pool it blows across, so each press sent the pool's liquid
   back against the breath, and the gap it closed crept open for seconds after; thirty presses
   a stroke whatever the pace against the breath's steps, which came with the runner's. Story
-  in `docs/plan-shipped.md` §15g-7; `npm run tools` now counts the glass a Blow stroke
-  presses and asks for none.
+  in `docs/plan-shipped.md` §15g-7; `npm run tools` now counts the glass the hand presses in a
+  Blow stroke and asks for none; the touch path shares the fix, and a bubble's squeeze on its
+  footprint is counted as the bubble's, not the hand's.
 - **15g-8 The stroke's straw on GitHub's runners.** On those runners the stroke's "keeps it
   rather than erasing it" line (the pool's loss held to a tenth plus five) swings from a gain
   to a loss of 11% across eight pull requests of one morning (2026-10-30; pools of 235 to 367,

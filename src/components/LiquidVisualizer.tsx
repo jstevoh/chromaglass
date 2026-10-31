@@ -4677,11 +4677,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // it. A standing squeeze on each footprint keeps pumping the
               // dye out to the rim, so the field flows round the bubbles
               // instead of sliding underneath them as if they were painted on.
+              // The bubble's press, not the hand's (lib/squish.ts Presser): a held Blow's straw bubble is one, and `npm run tools` counts the hand's alone.
               if (lead) {
                 for (const b of bubbles.bubbles) {
                   if (b.r < 1.2) continue;
                   const bx = Math.round(b.x), by = Math.round(b.y);
-                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035);
+                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
                 }
               }
               // A pop is an inward cavity collapse into the void left behind.
@@ -7397,10 +7398,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (!h) continue;
           h.x = x; h.y = y;
         }
-        // Not under the magnet, the finger or the drop, as for the mouse above.
-        if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && activeToolRef.current !== 'dropper' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-          activeFluid.applySquish(x, y, 8, 0.005);
-        }
+        // The press as for the mouse above, and no stir, which a touch never had (stirAlongMove: not under the finger, the drop or the blow).
+        if (activeFluid && activeToolRef.current !== 'magnet') stirAlongMove(activeFluid, activeToolRef.current, x, y, 0, 0);
       }
     };
 

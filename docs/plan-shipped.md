@@ -2745,7 +2745,13 @@ What changed: the press and stir moved to `src/sim/tools.ts` (`stirAlongMove`, a
 first, the visualizer file being at its size ceiling) and the Blow returns before them as the
 Drop and the Finger do. `npm run tools` prints the cells of glass each stroke pressed
 (`pressedCells.hand`, the solver's own count) and a new line asks for none; the bar and the
-3000 ms stroke are unchanged. The straw's swing on GitHub's runners is 15g-8; the other
+3000 ms stroke are unchanged. The touch handler's press (the phone and the pad) goes through
+the same function, with no stir, so a finger's Blow is exempt too. A bubble's standing
+squeeze on its footprint pressed as the hand; it is counted as the bubble's now (`Presser`
+'bubble', lib/squish.ts), since on a runner slow enough to hold the Blow still between moves
+the straw's bubble presses mid-stroke, and the hand's count has to stay the hand's (the app
+on the software plate: 531 cells by the bubble, none by the hand, over a stroke with six
+straw steps). The straw's swing on GitHub's runners is 15g-8; the other
 tools' press and stir are 15g-9.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid

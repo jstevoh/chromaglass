@@ -647,7 +647,7 @@ try {
       */
       const again = await windRun(C, [C[0] + half, C[1]], 1);
       for (const [name, r] of [['right', fwd], ['left', back], ['right again', again]]) {
-        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, ${r.pressed} cells of glass pressed, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
+        console.log(`     ${name.padEnd(11)} ${(r.along * 100).toFixed(2)}% along, ${r.wind} wind steps (${r.directed} with a way to go, ${r.aired} as air on the film, ${r.straw} straw), ${r.carries} carries moving ${r.carried.toFixed(1)}, ${r.readings} readings landed, ${r.pressed} cells of glass pressed by the hand, moves took ${r.strokeMs} ms, pool's middle ${(r.poolX * 100).toFixed(2)}%, ${(r.poolY * 100).toFixed(2)}% from where it was laid`);
       }
       /*
         The plate's own drift, signed, at its rate toward where the stroke
@@ -768,9 +768,13 @@ try {
         the solver (pressedCells.hand, as `npm run squeeze` reads the kicks'),
         not inferred from the colour, and asked of a stroke that ran as a Blow
         (wind steps), or a tool pick that missed would press nothing either.
+        The hand's count alone: a bubble's standing squeeze on its footprint
+        is the bubble's (pressedCells.bubble), the straw's included, which a
+        runner slow enough to hold the Blow still between moves blows
+        mid-stroke (15g-8).
       */
       check('and presses no glass along the way', fwd.pressed === 0 && wind > 0 && back.pressed === 0 && back.wind > 0,
-        `${Number.isFinite(fwd.pressed) ? fwd.pressed : 'no count of'} cell(s) of glass pressed in the stroke, ${Number.isFinite(back.pressed) ? back.pressed : 'no count of'} the other way`);
+        `${Number.isFinite(fwd.pressed) ? fwd.pressed : 'no count of'} cell(s) of glass pressed by the hand in the stroke, ${Number.isFinite(back.pressed) ? back.pressed : 'no count of'} the other way`);
       const pushed = (r, name) => !r.stepsOk
         ? `${name}: the plate did not step through every window (${r.before.steps}, ${r.strokeSteps}, ${r.early.steps}, ${r.late.steps} steps)`
         : `${name}: ${pct(r.along)} over ${r.strokeSteps} steps against ${pct(r.idle)} over ${r.before.steps} left alone before (${pct(r.bar)} to beat), from a pool of ${r.wa.total.toFixed(0)} (${r.wb.total.toFixed(0)} after); after it ${pct(r.earlyAlong)} over ${r.early.steps} then ${pct(r.lateAlong)} over ${r.late.steps} (printed, not judged)`;
