@@ -537,6 +537,9 @@ function showDetails() {
     show.oscMode === 'off'
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // Where a VJ finds the whole address space and the starter maps (PLAN 13.4):
+    // the details are the one place the app names OSC beside its port.
+    'Every OSC address, with Resolume and TouchDesigner maps: github.com/jstevoh/chromaglass/blob/main/docs/osc.md',
     // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
     // details say so, rather than an open port that answers nothing. Not a
     // dialog on the menu's pick: on a Mac a message box is a sheet on the

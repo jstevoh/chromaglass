@@ -3611,7 +3611,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
-            const rate = Math.max(0, Math.min(1, currentSettings.automateRate ?? 0.12));
+            const rate = Math.max(0, Math.min(3, currentSettings.automateRate ?? 0.12));
             /*
               What the hands hear: the song over the last half minute, and its
               section. Not the frame's energy, treble and spectral centroid,
@@ -4225,7 +4225,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     its own and read as Beat Squeeze, which sits at 0 on every
                     look but Bass Drop.
                   */
-                  const bloomGain = Math.max(0, Math.min(1.5, currentSettings.kickBloom ?? 1));
+                  const bloomGain = Math.max(0, Math.min(4, currentSettings.kickBloom ?? 1));
                   if (kickRef.current.kick && simStep === 0 && bloomGain > 0) {
                     // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
@@ -4402,7 +4402,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (melodyQueueRef.current.length > 0) {
               const drops = melodyQueueRef.current.splice(0);
               const mf = fluidsRef.current[activeLayerRef.current];
-              const gain = Math.max(0, Math.min(1, currentSettings.melodyWalk ?? 0));
+              const gain = Math.max(0, Math.min(2, currentSettings.melodyWalk ?? 0));
               if (mf && gain > 0 && isActiveRef.current && drainFrameRef.current === 0) {
                 const target = dyeLookTarget(mf.seedMean, currentSettings.dyeBudget ?? 0.85, mf.seedBudget);
                 const clearPhase = mf.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
@@ -4434,7 +4434,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // leans a small sway keeps it alive.
           {
             const rock = rockRef.current;
-            const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
+            const R = Math.max(0, Math.min(3, currentSettings.plateRock ?? 0));
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const kickStep = kickRef.current.kick && simStep === 0;
             /*
@@ -5220,7 +5220,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Second-layer throw: zoom grows with the setting, drift is a slow
         // Lissajous so the two scales slide past each other.
         {
-          const variety = Math.max(0, Math.min(1, currentSettings.layerScaleVariety ?? 0));
+          const variety = Math.max(0, Math.min(2, currentSettings.layerScaleVariety ?? 0));
           const view = layer1ViewRef.current;
           view.zoom = 1 + variety * 1.6;
           view.dx = Math.sin(time * 0.05) * 0.07 * variety;

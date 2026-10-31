@@ -570,7 +570,7 @@ export function useMusicIntelligence(
     let sat = params.saturationBoost;
     let impact = baseSettings.audioImpact;
     if (section) {
-      if (section.label === 'chorus') { turb = Math.min(1, turb + 0.2); sat = Math.min(2, sat + 0.15); impact = Math.min(1, impact + 0.2); }
+      if (section.label === 'chorus') { turb = Math.min(1, turb + 0.2); sat = Math.min(3, sat + 0.15); impact = Math.min(1, impact + 0.2); }
       else if (section.label === 'intro' || section.label === 'outro') { turb *= 0.6; impact *= 0.7; }
       else if (section.label === 'bridge') { turb = Math.min(1, turb + 0.1); }
     }

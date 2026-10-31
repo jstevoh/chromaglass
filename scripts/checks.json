@@ -1062,6 +1062,15 @@
       ]
     },
     {
+      "name": "Thin Film's rings are round",
+      "shard": "lab2",
+      "run": "npm run filmrings",
+      "why": [
+        "Thin Film's rings read the film's amount through a B-spline (PLAN 1i): the film itself, probed",
+        "out of the display pass, has no corner at the texels where the old read had one in every cell."
+      ]
+    },
+    {
       "name": "Sign-in",
       "shard": "lab2",
       "run": "npm run signin",
