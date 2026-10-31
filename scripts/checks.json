@@ -987,6 +987,22 @@
       ]
     },
     {
+      "name": "Soap Breakdown keeps a long show bursting",
+      "shard": "lab2",
+      "run": "npm run soapbreak -- --owed=law,decay,show,default",
+      "why": [
+        "The Soap Breakdown dial (PLAN 38c-3, scripts/soapbreak.mjs), written ahead of",
+        "its build: soapBreakdownRate's law (0 takes nothing, an hour's half-life or",
+        "more at 0.01, ten seconds or less at the top), the solver's loss as",
+        "exp(-kt) per real second within 2% at two step lengths and three times the",
+        "sim's dt, the tenth minute of a kick track (a drop still bursts with the",
+        "dial up, does nothing at 0, every drop kept at 0), and the setting 0 on",
+        "every look. --owed: each line is excused only in main's state and printed",
+        "as owed until the PR that builds it takes its id out. The lab alone, about",
+        "four minutes on SwiftShader, beside soap."
+      ]
+    },
+    {
       "name": "A bubble's middle is the plate",
       "shard": "lab2",
       "run": "npm run bubblelook",

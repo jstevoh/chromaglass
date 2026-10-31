@@ -90,7 +90,20 @@ written first. Line numbers are as read on main at d07ac31.
     nature, so a long show keeps bursting: the soap taken up by the oil's interface, or
     fresh water through the trough, as a first-order rate on the mix's .g in
     `mixUpdate`, scaled in metres and seconds; MIDI, both desks and the phone's Soap
-    sheet in the same PR. *Measure:* bursts over ten minutes of a kick track.
+    sheet in the same PR. *Measure:* `npm run soapbreak`, written first and red on main
+    (CI runs it with `--owed=law,decay,show,default`; the build takes each id out as it
+    turns green). Its contract: `src/gpu/fluid/soap.ts` exports `soapBreakdownRate(dial)`
+    (0..1 to k in 1/s, exactly 0 at 0, a half-life of an hour or more at 0.01 and ten
+    seconds or less at 1); the step's params carry the dial as `soapBreakdown` and the loss
+    is per real second (`magnetSeconds`), never per frame or by `dt`, so 30 s reads
+    exp(−k·30) within 2% at two step lengths and at three times the dt; in the tenth minute
+    of a kick track (nine minutes' drops laid at once, the last minute dropped on the
+    kicks) a drop bursts half as well as on clean water or better with the dial at its top,
+    and under a fifth at 0 with every drop kept to 1%; `soapBreakdown` is 0 in
+    DEFAULT_SETTINGS and no look sets it. Proved against a scratch build: a correct loss
+    passes all four (kept 0.3536 against exp(−kt) 0.3536; the drop 69% against clean
+    water's 99.5%); a loss per frame reads 0.84 and 0.71 at the two steps, one scaled by
+    dt 0.044, both red.
   - **38c-4. Acidity diffuses at a grid rate** (S). The same mix update spreads the
     acidity at 0.04 cells² a step (`fluid.ts`, 'mix update'), about 6.5e-7 m²/s at 384²
     and 60 Hz, where H⁺ and OH⁻ are 9.3e-9 and 5.3e-9 (and a pH indicator's dye, 4e-10):
