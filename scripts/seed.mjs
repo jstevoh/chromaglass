@@ -298,7 +298,7 @@ const lay = (seed) => { setShowSeed(seed); restartStreams('look:fillmore-1969', 
 
 const churnBubbles = () => {
   const f = new BubbleField(N);
-  for (let t = 0; t < 240; t++) { if (t % 20 === 0) f.spawn(60 + t / 4, 90, 5, 3, 20); f.step(dt, swirl, 0, 0, 1, 0.8); }
+  for (let t = 0; t < 240; t++) { if (t % 20 === 0) f.spawn(60 + t / 4, 90, 5, 3, 20); f.step(dt, swirl, 0, 0, 0.8); }
 };
 const churnBeads = () => {
   const f = new BeadField(N);
@@ -321,11 +321,11 @@ const bubbles = (seed, churn = false) => {
   f.spawn(96, 96, 6, 8, 24);
   for (let t = 0; t < 360; t++) {
     if (t < 90) f.blow(50, 140, dt, 1);
-    f.step(dt, swirl, 0, 0, 1, 0.6);
+    f.step(dt, swirl, 0, 0, 0.6);
     if (t % 90 === 45) f.spawn(40 + t / 6, 60, 5, 4, 16);
   }
-  f.pack(1);
-  return { n: f.bubbles.length, nums: [...f.bubbles.flatMap((b) => [b.x, b.y, b.r, b.wph, b.lobes]), ...f.packed] };
+  f.pack();
+  return { n: f.bubbles.length, nums: [...f.bubbles.flatMap((b) => [b.x, b.y, b.r, b.film, b.lobes]), ...f.packed] };
 };
 const macro = (seed) => {
   lay(seed);
@@ -467,8 +467,8 @@ if (process.argv.includes('--lab')) {
     for (let i = 0; i < 12; i++) kicks.push({ x: 0.1 + r.float() * 0.8, y: 0.1 + r.float() * 0.8, v: [r.centred() * 0.02, r.centred() * 0.02, 0, 0] });
     const f = new BubbleField(256);
     f.spawn(128, 128, 8, 10, 60);
-    for (let t = 0; t < 60; t++) f.step(dt, swirl, 0, 0, 1, 0.5);
-    const count = f.pack(1);
+    for (let t = 0; t < 60; t++) f.step(dt, swirl, 0, 0, 0.5);
+    const count = f.pack();
     return { blobs, kicks, bubbles: { packed: Array.from(f.packed), finger: Array.from(f.packedFinger), count } };
   };
   const { page, close } = await openLab();

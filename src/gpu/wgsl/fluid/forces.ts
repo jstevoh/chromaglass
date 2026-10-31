@@ -8,7 +8,7 @@
  */
 
 import { BILERP_N, HEAD, NOISE_WGSL, W } from './shared';
-import { DISH_GAP_RANGE, DISH_METRES } from '../../../lib/turntable';
+import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../lib/turntable';
 
 export const FORCE_KERNELS: Record<string, string> = {
   liquidForces: `${HEAD}
@@ -305,7 +305,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var flow = v.xy + c;
   if (A.a.z > 0.0) {
     let h = max(textureLoad(sq, vec2i(id.xy), 0).r, 0.0005);
-    let nominal = 0.03;
+    let nominal = ${DISH_REST_GAP};
     /*
       Capped at one, so this is a drag and never a pump.
 
@@ -386,8 +386,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     Integrated exactly over the step for a force held through it:
     w = a/k + (w − a/k) e^(−k dt), which is stable for any k, down to the
     glycerine's millisecond. dt is A.a.w, real seconds. Units are plate
-    widths and seconds throughout; the gap is turned into metres by the
-    plate's width (DISH_METRES) only where it meets the viscosity.
+    widths and seconds throughout; the gap is turned into metres
+    (DISH_GAP_FIELD_METRES, metres per unit of the gap field) only where it
+    meets the viscosity.
   */
   spinSwirl: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var sw: texture_2d<f32>;
@@ -418,7 +419,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // The way round a positive speed turns, in the solver's uv: the picture's
   // angle grows this way (uvToFluid in wgsl/plate.ts).
   let turn = vec2f(-d.y, d.x);
-  let h = clamp(bilerpN(sq, uv, S.n).r, ${DISH_GAP_RANGE[0]}, ${DISH_GAP_RANGE[1]}) * ${DISH_METRES};
+  let h = clamp(bilerpN(sq, uv, S.n).r, ${DISH_GAP_RANGE[0]}, ${DISH_GAP_RANGE[1]}) * ${DISH_GAP_FIELD_METRES};
   let nu = exp(mix(log(A.b.x), log(A.b.y), oilAt(uv)));
   let k = 12.0 * nu / (h * h);
   var a = A.a.x * (k - A.a.y) * turn;

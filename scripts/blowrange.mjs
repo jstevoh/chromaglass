@@ -74,7 +74,7 @@ function wind(a, { seconds = 3, rate = 60, old = false } = {}) {
     const x = 40 + (step / (seconds * rate)) * 110, y = 96;
     const n = old ? (step % 6 === 0 ? 1 : 0) : spawnsOf(WIND_SPAWNS_PER_SECOND * airTaken(k) * dt, u());
     if (n > 0) { f.spawn(x, y, 1.2 * 1.5, 2 * n, 3 * 1.5); spawns += n; }
-    f.step(dt, still, 0, 0, 1.5, 0);
+    f.step(dt, still, 0, 0, 0);
   }
   return { spawns, bubbles: f.bubbles.length };
 }
@@ -114,7 +114,7 @@ check('a breath gentler than the speed the surface tears at takes no air in',
 {
   const area = (a, flow) => {
     const f = new BubbleField(N);
-    for (let t = 0; t < 60; t++) { f.blow(96, 96, 1 / 60, flow(a)); f.step(1 / 60, still, 0, 0, 1, 0); }
+    for (let t = 0; t < 60; t++) { f.blow(96, 96, 1 / 60, flow(a)); f.step(1 / 60, still, 0, 0, 0); }
     const b = f.bubbles.find((q) => q.straw);
     return b ? Math.PI * b.r * b.r : 0;
   };

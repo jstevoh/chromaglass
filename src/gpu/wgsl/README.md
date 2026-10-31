@@ -22,6 +22,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `air.ts`: air splat. `splat.ts`: pours. `stats.ts`: field summaries.
 - `camera.ts`, `cameraFields.ts`: camera pass.
 - `ferroDrop.ts`: closeup drop. `standing.ts`: domes.
+- `lampField.ts`: `LAMP_FIELD_WGSL`, `lampField`, `pupilPass`: the projector's light on the stage (the lamp lever, the aperture), with the CPU twin `npm run lampfield` reads.
 - `film.ts`: a clear film that tears.
 - `fluid/`: the solver's kernels, one file a pass.
 - `output.ts`, `outputFields.ts`: projector pass.
@@ -33,4 +34,4 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 ## Checks
 
-`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `mixer`, `grainedge`, `lampzero`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `particles`. A changed constant: `checkguard`.
+`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `mixer`, `grainedge`, `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `particles`. A changed constant: `checkguard`.
