@@ -19,15 +19,18 @@
  * bubble at the closeup's zoom:
  *
  *   1. its middle is the lamp through a pocket of clear air: over WINDOW
- *      of the lamp through clear water (255 in the lab), all but what
- *      Fresnel reflects at the pocket's two faces, about 4%. It was a mix
- *      toward a dimmed tint, 150 here: darker than air ever is;
+ *      of the lamp through clear water, drawn in the same run. It was a mix
+ *      toward a dimmed tint, 150 here: darker than air ever is. (This line
+ *      holds the window, not the trace: the solver empties the pocket's dye,
+ *      and the lab's lamp clips near 255, so Fresnel's 4% is not readable
+ *      here. Lines 2 and 3 hold the trace.)
  *   2. its wall is a dark band, darkest under DARK of the liquid's level,
- *      between the window and the contact, and the light is back within
- *      CLOSE of the radius past its darkest: by the trace, the grazing
- *      reflection lights the outer tenth of the meniscus, which is a third
- *      of a pancake's radius, so 3% and a pixel's antialiasing. The single
- *      bend left the wall dark to the contact, 8 px (9%) here;
+ *      just inside the contact worked out beforehand (CONTACT), and up close
+ *      (EDGE_ZOOM) the light comes back by over LINE of the liquid before
+ *      the contact. OPEN (38h-7 review): with the grazing reflection taken
+ *      out this line still passes, the coverage's fade of the cleared middle
+ *      lights that stretch; it holds once the rim is drawn from the bubble's
+ *      centre and size rather than the coarse air field;
  *   3. the liquid round it is seen through its wall: with a red pool on one
  *      side, the meniscus inside the band is redder on that side than the
  *      other by over LENS levels (r - g). A magnifier, as the bubble was,
@@ -46,13 +49,22 @@ const check = (name, ok, detail = '') => {
 
 /** The grid, the picture, a bubble of B cells at the closeup's zoom (a pancake: its radius three times half the gap). */
 const N = 384, S = 360, B = 18, ZOOM = 4;
-const WINDOW = 0.9, DARK = 0.3, LENS = 12, CLOSE = 0.05;
+const DARK = 0.3, LENS = 40, LINE = 0.25, SIDE = 0.25;
+const WINDOW = 0.9;
+/** One plate uv is S * 1.5 * zoom pixels (the camera's uvToFluid), so the contact is known before anything is read. */
+const CONTACT = (B / N) * S * 1.5 * ZOOM;
+const EDGE_ZOOM = 12, EDGE_SHIFT = 0.9;
 
 const { page, close } = await openLab();
 let r;
 try {
-  r = await page.evaluate(async ({ N, S, B, ZOOM }) => {
+  r = await page.evaluate(async ({ N, S, B, ZOOM, EDGE_ZOOM, EDGE_SHIFT }) => {
     await lab.create(N);
+    const cam = { time: 3, macroAmount: 1, zoom: ZOOM, cx: 0.5, cy: 0.5, bubbles: 1 };
+    const base = { bubbles: 1, lampGround: 1, lightPlay: 0 };
+    const shot = async (over, c = cam) => Array.from(await lab.render(S, { ...base, ...over }, c));
+    // The lamp through clear water, no dye and no bubble: line 1's reference.
+    const clear = await shot({});
     // A pale wash, the same everywhere, and later a red pool beside the bubble.
     lab.dye(0.5, 0.5, 1.2, [0.9, 0.5, 0.3], 0.5);
     lab.flush(); await lab.step(4);
@@ -61,10 +73,10 @@ try {
       await lab.step(2, { bubbleClear: 1 });
     };
     await bubble();
-    const cam = { time: 3, macroAmount: 1, zoom: ZOOM, cx: 0.5, cy: 0.5, bubbles: 1 };
-    const base = { bubbles: 1, lampGround: 1, lightPlay: 0 };
-    const shot = async (over, c = cam) => Array.from(await lab.render(S, { ...base, ...over }, c));
     const out = {
+      clear,
+      // The bubble's right-hand rim at EDGE_ZOOM, its centre EDGE_SHIFT radii left of the picture's middle.
+      edge: await shot({}, { ...cam, zoom: EDGE_ZOOM, cx: 0.5 + EDGE_SHIFT * B / N }),
       wash: await shot({}),
       lit: await shot({ lightPlay: 1 }),
       plate0: await shot({}, { ...cam, macroAmount: 0, zoom: 1 }),
@@ -76,7 +88,7 @@ try {
     await bubble();
     out.pool = await shot({});
     return out;
-  }, { N, S, B, ZOOM });
+  }, { N, S, B, ZOOM, EDGE_ZOOM, EDGE_SHIFT });
 } finally {
   await close();
 }
@@ -94,14 +106,30 @@ const ring = (px, rad, f, from = 0, to = 2 * Math.PI) => {
 const prof = Array.from({ length: Math.floor(S / 2) - 2 }, (_, k) => ring(r.wash, k, lum));
 const outside = prof[prof.length - 1];
 const middle = prof.slice(0, 10).reduce((a, b) => a + b) / 10;
-let band = 0; for (let k = 10; k < prof.length; k++) if (prof[k] < prof[band] || band === 0) band = k;
+const lamp = Array.from({ length: 10 }, (_, k) => ring(r.clear, k, lum)).reduce((a, b) => a + b) / 10;
+let band = 10; for (let k = 10; k < prof.length; k++) if (prof[k] < prof[band]) band = k;
 const windowEdge = prof.findIndex((v, k) => k > 10 && v < middle - 20);
-const after = prof.slice(band).findIndex((v) => v > 0.5 * outside);
-check(`1. a bubble's middle is the lamp through clear air: over ${WINDOW} of 255`,
-  middle > WINDOW * 255, `middle ${middle.toFixed(0)}, the liquid round it ${outside.toFixed(0)}`);
-check(`2. its wall is a dark band under ${DARK} of the liquid between the window and the contact, and the light is back over half within ${CLOSE} of the radius outside it`,
-  prof[band] < DARK * outside && windowEdge > 0 && band > windowEdge && after >= 0 && after < CLOSE * band,
-  `window to ${windowEdge} px, darkest ${prof[band].toFixed(0)} at ${band} px, half back ${after} px out`);
+// Every line below reads at the bubble the picture was asked to show: its band just inside the contact worked out beforehand.
+const placed = band >= CONTACT - 14 && band <= CONTACT - 1;
+check(`1. a bubble's middle is the lamp through clear air: over ${WINDOW} of the lamp through clear water`,
+  placed && middle > WINDOW * lamp, `middle ${middle.toFixed(1)}, the lamp ${lamp.toFixed(1)}: ${(middle / lamp).toFixed(3)}; the liquid round it ${outside.toFixed(0)}`);
+/*
+  The grazing line, at EDGE_ZOOM along the row through the bubble's centre,
+  out to the right: the outer tenth of the meniscus (sin θ past 0.91) is
+  several pixels there. Between the band's darkest and three pixels short
+  of the contact (the coverage's antialiasing) the light must come back by
+  over LINE of the liquid's level: a reflection the trace makes. With the
+  reflection taken out, that stretch is dark to the antialiasing.
+*/
+const ez = (B / N) * S * 1.5 * EDGE_ZOOM, ex0 = S / 2 - EDGE_SHIFT * ez;
+const row = Array.from({ length: S }, (_, x) => { let v = 0; for (let dy = -3; dy <= 3; dy++) v += lum(r.edge, x, S / 2 + dy); return v / 7; });
+const eContact = Math.round(ex0 + ez);
+let eBand = Math.round(ex0 + 0.66 * ez); for (let x = eBand; x < eContact - 3; x++) if (row[x] < row[eBand]) eBand = x;
+let eLine = eBand; for (let x = eBand; x < eContact - 3; x++) if (row[x] > row[eLine]) eLine = x;
+const eLiquid = row[Math.min(S - 1, eContact + 20)];
+check(`2. its wall is a dark band under ${DARK} of the liquid just inside the contact, and grazing reflection brings the light back by over ${LINE} of the liquid before the contact`,
+  placed && windowEdge > 0 && band > windowEdge && prof[band] < DARK * outside && row[eLine] - row[eBand] > LINE * eLiquid,
+  `contact ${CONTACT.toFixed(0)} px, darkest ${prof[band].toFixed(0)} at ${band} px; up close the band ${row[eBand].toFixed(0)} at ${eBand - eContact} px, the line ${row[eLine].toFixed(0)} at ${eLine - eContact} px, the liquid ${eLiquid.toFixed(0)}`);
 const inner = Math.max(windowEdge, band - 10);
 const meniscus = (side) => {
   let s = 0, n = 0;
@@ -110,20 +138,21 @@ const meniscus = (side) => {
 };
 const right = meniscus(0), left = meniscus(Math.PI);
 check(`3. the liquid round it is seen through its wall: the meniscus is redder on the red pool's side than the other by over ${LENS} levels (r - g)`,
-  right - left > LENS, `pool's side ${right.toFixed(1)}, far side ${left.toFixed(1)} (from ${inner} to ${band - 1} px)`);
+  placed && right - left > LENS, `pool's side ${right.toFixed(1)}, far side ${left.toFixed(1)} (from ${inner} to ${band - 1} px)`);
 let down = 0, added = 0, cx = 0, cy = 0, outsideAdd = 0;
 for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
   const d = lum(r.lit, x, y) - lum(r.wash, x, y);
   if (d < -1) down++;
   if (d > 1) {
     added += d; cx += d * (x - S / 2); cy += d * (y - S / 2);
-    if (Math.hypot(x - S / 2, y - S / 2) > band + 4) outsideAdd += d;
+    if (Math.hypot(x - S / 2, y - S / 2) > CONTACT + 2) outsideAdd += d;
   }
 }
+cx /= Math.max(added, 1); cy /= Math.max(added, 1);
 let plateMoved = 0; for (let i = 0; i < r.plate0.length; i++) if ((i & 3) !== 3) plateMoved = Math.max(plateMoved, Math.abs(r.plate0[i] - r.plate1[i]));
-check('4. Light Play adds light only, only on the bubble, above and left of its middle; the projected plate unchanged',
-  down === 0 && added > 1000 && outsideAdd === 0 && cx < 0 && cy < 0 && plateMoved <= 1,
-  `${down} pixels darker, ${added.toFixed(0)} levels added, ${outsideAdd.toFixed(0)} of them outside the bubble, centre of the added light (${(cx / Math.max(added, 1)).toFixed(1)}, ${(cy / Math.max(added, 1)).toFixed(1)}) px from the middle; the plate's most moved channel ${plateMoved}`);
+check(`4. Light Play adds light only, only on the bubble, its centre over ${SIDE} of the radius above and left of the middle; the projected plate unchanged`,
+  placed && down === 0 && added > 1000 && outsideAdd === 0 && cx < -SIDE * CONTACT && cy < -SIDE * CONTACT && plateMoved <= 1,
+  `${down} pixels darker, ${added.toFixed(0)} levels added, ${outsideAdd.toFixed(0)} of them outside the bubble, centred (${cx.toFixed(1)}, ${cy.toFixed(1)}) px from the middle; the plate's most moved channel ${plateMoved}`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n${checks.length - failed}/${checks.length} passed`);
