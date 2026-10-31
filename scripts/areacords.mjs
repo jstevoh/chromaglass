@@ -38,6 +38,29 @@
  *     and each of those carries an absolute floor (the area itself must have
  *     changed), so two runs that both did nothing cannot pass on a ratio of
  *     two zeros.
+ *  2b. Colour that answers the music (PLAN 25i), in node. (i) The lead's note
+ *     as a cord hears it: a melody of eight notes through the real HitSource
+ *     (its `pitchFine` an octave off on every third reading, and a neighbour
+ *     for two readings on each attack, the two errors a tracker makes) reads
+ *     each note's class once it has held for the ear's settle, the blips never,
+ *     and a rest keeps the last; and Sound Impact at 0.4 reads the same note
+ *     (a master scaling a name would read another), at 0 nothing. (ii) Poster's
+ *     own two cords (the kick's pour, the note's Bottle) on that melody with a
+ *     kick on each note: each kick pours the bottle its note maps to, 8 of 8,
+ *     where a bottle turned by the kicks' count or by the level is right about
+ *     a third of the time. (iii) Red Cabbage's pour cords drop their area's
+ *     own reagent, one drop a hit, and lay no dye at all, and so does a cord
+ *     on one of Chemical Clock's places; those are all on the bass and all
+ *     activator, so the kick's own hand touches them in turn.
+ *  3c. In the lab, the note and the chemistry on the real plate: (i) Poster's
+ *     cords on that melody, the dye each kick added to its area read off the
+ *     plate between notes, is nearest (as an absorbance's direction) the
+ *     bottle the note maps to, 8 of 8; (ii) Red Cabbage, snares and kicks: the
+ *     acidity in the snare's acid well moves at least 5x what it moves outside
+ *     every area, the kick's base well the other way at least 5x, and no dye
+ *     is laid; (iii) Chemical Clock, one drop of activator in one of its
+ *     places (as the kick's own hand lays it, in the visualizer's loop):
+ *     the gel fires there and not in the other two.
  *  4. The 25e count of lit places (connected cells over density 0.3, each over
  *     1% of the plate) on the three looks rebuilt with this, each played by
  *     its own cords for four seconds of a groove: once in its areas, once with
@@ -48,13 +71,17 @@
 import { readFileSync } from 'node:fs';
 import { CordGate, AreaHands, isAreaCord, AREA_TARGETS, GATE_HYSTERESIS, AREA_PADDLE_ORBIT, AREA_STIR_TURN_S } from '../src/lib/areaCords.ts';
 import { PatchBay, cordReading } from '../src/lib/sceneMap.ts';
-import { PRESET_AREAS, areaFamily, areasForBand } from '../src/lib/plateAreas.ts';
+import { PRESET_AREAS, areaFamily, areasForBand, areaForBand, areaDye } from '../src/lib/plateAreas.ts';
 import { PRESET_CONTRACTS } from '../src/presetPlate.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { sanitizePatch } from '../src/lib/sanitizeSettings.ts';
 import { SOURCE_NAMES } from '../src/lib/audioFeatures.ts';
-import { HIT_FEATURES } from '../src/lib/hitSource.ts';
+import { HIT_FEATURES, HitSource } from '../src/lib/hitSource.ts';
+import { MAPPABLE_SOURCES } from '../src/lib/midi.ts';
+import { reagentArea, AREA_DROP } from '../src/lib/areaCords.ts';
+import { dyeAbsorbances } from '../src/lib/dye.ts';
+import { PALETTE_RGB } from '../src/constants.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -297,6 +324,114 @@ const DT = 1 / 60;
   check('the patch bay offers the hand\'s four acts', AREA_TARGETS.map(t => t.key).join() === 'areaHeat,areaStir,areaPour,areaHue');
 }
 
+// ── 2b. Colour that answers the music (PLAN 25i) ─────────────────────
+/** The melody: MIDI notes, one each half second, whose classes span the octave (C G# E A D B F C#), in an order the kicks' own turn through the bottles does not follow. */
+const MELODY = [60, 68, 64, 69, 62, 71, 65, 61];
+const NOTE_S = 0.5;
+/** A kick's touch on one of Chemical Clock's places, as a cord (the look's own kick hand lays the same drop in the visualizer). */
+const touch = { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 1, depth: 0.6, threshold: 0.35, attack: 0.01, release: 0.2 };
+/** Which of an n-bottle family a class picks: the octave cut into n runs of notes (AreaHands.picked on (k + ½)/12). */
+const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
+{
+  const SETTLE = 8 / 60;
+  /** Readings at 60 a second: the melody, an octave off every third, a neighbour for two on each attack, a kick 0.25 s into each note. */
+  const readingAt = (f) => {
+    const t = f / 60, i = Math.floor(t / NOTE_S), u = t - i * NOTE_S;
+    if (i >= MELODY.length) return { t, r: { pitch: 0, pitchFine: 0, pitchSettleS: SETTLE, onsets: {} } };
+    const note = MELODY[i];
+    const fine = f % (Math.round(NOTE_S * 60)) < 2 ? note + 1 : (f % 3 === 0 ? note - 12 : note) + 0.2 * Math.sin(f);
+    const kickAt = i * NOTE_S + 0.25;
+    return { t, r: { pitch: 40, pitchFine: fine, pitchSettleS: SETTLE, onsets: { kick: { at: t >= kickAt ? kickAt : (i > 0 ? kickAt - NOTE_S : null), strength: 0.9, last: 0.9 } } } };
+  };
+  const src = new HitSource();
+  const sound = { features: { bands: new Array(8).fill(0) } };
+  const ctxAt = (impact) => ({ room: null, film: null, shape: null, sound, hits: src, roomImpact: 0, filmImpact: 0, soundImpact: impact, shapeImpact: 0 });
+  const noteCord = { source: 'hits', feature: 'noteClass', setting: 'areaHue', area: 0, depth: 1 };
+  const heard = [], blips = [], scaled = [];
+  for (let f = 0; f < (MELODY.length + 1) * NOTE_S * 60; f++) {
+    const { t, r } = readingAt(f);
+    src.update(r, t);
+    const i = Math.floor(t / NOTE_S), u = t - i * NOTE_S;
+    const k = Math.floor(src.value('noteClass') * 12);
+    if (i < MELODY.length && u > SETTLE + 3 / 60) { if (k !== MELODY[i] % 12) blips.push(`${t.toFixed(2)} s: ${k} for ${MELODY[i] % 12}`); }
+    // On the attack, before it settles: the last note or this one, never the neighbour a tracker hears for two readings.
+    if (i < MELODY.length && k !== MELODY[i] % 12 && k !== (i > 0 ? MELODY[i - 1] : MELODY[0]) % 12) blips.push(`${t.toFixed(2)} s: ${k} on the attack`);
+    if (i < MELODY.length && Math.abs(u - (NOTE_S - 1 / 60)) < 1e-6) heard.push(k);
+    if (i >= MELODY.length && k !== MELODY[MELODY.length - 1] % 12) blips.push(`rest ${t.toFixed(2)} s: ${k}`);
+    const a = cordReading(ctxAt(1), noteCord, 0), b = cordReading(ctxAt(0.4), noteCord, 0);
+    if (a !== b) scaled.push(`${a} at Sound Impact 1, ${b} at 0.4`);
+  }
+  check('the lead\'s note, through octave errors and a neighbour on each attack, is each note\'s class once settled, and kept through a rest',
+    blips.length === 0 && heard.join() === MELODY.map(n => n % 12).join(), blips.slice(0, 3).join('; ') || `heard ${heard.join(' ')}`);
+  check('a master turns a level down, not a note into another: the same note at Sound Impact 0.4, none at 0, and no MIDI fader rides it',
+    scaled.length === 0 && cordReading(ctxAt(0), noteCord, 0) === null && !MAPPABLE_SOURCES.includes('noteClass'), scaled[0] ?? 'alike');
+
+  // Poster's own cords: the kick's pour and the note's Bottle, on area 0.
+  const poster = PRESETS.find(p => p.id === 'poster-1969').settings.sceneMappings.filter(m => isAreaCord(m) && m.area === 0);
+  const pArea = PRESET_AREAS['poster-1969'];
+  const n = areaFamily(pArea[0]).length;
+  const want = MELODY.map(m => bottleOf(m, n));
+  const melodyRun = (cords) => {
+    const s2 = new HitSource(), hands = new AreaHands(), ctx2 = { ...ctxAt(1), hits: s2 };
+    // Each kick's pour, by the kick it follows (0.25 s into its note): its release runs on into the next note.
+    const poured = new Map();
+    const sinkHere = { heat() {}, paddle() {}, dye(x, y, amount, c) { const i = Math.floor((c.t - 0.25) / NOTE_S); poured.set(i, [...(poured.get(i) ?? []), c.k]); } };
+    for (let f = 0; f < MELODY.length * NOTE_S * 60; f++) {
+      const { t, r } = readingAt(f);
+      s2.update(r, t);
+      hands.step(cords, pArea, (m, band) => cordReading(ctx2, m, 0, band), DT);
+      hands.lay(sinkHere, 128, DT, (_a, k) => ({ r: 0, g: 0, b: 0, k, t }));
+    }
+    return MELODY.map((_, i) => { const ks = new Set(poured.get(i) ?? []); return ks.size === 1 ? [...ks][0] : -1; });
+  };
+  const got = melodyRun(poster), noNote = melodyRun(poster.filter(m => m.setting !== 'areaHue'));
+  const hits = (g) => g.filter((k, i) => k === want[i]).length;
+  check('Poster: each kick pours the bottle its note picks (the kicks\' own turn alone is the control)',
+    poster.some(m => m.setting === 'areaHue' && m.feature === 'noteClass') && hits(got) === MELODY.length && hits(noNote) < MELODY.length / 2,
+    `${hits(got)} of ${MELODY.length} (bottles ${got.join('')}, wanted ${want.join('')}); turned by the kicks ${hits(noNote)} of ${MELODY.length}`);
+
+  // The reagents: Red Cabbage's pour cords, and one on a Chemical Clock place, drop their area's own liquid, one a hit, and no dye.
+  const wrongDrop = [];
+  for (const id of ['red-cabbage', 'chemical-clock']) {
+    const areas = PRESET_AREAS[id];
+    const shipped = PRESETS.find(p => p.id === id).settings.sceneMappings.filter(m => isAreaCord(m) && m.setting === 'areaPour');
+    const pours = id === 'chemical-clock' ? [touch] : shipped;
+    if (pours.length < (id === 'chemical-clock' ? 1 : 2)) wrongDrop.push(`${id}: ${pours.length} pour cords`);
+    for (const m of pours) {
+      if (!reagentArea(areas[m.area])) wrongDrop.push(`${id} area ${m.area}: ${areas[m.area].liquid} is no reagent`);
+      const hands = new AreaHands(), feats = {}, laid = { dye: 0, drops: [] };
+      const ctx3 = { ...ctxAt(1), hits: { value: (f) => feats[f] ?? 0 } };
+      const sinkHere = { heat() {}, paddle() {}, dye() { laid.dye++; }, liquid(x, y, liq, strength) { laid.drops.push({ x: x / 128, y: y / 128, liq, strength }); } };
+      for (let f = 0; f < 240; f++) {
+        feats[m.feature] = f % 30 < 6 ? 0.9 : 0.02;
+        hands.step([m], areas, (c, band) => cordReading(ctx3, c, 0, band), DT);
+        hands.lay(sinkHere, 128, DT, () => ({ r: 1, g: 1, b: 1 }));
+      }
+      const a = areas[m.area];
+      if (laid.dye > 0) wrongDrop.push(`${id} area ${m.area}: ${laid.dye} dye pours`);
+      if (laid.drops.length !== 8) wrongDrop.push(`${id} area ${m.area}: ${laid.drops.length} drops for 8 hits`);
+      if (laid.drops.some(d => d.liq !== a.liquid || Math.hypot(d.x - a.x, d.y - a.y) > a.r * 0.55 || Math.abs(d.strength - AREA_DROP * Math.abs(m.depth) * 0.9) > 1e-9)) wrongDrop.push(`${id} area ${m.area}: a drop astray ${JSON.stringify(laid.drops[0])}`);
+    }
+  }
+  /*
+    The app's sink pours a reagent's drop through pourLiquid (sim/tools.ts
+    areaSink), and the visualizer lays the area cords through areaSink: the
+    lines above hand AreaHands sinks of their own, so without these two a
+    sink with no liquid (a reagent area then pours nothing in the app)
+    would leave every line green (the check-skeptic). tools.ts needs the
+    window, so the source is read, as the visualizer's is above.
+  */
+  const tools = readFileSync('src/sim/tools.ts', 'utf8'), viz = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  if (!/export const areaSink = \(fluid: FluidSimulation\): AreaSink => fluidSink\(fluid, GRID_SCALE, pourLiquid\);/.test(tools)) wrongDrop.push('sim/tools.ts areaSink does not hand fluidSink pourLiquid');
+  if (!/hands\.lay\(sink,/.test(viz) || !/sink = areaSink\(af\)/.test(viz)) wrongDrop.push('the visualizer does not lay the area cords through areaSink');
+  // Chemical Clock's places: every one activator and on the bass, so successive kicks take them in turn.
+  const clock = PRESET_AREAS['chemical-clock'];
+  const turns = [0, 1, 2].map(k => clock.indexOf(areaForBand(clock, 'bass', k)));
+  if (!(clock.length === 3 && clock.every(a => reagentArea(a) && a.liquid === 'activator' && a.band === 'bass') && new Set(turns).size === 3)) wrongDrop.push(`chemical-clock: places ${JSON.stringify(clock.map(a => [a.liquid, a.band]))}, kicks to ${turns}`);
+  check('Red Cabbage\'s pours, and a pour on a Chemical Clock place, are a drop of their area\'s own reagent, one a hit, with no dye; the kicks take the clock\'s three places in turn',
+    wrongDrop.length === 0, wrongDrop.join('; ') || `acid, base and activator, 8 drops for 8 hits on each cord; three kicks to places ${turns.join(', ')}`);
+}
+
 // ── 3, 4. The lab ────────────────────────────────────────────────────
 if (!process.argv.includes('--node')) {
   const { openLab } = await import('./lab.mjs');
@@ -404,6 +539,103 @@ if (!process.argv.includes('--node')) {
     check('and band 7 works the syrup and leaves the well',
       ratio(h2.dye, h1.dye) >= 5 && ratio(h2.speed, h1.speed) >= 5 && h2.density >= 0.5 * h2.laid && h2.speed >= 0.5 * inW.speed,
       `${ratio(h2.dye, h1.dye).toFixed(1)}x dye, ${ratio(h2.speed, h1.speed).toFixed(1)}x flow`);
+
+    // 3c. Colour that answers the music (PLAN 25i), on the real plate.
+    {
+      const nearest = (vec, family) => {
+        let best = -1, bestCos = -2;
+        family.forEach((rgb, k) => {
+          const a = dyeAbsorbances(rgb.r, rgb.g, rgb.b), m = Math.hypot(...a) * Math.hypot(...vec);
+          const cos = m > 0 ? (a[0] * vec[0] + a[1] * vec[1] + a[2] * vec[2]) / m : -2;
+          if (cos > bestCos) { bestCos = cos; best = k; }
+        });
+        return best;
+      };
+      // (i) Poster's own cords on the melody: a kick 0.25 s into each note, the dye it added read off the plate.
+      const pId = 'poster-1969', pAreas = PRESET_AREAS[pId], pContract = PRESET_CONTRACTS[pId];
+      const pLook = PRESETS.find(p => p.id === pId).settings;
+      const pCords = pLook.sceneMappings.filter(m => isAreaCord(m) && m.area === 0);
+      const notes = MELODY.map((m, i) => ({ feature: 'noteClass', t0: i * NOTE_S, dur: NOTE_S, level: ((m % 12) + 0.5) / 12, hold: true }));
+      const kicks = MELODY.map((_, i) => ({ feature: 'kickHit', t0: i * NOTE_S + 0.25, dur: 0.15, level: 0.9 }));
+      const snaps = MELODY.map((_, i) => i * NOTE_S + 0.24).concat([MELODY.length * NOTE_S - 1 / 60]);
+      const pOver = { ...over, dt: pLook.globalSpeed * 0.2, advection: pLook.advection, damping: pLook.damping };
+      const pRun = await page.evaluate((c) => window.areas.run(c), { L, seconds: MELODY.length * NOTE_S, areas: pAreas, contract: pContract, cords: pCords, bursts: [...notes, ...kicks], over: pOver, every: 60, pools: false, snaps });
+      const a0 = pAreas[0], fam = areaFamily(a0).map((_, k) => PALETTE_RGB[areaDye(a0, pContract, 0, k)]);
+      const picked = MELODY.map((_, i) => {
+        const before = pRun.snaps[i], after = pRun.snaps[i + 1], v = [0, 0, 0];
+        for (let c = 0; c < L * L; c++) {
+          const p = { x: (c % L + 0.5) / L, y: (Math.floor(c / L) + 0.5) / L };
+          if (Math.hypot(p.x - a0.x, p.y - a0.y) >= a0.r) continue;
+          for (let ch = 0; ch < 3; ch++) v[ch] += after[c * 4 + ch] - before[c * 4 + ch];
+        }
+        return nearest(v, fam);
+      });
+      const wantLab = MELODY.map(m => bottleOf(m, fam.length));
+      console.log(`  Poster on the melody: the dye each kick added to its area is nearest bottle ${picked.join('')}, its notes pick ${wantLab.join('')}`);
+      check('on the plate, the dye each of Poster\'s kicks adds to its area is the bottle its note picks, every note',
+        picked.join() === wantLab.join(), `${picked.filter((k, i) => k === wantLab[i]).length} of ${MELODY.length}`);
+
+      // (ii) Red Cabbage: snares and kicks, the acidity read off the plate's mix.
+      const rId = 'red-cabbage', rAreas = PRESET_AREAS[rId], rLook = PRESETS.find(p => p.id === rId).settings;
+      const rCords = rLook.sceneMappings.filter(isAreaCord);
+      const rOver = { ...over, dt: rLook.globalSpeed * 0.2, advection: rLook.advection, damping: rLook.damping, phIndicator: 1 };
+      const rBursts = [...groove('kickHit', 4, 0.5, 0.15), ...groove('snareHit', 4, 1, 0.15).map(b => ({ ...b, t0: b.t0 + 0.25 }))];
+      const rCfg = { L, seconds: 4, areas: rAreas, contract: PRESET_CONTRACTS[rId], cords: rCords, bursts: rBursts, over: rOver, every: 60, pools: false, chem: 'mix' };
+      const rRun = await page.evaluate((c) => window.areas.run(c), rCfg);
+      const mix = rRun.chem;
+      /** Mean acidity (mix.b: + acid, − base) over the cells `where` picks, on the mix's own grid. */
+      const acidity = (where) => {
+        let sum = 0, n = 0;
+        if (!mix) return { mean: 0, abs: 0 };
+        let abs = 0;
+        for (let c = 0; c < mix.n * mix.n; c++) {
+          const p = { x: (c % mix.n + 0.5) / mix.n, y: (Math.floor(c / mix.n) + 0.5) / mix.n };
+          if (!where(p)) continue;
+          sum += mix.data[c * 4 + 2]; abs += Math.abs(mix.data[c * 4 + 2]); n++;
+        }
+        return { mean: sum / Math.max(1, n), abs: abs / Math.max(1, n) };
+      };
+      const outR = (p) => Math.hypot(p.x - 0.5, p.y - 0.5) < 0.45 && rAreas.every(a => Math.hypot(p.x - a.x, p.y - a.y) > 1.25 * a.r);
+      const inAcid = acidity(p => inArea(rAreas[0], p)), inBase = acidity(p => inArea(rAreas[1], p)), outAcid = acidity(outR);
+      const laidDye = rRun.laidDye.reduce((a, b) => a + b, 0);
+      const byId = (id) => rRun.drops.filter(d => d.id === id).length;
+      console.log(`  Red Cabbage: acidity ${inAcid.mean.toFixed(4)} in the acid well, ${inBase.mean.toFixed(4)} in the base well, ${outAcid.abs.toFixed(5)} outside (mean |acidity|); ${byId('acid')} acid and ${byId('base')} base drops for ${rRun.fires.join('/')} openings; dye laid ${laidDye.toFixed(3)}`);
+      check('Red Cabbage: the snare\'s acid moves the acidity in its own well at least 5x what it moves outside every area, the kick\'s base the other way in its, and neither lays dye',
+        inAcid.mean >= 0.01 && -inBase.mean >= 0.01 && inAcid.mean >= 5 * outAcid.abs && -inBase.mean >= 5 * outAcid.abs && laidDye === 0 && byId('acid') >= 4 && byId('base') >= 8,
+        `${ratio(inAcid.mean, outAcid.abs).toFixed(1)}x acid, ${ratio(-inBase.mean, outAcid.abs).toFixed(1)}x base`);
+
+      /*
+        (iii) Chemical Clock: one kick's drop of activator in its first place,
+        laid by a cord as the kick's own hand lays it (the visualizer's beat
+        dose, doseArea, which the lab does not run), and the gel's activator
+        (rxn.r) read off the plate half a second later. At the beat dose's
+        size and not the cord's: the dose is `bass01` of a dose (Kick Bloom
+        1), so a middling kick (bass01 0.45) lays 0.45 of one, which a cord
+        at depth 0.25 on a hit of 0.9 also lays (AREA_DROP 2 × 0.225); and
+        where the dose lands, about the kick's ring out from the place's
+        middle (0.35 + 0.5 × bass01 of its radius, 0.6 here), which the cord's
+        first drop (at the middle) reaches with the place moved over by that
+        for the cord alone. The peaks are read in the real places.
+      */
+      const cId = 'chemical-clock', cAreas = PRESET_AREAS[cId], cLook = PRESETS.find(p => p.id === cId).settings;
+      const cOver = { ...over, dt: cLook.globalSpeed * 0.2, advection: cLook.advection, damping: cLook.damping, bzReaction: cLook.bzReaction };
+      const cRun = await page.evaluate((c) => window.areas.run(c), { L, seconds: 0.6, areas: cAreas.map((a, i) => (i === 0 ? { ...a, x: a.x + 0.6 * a.r } : a)), contract: PRESET_CONTRACTS[cId], cords: [{ ...touch, area: 0, depth: 0.25 }], bursts: [{ feature: 'kickHit', t0: 0.1, dur: 0.15, level: 0.9 }], over: cOver, every: 60, pools: false, chem: 'rxn' });
+      const rxn = cRun.chem;
+      const peakIn = (a) => {
+        let peak = 0;
+        if (!rxn) return 0;
+        for (let c = 0; c < rxn.n * rxn.n; c++) {
+          const p = { x: (c % rxn.n + 0.5) / rxn.n, y: (Math.floor(c / rxn.n) + 0.5) / rxn.n };
+          if (inArea(a, p)) peak = Math.max(peak, rxn.data[c * 4]);
+        }
+        return peak;
+      };
+      const peaks = cAreas.map(peakIn);
+      console.log(`  Chemical Clock, one kick: the gel's activator peaks at ${peaks.map(v => v.toFixed(3)).join(', ')} in its three places; ${cRun.drops.length} drop(s)`);
+      check('Chemical Clock: a kick fires the gel in the kick\'s own place and not in the other two',
+        peaks[0] > 0.2 && peaks[1] < 0.05 * peaks[0] && peaks[2] < 0.05 * peaks[0] && cRun.drops.length === 1,
+        peaks.map(v => v.toFixed(3)).join(' / '));
+    }
 
     // 4. The lit places, on each rebuilt look, by its own cords.
     /** The lit places, and which place (0 = none) each cell is in. */

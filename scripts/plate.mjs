@@ -84,9 +84,11 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // journey's narrower window (two of three areas came out one colour).
 {
   // What `deposit` (lib/liquidPhase.ts) does anything with: a liquid whose
-  // every one of these is zero returns from it having poured nothing.
+  // every one of these is zero returns from it having poured nothing. The BZ
+  // activator (PLAN 25i) goes where the acid does, to the GPU through
+  // onDeposit (gpu/fluid/inputs.ts addLiquidDrop: the gel fires).
   const pours = (l) => !!l.behaviour && !l.behaviour.magnetic
-    && ['soap', 'body', 'repel', 'weight', 'polarity', 'acid'].some(k => (l.behaviour[k] ?? 0) !== 0);
+    && ['soap', 'body', 'repel', 'weight', 'polarity', 'acid', 'bz'].some(k => (l.behaviour[k] ?? 0) !== 0);
   const pourable = new Set(DEFAULT_LIQUID_TYPES.filter(pours).map(l => l.id));
   const finite = (...v) => v.every(Number.isFinite);
   const bad = [];

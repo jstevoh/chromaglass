@@ -4796,6 +4796,42 @@ number for the whole plate and every area drew on one palette.
   other two are stirred and warmed), Bass Drop 0 → 0 (its cords pour nothing; its wells take
   the music's own hands, 25h-7).
 
+### 25i. Colour that answers the music (shipped)
+
+The owner's 2026-10-24 direction C: once each area has its own family (25h), the music picks
+which bottle pours next, and no hue dial is turned.
+
+- **By the note.** A sixth reading on the `hits` source, **Note (C to B)** (`noteClass`,
+  `lib/hitSource.ts`): which of the twelve notes the lead is playing, read off `pitchFine` (the
+  melody's own pitch, 24.3-place) and not `pitch` (mostly the bass line's bin). A pitch class
+  is the one reading an octave error cannot move. A new note is taken once it has held for the
+  ear's settle (`pitchSettleS`), so a tracker's neighbour on an attack picks nothing, and a
+  rest keeps the last note. It is a name, not a level: no gate, no Sound Impact scaling
+  (`sceneMap.ts`; a master at 0 still silences it), not a MIDI or Sound Learn source
+  (`midi.ts` MAPPABLE_SOURCES), and the patch sheet (the desk's and the phone's, one sheet)
+  hides Gain and Gate on it. On a Bottle cord (`AreaHands`) the class cuts the octave into the
+  area's bottles. A gated pour now keeps the bottle it was picked up with until its next
+  opening, so a note that changes in a pour's release colours the next pour, not the tail.
+  **Poster, 1969**: the kick pours into the left shape, whose bottle the lead picks (orange C
+  to D#, ultramarine E to G, purple G# to B); the old Bottle cord there read band 2's level.
+- **By chemistry.** An area whose liquid is a reagent (Acid, Base, and a new bottle, **BZ
+  Activator**: bromous acid, which fires a BZ gel where it lands) pours a drop of that liquid
+  on each opening of its Pour cord (`AREA_DROP`, two automation doses at full) and no dye. Red
+  Cabbage's snare and kick poured the areas' pink and green dye before, a painted colour; now
+  they drop acid and base and the indicator answers. The activator goes to the gel through the
+  solver's `addLiquidDrop` (a target ring, not a spiral: a whole disc with no wake). **Chemical
+  Clock** has three activator places, all on the bass, so the kick's own beat dose touches
+  them in turn (`areaForBand`); its own seed still lays the dish (`OWN_SEED_AREAS`).
+- **More than five dyes** was not needed to show this (25i-3 keeps it open).
+- **Measured** (`npm run areacords`, 28 lines; the lab with `PW_WEBGPU=1`, 362 s here): the
+  note through octave errors and attack neighbours reads 0 8 4 9 2 11 5 1 for the melody C G#
+  E A D B F C#, and both mutants tried (no settle; `pitch` for `pitchFine`) fail it; Poster's
+  own cords pour the mapped bottle 8 of 8 where turning by the kicks alone gets 2 of 8; on the
+  real plate the dye each kick adds is nearest its note's bottle 8 of 8; Red Cabbage's acidity
+  0.028 in the acid well and -0.056 in the base well with nothing outside either, and no dye
+  laid; one drop of activator fires the gel to 0.81 in its place and 0.000 in the other two.
+  Judging §96 owes the owner's eyes. Open: 25i-1 to 25i-5.
+
 ## 26. A reaction that prints: Turing stripes in black and white
 
 ### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)
