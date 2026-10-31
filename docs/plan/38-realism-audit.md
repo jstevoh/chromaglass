@@ -98,18 +98,28 @@ written first. Line numbers are as read on main at d07ac31.
   against N_B at three gaps and three fields, within 15% of the law; stripes, not dots, at
   the fill where the theory says stripes.
 
-- **38e. Oil's surface tension in newtons a metre, and no cap at the moment it matters**
-  (S, nil; Medium-High: every oil look's rounding and break-up). Sharpens **18c-4** and
-  **18d-1**. *Now:* the oil's tension is a 0–1 dial times `OIL_TENSION` 4e-4 plate widths,
-  "set in the lab so each effect is plainly there at full" (`constants.ts:134-150`,
-  `fluid.ts:785`), and the capillary force is capped at 0.5 cells a step (`OIL_CELLS`,
-  `wgsl/fluid/capillary.ts:283-288`), which the comment says bites when a fresh pour is
-  breaking up: the Rayleigh–Plateau moment, the one a viewer watches. *Real:* in a thin gap
-  a curved interface moves at u = h²σκ/(12μ), with σ for oil on water 0.02–0.05 N/m from
-  the bottle (bottles carry σ since 18d-1). *Build:* the dial becomes σ/σ_ref from the
-  bottle; the cap becomes CFL sub-steps, as the carries already do. *Measure:* a thread's
-  break-up time against Rayleigh–Plateau in a gap, and a drop's rounding time against
-  h²σ/(12μR) for two oils.
+- ~~**38e**~~ Oil's surface tension in newtons a metre, and no cap: shipped (`npm run oiltension`;
+  story in `docs/plan-shipped.md` §38). Found with it:
+  - **38e-1** One σ for the plate's oil. The oil is one field, so a plate with sunflower and
+    silicone poured on it takes the area-weighted mean of their tensions (`oilSigma`), where
+    really the two oils do not mix with each other either and each drop keeps its own. Carry
+    σ a cell with the oil's own viscosity (18d-3) in the same texture.
+  - **38e-2** A thread narrower than the gap. The force is the in-plane curvature only, which
+    is the whole of it for a body wider than the gap (in a Hele-Shaw cell such a thread does
+    not break by Rayleigh–Plateau: it retracts and rounds, and the plate now does that at the
+    law's rate). A thread squeezed thinner than the gap is a cylinder, and it should bead up
+    by Rayleigh–Plateau within the gap: give the capillary pressure the out-of-plane
+    meniscus, σ(2/min(w, h)), with w the body's own width, and measure the break-up time
+    against the law in a gap.
+  - **38e-3** The old plate (Thin Gap off) keeps the half-cell cap (`OIL_CELLS`): it has no
+    drag to answer a force, and clamps every cell besides. Retire it with the old plate.
+  - **38e-4** The last of a thread's oval. On 192² a thread pulled in at the oil's own
+    tension stops short of round: aspect 1.30 after eight seconds and falling a hundredth a
+    half second, where the law's rate for its radius would round it in about a second (the
+    lab's oval drop of R 0.1, laid round, relaxes at 89% of the law). A flow of about 0.09
+    of the flow's unit stays in it (0.27 at three times real): the diffuse edge's own current,
+    linear in σ. Find what holds it (Cahn–Hilliard pinning the edge to the grid, the current,
+    or the shape not being an oval) and measure it on the Mac's 768.
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).

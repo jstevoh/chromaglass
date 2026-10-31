@@ -1978,6 +1978,20 @@
       ]
     },
     {
+      "name": "Oil's surface tension is the oil's own",
+      "shard": "fifth",
+      "run": "npm run oiltension",
+      "timeout": 15,
+      "why": [
+        "Oil's surface tension in newtons a metre, with no cap (PLAN 38e): an",
+        "oval drop relaxes at Darcy's h²σ/4μR³ with σ the shelf's sunflower oil",
+        "against water; the silicone bottle's own tension makes it faster by",
+        "their ratio; twice the dial takes half the time (a cap would not); and",
+        "at three times real on a finer grid the step stays one settled body.",
+        "About ten minutes on software WebGPU; in the fifth shard beside rimhold."
+      ]
+    },
+    {
       "name": "Drops of oil crowd without merging",
       "shard": "fifth",
       "run": "npm run filmhold",

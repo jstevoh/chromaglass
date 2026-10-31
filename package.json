@@ -213,6 +213,7 @@
     "sheet": "node scripts/sheet.mjs",
     "oillift": "node scripts/oillift.mjs",
     "rimhold": "node scripts/rimhold.mjs",
+    "oiltension": "node --experimental-strip-types --no-warnings scripts/oiltension.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
     "thick": "node scripts/thick.mjs",

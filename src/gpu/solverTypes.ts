@@ -1,4 +1,5 @@
 import type { SloshDrive } from '../lib/slosh';
+import type { LiquidBehaviour } from '../types';
 /**
  * What a solver is told, and what the plate needs of one
  * (docs/webgpu-plan.md, P7).
@@ -286,7 +287,8 @@ export interface PlateSolver {
   addLiquidDrop?(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number; bz?: number }, amount: number, seconds?: number): void;
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
-  addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** `of`, the bottle the oil came from, for its tension against water (lib/liquidProps.ts interfacialTension); `sigma`, that tension in N/m outright; the shelf Oil's with neither. */
+  addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number; sigma?: number; of?: LiquidBehaviour }): void;
   /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out

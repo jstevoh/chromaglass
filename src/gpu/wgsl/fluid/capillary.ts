@@ -25,7 +25,7 @@ export const RIM_SAMPLES = 1024;
   The oil's capillary force, σ κ ∇c̃, at one cell (mixForce has the physics),
   shared by mixForce and rimLaplace so the rim reads the very force the flow
   is given. Both bind the oil's blur as \`soft\`; A.a.x is σ and A.a.y the most
-  it may add, both mixForce's.
+  it may add, both mixForce's (0: no cap, as on a thin gap, PLAN 38e).
 
   And the rim's share of it (PLAN 18g-6). The thin gap's rim is open: past
   it the liquid is the reservoir round the cover glass, held at the air's
@@ -70,7 +70,7 @@ fn capillaryAt(p: vec2i, n: f32) -> vec2f {
   let kappa = -0.5 * ((nrm(p + vec2i(1, 0), n).x - nrm(p - vec2i(1, 0), n).x) + (nrm(p + vec2i(0, 1), n).y - nrm(p - vec2i(0, 1), n).y));
   var f = A.a.x * kappa * g;
   let l = length(f);
-  if (l > A.a.y) { f *= A.a.y / l; }
+  if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
   return f;
 }
 // The ring rimLaplace integrates along: two cells inside the rim, inside
@@ -285,7 +285,8 @@ fn sampleAt(g: vec2f, n: f32) -> vec3f {
     is curved, with κ = −∇·(∇c̃/|∇c̃|) and c̃ the oil blurred [1 4 6 4 1]²
     (mixSmooth). It is what makes an oil blob in water pull itself round and
     carry the dye inside it along. A.a.x = σ (in cells, so the host scales it
-    by N² for the same force on every grid), A.a.y the most it may add.
+    by N² for the same force on every grid; in N/m through oilMobility in
+    fluid/constants.ts), A.a.y the most it may add, on the old plate only.
 
     It was the Korteweg form, −σ c ∇μ, which is the same force on paper and
     is what the Cahn–Hilliard energy hands you. On a grid it is not: μ is a
@@ -418,7 +419,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     if (h > 0.0) {
       var f = A.a.x * exp(-h / ${FILM_DECAY.toFixed(2)}) * g;
       let l = length(f);
-      if (l > A.a.y) { f *= A.a.y / l; }
+      if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
       v = vec4f(v.xy + f, v.zw);
     }
   }

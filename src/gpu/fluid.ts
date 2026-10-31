@@ -49,7 +49,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, oilMobility, OIL_TENSION_MOST, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidReads } from './fluid/reads';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
@@ -738,7 +738,7 @@ export class WebGPUFluid extends FluidReads {
       the plate is what each step adds and the lasting current).
       In real seconds: each strength is plate widths a second.
     */
-    const oil = Math.max(0, Math.min(1, p.oilTension ?? 0));
+    const oil = Math.max(0, Math.min(OIL_TENSION_MOST, p.oilTension ?? 0));
     const soap = Math.max(0, Math.min(1, p.surfactantFlow ?? 0));
     /*
       Dye weighs something whether or not a look says how much, so standing
@@ -782,7 +782,9 @@ export class WebGPUFluid extends FluidReads {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      const args = this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
+      // σ in N/m times the dial (oilMobility); capped only on the old plate, which has no drag to answer it (0: none).
+      const sigma = oil * oilMobility(this.oilSigma) * perSecond * N * N, most = thin ? 0 : OIL_CELLS / Math.max(disp * N, 1e-9);
+      const args = this.arg('mix force', [sigma, most, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
         gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
@@ -799,7 +801,7 @@ export class WebGPUFluid extends FluidReads {
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {
         this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
-          this.arg('mix film', [oil * OIL_TENSION * perSecond * N * N * FILM_PUSH * hold, OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+          this.arg('mix film', [sigma * FILM_PUSH * hold, most, 0, 0]));
         this.vel.swap();
       }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));

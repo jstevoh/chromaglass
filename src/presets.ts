@@ -84,7 +84,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'surfactantFlow', depth: 0.25 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
-        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.067 },  // a third of 0.2: Oil Tension's travel is 0 to 3 now (PLAN 38e), the swing the same,
       ],
       audioMappings: {
         velocity: 'bass',        // low frequencies push the fluid gently
@@ -677,7 +677,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'bands', feature: 'hats', setting: 'beads', depth: 0.3 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
-        { source: 'bands', feature: 'tonalHigh', setting: 'oilTension', depth: 0.2 },
+        { source: 'bands', feature: 'tonalHigh', setting: 'oilTension', depth: 0.067 },
       ],
       audioMappings: {
         velocity: 'complexity',
@@ -1147,7 +1147,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'cells', depth: 0.25 },
         { source: 'hits', feature: 'snareHit', setting: 'lacing', depth: 0.25 },
-        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.067 },
       ],
       audioMappings: {
         velocity: 'bass',
@@ -1570,7 +1570,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'fingering', depth: 0.25 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
-        { source: 'bands', feature: 'bass', setting: 'oilTension', depth: 0.2 },
+        { source: 'bands', feature: 'bass', setting: 'oilTension', depth: 0.067 },
       ],
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
@@ -1890,7 +1890,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.25 },
         { source: 'hits', feature: 'snareHit', setting: 'fingering', depth: 0.25 },
-        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.2 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.067 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
     }
@@ -1963,7 +1963,7 @@ export const PRESETS: Preset[] = [
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.3 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.15 },
-        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.15 },
+        { source: 'bands', feature: 'tonalMid', setting: 'oilTension', depth: 0.05 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }

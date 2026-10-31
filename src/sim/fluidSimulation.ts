@@ -553,7 +553,7 @@ export class FluidSimulation {
         const room = 1 - (g.oilCover ?? 0) / BODY_COVER;
         if (room > 0) {
           const r = Math.max(1.5, radius) * BODY_DROP * Math.sqrt(Math.min(1, oil) * Math.min(1, room + 0.25));
-          g.addMix(cx / L, cy / L, r / L, { oil: 1 });
+          g.addMix(cx / L, cy / L, r / L, { oil: 1, of: what });
         }
         oil = 0;
       }
@@ -563,7 +563,7 @@ export class FluidSimulation {
       }
       
       if (oil <= 0 && soap <= 0 && acid === 0) return;
-      g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
+      g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid, of: what });
     };
 
     this.s = new Float32Array(GRID_AREA);
@@ -3374,7 +3374,7 @@ export class FluidSimulation {
       magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
-      oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
+      oilTension: settings.oilTension ?? 0,
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
       filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
       surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),

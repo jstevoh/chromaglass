@@ -4,7 +4,7 @@ The WebGPU solver's class, split by what its members do (PLAN 19ai-7). Each file
 
 ## Files, in the order a step runs
 
-- `constants.ts` (37 KB, grep it): the constants (`REST_GAP`, `NU_REF`, `THIN_GAP_THICKNESS`, the carry and film numbers), the shapes handed out (`FieldStats`, `FieldCarry`) and the few physics helpers. No class.
+- `constants.ts` (37 KB, grep it): the constants (`REST_GAP`, `NU_REF`, `THIN_GAP_THICKNESS`, the carry and film numbers), the shapes handed out (`FieldStats`, `FieldCarry`) and the few physics helpers (`oilMobility`: the oil's tension in N/m as the capillary force's σ, PLAN 38e). No class.
 - `core.ts`: `FluidCore`. Every field, the constructor, `clear`, and the pipeline and bind-group helpers.
 - `fields.ts`: `FluidFields`. The fields a look makes on first use (the mix, the film, the reaction's grids, the thin gap's), the getters the frame loop reads, `dispose`.
 - `inputs.ts`: `FluidInputs`. What is put in from outside a step: `applyDeltas`, `applySplats`, the poured image and video, chemistry, phase, film and liquids, `handOver` and `takeOver`.
