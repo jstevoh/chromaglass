@@ -112,7 +112,22 @@ async function scene(labels) {
   await shot('film1Later', { thinFilm: 1, filmPhysics: 1 }, { ...plate, time: T + 60 });
   const bs = [], sizes = [4, 5, 6, 8, 10, 12, 14];
   for (const rad of sizes) bs.push(0.25 + rnd() * 0.5, 0.25 + rnd() * 0.5, rad / N, 1);
-  lab.solver().setBubbles(new Float32Array(bs), sizes.length, 0.05, new Float32Array(sizes.length * 4));
+  /*
+    Each pocket's film is the one its own speed laid on the glass (PLAN 38n;
+    bubbles.ts packs it in the byte that was the film's age, a log scale
+    from Ca 1e-6 to 1e-2): these seven drifted at capillary numbers from
+    3e-5 to 3e-4, a tenth to a third of a millimetre a second in the default
+    oil, a plate at rest. Zeros there would now be the thinnest film a still
+    pocket can keep, where they used to be a fresh one with a random
+    thickness of its own.
+  */
+  const rim = new Float32Array(sizes.length * 4);
+  const span = Math.log10(Math.pow(1e-2, 2 / 3) / 1e-4);
+  sizes.forEach((_, k) => {
+    const Ca = 3e-5 * Math.pow(10, k / (sizes.length - 1));
+    rim[k * 4 + 3] = Math.log10(Math.cbrt(Ca * Ca) / 1e-4) / span;
+  });
+  lab.solver().setBubbles(new Float32Array(bs), sizes.length, 0.05, rim);
   await lab.step(3);
   const QUIET = { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 };
   const views = {
