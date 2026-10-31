@@ -2190,6 +2190,23 @@ holds the arithmetic and the plate in the lab; only a real plate says whether it
 5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
    snare and hats touching places of their own as well.
 
+## 97. The oil beads drawn on the GPU (PLAN 14ab-6)
+
+The beads' mask is drawn by the plate now, not by a canvas and an upload. `npm run beadmask`
+holds the drops to the CPU's drawing to a level, but the rings' edges were the canvas's
+antialiasing and are now each pixel's coverage, so an edge can sit a few levels apart.
+
+1. Fillmore with Oil Beads at 0.8 and Drops at 0, then Drops at 1, a minute of each with
+   music. The beads should look as they did: rings with a thin dark rim, drops with their
+   colours, walls and passengers. Nothing should flicker, lag a frame behind the flow, or
+   draw a bead where none is.
+2. The closeup at 3x on a crowd of rings: their rims should be as thin and even as before,
+   with no staircase of dark squares round the edge (droplens's old fault).
+3. The governor's readout with Drops at 1, before this change and after if you have the
+   last build: the frame should be cheaper, most on the busiest crowds.
+4. Bad: a stripe or square of mask missing (a tile the list did not reach), drops drawn
+   upside down against the flow, a passenger outside its drop.
+
 ## 98. The projector's light: the lamp lever (PLAN 38a)
 
 `npm run lampfield` proves the law on a bare lab stage; only the Mac at 60 fps says how it
