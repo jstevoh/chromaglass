@@ -637,6 +637,8 @@ const api = {
     cam: {
       magnets?: { x: number; y: number; height: number; strength: number }[];
       cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource | BeadField; view?: boolean; time?: number;
+      /** Where the app's Lamp Motion has put the light the gloss is lit from (`npm run lampfield`: the hot-spot must not follow it). */
+      lamp?: { x: number; y: number; x2: number; y2: number };
       /*
         The other pictures the plate composites, for the mixer's check
         (`npm run mixer`): a film frame, a logo, and a second plate. The
@@ -696,7 +698,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
