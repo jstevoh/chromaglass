@@ -48,6 +48,11 @@ import { launchChromium } from './chromium.mjs';
 import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
+import { PIN_RANGE } from '../src/lib/deskPins.ts';
+
+// Magnet Size's top, the registry's: it ran to 1 and runs on to 1.5 since PLAN 27h-1,
+// so "end to end" is read against the dial's own end rather than a copy of it.
+const MAGNET_SIZE_TOP = PIN_RANGE.get('magnetSize').max;
 
 const PORT = Number(process.env.PHONE_PORT ?? 4183);
 const HEADED = process.argv.includes('--head');
@@ -380,7 +385,7 @@ try {
       `shown ${thinShown}/${liftShown}, on the Magnet ${magnetGlass}; Thin Gap ${thinOff} then ${thinOn} ("${thinSaid}"); Press Lift ${liftUp} then ${liftBack}`);
     const pressSize = await visible(page, 'phone-magnet-size');
     check(`${label}: the Magnet's Amount has Size under it, and only the Magnet's, and it moves Magnet Size end to end`,
-      magnetSize && !pressSize && sizeUnder && sizeUp === 1 && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
+      magnetSize && !pressSize && sizeUnder && sizeUp === MAGNET_SIZE_TOP && sizeBack === 0 && Math.abs((sizeReset ?? -1) - 0.5) < 1e-6,
       `on the Magnet ${magnetSize}, on the Press ${pressSize}, under the Amount ${sizeUnder}, Magnet Size ${sizeUp} then ${sizeBack}, then ${sizeReset} put back`);
     await tap(page, 'phone-tool-press');
     await tap(page, 'phone-tool-magnet');
