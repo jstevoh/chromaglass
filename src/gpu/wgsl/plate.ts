@@ -183,8 +183,8 @@ var<private> milkGap: f32 = 1.0;
  *
  * 1. Black Ground (diffuse backscatter):
  *    In two-flux Kubelka-Munk theory, a non-absorbing scattering layer of
- *    thickness d = d_0 * gap (rest gap d_0 = 6.0 mm from DISH_REST_GAP = 0.03
- *    on a 0.2 m plate) has optical scattering depth Sd = sc * (6.0 * gap).
+ *    thickness d = d_0 * gap (d_0 = 6.0 mm, the old gap, until PLAN 38i)
+ *    has optical scattering depth Sd = sc * (6.0 * gap).
  *    Diffuse reflectance is R_KM = Sd / (1.0 + Sd), exactly conserving energy
  *    (R + T = 1.0). Large fat globules (1-10 um) scatter flat across visible
  *    wavelengths (Mie), providing an opaque white body (R_KM) over the ground
@@ -1347,7 +1347,7 @@ fn pouredDn(uv: vec2f) -> f32 {
 
 /*
   The optical path through the column, OPL = n·h, with h in rest gaps
-  (DISH_REST_GAP, 6 mm on the 0.2 m dish), so a column of clear water at
+  (DISH_REST_GAP, 2 mm in the middle), so a column of clear water at
   rest reads 1.333. v is viewProps' (oil, gap, film); dn is pouredDn's.
   The dye's own term, d·0.015·dyeGain, is a named stand-in (refractionOptics
   note 6): a dilute dye barely moves water's index, and this is what gives
@@ -1763,7 +1763,7 @@ const DROP_MAG: f32 = 1.23;
   a ball (at 2.3 it came out a fifth flat, and the camera's view through it
   lost a third of its turn: npm run droplens). The gap (0.03 in the
   solver's units at rest) scales it: a press to half the gap halves every
-  meniscus.
+  meniscus. Half the old 6 mm gap (38r-2).
 */
 const DROP_HALF_GAP: f32 = 0.016;
 /** Half the gap where the last dropLens call found a drop (it reads it only there). */
@@ -2961,7 +2961,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
-          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);
+          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005));
           pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 

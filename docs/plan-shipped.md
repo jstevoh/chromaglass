@@ -10111,6 +10111,65 @@ model cannot reach one, the PR says what it reached and asks.
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
 
+### 38. Realism audit: what still imitates, after §18 (asked 2026-10-30)
+
+#### 38r. The rest gap
+
+  - **38r. The glass sandwich is 2 mm, one number (shipped 2026-10-31).** The owner, on the
+    audit: "Put the glass sandwich like it's supposed to be. I have no idea." The plate's
+    glasses were 6 mm apart at rest (0.03 of the 0.2 m plate), a dish with a glass resting
+    on a deep layer. No source found gives a number for nested clock glasses on an overhead
+    projector (the histories say a few drops of oil and colour, spread by the top glass and
+    held by surface tension); a few millilitres under a top glass about 15 cm across is
+    1–3 mm, and 2 mm, the middle, is a judgement and not a measurement.
+
+    The 6 mm lived in three places that agreed by hand (`REST_GAP`, `DISH_REST_GAP`, the gap
+    kernels' literals) and in about twenty readers that made the field a length by the
+    plate's width. Now `DISH_GAP_METRES` (`src/lib/turntable.ts`) is the one number. The gap
+    field keeps 0.03 at rest, in *gap units* (h₀/0.03), so every press, kick, lift and check
+    written in those numbers since #220 reads the same; a reader that needs a length
+    multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in the solver) or `DISH_GAP_FIELD_UV`.
+    Rescaling the field itself to 0.01 would have touched about sixty tuned press amounts
+    and check literals for no change in the physics. The gap kernels interpolate the rest
+    number, floor (0.27 mm) and ceiling (4 mm) from the lib.
+
+    On the 2 mm: the drag 12ν/h² (hsPrep's scale is now 12ν/G², G the field's metres; the
+    clear liquid's viscosity read back from the same G), the glass's drift, the slump's gap,
+    the breath's stress, the spin's swirl, the oil's free rise (`OIL_LIFT`, 16 → 1.75 cm/s
+    per unit sinθ), the pour's dome (three times the share a second), the cover glass's
+    shear (three times the drag), the rhythm sheet's film (mobility h³, so the kick's dent is
+    about 1.7× narrower), a finger's Brinkman edge (1.7 → 0.58 mm), the ferrofluid's room
+    under the top glass (`FILM_TOP` 15.6 → 5.1 full cells; the lab's tallest domes, 1.6 l_c,
+    now reach the glass, as a ferrofluid's peaks in a real 2 mm sandwich do) and the
+    closeup drop's (`GAP_LC` 4.7 → 1.57 l_c).
+
+    Held by the physical quantities they read, never by a fudge: the forces read as speeds at
+    the rest gap (Rain Drip, Updraft, Plate Rock's `ROCK_FALL`, the magnet) keep their
+    numbers, so a look's push is the push it was tuned on. `MAGNET_GAIN` was a tenth of the
+    real pull at 6 mm; the real pull goes as h₀², so at 2 mm the same gain is 0.93 of it
+    (`npm run magnetgain` now asks 0.93). `ROCK_FALL` is now about twice what dyed water does
+    in a real 2 mm sandwich, a dial past nature (the owner's rule, 10-30). What moves for
+    real: water's drag time is a third of a second, not three, so a push or a spun dish's
+    lag fades nine times sooner and a water look's music sway comes through at 0.97 of the
+    dish's, not 0.39 (38r-3 is a Gap dial if a look wants the old glide); the reduced
+    Reynolds number for water drops from about 2 to 0.2, so dropping the carry in the thin
+    solve is now right for water too.
+
+    Not on the 2 mm yet, each named in its file and written in as an item: the tilt's slosh
+    (38r-1, a free surface the sandwich does not have), a drop's pancake radius and the
+    beads' merge time (38r-2, with 14ab-6), and the milk's scattering depth (38i).
+
+    Checks: `npm run gap` (new, logic shard): eleven lines, every reader of the gap as a length against its SI physics at 2 mm, the shaders' compiled numbers and a grep of the source for a gap made a length by the plate's width,
+    red on the old tree (no `DISH_GAP_METRES`), green after. `npm run turntable`'s drag
+    times are worked from 2 mm (water 0.333 s, thick 0.0167 s, oil 0.0067 s; were 3, 0.15,
+    0.06) and its windows put on the drag time (63% in one, the flick read after a frame and
+    at a quarter and one τ, the share after one τ), and its steady lag reads the frame's own
+    exact turn. `npm run framesway`'s half-way line is read on water at full Plate Rock (on
+    the default oil the cover no longer reaches the rim: 0.489% against 0.487%; on water
+    0.759% against 1.212%). `thingap`, `oillift`, `dish`, `fingerflow`, `flick`, `sheet`,
+    `slump`, `rides`, `flush`, `derive` and `magnetgain` read the gap from the constant
+    instead of a typed 6 mm.
+
 ### QA list: what the owner found playing it (from 2026-10-04)
 
 #### QA-19. Interacting with settings switches to and maximizes the performance window

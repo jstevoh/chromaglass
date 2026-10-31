@@ -62,7 +62,7 @@
  *     under a body force is Darcy's, f · h² / 12μ (wgsl/thinGap.ts, the
  *     header). hsPrep reads every body force as the speed it drives the
  *     *reference* liquid to at the rest gap (Thin Gap's default Thickness,
- *     ν_ref = 22 mm²/s, a light oil; h₀ = 6 mm): the force is k_ref · Δv with
+ *     ν_ref = 22 mm²/s, a light oil; h₀ = 2 mm, PLAN 38r): the force is k_ref · Δv with
  *     k_ref = 12 ν_ref / h₀², a step adds k_ref Δt of it, and the drag
  *     k = 12 ν / h² of the cell's own liquid is taken implicitly, so a cell
  *     of ferrofluid alone settles at Δv · ν_ref / ν_ff, and a drop of it in
@@ -193,9 +193,9 @@ try {
   const K = await page.evaluate(() => ({
     bRef: lab.SPIKE_B_REF, radius: lab.MAGNET_RADIUS, E: lab.MAGNET_E, Bs: lab.MAGNET_BS, gain: lab.MAGNET_GAIN,
     cap: lab.MAGNET_CAP, cells: lab.MAGNET_CELLS, nuRef: lab.NU_REF, nuFf: lab.FERRO_NU, rho: lab.LIQUID_DENSITY,
-    restGap: lab.REST_GAP, L: lab.PLATE_METRES,
+    restGapMetres: lab.REST_GAP_METRES, L: lab.PLATE_METRES,
   }));
-  const L = K.L, h0 = K.restGap * L;
+  const L = K.L, h0 = K.restGapMetres;
   const bRefT = K.bRef * BR;                    // the tesla value of share 1
   const muRef = K.rho * K.nuRef, muFf = K.rho * K.nuFf;
   const perPsi = (EFH1.chi / (2 * MU0)) * bRefT * bRefT / K.E;   // J/m³ per unit of ψ, weak field
@@ -343,8 +343,9 @@ fn magnetRadius() -> f32 { return R; }
   const ratioLin = pull(far.fLin), ratioLang = pull(far.fLang);
   check('units: in the weak field the shader\'s ∇ψ, in the joules a unit of ψ is matched to, is the linear Kelvin force (its law\'s saturation allowed for); this holds ψ\'s units, not the gain, which cancels here', Math.abs(ratioLin * sat / (gainPhys / K.gain) - 1) < 0.05,
     `the linear law's pull over the solver's ${ratioLin.toFixed(3)} at Ferro Maze's magnet (b ${far.share.toFixed(3)}, where the solver's law is ${sat.toFixed(3)} of its quadratic), against GAIN_phys over MAGNET_GAIN, ${(gainPhys / K.gain / sat).toFixed(3)} with the saturation; the Langevin law's ${ratioLang.toFixed(3)}; the EFH1 drop's speed in the oil over the solver's drop's ${far.ratio.toFixed(3)}`);
-  check('MAGNET_GAIN is a tenth of GAIN_phys, the gain the derivation gives at EFH1\'s χ (PLAN 29c-2)', Math.abs(K.gain / gainPhys / 0.10 - 1) < 0.1,
-    `MAGNET_GAIN ${K.gain.toExponential(3)} is ${(K.gain / gainPhys).toFixed(3)} of GAIN_phys ${gainPhys.toExponential(3)} s (0.10 asked, within a tenth)`);
+  // 0.93 since PLAN 38r: GAIN_phys goes as h₀², and the 2 mm gap's is a ninth of the 6 mm gap's, at which this asked 0.10.
+  check('MAGNET_GAIN is the real pull, GAIN_phys, the gain the derivation gives at EFH1\'s χ at the 2 mm rest gap (PLAN 29c-2, 38r)', Math.abs(K.gain / gainPhys / 0.93 - 1) < 0.1,
+    `MAGNET_GAIN ${K.gain.toExponential(3)} is ${(K.gain / gainPhys).toFixed(3)} of GAIN_phys ${gainPhys.toExponential(3)} s (0.93 asked, within a tenth)`);
 
   // ── The solver's drop against the Darcy speed ──
   /*

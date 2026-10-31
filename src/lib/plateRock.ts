@@ -232,7 +232,7 @@ export function rockSwing(rock: { x: number; y: number }, R: number, swayX: numb
   one's when the same hand rocks it.
 */
 export type CoverGlass = { x: number; y: number; vx: number; vy: number };
-import { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './turntable';
+import { DISH_GAP_METRES, thicknessViscosity } from './turntable';
 /** The cover's mass per area, kg/m²: 2 mm of glass at 2,500 kg/m³. */
 export const COVER_KG_M2 = 5;
 /*
@@ -267,9 +267,9 @@ export function plateSin(hold: number, swing: number): number {
   return hold * 10 + swing * CUR_ROCK;
 }
 const G = 9.81;
-/** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (6 mm in the middle). */
+/** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (2 mm in the middle, DISH_GAP_METRES). */
 export function coverDrag(thickness: number, density = 1000): number {
-  return (density * thicknessViscosity(thickness)) / (COVER_KG_M2 * DISH_REST_GAP * DISH_METRES);
+  return (density * thicknessViscosity(thickness)) / (COVER_KG_M2 * DISH_GAP_METRES);
 }
 /**
  * One step of `dt` seconds: the plate tipped by `tiltX`, `tiltY` (the sinθ

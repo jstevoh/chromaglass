@@ -65,6 +65,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -76,7 +77,7 @@ const check = (name, ok, detail = '') => {
 const G = 9.81;
 const DRHO = (1000 - 880) / 1000;   // light mineral oil against water
 const PLATE = 0.2;                  // the clock glass, 8 inches (fluid.ts PLATE_METRES)
-const GAP = 0.03 * PLATE;           // the rest gap at the middle, 6 mm
+const GAP = DISH_GAP_METRES;        // the rest gap at the middle, 2 mm (lib/turntable.ts, PLAN 38r)
 const SIN = 0.1;                    // the tilt: about 6°, a firm lean
 const R = 0.06;                     // the lens's radius, in plates
 

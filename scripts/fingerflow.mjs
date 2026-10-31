@@ -156,7 +156,7 @@ try {
     await lab.step(30, over);
     const t2 = await read();
     // The drag time ρh²/12μ at the rest gap, in seconds, and the seconds half a second of the lab's steps stands for.
-    const h = 0.03 * 0.2;
+    const h = lab.REST_GAP_METRES;
     const tau = h * h / (12 * lab.thinGapViscosity(over.gapThickness));
     return { t0, t1, t2, under, beside, still, speed, a: r - lab.handEdge(L) / 2, d: L / 6, tau, half: 30 / 60 };
   }, { hand, liquid, speed });

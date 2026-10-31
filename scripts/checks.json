@@ -121,6 +121,17 @@
       ]
     },
     {
+      "name": "The glass gap, one number",
+      "shard": "logic",
+      "run": "npm run gap",
+      "why": [
+        "The glass sandwich's gap (PLAN 38r): 2 mm at rest, one constant, and every",
+        "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
+        "cover's shear, the sheet's film, a finger's edge, the ferrofluid's room)",
+        "held to its physics worked out in SI from the millimetres alone."
+      ]
+    },
+    {
       "name": "The slosh",
       "shard": "logic",
       "run": "npm run slosh",
