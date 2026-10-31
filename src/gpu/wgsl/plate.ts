@@ -3439,12 +3439,15 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         reflections of the lamp off its dome, and the second lamp's glint:
         all light from above, which nothing under the glass sends.
       */
-      // Up to the contact, where the wall ends and the liquid begins.
-      let wallB = 1.0 - smoothstep(0.97, 1.0, length(p));
-      c *= mix(1.0, edgePass(airBend(length(n.xy) / max(n.z, 1e-3)), 1.0), wallB);
+      // Up to the contact, on the round rim (camBubbleAt, plateTransmit.ts).
+      let pC = camBubbleAt(fuvBase, p, R);
+      let rC = min(1.0, length(pC));
+      let nC = normalize(vec3f(pC * 0.85, sqrt(max(0.0, 1.0 - rC * rC)) + 0.15));
+      let wallB = 1.0 - smoothstep(0.97, 1.0, length(pC));
+      c *= edgePass(airBend(length(nC.xy) / max(nC.z, 1e-3)), 1.0);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
-      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
+      outColor = mix(outColor, c, mix(opac, wallB, dropCam) * U.bubbleStrength * mix(0.7, 1.0, filmT));
       /*
         The camera pass (wgsl/camera.ts) bends the screen along this normal,
         which is the camera's dome: on the plate it would lens the window the

@@ -81,6 +81,27 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
   }
   return outc;
 }
+
+/*
+  The camera's bubble: where in it a point is (PLAN 38h-2), from p, the
+  position field's reading, and R, the bubble's radius in plate uv. The
+  position field is exact where the air covers a texel whole, but its splat
+  discards past the rim, so in the last texel the filtered position stops
+  growing (0.9 of the radius a texel outside the bubble) while the coverage
+  runs on in a square-cornered staircase: with the camera's band dark, the
+  owner saw that as a blocky edge (2026-10-31). So the centre is taken where
+  the field says it is, the field read again there, where it is whole and
+  the position near zero, and the point measured from that corrected centre:
+  the band and the rim are circles of the bubble's own radius. (A step two
+  texels inward was tried first; a bubble two cells across has no whole
+  texel two in, and stayed square.)
+*/
+fn camBubbleAt(fuv: vec2f, p: vec2f, R: f32) -> vec2f {
+  let cEst = fuv - p * R;
+  let airM = textureSampleLevel(air0, samp, cEst, 0.0);
+  if (airM.r <= 0.02) { return p; }
+  return (fuv - (cEst - (airM.gb / airM.r - vec2f(0.5)) * 2.0 * R)) / R;
+}
 `;
 
 /**
