@@ -142,16 +142,31 @@ async function films(smooth) {
   a cell) shows as a bin above the rest, not only one on the centres.
 */
 const BINS = 8;
-function measure(buf, cam) {
+/*
+  w: the film is averaged over 2w + 1 pixels along the knot line before it is
+  differenced across it. A texel's corner runs the whole length of its knot
+  line, so this keeps it whole and averages away what does not line up: on
+  the owner's Mac (Metal) the old read's knot bin came to only 1.5 to 2.1
+  times the median at w = 0, against 2.7 to 13 here, with the shipped read's
+  bins as even as here (1.06 to 1.22), which is what pixel-to-pixel noise in
+  the film does to a ratio over the median. h: the stencil's half-width.
+*/
+const W = 2, H = 1;
+function measure(buf, cam, w = W, h = H) {
   const F = new Float64Array(S * S).fill(NaN);
   for (let i = 0; i < S * S; i++) if (buf[i * 4 + 2] === 255) F[i] = (buf[i * 4] * 256 + buf[i * 4 + 1]) / 65535 / 2.5;
   const phase = (u, c) => { const p = ((u - 0.5) / (1.5 * cam.zoom) + c) * N - 0.5; return p - Math.floor(p); };
   const axes = [0, 1].map(() => ({ sum: new Float64Array(BINS), n: new Float64Array(BINS) }));
   let pairs = 0;
-  for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+  const m = Math.max(w, h);
+  for (let y = m; y < S - m; y++) for (let x = m; x < S - m; x++) {
     for (const ax of [0, 1]) {
-      const at = (k) => F[ax ? (y + k) * S + x : y * S + x + k];
-      const a = at(-1), b = at(0), c = at(1);
+      const at = (k) => {
+        let v = 0;
+        for (let j = -w; j <= w; j++) v += F[ax ? (y + k) * S + x + j : (y + j) * S + x + k];
+        return v / (2 * w + 1);
+      };
+      const a = at(-h), b = at(0), c = at(h);
       if (Number.isNaN(a) || Number.isNaN(b) || Number.isNaN(c)) continue;
       const f = ax ? phase(1 - (y + 0.5) / S, cam.cy) : phase((x + 0.5) / S, cam.cx);
       // bin 0 is centred on the knot
@@ -161,9 +176,9 @@ function measure(buf, cam) {
     }
   }
   const fold = axes.map(({ sum, n }) => {
-    const m = Array.from(sum, (v, i) => v / n[i]);
-    const med = [...m].sort((p, q) => p - q)[BINS / 2];
-    return { m, knot: m[0] / med, peak: Math.max(...m) / med, peakAt: m.indexOf(Math.max(...m)) };
+    const mean = Array.from(sum, (v, i) => v / n[i]);
+    const med = [...mean].sort((p, q) => p - q)[BINS / 2];
+    return { m: mean, med, knot: mean[0] / med, peak: Math.max(...mean) / med, peakAt: mean.indexOf(Math.max(...mean)) };
   });
   return { F, pairs, fold };
 }
@@ -175,6 +190,15 @@ for (const key of Object.keys(smooth)) {
   const cam = SHOTS.find(([n]) => key.endsWith(n))[1];
   const a = measure(old[key], cam), b = measure(smooth[key], cam);
   const show = (r) => r.fold.map((f, i) => `${'xy'[i]} ${f.knot.toFixed(2)}`).join(', ');
+  if (process.argv.includes('--sweep')) {
+    // For a new adapter: what each form of the fold reads, and the control's whole profile.
+    for (const [w, h] of [[0, 1], [2, 1], [4, 1], [8, 1], [2, 2]]) {
+      const p = measure(old[key], cam, w, h), q = measure(smooth[key], cam, w, h);
+      console.log(`      sweep ${key} w${w} h${h}: old knot ${p.fold.map(f => f.knot.toFixed(2)).join('/')}, shipped peak ${q.fold.map(f => f.peak.toFixed(2)).join('/')}`);
+    }
+    const p = measure(old[key], cam, 0, 1), q = measure(smooth[key], cam, 0, 1);
+    console.log(`      sweep ${key} w0 h1 bins x old ${p.fold[0].m.map(v => (v * 1e5).toFixed(1)).join(' ')} | shipped ${q.fold[0].m.map(v => (v * 1e5).toFixed(1)).join(' ')} (1e-5)`);
+  }
   check(`${key}: the probe reads a film`, a.pairs > 20000 && b.pairs > 20000, `${b.pairs} pixel pairs shipped, ${a.pairs} with the old read`);
   if (key.startsWith('wide')) {
     // The wide blur is left as it was: what it does is printed, for the PLAN.
