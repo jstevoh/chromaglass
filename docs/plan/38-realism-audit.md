@@ -143,34 +143,28 @@ written first. Line numbers are as read on main at d07ac31.
   fraction of 0.84. The drops' wall arcs (`dropWall` in `beads.ts`) are the model to reuse.
   *Measure:* relaxation time against R³ at three sizes; facets on a jammed raft.
 
-- **38h. Nothing on a lit-from-below plate makes light** (S each, nil; Medium). Several
-  places still paint light a transmission projector cannot throw, though the block's own
-  rule says it (`plate.ts:3599-3602`: "a plate lit from beneath shows transmitted light
-  only"):
-  - the Micro Droplets satellites carry a lamp highlight, a specular dot
-    exp(−14·hd²) (`plate.ts:724-748, 3323-3330`); a small drop is a lens whose rim leaves
-    the pupil, a dark ring (`dropBand`) and no dot;
-  - the oil brightens by a flat 8% wherever it is, at any focus (`plate.ts:3082`); a lens
-    concentrates light only out of focus, the shadowgraph's 1 − Δz·∇²OPL that
-    `refractionOptics` already has (`:2028-2031`), zero at focus. **18e-2** says the 8%
-    stays; this says move it onto that term;
-  - the gel multiplies the lamp by 1.5 (`plate.ts:2163, 2195`); a gel is a filter,
-    transmission at most 1 in every band (the mixer's own note in §11 owes a Mac look at
-    this gain);
-  - the dye is shaded as if lit from a point above, Lambert plus a Blinn highlight plus
-    Schlick (`plate.ts:505-507, 546-567`); the lamp is below and collimated, and a dye film
-    reflects nothing into the lens. **18b-3** and **18e** name the gloss; new is only that
-    the light's direction is above the plate;
-  - the dish's rim adds a warm glow and Lamp Warmth carries a painted vignette
-    (`plate.ts:3686-3694, 3700-3721`); a dish's glass wall refracts the lamp out of the
-    pupil, a dark line by the same aperture law as a drop's band, and the falloff is 38a's
-    cos⁴;
-  - film grain is added on the plate itself every frame when no camera is on
-    (`plate.ts:3762-3765`); grain belongs to the camera or the film stock (`post.ts` has it),
-    not to a lamp through liquid onto a wall.
-
-  *Measure:* on the projector's view, no pixel outside a lens's defocus term brighter than
-  the lamp through clear liquid.
+- ~~**38h**~~ *shipped 2026-10-30.* Nothing on a lit-from-below plate makes light: the
+  satellite droplets are lenses (a dark band past DROP_CORE, no dot), the oil's 8% moved onto
+  the shadowgraph's 1 − Δz·∇²OPL (nothing at focus), the gel is a filter (Beer–Lambert in
+  Gel Wheel, no 1.5, no floor), Glossiness is the dye surface's relief gain (1 to 4× the
+  real slope; no Lambert, Blinn or Schlick), the dish's and the projectors' rims are dark
+  lines, and the plate draws no grain. `npm run nolight`. Story in `docs/plan-shipped.md` §38.
+  - **38h-2. The rest of the light painted from above** (S each, nil; Medium). Found
+    building 38h. The meniscus (`meniscus` in `plate.ts`) still brightens the rim's side that
+    faces `lampDir` and adds a camera highlight toward it; the air bubbles' pass adds a
+    specular `spec + spec2` toward the lamp and the second lamp (the bubbles block, "shine");
+    the rings' rim adds `ring · 0.15` (the beads block); the macro's paint glint
+    (`glint = 1 − exp(−spec·1.6)`); and on the camera and non-derived path the boundary line
+    adds `edge0 · edgeK · 0.25` of white. Each is a lamp seen from above or light added at an
+    edge; each should take its light from the pupil law the drops use (and the camera's
+    wider lens), as 38h did. Once they go, `lampDir` and Lamp Motion drive nothing but the
+    hot spot, which is 38a-3's to retire.
+  - **38h-3. The oil's shadowgraph and the dye's are one term** (with **18e-2**). 38h draws
+    the oil's out-of-focus lens from its own ∇²OPL in the oil block, on both sides of its edge;
+    where dye crosses the oil's edge `refractionOptics` already takes the oil's share of the
+    derive pass's ∇²OPL, so there it is counted twice. When 18e-2 deflects by ∇OPL, take the
+    oil block's term out. *Measure:* `npm run nolight` line 7 holds with the oil block's
+    shadow gone.
 
 - **38i. Milk's forward scatter takes light from the beam, it does not add it** (S–M, low;
   Medium on the milk looks: today a bright rim rings every pool). After **18j**; sharpens
