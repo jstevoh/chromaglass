@@ -313,8 +313,8 @@ export class PressLift {
   get live(): boolean { return this.at !== null; }
 }
 
-/** Who pressed: a hand (the Press tool, a finger, the pad, a person standing still) or the beat squeeze's kick. */
-export type Presser = 'hand' | 'kick';
+/** Who pressed: a hand (the Press tool, a finger, the pad, a person standing still), the beat squeeze's kick, or a bubble's standing squeeze on its footprint (a held Blow's straw bubble is one), so a count of the hand's cells is the hand's alone. */
+export type Presser = 'hand' | 'kick' | 'bubble';
 
 /**
  * Every press on one plate, each remembered where it is. One memory for the
