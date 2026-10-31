@@ -109,7 +109,7 @@ Left, each its own plan item:
   recording of a real breath across a dish of oil (`npm run watch`) would set the speed
   the colour goes at, against the lab's 2.72% of the plate over a 1.5 s stroke.
 - ~~**15g-7 Blow's stroke to the right moves less than to the left in the app.**~~
-  **Shipped** (this PR): the pointer handler pressed the glass under the pointer (a bowl 24
+  **Shipped** (#623): the pointer handler pressed the glass under the pointer (a bowl 24
   cells across) and stirred along the move on every pointer event with the button down, for
   every tool but the Magnet, the Spin, the Drop and the Finger, and the Blow was never taken
   out of it. The pointer leads the pool it blows across, so each press sent the pool's liquid

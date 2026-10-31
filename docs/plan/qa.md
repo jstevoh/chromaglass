@@ -39,7 +39,7 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   Amount stops doing anything past about 1.7). Found with QA-20; not measured yet.
 - ~~**QA-20b** Blow's push on `npm run tools` (Mac) spreads widely from run to run (0.08% to
   2.62% on twelve runs of 9 and 10 October against the lab's 2.72%).~~ **Fixed with 15g-7**
-  (this PR): what the app did between the pointer's moves and the steps was the pointer
+  (#623): what the app did between the pointer's moves and the steps was the pointer
   handler's press of the glass on every pointer event, thirty a stroke, against the breath's
   steps, which came with the runner's pace.
 
@@ -116,7 +116,7 @@ run. The Stage sheet's Esc and the Magnet's drag are another thread's (#349).
   step), so 27a-1's plan held, but a step cost 1,080 ms against the tilt's 740: its
   drift shift (`driftShift`, one pass for every carried field) called `at` once per use,
   twenty-one times a cell, each a load of the field and one of the gap (a `select`
-  reads both sides). **Fixed (this PR):** each of the seven cells it needs read once,
+  reads both sides). **Fixed (#623):** each of the seven cells it needs read once,
   the gap only for the ferrofluid's volume, summed in the old order: on SwiftShader the field is
   the same to the bit (the lab's dye after 120 steps of the glass, 8879.708350418165 both),
   and a step with the glass costs 865 ms, the glass's own cost from 340 ms to 125.
