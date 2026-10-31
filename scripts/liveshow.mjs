@@ -288,6 +288,12 @@ try {
     && req.destinations.every(d => d.keyName === `live-${after.dests.find(x => x.name === d.name)?.id}` && d.key === undefined), names ?? 'no start');
   check('two encodes: 1920x1080 for the wide ones, 720x1280 for Instagram', req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', ') === 'landscape 1920x1080, portrait 720x1280',
     req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', '));
+  // The encoders hand the bridge their configuration with their first output,
+  // which comes some frames after the panel says live; read at once, a slow
+  // machine (CI's browser shard, a loaded container) had none yet and the line
+  // went red on "0 configurations" with no key anywhere. Wait for them, so the
+  // line asks what it means to: whether a key is in what was configured.
+  await until(page, () => window.__liveStub.calls.configs.length > 0);
   const configs = await page.evaluate(() => window.__liveStub.calls.configs);
   check('no key crossed with the start or the encoders\' configuration', !!req && configs.length > 0 && !JSON.stringify(req).includes(SECRET) && !configs.join('').includes(SECRET),
     `${configs.length} configurations`);
