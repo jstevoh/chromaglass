@@ -21,24 +21,28 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## The top picks
 
-- **38a. The lamp is a condenser, not a wandering painted glow** (S, nil frame cost;
-  High). *Now:* the hot spot multiplies the finished picture by
-  `mix(0.78, 1.25, exp(-3.5·d²))` with a warm tint (`src/gpu/wgsl/plate.ts:3308-3319`); a
-  second lamp *multiplies* a bluish 1.25× Gaussian on top; both centres drift by noise up
-  to a third of the plate when Lamp Motion is up (`LiquidVisualizer.tsx:5207-5213`); and
-  the lamp ground is divided by 1.28125 to stop the peak clipping (`plate.ts:2514`). The
-  heat's own hot spot is another shape again, 1/(1+2.5r²) (`fluid/dye.ts:231-235`), so the
-  warmth and the light disagree about where the lamp is. *Real:* an overhead projector's
-  Fresnel condenser images the bulb into the lens's pupil, so the stage is lit nearly flat,
-  falling off as the lens's cos⁴ of field angle and the condenser's edge, with a soft fixed
-  image of the filament at most; a second lamp *adds* light; and nothing in the picture
-  moves unless the liquid does. A brightness that slides across the whole frame is the
-  kind of whole-frame motion the owner already took out of the sound (frameSway 0).
-  *Build:* one irradiance map E(x) from the condenser (cos⁴ and an edge), shared by the
-  lamp ground and the heat source, a second lamp added in light, Lamp Motion retired or
-  turned into a real thing that moves (a hand-held second lamp). *Measure:* the plate with
-  no liquid is flat to the cos⁴ law and still from frame to frame; the heat's peak and the
-  light's peak are the same point.
+- ~~**38a. The lamp is a condenser, not a wandering painted glow**~~ — **Shipped, this PR**
+  (the Hot-Spot is the projector's lamp lever: the bulb's image off the lens's aperture,
+  `src/gpu/wgsl/lampField.ts`; the heat lit evenly; `npm run lampfield` 7/7, 1/7 on the old
+  plate; story in `docs/plan-shipped.md` §38a). Left from it: 38a-2, 38a-3.
+
+- **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
+  every look, so the Mac's eyes first). 38a keeps Hot-Spot 0 an ideal projector, lit evenly,
+  so no look changed. A real one is not: the head's lens dims the frame's corners as cos⁴ of
+  the field angle (a 355 mm head over the 0.133 m frame: about 9% at the corners), and the
+  lamp below the condenser lights the stage as cos³ of its own angle. Both belong in
+  `lampField` as the default, applied to the light and (the stage's half) to the heat, and
+  Lamp Warmth's painted vignette (`plate.ts`, the Lamp warmth block: a smoothstep that
+  darkens corners by up to 45% with the warmth) goes in the same PR, since that is what it
+  was standing in for. *Measure:* `npm run lampfield`'s law with the cos⁴ term; the warm
+  looks' corners against the vignette's, judged on the Mac.
+
+- **38a-3. Lamp Motion has nothing real left to move** (S; Low). After 38a it moves only the
+  light the gloss and the bubbles' rims are lit from (`lampDir`, the lit-from-above shading
+  38h takes out). When 38h lands, Lamp Motion and the plate rock's push on the lamp
+  (`lampRock`) move nothing a projector has: retire the slider (its MIDI, desk pin and
+  the two looks that set it, Crowd Plate with its `dirX` patch and Soap Film), or give it a real
+  thing that moves, such as the gel wheel's hand.
 
 - **38b. Bubbles that never appear or vanish by a clock** (S for the fades, M for the rim;
   High: every music look pops bubbles). Sharpens **18i**, which named the timers but not

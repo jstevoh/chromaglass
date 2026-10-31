@@ -2167,3 +2167,20 @@ from the same reading of the protocol, so only Live can say the two agree.
 6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
+
+## 96. The projector's light: the lamp lever (PLAN 38a)
+
+`npm run lampfield` proves the law on a bare lab stage; only the Mac at 60 fps says how it
+looks on a moving plate. The Hot-Spot is now a projector's lamp lever: the plate is never
+brighter than the lamp, and nothing in the light moves.
+
+1. Any look, Hot-Spot 0: the plate looks as it did before this change, to the eye.
+2. A look that sets Hot-Spot (Sunburst at 0.8, the looks at 0.4 or 0.5): the middle is no
+   longer lifted and warm; the corners fall away a little at 0.4, a lot at 0.8. Raise Lamp
+   Motion to 1 on a still plate: the light on the stage stays put (only the gloss moves).
+3. Hot-Spot 1 on a light look with Lamp Ground up: a lit middle, dark sides, and a faint
+   coloured edge where it falls away (the condenser's glass), not a soft Gaussian.
+4. Second Lamp 1 with Hot-Spot 0.7: one side lit a little more and a little cooler, the
+   middle still white.
+5. Bad: a look that relied on the old lift now reads dim in the middle (say which), or the
+   edge colour reads as a painted ring rather than glass.

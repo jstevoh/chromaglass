@@ -10115,3 +10115,31 @@ model cannot reach one, the PR says what it reached and asks.
   green lands on yellow or blue. A real comic printed green as yellow and blue dots
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
+
+## 38. Realism audit, after §18
+
+### 38a. The lamp is a condenser, not a wandering painted glow
+
+*Was:* the hot-spot multiplied the finished picture by `mix(0.78, 1.25, exp(-3.5·d²))` with a
+warm tint in the middle; a second lamp multiplied a bluish 1.25× Gaussian on top; both centres
+wandered by noise across up to a third of the plate with Lamp Motion, and with the plate's rock
+even at Lamp Motion 0; the lamp ground was divided by 1.28125 so the lifted middle did not clip;
+and the heat had its own hot-spot, 1/(1 + 2.5 r²) round the plate's middle.
+
+*Now:* `src/gpu/wgsl/lampField.ts` is an overhead projector's light path. The condenser images
+the bulb into the head's aperture; Hot-Spot is the lamp lever, the misfocus μ = 0.6 × Hot-Spot,
+and the light a stage point sends the wall is the share of its bundle (a disc at x·μ/P, radius
+k(1 − μ), P = 0.04 m, k = 0.9) inside the aperture: flat in the middle at the lamp's full
+light, falling away toward the corners, dark at the edges past Hot-Spot 0.8. The acrylic
+condenser's dispersion (Abbe 57) puts each colour's image at its own height, which colours the
+knee. A second bulb beside the first adds its own share, offset in the aperture, white-balanced
+at the axis. It is computed on the stage (screen) and not on the turning plate, so nothing in
+it moves; the lamp ground's divide is gone; the heat is the same at every point, because the
+aperture turns light away after it has gone through the liquid. Hot-Spot 0 is the plate as it
+was, so no look at 0 changed; looks at 0.4 lose about 9% at a wide frame's corners, as the old
+Gaussian took 7%, and their middle is no longer lifted.
+
+*Measured:* `npm run lampfield`, 7/7 (on the old plate 1/7: the law worst 0.165 and 0.813 off,
+the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
+gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.
+
