@@ -10140,7 +10140,9 @@ Measured (`npm run plume`, lab, 128², SwiftShader): a soft patch 30 K warm on a
 rose at 4.97 mm/s against 5.08 from Darcy with Kell's density and Vogel's viscosity (0.98), 10 K
 at 1.23 against 1.27, their ratio 4.05 against 4.00 (a straight line would be about 3), level
 0.00, Buoyancy 0.9 1.96 times 0.45; the lamp 0.0564 K in 3 s against 0.0566 from I·a/C, the same
-at four times the Speed; Classic's air 9.04/ks against 9.01/ks, the same at four times the Speed.
+at four times the Speed; Classic's air 9.04/ks against 9.01/ks, the same at four times the Speed
+and 9.13/ks at half the real seconds a step; still air (radiation alone) 3.98 against 3.76 per
+10 ks at 40 K; a hand's tip of sinθ 0.5 lifts it up the tip at 0.62 mm/s against 0.64.
 `npm run heat` 9/9 (two inputs moved to real seconds: two seconds of lamp where half of one was
 0.009 K under its bar, and the half-length step's magnetSeconds).
 

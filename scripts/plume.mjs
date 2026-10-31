@@ -41,7 +41,10 @@
  *      next second, while the patch has moved under a third of its radius:
  *      a soft patch's middle outruns its edge, and one carried further has
  *      begun to stretch into a plume, which the round patch's law is not.
- *   2. The same patch on a level plate does not move (under 3% of that).
+ *   2. The same patch on a level plate does not move (under 3% of that),
+ *      and on a level plate a hand tips by sinθ 0.5 (Plate Rock's input,
+ *      not the standing plate's) it rises up the tip at half the standing
+ *      speed, to 12%.
  *   3. Buoyancy is a multiple of the real expansion: 0.45 (the default) is
  *      water's own, 0.9 twice it, 1.8 to 2.2 times the speed (at 10 K, where
  *      twice the speed is still under half the patch's radius in the time).
@@ -58,16 +61,27 @@
  *      is 145, a projector's fan blowing hard; 0.998 is still air), and each
  *      face radiates εσ((T+ΔT)⁴ − T⁴), ε 0.9. A sheet 10 K warm, three
  *      seconds, the rate −ln(T₁/T₀)/t against the same law integrated here,
- *      to 10%, and the same at four times the Speed, to 5%.
+ *      to 10%, and the same at four times the Speed and at half the real
+ *      seconds a step (twice the steps), to 5%. In still air (Heat Decay 1)
+ *      only the radiation is left, the plate 40 K warm: to 10% (at Classic's
+ *      air it is 4% of the loss, under that line's tolerance).
  *   6. Updraft is a draught, not a noise (38t): a laminar boundary layer's
  *      stress τ = 0.332 ρ U^1.5 √(ν_air/x) from the edge it enters at. It
- *      is steady (the flow half a second apart within 2%), and it grows as
- *      U^1.5: Updraft 1 against 0.25 moves the liquid 8 times as fast, to
- *      12% (the noise it replaces grew as U, 4 times).
+ *      is steady (the flow half a second apart within 2%); by the edge it
+ *      comes in at it blows the liquid the way the air goes, along −v, at
+ *      over a fifth of the dish's mean speed (how fast, and how the closed
+ *      dish's return flow shares it with the middle, has no simple form for
+ *      an x^-½ stress, so the size is not asked: the first cut asked the edge
+ *      to outrun the middle and read 1.67e-2 against 1.92e-2); and it grows
+ *      as U^1.5: Updraft 1 against
+ *      0.25 moves the liquid 8 times as fast, to 12% (the noise it replaces
+ *      grew as U, 4 times). The 1.5 is the boundary layer's, written in the
+ *      step: this line holds the solver to it, not the law to the air.
  *   7. And it cools where it enters: the top face loses
  *      h = 0.332 k Pr^⅓ √(U/ν x)/x more, so a sheet a tenth of the plate in
  *      from the edge the air comes over cools √5 times as fast (over the
- *      still plate's own loss) as one in the middle, to 25%. On a sheet
+ *      still plate's own loss) as one in the middle, to 25%, and each to
+ *      15% of the law's number. On a sheet
  *      evenly 40 K warm in a liquid a thousand times water's, so the
  *      draught's own flow carries no heat past the points read (in the
  *      test's first cut, at the rise's 12 cSt, the flow brought warmer
@@ -147,7 +161,7 @@ try {
     // 1–3. A warm patch, standing up and level.
     const N = 128;
     for (const [name, dT, over] of [['rise30', 30, { plateUpright: 1, buoyancy: 0.45 }], ['rise10', 10, { plateUpright: 1, buoyancy: 0.45 }],
-      ['level', 30, { plateUpright: 0, buoyancy: 0.45 }], ['dial', 10, { plateUpright: 1, buoyancy: 0.9 }]]) {
+      ['level', 30, { plateUpright: 0, buoyancy: 0.45 }], ['dial', 10, { plateUpright: 1, buoyancy: 0.9 }], ['rock', 10, { plateUpright: 0, rockY: -0.5, buoyancy: 0.45 }]]) {
       await lab.create(N, N);
       lab.vel(0.5, 0.35, 0.08, [0, 0, dT, 0]);
       lab.flush();
@@ -184,15 +198,16 @@ try {
     }
 
     // 5. A warm sheet under Classic's air, at two Speeds.
-    for (const [name, dt] of [['cool', 0.004], ['coolFast', 0.016]]) {
+    // And at half the real seconds a step (the frame loop's own magnetSeconds), twice the steps.
+    for (const [name, dt, sec, steps] of [['cool', 0.004, 1 / 60, 180], ['coolFast', 0.016, 1 / 60, 180], ['coolHalf', 0.004, 1 / 120, 360]]) {
       await lab.create(N, N);
       lab.vel(0.5, 0.5, 2.0, [0, 0, 10, 0]);
       lab.flush();
-      await lab.step(1, { ...base, heatDecay: 0.98, dt });
+      await lab.step(1, { ...base, heatDecay: 0.98, dt, magnetSeconds: sec });
       const t0 = disc(await temps(N), N, 0.5, 0.5, 0.08);
-      await lab.step(180, { ...base, heatDecay: 0.98, dt });
+      await lab.step(steps, { ...base, heatDecay: 0.98, dt, magnetSeconds: sec });
       const t1 = disc(await temps(N), N, 0.5, 0.5, 0.08);
-      out[name] = { t0, t1, steps: 180 };
+      out[name] = { t0, t1, seconds: steps * sec };
     }
 
     // 6. Updraft on a still plate: its flow at two moments, and at a quarter of the air.
@@ -220,7 +235,14 @@ try {
       await lab.create(N, N);
       await lab.step(60, { ...base, air: 0.25 });
       const q = await lab.field('vel');
-      out.updraft = { change: diff / Math.max(sum, 1e-12), full: speed(a, N), quarter: speed(q, N) };
+      // Where and which way: the mean flow along v near the edge the air comes in at, and the speed in the middle.
+      let ev = 0, ec = 0, ms = 0, mc = 0;
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const x = (i + 0.5) / N, y = (j + 0.5) / N, k = (i + j * N) * 4;
+        if (Math.hypot(x - 0.5, y - 0.88) < 0.05) { ev += a[k + 1]; ec++; }
+        if (Math.hypot(x - 0.5, y - 0.5) < 0.05) { ms += Math.hypot(a[k], a[k + 1]); mc++; }
+      }
+      out.updraft = { change: diff / Math.max(sum, 1e-12), full: speed(a, N), quarter: speed(q, N), edgeV: ev / Math.max(ec, 1), middle: ms / Math.max(mc, 1) };
     }
 
     // 7. Updraft's cooling, a tenth of the plate in from the edge it enters at and in the middle.
@@ -254,16 +276,22 @@ const meanB = (cells) => cells.reduce((a, T) => a + lightness(T) * (2 * runnier(
     const soft = (meanB(o.cellsA) + meanB(o.cellsB)) / 2;
     return { got: (o.y1 - o.y0) * plate / (60 * s), want: 0.5 * soft * G * h * h / (12 * nu) * dial };
   };
-  const r30 = rise(r.rise30), r10 = rise(r.rise10), lv = rise(r.level), dl = rise(r.dial, 2);
+  const r30 = rise(r.rise30), r10 = rise(r.rise10), lv = rise(r.level), dl = rise(r.dial, 2), rk = rise(r.rock, 0.5);
   const mm = (x) => `${(x * 1000).toFixed(2)} mm/s`;
   check('a patch 30 K warm rises at Hele-Shaw\'s speed from water\'s real density and viscosity', Math.abs(r30.got / r30.want - 1) < 0.12,
     `${mm(r30.got)} against ${mm(r30.want)} (${(r30.got / r30.want).toFixed(3)}), gap ${(h * 1000).toFixed(1)} mm, ν ${(nu * 1e6).toFixed(1)} cSt`);
   check('a patch 10 K warm, the same law', Math.abs(r10.got / r10.want - 1) < 0.12,
     `${mm(r10.got)} against ${mm(r10.want)} (${(r10.got / r10.want).toFixed(3)})`);
   const ratio = r30.got / Math.max(r10.got, 1e-12), wantRatio = r30.want / r10.want;
+  // The alternative it tells apart: water's expansion at the room's 20 °C held for every ΔT, with the same viscosity.
+  const beta = (kell(ROOM - 0.5) - kell(ROOM + 0.5)) / kell(ROOM);
+  const linB = (cells) => cells.reduce((a, T) => a + beta * T * (2 * runnier(T) / (1 + runnier(T))) * T, 0) / Math.max(cells.reduce((a, T) => a + T, 0), 1e-9);
+  const linRatio = (linB(r.rise30.cellsA) + linB(r.rise30.cellsB)) / (linB(r.rise10.cellsA) + linB(r.rise10.cellsB));
   check('and the two keep real water\'s ratio, not a straight line\'s', Math.abs(ratio / wantRatio - 1) < 0.1,
-    `${ratio.toFixed(2)} against ${wantRatio.toFixed(2)} from Kell and Vogel (a straight line with a constant viscosity would be about 3)`);
+    `${ratio.toFixed(2)} against ${wantRatio.toFixed(2)} from Kell and Vogel (20 °C's expansion held constant would give ${linRatio.toFixed(2)})`);
   check('a level plate does not lift it', Math.abs(lv.got) < 0.03 * r30.want, `${mm(lv.got)} (${(lv.got / r30.want * 100).toFixed(1)}% of standing)`);
+  check('a plate tipped by a hand (sinθ 0.5) lifts it uphill at half the standing speed', rk.got > 0 && Math.abs(rk.got / rk.want - 1) < 0.12,
+    `${mm(rk.got)} against ${mm(rk.want)} (${(rk.got / rk.want).toFixed(3)}), up the tip`);
   check('Buoyancy 0.9 is twice water\'s expansion', dl.got / r10.got > 1.8 && dl.got / r10.got < 2.2, `${(dl.got / r10.got).toFixed(3)} times 0.45's speed, at 10 K`);
 
   // 4.
@@ -281,16 +309,27 @@ const meanB = (cells) => cells.reduce((a, T) => a + lightness(T) * (2 * runnier(
     return T;
   };
   const hAir = 7200 * -Math.log(0.98);
-  const rate = (o) => -Math.log(o.t1 / o.t0) / (o.steps * s);
-  const cw = -Math.log(coolWant(r.cool.t0, r.cool.steps * s, hAir) / r.cool.t0) / (r.cool.steps * s);
+  const rate = (o) => -Math.log(o.t1 / o.t0) / o.seconds;
+  const cw = -Math.log(coolWant(r.cool.t0, r.cool.seconds, hAir) / r.cool.t0) / r.cool.seconds;
   check('Heat Decay is the air on both faces, with radiation', Math.abs(rate(r.cool) / cw - 1) < 0.1,
     `${(rate(r.cool) * 1000).toFixed(2)}/ks against ${(cw * 1000).toFixed(2)}/ks (τ ${(1 / cw).toFixed(0)} s; ${r.cool.t0.toFixed(3)} → ${r.cool.t1.toFixed(3)} K)`);
   check('cooling in real seconds, whatever the Speed', Math.abs(rate(r.coolFast) / rate(r.cool) - 1) < 0.05,
     `${(rate(r.coolFast) * 1000).toFixed(2)}/ks at four times the Speed against ${(rate(r.cool) * 1000).toFixed(2)}/ks`);
+  check('and whatever the real seconds a step stands for', Math.abs(rate(r.coolHalf) / rate(r.cool) - 1) < 0.05,
+    `${(rate(r.coolHalf) * 1000).toFixed(2)}/ks at 1/120 s a step against ${(rate(r.cool) * 1000).toFixed(2)}/ks at 1/60`);
+  // Still air (Heat Decay 1, Updraft's still run below): what is left is the glass's radiation.
+  {
+    const o = r.updraftCool[0], sec = o.steps * s, T0 = o.middle[0];
+    const got = -Math.log(o.middle[1] / T0) / sec, want = -Math.log(coolWant(T0, sec, 0) / T0) / sec;
+    check('in still air the glass still radiates, εσ(T⁴ − T_room⁴) a face', Math.abs(got / want - 1) < 0.1,
+      `${(got * 1e4).toFixed(2)} against ${(want * 1e4).toFixed(2)} per 10 ks at ${T0.toFixed(1)} K warm`);
+  }
 
   // 6.
   check('Updraft is steady, not a noise', r.updraft.change < 0.02 && r.updraft.full > 0,
     `flow changed ${(r.updraft.change * 100).toFixed(2)}% in half a second (mean speed ${r.updraft.full.toExponential(2)})`);
+  check('it blows the liquid the way the air goes, by the edge it comes in at', r.updraft.edgeV < -0.2 * r.updraft.full,
+    `along v ${r.updraft.edgeV.toExponential(2)} by the edge, speed ${r.updraft.middle.toExponential(2)} in the middle`);
   const u15 = r.updraft.full / Math.max(r.updraft.quarter, 1e-12);
   check('Updraft drives the liquid as U^1.5, a boundary layer\'s stress', Math.abs(u15 / 8 - 1) < 0.12, `${u15.toFixed(2)} times at four times the air (8 wanted; the noise was 4)`);
 
@@ -301,7 +340,7 @@ const meanB = (cells) => cells.reduce((a, T) => a + lightness(T) * (2 * runnier(
   // From where the air comes over the rim along the middle line: x = 0.1 and 0.5 of the plate.
   const hForced = (x) => 0.332 * AIR.k * AIR.pr ** (1 / 3) * Math.sqrt(UPDRAFT / (AIR.nu * x)) ;
   const wantEdge = hForced(0.1 * plate) / C, wantMid = hForced(0.5 * plate) / C;
-  check('Updraft cools the face it blows over, most where it comes in', Math.abs((extraEdge / extraMid) / (wantEdge / wantMid) - 1) < 0.25 && Math.abs(extraMid / wantMid - 1) < 0.25,
+  check('Updraft cools the face it blows over, most where it comes in', Math.abs((extraEdge / extraMid) / (wantEdge / wantMid) - 1) < 0.25 && Math.abs(extraMid / wantMid - 1) < 0.15 && Math.abs(extraEdge / wantEdge - 1) < 0.15,
     `edge ${(extraEdge * 1e4).toFixed(2)}, middle ${(extraMid * 1e4).toFixed(2)} per 10 ks against ${(wantEdge * 1e4).toFixed(2)} and ${(wantMid * 1e4).toFixed(2)}`);
 } finally {
   await close();
