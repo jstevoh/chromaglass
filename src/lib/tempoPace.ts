@@ -13,7 +13,10 @@ import type { VisualizerSettings } from '../types';
  * So each look now has a target speed that comes from the music, and its own
  * speed is blended toward it: geometrically, so a slow look stays slower than
  * a fast one, and by `tempoSync` (0 is the look as written, 1 is the music
- * alone). Random Evolve leans harder on the music. Everything here is
+ * alone, and past 1, to 1.6, the music's pace overstated: a slow song slower
+ * than itself, a fast one faster, inside the same bounds; the owner asked for
+ * an extreme end on every dial, 2026-10-31). Random Evolve leans harder on
+ * the music. Everything here is
  * slewed on seconds by the caller, so the plate never lurches with the beat
  * (see the clock's own note on why that matters).
  */
@@ -63,7 +66,7 @@ export function musicPace(bpm: number, loudness: number, playing: boolean): numb
  * further from what the look was written as.
  */
 export function tempoMultiplier(look: number, pace: number, tempoSync: number, evolving: boolean): number {
-  const k = Math.max(Math.max(0, Math.min(1, tempoSync)), evolving ? 0.85 : 0);
+  const k = Math.max(Math.max(0, Math.min(1.6, tempoSync)), evolving ? 0.85 : 0);
   if (k <= 0) return 1;
   const want = Math.pow((TEMPO_REF * pace) / Math.max(1e-6, look), k);
   const [lo, hi] = evolving ? [0.05, 6] : [0.1, 4];

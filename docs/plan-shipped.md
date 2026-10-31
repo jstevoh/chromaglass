@@ -559,6 +559,47 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.4. Control, written up (2026-10-31)
+
+`docs/osc.md` is every address the show server takes over OSC (settings, every
+action of the remote protocol by name, every built-in preset by id, the plate's
+hands), the settings worth a fader with their travel, a starter map for Resolume
+(the composition's Dashboard knobs and buttons, each with its custom output
+address) and a TouchDesigner module over an OSC Out DAT
+(`docs/osc/chromaglass_touchdesigner.py`). The guide's OSC section, the in-app
+manual's OSC row, Show Server Details in the Mac app and `npm run show`'s banner
+point to it. `npm run rig` holds the page to the code both ways (its presets are
+`src/presets.ts`'s, its actions `RemoteAction`'s, its settings learnable) and
+sends every line of its "Try it" block to a real show server, each arriving as the
+message its address names; a misspelt action, a preset the app does not have and a
+missing action each turned it red. Found writing it: a button bound to
+`/chromaglass/preset/<id>` sends 1 on press and 0 on release, and both cued the
+look, so one press cleared and reseeded the plate twice. The address form now
+fires on a non-zero argument only, as actions do (`npm run rig`: the release line
+is new, 32/32).
+
+### 13-version. The page inside a release says the release's version (2026-10-31)
+
+Measured first: the released 1.3.692's `Info.plist` (read out of the release's zip)
+has `CFBundleShortVersionString` and `CFBundleVersion` both 1.3.692, so the Mac's
+About box already named the release. What did not was the site packed inside, built
+from `package.json`'s 1.3.0 before desktop.yml worked out the version. The version
+step now runs before the site's build and passes `CHROMAGLASS_VERSION`;
+`vite.config.ts` writes it to `APP_VERSION` (`src/lib/appVersion.ts`) and to a
+`<meta name="chromaglass-version">` in the page. The manual's header shows it, on
+the desk and the phone. `npm run desktop -- --packaged` checks the packed page's
+version against `app.getVersion()`. The cast hello still carries none (14k).
+
+### 13-icon. The Mac app's own icon (2026-10-31)
+
+The app's icon was the website's 512 tile, scaled by electron-builder into an
+`.icns`: a flat square edge to edge in the Dock. `scripts/brand/art.mjs` draws a
+`mac` shape on Apple's grid (the body 824 of 1024, a superellipse's continuous
+corners, a drop shadow), and `npm run brand` writes `desktop/resources/icon.icns`
+from it, 16 to 1024 px with the 2x sizes, in the icns format written directly
+(no Mac tool). electron-builder copies an `.icns` unchanged, and
+`npm run desktop -- --packaged` checks the packed app's `icon.icns` is that file.
+
 ### 13-update. The Mac app's download, its releases and its updates (2026-10-25)
 
 Asked by the owner on 2026-10-25, after the app was built and put in Applications by hand:
@@ -2713,6 +2754,46 @@ main), and a pre-existing pull to the left (PLAN 15g-7) outweighed it to the rig
 breath was set to a firm 8 m/s (0.38 Pa): in the lab the pool then moved +2.72% and
 +2.82%, held 19.0 mm/s (0.37 of τh₀/2μ), thick 0.101 as fast, pressed to a third of the
 gap 0.42 of its τh/2μ, ferrofluid +7.08%, oil +2.07%, nothing made or lost (5/5).
+
+### 15g-7. Blow's stroke to the right moved less than to the left in the app: the pointer's press on every move (shipped)
+
+What was reported: `npm run tools`' "and pushes the colour along, whichever way it blows"
+was red on 13 of 187 Mac runs in the week to 2026-10-24, on strokes of 38 to 71 steps of
+breath that read -0.07% to +0.05% of the plate against +0.15% to beat, while other runs with
+the same steps read +0.3% to +1.6%; the lab's airblow read +2.72% and +2.82% for the same
+stroke. The #385 reviewer thought the check read the dye at a single moment. #465 doubled the
+stroke's time and the line went red once in 354.
+
+What was measured: the lab drew the stroke at the app's own step, parameters (dumped from the
+app on software WebGPU), 192-grid geometry and Dropper pool, thirty moves over 45 solver
+steps, and pushed +1.74% with the breath alone, flat after 0.4 s. On every Mac run the two
+windows after the stroke drifted +0.2% to +0.35% toward it, the strokes that pushed nothing
+included, so that drift was not the wind's flow dying away. The pointer handler
+(`handleMouseMove`) pressed the glass under the pointer (`applySquish` 8, 0.005, a bowl 24
+cells across) and shoved the liquid five times the move on every pointer event with the
+button down, for every tool but the Magnet, the Spin, the Drop and the Finger, each taken
+out as it was found copying or scattering colour; the Blow never was. With that press on
+each of the lab's thirty moves the same stroke read -0.32% during the stroke and crept
++0.75% in the 2.5 s after (the press alone -0.80% then +1.1%; the stir with the press the
+same as the press); over 88 steps, the 3000 ms stroke's on those Macs, +0.72% then +0.9%.
+The pointer leads the pool it blows across, so each press squeezes the pool's liquid back
+the way the stroke came, against the breath, and the gap it closes along the stroke opens
+again over the gap's memory for seconds, drawing the liquid toward the stroke's end. The
+presses came thirty a stroke whatever the pace and the breath's steps with the runner's
+(12 to 23 a second on the CI Macs, 60 on the owner's), which is the spread and the reds.
+
+What changed: the press and stir moved to `src/sim/tools.ts` (`stirAlongMove`, a pure move
+first, the visualizer file being at its size ceiling) and the Blow returns before them as the
+Drop and the Finger do. `npm run tools` prints the cells of glass each stroke pressed
+(`pressedCells.hand`, the solver's own count) and a new line asks for none; the bar and the
+3000 ms stroke are unchanged. The touch handler's press (the phone and the pad) goes through
+the same function, with no stir, so a finger's Blow is exempt too. A bubble's standing
+squeeze on its footprint pressed as the hand; it is counted as the bubble's now (`Presser`
+'bubble', lib/squish.ts), since on a runner slow enough to hold the Blow still between moves
+the straw's bubble presses mid-stroke, and the hand's count has to stay the hand's (the app
+on the software plate: 531 cells by the bubble, none by the hand, over a stroke with six
+straw steps). The straw's swing on GitHub's runners is 15g-8; the other
+tools' press and stir are 15g-9.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
@@ -6105,8 +6186,6 @@ larger in mean radius (bar 1.4 to 1.8) and 343 of 332 (bar 60%). The lab, `macro
 2.5x on the 9-pool plate: before, small beads, one lens bead the size of a thumbnail; after,
 a dozen glass-like lens beads, three of them a fifth of the frame. Pictures in the project's
 shared files, `macro-closeup-33g/`. Not measured: how it looks on the owner's GPU.
-
-*33g-2b (2026-10-30, the owner: "Why do the beads have dimples on the top and ragged edges?", then "make the macro view look as accurate as possible").* Found in the lab on a flat plate with one bead at 5x. **The rim:** the outermost pixel of a bead strayed from a circle by 1.26, 1.24 and 1.22 px for a droplet (2 cells), the common bead (4.5) and a pool (7), a quarter of a mask texel, because the contour of the bilinear coverage of a 512 mask wanders by a third of a texel; the lens now takes the distance to the edge from the dome's cone read at one clean texel three texels in (`dropLens`, now `gpu/wgsl/dropLens.ts`) and the edge coverage from that, and the stray is 0.42, 0.32 and 0.37 px (0.06 of a texel), 0.53 px for a 12-cell bead, and the same on the drops' wide mask. A droplet of one to two cells keeps its whole dark outline: a first version of the step (three texels in, always) landed past the centre of a drop of four texels' radius and erased 60% of the outline of a 1.5-cell one, so a read that lands above 0.6 of the dome's height is refused and the drop keeps the old estimate (capping the step by the pixel's own size estimate was tried and cost every drop from two cells up its roundness: that estimate is the noise). The pools also come out 6 percent smaller, the true size: the coverage contour had stood half a texel proud. **The dimple:** a bead wider than the gap (3 cells) is a pancake, a flat window with the bend in its half-round edge, and the bend was in proportion to the band, so the map from the window to the band crossed the drop's own centre a little outside the window: a ring of one colour with a pin inside it. The bend now follows the band to a power that goes from 1 (a ball) to 6 (a pancake flat over 0.4 of its radius), so the window is clear and the bend is a sliver at the contact, as the report says (item 1.3 and the closeup comment in plate.ts). `npm run droplens` 32/32 on SwiftShader (11 new lines: roundness for seven drop sizes over both masks, the three droplets' outlines, and the sizes). Pictures in the project's shared files, `macro-closeup-33g/`. Not measured: the owner's GPU, and a mid-sized bead (3 to 4 cells), whose fold ring a real lens has too.
 
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'

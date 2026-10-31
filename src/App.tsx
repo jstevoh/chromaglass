@@ -17,7 +17,7 @@ import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
 import { useDeskTabs } from './hooks/useDeskLayout';
 import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
-import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
+import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, travelOfKey, valueOfKey, type DeskSurface } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette } from './components/desk/CommandPalette';
@@ -2310,6 +2310,7 @@ export default function App() {
   // A section as a panel; with Music & Drone out, Sound has no way there (35c-5).
   const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {}, ...(whereIs(deskLayout, 'player') && { onOpenSound: undefined }) });
 
+  const evolveAt = travelOfKey('automateRate', settings.automateRate);
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
     // height with the browser's bars hidden, which put the dock under them.
@@ -2920,7 +2921,7 @@ export default function App() {
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     />
                   </button>
-                  {/* How fast it evolves: a drop or a blow every second or so at the left, a frenzy at the right */}
+                  {/* How busy Evolve is: a drop a second at left, a frenzy at right */}
                   <div className={`flex flex-col gap-1 w-full mt-1 transition-opacity ${isAutomated ? '' : 'opacity-40'}`}>
                     <div className="flex items-center justify-between w-full">
                       <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve Speed</span>
@@ -2930,12 +2931,12 @@ export default function App() {
                       type="range"
                       min="0"
                       max="1"
-                      step="0.01"
-                      value={settings.automateRate ?? 0}
-                      onChange={e => updateSettings({ automateRate: parseFloat(e.target.value) })}
+                      step="0.001"
+                      value={evolveAt}
+                      onChange={e => updateSettings({ automateRate: valueOfKey('automateRate', +e.target.value) })}
                       className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
-                      style={{ background: `linear-gradient(to right, rgb(192,132,252) ${(settings.automateRate ?? 0) * 100}%, rgba(255,255,255,0.1) ${(settings.automateRate ?? 0) * 100}%)` }}
-                      title="How busy Random Evolve is: how often it pours, thins, strokes, and how far the dials wander"
+                      style={{ background: `linear-gradient(to right, rgb(192,132,252) ${evolveAt * 100}%, rgba(255,255,255,0.1) ${evolveAt * 100}%)` }}
+                      title="How busy Random Evolve is: how often it pours, thins and strokes"
                       data-testid="evolve-speed"
                     />
                   </div>

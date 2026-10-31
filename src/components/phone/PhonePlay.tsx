@@ -6,6 +6,10 @@ import type { VisualizerSettings } from '../../types';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
+import { PIN_RANGE } from '../../lib/deskPins';
+
+/** Evolve's top, the registry's: the dial runs on past 1 to its extreme on every surface. */
+const EVOLVE_MAX = PIN_RANGE.get('automateRate')?.max ?? 1;
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
 import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
@@ -467,7 +471,7 @@ export function PhonePlay(p: PhonePlayProps) {
               {/* To 8×, not the pinch's 16: past 8 a phone's plate is a few cells across, and the slider's travel is better spent below. */}
               <TouchSlider glass label="Zoom" help="How close the camera looks into the plate. One is the whole plate." min={1} max={8} value={Math.min(8, zoom)}
                 display={`${zoom.toFixed(1)}×`} onChange={v => p.onZoom(v)} testId="play-slider-zoom" />
-              <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={1} value={s.automateRate ?? 0}
+              <TouchSlider glass label="Evolve" setting="automateRate" min={0} max={EVOLVE_MAX} value={s.automateRate ?? 0}
                 display={pct(s.automateRate ?? 0)} resetTo={p.lookValueOf?.('automateRate')} onChange={v => p.onSetting({ automateRate: v })} testId="play-slider-evolve" />
               </div>
               <div className="min-w-0">
