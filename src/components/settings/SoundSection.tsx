@@ -78,8 +78,8 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         <Slider
           label="Bass Boost"
           value={settings.bassBoost}
-          min={1.0}
-          max={3.0}
+          min={0.25}
+          max={5}
           step={0.1}
           onChange={(v: number) => onUpdate({ bassBoost: v })}
           settingKey="bassBoost"
