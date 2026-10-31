@@ -143,9 +143,10 @@ try {
     frames in the gap. GitHub's Macs blew 18 to 27 straw steps a stroke
     (#623's shard: 22, 18, 24), the owner's Mac 0 to 2. The straw's bubbles
     took the pool's dye on the GPU and the CPU put back a different amount
-    from a mirror frames behind, which was the swing of "keeps it" (fixed in
-    the solver in the same PR; this is so the stroke measures the wind it
-    says it does, on any runner).
+    from a mirror frames behind, which was the swing of "keeps it" (that
+    accounting is PLAN 15g-8b; this is so the stroke measures the wind it
+    says it does, on any runner). GitHub's Mac with this: 0 straw steps a
+    stroke, the pool 356 → 356 and 277 → 279.
 
     So: as many moves as the stroke has whole cells and a quarter in it
     (measured on the plate before the press, from the pointer's own cell),
