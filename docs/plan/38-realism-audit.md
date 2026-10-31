@@ -55,6 +55,10 @@ written first. Line numbers are as read on main at d07ac31.
   so how fast they turn over is now how fast the flow takes them to the rim and how often they
   merge. On the Mac: count the kick bubbles a minute on a music look, before and after; if the
   plate goes still, 38b-2 is the answer, not a clock.
+  The deploy after #603 found it first: `npm run kickbubbles` counted 11 chances with room
+  on Classic in a minute where its floor is 15 (the room no longer empties itself); the
+  check now lets the look's bubbles go every eight seconds, since it measures the kick's
+  odds, not a bubble's life.
 
 - **38c. Soap is conserved: no decay, no grid-rate spreading** (S, nil; High on the soap and
   milk looks). Sharpens **18d-5** (which owes the σ(Γ) law, not these). *Now:* the mix update
