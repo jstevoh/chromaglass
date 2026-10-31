@@ -7,9 +7,9 @@ import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { StepClock } from '../lib/stepClock';
 import { VisualizerSettings, LiquidType } from '../types';
-import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, pourRoomOf, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, WORKING_DYES, dyesOnPlate } from '../presetPlate';
-import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
+import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, layAngle, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -1373,7 +1373,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
     fluidsRef.current[0]?.gpu?.clearChemistry?.();
-    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
+    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? layAngle(presetId, DICE.lay.angle()) : a));
     spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
     // The turntable likewise: a kept back plate keeps its dish turning.
     dishSpinRef.current = dishSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
@@ -4164,7 +4164,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // other look keeps `treble01 * 1.1` in the 50%-white mix it always had.
                   const clearPhase = activeFluid.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
                   const lookTarget = dyeLookTarget(activeFluid.seedMean, currentSettings.dyeBudget ?? 0.85, activeFluid.seedBudget);
-                  const pourRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - activeFluid.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
+                  const pourRoom = clearPhase ? 0 : pourRoomOf(activeFluid.meanDensity / Math.max(0.06, lookTarget));
                   const pourDt = Math.min(1, Math.max(0.04, activeFluid.dt / 0.05)) * pourRoom;
                   const sparseDark = isSparseDark(currentSettings.lampGround, lookTarget);
                   const contStyle = () => { const st = aStyle(); return sparseDark && (st === 'spray' || st === 'splatter') ? 'drop' : st; };
@@ -4372,8 +4372,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               plate the music plays, in its areas, every running step, read
               from the same sources the patch bay folds this frame. Apart from
               the music's hands above because a cord need not be on the sound
-              at all (the room, a film, an LFO), and its pours are held under
-              the look's fill as the music's are (28d-A's regulator).
+              at all (the room, a film, an LFO). The regulator on its pours
+              is AreaHands.lay's, by how full the plate is (28d-A).
             */
             if (isActiveRef.current && drainFrameRef.current === 0) {
               const hands = areaHandsRef.current;
@@ -4386,11 +4386,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m, band) => cordReading(patchCtx, m, patchNow, band), simStepS);
               const af = fluidsRef.current[activeLayerRef.current];
               if (af && acts.length > 0) {
-                const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);
-                const room = Math.max(0, Math.min(1, (1.0 - af.meanDensity / Math.max(0.06, target)) * 2.5));
+                const fill = af.meanDensity / Math.max(0.06, dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget));
                 let sink = areaSinksRef.current.get(af);
                 if (!sink) { sink = areaSink(af); areaSinksRef.current.set(af, sink); }
-                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], room);
+                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], fill);
               }
             }
             /*
@@ -5199,11 +5198,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // See the note in the fragment source.
         if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
 
-        // The lamp wanders slowly under the plate, and with Frame Sway up
-        // the plate's own rock moves it too — a tilted plate is lit from a
-        // new side. Off by default: the lamp jumping a twentieth of the plate
-        // on every kick lights the whole frame from somewhere else in time
-        // with the beat, which reads as the frame moving (lib/plateRock.ts).
+        // The gloss's light wanders slowly, and with Frame Sway up the
+        // plate's rock moves it too (lib/plateRock.ts); off by default, as a
+        // jump on every kick reads as the frame moving. The hot-spot stays on
+        // the stage's axis whatever this does (wgsl/lampField.ts, 38a).
         {
           const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
           const rock = rockRef.current;

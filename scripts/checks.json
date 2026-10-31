@@ -2001,6 +2001,19 @@
       ]
     },
     {
+      "name": "The projector's light",
+      "shard": "open",
+      "run": "npm run lampfield",
+      "why": [
+        "The hot-spot is the projector's lamp lever (PLAN 38a): on the bare lamp",
+        "ground the stage is even at 0, each pixel is the aperture law at its",
+        "place on the stage, nothing moves with Lamp Motion or the clock, no",
+        "pixel is above the lamp, the condenser's colour edge is the law's, and",
+        "a second bulb adds light. Beside `lamp` in the open shard, about a",
+        "minute on SwiftShader."
+      ]
+    },
+    {
       "name": "The heat",
       "shard": "open",
       "run": "npm run heat",

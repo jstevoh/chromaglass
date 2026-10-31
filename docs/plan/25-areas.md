@@ -128,6 +128,24 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     bromous acid fires the gel (`bottles.ts` BZ Activator). A wire works by taking the bromide
     (the inhibitor) out of a spot, which the two-variable Oregonator here does not carry; the
     two look alike in a dish (a ring runs out), and the second needs a third species.
+  - ~~**25i-6. Three looks fixed after filming on the Mac**~~ (shipped: Poster's kicks pour on a
+    full plate, Red Cabbage's pH is solved from what was poured and its dish set square,
+    Chemical Clock's gel no longer switched off by the song; `npm run areacords`). Story in
+    `docs/plan-shipped.md` §25.
+  - **25i-7. Red Cabbage's seed paints its pH zones.** Its opening picture (fluidSimulation.ts,
+    `red-cabbage` in both seed paths) lays crimson, teal-green and gold *dye* where acid and base
+    would make those colours, and its palette (hot pink, violet, teal-green) and Hue Journey 2
+    pour and turn painted colours too; at neutral pH the indicator leaves them as painted. The
+    real dish is one dye, violet anthocyanin, with its zones laid as acid and base in the mix
+    (`addMix`), so every colour on it is the chemistry's. fluidSimulation.ts is at its size
+    ceiling: the seed goes in a module beside it. Measure the 28i-2 hue count before and after.
+  - **25i-8. A hit's pour turns the dish over through the regulator.** `hitRoomOf`
+    (lib/dyeTarget.ts) lets a gated area pour land on a plate at its fill target, up to 15% over,
+    and the regulator's evaporation takes the excess: the same named shortcut as 28d-A, replaced
+    with it by the volume model (PLAN 18c-2), where a pour adds volume and the dish overflows.
+  - **25i-9. The juice's buffer is an estimate.** lib/phIndicator.ts takes red cabbage juice as
+    2 mM of a buffer at pKa 7, which sets how much acid tips a well from violet. A titration of a
+    home-made juice (drops of vinegar to the first pink) would measure it.
 - **25j. A lamp under each area** (direction D, 2026-10-24; after 25i). Each area sits over
   its own lamp whose brightness and warmth follow its band, and a gel can turn a step on a
   hit, as the old shows ran several projectors and colour wheels. Since 18f the plate's
