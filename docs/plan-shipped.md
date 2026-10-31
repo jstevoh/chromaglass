@@ -10192,6 +10192,24 @@ model cannot reach one, the PR says what it reached and asks.
     - *Grain* of 3% was added to the plate every frame when no camera was on; a lamp through
       liquid onto a wall has none, and the camera's and the film stock's grain is the post
       chain's. Two times of the clock now draw the same plate (8 levels apart on main).
+      Taking it off showed what it had hidden: on a lamp-ground look the pigment's grain
+      reached the lamp as its share of the *opacity* (grainedDepth, 1 on any body near
+      opaque), not as more or less dye, which Beer–Lambert puts in the exponent, T^grain, as
+      `throughScaled`'s own note says. So Chemical Clock's and Lava Lamp's grain was 0.04 of
+      a level in their bodies and `npm run grainedge` line 2 had passed on the plate grain's
+      luma-scaled noise moving with it (main with only that grain taken out reads 0.041,
+      the same). The front plate's lamp now takes the grain as dye (`lampGrain0`): 0.107 and
+      0.131, twice the grain 2.3 times the texture. The back plate's lamp still takes the
+      opacity's factor (38h-4).
+      The gel's 1.5 gain and floor had carried `npm run mixer` too. As a filter it is now
+      coverage (half the level, half the change: 0.52), and it has no light to colour on a
+      painted ground, so the gel's shots are on the lamp ground. Its order line read 3.1 a
+      channel, under a bar of 4: the lab's wheel and lumia are the same warm dyes, and a
+      yellow gel passes a yellow lumia. The wheel is turned three quarters for that pair
+      (the lab's new `gelAngle`), under the pink and red that stop the lumia's green: 11.3.
+      And one rim pixel of the back plate, (109, 6), rounded to the same byte with the
+      plate and without, and read as "off the plate" while its grade moved it by 1; the
+      footprint now drops a pixel whose neighbours the plate moves.
     New code went beside `plate.ts` in `src/gpu/wgsl/plateTransmit.ts`; `plate.ts` shrank by
     about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
     line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one

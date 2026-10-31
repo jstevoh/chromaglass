@@ -31,12 +31,14 @@ fn reliefGain(n: vec3f) -> vec3f {
   A gel is a filter: it passes at most all of each band and makes none
   (PLAN 38h). It multiplied the lamp by its colour times 1.5, over a floor
   of 0.10 under it, so a gel brightened a white lamp by half and lit a black
-  one. Now Beer and Lambert: the gel's colour is what one sheet passes, and
-  Gel Wheel is how thick a gel is, as a share of that sheet's thickness:
-  each band passes its colour to that power, never more than all of it.
+  one. Now one sheet passes its colour, and Gel Wheel is how much of the beam
+  the sheet covers: the covered share takes the gel's colour, the rest passes
+  clear, (1 - w) + w * gel, which is the blend the mixer's levels are (half
+  the level, half the change: npm run mixer) and never more than all of a
+  band. A thicker gel is a deeper colour in the wheel, not a higher level.
 */
 fn gelFilter(uv: vec2f) -> vec3f {
-  return pow(clamp(gelColor(uv), vec3f(1e-4), vec3f(1.0)), vec3f(U.gelWheel));
+  return mix(vec3f(1.0), clamp(gelColor(uv), vec3f(0.0), vec3f(1.0)), U.gelWheel);
 }
 
 /*

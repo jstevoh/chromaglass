@@ -36,7 +36,8 @@
  *      pad that raises a source walks it through every place it can go and
  *      back to where it began
  *   6. the gel wheel and the lumia (PLAN.md §11 step 2): in the lamp the gel
- *      colours the bare glass and the lumia lights it; over the glass the gel
+ *      colours the bare glass (on a lamp ground, where there is light there to
+ *      colour: PLAN 38h) and the lumia lights it; over the glass the gel
  *      is a filter on the lens, which colours the dye and leaves black glass
  *      black, and the lumia a beam, which lays its light over the plate and
  *      stops lighting the glass from beneath; at level 0 each is nothing,
@@ -286,22 +287,41 @@ const shots = await page.evaluate(async (controls) => {
     // The front plate at 0 over a lit lamp: must leave the lamp, not black.
     ledFrontOff: await shot({ ledPlatform: true, ledMode: 'rainbow', layerCount: 1, filmMix: 0, markMix: 0, frontLevel: 0 }, {}),
     // The gel wheel and the lumia, one plate and nothing else lit.
-    gelLamp: await shot({ gelWheel: 0.9, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    /*
+      The gel in the lamp on a lamp ground (Lamp Ground 1), where the bare
+      glass is the lamp's light for the gel to colour. On the black ground it
+      had none, and the gel coloured it only by a floor of 0.10 times 1.5
+      that lit black glass, light a filter cannot make (PLAN 38h took it
+      out). At the full sheet, so the bare glass is the wheel's own colour:
+      at 0.9 a tenth of the lamp passes clear beside the sheet.
+    */
+    noLedLit: await shot({ layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1 }, {}),
+    gelLamp: await shot({ gelWheel: 1, layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1 }, {}),
     gelLens: await shot({ gelWheel: 0.9, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
     gelLensOff: await shot({ gelWheel: 0, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
     lumiaLamp: await shot({ lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
     lumiaBeam: await shot({ lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, {}),
     lumiaBeamOff: await shot({ lumia: 0, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, {}),
     // Each alone, with the other's grade moved: it must change nothing.
-    gelOnlyLumiaGraded: await shot({ gelWheel: 0.9, lumiaBright: 0.4, lumiaHue: 90, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
+    gelOnlyLumiaGraded: await shot({ gelWheel: 1, lumiaBright: 0.4, lumiaHue: 90, layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1 }, {}),
     lumiaOnlyGelGraded: await shot({ lumia: 0.9, gelBright: 0.4, gelHue: 90, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
     // Half the level of the ones above, for how much a level gives.
     gelLensHalf: await shot({ gelWheel: 0.3, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
     gelLensSix: await shot({ gelWheel: 0.6, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia front gel back film mark' }, {}),
     lumiaBeamHalf: await shot({ lumia: 0.45, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led gel front lumia back film mark' }, {}),
-    // Both lit in the lamp, in the two orders of the pair: the gel colours only what is under it.
-    lampGelUnder: await shot({ gelWheel: 0.9, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0 }, {}),
-    lampGelOver: await shot({ gelWheel: 0.9, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, mixOrder: 'led lumia gel front back film mark' }, {}),
+    /*
+      Both lit in the lamp, in the two orders of the pair: the gel colours only
+      what is under it. The wheel turned three quarters round (PLAN 38h). The
+      lab's wheel and its lumia are the same warm dyes (the harmony's first
+      four, the lumia its first two: yellow and orange), so at rest the bare
+      glass lies under the yellow and the red, and a real gel passes nearly
+      all of a yellow lumia: only the red segment's green differs between the
+      orders, 3.1 a channel. The 1.5 gain the gel had made light in the
+      channels it passed, and that is what read 4 and more. Turned, the bare
+      glass is under the pink and the red, which stop the lumia's green.
+    */
+    lampGelUnder: await shot({ gelWheel: 1, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1 }, { gelAngle: 0.75 }),
+    lampGelOver: await shot({ gelWheel: 1, lumia: 0.9, layerCount: 1, filmMix: 0, markMix: 0, lampGround: 1, mixOrder: 'led lumia gel front back film mark' }, { gelAngle: 0.75 }),
     // Over the glass, with the film on the wall to be under or over: one plate,
     // and bare glass on the right where only the film shows.
     filmAlone: await shot({ layerCount: 1, markMix: 0 }, { film }),
@@ -590,7 +610,24 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
   // glass from beneath, must change it; the logo's stay inside the logo.
   // The film covers the frame and the front plate carries the lamp's light,
   // so theirs have no footprint to hold them to.
-  const offBack = (x, y) => { const p = px(shots.eachRest, x, y), q = px(shots.eachNoBack, x, y); return p[0] === q[0] && p[1] === q[1] && p[2] === q[2]; };
+  /*
+    Less the plate's last pixel (PLAN 38h). Where the back plate's coverage
+    falls to a fraction of a level at its edge, adding it and leaving it out
+    can round to the same byte while its grade, on the same fraction, rounds
+    the other way: on the branch that made the gel a filter, one pixel at
+    (109, 6), with neighbours the plate moved by 4 to 63, read as off the
+    plate and as moved by Saturation and Hue by 1. Equal bytes cannot tell a
+    sub-level of plate from none, so a pixel counts as off the plate only
+    when its eight neighbours are too.
+  */
+  const sameBack = (x, y) => { const p = px(shots.eachRest, x, y), q = px(shots.eachNoBack, x, y); return p[0] === q[0] && p[1] === q[1] && p[2] === q[2]; };
+  const offBack = (x, y) => {
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && yy >= 0 && xx < S && yy < S && !sameBack(xx, yy)) return false;
+    }
+    return true;
+  };
   const stray = [];
   for (const c of MIX_CONTROLS) {
     const img = shots.each[c.key];
@@ -612,7 +649,7 @@ const inRect = (x, y) => Math.abs(x / S - 0.5) <= 0.31 && Math.abs(y / S - 0.5) 
 {
   const bareGlass = (x) => x > S * 0.6;
   const dye = (x) => x < S * 0.45;
-  const tint = diff(shots.gelLamp, shots.noLed, bareGlass);
+  const tint = diff(shots.gelLamp, shots.noLedLit, bareGlass);
   // And in the wheel's own colours, a segment each: the lab holds the wheel
   // still (gelAngle 0) on the harmony's first four dyes, so the bare glass's
   // upper right is under one segment (a yellow) and its lower right under

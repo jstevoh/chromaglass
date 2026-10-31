@@ -164,6 +164,12 @@ written first. Line numbers are as read on main at d07ac31.
     under a red gel a cyan pool's red rises 55 levels past what the gel passed; whether the
     projected path's grade may lift a band past its input is the owner's call, and
     `npm run nolight` asks its lines at a grade of 1 meanwhile.
+  - **38h-4. The back plate's lamp takes the pigment's grain as dye** (S, nil; Low-Medium on
+    two-plate lamp looks). 38h made the front plate's lamp read the grain as T^grain
+    (`lampGrain0`); the back plate's lamp branch still reads `grained1 / film1`, the grain's
+    share of the opacity, which is 1 on a body near opaque. Its note warns that Metal folded
+    `grainedDepth` differently when it had two uses, so carry the raw grain in a var as the
+    front plate does. *Measure:* `npm run grainedge` with the back plate on.
   - **38h-3. The oil's shadowgraph and the dye's are one term** (with **18e-2**). 38h draws
     the oil's out-of-focus lens from its own ∇²OPL in the oil block, on both sides of its edge;
     where dye crosses the oil's edge `refractionOptics` already takes the oil's share of the

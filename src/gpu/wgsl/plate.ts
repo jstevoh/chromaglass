@@ -2095,9 +2095,8 @@ fn screenOver(c: vec3f, light: vec3f) -> vec3f {
 /**
  * The rows under the front plate, bottom up: the lamp the glass is lit by.
  * The LED ring replaces what is under it by its level, as the platform always
- * did; the gel colours what is under it, with a floor so that a gel over a
- * dark lamp still shows its colour, as a gel over a dim bulb does; the lumia
- * adds its light.
+ * did; the gel filters what is under it (gelFilter: it makes no light, so
+ * over a dark lamp it shows nothing, PLAN 38h); the lumia adds its light.
  */
 fn mixLamp(bg: vec3f, uv: vec2f) -> vec3f {
   var c = bg;
@@ -2597,11 +2596,24 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     drawn exactly as it was.
   */
   var film0 = fluid0.a;
+  /*
+    What turns the grain's share of the opacity (fluid0.a / film0, below)
+    into its share of the dye, for the lamp ground. There the grain is more
+    or less pigment, so Beer and Lambert put it in the exponent, T^grain,
+    as this file's own note on throughScaled says; the lamp read the
+    opacity's factor instead, grainedDepth, which is 1 on any body near
+    opaque. So on a lamp look the pigment's grain was 0.04 of a level in the
+    bodies (Chemical Clock, Lava Lamp in npm run grainedge), and passed only
+    because the plate's own film grain, louder where the picture was
+    brighter, moved with it (PLAN 38h took that grain off).
+  */
+  var lampGrain0 = 1.0;
   if (U.granulation > 0.002 && fluid0.a > 0.004) {
     let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain0, fuv0) * 1.6);
     let gd0 = grainedDepth(bare0, grain);
     fluid0.a = min(1.0, fluid0.a * gd0);
     more0 *= grain;
+    lampGrain0 = grain * film0 / max(fluid0.a, 1e-4);
   }
 
   let sharp0 = dof < 0.55;
@@ -2719,7 +2731,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     milkScatter = sc0;
     milkGap = layerGap0;
     outColor = onGround(outColor, fluid0,
-      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4), film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0));
+      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4) * lampGrain0, film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0));
     milkScatter = 0.0;
 
     /*
