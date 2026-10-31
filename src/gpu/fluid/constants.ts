@@ -400,6 +400,16 @@ export const MAX_SPEED = 0.002;
 export const PLATE_METRES = DISH_METRES;
 export const REST_GAP = 0.03;
 /*
+  The film a full press leaves, as a share of the rest gap: where Press
+  Lift's half-life is read for the glass coming back up against the film's
+  suction (PLAN 38l, squeezeUpdate in wgsl/fluid/gap.ts). The app's Press
+  held for a moment takes the film to about a fifth of rest (Stefan's
+  closing never quite reaches the floor), a tap to a little under rest; a
+  quarter keeps a full press's lift where Press Lift and npm run presslift
+  have always had it.
+*/
+export const STEFAN_FILM = 0.25;
+/*
   Real molecular diffusion of food dye in water (PLAN 18h).
   Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an
   effective D ≈ 1.7e-5 m²/s in the lab (~40,000× real food dye in water ~4e-10 m²/s,

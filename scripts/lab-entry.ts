@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, PLATE_METRES } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
@@ -552,7 +552,7 @@ const api = {
    * the gain and its guards, the reference liquid and the ferrofluid's
    * viscosities, the rest gap and the dish's width (gpu/fluid.ts).
    */
-  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, PLATE_METRES,
+  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, PLATE_METRES, STEFAN_FILM,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /**

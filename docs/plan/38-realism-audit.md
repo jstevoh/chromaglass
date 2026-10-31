@@ -126,6 +126,26 @@ written first. Line numbers are as read on main at d07ac31.
   (τ ≈ h²/κ, seconds) and the glass to the air and by radiation, which
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
+  *Found reading it for the build (2026-10-30), before any of it was built:*
+  - **The heat is not carried on a thin gap.** The temperature lives in the velocity's z,
+    and a thin gap skips the self-advection (`fluid.ts`, step 2's `if (thin) return`), so
+    the lamp's heat stays where it was laid while the flow it drives moves the colour out
+    from under it: a warm patch cannot rise as a thermal, it pushes from a fixed place.
+    The build starts here: carry h·T with the gap's flow, as the dye's amount is carried.
+  - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
+    at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
+    Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in
+    real time, not the 12.4 s its comment says, and the lamp's 0.24 K a unit is 0.026 K/s
+    real, near the physical 1000 W/m² over a 6 mm layer and its two glasses (C ≈ 33 kJ/m²K,
+    0.030 K/s). So the physical model in seconds keeps Classic's heat nearly as it is if
+    Heat Decay is read as the air on the glass: h ≈ 7200·(−ln v) W/m²K puts 0.98 at a
+    strong fan (145, τ ≈ 115 s), 0.998 at still air (τ ≈ 20 min), 0.9 past any fan.
+  - **The current's cap is 0.75 cells a step** (`maxCurrent` in `sim/fluidSimulation.ts`),
+    not the 0.002 the audit read from the lab's BASE; the point stands: past a few
+    hundredths of a kelvin every plume goes at the cap.
+  - Real sizes for the check: water's β ≈ 2.1e-4 /K, so a free column in the reference
+    liquid (22.4 cSt) at the 6 mm rest gap rises 0.27 mm/s per kelvin, a round patch half
+    that (oillift's inclusion law); in water 22 times faster.
 
 - **38g. Bubbles that merge, crowd and stretch like pockets in a gap** (M, CPU only, nil
   frame cost; Medium-High for the straw's rafts and dense froth). The research's ranked
@@ -209,11 +229,20 @@ written first. Line numbers are as read on main at d07ac31.
   comment says so; two like-poled fingers' fields add as vectors, up to twice between
   them; `magnetDiscExact` already gives B_ρ and B_z, which 9v-tilt needs too).
 
-- **38l. The glass springs back by the second, not by the frame** (M; Medium: every press
-  and lift). Sharpens **18a-5**. `gap += (rest − gap)·gapSpring` with no dt
-  (`wgsl/fluid/gap.ts:239`), so a lift recovers twice as fast at 120 fps as at 60. Real: a
-  lifted glass is held by Stefan suction, F = 3πμR⁴ḣ/(2h³), and a bent one relaxes by its
-  stiffness. The dt is a fix on its own (S) before the law.
+- ~~**38l. The glass springs back by the second, not by the frame**~~ — **Shipped, this PR**
+  (the glass opens against the film's suction, k(h₀ − h)(h/h_s)³ with Press Lift read at
+  the film a full press leaves, STEFAN_FILM; the dt half already held on a thin gap;
+  `npm run stefan`; story in `docs/plan-shipped.md` §38l).
+  - **38l-1. The liquid's viscosity in the press and the lift** (S; Low-Medium). Stefan's
+    rate goes as 1/μ, and neither the press's closing nor the lift reads the liquid under
+    the palm: glycerine presses and lifts as water does. hsPrep's per-cell μ is there to
+    read. Found building 38l.
+  - **38l-2. The kick's sheet lifts by the same law** (S–M; Low). While Beat Squeeze's
+    rhythm sheet is live the gap keeps the plain spring, because the sheet holds its dent
+    as that spring takes it (`lib/sheet.ts` decays its modes by one `keep`); the suction
+    on top parted the gap from the sheet's dent by 7% (`npm run sheet`). The sheet's own
+    solve could take the 1/h³ in its lubrication instead, and then the plate's suction
+    everywhere. Found building 38l.
 
 - **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,

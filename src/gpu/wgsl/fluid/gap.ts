@@ -8,6 +8,7 @@
  */
 
 import { HEAD, PACKED, PACKED_BILERP, W } from './shared';
+import { STEFAN_FILM } from '../../fluid/constants';
 
 export const GAP_KERNELS: Record<string, string> = {
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -190,9 +191,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   var sheetRate = 0.0;
   var owed = s.a;
+  var sheetHere = false;
   if (A.a.z > 0.5) {
     let dw = textureLoad(sheetT, vec2i(id.xy), 0).r;
     if (dw != 0.0) {
+      sheetHere = true;
       let want = gap + dw - owed;
       let g2 = max(0.004, want);
       owed = g2 - want;
@@ -235,10 +238,52 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let room = (gap - 0.004) / max(S.dt, 0.0001);
     dhdt += max(s.b * S.gapMemory, -room);
   }
-  // The spring back toward the dome, and its motion counts.
-  let g3 = gap + (rest - gap) * S.gapSpring;
+  /*
+    The spring back toward the dome, and its motion counts.
+
+    On a thin gap, against the film's suction (PLAN 38l). The spring was the
+    same fraction of what is left whatever the gap, so a glass pressed nearly
+    flat came away as easily as one barely dented, and two wet glasses do
+    not part like that: to open, the gap has to draw the liquid back in
+    through itself, and that resistance goes as 1/h³, the press's own law
+    (Stefan, F = 3πμR⁴ḣ/2h³, above). Under the glass's restoring force
+    K(h₀ − h) the gap then opens at k(h₀ − h)(h/h_s)³: slow while the film
+    is thin, quick as it opens, the glass peeling and then letting go.
+
+    k is the look's spring (Press Lift, glassSpring, by the second) at the
+    film a full press leaves, h_s = STEFAN_FILM of the rest gap, not at
+    rest. Glass is stiff: a real clock glass let go is back as fast as the
+    film lets the liquid in, so the time a person sees is the thin film's,
+    and that is the time Press Lift has always set ("the ring a press
+    pushed out is a third of the way back in a second", npm run presslift).
+    Read at rest instead, the same dial left a full press stuck for minutes
+    ((0.2)³ of its rate). Shallower dents, a tap or a kick's, come back that
+    much quicker, which is what stiff glass on a thick film does.
+
+    Integrated over the step with the depth held, so the step takes
+    1 − (1 − k)^((h/h_s)³) of what is left and never overshoots. A film past
+    rest (the sheet's ring) closes the same way, faster as it is thicker, at
+    most at twice the rest gap. \`npm run stefan\` holds the law at two
+    depths. The old plate keeps its spring, which its looks were tuned on:
+    there the gap only shapes how long the film stays thin.
+
+    Not where the rhythm sheet lays its change: its solve is the
+    film draining under the kick already (lubrication, above), and it holds
+    its dent as the plate's plain spring will take it (lib/sheet.ts \`keep\`,
+    on its modes, the same everywhere). The suction on top made the gap and
+    the sheet's dent part by 7% of a dent (npm run sheet). Cell by cell, so
+    a hand's press beside a kick lifts by the suction as it does alone; a
+    hand pressing on the sheet's own cells lifts on the plain spring, the
+    shortcut PLAN 38l-2 names.
+  */
+  var spring = S.gapSpring;
+  if (A.a.y > 0.5 && !sheetHere) {
+    let x = clamp(gap / max(rest, 0.004), 0.0, 2.0) / ${STEFAN_FILM.toFixed(3)};
+    spring = 1.0 - pow(clamp(1.0 - S.gapSpring, 0.0, 1.0), x * x * x);
+  }
+  let g3 = gap + (rest - gap) * spring;
   dhdt += (g3 - gap) / max(S.dt, 0.0001);
-  let out = vec4f(g3, dhdt, dhdt - sheetRate, owed * (1.0 - S.gapSpring));
+  let out = vec4f(g3, dhdt, dhdt - sheetRate, owed * (1.0 - spring));
   textureStore(dst, vec2i(id.xy), select(vec4f(rest, 0.0, 0.0, 0.0), out, finite2(out.xy) && finite2(out.zw)));
 }`,
 
