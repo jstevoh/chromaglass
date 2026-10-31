@@ -72,7 +72,7 @@ export const CONTROL_HELP: Record<string, string> = {
   dishVignette: 'The round edge of a projected dish: dark beyond the rim and a thin bright ring at it.',
 
   // Lamp
-  lightPlay: 'How strongly a bubble magnifies the liquid behind it, up close. Edges take no light from the lamp\'s side.',
+  lightPlay: 'Up close, a softbox above the glass: its reflection in each bubble\'s curved wall, by Fresnel\'s law. 0 is the light box alone.',
   lampMotion: 'How far the light the gloss catches wanders, so highlights keep moving over the liquid. The projector\'s own light stays put.',
   lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
   secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot.',

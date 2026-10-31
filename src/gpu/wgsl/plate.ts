@@ -30,6 +30,7 @@ import { PH_WGSL } from '../../lib/phIndicator';
 import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
+import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -526,6 +527,7 @@ fn thinFilmColour(t: f32) -> vec3f {
 ${filmTableWgsl()}
 ${LAMP_FIELD_WGSL}
 ${EDGE_LIGHT_WGSL}
+${CLOSEUP_DEPTH_WGSL}
 
 // Read one of the two tables at t rainbow periods, one period being one
 // interference order of soap (FILM_NM_PER_T nm), linearly between entries.
@@ -3306,7 +3308,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // Pressed between two plates it is a lens, flatter than a sphere.
       let n = normalize(vec3f(p * 0.85, h + 0.15));
       let opac = smoothstep(0.02, 0.28, aC);
-      let play = U.lightPlay;
       /*
         The liquid round it: its light and colour, averaged over a ring just
         outside the rim, so one bubble has one tint. It used to be read
@@ -3325,23 +3326,29 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       }
       rimCol /= 6.0;
       let rimF = vec4f(rimCol, rimA / 6.0);
-      let ground = dot(rimCol, vec3f(0.299, 0.587, 0.114));
       let filmT = smoothstep(0.02, 0.28, rimF.a);
       let tint = mix(vec3f(1.0), rimCol / max(max(rimCol.r, max(rimCol.g, rimCol.b)), 1e-3), filmT);
 
-      // Through it: the liquid beyond, magnified by the lens (more toward the
-      // middle), in the closeup; the projector's view of it (below) is the
-      // liquid right there, a flat slab of air being a window, not a lens.
-      let lensUv = fuvBase - p * R * (0.35 + 0.45 * play) * dropCam;
-      let lensF = decodeFluid(layer0, lensUv, 0.0, false);
-      let lensCol = mix(bgColor, lensF.rgb, lensF.a);
-      // And the lamp through the clear gap, carrying the liquid's hue
-      // (0.18 toward white: measured, see git history of this block).
-      let through = mix(tint, vec3f(1.0), 0.18) * (0.45 + 0.5 * h + 0.55 * ground);
-      // Some bubbles are all but clear, some milky with a thicker film.
-      let clarity = mix(0.3, 0.95, k1);
-      var c = mix(lensCol, through, 0.25 + 0.55 * clarity);
-      c = mix(outColor, c, smoothstep(0.0, 0.2, h));
+      // Its wall as the projector's band reads it, a half-round meniscus
+      // half the gap wide: sin θ is how far across it a point is.
+      let rho = dropHalfGap(fuvBase);
+      let tB = dropBand(rr, R, rho);
+      // A screen pixel in plate uv (uvToFluid, above).
+      let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
+      let curvedB = max((1.0 - dropFlat(R, rho)) * R, spx);
+      let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
+      // Through it, to the camera: the liquid round it, seen through a lens of
+      // air (closeupDepth.ts), turned outward across the gap; the projector's
+      // view (below) is the liquid right there, a slab of air being a window.
+      var wall = vec4f(1.0, 0.0, 0.0, 0.0);
+      if (dropCam > 0.001) { wall = airWallSeen(tB, softB, outward); }
+      let lensUv = fuvBase + outward * (2.0 * rho) * wall.w * dropCam;
+      // The light through the pocket is the pad through the liquid where the
+      // ray lands, the bubble's own clear middle most of all, with at most a
+      // tenth of the wetting film's hue, as the projector's (38h-7: it was a
+      // mix, by eye, toward a dimmed tint that left a bubble's middle darker
+      // than the liquid round it, which a pocket of air never is).
+      var c = onGround(bgColor, decodeFluid(layer0, lensUv, 0.0, false), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
 
       // The film: interference colour, strongest at a glancing angle (the
       // rim), as thick as the pocket's own speed laid it (Bretherton,
@@ -3403,13 +3410,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       */
       var cp = vec3f(0.0);
       if (dropCam < 0.999) {
-        let rho = dropHalfGap(fuvBase);
-        let flatB = dropFlat(R, rho);
-        let tB = dropBand(rr, R, rho);
-        // A screen pixel in plate uv (uvToFluid, above).
-        let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
-        let curvedB = max((1.0 - flatB) * R, spx);
-        let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
         cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
         let cp0 = cp;
@@ -3430,18 +3430,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
 
       /*
-        The camera's bubble lit from beneath (PLAN 38h-2), by the light its
-        dome's wall leaves in the lens: air bends the light three times as
-        hard as oil, so past about half its radius the wall sends the light
-        box's light outside the camera's cone and the bubble is a dark ring
-        round a clear middle, as a backlit bubble photographs. It wore a lit
-        crescent on the lamp's side, a meniscus darker away from it and two
-        reflections of the lamp off its dome, and the second lamp's glint:
-        all light from above, which nothing under the glass sends.
+        The camera's bubble lit from beneath (38h-2), traced (38h-7,
+        closeupDepth.ts): through the wall what Fresnel passes of the pad,
+        by reflection the liquid round it (the bright line at the contact)
+        and the softbox Light Play hangs in front. Out to the contact.
       */
-      // Up to the contact, where the wall ends and the liquid begins.
-      let wallB = 1.0 - smoothstep(0.97, 1.0, length(p));
-      c *= mix(1.0, edgePass(airBend(length(n.xy) / max(n.z, 1e-3)), 1.0), wallB);
+      let wallB = 1.0 - smoothstep(1.0 - softB, 1.0, rr);
+      c = mix(c, c * wall.x + rimCol * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
       outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));

@@ -24,6 +24,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `ferroDrop.ts`: closeup drop. `standing.ts`: domes.
 - `lampField.ts`: `LAMP_FIELD_WGSL`, `lampField`, `pupilPass`: the projector's light on the stage (the lamp lever, the aperture), with the CPU twin `npm run lampfield` reads.
 - `plateTransmit.ts`: `TRANSMIT_WGSL` (Glossiness as relief, the gel as a filter, the satellite droplets as lenses, PLAN 38h) and `EDGE_LIGHT_WGSL` (every edge's share of the light from beneath, `edgePass`, and the drops' aperture and indices, PLAN 38h-2): pieces of the plate shader kept beside `plate.ts`; `npm run nolight` checks them.
+- `closeupDepth.ts`: `CLOSEUP_DEPTH_WGSL` (the camera's bubble wall traced through Snell, Fresnel and total internal reflection against the light pad's critical cone, `airWallSeen`; Light Play as a softbox above the glass, `softboxRadiance`, PLAN 38h-7) and its constants `SOFTBOX_TILT`, `SOFTBOX_HALF`, `SOFTBOX_GAIN`; built into the plate shader after `EDGE_LIGHT_WGSL`; `npm run closeupdepth` checks it.
 - `film.ts`: a clear film that tears.
 - `fluid/`: the solver's kernels, one file a pass.
 - `output.ts`, `outputFields.ts`: projector pass.

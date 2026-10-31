@@ -838,6 +838,20 @@
       ]
     },
     {
+      "name": "The closeup's bubbles in depth",
+      "shard": "lab2",
+      "run": "npm run closeupdepth",
+      "why": [
+        "The camera's bubble traced through Snell, Fresnel and total internal",
+        "reflection (PLAN 38h-7): its middle the lamp through clear air, its wall",
+        "a dark band closed by the grazing reflection at the contact, the liquid",
+        "round it seen through the wall, and Light Play a softbox that only adds",
+        "light, only on the bubble, on its own side, and never on the plate. Red",
+        "on 38h-2's bubble in three of four lines. About a minute in the lab,",
+        "beside nolight, which reads the same plate shader."
+      ]
+    },
+    {
       "name": "Nothing on the plate makes light",
       "shard": "lab2",
       "run": "npm run nolight",

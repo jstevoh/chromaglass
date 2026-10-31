@@ -154,9 +154,28 @@ written first. Line numbers are as read on main at d07ac31.
     `plateTransmit.ts`), the camera's view through a light box's wider cone. No lamp
     direction is read on the glass. `npm run nolight` lines 9 to 12. Story in
     `docs/plan-shipped.md` §38.
-  - **38h-5. What Light Play and the Second Lamp do now** (S, nil; owner's call). 38h-2
-    took the lamp's side off every edge, so Light Play drives only how much the camera's
-    bubble magnifies the liquid behind it, and the Second Lamp only its share of the hot
+  - ~~**38h-7**~~ *shipped 2026-10-31.* Depth in the closeup's bubbles: the camera's
+    bubble wall traced through Snell, Fresnel and total internal reflection against the
+    light pad's critical cone (`closeupDepth.ts`), the middle the lamp through clear air,
+    the liquid round it seen through the wall (a diverging lens), and Light Play a softbox
+    above the glass seen only in a curved wall. `npm run closeupdepth`. Story in
+    `docs/plan-shipped.md` §38.
+  - **38h-8. The rest of the closeup's depth, found doing 38h-7** (M, nil). The owner's
+    photos (drops/references) have two more cues the bubbles now show and the rest of the
+    closeup does not. *The beads:* an oil drop in water is traced the same way (Snell into
+    the oil and out, total internal reflection leaving the oil past asin(1.333/1.47), 65
+    degrees, so a bright line at its contact too), but its rim and camera line are what
+    `droplens` holds on the owner's Mac, so it goes with **33g-2b**, generalising
+    `airWall` to two indices. *The cells:* the dye's relief bends the light the same way,
+    so the dye beyond a dome is seen shifted by its slope (the lensing that shades a dome
+    in a photograph); `macroDetail` has the decoded colour only, so it needs the decode
+    moved to the lensed point first. The softbox reflects off an oil drop by 0.24% at
+    normal incidence, so no glint there unless asked past real. *Measure:* `npm run
+    closeupdepth` lines on a bead and a cell field.
+  - **38h-5. What Light Play and the Second Lamp do now** (S, nil; owner's call). Light
+    Play is decided (38h-7, the owner's "the lighting can do whatever is most realistic and
+    useful"): the closeup photographer's softbox. The Second Lamp is open. 38h-2
+    took the lamp's side off every edge, so the Second Lamp drives only its share of the hot
     spot. A real meaning for both is there to draw: a bulb whose image sits off the
     pupil's centre (the second bulb's, at `SECOND_BULB`) lights edges on one side only,
     the share `pupilPass` gives a bend added to that offset (oblique light, as a
