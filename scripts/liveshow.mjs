@@ -39,7 +39,8 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
 import { engineQuery, installFrameReader } from './frame.mjs';
-import { filmFile, stackJudge, gridOfPixels, STACK_KEYSTONE } from './liveshowstack.mjs';
+import { presentsInXvfb } from './chromium.mjs';
+import { filmFile, stackJudge, gridOfPixels, barColumn, STACK_KEYSTONE } from './liveshowstack.mjs';
 import {
   cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS,
 } from '../src/lib/liveShow.ts';
@@ -386,9 +387,10 @@ function finish() {
   --stack: the Mixer stack source (PLAN.md 37x-4d-1), written ahead of the
   build for the Antigravity brief of 2026-10-31, red on main by design; CI
   runs it as `npm run liveshow -- --stack --owed=plate,stack` until the PRs
-  that fix them take each id out of `--owed` (an owed line that passes is a
-  failure, so it cannot stay excused once it holds; an id this file does not
-  know is one too).
+  that fix them take each id out of `--owed`. An owed line is excused only in
+  the state it is owed for (below); an owed line that passes is a failure, so
+  it cannot stay excused once it holds, and an id this file does not know is
+  one too.
 
   What was wrong (37x-4c's found item): the panel streams #liquid-canvas,
   and with a projector set up that canvas carries the projector's pass, the
@@ -406,27 +408,38 @@ function finish() {
   (0, 0, 0) in every cell.
 
   The film is the browser's fake camera playing a file written here
-  (scripts/liveshowstack.mjs): its left half blue, its right half orange, a
-  picture no plate makes, started from Settings, Film, Camera as `wall` does,
-  with every other row of the stack at 0 so the picture is the film alone.
-  The wall gets a keystone (its top edge pulled in a fifth from each side).
-  Then the lines, each frame as a 16 x 9 grid of mean colours:
+  (scripts/liveshowstack.mjs says why each part): a green band across its top
+  third, a blue left half and an orange right half below, a white bar
+  crossing the bottom third every 1.5 s. Started from Settings, Film, Camera
+  as `wall` does, with every other row of the stack at 0 so the picture is
+  the film alone, and the film's own Brightness at 0.8 so the picture is the
+  mixer's graded film and not the camera. The wall gets a keystone (its top
+  edge pulled in a fifth from each side). Then the lines, each frame as a
+  16 x 9 grid of mean colours:
 
     control  the plate read in the frame task that drew it (`grabFrame`, as
-             every harness that photographs the app reads it): the film's
-             halves and the keystone's black wedges in two corners. So the
-             scene is what it says before any stream is asked about it, and
-             "square" below cannot pass on a wall with no keystone.
-    plate    a stream to one 16:9 destination through the stand-in bridge,
-             the Plate source (today's, the default), its last frame decoded
-             by Chromium's own decoder as a viewer's player would: the same
-             picture, the film with the keystone, as the canvas has it.
-    stack    the same with the Mixer stack source, chosen in the panel's
-             Source (`data-testid="live-source"`, a select, values `plate` and
-             `stack`, `plate` the default): 1920 x 1080, the film's halves
-             as the plate has them, every corner the film's and not black,
-             and each column the same colour at the top as at the bottom: the
-             frame is square.
+             every harness that photographs the app reads it): the film the
+             right way up and round, and the keystone's black wedges in the
+             two top corners. So the scene is what it says before any stream
+             is asked about it, and "square" below cannot pass on a wall with
+             no keystone.
+    decodes  (never owed) each stream, to one 16:9 destination through the
+             stand-in bridge, went live and Chromium's own decoder made
+             1920 x 1080 frames of it, as a viewer's player would.
+    plate    the Plate source (today's, the default): the same picture as the
+             control, the film with the keystone, dark corners where the
+             control has them, colours within 50 of its. Owed only while its
+             frames decode black, today's fault; any other wrong picture is red.
+    stack    the Mixer stack source, chosen in the panel's Source
+             (`data-testid="live-source"`, a select, values `plate` and
+             `stack`, `plate` the default): the film the right way up and
+             round, the control's colours, no corner dark and every cell of
+             both edge columns the film's (no wedge, no pillarbox): square.
+             Owed only while the panel has no Source choice.
+    moving   on a Mac, each stream's bar is somewhere else between its first
+             and last frames decoded, a second or more apart, so a stream that
+             sent one frame for ever is red. Skipped in software, which draws
+             a few frames a minute.
 
   Needs WebGPU (the projector's pass is src/gpu/output.ts): a Mac, or
   `PW_WEBGPU=1` on Linux, where it presents into Xvfb at a few frames a
@@ -439,10 +452,41 @@ async function stackLines() {
   const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
   const unknown = [...owed].filter(id => !OWED_IDS.includes(id));
   if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${OWED_IDS.join(', ')})`);
-  const due = (id, name, ok, detail) => {
+  /**
+   * Under --owed a line is excused only in the state it is owed for, which
+   * the caller names (`excused`): the stream decoded and its picture is the
+   * wrong one, or the panel has no Source choice. A stream that never went
+   * live or never decoded is red on the line before, which is never owed; an
+   * owed line that passes is red until its id is taken out.
+   */
+  const due = (id, name, ok, detail, excused) => {
     if (!owed.has(id)) return check(name, ok, detail);
     if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+    if (!excused) return check(name, false, detail);
     console.log(` owed ${name} — ${detail}`);
+  };
+  /** Never owed: the stream went live and Chromium decoded 1920 x 1080 frames from it. */
+  const decoded = (which, f) => {
+    const ok = !!f && !f.error && f.w === 1920 && f.h === 1080 && f.frames >= 1;
+    check(`the ${which} stream went live and decodes, 1920x1080`, ok,
+      ok ? `${f.frames} frames decoded from ${f.packets} packets over ${(f.spanMs / 1000).toFixed(2)} s` : (f?.error ?? `${f?.w}x${f?.h}`));
+    return ok;
+  };
+  /*
+    And moving. A stream that copied one frame at Go live and sent it again
+    for ever (the frame task's fault family) would pass every picture line, so
+    on a Mac the film's bar has to have moved between the first and the last
+    frame decoded, at least a second apart. Not in software: there the plate
+    draws a few frames a minute, the stream sends the last one again, and a
+    still bar is the plate's pace, not the stream's.
+  */
+  const moving = (which, f, id) => {
+    if (presentsInXvfb()) { console.log(` skip  the ${which} stream moves with the film: software WebGPU draws a few frames a minute`); return true; }
+    const a = barColumn(f?.first), b = barColumn(f);
+    const ok = a !== null && b !== null && a !== b && f.spanMs >= 1000;
+    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, ok,
+      `bar at column ${a} then ${b}, ${(f?.spanMs / 1000).toFixed(2)} s apart`, ok === false && f?.blackStream === true);
+    return ok;
   };
   const STACK_LINE = 'with a film in the mixer and a keystone on the wall, the Mixer stack source\'s frames carry the film and are square';
 
@@ -464,7 +508,11 @@ async function stackLines() {
     return window.chromaglassDebug?.().film?.kind === 'camera' && !!v && v.readyState >= 2 && v.videoWidth > 0;
   }, undefined, 30_000);
   await page.keyboard.press('Escape');
-  const alone = { camera: 0, stock: 0, frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0, lampGround: 0, filmMix: 1 };
+  // The film's own Brightness at 0.8, a grade the mixer applies: measured in
+  // software, the plate's blue half (1, 63, 151) where at 1 it was (3, 105,
+  // 251), so a source that drew the camera itself and not the mixer's film is
+  // 100 too bright in blue, past `same`'s 50.
+  const alone = { camera: 0, stock: 0, frontLevel: 0, backLevel: 0, ledLevel: 0, gelWheel: 0, lumia: 0, markMix: 0, lampGround: 0, filmMix: 1, filmBright: 0.8 };
   if ((await page.evaluate(() => window.chromaglassSettings?.()?.filmBlend)) === 'multiply') alone.filmBlend = 'add';
   await page.evaluate((p) => window.chromaglassSettings?.(p), alone);
   const settled = await until(page, (p) => {
@@ -514,32 +562,45 @@ async function stackLines() {
       const { video, desc } = window.__liveStub.calls;
       window.__liveStub.calls.keep = false;
       const pk = video.filter(v => v.output === 'landscape');
+      // From the latest keyframe at least 1.2 s before the last packet, or the
+      // first keyframe there is: a first and a last frame a second or more
+      // apart where the stream ran that long.
+      const end = pk.length ? pk[pk.length - 1].ts : 0;
       let k = -1;
-      for (let i = pk.length - 1; i >= 0; i--) if (pk[i].key) { k = i; break; }
+      for (let i = 0; i < pk.length; i++) if (pk[i].key && (k < 0 || pk[i].ts <= end - 1200)) k = i;
       const d = desc.landscape;
       if (k < 0 || !d) return { error: `${pk.length} packets, ${k < 0 ? 'no keyframe' : 'no decoder configuration'}` };
       const hex = (n) => n.toString(16).padStart(2, '0');
-      let last = null, error = null;
-      const dec = new VideoDecoder({ output: (f) => { last?.close(); last = f; }, error: (e) => { error = String(e); } });
+      let first = null, last = null, firstTs = 0, lastTs = 0, n = 0, error = null;
+      const dec = new VideoDecoder({
+        output: (f) => { n++; if (!first) { first = f; firstTs = f.timestamp; return; } last?.close(); last = f; lastTs = f.timestamp; },
+        error: (e) => { error = String(e); },
+      });
       dec.configure({ codec: `avc1.${hex(d[1])}${hex(d[2])}${hex(d[3])}`, description: d });
       for (const p of pk.slice(k)) dec.decode(new EncodedVideoChunk({ type: p.key ? 'key' : 'delta', timestamp: Math.round(p.ts * 1000), data: p.data }));
       await dec.flush().catch((e) => { error ??= String(e); });
-      if (!last) return { error: error ?? 'nothing decoded' };
-      const w = last.displayWidth, h = last.displayHeight;
-      const c = new OffscreenCanvas(w, h);
-      const x = c.getContext('2d');
-      x.drawImage(last, 0, 0);
-      last.close();
-      const px = x.getImageData(0, 0, w, h).data;
-      const cols = 16, rows = 9, grid = [];
-      for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
-        const x0 = Math.floor((gx * w) / cols), x1 = Math.floor(((gx + 1) * w) / cols);
-        const y0 = Math.floor((gy * h) / rows), y1 = Math.floor(((gy + 1) * h) / rows);
-        let r = 0, g = 0, b = 0, n = 0;
-        for (let y = y0; y < y1; y += 2) for (let xx = x0; xx < x1; xx += 2) { const i = (y * w + xx) * 4; r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
-        grid.push([r / n, g / n, b / n]);
-      }
-      return { w, h, frames: pk.length - k, packets: pk.length, cols, rows, grid };
+      if (!first) return { error: error ?? 'nothing decoded' };
+      if (!last) { last = first; lastTs = firstTs; first = null; }
+      const gridOf = (frame) => {
+        const w = frame.displayWidth, h = frame.displayHeight;
+        const c = new OffscreenCanvas(w, h);
+        const x = c.getContext('2d');
+        x.drawImage(frame, 0, 0);
+        frame.close();
+        const px = x.getImageData(0, 0, w, h).data;
+        const cols = 16, rows = 9, grid = [];
+        for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
+          const x0 = Math.floor((gx * w) / cols), x1 = Math.floor(((gx + 1) * w) / cols);
+          const y0 = Math.floor((gy * h) / rows), y1 = Math.floor(((gy + 1) * h) / rows);
+          let r = 0, g = 0, b = 0, m = 0;
+          for (let y = y0; y < y1; y += 2) for (let xx = x0; xx < x1; xx += 2) { const i = (y * w + xx) * 4; r += px[i]; g += px[i + 1]; b += px[i + 2]; m++; }
+          grid.push([r / m, g / m, b / m]);
+        }
+        return { w, h, cols, rows, grid };
+      };
+      const out = { ...gridOf(last), frames: n, packets: pk.length, spanMs: (lastTs - firstTs) / 1000 };
+      out.first = first ? gridOf(first) : out;
+      return out;
     });
   };
 
@@ -551,13 +612,25 @@ async function stackLines() {
   const g = stackJudge(seen);
   check('control: the plate, read in its own frame, is the film with the wall\'s keystone on it, black in two corners', g.film && g.keystoned, g.detail);
 
-  const p = stackJudge(await stream(), seen);
-  due('plate', 'the Plate source\'s frames are the plate: the film, with the wall\'s keystone on it as the canvas has it', p.film && p.keystoned && p.same, p.detail);
+  // Owed while it decodes and is black, today's fault (37x-4d-6, on Metal and
+  // in software alike); any other wrong picture is red.
+  const blackOf = (f) => !!f?.grid && f.grid.every(c => Math.max(...c) < 8);
+  const plate = await stream();
+  plate.blackStream = blackOf(plate);
+  if (decoded('Plate source\'s', plate)) {
+    const p = stackJudge(plate, seen);
+    due('plate', 'the Plate source\'s frames are the plate: the film, with the wall\'s keystone on it as the canvas has it', p.film && p.keystoned && p.same, p.detail, plate.blackStream);
+    moving('Plate source\'s', plate, 'plate');
+  }
 
   const choice = await page.getByTestId('live-source').count();
-  if (!choice) { due('stack', STACK_LINE, false, 'the panel has no Source choice yet (data-testid="live-source")'); return; }
+  if (!choice) { due('stack', STACK_LINE, false, 'the panel has no Source choice yet (data-testid="live-source")', true); return; }
   await page.getByTestId('live-source').selectOption('stack');
-  const s = stackJudge(await stream(), seen);
-  due('stack', STACK_LINE, s.film && s.square && s.same, s.detail);
+  const stack = await stream();
+  if (decoded('Mixer stack source\'s', stack)) {
+    const s = stackJudge(stack, seen);
+    due('stack', STACK_LINE, s.film && s.square && s.same, s.detail, false);
+    moving('Mixer stack source\'s', stack, 'stack');
+  }
   await page.getByTestId('live-source').selectOption('plate');
 }

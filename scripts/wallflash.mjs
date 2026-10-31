@@ -140,8 +140,10 @@ export function flashTraces(check) {
 // Written before the guard it checks, red on main by design, for the
 // Antigravity brief of 2026-10-31 that builds it; CI runs `npm run wall --
 // --owed=quarter,red,rung` until that PR ships them and takes each id it
-// ships out of the flag (an id whose line passes, or one this file does not
-// know, is a failure, so a line cannot stay excused once it holds). Three
+// ships out of the flag. An owed line is excused only while the guard has no
+// tile entry at all; once it has one every line counts. An id whose line
+// passes, or one this file does not know, is a failure, so a line cannot stay
+// excused once it holds. Three
 // things the guard on one whole-wall number cannot do, from 14r and the
 // flash-guard bullet of 14i:
 //
@@ -158,7 +160,8 @@ export function flashTraces(check) {
 //            negatives as 0; a pair of opposing ones is one red flash). Black
 //            to a linear red of 0.4 moves luminance 0.085, under the general
 //            step, and is a red flash at every swing.
-//   rung     a change of the pixel-ratio rung is not a flash. The probe today
+//   rung     a change of the pixel-ratio rung is not a flash (the guard's half:
+//            see the block). The probe today
 //            divides a frame's sum, read a frame or two late through the
 //            readback ring, by the newest frame's pixel count (src/gpu/
 //            probe.ts, `this.pixels`), so the reading after a 1.5x to 1x step
@@ -194,14 +197,22 @@ export function flashTraces(check) {
 export function tileTraces(check) {
   const HZ = 60;
   const OWED_IDS = ['quarter', 'red', 'rung'];
+  const hasTiles = typeof FlashGuard.prototype.sampleTiles === 'function';
   const flag = process.argv.find(a => a.startsWith('--owed='));
   const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
   const unknown = [...owed].filter(id => !OWED_IDS.includes(id));
   if (unknown.length) check('every id in --owed is a line of this file', false, `unknown: ${unknown.join(', ')} (known: ${OWED_IDS.join(', ')})`);
-  /** A line written ahead of the build: counted, or under --owed printed and not counted, until it passes. */
+  /**
+   * A line written ahead of the build. Under --owed it is excused only in the
+   * state the build is owed for, the guard with no tile entry at all: once
+   * `sampleTiles` exists every line counts, owed or not, so a broken entry is
+   * red and not "owed", and a line that passes with its id still listed is
+   * red too (take the id out).
+   */
   const due = (id, name, ok, detail) => {
     if (!owed.has(id)) return check(name, ok, detail);
     if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+    if (hasTiles) return check(name, false, detail);
     console.log(` owed  ${name} — ${detail}`);
   };
 
@@ -280,7 +291,6 @@ export function tileTraces(check) {
     const all = Array.from({ length: tiles.cols * tiles.rows }, (_, i) => i);
     return lumOf(meanOf(tiles, all));
   };
-  const hasTiles = typeof FlashGuard.prototype.sampleTiles === 'function';
   const NO_ENTRY = 'FlashGuard has no sampleTiles(now, tiles) entry yet (14r)';
 
   /**
@@ -324,52 +334,86 @@ export function tileTraces(check) {
 
   console.log('\n  The guard by quarters, in light (14i-guard, 14r):');
 
+  const bareOf = (seconds, frameAt) => judge(Array.from({ length: seconds * HZ }, (_, i) => {
+    const t = (i * 1000) / HZ, f = frameAt(t);
+    return { t, tiles: reading(f.cols, f.rows, f.width, f.height, f.colourOf) };
+  }));
+  const centred = (x, y) => x >= 2 && x < 6 && y >= 2 && y < 6;
+  const wall8 = (colourOf) => ({ cols: 8, rows: 8, width: 1920, height: 1080, colourOf });
+  const square = (hz, lo, hi) => (t) => (Math.sin((t / 1000) * 2 * Math.PI * hz) > 0 ? hi : lo);
+
   // quarter: the centred quarter of the wall, a window that straddles all
   // four quadrants (so a guard that kept only the four fixed quadrants misses
   // it), between 0.04 and 0.4 at 5 Hz on a ground of 0.04. The wall's mean
-  // moves 0.09: under the step, as the whole-wall guard sees it.
+  // moves 0.09: under the step, as the whole-wall guard sees it. Dimmed as far
+  // as it has to be and no further, as the whole-wall lines above ask: its
+  // window's excursion of 0.36 needs 0.075 / 0.36 = 0.208, and a guard that
+  // dimmed to its floor at the first movement would pass "not a strobe" alone
+  // (found in review: such a guard passed all three lines).
   {
-    const frameAt = (t) => ({
-      cols: 8, rows: 8, width: 1920, height: 1080,
-      colourOf: (x, y) => grey(x >= 2 && x < 6 && y >= 2 && y < 6 && on5(t) ? 0.4 : 0.04),
-    });
-    const bare = judge(Array.from({ length: 3 * HZ }, (_, i) => {
-      const t = (i * 1000) / HZ, f = frameAt(t);
-      return { t, tiles: reading(f.cols, f.rows, f.width, f.height, f.colourOf) };
-    }));
+    const frameAt = (t) => wall8((x, y) => grey(centred(x, y) && on5(t) ? 0.4 : 0.04));
+    const bare = bareOf(3, frameAt);
     const whole = runWhole(10, frameAt);
     check('control: a quarter of the wall at 5 Hz is a strobe in its window, and the whole-wall guard leaves it alone',
       bare.flash > 3 && whole === 0, `${bare.flash}/s in the worst quarter window; the whole-wall mean moves 0.09, ${whole} frames touched`);
-    if (!hasTiles) due('quarter', 'a quarter of the wall flashing 0.4 at 5 Hz is counted, and is not a strobe by the time it reaches the wall', false, NO_ENTRY);
+    const name = 'a quarter of the wall flashing 0.4 at 5 Hz is counted, dimmed as far as it has to be, and is not a strobe by the time it reaches the wall';
+    if (!hasTiles) due('quarter', name, false, NO_ENTRY);
     else {
       const r = runTiles(10, frameAt);
       const after = judge(r.readings, 4000);
-      due('quarter', 'a quarter of the wall flashing 0.4 at 5 Hz is counted, and is not a strobe by the time it reaches the wall',
-        after.flash <= 3 && r.rules.includes('flash') && r.minGain >= 0.1,
-        `${bare.flash}/s -> ${after.flash}/s delivered after 4 s in the worst quarter window, held by ${r.rules.join(', ') || 'nothing'}, gain ${r.guard.state.gain.toFixed(3)} (floor ${r.minGain.toFixed(3)})`);
+      const needed = 0.075 / 0.36, settled = r.guard.state.gain;
+      due('quarter', name,
+        after.flash <= 3 && r.rules.includes('flash') && r.minGain >= 0.1 && Math.abs(settled - needed) < 0.03,
+        `${bare.flash}/s -> ${after.flash}/s delivered after 4 s in the worst quarter window, held by ${r.rules.join(', ') || 'nothing'}, gain ${settled.toFixed(3)} (needs ${needed.toFixed(3)}; floor ${r.minGain.toFixed(3)})`);
+    }
+    // And what the tile entry must leave alone, as the whole-wall lines above
+    // ask of `sample()`: a strobe at the line, on the whole wall and on the
+    // centred quarter; one hard hit; and letting go once a strobe stops.
+    const alone = [
+      ['2.5 Hz on the whole wall', (t) => wall8(() => grey(square(2.5, 0.2, 0.7)(t))), 10, (r) => r.touched === 0],
+      ['2.5 Hz on the centred quarter', (t) => wall8((x, y) => grey(centred(x, y) ? square(2.5, 0.2, 0.7)(t) : 0.2)), 10, (r) => r.touched === 0],
+      ['one hard hit', (t) => wall8(() => grey(t > 2000 && t < 2120 ? 0.85 : 0.2)), 5, (r) => r.touched === 0],
+      ['a strobe that stops at 4 s, let go within 3 s', (t) => wall8(() => grey(t < 4000 ? square(10, 0.15, 0.75)(t) : 0.5 + 0.2 * Math.sin((t / 1000) * 2 * Math.PI * 0.3))), 12,
+        (r) => r.readings.filter(d => d.t > 7000 && Math.abs(d.gain - 1) > 0.01).length === 0 && r.minGain < 0.9],
+    ];
+    for (const [what, at, seconds, ok] of alone) {
+      const label = `the tile entry leaves the show alone: ${what}`;
+      if (!hasTiles) { due('quarter', label, false, NO_ENTRY); continue; }
+      const r = runTiles(seconds, at);
+      due('quarter', label, ok(r), `${r.touched} frames touched, gain at the end ${r.guard.state.gain.toFixed(3)}`);
     }
   }
 
-  // red: the whole wall between black and a linear red of 0.4 at 5 Hz.
-  // Luminance moves 0.085, under the general step in every window; (R - G -
-  // B) x 320 moves 128. A gain of 0.156 or less brings that under 20, above
-  // the guard's floor of 0.1, so a guard that dims for it can make it safe.
+  // red: the centred quarter between black and a linear red of 0.4 at 5 Hz,
+  // the rest of the wall black. Luminance moves 0.085, under the general step
+  // in every window; (R - G - B) x 320 moves 128. A gain of 0.156 or less
+  // brings that under 20, above the guard's floor of 0.1, so a guard that dims
+  // for it can make it safe. On a quarter, not the whole wall, so a red rule
+  // read on the whole wall's mean (which moves a quarter as far) misses it.
+  // Beside it a red that is not saturated: (0.3, 0.04, 0.04), R/(R+G+B) 0.79,
+  // luminance 0.095, (R - G - B) x 320 = 70: no flash by either rule, which a
+  // red rule that forgot the ratio would dim (found in review).
   {
-    const frameAt = (t) => ({ cols: 8, rows: 8, width: 1920, height: 1080, colourOf: () => (on5(t) ? [0.4, 0, 0] : [0, 0, 0]) });
-    const bare = judge(Array.from({ length: 3 * HZ }, (_, i) => {
-      const t = (i * 1000) / HZ, f = frameAt(t);
-      return { t, tiles: reading(f.cols, f.rows, f.width, f.height, f.colourOf) };
-    }));
+    const frameAt = (t) => wall8((x, y) => (centred(x, y) && on5(t) ? [0.4, 0, 0] : [0, 0, 0]));
+    const pale = (t) => wall8((x, y) => (centred(x, y) && on5(t) ? [0.3, 0.04, 0.04] : [0, 0, 0]));
+    const bare = bareOf(3, frameAt), barePale = bareOf(3, pale);
     const whole = runWhole(10, frameAt);
-    check('control: a red flash under the luminance step is a red strobe and no general one, and the whole-wall guard leaves it alone',
-      bare.red > 3 && bare.flash === 0 && whole === 0, `${bare.red} red flashes/s, ${bare.flash} general; ${whole} frames touched`);
-    if (!hasTiles) due('red', 'a full-wall red flash at 5 Hz is counted by the red rule, and is not a red strobe on the wall', false, NO_ENTRY);
+    check('control: a red flash under the luminance step is a red strobe and no general one, and the whole-wall guard leaves it alone; the paler red is neither',
+      bare.red > 3 && bare.flash === 0 && whole === 0 && barePale.red === 0 && barePale.flash === 0,
+      `${bare.red} red flashes/s, ${bare.flash} general; ${whole} frames touched; the paler red ${barePale.red} red, ${barePale.flash} general`);
+    const name = 'a red flash at 5 Hz over a quarter of the wall is counted by the red rule, and is not a red strobe on the wall';
+    if (!hasTiles) due('red', name, false, NO_ENTRY);
     else {
       const r = runTiles(10, frameAt);
       const after = judge(r.readings, 4000);
-      due('red', 'a full-wall red flash at 5 Hz is counted by the red rule, and is not a red strobe on the wall',
-        after.red <= 3 && r.rules.includes('red') && r.minGain >= 0.1,
+      due('red', name, after.red <= 3 && r.rules.includes('red') && r.minGain >= 0.1,
         `${bare.red}/s -> ${after.red}/s red flashes delivered after 4 s, held by ${r.rules.join(', ') || 'nothing'}, gain ${r.guard.state.gain.toFixed(3)} (floor ${r.minGain.toFixed(3)})`);
+    }
+    const paleName = 'the tile entry leaves a red under the saturation line alone: R/(R+G+B) 0.79 at 5 Hz';
+    if (!hasTiles) due('red', paleName, false, NO_ENTRY);
+    else {
+      const r = runTiles(10, pale);
+      due('red', paleName, r.touched === 0, `${r.touched} frames touched`);
     }
   }
 
@@ -377,6 +421,13 @@ export function tileTraces(check) {
   // has its own mean) on a 1366 x 768 window, at the 1.5x rung (2049 x 1152,
   // tiles that do not divide evenly) stepping to 1x at 2 s, back up at 4 s,
   // down at 6 s: three changes of a governor's rung in eight seconds.
+  //
+  // The guard's half only. The readings are made here with each frame's own
+  // count, as the contract says the probe will hand them over, so a guard that
+  // divides by its own `pixels` passes whatever src/gpu/probe.ts does (a guard
+  // that caches the first reading's counts is red). The probe's half, the
+  // count carried through the readback ring on the GPU, has no line yet: read
+  // in review, and PLAN.md 14r-4.
   {
     const RUNG = (t) => (t < 2000 || (t >= 4000 && t < 6000) ? 1.5 : 1);
     const frameAt = (t) => ({
@@ -408,12 +459,12 @@ export function tileTraces(check) {
     // bright; the counter sees the rise out of the first run into the second.
     check('control: read as the probe reads it today, the rung changes are flashes in the same still picture',
       spikes >= 2, `${spikes} flashes at 3 changes; the still picture ${still.toFixed(3)}, its brightest reading ${brightest.toFixed(3)} (${(brightest / still).toFixed(2)}x)`);
-    if (!hasTiles) due('rung', 'a pixel-ratio rung change, 1.5x to 1x and back, is not a flash', false, NO_ENTRY);
+    const name = 'the guard\'s half of a rung change: readings that carry their own frame\'s count, 1.5x to 1x and back, are not a flash';
+    if (!hasTiles) due('rung', name, false, NO_ENTRY);
     else {
       const r = runTiles(8, frameAt);
       const counted = r.guard.state.counted;
-      due('rung', 'a pixel-ratio rung change, 1.5x to 1x and back, is not a flash',
-        counted === 0 && r.touched === 0,
+      due('rung', name, counted === 0 && r.touched === 0,
         `${typeof counted === 'number' ? counted : `state.counted is ${counted}`} counted at 3 changes, ${r.touched} frames touched`);
     }
   }
