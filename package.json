@@ -182,6 +182,7 @@
     "pops": "node scripts/pops.mjs",
     "drops": "node scripts/drops.mjs",
     "droplens": "node scripts/droplens.mjs",
+    "beadmask": "node scripts/beadmask.mjs",
     "airlens": "node scripts/airlens.mjs",
     "filmtable": "node scripts/filmtable.mjs",
     "filmlook": "node scripts/filmlook.mjs",

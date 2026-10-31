@@ -9,11 +9,15 @@ import { cordReading, type PatchContext } from '../src/lib/sceneMap';
 import { areaDye, type PlateArea } from '../src/lib/plateAreas';
 import { dyeAbsorbances } from '../src/lib/dye';
 import { PALETTE_RGB } from '../src/constants';
+import { AUTO_DOSE, LIQUIDS_BY_ID } from '../src/presetPlate';
 import { layFinger } from '../src/lib/handSolid';
 import type { SceneMapping } from '../src/types';
 
-/** A burst of one reading: on from `t0` for `dur` seconds at `level`, falling by half across it, as a hit's hold does. */
-type Burst = { feature: string; t0: number; dur: number; level: number };
+/**
+ * A burst of one reading: on from `t0` for `dur` seconds at `level`, falling by half across it, as a hit's hold does;
+ * or, `hold`, set to `level` from `t0` and kept (a note's name, hitSource.ts noteClass, which is not a level and does not fall).
+ */
+type Burst = { feature: string; t0: number; dur: number; level: number; hold?: boolean };
 
 type Lab = {
   create(N: number, L: number): Promise<unknown>;
@@ -23,6 +27,11 @@ type Lab = {
   flush(dt?: number): void;
   step(n: number, over?: Record<string, number>, flushed?: boolean): Promise<void>;
   field(which: 'dye' | 'vel'): Promise<number[]>;
+  chemistry(which: 'mix' | 'rxn'): Promise<{ n: number; data: number[] } | null>;
+  solver(): {
+    addMix(x: number, y: number, r: number, what: { acid?: number }): void;
+    addLiquidDrop(x: number, y: number, r: number, what: Record<string, number>, amount: number): void;
+  };
 };
 const lab = (window as unknown as { lab: Lab }).lab;
 
@@ -36,7 +45,7 @@ const api = {
    * |velocity| and temperature over the run sampled every `every` steps. `contract`
    * is the look's dyes (palette indices).
    */
-  async run(cfg: { L: number; seconds: number; areas: PlateArea[]; contract: number[]; cords: SceneMapping[]; bursts: Burst[]; over: Record<string, number>; every: number; pools: boolean; middle?: boolean }) {
+  async run(cfg: { L: number; seconds: number; areas: PlateArea[]; contract: number[]; cords: SceneMapping[]; bursts: Burst[]; over: Record<string, number>; every: number; pools: boolean; middle?: boolean; chem?: 'mix' | 'rxn'; snaps?: number[] }) {
     const { L, areas, contract, cords, bursts, over } = cfg;
     await lab.create(L, L);
     const dye = new Float32Array(L * L * 4), vel = new Float32Array(L * L * 4);
@@ -89,7 +98,26 @@ const api = {
         layFinger(paddleNow, L, x, y, r, mx, my);
       },
     };
-    const sink = fluidSink(plate, GS);
+    /*
+      An area of a reagent pours its bottle (PLAN 25i): what the app's
+      pourLiquid hands the plate (its radius, AUTO_DOSE a dose, a fresh plate's
+      whole headroom), then what FluidSimulation's onDeposit does with it on
+      the GPU, the two this check reads: an acid or a base into the mix's
+      acidity with the indicator on, and the BZ activator through the solver's
+      own addLiquidDrop, which is where the app's lands. Each drop kept, for
+      the count.
+    */
+    const drops: { id: string; x: number; y: number; t: number }[] = [];
+    let now = 0;
+    const sink = fluidSink(plate, GS, (_f, id, x, y, strength) => {
+      const liq = LIQUIDS_BY_ID.get(id);
+      if (!liq?.behaviour) return;
+      const r = Math.max(1.5, Math.max(2, Math.round((liq.injectRadius ?? 3) * GS))) / L, amount = AUTO_DOSE * strength;
+      const acid = liq.behaviour.acid ?? 0;
+      if (acid !== 0 && (over.phIndicator ?? 0) > 0.001) lab.solver().addMix(x / L, y / L, r, { acid: acid * Math.min(1, amount) });
+      if ((liq.behaviour.bz ?? 0) > 0) lab.solver().addLiquidDrop(x / L, y / L, r, liq.behaviour as Record<string, number>, amount);
+      drops.push({ id, x: x / L, y: y / L, t: now });
+    });
     /*
       `middle`: the same cords, every act moved to the plate's middle, as the
       music's hands landed before areas (the before of the lit-region count).
@@ -108,11 +136,16 @@ const api = {
     const speed = new Float32Array(L * L), temp = new Float32Array(L * L), heatDry = new Float32Array(L * L);
     let samples = 0;
     const trace: { t: number; env: number[] }[] = [];
+    const snaps: number[][] = [];
+    const snapAt = new Set((cfg.snaps ?? []).map(t => Math.round(t / DT)));
     for (let s = 0; s < steps; s++) {
       const t = s * DT;
+      now = t;
+      if (snapAt.has(s)) snaps.push(Array.from(await lab.field('dye')));
       for (let b = 0; b < 8; b++) reading.bands[b] = floor(t, `band${b + 1}`);
       for (const f of ['kickHit', 'snareHit', 'hatsHit']) reading[f] = floor(t, f);
       for (const b of bursts) {
+        if (b.hold) { if (t >= b.t0) reading[b.feature] = b.level; continue; }
         if (t < b.t0 || t >= b.t0 + b.dur) continue;
         const v = b.level * (1 - 0.5 * (t - b.t0) / b.dur);
         const band = /^band(\d)$/.exec(b.feature);
@@ -143,7 +176,8 @@ const api = {
       laidDye: Array.from(laidDye), heatDry: Array.from(heatDry),
       paddleDry: Array.from(paddleDry), swept: Array.from(swept),
       fires: cords.map(m => hands.fires(m)),
-      trace,
+      trace, drops, snaps,
+      chem: cfg.chem ? await lab.chemistry(cfg.chem) : null,
     };
   },
 };

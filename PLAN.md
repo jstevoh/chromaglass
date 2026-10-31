@@ -161,7 +161,8 @@ merge conflicts are the shared documents', which 0.6 ends.
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
   video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
-  14ab-13 with #591, finished in #596). Left: 14ab-6, -10, -11.
+  14ab-13 with #591, finished in #596; 14ab-6 the beads' mask on the GPU). Left: 14ab-10, -11,
+  -14.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
@@ -181,8 +182,8 @@ bar grid together); **14e** (M, output latency and one lead per source); **10.2-
 **10.2-snare** then **10.2-build** (M); **10.3-rest** (M); from §30 (VS, 2026-10-11,
 re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering the
 music, explored as four directions the same day and all four taken, in this order:
-~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), then **25i**
-colour that answers the music (C, S–M), then **25j** a lamp under each area (D, M, with
+~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), ~~**25i**
+colour that answers the music~~ (shipped), then **25j** a lamp under each area (D, M, with
 14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), **14t-pc** Program Change (S), **24.3** notes as voices
 with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
