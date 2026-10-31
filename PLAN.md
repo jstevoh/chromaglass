@@ -239,9 +239,9 @@ style (§31).
 
 - **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
   **12.7**, **12.8**; **12.4a**; later **12.9**. When the owner says go: **12-ship**, **12-play-org**; later **12-link**; **12-mas** not for now.
-- **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
+- **7.2** VJ software (§13): ~~**13.4**~~ the OSC write-up (shipped 2026-10-31, with ~~**13-icon**~~ and ~~**13-version**~~), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out (Link shipped 2026-10-30),
-  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
+  **13-port**, **13-intel**, **13-exit**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.

@@ -157,6 +157,8 @@ With the window-management permission granted (the Cast menu's **Second display*
 
 The show server listens for OSC on UDP port 9000 (`OSC_PORT` to change, `OSC_PORT=0` to turn it off), from the local network only, so Resolume, TouchDesigner, Max, Ableton (Connection Kit) and phone OSC apps can drive the show. OSC has no show key, so anyone on the same Wi-Fi who sends a packet drives the show: `OSC_BIND=127.0.0.1` keeps `npm run show` to this computer. **The Mac app starts with OSC off**; *Show → OSC input* turns it on for *This Mac only* (Resolume or Ableton on the same laptop) or *From the network* (a lighting desk or a second computer), applies at once, and is kept between launches. It is a menu on the laptop and has no phone version on purpose: a phone that could open the show to the network would hand that to anyone holding its key. OSC is **Pro**: with a Home licence, or none in the Mac app, the port opens and the server ignores what arrives, and Show Server Details says so (PLAN.md 34a-7a). A `npm run show` on a developer's machine with no licence and no `CHROMAGLASS_ENFORCE_TIERS` stays open, as every local build does.
 
+Every address, each action and preset by name, the settings worth a fader, a starter map for Resolume and a script for TouchDesigner are on one page: [osc.md](osc.md). In short:
+
 ```
 /chromaglass/setting/<key> <number>    any numeric setting, e.g. /chromaglass/setting/audioImpact 0.8
 /chromaglass/action/<name>             seed clear drain lucky play pause automate-on automate-off

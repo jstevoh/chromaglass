@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { LIT } from './ui';
+import { APP_VERSION } from '../lib/appVersion';
 import {
   X, BookOpen, Play, Layers, Droplets, Palette, Activity, Aperture,
   Zap, Microscope, Projector, Video, Sliders, GitMerge, History, Gauge,
@@ -469,7 +470,7 @@ const SECTIONS: Section[] = [
           ['MIDI', <>Plug the controller in and click the <Em>MIDI</Em> dot in the header, or open Settings → Inputs → Controller: if we recognise the port, its factory map is one button. Factory maps for APC mini mk2, APC40 mkII, nanoKONTROL2, Launchpad and Launch Control XL, or teach yours: choose what a control should do, then touch it. Soft takeover, endless encoders and LED feedback. The panel draws your controller to scale, which doubles as a printable cheat sheet. Maps save as <C>.chromaglass-midi.json</C>.</>],
           ['Game controller', <>Sticks move a cursor and blow, triggers drop dye, shoulders cycle the dye, d-pad steps presets and plates, face buttons fire the one-shots.</>],
           ['Phone / iPad', <>A projectionist's pad: drag to blow, tap to drop, pick a dye, pick which plate you are working, tilt the device to rock the plate. On an iPad it is two columns — the pad on the left, the dials and sequencer on the right. A pen's pressure sets how much dye and its lean sets which way the air goes.</>],
-          ['OSC', <>Addresses like <C>/chromaglass/dye</C> for a lighting desk or a laptop running a show-control app.</>],
+          ['OSC', <>Addresses like <C>/chromaglass/preset galaxy</C> or <C>/chromaglass/setting/dimmer 0.5</C> for Resolume, TouchDesigner, a lighting desk or a laptop running a show-control app, on UDP port 9000 (Pro; the Mac app's Show → OSC input turns it on). Every address, with a starter Resolume map and a TouchDesigner script: <C>docs/osc.md</C> on ChromaGlass's GitHub.</>],
         ]} />
         <H>The show over time</H>
         <Rows items={[
@@ -835,7 +836,8 @@ export function GuidePanel({ focus = null, onClose }: GuidePanelProps) {
             <h2 className="text-lg font-bold tracking-tighter flex items-center gap-2">
               <BookOpen size={17} /> About ChromaGlass
             </h2>
-            <p className="text-[10px] uppercase tracking-[0.25em] opacity-30 mt-0.5">The manual</p>
+            {/* Which build this is, by the release's name (lib/appVersion.ts): the one place a performer reads it on the web and the phone, as the Mac app's About box is on the Mac. */}
+            <p className="text-[10px] uppercase tracking-[0.25em] opacity-30 mt-0.5">The manual · <span data-testid="guide-version">{APP_VERSION}</span></p>
           </div>
           <button
             onClick={onClose}
