@@ -52,6 +52,12 @@ export interface LiquidBehaviour {
   /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
   acid?: number;
   /**
+   * The BZ reaction's activator (bromous acid), into its gel: where it lands
+   * the gel fires and a wave runs out from there, as a real dish of it does
+   * where a silver wire touches it (PLAN 25i). Nothing without BZ Reaction on.
+   */
+  bz?: number;
+  /**
    * Ferrofluid: how much of each drop goes into the dark liquid a magnet
    * pulls (the solver's second phase). That liquid never mixes with the dye;
    * the magnet, and the maze field, move it.
@@ -686,7 +692,7 @@ export interface VisualizerSettings {
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
-  bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
+  bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid

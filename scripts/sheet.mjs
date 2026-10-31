@@ -63,6 +63,7 @@
  * And any GPU validation error fails the run.
  */
 import { build } from 'esbuild';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -96,7 +97,7 @@ const zeroOf = (prof, spacing) => { for (let k = 1; k < prof.length; k++) if (pr
 */
 const J0 = (x) => { let v = 0; const m = 48; for (let k = 0; k < m; k++) v += Math.cos(x * Math.sin(((k + 0.5) / m) * Math.PI)); return v / m; };
 const theory = (nu, rs, t) => {
-  const M = 0.006 ** 3 / (12 * 1000 * nu), rhoG = 9810, dk = 0.5, top = 8 / FINGER_SIGMA;
+  const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nu), rhoG = 9810, dk = 0.5, top = 8 / FINGER_SIGMA;
   return rs.map((r) => {
     let v = 0;
     for (let k = dk / 2; k < top; k += dk) {
@@ -203,7 +204,7 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     (its weight levels 6 mm of it at 0.18 m²/s), the default oil's for twelve, glycerine's for all
     sixty. Past that the rim sets the pace, which is asked next.
   */
-  const reach = (nu, t) => Math.sqrt(4 * (0.006 ** 3 / (12 * 1000 * nu)) * 9810 * t);
+  const reach = (nu, t) => Math.sqrt(4 * (DISH_GAP_METRES ** 3 / (12 * 1000 * nu)) * 9810 * t);
   const asked = rows.flatMap((r, i) => r.got.map((v, k) => ({ d: Math.abs(v - r.want[k]), ok: reach(Object.values(LIQUIDS)[i], after[k]) < 0.12 }))).filter((x) => x.ok);
   const worst = Math.max(...asked.map((x) => x.d));
   check('let go, the dent is given back at the theory\'s pace: its middle within 1% of its depth of the theory\'s at 1, 4, 12 and 60 frames after the lift, while the dent is still the finger\'s and not the rim\'s',
@@ -215,7 +216,7 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     const a = s.depthAt(0.5, 0.5);
     s.step(64, 1 / 60, 0, buf);
     const b = s.depthAt(0.5, 0.5);
-    const k2 = 2 * (Math.PI / W) ** 2, lam = (0.006 ** 3 / (12 * 1000 * LIQUIDS.water)) * k2 * (SHEET_D * k2 * k2 + 9810);
+    const k2 = 2 * (Math.PI / W) ** 2, lam = (DISH_GAP_METRES ** 3 / (12 * 1000 * LIQUIDS.water)) * k2 * (SHEET_D * k2 * k2 + 9810);
     const want = Math.exp(-lam / 60);
     check('and once water\'s dent has reached the rim it goes as the dish\'s slowest mode: its middle a frame apart within 5% of e^(−λ₁/60)', Math.abs(b / a / want - 1) < 0.05,
       `${(b / a).toFixed(3)} a frame against ${want.toFixed(3)} (λ₁ ${lam.toFixed(0)} a second)`);
@@ -314,7 +315,7 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     c.step(L, T, 0, buf);
     let t = T, t1 = null, p1 = null;
     while (c.live && t < 60) { c.step(L, 1 / 60, sp, buf); t += 1 / 60; if (p1 === null && c.peak < 30 * SHEET_QUIET) { p1 = c.peak; t1 = t; } }
-    const M = 0.006 ** 3 / (12 * 1000 * nv), k2 = 2 * (Math.PI / 0.2) ** 2, lam = M * k2 * (SHEET_D * k2 * k2 + 9810);
+    const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nv), k2 = 2 * (Math.PI / 0.2) ** 2, lam = M * k2 * (SHEET_D * k2 * k2 + 9810);
     // The spring's rate at rest, where a trace thirty times the quiet is (1% of the gap): the full press's share to the (1/STEFAN_FILM)³.
     const want = t1 + Math.log(p1 / SHEET_QUIET) / (lam - (60 / STEFAN_FILM ** 3) * Math.log(1 - sp));
     quiet.push({ name, t, want, live: c.live });

@@ -174,11 +174,11 @@ try {
     if (press) { for (let k = 0; k < 60; k++) { pressDown(); lab.flush(DT); await lab.step(1, over, true); } still = mean(await lab.field('vel')); }
     for (let k = 0; k < 60; k++) { pressDown(); lab.breath(cx, cy, R, 1, 0); lab.flush(DT); await lab.step(1, over, true); }
     const blowing = mean(await lab.field('vel'));
-    // The gap under the breath's middle, in metres (0.03 of a 0.2 m plate at rest).
+    // The gap under the breath's middle, in metres (the field is in gap units: lib/turntable.ts DISH_GAP_FIELD_METRES a unit, PLAN 38r).
     const sq = await lab.squeeze();
     let hs = 0, hn = 0;
     for (let j = 0; j < sq.n; j++) for (let i = 0; i < sq.n; i++) if (Math.hypot((i + 0.5) / sq.n - 0.5, (j + 0.5) / sq.n - 0.5) < 0.5 * R / L) { hs += sq.gap[i + j * sq.n]; hn++; }
-    const h = (hs / hn) * 0.2;
+    const h = (hs / hn) * lab.GAP_METRES;
     await lab.step(30, over);
     const after = mean(await lab.field('vel'));
     const nu = lab.thinGapViscosity(thickness);

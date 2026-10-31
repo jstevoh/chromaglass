@@ -135,6 +135,7 @@
   on the same cells deepens the plate's film without slowing the sheet's
   lift there (PLAN 38l-2).
 */
+import { DISH_GAP_METRES } from './turntable.ts';
 
 /** Cells across the sheet's own grid (a power of two). */
 export const SHEET_N = 128;
@@ -308,7 +309,7 @@ export class RhythmSheet {
     this.plateMetres = opts.plateMetres ?? 0.2;
     // 0.1 mm of polyester (E 4 GPa, ν 0.4): lib/squish.ts SHEET_D, written out so this file stands alone.
     this.D = opts.D ?? (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4));
-    this.h0 = opts.h0 ?? 0.006;
+    this.h0 = opts.h0 ?? DISH_GAP_METRES;
     const n = this.n, n2 = n * n;
     const side = this.span * this.plateMetres;
     this.dx = side / n;
@@ -797,7 +798,7 @@ const reachCache = new Map<string, number>();
  * effects (the slosh dish's press, the beads, the lift's fingers; lib/squish.ts
  * dentRadius) take the solved dent's width without a solve.
  */
-export function sheetReach(nu: number, hold: number, h0 = 0.006, density = 1000, D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4))): number {
+export function sheetReach(nu: number, hold: number, h0 = DISH_GAP_METRES, density = 1000, D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4))): number {
   const key = `${nu}:${hold}:${h0}:${density}:${D}`;
   const hit = reachCache.get(key);
   if (hit !== undefined) return hit;
