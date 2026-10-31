@@ -102,12 +102,14 @@ export const isAreaCord = (m: SceneMapping): boolean =>
 /*
   The hand's numbers, at a cord at full depth and full reading.
 
-  Heat: 1.5 K/s. The lamp heats dark dye at 0.24 K/s (18f's LAMP_HEATING, from
-  a kilowatt a square metre into a millimetre of water); a hot-air gun a hand
-  holds under a dish puts several times that into a spot. With Newton cooling
-  at about 12 s a held full cord settles some 18 K up, 36% runnier water in
-  18f's mobility, and a kick's envelope of a few tenths of a second adds a
-  few tenths of a kelvin that a run of kicks builds on.
+  Heat: 1.5 K/s. A hot-air gun a hand holds under a dish puts tens of times
+  the lamp's own warming into a spot (the lamp heats dark dye at about
+  0.02 K/s, a kilowatt a square metre into the sandwich's 33 kJ/m²K; PLAN 38f,
+  LAMP_IRRADIANCE). It was tuned when the plate cooled in about 12 s, where a
+  held full cord settled some 18 K up; the plate's own air and radiation
+  take it off in about two minutes on Classic's Heat Decay now (38f), so a
+  held cord climbs for longer, and a kick's envelope of a few tenths of a
+  second adds a few tenths of a kelvin that a run of kicks builds on.
 
   Stir: one turn of the paddle in 1.2 s, round a circle 0.45 of the area's
   radius, the paddle 0.3 of it: a hand folding a pool, not whisking it. On

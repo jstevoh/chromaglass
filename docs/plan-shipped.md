@@ -10149,6 +10149,52 @@ model cannot reach one, the PR says what it reached and asks.
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
 
+### 38. Realism audit, after §18 (asked 2026-10-30)
+
+#### 38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses
+
+**Shipped (this PR).** What was there: on a thin gap the temperature (the velocity's z) was
+never carried (the thin step skips the velocity's self-advection), so a warm patch stayed where
+it was laid; its lift rode the half-resolution current, eased 0.98 a step and capped at 0.75 of
+a cell a step; the lamp warmed it at 0.24 K/s (a bare millimetre of water) and Heat Decay cooled
+it by heatDecay^(4·dt), both on the look's clock; and the field is a half float, so at the app's
+step Classic's cooling (3e-4 of the heat a step) was under half the last bit and rounded away:
+the plate never cooled. `npm run plume` on main: 11 of 13 red, a sheet 10 K warm 9.992 → 9.992 K
+in three seconds of Classic's air.
+
+What it is: the sandwich holds C(h) = ρc_w·h + 2ρc_g·t per kelvin (33.5 kJ/m²K at 6 mm with two
+2 mm glasses, h read off the squeeze); the lamp puts 1000 W/m² × the dye's share into it; Heat
+Decay is the air on both faces, h = 7200·(−ln v) W/m²K (Classic's 0.98 is 145, τ 111 s with the
+radiation, about what it had on Classic's clock), and each face radiates εσ(T⁴ − T_room⁴); all
+in real seconds (decayVel, `fluid/heat.ts`). A stored value is rounded to its half at random
+(`halfRound` in the shared head), so a slow change is kept on average. On a thin gap the heat is
+carried with the flow the dye rides (in decayVel, so no kernel joins the step whenever its build lands: the first cut had one, and two renders of a seed differed), and lifts as a body force in hsBody:
+water's lightness from Kell's density over the dish's mean of it (`hsHeatMean`), along the
+plate's up as far as it stands or is tipped, at B g h₀²/12ν_ref (`HEAT_RISE`), times Buoyancy
+over 0.45 (the default is water's own). The current's buoyancy and mixForce's heat lift are zero
+on a thin gap. hsHeatMean builds behind the show and, if a standing or tipped plate asks first, on that frame, as the oil lift's kernels do.
+
+Measured (`npm run plume`, lab, 128², SwiftShader): a soft patch 30 K warm on a standing plate
+rose at 4.97 mm/s against 5.08 from Darcy with Kell's density and Vogel's viscosity (0.98), 10 K
+at 1.23 against 1.27, their ratio 4.05 against 4.00 (a straight line would be about 3), level
+0.00, Buoyancy 0.9 1.96 times 0.45; the lamp 0.0564 K in 3 s against 0.0566 from I·a/C, the same
+at four times the Speed; Classic's air 9.04/ks against 9.01/ks, the same at four times the Speed
+and 9.13/ks at half the real seconds a step; still air (radiation alone) 3.98 against 3.76 per
+10 ks at 40 K; a hand's tip of sinθ 0.5 lifts it up the tip at 0.62 mm/s against 0.64.
+`npm run heat` 9/9 (two inputs moved to real seconds: two seconds of lamp where half of one was
+0.009 K under its bar, and the half-length step's magnetSeconds).
+
+#### 38t. Updraft is noise between two glasses
+
+**Shipped (this PR).** Updraft was snoise(p·0.05 − t)·air·4dt plus a uniform 8dt up the plate.
+It is the air's speed now (3 m/s at full): its laminar boundary layer's stress
+0.332 ρ U^1.5 √(ν_air/x) from the rim the air comes over, less the dish's mean (a uniform stress
+on a closed sandwich moves nothing; through the open rim it would slide the picture), read as the
+Blow's stress (τh/2μ), and its forced cooling 0.332 k Pr^⅓ √(U/νx)/x on the top face. Measured:
+the flow changed 0.00% in half a second (22.5% on main), Updraft 1 against 0.25 moved it 8.00
+times (4.00 on main), and the top face cooled at 7.56 and 3.57 per 10 ks a tenth of the plate and
+half of it in from the edge, against 7.27 and 3.25. Its looks go calmer and steady: judging §98.
+
 ### QA list: what the owner found playing it (from 2026-10-04)
 
 #### QA-19. Interacting with settings switches to and maximizes the performance window

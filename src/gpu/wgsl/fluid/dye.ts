@@ -9,7 +9,8 @@
  */
 
 import { HEAD, W } from './shared';
-import { OPEN_RIM } from '../../../lib/turntable';
+import { DISH_GAP_RANGE, DISH_METRES, OPEN_RIM } from '../../../lib/turntable';
+import { GLASS_METRES, HEAT_EMISSIVITY, HEAT_ROOM, RHOC_GLASS, RHOC_WATER, STEFAN_BOLTZMANN } from '../../fluid/constants';
 
 export const DYE_KERNELS: Record<string, string> = {
   /*
@@ -198,10 +199,49 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, max(d, vec4f(0.0)));
 }`,
 
+  /*
+    The velocity's damping and speed limit (the old plate's; a thin gap has
+    its drag in the projection), and the heat's gains and losses in watts
+    and real seconds (PLAN 38f, the constants' note in fluid/constants.ts):
+
+      C dΔT/dt = I·a·spot − 2·h_air·ΔT − h_up(x)·ΔT − 2εσ((T_room + ΔT)⁴ − T_room⁴)
+
+    C the sandwich's heat a square metre per kelvin where the gap is h (the
+    squeeze), I the lamp's flux (S.lampHeat), a the share of it the dye takes
+    (Beer–Lambert, 18b), h_air Heat Decay's air on both faces (S.heatAir is
+    the two together), h_up Updraft's forced air on the top face, strongest
+    where it comes in (S.airCool a plate's width in, × √(W/x)), and each
+    face's radiation. The air's loss is taken exactly over the step (it is
+    linear); the radiation, a few W/m²K, explicitly. The result is rounded
+    to a half at random (halfRound), or a slow change would be lost.
+
+    And on a thin gap the heat is first carried by the liquid. The thin step
+    skips the velocity's self-advection (wgsl/thinGap.ts's header, "What the
+    step no longer does"), so nothing moved the temperature, which rides in
+    the velocity's z: a warm patch stayed where it was laid whatever the
+    liquid did, and its lift could only ever stir the current. Here it goes
+    with the flow the dye rides (\`flow\`, velForced), backtraced over the
+    step's displacement and read between the four cells it lands among. The
+    heat a cell holds is h·T, and the solve makes the flow keep
+    ∇·(hu) = 0 (or the press's own ∂h/∂t), so ∂(hT)/∂t + ∇·(huT) = 0 is
+    DT/Dt = 0: the temperature itself is what is carried, at the liquid's
+    speed. The glasses hold some of the heat and do not flow; over the
+    seconds a plume takes, the water across a few millimetres has not traded
+    much of it with them (h²/κ is a minute across 6 mm), so the liquid
+    carries its own, the shortcut PLAN 38f-3 names. Done here, in the pass
+    that already reads and writes the velocity, and not in a kernel of its
+    own: a kernel built behind the show joins the step whenever its build
+    lands, which made two renders of one seed differ (the render check,
+    239 of 240 frames), and one waited for at the opening costs the show's
+    first frame its build.
+  */
   decayVel: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var sq: texture_2d<f32>;
+@group(0) @binding(5) var flow: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
+fn tAt(c: vec2i) -> f32 { return textureLoad(vel, clampP(c, S.n), 0).z; }
 
 // Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
 fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
@@ -210,17 +250,37 @@ fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
 
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
-  var v = textureLoad(vel, vec2i(id.xy), 0);
+  let q = vec2i(id.xy);
+  var v = textureLoad(vel, q, 0);
   // Before the speed limit: an infinite speed through it is inf * 0, a NaN.
   if (!finite4(vec4f(v.xyz, 0.0))) { v = vec4f(0.0); }
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
-  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
-  var temp = v.z * cool;
+  let h = clamp(textureLoad(sq, q, 0).r, ${DISH_GAP_RANGE[0]}, ${DISH_GAP_RANGE[1]}) * ${DISH_METRES};
+  let cap = ${RHOC_WATER.toExponential(4)} * h + ${(2 * RHOC_GLASS * GLASS_METRES).toFixed(1)};
+  let dt = S.heatSeconds;
+  var air = S.heatAir;
+  if (S.airCool > 0.0) {
+    // From the rim the air comes over (toward −v), as hsBody's stress.
+    let d = uvOf(id) - vec2f(0.5);
+    let lead = sqrt(max(0.25 - d.x * d.x, 0.0));
+    air += S.airCool * inverseSqrt(max(lead - d.y, 1.0 / S.n));
+  }
+  var t0 = v.z;
+  if (S.thinGap > 0.5) {
+    let at = clamp(uvOf(id) - textureLoad(flow, q, 0).xy * S.disp, vec2f(0.5 / S.n), vec2f(1.0 - 0.5 / S.n)) * S.n - 0.5;
+    let c0 = vec2i(floor(at));
+    let f = at - vec2f(c0);
+    let t = mix(mix(tAt(c0), tAt(c0 + vec2i(1, 0)), f.x), mix(tAt(c0 + vec2i(0, 1)), tAt(c0 + vec2i(1, 1)), f.x), f.y);
+    if (finite4(vec4f(t))) { t0 = t; }
+  }
+  var temp = t0 * exp(-air * dt / cap);
+  let tk = ${(HEAT_ROOM + 273.15).toFixed(2)};
+  let tw = max(tk + temp, 1.0);
+  temp -= 2.0 * ${(HEAT_EMISSIVITY * STEFAN_BOLTZMANN).toExponential(4)} * (tw * tw * tw * tw - tk * tk * tk * tk) * dt / cap;
   // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
-  let d = textureLoad(dye, vec2i(id.xy), 0);
+  let d = textureLoad(dye, q, 0);
   var absorbed = 0.0;
   if (d.a > 1e-4) {
     let norm = 1.0 / d.a;
@@ -232,9 +292,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let toCenter = uvOf(id) - vec2f(0.5);
   let r2 = dot(toCenter, toCenter);
   let hotspot = 1.0 / (1.0 + r2 * 2.5);
-  temp += S.lampHeat * hotspot * absorbed * S.dt;
-  v.z = temp;
-  textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
+  temp += S.lampHeat * hotspot * absorbed * dt / cap;
+  v.z = halfRound(temp, q, 1u);
+  textureStore(dst, q, vec4f(v.xyz, 0.0));
 }`,
 
   // The drain's inward spiral. A.a.x is the pull, A.a.y how far through it is.

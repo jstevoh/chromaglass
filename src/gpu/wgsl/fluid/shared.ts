@@ -29,7 +29,7 @@ struct Sim {
   air: f32,
   smear: vec2f,
   damping: f32,
-  heatDecay: f32,
+  heatAir: f32,        // W/m²K, the air on both faces (Heat Decay, PLAN 38f)
   maxSpeed: f32,
   evap: f32,
   sharp: f32,
@@ -72,8 +72,19 @@ struct Sim {
   magRadius: f32,
   // 1 where decayDye clears thin mist first (sparse dark looks only; lib/dyeTarget.ts).
   surfaceClear: f32,
-  // Lamp intensity scaled by heating rate (PLAN 18f).
+  // The lamp's irradiance at the stage times the dimmer, W/m² (PLAN 38f).
   lampHeat: f32,
+  // Real seconds a step (the heat's clock, PLAN 38f; not the look's dt).
+  heatSeconds: f32,
+  /*
+    The heat's lift (PLAN 38f, hsBody): the flow's per-step speed per unit of
+    water's lightness B, along the plate's up wherever it stands or is tipped.
+    Zero on a level plate, and on the old plate (its current carries it).
+  */
+  heatLift: vec2f,
+  // Updraft's forced air on the top face, W/m²K a plate's width in from its edge (PLAN 38t).
+  airCool: f32,
+  simPad: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -139,6 +150,42 @@ fn capDye(d: vec4f) -> vec4f {
   var c = max(d, vec4f(0.0));
   if (c.a > 6.0) { c *= 6.0 / c.a; }
   return c;
+}
+/*
+  A value about to be stored in a half float, rounded up or down at random in
+  proportion to how near it is to each (stochastic rounding), so that a
+  change smaller than half the half's last bit is kept on average rather
+  than lost every step (PLAN 38f). The temperature lives in the velocity's z,
+  a half float: at the app's step, Classic's cooling took 3e-4 of the heat a
+  step, under the 2^-11 that rounding to the nearest half keeps, so a warm
+  plate rounded back to its own temperature every step and never cooled; the
+  lamp's own warming stalled the same way past about a kelvin. Rounded at
+  random, each cell's error is a bit either way and the plate's mean is
+  exact. Both neighbours are exact halves (a multiple of the bit, under the
+  next power of two), so the store keeps whichever is picked, however the
+  hardware rounds. The draw is the cell, a salt and the step's time.
+
+  The bit and its inverse are built from the float's own exponent field, not
+  exp2(floor(log2(a))) and a division. Those are allowed to be approximate,
+  and on the Mac's Metal they are fast-math: a bit a hair off a power of two
+  puts lo a hair off a half, and a store that does not round to nearest keeps
+  the half below. npm run heat's cooling line read 8.95 K after 60 steps at
+  1/60 s and 8.02 after 120 at 1/120 on CI's Mac (ratio 1.12), about 0.017 K,
+  two bits, lost each step, where software WebGPU read 9.88 both. A power of
+  two made from its bits, and a multiply by its exact inverse, are exact on
+  any hardware, so lo and lo + bit are halves whatever the store does.
+*/
+fn halfRound(x: f32, q: vec2i, salt: u32) -> f32 {
+  let a = abs(x);
+  if (a < 6.1e-5 || a > 65000.0) { return x; }
+  let e = (bitcast<u32>(a) >> 23u) & 0xffu;
+  let bit = bitcast<f32>((e - 10u) << 23u);
+  let inv = bitcast<f32>((264u - e) << 23u);
+  let lo = floor(a * inv) * bit;
+  var h = (u32(q.x + 4096) * 1664525u) ^ (u32(q.y + 4096) * 1013904223u) ^ (salt * 2654435761u) ^ bitcast<u32>(S.time);
+  h = h ^ (h >> 16u); h = h * 0x7feb352du; h = h ^ (h >> 15u); h = h * 0x846ca68bu; h = h ^ (h >> 16u);
+  let up = f32(h >> 8u) / 16777216.0 < (a - lo) * inv;
+  return sign(x) * select(lo, lo + bit, up);
 }
 `;
 

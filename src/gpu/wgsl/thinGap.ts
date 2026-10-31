@@ -85,6 +85,11 @@
 import { HAND_GRIP } from '../../lib/handSolid';
 import { DISH_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
+import { HEAT_ROOM, UPDRAFT_MEAN } from '../fluid/constants';
+import { waterDensity } from '../../lib/lampBoil';
+
+// Water's density at the room's temperature (Kell 1975), the heat's lightness's reference (HEAT_LIGHT).
+const HEAT_ROOM_RHO = waterDensity(HEAT_ROOM);
 
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
@@ -176,6 +181,33 @@ fn liftIn(q: vec2i, m: i32) -> bool {
 fn waterDye(q: vec2i, d: f32) -> f32 {
   if (textureDimensions(oilDye).x > 1u) { return max(d - textureLoad(oilDye, q, 0).a, 0.0); }
   return d * (1.0 - clamp(textureLoad(mixT, min(q, vec2i(textureDimensions(mixT)) - 1), 0).r, 0.0, 1.0));
+}
+`;
+
+  /*
+    The heat's lightness (PLAN 38f): B = 1 − ρ(T_room + ΔT)/ρ(T_room), water's
+    real density (Kell 1975, as src/lib/lampBoil.ts's waterDensity), with
+    ΔT the field's temperature over the room (vel.z). Held to 0–100 °C,
+    the range the curve is written for and liquid water keeps.
+  */
+  const HEAT_LIGHT = /* wgsl */ `
+fn heatLight(dT: f32) -> f32 {
+  let t = clamp(${HEAT_ROOM.toFixed(1)} + dT, 0.0, 100.0);
+  let rho = (999.83952 + t * (16.945176 + t * (-7.9870401e-3 + t * (-46.170461e-6 + t * (105.56302e-9 - t * 280.54253e-12))))) / (1.0 + 16.879850e-3 * t);
+  return 1.0 - rho / ${HEAT_ROOM_RHO.toFixed(4)};
+}
+`;
+
+  /*
+    Updraft's stress over the dish (PLAN 38t), per unit of its value a
+    plate's width in: √(W/x), x from the rim the air comes over, along −v.
+    Past the rim, the dish's mean, so it adds nothing there.
+  */
+  const UPDRAFT_AT = /* wgsl */ `
+fn updraftAt(uv: vec2f, n: f32) -> f32 {
+  let d = uv - vec2f(0.5);
+  if (dot(d, d) >= 0.25) { return ${UPDRAFT_MEAN.toFixed(5)}; }
+  return inverseSqrt(max(sqrt(0.25 - d.x * d.x) - d.y, 1.0 / n));
 }
 `;
 
@@ -285,8 +317,24 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
       keep the colour's whole weight over the app's mean, as they were: a
       standing plate's oil is PLAN 27f-6.
 
-      A.a = (Rain Drip's weight, Updraft's share of the old push (fluid.ts,
-      AIR_SHEAR), the rest gap h0, the breath's pascals to the flow's speed);
+      The heat's lift (PLAN 38f): water's lightness B where it is warm
+      (HEAT_LIGHT, Kell's density), over the dish's mean of it (hsHeatMean,
+      for the same reason as the colour's: a lift the same everywhere is a
+      pressure in a closed sandwich, and through the solver's open rim it
+      would slide the picture), times S.heatLift, the plate's up as far as it
+      stands or is tipped in the flow's speed per unit B (fluid.ts writeSim).
+      It went through the current, eased and capped at 0.75 of a cell a
+      step, so every plume rose at the cap; here it rises at Darcy's
+      B g h²/12μ, as fast as the heat says (`npm run plume`).
+
+      Updraft (PLAN 38t): a boundary layer's stress τ ∝ x^-½ from the rim
+      the air comes over (toward −v), less the dish's mean of it
+      (UPDRAFT_MEAN), read as the breath's stress is. It was a noise,
+      snoise(p·0.05 − t), plus a uniform push up the plate.
+
+      A.a = (Rain Drip's weight, Updraft's stress a plate's width in from its
+      edge in the flow's speed (fluid.ts), the rest gap h0, the breath's
+      pascals to the flow's speed);
       A.b = (Plate Rock's pull on the colour, x and y; the oil's lift L, x
       and y, zero with no oil). \`oilMean\` is the water's colour's mean on
       the dish (hsOilMean), \`psi\` hsLiftRelax's (Ψ_x, Ψ_y), on its own
@@ -304,6 +352,8 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
 @group(0) @binding(10) var oilDye: texture_2d<f32>;
 ${LIFT_GRID}
 ${WATER_DYE}
+${HEAT_LIGHT}
+${UPDRAFT_AT}
 // Ψ at a point of the plate, bilinear between its cell middles, zero past the rim.
 fn psiAt(uv: vec2f, m: i32) -> vec2f {
   let g = uv * f32(m) - 0.5;
@@ -345,11 +395,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     }
     v = vec4f(v.xy - S.up * (A.a.x * w) + vec2f(S.cometX, S.cometY) * w + rock, v.z, v.w);
   }
+  if (any(S.heatLift != vec2f(0.0))) {
+    v = vec4f(v.xy + S.heatLift * (heatLight(v.z) - oilMean[1]), v.z, v.w);
+  }
   if (S.air > 0.1) {
-    let p = uvOf(id) * S.l;
-    let gx = snoise(vec2f(p.x * 0.05, p.y * 0.05 - S.time)) * S.air * 4.0 * S.dt;
-    let gy = -S.air * 8.0 * S.dt + snoise(vec2f(p.y * 0.05, p.x * 0.05 + S.time)) * S.air * 4.0 * S.dt;
-    v = vec4f(v.xy + vec2f(gx, gy) * A.a.y / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
+    let tau = A.a.y * (updraftAt(uvOf(id), S.n) - ${UPDRAFT_MEAN.toFixed(5)});
+    v = vec4f(v.xy - vec2f(0.0, tau) / hsGap(textureLoad(sq, q, 0).r, A.a.z), v.z, v.w);
   }
   if (A.a.w > 0.0) {
     let tau = textureLoad(breath, min(q, vec2i(textureDimensions(breath)) - 1), 0).xy;
@@ -365,6 +416,33 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       a tree (ferroDrop's MEAN), so the mean is this step's, not a
       readback's from frames ago.
     */
+    /*
+      The dish's mean of the heat's lightness, B(ΔT) (hsBody, PLAN 38f), into
+      the oil's mean buffer's second slot, this step: one late by a readback
+      would leave a residue that slides the plate standing up. One workgroup.
+    */
+    hsHeatMean: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var<storage, read_write> oilMean: array<f32, 4>;
+${HEAT_LIGHT}
+var<workgroup> sums: array<vec2f, 256>;
+@compute @workgroup_size(256) fn main(@builtin(local_invocation_index) t: u32) {
+  let n = u32(S.n);
+  var s = vec2f(0.0);
+  for (var i = t; i < n * n; i += 256u) {
+    let q = vec2i(i32(i % n), i32(i / n));
+    if (length((vec2f(q) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) { continue; }
+    s += vec2f(1.0, heatLight(textureLoad(vel, q, 0).z));
+  }
+  sums[t] = s;
+  workgroupBarrier();
+  for (var k = 128u; k > 0u; k >>= 1u) {
+    if (t < k) { sums[t] += sums[t + k]; }
+    workgroupBarrier();
+  }
+  if (t == 0u) { oilMean[1] = sums[0].y / max(sums[0].x, 1.0); }
+}`,
+
     hsOilMean: `${HEAD}
 @group(0) @binding(2) var mixT: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
