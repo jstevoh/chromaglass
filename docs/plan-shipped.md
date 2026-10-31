@@ -10278,6 +10278,82 @@ seven landscapes, which iOS zooms on focus), and the strip's Feedback row.
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
 
+## ~~38l. The glass springs back by the second, not by the frame~~ — **Shipped**
+
+The audit (PLAN §38) found `gap += (rest − gap)·gapSpring` with no dt, and the same
+fraction of what is left at any depth. The dt half already held on a thin gap: the app
+hands the solver `glassSpring(Press Lift, dtSeconds)` (sim/fluidSimulation.ts, since the
+presslift work), so the glass at 120 fps takes twice the steps of a sixtieth to come up
+the same way. The law did not: a glass pressed nearly flat came away as easily as one
+barely dented, where two wet glasses part only as fast as the liquid can flow back in
+through the gap that is opening, a resistance that goes as 1/h³ (Stefan,
+F = 3πμR⁴ḣ/2h³, the law the press already closed by).
+
+Now, on a thin gap, `squeezeUpdate` opens the gap at k(h₀ − h)(h/h_s)³, integrated over
+the step with the depth held (the step takes 1 − (1 − k)^((h/h_s)³) of what is left, so
+it never overshoots). k is Press Lift's spring, read at the film a full press leaves,
+h_s = STEFAN_FILM of rest (0.30, 38l-4), not at rest: glass is stiff, so the time a person
+sees is the thin film's, and that is the time Press Lift always set. Read at rest the same
+dial left a full press stuck for minutes. Shallow dents (a tap, a kick) come back (1/h_s)³
+quicker, as stiff glass on a thick film does. The "no delta" update now hands the kernel
+the thin flag too (it was 0, so most steps ran the old spring). The old plate keeps its
+linear spring.
+
+`npm run stefan` (5/5 in software WebGPU): the opening rate over what is left at h/h₀
+0.253 and 0.687 came in ratio 0.0499 against (0.253/0.687)³ = 0.0499 (1 on main, the check
+red there: the deep press never reached the second depth's test on main's flat rate ratio),
+and each rate is k(h/h_s)³ to 0.1%; 60 and 120 fps agree to 0.68% at 0.5 s; a hundredth
+dent comes back at 1.278 a step against the law's 1.278. `npm run presslift` 6/6 with it:
+93% of the ring's shift back after 1 s, all of it by 1.5 s. Found along the way: 38l-1,
+the liquid's viscosity in the press and the lift.
+
+**38l-2, the kick's sheet lifts by the same law (same PR).** Beat Squeeze's rhythm sheet
+(`lib/sheet.ts`) held its dent as the plate's spring would take it, one `keep` for every
+cell and every mode. With the suction in the shader everywhere, the plate's gap parted
+from the sheet's dent by 7% of a dent; with the sheet's cells left on the plain spring, a
+hand press beside a kick lost 27% of its memory (every cell carries a little of the
+sheet, a sum of sines). Now the sheet takes the law cell by cell: on the dent it holds,
+each cell's share (1 − s)^((h/h_s)³) at the gap the shader sees there (Plate Shape's rest
+less the dent, floored), and on its own solve, out to space, each node times its share
+(its images take their mirror's, which keeps the sheet odd), and back to the modes by an
+exact forward transform (`toModes`, toSpace's inverse to 1e-16). The shader's exception
+is gone. `STEFAN_FILM` moved to `lib/sheet.ts` (the gpu constants re-export it) so both
+read one number. `npm run sheet` 18/18 in software WebGPU: the gap against the solve
+0.001% held, 0.001% letting go, 0.027% let go (1% bar); the hand press's memory beside a
+kick 0.04% (2% bar). Its spring line now asks the law one step from the same state, cell
+for cell and node for node, flat and on a dome (1.8e-8 and 1.6e-16 of the depth), and the
+quiet time with the spring's rate at rest (oil 1.017 s against 1.016). The sheet costs
+1.6 ms a step in node on the app's 192 plate (was 0.8): the forward transform 0.5 ms, the
+shares the rest, a short series for e^z near 1 where Math.exp alone took 0.48 ms. Left:
+38l-3, the sheet's share reads its own dent, not the plate's gap.
+
+**And a held kick holds (same PR).** On the Frame Sway looks Beat Squeeze still lays the
+stamped bowl across the dish (KickRelease). Near rest the suction lifts at
+(1/STEFAN_FILM)³ = 64 times Press Lift's rate, so let alone through its 0.15 s hold the
+kick's dent came up a tenth, and `npm run rides`' ring 30 cells out went 3.6 cells against
+its bar of 4 (red on the Mac too). A hand holding the glass balances the glass's
+restoring force through the same film: the press closes at a(h/h₀)³, the lift opens at
+k(h₀ − h)(h/h_s)³, so the hold that keeps the dent where it is lays k·amount/STEFAN_FILM³ a
+step in each disc, at any depth. KickRelease lays it on a thin gap (the sim hands it the
+step's spring); rides holds its kick the same way. Measured in the lab before the change
+(the kick alone): 3.61 cells let alone, 4.30 held, 4.16 with no spring at all.
+
+**38l-4, the glass's stiffness against the hand (same PR).** Filmed on the owner's Mac at
+the first STEFAN_FILM, a quarter, the peel was gone: the app's Press tool held 1.5 s went
+only to 0.0146 of the 0.03 gap (0.0062 before 38l) and was back in 0.6 s, where before the
+hole was still open at 4 s. The press closes at a(h/h₀)³ and the lift opens at
+k(h₀ − h)(h/h_s)³; both go as h³, so the film's viscosity drops out of a held press and it
+settles at a dent of a·STEFAN_FILM³/k at any depth, Hooke's F/K. STEFAN_FILM is then the
+glass's stiffness against the hand, and a quarter never let a press under h_s, where the
+lift is slower than the plain spring. Swept on the Mac (Classic, 192, mean within 0.12 of
+the middle; deepest, then back to 0.0299): 0.28 0.00454, 2.1 s; 0.30 0.00462, 2.6 s; 0.32
+0.00430, 3.1 s; 0.34 0.00428, 3.7 s. 0.30 shipped: filmed, the Press tool goes to 0.0045,
+holds about a second (0.0055 at 0.5 s, 0.0073 at 1 s), peels, and lets go by 2.5 s; a
+light tap (0.001) is back in 0.3 s. The depth sits near the floor for every value past
+0.28 and falls off a cliff below it (0.25 is half as deep), so 0.30 keeps a margin. Left:
+38l-5, a light press barely dents.
+
+
 ## 38b, 38g, 38n. Bubbles as pockets in a gap (#603, 2026-10-30)
 
 Asked by the owner after the second realism audit: "physics at its core", settings may

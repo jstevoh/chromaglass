@@ -1635,6 +1635,18 @@
       ]
     },
     {
+      "name": "The glass peels back against the film's suction",
+      "shard": "plate",
+      "run": "npm run stefan",
+      "timeout": 3,
+      "why": [
+        "The glass comes back up as Stefan's law says a thin wet film lets it",
+        "(PLAN 38l): let go, its opening rate over what is left goes as the",
+        "film's depth cubed, at two depths, and is the same by the second at",
+        "60 and 120 frames a second. The spring before was one rate at any depth."
+      ]
+    },
+    {
       "name": "The rhythm sheet is solved",
       "shard": "open",
       "run": "npm run sheet",

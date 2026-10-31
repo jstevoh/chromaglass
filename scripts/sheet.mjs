@@ -35,10 +35,13 @@
  *      reach is the stamped bowl's (stampedVolume), its middle capped at
  *      SHEET_DEEPEST.
  *   7. The ring opens the gap: the sheet lays openings past rest round its dent.
- *   8. The plate's spring, taken on the sheet: let go, with a spring s a step
- *      the laid dent is (1 − s)^n of the springless one, and a sheet left
- *      alone goes quiet (stops being stepped) within two frames of when its
- *      slowest mode, decaying at its own rate and the spring's, says.
+ *   8. The plate's spring, taken on the sheet against the film's suction
+ *      (PLAN 38l, squeezeUpdate's law): let go, a step with a spring s keeps
+ *      (1 − s)^((h/h_s)³) of the dent, h = rest − dent and h_s = STEFAN_FILM
+ *      of rest, cell for cell on the dent the plate holds and node for node
+ *      on the sheet's own solve; and a sheet left alone goes quiet (stops
+ *      being stepped) within two frames of when its slowest mode, decaying
+ *      at its own rate and the spring's at rest, says.
  *
  *   Lab (the solved sheet laid on a thin gap through its own channel):
  *   9.  The plate's gap is the solve's: rest minus the sheet's dent, cell for
@@ -70,7 +73,7 @@ const check = (name, ok, detail = '') => {
 
 const out = 'node_modules/.cache/sheet-lib.mjs';
 await build({ stdin: { contents: "export * from './src/lib/sheet.ts'; export { dentRadius, kickDepth, kickPress, KICK_HOLD, SHEET_D } from './src/lib/squish.ts'; export { thicknessViscosity } from './src/lib/turntable.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { RhythmSheet, stampedDepth, stampedVolume, SHEET_DEEPEST, FINGER_SIGMA, SHEET_QUIET, SHEET_D, dentRadius, kickDepth, kickPress, KICK_HOLD, thicknessViscosity } = await import(`../${out}`);
+const { RhythmSheet, stampedDepth, stampedVolume, SHEET_DEEPEST, FINGER_SIGMA, SHEET_QUIET, STEFAN_FILM, SHEET_D, dentRadius, kickDepth, kickPress, KICK_HOLD, thicknessViscosity } = await import(`../${out}`);
 
 const T = KICK_HOLD;
 const LIQUIDS = { water: thicknessViscosity(0), 'the default oil': thicknessViscosity(0.45), glycerine: thicknessViscosity(1) };
@@ -260,16 +263,40 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
 }
 // ── 8. The spring ──────────────────────────────────────────────────────
 {
-  const nu = LIQUIDS['the default oil'], L = 64, n = 40, sp = 0.01;
-  const a = new RhythmSheet(), b = new RhythmSheet();
-  a.setLiquid(nu); b.setLiquid(nu);
-  a.press(0.5, 0.5, 0.008, T); b.press(0.5, 0.5, 0.008, T);
-  // Let go first: while the finger presses, the spring takes each step's load for fewer steps than the first's.
-  a.step(L, T, 0, new Float32Array(L * L)); b.step(L, T, 0, new Float32Array(L * L));
-  for (let k = 0; k < n; k++) { a.step(L, 1 / 60, sp, new Float32Array(L * L)); b.step(L, 1 / 60, 0, new Float32Array(L * L)); }
-  const ha = a.heldNow(), hb = b.heldNow();
-  let worst = 0;
-  for (let q = 0; q < ha.length; q++) worst = Math.max(worst, Math.abs(ha[q] - hb[q] * (1 - sp) ** n));
+  /*
+    Before 38l the spring was one share everywhere, and the line asked that n steps of it left the
+    laid dent (1 − s)^n of the springless one. Against the suction the share goes with the gap
+    cubed, so a step no longer commutes with the solve and the line asks the law itself, one step
+    from the same state: the dent the plate holds, cell for cell on its 64 grid, and the solve's own
+    state, read at every one of the sheet's nodes on the plate (plate fractions i/64), each
+    the springless one times the law's share at the gap there. The shares run from the ring's,
+    past rest, to the dent's middle's (printed), and must differ: one share everywhere fails.
+  */
+  const nu = LIQUIDS['the default oil'], L = 64, sp = 0.01;
+  // And on a dome (Plate Shape −0.5), each cell's share read at its own rest, as the shader lays it (gapRest).
+  const restAt = (x, y, curve) => Math.max(0.004, Math.min(0.06, 0.03 * (1 - curve * (Math.min(1, ((x - 0.5) ** 2 + (y - 0.5) ** 2) * 4) - 0.5) * 2)));
+  const share = (d, rest) => (1 - sp) ** ((Math.min(2, Math.max(0.004, rest - d) / rest) / STEFAN_FILM) ** 3);
+  let worst = 0, worstNode = 0, least = 1, most = 0;
+  for (const curve of [0, -0.5]) {
+    const a = new RhythmSheet(), b = new RhythmSheet();
+    a.setLiquid(nu); b.setLiquid(nu);
+    // Off the middle, so a rest or a node read at its mirror about the middle is not the same rest (the check-skeptic review).
+    a.press(0.37, 0.58, 0.008, T); b.press(0.37, 0.58, 0.008, T);
+    // Let go first: while the finger presses, the spring takes each step's load for fewer steps than the first's.
+    a.step(L, T, 0, new Float32Array(L * L), curve); b.step(L, T, 0, new Float32Array(L * L), curve);
+    a.step(L, 1 / 60, sp, new Float32Array(L * L), curve); b.step(L, 1 / 60, 0, new Float32Array(L * L), curve);
+    const ha = a.heldNow(), hb = b.heldNow();
+    for (let q = 0; q < ha.length; q++) {
+      const k = share(hb[q], restAt(((q % L) + 0.5) / L, (Math.floor(q / L) + 0.5) / L, curve));
+      worst = Math.max(worst, Math.abs(ha[q] - hb[q] * k)); least = Math.min(least, k); most = Math.max(most, k);
+    }
+    // Every node on the plate (a keep wrong on fifteen nodes in sixteen passed when every fourth was read), from one inverse each.
+    const n = a.n, P = a.plateMetres, wa = Float64Array.from(a.toSpace()), wb = b.toSpace();
+    for (let j = 0; j <= n / 2; j++) for (let i = 0; i <= n / 2; i++) {
+      const db = wb[i + j * n] / P;
+      worstNode = Math.max(worstNode, Math.abs(wa[i + j * n] / P - db * share(db, restAt(i / (n / 2), j / (n / 2), curve))));
+    }
+  }
   /*
     Left alone at the app's spring (Classic's glass, 0.00048 a 60th of a second), a full kick goes
     quiet when the solve says it should: once its last trace (thirty times SHEET_QUIET) is the
@@ -289,12 +316,13 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     let t = T, t1 = null, p1 = null;
     while (c.live && t < 60) { c.step(L, 1 / 60, sp, buf); t += 1 / 60; if (p1 === null && c.peak < 30 * SHEET_QUIET) { p1 = c.peak; t1 = t; } }
     const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nv), k2 = 2 * (Math.PI / 0.2) ** 2, lam = M * k2 * (SHEET_D * k2 * k2 + 9810);
-    const want = t1 + Math.log(p1 / SHEET_QUIET) / (lam - 60 * Math.log(1 - sp));
+    // The spring's rate at rest, where a trace thirty times the quiet is (1% of the gap): the full press's share to the (1/STEFAN_FILM)³.
+    const want = t1 + Math.log(p1 / SHEET_QUIET) / (lam - (60 / STEFAN_FILM ** 3) * Math.log(1 - sp));
     quiet.push({ name, t, want, live: c.live });
   }
-  check('the plate\'s spring taken on the sheet: let go, the laid dent is (1 − s)^n of the springless one, and a sheet left alone goes quiet within two frames of when its slowest mode says, in water and on the default oil',
-    worst < 1e-6 * 0.008 && quiet.every((q) => !q.live && Math.abs(q.t - q.want) <= 2 / 60),
-    `worst ${(worst / 0.008).toExponential(1)} of the depth; quiet ${quiet.map((q) => `${q.name} at ${q.t.toFixed(3)} s, its slowest mode says ${q.want.toFixed(3)}`).join('; ')}`);
+  check('the plate\'s spring taken on the sheet against the film\'s suction: let go, a step keeps (1 − s)^((h/h_s)³) of the dent cell for cell and on the solve node for node, flat and on a dome, and a sheet left alone goes quiet within two frames of when its slowest mode says, in water and on the default oil',
+    worst < 1e-6 * 0.008 && worstNode < 1e-6 * 0.008 && least < most && quiet.every((q) => !q.live && Math.abs(q.t - q.want) <= 2 / 60),
+    `worst ${(worst / 0.008).toExponential(1)} of the depth on the plate, ${(worstNode / 0.008).toExponential(1)} on the solve, shares ${least.toFixed(4)} to ${most.toFixed(4)}; quiet ${quiet.map((q) => `${q.name} at ${q.t.toFixed(3)} s, its slowest mode says ${q.want.toFixed(3)}`).join('; ')}`);
 }
 // Its cost, printed: the app pays this each step while the sheet moves.
 {

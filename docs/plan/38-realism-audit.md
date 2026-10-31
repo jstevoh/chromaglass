@@ -129,6 +129,26 @@ written first. Line numbers are as read on main at d07ac31.
   (τ ≈ h²/κ, seconds) and the glass to the air and by radiation, which
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
+  *Found reading it for the build (2026-10-30), before any of it was built:*
+  - **The heat is not carried on a thin gap.** The temperature lives in the velocity's z,
+    and a thin gap skips the self-advection (`fluid.ts`, step 2's `if (thin) return`), so
+    the lamp's heat stays where it was laid while the flow it drives moves the colour out
+    from under it: a warm patch cannot rise as a thermal, it pushes from a fixed place.
+    The build starts here: carry h·T with the gap's flow, as the dye's amount is carried.
+  - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
+    at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
+    Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in
+    real time, not the 12.4 s its comment says, and the lamp's 0.24 K a unit is 0.026 K/s
+    real, near the physical 1000 W/m² over a 6 mm layer and its two glasses (C ≈ 33 kJ/m²K,
+    0.030 K/s). So the physical model in seconds keeps Classic's heat nearly as it is if
+    Heat Decay is read as the air on the glass: h ≈ 7200·(−ln v) W/m²K puts 0.98 at a
+    strong fan (145, τ ≈ 115 s), 0.998 at still air (τ ≈ 20 min), 0.9 past any fan.
+  - **The current's cap is 0.75 cells a step** (`maxCurrent` in `sim/fluidSimulation.ts`),
+    not the 0.002 the audit read from the lab's BASE; the point stands: past a few
+    hundredths of a kelvin every plume goes at the cap.
+  - Real sizes for the check: water's β ≈ 2.1e-4 /K, so a free column in the reference
+    liquid (22.4 cSt) at the 6 mm rest gap rises 0.27 mm/s per kelvin, a round patch half
+    that (oillift's inclusion law); in water 22 times faster.
 
 - ~~**38g. Bubbles that merge, crowd and stretch like pockets in a gap**~~ **Shipped** (#603):
   the merged pocket starts as long as the pair was end to end and rounds off at Paterson's
@@ -209,11 +229,44 @@ written first. Line numbers are as read on main at d07ac31.
   comment says so; two like-poled fingers' fields add as vectors, up to twice between
   them; `magnetDiscExact` already gives B_ρ and B_z, which 9v-tilt needs too).
 
-- **38l. The glass springs back by the second, not by the frame** (M; Medium: every press
-  and lift). Sharpens **18a-5**. `gap += (rest − gap)·gapSpring` with no dt
-  (`wgsl/fluid/gap.ts:239`), so a lift recovers twice as fast at 120 fps as at 60. Real: a
-  lifted glass is held by Stefan suction, F = 3πμR⁴ḣ/(2h³), and a bent one relaxes by its
-  stiffness. The dt is a fix on its own (S) before the law.
+- ~~**38l. The glass springs back by the second, not by the frame**~~ — **Shipped, this PR**
+  (the glass opens against the film's suction, k(h₀ − h)(h/h_s)³ with Press Lift read at
+  the film a full press leaves, STEFAN_FILM 0.30 (38l-4); the dt half already held on a thin gap;
+  `npm run stefan`; story in `docs/plan-shipped.md` §38l).
+  - **38l-1. The liquid's viscosity in the press and the lift** (S; Low-Medium). Stefan's
+    rate goes as 1/μ, and neither the press's closing nor the lift reads the liquid under
+    the palm: glycerine presses and lifts as water does. hsPrep's per-cell μ is there to
+    read. Found building 38l.
+  - ~~**38l-2. The kick's sheet lifts by the same law**~~ — **Shipped, this PR** (the sheet
+    takes the suction's share cell by cell on the dent it holds and node by node on its own
+    solve, so the shader takes it everywhere; `npm run sheet` 18/18; story in
+    `docs/plan-shipped.md` §38l).
+  - **38l-3. The sheet's suction reads the plate's own gap** (S; Low). The sheet works out
+    each cell's share at rest less its own dent, not the plate's gap, which it cannot read
+    (the gap is on the GPU): where a hand presses on a kick's cells the plate's film is
+    thinner than the sheet thinks, so the sheet's part of the dent there lifts at the
+    shallower film's pace. Measured small (a hand press beside a live kick keeps its memory
+    to 0.04%), but on the same cells it is a shortcut. Found building 38l-2.
+  - ~~**38l-4. The glass's stiffness against the hand**~~ — **Shipped, this PR**
+    (STEFAN_FILM 0.25 → 0.30: a held press settles at a·STEFAN_FILM³/k, so the number is
+    the glass's stiffness; the Press tool goes to 0.0045, holds a second and lets go by
+    2.5 s on the Mac; story in `docs/plan-shipped.md` §38l).
+  - **38l-5. A light press barely dents** (M; Medium). Since 38l a held press settles at a
+    dent linear in how hard it presses (F/K), where before even a light press dug deep.
+    The Mac's lighter recipe (one r30 disc at 0.004 every 60 ms, far lighter than the
+    Press tool) went to 0.0129 before and 0.0292 after, and a phone's finger presses are
+    lighter still. The press is laid as a gap change a frame, not a force: model the
+    hand's press as a force over time (the third option the owner was offered), so a
+    soft, long press digs as a soft hand on stiff glass does. Found filming 38l-4.
+  - **38l-6. The lift's step reads the film at its start** (S; Low). `squeezeUpdate` (and
+    the sheet's share in `lib/sheet.ts`) takes 1 − (1 − k)^((h/h_s)³) with the depth held
+    at the step's start, so the glass lags where it opens fastest, the snap once a peeled
+    press passes h_s: `npm run stefan` reads 2.14% of the press between 60 and 120 frames a
+    second at 1 s (bar 3%). A midpoint step (the half step's gap, then the whole step's
+    share) takes it to 0.1% in a model, but tried here it moved stefan's "the rate is
+    k(h/h_s)³" line, which reads the rate at the step's start with the lab's big spring
+    (0.02 a step), 16% off: that line has to read the rate at the step's middle, and the
+    sheet and its check take the same step. Found building 38l-4.
 
 - **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,
