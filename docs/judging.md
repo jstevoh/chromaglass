@@ -2273,3 +2273,19 @@ moved: every look's own value is where it was, so a look should open exactly as 
 3. Evolve on for five minutes: it should wander the widened dials no further than before.
 4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
    plate that blows up at a top.
+
+## 101. Every edge lit from beneath (PLAN 38h-2)
+
+`npm run nolight` lines 9 to 12 show the light from above gone in the lab; only the Mac
+shows whether the closeup still reads. Most of it is the closeup (the macro camera): the
+projected plate changes only where a look has the Second Lamp (its glint on bubbles is gone)
+or dyed beads on the lamp ground (a filter now, darker).
+
+1. Zoom into any look with bubbles: each bubble is a dark ring round a clear middle, as a
+   bubble photographed over a light box is; no white dots, no lit crescent.
+2. The closeup with Macro Cells and Macro Relief up: every cell a dark ring, no white glints,
+   no lit side. Macro Relief turns the rings from nothing to bold.
+3. Lamp Motion and Light Play moving: no edge in the closeup follows the lamp any more.
+4. Bad: a closeup that went dull where its sparkle was liked, or cells that read as black
+   holes; Glossiness steepens the surface the relief reads.
+

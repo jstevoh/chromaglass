@@ -149,21 +149,30 @@ written first. Line numbers are as read on main at d07ac31.
   Gel Wheel, no 1.5, no floor), Glossiness is the dye surface's relief gain (1 to 4× the
   real slope; no Lambert, Blinn or Schlick), the dish's and the projectors' rims are dark
   lines, and the plate draws no grain. `npm run nolight`. Story in `docs/plan-shipped.md` §38.
-  - **38h-2. The rest of the light painted from above** (S each, nil; Medium). Found
-    building 38h. The meniscus (`meniscus` in `plate.ts`) still brightens the rim's side that
-    faces `lampDir` and adds a camera highlight toward it; the air bubbles' pass adds a
-    specular `spec + spec2` toward the lamp and the second lamp (the bubbles block, "shine");
-    the rings' rim adds `ring · 0.15` and coloured drops add their dye as light, `glowC`
-    (the beads block); the macro's paint glint
-    (`glint = 1 − exp(−spec·1.6)`); and on the camera and non-derived path the boundary line
-    adds `edge0 · edgeK · 0.25` of white. Each is a lamp seen from above or light added at an
-    edge; each should take its light from the pupil law the drops use (and the camera's
-    wider lens), as 38h did. Once they go, `lampDir` and Lamp Motion drive nothing but the
-    hot spot, which is 38a-3's to retire. Not light from above but light added all the
-    same: Saturation Boost (1.35 by default) pushes each channel from the pixel's grey, so
-    under a red gel a cyan pool's red rises 55 levels past what the gel passed; whether the
-    projected path's grade may lift a band past its input is the owner's call, and
-    `npm run nolight` asks its lines at a grade of 1 meanwhile.
+  - ~~**38h-2**~~ *shipped 2026-10-31.* The rest of the light painted from above: every edge
+    takes the lamp's light through the pupil law the lamp lever uses (`edgePass`,
+    `plateTransmit.ts`), the camera's view through a light box's wider cone. No lamp
+    direction is read on the glass. `npm run nolight` lines 9 to 12. Story in
+    `docs/plan-shipped.md` §38.
+  - **38h-5. What Light Play and the Second Lamp do now** (S, nil; owner's call). 38h-2
+    took the lamp's side off every edge, so Light Play drives only how much the camera's
+    bubble magnifies the liquid behind it, and the Second Lamp only its share of the hot
+    spot. A real meaning for both is there to draw: a bulb whose image sits off the
+    pupil's centre (the second bulb's, at `SECOND_BULB`) lights edges on one side only,
+    the share `pupilPass` gives a bend added to that offset (oblique light, as a
+    microscope's). It belongs in `refractionOptics` with **18e-2**, so the projected path
+    shows it, and with **38a-3**, which decides Lamp Motion. *Measure:* `npm run nolight`
+    line 12 with the bulb's offset in place of the lamp's position: the same edge
+    brighter on one side, darker on the other, never over the flat plate plus the second
+    bulb's lost share.
+  - **38h-6. Light still made at an edge, found doing 38h-2** (S each, nil). The back
+    plate's derived boundary adds `edge1 · edgeK · 0.25` of white and 1.6 of the dye (the
+    31a shortcut, left to **31a**); the camera's bubble's film colour multiplies by up to
+    1.7 (a front-lit soap film's reflection, where a backlit pocket's film transmits:
+    `filmTableAt(…, true)`, as the projected bubble already uses at Film Physics); the
+    ferrofluid's glint is a fixed key light (with **38j**). The photo style's softbox is a
+    print lit from the front and stays. And the lab draws only the derived path, so the
+    plain path's rims are checked through the camera's, which shares `meniscus`.
   - **38h-4. The back plate's lamp takes the pigment's grain as dye** (S, nil; Low-Medium on
     two-plate lamp looks). 38h made the front plate's lamp read the grain as T^grain
     (`lampGrain0`); the back plate's lamp branch still reads `grained1 / film1`, the grain's

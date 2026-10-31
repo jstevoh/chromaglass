@@ -40,7 +40,25 @@
  *   8.   no grain: the same plate drawn at two times of the clock is the same
  *        picture, byte for byte
  *
- * Every number asked is printed. Run against main before this change it
+ * And the light at the edges (PLAN 38h-2), which was a lamp above the glass:
+ *
+ *   9-10. the oil drops, clear and dyed, on the lamp through the wash: no
+ *        pixel brighter than the wash without them (the rings' rim glowed
+ *        15% of the plate; a dyed drop added its colour as light on the lamp
+ *        ground too), and their band darker
+ *   11.  the camera's dye rims and its line between two dyes, where the dye
+ *        is light (Lamp Ground 0): nothing brighter than with both off (the
+ *        rim was lit on the lamp's side, the line added a quarter of white)
+ *   12.  where the two lamps stand draws nothing: the plate, the camera's
+ *        view, the closeup's relief and the camera's bubbles, the same with
+ *        both lamps moved to opposite corners; the relief and the bubbles
+ *        each shown to draw something, so a view that drew nothing cannot pass
+ *
+ * Main before 38h-2 read 8/12 on these (lines 9 to 12 red: the drops 2 and
+ * 91 levels over, the camera's edges 206, the lamps' move 227 levels on
+ * the camera's view, 145 on the closeup, 138 on the bubbles).
+ *
+ * Every number asked is printed. Run against main before 38h it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
  * sheen, the dish's and the rims' glow and the grain each over the plate
  * (the PR's body has the numbers). A branch with the dish's, the rims' and
@@ -59,7 +77,9 @@ const N = 128, SIZE = 256, SLACK = 1, DARK = 8, DOES = 0.002;
 const OIL = { x: 0.72, y: 0.28, r: 0.09 };
 
 const { page, close } = await openLab();
-let r;
+/** Where the lamps stand for line 12: the middle, and opposite corners. */
+const LAMPS = [{ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, { x: 0.1, y: 0.9, x2: 0.9, y2: 0.1 }];
+let r, r2;
 try {
   r = await page.evaluate(async ({ N, SIZE, OIL, DARK }) => {
     await lab.create(N);
@@ -129,6 +149,78 @@ try {
     out.oil2 = await shot({ projectorFocus: 0.2 });
     return out;
   }, { N, SIZE, OIL, DARK });
+  r2 = await page.evaluate(async ({ N, SIZE, LAMPS }) => {
+    await lab.create(N);
+    const base = { lampGround: 1, edgeRelief: 0.6, saturationBoost: 1, lampHotspot: 0 };
+    const shot = async (over, cam = {}) => Array.from(await lab.render(SIZE, { ...base, ...over }, { time: 3, ...cam }));
+    lab.dye(0.5, 0.5, 1.2, [0.35, 0.35, 0.35], 0.6);
+    lab.flush(); await lab.step(2);
+    /*
+      The oil drops on the lamp through the wash: a lens over a level wash
+      shows the same wash, so any pixel brighter than the wash without them
+      is light the drops made. Three round ones of 2.5 to 5 cells (the rings
+      the bead field draws), and the same three as dyed drops, the mask as
+      the field rasters it (npm run droplens draws it the same way).
+    */
+    const beads = [{ x: 0.3 * N, y: 0.5 * N, r: 3 }, { x: 0.6 * N, y: 0.4 * N, r: 5 }, { x: 0.68 * N, y: 0.7 * N, r: 2.5 }];
+    const ringMask = new lab.BeadField(N);
+    for (const b of beads) ringMask.beads.push({ age: 5, seed: 0.5, ...b });
+    ringMask.dirty = true;
+    const px = new Uint8ClampedArray(SIZE * 2 * SIZE * 4);
+    lab.rasterDrops(beads.map((b) => ({ age: 5, seed: 0.5, color: [1, 0.48, 0], ...b })), N, SIZE, px, new Float32Array(SIZE * SIZE), new Int32Array(SIZE * SIZE), 1);
+    const dropMask = new OffscreenCanvas(SIZE * 2, SIZE);
+    dropMask.getContext('2d').putImageData(new ImageData(px, SIZE * 2, SIZE), 0, 0);
+    const out = {
+      beadsOff: await shot({ beads: 0 }),
+      rings: await shot({ beads: 0.8 }, { beadMask: ringMask }),
+      drops: await shot({ beads: 0.8, beadDrops: 1 }, { beadMask: dropMask }),
+    };
+    // The two pools of the first plate, and a row of bubbles across them.
+    lab.dye(0.3, 0.62, 0.13, [1.4, 0.3, 0.2], 1.2);
+    lab.dye(0.4, 0.35, 0.1, [0.2, 0.7, 1.3], 1.0);
+    lab.vel(0.35, 0.5, 0.15, [0.01, -0.006, 0, 0]);
+    lab.flush(); await lab.step(40);
+    const bub = [[0.3, 0.6, 5], [0.42, 0.4, 8], [0.6, 0.55, 4]];
+    lab.solver().setBubbles(new Float32Array(bub.flatMap(([u, v, c]) => [u, v, c / N, 1])), bub.length, 0.25,
+      new Float32Array(bub.flatMap((_, i) => [0, 0, ((i + 0.5) / bub.length) * Math.PI * 2 * 0.999, 0])));
+    await lab.step(2, { bubbleClear: 1 });
+    /*
+      The camera's rims and lines, where the dye is light (Lamp Ground 0, a
+      black ground): on the lamp ground the dye's own colour is not what the
+      plate shows, so light added to it there would pass unseen. Glossiness
+      at 1 steepens the relief four times, so the rims have slope to show.
+    */
+    const dyeLight = { lampGround: 0, glossiness: 1 };
+    const cam = { macroAmount: 0.02 };
+    out.camEdges = await shot({ ...dyeLight, edgeRelief: 1, boundaryContrast: 1 }, cam);
+    out.camFlat = await shot({ ...dyeLight, edgeRelief: 0, boundaryContrast: 0 }, cam);
+    /*
+      Where the lamps stand. Both on (Second Lamp 1), Edge Relief, the line,
+      Light Play and the closeup's relief up, the hot spot off (it is the
+      lamp lever's, in stage coordinates, and never followed the lamp): the
+      same plate with the two lamps moved to opposite corners. Light from
+      beneath comes up the axis whatever the bulb's place, so the picture is
+      the same; light from above lit the sides facing the lamp. The cells
+      on (Macro Cells 1): the closeup's relief is their menisci and the
+      field's own slope, and on this plate the field alone is too gentle
+      for the camera's cone to lose any light.
+    */
+    const lit = { secondLamp: 1, edgeRelief: 1, boundaryContrast: 1, lightPlay: 1, macroRelief: 1, macroCells: 1 };
+    const views = {
+      plate: { macroAmount: 0 },
+      camera: { macroAmount: 0.02 },
+      closeup: { zoom: 3, macroAmount: 1, cx: 0.35, cy: 0.5 },
+      bubbles: { zoom: 2, macroAmount: 1, cx: 0.42, cy: 0.5, bubbles: 0.8 },
+    };
+    out.moved = {};
+    for (const [name, v] of Object.entries(views)) {
+      out.moved[name] = [await shot(lit, { ...v, lamp: LAMPS[0] }), await shot(lit, { ...v, lamp: LAMPS[1] })];
+    }
+    // That the closeup's relief and the camera's bubbles draw something at all.
+    out.reliefOff = await shot({ ...lit, macroRelief: 0 }, { ...views.closeup, lamp: LAMPS[0] });
+    out.bubblesOff = await shot(lit, { ...views.bubbles, bubbles: 0, lamp: LAMPS[0] });
+    return out;
+  }, { N, SIZE, LAMPS });
 } finally {
   await close();
 }
@@ -249,6 +341,29 @@ const oilThere = up8 > 20 && down8 > 20;
 {
   const d = compare(r.later, r.plain), e = compare(r.plain, r.later);
   check('8. no grain: two times of the clock draw the same plate', d.over <= 0 && e.over <= 0, `the most a channel moved: ${Math.max(d.over, e.over, 0)} levels`);
+}
+
+{
+  const lampR = top(r2.beadsOff);
+  for (const [i, key, name] of [[9, 'rings', 'the oil drops (Beads 0.8)'], [10, 'drops', 'the dyed drops (Bead Drops 1)']]) {
+    const d = compare(r2[key], r2.beadsOff);
+    check(`${i}. ${name} on the lamp: no pixel brighter than the wash without them (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+`,
+      lampR > 100 && lampR < 250 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the wash ${lampR}`);
+  }
+}
+{
+  const d = compare(r2.camEdges, r2.camFlat);
+  check(`11. the camera's dye rims and two-dye lines (Edge Relief 1, Boundary Contrast 1): no pixel brighter than with them off (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+`,
+    top(r2.camFlat) > 100 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${top(r2.camFlat)}`);
+}
+{
+  const most = (a, b) => { let m = 0; for (let i = 0; i < a.length; i++) if ((i & 3) !== 3) m = Math.max(m, Math.abs(a[i] - b[i])); return m; };
+  const moved = Object.entries(r2.moved).map(([k, [a, b]]) => [k, most(a, b)]);
+  const relief = compare(r2.reliefOff, r2.moved.closeup[0]).dark, bubbles = compare(r2.bubblesOff, r2.moved.bubbles[0]);
+  const bubblesDo = Math.max(bubbles.dark, compare(r2.moved.bubbles[0], r2.bubblesOff).dark);
+  check(`12. where the two lamps stand draws nothing: the plate, the camera's view, the closeup's relief and the camera's bubbles the same (by ${SLACK}) with both lamps moved to opposite corners, the relief and the bubbles each moving over ${pct(DOES)} of the picture`,
+    moved.every(([, m]) => m <= SLACK) && Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark) > DOES && bubblesDo > DOES,
+    `${moved.map(([k, m]) => `${k} ${m}`).join(', ')} levels; the relief moves ${pct(Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark))}, the bubbles ${pct(bubblesDo)}`);
 }
 
 const failed = checks.filter((c) => !c.ok).length;
