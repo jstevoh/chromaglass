@@ -72,7 +72,8 @@ written first. Line numbers are as read on main at d07ac31.
     solution laid ahead of the explicit one, then the dye's carry on that flow.
     Also: the surface flow is only where θ has a gradient, so clean surface ahead of a
     front is not pushed, where on real water the whole surface moves ahead of it.
-    *Measure:* a drop's front radius against Jensen's law at two grids.
+    *Measure:* a drop's front radius against Jensen's law at two grids; and `npm run physics`'s
+    burst line measured at a tenth of the plate again, not the drop's own radius (moved in #609).
   - **38c-2. One soap, not three** (M). A bottle's soap lands twice on a GPU plate:
     in the mix (.g, this item's) and in the poured liquids' `liquids0.r`, which has its
     own Marangoni as a body force (`liquidForces`, `wgsl/fluid/forces.ts:42`) that the
