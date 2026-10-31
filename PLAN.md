@@ -161,7 +161,8 @@ merge conflicts are the shared documents', which 0.6 ends.
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
   video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
-  14ab-13 with #591, finished in #596). Left: 14ab-6, -10, -11.
+  14ab-13 with #591, finished in #596; 14ab-6 the beads' mask on the GPU). Left: 14ab-10, -11,
+  -14.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).

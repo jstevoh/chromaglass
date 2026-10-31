@@ -7,6 +7,7 @@ import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
+import { BeadPacker, packBytes } from '../src/lib/beadPack';
 import { fillPlateUniforms, magnetsOnPlate, type PlateView } from '../src/gpu/plateUniforms';
 import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
@@ -555,6 +556,8 @@ const api = {
   MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, PLATE_METRES,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
+  /** The beads' list and the plate's GPU drawing of it, for `npm run beadmask` (PLAN 14ab-6). */
+  BeadPacker, packBytes,
   /**
    * The projector's pass alone (gpu/output.ts), on pictures made to order:
    * each source a ramp from one colour to another, left to right, or top to
@@ -632,7 +635,7 @@ const api = {
   async render(size: number, over: Partial<VisualizerSettings> = {},
     cam: {
       magnets?: { x: number; y: number; height: number; strength: number }[];
-      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource; view?: boolean; time?: number;
+      cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource | BeadField; view?: boolean; time?: number;
       /*
         The other pictures the plate composites, for the mixer's check
         (`npm run mixer`): a film frame, a logo, and a second plate. The
@@ -670,9 +673,11 @@ const api = {
     // The closeup's drop kernels, built behind the show in the app; here before the one frame drawn (PLAN §29a).
     await plate.drop.prepare();
     const zoom = cam.zoom ?? 1;
-    // The beads' mask, as the app uploads it: a BeadField's render(), square
-    // for rings and twice as wide for drops.
-    if (cam.beadMask) plate.setSource('beads', cam.beadMask);
+    // The beads' mask: a BeadField itself, drawn on the GPU as the app draws
+    // it (PLAN 14ab-6), or a picture of it (its render(), square for rings
+    // and twice as wide for drops), which is the CPU's drawing.
+    if (cam.beadMask instanceof BeadField) plate.setBeads(cam.beadMask);
+    else if (cam.beadMask) plate.setSource('beads', cam.beadMask);
     const size2 = (img: CanvasImageSource) => {
       const it = img as unknown as { width: number; height: number };
       return [it.width, it.height];

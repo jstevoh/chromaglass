@@ -7,6 +7,7 @@ import { STAND_WINDOW, standingKernels } from '../src/gpu/wgsl/standing';
 import { DROP_KERNELS } from '../src/gpu/wgsl/ferroDrop';
 import { SLOSH_KERNELS } from '../src/gpu/wgsl/slosh';
 import { SPLAT_KERNELS, splatKernel } from '../src/gpu/wgsl/splat';
+import { BEAD_KERNELS } from '../src/gpu/wgsl/beadMask';
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -34,6 +35,8 @@ const FORMATS: Record<string, string> = {};
   for (const [name, code] of Object.entries(SLOSH_KERNELS)) await check(`slosh.${name}`, code);
   // What lands on the plate (wgsl/splat.ts): the splats, the poured picture, the deltas' upsample and the video pour (PLAN 14ab-2).
   for (const name of Object.keys(SPLAT_KERNELS)) await check(`splat.${name}`, splatKernel(name, 'rgba32float'));
-  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length} shaders`);
+  // The oil beads' mask (PLAN 14ab-6), drawn by the plate from the beads' list.
+  for (const [name, code] of Object.entries(BEAD_KERNELS)) await check(`beads.${name}`, code);
+  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length} shaders`);
   return out;
 };

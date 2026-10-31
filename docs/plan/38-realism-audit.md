@@ -288,7 +288,7 @@ written first. Line numbers are as read on main at d07ac31.
   air's speed (3 m/s at full); its laminar boundary layer's stress 0.332 ρ U^1.5 √(ν/x) from
   the rim it comes over, less the dish's mean, read as the Blow's is, and its forced cooling
   on the top face (`npm run plume` lines 6–7; story in `docs/plan-shipped.md` §38t). Its looks
-  are calmer, steady where they wobbled: judging §97.
+  are calmer, steady where they wobbled: judging §98.
 
 Also found, left with their owners: the ferrofluid's dye is moved by two exchanges that
 tell it where the black went (`phaseDisplace`, `wgsl/fluid/phase.ts:330-370`) rather than
