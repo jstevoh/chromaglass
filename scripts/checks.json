@@ -990,6 +990,7 @@
       "name": "Soap Breakdown keeps a long show bursting",
       "shard": "lab2",
       "run": "npm run soapbreak -- --owed=law,decay,show,default",
+      "timeout": 8,
       "why": [
         "The Soap Breakdown dial (PLAN 38c-3, scripts/soapbreak.mjs), written ahead of",
         "its build: soapBreakdownRate's law (0 takes nothing, an hour's half-life or",
