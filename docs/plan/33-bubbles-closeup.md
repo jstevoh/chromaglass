@@ -140,25 +140,21 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   `macroMode`, so a look cannot ask for smaller closeup beads); 33g-2 proper (refraction of
   the ground, depth of field, parallax) is still the next optics step, and `lampjudge.mjs`
   still quotes Cell Bloom's old description for its judge.
-- ~~**33g-2b. The closeup's beads are drawn as drops are.**~~ **Shipped** (the owner, 2026-10-30:
-  "Why do the beads have dimples on the top and ragged edges?", then "make the macro view look
-  as accurate as possible"). Two causes in `dropLens` (`gpu/wgsl/dropLens.ts`). The ragged rim:
-  the bead mask is 512 across the whole plate, so at 5x a texel is ten screen pixels and the
-  contour of a bilinear read of its coverage scalloped; the edge, the radius and the direction
-  to the centre now come from the dome's cone fitted at one clean texel three texels in, which
-  is exact to a fraction of a pixel and holds along a wall between pressed drops. The dimple:
-  a pancake's bend was in proportion to the band, so the map from its flat window to its band
-  ran through the drop's own centre just outside the window; the bend is now held to the rim as
-  the drop flattens (`power`), so a big bead is a clear window with a thin rim. `droplens` has
-  eleven new lines. Story in `docs/plan-shipped.md` §33g. Shortcuts, named: the exponent
-  (1 for a ball to 6 for a pancake, over a flatness of 0 to 0.4) is a taste choice, not a ray
-  trace (the report's item 4b is the exact table); a mid-sized bead (about 3 to 4 cells) still
-  shows the ring where its map folds, which a real lens does too; the centre of a ball is
-  still read from a gradient that is noise within a texel of the apex. Open: whether the
-  upside-down picture is right for the performer's camera, which looks at the dye a few
-  radii under the bead and so, strictly, sees it upright and magnified 1.2 times (the photographs
-  of beads over a distant background are upside down); the owner chose upside down in 2026-09
-  ("both") and it stays until they say.
+- **33g-2b. Round rims and clear windows on the closeup's beads: built, reverted, open.**
+  Shipped as #611 (rim wobble at 5x on SwiftShader 1.2 px to 0.3-0.6 px, a pancake bead's
+  clear window, `droplens` 32/32, green on GitHub's Macs) and reverted the same night
+  because the owner's Mac (a real Apple GPU, `owner-mac`, which only a deploy reaches)
+  failed `droplens` on it: the old line "dark round it from where the aperture says" read
+  0.687 of the radius against 0.709 before and an allowed 0.72 +- 0.03, and the seven new
+  roundness lines read 3.4 to 3.7 px (0.45 to 0.50 of a mask texel) at every size, 3 px
+  more radius than SwiftShader, the same on two runs. So something the fit leans on
+  (the clean read three texels in, the cone's slope from taps one texel either side,
+  the edge coverage from `dpdx` of the surface uv) is not the same on Metal hardware as on
+  the software rasteriser, and a pull request's run cannot see it. Next: put the fit back
+  with the roundness lines printing what they read (the fit's accepted share, the mean
+  `dropPx`, a row of raw mask taps) in a run that reaches `owner-mac` before it merges.
+  The dimple half (`power`, the bend held to the rim) was not isolated and comes back
+  with it. Shortcuts and numbers of the first build are in the pull request #611.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
