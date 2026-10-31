@@ -67,6 +67,51 @@ fn phs(p: vec2i, n: f32) -> f32 {
   for (var j = -1; j <= 1; j++) { for (var i = -1; i <= 1; i++) { t += ph(p + vec2i(i, j), n); } }
   return t / 9.0;
 }
+/*
+  Under a standing layer (STAND_ASIDE), the pull acts on the layer as a
+  whole: its share is the layer's mean over a seven-cell box round the cell
+  (a dome's spacing, the box the advection takes the flow's mean over
+  there: phase.ts, boxVel), counting a dome's cells past full at what they hold,
+  and at most full. PLAN 9t-2.
+
+  What was wrong. The pull stepped aside under the film's window, for the
+  film to pull the layer in its own pressure (wgsl/standing.ts, kelvin),
+  and the film's share of it was nought (standing.ts, PULL_SHARE): under
+  the window nothing pulled the ferrofluid toward the magnet at all. While
+  the onset was the lab's 22 mT only the hand's magnet ran the film, and it
+  was held still over a pool. At the liquid's own onset, 4 mT (PLAN 38k),
+  every look's own magnet runs it, and on the Mac a drop dragged by a
+  magnet of 14 mT (ferrodrag) was left 7.4 radii behind once the film
+  took it.
+
+  Why here and not in the film's pressure. The pull is μ0 M ∇H, and H
+  changes over the magnet's width, five to ten capillary lengths, where
+  the domes stand one apart: over a dome it is a tilt, and a tilt moves the
+  layer as a whole, which is the mean the flow carries under the window,
+  not the domes' shape, which the film makes. Outside the window that
+  motion is this force through the gap's own drag (Darcy, MAGNET_GAIN, 0.93
+  of a real rod's pull: npm run magnetgain); the film's flux would move
+  the same liquid by a second law, a 0.4 mm layer's lubrication flow, and
+  at the film's held lift (G 2.8, wgsl/standing.ts LIFT) its pull is a
+  ninth of the real one at that 14 mT, so a drop would change speed where
+  it crossed into the window, at a line nobody can see. One law across the
+  plate: the force that carries a drop to the window's edge carries it on
+  under the window, and the film stands the domes up on what it brings.
+
+  What it brings is a mound. Pulled inward faster than the layer's own
+  weight spreads it, the pool piles under the magnet, past full, up to the
+  top glass (phaseRelax's ceiling, FILM_TOP), as a real layer does under a
+  magnet a few times past its onset (its pull there is 60 times the
+  pressure of a capillary length of it, and the gap is four). The mean,
+  not the cell's own share: on the cell's own the force would differ dome
+  to dome and its curl, which the projection keeps, would stir the domes
+  apart at their own scale.
+*/
+fn layerMean(p: vec2i, n: f32) -> f32 {
+  var t = 0.0;
+  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) { t += max(textureLoad(phase, clampP(p + vec2i(i, j), n), 0).r, 0.0); } }
+  return min(t / 49.0, 1.0);
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -76,8 +121,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let h = 1.0 / n;
   let gpsi = vec2f(magnetsEnergy(uv + vec2f(h, 0.0), A.a) - magnetsEnergy(uv - vec2f(h, 0.0), A.a),
                    magnetsEnergy(uv + vec2f(0.0, h), A.a) - magnetsEnergy(uv - vec2f(0.0, h), A.a)) * (0.5 * n);
-  // None under a standing layer: the film has the magnet's pull in its own
-  // pressure there (wgsl/standing.ts, kelvin), and moves the layer by it.
   // The pull is the three-by-three mean's share, so the force fades over
   // the rim instead of stepping at the flux's edge; the factor's exponent
   // is the cell's own share, the one hsPrep's drag is raised to
@@ -88,8 +131,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // it. And no floor at 1: in water the ferrofluid is the thicker liquid
   // and the ratio is under 1, and the factor is still the mixed drag over
   // the ferrofluid's (1e-6 is the drag's own floor).
-  let share = phs(p, n);
-  var f = (1.0 - textureLoad(stand, p, 0).r) * share * pow(max(A.b.z, 1e-6), 1.0 - ph(p, n)) * gpsi * A.b.x;
+  // Under a standing layer, the layer's mean round the cell instead: see layerMean.
+  var share = phs(p, n);
+  let st = textureLoad(stand, p, 0).r;
+  if (st > 0.0) { share = mix(share, layerMean(p, n), st); }
+  var f = share * pow(max(A.b.z, 1e-6), 1.0 - ph(p, n)) * gpsi * A.b.x;
   let fl = length(f);
   if (fl > A.b.y) { f = f * (A.b.y / fl); }
   textureStore(dst, p, safeVel(vec4f(v.xy + f, v.z, v.w)));
