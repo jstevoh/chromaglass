@@ -7720,6 +7720,34 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   a time); a round tray clicks one slot when the look on stage changes (`slideTray.ts`, `SlideMount`,
   `SlideTray`). Held by `npm run panel`. Judging §82. Story in `docs/plan-shipped.md` §35.
 
+### 38. Realism audit: what still imitates, after §18 (asked 2026-10-30)
+
+#### 38c. Soap is conserved
+
+  - **38c. Soap is conserved: no decay, no grid-rate spreading (shipped 2026-10-30).**
+    The audit found the mix's soap faded to a tenth every ten seconds, spread by a
+    diffusion of 0.08 cells² a step (about 1.3e-6 m²/s at 384² and 60 Hz, 2,500 times a
+    surfactant's own and four times faster on a grid half as fine), was clamped at 1 by
+    every splat and update, and pulled per cell of difference in two substeps of the
+    frame's whole time whatever the grid. The owner asked for all of §38 with physics at
+    the core and settings free to ramp past it. Now (`src/gpu/fluid/soap.ts`): the mix's
+    .g is the soap a cell holds in monolayers Γ∞, kept; the surface's coverage is
+    θ = min(soap, 1), the rest in the water as micelles; the Marangoni flow is
+    u = −K∇θ in metres and seconds and carries the dye and the monolayer (never the
+    micelles), so a pool of strong soap pulls only at its edge and a plate soaped all
+    over pulls nowhere; molecular diffusion is SOAP_D, 5e-10 m²/s; on a thin gap the
+    open rim takes soap carried past it as it takes the dye, and no surface flow
+    crosses it. The caps that keep the explicit flux stable are in m/s and m²/s, with
+    as many substeps (up to 8) as the grid and step need: at 384² and 60 Hz every
+    number is the old one, so the looks keep their pull. The front's real speed is
+    38c-1. `npm run soap` (9 lines, lab, SwiftShader in about five minutes): a stirred,
+    bursting closed plate keeps its soap to 0.00% over a minute (the fade left a
+    millionth); with Soap Bursts at 0 the soap's second moment moves 0.000003 in a minute
+    (the old diffusion, 0.0117); a drop on a plate soaped ten seconds before moves 0.0%
+    of the dye under it, against 99.5% on clean water; a burst's spread is 1.477e-3 at
+    128² and 1.463e-3 at 256², against 4·D_cap·t's 1.562e-3; the rim takes all 8.6e-3
+    outside it and keeps the 0.01713 inside.
+
 ### QA list: what the owner found playing it
 
 - ~~**QA-29** Choices that did nothing: 20 of the 80 values the menus offer were

@@ -49,8 +49,10 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidReads } from './fluid/reads';
+import { soapPlan } from './fluid/soap';
+import { OPEN_RIM } from '../lib/turntable';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
 export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
@@ -64,6 +66,8 @@ export class WebGPUFluid extends FluidReads {
    * mid-measurement is held off too.
    */
   static swirlHeldOff = false;
+  /** The step's soap numbers (soapPlan), kept so a frame makes none. */
+  private readonly soapNums = new Float64Array(5);
 
   /**
    * The kernels a step runs, on any look a show can open on, built before
@@ -1213,13 +1217,15 @@ export class WebGPUFluid extends FluidReads {
     /*
       Marangoni flow (see marangoniFlux): the dye, and the mix itself, carried
       away from soap along the surface, conservatively. The mix goes second,
-      reading the same soap the dye was moved by.
+      reading the same soap the dye was moved by. In metres and seconds, in
+      as many substeps as the grid and the step need (soapPlan, PLAN 38c).
     */
+    const sp = soapPlan(soap, p.magnetSeconds ?? 1 / 60, N, this.soapNums);
+    const soapRim = thin ? OPEN_RIM : 0;
     stage('marangoni', (pass) => {
-      const pull = soap * SOAP_PULL * (p.magnetSeconds ?? 1 / 60) * N;
-      const k = this.arg('marangoni', [pull, 0, 0, 0]);
-      const kMix = this.arg('marangoni mix', [pull, 1, 0, 0]);
-      for (let s2 = 0; s2 < 2; s2++) {
+      const k = this.arg('marangoni', [sp[1], 0, sp[2], sp[3], soapRim, 0, 0, 0]);
+      const kMix = this.arg('marangoni mix', [sp[1], 1, sp[2], sp[3], soapRim, 0, 0, 0]);
+      for (let s2 = 0; s2 < sp[0]; s2++) {
         this.run(pass, 'marangoniFlux', this.dye.write, [this.dye.read, mix!.read], k);
         this.dye.swap();
         this.run(pass, 'marangoniFlux', mix!.write, [mix!.read, mix!.read], kMix);
@@ -1448,10 +1454,10 @@ export class WebGPUFluid extends FluidReads {
         /*
           M dt under the explicit limit (1/64 for this stencil), in several
           substeps: the flow smears the oil's edge every step and the
-          separation has to win it back as fast. Surfactant diffuses and
-          lasts about ten seconds; acidity diffuses slowly. Only the first
-          substep diffuses those two, so their rates do not depend on how
-          many the oil takes.
+          separation has to win it back as fast. Surfactant diffuses at its
+          own molecular rate and is kept (soapPlan, PLAN 38c); acidity
+          diffuses slowly. Only the first substep diffuses those two, so
+          their rates do not depend on how many the oil takes.
         */
         const subs = oil > 0 ? CH_SUBSTEPS : 1;
         // Film Hold: the water film between two drops pushes back (FILM_WGSL).
@@ -1460,8 +1466,8 @@ export class WebGPUFluid extends FluidReads {
           this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
-            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), 0.08, Math.pow(0.1, (p.magnetSeconds ?? 1 / 60) / 10), 0.04])
-            : this.arg('mix update oil', [0.012, 0, 1, 0]));
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04])
+            : this.arg('mix update oil', [0.012, 0, 0, 0]));
           m.swap();
         }
       }
