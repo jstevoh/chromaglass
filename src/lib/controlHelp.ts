@@ -74,9 +74,9 @@ export const CONTROL_HELP: Record<string, string> = {
 
   // Lamp
   lightPlay: 'How much the lamp\'s direction shows: bubbles shaded as lenses, dye rims lit on the lamp side.',
-  lampMotion: 'How far the lamp wanders under the plate, so the light keeps moving across everything.',
-  lampHotspot: 'The projector\'s hot spot: brightest over the lamp and falling away toward the rim.',
-  secondLamp: 'A second, cooler lamp from the other side, so two lights play across every bubble and edge.',
+  lampMotion: 'How far the light the gloss catches wanders, so highlights keep moving over the liquid. The projector\'s own light stays put.',
+  lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
+  secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot, and two lights play across every bubble and edge.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
   lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',

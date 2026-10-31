@@ -10,7 +10,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
 | `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), `litstage` (each look over a projector's black lifted by a stage wash; `-- --controls` until PLAN 36a is built), and a `look` render |
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
-| areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
+| areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords; the indicator's pH, `src/lib/phIndicator.ts`; the hit's regulator, `hitRoomOf` in `src/lib/dyeTarget.ts`) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
 | Preview's copy (`drafting`, `wallRef` in `src/app/useWallLook.ts`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
@@ -19,6 +19,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `src/app/usePour.ts`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
+| Settings → Feedback (`server/feedback-worker.js`, `feedback-schema.sql`, `wrangler.feedback.toml`, `src/lib/feedback*.ts`, `FeedbackPane.tsx`) | `feedback-worker`, `feedbackpane` (the pane on the desk and the phone), `phone` |
 | `scripts/watch.mjs` | `npm run watch -- --selftest` and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
 | `scripts/recorder.mjs` | `moving` and `film` record through it (Mac only; a PR touching it films three looks in `film.yml`) |
 | the mixer (`src/lib/mixer.ts`, `MixerPanel.tsx`) | `mixer`, `rowfade` (the take buttons), `panel`, `phone`, `remotemix` (the remote's) |

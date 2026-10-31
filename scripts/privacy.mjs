@@ -63,11 +63,12 @@ const LINK_ONLY = {
   'www.w3.org': 'the SVG namespace string; nothing is fetched from it',
 };
 /** Hosts the page names by the service's name rather than its address. */
-const NAMED_AS = { 'api.audd.io': 'AudD', 'audd.io': 'AudD' };
+const NAMED_AS = { 'api.audd.io': 'AudD', 'audd.io': 'AudD', 'api.resend.com': 'Resend' };
 /** Build-time services: VITE_ key (or prefix ending _) → words the page uses for it. */
 const SERVICES = {
   VITE_FINGERPRINT_PROXY_URL: 'Song identification',
   VITE_CRASH_REPORT_URL: 'Crash reports',
+  VITE_FEEDBACK_URL: 'Feedback',
   VITE_FIREBASE_: 'Firebase Authentication',
 };
 /**
@@ -77,7 +78,11 @@ const SERVICES = {
  * opens only on a licence; it adds no host (the accounts it uses are
  * VITE_FIREBASE_, above).
  */
-const SWITCHES = { VITE_MAC_APP: 'the Mac app opens its show only on a licence' };
+const SWITCHES = {
+  VITE_MAC_APP: 'the Mac app opens its show only on a licence',
+  // PLAN 39a: the commit the site was built from; it goes anywhere only inside a feedback note, which the Feedback entry covers.
+  VITE_BUILD_SHA: 'the commit the build came from, named in a feedback note',
+};
 /** A server's host or URL from its environment → the words the page uses for it. */
 const ENV_HOSTS = {
   ACR_HOST: 'ACRCloud', // the song identification Worker's second service

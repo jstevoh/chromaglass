@@ -46,11 +46,12 @@ await build({ entryPoints: ['src/lib/bubbles.ts'], bundle: true, format: 'esm', 
 await build({ entryPoints: ['src/lib/beads.ts'], bundle: true, format: 'esm', platform: 'node', outfile: outBeads, logLevel: 'warning' });
 const { BubbleField } = await import(`../${outBubbles}`);
 const { BeadField } = await import(`../${outBeads}`);
+const { DISH_GAP_METRES } = await import('../src/lib/turntable.ts');
 
 const N = 192, dt = 1 / 60;
 const CPU = 0.05 * 190 * 60;   // solver units to cells a second (bubbles.ts)
 const M = 0.2 / N;             // metres a cell
-const GAP = 0.03 * 0.2;        // the rest gap, metres (DISH_REST_GAP × DISH_METRES)
+const GAP = DISH_GAP_METRES;   // the rest gap, metres (lib/turntable.ts, PLAN 38r)
 
 // ── 1. Taylor–Saffman with Bretherton's film drag ────────────────
 {
