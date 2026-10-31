@@ -93,6 +93,8 @@ import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 import { turingInk } from '../src/lib/turingInk.ts';
 
+const source = (path) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
+
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok });
@@ -518,8 +520,8 @@ try {
     session.
   */
   {
-    const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
-    const types = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+    const vis = source('components/LiquidVisualizer.tsx');
+    const types = source('types.ts');
     const wired = /print > 0\s*\?\s*turingInk\(currentSettings\.turingInk \?\? 0\)/.test(vis);
     const defaults = (types.match(/^\s*turingInk: 0,/gm) || []).length;
     check('the visualizer draws the print in the turingInk setting, defaulting to starch', wired && defaults === 1,
@@ -583,29 +585,29 @@ try {
     stripes; 389 and 374 at the run's end for Drift 0.7 and 1; 608 for held
     spots). Movement: correlation 0.901 at Drift 0, 0.641 at 0.7, 0.591 at 1.
   */
-  const presetsSrc = readFileSync(new URL('../src/presets.ts', import.meta.url), 'utf8');
-  const typesSrc = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+  const presetsSrc = source('presets.ts');
+  const typesSrc = source('types.ts');
   const turingPreset = presetsSrc.slice(presetsSrc.indexOf("id: 'turing-print'"));
   const presetDrift = Number(/^\s*turingDrift: ([0-9.]+),/m.exec(turingPreset.slice(0, turingPreset.indexOf("id: '", 10)))?.[1] ?? 0);
   // The held-spots plate is the shader's own spots end, so its numbers are read from the shader's
   // text (as the preset's Drift is from presets.ts) and not typed a second time: if the cap or the
   // share moves there, this follows, and if the lines are not found the check cannot run.
-  const fluidSrc = readFileSync(new URL('../src/gpu/wgsl/fluid.ts', import.meta.url), 'utf8');
+  const fluidSrc = source('gpu/wgsl/fluid/reactions.ts');
   const capM = /let cap = max\(([0-9.]+) - ([0-9.]+) \* f1,/.exec(fluidSrc);
   const shareM = /let above = cap \* mix\(([0-9.]+), ([0-9.]+), r\);/.exec(fluidSrc);
-  if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in fluid.ts');
+  if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in wgsl/fluid/reactions.ts');
   const SPOT_CAP = Number(capM[1]) - Number(capM[2]) * FEED, SPOT_SHARE = Number(shareM[2]);
-  // The rate the app moves the Drift it hands the solver by is read from the visualizer, so the
+  // The rate the app moves the Drift it hands the solver by is read from the app (sim/constants.ts), so the
   // lab ramps as the app does and not as a number typed twice (a step of full Drift starves a tile).
-  const visSrc = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+  const visSrc = source('sim/constants.ts');
   const rateM = /const TURING_DRIFT_PER_SECOND = ([0-9.]+);/.exec(visSrc);
-  if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in LiquidVisualizer.tsx');
+  if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in sim/constants.ts');
   const DRIFT_RATE = Number(rateM[1]);
   // A "." parses to NaN, which Math.min would hand the shader without a word.
   if (!(Number.isFinite(DRIFT_RATE) && DRIFT_RATE > 0 && DRIFT_RATE <= 1)) throw new Error(`turing: TURING_DRIFT_PER_SECOND read as ${rateM[1]}, wanted a number in (0, 1]`);
   // The app counts the rate in solver iterations (a slow machine runs fewer a frame), and so does the lab.
   const iterM = /const TURING_ITERATIONS_PER_SECOND = ([0-9.]+);/.exec(visSrc);
-  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in LiquidVisualizer.tsx is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
+  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in sim/constants.ts is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
   const drift = await page.evaluate(async ({ FEED, KILL, DU, DV, SEEDS, SETTLE, RUN, ABOVE, TILE, PER_SECOND, RATE, DRIFTS, SPOT_KILL, SNAPS }) => {
     const N = 256;
     // Connected pieces of the activator (over ABOVE, four-way, the plate's outer 16 pixels left out
@@ -746,7 +748,7 @@ try {
     ships off, and the preset that is the print ships it on (the number read, not just the line).
   */
   {
-    const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+    const vis = source('components/LiquidVisualizer.tsx');
     const clock = /turingClockRef\.current \+= sixtieths \/ 60;/.test(vis)
       && (vis.match(/turingClockRef\.current\s*[-+*/]?=/g) || []).length === 1;
     const gated = /print0 > 0\s*\?\s*Math\.max\(0,\s*Math\.min\(1,\s*currentSettings\.turingDrift \?\? 0\)\)\s*:\s*0/.test(vis);

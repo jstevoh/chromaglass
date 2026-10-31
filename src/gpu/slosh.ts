@@ -1,5 +1,7 @@
 import { SLOSH_KERNELS, type SloshKernel } from './wgsl/slosh';
-import { Disposer, FIELD_USAGE, PipelineCache, type Prep, bindGroup } from './kit';
+import { Disposer, FIELD_USAGE, PipelineCache, type Prep } from './kit';
+import { groupOf } from './groupCache';
+import type { Opening } from './opening';
 import {
   SLOSH_N, SLOSH_G, SLOSH_REST_DEPTH, SLOSH_LENS, SLOSH_OIL_DENSITY, SLOSH_OIL_NU, SLOSH_PRESSES,
   sloshSteps, type SloshPress,
@@ -35,10 +37,12 @@ export class WebGPUSlosh {
   private readonly data = new Float32Array(12 + 4 * SLOSH_PRESSES);
   private disposed = false;
 
-  static prepare(device: GPUDevice): Prep[] {
+  static prepare(device: GPUDevice, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'slosh');
-    // Behind the show: nothing sloshes in an opening's first steps (the dial is a hand's, at 0 on every look).
-    return (Object.keys(SLOSH_KERNELS) as SloshKernel[]).map((k) => cache.computePrep(k, SLOSH_KERNELS[k], true));
+    // Behind the show, unless the look's own dials tip the dish from its first
+    // step (Plate Rock through Frame Sway: Bass Drop; `gpu/opening.ts`, slosh).
+    // The Slosh dial itself is a hand's, at 0 on every look.
+    return (Object.keys(SLOSH_KERNELS) as SloshKernel[]).map((k) => cache.computePrep(k, SLOSH_KERNELS[k], !open.slosh));
   }
 
   constructor(private readonly device: GPUDevice, readonly n = SLOSH_N) {
@@ -69,7 +73,7 @@ export class WebGPUSlosh {
     const p = this.pipe(k);
     if (!p) return false;
     pass.setPipeline(p);
-    pass.setBindGroup(0, bindGroup(this.device, p, res));
+    pass.setBindGroup(0, groupOf(this.device, p, res));
     pass.dispatchWorkgroups(Math.ceil(this.n / WG), Math.ceil(this.n / WG));
     return true;
   }

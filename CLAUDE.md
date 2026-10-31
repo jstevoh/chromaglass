@@ -4,16 +4,49 @@ A liquid light show: a WebGPU fluid solver (`src/gpu/`, shaders in `src/gpu/wgsl
 drawn as a projected plate, played from a Perform desk, built on a Design desk,
 driven by sound. Live at Firebase Hosting; `main` deploys on every merge.
 
-Before starting anything that is not a bug fix, read `PLAN.md`'s **Order of work**
-(its first section: which step is next, in which lane) and then only the section your
-step names: `grep -n '^##' PLAN.md` for the map, then `sed -n` the section. Not the
-whole file: `PLAN.md` is about 124k tokens (500 KB, 2026-10-17), and see "Keeping a session small" for why
-that matters. What shipped is in `docs/plan-shipped.md`, under the same section numbers:
-`PLAN.md` keeps a one-line stub per shipped item and only the open work, so read the
-archive only when an open item needs the history behind it. When an item ships, move its
-story there in the same PR and leave the stub. The engine's own order is in
+Before starting anything that is not a bug fix, read `PLAN.md`: it is the plan's index
+(about 45 KB): the **Order of work** first (which step is next, in which lane), the running
+order, and a table of the sections. Then read only the file your step names: each section
+is a file under `docs/plan/` (`00-dye-tools.md` to `36-analog-operators.md`, a big one cut
+between items into parts of about 30 KB), and `grep -rn '14ab-4' docs/plan/` finds
+an item from its id. Never read every section: the open plan is about 630 KB in all, and
+see "Keeping a session small" for why that matters. What shipped is in
+`docs/plan-shipped.md`, under the same numbers: a section keeps a one-line stub per shipped
+item and only the open work, so read the archive only when an open item needs the history
+behind it. When an item ships, move its story there in the same PR and leave the stub. A
+branch that still edits the old one-file `PLAN.md` carries its edits across with
+`node scripts/planmove.mjs` after merging main (19m). The engine's own order is in
 `docs/roadmap.md`.
 `docs/judging.md` lists what needs the owner's eyes on a real GPU.
+
+## Where things live
+
+Before any code, read the folder's `README.md`: `src/gpu`, `src/gpu/fluid`, `src/gpu/wgsl`,
+`src/gpu/wgsl/fluid`, `src/sim`, `src/app`, `src/lib`, `src/hooks`, `src/components/desk`,
+`src/components/settings`, `src/components/phone`, `server`, `scripts`. Which domain owns
+what, and why the code is split this way: `docs/architecture.md`. A file over 40 KB is
+never opened whole: grep for the symbol, then read about 80 lines around it. A search
+across many files goes to an Explore agent that returns paths and line numbers.
+
+- **Edges are typed and written down.** Code reaches another domain only through what it
+  exports. A PR that changes an export updates that folder's README in the same PR.
+- **Physics writes, rendering reads.** The plate shader draws the solver's fields and never
+  fakes a motion, mixing or surface effect the solver should produce. Sound moves the plate
+  only through cords and preset patches. Desks change settings and never call GPU code.
+  Only the accounts code touches keys and tokens; everything else asks `tierGates`.
+- **One owner per piece of state.** App state lives in `App()` and its hooks (`src/app/`),
+  the plate's live state in the visualizer's refs. `window` carries only the checks' hooks
+  and the Mac and iPhone bridges, declared in `src/lib/checkHooks.ts`.
+- **No ceremony in the frame.** In the frame loop and the solver, plain functions over
+  typed arrays and refs; no new per-frame objects, classes or wrappers.
+- **The phone shares, never forks.** Phone components call the same lib functions as the desks.
+- **Size.** `npm run sizes` fails a new file over 100 KB or a file already over it that
+  grows, and warns past 40 KB: new code for a big file goes in a module beside it. A split
+  is a pure move in its own PR, with bytes before and after and a table of old lines to
+  new files. A frame-loop change first moves its piece to its own module (19ai-10).
+- **Planning.** The PR body opens with the domains it touches, the exports it changes and
+  the checks that prove it. Ask the owner first only when an export between two domains
+  changes shape.
 
 ## How work is done here
 
@@ -41,7 +74,7 @@ pays for on every tool call since. Measured 2026-09-27 on the busiest threads: a
 70% of their usage was that re-reading, at 200–380k tokens of context each.
 
 - Read the section, not the file. Pipe long output (`npm run check`, a `git diff` of
-  `PLAN.md`, job logs) through `tail` or `grep FAIL`; a long log or a wide search
+  the plan, job logs) through `tail` or `grep FAIL`; a long log or a wide search
   goes to a subagent that returns only the lines that matter.
 - Open the one picture the question needs, not every contact sheet a run wrote.
 - Waiting on CI, the PR subscription wakes the session when the suite completes. Set
@@ -72,95 +105,36 @@ skill: the lab renders the real plate shader on a deterministic plate.
 
 ## Which checks for which files
 
-| You touched | Run before pushing |
-|---|---|
-| anything | `npm run lint` (typecheck), `npm run sizes` (no new file over 40 KB, no file already over it grows; PLAN 19ai-5) |
-| `src/gpu/wgsl/*` | `npm run wgsl`, then `physics`, `maze`, `spikes`, `disc` (the magnet's field), `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating` (anything in the dye's step) as relevant (`physics` takes over five minutes in a cloud session) |
-| `src/gpu/wgsl/plate.ts`, bubbles, `src/lib/bubbles.ts`, `bubbleDye.ts` | `pops`, `straw`, `ferrolook` (the ferrofluid's drawing), `mixer` (the stack's order and grades), `grainedge` (the pigment's grain at the dye's edge), `lampzero` (the before-lamp control finds the lamp's lines by count), `litstage` (each look over a projector's black lifted by a stage wash; `-- --controls` until PLAN 36a is built), and a `look` render |
-| `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
-| areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
-| settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
-| Preview's copy (`drafting`, `wallRef` in `App.tsx`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
-| the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
-| sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |
-| the patch bay's cords (`src/lib/sceneMap.ts`, a cord's gate, gain or dragged band; `CordGate` in `lib/areaCords.ts`) | `soundcords` (`-- --controls` until PLAN 30a is built), `scene`, `areacords -- --node` |
-| the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `App.tsx`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
-| `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
-| `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
-| `scripts/watch.mjs` | `npm run watch -- --selftest` and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
-| `scripts/recorder.mjs` | `moving` and `film` record through it (Mac only; a PR touching it films three looks in `film.yml`) |
-| the mixer (`src/lib/mixer.ts`, `MixerPanel.tsx`) | `mixer`, `rowfade` (the take buttons), `panel`, `phone`, `remotemix` (the remote's) |
-| the projector's pass (`src/gpu/output.ts`, `src/gpu/wgsl/output.ts`, `src/lib/outputConfig.ts`, `src/lib/plateSources.ts`, `OutputPanel.tsx`) | `map`, `beams`, `wallpattern` and `mixer` (the lab, `PW_WEBGPU=1`), `phone`; `wall` on the Mac |
-| the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`, `server/remote-server.js`), the Phone · iPad panel | `applink`, `remotemix`, `phonelink` (the panel's code, and the relay's count of phones); the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
-| the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
-| the governor (`src/lib/governor.ts`) or what the loop feeds it | `rungs` (the ladder, the policy, and Poster's measured costs replayed); `stutter` on the Mac (two-step frames per look) |
-| a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
-| a new or changed check in `scripts/` | that check, and the `check-skeptic` agent; a new one is an entry in `scripts/checks.json` (its shard, its command, why), never a step in `checks.yml`, then `npm run checks` |
-| `.github/workflows/deploy.yml`, `scripts/deploygate.sh` | `npm run deploygate -- --history 20` (which recent merges the deploy would have trusted), `npm run actionlint` |
-| `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `npm run cisecrets` (any workflow: keys only in main's environments, read-only tokens, pinned outside actions), `npm run actionlint` (a pinned release, fetched on first use); `npm run macqueue -- --hours 24` for the Mac time before and after |
-| a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
-| `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
+Every change: `npm run lint` (typecheck) and `npm run sizes`. Then `npm run quick` runs,
+side by side, the checks your diff from `origin/main` reaches and a cloud session can run
+(`-- --dry` says which and why). The full table, with what `quick` cannot see (agents,
+pictures, the Mac), is `docs/checks-map.md`: grep it for the paths you touched. Three
+rows every session needs:
 
-`npm run quick` is this table made executable (PLAN 19k): it reads
-`scripts/checks.json`, works out what each check reads (its scripts, the `src/` files
-they import, every site file for a check that serves the app) and runs, side by side,
-the checks your diff from `origin/main` reaches and a cloud session can run; `-- --dry`
-says which and why. The rows above stay for what it cannot see: agents, pictures, the Mac.
+- a new or changed setting: `panel`, `desk`, and the `setting-auditor` agent;
+- a new or changed check: that check and the `check-skeptic` agent; a new one is an entry
+  in `scripts/checks.json` (its shard, its command, why), never a step in `checks.yml`;
+- a check's bar or input, or a SHOUTING_CASE number in `src/gpu/`: name each under
+  `Check changes:` in the PR body (`docs/handoff.md`), or `Measure` is red.
 
 The `panel` check greps the source for `npm run <name>` and fails if `<name>` is
 not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 
 ## CI
 
-`.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
-deploy:
-
-- **Measure** (ubuntu, five parts side by side, 4–19 min each): typecheck, every script
-  parsing, the workflows linted (`actionlint`), the shaders compiling on SwiftShader, and
-  the node harnesses. A PR whose diff is only check scripts, manifest entries, the npm
-  scripts checks run and documents runs only the Measure checks it reaches (PLAN 19k-4;
-  `always` entries in `scripts/checks.json` hold the rest), and the deploy never takes
-  such a run as proof of a whole tree.
-- Which checks each Measure part and Mac shard runs is `scripts/checks.json`; each job's
-  one `The checks` step runs its shard's list (`scripts/checks.mjs --ci`), each check in a
-  `Run <command>` log group, a red one an error annotation with its name and FAIL lines,
-  the job summary a table of every check's time.
-- **Check changes named** (`scripts/checkguard.mjs`, under `Measure`): a PR that moves a
-  check's bar or input names each change in its body under `Check changes:`, or is red.
-  Re-run the failed jobs after editing the body; no push is needed.
-- **What the change reaches** (`scripts/reach.mjs`): a PR that changes only Markdown,
-  `.claude/`, `ios/`, `desktop/`, a workflow that never runs a Mac shard or the scripts
-  that check the workflows (`closedruns`, `macqueue`, `deploygate`) skips the
-  Mac shards (Measure still runs), and the deploy gate never trusts such a run. A PR
-  whose Mac-reaching change is only check scripts, manifest entries or the npm scripts
-  checks run runs only those checks' shards (PLAN 19k).
-- **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
-  jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
-- A deploy skips the checks when main's new tree is the exact tree its PR's
-  `Checks` run passed on (the PR's head contained main when it merged;
-  `scripts/deploygate.sh`). Since 2026-10-04 (the owner's choice) it also skips
-  just the Mac shards, running Measure, when the PR's green run tested an older
-  main and the site files the PR changed (src/, public/, index.html, the build
-  config, package.json beyond its scripts) are not ones main changed since, and
-  no deploy since went red. Otherwise the deploy runs them in full. And when no
-  file the site is built from differs from the commit that is live (a docs, check
-  or workflow merge; PLAN.md 19j), the deploy checks and publishes nothing, green in
-  seconds. A run started by hand always checks and deploys.
-- Superseded PR runs are cancelled, and so are a PR's runs still queued or going
-  when it merges or closes (`closed.yml`). `gallery.yml` (every preset
-  photographed), `controls.yml` (every control measured), `pixels.yml` (every
-  look at a laptop's size, one to one, with the cell's lattice measured) and
-  `film.yml` (every look filmed and measured against real shows: swells, calm,
-  black, sync by section) run by hand; the first three also on a PR labelled
-  `gallery`, `controls` or `pixels`, which a session can add.
-
-When CI is red, use the `steward` skill.
+`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, five parts) and
+`WebGPU (macOS)` (Metal, sharded). What each part runs is `scripts/checks.json`; what
+skips the Mac is `scripts/reach.mjs`; when a deploy trusts a PR's run, or skips the
+checks, is `scripts/deploygate.sh`; the owner's Mac takes main's deploy shards when idle
+and never a PR's (`docs/mac-runner.md`). The whole account is `docs/ci.md`; read it when
+a run or a deploy needs explaining. When CI is red, use the `steward` skill.
 
 ## Branches, PRs, deploys
 
 - One PR per piece of work, a draft until CI is green. Squash-merge.
-- Every PR updates `PLAN.md`: what it shipped marked shipped, and anything found
-  along the way that needs fixing or adding written in as a plan item.
+- Every PR updates the plan: what it shipped marked shipped in its section file under
+  `docs/plan/` (and its row in `PLAN.md`'s running order), and anything found along the
+  way that needs fixing or adding written in as an item in the section it belongs to.
 - Every feature ships its phone version in the same PR.
 - Merge as soon as CI is green; the owner does not need to be asked (2026-09-27).
 - After a PR merges, a branch that carries on is restarted from `main`

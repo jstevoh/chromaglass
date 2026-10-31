@@ -89,6 +89,7 @@ const SECTION_OF: Record<string, string> = {
   slosh: 'tilt',
   beatSqueeze: 'show',
   kickBloom: 'show',
+  melodyWalk: 'show',
   beatAccent: 'show',
   fingering: 'show',
   beads: 'show',
@@ -332,6 +333,26 @@ export const DEFAULT_RECIPE: (keyof VisualizerSettings)[] = [
   // read as a fault. The physics dials in its place each do something large.
   'globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright',
   'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate',
+];
+
+/*
+  What a performer rides. Each has to pass three tests: it shows on any look
+  within a second, pulling it back undoes it, and it does something no other
+  ride does.
+
+  Dimmer (intensity), Speed (motion), Turbulence (calm glass to boiling),
+  Beat Press (the kick squeezes the glass), Plate Rock (the kick tips the
+  plate and it sloshes back), Soap Bursts (the dye blown apart on the beat),
+  Zoom (a dive into the liquid), and Evolve Speed (how far the show wanders
+  on its own; raising it from zero switches Random Evolve on).
+
+  Swirl and Gravity were here and are not now, though Choose still has both.
+  Swirl only spins up eddies a look already has, so on a calm one it did
+  next to nothing. Gravity pours the dye down the plate and pulling it back
+  does not bring the dye up again: it is a scene change, not a ride.
+*/
+export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
+  'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
 ];
 
 /** How many a strip will hold before it stops being a surface you can read. */

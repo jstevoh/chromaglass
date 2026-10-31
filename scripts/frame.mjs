@@ -43,7 +43,7 @@ export const engineName = () => 'webgpu';
  * `lockstep=1`, for a harness that asks (`{ lockstep: true }`): each frame is
  * exactly the one step it takes, so the lamp, the gel wheel and the dish's
  * turn move by the step and not by the wall clock's two to fifteen seconds a
- * software frame lasts (`LOCKSTEP` in LiquidVisualizer.tsx has the
+ * software frame lasts (`LOCKSTEP` in src/sim/stepping.ts has the
  * measurement). Asked for, not the default, the way `present` is: each
  * harness that takes it is run in a session first (PLAN.md 19l-4).
  */

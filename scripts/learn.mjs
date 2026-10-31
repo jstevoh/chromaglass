@@ -45,6 +45,7 @@ import { PatchBay, SETTING_TRAVEL } from '../src/lib/sceneMap.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { appSource } from './appSource.mjs';
 
 const SR = 44100;
 const FPS = 60;
@@ -561,7 +562,7 @@ const M = (source, depth, key = 'turbulenceScale') => {
     node cannot run, so its source is read, the way `npm run panel` reads the
     MIDI panel's: the function App passes as `dye` must not touch the tool.
   */
-  const app = readFileSync(join(process.env.INIT_CWD ?? process.cwd(), 'src/App.tsx'), 'utf8');
+  const app = appSource();
   const wired = /runTrigger\([^)]*\bdye:\s*(\w+)/.exec(app)?.[1] ?? null;
   const body = wired ? new RegExp(`const ${wired} = \\([^)]*\\) => \\{([\\s\\S]*?)\\n  \\};`).exec(app)?.[1] ?? null : null;
   check("the app's dye for a trigger leaves the tool alone", !!body && !/setActiveTool|selectDye/.test(body),

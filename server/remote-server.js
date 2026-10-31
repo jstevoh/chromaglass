@@ -25,6 +25,7 @@ import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
+import { startLink } from './abletonLink.js';
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
@@ -164,7 +165,43 @@ const lanAddresses = () =>
 
 const handleAccountShows = createAccountShowsHandler();
 const licenseManager = createServerLicenseManager();
-void licenseManager.initFromEnv();
+
+/*
+  OSC and Art-Net are Pro (PLAN.md §23's table, the Pro page, the Settings
+  tiles), and until PLAN.md 34a-7a nothing here asked: a Home key, or no key
+  at all in the Mac app, drove the show over OSC and fed a lighting rig. The
+  gate is here rather than in the Mac app's menu because this is where the
+  packets arrive and leave, so a Home key that sets OSC_PORT or ARTNET_HOST by
+  hand meets it too, and the menu cannot drift from it.
+
+  The tier is the page's own rule (`getEffectiveTier` in src/lib/tierGates.ts):
+  a verified key gives its tier; with no key, an enforced launch (the packed
+  Mac app, `CHROMAGLASS_REQUIRE_SIGNIN` or `CHROMAGLASS_ENFORCE_TIERS`) is free,
+  and a bare `npm run show` on a developer's machine is Pro, as every local
+  build of the page is, so working on the server and its checks needs no key.
+
+  It is asked per packet, against a copy kept fresh: `currentStatus` reads the
+  licence file and verifies the key's signature, which is too much for every
+  OSC message at a controller's rate and too slow for the Art-Net tick. The
+  copy is renewed as soon as this server files or removes a key, and every two
+  seconds besides, because the Mac app's main process files keys through its
+  own manager on the same file (desktop/main.js). Until the first answer
+  arrives nothing passes: a refusal for a few milliseconds at start is cheaper
+  than a free launch that drives the rig before its tier is known.
+*/
+let showTier = null;
+const refreshTier = async () => {
+  try {
+    const s = await licenseManager.currentStatus();
+    showTier = s.valid ? s.tier : s.enforced ? 'free' : 'pro';
+  } catch { /* keep the last answer */ }
+  return showTier;
+};
+const proLinks = () => showTier === 'pro';
+/** For the Mac app's menu and Show Server Details: the tier the server last read, and whether OSC and Art-Net are open to it. */
+export const linkTier = () => ({ tier: showTier, pro: proLinks() });
+void licenseManager.initFromEnv().then(refreshTier);
+setInterval(refreshTier, 2000).unref?.();
 
 // ── Static files, with SPA fallback ────────────────────────────────────
 const server = createServer((req, res) => {
@@ -178,7 +215,7 @@ const server = createServer((req, res) => {
     url.pathname === LICENSE_ACTIVATE_PATH ||
     url.pathname === LICENSE_DEACTIVATE_PATH
   ) {
-    void licenseManager.handleRequest(req, res, url.pathname, isLaptop(req));
+    void licenseManager.handleRequest(req, res, url.pathname, isLaptop(req)).then(refreshTier);
     return;
   }
   // The display asks for this before opening a socket, so a page served from
@@ -358,7 +395,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link']);
 
 wss.on('connection', (socket, req) => {
   roles.set(socket, 'unknown');
@@ -428,6 +465,9 @@ wss.on('connection', (socket, req) => {
         const phoneCount = [...wss.clients].filter(c => roles.get(c) === 'controller').length;
         if (socket.readyState === 1) {
           socket.send(JSON.stringify({ type: 'controllers', count: phoneCount }));
+          // Tells the page Link is here to switch on, which a page with no
+          // show server behind it never hears, so it never offers the switch.
+          socket.send(linkMessage());
         }
       }
       return;
@@ -449,6 +489,12 @@ wss.on('connection', (socket, req) => {
         layers: Array.isArray(message.layers) ? message.layers.slice(0, 64) : [],
         master: typeof message.master === 'number' ? message.master : 1,
       };
+      return;
+    }
+    // Link on or off, from the laptop's own page only: a phone switching the
+    // room's clock source is not a remote's job.
+    if (message.type === 'link-enable') {
+      if (from === 'display') setLink(message.on === true);
       return;
     }
     if (from === 'mirror') return;   // a display only listens
@@ -577,7 +623,7 @@ export function setOsc(port, host = '127.0.0.1') {
     bound();
   });
   udp.on('message', (buf, rinfo) => {
-    if (!isPrivateAddress(rinfo.address)) return;
+    if (!isPrivateAddress(rinfo.address) || !proLinks()) return;
     let msgs;
     try { msgs = readOsc(buf); } catch { return; }
     for (const m of msgs) {
@@ -619,6 +665,8 @@ if (artnet) {
   // that way — 2.255.255.255 and 10.255.255.255 are both conventional here.
   out.bind(() => { try { out.setBroadcast(true); } catch { /* unicast only, which is fine */ } });
   const tick = setInterval(() => {
+    // Not Pro, no packets: a rig left dark rather than one held on a last frame.
+    if (!proLinks()) return;
     const frame = buildUniverse(plate.layers, { ...artnet, master: plate.master });
     const packet = encodeArtDmx(artnet.universe, (artSeq = (artSeq % 255) + 1), frame);
     out.send(packet, artnet.port, artnet.host, () => { /* a rig that is not there is not an error */ });
@@ -631,7 +679,7 @@ if (ARTNET_IN.size > 0) {
   const listen = createSocket({ type: 'udp4', reuseAddr: true });
   listen.on('error', () => { try { listen.close(); } catch { /* already */ } });
   listen.on('message', (buf, rinfo) => {
-    if (!isPrivateAddress(rinfo.address)) return;
+    if (!isPrivateAddress(rinfo.address) || !proLinks()) return;
     const packet = decodeArtDmx(buf);
     // Our own output, if we are broadcasting into the same universe we listen
     // on: taking it back in would be a loop that slowly walks every mapped
@@ -647,6 +695,38 @@ if (ARTNET_IN.size > 0) {
     if (settings) broadcastTo('display', JSON.stringify({ type: 'patch', settings }));
   });
   listen.bind(ARTNET_PORT, '0.0.0.0');
+}
+
+// ── Ableton Link ───────────────────────────────────────────────────────
+//
+// The music's tempo and bar from Live, Bitwig, Traktor or an iPad's AUM, on
+// the network the show server is already on (`abletonLink.js`, PLAN.md
+// 13.5-link). Off until the laptop's page switches it on, so a show server
+// never shows up in somebody's Link session uninvited.
+//
+// The reading goes to the displays twenty times a second: the beat as Link
+// counts it at the moment of sending, which the page stamps on arrival. On
+// the one machine the socket is well under a millisecond and the page keeps
+// the earliest-arriving stamp (`TempoSource.linkReading`), so a late frame
+// does not drag the phase. A beat at 200 bpm is 300 ms; a twentieth of a
+// second between readings is only how fast a tempo change is heard.
+let link = null;
+let linkTimer = null;
+const linkMessage = () => JSON.stringify(link ? { type: 'link', on: true, ...link.reading() } : { type: 'link', on: false, peers: 0, bpm: 0, beat: null, playing: false });
+function setLink(on) {
+  if (on === (link !== null)) { broadcastTo('display', linkMessage()); return; }
+  if (on) {
+    link = startLink({ onError: (err) => console.log(`  Ableton Link: ${err.code ?? err.message}`) });
+    linkTimer = setInterval(() => broadcastTo('display', linkMessage()), 50);
+    linkTimer.unref?.();
+    console.log('  Ableton Link:       on (following the session on this network)');
+  } else {
+    clearInterval(linkTimer);
+    link.stop();
+    link = null;
+    console.log('  Ableton Link:       off');
+  }
+  broadcastTo('display', linkMessage());
 }
 
 // ── Startup banner ─────────────────────────────────────────────────────

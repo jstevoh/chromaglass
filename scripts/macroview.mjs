@@ -13,14 +13,13 @@
  * is a texture laid on the liquid, not the liquid seen closer.
  *
  * Asked here, on one stirred plate of nine pools at 256², of the default
- * settings and of three shipped looks that do not name cells (classic,
- * jellyfish-bloom, oil-and-water; macro-bead, cell-bloom and lace-run are
- * cell looks by name and are not asked), at 4x and 6x (the frame the pinch
+ * settings and of three shipped looks (classic, jellyfish-bloom,
+ * oil-and-water; no look draws cells now, 33g-3), at 4x and 6x (the frame the pinch
  * and the Auto camera reach):
  *
  *   1. no cells the dye did not ask for. This is a settings audit and says
- *      so: every shipped look but the ones that name cells (CELL_LOOKS) has
- *      macroCells and macroLacing at 0, and so do the defaults. A pixel
+ *      so: every shipped look has macroCells at 0, and macroLacing
+ *      too but Lacing Run's (LACE_LOOKS), and so do the defaults. A pixel
  *      comparison of the same settings against themselves would read 0 by
  *      construction (the skeptic counted 0 differing bytes), so the pixels
  *      are asked only for the knob: 1c, the old defaults (0.75 and 0.55) put
@@ -63,8 +62,9 @@ const check = (name, ok, detail = '') => {
 const N = 256, STEPS = 300, SIZE = 768;
 const ZOOMS = [4, 6];
 const CELLS = 0.01, CONTROL = 5, RELIEF = 0.02, SMOOTH = 0.9, HUE_DE = 5, CHROMA = 5;
-/** Looks that draw cells by name (PLAN 33g-3). */
-const CELL_LOOKS = ['macro-bead', 'cell-bloom', 'lace-run'];
+/** Looks that keep Macro Lacing by name (PLAN 33g-3: the owner said no cells, 2026-10-29,
+ *  so Paint Cells is 0 in every look; Lacing Run's dendritic lacing is its subject). */
+const LACE_LOOKS = ['lace-run'];
 /** The old defaults (types.ts before 33g), the control for line 1. */
 const OLD = { macroCells: 0.75, macroLacing: 0.55 };
 const LOOKS = ['classic', 'jellyfish-bloom', 'oil-and-water'];
@@ -193,10 +193,10 @@ const all = shipped.flatMap((r) => r.zooms.map((z) => ({ ...z, name: r.name })))
 const worst = (k, dir = 1) => all.filter((z) => z[k] != null).reduce((m, z) => (dir * z[k] > dir * m[k] ? z : m));
 const wc = worst('cells'), wr = worst('relief', -1), ws = worst('smooth', -1), wd = worst('de');
 const cc = Math.min(...control.zooms.map((z) => z.cells));
-const bad = audit.filter((a) => !CELL_LOOKS.includes(a.id) && (a.cells !== 0 || a.lacing !== 0));
-const named = audit.filter((a) => CELL_LOOKS.includes(a.id) && (a.cells > 0 || a.lacing > 0)).length;
-check(`1. no cells the dye did not ask for: ${audit.length - CELL_LOOKS.length} looks and the defaults have Paint Cells and Macro Lacing at 0`,
-  audit.length > 20 && bad.length === 0, bad.length ? `set by ${bad.map((a) => `${a.id} ${a.cells}/${a.lacing}`).join(', ')}` : `${named} of ${CELL_LOOKS.length} named cell looks set them`);
+const bad = audit.filter((a) => a.cells !== 0 || (a.lacing !== 0 && !LACE_LOOKS.includes(a.id)));
+const named = audit.filter((a) => LACE_LOOKS.includes(a.id) && a.lacing > 0).length;
+check(`1. no cells: all ${audit.length} looks and the defaults have Paint Cells at 0, and Macro Lacing at 0 but in ${LACE_LOOKS.join(', ')}`,
+  audit.length > 20 && bad.length === 0 && named === LACE_LOOKS.length, bad.length ? `set by ${bad.map((a) => `${a.id} ${a.cells}/${a.lacing}`).join(', ')}` : `${named} of ${LACE_LOOKS.length} lacing looks keep it`);
 check(`1c. and the knob is live: the old defaults put cells in the frame, over ${CONTROL} times ${CELLS}`,
   cc > CONTROL * CELLS, `control least ${cc}`);
 check(`2a. the measure tells grain from a swell: a checkerboard, noise and a 4 px ripple read under ${SMOOTH}, a swell over it`,
