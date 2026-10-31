@@ -3024,12 +3024,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       gathers light only on a plane past itself, the shadowgraph's
       1 - Δz·∇²OPL that refractionOptics draws for the dye, with the same Δz
       and gain. So the body is lit by its own optical path, (n_oil - n_water)
-      times the oil's depth, its Laplacian the derive pass's own (its
-      spacing, nine taps, its scale): bright in the middle and dark at the
+      times the oil's depth, at the derive pass's scale (below): bright in the middle and dark at the
       rim when the lens is focused past the plate, the other way round short
       of it, and nothing at Focus's middle. Drawn on both sides of the oil's
       edge, since the caustic lies across it: gated on the oil, it was cut
-      off at the edge in a staircase. So it costs eight reads of the view on
+      off at the edge in a staircase. So it costs twenty-four reads of the view on
       every pixel while Focus is off its middle, which no look ships with.
       Where dye crosses the oil's edge refractionOptics already takes the
       oil's share of ∇²OPL (until 18e-2 makes the two one term), so there
@@ -3046,13 +3045,33 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     }
     let dz = (U.projectorFocus - 0.5) * 1.5;
     if (abs(dz) > 0.001 && !isCamera) {
+      /*
+        Out of focus the wall sees the plate through the lens's defocus
+        disc, so the caustic is the Laplacian seen through that blur, not
+        cell by cell: read off the view grid's bilinear facets, the first
+        version drew its rings in stair-steps a cell wide, and the hard
+        clamp turned them into flat black and white bands with stepped
+        edges (the owner, on the Mac's pictures: "really pixelated at the
+        edge ... super digital"). So the Laplacian is the difference of two
+        ring means (sixteen taps and eight: with eight and four the rings
+        came out blotched where the taps fell on the facets), 4 (mean over radius R - mean over R/3) / (R² - R²/9),
+        with R the derive pass's spacing widened as the disc grows with Δz,
+        which averages over the facets as the defocus does; scaled to the
+        derive pass's 9-tap stencil (50 e² ∇²). And the transport is
+        exp(-Δz ∇²OPL/n), the linear law's own first order, positive as
+        light must be and without the clamp's kinks.
+      */
       let e = 3.0 / U.logicalGrid;
-      let o = vec2f(e, 0.0);
-      let q = vec2f(0.0, e);
-      let ring = viewAt(fuvBase + o).oil + viewAt(fuvBase - o).oil + viewAt(fuvBase + q).oil + viewAt(fuvBase - q).oil;
-      let diag = viewAt(fuvBase + o + q).oil + viewAt(fuvBase - o - q).oil + viewAt(fuvBase + o - q).oil + viewAt(fuvBase - o + q).oil;
-      let lapOil = ((ring - 4.0 * view.oil) + 0.5 * (diag - 4.0 * view.oil)) * 25.0 * (N_OIL - N_WATER);
-      outColor *= clamp(1.0 - dz * (lapOil / N_WATER) * max(1.0, U.boundaryContrast * 2.0), 0.2, 2.5);
+      let R = e * (1.0 + 4.0 * abs(dz));
+      var outer = 0.0;
+      var inner = 0.0;
+      for (var k = 0; k < 16; k++) {
+        let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
+        outer += viewAt(fuvBase + d * R).oil;
+        if (k % 2 == 1) { inner += viewAt(fuvBase + d * (R / 3.0)).oil; }
+      }
+      let lapOil = (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e * (N_OIL - N_WATER);
+      outColor *= clamp(exp(-dz * (lapOil / N_WATER) * max(1.0, U.boundaryContrast * 2.0)), 0.2, 2.5);
     }
     /*
       A pH indicator in the dye (red cabbage's anthocyanin). The indicator
@@ -3295,8 +3314,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // ── Satellite droplets ───────────────────────────────────────────
   if (U.droplets > 0.001 && plateOn) {
     let keep = U.droplets * (0.18 + 0.32 * fluid0.a);
-    var dropped = microDrops(outColor, fuvBase * U.logicalGrid * 0.55 + 17.0, keep, dropCam);
-    dropped = microDrops(dropped, fuvBase * U.logicalGrid * 1.1 + 5.0, keep * 0.6, dropCam);
+    let pxCell = U.logicalGrid * 0.55 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
+    var dropped = microDrops(outColor, fuvBase * U.logicalGrid * 0.55 + 17.0, keep, dropCam, pxCell);
+    dropped = microDrops(dropped, fuvBase * U.logicalGrid * 1.1 + 5.0, keep * 0.6, dropCam, pxCell * 2.0);
     outColor = mix(outColor, dropped, min(1.0, U.droplets * 1.5) * plateAmt);
   }
 

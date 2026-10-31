@@ -49,7 +49,14 @@ fn gelFilter(uv: vec2f) -> vec3f {
   past DROP_CORE round a clear middle; to a camera focused past it the middle
   gathers that light and only the contact is a line. No dot either way.
 */
-fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32) -> vec3f {
+/*
+  pxCell is one screen pixel in the grid's cells. A droplet is a few pixels
+  across, so its ring was a step of 0.06 of its radius, under a pixel: a
+  hard 1-2 px black circle, stair-stepped round (the owner, on the Mac's
+  pictures: "pixelated at the edge"). Each edge is now spread over at least
+  a pixel, as the lens's own resolution would.
+*/
+fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
   let i = floor(p);
   let f = fract(p);
   var outc = c;
@@ -64,9 +71,10 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32) -> vec3f {
       let q = dot(d, d);
       if (q > 1.0) { continue; }
       let r = sqrt(q);
-      let projected = 1.0 - 0.85 * smoothstep(DROP_CORE - 0.06, DROP_CORE + 0.06, r);
-      let photographed = (1.0 + 0.3 * (1.0 - r) * (1.0 - r)) * (1.0 - 0.85 * smoothstep(0.8, 0.9, r));
-      outc = mix(outc, c * mix(projected, photographed, cam), smoothstep(1.0, 0.85, q));
+      let soft = max(0.06, pxCell / rad);
+      let projected = 1.0 - 0.85 * smoothstep(DROP_CORE - soft, DROP_CORE + soft, r);
+      let photographed = (1.0 + 0.3 * (1.0 - r) * (1.0 - r)) * (1.0 - 0.85 * smoothstep(0.85 - soft, 0.85 + soft, r));
+      outc = mix(outc, c * mix(projected, photographed, cam), 1.0 - smoothstep(1.0 - 2.0 * soft, 1.0, r));
     }
   }
   return outc;

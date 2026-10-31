@@ -61,7 +61,7 @@ const OIL = { x: 0.72, y: 0.28, r: 0.09 };
 const { page, close } = await openLab();
 let r;
 try {
-  r = await page.evaluate(async ({ N, SIZE, OIL }) => {
+  r = await page.evaluate(async ({ N, SIZE, OIL, DARK }) => {
     await lab.create(N);
     /*
       The grade at 1, a plain transfer. Saturation Boost pushes each channel
@@ -95,7 +95,23 @@ try {
     lab.flush(); await lab.step(40);
     const plain = await shot({});
     out.plain = plain;
-    out.droplets = await shot({ microDroplets: 1 });
+    /*
+      The droplets at 768 px, compared in the page: a droplet is a fifth to a
+      third of a cell across, under a pixel at 256, and drawn antialiased to
+      the pixel its ring there is a faint smudge no case could see. At 768
+      (about a pixel and a half to four across) the ring is resolved.
+    */
+    {
+      const big = async (over) => lab.render(768, { ...base, ...over }, { time: 3 });
+      const a = await big({ microDroplets: 1 }), b = await big({});
+      let over = 0, dark = 0;
+      for (let i = 0; i < a.length; i += 4) {
+        let up = -255, down = 0;
+        for (let c = 0; c < 3; c++) { up = Math.max(up, a[i + c] - b[i + c]); down = Math.max(down, b[i + c] - a[i + c]); }
+        over = Math.max(over, up); if (down > DARK) dark++;
+      }
+      out.dropletsBig = { over, dark: dark / (a.length / 4) };
+    }
     out.gloss = await shot({ glossiness: 1 });
     out.gel = await shot({ gelWheel: 1 });
     out.dish = await shot({ dishVignette: 1 });
@@ -112,7 +128,7 @@ try {
     out.oil8 = await shot({ projectorFocus: 0.8 });
     out.oil2 = await shot({ projectorFocus: 0.2 });
     return out;
-  }, { N, SIZE, OIL });
+  }, { N, SIZE, OIL, DARK });
 } finally {
   await close();
 }
@@ -157,8 +173,12 @@ function levelMoved(a, b) {
 }
 const top = (p) => { let m = 0; for (let i = 0; i < P; i++) for (let c = 0; c < 3; c++) m = Math.max(m, p[4 * i + c]); return m; };
 const lamp = top(r.empty);
+{
+  const d = r.dropletsBig;
+  check(`1. the satellite droplets (at 768 px): no pixel brighter than without them (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+`,
+    lamp < 250 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${lamp}`);
+}
 for (const [i, key, name, off] of [
-  [1, 'droplets', 'the satellite droplets', 'plain'],
   [2, 'gloss', 'Glossiness at 1', 'plain'],
   [3, 'gel', 'the gel at 1', 'plain'],
 ]) {
