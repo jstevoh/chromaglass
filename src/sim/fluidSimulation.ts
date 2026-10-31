@@ -32,7 +32,7 @@ import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, type 
 import { OPEN_RIM, carrierViscosity, dragSeconds, dyeDensityContrast } from '../lib/turntable';
 import { DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { frameSway, plateSin } from '../lib/plateRock';
+import { frameSway, rockStep } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { pourPictureCpu } from '../lib/videoFlow';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -148,8 +148,6 @@ export class FluidSimulation {
   dropFingering = 0;
   rockX = 0;
   rockY = 0;
-  /** Plate Rock past real (lib/plateRock.ts rockPast), set by the render loop from the slider: 1 up to the default. */
-  rockGain = 1;
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
   coverX = 0;
   coverY = 0;
@@ -3429,9 +3427,7 @@ export class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      rockX: plateSin(this.tiltX, this.rockX),
-      rockY: plateSin(this.tiltY, this.rockY),
-      rockGain: this.rockGain,
+      ...rockStep(this.tiltX, this.tiltY, this.rockX, this.rockY, settings.plateRock),
       coverX: this.coverX,
       coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,

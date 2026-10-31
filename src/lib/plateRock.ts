@@ -131,7 +131,7 @@ export const ROCK_PAST = (0.006 / DISH_GAP_METRES) ** 2;
 /** The dial below which the rock is the real gap's. */
 export const ROCK_REAL_TO = 0.45;
 /** The rock's pull on the colour for the slider `R`, × the real gap's: 1 up to ROCK_REAL_TO, ROCK_PAST at full. */
-export function rockPast(R: number): number {
+export function rockPast(R = 0): number {
   if (!(R > ROCK_REAL_TO)) return 1;
   return ROCK_PAST ** (Math.min(1, (R - ROCK_REAL_TO) / (1 - ROCK_REAL_TO)));
 }
@@ -294,6 +294,10 @@ export const COVER_ROOM = 0.04;
 export const HOLD_TILT = 0.004;
 export function plateSin(hold: number, swing: number): number {
   return hold * 10 + swing * CUR_ROCK;
+}
+/** The solver's rock for a step (FluidSimulation's params): the plate's sinθ each way, and the slider's past-real gain (rockPast). */
+export function rockStep(holdX: number, holdY: number, swingX: number, swingY: number, R?: number): { rockX: number; rockY: number; rockGain: number } {
+  return { rockX: plateSin(holdX, swingX), rockY: plateSin(holdY, swingY), rockGain: rockPast(R) };
 }
 const G = 9.81;
 /** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (DISH_GAP_METRES in the middle). */

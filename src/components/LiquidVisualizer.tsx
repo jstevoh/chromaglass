@@ -41,7 +41,7 @@ import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
-import { kickRock, stepRock, rockSwing, rockPast, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
@@ -4544,7 +4544,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS,
               coverRoom(currentSettings.frameSway));
             for (const fluid of fluidsRef.current) {
-              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; fluid.rockGain = rockPast(R);
+              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
               fluid.coverX = cover.vx; fluid.coverY = cover.vy;
               fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
               fluid.swingX = swingX; fluid.swingY = swingY;
