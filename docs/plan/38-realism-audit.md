@@ -258,6 +258,15 @@ written first. Line numbers are as read on main at d07ac31.
     lighter still. The press is laid as a gap change a frame, not a force: model the
     hand's press as a force over time (the third option the owner was offered), so a
     soft, long press digs as a soft hand on stiff glass does. Found filming 38l-4.
+  - **38l-6. The lift's step reads the film at its start** (S; Low). `squeezeUpdate` (and
+    the sheet's share in `lib/sheet.ts`) takes 1 − (1 − k)^((h/h_s)³) with the depth held
+    at the step's start, so the glass lags where it opens fastest, the snap once a peeled
+    press passes h_s: `npm run stefan` reads 2.14% of the press between 60 and 120 frames a
+    second at 1 s (bar 3%). A midpoint step (the half step's gap, then the whole step's
+    share) takes it to 0.1% in a model, but tried here it moved stefan's "the rate is
+    k(h/h_s)³" line, which reads the rate at the step's start with the lab's big spring
+    (0.02 a step), 16% off: that line has to read the rate at the step's middle, and the
+    sheet and its check take the same step. Found building 38l-4.
 
 - **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,

@@ -72,17 +72,24 @@ try {
       rest gap, then let go and stepped `seconds`, the gap read every step.
       `perSecond` frames a second; the spring a step from Press Lift 0.35
       at that frame's length, as the app's (glassSpring), unless `spring`.
+      Pressed at sixty frames a second whatever `perSecond`, and switched
+      only at let go: where the glass is still thin, the time to the snap
+      goes steeply with the depth it starts from (a start at 0.19 of rest
+      instead of 0.20 moves the gap at 1 s by 15% of the press, check-skeptic
+      on 38l-4), so two presses stopped a step apart would measure where
+      they stopped, not the frame rate.
     */
     const lift = async ({ perSecond = 60, floor = 0.2, seconds = 2, spring = null, amount = 0.03 }) => {
       await lab.create(N, L);
-      const over = { thinGap: 1, gapThickness: 0.45, gapMemory: 0, plateCurve: 0, magnetSeconds: 1 / perSecond,
-        gapSpring: spring ?? lab.glassSpring(0.35, 1 / perSecond) };
-      await lab.step(2, over);
+      const at = (fps) => ({ thinGap: 1, gapThickness: 0.45, gapMemory: 0, plateCurve: 0, magnetSeconds: 1 / fps,
+        gapSpring: spring ?? lab.glassSpring(0.35, 1 / fps) });
+      const press = at(60), over = at(perSecond);
+      await lab.step(2, press);
       const rest = await middle();
       for (let k = 0; k < 400 && (await middle()) > floor * rest; k++) {
         lab.squish(L / 2, L / 2, 20, amount, 0, 'press', 0);
         lab.flush();
-        await lab.step(1, over, true);
+        await lab.step(1, press, true);
       }
       const trace = [await middle()];
       for (let k = 0; k < Math.round(seconds * perSecond); k++) { await lab.step(1, over); trace.push(await middle()); }
@@ -133,8 +140,9 @@ check('no GPU pass failed validation (a stage that never ran would read as still
     return Math.abs(left(r.at60, Math.round(s * 60)) - left(r.at120, Math.round(s * 120)));
   });
   check('the glass comes up by the second: at 60 and 120 frames a second, each with its own spring, the gap at 0.5, 1 and 2 s agrees to 3% of the press',
-    dev.every((d) => d < 0.03) && r.at60.trace[0] < 0.3 * r.at60.rest && r.at120.trace[0] < 0.3 * r.at120.rest,
-    `${dev.map((d) => `${(d * 100).toFixed(2)}%`).join(', ')}; the gap at 2 s ${(r.at60.trace[120] / r.at60.rest).toFixed(3)} and ${(r.at120.trace[240] / r.at120.rest).toFixed(3)} of rest (springs ${r.at60.spring.toExponential(3)}, ${r.at120.spring.toExponential(3)} a step)`);
+    dev.every((d) => d < 0.03) && r.at60.trace[0] < 0.3 * r.at60.rest && r.at120.trace[0] < 0.3 * r.at120.rest
+      && Math.abs(r.at60.trace[0] / r.at60.rest - r.at120.trace[0] / r.at120.rest) < 0.001,
+    `${dev.map((d) => `${(d * 100).toFixed(2)}%`).join(', ')}; let go from ${(r.at60.trace[0] / r.at60.rest).toFixed(4)} and ${(r.at120.trace[0] / r.at120.rest).toFixed(4)} of rest (the same within 0.001); the gap at 2 s ${(r.at60.trace[120] / r.at60.rest).toFixed(3)} and ${(r.at120.trace[240] / r.at120.rest).toFixed(3)} of rest (springs ${r.at60.spring.toExponential(3)}, ${r.at120.spring.toExponential(3)} a step)`);
 }
 // 4. A shallow dent: stiff glass on a thick film.
 {
