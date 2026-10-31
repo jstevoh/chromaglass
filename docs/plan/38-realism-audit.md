@@ -23,7 +23,7 @@ written first. Line numbers are as read on main at d07ac31.
 
 - ~~**38a. The lamp is a condenser, not a wandering painted glow**~~ — **Shipped, this PR**
   (the Hot-Spot is the projector's lamp lever: the bulb's image off the lens's aperture,
-  `src/gpu/wgsl/lampField.ts`; the heat lit evenly; `npm run lampfield` 7/7, 1/7 on the old
+  `src/gpu/wgsl/lampField.ts`; the heat lit evenly; `npm run lampfield` 9/9, 1 of 7 on the old
   plate; story in `docs/plan-shipped.md` §38a). Left from it: 38a-2, 38a-3.
 
 - **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes

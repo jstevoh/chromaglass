@@ -10139,7 +10139,7 @@ aperture turns light away after it has gone through the liquid. Hot-Spot 0 is th
 was, so no look at 0 changed; looks at 0.4 lose about 9% at a wide frame's corners, as the old
 Gaussian took 7%, and their middle is no longer lifted.
 
-*Measured:* `npm run lampfield`, 7/7 (on the old plate 1/7: the law worst 0.165 and 0.813 off,
+*Measured:* `npm run lampfield`, 9/9 (on the old plate 1 of its first 7: the law worst 0.165 and 0.813 off,
 the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
 gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.
 
