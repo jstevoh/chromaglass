@@ -101,6 +101,47 @@ const MU_WATER = 1e-3;
 const ATMOSPHERE = 101325;
 const G = 9.81;
 
+/*
+  The Bubble Melt dial (PLAN 38b-2): how many times faster than nature air
+  diffuses out of a pocket into the liquid. The owner asked for bubbles that
+  melt away (2026-10-31), and the rule is that a dial scales a physical
+  quantity past real without the law under it changing, so the dial is a
+  factor on D in the Henry's-law shrink `step` already runs and nothing else:
+  the small pockets still go first, each faster as its Laplace pressure
+  climbs at the end, a thick oil still slower than water by Stokes–Einstein.
+
+  Why a jump off zero and then decades. At 0 the rate is the real one, and
+  the real one is nil on a show's clock: a 1 mm pocket in the default oil
+  takes years. Even a fully degassed liquid, the most a real plate could do
+  (the drive Δp/p₀ going from the Laplace pressure's 3e-4 to 1), is only
+  about 3,000 times that, still days. So the dial's first step jumps to a
+  million and its travel is five decades on a log scale, from very gentle
+  to very extreme, as the owner asked every dial to run (2026-10-31). What
+  a show has sets the ends: the music's and the straw's bubbles are born
+  at two cells' radius or more (`spawn`), 2 mm at 192², the straw blows
+  them to 8 mm, and the flow carries most of them to the rim in 5 to 30 s.
+  At the first step (0.05, 1.8e6) a 2 mm pocket takes about 25 minutes, a
+  slow thinning over a set; at 0.25 (1.8e7) about 2.5 minutes, the small
+  ones going while they are still on the plate; at the middle (3e8) 9 s,
+  4 mm in 45 s; at 0.75 (5.6e9) 2 mm in half a second and the straw's 8 mm
+  in 11 s; at the top (1e11) even that one is gone in a fraction of a
+  second and no bubble lives to be seen. Filmed on the owner's Mac
+  (2026-10-31): the first mapping, 10^(6 + 3v), melted nothing visible
+  below 0.9; the second, 10^(8 + 3v), went from a gradual melt at 0.25 to
+  an empty plate at 0.9, all of it strong, with nothing gentle.
+  Those times are at today's 6 mm gap; at 38r's 2 mm the Laplace pressure
+  2σ/b triples and a millimetre pocket goes about a quarter sooner, by the
+  same law. `npm run bubblephysics` holds the dial to these times.
+*/
+export const MELT_FLOOR = 1e6;
+export const MELT_DECADES = 5;
+
+/** The Bubble Melt dial (0–1) as the factor on air's diffusivity: 1 at 0, then 10^(6 + 5v). */
+export function meltFactor(v: number | undefined): number {
+  const x = Number.isFinite(v) ? Math.max(0, Math.min(1, v as number)) : 0;
+  return x > 0 ? MELT_FLOOR * Math.pow(10, MELT_DECADES * x) : 1;
+}
+
 /**
  * A pancake's film (Park and Homsy 1984, Bretherton's law with the half gap
  * as the tube's radius): a pocket moving at capillary number Ca leaves a
@@ -175,7 +216,7 @@ export class BubbleField {
    * How many times the real rate air dissolves into the liquid. 1 is real,
    * and real is effectively never on a show's clock (see `step`); a dial
    * may scale it past nature, as the owner's rule allows, without the law
-   * underneath changing (PLAN 38b-2).
+   * underneath changing: the Bubble Melt dial, by `meltFactor` (PLAN 38b-2).
    */
   dissolve = 1;
 
@@ -201,9 +242,11 @@ export class BubbleField {
    * Thickness dial's, on the same log scale from water to glycerine the
    * thin-gap solver drags with; off, the Viscosity word's. The word also
    * says whether the carrier is water ('thin') or oil, which sets the
-   * surface tension and how much air it dissolves.
+   * surface tension and how much air it dissolves. Bubble Melt scales how
+   * fast that air leaves it.
    */
-  liquid(s: { thinGap?: number; gapThickness?: number; viscosity?: string }): void {
+  liquid(s: { thinGap?: number; gapThickness?: number; viscosity?: string; bubbleMelt?: number }): void {
+    this.dissolve = meltFactor(s.bubbleMelt);
     const c = s.viscosity === 'thin' ? WATER_AIR : OIL_AIR;
     this.liquidRho = c.rho;
     this.liquidSigma = c.sigma;

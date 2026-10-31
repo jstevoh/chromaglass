@@ -19,7 +19,8 @@
  *   6. It leaves at the open round rim (not the square round the dish), its
  *      area emptying at the steady π·bσ/(3μ), so time to empty goes as R².
  *   7. It dissolves at Henry's law's real rate, nil on a show's clock, and
- *      scaled past nature the smaller goes first.
+ *      scaled past nature the smaller goes first; Bubble Melt (38b-2) is
+ *      nature at 0 and a factor on D alone above it.
  *   8. Its shape relaxes at Paterson's τ₂ = 2μR³/(b²σ): times at three sizes
  *      go as R³; a merged pair starts as long as it was end to end.
  *   9. Strain stretches it to ε·τ₂ along the stretching axis, and past the
@@ -259,6 +260,82 @@ const still = () => [0, 0];
   check('scaled past nature, the same law melts the small one first, faster as it shrinks',
     smallGone !== null && bigGone !== null && bigGone > 3 * smallGone,
     `2 cells gone at ${smallGone?.toFixed(1)} s, 4 cells at ${bigGone?.toFixed(1)} s`);
+}
+
+// ── 7b. Bubble Melt: the same law, its diffusivity scaled past nature (38b-2)
+/*
+  The dial's promises, each against the law and not against a time typed in
+  here. Off is nature (the factor is exactly 1, so every look that does not
+  name the dial keeps the plate of check 7). Up, the dial changes D and only
+  D: Henry's shrink is linear in D, so a pocket's melt time times the factor
+  is the same at every setting, which a dial that also switched the law to
+  a fade or a timer would fail. And at the middle the melt time of a pocket
+  of 2 mm radius is the law's own integral, done here
+  with a step 167 times finer than the frame's, at two sizes so the small
+  one is seen to go first on the dial's own path, and short enough to
+  watch, which nature's is not. The factor itself is held to the dial's
+  mapping written out here again, 10^(6 + 5v), so a wrong floor or a
+  linear dial cannot hide behind a constant t·k.
+*/
+{
+  const f = new BubbleField(N);
+  f.liquid({ bubbleMelt: 0 });
+  const off = f.dissolve;
+  f.liquid({ bubbleMelt: 0.8 });
+  f.liquid({});
+  const absent = f.dissolve;
+  const meltTime = (v, r) => {
+    const g = new BubbleField(N);
+    g.liquid({ bubbleMelt: v });
+    const b = put(g, 96, 96, r);
+    for (let t = 0; t < 60 * 3600; t++) {
+      g.step(dt, still, 0, 0, 0);
+      if (g.events.length) return { t: NaN, k: g.dissolve, events: g.events.length };
+      if (!g.bubbles.includes(b)) return { t: (t + 1) * dt, k: g.dissolve, events: 0 };
+    }
+    return { t: Infinity, k: g.dissolve, events: 0 };
+  };
+  check('Bubble Melt off is nature\'s rate, and a look without it is the same',
+    off === 1 && absent === 1, `factor ${off} at 0, ${absent} absent`);
+
+  const runs = [0.3, 0.6, 0.9].map((v) => ({ v, ...meltTime(v, 8) }));
+  const tk = runs.map((r) => r.t * r.k);
+  const spread = Math.max(...tk) / Math.min(...tk) - 1;
+  const mapped = runs.every((r) => Math.abs(r.k / 10 ** (6 + 5 * r.v) - 1) < 1e-9);
+  check('up, it scales air\'s diffusivity by 10^(6 + 5v) and nothing else: melt time × factor holds across the dial',
+    mapped && runs.every((r) => Number.isFinite(r.t) && r.events === 0) && runs[0].t > runs[1].t && runs[1].t > runs[2].t && spread < 0.05,
+    runs.map((r) => `${r.v}: ${r.t.toFixed(2)} s at ${r.k.toExponential(1)}`).join(', ') + `; t·k spread ${(spread * 100).toFixed(1)}%`);
+
+  // The law's integral from a radius to the 0.3-cell floor, at the middle's factor.
+  const lawTime = (R0, k) => {
+    const mu = f.liquidMu, sigma = f.liquidSigma, L = f.liquidOstwald, D = 2e-9 * (1e-3 / mu) * k;
+    let R = R0, T = 0;
+    const h = 1e-4;
+    while (R > 0.3 * M) {
+      const dA = 2 * Math.PI * D * L * (sigma * (2 / GAP + 1 / R) / 101325) / Math.max(1, Math.log(0.1 / R));
+      const A = Math.PI * R * R - dA * h;
+      R = A > 0 ? Math.sqrt(A / Math.PI) : 0;
+      T += h;
+    }
+    return T;
+  };
+  const mid = meltTime(0.5, 2e-3 / M), small = meltTime(0.5, 1e-3 / M);
+  const T = lawTime(2e-3, mid.k), Ts = lawTime(1e-3, small.k);
+  check('at the middle, pockets of 2 and 1 mm radius (the music\'s smallest, and half it) melt on the law\'s own clock, the small first, inside half a minute',
+    Math.abs(mid.k / 10 ** 8.5 - 1) < 1e-9 && Math.abs(mid.t / T - 1) < 0.03 && Math.abs(small.t / Ts - 1) < 0.03
+      && small.t < mid.t / 3 && mid.t < 30 && mid.events === 0 && small.events === 0,
+    `2 mm ${mid.t.toFixed(2)} s (law ${T.toFixed(2)} s), 1 mm ${small.t.toFixed(2)} s (law ${Ts.toFixed(2)} s) at ${mid.k.toExponential(1)}× nature`);
+
+  // Very gentle to very extreme (the owner, 2026-10-31): at its first step a
+  // 2 mm pocket thins over a set, longer than the 5–30 s the flow keeps one
+  // on the plate many times over; at the top the straw's 8 mm one is gone
+  // inside a second. Both ends by the law's own integral at the dial's factor.
+  const g0 = new BubbleField(N), g1 = new BubbleField(N);
+  g0.liquid({ bubbleMelt: 0.05 }); g1.liquid({ bubbleMelt: 1 });
+  const gentle = lawTime(2e-3, g0.dissolve), extreme = lawTime(8e-3, g1.dissolve);
+  check('the dial runs from very gentle to very extreme: 2 mm takes over ten minutes at its first step, 8 mm under a second at the top',
+    gentle > 600 && extreme < 1,
+    `2 mm in ${(gentle / 60).toFixed(1)} min at 0.05 (${g0.dissolve.toExponential(1)}×), 8 mm in ${extreme.toFixed(2)} s at 1 (${g1.dissolve.toExponential(1)}×)`);
 }
 
 // ── 8. Paterson's τ₂ ─────────────────────────────────────────────────

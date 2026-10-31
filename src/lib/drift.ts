@@ -151,6 +151,9 @@ const NOT_THE_LOOK = new Set([
   'magnetX', 'magnetY',
   // And how big that hand's magnet is (Magnet Size): the performer's choice.
   'magnetSize',
+  // Bubble Melt (PLAN 38b-2): its first step off zero is a million times
+  // nature, so a nudge would start a look's bubbles melting by themselves.
+  'bubbleMelt',
   // The clear film (PLAN §20b): moving it pours clear oil over the dish or
   // draws it off, so a wander would fill the lace's holes back in by itself.
   'clearFilm',

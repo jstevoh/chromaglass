@@ -156,6 +156,20 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ bubbles: v })}
           settingKey="bubbles"
         />
+        {/*
+          How fast that air dissolves (PLAN 38b-2). Beside Bubbles because
+          with no clock a look's bubbles leave only by the rim, a merge or
+          this, so it is how fast the plate turns its air over.
+        */}
+        <Slider
+          label="Bubble Melt"
+          value={settings.bubbleMelt ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ bubbleMelt: v })}
+          settingKey="bubbleMelt"
+        />
         <Slider
           label="Frame Sway"
           value={settings.frameSway ?? 0}

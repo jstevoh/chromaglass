@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Bubble Melt, the bubbles' air dissolving away (PLAN 38b-2)
+
+- A new dial under Bubbles (Settings → Look, the desks, MIDI, the phone): how fast a
+  bubble's air dissolves into the liquid, by Henry's law with air's diffusivity scaled past
+  nature. Off is nature's rate, where a bubble stays all night; up, the small ones melt
+  first, from minutes at the bottom of the dial to seconds at the top. Every look keeps it off.
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a

@@ -42,6 +42,7 @@ export const CONTROL_HELP: Record<string, string> = {
   frameSway: 'Lets the music move the whole frame, not just the liquid. Kept at zero unless you want the picture itself to move.',
   slosh: 'How much the dish\'s own momentum carries when it is tilted: the colour piles on the low edge and a wave rings back.',
   bubbles: 'Trapped air bubbles on the plate. A few go a long way.',
+  bubbleMelt: 'How fast the bubbles\' air dissolves into the liquid, the small ones first. Off is nature\'s rate, where a bubble stays all night.',
   saturationBoost: 'Colour strength of the finished picture, from washed out to vivid.',
   edgeRelief: 'The curved rim where a blob of liquid meets the glass: a dark edge and a bright refracted highlight.',
   projectorFocus: 'Moves the projector lens\'s focus through the liquid, turning edges into bright and dark Becke lines.',
