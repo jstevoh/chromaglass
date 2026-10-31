@@ -10130,7 +10130,7 @@ F = 3πμR⁴ḣ/2h³, the law the press already closed by).
 Now, on a thin gap, `squeezeUpdate` opens the gap at k(h₀ − h)(h/h_s)³, integrated over
 the step with the depth held (the step takes 1 − (1 − k)^((h/h_s)³) of what is left, so
 it never overshoots). k is Press Lift's spring, read at the film a full press leaves,
-h_s = STEFAN_FILM (a quarter of rest), not at rest: glass is stiff, so the time a person
+h_s = STEFAN_FILM of rest (0.30, 38l-4), not at rest: glass is stiff, so the time a person
 sees is the thin film's, and that is the time Press Lift always set. Read at rest the same
 dial left a full press stuck for minutes. Shallow dents (a tap, a kick) come back (1/h_s)³
 quicker, as stiff glass on a thick film does. The "no delta" update now hands the kernel
@@ -10175,5 +10175,20 @@ k(h₀ − h)(h/h_s)³, so the hold that keeps the dent where it is lays k·amou
 step in each disc, at any depth. KickRelease lays it on a thin gap (the sim hands it the
 step's spring); rides holds its kick the same way. Measured in the lab before the change
 (the kick alone): 3.61 cells let alone, 4.30 held, 4.16 with no spring at all.
+
+**38l-4, the glass's stiffness against the hand (same PR).** Filmed on the owner's Mac at
+the first STEFAN_FILM, a quarter, the peel was gone: the app's Press tool held 1.5 s went
+only to 0.0146 of the 0.03 gap (0.0062 before 38l) and was back in 0.6 s, where before the
+hole was still open at 4 s. The press closes at a(h/h₀)³ and the lift opens at
+k(h₀ − h)(h/h_s)³; both go as h³, so the film's viscosity drops out of a held press and it
+settles at a dent of a·STEFAN_FILM³/k at any depth, Hooke's F/K. STEFAN_FILM is then the
+glass's stiffness against the hand, and a quarter never let a press under h_s, where the
+lift is slower than the plain spring. Swept on the Mac (Classic, 192, mean within 0.12 of
+the middle; deepest, then back to 0.0299): 0.28 0.00454, 2.1 s; 0.30 0.00462, 2.6 s; 0.32
+0.00430, 3.1 s; 0.34 0.00428, 3.7 s. 0.30 shipped: filmed, the Press tool goes to 0.0045,
+holds about a second (0.0055 at 0.5 s, 0.0073 at 1 s), peels, and lets go by 2.5 s; a
+light tap (0.001) is back in 0.3 s. The depth sits near the floor for every value past
+0.28 and falls off a cliff below it (0.25 is half as deep), so 0.30 keeps a margin. Left:
+38l-5, a light press barely dents.
 
 

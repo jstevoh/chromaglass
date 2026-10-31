@@ -231,7 +231,7 @@ written first. Line numbers are as read on main at d07ac31.
 
 - ~~**38l. The glass springs back by the second, not by the frame**~~ — **Shipped, this PR**
   (the glass opens against the film's suction, k(h₀ − h)(h/h_s)³ with Press Lift read at
-  the film a full press leaves, STEFAN_FILM; the dt half already held on a thin gap;
+  the film a full press leaves, STEFAN_FILM 0.30 (38l-4); the dt half already held on a thin gap;
   `npm run stefan`; story in `docs/plan-shipped.md` §38l).
   - **38l-1. The liquid's viscosity in the press and the lift** (S; Low-Medium). Stefan's
     rate goes as 1/μ, and neither the press's closing nor the lift reads the liquid under
@@ -247,6 +247,17 @@ written first. Line numbers are as read on main at d07ac31.
     thinner than the sheet thinks, so the sheet's part of the dent there lifts at the
     shallower film's pace. Measured small (a hand press beside a live kick keeps its memory
     to 0.04%), but on the same cells it is a shortcut. Found building 38l-2.
+  - ~~**38l-4. The glass's stiffness against the hand**~~ — **Shipped, this PR**
+    (STEFAN_FILM 0.25 → 0.30: a held press settles at a·STEFAN_FILM³/k, so the number is
+    the glass's stiffness; the Press tool goes to 0.0045, holds a second and lets go by
+    2.5 s on the Mac; story in `docs/plan-shipped.md` §38l).
+  - **38l-5. A light press barely dents** (M; Medium). Since 38l a held press settles at a
+    dent linear in how hard it presses (F/K), where before even a light press dug deep.
+    The Mac's lighter recipe (one r30 disc at 0.004 every 60 ms, far lighter than the
+    Press tool) went to 0.0129 before and 0.0292 after, and a phone's finger presses are
+    lighter still. The press is laid as a gap change a frame, not a force: model the
+    hand's press as a force over time (the third option the owner was offered), so a
+    soft, long press digs as a soft hand on stiff glass does. Found filming 38l-4.
 
 - **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,
