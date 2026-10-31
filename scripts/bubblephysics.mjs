@@ -270,13 +270,17 @@ const still = () => [0, 0];
   is the same at every setting, which a dial that also switched the law to
   a fade or a timer would fail. And at the middle the melt time of a pocket
   of a millimetre's radius is the law's own integral, done here
-  independently with a step a thousand times finer than the frame's, and
-  short enough to watch, which nature's is not.
+  with a step 167 times finer than the frame's, at two sizes so the small
+  one is seen to go first on the dial's own path, and short enough to
+  watch, which nature's is not. The factor itself is held to the dial's
+  mapping written out here again, 10^(6 + 3v), so a wrong floor or a
+  linear dial cannot hide behind a constant t·k.
 */
 {
   const f = new BubbleField(N);
   f.liquid({ bubbleMelt: 0 });
   const off = f.dissolve;
+  f.liquid({ bubbleMelt: 0.8 });
   f.liquid({});
   const absent = f.dissolve;
   const meltTime = (v, r) => {
@@ -296,24 +300,30 @@ const still = () => [0, 0];
   const runs = [0.3, 0.6, 0.9].map((v) => ({ v, ...meltTime(v, 2) }));
   const tk = runs.map((r) => r.t * r.k);
   const spread = Math.max(...tk) / Math.min(...tk) - 1;
-  check('up, it scales air\'s diffusivity and nothing else: melt time × factor holds across the dial',
-    runs.every((r) => Number.isFinite(r.t) && r.events === 0) && runs[0].t > runs[1].t && runs[1].t > runs[2].t && spread < 0.05,
+  const mapped = runs.every((r) => Math.abs(r.k / 10 ** (6 + 3 * r.v) - 1) < 1e-9);
+  check('up, it scales air\'s diffusivity by 10^(6 + 3v) and nothing else: melt time × factor holds across the dial',
+    mapped && runs.every((r) => Number.isFinite(r.t) && r.events === 0) && runs[0].t > runs[1].t && runs[1].t > runs[2].t && spread < 0.05,
     runs.map((r) => `${r.v}: ${r.t.toFixed(2)} s at ${r.k.toExponential(1)}`).join(', ') + `; t·k spread ${(spread * 100).toFixed(1)}%`);
 
-  // The law's integral for R from 1 mm to the 0.3-cell floor, at the middle's factor.
-  const mid = meltTime(0.5, 1e-3 / M);
-  const mu = f.liquidMu, sigma = f.liquidSigma, L = f.liquidOstwald, D = 2e-9 * (1e-3 / mu) * mid.k;
-  let R = 1e-3, T = 0;
-  const h = 1e-4;
-  while (R > 0.3 * M) {
-    const dA = 2 * Math.PI * D * L * (sigma * (2 / GAP + 1 / R) / 101325) / Math.max(1, Math.log(0.1 / R));
-    const A = Math.PI * R * R - dA * h;
-    R = A > 0 ? Math.sqrt(A / Math.PI) : 0;
-    T += h;
-  }
-  check('at the middle, a pocket of a millimetre\'s radius melts on the law\'s own clock, inside half a minute',
-    Math.abs(mid.t / T - 1) < 0.03 && mid.t < 30 && mid.events === 0,
-    `${mid.t.toFixed(2)} s (law ${T.toFixed(2)} s) at ${mid.k.toExponential(1)}× nature`);
+  // The law's integral from a radius to the 0.3-cell floor, at the middle's factor.
+  const lawTime = (R0, k) => {
+    const mu = f.liquidMu, sigma = f.liquidSigma, L = f.liquidOstwald, D = 2e-9 * (1e-3 / mu) * k;
+    let R = R0, T = 0;
+    const h = 1e-4;
+    while (R > 0.3 * M) {
+      const dA = 2 * Math.PI * D * L * (sigma * (2 / GAP + 1 / R) / 101325) / Math.max(1, Math.log(0.1 / R));
+      const A = Math.PI * R * R - dA * h;
+      R = A > 0 ? Math.sqrt(A / Math.PI) : 0;
+      T += h;
+    }
+    return T;
+  };
+  const mid = meltTime(0.5, 1e-3 / M), small = meltTime(0.5, 0.5e-3 / M);
+  const T = lawTime(1e-3, mid.k), Ts = lawTime(0.5e-3, small.k);
+  check('at the middle, pockets of 1 and ½ mm radius melt on the law\'s own clock, the small first, inside half a minute',
+    Math.abs(mid.k / 10 ** 7.5 - 1) < 1e-9 && Math.abs(mid.t / T - 1) < 0.03 && Math.abs(small.t / Ts - 1) < 0.03
+      && small.t < mid.t / 3 && mid.t < 30 && mid.events === 0 && small.events === 0,
+    `1 mm ${mid.t.toFixed(2)} s (law ${T.toFixed(2)} s), ½ mm ${small.t.toFixed(2)} s (law ${Ts.toFixed(2)} s) at ${mid.k.toExponential(1)}× nature`);
 }
 
 // ── 8. Paterson's τ₂ ─────────────────────────────────────────────────

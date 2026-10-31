@@ -118,7 +118,7 @@ const G = 9.81;
   at a million, where a pocket of half a millimetre's radius melts in about
   a minute and one of a millimetre (a cell at 192², the music's size) in
   eight, and the rest of its travel is three more decades on a log scale:
-  about 3e7 at the middle (1 mm in 16 s, 2 mm in a minute and a half, the
+  about 3e7 at the middle (1 mm in 15 s, 2 mm in a minute and a half, the
   turnover a song's bubbles had from their old timers), 1e9 at the top (2 mm
   gone in under three seconds).
   Those times are at today's 6 mm gap; at 38r's 2 mm the Laplace pressure
