@@ -308,7 +308,12 @@ try {
     && req.destinations.every(d => d.keyName === `live-${after.dests.find(x => x.name === d.name)?.id}` && d.key === undefined), names ?? 'no start');
   check('two encodes: 1920x1080 for the wide ones, 720x1280 for Instagram', req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', ') === 'landscape 1920x1080, portrait 720x1280',
     req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', '));
-  const configs = await page.evaluate(() => window.__liveStub.calls.configs);
+  // Waited for, not read at once: the encoders hand their configuration over
+  // with their first output, which can land after the start has been
+  // answered. Read at once, a loaded runner saw "0 configurations" (CI on
+  // #619, 2026-10-31; and here beside four other checks), a line about keys
+  // failing on how soon the first frame was encoded.
+  const configs = (await until(page, () => window.__liveStub.calls.configs.length > 0 && window.__liveStub.calls.configs)) || [];
   check('no key crossed with the start or the encoders\' configuration', !!req && configs.length > 0 && !JSON.stringify(req).includes(SECRET) && !configs.join('').includes(SECRET),
     `${configs.length} configurations`);
   const packets = await until(page, () => window.__liveStub.calls.packets > 30 && window.__liveStub.calls, undefined, 20_000);
