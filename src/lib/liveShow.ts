@@ -282,7 +282,7 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
   testing = o.test === true;
   names = destinations.map((d) => d.name ?? d.url);
   upload = { heldKbps: 0, saturatedKbps: null };
-  const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration });
+  const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration, frames: 'plate' });
   current = enc;
   publish({ ...IDLE, phase: 'starting', test: testing, names });
   try {
