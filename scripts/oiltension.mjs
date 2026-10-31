@@ -60,8 +60,8 @@
 import { openLab } from './lab.mjs';
 import { DEFAULT_LIQUID_TYPES } from '../src/bottles.ts';
 import { interfacialTension } from '../src/lib/liquidProps.ts';
-// The gap and the reference liquid as the solver takes them (REST_GAP, NU_REF in src/gpu/fluid/constants.ts).
-import { DISH_METRES as PLATE_METRES, DISH_REST_GAP as REST_GAP, thicknessViscosity } from '../src/lib/turntable.ts';
+// The gap and the reference liquid as the solver takes them (REST_GAP_METRES, NU_REF in src/gpu/fluid/constants.ts; PLAN 38r).
+import { DISH_METRES as PLATE_METRES, DISH_GAP_METRES as REST_GAP_METRES, thicknessViscosity } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
