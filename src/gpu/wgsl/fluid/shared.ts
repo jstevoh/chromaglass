@@ -414,11 +414,7 @@ fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
   would be. One magnet reads exactly as it did (magnetDiscFieldVec).
 */
 fn magnetsEnergy(uv: vec2f, m: vec4f) -> f32 {
-  var b = magnetVec(uv, m);
-  for (var k = 0; k < 3; k++) {
-    if (S.mags[k].w > 0.0) { b += magnetVec(uv, S.mags[k]); }
-  }
-  return magnetFieldEnergy(length(b));
+  return magnetFieldEnergy(magnetsShare(uv, m, S.mags));
 }
 ${SPIKES_WGSL}
 /*

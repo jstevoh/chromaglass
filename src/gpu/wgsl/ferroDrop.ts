@@ -109,9 +109,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let chi = clamp((phase - 0.2) / 0.6, 0.0, 1.0);
   let p = (vec2f(id.xy) + 0.5) / f32(n);
   // The magnets' fields add as vectors (PLAN 38k; until then their |B| did).
-  var bv = vec3f(0.0);
-  for (var k = 0; k < 4; k++) { bv += magnetVec(p, A.mags[k]); }
-  let b = length(bv);
+  let b = magnetsShare(p, A.mags[0], array<vec4f, 3>(A.mags[1], A.mags[2], A.mags[3]));
   textureStore(dst, vec2i(id.xy), vec4f(chi, kelvin(b / A.more.x), 0.0, 0.0));
 }`;
 

@@ -187,6 +187,16 @@ fn magnetVec(p: vec2f, m: vec4f) -> vec3f {
   if (m.w <= 0.001) { return vec3f(0.0); }
   return m.w * magnetDiscFieldVec(p, m, magnetRadius()) / SPIKE_B_REF;
 }
+// All the magnets' field at p, |m's + each of mags'|, on magnetShare's scale:
+// the one sum the solver's pull (magnetsEnergy) and the drop's take, and
+// what \`npm run disc\` holds to Biot–Savart's vector sum (PLAN 38k).
+fn magnetsShare(p: vec2f, m: vec4f, mags: array<vec4f, 3>) -> f32 {
+  var b = magnetVec(p, m);
+  for (var k = 0; k < 3; k++) {
+    if (mags[k].w > 0.0) { b += magnetVec(p, mags[k]); }
+  }
+  return length(b);
+}
 // How far into spikes the field of magnet m is at p: 0 flat, 1 full. The
 // plate asks this of every pixel, so past twice the rim and the gap, where
 // the magnet's field is under 1.25 times its dipole's (\`npm run disc\`

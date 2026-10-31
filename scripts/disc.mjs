@@ -155,7 +155,8 @@ fn magnetRadius() -> f32 { return R; }
   let b = magnetShare(q.p, q.m);
   outs[2u * i] = vec4f(magnetDiscField(q.p, q.m, q.radius), b, spikeAmp(q.p, q.m), magnetFieldEnergy(b));
   // The field as a vector (PLAN 38k): one magnet's length, and two magnets' sum.
-  outs[2u * i + 1u] = vec4f(length(magnetVec(q.p, q.m)), length(magnetVec(q.p, q.m) + magnetVec(q.p, q.m2)), magnetShare(q.p, q.m2), 0.0);
+  // magnetsShare is the sum the solver's magnetsEnergy and the drop's pull call.
+  outs[2u * i + 1u] = vec4f(length(magnetVec(q.p, q.m)), magnetsShare(q.p, q.m, array<vec4f, 3>(q.m2, vec4f(0.0), vec4f(0.0))), magnetShare(q.p, q.m2), 0.0);
 }`;
     const module = device.createShaderModule({ code });
     const info = await module.getCompilationInfo();
@@ -217,16 +218,16 @@ fn magnetRadius() -> f32 { return R; }
     How far out a magnet raises spikes: where its share falls under the onset.
     Searched to a whole plate out: at the real onset (PLAN 38k, five times
     under the lab's old 0.18) Magnet Size's biggest reaches past the 0.4 this
-    stopped at, and read 0.4 there.
+    stopped at, and read 0.4 there. Not found at all is NaN, which no bar passes.
   */
   const reachOf = async (a, h, w = W, onset = consts.onset) => {
     const rs = Array.from({ length: 1000 }, (_, i) => i * 0.001);
     const got = await run(rs.map((r) => at(r, h, a, w)));
     if (!got.every((g) => Number.isFinite(g.share))) return { axis: NaN, reach: NaN, peak: NaN };
     const i = got.findIndex((g) => g.share < onset);
-    return { axis: got[0].share, peak: Math.max(...got.map((g) => g.share)), reach: i < 0 ? 1 : rs[i] };
+    return { axis: got[0].share, peak: Math.max(...got.map((g) => g.share)), reach: i < 0 ? NaN : rs[i] };
   };
-  const dipReach = (h, w, onset = consts.onset) => { for (let r = 0; r < 1; r += 0.001) if (dipoleShare(r, h, w) < onset) return r; return 1; };
+  const dipReach = (h, w, onset = consts.onset) => { for (let r = 0; r < 1; r += 0.001) if (dipoleShare(r, h, w) < onset) return r; return NaN; };
   /*
     PLAN 9v's onset, 0.18 of the hand's field: the contour the cylinder was
     held to the dipole on when it replaced it, so the default kept its look.
@@ -253,8 +254,9 @@ fn magnetRadius() -> f32 { return R; }
       off, raised no spikes, against an onset of 0.18 set in the lab for it.
       The onset is the liquid's now (the next check), 4 mT, and a magnet
       strong enough to pull a pool across the dish stands it up (PLAN 9u):
-      what each look's own magnet does is printed, and the two looks that
-      carry one are still asked to be found, so a lab that finds none is red.
+      so each look's own magnet is asked to be past it (the opposite of the
+      old line, turned on purpose), and the two looks that carry one are
+      still asked to be found, so a lab that finds none is red.
     */
     const looks = await page.evaluate(() => lab.lookIds().map((id) => ({ id, s: lab.look(id).settings }))
       .filter((l) => (l.s.magnetStrength ?? 0) > 0 && (l.s.phaseAmount ?? 0) > 0)
@@ -262,7 +264,7 @@ fn magnetRadius() -> f32 { return R; }
     const peaks = [];
     for (const l of looks) peaks.push((await reachOf(consts.radius, l.h, l.w)).peak);
     const MAGNET_LOOKS = ['magnet-garden', 'ferro-paint'];
-    check('the looks that carry a magnet are found', MAGNET_LOOKS.every((id) => looks.some((l) => l.id === id)),
+    check('the looks that carry a magnet are found, and each one\'s magnet is past the onset', MAGNET_LOOKS.every((id) => looks.some((l) => l.id === id)) && peaks.length >= 2 && peaks.every((p) => p > consts.onset),
       looks.map((l, i) => `${l.id} ${peaks[i].toFixed(3)} at most (${(peaks[i] / consts.onset).toFixed(1)}× the onset)`).join(', '));
 
     /*
@@ -375,7 +377,8 @@ fn magnetRadius() -> f32 { return R; }
       Two like-poled magnets of the tool's size, held at the hand's depth a
       little more than a magnet's width apart (a phone's two fingers), and
       the field at points between them, beside them and off the line: the
-      shader's |ΣB| (magnetVec, what magnetsEnergy and the drop's pull take)
+      shader's |ΣB| (magnetsShare, the one sum magnetsEnergy and the drop's
+      pull call, so going back to adding energies there turns this red)
       against the two Biot–Savart fields added as vectors. And one magnet
       alone, the vector's length against its |B| (magnetShare), so a single
       magnet reads as it did. The energies' sum the solver used until 38k

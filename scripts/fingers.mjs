@@ -102,6 +102,7 @@ const CIRCLES = [0.06, 0.09, 0.12, 0.15];
 
 const { page, close } = await openLab();
 FAR = { ...FAR, magnetStrength: await page.evaluate((h) => 0.8 * lab.SPIKE_ONSET / lab.fieldOnAxis(1, h), FAR.magnetHeight) };
+if (!(FAR.magnetStrength > 0.001 && Number.isFinite(FAR.magnetStrength))) throw new Error(`the control magnet's strength is ${FAR.magnetStrength}: the lab's SPIKE_ONSET or fieldOnAxis is missing`);
 try {
   const run = (over, look) => page.evaluate(async ({ over, look, AT, POUR, STEPS, S }) => {
     await lab.create(384);

@@ -78,6 +78,7 @@ const RISE = 240;
 
 const { page, close } = await openLab();
 ONSET = await page.evaluate(() => lab.SPIKE_ONSET);
+if (!(ONSET > 0 && Number.isFinite(ONSET))) throw new Error(`the lab's SPIKE_ONSET is ${ONSET}`);
 try {
   /**
    * A pool on a dyed plate under the magnet, stepped in legs of

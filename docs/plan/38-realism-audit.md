@@ -211,6 +211,14 @@ written first. Line numbers are as read on main at d07ac31.
   - **38k-4. The ramp past the onset** (S). `SPIKE_FULL` keeps the old proportion (1.94 ×
     the onset): the solver's gate as domes arrive, not their height, which the film's
     lift makes. The subcritical jump and its hysteresis are 9t-3's.
+  - **38k-5. The looks' own magnets in the dome checks** (S). `spikes` and `fingers` used
+    Magnet Garden's own magnet as their control under the onset; it is past it now, so the
+    control is a magnet at 0.8 of the onset, whose pull is about 3% of Garden's. Add
+    Garden's own magnet as a case that must raise domes, its bar set from the Mac's first
+    reading (`disc` asserts only that its field is past the onset, 4.6×).
+  - **38k-6. One χ for EFH1** (S, with 38s). `standing.ts`'s `CHI0` is 2.6 and
+    `spikes.ts`'s `FERRO_CHI` 2.64; the drop's pull reads `CHI0`. Import the one number
+    and re-read `ferrodrop` (about 1%).
 
 - **38l. The glass springs back by the second, not by the frame** (M; Medium: every press
   and lift). Sharpens **18a-5**. `gap += (rest − gap)·gapSpring` with no dt

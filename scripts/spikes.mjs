@@ -93,6 +93,7 @@ const AT = { x: 0.36, y: 0.65 };
 
 const { page, close } = await openLab();
 FAR = { ...FAR, magnetStrength: await page.evaluate((h) => 0.8 * lab.SPIKE_ONSET / lab.fieldOnAxis(1, h), FAR.magnetHeight) };
+if (!(FAR.magnetStrength > 0.001 && Number.isFinite(FAR.magnetStrength))) throw new Error(`the control magnet's strength is ${FAR.magnetStrength}: the lab's SPIKE_ONSET or fieldOnAxis is missing`);
 try {
   /**
    * Pools of ferrofluid (x, y, r) on a coloured plate, stepped with a magnet
