@@ -6838,15 +6838,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
               lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
               /*
-                And the dye those bubbles displace, put back as a ring
-                (H6 · A). Before the hand-off in reading order but after it in
-                effect: the deposit goes into the CPU's delta buffers and is
-                folded in on the next flush, by which time the solver has
-                taken the disc. Measured without it, the plate drained to 83%
-                of its dye in twenty seconds and a popped bubble never got
-                its colour back.
+                And a popped bubble's hole filled back in from its ring
+                (H6 · A). The ring itself is the GPU's: it carries the liquid
+                under the air out to the rim (airDisplace, PLAN 15g-8).
               */
-              lead.depositBubbleRims(bubblesRef.current.packed, live);
+              lead.fillBubbleHoles(bubblesRef.current.packed, live);
             }
           }
           const frame = stage?.frame();

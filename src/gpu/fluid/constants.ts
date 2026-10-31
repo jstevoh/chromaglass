@@ -19,6 +19,12 @@ import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thi
   needs nothing here.
 */
 export const AIR_CAPACITY = 512;
+/**
+ * Passes a step of the air carrying the liquid under it out to its rim
+ * (airDisplace, PLAN 15g-8). Each moves dye a cell at most; four empty a
+ * bubble twenty cells across in five steps (see the stage in fluid.ts).
+ */
+export const AIR_DISPLACE_PASSES = 4;
 
 /** What `handOver` copies out: the fields, on the device they were copied on. */
 /** One step of `groupAt`'s walk: what it found here, and where each next object leads. */
