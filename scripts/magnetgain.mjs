@@ -354,10 +354,21 @@ fn magnetRadius() -> f32 { return R; }
     guard and not the physics is the drop's speed; and under a weak one
     (0.08), where the speed is Darcy's own. The centroid is read every two
     steps from the switch-on, so the drag time's rise shows beside the
-    steady speed, which is taken over the last twenty steps of sixty: the
-    ferrofluid's own drag time is ρh²/12μ_ff, 0.6 s, thirty-six steps, so
-    the first thirty are still the rise (the first form of this read ten
-    steps at thirty, a fifth under the steady speed).
+    steady speed. The window the speed is read over is set by the physics
+    at both ends: it opens three drag times after the switch-on (the
+    ferrofluid's own drag time is h²/12ν_ff, 0.07 s at the 2 mm gap, four
+    steps, so the rise is over by step twelve; it was 0.6 s, thirty-six
+    steps, in the 6 mm dish, PLAN 38r), and it closes when the drop's near
+    edge reaches the magnet's axis (its centroid within R of it). Past
+    that the pull over the drop is no longer one-signed, its mean goes to
+    nothing while the cells either side of the axis still pull inward, and
+    the drop packs itself under the magnet: the centroid goes on creeping
+    at a speed the mean pull no longer gives, which is not Darcy's law
+    failing but the derivation's premise (one pull over the drop) ending.
+    Read over the last twenty steps of sixty, as this did in the 6 mm dish
+    where the slow rise kept the drop short of the magnet, the 2 mm drop
+    had arrived (its speed 1.3 cells a step by step eight, 0.05 by step
+    sixty) and read 66% over a mean pull of nearly nothing.
 
     Whether the drop holds together under its drag is `npm run ferrodrag`'s
     measure, not this check's. The share is carried at the mixture's
@@ -367,7 +378,11 @@ fn magnetRadius() -> f32 { return R; }
     drop's mixture, share-weighted, at 0.81 of its core's speed with the
     rim's force read against the ferrofluid's own drag, 0.55 before).
   */
-  const N = 384, R = 0.022, D = 0.1, H = 0.2, STEPS = 60, EVERY = 2, LAST = 10;
+  const N = 384, R = 0.022, D = 0.1, H = 0.2, STEPS = 60, EVERY = 2;
+  // The ferrofluid's drag time in steps at the rest gap, and the window's first reading, three of them on.
+  const tauSteps = 60 * h0 * h0 / (12 * K.nuFf);
+  const FIRST = Math.ceil(3 * tauSteps / EVERY);
+  if (FIRST * EVERY >= STEPS - 4 * EVERY) throw new Error(`magnetgain: the rise (3τ = ${(3 * tauSteps).toFixed(0)} steps) leaves no window in ${STEPS} steps`);
   const measure = async (W) => {
     const run = await page.evaluate(async ({ N, R, D, W, H, STEPS, EVERY, alone }) => {
       const centroid = async () => {
@@ -408,8 +423,12 @@ fn magnetRadius() -> f32 { return R; }
       return { path, cells };
     }, { N, R, D, W, H, STEPS, EVERY, alone });
     const last = run.path[run.path.length - 1];
-    const window = run.path.slice(-LAST - 1);
-    const measured = (window[window.length - 1].x - window[0].x) / (LAST * EVERY / 60);   // plate/s toward the magnet
+    // The window: from the rise's end to the last reading with the drop's near edge short of the magnet's axis.
+    let END = run.path.length - 1;
+    while (END > FIRST && run.path[END].x > 0.5 + D - R) END--;
+    if (END - FIRST < 3) throw new Error(`magnetgain: the drop reached the magnet by step ${END * EVERY}, before the rise was over (step ${FIRST * EVERY})`);
+    const window = run.path.slice(FIRST, END + 1);
+    const measured = (window[window.length - 1].x - window[0].x) / ((END - FIRST) * EVERY / 60);   // plate/s toward the magnet
     // The prediction along the window: the shader's ∇ψ·x̂ over the drop's cells, their shape from the end, at each sampled centroid.
     const pred = [];
     for (const c of window) {
@@ -441,7 +460,7 @@ fn magnetRadius() -> f32 { return R; }
     const predicted = pred.reduce((t, p) => t + p.v, 0) / pred.length;
     const speeds = run.path.slice(1).map((c, i) => ((c.x - run.path[i].x) * N / EVERY).toFixed(2)).join(' ');
     console.log(`  Magnet ${W} at depth ${H}, ${D} of the plate from a drop r ${R} (${(R * L * 1e3).toFixed(1)} mm): the centroid's speed every ${EVERY} steps, cells a step: ${speeds}.`);
-    console.log(`    Over the last ${LAST * EVERY} steps ${fmt(measured, 4)} plate/s (${(measured * L * 100).toFixed(2)} cm/s), ${(measured * N / 60).toFixed(2)} cells a step; the pull asked ${pred.map((p) => fmt(p.asked, 3)).join(', ')} plate/s (∇ψ ${fmt(pred[0].dpsi, 0)} to ${fmt(pred[pred.length - 1].dpsi, 0)} per plate), its steepest cell ${fmt(Math.max(...pred.map((p) => p.steepest)), 3)} plate/s, Darcy's drop ${fmt(predicted, 4)} plate/s.`);
+    console.log(`    Over steps ${FIRST * EVERY} to ${END * EVERY} (the rise over at 3τ, ${(3 * tauSteps).toFixed(0)} steps; the drop's edge at the magnet's axis after) ${fmt(measured, 4)} plate/s (${(measured * L * 100).toFixed(2)} cm/s), ${(measured * N / 60).toFixed(2)} cells a step; the pull asked ${pred.map((p) => fmt(p.asked, 3)).join(', ')} plate/s (∇ψ ${fmt(pred[0].dpsi, 0)} to ${fmt(pred[pred.length - 1].dpsi, 0)} per plate), its steepest cell ${fmt(Math.max(...pred.map((p) => p.steepest)), 3)} plate/s, Darcy's drop ${fmt(predicted, 4)} plate/s.`);
     return { measured, predicted, asked: Math.max(...pred.map((p) => p.asked)), steepest: Math.max(...pred.map((p) => p.steepest)) };
   };
   const strong = await measure(0.4);

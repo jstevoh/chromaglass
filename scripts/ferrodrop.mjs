@@ -19,9 +19,11 @@
  *     that only followed the phase would be a step).
  *  2. The magnet moves the drop's volume toward itself: with the hand's
  *     magnet just off its right side (where the field falls off fastest)
- *     the right shoulder stands a tenth taller than with no field and the
- *     left lower, and the volume is the same within a tenth (the field
- *     moves the liquid, it does not add any).
+ *     the left shoulder stands lower than with no field and the right a
+ *     tenth taller, or, where the drop is already pressed to the top glass
+ *     (this drop in the 2 mm gap, PLAN 38r), held at the glass; the lean
+ *     between the two is 1.15 either way, and the volume is the same within
+ *     a tenth (the field moves the liquid, it does not add any).
  *  3. The picture: in the closeup the drop's inside is no longer one black.
  *     The spread of its light (the 98th percentile less the 5th) is wide at
  *     Relief / 3D 0.7 and nearly nothing at 0, which is the flat drawing as
@@ -171,9 +173,25 @@ try {
   // Each side against itself with no field, since the drop's middle falls between cells.
   const half = Math.round((edge - mid) / 2);
   const right = leaned[mid + half] / still[mid + half], left = leaned[mid - half] / still[mid - half];
-  check('a magnet off the drop\'s right side stands that side taller and the far side lower',
-    right > 1.1 && left < 1 && right > 1.15 * left,
-    `right shoulder ${(right * 100).toFixed(0)}% of its height with no field, left ${(left * 100).toFixed(0)}%`);
+  /*
+    Under a top glass the drop cannot stand taller on the magnet's side:
+    this drop's sessile top (1.66 l_c) is above the 2 mm gap's glass (1.49
+    l_c, PLAN 38r), so with no field it already stands at the glass, and
+    the magnet's lean, which the solve clamps to the glass (gpu/ferroDrop.ts
+    A.more.y), can only take the far side down. That is the physics of a
+    sandwich: the volume the magnet draws toward itself comes off the far
+    side, and the near side stays pressed to the glass. So here the near
+    shoulder holds its height (within 2%) while the far one falls, and the
+    lean between them is the same 1.15 as before. On a gap the sessile top
+    clears (the 6 mm dish this was written on: 138% and 78%) the near
+    shoulder rises a tenth, as it did.
+  */
+  const pinned = sessile > glass;
+  check(pinned
+    ? 'a magnet off the drop\'s right side, the drop pressed to the top glass, holds that side at the glass and takes the far side lower'
+    : 'a magnet off the drop\'s right side stands that side taller and the far side lower',
+    (pinned ? right > 0.98 : right > 1.1) && left < 1 && right > 1.15 * left,
+    `right shoulder ${(right * 100).toFixed(0)}% of its height with no field, left ${(left * 100).toFixed(0)}%${pinned ? ` (the sessile top ${sessile.toFixed(2)} l_c is above the glass's ${glass.toFixed(2)})` : ''}`);
   check('and moves the volume rather than adding to it',
     Math.abs(result.volLeaned / result.volStill - 1) < 0.1, `${(result.volLeaned / result.volStill * 100).toFixed(1)}% of the volume with no field`);
   // 3. The picture.
