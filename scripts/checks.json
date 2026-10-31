@@ -720,6 +720,22 @@
       "run": "npm run map"
     },
     {
+      "name": "The feedback Worker",
+      "shard": "logic",
+      "run": "npm run feedback-worker",
+      "why": [
+        "Settings → Feedback's Worker (PLAN 39a), against a real SQLite",
+        "database built from server/feedback-schema.sql, the file D1 is made",
+        "from: a note is stored with the account only a verified token proves,",
+        "its log and its picture, and mailed to support@ with Reply-To the",
+        "sender; a forged token or a claimed uid is nobody; bad bodies are",
+        "refused without quoting them; one address is held to its hourly",
+        "limit; a failed or missing mail provider costs the mail and never",
+        "the entry; reading needs the token; and the page's scrub takes",
+        "tokens, licence and stream keys out of the log and leaves Keystone."
+      ]
+    },
+    {
       "name": "The report Worker",
       "shard": "logic",
       "run": "npm run report-worker",

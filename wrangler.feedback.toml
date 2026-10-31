@@ -1,0 +1,33 @@
+# Cloudflare Worker config for Settings → Feedback (PLAN 39a,
+# server/feedback-worker.js). Its own Worker and its own database, so a burst
+# of notes never touches the licences, and either redeploys without the other.
+#
+# Once:
+#   npx wrangler d1 create chromaglass-feedback        # paste its id below
+#   npx wrangler d1 execute chromaglass-feedback --remote --file server/feedback-schema.sql
+#   npx wrangler secret put FEEDBACK_TOKEN -c wrangler.feedback.toml   # for reading entries
+#   npx wrangler secret put RESEND_API_KEY -c wrangler.feedback.toml   # for the mail
+#   npx wrangler secret put IP_SALT -c wrangler.feedback.toml          # any random string
+# The mail's sender is chromaglass.art verified at Resend: its records are a
+# DKIM name and an MX and SPF on send.chromaglass.art, added at the DNS host
+# beside the forwarder's root MX, which they do not touch.
+# Deploy:
+#   npm run deploy:feedback
+# Then set the repository secret VITE_FEEDBACK_URL to https://<this Worker>/feedback.
+#
+# Reading it:
+#   npx wrangler d1 execute chromaglass-feedback --remote --command \
+#     "SELECT at, topic, email, look, substr(message, 1, 80) FROM feedback ORDER BY at DESC LIMIT 20"
+name = "chromaglass-feedback"
+main = "server/feedback-worker.js"
+compatibility_date = "2026-07-01"
+
+[vars]
+FEEDBACK_TO = "support@chromaglass.art"
+FEEDBACK_FROM = "ChromaGlass feedback <feedback@chromaglass.art>"
+FIREBASE_PROJECT_ID = "chromaglass"
+
+[[d1_databases]]
+binding = "FEEDBACK_DB"
+database_name = "chromaglass-feedback"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"

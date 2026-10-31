@@ -410,6 +410,44 @@ try {
       check(`${label}: and a tap above it closes it, back to the dock`, !(await visible(page, `phone-sheet-${s}`)) && (await visible(page, 'phone-dock')));
     }
 
+    /*
+      Feedback (PLAN 39a), from More: the same pane the Settings sheet draws,
+      in a sheet of its own. It fits, nothing in it is covered, the box takes
+      16 px type (under that iOS zooms the page on focus and the sheet slides
+      off), and Send waits for words: a pane whose button sent an empty note
+      would fill the owner's inbox with nothing. Not pressed here: a build
+      with no feedback Worker (the checks' build) sends by mail, which would
+      leave the page; the Worker's half is `npm run feedback-worker`.
+    */
+    await tap(page, 'phone-open-more');
+    await tap(page, 'phone-feedback');
+    const fbOpen = await visible(page, 'phone-sheet-feedback');
+    const fb = fbOpen ? await page.evaluate(() => {
+      const sheet = document.querySelector('[data-testid="phone-sheet-feedback"]');
+      const panel = sheet?.lastElementChild?.getBoundingClientRect();
+      const box = sheet?.querySelector('[data-testid="feedback-message"]');
+      const send = sheet?.querySelector('[data-testid="feedback-send"]');
+      return {
+        top: panel?.top ?? -1, bottom: panel?.bottom ?? 1e9, height: panel?.height ?? 1e9,
+        font: box ? parseFloat(getComputedStyle(box).fontSize) : 0,
+        topics: sheet?.querySelectorAll('[data-testid^="feedback-topic-"]').length ?? 0,
+        disabled: send ? send.disabled : null,
+      };
+    }) : null;
+    const fbCovered = fbOpen ? await coveredControls(page, { skipInside: '[data-testid="needs-webgpu"], [data-testid="phone-stage"] > :not([data-testid^="phone-sheet"])' }) : [];
+    let fbArmed = null;
+    if (fbOpen) {
+      await page.getByTestId('feedback-message').first().fill('The plate went dark after a pour');
+      fbArmed = await page.getByTestId('feedback-send').first().isEnabled();
+      await shot(page, `${label.replace(/ /g, '-')}-sheet-feedback`);
+      await page.getByTestId('phone-sheet-scrim').tap({ position: { x: 20, y: 20 } });
+      await page.waitForTimeout(250);
+    }
+    check(`${label}: Feedback opens from More on screen, its box in 16 px type, four topics, and Send waits for words`,
+      fb && fb.top >= 0 && fb.bottom <= h + 0.5 && fb.height <= 0.9 * h && fb.font >= 16 && fb.topics === 4
+        && fb.disabled === true && fbArmed === true && fbCovered.length === 0,
+      fb ? `${Math.round(fb.height)} of ${h} px, ${fb.font} px type, ${fb.topics} topics, Send ${fb.disabled ? 'off' : 'ON'} empty and ${fbArmed ? 'on' : 'OFF'} with words${fbCovered.length ? `; covered ${fbCovered.slice(0, 3).join('; ')}` : ''}` : 'no Feedback sheet');
+
     if (label === 'portrait') {
       /*
         The mixer (lib/mixer.ts), from the dock: the same stack the desk and
@@ -939,6 +977,20 @@ try {
       check('every tab of the phone\'s Settings rail takes a tap where it is drawn',
         railCovered.tabs > 20 && railCovered.covered.length === 0,
         `${railCovered.tabs} tabs; ${railCovered.covered.length ? `covered: ${railCovered.covered.join(', ')}` : 'none covered'}`);
+      // And Feedback, the row under the seven groups, which is not a `settings-nav-` tab: at the strip's end, it takes a tap and opens the pane.
+      const fbRow = page.getByTestId('settings-feedback-nav').first();
+      await fbRow.scrollIntoViewIfNeeded().catch(() => {});
+      const fbRowHit = await page.evaluate(() => {
+        const t = document.querySelector('[data-testid="settings-feedback-nav"]');
+        if (!t) return false;
+        const r = t.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return !!hit && t.contains(hit);
+      });
+      if (fbRowHit) await fbRow.tap();
+      await page.waitForTimeout(250);
+      const fbPane = await visible(page, 'settings-feedback');
+      check('the Settings strip ends in Feedback, which takes a tap and opens the pane', fbRowHit && fbPane, `row ${fbRowHit ? 'takes a tap' : 'covered or missing'}, pane ${fbPane ? 'open' : 'not open'}`);
       /*
         And the strip names its groups (PLAN 35b). The seven headings were
         drawn on the desk and hidden on a phone (`hidden ... sm:block`), so the
