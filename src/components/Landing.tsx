@@ -107,6 +107,7 @@ const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: s
       'Everything in Home',
       'OSC and Art-Net / DMX in the Mac app',
       'The finest 1024² grid, and cloud sync of your looks',
+      'Make your own liquids',
     ],
   },
 ];

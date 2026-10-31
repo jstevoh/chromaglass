@@ -377,7 +377,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
 | 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 5 |
 | 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 22 |
-|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.17-cikeys | 13 |
+|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.19 | 16 |
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
 | 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 11 |
 | 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 10 |
