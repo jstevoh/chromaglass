@@ -377,10 +377,10 @@ try {
 
     400ms was enough while the exclusion was a neighbour exchange, because
     that only ever moved dye one cell and clearing the bubbles let it step
-    straight back. The exclusion is a multiply now -- the only operator that
-    reaches the middle of a bubble -- and the dye it displaces is put back as
-    a ring outside the rim, so closing a hole means advecting that ring
-    inward on a plate deliberately slowed to a crawl for the photographs.
+    straight back. The air now carries the dye under it out to a ring at the
+    rim, face by face (airDisplace, PLAN 15g-8; before that a multiply and a
+    ring laid from the mirror), so closing a hole means bringing that ring
+    back inward on a plate deliberately slowed to a crawl for the photographs.
 
     A fixed wait was tried and is the wrong instrument: eight seconds is
     plenty at a preset's own speed of 0.009 and nowhere near enough at the

@@ -118,17 +118,19 @@ Left, each its own plan item:
   in `docs/plan-shipped.md` §15g-7; `npm run tools` now counts the glass the hand presses in a
   Blow stroke and asks for none; the touch path shares the fix, and a bubble's squeeze on its
   footprint is counted as the bubble's, not the hand's.
-- **15g-8 The stroke's straw on GitHub's runners.** On those runners the stroke's "keeps it
-  rather than erasing it" line (the pool's loss held to a tenth plus five) swings from a gain
-  to a loss of 11% across eight pull requests of one morning (2026-10-30; pools of 235 to 367,
-  8 to 28 straw steps), and #550's shard read a loss of 20% on the stroke back twice running,
-  22 straw steps each time, while the owner's Mac at twice the steps keeps or gains (608 → 597,
-  610 → 670). The check's moves are 0.68 of a cell at the plate's scale and the hand's cell is
-  floored, so a move lands on a new cell two times in three; a frame or two with none, on a
-  runner whose frames are 50 to 80 ms, is a hand held still (BLOW_STRAW_FRAMES) and the straw's
-  bubble takes the dye under it. Whether the loss follows the straw count or the step count is
-  to be read before the bar is trusted on those runners; a stroke paced by the plate's own steps
-  (so many cells a step, not a move every 100 ms of wall clock) is the likely shape of the fix.
+- ~~**15g-8 The stroke's straw on GitHub's runners.**~~ **Shipped** (this PR): the straw's
+  bubbles took the dye under them by a multiply on the GPU and the CPU put it back from a
+  readback mirror frames behind, so "keeps it" swung ±15–20% wherever the straw blew. The air now
+  carries the liquid under it out to the rim on the GPU in flux form (airDisplace), conserving
+  at any frame rate, and the check's Blow stroke is paced by the plate so no runner blows the
+  straw mid-stroke. Story in `docs/plan-shipped.md` §15g-8.
+  - **15g-8b A whole-placed bubble piles its liquid in a ring a cell or two wide.** The push
+    stops at the first cell with no air, so a bubble that appears whole (a kick's, a look's
+    seeded ones) leaves its displaced dye in a narrow, bright ring, where a real thin layer is
+    incompressible and shifts the liquid round it outward instead (no ring on an even plate). A
+    growing bubble is the flow's: the air arriving is a source in the projection. The real fix
+    is the dye's carry in flux form where the air arrives, so the source's flow moves the dye
+    without the semi-Lagrangian copy it leaves behind (the reason the push exists at all).
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event

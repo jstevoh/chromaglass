@@ -35,7 +35,7 @@ import { stirOf } from '../lib/stir';
 import { frameSway, plateSin } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { pourPictureCpu } from '../lib/videoFlow';
-import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
+import { fillHole, type DyeTarget } from '../lib/bubbleDye';
 import { DeltaRows, packRows, restRows } from '../lib/deltaRows';
 import { LiquidPhase } from '../lib/liquidPhase';
 import { pourShare, speciesOf } from '../lib/liquidProps';
@@ -270,8 +270,8 @@ export class FluidSimulation {
    *     the solver has stepped, so the render's first steps read the live
    *     plate's angle (gravity's direction) and spin (the swirl) rather than
    *     the ones the look was just laid with;
-   *   - the bubbles' bookkeeping (`prevPacked`, `coverPacked`, the holes
-   *     still filling, the mirror's sequence the rim deposit keys on): the
+   *   - the bubbles' bookkeeping (`prevPacked`, the holes still filling,
+   *     the mirror's sequence the hole fill keys on): the
    *     bubbles are cleared with the look, and a list of last frame's bubbles
    *     that is not cleared with them reads as every one of them popping at
    *     once, whose holes are then filled from the render's own plate at the
@@ -305,7 +305,6 @@ export class FluidSimulation {
     this.rbSeq = 0;
     this.rimSeq = -1;
     this.prevCount = 0;
-    this.coverCount = 0;
     this.fillingHoles = [];
   }
   /**
@@ -329,11 +328,11 @@ export class FluidSimulation {
   /** Whether the last blowWind blew as air on the film (PLAN 15g) rather than by the carries: `npm run tools` counts it. */
   lastBlowAired = false;
   /*
-    How many readbacks have landed. The rim deposit needs it: the mirror
-    refreshes only when `readbackAsync` has something, and depositing from a
-    mirror that has not moved puts the same displaced dye back twice — which
-    measured as a plate 4-8% *over* its control and a popped bubble
-    refilling to 124% of what had been there.
+    How many readbacks have landed. The hole fill needs it: the mirror
+    refreshes only when `readbackAsync` has something, and filling from a
+    mirror that has not moved moves the same dye twice. When the rim was
+    still laid from it, that measured as a plate 4-8% *over* its control
+    and a popped bubble refilling to 124% of what had been there.
   */
   private rbSeq = 0;
   /**
@@ -415,13 +414,6 @@ export class FluidSimulation {
   /** Last frame's bubbles, for spotting the ones that have popped. */
   private prevPacked = new Float32Array(0);
   private prevCount = 0;
-  /**
-   * The bubbles as they stood at the last rim deposit, live ones only: a
-   * cell a bubble already covered then has had its dye moved to the rim
-   * once, and is not counted again.
-   */
-  private coverPacked = new Float32Array(0);
-  private coverCount = 0;
   /** Holes still closing: carried so the fill converges instead of running once. */
   private fillingHoles: { at: Float32Array; left: number }[] = [];
   private rbDensity: Float32Array;  // downsampled readback
@@ -896,32 +888,22 @@ export class FluidSimulation {
   }
 
   /**
-   * The dye a bubble displaces, put back as a ring around it (H6 · A).
+   * A popped bubble's hole, filled back in from the ring its liquid was
+   * pushed into (H6 · A). Once per readback mirror.
    *
-   * The exclusion on the GPU is a multiply, because it is the only operator
-   * that reaches the middle of a bubble — every gradient-driven one is zero
-   * where the air is uniform, which is measured in `bubbles-plan.md`. A
-   * multiply destroys what it removes, and that was measured too: the plate
-   * drained to 83% of its dye in twenty seconds with one bubble on it, and a
-   * popped bubble refilled to 20% of what had been there and stopped. A
-   * permanent scar is worse than the shading H6 exists to replace.
-   *
-   * So the mass goes back, as a ring just outside the rim, which is where a
-   * bubble in a thin layer really does push it. Two things make this cheap
-   * rather than the three blur passes it first looked like:
-   *
-   * The mirror is a frame behind, and that is exactly right. On the frame a
-   * bubble arrives the mirror still holds the dye the GPU is removing this
-   * frame, so the disc total *is* the mass to redeposit. A frame later the
-   * mirror shows the emptied disc and there is nothing to move, which is
-   * also right — the bubble has already taken what was under it.
-   *
-   * And both halves read the same mirror, so it conserves by construction
-   * rather than by a servo. A servo was tried: the plate's dye-budget loop
-   * made symmetric, which never engaged, because the deficit term is
-   * quadratic and a 10% shortfall contributes 0.0001.
+   * This used to lay that ring as well: the GPU multiplied away the dye
+   * under each bubble and this put the same mass back round the rim from the
+   * mirror. It conserved only when the mirror, the bubble list and the GPU
+   * agreed on which cells had been covered since the last deposit, and on a
+   * slow runner they did not: the Blow's straw blows a new bubble every hold
+   * on dye drifting in the breath, the mirror is frames behind, and the
+   * stroke's pool swung from +16% to -20% on a check that asks it to keep
+   * (PLAN 15g-8). The GPU now carries the liquid under the air out to the
+   * rim itself, conservatively, every step (airDisplace, wgsl/fluid/gap.ts),
+   * and there is nothing left here to put back. What stays is the hole: once
+   * the air is gone nothing points inward, and the fill below closes it.
    */
-  depositBubbleRims(packed: Float32Array, count: number): void {
+  fillBubbleHoles(packed: Float32Array, count: number): void {
     if (!this.gpu) return;
     // Once per mirror, not once per frame: see `rbSeq`.
     if (this.rbSeq === this.rimSeq) return;
@@ -931,80 +913,7 @@ export class FluidSimulation {
     if (count <= 0 && this.prevCount <= 0) return;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
-    for (let k = 0; k < count; k++) {
-      // The packed block, because it carries the fade as its opacity and the
-      // Bubble record does not — a bubble part-way in has taken part of the
-      // dye, and the ring has to match or the plate gains colour.
-      const o = k * 4;
-      const b = { x: packed[o] * N, y: packed[o + 1] * N, r: packed[o + 2] * N, opacity: packed[o + 3] };
-      // The bubble list is in logical cells already, which is the grid the
-      // mirror and the deltas are both on, so nothing is mapped.
-      const R = b.r;
-      if (!(R > 0.7) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
-      const clear = Math.max(0, Math.min(1, b.opacity));
-      if (clear < 0.02) continue;
-      /*
-        Only cells it did not already cover at the last deposit.
-
-        The mirror is a few frames behind the GPU, which has already taken the
-        dye out from under the bubble as it stood then. A bubble sitting still
-        or drifting shows that as nothing under it; a bubble growing fast (the
-        straw's) covers, deposit after deposit, cells the mirror still shows
-        full, and the same dye went to the rim once per deposit: the Blow's
-        bubble turned 36 of dye into 358 in the tools check. Each cell's dye
-        now goes to the rim once, the first time the bubble covers it.
-
-        And what a bubble covers by growing goes to the rim not at all: its
-        own flow has already taken it there. The air arriving is a source in
-        the projection (the divergence pass, wgsl/fluid.ts), so a growing
-        bubble pushes the liquid and its dye out ahead of its edge, and the
-        multiply finds next to nothing left to remove. Measured in the lab
-        with the straw's own growth (bubbles.ts, blow: to 0.047 of the plate
-        in 1.5 s, fingers and all) on a pool of 834 and no deposit at all,
-        the plate kept its dye: 834 -> 827. The same growth with this deposit
-        emulated as the app runs it made 50 to 74 more (+7 to +10%), all of
-        it laid round the bubble, and more the staler the mirror: the Blow's
-        "pushes it out to the rim rather than making more" read 494 -> 920
-        on CI's Mac. A bubble that appears where it was not, or moves onto
-        dye, is not the same: the multiply takes what is under it before
-        any flow has moved it (the lab: -12.6% for a bubble put down whole,
-        -10.4% for one drifting across a pool, with no deposit), and that is
-        what the ring is for. So a bubble that was here at the last deposit
-        counts only the cells it has moved onto at the size it was then; the
-        ring it has grown into is the flow's.
-      */
-      let was: { x: number; y: number; r: number } | null = null;
-      for (let j = 0; j < this.coverCount; j++) {
-        const q = j * 4;
-        const px = this.coverPacked[q] * N, py = this.coverPacked[q + 1] * N, pr = this.coverPacked[q + 2] * N;
-        if (Math.hypot(px - b.x, py - b.y) < Math.max(2, R * 0.5) && (!was || pr > was.r)) was = { x: px, y: py, r: pr };
-      }
-      const reach = was ? Math.min(R, was.r) : R;
-      let mass = 0, aR = 0, aG = 0, aB = 0;
-      const lo = Math.max(0, Math.floor(b.y - R)), hi = Math.min(N - 1, Math.ceil(b.y + R));
-      const xl = Math.max(0, Math.floor(b.x - R)), xh = Math.min(N - 1, Math.ceil(b.x + R));
-      for (let y = lo; y <= hi; y++) {
-        for (let x = xl; x <= xh; x++) {
-          const dx = x - b.x, dy = y - b.y;
-          if (dx * dx + dy * dy > reach * reach) continue;
-          if (was && (x - was.x) * (x - was.x) + (y - was.y) * (y - was.y) <= was.r * was.r) continue;
-          const i4 = (x + y * N) * 4;
-          const d = dye[i4 + 3];
-          if (!(d > 1e-5)) continue;
-          mass += d * clear;
-          aR += dye[i4] * clear; aG += dye[i4 + 1] * clear; aB += dye[i4 + 2] * clear;
-        }
-      }
-      if (!(mass > 1e-4)) continue;
-      // Into the ring just outside the rim (bubbleDye.ts), in the mirror's
-      // own log-space rather than through `addDensity`, which takes a colour
-      // and takes its log: going out to a colour and back would lose the mix.
-      if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.rows.rim(b.y, R);
-    }
     this.fillPoppedHoles(packed, count, dye, N);
-    if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
-    this.coverPacked.set(packed.subarray(0, count * 4));
-    this.coverCount = count;
     /*
       Next frame's list to diff against: this frame's bubbles, *plus* the
       ones still filling.
@@ -3252,9 +3161,9 @@ export class FluidSimulation {
       removes, and making this loop symmetric was the first attempt at
       keeping the plate's colour. It never engaged: the deficit term is
       quadratic, so a plate 10% under its budget contributed 0.0001. The dye
-      goes back where it physically went instead — a ring at the bubble's
-      rim, in `depositBubbleRims` — which conserves by construction because
-      both halves read the same mirror.
+      now goes where it physically went instead: the GPU carries the liquid
+      under the air out to the rim, face by face, so none is lost to begin
+      with (airDisplace, PLAN 15g-8).
     */
     /*
       Per second of the plate's own time, not per step.

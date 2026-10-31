@@ -258,6 +258,14 @@ export class FluidFields extends FluidCore {
   setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.setBubbles(packed, count, soft, finger);
+    // How far the air's push has to carry the liquid: the widest bubble's
+    // reach, fingers and all, in cells (airDisplace's passes follow it).
+    let reach = 0;
+    for (let i = 0; i < count; i++) {
+      const f = finger ? Math.max(0, Math.min(1, finger[i * 4])) : 0;
+      reach = Math.max(reach, packed[i * 4 + 2] * this.N * (1 + 0.9 * f));
+    }
+    this.airReach = Number.isFinite(reach) ? reach : 0;
   }
 
   /**
