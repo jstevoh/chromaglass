@@ -230,7 +230,7 @@ check('and it is the dial: at full Frame Sway the same song slides the default l
 const water = { ...base, plateRock: 1, gapThickness: 0 };
 const fullRock = song({ ...water, frameSway: 1 }), halfRock = song({ ...water, frameSway: 0.5 });
 check('half way slides it less than full and more than none (at full Plate Rock on water, where the glass reaches the rim)',
-  halfRock.slidePeak > 0 && halfRock.slidePeak < fullRock.slidePeak && half.beat === 0.5,
+  halfRock.slidePeak > 0 && halfRock.slidePeak < 0.85 * fullRock.slidePeak && half.beat === 0.5,
   `${pc(halfRock.slidePeak)} against ${pc(fullRock.slidePeak)}; at the default rock ${pc(half.slidePeak)} against ${pc(full.slidePeak)}`);
 check('and the plate\'s own tilt still swings with the kicks at Frame Sway 0 (Plate Rock moves the heavier colour, the liquid\'s motion)',
   off.tiltPeak > 0.05 && Math.abs(off.tiltPeak - full.tiltPeak) < 1e-12, `sinθ up to ${off.tiltPeak.toFixed(3)}, the same as at full`);

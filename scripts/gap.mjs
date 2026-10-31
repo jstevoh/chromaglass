@@ -32,7 +32,15 @@
  *      the kick's other effects take from it;
  *   8. a finger's Brinkman edge, two of h₀/√12;
  *   9. the ferrofluid's room under the top glass, and the closeup drop's,
- *      in capillary lengths: h₀ over l_c.
+ *      in capillary lengths: h₀ over l_c;
+ *  10. the numbers the shaders are compiled with: the thin solve's clear
+ *      viscosity read back (G²/12ν_water, G = h₀/0.03), the spun dish's
+ *      swirl (h in metres) and the closeup drop's view (h in plate widths);
+ *  11. and no source anywhere under src/ makes the gap a length by the
+ *      plate's width (a gap times PLATE_METRES or DISH_METRES), which is how
+ *      every one of the old 6 mm readers was written: a reader the lines
+ *      above do not reach (the breath, the slump's gap, the glass's drift)
+ *      cannot go back to it unseen.
  *
  * The drag the solver applies on the GPU is `npm run thingap` (a push fades
  * at 12ν/h² with h the same constant), and the turntable's lag `npm run
@@ -42,6 +50,8 @@
  * scattering depth (38i).
  */
 import { build } from 'esbuild';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 
 let bad = 0;
 const check = (name, ok, detail = '') => {
@@ -64,6 +74,9 @@ await build({
       "export { handEdge } from './src/lib/handSolid.ts';",
       "export { FILM_TOP, FILM_H0 } from './src/gpu/wgsl/standing.ts';",
       "export { SPIKE_PITCH } from './src/gpu/wgsl/spikes.ts';",
+      "export { thinGapKernels } from './src/gpu/wgsl/thinGap.ts';",
+      "export { FORCE_KERNELS } from './src/gpu/wgsl/fluid/forces.ts';",
+      "export { FERRO_DROP_WGSL, GAP_LC } from './src/gpu/wgsl/ferroDrop.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
   },
@@ -89,9 +102,10 @@ check('the rest gap is 2 mm, and the field\'s rest number times its metres is th
   const clamps = [...src.matchAll(/, (0\.00[0-9]+), (0\.0[0-9]+)\)/g)].map((m) => [Number(m[1]), Number(m[2])]);
   const floors = [...src.matchAll(/max\(([0-9.]+), /g)].map((m) => Number(m[1]));
   check('the gap kernels lay the rest number, floor and ceiling the lib holds, and no other',
-    src.length > 0 && rests.length >= 4 && rests.every((v) => v === L.DISH_REST_GAP)
-      && clamps.length >= 4 && clamps.every(([a, b]) => a === L.DISH_GAP_RANGE[0] && b === L.DISH_GAP_RANGE[1])
-      && floors.length >= 3 && floors.every((v) => v === L.DISH_GAP_RANGE[0]),
+    // Exactly as many as the three kernels write (4 rests, 5 clamps, 3 floors), so one written another way is missed by count.
+    rests.length === 4 && rests.every((v) => v === L.DISH_REST_GAP)
+      && clamps.length === 5 && clamps.every(([a, b]) => a === L.DISH_GAP_RANGE[0] && b === L.DISH_GAP_RANGE[1])
+      && floors.length === 3 && floors.every((v) => v === L.DISH_GAP_RANGE[0]),
     `rests ${[...new Set(rests)].join(', ')} (${rests.length}); clamps ${[...new Set(clamps.map((c) => c.join('–')))].join(', ')} (${clamps.length}); floors ${[...new Set(floors)].join(', ')}`);
 }
 
@@ -151,8 +165,36 @@ check('the rest gap is 2 mm, and the field\'s rest number times its metres is th
 {
   const lc = L.SPIKE_PITCH / (2 * Math.PI) * W;
   const roomLc = L.FILM_TOP * L.FILM_H0 + 0.03;
-  check('the ferrofluid\'s room under the top glass is h₀ over its capillary length', near(roomLc, H0 / lc, 1e-9),
-    `${roomLc.toFixed(3)} l_c (h₀/l_c ${(H0 / lc).toFixed(3)}, l_c ${(lc * 1000).toFixed(2)} mm), ${L.FILM_TOP.toFixed(2)} full cells`);
+  check('the ferrofluid\'s room under the top glass, and the closeup drop\'s, are h₀ over its capillary length', near(roomLc, H0 / lc, 1e-9) && near(L.GAP_LC, H0 / lc, 1e-9),
+    `${roomLc.toFixed(3)} l_c under the layer, ${L.GAP_LC.toFixed(3)} over the drop (h₀/l_c ${(H0 / lc).toFixed(3)}, l_c ${(lc * 1000).toFixed(2)} mm), ${L.FILM_TOP.toFixed(2)} full cells`);
+}
+
+// 10: the shaders' compiled numbers, each worked here from the millimetres.
+{
+  const G = H0 / 0.03, Guv = H0 / W / 0.03;
+  const prep = L.thinGapKernels('', '', '').hsPrep ?? '';
+  const swirl = L.FORCE_KERNELS.spinSwirl ?? '';
+  const lnClear = (G * G / 12 / 1e-6).toFixed(4);
+  // Each number as the shader was compiled with it, read back out of its code.
+  const num = (code, re) => { const m = re.exec(code); return m ? Number(m[1]) : NaN; };
+  const gotClear = num(prep, /let lnClear = log\(max\(A\.a\.x \* ([0-9.e-]+),/);
+  const gotSwirl = num(swirl, /\) \* ([0-9.e-]+);/);
+  const gotDrop = num(L.FERRO_DROP_WGSL, /let gapLc = gapUnits \* ([0-9.e-]+) \/ LC_UV;/);
+  check('the shaders are compiled with the 2 mm: the thin solve\'s viscosity read back, the spun dish\'s swirl, the closeup drop\'s view',
+    near(gotClear, Number(lnClear), 1e-6) && near(gotSwirl, G, 1e-9) && near(gotDrop, Guv, 1e-9),
+    `G²/12ν_water ${gotClear} in hsPrep (SI ${lnClear}); ${gotSwirl} m a unit in spinSwirl (SI ${G.toFixed(5)}); ${gotDrop} of the plate a unit in the drop's view (SI ${Guv.toFixed(4)})`);
+}
+
+// 11: no source makes the gap a length by the plate's width.
+{
+  const files = [];
+  const walk = (d) => { for (const f of readdirSync(d)) { const p = join(d, f); if (statSync(p).isDirectory()) walk(p); else if (/\.tsx?$/.test(f)) files.push(p); } };
+  walk('src');
+  const bad = /(REST_GAP|DISH_REST_GAP|\bgap\b|sq\.r|\.gap|\bh0\b|\bhw\b|\))\s*\*\s*(\$\{)?(PLATE_METRES|DISH_METRES)\b|(PLATE_METRES|DISH_METRES)\s*\*\s*(REST_GAP|DISH_REST_GAP|\bgap\b)/;
+  const hits = [];
+  for (const f of files) readFileSync(f, 'utf8').split('\n').forEach((line, i) => { if (bad.test(line)) hits.push(`${f}:${i + 1}`); });
+  check('no source makes the gap a length by the plate\'s width', files.length > 100 && hits.length === 0,
+    hits.length ? hits.join(', ') : `${files.length} files read, none`);
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall ok');

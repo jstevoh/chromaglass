@@ -352,12 +352,12 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
 
 // 13
 {
-  const sway = (tau) => {
+  const sway = (tau, period = 8) => {
     // The dish swung every eight seconds; amplitudes read over the last of
     // 60 s, once the start has died away. The dish's speed itself, not the
     // motor's: the flywheel's dry friction bends a sine near its zeros, and
     // what is measured here is the liquid's filter, not the flywheel's.
-    const w = 2 * Math.PI / 8, fps = 60;
+    const w = 2 * Math.PI / period, fps = 60;
     let liq = 0, aDish = 0, aLiq = 0;
     for (let k = 0; k < fps * 60; k++) {
       const t = k / fps;
@@ -368,6 +368,15 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
     return { ratio: aLiq / aDish, want: 1 / Math.sqrt(1 + (w * tau) ** 2) };
   };
   const water = sway(tw), thick = sway(tt);
+  /*
+    At the 2 mm gap water's τ is a third of a second, so an eight-second swing
+    comes through at 0.97 and a sway with no filter at all (1.0) is only 3.4%
+    off it: the line below would barely tell them apart. A swing every two
+    seconds (a bar at 120 bpm), ωτ ≈ 1, is where the filter shows: 0.69.
+  */
+  const quick = sway(tw, 2);
+  check('and a sway every two seconds through water is cut to 1/√(1 + (ωτ)²), well short of the dish\'s', near(quick.ratio, quick.want, 0.03) && quick.ratio < 0.8,
+    `${quick.ratio.toFixed(3)} of the dish's sway, want ${quick.want.toFixed(3)}`);
   check('a look\'s music sway through water is filtered by its drag time', near(water.ratio, water.want, 0.03),
     `${water.ratio.toFixed(3)} of the dish's sway, 1/√(1 + (ωτ)²) = ${water.want.toFixed(3)}`);
   check('and through the thick liquid hardly at all', near(thick.ratio, thick.want, 0.03) && thick.ratio > 0.98,

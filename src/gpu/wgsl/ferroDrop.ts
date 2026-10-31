@@ -70,7 +70,7 @@
  */
 import { SPIKES_WGSL, SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
-import { DISH_GAP_FIELD_UV } from '../../lib/turntable';
+import { DISH_GAP_FIELD_UV, DISH_GAP_METRES, DISH_METRES } from '../../lib/turntable';
 
 const W = '@compute @workgroup_size(8, 8)';
 
@@ -191,6 +191,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, q, vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), z, 2.0));
 }`;
 
+/* The plate's gap at rest (lib/turntable.ts DISH_GAP_METRES, 2 mm: PLAN 38r), in l_c: the most a drop can stand before the top glass (gpu/ferroDrop.ts). */
+export const GAP_LC = DISH_GAP_METRES / DISH_METRES / (SPIKE_PITCH / (2 * Math.PI));
 export const DROP_KERNELS = { dropSource: SOURCE, dropMean: MEAN, dropRelax: RELAX, packVelDrop: PACK } as const;
 
 /*

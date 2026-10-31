@@ -258,7 +258,7 @@ written first. Line numbers are as read on main at d07ac31.
 - ~~**38r. The rest gap**~~ — **Shipped, this PR** (2 mm at rest in the middle, one
   number, `DISH_GAP_METRES` in `src/lib/turntable.ts`; the gap field stays 0.03 at rest in
   gap units, and every reader of it as a length goes through `DISH_GAP_FIELD_METRES`;
-  `npm run gap` holds nine readers to their SI physics at 2 mm; story in
+  `npm run gap` holds every reader to its SI physics at 2 mm; story in
   `docs/plan-shipped.md` §38r). What it left:
 
   - **38r-1. Does a sandwich slosh?** (S to decide, M to build; Medium on Plate Rock's
@@ -280,6 +280,13 @@ written first. Line numbers are as read on main at d07ac31.
     (`npm run turntable` line 13); every push fades nine times sooner. If a look wants the
     old long glide, the honest dial is the gap itself (physical, 0.27–4 mm in the
     squeeze's range and past it if the owner wants), not a stand-in for inertia.
+  - **38r-4. Frame Sway does nothing on the default oil** (S; Low-Medium). On the 2 mm
+    film the cover glass's shear drag is three times what it was, and on the default light
+    oil even full Plate Rock leaves the glass inside half its room, so Frame Sway 0.5 and 1
+    slide the picture the same (0.489% against 0.487% a frame, `npm run framesway`, which now
+    reads its half-way line on water). Either the room is set by what the glass really
+    travels, or the dial's top asks for a looser cover; physical either way, the owner's
+    call.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

@@ -10159,7 +10159,7 @@ model cannot reach one, the PR says what it reached and asks.
     (38r-1, a free surface the sandwich does not have), a drop's pancake radius and the
     beads' merge time (38r-2, with 14ab-6), and the milk's scattering depth (38i).
 
-    Checks: `npm run gap` (new, logic shard): nine readers against their SI physics at 2 mm,
+    Checks: `npm run gap` (new, logic shard): eleven lines, every reader of the gap as a length against its SI physics at 2 mm, the shaders' compiled numbers and a grep of the source for a gap made a length by the plate's width,
     red on the old tree (no `DISH_GAP_METRES`), green after. `npm run turntable`'s drag
     times are worked from 2 mm (water 0.333 s, thick 0.0167 s, oil 0.0067 s; were 3, 0.15,
     0.06) and its windows put on the drag time (63% in one, the flick read after a frame and
