@@ -414,8 +414,16 @@ export const valueAt = (t: number, min: number, max: number, curve = 1): number 
  * values readable and the travel smooth to the bottom.
  */
 export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
-  const v = valueAt(t, min, max, curve);
-  return v === 0 ? 0 : Number(v.toPrecision(3));
+  /*
+    The three figures are the distance above the bottom, not the value. Every
+    curved control started at 0 until Macro Zoom took a curve (PLAN 27h-1),
+    whose bottom is 1: there 1.8% of the travel is 1.005, three figures made
+    it 1.00, and the knob jumped back to the stop (`npm run rungs`, worst 1.8%
+    off). Measured from its own bottom a control keeps its fine end whatever
+    number that end is, and a bottom of 0 rounds exactly as before.
+  */
+  const above = valueAt(t, min, max, curve) - min;
+  return above === 0 ? min : min + Number(above.toPrecision(3));
 };
 
 /** The inverse: where a value sits on the control, 0..1. */

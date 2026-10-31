@@ -48,11 +48,7 @@ import { launchChromium } from './chromium.mjs';
 import { coveredControls, legibility } from './layoutProbe.mjs';
 import { wantsPhoneLayout, tiltReading, phoneScreen } from '../src/lib/phone.ts';
 import { playHand, DRAG_PX, HOLD_MS } from '../src/lib/playGesture.ts';
-import { PIN_RANGE } from '../src/lib/deskPins.ts';
-
-// Magnet Size's top, the registry's: it ran to 1 and runs on to 1.5 since PLAN 27h-1,
-// so "end to end" is read against the dial's own end rather than a copy of it.
-const MAGNET_SIZE_TOP = PIN_RANGE.get('magnetSize').max;
+import { magnetSizeEnds, MAGNET_SIZE_TOP } from './phoneMagnet.mjs';
 
 const PORT = Number(process.env.PHONE_PORT ?? 4183);
 const HEADED = process.argv.includes('--head');
@@ -308,23 +304,7 @@ try {
       middle after, the tool as it always was.
     */
     const magnetSize = await visible(page, 'phone-magnet-size');
-    let sizeUnder = false, sizeUp = null, sizeBack = null, sizeReset = null;
-    if (magnetSize) {
-      const amountBox = await box(page, 'phone-amount-slider'), sizeBox = await box(page, 'phone-magnet-size');
-      sizeUnder = !!amountBox && !!sizeBox && sizeBox.y >= amountBox.y + amountBox.height - 1;
-      const setting = () => page.evaluate(() => window.chromaglassDebug?.().settings?.magnetSize ?? null);
-      await page.getByTestId('phone-magnet-size').locator('input').focus();
-      await page.keyboard.press('End');
-      await page.waitForTimeout(200);
-      sizeUp = await setting();
-      await page.keyboard.press('Home');
-      await page.waitForTimeout(200);
-      sizeBack = await setting();
-      // Ten steps of 0.05 back to the middle, through the slider, and read back.
-      for (let k = 0; k < 10; k++) await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-      sizeReset = await setting();
-    }
+    const { sizeUnder, sizeUp, sizeBack, sizeReset } = await magnetSizeEnds(page, magnetSize, box);
     await tap(page, 'phone-tool-magnet');
     /*
       Fingering on the Press tool's own Amount (lib/squish.ts: the glass
