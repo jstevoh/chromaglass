@@ -46,11 +46,14 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
  * always was: from about a coin, whose spikes are a cluster of a few over the
  * fingertip, to about a palm, whose hedgehog covers a fifth of the plate.
  * Exponential, so each step of the control is the same proportion bigger.
+ * The control now runs on to 1.5 (the owner, 2026-10-31: every dial from very
+ * gentle to very extreme): 2.8 times the tool, a magnet as wide as a hand
+ * spread, whose hedgehog takes most of the plate. Same law, more of it.
  */
 
-/** The factor on the magnet's size: 0.5 at 0, 1 at 0.5 (the tool as it was), 2 at 1. */
+/** The factor on the magnet's size: 0.5 at 0, 1 at 0.5 (the tool as it was), 2 at 1, 2.8 at 1.5. */
 export function magnetReach(size: number | undefined): number {
-  const s = Number.isFinite(size) ? Math.max(0, Math.min(1, size as number)) : 0.5;
+  const s = Number.isFinite(size) ? Math.max(0, Math.min(1.5, size as number)) : 0.5;
   return 2 ** (2 * s - 1);
 }
 

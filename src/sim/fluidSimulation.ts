@@ -225,9 +225,9 @@ export class FluidSimulation {
    * run where the finger was.
    */
   readonly pressLift = new PressLifts();
-  /** Cells each presser's strokes have pressed on this plate (a kick's are Beat Squeeze's), and how deep, summed over those cells. */
-  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0 };
-  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0 };
+  /** Cells each presser (lib/squish.ts Presser) has pressed on this plate, and how deep, summed over them. */
+  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0, bubble: 0 };
+  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0, bubble: 0 };
   /**
    * Beat Squeeze's kicks, given back (lib/squish.ts `KickRelease`): each
    * kick's press is held a moment and then let go over a third of a second,

@@ -51,6 +51,32 @@ regulator will bite sooner; recheck every preset's `dyeBudget` in the same PR.
 **Fallback:** the settings default to 0, so a bad look is one slider away from the
 current behaviour.
 
+#### 1i. Thin Film's rings were faceted at the grid's cells (shipped 2026-10-31)
+
+Found from 38m's pictures (the owner: "the edges are super pixelated"). A thin-film ring is
+a contour of the film's amount at sixteen periods per unit, and on the gooey edge's contrast
+(1.2 + 4 × Gooey, 2.4 on Soap Film, 3 at the default) three times that again, so any corner
+in how the amount is read shows many times over. 1h said the dye is read through the
+Catmull-Rom `textureBicubic`; that is true only with no gooey blur. With it (every look) the
+opacity comes from `blurAlpha`, plain bilinear taps a fraction of a cell apart (a third of a
+cell on the lab's 640-pixel plate of 192 cells), whose slope jumps at every texel: a corner in
+every ring in every cell. Fixed in `src/gpu/wgsl/plateThinFilm.ts` (the Thin Film block moved
+out of plate.ts whole, which is over its size budget): where Thin Film draws, in focus and
+with a blur under a cell, the film's amount is read again through a four-tap cubic B-spline
+(C2), and the film is rebuilt from it by the same steps the decode made (the thickness times
+the two depths' ratio, the gooey contrast, the dark blend's scale), so the darkness, gap,
+speckle and grain carry over and only the read changes. Cost: nine taps (B-spline and the
+reference read) on Thin Film's pixels only. A wide blur and a defocused pixel are left as
+they were. *Measured* (`npm run filmrings`, the lab with the film's amount probed out of the
+display pass at sixteen bits; its second difference on each axis folded into eight bins of
+the cell, the bin on the texel centres over the median): defaults 2.8 → 1.15 at zoom 1.3 and
+13.4 → 1.2 at zoom 3; Soap Film 3.2 → 1.2 and 7.6 → 1.3; the film moves 0.007–0.017 at the
+95th percentile (a ring is 0.0625; a read blurred a cell further, run as a mutation, moved it
+0.033–0.050). The pictures' own luminance cannot see it (within 13 % of even both before and
+after: the rings' curvature drowns the corners), which is why the check reads the film. The
+check-skeptic's pass found the first version folding the rows the wrong way up at zoom 3
+(the display pass flips y), which had hidden most of the corner there.
+
 ### 2. Lacing
 
 `src/components/LiquidVisualizer.tsx` (fragment shader)
@@ -558,6 +584,47 @@ follows 128 → 140 within a broadcast, lets go on ByeBye and after a silent pee
 seconds; the beat clock's kicks once a beat, each in its beat's frame; and over real UDP
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
+
+### 13.4. Control, written up (2026-10-31)
+
+`docs/osc.md` is every address the show server takes over OSC (settings, every
+action of the remote protocol by name, every built-in preset by id, the plate's
+hands), the settings worth a fader with their travel, a starter map for Resolume
+(the composition's Dashboard knobs and buttons, each with its custom output
+address) and a TouchDesigner module over an OSC Out DAT
+(`docs/osc/chromaglass_touchdesigner.py`). The guide's OSC section, the in-app
+manual's OSC row, Show Server Details in the Mac app and `npm run show`'s banner
+point to it. `npm run rig` holds the page to the code both ways (its presets are
+`src/presets.ts`'s, its actions `RemoteAction`'s, its settings learnable) and
+sends every line of its "Try it" block to a real show server, each arriving as the
+message its address names; a misspelt action, a preset the app does not have and a
+missing action each turned it red. Found writing it: a button bound to
+`/chromaglass/preset/<id>` sends 1 on press and 0 on release, and both cued the
+look, so one press cleared and reseeded the plate twice. The address form now
+fires on a non-zero argument only, as actions do (`npm run rig`: the release line
+is new, 32/32).
+
+### 13-version. The page inside a release says the release's version (2026-10-31)
+
+Measured first: the released 1.3.692's `Info.plist` (read out of the release's zip)
+has `CFBundleShortVersionString` and `CFBundleVersion` both 1.3.692, so the Mac's
+About box already named the release. What did not was the site packed inside, built
+from `package.json`'s 1.3.0 before desktop.yml worked out the version. The version
+step now runs before the site's build and passes `CHROMAGLASS_VERSION`;
+`vite.config.ts` writes it to `APP_VERSION` (`src/lib/appVersion.ts`) and to a
+`<meta name="chromaglass-version">` in the page. The manual's header shows it, on
+the desk and the phone. `npm run desktop -- --packaged` checks the packed page's
+version against `app.getVersion()`. The cast hello still carries none (14k).
+
+### 13-icon. The Mac app's own icon (2026-10-31)
+
+The app's icon was the website's 512 tile, scaled by electron-builder into an
+`.icns`: a flat square edge to edge in the Dock. `scripts/brand/art.mjs` draws a
+`mac` shape on Apple's grid (the body 824 of 1024, a superellipse's continuous
+corners, a drop shadow), and `npm run brand` writes `desktop/resources/icon.icns`
+from it, 16 to 1024 px with the 2x sizes, in the icns format written directly
+(no Mac tool). electron-builder copies an `.icns` unchanged, and
+`npm run desktop -- --packaged` checks the packed app's `icon.icns` is that file.
 
 ### 13-update. The Mac app's download, its releases and its updates (2026-10-25)
 
@@ -2713,6 +2780,67 @@ main), and a pre-existing pull to the left (PLAN 15g-7) outweighed it to the rig
 breath was set to a firm 8 m/s (0.38 Pa): in the lab the pool then moved +2.72% and
 +2.82%, held 19.0 mm/s (0.37 of τh₀/2μ), thick 0.101 as fast, pressed to a third of the
 gap 0.42 of its τh/2μ, ferrofluid +7.08%, oil +2.07%, nothing made or lost (5/5).
+
+### 15g-7. Blow's stroke to the right moved less than to the left in the app: the pointer's press on every move (shipped)
+
+What was reported: `npm run tools`' "and pushes the colour along, whichever way it blows"
+was red on 13 of 187 Mac runs in the week to 2026-10-24, on strokes of 38 to 71 steps of
+breath that read -0.07% to +0.05% of the plate against +0.15% to beat, while other runs with
+the same steps read +0.3% to +1.6%; the lab's airblow read +2.72% and +2.82% for the same
+stroke. The #385 reviewer thought the check read the dye at a single moment. #465 doubled the
+stroke's time and the line went red once in 354.
+
+What was measured: the lab drew the stroke at the app's own step, parameters (dumped from the
+app on software WebGPU), 192-grid geometry and Dropper pool, thirty moves over 45 solver
+steps, and pushed +1.74% with the breath alone, flat after 0.4 s. On every Mac run the two
+windows after the stroke drifted +0.2% to +0.35% toward it, the strokes that pushed nothing
+included, so that drift was not the wind's flow dying away. The pointer handler
+(`handleMouseMove`) pressed the glass under the pointer (`applySquish` 8, 0.005, a bowl 24
+cells across) and shoved the liquid five times the move on every pointer event with the
+button down, for every tool but the Magnet, the Spin, the Drop and the Finger, each taken
+out as it was found copying or scattering colour; the Blow never was. With that press on
+each of the lab's thirty moves the same stroke read -0.32% during the stroke and crept
++0.75% in the 2.5 s after (the press alone -0.80% then +1.1%; the stir with the press the
+same as the press); over 88 steps, the 3000 ms stroke's on those Macs, +0.72% then +0.9%.
+The pointer leads the pool it blows across, so each press squeezes the pool's liquid back
+the way the stroke came, against the breath, and the gap it closes along the stroke opens
+again over the gap's memory for seconds, drawing the liquid toward the stroke's end. The
+presses came thirty a stroke whatever the pace and the breath's steps with the runner's
+(12 to 23 a second on the CI Macs, 60 on the owner's), which is the spread and the reds.
+
+What changed: the press and stir moved to `src/sim/tools.ts` (`stirAlongMove`, a pure move
+first, the visualizer file being at its size ceiling) and the Blow returns before them as the
+Drop and the Finger do. `npm run tools` prints the cells of glass each stroke pressed
+(`pressedCells.hand`, the solver's own count) and a new line asks for none; the bar and the
+3000 ms stroke are unchanged. The touch handler's press (the phone and the pad) goes through
+the same function, with no stir, so a finger's Blow is exempt too. A bubble's standing
+squeeze on its footprint pressed as the hand; it is counted as the bubble's now (`Presser`
+'bubble', lib/squish.ts), since on a runner slow enough to hold the Blow still between moves
+the straw's bubble presses mid-stroke, and the hand's count has to stay the hand's (the app
+on the software plate: 531 cells by the bubble, none by the hand, over a stroke with six
+straw steps). The straw's swing on GitHub's runners is 15g-8; the other
+tools' press and stir are 15g-9.
+
+### 15g-8. The stroke's straw on GitHub's runners (shipped)
+
+On GitHub's Macs the tools check's Blow stroke, "keeps it rather than erasing it" (the pool's
+loss held to a tenth plus five), read +13%, −6.6%, −15%, +16% and −20% across #550 and #623,
+and red on every head of #618 (the glass peel, which leaves the gap at rest and so took away
+what had been hiding it). The owner's Mac kept or gained. Those runners blew the straw 18 to 27
+times a stroke, the owner's Mac 0 to 2, and every straw step blows a bubble whose dye is taken by
+the GPU and put back by the CPU from a readback mirror frames behind (15g-8b).
+
+Why the straw blew mid-stroke: the check's thirty moves were 0.68 of a cell at the plate's scale
+and the hand's cell is floored, so one move in three was no move, and a runner whose frames take
+50 to 80 ms drew the three still frames the straw waits for (BLOW_STRAW_FRAMES, after
+BLOW_DIR_HOLD_MS) in the gap. Now `pacedStroke` in `scripts/tools.mjs` makes as many moves as the
+stroke has whole cells and a quarter in it, read from the pointer's own cell before the press,
+the next after 120 ms or two of the plate's frames, whichever is later: the same distance, the
+same bar. GitHub's Mac (#636): 17 moves in 2.4–2.5 s, 61 wind steps and 0 straw a stroke, the
+pool 356 → 356 and 277 → 279, the push +4.80% and +6.50% against +0.15% to beat.
+
+The solver half (the air carrying its liquid out to the rim, conserving) was built in the same PR
+and taken out of it: it piles the liquid in a narrow ring the plate's checks see. 15g-8b.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
@@ -6105,8 +6233,6 @@ larger in mean radius (bar 1.4 to 1.8) and 343 of 332 (bar 60%). The lab, `macro
 2.5x on the 9-pool plate: before, small beads, one lens bead the size of a thumbnail; after,
 a dozen glass-like lens beads, three of them a fifth of the frame. Pictures in the project's
 shared files, `macro-closeup-33g/`. Not measured: how it looks on the owner's GPU.
-
-*33g-2b (2026-10-30, the owner: "Why do the beads have dimples on the top and ragged edges?", then "make the macro view look as accurate as possible").* Found in the lab on a flat plate with one bead at 5x. **The rim:** the outermost pixel of a bead strayed from a circle by 1.26, 1.24 and 1.22 px for a droplet (2 cells), the common bead (4.5) and a pool (7), a quarter of a mask texel, because the contour of the bilinear coverage of a 512 mask wanders by a third of a texel; the lens now takes the distance to the edge from the dome's cone read at one clean texel three texels in (`dropLens`, now `gpu/wgsl/dropLens.ts`) and the edge coverage from that, and the stray is 0.42, 0.32 and 0.37 px (0.06 of a texel), 0.53 px for a 12-cell bead, and the same on the drops' wide mask. A droplet of one to two cells keeps its whole dark outline: a first version of the step (three texels in, always) landed past the centre of a drop of four texels' radius and erased 60% of the outline of a 1.5-cell one, so a read that lands above 0.6 of the dome's height is refused and the drop keeps the old estimate (capping the step by the pixel's own size estimate was tried and cost every drop from two cells up its roundness: that estimate is the noise). The pools also come out 6 percent smaller, the true size: the coverage contour had stood half a texel proud. **The dimple:** a bead wider than the gap (3 cells) is a pancake, a flat window with the bend in its half-round edge, and the bend was in proportion to the band, so the map from the window to the band crossed the drop's own centre a little outside the window: a ring of one colour with a pin inside it. The bend now follows the band to a power that goes from 1 (a ball) to 6 (a pancake flat over 0.4 of its radius), so the window is clear and the bend is a sliver at the contact, as the report says (item 1.3 and the closeup comment in plate.ts). `npm run droplens` 32/32 on SwiftShader (11 new lines: roundness for seven drop sizes over both masks, the three droplets' outlines, and the sizes). Pictures in the project's shared files, `macro-closeup-33g/`. Not measured: the owner's GPU, and a mid-sized bead (3 to 4 cells), whose fold ring a real lens has too.
 
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
@@ -10180,6 +10306,72 @@ model cannot reach one, the PR says what it reached and asks.
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
 
+### 38. Realism audit: what still imitates, after §18 (asked 2026-10-30)
+
+#### 38h. Nothing on a lit-from-below plate makes light
+
+  - **38h (shipped 2026-10-31).** The audit (`docs/plan/38-realism-audit.md`) found six
+    places where the plate shader painted light a transmission projector cannot throw, though
+    the beads' own note already said "a plate lit from beneath shows transmitted light only".
+    Each now takes its light from what passes through, and `npm run nolight` asks it of the
+    real plate shader in the lab, each case against the same plate with the one thing off
+    on a grey wash that passes 60% of the lamp, so added light cannot clip (0/8 on main
+    before, 8/8 after):
+    - *The satellite droplets* carried a white dot of a lamp above them, exp(−14·hd²), and a
+      dome lit toward and away from the lamp. A ball of oil lit from beneath is a lens: the
+      big drops' law (`dropLens`, DROP_CORE 0.71) gives a dark band over its outer three
+      tenths on the projector and, to a camera focused past it, a gathered middle and a
+      contact line. On main a droplet stood 115 levels over the plate; now 0.
+    - *The oil* was 8% brighter than the water wherever it lay, at any focus. A lens gathers
+      light only on a plane past itself, so the oil block draws the shadowgraph
+      1 − Δz·∇²OPL from the oil's own optical path, (n_oil − n_water) × depth, with the
+      derive pass's stencil, Δz and gain: nothing at Focus's middle (10 levels over its water
+      on main, 0 now), a bright inner and dark outer caustic at 0.8 that turns over at 0.2
+      (1203 of 1203 pixels; 19 of 918 on main). It is drawn on both sides of the oil's edge, eight reads of the
+      view a pixel, only while Focus is off its middle (no look ships so).
+    - *The gel* multiplied the lamp by 1.5 over a floor of 0.10, so it brightened a white
+      lamp by half and lit a black one (83 levels over the plate on main). It is a filter now,
+      Beer–Lambert: each band passes the gel's colour to the power Gel Wheel, never more
+      than all of it, under the glass and over the lens alike (`gelFilter`).
+    - *Glossiness* lit the dye from a point above: Lambert toward `lampDir`, a Blinn highlight
+      for the camera, a Schlick sheen added everywhere. A dye surface under a projector
+      reflects nothing into the lens; its relief bends the light, which the pupil law
+      (`refractionOptics`) and the meniscus already draw. Glossiness is now a gain on the
+      slope those read, 1 + 3g times the field's surface (`reliefGain`), so 0 is the real
+      surface and 1 a surface four times as steep, and flat dye is never lit or darkened.
+      A level stretch of dye moved 15 levels under it on main, 1 now. The setting's key,
+      range and MIDI stay; its help and the guide say what it is now.
+    - *The dish's rim* (Dish Vignette) and *the projectors' rims* (Dish Spread) added a warm
+      glow of 0.35 and 0.16. The glass wall bends the lamp out of the pupil as a meniscus
+      does, so each is a dark line taking the drop band's 0.85 (the dish's rim 1.61 times the
+      plate just inside it on main, 0.18 now; the spread rims 196 against a lamp of 168, now
+      165 against 165).
+    - *Grain* of 3% was added to the plate every frame when no camera was on; a lamp through
+      liquid onto a wall has none, and the camera's and the film stock's grain is the post
+      chain's. Two times of the clock now draw the same plate (8 levels apart on main).
+      Taking it off showed what it had hidden: on a lamp-ground look the pigment's grain
+      reached the lamp as its share of the *opacity* (grainedDepth, 1 on any body near
+      opaque), not as more or less dye, which Beer–Lambert puts in the exponent, T^grain, as
+      `throughScaled`'s own note says. So Chemical Clock's and Lava Lamp's grain was 0.04 of
+      a level in their bodies and `npm run grainedge` line 2 had passed on the plate grain's
+      luma-scaled noise moving with it (main with only that grain taken out reads 0.041,
+      the same). The front plate's lamp now takes the grain as dye (`lampGrain0`): 0.107 and
+      0.131, twice the grain 2.3 times the texture. The back plate's lamp still takes the
+      opacity's factor (38h-4).
+      The gel's 1.5 gain and floor had carried `npm run mixer` too. As a filter it is now
+      coverage (half the level, half the change: 0.52), and it has no light to colour on a
+      painted ground, so the gel's shots are on the lamp ground. Its order line read 3.1 a
+      channel, under a bar of 4: the lab's wheel and lumia are the same warm dyes, and a
+      yellow gel passes a yellow lumia. The wheel is turned three quarters for that pair
+      (the lab's new `gelAngle`), under the pink and red that stop the lumia's green: 11.3.
+      And one rim pixel of the back plate, (109, 6), rounded to the same byte with the
+      plate and without, and read as "off the plate" while its grade moved it by 1; the
+      footprint now drops a pixel whose neighbours the plate moves.
+    New code went beside `plate.ts` in `src/gpu/wgsl/plateTransmit.ts`; `plate.ts` shrank by
+    about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
+    line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
+    term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §99).
+
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
 #### 39a. Settings → Feedback, mailed and kept
@@ -10447,3 +10639,39 @@ Gaussian took 7%, and their middle is no longer lifted.
 *Measured:* `npm run lampfield`, 9/9 (on the old plate 1 of its first 7: the law worst 0.165 and 0.813 off,
 the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
 gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.
+
+## 38k. The magnets' field in tesla, and the liquid's onset worked out (#630, 2026-10-31)
+
+The second realism audit found the onset of the ferrofluid's spikes was a share of the hand's
+magnet (0.18 → 0.35 by a smoothstep), set in the lab so that each look's own magnet gathered
+its pool flat and only the hand's raised domes; and that several magnets added their
+energies, |B₁|² + |B₂|², not their fields. This part ships the fields and the derivation;
+the plate keeps the lab's onset until the standing film has its pull (38k-7).
+
+- **Fields add** (`magnetDisc.ts`'s `magnetDiscFieldVec`, `spikes.ts`'s `magnetVec` and
+  `magnetsShare`): `magnetsEnergy` and the drop's pull take |ΣB|. One magnet reads exactly
+  as before; two like-poled fingers pull up to twice as hard between them, as real ones do.
+- **The onset from the liquid** (`spikes.ts`, `ferroOnsetTesla`, `SPIKE_ONSET_REAL`).
+  Cowley and Rosensweig: a layer stands up at μ0 Mc² = 2 (1 + 1/μ̂) √(Δρ g σ). EFH1 (μ0Ms
+  44 mT, χ 2.64, 1210 kg/m³) under water, √(Δρ g σ) = Δρ g l_c with l_c the pitch's
+  1.27 mm: Mc 2.31 kA/m. The layer feels its inner field, H_in = H0 − M (B is continuous
+  through a sheet), so its Langevin M is of H_in, 0.88 kA/m, and the applied field is
+  μ0(H_in + Mc) = 4.0 mT, a share of 0.033 (one share is `SPIKE_B_REF` of an N52 rod's
+  1.45 T, 123 mT). The lab's 0.18 is 22 mT, 5.5× it.
+- **Why the plate does not run on it yet.** #625 lowered `SPIKE_ONSET` to 0.033, and Mac CI
+  (run 41179196537) went red: past the onset the standing film takes the pool, and the film
+  has no Kelvin pull (9t-2, `PULL_SHARE` 0; it steps the plate's pull aside in its window).
+  At the real onset Magnet Garden's own magnet (4.6×), Ferro Paint's (3.0×) and the
+  drag checks' (0.112) all ran the film: a dragged drop lagged 7.4 R and kept 52 of 100
+  half-full cells (`ferrodrag`), Ferro Paint's fingers changed (`ferropour`), the film's
+  async start broke `ferrodye`'s "at 0 the plate is the plate it was", and the opening
+  waited for the film's pipelines (`startup` 1b, 2.14 s). The owner was offered the split
+  (2026-10-31); the onset stays the lab's, a shortcut written in at `spikes.ts` and in 38k-7.
+- **The lift's scale as the onset's** (`wgsl/standing.ts`, `LIFT_ONSET` = 0.18 / 0.035):
+  the same number today, so that when the onset moves G stays the function of the field
+  over the onset it is drawn round at (2 at the onset, 2.8 under the Magnet tool).
+- **Checks.** `npm run disc` 13/13, two new lines: the liquid's onset worked out on its own
+  from the sheet's numbers, by M instead of H, 4.00 mT against `SPIKE_ONSET_REAL`'s 4.00
+  (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
+  vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
+

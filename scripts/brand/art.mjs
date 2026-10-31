@@ -93,6 +93,16 @@ function hub({ cx = 256, cy = 256, s = 1, id = 'h', detail = 'high' }) {
 const svg = (viewBox, defs, body) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" role="img" aria-label="ChromaGlass"><defs>${defs}</defs>${body}</svg>\n`;
 
+/** |x/r|^n + |y/r|^n = 1 about (cx, cy), as a closed path of 512 points. */
+function superellipse(cx, cy, r, n) {
+  const pts = [];
+  for (let i = 0; i < 512; i++) {
+    const t = (i / 512) * 2 * Math.PI, c = Math.cos(t), s = Math.sin(t);
+    pts.push(`${r1(cx + r * Math.sign(c) * Math.abs(c) ** (2 / n))} ${r1(cy + r * Math.sign(s) * Math.abs(s) ** (2 / n))}`);
+  }
+  return `M${pts.join('L')}Z`;
+}
+
 /**
  * The icon on a 512 canvas.
  *
@@ -101,6 +111,11 @@ const svg = (viewBox, defs, body) =>
  *           icons, iOS home screens, avatars cropped to a circle); `scale`
  *           pulls the burst in to sit inside the platform's safe zone
  *   circle  the dish on its own, for sitting beside the name
+ *   mac     a Mac app's icon (PLAN 13-icon): the tile drawn on macOS's own icon
+ *           grid, the body 824 of 1024 with clear margins, its corners the
+ *           continuous curve macOS draws rather than a circular arc, and a
+ *           shadow under it, so in the Dock it sits with the other apps
+ *           instead of as a flat square edge to edge
  */
 export function icon({ shape = 'tile', detail = 'high', scale = 1 } = {}) {
   const b = burst({ s: scale, detail });
@@ -115,6 +130,18 @@ export function icon({ shape = 'tile', detail = 'high', scale = 1 } = {}) {
     defs += `<clipPath id="clip"><rect width="512" height="512" rx="112"/></clipPath>`;
     frame = `<rect width="512" height="512" fill="url(#ground)"/>`;
     open = '<g clip-path="url(#clip)">' + frame; frame = '';
+  } else if (shape === 'mac') {
+    // Apple's grid on a 1024 canvas: a body of 824 inset 100 on each side,
+    // which is 412 inset 50 here. The outline is a superellipse of exponent 5,
+    // the usual stand-in for Apple's continuous corners (a rounded rect's arc
+    // meets its straight edge with a kink in curvature that reads as a
+    // different shape beside the other icons in the Dock).
+    const body = superellipse(256, 256, 206, 5);
+    defs += `<clipPath id="clip"><path d="${body}"/></clipPath>`
+      + `<filter id="lift" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000" flood-opacity="0.35"/></filter>`;
+    frame = `<path d="${body}" fill="${INK}" filter="url(#lift)"/>`;
+    open = `<g clip-path="url(#clip)"><g transform="translate(50 50) scale(${412 / 512})"><rect width="512" height="512" fill="url(#ground)"/>`;
+    close = '</g></g>';
   } else {
     frame = `<rect width="512" height="512" fill="url(#ground)"/>`;
   }

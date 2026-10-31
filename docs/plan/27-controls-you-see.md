@@ -194,4 +194,49 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27g-1, open. The readings that clip.** Presets' bass mappings (`getAudioValue`, clipped at
     100) and the camera's punch still saturate at a high boost, as the reading did. Whether the
     boost should reach them as a gain on their depth too is the owner's call once he has felt this.
+- **27h. Every dial runs from very gentle to very extreme (the owner, 2026-10-31: "Let's have
+  very gentle options and very extreme options (which should be a general principle for all
+  dials)").** A survey read the 127 dials that set an amount (positions, switches, masters and
+  mixer strips left out; the dials an open PR owns left to it): what the stored value does in the
+  solver or the shader, what its first step does and what its top does. The whole table is in the
+  project's shared files (`dials/survey-2026-10-31.md`). The rule it leaves: the bottom step is
+  barely there, the top is past nature with the law still at the core, the default and every
+  look's value stay where they are, and Evolve never takes a dial to its far end on its own.
+  - **27h-1, shipped (this PR).** Twenty-five dials whose top was timid and whose consumer could
+    simply be let further: Evolve Speed to 3, Plate Rock 3, Kick Bloom 4, Melody Walk 2,
+    Saturation 0 (grey) to 3, Macro Chase 3, Hue Journey 30 min, Bass Boost 0.25 (a cut) to 5,
+    Grain Fineness 20 to 1200 (the uniform's own clamp), Layer Scale Variety 2, Gel Speed 30 rpm,
+    Film Grain 3, Grain Size 16 px, Gate Weave 12 px, Shot Length 60 s, Paint Cells 2, Cell Size
+    3, Edge Detail 2.5, Magnet Strength 3 (at 1 and the default height the spikes were only at
+    onset; full spikes need 1.76), Magnet Size 1.5, Tempo Sync 1.6, Rain Drip 2, Evaporation 0.5,
+    Rotation Speed 1.3 (40 rpm, inside the motor's 45), Flick Strength 2. A curve on the travel
+    (`curve`, and `PANEL_CURVES` in `lib/midi.ts` for the panel's own dials) keeps the gentle
+    end's room where the top went up four times or more. Each widened dial carries its old width
+    as `wanderSpan`, which Evolve's wander is still a fifth of (`dialWindow`, `lib/drift.ts`).
+  - **27h-2, open. Dials whose top is held in the solver** (`src/sim/fluidSimulation.ts` is at its
+    size ceiling and four open PRs edit it, so these wait for a quiet moment): Swirl (`min(1)`,
+    to 2), Dye Weight (three clamps, to 2), Heat Spread (to 2, under the Jacobi's limit), Momentum
+    (0.995 clamp, to 0.999), Drop Height (to 2), Background Loop (to 1.4), Glass Smear (a gate at
+    0.2 makes its first step a jump to a fifth of full; to 3 with no gate), Pushes Dye (to 1.2),
+    Buoyancy (the current's cap).
+  - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
+    `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
+    the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate
+    Boundary Glow near 0.45), Gate Edge (clamp the mix, let the width grow).
+  - **27h-4, open. Dead bottoms that need a re-map, not a range** (each must give today's value
+    at today's default): Iridescence never reaches off (a 0.25 floor), Beat Prediction's lower
+    half never locks (the lock asks trust × confidence ≥ 0.5), Sensitivity's trim never goes
+    under 0.5, Film Key cannot key nothing out, Room Hands' 0.05 floor, Phase Edge's mobility
+    floor (a third of its top), Gravity forces Dye Weight to 0.5 from its first step, Ferrofluid
+    lays the whole pour at its first step, Macro Chase has no lazy end (1 a second at 0).
+  - **27h-5, open. Dials that cross zero or run backwards need a bipolar or inverted curve:**
+    Kaleido Spin and Spin Rate (the looks' 1 rpm sits in the middle 1% of the throw), LED
+    Rotation Speed (its phase is `time × v`, so a move jumps the ring: integrate it first, as the
+    kaleidoscope's is, then widen to 20 with a curve).
+  - **27h-6, open. Ceilings that are a measured choice, to be asked of the owner, not moved:**
+    Diffusion Rate (0.0002, cut for the step's cost; the survey reads it as under the pass's own
+    skip threshold everywhere, which wants measuring), Room Drive and Film Drive (`ROOM_MAX`
+    bounds a camera-to-screen feedback loop), Sound Drive (four separate caps), Frame Sway (the
+    owner's rule, 0).
+  - **Judging.** Films of each widened dial's two ends on the Mac: `docs/judging.md`.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.

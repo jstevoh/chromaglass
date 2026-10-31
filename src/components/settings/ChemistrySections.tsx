@@ -122,7 +122,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
           label="Rain Drip"
           value={settings.rainDrip}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ rainDrip: v })}
           settingKey="rainDrip"
@@ -298,7 +298,7 @@ export const FerroSection = ({ c }: { c: SectionCtx }) => {
           label="Magnet Strength"
           value={settings.magnetStrength ?? 0}
           min={0}
-          max={1}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ magnetStrength: v })}
           settingKey="magnetStrength"
@@ -321,7 +321,7 @@ export const FerroSection = ({ c }: { c: SectionCtx }) => {
           label="Magnet Size"
           value={settings.magnetSize ?? 0.5}
           min={0}
-          max={1}
+          max={1.5}
           step={0.05}
           onChange={(v: number) => onUpdate({ magnetSize: v })}
           settingKey="magnetSize"

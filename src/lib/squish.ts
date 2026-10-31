@@ -313,8 +313,8 @@ export class PressLift {
   get live(): boolean { return this.at !== null; }
 }
 
-/** Who pressed: a hand (the Press tool, a finger, the pad, a person standing still) or the beat squeeze's kick. */
-export type Presser = 'hand' | 'kick';
+/** Who pressed: a hand (the Press tool, a finger, the pad, a person standing still), the beat squeeze's kick, or a bubble's standing squeeze on its footprint (a held Blow's straw bubble is one), so a count of the hand's cells is the hand's alone. */
+export type Presser = 'hand' | 'kick' | 'bubble';
 
 /**
  * Every press on one plate, each remembered where it is. One memory for the
@@ -678,9 +678,9 @@ export function bassPressFor(routeValue: number, energyRoute: boolean, impact: n
 export function bassRouteValue(bass: number, boost: number | undefined): number {
   return Math.max(0, Math.min(1, (Number.isFinite(bass) ? bass : 0) / bassBoostGain(boost) / 100));
 }
-/** The boost as a gain, kept to the slider's travel (and away from a zero or a NaN a bad save could leave). */
+/** The boost as a gain, kept to the slider's travel, 0.25 (the bass cut to a quarter) to 5 (and away from a zero or a NaN a bad save could leave). */
 export function bassBoostGain(boost: number | undefined): number {
-  return Number.isFinite(boost) ? Math.max(0.25, Math.min(3, boost as number)) : 1;
+  return Number.isFinite(boost) ? Math.max(0.25, Math.min(5, boost as number)) : 1;
 }
 export const BASS_PRESS = 0.004;
 /** The bass's depth for the velocity route's level (0–1) and Sound Drive (`impact`): see above. */

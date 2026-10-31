@@ -1485,16 +1485,6 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   holes. Beads already on a plate keep their size until they retire, so switch looks, not
   only zoom, to see the full effect.
 
-  *(33g-2b, 2026-10-30.)* The beads' edges are drawn from the dome's exact cone now, and a
-  big bead (over about 3 cells across its radius) is a clear window with a thin rim and no
-  dimple. Look at Macro Bead and Lens Pools at 4x to 6x: the rims should be perfect circles
-  with a crisp dark line, a big bead should look like a flat disc of oil (the plate seen
-  through it as it is), and a small one a ball with a small upside-down picture. Say whether
-  a bead of three to four cells, where the two kinds meet, shows a ring that looks wrong
-  (the map folds there, as a real lens does), and whether the upside-down picture is what you
-  want or an upright, slightly magnified one (a camera looking at the dye a few radii under
-  the bead sees it upright; the macro photographs are of beads over a distant background).
-
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should
@@ -2238,3 +2228,48 @@ brighter than the lamp, and nothing in the light moves.
    middle still white.
 5. Bad: a look that relied on the old lift now reads dim in the middle (say which), or the
    edge colour reads as a painted ring rather than glass.
+
+## 99. Nothing on the plate makes light (PLAN 38h)
+
+`npm run nolight` shows each painted light gone in the lab; only the Mac at 60 fps shows
+whether the looks still read. Every change darkens or leaves alone; none brightens.
+Filmed before and after on the owner's Mac (2026-10-31) and judged from the phone page:
+"Looks great". One change came after the film: on the lamp-ground looks (Chemical Clock,
+Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
+
+1. Microdroplets up on any look (Settings → Look): the hundreds of tiny beads are now small
+   clear lenses with a dark ring, no white dot. In the closeup (camera), a brighter middle
+   and a thin contact line.
+2. A look with oil (Oil on Water, Clock Glass): at Focus's middle the oil's body is no longer
+   a touch brighter than the water. Turn Focus up and down: a bright and a dark caustic
+   round each oil body, swapping sides as Focus passes the middle.
+3. Gel Wheel up: the lamp goes the gel's colours and darker, never brighter than the bare
+   lamp; a deep red gel passes little green or blue.
+4. The looks with Glossiness set (twelve, 0.12 to 0.5; Ferro Paint highest, then Velvet
+   Underground and Splodascope): the dye no longer reads as lit domes; flat colour stays
+   flat and edges and ripples darken a little more. Glossiness 1 by hand is now four times
+   the real relief, the strongest it goes.
+5. Dish Vignette and Dish Spread: the rim is a thin dark line, not a warm bright one.
+6. No grain on the plate with the camera off; with the camera or a film stock on, the
+   grain is theirs as before. On Chemical Clock and Lava Lamp the dye's body keeps a fine
+   mottle of more and less pigment, which is the dye's own grain and not the plate's.
+7. Bad: a look that went dull or flat where it had sparkle the owner liked (say which, and
+   Glossiness can be turned up past where it was: it now steepens the real surface), black
+   doughnut droplets that read as dirt, a caustic ring that looks drawn.
+
+## 100. Every dial from very gentle to very extreme (PLAN 27h-1)
+
+Twenty-five dials go further than they did (the list is in PLAN 27h-1). The looks have not
+moved: every look's own value is where it was, so a look should open exactly as before.
+
+1. Any look, each widened dial at its first step and at its top, with music. The first step
+   should be barely there; the top should be more than nature, never black, one flat colour or
+   frozen. Magnet Strength at 3 over ferrofluid should stand the spikes up full, which 1 never
+   did at the default height. Saturation at 0 is a grey plate.
+2. The curved dials (Gel Speed, Film Grain, Grain Size, Gate Weave, Grain Fineness, Shot Length,
+   Bass Boost, Evaporation, Flick Strength, Evolve Speed, Plate Rock, Kick Bloom, Hue Journey,
+   Macro Zoom): the look's own value should sit a third or so along the slider, not hard
+   against the left stop, on the panel, a pinned desk fader, the phone and a MIDI fader alike.
+3. Evolve on for five minutes: it should wander the widened dials no further than before.
+4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
+   plate that blows up at a top.
