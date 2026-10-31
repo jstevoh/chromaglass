@@ -138,8 +138,16 @@ export const PHASE_COMPRESS = 1;
   about a second, which is how an oil drop on a real dish behaves; the
   Korteweg force it replaced (−σ c ∇μ) had its own σ and no N², and a
   second-derivative field under it that did not scale either.
+
+  Between two glasses the tension moves the oil as Darcy moves it, h²/12μ
+  times σ∇κ, so it carries the gap's h² as every body force here does
+  (OIL_LIFT below): 4e-4 was set in the lab on the 6 mm gap, and on the 2 mm
+  one (PLAN 38r) a drop rounds nine times slower. Kept at 4e-4 the half
+  sheets in `npm run oillift` settled off the rim at 0.017 mm/s against a
+  lens that now rises nine times slower too (0.71 mm/s), over the frame's 2%
+  of it. PLAN 38e (σ in N/m from each bottle) replaces the 4e-4 itself.
 */
-export const OIL_TENSION = 4e-4;
+export const OIL_TENSION = 4e-4 * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The most the oil's surface tension may move the liquid in a step, in cells
   (see mixForce). A drop rounding up is a slow thing, a second or so for a
@@ -490,8 +498,17 @@ export const AIR_SHEAR = 0.5;
   rocked plate barely moves. With forty
   pools rocked as the app rocks them the colour moved 0.43 against 0.028
   before, where a look's own stir moves it 0.79.
+
+  That was on the 6 mm gap. Its 12 is a weight through Darcy's h² as the
+  oil's lift is (OIL_LIFT, which carries REST_GAP_METRES²), so it carries the
+  gap's h² too: held at 12 on the 2 mm gap the colour's weight stood nine
+  times its old share against the oil's lift, a dye as heavy against the oil
+  as Δρ 400 kg/m³ (dyed water is 150), and Clock Glass's coloured lens rose at
+  21% of a plain one's (`npm run oillift`, bar 80%). On 2 mm a rocked pool
+  slides a ninth as far, as a real sandwich does; a look that wants the old
+  swing turns Plate Rock past real (PLAN 38r-3, 38r-8).
 */
-export const ROCK_FALL = 12;
+export const ROCK_FALL = 12 * (DISH_GAP_METRES / 0.006) ** 2;
 /*
   The oil rising up the same tipped plate (PLAN 27f-5, hsBody). Unlike the
   colour's weight this is not tuned: a light mineral oil is 12% lighter than
