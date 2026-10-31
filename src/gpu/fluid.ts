@@ -49,7 +49,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISPLACE_PASSES, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISPLACE_PASSES, AIR_DISPLACE_MAX, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, SOAP_PULL, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidReads } from './fluid/reads';
 
 // What this file exported before its constants moved (PLAN 19ai-7); importers still import them from here.
@@ -1237,17 +1237,17 @@ export class WebGPUFluid extends FluidReads {
       plate, which is most looks: `stage` does not open a pass it is told
       not to, so the profiler reads zero rather than the cost of nothing.
 
-      AIR_DISPLACE_PASSES passes a step, because each moves the dye a cell
-      at most. A bubble grows a few cells a second (the straw's: to a
-      twentieth of the plate in a second and a half), which one pass keeps
-      ahead of; four empty a bubble that fades in whole, as a kick lays one,
-      twenty cells across, in five steps, a twelfth of a second at sixty, which is
-      within the fade-in. Each pass is a gather over five cells, no reduction,
+      Enough passes to empty the widest bubble in two steps, because each
+      moves the dye a cell at most (AIR_DISPLACE_PASSES to AIR_DISPLACE_MAX,
+      constants.ts). A growing bubble needs one (the straw's grows to a
+      twentieth of the plate in a second and a half); a whole one laid down
+      needs its radius. Each pass is a gather over five cells, no reduction,
       no readback.
     */
     stage('air exclude', (pass) => {
       const k = this.arg('air clear', [p.bubbleClear ?? 1, 0, 0, 0]);
-      for (let i = 0; i < AIR_DISPLACE_PASSES; i++) {
+      const passes = Math.min(AIR_DISPLACE_MAX, Math.max(AIR_DISPLACE_PASSES, Math.ceil(this.airReach / 2)));
+      for (let i = 0; i < passes; i++) {
         this.run(pass, 'airDisplace', this.dye.write, [this.dye.read, this.air!.field], k);
         this.dye.swap();
       }

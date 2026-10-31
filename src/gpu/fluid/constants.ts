@@ -21,10 +21,15 @@ import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thi
 export const AIR_CAPACITY = 512;
 /**
  * Passes a step of the air carrying the liquid under it out to its rim
- * (airDisplace, PLAN 15g-8). Each moves dye a cell at most; four empty a
- * bubble twenty cells across in five steps (see the stage in fluid.ts).
+ * (airDisplace, PLAN 15g-8): at least AIR_DISPLACE_PASSES, and as many as
+ * empty the widest bubble on the plate in two steps (a pass moves dye a cell
+ * at most), up to AIR_DISPLACE_MAX. A bubble is where the liquid is not, so a
+ * whole one laid down (a kick's, a seeded look's) empties at once rather
+ * than over a second; the lab's holes of 14 cells read their rim at 11.8
+ * cells after two steps at a fixed four.
  */
 export const AIR_DISPLACE_PASSES = 4;
+export const AIR_DISPLACE_MAX = 24;
 
 /** What `handOver` copies out: the fields, on the device they were copied on. */
 /** One step of `groupAt`'s walk: what it found here, and where each next object leads. */

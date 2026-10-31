@@ -101,7 +101,7 @@ const check = (name, ok, detail = '') => {
 
 const N = 256, SIZE = 768;
 const MOVED = 24, MAX_HALO = 1, MAX_MOVE = 4, HALO_OUT = 6, KEEP = 0.8, MIN_LINE = 10;
-const CONTROL_WORST = 5, CONTROL_EACH = 3, RIM_SLACK = 1.5;
+const CONTROL_WORST = 5, CONTROL_EACH = 3, RIM_SLACK = 1.5, HOLE_STEPS = 6;
 const SIZES = [1.8, 3, 5, 8, 14];
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
@@ -147,7 +147,7 @@ const CONTROL_AIR = {
   },
 };
 
-const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT }) => {
+const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT, HOLE_STEPS }) => {
   const { L } = await lab.create(N);
   // The frame shows the middle 1/1.5 of the plate (plate.ts), so a point x
   // on the plate is at 0.5 + (x - 0.5) * 1.5 in the picture.
@@ -186,7 +186,11 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   const holes = SIZES.map((r, i) => ({ x: 0.3 + i * 0.09, y: 0.5, r: r / N }));
   const list = holes.flatMap((h) => [h.x, h.y, h.r, 1]);
   lab.solver().setBubbles(new Float32Array(list), holes.length, 0.25, new Float32Array(holes.length * 4));
-  await lab.step(2, { bubbleClear: 1 });
+  // Six steps, not two: the air carries the liquid under it out a cell a pass
+  // (airDisplace, PLAN 15g-8), and a bubble laid down whole empties its soft
+  // edge over a few steps where the multiply it replaced took a share at once
+  // (a 14-cell hole read its rim at 12.5 cells after two).
+  await lab.step(HOLE_STEPS, { bubbleClear: 1 });
   const aOn = await shot(0.35), aOff = await shot(0);
   const bOn = await shot(0.35, 1), bOff = await shot(0, 1);
   const halo = holes.map((h) => {
@@ -194,10 +198,17 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
     const ring = (x, y) => { const d = Math.hypot(x - h.x, y - h.y); return d >= lo && d <= hi; };
     const s = share(aOn, aOff, ring, area), drawn = share(bOn, bOff, ring, area);
     // Where the hole's rim is: out from the centre along a ray, the first
-    // point within MOVED levels of the dye ten cells past the rim.
-    const beside = at(aOff, h.x, h.y + h.r + 10 / N);
+    // point nearer the dye ten cells past the rim than the hole's own middle.
+    // It was the first point within MOVED levels of that dye, while nothing
+    // lay between the hole and the plate. Now the air carries the liquid it
+    // stands on out to its rim (airDisplace, PLAN 15g-8), so just past the rim
+    // the dye is deeper than the plate's, and the first point within MOVED
+    // levels of the plate was the far side of that ring: an 8-cell hole read
+    // its rim at 9.6 cells. Half-way from the hole to the dye is the hole's
+    // edge whatever lies past it, and a hole cut elsewhere or wider still reads so.
+    const beside = at(aOff, h.x, h.y + h.r + 10 / N), mid = at(aOff, h.x, h.y);
     let rim = NaN;
-    for (let d = 0; d <= h.r + 10 / N; d += 0.1 / N) if (far(at(aOff, h.x, h.y + d), beside) <= MOVED) { rim = d * N; break; }
+    for (let d = 0; d <= h.r + 10 / N; d += 0.1 / N) { const p = at(aOff, h.x, h.y + d); if (far(p, beside) < far(p, mid)) { rim = d * N; break; } }
     return { cells: h.r * N, pct: s.pct, max: s.max, n: s.n, drawn: drawn.pct, cut: far(at(aOff, h.x, h.y), beside), rim };
   });
   const rim = share(aOn, aOff, (x, y) => Math.abs(Math.hypot(x - C, y - C) - R) < HALO_OUT / N && Math.abs(y - 0.5) > 0.1, 0);
@@ -221,14 +232,14 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   // Near hues: the green absorbance moved so exp(-c) moves about 0.08 and 0.2.
   const near = await meet(pink, 1.3, [1.2, 0.414, 0.8], 1.3), nearer = await meet(pink, 1.3, [1.2, 0.614, 0.8], 1.3);
   return { halo, rim, even, uneven, near, nearer, px };
-}, { N, SIZE, SIZES, MOVED, HALO_OUT });
+}, { N, SIZE, SIZES, MOVED, HALO_OUT, HOLE_STEPS });
 
 /*
   Plate A again, with the air handed to the plate and the bubbles not drawn.
   Edge Relief is the setting under test: a render at the look's own value
   against one at 0, so the pool's rim has something to be compared with.
 */
-const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH }) => {
+const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH, HOLE_STEPS }) => {
   await lab.create(N);
   const F = 1.5, W = SIZE;
   const pink = [1.2, 0.3, 0.8];
@@ -258,7 +269,7 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
   // by asking which of the two candidates is not dye. It is not reported as a hole.
   holes.push({ x: C, y: C - R + 16 / N, r: 3 / N, aside: true });
   lab.solver().setBubbles(new Float32Array(holes.flatMap((h) => [h.x, h.y, h.r, 1])), holes.length, 0.25, new Float32Array(holes.length * 4));
-  await lab.step(2, { bubbleClear: 1 });
+  await lab.step(HOLE_STEPS, { bubbleClear: 1 });
   const on = await shot({}), off = await shot({ edgeRelief: 0 });
   const rgb = (p, i) => [p[4 * i], p[4 * i + 1], p[4 * i + 2]];
   const idx = (u, v) => Math.floor((0.5 + (u - 0.5) * F) * W) + Math.floor((0.5 + (v - 0.5) * F) * W) * W;
@@ -322,7 +333,7 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
   if (rn < 1000) throw new Error(`holeline: the pool's rim ring picked only ${rn} pixels`);
   if (an < 500) throw new Error(`holeline: the rim arc beside the aside hole picked only ${an} pixels`);
   return { holes: out, rim: rsum / rn, rimN: rn, arc: asum / an, arcN: an };
-}, { N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH });
+}, { N, SIZE, SIZES, HOLE_FROM, HOLE_TO, HOLE_REF, ARC_REACH, HOLE_STEPS });
 
 const t0 = Date.now(), lap = (what) => console.log(`   (${what}: ${((Date.now() - t0) / 1000).toFixed(0)} s in)`);
 const plain = await openLab();

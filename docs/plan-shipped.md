@@ -2774,7 +2774,7 @@ whose frames take 50 to 80 ms drew the three still frames the straw waits for in
 
 **The solver now**: the liquid under the air leaves the way a meniscus sends it, out from the
 bubble's centre across the cell faces in flux form (`airDisplace`, `src/gpu/wgsl/fluid/gap.ts`;
-`AIR_DISPLACE_PASSES` 4 a step), split by where in its bubble each cell is (the air field carries
+as many passes a step as empty the widest bubble in two, 4 to 24), split by where in its bubble each cell is (the air field carries
 it) and a twentieth to every face so the very centre empties too. Each face's flux is what one
 cell sends and its neighbour receives: nothing made or lost on any step, at any frame rate, with
 no mirror in it. The flow's source for air arriving (the divergence pass) is unchanged; the push
