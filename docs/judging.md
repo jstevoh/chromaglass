@@ -2189,6 +2189,11 @@ holds the arithmetic and the plate in the lab; only a real plate says whether it
    flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
 5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
    snare and hats touching places of their own as well.
+6. After the fixes filmed on the Mac (25i-6): Poster's kick pours should now show in the left shape
+   on a plate already at its fill; Red Cabbage's acid well should stand on the left on every night
+   (the dish set square), its pink deepening to red only as far as vinegar goes and the green to
+   yellow-green, with a run of colours across each front; Chemical Clock's gel should keep turning
+   while the song plays, a ring from each kick's place and from the bottom place on each snare.
 
 ## 97. The oil beads drawn on the GPU (PLAN 14ab-6)
 

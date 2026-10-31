@@ -26,6 +26,7 @@ import { SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
 import { filmTableWgsl } from '../../lib/filmTable';
 import { FERRO_DROP_WGSL } from './ferroDrop';
+import { PH_WGSL } from '../../lib/phIndicator';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -330,7 +331,7 @@ fn reliefOf(tintNow: vec3f, tintDecoded: vec3f, aDecoded: f32) -> f32 {
   ground it is one more absorber in the gap, the colour as a filter at the
   same weight, so a BZ front is a pale blue wave through the orange with the
   dye still showing under it.
-*/
+*/${PH_WGSL}
 fn chemOnGround(c: vec3f, painted: vec3f, tint: vec3f, w: f32) -> vec3f {
   if (U.lampGround <= 0.001) { return painted; }
   return mix(painted, c * pow(max(tint, vec3f(1e-3)), vec3f(w)), U.lampGround);
@@ -3089,20 +3090,19 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       blue anion with the yellow chalcone, together taking out red and
       blue), yellow above 12.
 
-      It was drawn as a tint multiplied over the dye's own colour, at the
-      dye's opacity times a share of the acidity: a purple dye already takes
-      out nearly all the green, so no tint of it could ever be green (the
-      lab, a red-cabbage plate dosed +1, +0.35, -0.35 and -1: hue 269, 264,
-      273, 268 against the neutral's 260 — one purple field), and the pink
-      came out the purple again. Now the dye keeps its optical depth (its
+      It was a tint multiplied over the dye's own colour: a purple dye takes
+      out nearly all the green, so no tint of it could be green (the lab,
+      a red-cabbage plate dosed +1 to -1: hue 264 to 273, one purple
+      field). Now the dye keeps its optical depth (its
       strongest channel's absorbance, read back from what it lets through)
-      and takes the form's spectrum at that depth, Beer and Lambert, so a
-      thin wash goes pale pink and a deep pool crimson, as a dish does. The
+      and takes the form's spectrum at that depth, Beer and Lambert. The
       forms' spectra are three-band shortcuts of the measured ones, each
-      normalised to its peak; the acidity's -1..1 is read as pH 1 to 13.
+      normalised to its peak, on pH 1 to 13 as -1..1; the pH is solved from
+      the acid and base poured (indicatorScale, lib/phIndicator.ts: it was
+      the acidity itself, in pH units, so drops stacked to pH 1).
     */
     if (U.phIndicator > 0.001) {
-      let a = clamp(view.acid, -1.0, 1.0);
+      let a = indicatorScale(view.acid);
       let kPurple = vec3f(0.5, 1.0, 0.2);
       let kAcid = mix(mix(kPurple, vec3f(0.1, 0.8, 0.3), smoothstep(0.0, 0.25, a)), vec3f(0.08, 1.0, 0.55), smoothstep(0.4, 0.9, a));
       let b = -a;

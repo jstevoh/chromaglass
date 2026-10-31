@@ -52,8 +52,15 @@
  *     own reagent, one drop a hit, and lay no dye at all, and so does a cord
  *     on one of Chemical Clock's places; those are all on the bass and all
  *     activator, so the kick's own hand touches them in turn.
+ *     (iv) Poster's kicks with the dye regulator live (PLAN 25i-6): at a fill
+ *     of 0.96 and 1.0 (where the owner's Mac filmed it) each kick pours at
+ *     least 0.9 of itself, at 1.2 none, and a held pour none at its target.
+ *     (v) Red Cabbage's pH, solved from the moles poured (lib/phIndicator.ts),
+ *     against vinegar's and washing soda's own and the buffered juice's, and
+ *     the plate's shader reads it. (vi) Looks with areas are set down square.
+ *     (vii) No look carries a cord on a reaction's strength.
  *  3c. In the lab, the note and the chemistry on the real plate: (i) Poster's
- *     cords on that melody, the dye each kick added to its area read off the
+ *     cords on that melody, at its own fill target (the regulator live), the dye each kick added to its area read off the
  *     plate between notes, is nearest (as an absorbance's direction) the
  *     bottle the note maps to, 8 of 8; (ii) Red Cabbage, snares and kicks: the
  *     acidity in the snare's acid well moves at least 5x what it moves outside
@@ -71,7 +78,9 @@
 import { readFileSync } from 'node:fs';
 import { CordGate, AreaHands, isAreaCord, AREA_TARGETS, GATE_HYSTERESIS, AREA_PADDLE_ORBIT, AREA_STIR_TURN_S } from '../src/lib/areaCords.ts';
 import { PatchBay, cordReading } from '../src/lib/sceneMap.ts';
-import { PRESET_AREAS, areaFamily, areasForBand, areaForBand, areaDye } from '../src/lib/plateAreas.ts';
+import { PRESET_AREAS, areaFamily, areasForBand, areaForBand, areaDye, layAngle } from '../src/lib/plateAreas.ts';
+import { indicatorPH, indicatorScale, PH_WGSL } from '../src/lib/phIndicator.ts';
+import { hitRoomOf } from '../src/lib/dyeTarget.ts';
 import { PRESET_CONTRACTS } from '../src/presetPlate.ts';
 import { PRESETS } from '../src/presets.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
@@ -395,8 +404,8 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
   for (const id of ['red-cabbage', 'chemical-clock']) {
     const areas = PRESET_AREAS[id];
     const shipped = PRESETS.find(p => p.id === id).settings.sceneMappings.filter(m => isAreaCord(m) && m.setting === 'areaPour');
-    const pours = id === 'chemical-clock' ? [touch] : shipped;
-    if (pours.length < (id === 'chemical-clock' ? 1 : 2)) wrongDrop.push(`${id}: ${pours.length} pour cords`);
+    const pours = id === 'chemical-clock' ? [...shipped, touch] : shipped;
+    if (shipped.length < (id === 'chemical-clock' ? 1 : 2)) wrongDrop.push(`${id}: ${shipped.length} pour cords`);
     for (const m of pours) {
       if (!reagentArea(areas[m.area])) wrongDrop.push(`${id} area ${m.area}: ${areas[m.area].liquid} is no reagent`);
       const hands = new AreaHands(), feats = {}, laid = { dye: 0, drops: [] };
@@ -430,6 +439,135 @@ const bottleOf = (midi, n) => Math.floor(((midi % 12) + 0.5) / 12 * n);
   if (!(clock.length === 3 && clock.every(a => reagentArea(a) && a.liquid === 'activator' && a.band === 'bass') && new Set(turns).size === 3)) wrongDrop.push(`chemical-clock: places ${JSON.stringify(clock.map(a => [a.liquid, a.band]))}, kicks to ${turns}`);
   check('Red Cabbage\'s pours, and a pour on a Chemical Clock place, are a drop of their area\'s own reagent, one a hit, with no dye; the kicks take the clock\'s three places in turn',
     wrongDrop.length === 0, wrongDrop.join('; ') || `acid, base and activator, 8 drops for 8 hits on each cord; three kicks to places ${turns.join(', ')}`);
+
+  /*
+    (iv) Poster's kicks with the regulator live (the fault filmed on the
+    owner's Mac, 2026-10-31). Poster's plate sits at its own fill target
+    (mean dye 0.50 to 0.52 against 0.522), and the room the app gave every
+    area pour there was 0 to 0.1: the kicks poured 2 to 10% of themselves and
+    no note's bottle showed. The lab ran with the room at 1, so it never saw
+    it. Here Poster's own cords lay eight kicks at a fill (mean over target)
+    of 0, 0.96, 1.0 and 1.2 through AreaHands.lay, which applies the
+    regulator itself, and the dye laid is summed: a hit pours nearly all of
+    itself on a plate at its target and none at 1.2 (the bound), and a held
+    pour of the same strength (no gate) none at its target (the control: the
+    continuous pours keep their room). The visualizer must hand lay that fill,
+    the plate's mean over the look's target, which its source is read for.
+  */
+  {
+    const posterCords = PRESETS.find(p => p.id === 'poster-1969').settings.sceneMappings.filter(m => isAreaCord(m) && m.area === 0);
+    const pAreasN = PRESET_AREAS['poster-1969'];
+    const laidAt = (cords, fill) => {
+      const hands = new AreaHands(), feats = { noteClass: 0.5 / 12 };
+      const ctx4 = { ...ctxAt(1), hits: { value: (f) => feats[f] ?? 0 } };
+      let mass = 0;
+      const sinkHere = { heat() {}, paddle() {}, liquid() {}, dye(_x, _y, k) { mass += k; } };
+      for (let f = 0; f < 240; f++) {
+        feats.kickHit = f % 30 < 6 ? 0.9 : 0.02;
+        hands.step(cords, pAreasN, (c, band) => cordReading(ctx4, c, 0, band), DT);
+        hands.lay(sinkHere, 128, DT, () => ({ r: 1, g: 0, b: 0 }), fill);
+      }
+      return mass;
+    };
+    const free = laidAt(posterCords, 0), at96 = laidAt(posterCords, 0.96), at1 = laidAt(posterCords, 1), over = laidAt(posterCords, 1.2);
+    /*
+      Where the plate settles once hits pour past the target (the
+      check-skeptic: a fixed fill of 1 is where hitRoomOf is still whole, and
+      says nothing of the plate a minute later). A closed loop, 60 s of a kick
+      every half second from a plate at its target: each frame the dye laid
+      raises the mean (over Poster's own target, 0.522), and the regulator's
+      turnover takes back min(0.12, 0.6 × over²) of it a frame (fluidSimulation
+      stepDecay; its step scale and its dt exponent cancel at one step a
+      frame). The look's own evaporation and every other pour are left out:
+      the first only lowers the fill, and the others are held to nought over
+      the target by pourRoomOf. The hit's room where it settles is the share
+      the kicks pour in a long song.
+    */
+    const settle = (() => {
+      const hands = new AreaHands(), feats = { noteClass: 0.5 / 12 };
+      const ctx4 = { ...ctxAt(1), hits: { value: (f) => feats[f] ?? 0 } };
+      let fill = 1, mass = 0, peak = 1;
+      const sinkHere = { heat() {}, paddle() {}, liquid() {}, dye(_x, _y, k) { mass += k; } };
+      for (let f = 0; f < 3600; f++) {
+        feats.kickHit = f % 30 < 6 ? 0.9 : 0.02;
+        mass = 0;
+        hands.step(posterCords, pAreasN, (c, band) => cordReading(ctx4, c, 0, band), DT);
+        hands.lay(sinkHere, 128, DT, () => ({ r: 1, g: 0, b: 0 }), fill);
+        fill += mass / (128 * 128) / 0.522;
+        const ov = Math.max(0, fill - 1);
+        fill *= 1 - Math.min(0.12, 0.6 * ov * ov);
+        peak = Math.max(peak, fill);
+      }
+      return { fill: peak, room: hitRoomOf(peak) };
+    })();
+    const heldCords = posterCords.map(m => (m.setting === 'areaPour' ? { ...m, threshold: undefined, attack: undefined, release: undefined } : m));
+    const heldFree = laidAt(heldCords, 0), heldAt1 = laidAt(heldCords, 1);
+    const vizSrc = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+    const handed = /const fill = af\.meanDensity \/ Math\.max\(0\.06, dyeLookTarget\(af\.seedMean, currentSettings\.dyeBudget \?\? 0\.85, af\.seedBudget\)\);/.test(vizSrc)
+      && /hands\.lay\(sink, GRID_SIZE, simStepS, \([^)]*\) => [^\n]*, fill\);/.test(vizSrc);
+    console.log(`  Poster's kicks with the regulator live: dye laid ${(at96 / free).toFixed(2)} of a free plate's at 0.96 full, ${(at1 / free).toFixed(2)} at its target, ${(over / free).toFixed(2)} at 1.2; a held pour ${(heldAt1 / Math.max(1e-9, heldFree)).toFixed(2)} at its target; a minute of kicks peaks at fill ${settle.fill.toFixed(3)}, where a hit pours ${settle.room.toFixed(2)} of itself`);
+    check('Poster: with the regulator live, each kick still pours on a plate at its own fill target (at least 0.9 of itself) and a minute of kicks later (at least 0.7), none 20% over it, and a held pour none at its target (the control)',
+      free > 0 && at96 >= 0.9 * free && at1 >= 0.9 * free && settle.room >= 0.7 && over === 0 && heldFree > 0 && heldAt1 === 0 && handed,
+      `${(at1 / free).toFixed(2)} at the target${handed ? '' : '; the visualizer does not hand lay the plate\'s fill'}`);
+  }
+
+  /*
+    (v) Red Cabbage's chemistry (PLAN 25i-6). The acidity is moles of acid
+    and base (a share of a bottle), and the pH the indicator shows is solved
+    from it (lib/phIndicator.ts): checked against what the bottles are. Undiluted
+    vinegar (5%, 0.83 M acetic acid) is pH 2.4; washing soda about 12;
+    a trace of either in the buffered juice leaves it at 7; ten times the acid
+    is at most about one pH unit lower (a logarithm: in pH units, as the plate
+    read it before, ten drops went from pH 6.8 to the clamp at 1); and the
+    plate's shader runs the same sum on the same constants (its twin, read).
+  */
+  {
+    const vinegar = indicatorPH(1), soda = indicatorPH(-1), trace = [indicatorPH(1e-4), indicatorPH(-1e-4)];
+    const one = indicatorPH(0.02), ten = indicatorPH(0.2);
+    const plateSrc = readFileSync('src/gpu/wgsl/plate.ts', 'utf8');
+    /*
+      The shader's twin, run: PH_WGSL turned into JavaScript (WGSL's `let`,
+      `var`, `select`, `clamp`, `abs` and `pow` have their plain meanings here)
+      and held to indicatorScale at points across both sides, to a millionth.
+      Its constants are built from the same names, so reading them for the
+      numbers could not fail (the check-skeptic); a swapped select or a lost
+      `14.0 - p` would.
+    */
+    const js = PH_WGSL.replace(/fn indicatorScale\(s: f32\) -> f32 \{/, 'return function (s) {').replace(/\bvar\b/g, 'let');
+    const wgslScale = new Function('select', 'clamp', 'abs', 'pow', js)((f, t, c) => (c ? t : f), (v, lo, hi) => Math.min(hi, Math.max(lo, v)), Math.abs, Math.pow);
+    const twinWorst = [-1, -0.1, -0.01, -1e-3, -1e-4, 0, 1e-4, 1e-3, 0.01, 0.1, 1].reduce((w, v) => Math.max(w, Math.abs(wgslScale(v) - indicatorScale(v))), 0);
+    const twin = twinWorst < 1e-6
+      && /import \{ PH_WGSL \} from '\.\.\/\.\.\/lib\/phIndicator';/.test(plateSrc) && /let a = indicatorScale\(view\.acid\);/.test(plateSrc);
+    console.log(`  Red Cabbage's pH: vinegar ${vinegar.toFixed(2)}, washing soda ${soda.toFixed(2)}, a trace ${trace.map(v => v.toFixed(2)).join(' / ')}, a drop's worth ${one.toFixed(2)} and ten ${ten.toFixed(2)}`);
+    check('Red Cabbage: the pH is the bottles\' own chemistry (vinegar 2.3 to 2.6, washing soda 11.6 to 12.3, a trace in the juice within 0.1 of 7, ten times the acid at most 1.2 pH lower), and the plate draws it',
+      vinegar >= 2.3 && vinegar <= 2.6 && soda >= 11.6 && soda <= 12.3 && trace.every(v => Math.abs(v - 7) <= 0.1) && one - ten > 0 && one - ten <= 1.2 && twin,
+      `${vinegar.toFixed(2)} / ${soda.toFixed(2)}; the shader's twin within ${twinWorst.toExponential(1)}${twin ? '' : ', or the plate does not run indicatorScale'}`);
+  }
+
+  /*
+    (vi) A look with areas is set down square, so its places stand where its
+    words put them (Red Cabbage's acid well left, filmed on the owner's Mac
+    on the right): every look with areas lays at 0 (where its motor takes
+    the dish from there is the look's: Red Cabbage's and Poster's turn about
+    a thousandth of a radian a second, Velvet Underground's half a turn in
+    36 s), a look without keeps the
+    dice's angle, and the visualizer lays through layAngle (read).
+    (vii) Nothing a band plays changes a dish's chemistry: no look carries a
+    cord on a reaction's strength (Chemical Clock's took BZ Reaction to
+    nought under a song, and the gel stopped and went undrawn).
+  */
+  {
+    const crooked = Object.keys(PRESET_AREAS).filter(id => layAngle(id, 1.234) !== 0);
+    const freeLook = PRESETS.find(p => !PRESET_AREAS[p.id]);
+    const vizSrc = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+    const laysSquare = crooked.length === 0 && layAngle(freeLook.id, 1.234) === 1.234 && /layAngle\(presetId, DICE\.lay\.angle\(\)\)/.test(vizSrc);
+    check('every look with areas is set down square, a look without keeps its drawn angle, and the visualizer lays through it',
+      laysSquare, crooked.join(', ') || `${Object.keys(PRESET_AREAS).length} area looks at 0; ${freeLook.id} at its own`);
+    const CHEM = new Set(['bzReaction', 'liesegang', 'phIndicator', 'chemistry']);
+    const onChem = PRESETS.flatMap(p => (p.settings.sceneMappings ?? []).filter(m => CHEM.has(m.setting)).map(m => `${p.id}: ${m.source}:${m.feature} on ${m.setting}`));
+    check('no shipped look carries a cord on a reaction\'s strength (BZ, Liesegang, the indicator, the chemistry), so its music cannot stop the dish\'s chemistry',
+      onChem.length === 0, onChem.join('; ') || 'none');
+  }
 }
 
 // ── 3, 4. The lab ────────────────────────────────────────────────────
@@ -559,7 +697,8 @@ if (!process.argv.includes('--node')) {
       const kicks = MELODY.map((_, i) => ({ feature: 'kickHit', t0: i * NOTE_S + 0.25, dur: 0.15, level: 0.9 }));
       const snaps = MELODY.map((_, i) => i * NOTE_S + 0.24).concat([MELODY.length * NOTE_S - 1 / 60]);
       const pOver = { ...over, dt: pLook.globalSpeed * 0.2, advection: pLook.advection, damping: pLook.damping };
-      const pRun = await page.evaluate((c) => window.areas.run(c), { L, seconds: MELODY.length * NOTE_S, areas: pAreas, contract: pContract, cords: pCords, bursts: [...notes, ...kicks], over: pOver, every: 60, pools: false, snaps });
+      // With the regulator live at the state filmed on the owner's Mac (mean dye at the look's own target, fill 1): it ran at 0 and missed the kicks pouring 2 to 10%.
+      const pRun = await page.evaluate((c) => window.areas.run(c), { L, seconds: MELODY.length * NOTE_S, areas: pAreas, contract: pContract, cords: pCords, bursts: [...notes, ...kicks], over: pOver, every: 60, pools: false, snaps, fill: 1 });
       const a0 = pAreas[0], fam = areaFamily(a0).map((_, k) => PALETTE_RGB[areaDye(a0, pContract, 0, k)]);
       const picked = MELODY.map((_, i) => {
         const before = pRun.snaps[i], after = pRun.snaps[i + 1], v = [0, 0, 0];
@@ -572,7 +711,7 @@ if (!process.argv.includes('--node')) {
       });
       const wantLab = MELODY.map(m => bottleOf(m, fam.length));
       console.log(`  Poster on the melody: the dye each kick added to its area is nearest bottle ${picked.join('')}, its notes pick ${wantLab.join('')}`);
-      check('on the plate, the dye each of Poster\'s kicks adds to its area is the bottle its note picks, every note',
+      check('on the plate at its own fill target (the regulator live), the dye each of Poster\'s kicks adds to its area is the bottle its note picks, every note',
         picked.join() === wantLab.join(), `${picked.filter((k, i) => k === wantLab[i]).length} of ${MELODY.length}`);
 
       // (ii) Red Cabbage: snares and kicks, the acidity read off the plate's mix.
