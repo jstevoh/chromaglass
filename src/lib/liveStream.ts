@@ -361,8 +361,12 @@ export class LiveEncoder {
    * whose plate never draws (the panel's check, on a machine with no WebGPU)
    * still makes a stream, its first frame a keyframe, as it always has.
    * Black then is the truth about the plate, not the bug: once a picture has
-   * come, the stage keeps the newest, and a plate slower than the stream is
-   * repeated, never blacked out.
+   * come, the stage keeps it until the next copy, and a plate slower than
+   * the stream is repeated, never blacked out. The copy is the first plate
+   * frame after a stream frame went out, not the last before the next: at
+   * sixty and thirty that is up to one plate frame (17 ms) older than the
+   * stream frame's stamp, well inside what a viewer's player smooths over,
+   * for half the copies a copy on every frame would cost.
    */
   private want = true;
   private unlisten: (() => void) | null = null;

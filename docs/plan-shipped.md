@@ -10069,7 +10069,7 @@ model cannot reach one, the PR says what it reached and asks.
     is on air (`LiveEncoder` with `frames: 'plate'`, as `lib/liveShow.ts` starts it) the
     encoder copies the picture onto each output's 2D staging canvas there, once for each
     frame its clock has sent since, and encodes the stage on its own clock: the stream
-    keeps its rate, repeats the newest picture when the plate is slower, and is black
+    keeps its rate, repeats its last picture when the plate is slower, and is black
     only before the first picture comes (a frame or two at sixty; and a page with no
     plate, as the panel's check on a machine with no WebGPU, still streams). Measured
     with `PW_WEBGPU=1 npm run liveshow -- --stack` in a cloud session: the Plate source's

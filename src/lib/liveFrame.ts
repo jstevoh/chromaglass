@@ -16,7 +16,7 @@
  * and the encoder, while it is on air, copies it into its own 2D staging
  * canvases there, which it can read on its own clock whenever a frame is due.
  * The clock stays the encoder's: a stream runs at its own rate whatever the
- * display's refresh, and repeats the newest copy when the plate is slower.
+ * display's refresh, and repeats its last copy when the plate is slower.
  *
  * `kind` names which picture the canvas is: 'plate' is `#liquid-canvas`, the
  * wall as the projector has it; 'stack' is the Mixer stack drawn without the
