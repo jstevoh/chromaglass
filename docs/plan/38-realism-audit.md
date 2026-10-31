@@ -209,7 +209,9 @@ written first. Line numbers are as read on main at d07ac31.
   4.0 mT (`SPIKE_ONSET_REAL`, a share of 0.033), held to an independent solution by
   `npm run disc` 13/13. The plate still runs on the lab's 0.18 (22 mT): **38k-7**. Story
   in `docs/plan-shipped.md` §38k.
-  - **38k-7. The plate on the real onset** (S once 9t-2 is in; High: Magnet Garden, Ferro
+  - **38k-7. The plate on the real onset** (**built with 9t-2 in one PR, Mac CI owed**:
+    #625's code carried over, `ferrodye` waits for the film's build; the owner's films of
+    Magnet Garden, Ferro Paint and a dragged Magnet still owed) (S once 9t-2 is in; High: Magnet Garden, Ferro
     Paint, the set-down magnet). *Shortcut today:* `SPIKE_ONSET` is the lab's 0.18, 5.5×
     the liquid's, so the looks' own magnets and the hand's set-down one gather a flat
     pool where a real one raises domes (9u). *Blocked on* **9t-2**: past the onset the

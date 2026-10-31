@@ -46,11 +46,15 @@ const LC = SPIKE_PITCH / (2 * Math.PI);
   paraboloid of that pressure against its own weight it is a mound about
   1.7 l_c high and 11 l_c (0.07 of the plate) in radius.
 
-  The plate takes none of it yet (PULL_SHARE 0), a shortcut (PLAN 9t):
-  under the film the layer is not pulled toward the magnet, only lifted,
-  and the plate's own pull (phaseForce) brings the pool to the window's
-  edge. Each share tried, in the lab on 384² with the hand's Magnet over a
-  pool 0.12 across for four seconds:
+  The film takes none of it (PULL_SHARE 0): since PLAN 9t-2 the pull acts
+  under the film through the plate's own flow, on the layer's mean
+  (wgsl/fluid/phaseForces.ts, layerMean, which has why there and not
+  here: over a dome the pull is a tilt, which moves the layer as a whole,
+  and the plate's is the real one where the film's, at the held lift, is a
+  ninth of it). Before 9t-2 nothing pulled the layer under the window, and
+  at the liquid's real onset (PLAN 38k) a dragged drop was left behind.
+  Each share of it tried in the film, in the lab on 384² with the hand's
+  Magnet over a pool 0.12 across for four seconds:
 
     - the whole of it: the pool gathered into that mound, one smooth heap
       1.8 l_c high with the pool's rim left out at 0.08 as a thin ring,
@@ -70,11 +74,10 @@ const LC = SPIKE_PITCH / (2 * Math.PI);
     - none: domes and short ridges strewn radially over the pool, the
       colour between them, cover 0.3, no grid in them.
 
-  Putting it back means a finer grid under the magnet than the plate's
-  (the patch at twice the plate's cells), where a front can move across
-  the glass without the grid steering it; the scale it would take is the
-  whole one above, with a lift nearer the real one to stand domes on the
-  mound it makes.
+  In the film the pull would want a finer grid under the magnet (9t-1) and
+  a lift nearer the real one to stand domes on the mound it makes; through
+  the plate's flow it needs neither, because the flow moves the layer at
+  the domes' scale and over and leaves their shape to the film.
 */
 export const CHI0 = 2.6;
 const PULL_SHARE = 0;
@@ -205,8 +208,10 @@ export class StandingFilm {
 
   /**
    * Built behind the show, the first time a magnet is close enough to want
-   * it: no look opens with a magnet that close, so no show's opening pays.
-   * Until then the plate keeps its ferrofluid as it did without the film.
+   * it, unless the look opens with one (Opening.film: since PLAN 38k's real
+   * onset, Magnet Garden's and Ferro Paint's own magnets are), when the
+   * opening's list builds and waits for them (filmBuilds below). Until then
+   * the plate keeps its ferrofluid as it did without the film.
    */
   isReady(): boolean {
     void this.prepare();
@@ -217,8 +222,7 @@ export class StandingFilm {
   prepare(): Promise<void> {
     if (!this.ready && !this.building) {
       this.building = (async () => {
-        for (const [name, code] of Object.entries(this.kernels)) await this.pipelines.prepareCompute(`film:${name}`, code);
-        await this.pipelines.prepareCompute('film:window', STAND_WINDOW);
+        for (const [key, code] of filmBuilds(this.kernels)) await this.pipelines.prepareCompute(key, code);
         this.ready = true;
       })();
     }
@@ -317,4 +321,12 @@ export class StandingFilm {
     }
     return g;
   }
+}
+
+/**
+ * The film's pipelines by the keys the film asks for them by, for the
+ * opening's list (gpu/fluid.ts, Opening.film) and the film's own build.
+ */
+export function filmBuilds(kernels: Record<string, string> = standingKernels(SPIKES_WGSL)): [string, string][] {
+  return [...Object.entries(kernels).map(([name, code]): [string, string] => [`film:${name}`, code]), ['film:window', STAND_WINDOW]];
 }
