@@ -135,6 +135,13 @@ Left, each its own plan item:
   (`src/sim/tools.ts` stirAlongMove), thirty a stroke whatever the pace. Whether each wants it
   is its own question, measured as the Blow's was: the lab at the app's step with and without
   it, and `npm run tools`' pressed-cell count per stroke.
+- **15g-10 The drop's splash presses as the hand.** `applySquish` with the `splash` stroke
+  (`src/sim/fluidSimulation.ts`, the drop's landing) takes the default presser, the hand, so a
+  drop falling during a Blow stroke would count in `npm run tools`' "presses no glass along
+  the way" as the hand's (none falls there: the section runs with Rain Drip 0, so it can only
+  ever be a false red, never a miss; found in #623's review). Give the splash its own presser
+  (`Presser` in `src/lib/squish.ts`) when `fluidSimulation.ts` has the bytes: it sits at its
+  size ceiling.
 
 *The item as first written* (what air on a thin layer does: shear, pressure, the film, and why the carries were a shortcut) is in `docs/plan-shipped.md` §15g (moved 2026-10-29, 19m-2); its pressure and film halves are 15g-2 and 15g-3.
 
