@@ -2168,7 +2168,29 @@ from the same reading of the protocol, so only Live can say the two agree.
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
 
-## 96. The glass sandwich at 2 mm (PLAN 38r)
+## 96. Colour that answers the music (PLAN 25i)
+
+Three looks now take their colour from the music without a hue being turned. `npm run areacords`
+holds the arithmetic and the plate in the lab; only a real plate says whether it reads as music.
+
+1. Load **Poster, 1969** and play a song with a clear lead (a voice, a synth line, a piano) through
+   the microphone. The kick pours into the left shape; the colour of each pour should follow the
+   tune: notes C to D# orange, E to G ultramarine, G# to B purple. A tune that moves should leave
+   a run of colours in the shape; a held note, the same colour pour after pour.
+2. Load **Red Cabbage** with a song with drums. Each snare should bloom pink in the left well and
+   each kick turn the right well green, with no pink or green paint poured: the colour should come
+   up through the violet where the drop landed and spread as the liquid moves. Where the two
+   meet across the middle they should go back to violet.
+3. Load **Chemical Clock** with the same song. Each kick should start a ring in one of three
+   places (upper left, upper right, bottom), taking them in turn; a ring passing through a place
+   should hold back the next touch there until the gel recovers.
+4. Bad: Poster's colour changing on the drums rather than the tune, a pour that changes colour
+   halfway (a pour keeps the bottle it was picked up with), Red Cabbage's wells saturating to one
+   flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
+5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
+   snare and hats touching places of their own as well.
+
+## 97. The glass sandwich at 2 mm (PLAN 38r)
 
 The glasses are 2 mm apart at rest now, not 6, which is what a real overhead-projector
 sandwich holds. The forces were kept where the looks were tuned, so most looks should look

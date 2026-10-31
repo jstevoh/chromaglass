@@ -110,6 +110,17 @@ export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
     description: 'Washing soda: turns a pH indicator in the dye green, and neutralises an acid',
     injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
     behaviour: { acid: -1 } },
+  /*
+    PLAN 25i: what touches a dish of the Belousov–Zhabotinsky reaction and
+    starts a wave there. In a real dish that is a silver wire (it takes the
+    bromide, the reaction's inhibitor, out of one spot) or a drop of the
+    reaction's own autocatalyst, bromous acid; either way the gel at that spot
+    fires and a ring runs out from it. Clear, as both are at a drop's depth.
+  */
+  { id: 'activator', name: 'BZ Activator', color: '#ffffff', own: '#ffffff',
+    description: 'A drop of bromous acid: in a BZ gel it fires the gel where it lands and starts a wave there',
+    injectRadius: 3, injectAmount: 0.3, heatAmount: 0.0,
+    behaviour: { bz: 1 } },
   { id: 'glycerine', name: 'Glycerine', color: '#ffffff', own: '#ffffff',
     description: 'Thick and slow: it crawls where it lands while the plate moves past it',
     injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
