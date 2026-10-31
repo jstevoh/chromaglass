@@ -513,8 +513,9 @@ export const KICK_RELEASE = 1 / 3;
  *
  * Held, it holds (PLAN 38l). On a thin gap the glass comes back up against
  * the film's suction at k(h₀ − h)(h/h_s)³ (squeezeUpdate), which for a
- * kick's shallow dent is (1/STEFAN_FILM)³ = 64 times Press Lift's own rate
- * near rest: let alone through its hold the kick's dent across the dish lost
+ * kick's shallow dent is (1/STEFAN_FILM)³ times Press Lift's own rate near
+ * rest (37 at 0.30; 64 at the first 0.25, when this was measured): let alone
+ * through its hold the kick's dent across the dish lost
  * a tenth of its depth, and the ring 30 cells out went 3.6 cells against the
  * 4.2 it goes held (npm run rides). A hand holding the glass down balances
  * the glass's restoring force, K(h₀ − h), through the same film: the press

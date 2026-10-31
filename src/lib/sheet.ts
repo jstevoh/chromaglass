@@ -158,17 +158,29 @@ export const GAP_FLOOR = 0.004;
   The film a full press leaves, as a share of the rest gap: where Press
   Lift's half-life is read for the glass coming back up against the film's
   suction (PLAN 38l, squeezeUpdate in gpu/wgsl/fluid/gap.ts, and the sheet's
-  own dent below, which must take the same law or the two part). The app's
-  Press held for a moment takes the film to about a fifth of rest (Stefan's
-  closing never quite reaches the floor), a tap to a little under rest; a
-  quarter keeps a full press's lift where Press Lift and npm run presslift
-  have always had it. The share of a dent the glass keeps over a step is
-  then (1 − spring)^((h/h_s)³), h_s = STEFAN_FILM of the rest gap, h/rest
-  held between 0 and 2. Here and not in gpu/fluid/constants.ts (which
-  re-exports it) because this file stands alone and the shader already
-  reads lib.
+  own dent below, which must take the same law or the two part). The share
+  of a dent the glass keeps over a step is (1 − spring)^((h/h_s)³), h_s =
+  STEFAN_FILM of the rest gap, h/rest held between 0 and 2.
+
+  Why 0.30 and not the quarter it was first. The hand's press closes the
+  film by the same law (Stefan, squeezeUpdate's inverseSqrt): a(h/h₀)³
+  against the lift's k(h₀ − h)(h/h_s)³. Both go as h³, so the film's
+  viscosity drops out of a held press and it settles where the push
+  balances the glass, a dent of a·STEFAN_FILM³/k at any depth: Hooke's
+  F/K, as a hand on a real glass does. So this number is the glass's
+  stiffness against the hand, and it sets how deep a press goes as its
+  cube. At a quarter the Press tool held 1.5 s on the owner's Mac went to
+  0.0146 of a 0.03 gap, where it used to go to 0.0062, and was back in
+  0.6 s (it used to still be open at 4 s): never under h_s, where the lift
+  is slower than the plain spring was, so no press peeled. The Mac's
+  sweep is in PLAN 38l-4. Shallower dents, a tap or a kick's, still come
+  back (1/STEFAN_FILM)³ times Press Lift's rate near rest: stiff glass on
+  a thick film.
+
+  Here and not in gpu/fluid/constants.ts (which re-exports it) because
+  this file stands alone and the shader already reads lib.
 */
-export const STEFAN_FILM = 0.25;
+export const STEFAN_FILM = 0.30;
 
 /*
   e^z for the suction's share, which the sheet takes on every cell of the
