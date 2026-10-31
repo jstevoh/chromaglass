@@ -19,6 +19,7 @@ import type { CastState } from '../lib/castProtocol';
 import type { MidiAction } from '../lib/midi';
 import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
+import { useLiveShow, onAir, stopLive } from '../lib/liveShow';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -94,6 +95,17 @@ export function useRemote({
   // anything changes, and applies commands the phone sends back. When no relay
   // is running (the Firebase-hosted build, or plain `vite dev`), the link stays
   // dormant and nothing here changes behaviour.
+  /*
+    The live stream (lib/liveShow.ts, PLAN 37x-4d) as the phone needs it. Read
+    whole once a second while on air (its clock), and folded to what the
+    phone draws, so a destination's byte counts moving do not resend the
+    state between those seconds.
+  */
+  const liveShow = useLiveShow();
+  const liveKey = onAir(liveShow)
+    ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
+    : '';
+  const live = useMemo<RemoteState['live']>(() => (liveKey ? JSON.parse(liveKey) : null), [liveKey]);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -118,7 +130,8 @@ export function useRemote({
     filmLoaded: filmSource !== 'none',
     markLoaded,
     rowFading,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading]);
+    live,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -227,6 +240,7 @@ export function useRemote({
             case 'preset-prev':   stepPreset(-1); break;
             case 'blackout-toggle': toggleBlackout(); break;
             case 'record-toggle': toggleRecording(); break;
+            case 'live-stop':     void stopLive().catch(() => { /* the panel shows why */ }); break;
             case 'performance-toggle': togglePerformance(); break;
             case 'go':            goLook(); break;
             case 'back':          revertLook(); break;

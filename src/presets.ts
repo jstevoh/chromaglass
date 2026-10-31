@@ -1078,7 +1078,8 @@ export const PRESETS: Preset[] = [
       */
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
-        { source: 'bands', feature: 'band2', setting: 'areaHue', area: 0, depth: 0.6 },
+        // The lead's note picks the kick's bottle (PLAN 25i): C to D#, orange; E to G, ultramarine; G# to B, purple. A depth only says it is on (a look's cords stay at 0.6 or under for the fade).
+        { source: 'hits', feature: 'noteClass', setting: 'areaHue', area: 0, depth: 0.6 },
         { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 1, depth: 0.45, threshold: 0.35, attack: 0.02, release: 0.3 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
@@ -1622,7 +1623,9 @@ export const PRESETS: Preset[] = [
         Two pH wells that cancel where they meet (PLAN 25i-2, 28i-3b): the
         snare drops acid into the left well (area 0, blooming pink), the kick
         drops base into the right well (area 1, turning green), and mid
-        harmony stirs the two fronts together across the dish.
+        harmony stirs the two fronts together across the dish. Each hit a
+        drop of the reagent itself (an area of a reagent, areaCords.ts), so
+        the pink and the green are the indicator's, never a dye poured.
       */
       sceneMappings: [
         { source: 'hits', feature: 'snareHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },

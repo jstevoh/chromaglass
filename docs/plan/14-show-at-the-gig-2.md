@@ -283,12 +283,12 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   rim pixels past 24 levels of 59,000. The beads' true share of a pixel (an exact circle's
   area, or four by four samples on the edge pixels alone) would close it for both, and the
   drops' check would move with it. Judge by eye at 3x in the closeup first (`docs/judging.md`).
-- **14ab-15** (open; found with 14ab-6) *The beads' passes are not timed on the GPU.* `npm run
-  beadmask` times the CPU's side only (the list 0.4–0.7 ms against rasterDrops' 16–19 ms):
-  SwiftShader's GPU time says nothing about Metal's. Each pixel loops over its tile's beads,
-  and a tile in the middle of a crowd holds a few dozen. Time the `bead mask` pass with the
-  frame's timestamp queries on the Mac, the busiest crowd at Drops 1, and give it a bar
-  against the 17 ms it replaced.
+- ~~**14ab-15** *The beads' passes are not timed on the GPU.*~~ **Measured** 2026-10-30 on the
+  owner's Mac (Apple M4, Metal), `scratch/beadbench.mjs` (not kept: the same field a frame, the
+  old way and the new, each waited out with `onSubmittedWorkDone`, 200 frames, twice): drops 16.5
+  ms → 1.6 ms a frame (closeup sizes 23.0 → 1.6), rings 3.0 → 0.6; the `bead mask` pass alone by
+  timestamp query 0.50 ms for 502 drops (0.57 at closeup sizes), 0.11 ms for rings. No bar in CI:
+  the Mac shards' runners are not the owner's GPU, and the lab shard's is software.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
   their history.~~ Shipped; story in `docs/plan-shipped.md` §14ab-7 (moved 2026-10-29, 19m).
@@ -353,12 +353,7 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   next owns them: on Soap Film every step flushed even with no tool (603 of 603), so there
   the liquids' forces run once a step whatever 15e-1 says of a plate nothing is laid in; and
   `applySplats` with `gpu/splats.ts` is code nothing runs.
-- **14ab-13** (open, found with 14ab-2, read in the code) *Is a poured video upside down?*
-  The pour has always laid the frame's rows, which count down, on the grid's rows as they
-  come; the text pour (`pourText`) flips its canvas first because "the plate's rows run from
-  the bottom of the frame up", and `injectImage` does not. If that comment is right, a poured
-  video and an uploaded picture land upside down. A `look` render of a cartoon with a known
-  top (a title card) settles it; 14ab-2 kept the orientation as it was.
+- ~~**14ab-13** *Is a poured video upside down?*~~ **Shipped** (#591, finished in #596): it was, and an uploaded picture too; both turned where their rows are taken (`flipY` in the solver's copy, the loop's row read, `uprightPicture` for an upload), `npm run videoflow` asks which way up. Story in `docs/plan-shipped.md` §14ab-13.
 - **14ab-11** (open, found with 14ab-4) *The deltas' whole-grid writers and the GPU's whole
   passes.* The writers that still set `dirty = true` send all 192² rows: the room's and the
   film's stir (whole by nature), but also a press, a lift, a carry, a pop and the liquids'

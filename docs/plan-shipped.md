@@ -4466,6 +4466,27 @@ only wiring that stayed in `App.tsx` and is unchanged.
 declarations looser than their setters (`chromaglassTool` took any string, `chromaglassBench`
 `unknown`), now the shapes the setters take.
 
+### 19ai-1, 19ai-2. A lighter CLAUDE.md, and a map in every folder
+
+Shipped 2026-10-30. `CLAUDE.md` is loaded on every step of every session, Claude Code's
+and Antigravity's, and it had grown to 18,082 bytes: its "Which checks for which files"
+table (6 KB) and its account of CI (3.5 KB) were read on every tool call by sessions that
+touched neither. They moved verbatim to `docs/checks-map.md` and `docs/ci.md`; `CLAUDE.md`
+keeps the rows every session needs (lint and sizes on every change, `npm run quick`, a
+setting, a check, a check's bar) and a paragraph on CI with the four files that decide it.
+In their place it gained *Where things live*: which folder README to read before code, the
+domain boundaries (physics writes and rendering reads, one owner per piece of state, no
+per-frame objects, the phone shares and never forks) and the size rule as `npm run sizes`
+now holds it (fail past 100 KB, warn past 40 KB). The domain table, the measurements and
+the splits went to `docs/architecture.md`. Net: 18,082 → 12,008 bytes. Every standing rule
+stayed in `CLAUDE.md`; the headings other files cite ("What can be verified where", "Which
+checks for which files", "Keeping a session small") kept their names.
+
+Each folder a session lands in got a `README.md` of 1.5 to 5 KB: what it owns, its entry
+files, its contracts and its checks, every file and `npm run` name in it checked against
+`main`. The first draft (2026-10-28) was written before 19ai-3 and 19ai-6 to -9 moved the
+code; it was rebuilt on `main` after them, with maps for the two new `fluid/` folders.
+
 ### 19ai-9. The settings panel's sections into their own files
 
 Shipped 2026-10-30. `components/SettingsPanel.tsx` was 201,442 bytes and 4,277 lines, and
@@ -4774,6 +4795,42 @@ number for the whole plate and every area drew on one palette.
   areas: Jellyfish Bloom 1 → 3, Velvet Underground 1 → 1 (its cords pour in one pool; the
   other two are stirred and warmed), Bass Drop 0 → 0 (its cords pour nothing; its wells take
   the music's own hands, 25h-7).
+
+### 25i. Colour that answers the music (shipped)
+
+The owner's 2026-10-24 direction C: once each area has its own family (25h), the music picks
+which bottle pours next, and no hue dial is turned.
+
+- **By the note.** A sixth reading on the `hits` source, **Note (C to B)** (`noteClass`,
+  `lib/hitSource.ts`): which of the twelve notes the lead is playing, read off `pitchFine` (the
+  melody's own pitch, 24.3-place) and not `pitch` (mostly the bass line's bin). A pitch class
+  is the one reading an octave error cannot move. A new note is taken once it has held for the
+  ear's settle (`pitchSettleS`), so a tracker's neighbour on an attack picks nothing, and a
+  rest keeps the last note. It is a name, not a level: no gate, no Sound Impact scaling
+  (`sceneMap.ts`; a master at 0 still silences it), not a MIDI or Sound Learn source
+  (`midi.ts` MAPPABLE_SOURCES), and the patch sheet (the desk's and the phone's, one sheet)
+  hides Gain and Gate on it. On a Bottle cord (`AreaHands`) the class cuts the octave into the
+  area's bottles. A gated pour now keeps the bottle it was picked up with until its next
+  opening, so a note that changes in a pour's release colours the next pour, not the tail.
+  **Poster, 1969**: the kick pours into the left shape, whose bottle the lead picks (orange C
+  to D#, ultramarine E to G, purple G# to B); the old Bottle cord there read band 2's level.
+- **By chemistry.** An area whose liquid is a reagent (Acid, Base, and a new bottle, **BZ
+  Activator**: bromous acid, which fires a BZ gel where it lands) pours a drop of that liquid
+  on each opening of its Pour cord (`AREA_DROP`, two automation doses at full) and no dye. Red
+  Cabbage's snare and kick poured the areas' pink and green dye before, a painted colour; now
+  they drop acid and base and the indicator answers. The activator goes to the gel through the
+  solver's `addLiquidDrop` (a target ring, not a spiral: a whole disc with no wake). **Chemical
+  Clock** has three activator places, all on the bass, so the kick's own beat dose touches
+  them in turn (`areaForBand`); its own seed still lays the dish (`OWN_SEED_AREAS`).
+- **More than five dyes** was not needed to show this (25i-3 keeps it open).
+- **Measured** (`npm run areacords`, 28 lines; the lab with `PW_WEBGPU=1`, 362 s here): the
+  note through octave errors and attack neighbours reads 0 8 4 9 2 11 5 1 for the melody C G#
+  E A D B F C#, and both mutants tried (no settle; `pitch` for `pitchFine`) fail it; Poster's
+  own cords pour the mapped bottle 8 of 8 where turning by the kicks alone gets 2 of 8; on the
+  real plate the dye each kick adds is nearest its note's bottle 8 of 8; Red Cabbage's acidity
+  0.028 in the acid well and -0.056 in the base well with nothing outside either, and no dye
+  laid; one drop of activator fires the gel to 0.81 in its place and 0.000 in the other two.
+  Judging §96 owes the owner's eyes. Open: 25i-1 to 25i-5.
 
 ## 26. A reaction that prints: Turing stripes in black and white
 
@@ -6671,7 +6728,45 @@ of 196,608 past 4 levels). All on one plate switched rings, drops, half drops an
 as the app's is, with the bytes counted where `setBeads` writes them at the queue. Controls: a pixel over and upside down read thousands of pixels
 apart, the plate with no beads 104,033 values. The frame's CPU: drops 16–19 ms → 0.4–0.6 ms,
 rings 1.0–1.6 ms → 0.07 ms; the bytes across 2.10 MB → 95 KB and 1.05 MB → 43 KB.
-`npm run wgsl` compiles the four kernels (149 → 153).
+`npm run wgsl` compiles the four kernels (149 → 153). On the owner's Mac (Apple M4, Metal), the
+same field a frame both ways, waited out on the GPU: drops 16.5 → 1.6 ms a frame, rings 3.0 → 0.6,
+the bead pass alone 0.50 ms for 502 drops by timestamp query (14ab-15).
+
+## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
+
+14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the
+bottom of the frame up; a canvas's run down"), and the video pour and an uploaded picture
+did not, so if that comment was right both landed upside down. It was. On the owner's Mac
+(Apple GPU, Metal), a still plate, a pour and a photograph straight after, beside its source:
+the word "TOP RAT" over "bottom" through `pourText` stood the right way up; an uploaded
+picture of the same two words, pink above and blue below, landed with the blue on top and
+every letter upside down (a vertical flip, not a mirror: the words still read left to right);
+and a cartoon frame (Jack Frost, 240 s in: an orange sky above, pumpkins below) poured with
+the pumpkins at the top and the sky's light at the bottom. The pictures, before and after,
+desktop and phone, are on the branch `antigravity/14ab-13-pictures`.
+
+The grid's rows count up the plate and every pour but the text's laid a source's first row
+on the grid's first: `pourPictureCpu`, the solver's `videoSample` pass and the CPU loop. Each
+is turned where its rows are taken, at no cost a frame. The upload draws its picture turned
+over once, as `pourText` does (`uprightPicture` in `lib/videoFlow.ts`, called by
+`usePour.ts`). The solver's copy of a video's frame turns it (`flipY: true` on
+`copyExternalImageToTexture` in `pourVideo`, `gpu/fluid/inputs.ts`). The CPU loop
+(`pourVideoFrameCpu`, the WebGL solver's way) reads the grid's row y from the frame's row
+S−1−y, and the cell above from the row before, so the flow it reads is turned with the dye.
+Antigravity's first fix drew every video frame again onto a canvas of its own turned over,
+a full-size draw a frame on the path 14ab exists to lighten; the review moved it into the
+copy and the loop's read, and the frame loop's call is as it was.
+
+`npm run videoflow` holds it (24 lines, 5 new): a title card with a known top (a bright band
+across its top third, a dim one across its bottom third, a blob rising two rows between two
+frames) poured through the loop and through the solver's pass lands its brightest cells
+above the middle of its dye (`up` +0.334 and +0.332 of the dyed rows' height) and its rise
+as flow up the plate; an uploaded picture of it through `uprightPicture` lands +0.333. Each
+against the card turned over (−0.334, −0.332) and the upload read as it came (−0.333). On the
+code before the fix the four video lines go red (20 of 24, `up` −0.334 and −0.332): the
+other twenty hold the pass and the loop to each other, which a frame turned the same wrong
+way on both passes. The lines run on the Mac's `--video` shard too, so Metal's turned copy
+is asked as well as SwiftShader's.
 
 ## Moved in the third pass (2026-10-29, 19m)
 
@@ -9949,6 +10044,36 @@ model cannot reach one, the PR says what it reached and asks.
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
 
 ### 37. Marketing and social media (asked 2026-10-29)
+
+#### 37x-4d. The Live Show panel and the Pro gate
+
+  - **37x-4d. The Live Show panel and the Pro gate (shipped 2026-10-30).** The owner asked
+    for "a Live Show panel in the Mac app, Pro only" to stream to every popular platform at
+    once; 37x-4b and 4c built the stream and drove it from the console. The panel
+    (`src/components/LiveShowPanel.tsx`, in + Panel as "Live Show", in Play) adds each
+    destination by its platform (the server filled in for YouTube, Twitch and Facebook,
+    pasted for the rest; Instagram and TikTok at 9:16), a name and its key, in a password
+    field emptied the moment the key goes to the keychain store (`desktop/keys.js`), so the
+    page can only say "Key kept" and when. A destination marked "For tests" (an unlisted
+    YouTube broadcast) is streamed by Test and never by Go live, which asks once more,
+    naming where it goes, before the one press that cannot be taken back; Stop does not
+    ask. While on air each destination has its line (kbps, seconds behind, dropping,
+    retrying, refused). The upload warning sums what the destinations will push (each its
+    own copy of its encode, at `render.ts`'s rate, plus the sound) with the research's 20%
+    headroom, against what the last stream measured: the sum acknowledged while all kept
+    up, and the sum while one was a second behind by the server's count
+    (`src/lib/liveShow.ts`), since there is no server of ours to time an upload against.
+    The panel, `window.__cgLive` and the phone share one controller in `liveShow.ts`, so two
+    encoders can never race for the main process's one session. Pro by `canUseProFeature`
+    (the panel says it is Pro on a free key and has no Go live); not offered on the website,
+    which has no RTMPS client. The phone: the remote's state carries the stream (a test or
+    live, its clock, where, whether one is in trouble), shown as a red chip on Draw and on
+    Controls, and Stop is two taps (`live-stop`); the phone cannot start a stream.
+    Check: `npm run liveshow` (32 lines: the sums against numbers worked by hand, then the
+    built app with a stand-in for the Mac app's bridge and the page's real encoder: the key
+    once to the store and nowhere in the page or its storage, Go live to the three that are
+    on with two encodes and no key, Test to the test one only, the dropping line, the
+    phone's chip and its Stop, the upload measured as enough at 24 Mb/s and short at 3).
 
 #### 37x-4c. Several destinations, and a vertical one
 

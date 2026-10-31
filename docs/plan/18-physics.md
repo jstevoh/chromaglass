@@ -2,6 +2,8 @@
 
 This section is in 3 files, cut between items: `18-physics.md`, `18-physics-2.md`, `18-physics-3.md`.
 
+A second pass, on 2026-10-30, read the code again after 18a–18m had shipped and ranked what still imitates in §38 (`38-realism-audit.md`); it lists only what is not open here, and names the item here that each finding sharpens.
+
 Asked 2026-09-28. The owner's standing rule is to build from the chemistry and physics
 of the liquids, not from a picture of their result, and to name any shortcut kept for
 speed. This section is the audit that rule asked for: every place found in the solver

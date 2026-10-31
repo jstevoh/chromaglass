@@ -2064,6 +2064,14 @@ system-audio path. Unlisted, never public, until you say so.
    back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
    one. A wrong key on one destination should fail that one alone, once, with the
    platform's words, while the others stream.
+9. The panel (37x-4d), instead of the console: + Panel → Live Show. Add the unlisted YouTube
+   broadcast (paste its key; the field should empty and say "Key kept"), press **For tests**
+   on it, and **Test**: the same picture as step 1. Add a second destination, leave it on,
+   and press **Go live**: it should ask "Go live to …? Press again" and do nothing until the
+   second press (use the unlisted one turned on, not a public key). While live, each row
+   should show its Mb/s and seconds behind; on the phone remote a red Live chip with the
+   clock on Draw and Controls, and two taps on it should stop the stream on the Mac. After
+   a stream, the line under the buttons should name the upload the stream carried.
 
 ## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
 
@@ -2160,7 +2168,29 @@ from the same reading of the protocol, so only Live can say the two agree.
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
 
-## 96. The oil beads drawn on the GPU (PLAN 14ab-6)
+## 96. Colour that answers the music (PLAN 25i)
+
+Three looks now take their colour from the music without a hue being turned. `npm run areacords`
+holds the arithmetic and the plate in the lab; only a real plate says whether it reads as music.
+
+1. Load **Poster, 1969** and play a song with a clear lead (a voice, a synth line, a piano) through
+   the microphone. The kick pours into the left shape; the colour of each pour should follow the
+   tune: notes C to D# orange, E to G ultramarine, G# to B purple. A tune that moves should leave
+   a run of colours in the shape; a held note, the same colour pour after pour.
+2. Load **Red Cabbage** with a song with drums. Each snare should bloom pink in the left well and
+   each kick turn the right well green, with no pink or green paint poured: the colour should come
+   up through the violet where the drop landed and spread as the liquid moves. Where the two
+   meet across the middle they should go back to violet.
+3. Load **Chemical Clock** with the same song. Each kick should start a ring in one of three
+   places (upper left, upper right, bottom), taking them in turn; a ring passing through a place
+   should hold back the next touch there until the gel recovers.
+4. Bad: Poster's colour changing on the drums rather than the tune, a pour that changes colour
+   halfway (a pour keeps the bottle it was picked up with), Red Cabbage's wells saturating to one
+   flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
+5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
+   snare and hats touching places of their own as well.
+
+## 97. The oil beads drawn on the GPU (PLAN 14ab-6)
 
 The beads' mask is drawn by the plate now, not by a canvas and an upload. `npm run beadmask`
 holds the drops to the CPU's drawing to a level, but the rings' edges were the canvas's

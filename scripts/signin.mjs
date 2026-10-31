@@ -608,10 +608,14 @@ try {
       const W = innerWidth;
       const box = document.querySelector('[data-cg-landing]');
       const b = document.querySelector('[data-cg-landing-play]').getBoundingClientRect();
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5 };
+      // The Buy buttons on the Home and Pro cards (PLAN 34a-4b): the live store's checkout, in a new tab.
+      const buys = [...document.querySelectorAll('[data-cg-landing-buy]')];
+      const buyBad = buys.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
+        || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad };
     }) : null;
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}` : 'landing page not drawn'}`);
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong` : 'landing page not drawn'}`);
     await c.close();
   }
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));

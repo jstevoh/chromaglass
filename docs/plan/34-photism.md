@@ -46,10 +46,16 @@ a grid of generic stock thumbnails: ours are the plate itself.
   contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
   every look one to one at a laptop's size: take the eight from it and keep the file sizes under
   60 KB each.
-- **34a-4. Buy buttons, when the Lemon Squeezy webhook is set (23).** *(S.)* The page prints the
-  prices and says "Buying opens soon". When 23's webhook issues a key from a test purchase, the
-  tier cards get Buy buttons (`CHECKOUT_HOME_URL`, `CHECKOUT_PRO_URL` in `lib/tierGates.ts`) and
-  the "opens soon" line goes. Until a test purchase has been made, no button.
+- **34a-4. Buy buttons on the landing page.** *(S; built, held for the go-live order.)* The Home
+  and Pro cards carry a Buy button to the live Lemon Squeezy checkout (new tab) and the Free card
+  Play free; "Buying opens soon" is gone. The links live in `lib/checkoutLinks.ts` (the landing
+  chunk imports them without `tierGates.ts`'s sign-in flag and licence reader; `tierGates`
+  re-exports them for the account sheet). Live ids, 2026-10-29: Home 1479217, Upgrade 1479218,
+  Pro 1479219. `npm run signin` check 11b holds both buttons (44 px, new tab, a lemonsqueezy.com
+  checkout address). Merges only after the Worker is deployed with the live ids and the live
+  webhook exists (the order in `docs/handoff` for the store go-live). Open: the buyer is asked to
+  use their sign-in email, because the Worker keys on the order email; a signed-out visitor's
+  button cannot prefill it.
 - **34a-4b. The licence Worker refuses test-mode orders; the live store's product ids are settings.**
   *(S; shipped in the go-live PR, Worker deploy owed.)* The webhook never read the order's
   `test_mode`, so while the store is in test mode anyone paying with Lemon Squeezy's published

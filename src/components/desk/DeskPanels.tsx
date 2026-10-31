@@ -4,6 +4,7 @@ import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
+import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
 import { CartoonShelf } from '../CartoonShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
@@ -1056,6 +1057,7 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'dyes': return <DyesBody p={p} />;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
+    case 'live': return <LiveShowPanel />;
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;

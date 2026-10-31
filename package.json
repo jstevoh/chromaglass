@@ -53,6 +53,7 @@
     "render-lab": "node scripts/render-lab.mjs",
     "live": "node scripts/live.mjs",
     "livedrop": "node scripts/livedrop.mjs",
+    "liveshow": "npm run build && esbuild scripts/liveshow.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/liveshow.mjs && node node_modules/.cache/liveshow.mjs",
     "render-app": "npm run build && node scripts/render-app.mjs",
     "liquids": "node --experimental-strip-types scripts/liquids.mjs",
     "natural": "node --experimental-strip-types scripts/natural.mjs",

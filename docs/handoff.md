@@ -169,7 +169,7 @@ instructions by hand:
   space, runs each one, restores the tree and pastes the results under `Controls:`. A
   check is not changed without this.
 - **prepush-reviewer**: reads its own diff against the list in that file and runs
-  `npm run lint` plus whatever the "Which checks for which files" table in `CLAUDE.md` asks
+  `npm run lint` plus whatever the "Which checks for which files" table (`docs/checks-map.md`) asks
   for.
 - **steward, ship**: followed step by step. Merging works the same as for Claude Code
   (the owner, 2026-10-06): as soon as CI is green on the current head, without asking.

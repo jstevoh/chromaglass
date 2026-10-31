@@ -922,7 +922,9 @@
         "CPU's at the step's flush (PLAN.md 14ab-2, lib/videoFlow.ts, scripts/videoflow.mjs):",
         "the real FluidSimulation sends no row for it, and on the real solver the deltas the",
         "fold takes are the CPU loop's to a few parts in ten million, at the grid's size and",
-        "four times it. Logic and numbers, the same on any adapter that computes."
+        "four times it. And which way up (14ab-13): a title card's top lands at the top of the",
+        "plate through the loop, the solver's pass and an uploaded picture, each against the",
+        "card turned over. Logic and numbers, the same on any adapter that computes."
       ]
     },
     {
@@ -1203,6 +1205,21 @@
         "The iPhone app as the laptop's remote (src/lib/appLink.ts): a real",
         "relay, a stand-in laptop and the app's page from another origin. No",
         "plate needed, so it runs here rather than on a Mac."
+      ]
+    },
+    {
+      "name": "The Live Show panel",
+      "shard": "browser",
+      "run": "npm run liveshow",
+      "why": [
+        "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
+        "its sums in node against numbers worked by hand, then the built app",
+        "with a stand-in for the Mac app's bridge: a key goes to the keychain",
+        "store and nowhere else, Go live goes where it says and Test never to",
+        "the public, the upload warning, and the phone's Stop. No GPU: the",
+        "encoder is WebCodecs' software H.264. Through npm run, which builds",
+        "dist/ first and puts esbuild on the PATH (a bare esbuild in the",
+        "shard's shell is not found: exit 127 on the first CI run)."
       ]
     },
     {
@@ -1836,7 +1853,8 @@
         "it (PLAN.md 14ab-2, scripts/videoflow.mjs): the dye lands where the canvas of the",
         "same frame puts it, cell by cell. SwiftShader loses its GPU instance on a copy from",
         "a <video>, so the lab shard's run pours an ImageBitmap of it and only a Mac pours",
-        "the element. About twenty seconds, on the lightest shard."
+        "the element. The title card's which-way-up lines (14ab-13) run here too, so Metal's",
+        "turned copy is asked as well as SwiftShader's. About twenty seconds, on the lightest shard."
       ]
     },
     {

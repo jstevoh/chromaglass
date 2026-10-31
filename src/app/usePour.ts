@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState, type RefObject } from 'react';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
+import { uprightPicture } from '../lib/videoFlow';
 
 /**
  * Pouring a picture or a film into the dish: an image laid as dye, a video
@@ -21,14 +22,9 @@ export function usePour({
     if (!file) return;
     const img = new Image();
     img.onload = () => {
-      // Draw image to an offscreen canvas to get pixel data
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      // Its pixels turned over for the plate, whose rows count up (PLAN 14ab-13).
+      const imageData = uprightPicture(img, img.width, img.height);
+      if (!imageData) return;
       visualizerRef.current?.injectImage(imageData);
       URL.revokeObjectURL(img.src);
     };
