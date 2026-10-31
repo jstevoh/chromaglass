@@ -216,7 +216,8 @@ style (§31).
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
 - **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **18e-2** a clear pour's edge, **31a** the projector's
-  focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31).
+  focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
+  (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, **18m-5a** slump check with grid filter on), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
@@ -233,16 +234,16 @@ style (§31).
   **25c**, **25f** (after 18f and 18d).
 - **6.10** The realism audit's top picks (§38), each its own thread, in its order: ~~**38a** the lamp
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), **38c** soap conserved, **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), ~~**38h**~~
-  nothing on the plate makes light (38h-2 the rest painted from above, 38h-3, 38h-4 open), then **38d**, **38f**, **38g-2**, **38i**, **38j**; **38r** (the rest
+  nothing on the plate makes light (38h-2 the rest painted from above, 38h-3, 38h-4 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f**, **38g-2**, **38i**, **38j**; **38r** (the rest
   gap: part 1, one number at 6 mm, shipped; part 2, 2 mm, next) is read before 38d and 38i.
 
 ### Wave 7. Reach
 
 - **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
   **12.7**, **12.8**; **12.4a**; later **12.9**. When the owner says go: **12-ship**, **12-play-org**; later **12-link**; **12-mas** not for now.
-- **7.2** VJ software (§13): **13.4** the OSC write-up (S, any time), **13-win-app** then
+- **7.2** VJ software (§13): ~~**13.4**~~ the OSC write-up (shipped 2026-10-31, with ~~**13-icon**~~ and ~~**13-version**~~), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out (Link shipped 2026-10-30),
-  **13-port**, **13-intel**, **13-icon**, **13-exit**, **13-version**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
+  **13-port**, **13-intel**, **13-exit**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
@@ -331,7 +332,7 @@ Where each batch stands, as of 2026-09-27:
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-5's words shipped; 34a-7, the page for pros at `/pro`, shipped, and its 34a-7a, OSC and Art-Net gated to Pro; 34a-2 to 34a-4 and the share card open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 | 37 | Marketing and social media | Asked 2026-10-29: who it is for, the channels (YouTube, Shorts, Reels and TikTok, Reddit and the VJ and synth forums, Show HN, Product Hunt), the launch in order from the day the store goes live, a weekly cadence, who makes what and who posts, and how a sale is traced to a channel (37a–37o). The same day: the week that runs itself, the app filming itself, one Monday approval, a scheduler and YouTube's API (37p–37w), and a whole album performed live every week on YouTube from the Mac app, with a family of looks across it (37x-1 to 37x-9). 37x-4a (the live show research, `docs/live-show.md`) and 37x-4b (the RTMPS client, the wall-clock encoder, the key store, `npm run live`) shipped 2026-10-29; 37x-4c (several destinations, a portrait encode, the health readout, `npm run livedrop`) 2026-10-30; 37x-4d (the Live Show panel in the Mac app, Pro, and the phone's Stop, `npm run liveshow`) 2026-10-30; the rest not started |
-| 38 | Realism audit, after §18 | Audited 2026-10-30 across the fluid, the bubbles and films, the ferrofluid and the optics: twenty shortcuts not already open elsewhere, ranked (38a–38j the top picks: the lamp as a condenser, bubbles without clocks, soap conserved, the labyrinth from the Bond number, oil's σ in N/m, heat as a force, bubbles merging and crowding as pockets, nothing on the plate makes light, milk's scatter conserved, the ferrofluid black by its thickness); **38b, 38g, 38n shipped** (bubbles as pockets in a gap: no clocks, the round rim, Paterson, Durian, the look's own liquid; `npm run bubblephysics`), **38a shipped** (the lamp lever and the aperture, #604; 38a-2 and 38a-3 open), **38h shipped** (nothing on the plate makes light, `npm run nolight`; 38h-2, 38h-3 and 38h-4 open), the rest open |
+| 38 | Realism audit, after §18 | Audited 2026-10-30 across the fluid, the bubbles and films, the ferrofluid and the optics: twenty shortcuts not already open elsewhere, ranked (38a–38j the top picks: the lamp as a condenser, bubbles without clocks, soap conserved, the labyrinth from the Bond number, oil's σ in N/m, heat as a force, bubbles merging and crowding as pockets, nothing on the plate makes light, milk's scatter conserved, the ferrofluid black by its thickness); **38b, 38g, 38n shipped** (bubbles as pockets in a gap: no clocks, the round rim, Paterson, Durian, the look's own liquid; `npm run bubblephysics`), **38a shipped** (the lamp lever and the aperture, #604; 38a-2 and 38a-3 open), **38h shipped** (nothing on the plate makes light, `npm run nolight`; 38h-2, 38h-3 and 38h-4 open), **38k part shipped** (magnets add as fields, the liquid's onset worked out at 4 mT, #630; the plate on it is 38k-7, after 9t-2), the rest open |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -376,7 +377,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
 | 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 5 |
 | 23 | Selling it: the site free, the app paid | [`23-selling.md`](docs/plan/23-selling.md) | 23.1–23.10e | 22 |
-|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.17-cikeys | 13 |
+|  | (continued) | [`23-selling-2.md`](docs/plan/23-selling-2.md) | 23.15–23.19 | 16 |
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
 | 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 11 |
 | 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 10 |
@@ -385,7 +386,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28k | 16 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 14 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 9 |
-| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 6 |
+| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 13 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 10 |
 | 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) |  | 9 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 8 |
