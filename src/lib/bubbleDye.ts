@@ -1,10 +1,8 @@
 /**
- * What a bubble does to the dye on the CPU side (H6 · A): when it pops, the
- * hole is filled back in from the ring round it. Pure array work on the
- * logical grid, so it can be measured on its own (npm run pops). The ring
- * itself is the GPU's: the air carries the liquid under it out to the rim
- * (airDisplace in gpu/wgsl/fluid/gap.ts, PLAN 15g-8). It was laid here from
- * the readback mirror, and that went wrong whenever the mirror lagged.
+ * What a bubble does to the dye on the CPU side (H6 · A): the dye it pushes
+ * aside goes to a ring just outside its rim, and when it pops the hole is
+ * filled back in from that ring. Pure array work on the logical grid, so it
+ * can be measured on its own (npm run pops).
  *
  * Both used to work on hard-edged sets of cells: every cell inside the
  * radius, every cell in the annulus, each given the same amount. On a 192
@@ -31,8 +29,7 @@ const smooth = (a: number, b: number, x: number) => {
 };
 
 /**
- * The band the displaced dye was laid in when the CPU laid it, and the rows a
- * bubble's write is marked on (lib/deltaRows.ts): just outside the rim, a third of a
+ * The ring the displaced dye lands in: just outside the rim, a third of a
  * radius wide (what the references show round a bubble sitting in dye), and
  * never narrower than a few cells, so a small bubble's ring is a ring and
  * not a handful of cells. Peaks mid-band and falls to nothing at both edges.
@@ -52,6 +49,31 @@ export function rimBand(R: number): { rIn: number; rOut: number; w: (d: number) 
 
 /** The outer edge of the ring `fillHole` draws from; it writes a cell past it (and lib/deltaRows.ts marks that). */
 export function holeRing(R: number): number { return Math.max(R * 1.45, R + 3); }
+
+/**
+ * Lay `mass` of dye (with its absorptions) into the ring round a bubble at
+ * (x, y) of radius R, in the grid's own log-space so the ring keeps the
+ * colour of the dye it came from. Conserves exactly: the weights sum to one.
+ */
+export function depositRim(t: DyeTarget, N: number, x: number, y: number, R: number,
+  mass: number, aR: number, aG: number, aB: number): boolean {
+  const band = rimBand(R);
+  const yl = Math.max(0, Math.floor(y - band.rOut)), yh = Math.min(N - 1, Math.ceil(y + band.rOut));
+  const xl = Math.max(0, Math.floor(x - band.rOut)), xh = Math.min(N - 1, Math.ceil(x + band.rOut));
+  let sum = 0;
+  for (let j = yl; j <= yh; j++) for (let i = xl; i <= xh; i++) sum += band.w(Math.hypot(i - x, j - y));
+  if (!(sum > 1e-6)) return false;
+  for (let j = yl; j <= yh; j++) {
+    for (let i = xl; i <= xh; i++) {
+      const w = band.w(Math.hypot(i - x, j - y)) / sum;
+      if (w <= 0) continue;
+      const k = i + j * N;
+      t.density[k] += mass * w;
+      t.densityR[k] += aR * w; t.densityG[k] += aG * w; t.densityB[k] += aB * w;
+    }
+  }
+  return true;
+}
 
 /**
  * One pass of filling a popped bubble's hole from the ring around it, read

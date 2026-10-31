@@ -307,78 +307,78 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
-    Where air is, liquid is not, and it went out to the rim (H6 · A, PLAN 15g-8).
+    Where air is, dye is not — and it went somewhere (H6 · A).
 
-    A bubble between two glasses is a pocket of air the liquid has been
-    pushed out of: its meniscus sweeps the liquid, and the dye in it, ahead
-    of itself, and the dye ends up in the liquid just outside the rim. Most of
-    that is already the flow: the air arriving is a source in the projection
-    (divergence, pressure.ts), so a growing bubble pushes the liquid out ahead
-    of its edge. What the flow cannot do is empty the middle, and that is
-    structural rather than tuning. A radial source's velocity is zero at its
-    centre, and the dye's advection is semi-Lagrangian, which carries a value
-    along a characteristic and has no term to dilute it, so the centre cell
-    backtraces onto itself and keeps its dye for ever (a neighbour exchange
-    driven by the air's difference fails the same way: the middle of a bubble
-    is uniformly air, 0.990 of the plate's dye left there).
+    A bubble is a hole, so the liquid under it has to leave. The first
+    version of this scaled the dye down: dye *= 1 - air. That empties a
+    bubble perfectly and it is wrong, because the dye does not go anywhere —
+    it is destroyed. A bubble that drifts on leaves a scar of clear plate
+    behind it, and a plate with bubbles on it slowly loses all its colour.
 
-    This was a multiply, dye *= 1 - air, with the CPU putting what it took
-    back as a ring from the readback mirror (depositBubbleRims). The multiply
-    reached the middle; the deposit kept the plate's colour only when the
-    mirror, the bubble list and the GPU agreed on which cells had been
-    covered since the last deposit. On a slow runner they do not: a mirror
-    frames behind a straw that blows a new bubble every hold on dye drifting
-    in the breath's flow, and the Blow check's pool read +13%, -6.6%, -15%,
-    +16% and -20% on a stroke that should keep it (PLAN 15g-8).
+    Measured, which is how it was caught: with the bubbles cleared away, the
+    cells they had been standing on read 0.002 against 0.792 around them. The
+    dye never came back because there was none left to come back.
 
-    So the liquid under the air now leaves the way the meniscus sends it: out
-    from the bubble's centre, across the cell faces, in flux form. Each face's
-    flux is what one cell sends and what its neighbour receives, so nothing
-    is made or lost on any step, at any frame rate, with no mirror in it. A
-    cell sends its air's share of its dye (air 1: all of it; the soft rim,
-    its part), split over its four faces by where in its bubble it is (the
-    air field carries that, wgsl/air.ts), and a little to every face so a
-    bubble's very centre, which has no outward, still empties. The dye walks
-    out a cell a pass until it reaches liquid with no air in it, and piles
-    there: the ring a bubble pushes its dye into, which used to be laid by
-    the CPU, is now where the liquid actually went.
+    So this moves the dye instead. Between each pair of neighbouring cells,
+    liquid flows from the one with more air in it to the one with less, in
+    proportion to the difference — the same exchange in both directions, so
+    what one cell loses another gains and the total is unchanged. Run every
+    step, it walks the dye out of a bubble and piles it against the rim,
+    which is where the plan wants it: the bright ring around a bubble is
+    real dye that was pushed there, and it moves with the liquid.
 
-    A.a.x is bubbleClear: 1 is the physical answer, and lower keeps some of
-    the liquid in the air for a look that wants the old shading.
+    A.a.x is bubbleClear, the rate. The four flows are each at most a
+    quarter of the cell, so nothing can push a cell below zero.
   */
-  airDisplace: `${HEAD}
+  /*
+    Where air is, dye is not (H6 · A).
+
+    A multiply, and it was a multiply before, and the round trip is the
+    lesson. `dye *= 1 - air` empties a bubble perfectly — measured 0.000
+    against 1.492 — and destroys what it removes, so a bubble that drifts on
+    leaves a scar of clear plate and a plate with bubbles slowly loses its
+    colour. The check caught that, so the multiply was replaced by a
+    conserving exchange between neighbours, from more air to less.
+
+    That exchange conserves and **cannot empty a bubble**, for a reason that
+    is structural rather than a matter of tuning: it is driven by the
+    *difference* in air between neighbouring cells, and the inside of a
+    bubble is uniformly air, so there is no difference to flow down. The
+    radial profile says it exactly. With the air at 1.00 in the middle of a
+    bubble, the dye there measured **0.990** of what the same plate had with
+    no bubble on it — untouched — while the rim, where the gradient is, sat
+    at 0.85. A hole with its middle intact is not a hole.
+
+    Three things were tried before believing that. A velocity down the air
+    gradient does nothing at all, because a gradient field is precisely what
+    the pressure projection removes. A source in the divergence the
+    projection solves does reach the flow and still leaves the middle: the
+    velocity of a radially symmetric source is zero at its centre, and the
+    dye's advection is semi-Lagrangian, which transports a value along a
+    characteristic and has no term to dilute it — so the centre cell
+    backtraces onto itself and keeps its dye for ever. Blurring the air
+    field to manufacture a slope made it worse.
+
+    So: the multiply, which needs no transport and therefore reaches the
+    middle, and the dye it displaces is kept by the plate's own budget
+    servo rather than here — see `evapFactor` in `LiquidVisualizer`. The
+    conservation is global rather than at the rim; a rim ring of real
+    displaced dye is written up in `bubbles-plan.md` as what is left.
+
+    `A.a.x` is `bubbleClear`: 1 is the physical answer, and lower keeps some
+    of the old shading for a look that wants it.
+  */
+  airExclude: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
 @group(0) @binding(3) var air: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
-/*
-  The share of cell p's dye that leaves it this pass through each face, in
-  the order +x, -x, +y, -y: the air's share, split by the outward direction.
-  Nothing leaves through the plate's edge, and nothing leaves a cell off it.
-*/
-fn leaving(p: vec2i, n: i32) -> vec4f {
-  if (p.x < 0 || p.y < 0 || p.x >= n || p.y >= n) { return vec4f(0.0); }
-  let f = textureLoad(air, p, 0);
-  let a = clamp(f.r, 0.0, 1.0);
-  let s = clamp(A.a.x, 0.0, 1.0) * a;
-  if (s < 1e-4) { return vec4f(0.0); }
-  // Where in its bubble, -1 to 1 across and down (y-down, as the field is).
-  let q = clamp(vec2f(f.g, f.b) / a * 2.0 - 1.0, vec2f(-1.0), vec2f(1.0));
-  var w = vec4f(max(q.x, 0.0), max(-q.x, 0.0), max(q.y, 0.0), max(-q.y, 0.0)) + vec4f(0.05);
-  w = w * vec4f(select(1.0, 0.0, p.x + 1 >= n), select(1.0, 0.0, p.x == 0),
-                select(1.0, 0.0, p.y + 1 >= n), select(1.0, 0.0, p.y == 0));
-  return s * w / max(w.x + w.y + w.z + w.w, 1e-6);
-}
-fn dyeAt(p: vec2i, n: i32) -> vec4f { return textureLoad(dye, clamp(p, vec2i(0), vec2i(n - 1)), 0); }
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let n = i32(S.n);
-  let o = leaving(p, n);
-  let ex = vec2i(1, 0);
-  let ey = vec2i(0, 1);
-  let outVal = dyeAt(p, n) * (1.0 - (o.x + o.y + o.z + o.w))
-    + dyeAt(p - ex, n) * leaving(p - ex, n).x + dyeAt(p + ex, n) * leaving(p + ex, n).y
-    + dyeAt(p - ey, n) * leaving(p - ey, n).z + dyeAt(p + ey, n) * leaving(p + ey, n).w;
-  textureStore(dst, p, select(vec4f(0.0), max(outVal, vec4f(0.0)), finite4(outVal)));
+  let a = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
+  let here = textureLoad(dye, p, 0);
+  let keep = 1.0 - clamp(A.a.x, 0.0, 1.0) * a;
+  textureStore(dst, p, max(here * keep, vec4f(0.0)));
 }`,
 };

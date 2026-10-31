@@ -168,8 +168,6 @@ export class FluidCore {
   protected air: WebGPUAir | null = null;
   /** How hard the arriving air pushes the liquid aside (H6); 0 switches it off. */
   protected airPush = 0;
-  /** The widest bubble's reach in cells, from the last list (setBubbles): how many passes airDisplace needs. */
-  protected airReach = 0;
   /** Whether any of the second phase is on the plate; nothing runs without it. */
   protected phaseLive = false;
   /*

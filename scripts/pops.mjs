@@ -9,10 +9,10 @@
  * that closes its hole when it pops, were laid on hard-edged sets of grid
  * cells, each given the same amount: a small bubble came back as a flat,
  * stepped plug in a drained, stepped ring. Here a bubble sits in a plate of
- * gently varying dye, its air carries the liquid under it out to the rim as
- * the GPU does (airDisplace, PLAN 15g-8; until then a multiply and a ring
- * laid by the CPU), it pops, and the fill runs as the app runs it. Then: how
- * far the spot is from round (see below), and how much dye there is.
+ * gently varying dye, taking what is under it as the GPU does (a soft disc,
+ * multiplied out), its dye goes to the ring, it pops, and the fill runs as
+ * the app runs it. Then: how far the spot is from round (see below), and
+ * how much dye there is.
  * The old hard-edged way is run alongside, for the record.
  */
 import { build } from 'esbuild';
@@ -25,7 +25,7 @@ const check = (name, ok, detail = '') => {
 
 const out = 'node_modules/.cache/pops-bubbleDye.mjs';
 await build({ entryPoints: ['src/lib/bubbleDye.ts'], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { fillHole } = await import(`../${out}`);
+const { depositRim, fillHole } = await import(`../${out}`);
 
 // The old way, as it was: every cell inside R, every cell of the annulus, the same amount each.
 const old = {
@@ -51,49 +51,6 @@ const old = {
   },
 };
 
-/*
-  What the air does to the dye under it now, on the GPU (airDisplace in
-  src/gpu/wgsl/fluid/gap.ts, PLAN 15g-8): each cell sends its air's share of
-  its dye across its four faces, split by where in the bubble it is plus a
-  twentieth to every face, until the disc is empty and its liquid is piled
-  at the rim. A port of the kernel, here only to lay the ring the fill then
-  closes, which is what this script measures. The kernel's own numbers on a
-  real plate are \`npm run bubbles\` and the tools check's Blow.
-*/
-const displace = (dye, N, x, y, R) => {
-  const air = new Float32Array(N * N), qx = new Float32Array(N * N), qy = new Float32Array(N * N);
-  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-    const d = Math.hypot(i - x, j - y), k = i + j * N;
-    // The air splat's own edge (wgsl/air.ts): soft over the outer quarter of the radius the app asks for, never under a cell and a half.
-    const soft = Math.max(0.25, 1.5 / R), t = Math.max(0, Math.min(1, (d - R * (1 - soft)) / (R * soft)));
-    air[k] = 1 - t * t * (3 - 2 * t);
-    qx[k] = Math.max(-1, Math.min(1, (i - x) / R)); qy[k] = Math.max(-1, Math.min(1, (j - y) / R));
-  }
-  const leaving = (i, j) => {
-    if (i < 0 || j < 0 || i >= N || j >= N) return [0, 0, 0, 0];
-    const k = i + j * N, s = air[k];
-    if (s < 1e-4) return [0, 0, 0, 0];
-    const w = [Math.max(qx[k], 0) + 0.05, Math.max(-qx[k], 0) + 0.05, Math.max(qy[k], 0) + 0.05, Math.max(-qy[k], 0) + 0.05];
-    if (i + 1 >= N) w[0] = 0; if (i === 0) w[1] = 0; if (j + 1 >= N) w[2] = 0; if (j === 0) w[3] = 0;
-    const sum = w[0] + w[1] + w[2] + w[3];
-    return w.map((v) => (s * v) / sum);
-  };
-  const lo = Math.max(1, Math.floor(Math.min(x, y) - R - 3)), hi = Math.min(N - 2, Math.ceil(Math.max(x, y) + R + 3));
-  for (let pass = 0; pass < 8 * R + 40; pass++) {
-    const next = dye.slice();
-    for (let j = lo; j <= hi; j++) for (let i = lo; i <= hi; i++) {
-      const o = leaving(i, j), k4 = (i + j * N) * 4, keep = 1 - (o[0] + o[1] + o[2] + o[3]);
-      const ins = [[i - 1, j, 0], [i + 1, j, 1], [i, j - 1, 2], [i, j + 1, 3]];
-      for (let c = 0; c < 4; c++) {
-        let v = dye[k4 + c] * keep;
-        for (const [a, b, f] of ins) v += dye[(a + b * N) * 4 + c] * leaving(a, b)[f];
-        next[k4 + c] = v;
-      }
-    }
-    dye.set(next);
-  }
-};
-
 const N = 192;
 const run = (impl, R) => {
   const x = 100.37, y = 80.61;
@@ -113,20 +70,16 @@ const run = (impl, R) => {
       dye[k * 4 + 3] += t.density[k]; dye[k * 4] += t.densityR[k]; dye[k * 4 + 1] += t.densityG[k]; dye[k * 4 + 2] += t.densityB[k];
     }
   };
-  if (impl.depositRim) {
-    // The old way: the air took what was under it (a soft disc, as the air splat is), and the rim got it.
-    let mass = 0, aR = 0, aG = 0, aB = 0;
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const d = Math.hypot(i - x, j - y); const a = 1 - Math.max(0, Math.min(1, (d - (R - 0.75)) / 1.5));
-      if (a <= 0) continue;
-      const k = (i + j * N) * 4;
-      mass += dye[k + 3] * a; aR += dye[k] * a; aG += dye[k + 1] * a; aB += dye[k + 2] * a;
-      for (let c = 0; c < 4; c++) dye[k + c] *= 1 - a;
-    }
-    const t0 = fresh(); impl.depositRim(t0, N, x, y, R, mass, aR, aG, aB); apply(t0);
-  } else {
-    displace(dye, N, x, y, R);
+  // The air takes what is under it (a soft disc, as the air splat is), and the rim gets it.
+  let mass = 0, aR = 0, aG = 0, aB = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const d = Math.hypot(i - x, j - y); const a = 1 - Math.max(0, Math.min(1, (d - (R - 0.75)) / 1.5));
+    if (a <= 0) continue;
+    const k = (i + j * N) * 4;
+    mass += dye[k + 3] * a; aR += dye[k] * a; aG += dye[k + 1] * a; aB += dye[k + 2] * a;
+    for (let c = 0; c < 4; c++) dye[k + c] *= 1 - a;
   }
+  const t0 = fresh(); impl.depositRim(t0, N, x, y, R, mass, aR, aG, aB); apply(t0);
   // It pops: the fill, a pass per mirror, as long as the app keeps it on the books.
   for (let p = 0; p < 45; p++) { const t = fresh(); if (!(impl.fillHole(t, dye, N, x, y, R) > 0)) break; apply(t); }
   /*
@@ -158,7 +111,7 @@ const run = (impl, R) => {
 };
 
 for (const R of [2.5, 4, 8]) {
-  const was = run(old, R), now = run({ fillHole }, R);
+  const was = run(old, R), now = run({ depositRim, fillHole }, R);
   console.log(`     a bubble of radius ${R} cells, popped: out of round by ${now.blocks.toFixed(4)} (${was.blocks.toFixed(4)} the old way), `
     + `scar ${now.range.toFixed(2)} deep (${was.range.toFixed(2)}), in the plate's own level`);
   check(`radius ${R}: the spot it popped from is round, not blocks`, now.blocks < 0.4 * was.blocks && now.blocks < 0.012,

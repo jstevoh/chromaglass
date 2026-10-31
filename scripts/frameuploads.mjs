@@ -113,18 +113,12 @@ const frames = [
   // Radii in the 128-cell units the tools are given in (LiquidVisualizer's hand: 7).
   ['a hand in the liquid', (s) => s.fingerDrag(100, 120, 7, 0.05, 0.6, 0.2)],
   ['a breath on the film', (s) => s.blowWind(60, 150, 10, 1, 0.5, 0.5)],
-  /*
-    A bubble on the plate writes nothing here any more: the GPU carries the
-    liquid under its air out to the rim (airDisplace, PLAN 15g-8), where this
-    laid the ring from the mirror. So it is seen and popped in one frame, and
-    the frame is the fill.
-  */
-  ['a bubble seen, then popped and its hole filled', (s) => {
-    s.rbSeq++; s.fillBubbleHoles(new Float32Array([0.5, 0.3, 0.04, 1]), 1);
+  ['a bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1); }],
+  ['the bubble popped, its hole filled', (s) => {
     // The mirror shows the hole the bubble left, so there is something to fill.
     const v = s.gpu.rbDyeView, R = 0.04 * L;
     for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.3 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
-    s.rbSeq++; s.fillBubbleHoles(new Float32Array(4), 0);
+    s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
   }],
   ['a hand elsewhere, two flushes after the last', (s) => s.fingerDrag(30, 20, 5, 0.05, -0.4, 0.3)],
   ['a breath elsewhere, its grid by rows', (s) => s.blowWind(120, 60, 10, 1, -0.5, 0.3)],
@@ -134,11 +128,11 @@ const frames = [
     marking the rim's rows for the fill left rows unsent past R = 22 cells
     (the review of 14ab-4).
   */
-  ['a big bubble on the plate', (s) => { s.rbSeq++; s.fillBubbleHoles(new Float32Array([0.5, 0.5, 0.2, 1]), 1); }],
+  ['a big bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.5, 0.2, 1]), 1); }],
   ['the big bubble popped, its hole filled', (s) => {
     const v = s.gpu.rbDyeView, R = 0.2 * L;
     for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.5 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
-    s.rbSeq++; s.fillBubbleHoles(new Float32Array(4), 0);
+    s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
   }],
   ['a tool\'s few cells again', (s) => s.addDensity(150, 170, 0.2)],
   ['and the next step', (s) => s.addDensity(150, 171, 0.2)],
