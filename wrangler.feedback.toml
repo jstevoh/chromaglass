@@ -3,7 +3,7 @@
 # of notes never touches the licences, and either redeploys without the other.
 #
 # Once:
-#   npx wrangler d1 create chromaglass-feedback        # paste its id below
+#   npx wrangler d1 create chromaglass-feedback        # done 2026-10-31; its id is below
 #   npx wrangler d1 execute chromaglass-feedback --remote --file server/feedback-schema.sql
 #   npx wrangler secret put FEEDBACK_TOKEN -c wrangler.feedback.toml   # for reading entries
 #   npx wrangler secret put RESEND_API_KEY -c wrangler.feedback.toml   # for the mail
@@ -30,4 +30,4 @@ FIREBASE_PROJECT_ID = "chromaglass"
 [[d1_databases]]
 binding = "FEEDBACK_DB"
 database_name = "chromaglass-feedback"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "7e855345-d2ac-4436-aa7b-518d2e181be7"
