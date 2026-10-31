@@ -666,6 +666,21 @@ That pulls main, installs, builds, and starts the show server in the same window
 
 `npm run ship` is the same thing with a deploy in the middle, for publishing from this machine when something has to be live that isn't on `main` yet. The pieces are also separate: `npm run update` (pull, install, build), `npm run deploy` (publish the build), `npm run remote` (the show server).
 
+## Feedback
+
+Settings → Feedback (the last row of the rail; on a phone, More → Feedback, or the end of
+the Settings strip; or "Send feedback" in the command palette) sends a note to
+support@chromaglass.art and keeps it in the feedback database. Pick what it is about,
+write it, and Send. Two switches, both on and both yours to turn off before sending, add
+the app's recent log with this look's settings, and a picture of the plate; "See what is
+sent" shows exactly what will leave. Passwords, licence keys, stream keys and sign-in
+tokens are taken out of the log first. Signed in, the answer comes to your account's
+address; otherwise type one if you would like an answer.
+
+On a build with no feedback service (`VITE_FEEDBACK_URL` unset), Send opens your mail
+app with the note in it instead, without the log. Setting the service up, and reading
+what has come in: `wrangler.feedback.toml`.
+
 ## Deploying
 
 Pushes to `main` are typechecked, built and published to Firebase Hosting by

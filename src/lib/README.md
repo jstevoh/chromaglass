@@ -35,8 +35,8 @@ About 160 files, grouped; a name is its file.
 
 **Mac and iPhone bridges.** appLink: iPhone app link. castProtocol: casting. macApp: Mac download. padPicture: remote's picture. remoteProtocol: phone remote.
 
-**App infrastructure.** bench: grid sweep. checkHooks: the checks' `?debug` doors. crashLog: black box. platform: where it runs. showPath: site paths. unhandled: exhaustive switch.
+**App infrastructure.** bench: grid sweep. checkHooks: the checks' `?debug` doors. crashLog: black box. feedback: Settings → Feedback's note and its send (PLAN 39a); feedbackScrub: what a note must not carry. platform: where it runs. showPath: site paths. unhandled: exhaustive switch.
 
 ## Checks
 
-`npm run quick`. Looks, set list: `desk`, `setlist`, `panel`. Areas: `areacords`, `plate`. Sound: `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. Patch bay: `soundcords`, `scene`. Mixer: `mixer`, `rowfade`, `remotemix`. Projector: `map`, `beams`, `wallpattern`. Bridges: `applink`, `phonelink`. `governor`: `rungs`. `crashLog`: `crash`. `cartoons`: `cartoons`. `deltaRows`: `frameuploads`. `videoFlow`: `videoflow`.
+`npm run quick`. Looks, set list: `desk`, `setlist`, `panel`. Areas: `areacords`, `plate`. Sound: `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. Patch bay: `soundcords`, `scene`. Mixer: `mixer`, `rowfade`, `remotemix`. Projector: `map`, `beams`, `wallpattern`. Bridges: `applink`, `phonelink`. `governor`: `rungs`. `crashLog`: `crash`. `feedback`, `feedbackScrub`: `feedback-worker`, `feedbackpane`. `cartoons`: `cartoons`. `deltaRows`: `frameuploads`. `videoFlow`: `videoflow`.
