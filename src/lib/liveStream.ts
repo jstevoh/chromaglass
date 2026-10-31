@@ -331,6 +331,9 @@ export function liveCrop(cw: number, ch: number, w: number, h: number, fit: 'cov
   return { sx: (cw - sw) / 2, sy: (ch - sh) / 2, sw, sh, dx: 0, dy: 0, dw: w, dh: h };
 }
 
+/** How long `start` waits for the frame task's first picture before it starts the clock anyway (see `start`). */
+const FIRST_PICTURE_WAIT_MS = 500;
+
 export class LiveEncoder {
   readonly opts: LiveOptions;
   private outs: VideoOut[] = [];
@@ -356,10 +359,10 @@ export class LiveEncoder {
   private stopping = false;
   /**
    * With `frames`: the frame task copies the next picture only when a frame
-   * has gone out since the last. Before its first copy the stage is black,
-   * and goes out black: at sixty a second that is a frame or two, and a page
-   * whose plate never draws (the panel's check, on a machine with no WebGPU)
-   * still makes a stream, its first frame a keyframe, as it always has.
+   * has gone out since the last. `start` waits for the first copy before the
+   * clock starts; a page whose plate never draws (the panel's check, on a
+   * machine with no WebGPU) starts after half a second with the stage black
+   * and still makes a stream, its first frame a keyframe, as it always has.
    * Black then is the truth about the plate, not the bug: once a picture has
    * come, the stage keeps it until the next copy, and a plate slower than
    * the stream is repeated, never blacked out. The copy is the first plate
@@ -451,6 +454,23 @@ export class LiveEncoder {
       this.transportState = started.state ?? null;
       if (!started.ok) throw new Error(started.error ?? 'the server refused the stream');
 
+      /*
+        The first picture before the clock starts. Started at once, the
+        first frame, a keyframe at t = 0, went out of a stage the frame task
+        had not drawn yet: black, and on CI's Mac the moving line of
+        `npm run liveshow -- --stack` decoded from that keyframe and found
+        no film in its first frame. At sixty a second the wait is a frame;
+        a page whose plate never draws (no WebGPU) gives up after half a
+        second and starts black, as before.
+      */
+      if (this.opts.frames) {
+        let first: () => void = () => {};
+        const came = new Promise<void>((res) => { first = res; });
+        this.unlisten = listenLiveFrames(this.opts.frames, (c) => { if (this.take(c)) first(); });
+        await Promise.race([came, new Promise<void>((res) => setTimeout(res, FIRST_PICTURE_WAIT_MS))]);
+      }
+      // Stopped while it waited: `stop` has torn down what there was.
+      if (this.phase !== 'starting') return;
       this.t0 = performance.now();
       for (const o of this.outs) {
         o.encoder = new VideoEncoder({
@@ -467,7 +487,6 @@ export class LiveEncoder {
         this.audio.configure({ codec: audioMeta.codec === 'aac' ? 'mp4a.40.2' : 'opus', sampleRate: audioMeta.sampleRate, numberOfChannels: audioMeta.channels, bitrate: audioBitrate });
       }
       this.phase = 'live';
-      if (this.opts.frames) this.unlisten = listenLiveFrames(this.opts.frames, (c) => this.take(c));
       if (first) { this.takeAudio(first, firstReadAt); void this.pumpAudio(); }
       this.tick(0);
     } catch (e) {
@@ -519,12 +538,13 @@ export class LiveEncoder {
    * Copied even at the output's own size, unlike `staged`: the canvas
    * itself is unreadable by the time the frame is due.
    */
-  private take(canvas: HTMLCanvasElement | OffscreenCanvas): void {
-    if (!this.want || this.phase !== 'live') return;
+  private take(canvas: HTMLCanvasElement | OffscreenCanvas): boolean {
+    if (!this.want || (this.phase !== 'live' && this.phase !== 'starting')) return false;
     const t = performance.now();
     for (const o of this.outs) this.stage(canvas, o);
     this.timing.grabMs += performance.now() - t;
     this.want = false;
+    return true;
   }
 
   /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
