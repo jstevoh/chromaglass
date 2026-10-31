@@ -185,7 +185,7 @@ export const CONTROL_HELP: Record<string, string> = {
   spectralOptics: 'Mixes dyes across six bands of the spectrum rather than three, for cleaner mixtures.',
   evaporationRate: 'How fast the liquid dries off the plate.',
   heatDecay: 'The air blown over the glass, which takes the lamp\'s heat away. Near one it is still air and the heat lingers for minutes.',
-  airVelocity: 'A steady draught over the glass, up the plate: it drags the liquid most where it comes in, and cools the glass. Separate from the Blow tool.',
+  airVelocity: 'A steady draught up the plate: it drags the liquid most where it comes in, and cools the glass. Not the Blow tool.',
   vibrationFrequency: 'A steady shaking of the dish that keeps the surface restless.',
   dropHeight: 'How far a dropped liquid falls. Zero lays it on the plate, one splashes.',
   diffusionRate: 'How fast dye spreads into its surroundings. It costs speed, so it stays small.',
