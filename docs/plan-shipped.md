@@ -7790,9 +7790,12 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   0.55 at the two or three cells a film is drawn as), and the splodascope's 35 drops kept 19
   in six seconds (main 31; 29 with the cap put back, 21 uncapped at the old σ, so the cap and
   not σ). A held film's faces are its drops' own surfaces, never a neck that tight, so in a
-  film (where `mixFilm`'s ray finds the other face) the concave part of the blur's curvature
-  is taken back out of the force (σ times Film Hold, thin gap only): 35 → 28, the control
-  35 → 4, the lone drop untouched to the bit. Found: 38e-1 (one
+  film (where `filmSqueeze` finds oil on both sides of the cell along one of four lines, the
+  cells whose water mixMu already charges for) the concave part of the blur's curvature is
+  taken back out of the force (σ times Film Hold, thin gap only): 35 → 31, the control
+  35 → 4, the lone drop untouched to the bit. Gated by the push's one ray instead it kept 28
+  (the ray misses a neck's saddle), by the four lines' weight 22, ungated 32 but the lone
+  drop moved 1.6e-3. Found: 38e-1 (one
   σ a plate), 38e-2 (threads narrower than the gap), 38e-3 (the old plate's cap), 38e-4.
 
 ### QA list: what the owner found playing it

@@ -120,13 +120,19 @@ written first. Line numbers are as read on main at d07ac31.
     of the flow's unit stays in it (0.27 at three times real): the diffuse edge's own current,
     linear in σ. Find what holds it (Cahn–Hilliard pinning the edge to the grid, the current,
     or the shape not being an oval) and measure it on the Mac's 768.
-  - **38e-5** Film Hold's crowd, uncapped, keeps 28 of 35 where the capped plate kept 31
-    (`npm run filmhold`, 192², six seconds). The waist's concave pull is taken back only where
-    `mixFilm`'s ray, cast along a cell's own normal, finds the other face; at a neck's saddle
-    the normal runs along the film and the ray misses. Find where the seven merges start
-    (a picture of the mix a second in) and, if it is the saddle, read the film by
-    `filmSqueeze`'s four lines there instead; and give the push Π(h) in pascals against the
-    drops' σ/R, so Film Hold is a disjoining pressure with a unit, not a curvature.
+  - **38e-5** Film Hold as a disjoining pressure with a unit. The push (`FILM_PUSH`) is a
+    curvature times σ, set in the lab; give it as Π(h) in pascals against the drops' σ/R, so
+    the film's thickness at rest follows from the oil and the soap, and say what Film Hold
+    scales (the surfactant's charge). The waist's concave pull is already taken back in a
+    film (38e); the crowd keeps 31 of 35 at 192² over six seconds, as the capped plate did.
+  - **38e-6** An oil drop under the breath trails its own colour. `npm run airblow` part 5:
+    a drop of oil at Oil Tension 0.5 is carried +1.21% of the plate where the colour pool
+    goes +2.79% (bar: half); with the cap put back +2.07% against +2.93% (SwiftShader, and
+    the Mac's run the same, +1.20% against +2.75%). A circle's tension cannot slow its
+    translation (moving a circle changes no curvature, and ∮σκn ds = 0), so the uncapped
+    force has a net part over the drop that it should not: sum the capillary force over one
+    drop on the grid and find where it comes from (the blur's tails, the normal's
+    regularisation, the Cahn–Hilliard edge lagging the carry).
 
 - **38f. The lamp's heat lifts the liquid as a force, and cools by the plate's own losses**
   (S for the force, M for the cooling; Medium: plumes on the upright looks and Lava).

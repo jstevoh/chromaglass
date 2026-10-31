@@ -44,7 +44,11 @@
  *      draws is stiffest: the thread rounds to one body (aspect under 1.25),
  *      keeps its oil to 1%, its flow in the last of eight seconds is no more
  *      than 4.5 times the same thread's at the oil's own tension, and its
- *      last read is no faster than a second before. What is left
+ *      last second's reads, averaged, are no faster than the second's
+ *      before (a mean and not one read against one: the current is near
+ *      its floor, and one read a tick above the one a second earlier is
+ *      the ripple the drag lets ring, not a runaway, which climbs every
+ *      read and lifts the mean with it). What is left
  *      once a drop has rounded is the diffuse edge's own current, which
  *      grows as σ does (three times, at three times the tension: measured
  *      0.27 against 0.09 of the flow's unit after eight seconds, still
@@ -159,9 +163,10 @@ const lastSecond = (tr) => Math.max(...tr.slice(-4).map((q) => q.fast));
 const settled = lastSecond(top), real = lastSecond(r.real);
 console.log(`  top: ${top.map((q) => `${q.aspect.toFixed(2)}/${q.bodies}/${q.fast.toFixed(3)}`).join(' ')}`);
 console.log(`  real: ${r.real.map((q) => `${q.aspect.toFixed(2)}/${q.bodies}/${q.fast.toFixed(3)}`).join(' ')}`);
-const secondAgo = top[top.length - 5].fast;
-check('4. stable at the dial’s top on a finer grid', end.bodies === 1 && end.aspect < 1.25 && Math.abs(end.amount / top[0].amount - 1) < 0.01 && settled < 4.5 * real && end.fast <= secondAgo,
-  `${end.bodies} body, aspect ${end.aspect.toFixed(3)}, oil ${(100 * end.amount / top[0].amount).toFixed(2)}% kept, fastest flow in the last second ${settled.toFixed(3)} against ${real.toFixed(3)} at the oil's own tension (${(settled / real).toFixed(1)}×; the diffuse edge's own current grows as σ, 3×, a runaway without bound), and falling: ${end.fast.toFixed(3)} now, ${secondAgo.toFixed(3)} a second before`);
+const mean = (a) => a.reduce((t, q) => t + q.fast, 0) / a.length;
+const lastMean = mean(top.slice(-4)), secondAgo = mean(top.slice(-8, -4));
+check('4. stable at the dial’s top on a finer grid', end.bodies === 1 && end.aspect < 1.25 && Math.abs(end.amount / top[0].amount - 1) < 0.01 && settled < 4.5 * real && lastMean <= secondAgo,
+  `${end.bodies} body, aspect ${end.aspect.toFixed(3)}, oil ${(100 * end.amount / top[0].amount).toFixed(2)}% kept, fastest flow in the last second ${settled.toFixed(3)} against ${real.toFixed(3)} at the oil's own tension (${(settled / real).toFixed(1)}×; the diffuse edge's own current grows as σ, 3×, a runaway without bound), and falling: ${lastMean.toFixed(3)} on average in the last second, ${secondAgo.toFixed(3)} in the second before`);
 check('no GPU validation errors', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 const failed = checks.filter((c) => !c.ok);
 console.log(failed.length ? `\n${failed.length} of ${checks.length} failed` : `\nall ${checks.length} passed`);

@@ -407,19 +407,30 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     The pull is the artefact itself, not a force a real film feels: the
     faces of a held film are each its own drop's surface, flat or bowed
     into the bigger drop by the smaller's 1/R (a drop ten cells across
-    bows it by a fifth of a cell's), never a neck as tight as the blur's. So in a film, where the ray above finds the other face,
-    the concave part of the blur's curvature is taken back out of the
-    force, and the push answers the drops' own Laplace pressure as a real
-    disjoining pressure does. A face's own convexity is left alone, and a
-    lone drop, whose ray finds no other face, is untouched (the check's
-    sixth part). Not on the old plate, whose capped pull the cap still
-    answers (PLAN 38e-3).
+    bows it by a fifth of a cell's), never a neck as tight as the blur's.
+    So in a film the concave part of the blur's curvature is taken back
+    out of the force, and the push answers the drops' own Laplace pressure
+    as a real disjoining pressure does. A face's own convexity is left
+    alone. A film is where FILM_WGSL's filmSqueeze says so, oil past 0.55
+    on both sides of the cell along one of four lines within FILM_REACH,
+    the very cells whose water the hold already charges for in mixMu; not
+    the push's ray, which runs along the cell's own normal and misses the
+    saddle of a neck, where the normal runs along the film: gated by the
+    ray the crowd kept 28 of 35, by the four lines 31 (the capped plate's
+    own 31), by the four lines' weight rather than their yes or no 22, and
+    with no gate at all 32 but a lone drop moved (1.6e-3 of a cell's oil,
+    its edge's slight concavities between the grid's cells). A lone round
+    drop is convex everywhere and its edge reads no film, so it is
+    untouched to the bit (the check's sixth part; that part asks the gate,
+    since a round drop has no concave pull to take back). Not on the old
+    plate, whose capped pull the cap still answers (PLAN 38e-3).
   */
-  mixFilm: `${HEAD}${CAPILLARY}
+  mixFilm: `${HEAD}${CAPILLARY}${FILM_WGSL}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var mix: texture_2d<f32>;
 @group(0) @binding(4) var soft: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
+fn cc(p: vec2i, n: f32) -> f32 { return textureLoad(mix, clampP(p, n), 0).r; }
 fn oilAt(q: vec2f, n: f32) -> f32 { return textureLoad(mix, clampP(vec2i(floor(q)), n), 0).r; }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -441,12 +452,12 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     }
     if (h > 0.0) {
       var f = A.a.x * exp(-h / ${FILM_DECAY.toFixed(2)}) * g;
-      // And the waist's pull taken back: a held film's faces are its drops' own (above).
-      f -= A.a.z * min(curvature(p, n), 0.0) * g;
       let l = length(f);
       if (A.a.y > 0.0 && l > A.a.y) { f *= A.a.y / l; }
       v = vec4f(v.xy + f, v.zw);
     }
+    // And the waist's pull taken back wherever the cell is in a film (above).
+    if (A.a.z > 0.0 && filmSqueeze(p, n) > 0.01) { v = vec4f(v.xy - A.a.z * min(curvature(p, n), 0.0) * g, v.zw); }
   }
   textureStore(dst, p, safeVel(v));
 }`,
