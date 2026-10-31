@@ -2160,11 +2160,10 @@ export class FluidSimulation {
       }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
-    // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
-    // no dye, only the gap given back, which the shader never opens past rest.
-    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
-    // The rhythm sheet (pressKick): solved a step, its change laid as the gap's, the
-    // shader's spring taken on it too, at the plate's rest (lib/sheet.ts).
+    // The kicks' presses, held against the spring, let go (`pressKick`): only the gap
+    // given back, never past rest.
+    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring);
+    // The rhythm sheet (pressKick): solved a step, laid as the gap's change, with the spring (lib/sheet.ts).
     if (this.sheet.live) {
       if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
       if (!this.sheetGap) this.sheetGap = new Float32Array(this.size * this.size);
