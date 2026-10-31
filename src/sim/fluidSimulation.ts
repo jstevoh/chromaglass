@@ -2691,7 +2691,7 @@ export class FluidSimulation {
         // is — so a real drop from the dropper or the bench splashes, and the
         // faint pulse the music lays down on every frame (which also takes this
         // shape) does not.
-        const h = Math.max(0, Math.min(1, this.dropHeight));
+        const h = Math.max(0, Math.min(2, this.dropHeight));
         // Impact grows as the square root of the height (the speed a fall
         // reaches does), so the middle of the slider already splashes.
         const e = Math.sqrt(h) * Math.min(1.5, amount / 5);
@@ -2859,7 +2859,7 @@ export class FluidSimulation {
 
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
-    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
+    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
 
     /*
       The timestep, stretched to whatever rate the loop is stepping at (H2b).
@@ -2926,7 +2926,7 @@ export class FluidSimulation {
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
     if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
-    if (settings.glassSmear > 0.2) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
+    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
     // 8.9. The lasting current joins the flow the dye is about to ride.
@@ -3111,7 +3111,7 @@ export class FluidSimulation {
       music, and a loud track still cannot triple a calm look's (lib/stir.ts).
     */
     let turbScale = stirOf(settings.turbulenceScale ?? 0, audioData ? audioData.energy : null, settings.audioImpact ?? 0.45);
-    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
+    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
     let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
     if (audioData) {
@@ -3168,7 +3168,7 @@ export class FluidSimulation {
     const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
 
     let smearX = 0, smearY = 0;
-    if (settings.glassSmear > 0.2) {
+    if (settings.glassSmear > 0) {
       const t = time * 0.3;
       smearX = noise2D(t, 100) * settings.glassSmear * 12.0 * dt;
       smearY = noise2D(100, t) * settings.glassSmear * 12.0 * dt;
@@ -3373,7 +3373,7 @@ export class FluidSimulation {
       extraMagnets: this.extraMagnets,
       magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
-      vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
+      vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
       filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
@@ -3382,13 +3382,13 @@ export class FluidSimulation {
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).
       clearFilm: this.layerIndex === 0 ? Math.max(0, Math.min(1, settings.clearFilm ?? 0)) : 0,
-      solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
+      solutalBuoyancy: Math.max(0, Math.min(2, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
       ...this.downhill(settings.tiltDirection ?? 180),
-      doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
+      doubleDiffusion: Math.max(0, Math.min(2, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
       mazeDetail: Math.max(0, Math.min(1, settings.mazeDetail ?? 0)),
-      phaseDisplace: Math.max(0, Math.min(1, settings.phaseDisplace ?? 0)),
+      phaseDisplace: Math.max(0, Math.min(2, settings.phaseDisplace ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
@@ -3425,7 +3425,7 @@ export class FluidSimulation {
       // The lasting current. Damping is its drag per step — the first thing that
       // control has ever visibly done — and the cap keeps a step's travel under
       // ¾ of a cell whatever the Speed and Advection.
-      currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
+      currentDamp: Math.max(0.8, Math.min(0.999, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
       rockX: plateSin(this.tiltX, this.rockX),
       rockY: plateSin(this.tiltY, this.rockY),

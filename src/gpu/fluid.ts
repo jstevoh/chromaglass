@@ -658,7 +658,14 @@ export class WebGPUFluid extends FluidReads {
       reaches ≥ 0.02, where half-float changes survive quantization without loss,
       or whenever doubleDiffusion is elevated.
     */
-    const doubleDiff = Math.max(0, Math.min(1, p.doubleDiffusion ?? 0));
+    /*
+      Heat Spread runs to 2 (PLAN 27h-2): 199 times water's κ, a heat that
+      outruns the dye as no real liquid does, past nature for a show. The
+      Jacobi solve is implicit and so stable at any rate; at the top on a
+      fine grid its four passes under-converge, which spreads the heat less
+      than asked, never wrongly.
+    */
+    const doubleDiff = Math.max(0, Math.min(2, p.doubleDiffusion ?? 0));
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     this.heatSeconds += seconds;
     const heatRate = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff) * n2;
@@ -747,7 +754,7 @@ export class WebGPUFluid extends FluidReads {
       straight through the glass and this is zero either way.
     */
     const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
-    const buoy = Math.max(Math.max(0, Math.min(1, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
+    const buoy = Math.max(Math.max(0, Math.min(2, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
     if (buoy > 0.001) this.ensureMix();
     const mix = this.mix;
     /*
@@ -875,13 +882,19 @@ export class WebGPUFluid extends FluidReads {
         this.run(pass, 'scaleDye', this.hsMid!, [this.vel.read], this.arg('scale one', [1, 0, 0, 0]));
       }, body);
     }
-    // Vorticity confinement, a look option (see `curl` in wgsl/fluid.ts).
+    /*
+      Vorticity confinement, a look option (see `curl` in wgsl/fluid.ts).
+      Swirl runs to 2 (PLAN 27h-2). It puts back the spin the grid smooths
+      away, so it keeps an unforced plate stirring at today's 1 as at 2; at
+      2 the stir levels off rather than feeding itself (`npm run widedials`:
+      128², mean speed 1.44e-3 at step 300 and 1.48e-3 at 600).
+    */
     stage('confine', (pass) => {
       const w = this.scratch();
       // The spin of the flow the plate actually moved by last step: the
       // velocity carried between steps is capped small (decayVel).
       this.run(pass, 'curl', w, [this.velForced], none);
-      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(1, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
+      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(2, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
       this.vel.swap();
     }, (p.vorticity ?? 0) > 0.001);
     /*
@@ -1411,8 +1424,15 @@ export class WebGPUFluid extends FluidReads {
       under a cell a step, and one exchange moves at most 4·DISPLACE_PUSH of
       a cell's dye, so a single pass let the tip overrun its own colour.
       Off (and not run) at 0, which is every look but the ones that ask.
+
+      The dial runs to 1.2 (PLAN 27h-2) in the same two passes. Each of a
+      cell's four neighbours takes at most the push's share of it
+      (k·max(f − f′, 0) + d·min(f, f′) ≤ k, as d < k), so one pass gives
+      away at most 4·DISPLACE_PUSH·s, 0.86 at 1.2, under the 1 where it
+      would overshoot (`npm run widedials`). The step's parameters bound it
+      only at 2 (sim/fluidSimulation.ts cannot grow); its top is held here.
     */
-    const displace = Math.max(0, Math.min(1, p.phaseDisplace ?? 0));
+    const displace = Math.max(0, Math.min(1.2, p.phaseDisplace ?? 0));
     stage('phase displace', (pass) => {
       const args = this.arg('phase displace', [DISPLACE_PUSH * displace, DISPLACE_INSIDE * displace, 0, 0]);
       for (let k = 0; k < DISPLACE_ITERS; k++) {

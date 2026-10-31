@@ -175,6 +175,7 @@
     "slump": "node scripts/slump.mjs",
     "disc": "node scripts/disc.mjs",
     "standing": "node scripts/standing.mjs",
+    "widedials": "node scripts/widedials.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferrodrop": "node scripts/ferrodrop.mjs",
     "ferrorest": "node scripts/ferrorest.mjs",
