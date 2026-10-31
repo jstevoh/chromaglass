@@ -414,7 +414,7 @@ const centroid = (f, left, thick) => {
     const d = b.h[c] - a.h[c];
     if (onFrame(a, c)) { frameCells++; if (d > 1e-9) framed++; } else if (Math.abs(d) > 1e-9) inside++;
   }
-  check('C8 the border thins the film at the frame and nowhere else', inside === 0 && framed >= frameCells / 2,
+  check('C8 the border thins the film at the frame and nowhere else', inside === 0 && framed === frameCells,
     `${framed} of ${frameCells} frame cells thinner after one step, ${inside} cells off the frame changed`);
 
   const vol = film({ seed: 3 }), v0 = sum(vol.h);
@@ -433,15 +433,20 @@ const centroid = (f, left, thick) => {
     return 0.5 * (lo + hi);
   };
   // A uniform 800 nm film 8 mm tall: the bottom border at r0, the top one at Laplace-hydrostatic r(H).
-  const u = createSoapFilm({ nx: 8, ny: 8, noise: 0, h0: 800 });
-  stepSoapFilm(u, 0.05, { border: 1e-3 });
-  const expect = (r) => { const hf = frankel(800, r), V = (RHO * G * (800 - hf) * 1e-9) / ZETA; return [hf + (800 - hf) * Math.exp(-V * 0.05 / u.dx), hf, V]; };
-  const rTop = 1 / (1 / 1e-3 + (RHO * G * 8 * u.dx) / SIGMA);
-  const [bottom, hfB, vB] = expect(1e-3), [top, hfT] = expect(rTop);
-  const gotB = u.h[7 * 8 + 3], gotT = u.h[0 * 8 + 3];
+  // Asked at two thicknesses (800 and 300 nm), so the law is the cell's own thickness's and not one film's constant,
+  // and to 1% of each cell's change, not an absolute bar the change itself might sit under.
+  const rTopOf = (dx) => 1 / (1 / 1e-3 + (RHO * G * 8 * dx) / SIGMA);
+  const lines = [800, 300].map((h0) => {
+    const u = createSoapFilm({ nx: 8, ny: 8, noise: 0, h0 });
+    stepSoapFilm(u, 0.05, { border: 1e-3 });
+    const expect = (r) => { const hf = frankel(h0, r), V = (RHO * G * (h0 - hf) * 1e-9) / ZETA; return [hf + (h0 - hf) * Math.exp(-V * 0.05 / u.dx), hf, V]; };
+    const [bottom, hfB] = expect(1e-3), [top, hfT] = expect(rTopOf(u.dx));
+    const gotB = u.h[7 * 8 + 3], gotT = u.h[0 * 8 + 3];
+    const ok = Math.abs(gotB - bottom) <= 0.01 * (h0 - bottom) && Math.abs(gotT - top) <= 0.01 * (h0 - top) && Math.abs(u.h[27] - h0) < 1e-9 && gotT < gotB;
+    return { ok, text: `${h0} nm: bottom fresh film ${hfB.toFixed(1)}, a cell ${gotB.toFixed(3)} (wanted ${bottom.toFixed(3)}); top r ${(rTopOf(u.dx) * 1e6).toFixed(0)} um fresh film ${hfT.toFixed(1)}, a cell ${gotT.toFixed(3)} (wanted ${top.toFixed(3)})` };
+  });
   check('C8 the film the border draws out is Frankel\'s (h = 2.68 r Ca^2/3 at the buoyant exchange speed, r from the border\'s hydrostatics)',
-    Math.abs(gotB - bottom) < 0.05 && Math.abs(gotT - top) < 0.05 && Math.abs(u.h[3 * 8 + 3] - 800) < 1e-9 && gotT < gotB,
-    `bottom border r 1 mm: fresh film ${hfB.toFixed(1)} nm at ${(vB * 1e3).toFixed(3)} mm/s, a cell ${gotB.toFixed(2)} (wanted ${bottom.toFixed(2)}); top border r ${(rTop * 1e6).toFixed(0)} um: fresh film ${hfT.toFixed(1)} nm, a cell ${gotT.toFixed(2)} (wanted ${top.toFixed(2)}); the middle ${u.h[27].toFixed(2)}`);
+    lines.every((l) => l.ok), lines.map((l) => l.text).join('; '));
 
   // r0 is the bottom border's radius; the borders above it are set by hydrostatics, so the dial shows most at the bottom row.
   // The bottom row's thinning is read against the same film with no border, since thick film sinks into that row too.
@@ -504,6 +509,17 @@ const centroid = (f, left, thick) => {
   check('C9 a thin film goes black on Vrij\'s clock (tau = 96 pi^2 sigma mu h^5 / A^2, at 40 and 55 nm)',
     Math.abs(t40 / tau(40) - 1) < 0.05 && Math.abs(t55 / tau(55) - 1) < 0.05,
     `40 nm black at ${t40.toFixed(2)} s (Vrij ${tau(40).toFixed(2)} s), 55 nm at ${t55.toFixed(2)} s (Vrij ${tau(55).toFixed(2)} s)`);
+  // The clock integrates: a film held at 300 nm for 60 s and then thinned by hand to 40 nm has banked almost nothing
+  // (60 s of a 12 h clock), so it goes black about tau(40) after the thinning, not at once.
+  {
+    const f = createSoapFilm({ nx: 8, ny: 8, noise: 0, h0: 300 });
+    for (let k = 0; k < 120; k++) stepSoapFilm(f, 0.5, { g: 0 });
+    f.h.fill(40);
+    let after = Infinity;
+    for (let k = 1; k <= 1000 && after === Infinity; k++) { stepSoapFilm(f, 0.01, { g: 0 }); if (f.h.some((v) => v <= 8.01)) after = k * 0.01; }
+    check('C9 the clock is spent, not read: a film thinned late goes black Vrij\'s time after it thinned', Math.abs(after / tau(40) - 1) < 0.05,
+      `held at 300 nm 60 s, thinned to 40 nm: black ${after.toFixed(2)} s later (Vrij ${tau(40).toFixed(2)} s)`);
+  }
   const t300 = firstBlack(300, 0.5, 120);
   check('C9 a 300 nm film does not go black in a 120 s show', t300 === Infinity, t300 === Infinity ? `Vrij's time is ${(tau(300) / 3600).toFixed(0)} h` : `black at ${t300} s`);
 
@@ -524,10 +540,16 @@ const centroid = (f, left, thick) => {
     if (near) { rimCells++; if (f.h[c] > 300 + 1e-6) rim++; }
   }
   const left = spot.reduce((a, c) => a + f.h[c] - 8, 0) / (spot.length * 32);
+  // Where the liquid went: with g = 0 nothing else moves, so what the patch lost must sit in the cells touching it
+  // (99%), and every cell further out must still be 300 nm. A spot that spreads its liquid over the whole film fails.
+  const touching = new Set();
+  for (const c of spot) for (const n of [c - 1, c + 1, c - 32, c + 32]) if (n >= 0 && n < f.h.length && !inPatch.has(n)) touching.add(n);
+  const patchLost = spot.reduce((a, c) => a + 40 - f.h[c], 0), rimGot = [...touching].reduce((a, c) => a + f.h[c] - 300, 0);
+  let far = 0; for (let c = 0; c < f.h.length; c++) if (!inPatch.has(c) && !touching.has(c)) far = Math.max(far, Math.abs(f.h[c] - 300));
   const drift = Math.abs(sum(f.h) - s0) / s0;
   check('C9 a black spot keeps its liquid: the thin patch goes to 8 nm, its film goes to a rim, nothing is lost',
-    black >= spot.length / 2 && rimCells > 0 && rim === rimCells && left < 0.5 && drift < 1e-9,
-    `${black} of ${spot.length} patch cells black, ${(100 * left).toFixed(0)}% of the patch's liquid still in it, ${rim} of ${rimCells} film cells around it thicker than the film, total drift ${drift.toExponential(1)}`);
+    black >= spot.length / 2 && rimCells > 0 && rim === rimCells && left < 0.5 && patchLost > 0 && rimGot >= 0.99 * patchLost && far < 1e-9 && drift < 1e-9,
+    `${black} of ${spot.length} patch cells black, ${(100 * left).toFixed(0)}% of the patch's liquid still in it, the cells touching it hold ${(100 * rimGot / patchLost).toFixed(1)}% of what it lost, the film beyond moved ${far.toExponential(1)} nm, ${rim} of ${rimCells} film cells around it thicker than the film, total drift ${drift.toExponential(1)}`);
 }
 
 const failed = checks.filter((c) => !c.ok);

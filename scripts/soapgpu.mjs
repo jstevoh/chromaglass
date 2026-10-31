@@ -464,8 +464,11 @@ try {
     const [Gs, Cs] = [await gpu(ss), cpu(ss)];
     const blk = (h) => h.filter((v) => v <= 8.01).length, [bg, bc] = [blk(Gs.reads[100].h), blk(Cs.reads[100].h)];
     const drift = Math.abs(total(Gs.reads[100].h) - total(p0)) / total(p0);
-    check('32g a thin patch goes black as the reference\'s does (black cells within 10%) and keeps its liquid (1e-5)', bc > 0 && Math.abs(bg / bc - 1) <= 0.1 && drift < 1e-5,
-      `${bg} black cells against the reference's ${bc}; total drift ${drift.toExponential(1)}`);
+    // Cell by cell too: a shader that blackened as many cells but spread the liquid over the film would match the count.
+    const spRef = rms(diff(Cs.reads[100].h, p0)), spErr = rms(Gs.reads[100].h, Cs.reads[100].h) / spRef;
+    check('32g a thin patch goes black as the reference\'s does (black cells within 10%, cell by cell within 1% of its change) and keeps its liquid (1e-5)',
+      bc > 0 && Math.abs(bg / bc - 1) <= 0.1 && spRef > 0 && spErr <= 0.01 && drift < 1e-5,
+      `${bg} black cells against the reference's ${bc}; RMS difference ${(100 * spErr).toFixed(3)}% of the reference's change; total drift ${drift.toExponential(1)}`);
 
     const u = Array(64).fill(40), su = scenario({ nx: 8, ny: 8, h: u, dt: 0.01, steps: 200, reads: Array.from({ length: 200 }, (_, k) => k + 1), opts: { g: 0 } });
     const [Gu, Cu] = [await gpu(su), cpu(su)];

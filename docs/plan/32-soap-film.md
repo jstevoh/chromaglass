@@ -115,7 +115,7 @@ colleagues 2020.
 - **32f-2. The bottom border is a fixed radius.** Real drainage fills the bottom border (r0 grows
   with the liquid the borders take). `f.drained` is that liquid; r0 from it is the next step.
 
-## ~~32g. Black spots on Vrij's clock (shortcut d)~~ — **Shipped** (`blackSpots` in `src/lib/soapFilm.ts`, the same in `soapTransport`; `npm run soapfilm` C9, three lines; `npm run soapgpu` 32g, two)
+## ~~32g. Black spots on Vrij's clock (shortcut d)~~ — **Shipped** (`blackSpots` in `src/lib/soapFilm.ts`, the same in `soapTransport`; `npm run soapfilm` C9, four lines; `npm run soapgpu` 32g, two)
 
 **Shipped.** Story in `docs/plan-shipped.md` §32g (2026-10-30).
 

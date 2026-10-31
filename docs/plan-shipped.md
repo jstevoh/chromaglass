@@ -5909,7 +5909,7 @@ thick film at its edge. Spots that meet leave islands of film inside the black, 
 photograph. Nothing is lost (C9 to 1e-9). C6 and C7 still pass on the new model, unchanged:
 at 120 s, 4.0% black, 18.4% dark, 13% saturated, 8/12 hues.
 
-Checks: `npm run soapfilm` 31/31 (C8 five lines, C9 three; main's model fails seven of the eight new ones (the 300 nm film staying clear is the eighth) and passes the other 23), `npm run soapgpu` 32/32 on software WebGPU with three new lines (border cell by cell 0.16% of the reference's change, volume lost 5.359% against 5.359%; 21 black cells against 21; Vrij's step 178 against 178), `npm run soapgpu -- --selftest` 32/32.
+Checks: `npm run soapfilm` 32/32 (C8 five lines, C9 four; main's model fails eight of the nine new ones (the 300 nm film staying clear is the ninth) and passes the other 23; four look-alikes from the check review, a border solved for one fixed thickness, sides not graded by hydrostatics, a spot spreading its liquid over the whole film, and a clock read from the time since the film was made, each fail one line), `npm run soapgpu` 32/32 on software WebGPU with three new lines (border cell by cell 0.16% of the reference's change, volume lost 5.359% against 5.359%; 21 black cells against 21; Vrij's step 178 against 178), `npm run soapgpu -- --selftest` 32/32.
 
 ## 33. Bubbles and the closeup, per liquid
 
