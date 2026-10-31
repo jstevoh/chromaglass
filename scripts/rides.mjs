@@ -64,10 +64,10 @@ const check = (name, ok, detail = '') => {
 
 // ── 4, the curve, in node ───────────────────────────────────────────
 const out = 'node_modules/.cache/rides-lib.mjs';
-await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+await build({ stdin: { contents: "export * from './src/lib/stir.ts'; export * from './src/lib/squish.ts'; export * from './src/lib/plateRock.ts'; export { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity } from './src/lib/turntable.ts'; export { STRONG_BEAT, WEAK_BEAT } from './src/lib/barGrid.ts'; export { RhythmSheet, stampedVolume } from './src/lib/sheet.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
 const { stirOf, stirBefore, kickDepth, KICK_RADII, kickPress, dentRadius, kickRock, stepRock, rockSwing, swayAt, CUR_ROCK, restingHand, springKick, springStep,
   ROCK_LEVEL_AFTER, ROCK_LEVEL_MOVE, STRONG_BEAT, WEAK_BEAT,
-  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, thicknessViscosity, RhythmSheet, stampedVolume, KICK_HOLD } = await import(`../${out}`);
+  stepCover, coverDrag, plateSin, HOLD_TILT, BOWL_RADIUS, COVER_ROOM, DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, thicknessViscosity, RhythmSheet, stampedVolume, KICK_HOLD } = await import(`../${out}`);
 const { createNoise2D } = await import('simplex-noise');
 // The app's sway noise, on a fixed table (the app keys its own on the show's seed).
 let seedN = 11;
@@ -112,7 +112,7 @@ const tilts = ({ R, sway = false, t0 = 0, kicks = true, before = false, spring =
 const glassDrag = (t) => coverDrag(t);
 const covers = ({ R, t = 0.45, steps = 120, spring = false }) => {
   const rock = spring ? { x: 0, y: 0, vx: 0, vy: 0, phase: 0.7 } : restingHand(), cover = { x: 0, y: 0, vx: 0, vy: 0 };
-  const h = DISH_REST_GAP * DISH_METRES, catchUp = 1 - Math.exp(-(1 / 60) / (h * h / (12 * thicknessViscosity(t))));
+  const h = DISH_GAP_METRES, catchUp = 1 - Math.exp(-(1 / 60) / (h * h / (12 * thicknessViscosity(t))));
   const out = [];
   let ux = 0, uy = 0, px = 0, py = 0;
   for (let k = 0; k < steps; k++) {

@@ -8,6 +8,12 @@
  */
 
 import { HEAD, PACKED, PACKED_BILERP, W } from './shared';
+import { DISH_GAP_RANGE, DISH_REST_GAP } from '../../../lib/turntable';
+
+/* The gap field's rest number and its floor and ceiling, in gap units (lib/turntable.ts, PLAN 38r): one source for every kernel here. */
+const GAP_REST = DISH_REST_GAP;
+const GAP_FLOOR = DISH_GAP_RANGE[0];
+const GAP_TOP = DISH_GAP_RANGE[1];
 
 export const GAP_KERNELS: Record<string, string> = {
   // The plate gap and its rate of change. A.a.x is 1 when there is a delta to fold in.
@@ -78,10 +84,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   let k = (r2 - 0.5) * 2.0;
-  let was = clamp(0.03 * (1.0 - A.a.x * k), 0.004, 0.06);
-  let now = clamp(0.03 * (1.0 - A.a.y * k), 0.004, 0.06);
+  let was = clamp(${GAP_REST} * (1.0 - A.a.x * k), ${GAP_FLOOR}, ${GAP_TOP});
+  let now = clamp(${GAP_REST} * (1.0 - A.a.y * k), ${GAP_FLOOR}, ${GAP_TOP});
   let s = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), 0.004, 0.06), s.g, s.b, s.a));
+  textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), ${GAP_FLOOR}, ${GAP_TOP}), s.g, s.b, s.a));
 }`,
 
   gapRest: `${HEAD}
@@ -98,7 +104,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // the squeeze film and no look sets it, and depth did not reach the flow
   // until depth became a mobility on the transport, so the shape has
   // never been visible.
-  let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
+  let rest = clamp(${GAP_REST} * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), ${GAP_FLOOR}, ${GAP_TOP});
   textureStore(dst, vec2i(id.xy), vec4f(rest, 0.0, 0.0, 0.0));
 }`,
 
@@ -114,7 +120,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   // The dome the two glasses leave when nothing is pressing on them.
-  let rest = clamp(0.03 * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), 0.004, 0.06);
+  let rest = clamp(${GAP_REST} * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), ${GAP_FLOOR}, ${GAP_TOP});
   var gap = s.r;
   var dhdt = 0.0;
   var pressed = false;
@@ -130,7 +136,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       // it for tens of seconds, and to 0.053 even on the lab's spring, forty
       // times the app's (check-skeptic, pre-push review). A gap already past
       // rest is left where it is, not pulled down.
-      var g2 = max(0.004, gap + dg);
+      var g2 = max(${GAP_FLOOR}, gap + dg);
       if (dg > 0.0) { g2 = min(g2, max(gap, rest)); }
       /*
         On a thin gap (A.a.y) a press closes the film as a film under a load
@@ -148,8 +154,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
         hand's own number: a thicker liquid does not yet press slower.
       */
       if (dg < 0.0 && A.a.y > 0.5) {
-        let h0 = max(rest, 0.004);
-        g2 = max(0.004, inverseSqrt(1.0 / (gap * gap) + 2.0 * (-dg) / (h0 * h0 * h0)));
+        let h0 = max(rest, ${GAP_FLOOR});
+        g2 = max(${GAP_FLOOR}, inverseSqrt(1.0 / (gap * gap) + 2.0 * (-dg) / (h0 * h0 * h0)));
       }
       dhdt += (g2 - gap) / max(S.dt, 0.0001);
       gap = g2;
@@ -194,7 +200,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let dw = textureLoad(sheetT, vec2i(id.xy), 0).r;
     if (dw != 0.0) {
       let want = gap + dw - owed;
-      let g2 = max(0.004, want);
+      let g2 = max(${GAP_FLOOR}, want);
       owed = g2 - want;
       sheetRate = (g2 - gap) / max(S.dt, 0.0001);
       dhdt += sheetRate;
@@ -232,7 +238,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     at all is still a shortcut, written into PLAN.md.
   */
   if (!pressed) {
-    let room = (gap - 0.004) / max(S.dt, 0.0001);
+    let room = (gap - ${GAP_FLOOR}) / max(S.dt, 0.0001);
     dhdt += max(s.b * S.gapMemory, -room);
   }
   // The spring back toward the dome, and its motion counts.

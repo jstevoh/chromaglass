@@ -1485,6 +1485,16 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   holes. Beads already on a plate keep their size until they retire, so switch looks, not
   only zoom, to see the full effect.
 
+  *(33g-2b, 2026-10-30.)* The beads' edges are drawn from the dome's exact cone now, and a
+  big bead (over about 3 cells across its radius) is a clear window with a thin rim and no
+  dimple. Look at Macro Bead and Lens Pools at 4x to 6x: the rims should be perfect circles
+  with a crisp dark line, a big bead should look like a flat disc of oil (the plate seen
+  through it as it is), and a small one a ball with a small upside-down picture. Say whether
+  a bead of three to four cells, where the two kinds meet, shows a ring that looks wrong
+  (the map folds there, as a real lens does), and whether the upside-down picture is what you
+  want or an upright, slightly magnified one (a camera looking at the dye a few radii under
+  the bead sees it upright; the macro photographs are of beads over a distant background).
+
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
 Play a look with a clear kick (Classic, Poster 1969) at Audio Impact 0.6. Each kick should

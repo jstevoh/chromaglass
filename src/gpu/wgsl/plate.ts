@@ -27,6 +27,7 @@ import { FILM_H0, PHASE_VIEW_TOP } from './standing';
 import { filmTableWgsl } from '../../lib/filmTable';
 import { FERRO_DROP_WGSL } from './ferroDrop';
 import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
+import { DROP_LENS_WGSL } from './dropLens';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -1712,6 +1713,8 @@ const DROP_INVERT: f32 = 3.0;
 const DROP_REACH: f32 = 0.06;
 /** Radius of the biggest drop the field makes, plate uv: about eight cells of 192 (drops, 18/18, tops out near seven). */
 const DROP_BIGGEST: f32 = 0.045;
+/** The biggest radius the cone fit (dropLens) takes for a drop, plate uv: the closeup lays beads at up to 12.5 cells (MACRO_BEAD_SCALE), 0.065, and a clean read of the dome has no wall to be fooled by, so the cap above is not its to apply. */
+const DROP_FIT_MAX: f32 = 0.08;
 /*
   The projector. A ray crossing a round surface u of the way out meets it at
   a slope u/sqrt(1 - u^2), and two refractions bend it by about
@@ -1770,6 +1773,10 @@ const DROP_MAG: f32 = 1.23;
 const DROP_HALF_GAP: f32 = 0.016;
 /** Half the gap where the last dropLens call found a drop (it reads it only there). */
 var<private> dropRho: f32 = DROP_HALF_GAP;
+/** One screen pixel in plate uv, set where the frame reads it (dropLens' edge). */
+var<private> dropPx: f32 = 0.001;
+/** How much of this pixel the last drop covers, from the dome's cone (dropLens). */
+var<private> dropEdge: f32 = 0.0;
 /** Half the gap at uv, in plate uv. */
 fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
@@ -1803,56 +1810,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
   let f = dropFlat(R, rho);
   return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
-fn dropLens(uv: vec2f, cam: f32) -> vec4f {
-  // One texel of the plate either way; the height is the plate's in both shapes.
-  let px = 1.0 / f32(textureDimensions(beadTex).y);
-  let m = beadAt(uv);
-  if (m.r < 0.02) { return vec4f(0.0, 0.0, -1.0, 0.0); }
-  // The gap, read only under a drop: four packed texels, too many for every
-  // pixel of every look with beads.
-  let rho = dropHalfGap(uv);
-  dropRho = rho;
-  let h = clamp(m.b / m.r, 0.0, 1.0);
-  let hx = beadAt(uv + vec2f(px, 0.0)); let hx2 = beadAt(uv - vec2f(px, 0.0));
-  let hy = beadAt(uv + vec2f(0.0, px)); let hy2 = beadAt(uv - vec2f(0.0, px));
-  let g = vec2f(hx.b - hx2.b, hy.b - hy2.b) / (2.0 * px * max(m.r, 0.05));
-  let g2 = dot(g, g);
-  let r = clamp(1.0 - h, 0.0, 1.0);
-  if (g2 < 1.0) { return vec4f(0.0, 0.0, r, 0.0); }
-  /*
-    No drop is bigger than DROP_BIGGEST. Where the taps straddle the wall
-    between two drops of a size, the dome is nearly level across them, the
-    size it implies runs up to the whole plate, and a push of three radii
-    read the plate from up to three plate-widths away: eight in a hundred
-    fragments of a crowd at 3x sampled farther than any drop can see, most
-    within a texel of a wall (a copy of this arithmetic run on the drops
-    check's crowd). Held to the biggest drop, a wall shows a nearby patch.
-  */
-  let R = min(inverseSqrt(g2), DROP_BIGGEST);
-  // toC runs from here to the centre, r radii long.
-  let toC = normalize(g) * r * R;
-  /*
-    The push comes in with the mask's coverage rather than at a threshold.
-    The outermost texels of a drop are its antialiasing, and there both the
-    dome and the coverage are a few steps of eight bits, so the centre they
-    point at can be anywhere; pushed in full, those texels showed a patch of
-    plate from well outside the drop, a staircase of odd pixels round every
-    rim at 3x. Faded in over the edge they show the plate beside them, as
-    the coverage there says most of the texel is.
-  */
-  let band = dropBand(r, R, rho);
-  let cover = smoothstep(0.02, 0.6, m.r);
-  // The camera's push: past the centre, in radii.
-  let turned = (DROP_INVERT + DROP_REACH / max(R, px)) * band;
-  // The projector's: toward the centre by r(1 - 1/M) radii, which puts the
-  // sample at centre + (here - centre)/M, upright; a ball's whole round top,
-  // a pancake's flat none of it (it is a window), fading out across the
-  // flat as the drop flattens.
-  let upright = r * (1.0 - 1.0 / DROP_MAG) * (1.0 - smoothstep(0.0, 0.5, dropFlat(R, rho)));
-  let push = mix(upright, turned, cam) * cover;
-  return vec4f(toC * (push / max(r, 1e-3)), r, R);
-}
-
+${DROP_LENS_WGSL}
 /*
   How near this pixel is to the air of a bubble, 0 beyond the reach of the
   dye's relief and 1 inside it (33b). A hole in the dye is the bubble's own
@@ -2534,6 +2492,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   let dropCam = smoothstep(0.4, 0.6, macroAmt);
   if (U.beads > 0.001) {
+    dropPx = max(length(dpdx(fuvSurf)), length(dpdy(fuvSurf)));
     drop = dropLens(fuvSurf, dropCam);
     if (drop.z >= 0.0) { fuv0 += drop.xy * clamp(U.beads * 3.0, 0.0, 1.0); }
   }
@@ -2954,7 +2913,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         let drop3d = dropCam * smoothstep(0.0, 0.15, U.macroRelief) * dropSolved(fuvBase);
         if (drop3d > 0.001) {
           let edgeLit = outColor * exp(-depth * vec3f(0.45, 0.7, 1.0));
-          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005) / LC_UV);
+          let seen = ferroDropSeen(fuvBase, keyPlate, bgColor, max(view.gap, 0.005));
           pc = mix(pc, edgeLit + seen * (0.4 + 0.6 * amt), drop3d);
         }
 
@@ -3590,7 +3549,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   */
   if (U.beads > 0.001 && drop.z >= 0.0) {
     let bm = beadAt(fuvSurf);
-    let inner = bm.r;
+    let inner = dropEdge;
     let ring = bm.g;
     let r = drop.z;
     let R = drop.w;

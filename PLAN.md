@@ -123,7 +123,7 @@ Judged in this order, because these gate code:
 Then the rest of `docs/judging.md` in its own order, an area a sitting (the looks, the
 Mixer, the ferrofluid, the wall, the phone and the apps), from the judging sheet (0.13),
 with each PR's preview URL (0.9) so a look is judged before it merges. **13-win-smoke**, the site on two Windows PCs, by hand (§13).
-The owner's account steps sit here too: **S8-on** (switch the crash reports on),
+The owner's account steps sit here too: **39b** (switch Settings → Feedback on), **S8-on** (switch the crash reports on),
 **19g** (more Mac runners), **12.2** (the store accounts). ~~**13.1-sign**~~ (the Mac app's
 Developer ID and notarisation) is in, 2026-10-27: the five secrets are set and a pull
 request's build came back "Notarized Developer ID"; it shipped with the
@@ -233,7 +233,7 @@ style (§31).
 - **6.10** The realism audit's top picks (§38), each its own thread, in its order: ~~**38a** the lamp
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), **38c** soap conserved, **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), **38h**
   nothing on the plate makes light, then **38d**, **38f**, **38g-2**, **38i**, **38j**; **38r** (the rest
-  gap) is read before 38d and 38i.
+  gap: part 1, one number at 6 mm, shipped; part 2, 2 mm, next) is read before 38d and 38i.
 
 ### Wave 7. Reach
 
@@ -392,6 +392,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 36 | What the analog operators could not do (researched 2026-10-27) | [`36-analog-operators.md`](docs/plan/36-analog-operators.md) |  | 12 |
 | 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
 | 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) |  | 23 |
+| 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 5 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing
