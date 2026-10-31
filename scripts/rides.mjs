@@ -268,6 +268,8 @@ page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text(
 try {
   // The sheet's dent radius on the lab's 192 plate (GRID_SCALE 1.5), at the default Thickness, as kickPress lays it.
   const SHEET_CELLS = Math.round(kickPress(thicknessViscosity(0.45), 0).radii[0] * 1.5);
+  // The ring the sheet's dent is read on, three quarters of the way out to its zero (sheetKick, and why not the glass's 30).
+  const SHEET_RING = Math.round(0.75 * SHEET_CELLS);
   const r = await page.evaluate(async ({ KICK_RADII, SHEET, kicks, stirs, rocks, glasses }) => {
     const res = {};
     const DEF = 0.45, THICK = 0.75;
@@ -515,12 +517,18 @@ try {
       res.far = await kick(app_, kicks.def, 70);
       res.farPalm = await kick([40, 27, 15].map((r) => Math.round(r * 1.5)), kicks.def, 70);
       /*
-        The rhythm sheet (27f-3), on the default oil, read at the same rings: pressed as the app
+        The rhythm sheet (27f-3), on the default oil, read at a ring three quarters of the way
+        out to the dent's zero (SHEET.ring) and at the glass's far ring: pressed as the app
         presses it now, the sheet solved (lib/sheet.ts, PLAN 27f-4), a finger held KICK_HOLD
         (nine steps) and the sheet's own motion laid each step after, for as long as the glass's
-        kick above takes to be let go and settle (twenty steps and sixty).
+        kick above takes to be let go and settle (twenty steps and sixty). The near ring was the
+        glass's 30 while the dent reached 40 cells of this plate (the 6 mm gap's; three quarters
+        of the way out); in the 2 mm gap (PLAN 38r) the film under the sheet drains a
+        twenty-seventh as fast (h³/12μ) and the held dent reaches 25 cells, so a ring at 30 sat
+        outside the dent, in the lip the sheet lifts past rest, and read 0.9 cells for the 1.5
+        asked of a ring inside it. The ring keeps its place in the dent, not its place on the plate.
       */
-      const sheetKick = async (amount, R0 = 30) => {
+      const sheetKick = async (amount, R0 = SHEET.ring) => {
         await lab.create(N, N);
         for (let a = 0; a < 64; a++) { const t = a / 64 * 2 * Math.PI; lab.dye(0.5 + Math.cos(t) * R0 / N, 0.5 + Math.sin(t) * R0 / N, 2.5 / N, [1, 0, 0], 1); }
         lab.flush();
@@ -574,7 +582,7 @@ try {
     return res;
   }, {
     KICK_RADII,
-    SHEET: { def: SHEET_CELLS, nu: thicknessViscosity(0.45) },
+    SHEET: { def: SHEET_CELLS, ring: Math.round(0.75 * SHEET_CELLS), nu: thicknessViscosity(0.45) },
     glasses: { springFull: covers({ R: 1, spring: true }), springDef: covers({ R: 0.45, spring: true }), full: covers({ R: 1 }), def: covers({ R: 0.45 }), low: covers({ R: 0.2 }), thick: covers({ R: 1, t: 0.75 }) },
     kicks: { def: kickDepth(0.5, 0.7, 1), full: kickDepth(1, 1, 1), sheet: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, sheetFull: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share, before: 0.0024 * 0.5 * 0.7, classic: kickDepth(0.5, 0.7, 1) },
     stirs: { 'a look\'s 0.3': stirOf(0.3, ...BAND), '0.5': stirOf(0.5, ...BAND), full: stirOf(1, ...BAND) },
@@ -699,10 +707,11 @@ try {
     the solve's (sheetReach; `npm run sheet` holds it against the grid's
     solve): glycerine's narrower than the default oil's narrower than
     water's, and never the glass's dish. Then in the lab, pressed as the
-    app presses it, on the same ring of colour the glass's lines read: the
-    dent moves the ring 30 cells out (inside it), its push falls off away
-    from it faster than the glass's, and let go it comes back as the
-    glass's does.
+    app presses it, on a ring of colour three quarters of the way out to
+    the dent's zero (30 cells of a 40-cell dent in the 6 mm gap, 19 of 25
+    in the 2 mm one: sheetKick says why it moved with the dent): the dent
+    moves that ring, its push falls off away from it faster than the
+    glass's, and let go it comes back as the glass's does.
   */
   {
     const r45 = dentRadius(thicknessViscosity(0.45)), r1 = dentRadius(thicknessViscosity(1)), r0 = dentRadius(thicknessViscosity(0));
@@ -710,7 +719,7 @@ try {
       r1 < r45 && r45 < r0 && r0 < 0.5 && kickPress(thicknessViscosity(0.45), 0.35).radii === KICK_RADII,
       `a dent ${(128 * r1).toFixed(1)} cells of 128 in glycerine, ${(128 * r45).toFixed(1)} on the default oil, ${(128 * r0).toFixed(1)} in water; the glass's ${KICK_RADII[0]} on a look with Frame Sway`);
     check('and the dent moves the colour inside it, 1.5 cells or more at the default and 4 or more at full',
-      r.sheetDefault.out >= 1.5 && r.sheetFull.out >= 4, `${k(r.sheetDefault)}; full ${k(r.sheetFull)} (a dent of ${SHEET_CELLS} cells on the lab's 192)`);
+      r.sheetDefault.out >= 1.5 && r.sheetFull.out >= 4, `${k(r.sheetDefault)}; full ${k(r.sheetFull)} (a ring ${SHEET_RING} cells out in a dent of ${SHEET_CELLS} on the lab's 192)`);
     /*
       What "local" can mean in a film that cannot be squeezed: what a press
       displaces has to go somewhere, so past the dent's edge the colour still
@@ -743,7 +752,7 @@ try {
     const got = r.sheetFar.out / r.far.out, wantSheet = wantFar * solved;
     check('and is local: its push falls off away from the dent, 70 cells out under 0.6 of the glass\'s falloff, and far off moves the colour as much as the solve says leaves that disc, to 25%',
       r.sheetFar.out / r.sheetDefault.out < 0.6 * (r.far.out / r.kickDefault.out) && Math.abs(got / wantSheet - 1) < 0.25,
-      `30 → 70 cells out the sheet's ring goes ${r.sheetDefault.out.toFixed(2)} → ${r.sheetFar.out.toFixed(2)} cells, the glass's ${r.kickDefault.out.toFixed(1)} → ${r.far.out.toFixed(1)}; far off ${got.toFixed(3)} of the glass's, the solve says ${wantSheet.toFixed(3)} (${solved.toFixed(3)} of the stamp's ${wantFar.toFixed(3)} leaves the disc)`);
+      `${SHEET_RING} → 70 cells out the sheet's ring goes ${r.sheetDefault.out.toFixed(2)} → ${r.sheetFar.out.toFixed(2)} cells, the glass's ${r.kickDefault.out.toFixed(1)} → ${r.far.out.toFixed(1)}; far off ${got.toFixed(3)} of the glass's, the solve says ${wantSheet.toFixed(3)} (${solved.toFixed(3)} of the stamp's ${wantFar.toFixed(3)} leaves the disc)`);
     check('let go, it comes back at least three quarters of the way', share(r.sheetDefault) >= 0.75 && share(r.sheetFull) >= 0.75,
       `default ${(100 * share(r.sheetDefault)).toFixed(0)}%, full ${(100 * share(r.sheetFull)).toFixed(0)}%`);
   }

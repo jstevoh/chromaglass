@@ -303,6 +303,34 @@ written first. Line numbers are as read on main at d07ac31.
     three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
     half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
     would slide the picture the same.
+  - **38r-6. `thingap` 5 reads the Spin's edge, not the solve's residual** (S to decide, M to
+    build). The glycerine line (|∇·(hu)| under 0.005 of the flux) reads 0.0059 at 2 mm, and
+    it is not liquid lost: six V-cycles for two move it by 0.3%, a flat plate reads it too,
+    and it goes away with no dye laid (0.00054) or with the look's Spin off (0.00056).
+    Spin's stir (forcesB) is a curl noise masked by the dye, `min(1, d)` where `d > 0.05`,
+    a force with a one-cell step at every pool's edge; glycerine takes a step's force whole
+    at kΔt 50 (0.85 of it at the 6 mm gap's 5.6: the same stir on a liquid with that kΔt in
+    the 2 mm gap, Thickness 0.68, reads 0.0049), and the check's central difference of the
+    cell velocities reads the grid-scale pressure that step leaves as a divergence (the
+    solve conserves its own face fluxes). It peaks at 50 steps as the pools slump their
+    edges sharp and falls to 0.0012 by five seconds. Either read the solve's own fluxes
+    (hsP and the mobility through a lab readback) or give Spin's mask the width a real
+    stir has; until then the line is red on this branch.
+  - **38r-7. The rhythm sheet at 2 mm** (M). Its film drains a twenty-seventh as fast
+    (h³/12μ), so `npm run sheet` reads five lines red on this branch with no retune
+    (water keeps 4.7% of its dent a fifth of a second after the lift against under 1%, the
+    oil 20.8% against 10%; the dish's slowest mode 0.750 a frame against 0.947; the mean
+    gap 5.4% of a dent down kicked twice a second against 2%; the oil quiet at 15.3 s
+    against 21.7): the paces in the check's header are the 6 mm dent's. The sheet's own
+    metres are now the film's (`gapMetres`, this PR), which changes nothing it lays.
+    `rides` reads the sheet's ring at three quarters of the dent's zero (19 cells of 25 on
+    the lab's 192, as 30 of 40 was), since a 2 mm dent is narrower.
+  - **38r-8. The Blow's breath is 14 m/s** (S, shipped this PR). τh/2μ goes as the gap, so
+    the 8 m/s breath the Blow was tuned at moved the 2 mm film a third as far (`tools` read
+    +0.03% for +0.15%); the breath is set where it moves the film as the 6 mm one did,
+    1.18 Pa (lib/breath.ts says why that and not C_f). The surface tears at Amount 0.39
+    now, not 0.67 (`blowrange` reads the gentle breaths at 0.35). 15g-6's recording would
+    settle the number either way.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);
