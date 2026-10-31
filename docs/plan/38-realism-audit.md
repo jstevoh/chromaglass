@@ -190,7 +190,7 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## Smaller, each worth doing when its area is open
 
-- ~~**38k. The spikes' onset and the magnets' field, in tesla**~~ **Shipped** (#PR). The
+- ~~**38k. The spikes' onset and the magnets' field, in tesla**~~ **Shipped** (#625). The
   onset is Cowley and Rosensweig's field for EFH1 under water through the layer's inner
   field, 4.0 mT (a share of 0.033, was the lab's 0.18 = 22 mT); several magnets add as
   vectors. `npm run disc` 13/13. Closes **9u**. Story in `docs/plan-shipped.md` §38k.

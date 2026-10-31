@@ -151,7 +151,7 @@ Open, from building 9i:
     the onset would build it on every Magnet Garden show, whose own magnet is there;
     starting it when the Magnet tool is picked would not.
 - ~~**9u. A set-down magnet still gathers a pool with no domes.**~~ **Closed by 38k**
-  (#PR): the onset is the liquid's, 0.033 of the hand's field, so the set-down magnet
+  (#625): the onset is the liquid's, 0.033 of the hand's field, so the set-down magnet
   (0.15) stands its pool up. Whether the film's balance of pull and lift looks right
   there is the owner's to judge on the Mac (`docs/judging.md`).
 - **9x. Picking the Magnet poured the hole itself; a magnet you size and play**

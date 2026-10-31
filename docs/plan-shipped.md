@@ -10261,7 +10261,7 @@ The audit's text, as written:
   (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
   0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.
 
-## 38k. The spikes' onset and the magnets' field, in tesla (#PR, 2026-10-31)
+## 38k. The spikes' onset and the magnets' field, in tesla (#625, 2026-10-31)
 
 The second realism audit found the onset of the ferrofluid's spikes was a share of the hand's
 magnet (0.18 → 0.35 by a smoothstep), set in the lab so that each look's own magnet gathered
