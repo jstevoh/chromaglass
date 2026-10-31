@@ -442,31 +442,36 @@ try {
     }
     /*
       The outline at the zoom a performer parks on (PLAN 33g-2b). The mask is
-      512 across the whole plate, so at 5x one of its texels is ten screen
-      pixels or more and the contour of a bilinear read of its antialiased
-      coverage wanders by a third of a texel with the texel's period: a rim
-      of scallops, ragged on every big bead. A flat plate, so nothing but the
-      drop is drawn; the outline is the outermost pixel that differs from the
-      frame with no beads, read at every third of a degree round the drop's
-      middle, and what is measured is how far it strays from a circle, in
-      parts of the radius. Three sizes: a droplet (two cells), the common
-      bead (four and a half) and a merged pool (seven).
+      512 across the whole plate, so at 5x one of its texels is seven and a
+      half screen pixels and the contour of a bilinear read of its
+      antialiased coverage wanders by a third of a texel with the texel's
+      period: a rim of scallops, ragged on every big bead. A flat plate, so
+      nothing but the drop is drawn; the outline is the outermost pixel that
+      differs from the frame with no beads, read at every third of a degree
+      round the drop's middle (the drop is laid at the frame's centre), and
+      what is measured is how far it strays from a circle. Sizes: a droplet
+      (one, one and a half and two cells; a droplet of under two and a half
+      cells is where a step three texels in lands on the far side), the common
+      bead (four and a half), a merged pool (seven) and the biggest the
+      closeup lays (twelve, past the plate's DROP_BIGGEST). Both masks: the
+      rings' square one, and the drops' wide one (a different coverage ramp
+      and dome). `closed` is how much of the circle at 0.85 of the radius
+      differs from the plate: the dark outline a droplet is made of, none of
+      it erased.
     */
     {
       await plate(() => A);
       const cam = { zoom: 5, ...CAMERA.cam, cx: 0.5, cy: 0.5 };
       const off = await lab.render(S, { beads: 0, ...CAMERA.set }, cam);
       out.round = [];
-      for (const cells of [2, 4.5, 7]) {
-        const on = await lab.render(S, { beads: 0.8, ...CAMERA.set }, { ...cam, beadMask: mask([{ x: 0.5 * N, y: 0.5 * N, r: cells }]) });
+      const kinds = [['rings', {}, mask, [1, 1.5, 2, 4.5, 7, 12]], ['drops', { beadDrops: 1 }, wide, [2, 4.5, 12]]];
+      for (const [kind, over, make, sizes] of kinds) for (const cells of sizes) {
+        const on = await lab.render(S, { beads: 0.8, ...over, ...CAMERA.set }, { ...cam, beadMask: make([{ x: 0.5 * N, y: 0.5 * N, r: cells }]) });
         const differs = (x, y) => {
           if (x < 0 || y < 0 || x >= S || y >= S) return false;
           const i = (Math.round(y) * S + Math.round(x)) * 4;
           return Math.abs(on[i] - off[i]) + Math.abs(on[i + 1] - off[i + 1]) + Math.abs(on[i + 2] - off[i + 2]) > 24;
         };
-        // The drop is laid at the frame's middle: the centre is known, not found
-        // (found from the pixels it moves with the bright crescent, and reads
-        // as a wobble that is only the centre's error).
         const cx = S / 2 - 0.5, cy = S / 2 - 0.5, edge = [];
         for (let a = 0; a < 360; a += 1 / 3) {
           const t = a * Math.PI / 180;
@@ -476,7 +481,9 @@ try {
         }
         const mean = edge.reduce((p, c) => p + c, 0) / edge.length;
         const sd = Math.sqrt(edge.reduce((p, c) => p + (c - mean) ** 2, 0) / edge.length);
-        out.round.push({ cells, mean, sd });
+        let hit = 0, tot = 0;
+        for (let a = 0; a < 360; a += 1) { const t = a * Math.PI / 180; tot++; if (differs(cx + Math.cos(t) * 0.85 * mean, cy + Math.sin(t) * 0.85 * mean)) hit++; }
+        out.round.push({ kind, cells, mean, sd, closed: hit / tot });
       }
     }
     /*
@@ -641,16 +648,21 @@ try {
   check('where two drops press together, neither shows the far side of the plate in the closeup',
     m.pairApart && m.pair.rings.changed > 500 && m.pair.drops.changed > 500 && m.pair.rings.b === 0 && m.pair.drops.b === 0,
     `pixels of the dye beyond 0.22: ${m.pair.rings.b} as rings, ${m.pair.drops.b} as drops (${m.pair.rings.changed} and ${m.pair.drops.changed} pixels drawn)`);
-  // One texel of the mask at 5x, in frame pixels: the plate's 512 texels over a frame five times closer.
-  const TEXEL5 = 5 * 512 / 512;
-  for (const q of m.round) {
-    check(`at 5x the outline of a ${q.cells}-cell drop is round, to under a seventh of a mask texel`,
-      q.sd <= TEXEL5 / 7,
+  // One texel of the mask at 5x, in frame pixels: a frame is 1/(1.5 zoom) of the plate across (uvToFluid), 512 pixels of it per 512 texels.
+  const TEXEL5 = 1.5 * 5;
+  for (const q of m.round.filter((q) => q.cells >= 2)) {
+    check(`at 5x the outline of a ${q.cells}-cell drop (${q.kind} mask) is round, to under a tenth of a mask texel`,
+      q.sd <= TEXEL5 / 10,
       `the outermost pixel strays ${q.sd.toFixed(2)} px (${(q.sd / TEXEL5).toFixed(3)} of a texel, ${(100 * q.sd / q.mean).toFixed(2)}% of the ${q.mean.toFixed(1)} px radius); the coverage's own contour strayed 1.2 px`);
   }
-  check('and the three are in the sizes they were laid (2 : 4.5 : 7)',
-    Math.abs(m.round[1].mean / m.round[0].mean / (4.5 / 2) - 1) < 0.1 && Math.abs(m.round[2].mean / m.round[1].mean / (7 / 4.5) - 1) < 0.1,
-    `radii ${m.round.map((q) => q.mean.toFixed(1)).join(' : ')} px`);
+  for (const q of m.round.filter((q) => q.kind === 'rings' && q.cells <= 2)) {
+    check(`a ${q.cells}-cell droplet keeps its whole dark outline in the closeup`,
+      q.closed >= 0.97, `${(100 * q.closed).toFixed(1)}% of the circle at 0.85 of the radius differs from the plate (a step past the centre erased it)`);
+  }
+  const rr = (kind, c) => m.round.find((q) => q.kind === kind && q.cells === c).mean;
+  check('and the sizes are as laid (2 : 4.5 : 7 : 12)',
+    Math.abs(rr('rings', 4.5) / rr('rings', 2) / (4.5 / 2) - 1) < 0.1 && Math.abs(rr('rings', 7) / rr('rings', 4.5) / (7 / 4.5) - 1) < 0.1 && Math.abs(rr('rings', 12) / rr('rings', 7) / (12 / 7) - 1) < 0.1,
+    `radii ${[2, 4.5, 7, 12].map((c) => rr('rings', c).toFixed(1)).join(' : ')} px`);
   check('a dyed drop is its dye in the middle', m.dyed.c[1] - m.dyed.p[1] > 40,
     `green ${m.dyed.p[1]} → ${m.dyed.c[1]} (the plate ${m.dyed.p.join(',')}, the drop ${m.dyed.c.join(',')})`);
   check('and the wide mask\'s seam is not a drop', m.dyed.seam === 0, `${m.dyed.seam} pixels changed at the plate's right edge`);

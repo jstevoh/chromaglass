@@ -150,7 +150,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   a pancake's bend was in proportion to the band, so the map from its flat window to its band
   ran through the drop's own centre just outside the window; the bend is now held to the rim as
   the drop flattens (`power`), so a big bead is a clear window with a thin rim. `droplens` has
-  four new lines. Story in `docs/plan-shipped.md` §33g. Shortcuts, named: the exponent
+  eleven new lines. Story in `docs/plan-shipped.md` §33g. Shortcuts, named: the exponent
   (1 for a ball to 6 for a pancake, over a flatness of 0 to 0.4) is a taste choice, not a ray
   trace (the report's item 4b is the exact table); a mid-sized bead (about 3 to 4 cells) still
   shows the ring where its map folds, which a real lens does too; the centre of a ball is

@@ -1711,6 +1711,8 @@ const DROP_INVERT: f32 = 3.0;
 const DROP_REACH: f32 = 0.06;
 /** Radius of the biggest drop the field makes, plate uv: about eight cells of 192 (drops, 18/18, tops out near seven). */
 const DROP_BIGGEST: f32 = 0.045;
+/** The biggest radius the cone fit (dropLens) takes for a drop, plate uv: the closeup lays beads at up to 12.5 cells (MACRO_BEAD_SCALE), 0.065, and a clean read of the dome has no wall to be fooled by, so the cap above is not its to apply. */
+const DROP_FIT_MAX: f32 = 0.08;
 /*
   The projector. A ray crossing a round surface u of the way out meets it at
   a slope u/sqrt(1 - u^2), and two refractions bend it by about

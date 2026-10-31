@@ -52,21 +52,42 @@ fn dropLens(uv: vec2f, cam: f32) -> vec4f {
     and the direction to the centre, wherever here is in the last texels.
   */
   var edge = m.r;
-  if (h < 0.55) {
-    let uv2 = uv + normalize(g) * (3.0 * px);
-    let a = beadAt(uv2);
-    if (a.r > 0.97) {
-      let ax = beadAt(uv2 + vec2f(px, 0.0)); let ax2 = beadAt(uv2 - vec2f(px, 0.0));
-      let ay = beadAt(uv2 + vec2f(0.0, px)); let ay2 = beadAt(uv2 - vec2f(0.0, px));
-      let ga = vec2f(ax.b - ax2.b, ay.b - ay2.b) / (2.0 * px);
-      let la = length(ga);
-      let Rf = 1.0 / max(la, 1.0);
-      if (la > 1.0 && Rf <= DROP_BIGGEST) {
-        let dEdge = a.b * Rf - 3.0 * px;
-        R = Rf; rr = clamp(1.0 - dEdge / Rf, 0.0, 1.0);
-        toC = (ga / la) * rr * Rf;
-        edge = clamp(0.5 + dEdge / max(dropPx, 1e-5), 0.0, 1.0);
-      }
+  /*
+    Where to read it. The quotient is noise only in the outer part (h under
+    0.55 and less, or red not full), so the step in toward the centre is
+    three texels there and none in the middle, eased between (a switch at one
+    h left a ring where the two estimates met). Where the step lands matters
+    for a small drop: three texels in from the rim of a drop of four texels'
+    radius is a texel from its centre, and of one under three the far side,
+    where the dome is the far edge's, and the fit read the outline erased
+    (the pre-push review; a drop of one and a half cells kept 40% of its
+    outline). The size is not known before the step, and out there the first
+    estimate of it is the noise itself (capping the step by it cost every drop
+    from two cells up its roundness, measured), so the guard is the read: a
+    point that has gone a step in and finds the dome above 0.6 of its height
+    is too near the middle to say where the edge was, and the drop keeps the
+    estimate it always had; the fit is refused as well when its slope does not
+    point the way the taps' did, or when it puts here more than a texel and a
+    half beyond the edge.
+  */
+  // Where red is not full this is the antialiasing and h is the noise: all the way out, and the step the full three.
+  let outer = max(clamp((0.7 - h) / 0.15, 0.0, 1.0), 1.0 - smoothstep(0.9, 0.995, m.r));
+  let stepIn = 3.0 * px * outer;
+  let uv2 = uv + normalize(g) * stepIn;
+  let a = beadAt(uv2);
+  if (a.r > 0.97) {
+    let ax = beadAt(uv2 + vec2f(px, 0.0)); let ax2 = beadAt(uv2 - vec2f(px, 0.0));
+    let ay = beadAt(uv2 + vec2f(0.0, px)); let ay2 = beadAt(uv2 - vec2f(0.0, px));
+    let ga = vec2f(ax.b - ax2.b, ay.b - ay2.b) / (2.0 * px);
+    let la = length(ga);
+    let Rf = 1.0 / max(la, 1.0);
+    let dEdge = a.b * Rf - stepIn;
+    if (la > 1.0 && Rf <= DROP_FIT_MAX && dot(ga, g) > 0.0 && dEdge > -1.5 * px && (outer < 0.01 || a.b < 0.6)) {
+      R = Rf; rr = clamp(1.0 - dEdge / Rf, 0.0, 1.0);
+      toC = (ga / la) * rr * Rf;
+      // A wall between pressed drops is not antialiased in the mask (rasterDrops):
+      // where red is full the plate is not to show through it.
+      edge = select(clamp(0.5 + dEdge / max(dropPx, 1e-5), 0.0, 1.0), 1.0, m.r >= 0.995);
     }
   }
   dropEdge = edge;
