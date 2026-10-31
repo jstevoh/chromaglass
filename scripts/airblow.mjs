@@ -144,12 +144,24 @@ try {
     await lab.step(2, over);
     const R = lab.BLOW_RADIUS * L / 128, cx = L / 2, cy = L / 2;
     /*
-      Pressed: a palm four times the breath's size held down on the middle
+      Pressed: a palm eight times the breath's size held down on the middle
       of the plate as the app's Press lays it (lib/squish.ts), until the
       gap has stopped closing, and held on while the breath blows, so what
       flows under it is the breath's and not the press squeezing out.
+
+      Eight, not the four it was. τh/2μ is the speed where the gap is the
+      same all round, and the breath's flow comes back round it through
+      the film beside it: where that film is wider than under the breath
+      the way back is easier and the middle runs faster than its own gap
+      says. Since the glass lifts against the film's suction (PLAN 38l) a
+      held press settles at a dent in proportion to its push, so the
+      palm's bowl shows in the gap (before, every press sank to much the
+      same depth and the bottom was flat), and a palm four breaths wide
+      read 0.55 as fast at 0.43 of the gap, against 0.38 at 0.33 on the
+      old spring. Eight wide, the way back is under the palm too: 0.47 as
+      fast at 0.43 of the gap (software WebGPU).
     */
-    const pressDown = () => { if (press) lab.squish(cx, cy, 4 * R, 0.004, 0, 'press', 0, true); };
+    const pressDown = () => { if (press) lab.squish(cx, cy, 8 * R, 0.004, 0, 'press', 0, true); };
     if (press) for (let k = 0; k < 120; k++) { pressDown(); lab.flush(DT); await lab.step(1, over, true); }
     const disp = DT * look.advection * (N - 2) / N;
     // Metres a second from the flow's units: plate widths a step over disp, 0.2 m plates, 60 steps a second.
