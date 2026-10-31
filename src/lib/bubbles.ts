@@ -21,7 +21,7 @@
  * that constant; nothing here types a gap in millimetres).
  */
 import { stream, type Rng } from './rng';
-import { DISH_METRES, DISH_REST_GAP, OPEN_RIM, carrierViscosity, thicknessViscosity } from './turntable';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, OPEN_RIM, carrierViscosity, thicknessViscosity } from './turntable';
 import { plateSin } from './plateRock';
 
 export { DISH_METRES, DISH_REST_GAP };
@@ -170,7 +170,7 @@ export class BubbleField {
   /** Air's Ostwald coefficient in it (how fast a pocket dissolves). */
   liquidOstwald = OIL_AIR.ostwald;
   /** The gap between the glasses, metres: the dish's rest gap. */
-  gapMetres = DISH_REST_GAP * DISH_METRES;
+  gapMetres = DISH_GAP_METRES;
   /**
    * How many times the real rate air dissolves into the liquid. 1 is real,
    * and real is effectively never on a show's clock (see `step`); a dial
@@ -376,7 +376,7 @@ export class BubbleField {
       const uMps = speed * (DISH_METRES / N);
       const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
       // Effective meniscus neck gap b_eff ≈ 0.091 cells (0.095 mm) is a tuned shortcut:
-      // about 63x smaller than the real 6 mm plate gap (DISH_REST_GAP * DISH_METRES).
+      // about 63x smaller than the real 6 mm plate gap (lib/turntable.ts DISH_GAP_METRES).
       // If the physical 6 mm gap (b ≈ 5.76 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 0.5 lobes,
       // meaning a bubble on a 192 grid would never form more than 1 finger.
       // b_eff is set in cells (moves with grid size) to produce 6-18 visible Saffman-Taylor

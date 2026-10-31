@@ -38,8 +38,10 @@
  *   - **Pour** (`areaPour`): dye released into the area from
  *     one of its bottles, its own colour family (`PlateArea.dyes`), as much
  *     as the cord is open. Real dye, laid as every pour is, so it mixes and is
- *     carried as the plate's dye is; on the app it is held under the look's
- *     fill as every music pour is (the regulator, PLAN 28d-A).
+ *     carried as the plate's dye is. It is held under the look's fill as
+ *     every music pour is (the regulator, PLAN 28d-A), but a gated pour, a
+ *     bottle tipped on a hit, still lands on a full plate, which turns over
+ *     (`lay`, and `hitRoomOf` in lib/dyeTarget.ts).
  *   - **Bottle** (`areaHue`): which of the area's bottles its pours come from
  *     next. A pigment does not change colour where it lies, so this changes
  *     nothing on the plate by itself: it picks the bottle the next pour, kick
@@ -85,6 +87,7 @@ import { areaFamily, type PlateArea } from './plateAreas.ts';
 import { BandRange } from './audioFeatures.ts';
 import { isClassFeature } from './hitSource.ts';
 import { DEFAULT_LIQUID_TYPES } from '../bottles.ts';
+import { hitRoomOf, pourRoomOf } from './dyeTarget.ts';
 
 /** The four things a hand does to one place, in the order the patch bay lists them. */
 export const AREA_TARGETS: readonly { key: AreaTarget; label: string; hint: string }[] = [
@@ -371,9 +374,16 @@ export class AreaHands {
    * Lay this step's acts into `sink` on a `size`-cell plate, `dt` seconds of
    * them. `colour` turns an area and a bottle of its family into the dye's
    * colour (the look's dyes, a palette lock, the hue journey: the caller's).
-   * `pourScale` is the app's regulator on the pours (1 in the lab).
+   * `fill` is how full the plate is against the look's target (its mean dye
+   * over `lookTarget`; 0, an empty plate, by default), which the regulator
+   * holds the dye pours under: a held pour by `pourRoomOf`, a gated one, a
+   * bottle tipped on a hit, by `hitRoomOf` (lib/dyeTarget.ts has why the two
+   * differ). Read here, not by the caller, so `npm run areacords` runs the
+   * app's own regulator: its lab set the room to 1 and missed that Poster's
+   * kicks poured 2 to 10% of themselves.
    */
-  lay(sink: AreaSink, size: number, dt: number, colour: (area: PlateArea, k: number) => { r: number; g: number; b: number }, pourScale = 1): void {
+  lay(sink: AreaSink, size: number, dt: number, colour: (area: PlateArea, k: number) => { r: number; g: number; b: number }, fill = 0): void {
+    const held = pourRoomOf(fill), hit = hitRoomOf(fill);
     for (const a of this.acts) {
       const { area } = a;
       const cx = area.x * size, cy = area.y * size, R = area.r * size;
@@ -388,7 +398,7 @@ export class AreaHands {
         // Not under the dye's regulator: a reagent is not dye, and pourLiquid keeps its own headroom.
         sink.liquid(cx + Math.cos(ang) * d, cy + Math.sin(ang) * d, area.liquid, AREA_DROP * a.drop);
       } else if (a.target === 'areaPour') {
-        const k = AREA_POUR_RATE * Math.max(0, a.amount) * dt * pourScale;
+        const k = AREA_POUR_RATE * Math.max(0, a.amount) * dt * (gated(a.cord) ? hit : held);
         if (!(k > 0)) continue;
         /*
           A gated pour is a bottle picked up on the hit and poured until the

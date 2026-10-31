@@ -4873,6 +4873,35 @@ which bottle pours next, and no hue dial is turned.
   laid; one drop of activator fires the gel to 0.81 in its place and 0.000 in the other two.
   Judging §96 owes the owner's eyes. Open: 25i-1 to 25i-5.
 
+### 25i-6. Three looks fixed after filming on the Mac (shipped)
+
+Filmed on the owner's Mac on 2026-10-31 with a test song (120 bpm, a saw lead walking all twelve
+notes), three of 25i's looks misbehaved.
+
+- **Poster, 1969: no kick pour showed**, before 25i or after. Its plate sits at its own fill target
+  (mean dye 0.50 to 0.52 against 0.522), and every area pour was held by the music pours' room,
+  `(1 − fill) × 2.5`, which is 0 to 0.1 there. A dish that is full still takes a bottle tipped
+  into it and turns over, so a gated pour now has `hitRoomOf` (lib/dyeTarget.ts): all of itself up
+  to the target, none at 15% over it, the regulator's evaporation taking the excess (25i-8 names the
+  shortcut). AreaHands.lay applies the regulator itself from the plate's fill, so the check runs
+  the app's own: `npm run areacords` lays Poster's kicks at fill 0.96 and 1.0 (1.00 of a free
+  plate's dye) and 1.2 (none), a held pour none at its target, and the lab's 8-of-8 bottle check now
+  runs at fill 1. Before, the room was 0 to 0.1 at the filmed fill.
+- **Red Cabbage: green on the left and pink on the right, going flat.** Two faults. Every look lays
+  its dish at an angle the night's seed draws, and the areas turn with it, so the acid well (left
+  in the look's words) stood wherever the dice put it; a look with areas is now set down square
+  (`layAngle`, lib/plateAreas.ts). And the indicator read the acidity, a share of a bottle in the
+  cell, as pH units in a straight line: four or five drops in one place reached pH 1, a crimson no
+  vinegar makes, and soda went on to pH 13 and yellow. The pH is now solved from the proton
+  balance of what was poured (lib/phIndicator.ts: acetic acid pKa 4.76, carbonate pKa 10.33, the
+  juice's buffer 2 mM at pKa 7), in the plate's shader and its TypeScript twin: vinegar undiluted
+  2.49, washing soda 12.10, a trace 6.93 / 7.07, ten times the acid 0.76 pH lower.
+- **Chemical Clock: no rings.** Its two sound patches turned BZ Reaction down by 0.58 with the
+  bass's harmony and 0.55 with the mid's; under a song that is nought, and at nought the gel is
+  neither stepped nor drawn. They are gone (nothing a band plays changes a dish's chemistry, and
+  `npm run areacords` now holds that no look carries a cord on a reaction's strength); the snare
+  drops activator in the third place instead, beside the kick's own touches in turn.
+
 ## 26. A reaction that prints: Turing stripes in black and white
 
 ### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)
@@ -6117,6 +6146,8 @@ larger in mean radius (bar 1.4 to 1.8) and 343 of 332 (bar 60%). The lab, `macro
 2.5x on the 9-pool plate: before, small beads, one lens bead the size of a thumbnail; after,
 a dozen glass-like lens beads, three of them a fifth of the frame. Pictures in the project's
 shared files, `macro-closeup-33g/`. Not measured: how it looks on the owner's GPU.
+
+*33g-2b (2026-10-30, the owner: "Why do the beads have dimples on the top and ragged edges?", then "make the macro view look as accurate as possible").* Found in the lab on a flat plate with one bead at 5x. **The rim:** the outermost pixel of a bead strayed from a circle by 1.26, 1.24 and 1.22 px for a droplet (2 cells), the common bead (4.5) and a pool (7), a quarter of a mask texel, because the contour of the bilinear coverage of a 512 mask wanders by a third of a texel; the lens now takes the distance to the edge from the dome's cone read at one clean texel three texels in (`dropLens`, now `gpu/wgsl/dropLens.ts`) and the edge coverage from that, and the stray is 0.42, 0.32 and 0.37 px (0.06 of a texel), 0.53 px for a 12-cell bead, and the same on the drops' wide mask. A droplet of one to two cells keeps its whole dark outline: a first version of the step (three texels in, always) landed past the centre of a drop of four texels' radius and erased 60% of the outline of a 1.5-cell one, so a read that lands above 0.6 of the dome's height is refused and the drop keeps the old estimate (capping the step by the pixel's own size estimate was tried and cost every drop from two cells up its roundness: that estimate is the noise). The pools also come out 6 percent smaller, the true size: the coverage contour had stood half a texel proud. **The dimple:** a bead wider than the gap (3 cells) is a pancake, a flat window with the bend in its half-round edge, and the bend was in proportion to the band, so the map from the window to the band crossed the drop's own centre a little outside the window: a ring of one colour with a pin inside it. The bend now follows the band to a power that goes from 1 (a ball) to 6 (a pancake flat over 0.4 of its radius), so the window is clear and the bend is a sliver at the contact, as the report says (item 1.3 and the closeup comment in plate.ts). `npm run droplens` 32/32 on SwiftShader (11 new lines: roundness for seven drop sizes over both masks, the three droplets' outlines, and the sizes). Pictures in the project's shared files, `macro-closeup-33g/`. Not measured: the owner's GPU, and a mid-sized bead (3 to 4 cells), whose fold ring a real lens has too.
 
 *Measured* (`npm run macroview`, the lab on SwiftShader, and again on Metal in the CI `open` shard with the same result: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, old-defaults control 0.1397 and 0.1693, nine seeded pools stirred at
 256², 4x and 6x, defaults and `classic`, `jellyfish-bloom`, `oil-and-water`): the cells'
@@ -10190,6 +10221,63 @@ model cannot reach one, the PR says what it reached and asks.
     under software WebGPU (50 skipped, as the encoder is meant to when a frame is slow to
     take), the key kept by name where the machine has a keychain.
 
+### 39. Feedback from inside the app (asked 2026-10-30)
+
+#### 39a. Settings → Feedback, mailed and kept
+
+Asked: "a feedback panel in settings. It should send me an email with the feedback as
+well as collect it all in a single database with all of the relevant related logs data
+so I can track feedback over time."
+
+**The pane.** Feedback is the last row of the Settings rail, under the seven groups and
+apart from them, because it is not a setting: it is not in `SETTINGS_SECTIONS`, so it is
+never a desk panel, never pinned and never a search hit, and its test id is not one the
+section checks count. The phone has it twice: at the end of the Settings strip (the same
+panel) and as a tile on More, which opens the same `FeedbackPane` in a phone sheet. The
+command palette has "Send feedback". A note is a topic (broke, idea, love, else), up to
+5,000 characters, and, if not signed in, an address to be answered at.
+
+**What it carries.** Always: the app's version (the Mac app's, from its updater), the
+site's commit (`VITE_BUILD_SHA`, new in `deploy.yml` and `desktop.yml`), Mac app or
+browser, phone layout or not, the tier, the look's name, the page's path (never its
+query, which can carry a show's key), and the browser and screen. With the sender's
+tick, both ticked by default and in sight before Send: the black box's log and the
+look's settings, and a picture of the plate, all from `crashLog.buildReport`, so a note
+and a crash report agree on what "the log" is. "See what is sent" shows the JSON as it
+will leave. Before it leaves, `feedbackScrub.ts` takes out tokens, licence keys, stream
+keys, credential-named URL parameters and fields; Keystone and Key Light stay.
+
+**Where it goes.** `server/feedback-worker.js`: one D1 table (`feedback-schema.sql`), a
+row a note, the facts in columns for SQL and the whole context as JSON beside them, the
+picture as JPEG bytes. The context is rebuilt from the fields the page sends and scrubbed
+again on the Worker, so a stale or hostile client's credentials or claims are not kept.
+The account is only what a Firebase ID token proves (the same verifier as the licence
+Worker), and its address only when the token says Firebase proved it, since anyone can
+make an account with someone else's address. Then a plain-text
+mail through Resend to support@ (which forwards to the owner), Reply-To the sender, the
+picture and the entry attached. The row is written before the mail, so a mail that fails
+costs the notice and not the note (`emailed` says sent, failed, off, or the day's cap of
+80, under Resend's free 100). Ten notes an hour from one address (an IPv6 address by its
+/64), sixty an hour from everyone, counted by a salted hash. The review found the first
+version's count-then-insert let a burst through (50 of 50 with 5 ms on each database
+call); a row is now inserted first and counts the rows at or before its own rowid, so
+exactly the first ten of a burst of forty stay. Reading needs `FEEDBACK_TOKEN`.
+
+**Why D1 and Resend.** The server side is Workers already, and D1 is a binding with no
+service account; Firestore from a Worker would need a Google key in its secrets. And
+Cloudflare's own mail needs the domain's MX on Cloudflare, where chromaglass.art's MX is
+the forwarder's.
+
+**Measured.** `npm run feedback-worker` 31/31 against SQLite built from the schema file,
+with a few milliseconds on each call for the burst. Six mutations each turned a check red:
+trusting a body's uid, recording a failed mail as sent, dropping the `?key=` scrub,
+counting the whole burst (1 of 40 kept), counting before the insert (40 of 40), and
+taking an unproved address as the account's. `npm run feedbackpane` 11/11, its own file because `phone.mjs` is over the size budget:
+the desk's rail row and pane, Send waiting for words, the mail-only build drawing no
+switches, and on a phone in three sizes the More sheet on screen with nothing covered,
+16 px type and 48 px topics (its first run, as a block in `phone.mjs`, found 13 px in all
+seven landscapes, which iOS zooms on focus), and the strip's Feedback row.
+
 ### QA list: what the owner found playing it (from 2026-10-04)
 
 #### QA-19. Interacting with settings switches to and maximizes the performance window
@@ -10299,3 +10387,28 @@ The audit's text, as written:
   buoyant drift Δρ·g·b²/(12μ). Each bubble's film thickness and glint come from a random id
   (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
   0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.
+
+## 38a. The lamp is a condenser, not a wandering painted glow (#604, 2026-10-31)
+
+*Was:* the hot-spot multiplied the finished picture by `mix(0.78, 1.25, exp(-3.5·d²))` with a
+warm tint in the middle; a second lamp multiplied a bluish 1.25× Gaussian on top; both centres
+wandered by noise across up to a third of the plate with Lamp Motion, and with the plate's rock
+even at Lamp Motion 0; the lamp ground was divided by 1.28125 so the lifted middle did not clip;
+and the heat had its own hot-spot, 1/(1 + 2.5 r²) round the plate's middle.
+
+*Now:* `src/gpu/wgsl/lampField.ts` is an overhead projector's light path. The condenser images
+the bulb into the head's aperture; Hot-Spot is the lamp lever, the misfocus μ = 0.6 × Hot-Spot,
+and the light a stage point sends the wall is the share of its bundle (a disc at x·μ/P, radius
+k(1 − μ), P = 0.04 m, k = 0.9) inside the aperture: flat in the middle at the lamp's full
+light, falling away toward the corners, dark at the edges past Hot-Spot 0.8. The acrylic
+condenser's dispersion (Abbe 57) puts each colour's image at its own height, which colours the
+knee. A second bulb beside the first adds its own share, offset in the aperture, white-balanced
+at the axis. It is computed on the stage (screen) and not on the turning plate, so nothing in
+it moves; the lamp ground's divide is gone; the heat is the same at every point, because the
+aperture turns light away after it has gone through the liquid. Hot-Spot 0 is the plate as it
+was, so no look at 0 changed; looks at 0.4 lose about 9% at a wide frame's corners, as the old
+Gaussian took 7%, and their middle is no longer lifted.
+
+*Measured:* `npm run lampfield`, 9/9 (on the old plate 1 of its first 7: the law worst 0.165 and 0.813 off,
+the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
+gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.

@@ -1,7 +1,7 @@
 // Bundled into a page by scripts/lab.mjs: the GPU solver on its own, with no
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
-import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, PLATE_METRES } from '../src/gpu/fluid';
+import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
@@ -13,7 +13,7 @@ import { sourceSettings } from '../src/lib/plateSources';
 import { WebGPUOutput, fillOutputUniforms } from '../src/gpu/output';
 import { speciesOf } from '../src/lib/liquidProps';
 import { DEFAULT_LIQUID_TYPES } from '../src/types';
-import { DISH_METRES, DISH_REST_GAP } from '../src/lib/turntable';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES } from '../src/lib/turntable';
 import { normalizeOutput, type OutputConfig } from '../src/lib/outputConfig';
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
@@ -539,6 +539,7 @@ const api = {
   liquids: DEFAULT_LIQUID_TYPES,
   DISH_METRES,
   DISH_REST_GAP,
+  DISH_GAP_METRES,
   /**
    * The magnet's field as the solver and the plate both include it
    * (wgsl/spikes.ts with wgsl/magnetDisc.ts), and the TypeScript the solver
@@ -553,7 +554,7 @@ const api = {
    * the gain and its guards, the reference liquid and the ferrofluid's
    * viscosities, the rest gap and the dish's width (gpu/fluid.ts).
    */
-  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, PLATE_METRES,
+  MAGNET_E, MAGNET_BS, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, FERRO_NU, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES,
   /** The oil beads and drops, to lay a field on the lab's plate (`cam.beadMask` below). */
   BeadField, rasterDrops,
   /** The beads' list and the plate's GPU drawing of it, for `npm run beadmask` (PLAN 14ab-6). */
@@ -636,6 +637,8 @@ const api = {
     cam: {
       magnets?: { x: number; y: number; height: number; strength: number }[];
       cx?: number; cy?: number; zoom?: number; macroAmount?: number; filmLevel?: number; filmGain?: number; bubbles?: number; airField?: boolean; rotation?: number; beadMask?: CanvasImageSource | BeadField; view?: boolean; time?: number;
+      /** Where the app's Lamp Motion has put the light the gloss is lit from (`npm run lampfield`: the hot-spot must not follow it). */
+      lamp?: { x: number; y: number; x2: number; y2: number };
       /*
         The other pictures the plate composites, for the mixer's check
         (`npm run mixer`): a film frame, a logo, and a second plate. The
@@ -695,7 +698,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,
