@@ -83,7 +83,7 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
-import { DISH_METRES, OPEN_RIM } from '../../lib/turntable';
+import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
 
 /**
@@ -472,9 +472,11 @@ fn at(q: vec2i, m: i32) -> vec2f {
       radius), A.b = (the ferrofluid's viscosity over the clear liquid's,
       the reference liquid's viscosity over this one's, the glass's own
       velocity halved).
-      k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
-      liquid's kinematic viscosity over the plate's width squared, so the
-      drag is in real seconds whatever grid or look clock the plate runs at.
+      k = A.a.x / h², with h in gap units: A.a.x is 12ν/G², the liquid's
+      kinematic viscosity over G², G the metres in a unit of the gap field
+      (lib/turntable.ts DISH_GAP_FIELD_METRES, PLAN 38r: a fifth of a
+      metre at the 6 mm rest gap, the plate's width, as it was written), so the drag is in real seconds whatever
+      grid or look clock the plate runs at.
 
       Three snapshots of the velocity: \`prev\` before any of this step's
       forces, \`mid\` after the body forces, \`vel\` after the rest. Each
@@ -557,8 +559,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     And a poured liquid's own (PLAN 18d, src/lib/liquidProps.ts): the
     species field carries, for the share r of the column that is glycerine,
     syrup, milk or alcohol, Σ share·ln(ν/ν_water) in g. The rest of the
-    column is the clear liquid, whose ν is in A.a.x (12ν/W², W the plate's
-    width), so the column's viscosity against the clear liquid's is
+    column is the clear liquid, whose ν is in A.a.x (12ν/G², G the gap
+    field's metres), so the column's viscosity against the clear liquid's is
     exp(g − r·ln(ν_clear/ν_water)), the same geometric mixing by share as
     the ferrofluid's above. Glycerine in the default clear liquid is fifty
     times its drag, so where it lies the flow has to go round it (the
@@ -569,7 +571,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let sp = textureLoad(species, min(q, vec2i(textureDimensions(species)) - 1), 0);
   let filmDims = vec2i(textureDimensions(film));
   let fm = clamp(textureLoad(film, min(q * filmDims / n, filmDims - 1), 0).r, 0.0, 1.0);
-  let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
+  let lnClear = log(max(A.a.x * ${(DISH_GAP_FIELD_METRES * DISH_GAP_FIELD_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
   let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
   // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~50 cSt at 20°C, 50x water):
   // Two layers stacked across a pressure-driven Poiseuille gap (oil thickness fm against one

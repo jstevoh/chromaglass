@@ -225,9 +225,9 @@ export class FluidSimulation {
    * run where the finger was.
    */
   readonly pressLift = new PressLifts();
-  /** Cells each presser's strokes have pressed on this plate (a kick's are Beat Squeeze's), and how deep, summed over those cells. */
-  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0 };
-  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0 };
+  /** Cells each presser (lib/squish.ts Presser) has pressed on this plate, and how deep, summed over them. */
+  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0, bubble: 0 };
+  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0, bubble: 0 };
   /**
    * Beat Squeeze's kicks, given back (lib/squish.ts `KickRelease`): each
    * kick's press is held a moment and then let go over a third of a second,
@@ -2160,16 +2160,15 @@ export class FluidSimulation {
       }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
-    // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
-    // no dye, only the gap given back, which the shader never opens past rest.
-    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
-    // The rhythm sheet's own motion (pressKick): solved a step, its change laid as the gap's,
-    // with the spring the shader will give the gap this step taken on the sheet too (lib/sheet.ts).
+    // The kicks' presses, held against the spring, let go (`pressKick`): only the gap
+    // given back, never past rest.
+    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring);
+    // The rhythm sheet (pressKick): solved a step, laid as the gap's change, with the spring (lib/sheet.ts).
     if (this.sheet.live) {
       if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
       if (!this.sheetGap) this.sheetGap = new Float32Array(this.size * this.size);
       const depth = this.sheet.closed, cells = this.sheet.pressedCells;
-      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap) > 0) {
+      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap, this.lastStep?.plateCurve ?? 0) > 0) {
         this.sheetLaid = true;
         this.dirty = true;
         // As a stroke counts them (applySquish): the cells a held finger closes, and the depth.

@@ -21,45 +21,48 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## The top picks
 
-- **38a. The lamp is a condenser, not a wandering painted glow** (S, nil frame cost;
-  High). *Now:* the hot spot multiplies the finished picture by
-  `mix(0.78, 1.25, exp(-3.5·d²))` with a warm tint (`src/gpu/wgsl/plate.ts:3308-3319`); a
-  second lamp *multiplies* a bluish 1.25× Gaussian on top; both centres drift by noise up
-  to a third of the plate when Lamp Motion is up (`LiquidVisualizer.tsx:5207-5213`); and
-  the lamp ground is divided by 1.28125 to stop the peak clipping (`plate.ts:2514`). The
-  heat's own hot spot is another shape again, 1/(1+2.5r²) (`fluid/dye.ts:231-235`), so the
-  warmth and the light disagree about where the lamp is. *Real:* an overhead projector's
-  Fresnel condenser images the bulb into the lens's pupil, so the stage is lit nearly flat,
-  falling off as the lens's cos⁴ of field angle and the condenser's edge, with a soft fixed
-  image of the filament at most; a second lamp *adds* light; and nothing in the picture
-  moves unless the liquid does. A brightness that slides across the whole frame is the
-  kind of whole-frame motion the owner already took out of the sound (frameSway 0).
-  *Build:* one irradiance map E(x) from the condenser (cos⁴ and an edge), shared by the
-  lamp ground and the heat source, a second lamp added in light, Lamp Motion retired or
-  turned into a real thing that moves (a hand-held second lamp). *Measure:* the plate with
-  no liquid is flat to the cos⁴ law and still from frame to frame; the heat's peak and the
-  light's peak are the same point.
+- ~~**38a. The lamp is a condenser, not a wandering painted glow**~~ — **Shipped, this PR**
+  (the Hot-Spot is the projector's lamp lever: the bulb's image off the lens's aperture,
+  `src/gpu/wgsl/lampField.ts`; the heat lit evenly; `npm run lampfield` 9/9, 1 of 7 on the old
+  plate; story in `docs/plan-shipped.md` §38a). Left from it: 38a-2, 38a-3.
 
-- **38b. Bubbles that never appear or vanish by a clock** (S for the fades, M for the rim;
-  High: every music look pops bubbles). Sharpens **18i**, which named the timers but not
-  these. *Now:* `timedPops = true` (`src/lib/bubbles.ts:144`), lives drawn 9–23 s (`:261`),
-  8–18 s for the straw's satellites (`:331`), 0.8–1.6 s for daughters (`:216`), all scaled by
-  `lifeScale = 0.5 + bubbleAmt`; each bubble fades in over 0.35 s and out over 1.2 s like a
-  sprite (`:582-583`); its age over its life is packed (`:599`, `wgsl/air.ts:80`) and the
-  plate thins and darkens its film by it (`plate.ts:3448, 3518, 3533`). A pop throws two or
-  three daughters with 35–65 cell/s kicks by Culick's rim retraction (`:198-232`), which is a
-  free soap bubble's physics: an air pocket between two glasses has no film to retract.
-  Small bubbles also melt away by a ripening 1,400× too fast to be gas through oil
-  (`RIPEN 1.4`, `:84-88`; real Lifshitz–Slyozov ripening of mm pockets takes hours), and a
-  bubble under 0.6 cells is deleted (`:534`); a stretched one splits by a 0.3/s dice roll
-  (`:537-552`) rather than at a critical capillary number; and each one wobbles at a drawn
-  1.2–2.4 rad/s (`:181, :433-435`) where a mm pocket in oil between glasses is overdamped
-  (Re ≪ 1) and only follows what pushes it. *Real:* a pocket enters as volume (a pour, the
-  straw, a press that traps air) and leaves only by the open rim, by merging, by being
-  engulfed, or by dissolving over hours. *Build:* timers, fades, age-as-colour, the daughters
-  and the wobble out; leaving at the rim as the dye already does (18g-1); breakup at a
-  critical Ca from the bubble's own stretch. *Measure:* `npm run pops` and a still plate
-  where the bubble count holds for a minute with nothing pushing.
+- **38a-2. The head's cos⁴ and the lamp's stage fall-off, always on** (S; Medium; changes
+  every look, so the Mac's eyes first). 38a keeps Hot-Spot 0 an ideal projector, lit evenly,
+  so no look changed. A real one is not: the head's lens dims the frame's corners as cos⁴ of
+  the field angle (a 355 mm head over the 0.133 m frame: about 9% at the corners), and the
+  lamp below the condenser lights the stage as cos³ of its own angle. Both belong in
+  `lampField` as the default, applied to the light and (the stage's half) to the heat, and
+  Lamp Warmth's painted vignette (`plate.ts`, the Lamp warmth block: a smoothstep that
+  darkens corners by up to 45% with the warmth) goes in the same PR, since that is what it
+  was standing in for. *Measure:* `npm run lampfield`'s law with the cos⁴ term; the warm
+  looks' corners against the vignette's, judged on the Mac.
+
+- **38a-3. Lamp Motion has nothing real left to move** (S; Low). After 38a it moves only the
+  light the gloss and the bubbles' rims are lit from (`lampDir`, the lit-from-above shading
+  38h takes out). When 38h lands, Lamp Motion and the plate rock's push on the lamp
+  (`lampRock`) move nothing a projector has: retire the slider (its MIDI, desk pin and
+  the two looks that set it, Crowd Plate with its `dirX` patch and Soap Film), or give it a real
+  thing that moves, such as the gel wheel's hand.
+
+- ~~**38b. Bubbles that never appear or vanish by a clock**~~ **Shipped** (#603, with 38g and
+  38n): no timers, fades, age-as-colour, daughters or wobble; a pocket inflates at a breath's
+  rate, leaves at the open round rim (area falling at π·bσ/3μ), by a merge, under a drop, or by
+  dissolving at Henry's law's rate, which is years; breakup at a critical deformation from
+  the strain. `npm run bubblephysics` 24/24. Story in `docs/plan-shipped.md` §38b.
+- **38b-2. An Air Dissolves dial** (S; Low, the owner's call). `BubbleField.dissolve` scales
+  air's diffusivity past nature (1 is real, nil on a show's clock; 3e7 melts a 2-cell pocket in
+  about 90 s, the small first). A setting for it, with its desk, phone and MIDI, would give a
+  music look back the turnover its timers gave it, by the real law. Not built: the owner sees
+  the plate fill and empty only by the rim and merges first.
+- **38b-3. Music air reaches the rim** (S; Medium). With no clock a look's bubbles hold at its
+  Bubbles count (`room` in `LiquidVisualizer.tsx`) and new ones come only as old ones leave,
+  so how fast they turn over is now how fast the flow takes them to the rim and how often they
+  merge. On the Mac: count the kick bubbles a minute on a music look, before and after; if the
+  plate goes still, 38b-2 is the answer, not a clock.
+  The deploy after #603 found it first: `npm run kickbubbles` counted 11 chances with room
+  on Classic in a minute where its floor is 15 (the room no longer empties itself); the
+  check now lets the look's bubbles go every eight seconds, since it measures the kick's
+  odds, not a bubble's life.
 
 - ~~**38c**~~ Soap is conserved: no decay, no grid-rate spreading. Shipped 2026-10-30
   (`npm run soap`); story in `docs/plan-shipped.md` §38c. What it left:
@@ -167,51 +170,73 @@ written first. Line numbers are as read on main at d07ac31.
   (τ ≈ h²/κ, seconds) and the glass to the air and by radiation, which
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
+  *Found reading it for the build (2026-10-30), before any of it was built:*
+  - **The heat is not carried on a thin gap.** The temperature lives in the velocity's z,
+    and a thin gap skips the self-advection (`fluid.ts`, step 2's `if (thin) return`), so
+    the lamp's heat stays where it was laid while the flow it drives moves the colour out
+    from under it: a warm patch cannot rise as a thermal, it pushes from a fixed place.
+    The build starts here: carry h·T with the gap's flow, as the dye's amount is carried.
+  - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
+    at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
+    Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in
+    real time, not the 12.4 s its comment says, and the lamp's 0.24 K a unit is 0.026 K/s
+    real, near the physical 1000 W/m² over a 6 mm layer and its two glasses (C ≈ 33 kJ/m²K,
+    0.030 K/s). So the physical model in seconds keeps Classic's heat nearly as it is if
+    Heat Decay is read as the air on the glass: h ≈ 7200·(−ln v) W/m²K puts 0.98 at a
+    strong fan (145, τ ≈ 115 s), 0.998 at still air (τ ≈ 20 min), 0.9 past any fan.
+  - **The current's cap is 0.75 cells a step** (`maxCurrent` in `sim/fluidSimulation.ts`),
+    not the 0.002 the audit read from the lab's BASE; the point stands: past a few
+    hundredths of a kelvin every plume goes at the cap.
+  - Real sizes for the check: water's β ≈ 2.1e-4 /K, so a free column in the reference
+    liquid (22.4 cSt) at the 6 mm rest gap rises 0.27 mm/s per kelvin, a round patch half
+    that (oillift's inclusion law); in water 22 times faster.
 
-- **38g. Bubbles that merge, crowd and stretch like pockets in a gap** (M, CPU only, nil
-  frame cost; Medium-High for the straw's rafts and dense froth). The research's ranked
-  items 6, 7 and 10 (`drops/research/bubbles-and-drops.md` in the project's shared files),
-  #163 shipped them for drops but not for air. *Now:* once two bubbles' film has drained
-  they become one disc at once with a fixed 0.18 stretch (`bubbles.ts:462-477`), and every
-  stretch relaxes at τ ≈ 1.4 s whatever the size (`:427-430`); crowding pushes each pair
-  apart to 0.98 of their radii, half each whatever their sizes (`:488-505`), and every
-  bubble is drawn as a disc, so no facet or Plateau border can form. *Real:* the neck grows
-  as (γ/η)·t, then t^¼ (Yokota and Okumura 2011); a pancake's shape relaxes at
-  τ₂ ≈ 2μR³/(b²γ) (Paterson 1981), milliseconds at 1 mm and nearly half a second at 5 mm, so
-  big merged pockets stay long and small ones snap round; crowded pockets push with
-  stiffness γ/R (Durian's bubble model), so small ones stay round and big ones facet, the
-  wall between unequal ones an arc of curvature 1/R_s − 1/R_b, jamming near an area
-  fraction of 0.84. The drops' wall arcs (`dropWall` in `beads.ts`) are the model to reuse.
-  *Measure:* relaxation time against R³ at three sizes; facets on a jammed raft.
+- ~~**38g. Bubbles that merge, crowd and stretch like pockets in a gap**~~ **Shipped** (#603):
+  the merged pocket starts as long as the pair was end to end and rounds off at Paterson's
+  τ₂ = 2μR³/(b²σ) (times at 10, 15, 20 cells within 1% of the law); the neck's (σ/μ)·t growth
+  is a millisecond, inside the step; strain stretches a pocket to ε·τ₂; crowding by Durian's
+  stiffness σb/R̃ against each pocket's drag 6πμR²/b, so a pressed pair of 14-cell pockets
+  overlaps 6% of its radius where 3-cell ones stay round. Story in `docs/plan-shipped.md` §38g.
+- **38g-2. Facets and Plateau borders drawn** (M, GPU; Medium-High for the straw's rafts).
+  The air field still draws every pocket as a disc (`gpu/wgsl/air.ts`), so two big ones
+  pressed together overlap rather than meet in a wall, and a stretched one is drawn round
+  (`packedShape` is read by no shader). The wall between unequal pockets is an arc of
+  curvature 1/R_s − 1/R_b (`dropWall` in `beads.ts`); the stretch is an ellipse; a pocket
+  stretched past SPLIT_D necks before it tears. *Measure:* facets on a jammed raft in the lab.
 
-- **38h. Nothing on a lit-from-below plate makes light** (S each, nil; Medium). Several
-  places still paint light a transmission projector cannot throw, though the block's own
-  rule says it (`plate.ts:3599-3602`: "a plate lit from beneath shows transmitted light
-  only"):
-  - the Micro Droplets satellites carry a lamp highlight, a specular dot
-    exp(−14·hd²) (`plate.ts:724-748, 3323-3330`); a small drop is a lens whose rim leaves
-    the pupil, a dark ring (`dropBand`) and no dot;
-  - the oil brightens by a flat 8% wherever it is, at any focus (`plate.ts:3082`); a lens
-    concentrates light only out of focus, the shadowgraph's 1 − Δz·∇²OPL that
-    `refractionOptics` already has (`:2028-2031`), zero at focus. **18e-2** says the 8%
-    stays; this says move it onto that term;
-  - the gel multiplies the lamp by 1.5 (`plate.ts:2163, 2195`); a gel is a filter,
-    transmission at most 1 in every band (the mixer's own note in §11 owes a Mac look at
-    this gain);
-  - the dye is shaded as if lit from a point above, Lambert plus a Blinn highlight plus
-    Schlick (`plate.ts:505-507, 546-567`); the lamp is below and collimated, and a dye film
-    reflects nothing into the lens. **18b-3** and **18e** name the gloss; new is only that
-    the light's direction is above the plate;
-  - the dish's rim adds a warm glow and Lamp Warmth carries a painted vignette
-    (`plate.ts:3686-3694, 3700-3721`); a dish's glass wall refracts the lamp out of the
-    pupil, a dark line by the same aperture law as a drop's band, and the falloff is 38a's
-    cos⁴;
-  - film grain is added on the plate itself every frame when no camera is on
-    (`plate.ts:3762-3765`); grain belongs to the camera or the film stock (`post.ts` has it),
-    not to a lamp through liquid onto a wall.
-
-  *Measure:* on the projector's view, no pixel outside a lens's defocus term brighter than
-  the lamp through clear liquid.
+- ~~**38h**~~ *shipped 2026-10-31.* Nothing on a lit-from-below plate makes light: the
+  satellite droplets are lenses (a dark band past DROP_CORE, no dot), the oil's 8% moved onto
+  the shadowgraph's 1 − Δz·∇²OPL (nothing at focus), the gel is a filter (Beer–Lambert in
+  Gel Wheel, no 1.5, no floor), Glossiness is the dye surface's relief gain (1 to 4× the
+  real slope; no Lambert, Blinn or Schlick), the dish's and the projectors' rims are dark
+  lines, and the plate draws no grain. `npm run nolight`. Story in `docs/plan-shipped.md` §38.
+  - **38h-2. The rest of the light painted from above** (S each, nil; Medium). Found
+    building 38h. The meniscus (`meniscus` in `plate.ts`) still brightens the rim's side that
+    faces `lampDir` and adds a camera highlight toward it; the air bubbles' pass adds a
+    specular `spec + spec2` toward the lamp and the second lamp (the bubbles block, "shine");
+    the rings' rim adds `ring · 0.15` and coloured drops add their dye as light, `glowC`
+    (the beads block); the macro's paint glint
+    (`glint = 1 − exp(−spec·1.6)`); and on the camera and non-derived path the boundary line
+    adds `edge0 · edgeK · 0.25` of white. Each is a lamp seen from above or light added at an
+    edge; each should take its light from the pupil law the drops use (and the camera's
+    wider lens), as 38h did. Once they go, `lampDir` and Lamp Motion drive nothing but the
+    hot spot, which is 38a-3's to retire. Not light from above but light added all the
+    same: Saturation Boost (1.35 by default) pushes each channel from the pixel's grey, so
+    under a red gel a cyan pool's red rises 55 levels past what the gel passed; whether the
+    projected path's grade may lift a band past its input is the owner's call, and
+    `npm run nolight` asks its lines at a grade of 1 meanwhile.
+  - **38h-4. The back plate's lamp takes the pigment's grain as dye** (S, nil; Low-Medium on
+    two-plate lamp looks). 38h made the front plate's lamp read the grain as T^grain
+    (`lampGrain0`); the back plate's lamp branch still reads `grained1 / film1`, the grain's
+    share of the opacity, which is 1 on a body near opaque. Its note warns that Metal folded
+    `grainedDepth` differently when it had two uses, so carry the raw grain in a var as the
+    front plate does. *Measure:* `npm run grainedge` with the back plate on.
+  - **38h-3. The oil's shadowgraph and the dye's are one term** (with **18e-2**). 38h draws
+    the oil's out-of-focus lens from its own ∇²OPL in the oil block, on both sides of its edge;
+    where dye crosses the oil's edge `refractionOptics` already takes the oil's share of the
+    derive pass's ∇²OPL, so there it is counted twice. When 18e-2 deflects by ∇OPL, take the
+    oil block's term out. *Measure:* `npm run nolight` line 7 holds with the oil block's
+    shadow gone.
 
 - **38i. Milk's forward scatter takes light from the beam, it does not add it** (S–M, low;
   Medium on the milk looks: today a bright rim rings every pool). After **18j**; sharpens
@@ -239,40 +264,115 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## Smaller, each worth doing when its area is open
 
-- **38k. The spikes' onset and the magnets' field, in tesla** (S; Medium: which magnets
-  raise domes). Sharpens **29c-3**, **9u**, **9t-1**, **9t-3**. The onset is 0.18 → 0.35 of the
-  hand's magnet by a smoothstep (`wgsl/spikes.ts:49-50, 125`; `standing.ts:34` `LANGEVIN`
-  0.035 on the same scale). Real: Cowley–Rosensweig, μ0Mc² = 2(1 + 1/μr)·√(Δρgσ), and a
-  sudden (subcritical) jump, not a ramp. With it: the internal field, not the applied one
-  (a thin sheet in a normal field has H_in = H0 − M, so at χ 2.6 the layer feels about 0.28
-  of the field at low strength: `spikes.ts:104-106` and the film's lift use the applied B);
-  and several magnets add as *fields*, not energies (`shared.ts:406-414` sums |B_k|², its
-  comment says so; two like-poled fingers' fields add as vectors, up to twice between
-  them; `magnetDiscExact` already gives B_ρ and B_z, which 9v-tilt needs too).
+- **38k. The spikes' onset and the magnets' field, in tesla.** ~~Fields add, the onset
+  worked out~~ **shipped** (#630): several magnets add as vectors, and the liquid's onset,
+  Cowley and Rosensweig's field for EFH1 under water through the layer's inner field, is
+  4.0 mT (`SPIKE_ONSET_REAL`, a share of 0.033), held to an independent solution by
+  `npm run disc` 13/13. The plate still runs on the lab's 0.18 (22 mT): **38k-7**. Story
+  in `docs/plan-shipped.md` §38k.
+  - **38k-7. The plate on the real onset** (S once 9t-2 is in; High: Magnet Garden, Ferro
+    Paint, the set-down magnet). *Shortcut today:* `SPIKE_ONSET` is the lab's 0.18, 5.5×
+    the liquid's, so the looks' own magnets and the hand's set-down one gather a flat
+    pool where a real one raises domes (9u). *Blocked on* **9t-2**: past the onset the
+    standing film takes the pool and has no Kelvin pull, so #625's try at the real onset
+    left a dragged drop 7.4 R behind and turned `ferrodrag`, `ferrodye`, `ferropour` and
+    `startup` red on the Mac (story §38k). *Build, after 9t-2:* `SPIKE_ONSET =
+    SPIKE_ONSET_REAL`, `SPIKE_FULL` at the old 0.35 / 0.18 of it; the opening builds the
+    film's pipelines when a look's own magnet is past the onset (`Opening.film`, so
+    `startup` does not wait on them mid-show); `disc`'s "every look's own magnet raises
+    none" turned to "is past it"; `spikes`, `fingers` and `standing` re-aimed to shares of
+    the onset (38k-5). #625's branch (`claude/project-thread-2kj23l`, 4e8bbc9) has all of
+    it written. *Measure:* those checks on the Mac, and the owner's eyes on Magnet Garden,
+    Ferro Paint and a dragged-and-dropped Magnet, filmed before and after.
+  - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
+    φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
+    from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%
+    and over) moves the onset, the pull (Kelvin's χ in `MAGNET_GAIN`) and the density.
+    Needs `SPIKE_ONSET` as a uniform (shared.ts's `spikeAmp`, the film's lift, `fluid.ts`'s
+    film gate) and `fluid.ts` is 99.6 KB, so a split first (19ai-10).
+  - **38k-2. The pitch and the tension are one number** (S; Low-Medium). The domes' pitch
+    (`SPIKE_PITCH`, 8 mm) sets l_c, so the onset reads σ = Δρ g l_c² = 3.3 mN/m for EFH1
+    under water: low for a hydrocarbon against water (10–30 mN/m without surfactant at the
+    interface). A measured σ would set the pitch (2π l_c, about 14 mm at 10 mN/m) and the
+    onset (5.3 mT) together; the pitch is the look's today.
+  - **38k-3. The film's patches step their own magnet's field** (S). The pull and the drop
+    add the magnets as vectors now; each standing patch (`wgsl/standing.ts`, `lift`) still
+    reads its own magnet alone, so two fingers' domes between them stand on half the field.
+  - **38k-4. The ramp past the onset** (S). `SPIKE_FULL` keeps the old proportion (1.94 ×
+    the onset) when 38k-7 moves it: the solver's gate as domes arrive, not their height, which the film's
+    lift makes. The subcritical jump and its hysteresis are 9t-3's.
+  - **38k-5. The looks' own magnets in the dome checks** (S). `spikes` and `fingers` used
+    Magnet Garden's own magnet as their control under the onset; at the real onset (38k-7)
+    it is 4.6× past it, so the control becomes a magnet at 0.8 of the onset, whose pull is
+    about 3% of Garden's. Add Garden's own magnet as a case that must raise domes, its bar
+    set from the Mac's first reading.
+  - **38k-6. One χ for EFH1** (S, with 38s). `standing.ts`'s `CHI0` is 2.6 and
+    `spikes.ts`'s `FERRO_CHI` 2.64; the drop's pull reads `CHI0`. Import the one number
+    and re-read `ferrodrop` (about 1%).
 
-- **38l. The glass springs back by the second, not by the frame** (M; Medium: every press
-  and lift). Sharpens **18a-5**. `gap += (rest − gap)·gapSpring` with no dt
-  (`wgsl/fluid/gap.ts:239`), so a lift recovers twice as fast at 120 fps as at 60. Real: a
-  lifted glass is held by Stefan suction, F = 3πμR⁴ḣ/(2h³), and a bent one relaxes by its
-  stiffness. The dt is a fix on its own (S) before the law.
+- ~~**38l. The glass springs back by the second, not by the frame**~~ — **Shipped, this PR**
+  (the glass opens against the film's suction, k(h₀ − h)(h/h_s)³ with Press Lift read at
+  the film a full press leaves, STEFAN_FILM 0.30 (38l-4); the dt half already held on a thin gap;
+  `npm run stefan`; story in `docs/plan-shipped.md` §38l).
+  - **38l-1. The liquid's viscosity in the press and the lift** (S; Low-Medium). Stefan's
+    rate goes as 1/μ, and neither the press's closing nor the lift reads the liquid under
+    the palm: glycerine presses and lifts as water does. hsPrep's per-cell μ is there to
+    read. Found building 38l.
+  - ~~**38l-2. The kick's sheet lifts by the same law**~~ — **Shipped, this PR** (the sheet
+    takes the suction's share cell by cell on the dent it holds and node by node on its own
+    solve, so the shader takes it everywhere; `npm run sheet` 18/18; story in
+    `docs/plan-shipped.md` §38l).
+  - **38l-3. The sheet's suction reads the plate's own gap** (S; Low). The sheet works out
+    each cell's share at rest less its own dent, not the plate's gap, which it cannot read
+    (the gap is on the GPU): where a hand presses on a kick's cells the plate's film is
+    thinner than the sheet thinks, so the sheet's part of the dent there lifts at the
+    shallower film's pace. Measured small (a hand press beside a live kick keeps its memory
+    to 0.04%), but on the same cells it is a shortcut. Found building 38l-2.
+  - ~~**38l-4. The glass's stiffness against the hand**~~ — **Shipped, this PR**
+    (STEFAN_FILM 0.25 → 0.30: a held press settles at a·STEFAN_FILM³/k, so the number is
+    the glass's stiffness; the Press tool goes to 0.0045, holds a second and lets go by
+    2.5 s on the Mac; story in `docs/plan-shipped.md` §38l).
+  - **38l-5. A light press barely dents** (M; Medium). Since 38l a held press settles at a
+    dent linear in how hard it presses (F/K), where before even a light press dug deep.
+    The Mac's lighter recipe (one r30 disc at 0.004 every 60 ms, far lighter than the
+    Press tool) went to 0.0129 before and 0.0292 after, and a phone's finger presses are
+    lighter still. The press is laid as a gap change a frame, not a force: model the
+    hand's press as a force over time (the third option the owner was offered), so a
+    soft, long press digs as a soft hand on stiff glass does. Found filming 38l-4.
+  - **38l-6. The lift's step reads the film at its start** (S; Low). `squeezeUpdate` (and
+    the sheet's share in `lib/sheet.ts`) takes 1 − (1 − k)^((h/h_s)³) with the depth held
+    at the step's start, so the glass lags where it opens fastest, the snap once a peeled
+    press passes h_s: `npm run stefan` reads 2.14% of the press between 60 and 120 frames a
+    second at 1 s (bar 3%). A midpoint step (the half step's gap, then the whole step's
+    share) takes it to 0.1% in a model, but tried here it moved stefan's "the rate is
+    k(h/h_s)³" line, which reads the rate at the step's start with the lab's big spring
+    (0.02 a step), 16% off: that line has to read the rate at the step's middle, and the
+    sheet and its check take the same step. Found building 38l-4.
 
-- **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
+- **38m. Film Physics is built and on in no look** — *pictures taken 2026-10-30: six looks at 0 and
+  at 1 in the project's shared files (`film-physics-38m/`), for the owner to pick; judging §101.* (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,
   #163) is gated by `filmPhysics`, default 0 and set by no preset (`types.ts:1093`). The
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at
   0 and 1 for the owner to pick, as 18b-1 did for the lamp.
 
-- **38n. Bubbles move by the look's own liquids** (S; Medium: bubbles in glycerine against
-  water). Sharpens **18i** and **18d-3**. The speed ratio is max(1, 1.5/(1 + 2.26·Ca^⅔)), the
-  1.5 a named tuning for Taylor–Saffman's 2 and floored at 1; mineral oil's μ 0.017 and σ
-  0.030 are hard-wired "pending 18d" (`bubbles.ts:61, 389-405`); tilt drifts every bubble at
-  −tilt·900 cells/s whatever its size or the liquid (`:414`); the drops' λ is 1.5 "solved
-  back from 0.8" (`beads.ts:206`). Real: U = 2U/(1 + λ) with λ the poured liquids' ratio;
-  buoyant drift Δρ·g·b²/(12μ). Each bubble's film thickness and glint come from a random id
-  (`plate.ts:3394-3458`); the real film on a pancake pocket is Bretherton's,
-  0.84·Ca^⅔·b, from its own speed, so the variety stays and follows the flow.
+- ~~**38n. Bubbles move by the look's own liquids**~~ **Shipped** (#603): μ from the look's
+  Thickness (or its Viscosity word with Thin Gap off), σ and air's solubility from water or
+  oil; Taylor–Saffman's 2/(1 + 2.26·Ca^⅔) with no tuned 1.5 and no floor; buoyant climb
+  Δρ·g·sinθ·b²/(12μ); the film Bretherton's 1.337·Ca^⅔·(b/2) for the pocket's own speed, kept
+  when it stops, packed where the film's age was. Story in `docs/plan-shipped.md` §38n.
+- **38n-2. The film's colour at its real thickness** (S, GPU; Medium, the owner's eyes). A
+  pocket moving at a millimetre a second in the default oil lays a film of tens of microns,
+  far past interference (the table ends at 1.26 µm), so a real pocket between glasses shows
+  no thin-film colour. The plate still maps the film's log thickness onto the old 0.35–1
+  colour range: the order follows the flow, the scale is a look. Either Iridescence names
+  that scale as a dial past nature, or the film goes through the Airy table at its real
+  thickness and bubbles go clear.
+- **38n-3. The rock tilts the air too** (S; Low). Bubbles climb by the hold's tilt only
+  (`plateSin(tilt, 0)`); the solver also takes the rock's swing (`plateSin(hold, swing)`).
 
-- **38o. The soap film's named shortcuts become items** (M each; Medium: the lace).
+- **38o. The soap film's named shortcuts become items** — *numbered 2026-10-30 as 32f–32j; 32f
+  (the frame's border) and 32g (black spots) shipped, 32h–32j open.* (M each; Medium: the lace).
   §32's notes (lines 51–59) name five shortcuts with no open ids: in-plane gravity on a flat
   plate, ζ 1.5 compressing minutes into 30 s (`src/lib/soapFilm.ts:74`,
   `src/gpu/soapFilm.ts:34`), uniform evaporation, rupture as a 0.5 s relaxation to 8 nm, and
@@ -301,6 +401,44 @@ written first. Line numbers are as read on main at d07ac31.
   (a guess to confirm with the owner's own glass). Looks would not change (forces are read as
   terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
   labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
+
+  The owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." So 2 mm in the
+  middle at rest (a few millilitres under a top glass about 15 cm across is 1–3 mm; 2 mm is
+  the middle, a judgement and not a measurement), in two parts:
+
+  - **Part 1, one number (shipped, this PR, at 6 mm).** `DISH_GAP_METRES`
+    (`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
+    *gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
+    same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
+    the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
+    rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
+    h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
+    rest gap and greps `src/` for a gap made a length by the plate's width.
+  - **Part 2, 2 mm** (M; Medium-High on the water looks). Set the number, then retune what
+    the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
+    CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
+    of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
+    water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
+    `airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
+    (`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
+    under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
+    `magnetgain` need their windows on τ (#605 has them). Its leftovers, each its own item:
+  - **38r-1. Does a sandwich slosh?** (S to decide, M to build). `lib/slosh.ts` solves a
+    6 mm layer with a free surface (`SLOSH_REST_DEPTH`): between two glasses there is none,
+    and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
+    under it. Either the tilt's slosh is the open dish's, or on the sandwich it is the thin
+    gap's creeping flow. The owner's call.
+  - **38r-2. A drop is a pancake past half the real gap** (S). `DROP_HALF_GAP`
+    (`wgsl/plate.ts`) is 0.016 of the plate, half the 6 mm; half of 2 mm is 0.005, at which
+    the common bead touches both glasses, and `lib/beads.ts`'s merge time is in units of it.
+    Moves with 14ab-6 (#601), `npm run droplens` re-read.
+  - **38r-3. A Gap dial** (S). At 2 mm water's drag time is a third of a second, not three:
+    a push fades nine times sooner. If a look wants the old glide, the honest dial is the
+    gap itself, not a stand-in for inertia.
+  - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
+    three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
+    half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
+    would slide the picture the same.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

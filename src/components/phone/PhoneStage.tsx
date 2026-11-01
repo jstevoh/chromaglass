@@ -4,7 +4,7 @@ import type { MixTakes } from '../../lib/mixFade';
 import {
   Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
-  Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
+  Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
   Crosshair, LayoutGrid, Plus,
@@ -14,9 +14,11 @@ import { ToolGlyph } from '../ui/ToolGlyph';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { PIN_RANGE } from '../../lib/deskPins';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
+import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
@@ -81,7 +83,7 @@ export interface PhoneLook {
   swatch: string;
 }
 
-type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs';
+type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 'feedback';
 
 /**
  * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
@@ -627,7 +629,7 @@ export function PhoneStage(p: PhoneStageProps) {
               label="Magnet · size"
               value={p.magnetSize}
               min={0}
-              max={1}
+              max={PIN_RANGE.get('magnetSize')?.max ?? 1}
               step={0.05}
               onChange={p.onMagnetSize}
               display={`${Math.round(p.magnetSize * 100)}%`}
@@ -1094,7 +1096,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
-            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}
+            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={PIN_RANGE.get('automateRate')?.max ?? 1} step={0.01} onChange={p.onEvolveSpeed}
               display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
           </div>
           {/*
@@ -1193,6 +1195,14 @@ export function PhoneStage(p: PhoneStageProps) {
           </PanelGuard>
         </PhoneSheet>
       )}
+      {/* Settings → Feedback, the same pane the sheet draws (PLAN 39a), a tap from More rather than at the far end of the Settings strip. */}
+      {sheet === 'feedback' && (
+        <PhoneSheet title="Feedback" onClose={close} testId="phone-sheet-feedback">
+          <PanelGuard name="The Feedback sheet" inline onClose={close}>
+            <FeedbackPane card="" title="hidden" />
+          </PanelGuard>
+        </PhoneSheet>
+      )}
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
@@ -1208,6 +1218,7 @@ export function PhoneStage(p: PhoneStageProps) {
             />
             <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
+            <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}

@@ -1078,7 +1078,8 @@ export const PRESETS: Preset[] = [
       */
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
-        { source: 'bands', feature: 'band2', setting: 'areaHue', area: 0, depth: 0.6 },
+        // The lead's note picks the kick's bottle (PLAN 25i): C to D#, orange; E to G, ultramarine; G# to B, purple. A depth only says it is on (a look's cords stay at 0.6 or under for the fade).
+        { source: 'hits', feature: 'noteClass', setting: 'areaHue', area: 0, depth: 0.6 },
         { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 1, depth: 0.45, threshold: 0.35, attack: 0.02, release: 0.3 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
@@ -1622,7 +1623,9 @@ export const PRESETS: Preset[] = [
         Two pH wells that cancel where they meet (PLAN 25i-2, 28i-3b): the
         snare drops acid into the left well (area 0, blooming pink), the kick
         drops base into the right well (area 1, turning green), and mid
-        harmony stirs the two fronts together across the dish.
+        harmony stirs the two fronts together across the dish. Each hit a
+        drop of the reagent itself (an area of a reagent, areaCords.ts), so
+        the pink and the green are the indicator's, never a dye poured.
       */
       sceneMappings: [
         { source: 'hits', feature: 'snareHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
@@ -1677,14 +1680,18 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
       /*
-        The Belousov-Zhabotinsky gel dish (PLAN 28i-2, 28i-3b): bass and mid
-        harmony shift the ferroin oxidation weight so the dish alternates
-        between red/blue spiral fronts and the multi-hue indicator bath (>=6
-        colour changes/min), while snares shear wave tips into spiral pairs.
+        The Belousov-Zhabotinsky gel dish (PLAN 28i-2, 28i-3b, 25i): the
+        kick's own beat dose touches its three places in turn and the snare
+        drops activator in the third, so each fires and a ring runs out
+        (an area of a reagent, areaCords.ts), and snares shear wave tips into
+        spiral pairs. The reaction keeps its own time: bass and mid harmony
+        used to turn BZ Reaction down by 0.58 and 0.55, which under any song
+        took it to nought, where the gel is neither stepped nor drawn, so no
+        ring showed at all (filmed on the owner's Mac, 2026-10-31). Nothing
+        a band plays changes a dish's chemistry.
       */
       sceneMappings: [
-        { source: 'bands', feature: 'tonalLow', setting: 'bzReaction', depth: -0.58 },
-        { source: 'bands', feature: 'tonalMid', setting: 'bzReaction', depth: -0.55 },
+        { source: 'hits', feature: 'snareHit', setting: 'areaPour', area: 2, depth: 0.25, threshold: 0.35, attack: 0.01, release: 0.25 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },

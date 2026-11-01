@@ -242,7 +242,7 @@ export class BeadField {
    * the show's `plate.beads` stream unless a check hands in its own, so the
    * same seed lays the same carpet (lib/rng.ts, `npm run seed`).
    */
-  constructor(private readonly grid: number, private readonly rng: Rng = stream('plate.beads')) {}
+  constructor(readonly grid: number, private readonly rng: Rng = stream('plate.beads')) {}
 
   clear(): void { this.beads.length = 0; this.dirty = true; this.patchSeed = this.rng.float() * 1000; }
 
@@ -674,6 +674,19 @@ export class BeadField {
     }
     for (const b of bs) { b.x = Math.max(2, Math.min(N - 3, b.x)); b.y = Math.max(2, Math.min(N - 3, b.y)); }
     this.dirty = true;
+  }
+
+  /**
+   * The field, on a frame its mask needs drawing again (the beads moved, or
+   * Drops crossed zero), for the plate to draw on the GPU from its list
+   * (`WebGPUPlate.setBeads`, PLAN 14ab-6); null while the last one stands.
+   * `render` below is the same mask drawn on the CPU, which is what
+   * `npm run beadmask` holds the GPU's to.
+   */
+  moved(): this | null {
+    if (!this.dirty) return null;
+    this.dirty = false;
+    return this;
   }
 
   /**

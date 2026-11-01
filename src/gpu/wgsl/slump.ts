@@ -91,8 +91,8 @@ export function slumpKernels(HEAD: string, W: string): Record<string, string> {
   return {
     /*
       K Δt/Δx² for each cell, one substep's: A.a.x is g′Δt/(3νΔx²) in 1/m³,
-      A.a.y DYE_LAYER (metres per unit), A.a.z the plate's width in metres
-      (the gap field is in plate widths), A.a.w 1/(−ln DYE_FLOOR). The mix's
+      A.a.y DYE_LAYER (metres per unit), A.a.z the metres in a unit of the
+      gap field (GAP_METRES: the field is in gap units, 0.03 at rest), A.a.w 1/(−ln DYE_FLOOR). The mix's
       oil share is read where the look has a mix (a 1×1 blank, all water,
       where it has not).
     */

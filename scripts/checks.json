@@ -121,6 +121,17 @@
       ]
     },
     {
+      "name": "The glass gap, one number",
+      "shard": "logic",
+      "run": "npm run gap",
+      "why": [
+        "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
+        "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
+        "cover's shear, the sheet's film, a finger's edge, the ferrofluid's room)",
+        "held to its physics worked out in SI from the millimetres alone."
+      ]
+    },
+    {
       "name": "The slosh",
       "shard": "logic",
       "run": "npm run slosh",
@@ -720,6 +731,24 @@
       "run": "npm run map"
     },
     {
+      "name": "The feedback Worker",
+      "shard": "logic",
+      "run": "npm run feedback-worker",
+      "why": [
+        "Settings → Feedback's Worker (PLAN 39a), against a real SQLite",
+        "database built from server/feedback-schema.sql, the file D1 is made",
+        "from: a note is stored with the account only a verified token proves,",
+        "its log and its picture, and mailed to support@ with Reply-To the",
+        "sender; a forged token or a claimed uid is nobody; bad bodies are",
+        "refused without quoting them; one address is held to its hourly",
+        "limit even by forty at once with D1's latency, and everyone to an",
+        "hourly ceiling; an address Firebase has not proved is not the",
+        "account's; a failed or missing mail provider costs the mail and never",
+        "the entry; reading needs the token; and the page's scrub takes",
+        "tokens, licence and stream keys out of the log and leaves Keystone."
+      ]
+    },
+    {
       "name": "The report Worker",
       "shard": "logic",
       "run": "npm run report-worker",
@@ -806,6 +835,22 @@
         "is lampzero, bubblelook and the four account checks) it shares a runner",
         "with those, about ten minutes, and `lab` keeps the slosh dish, the soap",
         "film and holeline, about twelve."
+      ]
+    },
+    {
+      "name": "Nothing on the plate makes light",
+      "shard": "lab2",
+      "run": "npm run nolight",
+      "why": [
+        "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
+        "satellite droplets, Glossiness, the gel and the dish's wall each leave",
+        "no pixel brighter than the same plate without them, and each still",
+        "darkens some; the projectors' rims nothing over the lamp; the oil",
+        "nothing in focus and a lens out of it, its caustic turning over as",
+        "Focus passes the middle; and two times of the clock draw the same",
+        "plate (no grain). The lab on SwiftShader, beside lampzero, about two",
+        "minutes: the real plate shader on a lab plate, any adapter that",
+        "computes, so it has no need of the Mac."
       ]
     },
     {
@@ -928,6 +973,21 @@
       ]
     },
     {
+      "name": "The oil beads' mask drawn on the GPU",
+      "shard": "lab",
+      "run": "npm run beadmask",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "The beads' mask is drawn by the plate from a list of the beads in compute passes",
+        "rather than drawn on the CPU and uploaded (PLAN.md 14ab-6, lib/beadPack.ts,",
+        "gpu/beadMask.ts, scripts/beadmask.mjs): the drops' mask is rasterDrops' to a level,",
+        "the rings' each pixel's share of bead, dome and rim, on one plate switched between",
+        "them; the bytes written across and the CPU's time a tenth of the picture's or less",
+        "(measured a twentieth and a thirtieth). Logic and numbers, the same on any adapter",
+        "that computes."
+      ]
+    },
+    {
       "name": "The slosh dish on the GPU",
       "shard": "lab",
       "run": "npm run sloshgpu",
@@ -1016,6 +1076,15 @@
         "dark ground and the lamp ground, at five sizes. Pictures from the lab,",
         "which SwiftShader renders as the shader's text, so it sits beside",
         "holeline in the open shard."
+      ]
+    },
+    {
+      "name": "Thin Film's rings are round",
+      "shard": "lab2",
+      "run": "npm run filmrings",
+      "why": [
+        "Thin Film's rings read the film's amount through a B-spline (PLAN 1i): the film itself, probed",
+        "out of the display pass, has no corner at the texels where the old read had one in every cell."
       ]
     },
     {
@@ -1127,6 +1196,19 @@
         "the phone, a camera opened by the id picked, each choice remembered",
         "apart, an unplugged camera taken off and opened again when it is back.",
         "No GPU; the site the steps above built."
+      ]
+    },
+    {
+      "name": "Settings → Feedback on the desk and the phone",
+      "shard": "browser",
+      "run": "npm run feedbackpane",
+      "why": [
+        "PLAN 39a (scripts/feedbackpane.mjs, apart from phone.mjs, which may not",
+        "grow): the Settings rail ends in Feedback and opens the pane; Send waits",
+        "for words; a build with no Worker sends by mail and draws no switches;",
+        "on a phone in portrait and two landscapes, More → Feedback fits with",
+        "nothing covered, 16 px type (13 px was found in every landscape) and",
+        "48 px topics; and the phone's Settings strip ends in it too."
       ]
     },
     {
@@ -1609,6 +1691,18 @@
       ]
     },
     {
+      "name": "The glass peels back against the film's suction",
+      "shard": "plate",
+      "run": "npm run stefan",
+      "timeout": 3,
+      "why": [
+        "The glass comes back up as Stefan's law says a thin wet film lets it",
+        "(PLAN 38l): let go, its opening rate over what is left goes as the",
+        "film's depth cubed, at two depths, and is the same by the second at",
+        "60 and 120 frames a second. The spring before was one rate at any depth."
+      ]
+    },
+    {
       "name": "The rhythm sheet is solved",
       "shard": "open",
       "run": "npm run sheet",
@@ -1972,6 +2066,19 @@
         "\"Every look at 0 is the plate as it was before the lamp, byte for byte\"",
         "is Measure's (lampzero): it compares two compiled programs, which a",
         "GPU's compiler rounds differently (one pixel of Fillmore on an M4)."
+      ]
+    },
+    {
+      "name": "The projector's light",
+      "shard": "open",
+      "run": "npm run lampfield",
+      "why": [
+        "The hot-spot is the projector's lamp lever (PLAN 38a): on the bare lamp",
+        "ground the stage is even at 0, each pixel is the aperture law at its",
+        "place on the stage, nothing moves with Lamp Motion or the clock, no",
+        "pixel is above the lamp, the condenser's colour edge is the law's, and",
+        "a second bulb adds light. Beside `lamp` in the open shard, about a",
+        "minute on SwiftShader."
       ]
     },
     {
@@ -2411,6 +2518,19 @@
       ]
     },
     {
+      "name": "The Live Show streams the picture",
+      "shard": "fifth",
+      "run": "npm run liveshow -- --stack --owed=plate,stack",
+      "why": [
+        "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
+        "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
+        "mixer and a keystone on the wall, streamed and decoded, against the",
+        "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
+        "the Plate source's frames are black today and the Mixer stack source is",
+        "not built; printed as owed until the PR that fixes each takes its id out."
+      ]
+    },
+    {
       "name": "A drop lands only where it is dropped",
       "shard": "fifth",
       "run": "node scripts/mirror.mjs",
@@ -2454,10 +2574,13 @@
     {
       "name": "The wall",
       "shard": "tools",
-      "run": "npm run wall",
+      "run": "npm run wall -- --owed=quarter,red,rung",
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
-        "how many times a second the whole screen is allowed to change."
+        "how many times a second the whole screen is allowed to change.",
+        "--owed: the flash guard's lines by quarters, in light (PLAN.md 14r,",
+        "scripts/wallflash.mjs), are written ahead of the build and printed as",
+        "owed until it ships; the PR that ships one takes its id out."
       ]
     },
     {
