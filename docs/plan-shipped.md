@@ -4027,6 +4027,14 @@ the sessions' files or the native apps skips the Mac (19h).
   bundle, or a check the map does not place, and that check runs. Such a run leaves a
   `mac` "partial" notice, which the deploy gate reads as it reads Measure's, so the
   deploy of the merge runs every shard on main.
+- **19ak-3a, a re-run skips what passed.** "Re-run all jobs" on a red PR run started
+  all five Mac shards again; on attempt 2 or later `reach.mjs` drops the shards an
+  earlier attempt of the same run passed (`passedEarlier`), since a run's merge commit
+  does not move between attempts. Such an attempt is partial to the deploy gate.
+- **19ak-3c, the Mac waits for the typecheck.** A new `Compiles, before the Mac` job runs
+  `tsc --noEmit` on ubuntu beside `reach`; the Mac shards need it, so a PR that does not
+  compile takes no Mac. Building once for all five shards (19ak-3d) was measured and
+  left: `dist/` is 116 MB against a 15 s build.
 - **Measured** (`scratch/replay.mjs`, not committed: main's last 100 merges replayed
   through the old and new selection, each check priced at its median over three green
   five-shard PR runs of 2026-11-01, plus 45 s of setup a shard): 6,526 Mac minutes

@@ -195,6 +195,26 @@ export async function carry({ prNumber, headRef, baseRef, runId, head = 'HEAD', 
   };
 }
 
+/*
+  A whole run re-run (PLAN.md 19ak-3a). "Re-run all jobs" on a red PR run
+  started all five Mac shards again, about 80 Mac minutes, to retry the one
+  that was red, and about a third of PR attempts in the week to 2026-11-01
+  were re-runs. A shard that passed in an earlier attempt of the same run
+  passed on the same commit (a run's merge commit does not move between
+  attempts), so it is not run again. "Re-run failed jobs" does not run this
+  job at all and already starts only the red shards. Such a run is partial to
+  the deploy gate: its newest attempt does not show every shard.
+  `jobs` is `actions/runs/{id}/jobs?filter=all`, each with its `run_attempt`.
+*/
+export function passedEarlier(jobs, attempt) {
+  const out = new Set();
+  for (const j of jobs ?? []) {
+    if (!j.name?.startsWith('WebGPU (macOS) · ') || !(j.run_attempt < attempt) || j.conclusion !== 'success') continue;
+    out.add(j.name.slice('WebGPU (macOS) · '.length));
+  }
+  return [...out];
+}
+
 // The network and the checkout, for a run in CI. The token is the job's own
 // (the repository's default is read for every scope, which is all this asks);
 // without one, the public API's limit of 60 an hour is shared by every job on
@@ -387,6 +407,18 @@ async function selftest() {
     const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1').replace(/ maconly=.*$/, '');
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
+  // A whole run re-run skips the shards an earlier attempt passed (19ak-3a).
+  {
+    const j = (shard, attempt, conclusion) => ({ name: `WebGPU (macOS) · ${shard}`, run_attempt: attempt, conclusion });
+    const jobs = [j('show', 1, 'success'), j('tools', 1, 'failure'), j('open', 1, 'cancelled'), j('plate', 2, 'success'), { name: 'Measure · logic', run_attempt: 1, conclusion: 'success' }];
+    const got = (a) => passedEarlier(jobs, a).sort().join(',');
+    for (const [ok, what] of [
+      [got(2) === 'show', `attempt 2 skips only the shard attempt 1 passed (${got(2)}), not its red, cancelled or Measure jobs`],
+      [got(3) === 'plate,show', `attempt 3 skips what attempts 1 and 2 passed (${got(3)})`],
+      [got(1) === '', 'a first attempt skips nothing'],
+      [passedEarlier(undefined, 2).length === 0, 'and jobs that could not be read skip nothing'],
+    ]) { if (!ok) bad++; console.log(`${ok ? ' ok  ' : ' FAIL'} ${what}`); }
   }
   // The Mac's names ride it too (PLAN.md 19ak-2): the checks a change
   // selects, or empty for every one, which is what a deploy can trust.
@@ -608,6 +640,19 @@ if (!isMain) {
         console.log(`::notice title=carried::run ${verdict.run} tests ${verdict.tested}`);
       } else {
         why = `${why}; not carried: ${verdict.why}`;
+      }
+    }
+    const attempt = Number(process.env.GITHUB_RUN_ATTEMPT || 1);
+    if (mac && attempt > 1) {
+      let done = [];
+      try {
+        done = passedEarlier((await liveDeps().api(`actions/runs/${process.env.GITHUB_RUN_ID}/jobs?per_page=100&filter=all`)).jobs, attempt).filter((s) => shards.includes(s));
+      } catch (e) { console.log(`::warning title=reach::this run's earlier attempts could not be read (${e.message}), so every selected shard runs`); }
+      if (done.length) {
+        shards = shards.filter((s) => !done.includes(s));
+        why = `${why}; attempt ${attempt}: ${done.join(', ')} passed in an earlier attempt of this run, ${shards.length ? `${shards.join(', ')} run again` : 'nothing left to run'}`;
+        console.log(`::notice title=mac::partial: attempt ${attempt} of this run skips ${done.join(', ')}, which passed in an earlier attempt`);
+        if (!shards.length) mac = false;
       }
     }
   }

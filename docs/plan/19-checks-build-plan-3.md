@@ -430,16 +430,17 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   an end date (docs/plan-shipped.md, 19ak).
 - **19ak-2. Shipped:** a PR's site files run only the Mac checks that read them
   (docs/plan-shipped.md, 19ak).
-- **19ak-3. Open: what would save more Mac time.** Replayed over main's last 100 merges,
-  19ak-2 saves 13%; what still runs every Mac check is the solver and the libraries the
-  lab's one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and
-  `src/lib`), the workflows, and scripts no check traces. In order of size: (a) a red
-  PR run on a line it cannot move is re-run by its failed jobs only, never all jobs (one
-  shard, about 16 minutes, not five, about 80; the steward skill says so now); (b) the
-  lab bundles per check, so a change to the magnet's library runs the magnet's lab
-  checks and not the soap film's; (c) the Mac shards wait for the typecheck, so a PR that
-  does not compile never takes a Mac. Building once on Linux for all five shards was
-  measured and left: a shard's setup, build included, is 20 to 60 s of its ~16 minutes.
+- **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
+  saves 13%; what still runs every Mac check is the solver and the libraries the lab's
+  one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
+  the workflows, and scripts no check traces. (a) **Shipped:** a whole run re-run skips
+  the shards an earlier attempt passed, and the steward skill re-runs failed jobs only
+  (docs/plan-shipped.md, 19ak). (b) **Open:** the lab bundles per check, so a change to
+  the magnet's library runs the magnet's lab checks and not the soap film's. (c)
+  **Shipped:** the Mac shards wait for `tsc --noEmit`. (d) **Measured and left:**
+  building the app once on ubuntu for all five shards. `dist/` is 116 MB (the films in
+  public/) against a 15 s build, so the upload and five downloads would cost more than
+  the builds they replace.
 - **19ak-4. Open, found by 19ak-2: `npm run quick` lists every Mac check as "on the Mac
   only".** Its test for a check that serves the app read the trace, which over-reads (most
   scripts name `scripts/startup.mjs` in a comment), so all 96 read as serving the app and

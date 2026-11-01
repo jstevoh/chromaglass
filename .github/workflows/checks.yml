@@ -379,9 +379,35 @@ jobs:
   # setup is about half a minute (checkout, Node, npm ci, Chromium, the
   # build), so a run costs that much more Mac time and needs five runners
   # at once rather than four, but holds each for less.
+  # The Mac waits for the typecheck (PLAN.md 19ak-3c). A PR that does not
+  # compile used to take five Mac runners for the length of its first red
+  # check, and every check after it ran as well; on ubuntu `tsc --noEmit` is
+  # about half a minute after `npm ci`, beside `reach`, which the Mac waits for
+  # anyway. It is a gate, not a check: Measure's "The typecheck"
+  # (`scripts/checks.json`) is the one that reports, with its backtick hint,
+  # and this job runs the compiler itself so that no step here runs a
+  # manifest check's script (`npm run checks`). When it is red the Mac
+  # shards are skipped and `WebGPU (macOS)` is red with it. Building the app
+  # once here for all five shards was measured and left: `dist/` is 116 MB
+  # (the films in public/), whose upload and five downloads would cost more
+  # than the 15 s build each shard does now.
+  typecheck:
+    name: Compiles, before the Mac
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
+
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
-    needs: reach
+    needs: [reach, typecheck]
     if: ${{ needs.reach.outputs.mac == 'true' }}
     # GitHub's Mac, or the owner's (PLAN.md 19ah) for a shard `deploy.yml`'s
     # probe named. The repository is public, so a self-hosted runner must
