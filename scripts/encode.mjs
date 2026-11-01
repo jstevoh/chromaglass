@@ -55,6 +55,7 @@
  *   - a writeBuffer made by hand inside the window is counted.
  */
 import { openLab } from './lab.mjs';
+import { solveLines } from './encode-solve.mjs';
 
 const N = Number(process.env.ENCODE_GRID ?? 512);
 const STEPS = Number(process.env.ENCODE_STEPS ?? 30);
@@ -96,7 +97,15 @@ try {
     const make = s.device.createBindGroup.bind(s.device);
     s.device.createBindGroup = (...a) => { if (counts.on) counts.groups++; return make(...a); };
     const dispatch = GPUComputePassEncoder.prototype.dispatchWorkgroups;
-    GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) { if (counts.on) counts.dispatches++; return dispatch.apply(this, a); };
+    // Which kernel each dispatch ran, by its pipeline's label (kit.ts names a
+    // pipeline after its kernel), for the multigrid's own lines below.
+    const setPipeline = GPUComputePassEncoder.prototype.setPipeline;
+    GPUComputePassEncoder.prototype.setPipeline = function (p) { this.__kernel = p?.label ?? '?'; return setPipeline.call(this, p); };
+    counts.by = {};
+    GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) {
+      if (counts.on) { counts.dispatches++; counts.by[this.__kernel] = (counts.by[this.__kernel] ?? 0) + 1; }
+      return dispatch.apply(this, a);
+    };
     window.__encode = { counts };
   }, N);
 
@@ -132,13 +141,13 @@ try {
     const ms = [];
     const step = s.step.bind(s);
     s.step = (...a) => { const t = performance.now(); const r = step(...a); ms.push(performance.now() - t); return r; };
-    counts.writes = 0; counts.dispatches = 0; counts.groups = 0; counts.same = 0; counts.on = true;
+    counts.writes = 0; counts.dispatches = 0; counts.groups = 0; counts.same = 0; counts.by = {}; counts.on = true;
     await lab.step(steps, { thinGap: 1, immiscibility: 0.5 });
     counts.on = false;
     s.step = step;
     GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch;
     ms.sort((a, b) => a - b);
-    return { writes: counts.writes, same: counts.same, groups: counts.groups, dispatches: counts.dispatches, msMedian: ms[ms.length >> 1], msMax: ms[ms.length - 1], steps: ms.length };
+    return { writes: counts.writes, same: counts.same, groups: counts.groups, dispatches: counts.dispatches, by: { ...counts.by }, msMedian: ms[ms.length >> 1], msMax: ms[ms.length - 1], steps: ms.length };
   }, { steps: STEPS, waste: false });
   const control = await sampled(async ({ steps, waste }) => {
     const { counts } = window.__encode;
@@ -170,6 +179,8 @@ try {
   check('a dispatch allocates under 192 bytes', perDispatch(run.bytes) < 192, `${perDispatch(run.bytes).toFixed(0)} B`);
   check('no args buffer is written with what it already holds', run.same === 0, `${run.same} of ${run.writes} writes (${perStep(run.writes).toFixed(1)} a step)`);
   check('no bind group is made on a step after the first ones', run.groups === 0, `${run.groups} made in ${run.steps} steps`);
+
+  await solveLines(page, run, check);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

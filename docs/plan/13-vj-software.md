@@ -54,7 +54,12 @@ picks it up in its next build. `detectTier()` already reads Electron as the
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
-   against the plate's own frame. *Not started.*
+   against the plate's own frame. *Not started.* **Check written** (2026-11-01,
+   `scripts/desktop-syphon.mjs`, run by desktop.yml as `npm run desktop -- --owed=syphon`):
+   the add-on loads, a Show-menu checkbox `syphon-out` (off at start) serves "ChromaGlass"
+   with at least 30 frames a second published and each released, through
+   `globalThis.__chromaglassSyphon` in the main process; skipped off a Mac. The build
+   takes `syphon` out of `--owed`.
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
 4. ~~**Control, written up**~~ **Shipped** (2026-10-31): `docs/osc.md`, every address with a starter Resolume map and a TouchDesigner script (`docs/osc/chromaglass_touchdesigner.py`), held to the code by `npm run rig`. Story in `docs/plan-shipped.md` §13.4. **Owed:** the maps tried in Resolume and TouchDesigner, the owner's sitting in `docs/judging.md` §93.

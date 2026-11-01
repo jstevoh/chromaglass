@@ -205,7 +205,9 @@ jobs:
             echo "gatekeeper=refused" >> "$GITHUB_OUTPUT"
           fi
       - name: Check the built app (npm run desktop)
-        run: node scripts/desktop.mjs --packaged
+        # --owed=syphon: the Syphon line is written ahead of 13.2's add-on
+        # (scripts/desktop-syphon.mjs); the PR that ships it takes the id out.
+        run: node scripts/desktop.mjs --packaged --owed=syphon
         env:
           # The site above was built as the app ships it: the check's licence
           # lines ask a plain browser on the app's server for the door too.
