@@ -81,7 +81,7 @@ export interface DeskProps {
   onOpenSettings: () => void;
   onOpenAccount?: () => void;
   /** `song`: following a known song's map by ear, and how sure (lib/followedPlace.ts `followLine`; PLAN.md 28g-2). */
-  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null };
+  status: { audio: string; engine: string; sequence: string | null; phone: number; rec: string | null; song?: string | null; flashRule?: 'flash' | 'red' | null };
   onBlackout: () => void;
   blackout: boolean;
 

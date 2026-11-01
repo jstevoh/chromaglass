@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { getFlashGuardRule, subscribeFlashGuardRule } from '../lib/flashGuard';
 import { Info } from './Info';
 import { Knob, LIT } from './ui';
 import {
@@ -347,7 +348,7 @@ const Switch = ({ label, on, onChange, hint, testId }: {
   </button>
 );
 
-export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest }: {
+export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest, flashRule }: {
   output: OutputConfig;
   onChange: (next: OutputConfig) => void;
   onReset: () => void;
@@ -356,9 +357,13 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
   /** The wall test (PLAN.md 8e): the test pattern, and Identify. Kept beside the config, never in it. */
   test?: WallTest;
   onTest?: (t: WallTest) => void;
+  /** Which rule is currently holding the wall back ('flash' or 'red'), or null while it is not. */
+  flashRule?: 'flash' | 'red' | null;
 }) {
   const set = (patch: Partial<OutputConfig>) => onChange({ ...output, ...patch });
   const aspect = useFrameAspect();
+  const liveRule = useSyncExternalStore(subscribeFlashGuardRule, getFlashGuardRule);
+  const heldRule = flashRule !== undefined ? flashRule : liveRule;
   // Reset puts the guard back on as well as squaring the geometry, so it has
   // something to do even when the geometry is already square. It leaves the
   // mapped shapes alone — they have a section and a Clear of their own — so
@@ -466,7 +471,12 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
       {/* Not a switch: the one Flash Limit switch is in Master. A state line only,
           because the wall is where someone checking the safety is standing. */}
       <p className={`mb-3 mt-1 text-[12px] ${output.flashGuard ? 'text-white/50' : 'text-amber-200/90'}`} data-testid="output-flash-guard-state">
-        {output.flashGuard ? 'Flash Limit is on.' : 'Flash Limit is off.'} Its switch is in Master.
+        {output.flashGuard
+          ? heldRule
+            ? `Flash Limit is on — holding (${heldRule}).`
+            : 'Flash Limit is on.'
+          : 'Flash Limit is off.'}{' '}
+        Its switch is in Master.
       </p>
 
       <Info>

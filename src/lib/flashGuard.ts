@@ -95,6 +95,26 @@ const RELEASE_S = 1.2;
 
 export type FlashGuardRule = 'flash' | 'red';
 
+let activeRule: FlashGuardRule | null = null;
+const ruleListeners = new Set<() => void>();
+
+function publishRule(next: FlashGuardRule | null): void {
+  if (activeRule === next) return;
+  activeRule = next;
+  for (const fn of ruleListeners) fn();
+}
+
+/** Subscribe to changes in the active flash-guard holding rule ('flash', 'red', or null). */
+export function subscribeFlashGuardRule(fn: () => void): () => void {
+  ruleListeners.add(fn);
+  return () => { ruleListeners.delete(fn); };
+}
+
+/** The rule currently holding the show back ('flash' or 'red'), or null while it is not. */
+export function getFlashGuardRule(): FlashGuardRule | null {
+  return activeRule;
+}
+
 export interface FlashGuardTiles {
   cols: number;
   rows: number;
@@ -282,6 +302,7 @@ export class FlashGuard {
     this.tileCols = 0;
     this.tileRows = 0;
     this.windows = [];
+    publishRule(null);
   }
 
   /**
@@ -395,6 +416,7 @@ export class FlashGuard {
     if (over && now - this.overSince >= OVER_FOR_MS) this.engaged = true;
     else if (this.engaged && now - this.lastFlashAt > RELEASE_AFTER_MS) this.engaged = false;
     this.rule = this.engaged ? 'flash' : null;
+    publishRule(this.rule);
 
     // ── The gain ─────────────────────────────────────────────────────
     // Multiplicative: nudge by the ratio of what is safe to what is arriving,
@@ -507,6 +529,7 @@ export class FlashGuard {
       this.engaged = false;
       this.rule = null;
     }
+    publishRule(this.rule);
 
     const speed = want < this.gain ? dt / ATTACK_S : dt / RELEASE_S;
     this.gain += Math.max(-speed, Math.min(speed, want - this.gain));

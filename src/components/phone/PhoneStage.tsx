@@ -1,4 +1,5 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
+import { getFlashGuardRule, subscribeFlashGuardRule } from '../../lib/flashGuard';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
@@ -359,6 +360,8 @@ export interface PhoneStageProps {
   onOpenAccount?: () => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
+  /** Which flash-guard rule is currently holding the wall back ('flash' or 'red'), or null while it is not (14r: status line only, no control on the phone). */
+  flashRule?: 'flash' | 'red' | null;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -417,6 +420,8 @@ export function PhoneStage(p: PhoneStageProps) {
   const [sheet, setSheet] = useState<SheetName | null>(null);
   const signedIn = useSignedIn();
   const signedOut = ACCOUNTS_ON && !signedIn;
+  const liveRule = useSyncExternalStore(subscribeFlashGuardRule, getFlashGuardRule);
+  const heldRule = p.flashRule !== undefined ? p.flashRule : liveRule;
   const [amountOpen, setAmountOpen] = useState(false);
   // Whether the Looks sheet opened on a printed plate: its Ben-Day slider
   // stays for as long as the sheet is up, so taking it to 0 does not take
@@ -545,6 +550,16 @@ export function PhoneStage(p: PhoneStageProps) {
               Pinch to zoom · two fingers move the camera
             </span>
           )}
+        </div>
+      )}
+
+      {heldRule && (
+        <div
+          className="pointer-events-none mx-auto mt-1.5 rounded-full bg-black/60 px-3 py-1 text-[12px] text-text-2 backdrop-blur-xl"
+          role="status"
+          data-testid="phone-flash-guard-state"
+        >
+          {`Flash Limit holding (${heldRule})`}
         </div>
       )}
 
