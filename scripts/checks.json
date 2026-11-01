@@ -549,6 +549,19 @@
       ]
     },
     {
+      "name": "The opening's wait for its frames",
+      "shard": "logic",
+      "run": "npm run stillwait",
+      "why": [
+        "The opening's wait for the page's frames before its first compile",
+        "(src/lib/stillWait.ts, PLAN.md 19aa-7), on made-up timelines: four",
+        "frames waited for whenever they come, half a second of the page free",
+        "with no frame ends it (the GPU process holding them, 43 of 116 Mac",
+        "openings), a busy or held page is never read as starved, and nothing",
+        "waits past the old 1.5 s cap."
+      ]
+    },
+    {
       "name": "The one Record button",
       "shard": "logic",
       "run": "npm run record",

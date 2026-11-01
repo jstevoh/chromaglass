@@ -57,6 +57,28 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   so the week after this merges is the evidence. Two more on 2026-10-30 (#550's `open` shard on one head, af60ee4): 2.09 and 2.49 s against 0.72
   and 0.74 s, the show moving for good at 14.3 and 14.6 s against 23.6 and 22.1 s; the third run
   of the shard read it green, and nothing in that diff was on the opening's path.
+  - **19aa-7a. Found: the opening sat out the frame wait's whole 1.5 s cap (2026-11-01).**
+    Read across the 116 `open` shard runs of 10-27 to 11-01 (18 red on this line): the gap
+    from the device given to the first compile asked was 0.06 to 0.18 s on 73 runs (four
+    frames drawn, as `introStill` waits for) and 1.51 to 2.77 s on 43 (the cap firing), and
+    16 of the 18 reds were among the 43, their longest "page's own" stretch 1.51 to 1.62 s
+    starting at the device. The GPU process stopped presenting just after it gave the
+    device, with nothing of ours asked of it, and the page sat free waiting for frames it
+    already held (#656's run 41317399432: compile asked at 3.82 s, frames back at 4.75 s).
+    The check was right to count that as the page's own. The fix is the app's, not the
+    bar's: the wait now ends once the page has been free (its timer on time) for half a
+    second with no frame drawn (`src/lib/stillWait.ts`, `npm run stillwait` on made-up
+    timelines; four frames still waited for whenever they come, a busy or held page never
+    read as starved, never past the old cap). On those 43 runs that asks the compile about
+    a second sooner; modelled on the same 116, the reds go from 18 to about 6. Judge with
+    `npm run flakes -- --check 'no later than the old way'` a week after merge.
+  - **19aa-7b. Open: four reds start with the page held, not free.** On four of the 18
+    the device came at 0.2 s and the page's thread was held (timer silent, no long task)
+    for 1.15 to 1.50 s from about 1 s, then the cap; the starved rule does not count held
+    time, so it changes nothing there. Of the other two, one is a starved run the rule
+    brings about 0.8 s nearer but not under (its control read 0.75 s), and one's longest
+    stretch is behind the opening, at 16.7 s. Next: what holds the page's thread just
+    after a fast device (14v-7 sets held apart for the frame gaps; 1b counts it as own).
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
