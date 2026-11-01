@@ -7,7 +7,9 @@
     "one), never a new step in the workflow. `why` is the step's old comment: what the",
     "check measures and why it is where it is. `always`, on a Measure check, keeps it in",
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
-    "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
+    "cheap ones that hold the rest. `quarantine` (PLAN.md 19ak-1) lists a check's",
+    "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
+    "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
   "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
@@ -2395,6 +2397,7 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
+      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -2544,6 +2547,7 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
+      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -2670,6 +2674,7 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
+      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",

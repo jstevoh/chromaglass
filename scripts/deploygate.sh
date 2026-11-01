@@ -163,7 +163,10 @@ macrun() {
 # tree, so it is never the evidence that a tree is safe to publish; the deploy
 # runs Measure in full. It is only a PR of check scripts, the manifest and
 # documents that gets one, which publishes nothing (PLAN.md 19j) unless
-# package.json's scripts moved with it.
+# package.json's scripts moved with it. Since PLAN.md 19ak-2 the same holds for
+# the Mac: a PR whose site files are read by only some Mac checks runs those
+# (the reach job's `mac` notice, "partial: N of M Mac checks"), and the deploy
+# of its merge runs every shard.
 #
 # It fails closed. `errexit` is not inherited inside `$(...)`, so a failed API
 # call used to leave an empty answer, which reads as "ran in full": a run that
@@ -180,7 +183,7 @@ measurepartial() {
   # An empty or blank 200 body is no JSON at all, and jq exits 0 on it with no
   # output, so it needs its own guard.
   [[ $notes =~ [^[:space:]] ]] || { echo "partial: the reach job of run $1 has no annotations body"; return 0; }
-  notes=$(jq -r 'if type == "array" then .[] | select(.title == "measure") | .message // empty else error("not a list") end' <<<"$notes") || { echo "partial: the reach job of run $1 has annotations that are not JSON"; return 0; }
+  notes=$(jq -r 'if type == "array" then .[] | select(.title == "measure" or .title == "mac") | .message // empty else error("not a list") end' <<<"$notes") || { echo "partial: the reach job of run $1 has annotations that are not JSON"; return 0; }
   grep '^partial' <<<"$notes" | head -1 || true
 }
 
@@ -397,7 +400,7 @@ judge() {
       partial=$(measurepartial "$run_id")
       [ -n "$partial" ] || [ "${url##*/}" = "$run_id" ] || partial=$(measurepartial "${url##*/}")
       if [ -n "$partial" ]; then
-        echo "false #$pr's run $url ran only the Measure checks its diff reached ($partial)"; continue
+        echo "false #$pr's run $url ran only the checks its diff reached ($partial)"; continue
       fi
       if [ "$tested" != - ]; then
         ttree=$(treeof "$tested")

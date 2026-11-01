@@ -54,7 +54,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectShards, selectMeasure, parseManifest, loadManifest } from './checks.mjs';
+import { selectShards, selectMeasure, parseManifest, loadManifest, checkReads, loadEsbuild } from './checks.mjs';
 
 // Markdown only at the top, in docs/ and in .claude/: a `.md` under src/ or
 // public/ could be imported (`?raw`) or served, and would reach.
@@ -193,6 +193,26 @@ export async function carry({ prNumber, headRef, baseRef, runId, head = 'HEAD', 
     tested,
     why: `carried from run ${source.id} (tests ${tested.slice(0, 7)}): ${files.length} files differ, ${mac.length} of them reach a Mac shard and all are main's, none the PR's`,
   };
+}
+
+/*
+  A whole run re-run (PLAN.md 19ak-3a). "Re-run all jobs" on a red PR run
+  started all five Mac shards again, about 80 Mac minutes, to retry the one
+  that was red, and about a third of PR attempts in the week to 2026-11-01
+  were re-runs. A shard that passed in an earlier attempt of the same run
+  passed on the same commit (a run's merge commit does not move between
+  attempts), so it is not run again. "Re-run failed jobs" does not run this
+  job at all and already starts only the red shards. Such a run is partial to
+  the deploy gate: its newest attempt does not show every shard.
+  `jobs` is `actions/runs/{id}/jobs?filter=all`, each with its `run_attempt`.
+*/
+export function passedEarlier(jobs, attempt) {
+  const out = new Set();
+  for (const j of jobs ?? []) {
+    if (!j.name?.startsWith('WebGPU (macOS) · ') || !(j.run_attempt < attempt) || j.conclusion !== 'success') continue;
+    out.add(j.name.slice('WebGPU (macOS) · '.length));
+  }
+  return [...out];
 }
 
 // The network and the checkout, for a run in CI. The token is the job's own
@@ -384,7 +404,30 @@ async function selftest() {
     [touch('scripts/never-traced.mjs'), 'parts=["m"] only=', 'a script no check traces runs Measure in full'],
   ];
   for (const [mut, want, what] of MEASURE) {
-    const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1');
+    const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1').replace(/ maconly=.*$/, '');
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
+  // A whole run re-run skips the shards an earlier attempt passed (19ak-3a).
+  {
+    const j = (shard, attempt, conclusion) => ({ name: `WebGPU (macOS) · ${shard}`, run_attempt: attempt, conclusion });
+    const jobs = [j('show', 1, 'success'), j('tools', 1, 'failure'), j('open', 1, 'cancelled'), j('plate', 2, 'success'), { name: 'Measure · logic', run_attempt: 1, conclusion: 'success' }];
+    const got = (a) => passedEarlier(jobs, a).sort().join(',');
+    for (const [ok, what] of [
+      [got(2) === 'show', `attempt 2 skips only the shard attempt 1 passed (${got(2)}), not its red, cancelled or Measure jobs`],
+      [got(3) === 'plate,show', `attempt 3 skips what attempts 1 and 2 passed (${got(3)})`],
+      [got(1) === '', 'a first attempt skips nothing'],
+      [passedEarlier(undefined, 2).length === 0, 'and jobs that could not be read skip nothing'],
+    ]) { if (!ok) bad++; console.log(`${ok ? ' ok  ' : ' FAIL'} ${what}`); }
+  }
+  // The Mac's names ride it too (PLAN.md 19ak-2): the checks a change
+  // selects, or empty for every one, which is what a deploy can trust.
+  for (const [mut, want, what] of [
+    [touch('scripts/a.mjs'), 'maconly=["A"]', 'a check\'s script names that check to its shard'],
+    [touch('src/x.ts'), 'maconly=', 'a source file no map can place runs every Mac check'],
+    [touch('scripts/c.mjs'), 'maconly=', 'a change that skips the Mac names none'],
+  ]) {
+    const got = runDiff(mut, undefined, withManifest).replace(/^.* (maconly=)/, '$1');
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
   }
@@ -515,6 +558,7 @@ if (!isMain) {
   // scripts and documents. `only` empty is every check.
   let parts = loadManifest().shards.measure;
   let only = '';
+  let macOnly = '';
   if (event !== 'pull_request' && process.env.CALL_MAC === 'false') {
     // The deploy, when its gate's rule 5 held: the PR's run passed the Mac
     // and the site files it changed are apart from main's newer ones.
@@ -552,14 +596,35 @@ if (!isMain) {
       // change touches, every one otherwise. A tree with no manifest (the
       // selftest's scratch repositories) selects every shard.
       const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
+      // What each check reads, so that a change to the site's own files runs
+      // the checks that read them rather than every Mac check (PLAN.md
+      // 19ak-2). Without esbuild (its install in the job failed) there is no
+      // map, and such a file selects every shard as before.
+      let readsOf = null;
+      if (after.manifest && reaching.some((f) => /^(src|public)\/|^index\.html$/.test(f))) {
+        const esbuild = await loadEsbuild();
+        if (esbuild) readsOf = await checkReads(after.manifest, after.pkg?.scripts ?? {}, esbuild, process.cwd());
+        else console.log('::warning title=reach::esbuild did not load, so every Mac check runs for the site\'s files');
+      }
       const picked = after.manifest
-        ? selectShards(reaching, { before, after, root: process.cwd() })
-        : { shards: MAC_SHARDS, why: 'every shard: the tree has no manifest of checks' };
+        ? selectShards(reaching, { before, after, root: process.cwd(), readsOf })
+        : { shards: MAC_SHARDS, names: null, why: 'every shard: the tree has no manifest of checks' };
       shards = picked.shards;
       why = `${why}; ${picked.shards.length ? `shards ${picked.shards.join(', ')}` : 'no Mac shard'} (${picked.why})`;
       if (!shards.length) mac = false;
+      if (mac && picked.names) {
+        macOnly = JSON.stringify(picked.names);
+        const total = after.manifest.checks.filter((c) => after.manifest.shards.mac.includes(c.shard)).length;
+        why = `${why}; ${picked.names.length} of ${total} Mac checks`;
+        // For the deploy gate (deploygate.sh), as Measure's: a run of some of
+        // the Mac's checks is not evidence for a whole tree.
+        console.log(`::notice title=mac::partial: ${picked.names.length} of ${total} Mac checks in ${shards.join(', ')}`);
+      }
     }
-    if (mac) {
+    // A run of some Mac checks is not carried from, or onto (19ak-2): the
+    // earlier run's names were its own diff's, and main may since have moved
+    // what this one's reach. It runs; it is the cheaper run anyway.
+    if (mac && !macOnly) {
       const verdict = await carry({
         prNumber: process.env.PR_NUMBER,
         headRef: process.env.GITHUB_HEAD_REF,
@@ -577,11 +642,24 @@ if (!isMain) {
         why = `${why}; not carried: ${verdict.why}`;
       }
     }
+    const attempt = Number(process.env.GITHUB_RUN_ATTEMPT || 1);
+    if (mac && attempt > 1) {
+      let done = [];
+      try {
+        done = passedEarlier((await liveDeps().api(`actions/runs/${process.env.GITHUB_RUN_ID}/jobs?per_page=100&filter=all`)).jobs, attempt).filter((s) => shards.includes(s));
+      } catch (e) { console.log(`::warning title=reach::this run's earlier attempts could not be read (${e.message}), so every selected shard runs`); }
+      if (done.length) {
+        shards = shards.filter((s) => !done.includes(s));
+        why = `${why}; attempt ${attempt}: ${done.join(', ')} passed in an earlier attempt of this run, ${shards.length ? `${shards.join(', ')} run again` : 'nothing left to run'}`;
+        console.log(`::notice title=mac::partial: attempt ${attempt} of this run skips ${done.join(', ')}, which passed in an earlier attempt`);
+        if (!shards.length) mac = false;
+      }
+    }
   }
   console.log(why);
   // The matrix needs a list even when the shards are skipped (`mac=false`),
   // so then it is every shard, which nothing runs.
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\nshards=${JSON.stringify(mac ? shards : MAC_SHARDS)}\nparts=${JSON.stringify(parts)}\nonly=${only}\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\nshards=${JSON.stringify(mac ? shards : MAC_SHARDS)}\nparts=${JSON.stringify(parts)}\nonly=${only}\nmaconly=${mac ? macOnly : ''}\n`);
 } else {
   await selftest();
 }
