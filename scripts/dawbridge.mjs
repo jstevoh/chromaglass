@@ -170,8 +170,15 @@ if (NODE_ONLY) {
   mkdirSync(dist);
   writeFileSync(join(dist, 'index.html'), '<!doctype html><title>dawbridge</title>');
 } else if (!existsSync(join(dist, 'index.html'))) {
-  console.error(`No build at ${dist}: run "npm run build" first, or pass --node for the server and the libs alone.`);
-  process.exit(1);
+  // Run on its own (a PR whose diff reaches only this check in browser2, or by hand),
+  // nothing before it in the shard has built the app (PLAN 19k-10), so it builds; in
+  // a full browser2 run the build is already there and this is skipped.
+  console.log(`No build at ${dist}: building it (npm run build)`);
+  const built = spawnSync('npm', ['run', 'build'], { stdio: 'inherit' });
+  if (built.status !== 0 || !existsSync(join(dist, 'index.html'))) {
+    console.error('The build failed, so the app half cannot run; --node runs the server and the libs alone.');
+    process.exit(1);
+  }
 }
 
 const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
