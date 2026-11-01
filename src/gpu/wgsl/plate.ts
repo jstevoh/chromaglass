@@ -3291,7 +3291,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
       // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
       let Rq = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
-      // To the camera, its true centre and radius (camBubble, plateTransmit.ts).
+      // To the camera, its true centre and radius (camBubble).
       var geo = vec3f(fuvBase - p0 * Rq, Rq);
       if (dropCam > 0.001) { geo = mix(geo, camBubble(fuvBase, p0, Rq), dropCam); }
       let R = geo.z;
@@ -3309,7 +3309,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let bestD = p;
       // Pressed between two plates it is a lens, flatter than a sphere.
       let n = normalize(vec3f(p * 0.85, h + 0.15));
-      // The camera's edge: one screen pixel wide, on the rim.
+      // The camera's edge: one pixel wide, on the rim.
       let opac = mix(smoothstep(0.02, 0.28, aC), clamp(0.5 + (1.0 - length(p)) * R / spx, 0.0, 1.0), dropCam);
       /*
         The liquid round it: its light and colour, averaged over a ring just
