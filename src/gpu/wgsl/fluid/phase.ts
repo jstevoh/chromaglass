@@ -131,11 +131,12 @@ fn upwind(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
 }
 /*
   Under a standing layer (STAND_ASIDE) the water carries the layer as a
-  whole, and the film shapes it: what crosses a face there is the flow
-  times the layer's mean round the face (a seven-cell box round each of
-  its two cells, about a dome's spacing: they stand 8 apart on 384²), not
-  times the cell's own. A real layer's domes ride the flow over the glass; the flow does
-  not pour each dome into the gap beside it.
+  whole, and the film shapes it: what crosses a face there is each cell's
+  own share, carried at the layer's mean speed round the face (over a
+  seven-cell box round each of its two cells, about a dome's spacing: they
+  stand 8 apart on 384²; each cell weighed by the ferrofluid it holds), not
+  at the face's own. A real layer's domes ride the flow over
+  the glass; the flow does not pour each dome into the gap beside it.
 
   What was reported: with the domes on, a pool held under the hand threw
   half the fingers past its rim (6/4/5/2 on the Mac in npm run fingers,
@@ -144,28 +145,51 @@ fn upwind(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
   with the film off held 5429: the window had stepped the plate's flow
   aside altogether, so nothing carried the layer out of it, and the
   pool's edge, fed from the middle by that flow, had less to finger with.
-  Letting the flow carry each cell as it does outside brought the fingers
-  back (7/12/8/5) and broke the domes: it poured them into one another
-  and they set as black slabs, which is why the flow was stepped aside in
-  the first place. Carrying the mean, the window holds 5622, the fingers
-  are 9/12/9/4 in 7 sectors, and the domes stand.
+  Letting the flow carry each cell at the face's own speed brought the
+  fingers back (7/12/8/5) and broke the domes: the flow converges and
+  diverges cell to cell (the force's curl at the domes' own scale, the
+  collocated projection's leftovers), and it poured them into one another
+  so they set as black slabs, which is why the flow was stepped aside in
+  the first place.
+
+  Then (PLAN 9t-8) the face carried the layer's mean round it, a seven-cell
+  box, at the face's own speed: the window held 5622, the fingers were
+  9/12/9/4 in 7 sectors, and the domes stood. But the box is a blur of
+  what is carried, and a drop moving under the window was blurred by it
+  every step it moved: once the liquid's real onset (PLAN 38k) put a
+  dragged magnet's drop under the film, the drop dragged by ferrodrag's
+  magnet in the cloud lab fell from 100 cells past half full to 46 and its
+  top from 1.5 of full to 0.74 in three seconds, smeared 3.4 radii behind
+  the hand (PLAN 9t-2). So the box is over the speed now and not the
+  share: the speed is smooth at the domes' scale, which is what keeps it
+  from pouring them together, and the share it carries is the cell's own,
+  so a drop or a dome is moved whole, as the plate moves everything else.
+  The speed is the layer's, the cells' own weighed by the ferrofluid in
+  each: the box's plain mean took in the still water round a drop of eight
+  cells' radius and held the drop back (3.2 radii behind the same hand,
+  the drop whole at last, 76 cells past half full and its top 1.5).
 
   Blended in over the window's edge as the other passes are, so a cell
-  outside every window moves as it always has, to the bit. A gap the mean
-  takes more from than it holds goes under empty for a moment and
-  phaseRelax fills it from its neighbours, as it does everywhere the
-  limiter digs below empty.
+  outside every window moves as it always has, to the bit.
 */
-fn coarse(a: vec2i, b: vec2i, n: i32) -> f32 {
+fn boxVel(a: vec2i, e: vec2i, own: f32, n: i32) -> f32 {
+  let b = a + e;
   var t = 0.0;
-  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) { t += ph(a + vec2i(i, j), n) + ph(b + vec2i(i, j), n); } }
-  return t / 98.0;
+  var w = BOX_OWN;
+  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) {
+    let o = vec2i(i, j);
+    let qa = clamp(a + o, vec2i(0), vec2i(n - 1));
+    let qb = clamp(b + o, vec2i(0), vec2i(n - 1));
+    let wa = max(ph(qa, n), 0.0);
+    let wb = max(ph(qb, n), 0.0);
+    t += wa * dot(textureLoad(vel, qa, 0).xy, vec2f(e)) + wb * dot(textureLoad(vel, qb, 0).xy, vec2f(e));
+    w += wa + wb;
+  } }
+  return (t + BOX_OWN * own) / w;
 }
-fn carried(a: vec2i, e: vec2i, c: f32, n: i32) -> f32 {
-  let s = 1.0 - aside(a, a + e, S.n);
-  if (s <= 0.0) { return upwind(a, e, c, n); }
-  return mix(upwind(a, e, c, n), coarse(a, a + e, n), s);
-}
+// What the face's own speed weighs in the box's mean, in cells of ferrofluid:
+// half of one, so where the box holds next to none the face is its own.
+const BOX_OWN = 0.5;
 // The flux across the face between cell a and cell a + e, in the +e direction.
 fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
@@ -191,10 +215,12 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let pa = packedAt(a.x, a.y, n);
   let pb = packedAt(b.x, b.y, n);
   let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
-  let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
-  // Under a standing layer, the layer as a whole: see carried.
+  var ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
+  // Under a standing layer, the flow's mean round the face: see boxVel.
+  let s = 1.0 - aside(a, b, S.n);
+  if (s > 0.0) { ve = mix(ve, boxVel(a, e, ve, n), s); }
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
-  return c * carried(a, e, c, n);
+  return c * upwind(a, e, c, n);
 }
 
 // Under Thin Gap: the gap at cell p in rest gaps, a share t of the way through the step.
@@ -220,16 +246,34 @@ fn thinFace(a: vec2i, e: vec2i, n: i32) -> f32 {
 fn cellFlux(a: vec2i, e: vec2i, n: i32) -> f32 {
   return dot(textureLoad(vel, a, 0).xy, vec2f(e)) * max(textureLoad(sq, a, 0).r, 0.004) / A.a.w;
 }
+// Under a standing layer the same, the layer's mean round the face: see boxVel.
+fn boxFlux(a: vec2i, e: vec2i, own: f32, n: i32) -> f32 {
+  let b = a + e;
+  var t = 0.0;
+  var w = BOX_OWN;
+  for (var j = -3; j <= 3; j++) { for (var i = -3; i <= 3; i++) {
+    let o = vec2i(i, j);
+    let qa = clamp(a + o, vec2i(0), vec2i(n - 1));
+    let qb = clamp(b + o, vec2i(0), vec2i(n - 1));
+    let wa = max(ph(qa, n), 0.0);
+    let wb = max(ph(qb, n), 0.0);
+    t += wa * cellFlux(qa, e, n) + wb * cellFlux(qb, e, n);
+    w += wa + wb;
+  } }
+  return (t + BOX_OWN * own) / w;
+}
 // The volume across the face a → a + e this substep, in rest gaps of a cell.
 fn volumeFlux(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
   if (!inside(a, n) || !inside(b, n)) { return 0.0; }
-  let face = 0.5 * (cellFlux(a, e, n) + cellFlux(b, e, n))
+  var face = 0.5 * (cellFlux(a, e, n) + cellFlux(b, e, n))
            + 0.25 * f32(n) * (thinFace(a - e, e, n) - 2.0 * thinFace(a, e, n) + thinFace(b, e, n));
+  let s = 1.0 - aside(a, b, S.n);
+  if (s > 0.0) { face = mix(face, boxFlux(a, e, face, n), s); }
   // As a Courant number, bounded as the flux form's is, then back to a volume.
   let h = 0.5 * (gapAt(a, n, A.a.y) + gapAt(b, n, A.a.y));
   let c = clamp(face * A.b.y * f32(n) / h, -0.45, 0.45);
-  return h * c * carried(a, e, c, n);
+  return h * c * upwind(a, e, c, n);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
