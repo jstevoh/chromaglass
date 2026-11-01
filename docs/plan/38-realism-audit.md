@@ -64,17 +64,40 @@ written first. Line numbers are as read on main at d07ac31.
   check now lets the look's bubbles go every eight seconds, since it measures the kick's
   odds, not a bubble's life.
 
-- **38c. Soap is conserved: no decay, no grid-rate spreading** (S, nil; High on the soap and
-  milk looks). Sharpens **18d-5** (which owes the σ(Γ) law, not these). *Now:* the mix update
-  spreads surfactant at 0.08 cells² a step, about 1.3e-6 m²/s at 384² and 60 Hz on the 0.2 m
-  plate (real surfactant D ≈ 5e-10, about 2,500× slower, and today's number changes with
-  the grid and the frame rate), and multiplies it by 0.1^(dt/10), a tenth every ten
-  seconds (`src/gpu/fluid.ts:1463`, `wgsl/fluid/oil.ts:393`). *Real:* surfactant does not
-  disappear. It adsorbs at the interface up to Γ∞ (Langmuir), the Marangoni flow carries
-  it until ∇σ = 0, and the tension stays lowered where it went, which is why a real soap
-  front stops and the plate *remembers* where soap was. *Measure:* total surfactant on a
-  closed plate held to 1% over a minute; a burst's front stops where σ is level; the
-  spreading the same at two grids.
+- ~~**38c**~~ Soap is conserved: no decay, no grid-rate spreading. Shipped 2026-10-30
+  (`npm run soap`); story in `docs/plan-shipped.md` §38c. What it left:
+  - **38c-1. The Marangoni front at its real speed** (M; High on the soap and milk looks).
+    The named shortcut in `src/gpu/fluid/soap.ts`: K is SOAP_SPREAD, 1.04e-4 m²/s, the
+    old tuned pull, where h·Δσ/μ is about 0.07 on a 2 mm gap; and the surface speed is
+    capped at SOAP_FRONT, 15 mm/s, and the soap's self-spread at 3.9e-6 m²/s, the
+    explicit flux's limits, where a drop of dish soap sends its front out at 0.1 to
+    0.3 m/s (Jensen 1995: r ∝ t^¾). An implicit self-spread, or the similarity
+    solution laid ahead of the explicit one, then the dye's carry on that flow.
+    Also: the surface flow is only where θ has a gradient, so clean surface ahead of a
+    front is not pushed, where on real water the whole surface moves ahead of it.
+    *Measure:* a drop's front radius against Jensen's law at two grids; and `npm run physics`'s
+    burst line measured at a tenth of the plate again, not the drop's own radius (moved in #609).
+  - **38c-2. One soap, not three** (M). A bottle's soap lands twice on a GPU plate:
+    in the mix (.g, this item's) and in the poured liquids' `liquids0.r`, which has its
+    own Marangoni as a body force (`liquidForces`, `wgsl/fluid/forces.ts:42`) that the
+    projection deletes as a pure gradient (the reason marangoniFlux exists), no
+    diffusion, and is carried by MacCormack off a thin gap, which does not conserve.
+    The CPU's `LiquidPhase` (no WebGPU) still fades its soap in 6 s
+    (`DECAY_SECONDS`, `src/lib/liquidPhase.ts:79`). *Measure:* a bottle of soap moves
+    the dye once, by the mix's flux, and its total is kept as `npm run soap` keeps it.
+  - **38c-3. A Soap Breakdown dial** (S; the owner chose it, 2026-10-31). The Soap Bursts
+    dropper (`LiquidVisualizer`) lays a monolayer under each drop every 0.8 to 2.6 s, and
+    kicks add more; with the soap kept, a plate is soaped all over in a few minutes of a
+    show and the drops then do nothing, as a real dish does. The owner's answer: a
+    setting for a real loss, 0 (none, the real value) by default and free to ramp past
+    nature, so a long show keeps bursting: the soap taken up by the oil's interface, or
+    fresh water through the trough, as a first-order rate on the mix's .g in
+    `mixUpdate`, scaled in metres and seconds; MIDI, both desks and the phone's Soap
+    sheet in the same PR. *Measure:* bursts over ten minutes of a kick track.
+  - **38c-4. Acidity diffuses at a grid rate** (S). The same mix update spreads the
+    acidity at 0.04 cells² a step (`fluid.ts`, 'mix update'), about 6.5e-7 m²/s at 384²
+    and 60 Hz, where H⁺ and OH⁻ are 9.3e-9 and 5.3e-9 (and a pH indicator's dye, 4e-10):
+    from metres and seconds, as the soap's now is.
 
 - **38d. The ferrofluid's labyrinth from the magnetic Bond number and the sheet's own
   repulsion** (M, same cost per cell; High: it is the whole maze look). Sharpens **9aa**
