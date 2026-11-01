@@ -10821,5 +10821,20 @@ solve says 0.71 has left), the solve is stepped as the lab steps it (the app's s
 yardstick is the sheet's own bowl stamped on the same ring, so the colour's carry law cancels:
 0.627 of the stamp against 0.706 said. The bars stay 25% and 0.6. Both printed to two places now.
 
+*18g-9, the lip:* the last two red lines at 2 mm, rimhold's diagonal lens (0.6% lost in its last
+three readings, bar 0.5%) and oillift's rim lens (98.1% kept, bar 98.5%), were oil crossing the
+open rim with no overflow behind it. The suspect, the Rhie–Chow term across the jump to the held
+cell's zero, was refuted by reading the solve back (p′ in the lens's rim cells −2e-5 against its
+core's 3e-3; the pressure term across its rim faces inward throughout). Level, a lens pulling off the
+rim drew water in at its contact and out through the faces beside it, carrying the Cahn–Hilliard
+profile's foot (c ≈ 0.014) over, which the relaxation (closed at the rim since 18g-7) never brought
+back. Tilted, the lens drifted on through the rim into the held strip along the grid's wall at 3% of
+its free speed; at 6 mm the old window ended as the lens arrived, so main's green measured the
+approach, not the hold. Now a rim face carries the oil outward only while the dish's cell behind it
+has p′ > 0, an overflow (a pour, a press, a gap closing); soap, acid and inward faces are unchanged
+(`lipHolds`, `wgsl/fluid/carry.ts`). Cloud lab: oillift 9/9, the rim lens 100.0%; the diagonal
+probe's last three readings 0.57% → 0.17% (rimhold whole times out in the cloud at 2 mm; the Mac
+reads it); rimhold's pour still crosses (full/weak 1.049/1.018, bars > 0.25 and 0.6–1.5).
+
 *Judged:* the owner, from the 2 mm films (the sheet's dents, Plate Rock's slide), 2026-10-31
 16:39Z: "That looks fine".

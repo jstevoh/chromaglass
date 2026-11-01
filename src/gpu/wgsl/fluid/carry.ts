@@ -8,6 +8,7 @@
  * the one table every pass is asked for by name.
  */
 
+import { RIM_SIDE } from './oil';
 import { HEAD, PACKED, THIN_FACE, W } from './shared';
 
 export const CARRY_KERNELS: Record<string, string> = {
@@ -104,6 +105,66 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     The mix rides the flow in flux form, as the ferrofluid does (see
     phaseAdvect): each face's flux computed the same way from both sides, so
     none of it is made or lost. μ (a) is derived and is not carried.
+
+    **The lip** (lipHolds): across the open rim the oil goes only with an
+    overflow. On a thin gap the rim is open to the flow and held at the
+    oil's own pressure there (CAPILLARY in capillary.ts, PLAN 18g-6), and
+    the oil's own relaxation does not cross it (RIM_SIDE in oil.ts, 18g-7).
+    Its carry did, by whatever the face's velocity was, and in the 2 mm
+    gap (PLAN 38r) two checks read what that lets out, both at the looks'
+    scale of nine times the steps a reading took in the 6 mm gap:
+    \`npm run rimhold\`, a lens laid against the rim on the diagonal with
+    the plate level, 98.1% of its oil kept and still losing 0.2% a reading
+    at the end; \`npm run oillift\`, a lens sent up into the rim by a tilt
+    at a hundredth of the tension, 98.1% kept against 98.5%, the loss all
+    in the readings after it had arrived. Neither is the oil carried out by
+    the flow, and the suspect, the Rhie–Chow term across the jump to the
+    held cell's zero, was not it: read back from the solve (P and the
+    mobility, scratch/rimprobe2.mjs), p′ in the rim's cells of oil is zero
+    to within 3e-5 of the lens's own 3e-3, and the pressure term across the
+    lens's rim faces points inward throughout.
+
+    Level, on the diagonal: a lens laid tangent to the rim pulls off it (its
+    oil within three cells of the rim 16 → 3.4 of a cell's worth over the
+    six readings), drawing water in through the rim at the contact (the
+    face velocity there −0.1, summed with the oil on it) and sending it out
+    through the 86 faces beside it (+0.012). Those faces hold no body: the
+    oil on them averages 0.014, the foot of the Cahn–Hilliard profile, two
+    and three cells out from the interface. The water carries the foot
+    over the rim, the relaxation cannot take it back (closed since 18g-7),
+    so the body refills its foot and the lens drains through it: 6% in 54
+    seconds of settling, none of it from a cell over a half of oil. Inside
+    the dish that foot is the interface's own width and the flow that
+    carries it out one side the relaxation carries back from the other; at
+    the rim it is cut, and a sharp interface, which is what the profile
+    stands for, has no oil in the water beside a lens.
+
+    Tilted, at the middle of the grid's edge: the lens arrives, flattens
+    along the rim (nothing holds its shape at that tension) and its body
+    drifts on through the open rim at about 3% of its free speed, into the
+    strip of held cells between the rim's circle and the grid's wall and a
+    little beyond (of the 2.2 lost, 1.4 lies in the wall's own column). A
+    real rim is a lip: a lens floated up against it stays, water poured in
+    goes over it with whatever it carries (rimhold's third check, the
+    pour). The two differ in the pressure at the lip: a pour, a press, a
+    gap closing raise the dish's pressure above the trough's and the liquid
+    overflows; a lens pressing by its own buoyancy, or a dish circulating
+    through an open rim, does not. In the solve that pressure is p′ in the
+    rim's own cell: p − Φ, the liquid's pressure over the oil's own there,
+    zero at rest and positive only when something pushes the dish over.
+    So the oil crosses a rim face outward only while the dish's cell behind
+    it is above the trough's zero; otherwise the lip holds it and the water
+    goes on without it, as the soap and the acid in it do (.g, .b). The
+    face is not closed to the oil (a lip that held against a pour pushed
+    none, and rimhold's meter wants the pour's share of the lens over it),
+    and the rim's pressure is not reshaped for it: the line integral round
+    the ring cannot hold a body force's head (the head is across the body,
+    not along the rim), and the gap's own meniscus (18g-8, open) would hold
+    nothing at a hundredth of the tension, where oillift reads it.
+
+    Only the oil's face is held: the oil's own packing (mixRelax) shares
+    what piles against the lip back into its body, as it does against a
+    hand. On a closed plate there is no rim and nothing changes.
   */
   mixAdvect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -113,9 +174,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 // oil's capillary force is as sharp at a drop's rim as the maze's.
 @group(0) @binding(5) var<storage, read> pr: array<f32>;
 ${PACKED}
+${RIM_SIDE}
 fn mx(p: vec2i, n: i32) -> vec3f { return textureLoad(src, clamp(p, vec2i(0), vec2i(n - 1)), 0).rgb; }
 fn mm(a: vec3f, b: vec3f) -> vec3f {
   return select(vec3f(0.0), select(max(a, b), min(a, b), a > vec3f(0.0)), a * b > vec3f(0.0));
+}
+// The lip (above): the face a → a + e crosses the rim outward, with the flow's
+// sign c, and the dish's cell behind it is not above the trough's pressure.
+fn lipHolds(a: vec2i, e: vec2i, c: f32, n: i32) -> bool {
+  let ra = rimSide(a, f32(n));
+  if (ra == rimSide(a + e, f32(n))) { return false; }
+  let dish = select(a, a + e, ra);
+  return ((c >= 0.0) != ra) && packedAt(dish.x, dish.y, n) <= 0.0;
 }
 fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
   let b = a + e;
@@ -128,12 +198,15 @@ fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
   let wide = 0.25 * ((pb - packedAt(a.x - e.x, a.y - e.y, n)) + (packedAt(b.x + e.x, b.y + e.y, n) - pa));
   let ve = dot(va + vb, vec2f(e)) * 0.125 + (wide - (pb - pa)) * f32(n) * A.b.z;
   let c = clamp(ve * A.b.y * f32(n), -0.45, 0.45);
+  var f: vec3f;
   if (c >= 0.0) {
     let s = mm(mx(a, n) - mx(a - e, n), mx(b, n) - mx(a, n));
-    return c * (mx(a, n) + 0.5 * (1.0 - c) * s);
+    f = c * (mx(a, n) + 0.5 * (1.0 - c) * s);
+  } else {
+    let s = mm(mx(b, n) - mx(a, n), mx(b + e, n) - mx(b, n));
+    f = c * (mx(b, n) - 0.5 * (1.0 + c) * s);
   }
-  let s = mm(mx(b, n) - mx(a, n), mx(b + e, n) - mx(b, n));
-  return c * (mx(b, n) - 0.5 * (1.0 + c) * s);
+  return vec3f(select(f.r, 0.0, lipHolds(a, e, c, n)), f.g, f.b);
 }
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
