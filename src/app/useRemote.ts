@@ -78,7 +78,12 @@ interface RemoteDeps {
   runAction: (a: MidiAction) => void;
   /** Where Ableton Link's readings go (PLAN.md 13.5-link): the show server sends them, the beat clock reads them. */
   tempoRef: RefObject<TempoSource | null>;
+  /** Where the server's OSC out state goes (PLAN.md 13.5-osc): `useShowFeed` holds the switch. */
+  oscOutHearRef: RefObject<OscOutHear | null>;
 }
+
+/** The server's word on OSC out, to whoever holds its switch. */
+export type OscOutHear = (m: Extract<RemoteMessage, { type: 'osc-out' }>) => void;
 
 export function useRemote({
   settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
@@ -88,7 +93,7 @@ export function useRemote({
   setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
-  tempoRef,
+  tempoRef, oscOutHearRef,
 }: RemoteDeps) {
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
@@ -333,6 +338,9 @@ export function useRemote({
           }
           break;
         }
+        case 'osc-out':
+          oscOutHearRef.current?.(message);
+          break;
         /*
           Not this display's, and each for its own reason. Naming them is the
           point: without these four the switch below cannot ask the compiler
@@ -350,6 +358,8 @@ export function useRemote({
         case 'denied':
         case 'request-state':
         case 'link-enable':
+        case 'osc-out-enable':
+        case 'beat':
         case 'state':
         case 'lights':
         case 'cast':

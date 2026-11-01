@@ -7,7 +7,9 @@
     "one), never a new step in the workflow. `why` is the step's old comment: what the",
     "check measures and why it is where it is. `always`, on a Measure check, keeps it in",
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
-    "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
+    "cheap ones that hold the rest. `quarantine` (PLAN.md 19ak-1) lists a check's",
+    "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
+    "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
   "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
@@ -1029,6 +1031,21 @@
       ]
     },
     {
+      "name": "The dials held in the solver reach their tops",
+      "shard": "lab3",
+      "run": "npm run widedials",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-2: every clamp the solver puts on Swirl, Dye Weight, Heat Spread,",
+        "Pushes Dye, Drop Height, Background Loop, Glass Smear and Momentum's current",
+        "admits the dial's top, no look moved, and on the lab's 128² plate each top",
+        "does more than the old one, finite and conserving. 2.5 minutes on software",
+        "WebGPU (cloud, 2026-10-31), so on Linux's lab shards rather than a Mac's.",
+        "In lab3 since #658: its 3:40 in lab put that part past its 25 minutes on",
+        "main's merge of #646 (cancelled twice in holeline, after it); lab3 ran 11."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -1245,6 +1262,20 @@
       ]
     },
     {
+      "name": "The Tip pad on the desk and the phone",
+      "shard": "browser",
+      "run": "npm run tippad",
+      "why": [
+        "PLAN 18a-13j (scripts/tippad.mjs, apart from phone.mjs, which may not",
+        "grow): the owner never found a way to slosh the plate. The Tip pad is",
+        "seen in the Tools panel at 1440x900 with nothing opened or scrolled;",
+        "dragged right it stands the plate up toward 90, up toward 0, the keys",
+        "too; a grab with Slosh off puts it at half; let go, Gravity and Tilt",
+        "Direction are the look's own exactly (Lava Lamp's 1/180 too); and the",
+        "phone's Motion sheet has it at 128 px, pouring the same way."
+      ]
+    },
+    {
       "name": "The phone",
       "shard": "browser",
       "run": "npm run phone",
@@ -1341,6 +1372,21 @@
         "Draw, the renders, the input picker, the Source, following a song) lean on",
         "this build or the Live Show's or the shelf's, all in this part. The browser",
         "part ran 23:43 of its 25 minutes with all 29 (#650's run, 2026-11-01)."
+      ]
+    },
+    {
+      "name": "OSC out reaches a VJ app",
+      "shard": "browser2",
+      "run": "npm run oscout",
+      "why": [
+        "OSC out (PLAN.md 13.5-osc; scripts/oscout.mjs): the writer against bytes",
+        "laid out by hand and read by a decoder written in the check, the feed's",
+        "numbers against a plate worked by hand, the page's and the server's",
+        "target rule against each other, the real show server with a socket where",
+        "Resolume would be (a bundle a report, the beat at once and released, a",
+        "phone refused, Pro only), then the built app's switch in Settings, its",
+        "own reports, and the switch remembered over a reload. No GPU: the plate's",
+        "own beat is the fifth Mac shard's line."
       ]
     },
     {
@@ -2351,6 +2397,7 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
+      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -2373,6 +2420,8 @@
         "The pigment's grain inside the dye, not at its edge: in every look the",
         "grain moves almost no pixel of a dye edge by a fleck's worth (it made",
         "the edges a dithered fringe, \"very digital\"), and the bodies keep it.",
+        "Line 4 asks the same of the back plate alone on every lamp look, and",
+        "that its grain is pigment, T^grain, as the front's is (PLAN 38h-4).",
         "In the open shard (the plate shard is near its timeout), and after the",
         "opening's check, so a timing check never follows four minutes of",
         "renders: with this one before it, startup's first frame waited 2.27 s",
@@ -2498,6 +2547,7 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
+      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -2569,6 +2619,17 @@
       ]
     },
     {
+      "name": "OSC out carries the plate's beat",
+      "shard": "fifth",
+      "run": "npm run oscout",
+      "why": [
+        "The same check as Measure's (PLAN.md 13.5-osc), on Metal, where the plate",
+        "runs: its reports carry its own layers, and a beat the plate presses on",
+        "reaches the VJ app's socket as it lands. SwiftShader's plate presses on no",
+        "kick, so that line is skipped there and said."
+      ]
+    },
+    {
       "name": "A drop lands only where it is dropped",
       "shard": "fifth",
       "run": "node scripts/mirror.mjs",
@@ -2613,6 +2674,7 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
+      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",

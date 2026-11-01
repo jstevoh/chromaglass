@@ -5,7 +5,7 @@ The checks, one script per check (about 265 `.mjs` files), and the helpers they 
 ## Start here
 
 - `checks.json`: the manifest: `shards` (Measure: `logic`, `sound`, `browser`, `lab`, `lab2`; Mac: `show`, `tools`, `plate`, `open`, `fifth`) and `checks`, each `{name, shard, run, why, always}` and sometimes `env`, `timeout`.
-- `checks.mjs`: `runShard`, `selectShards`, `trace`: runs a shard in CI (`--ci <shard>`), `npm run checks` holds the rules.
+- `checks.mjs`: `runShard`, `selectShards`, `trace`, `checkReads`, `quarantined`, `loadEsbuild`: runs a shard in CI (`--ci <shard>`), says what each check reads (19ak-2) and which red lines are quarantined (19ak-1); `npm run checks` holds the rules.
 - `quick.mjs`: `npm run quick` runs the checks your diff from `origin/main` reaches, side by side; `-- --dry` says which and why.
 - `chromium.mjs`: `launchChromium`, `chromiumPath`; `PW_WEBGPU=1` gives the app software WebGPU off a Mac.
 - `frame.mjs`: `installFrameReader`, `waitForShow`, `settlePlate`, `frameOf`: photograph the plate and wait on the solver.

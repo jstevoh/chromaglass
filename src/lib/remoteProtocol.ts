@@ -161,7 +161,29 @@ export type RemoteMessage =
    * twenty of these a second — and the browser could not send the UDP itself
    * in any case.
    */
-  | { type: 'lights'; layers: { colour: string; fill: number }[]; master: number }
+  | {
+      type: 'lights'; layers: { colour: string; fill: number }[]; master: number;
+      /** The ear's fast readings, 0..1 (`oscOut.ts`'s SOUND_OUT), for OSC out (PLAN.md 13.5-osc); absent while nothing is heard. */
+      sound?: Record<string, number>;
+      /** The ear's bands, 0..1, low to high. */
+      bands?: number[];
+      /** The beat clock's tempo, 0 before it has one. */
+      bpm?: number;
+    }
+  /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
+  | { type: 'beat' }
+  /**
+   * Relay → display: where OSC out goes and whether it is sending (PLAN.md
+   * 13.5-osc). Sent on hello, which is how a page learns there is a show
+   * server to switch it on at; `pro` false means the server holds its packets.
+   */
+  | {
+      type: 'osc-out'; on: boolean; target: string | null; pro: boolean; says: string;
+      /** Off because someone switched it off (this page, another, the Mac app), not because the server has just started: the page does not switch it back on. */
+      stopped?: boolean;
+    }
+  /** Display → relay: OSC out on at `target` ("host:port"), or off. The relay takes it from the laptop's own page only. */
+  | { type: 'osc-out-enable'; on: boolean; target?: string }
   /** Relay → display, when a controller joins and needs a snapshot. */
   | { type: 'request-state' }
   /** Display → controllers. */

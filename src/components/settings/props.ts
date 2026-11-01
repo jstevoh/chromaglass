@@ -9,6 +9,7 @@ import type { PinApi } from './controls';
 import type { LiquidDesignerProps } from '../LiquidDesigner';
 import type { OutputConfig, WallTest } from '../../lib/outputConfig';
 import type { TempoLabel, TempoReading } from '../../lib/tempo';
+import type { OscOutLabel } from '../../lib/oscOut';
 import type { CartoonShelfProps } from '../CartoonShelf';
 import type { RoomCalibration } from '../../lib/audioCalibration';
 import type { EngineStatus } from '../../lib/platform';
@@ -138,6 +139,10 @@ export interface SettingsPanelProps {
   onLink?: (on: boolean) => void;
   /** Live's play and stop move the Sequence (PLAN.md 13.5-link-transport). */
   onLinkTransport?: (on: boolean) => void;
+  /** OSC out at the show server (PLAN.md 13.5-osc); null or absent until one is there to send it. */
+  oscOut?: OscOutLabel | null;
+  /** Switch it, or move it with a target ("address:port"); false if the target is refused. */
+  onOscOut?: (on: boolean, target?: string) => boolean;
   onTempoBpm?: (bpm: number) => void;
   /** Whether MIDI clock is arriving on the open port, for the note that says so. */
   midiClocked?: boolean;
@@ -165,7 +170,7 @@ export interface SettingsPanelProps {
   cartoons?: CartoonShelfProps;
 }
 
-export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'onOpenSound' | 'onFlickPlate' | 'cartoons'>
   & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;
