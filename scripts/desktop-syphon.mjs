@@ -1,7 +1,7 @@
 /**
  * The Mac app's Syphon line in `npm run desktop` (PLAN.md 13.2, "Syphon out",
  * docs/plan/13-vj-software.md; Antigravity's brief 5 of 2026-10-31), written
- * ahead of the add-on and run as `--owed=syphon` in desktop.yml until the PR
+ * ahead of the add-on and run with `DESKTOP_OWED: syphon` in desktop.yml until the PR
  * that ships it takes the id out.
  *
  * What the brief asks: a native add-on under desktop/ that publishes a Syphon
@@ -28,8 +28,10 @@
  * and misses is red.
  */
 export async function syphonLine({ electronApp, check, skip, sleep }) {
-  const flag = process.argv.find((a) => a.startsWith('--owed='));
-  const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+  // From `--owed=` or, as desktop.yml gives it, DESKTOP_OWED (its run line is
+  // held word for word by `npm run updates`).
+  const flag = process.argv.find((a) => a.startsWith('--owed='))?.slice('--owed='.length) ?? process.env.DESKTOP_OWED ?? '';
+  const owed = new Set(flag.split(',').filter(Boolean));
   const name = 'Syphon out: the add-on loads, and the menu item serves "ChromaGlass" with every frame released';
   if (process.platform !== 'darwin') { skip(name, `Syphon is macOS's; this is ${process.platform}${process.env.DISPLAY ? ' under xvfb' : ''}`); return; }
   const state = () => electronApp.evaluate(() => {
@@ -86,7 +88,7 @@ export async function syphonLine({ electronApp, check, skip, sleep }) {
     detail = `loaded ${before.loaded}, off at start ${!at.checked}; on: serving ${on?.serving} as ${JSON.stringify(on?.name)}, ${perS} frames published in a second and ${freed} paint textures released in it (seen by this check's own wrapper; the app reports ${later?.released}); off: serving ${off?.serving}`;
   }
   if (!owed.has('syphon')) return check(name, ok, detail);
-  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "syphon" out of --owed in desktop.yml`);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "syphon" out of DESKTOP_OWED in desktop.yml`);
   if (at || before) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
   console.log(` owed  ${name} — ${detail}`);
 }
