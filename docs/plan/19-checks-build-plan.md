@@ -222,6 +222,15 @@ from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) 
 side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
 [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
+- **19k-7** (S): `npm run scene`'s two cost bars red on a PR that changed nothing it runs
+  (#540, 2026-10-28, twice on one head): the worst frame 22.5 ms against 20 (the still room's
+  cold first push; 18.7 on the run before, 13.7 on another PR's that day, 11 to 15 when the bar
+  was set), and once the strobe room's median 2.01 ms against 2. The cost is
+  `process.cpuUsage()`, the whole process's, so the optimiser compiling on V8's background
+  threads during the first push is counted as the analysis's own. Measure the push's thread
+  alone (a worker, or `performance.now()` with the first push timed separately), or warm one
+  push before the timed ones and keep the 20 ms bar for the warm stalls it was set for; and
+  print the reading on the FAIL line, which today says only that it failed.
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
   wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the
@@ -246,3 +255,19 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.
+- **19k-8** (E, S): **shipped**, the soap's two checks (`soap`, `soapbreak`) in a sixth Measure
+  part `lab3`, since `lab2` ran 24:18 of its 25 minutes with them. Story in `docs/plan-shipped.md` §19k-8.
+- **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
+  part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
+  `docs/plan-shipped.md` §19k-9.
+- **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
+  `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
+  only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,
+  `opensource`, `clicks -- --app`, `csp`, `intro`, the remote's Mixer, the phone link and
+  every `vite preview` harness run as `node scripts/….mjs`) skips its build under `CI` and
+  serves a `dist/` nobody built. Found while cutting 19k-9; not yet seen red. Fix in
+  `runShard`: when a part's selection leaves out every builder before a selected leaner,
+  run `npm run build` first (or mark builders `always` within their part), with a
+  `npm run checks` self-test line that a lone leaner gets a build.
+  And a nit in the same file: `fmtSecs` rounds the seconds after flooring the minutes, so
+  119.6 s prints "1 min 60 s" (seen on the renders, 2026-11-01).

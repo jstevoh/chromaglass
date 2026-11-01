@@ -17,7 +17,9 @@ import type { FadeWay } from '../lib/mixFade';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { CastState } from '../lib/castProtocol';
 import type { MidiAction } from '../lib/midi';
+import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
+import { useLiveShow, onAir, stopLive } from '../lib/liveShow';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -74,6 +76,8 @@ interface RemoteDeps {
   pinnedLookName: string | null;
   runActionRef: RefObject<((a: MidiAction) => void) | null>;
   runAction: (a: MidiAction) => void;
+  /** Where Ableton Link's readings go (PLAN.md 13.5-link): the show server sends them, the beat clock reads them. */
+  tempoRef: RefObject<TempoSource | null>;
 }
 
 export function useRemote({
@@ -84,12 +88,24 @@ export function useRemote({
   setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
+  tempoRef,
 }: RemoteDeps) {
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
   // anything changes, and applies commands the phone sends back. When no relay
   // is running (the Firebase-hosted build, or plain `vite dev`), the link stays
   // dormant and nothing here changes behaviour.
+  /*
+    The live stream (lib/liveShow.ts, PLAN 37x-4d) as the phone needs it. Read
+    whole once a second while on air (its clock), and folded to what the
+    phone draws, so a destination's byte counts moving do not resend the
+    state between those seconds.
+  */
+  const liveShow = useLiveShow();
+  const liveKey = onAir(liveShow)
+    ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
+    : '';
+  const live = useMemo<RemoteState['live']>(() => (liveKey ? JSON.parse(liveKey) : null), [liveKey]);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -114,7 +130,8 @@ export function useRemote({
     filmLoaded: filmSource !== 'none',
     markLoaded,
     rowFading,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading]);
+    live,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -161,6 +178,8 @@ export function useRemote({
     return { x: p.x, y: p.y, dx: dx * Math.cos(a) - dy * Math.sin(a), dy: dx * Math.sin(a) + dy * Math.cos(a) };
   };
   const padPictureRef = useRef<PadPictureSender | null>(null);
+  const linkAskedRef = useRef(-Infinity);
+  const remoteLinkRef = useRef<((m: RemoteMessage) => void) | null>(null);
 
   const remoteLink = useRemoteLink({
     role: 'display',
@@ -221,6 +240,7 @@ export function useRemote({
             case 'preset-prev':   stepPreset(-1); break;
             case 'blackout-toggle': toggleBlackout(); break;
             case 'record-toggle': toggleRecording(); break;
+            case 'live-stop':     void stopLive().catch(() => { /* the panel shows why */ }); break;
             case 'performance-toggle': togglePerformance(); break;
             case 'go':            goLook(); break;
             case 'back':          revertLook(); break;
@@ -277,6 +297,21 @@ export function useRemote({
           wallRef.current?.setExternalTilt(g.x, g.y);
           break;
         }
+        case 'link': {
+          const t = tempoRef.current;
+          if (!t) break;
+          t.linkReading(performance.now(), message);
+          // The operator wanted Link on and the server says it is off: a server
+          // just started (the Mac app relaunches it) or this page just
+          // connected. Asked again at most every two seconds, so a server that
+          // will not switch it on is not asked twenty times a second.
+          const at = performance.now();
+          if (t.linkWanted && !message.on && at - linkAskedRef.current > 2000) {
+            linkAskedRef.current = at;
+            remoteLinkRef.current?.({ type: 'link-enable', on: true });
+          }
+          break;
+        }
         /*
           Not this display's, and each for its own reason. Naming them is the
           point: without these four the switch below cannot ask the compiler
@@ -293,6 +328,7 @@ export function useRemote({
         case 'hello':
         case 'denied':
         case 'request-state':
+        case 'link-enable':
         case 'state':
         case 'lights':
         case 'cast':
@@ -305,6 +341,7 @@ export function useRemote({
   usePublishAccountShow(!phone && remoteLink.status === 'connected', pinnedLookName);
 
   runActionRef.current = runAction;
+  remoteLinkRef.current = remoteLink.send;
 
   // The wall for a remote's Draw: one sender while the link is up, fed by the frame task.
   const remoteSend = remoteLink.send;
@@ -314,6 +351,13 @@ export function useRemote({
     setPadPictureSender(sender);
     return () => { if (padPictureRef.current === sender) padPictureRef.current = null; setPadPictureSender(null); };
   }, [remoteSend]);
+  // The desk's Link switch goes to the show server over this link.
+  useEffect(() => {
+    const t = tempoRef.current;
+    if (!t) return;
+    t.onLinkSwitch = (on) => remoteSend({ type: 'link-enable', on });
+    return () => { t.onLinkSwitch = null; };
+  }, [tempoRef, remoteSend]);
 
   return {
     remoteLink,

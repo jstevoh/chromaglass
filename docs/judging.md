@@ -2063,6 +2063,14 @@ system-audio path. Unlisted, never public, until you say so.
    back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
    one. A wrong key on one destination should fail that one alone, once, with the
    platform's words, while the others stream.
+9. The panel (37x-4d), instead of the console: + Panel → Live Show. Add the unlisted YouTube
+   broadcast (paste its key; the field should empty and say "Key kept"), press **For tests**
+   on it, and **Test**: the same picture as step 1. Add a second destination, leave it on,
+   and press **Go live**: it should ask "Go live to …? Press again" and do nothing until the
+   second press (use the unlisted one turned on, not a public key). While live, each row
+   should show its Mb/s and seconds behind; on the phone remote a red Live chip with the
+   clock on Draw and Controls, and two taps on it should stop the stream on the Mac. After
+   a stream, the line under the buttons should name the upload the stream carried.
 
 ## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
 
@@ -2139,7 +2147,196 @@ every other look.
 6. Decide: is the line in the right place on each look, which looks want one next, and should the music's colour
    (True Synesthesia) move to the finer pitch (24.3-place-4)?
 
-## 95. The camera's dials (PLAN 33i)
+## 95. Ableton Link with Live (PLAN 13.5-link)
+
+`npm run link` plays a Link session against the show server with a stand-in for Live written
+from the same reading of the protocol, so only Live can say the two agree.
+
+1. Live and the Mac app on the same Mac. In Live, Preferences → Link, Tempo & MIDI → Link on,
+   and the Link button in the transport bar lit. In the app, Settings → Sound → Tempo → **Link**.
+   Within a second or two the line beside it says "following 1 app", the tempo readout says
+   Live's tempo and "Link", and Live's transport bar says **1 Link**.
+2. Play a four-on-the-floor clip at 124. The plate's kicks should land with Live's kick, the
+   same way a MIDI clock's do; Beat Lead at 0. Change Live's tempo to 132 mid-clip: the readout
+   follows within half a second and the kicks stay on the beat.
+3. With the app open *first* and Live opened after: Live keeps its own tempo (the app must
+   never hand Live its 120).
+4. On two machines on the same Wi-Fi (Live on one, the app on the other): as step 2.
+5. Link off: Live's count goes back to 0 within a second, the readout to "listening".
+6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
+   prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
+   clock offset), Live's tempo changing when the app joins.
+
+## 96. Colour that answers the music (PLAN 25i)
+
+Three looks now take their colour from the music without a hue being turned. `npm run areacords`
+holds the arithmetic and the plate in the lab; only a real plate says whether it reads as music.
+
+1. Load **Poster, 1969** and play a song with a clear lead (a voice, a synth line, a piano) through
+   the microphone. The kick pours into the left shape; the colour of each pour should follow the
+   tune: notes C to D# orange, E to G ultramarine, G# to B purple. A tune that moves should leave
+   a run of colours in the shape; a held note, the same colour pour after pour.
+2. Load **Red Cabbage** with a song with drums. Each snare should bloom pink in the left well and
+   each kick turn the right well green, with no pink or green paint poured: the colour should come
+   up through the violet where the drop landed and spread as the liquid moves. Where the two
+   meet across the middle they should go back to violet.
+3. Load **Chemical Clock** with the same song. Each kick should start a ring in one of three
+   places (upper left, upper right, bottom), taking them in turn; a ring passing through a place
+   should hold back the next touch there until the gel recovers.
+4. Bad: Poster's colour changing on the drums rather than the tune, a pour that changes colour
+   halfway (a pour keeps the bottle it was picked up with), Red Cabbage's wells saturating to one
+   flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
+5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
+   snare and hats touching places of their own as well.
+6. After the fixes filmed on the Mac (25i-6): Poster's kick pours should now show in the left shape
+   on a plate already at its fill; Red Cabbage's acid well should stand on the left on every night
+   (the dish set square), its pink deepening to red only as far as vinegar goes and the green to
+   yellow-green, with a run of colours across each front; Chemical Clock's gel should keep turning
+   while the song plays, a ring from each kick's place and from the bottom place on each snare.
+
+## 97. The oil beads drawn on the GPU (PLAN 14ab-6)
+
+The beads' mask is drawn by the plate now, not by a canvas and an upload. `npm run beadmask`
+holds the drops to the CPU's drawing to a level, but the rings' edges were the canvas's
+antialiasing and are now each pixel's coverage, so an edge can sit a few levels apart.
+
+1. Fillmore with Oil Beads at 0.8 and Drops at 0, then Drops at 1, a minute of each with
+   music. The beads should look as they did: rings with a thin dark rim, drops with their
+   colours, walls and passengers. Nothing should flicker, lag a frame behind the flow, or
+   draw a bead where none is.
+2. The closeup at 3x on a crowd of rings: their rims should be as thin and even as before,
+   with no staircase of dark squares round the edge (droplens's old fault).
+3. The governor's readout with Drops at 1, before this change and after if you have the
+   last build: the frame should be cheaper, most on the busiest crowds.
+4. Bad: a stripe or square of mask missing (a tile the list did not reach), drops drawn
+   upside down against the flow, a passenger outside its drop.
+
+## 98. The projector's light: the lamp lever (PLAN 38a)
+
+`npm run lampfield` proves the law on a bare lab stage; only the Mac at 60 fps says how it
+looks on a moving plate. The Hot-Spot is now a projector's lamp lever: the plate is never
+brighter than the lamp, and nothing in the light moves.
+
+1. Any look, Hot-Spot 0: the plate looks as it did before this change, to the eye.
+2. A look that sets Hot-Spot (Sunburst at 0.8, the looks at 0.4 or 0.5): the middle is no
+   longer lifted and warm; the corners fall away a little at 0.4, a lot at 0.8. Raise Lamp
+   Motion to 1 on a still plate: the light on the stage stays put (only the gloss moves).
+3. Hot-Spot 1 on a light look with Lamp Ground up: a lit middle, dark sides, and a faint
+   coloured edge where it falls away (the condenser's glass), not a soft Gaussian.
+4. Second Lamp 1 with Hot-Spot 0.7: one side lit a little more and a little cooler, the
+   middle still white.
+5. Bad: a look that relied on the old lift now reads dim in the middle (say which), or the
+   edge colour reads as a painted ring rather than glass.
+
+## 99. Nothing on the plate makes light (PLAN 38h)
+
+`npm run nolight` shows each painted light gone in the lab; only the Mac at 60 fps shows
+whether the looks still read. Every change darkens or leaves alone; none brightens.
+Filmed before and after on the owner's Mac (2026-10-31) and judged from the phone page:
+"Looks great". One change came after the film: on the lamp-ground looks (Chemical Clock,
+Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
+
+1. Microdroplets up on any look (Settings → Look): the hundreds of tiny beads are now small
+   clear lenses with a dark ring, no white dot. In the closeup (camera), a brighter middle
+   and a thin contact line.
+2. A look with oil (Oil on Water, Clock Glass): at Focus's middle the oil's body is no longer
+   a touch brighter than the water. Turn Focus up and down: a bright and a dark caustic
+   round each oil body, swapping sides as Focus passes the middle.
+3. Gel Wheel up: the lamp goes the gel's colours and darker, never brighter than the bare
+   lamp; a deep red gel passes little green or blue.
+4. The looks with Glossiness set (twelve, 0.12 to 0.5; Ferro Paint highest, then Velvet
+   Underground and Splodascope): the dye no longer reads as lit domes; flat colour stays
+   flat and edges and ripples darken a little more. Glossiness 1 by hand is now four times
+   the real relief, the strongest it goes.
+5. Dish Vignette and Dish Spread: the rim is a thin dark line, not a warm bright one.
+6. No grain on the plate with the camera off; with the camera or a film stock on, the
+   grain is theirs as before. On Chemical Clock and Lava Lamp the dye's body keeps a fine
+   mottle of more and less pigment, which is the dye's own grain and not the plate's.
+7. Bad: a look that went dull or flat where it had sparkle the owner liked (say which, and
+   Glossiness can be turned up past where it was: it now steepens the real surface), black
+   doughnut droplets that read as dirt, a caustic ring that looks drawn.
+
+## 100. Every dial from very gentle to very extreme (PLAN 27h-1)
+
+Twenty-five dials go further than they did (the list is in PLAN 27h-1). The looks have not
+moved: every look's own value is where it was, so a look should open exactly as before.
+
+1. Any look, each widened dial at its first step and at its top, with music. The first step
+   should be barely there; the top should be more than nature, never black, one flat colour or
+   frozen. Magnet Strength at 3 over ferrofluid should stand the spikes up full, which 1 never
+   did at the default height. Saturation at 0 is a grey plate.
+2. The curved dials (Gel Speed, Film Grain, Grain Size, Gate Weave, Grain Fineness, Shot Length,
+   Bass Boost, Evaporation, Flick Strength, Evolve Speed, Plate Rock, Kick Bloom, Hue Journey,
+   Macro Zoom): the look's own value should sit a third or so along the slider, not hard
+   against the left stop, on the panel, a pinned desk fader, the phone and a MIDI fader alike.
+3. Evolve on for five minutes: it should wander the widened dials no further than before.
+4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
+   plate that blows up at a top.
+
+## 101. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+
+`filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
+colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
+(right) in the project's shared files, `film-physics-38m/` (`contact.png` has all six).
+
+1. Open Soap Film, then turn Film Physics to 1 (Design desk, camera group). The thin dye's
+   fringes go from loud multi-hue rings to straw, gold, olive-grey and blue-grey: what a real
+   film shows, and quieter (saturation 0.137 to 0.116 on the lab's plate).
+2. Macro Bead, Lacing Run, Oil & Water: zoom to a bubble. Its film tint changes from lilac and
+   pink to the soap film's own colours; small on the projected plate, plain in the closeup.
+3. Pick per look: keep the rainbow, take the real colours, or something between. A look that
+   should be real by its name (Soap Film) is the first candidate for 1.
+
+## 102. Every edge lit from beneath (PLAN 38h-2)
+
+`npm run nolight` lines 9 to 12 show the light from above gone in the lab; only the Mac
+shows whether the closeup still reads. Most of it is the closeup (the macro camera): the
+projected plate changes only where a look has the Second Lamp (its glint on bubbles is gone)
+or dyed beads on the lamp ground (a filter now, darker).
+
+1. Zoom into any look with bubbles: each bubble is a dark ring round a clear middle, as a
+   bubble photographed over a light box is; no white dots, no lit crescent.
+2. The closeup with Macro Cells and Macro Relief up: every cell a dark ring, no white glints,
+   no lit side. Macro Relief turns the rings from nothing to bold.
+3. Lamp Motion and Light Play moving: no edge in the closeup follows the lamp any more.
+4. Bad: a closeup that went dull where its sparkle was liked, or cells that read as black
+   holes; Glossiness steepens the surface the relief reads.
+
+## 103. Depth in the closeup's bubbles (PLAN 38h-7)
+
+`npm run closeupdepth` checks the optics in the lab; only the Mac shows whether the closeup
+now reads in depth beside the photos (drops/references).
+
+1. Zoom into any look with bubbles: each bubble a bright clear middle, the colour round it
+   squeezed into its rim, a thin dark band, and light again at the very edge.
+2. Light Play from 0 to 1: a soft glint grows on each bubble's top-left side; the projected
+   plate does not change.
+3. Bad: bubbles that read as white holes, or a glint that looks pasted on.
+4. (Part 2) Zoom all the way in on a small bubble: its rim a clean circle at any zoom, no
+   square corners or steps; a small bubble's middle the liquid's colour, paler, with a
+   bright glint; a big one's middle the clear lamp.
+
+## 104. The dials held inside the solver go further (PLAN 27h-2)
+
+Swirl, Dye Weight and Heat Spread now run to 2, Pushes Dye to 1.2, Drop Height to 2, Background
+Loop to 1.4 and Glass Smear to 3; Momentum's lasting current keeps up to 0.999 of itself a step
+(its dial was already 0.8 to 1). Before, the solver held each at its old top, so the far end of
+these dials did nothing. Every look opens as it did: the fourteen looks whose Glass Smear sat
+under the old 0.2 gate (and so smeared nothing) now say 0.
+
+1. Each at its top, on a look that uses it, with music: Swirl at 2 should curl the flow into
+   more and tighter eddies than 1 and settle into that, never blow up; Dye Weight at 2 with
+   Gravity up should sink the colour in faster, heavier fingers; Heat Spread at 2 with Dye
+   Weight should make broader salt fingers; Pushes Dye at 1.2 should clear the colour from
+   under the ferrofluid a little more than 1; Drop Height at 2 should throw the splash further;
+   Background Loop at 1.4 (two layers) should all but still the plate behind the lead.
+2. Glass Smear on the old plate (Thin Gap off): its first steps should now smear a little, where
+   anything under 0.2 did nothing and 0.2 jumped straight to a fifth of full; 3 should drag the
+   colour hard along the glass.
+3. Bad: a dial whose top looks the same as its old top, a look that opens differently than it
+   did yesterday, or any plate that blows up at a top.
+
+## 105. The camera's dials (PLAN 33i)
 
 Settings → Camera, with Lens at 0: turn Refraction, Aperture, Bloom and Chromatic Aberration up one
 at a time on a plate with a few pours. Each should visibly matter by about half way, and none should

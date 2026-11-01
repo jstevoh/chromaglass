@@ -12,10 +12,22 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
 import { FluidFields } from './fields';
 
 export class FluidPasses extends FluidFields {
+  /** What each cell with air in it divides its amounts among this substep (airGive), made by the first carry that sees the air. */
+  private airGiveTex: GPUTexture | null = null;
+  /** And the share of a cell each of its faces brings in this substep (airGive's second output). */
+  private airInTex: GPUTexture | null = null;
+  /** Whether the amounts' carries take the air's room this step (set in `step`, PLAN 15g-8b). */
+  protected airCarry = false;
+  /** airPair's answers, kept so a step allocates nothing for them: the air's four, or four blanks. */
+  private readonly airTex: GPUTexture[] = [];
+  private readonly noAirTex: GPUTexture[] = [];
+  /** The planned substeps' arguments with the air (airArgs), and their buffers' names, made once. */
+  private readonly airArgBufs: GPUBuffer[] = [];
+  private readonly airArgNames = Array.from({ length: 1 + 2 * CARRY_PAIRS }, (_, i) => `body advect thin @${i}`);
 
   /**
    * A carry on a thin gap through the solve's own faces (THIN_FACE in
@@ -23,20 +35,103 @@ export class FluidPasses extends FluidFields {
    * place of the pressure, then the gap and the mobility.
    */
   protected runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
-    const pipe = this.pipeline(name, dst.format);
+    // bodyAdvectThin carries amounts, so while there is air it takes it (airLiquid in wgsl/fluid.ts, PLAN 15g-8b);
+    // until its Air kernel is built, the plain carry, which keeps every amount too.
+    const airPipe = name === 'bodyAdvectThin' && this.airCarry ? this.pipeline('bodyAdvectThinAir', dst.format) : null;
+    const pipe = airPipe ?? this.pipeline(name, dst.format);
     if (!pipe) return;
     const ride = this.ride();
-    const at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'thin faced'), pipe), dst), src), args), this.squeeze.read);
+    const air = airPipe ? this.airPair() : null;
+    if (air) this.airGive(pass, false, args);
+    let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'thin faced'), pipe), dst), src), args), this.squeeze.read);
+    if (air) at = this.groupAt(at, air[0]);
     const last = this.groupAt(at, ride);
     let group = last.group;
     if (!group) {
-      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!]);
+      group = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.squeeze.read, this.hsMob!, ...(air ?? [])]);
       last.group = group;
     }
     pass.setPipeline(pipe);
     pass.setBindGroup(0, group);
     const w = Math.ceil(this.N / 8);
     pass.dispatchWorkgroups(w, w);
+  }
+
+  /**
+   * The step's air before and after it and what each cell with air in it
+   * divides its amounts among this substep (airGive), for the carries of
+   * amounts (airLiquid in wgsl/fluid.ts); blanks, so no air, on a plate that
+   * has never had a bubble. The same array each call, its first the step's
+   * air before it, which names the pair (the other is its twin).
+   */
+  protected airPair(): GPUTexture[] {
+    if (!this.air) {
+      if (!this.noAirTex.length) this.noAirTex.push(this.blank('rgba'), this.blank('rgba'), this.blank('r'), this.blank('rgba'));
+      return this.noAirTex;
+    }
+    if (!this.airGiveTex || !this.airInTex) {
+      const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING;
+      this.airGiveTex = this.disposer.track(this.device.createTexture({ label: 'air give', size: [this.N, this.N], format: R32, usage }));
+      this.airInTex = this.disposer.track(this.device.createTexture({ label: 'air in', size: [this.N, this.N], format: 'rgba32float', usage }));
+    }
+    const t = this.airTex;
+    t[0] = this.air.prev; t[1] = this.air.field; t[2] = this.airGiveTex; t[3] = this.airInTex;
+    return t;
+  }
+
+  /** Whether both airGive kernels are built (asking builds them): a carry takes the air only then. */
+  protected airGiveReady(): boolean {
+    return !!this.airGivePipe(true) && !!this.airGivePipe(false);
+  }
+
+  private airGivePipe(planned: boolean): GPUComputePipeline | null {
+    const name = planned ? 'airGiveSub' : 'airGiveThin';
+    // Prebuilt with the thin gap's kernels (THIN_GAP_KERNELS), under the same key.
+    return this.pipelines.computePipeline(this.pipelineKey(name, 'thin'), kernel(name, 'rgba16float'));
+  }
+
+  /**
+   * Each planned substep's arguments for a carry taking the air: its index
+   * (A.a.x, the share of the step done before it is the plan's share times
+   * it, decided on the GPU), how much of a cell the air takes, the step's
+   * displacement. The first is 0, then each pair's two are 1 + 2k and 2 + 2k.
+   */
+  protected airArgs(room: number, disp: number): GPUBuffer[] {
+    const v = this.argScratch;
+    for (let i = 0; i < this.airArgNames.length; i++) {
+      v[0] = i; v[1] = room; v[2] = 0; v[3] = 0; v[4] = 0; v[5] = disp; v[6] = 1; v[7] = REST_GAP;
+      this.airArgBufs[i] = this.argWrite(this.airArgNames[i]);
+    }
+    return this.airArgBufs;
+  }
+
+  /**
+   * airGive for the carry about to run with `args`, while there is air to
+   * carry round (airCarry): the planned substeps' through the same indirect
+   * dispatch as the carry (`indirect` its offset), the hand's sixths whole.
+   * With no air the carries read a liquid of 1 and never look at it.
+   */
+  private airGive(pass: GPUComputePassEncoder, planned: boolean, args: GPUBuffer, indirect?: number): void {
+    if (!this.airCarry || !this.air) return;
+    const pipe = this.airGivePipe(planned);
+    if (!pipe) return;
+    const air = this.airPair();
+    const ride = this.ride();
+    const at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'air give'), pipe), args), ride), this.squeeze.read);
+    const last = this.groupAt(at, air[0]);
+    let group = last.group;
+    if (!group) {
+      group = bindGroup(this.device, pipe, [this.sim, args, ride, air[2], this.hsP!, ...(planned ? [this.carrySub!] : []), this.squeeze.read, this.hsMob!, air[0], air[1], air[3]]);
+      last.group = group;
+    }
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    if (indirect === undefined) {
+      const w = Math.ceil(this.N / 8);
+      pass.dispatchWorkgroups(w, w);
+    } else {
+      pass.dispatchWorkgroupsIndirect(this.carryInd!, indirect);
+    }
   }
 
   /** The ferrofluid's carry velocity on a thin gap (phaseVelocity), or the mixture's off it. */
@@ -232,7 +327,7 @@ export class FluidPasses extends FluidFields {
     const perStep = gPrime * seconds / (3 * nu * dx * dx);
     if (!(perStep > 0) || !Number.isFinite(perStep)) return null;
     const eta = DYE_CAP * DYE_LAYER;
-    const b = REST_GAP * PLATE_METRES;
+    const b = REST_GAP_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
     const open = 1 - e / b;
@@ -467,33 +562,54 @@ export class FluidPasses extends FluidFields {
    * indirectly so one this step does not need runs no workgroups. The field
    * ends swapped once, as a single carry leaves it.
    */
-  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong): void {
+  protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
     // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
-    const pipe = this.pipeline(kernelName, field.format);
+    /*
+      The amounts' carries take the air while there is any (`argsAt`, from
+      airArgs; airLiquid in wgsl/fluid.ts, PLAN 15g-8b), in their Air kernels;
+      until one is built, the plain carry, which keeps every amount too.
+    */
+    const airPipe = argsAt && name === 'bodyAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
+    const pipe = airPipe ?? this.pipeline(kernelName, field.format);
     if (!pipe) return;
+    if (!airPipe) argsAt = undefined;
     const ride = this.ride();
-    const group = (src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
-      const key = `${kernelName}:${src.label}:${dst.label}:${src2?.label ?? ''}:${dst2?.label ?? ''}:${args.label}:${this.squeeze.read.label}:${ride.label}`;
-      let g = this.groups.get(key);
+    const air = airPipe ? this.airPair() : null;
+    const group = (a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
+      let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'carry'), pipe), a), src), dst);
+      if (src2) at = this.groupAt(at, src2);
+      at = this.groupAt(this.groupAt(at, this.squeeze.read), ride);
+      if (air) at = this.groupAt(at, air[0]);
+      let g = at.group;
       if (!g) {
-        g = bindGroup(this.device, pipe, [this.sim, args, src, ride, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : [])]);
-        this.groups.set(key, g);
+        g = bindGroup(this.device, pipe, [this.sim, a, src, ride, dst, this.hsP!, this.carrySub!, this.squeeze.read, this.hsMob!, ...(src2 && dst2 ? [src2, dst2] : []), ...(air ?? [])]);
+        at.group = g;
       }
       return g;
     };
+    // Taking the air, each substep its own arguments, which carry its index, and airGive before each, through the same dispatch.
+    const gives = !!air;
     const w = Math.ceil(this.N / 8);
+    const a0 = argsAt ? argsAt[0] : args;
+    if (gives) this.airGive(pass, true, a0);
     pass.setPipeline(pipe);
-    pass.setBindGroup(0, group(field.read, field.write, also?.read, also?.write));
+    pass.setBindGroup(0, group(a0, field.read, field.write, also?.read, also?.write));
     pass.dispatchWorkgroups(w, w);
     field.swap();
     also?.swap();
-    const there = group(field.read, field.write, also?.read, also?.write), back = group(field.write, field.read, also?.write, also?.read);
+    const there = argsAt ? null : group(args, field.read, field.write, also?.read, also?.write);
+    const back = argsAt ? null : group(args, field.write, field.read, also?.write, also?.read);
     for (let k = 0; k < CARRY_PAIRS; k++) {
-      pass.setBindGroup(0, there);
-      pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
-      pass.setBindGroup(0, back);
-      pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
+      for (let half = 1; half <= 2; half++) {
+        const a = argsAt ? argsAt[half + 2 * k] : args;
+        if (gives) this.airGive(pass, true, a, 12 * k);
+        pass.setPipeline(pipe);
+        pass.setBindGroup(0, half === 1
+          ? there ?? group(a, field.read, field.write, also?.read, also?.write)
+          : back ?? group(a, field.write, field.read, also?.write, also?.read));
+        pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
+      }
     }
     // And the rest of the way with the glass's drift.
     this.shiftCarried(pass, field, name === 'mixAdvect' ? 'mix' : 'amount');
@@ -557,7 +673,7 @@ export class FluidPasses extends FluidFields {
       take out (driftCells, and why): hsPrep's drag, u = (u + kΔt·glass) /
       (1 + kΔt), at the rest gap, in whole cells a step.
     */
-    const kdt = 12 * nu / (PLATE_METRES * PLATE_METRES * REST_GAP * REST_GAP) * seconds;
+    const kdt = 12 * nu / (REST_GAP_METRES * REST_GAP_METRES) * seconds;
     this.glassFlow = [(this.glassFlow[0] + kdt * glassX) / (1 + kdt), (this.glassFlow[1] + kdt * glassY) / (1 + kdt)];
     this.glassCells = [this.glassFlow[0] * disp * this.N, this.glassFlow[1] * disp * this.N];
     const whole = (c: number) => Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, Math.round(c)));
@@ -570,13 +686,12 @@ export class FluidPasses extends FluidFields {
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
     this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}`,
-      this.arg('thin prep', [12 * nu / (PLATE_METRES * PLATE_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
+      this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
       [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film]);
     this.vel.swap();
-    const invDt = 1 / Math.max(this.lastDt, 1e-4);
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
-      this.arg('thin divergence', [this.airPush, invDt, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) * invDt, 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
+      this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
       [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!, this.hsPour!]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.

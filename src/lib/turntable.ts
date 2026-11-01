@@ -45,12 +45,39 @@
 /**
  * The plate's real size (PLAN §18a's numbers, which the thin-gap solver in
  * #220 uses too, so the two agree when both are in): an overhead projector's
- * stage takes a clock glass of about eight inches, 0.2 m, and the gap field is
- * in plate widths, 0.03 in the middle at rest, so the rest gap is 6 mm.
+ * stage takes a clock glass of about eight inches, 0.2 m.
  */
 export const DISH_METRES = 0.2;
+/*
+  The glass sandwich's gap at rest in the middle, in metres (PLAN 38r).
+  The one number every reader of the gap in metres takes, through
+  DISH_GAP_FIELD_METRES below: the drag 12ν/h², the Darcy speeds, the slump,
+  the pour's dome, the cover's shear, the sheet's film, the milk's depth, the
+  ferrofluid's room under the top glass, a drop's pancake radius.
+
+  6 mm, what the plate has had since PLAN §18a (0.03 of the plate's width).
+  That is a dish with a glass resting on a deep layer, not a sandwich: the
+  audit (PLAN 38r) puts a real one at 1–3 mm (a few millilitres under a top
+  glass about 15 cm across), and 38r's second part moves this to 2 mm and
+  retunes what the thinner film changes. Until then every reader below takes
+  the gap from here, and at 6 mm every one of them reads what it read before.
+*/
+export const DISH_GAP_METRES = 0.006;
+/*
+  The gap field's number at rest (the squeeze texture's red, gapRest): 0.03.
+  It is in *gap units*, h₀/0.03, so a press, a kick's dent, a lift and every
+  check written in those numbers since #220 reads the same at any rest gap;
+  it is plate widths too only while the rest gap is 0.03 of the plate. Every reader
+  of the field that needs the gap as a length multiplies by
+  DISH_GAP_FIELD_METRES (or DISH_GAP_FIELD_UV for plate widths), never by
+  the plate's width.
+*/
 export const DISH_REST_GAP = 0.03;
-/** The narrowest and widest the squeeze lets the gap go, in plate widths (gapRest, squeezeUpdate). */
+/** Metres per unit of the gap field: the rest gap in metres over its number. */
+export const DISH_GAP_FIELD_METRES = DISH_GAP_METRES / DISH_REST_GAP;
+/** Plate widths per unit of the gap field (one, at 6 mm on 0.2 m). */
+export const DISH_GAP_FIELD_UV = DISH_GAP_FIELD_METRES / DISH_METRES;
+/** The narrowest and widest the squeeze lets the gap go, in gap units (gapRest, squeezeUpdate): 0.8 mm and 12 mm at the 6 mm rest gap. */
 export const DISH_GAP_RANGE = [0.004, 0.06] as const;
 /** The open circular rim of the dish (radius in plate uv coordinates from centre). Liquid and dye reaching it spill into the overflow trough (PLAN 18a, 18c, 18g). */
 export const OPEN_RIM = 0.5;
@@ -84,14 +111,19 @@ export function carrierViscosity(viscosity: string | undefined): number {
  * the oil round it. The look's Dye Weight (solutalBuoyancy) already says
  * which of those its dye is when the plate is stood up, so the spun dish
  * reads the same dial: 2% at 0, 15% at 1. So does the slump of a pool on a
- * level plate (PLAN 18m, wgsl/slump.ts). The oil a look pours is lighter
+ * level plate (PLAN 18m, wgsl/slump.ts). The dial runs on to 2 (PLAN 27h-2),
+ * 28%: a dye as heavy against its liquid as glycerine (1.26) is against
+ * water, still a real pair, just not one a light show pours. At 6 mm and
+ * 1024² the slump then asks for 27 substeps against SLUMP_SUBSTEPS' 20, and
+ * the face guard (SLUMP_FACE) holds each to its stable share: the front
+ * still runs faster than at 1, a little under its Froude speed. The oil a look pours is lighter
  * than the water, about 12% (mineral oil 0.85–0.88 against 1.0), and the
  * ferrofluid heavier, about 25% (a light-oil ferrofluid is 1.1–1.2 against a
  * 0.88 oil), both fixed properties of the liquids and so constants in the
  * solver (SPIN_OIL_LIGHT, SPIN_PHASE_HEAVY).
  */
 export function dyeDensityContrast(dyeWeight: number | undefined): number {
-  const w = Math.max(0, Math.min(1, Number.isFinite(dyeWeight) ? dyeWeight! : 0));
+  const w = Math.max(0, Math.min(2, Number.isFinite(dyeWeight) ? dyeWeight! : 0));
   return 0.02 + 0.13 * w;
 }
 
@@ -105,9 +137,9 @@ export function thicknessViscosity(thickness: number): number {
   return 1e-6 * Math.pow(10, 3 * Math.max(0, Math.min(1, thickness)));
 }
 
-/** The drag time h²/12ν, seconds, for a gap in plate widths. */
+/** The drag time h²/12ν, seconds, for a gap in gap units (the field's). */
 export function dragSeconds(nu: number, gap = DISH_REST_GAP): number {
-  const h = gap * DISH_METRES;
+  const h = gap * DISH_GAP_FIELD_METRES;
   return (h * h) / (12 * Math.max(1e-9, nu));
 }
 

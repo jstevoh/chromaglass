@@ -19,14 +19,13 @@
  */
 import { Disposer, PipelineCache } from './kit';
 import { groupOf } from './groupCache';
-import { DROP_KERNELS } from './wgsl/ferroDrop';
-import { SPIKE_ONSET, SPIKE_PITCH } from './wgsl/spikes';
+import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
+import { SPIKE_PITCH } from './wgsl/spikes';
+import { LIFT_ONSET } from './wgsl/standing';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { CHI0, LANGEVIN } from './standing';
 
 const LC_UV = SPIKE_PITCH / (2 * Math.PI);
-/* The plate's gap at rest (fluid.ts, REST_GAP), in l_c: the most a drop can stand before the top glass. */
-const GAP_LC = 0.03 / LC_UV;
 const WARM_SWEEPS = 24;
 const COLD_SWEEPS = 200;
 /*
@@ -42,7 +41,7 @@ function langevin(x: number): number { return x < 1e-3 ? x / 3 : 1 / Math.tanh(M
   pressure, 0.50 per unit of ln(sinh ξ / ξ)). The film takes none of it on
   the plate; the picture's drop takes all of it.
 */
-const PULL = (2 / langevin(SPIKE_ONSET / LANGEVIN) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
+const PULL = (2 / langevin(LIFT_ONSET) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
 
 /** The drop's height on a wide flat top, in l_c, at Relief / 3D `relief`: a large sessile drop's 2 sin(θ/2). */
 export function dropPlateau(relief: number): number {

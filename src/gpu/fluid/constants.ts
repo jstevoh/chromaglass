@@ -7,7 +7,7 @@
 
 import type { SolverCarry } from '../solverTypes';
 import { SOLVER_VEL_FORMAT } from '../wgsl/pack';
-import { DISH_METRES, thicknessViscosity } from '../../lib/turntable';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, DISH_GAP_FIELD_METRES, thicknessViscosity } from '../../lib/turntable';
 
 /*
   How many bubbles the air field has room for.
@@ -84,7 +84,9 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin'];
+/** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
+export const AIR_DISP_LEAST = 1e-5;
 /*
   The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
   substep may carry across a face, in cells, and the most substeps a step
@@ -148,7 +150,6 @@ export const OIL_TENSION = 4e-4;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
-export const SOAP_PULL = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
 /**
@@ -158,7 +159,26 @@ export const HEAT_LIFT = 0.06;
 export const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 export const LAMP_HEAT = 6;
-/** Vorticity confinement's push, as a fraction of the local spin, per step. */
+/*
+  Vorticity confinement's push, as a fraction of the local spin, per step.
+  The Swirl dial scales it up to 2 (PLAN 27h-2; fluid.ts holds the top). It
+  puts back the spin the grid smooths away, so it keeps an unforced plate
+  stirring at today's 1 as at 2; at 2 the stir levels off, feeding itself
+  no more than 1 does (`npm run widedials`, 128²: mean speed ×1.02 from step
+  300 to 600 at 2, ×1.11 at 1).
+
+  The other dials whose top fluid.ts holds (27h-2). Heat Spread runs to 2:
+  199 times water's κ (KAPPA_WATER), past nature for a show, through an
+  implicit Jacobi that is stable at any rate; on a fine grid at the top its
+  four passes under-converge, spreading the heat less than asked, never
+  wrongly. Dye Weight runs to 2, a dye 28% heavier than its liquid
+  (dyeDensityContrast, lib/turntable.ts). Pushes Dye runs to 1.2 in the same
+  passes: each of a cell's four neighbours takes at most the push's share of
+  it (k·max(f − f′, 0) + d·min(f, f′) ≤ k, as d < k), so a pass gives away at
+  most 4·DISPLACE_PUSH·s, 0.86 at 1.2, under the 1 where it would overshoot.
+  The step's parameters (sim/fluidSimulation.ts, at its size ceiling) bound
+  Pushes Dye only at 2; its top is held in fluid.ts.
+*/
 export const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 export const CH_SUBSTEPS = 4;
@@ -389,16 +409,24 @@ export const MAX_SPEED = 0.002;
   The plate as a Hele-Shaw cell (PLAN §18a, wgsl/thinGap.ts): its real size.
 
   The drag between two glasses is 12ν/h², which needs the gap in metres.
-  The gap field is in plate widths (0.03 at rest in the middle), so the
-  plate needs a width: an overhead projector's stage takes a clock glass of
-  about eight inches, 0.2 m, which puts the rest gap at 6 mm in the middle
-  and the tightest the squeeze allows (0.004) at 0.8 mm. The same 0.03 is
-  the unit the mobility is written in, so M is about c on an open plate.
-  The turntable's dish, because hsPrep reads the clear liquid's viscosity
-  back out of 12ν/W² with that width (PLAN 18d) and the two must agree.
+  The plate is a clock glass of about eight inches, 0.2 m, on an overhead
+  projector's stage, and the glasses are 6 mm apart in the middle at rest
+  (lib/turntable.ts DISH_GAP_METRES, the one number: PLAN 38r). The gap
+  field is in gap units, 0.03 at rest (REST_GAP), so the tightest the
+  squeeze allows (0.004) is 0.8 mm; a field value is a length only through
+  GAP_METRES, metres per unit, never through the plate's width (the two
+  are the same number only while the gap is 6 mm). The same
+  0.03 is the unit the mobility is written in, so M is about c on an open
+  plate. The turntable's dish, because hsPrep reads the clear liquid's
+  viscosity back out of 12ν/G² with that G (PLAN 18d) and the two must agree.
 */
 export const PLATE_METRES = DISH_METRES;
-export const REST_GAP = 0.03;
+export const REST_GAP = DISH_REST_GAP;
+/** The rest gap in metres, and metres per unit of the gap field. */
+export const REST_GAP_METRES = DISH_GAP_METRES;
+export const GAP_METRES = DISH_GAP_FIELD_METRES;
+// The film a full press leaves, as a share of the rest gap (PLAN 38l): lib/sheet.ts owns it, since the rhythm sheet takes the same suction cell by cell.
+export { STEFAN_FILM } from '../../lib/sheet';
 /*
   Real molecular diffusion of food dye in water (PLAN 18h).
   Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an
@@ -514,7 +542,7 @@ export const LIFT_MOST = 256;
 export const LIFT_SWEEPS = 8;
 export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
-export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * (REST_GAP * PLATE_METRES) ** 2 / (12 * NU_REF);
+export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*
   A drop of ink slumping under its own weight on a level plate (PLAN 18m,
   wgsl/slump.ts has the physics).
@@ -567,7 +595,7 @@ export function thinGapViscosity(thickness: number): number {
 }
 /** The drag time ρh²/12μ, in seconds, at the plate's rest gap, for a Thickness. */
 export function thinGapDragSeconds(thickness: number, gap = REST_GAP): number {
-  const h = gap * PLATE_METRES;
+  const h = gap * GAP_METRES;
   return (h * h) / (12 * thinGapViscosity(thickness));
 }
 /*

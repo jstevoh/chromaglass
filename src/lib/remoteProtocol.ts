@@ -64,7 +64,14 @@ export type RemoteAction =
   | 'performance-toggle'
   /** A Mixer row's take button (lib/mixFade.ts): out over its fade time, or back in. */
   | 'mix-fade-led' | 'mix-fade-gel' | 'mix-fade-lumia' | 'mix-fade-front'
-  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark';
+  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark'
+  /**
+   * End the Mac app's live stream (PLAN 37x-4d). Stop only: going live is the
+   * one press that cannot be taken back, so it is made at the desk, where the
+   * panel names every destination before it goes; a phone in a pocket can
+   * end a stream, never start one.
+   */
+  | 'live-stop';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
@@ -111,6 +118,12 @@ export interface RemoteState {
    * level alone, a fade half-way out read "Fade out", and a press turned it back in.
    */
   rowFading?: Partial<Record<'led' | 'gel' | 'lumia' | 'front' | 'back' | 'film' | 'mark', 'in' | 'out'>>;
+  /**
+   * The Mac app's live stream while it is on air (PLAN 37x-4d), so the phone
+   * can say so and stop it: a test or the real thing, for how long, to
+   * where, and whether a destination is dropping frames or retrying.
+   */
+  live?: { test: boolean; seconds: number; names: string[]; trouble: boolean } | null;
 }
 
 export type RemoteMessage =
@@ -129,6 +142,15 @@ export type RemoteMessage =
   | { type: 'mirrors'; count: number }
   /** Relay → display: how many phones (controllers) are connected. */
   | { type: 'controllers'; count: number }
+  /**
+   * Relay → display: Ableton Link (PLAN.md 13.5-link), sent on connect and,
+   * while it is on, twenty times a second. `beat` is the session's beat at the
+   * moment of sending, so its fraction is the beat's phase and its value modulo
+   * four is the bar's (beat zero is every peer's bar line); null while no session is joined.
+   */
+  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean }
+  /** Display → relay: switch Link on or off. The relay takes it from the laptop's own page only. */
+  | { type: 'link-enable'; on: boolean }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**

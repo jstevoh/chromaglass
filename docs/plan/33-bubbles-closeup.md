@@ -140,6 +140,21 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   `macroMode`, so a look cannot ask for smaller closeup beads); 33g-2 proper (refraction of
   the ground, depth of field, parallax) is still the next optics step, and `lampjudge.mjs`
   still quotes Cell Bloom's old description for its judge.
+- **33g-2b. Round rims and clear windows on the closeup's beads: built, reverted, open.**
+  Shipped as #611 (rim wobble at 5x on SwiftShader 1.2 px to 0.3-0.6 px, a pancake bead's
+  clear window, `droplens` 32/32, green on GitHub's Macs) and reverted the same night
+  because the owner's Mac (a real Apple GPU, `owner-mac`, which only a deploy reaches)
+  failed `droplens` on it: the old line "dark round it from where the aperture says" read
+  0.687 of the radius against 0.709 before and an allowed 0.72 +- 0.03, and the seven new
+  roundness lines read 3.4 to 3.7 px (0.45 to 0.50 of a mask texel) at every size, 3 px
+  more radius than SwiftShader, the same on two runs. So something the fit leans on
+  (the clean read three texels in, the cone's slope from taps one texel either side,
+  the edge coverage from `dpdx` of the surface uv) is not the same on Metal hardware as on
+  the software rasteriser, and a pull request's run cannot see it. Next: put the fit back
+  with the roundness lines printing what they read (the fit's accepted share, the mean
+  `dropPx`, a row of raw mask taps) in a run that reaches `owner-mac` before it merges.
+  The dimple half (`power`, the bend held to the rim) was not isolated and comes back
+  with it. Shortcuts and numbers of the first build are in the pull request #611.
 - **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
   shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
   old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
@@ -161,7 +176,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
 - **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
   sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
-  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §95); if it
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §105); if it
   costs frames, gather at half resolution for the wide discs. The gather weights also lack
   the disc-area share (about 64 over the radius squared of the physical strength); a naive
   area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
@@ -176,7 +191,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
   no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
   the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
-  closeup misses it first (`docs/judging.md` §95).
+  closeup misses it first (`docs/judging.md` §105).
 - **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
   Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`), the aperture's by Focus
   too (`apertureScale`) and the bloom's by Lens again (`bloomScale`: the old pass sent the glow
@@ -210,7 +225,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   fifth of its range below where the look set it, floored at the dial's minimum, so one set
   under 0.2 can be walked to exactly 0 by a calm passage at full Evolve Speed: with Lens at 0
   and nothing else up the pass is torn down and built again on the way back (33i-8). Ask the
-  owner (`docs/judging.md` §95) whether the camera belongs in the glass theme; if it stays, floor
+  owner (`docs/judging.md` §105) whether the camera belongs in the glass theme; if it stays, floor
   an optic's window above 0 as the look's own zero rule does, and `npm run lens` already prints
   which optics Evolve may wander.
 - **33i-10. A set item's controls and a sequence stage's settings skip the migration.**

@@ -6,7 +6,7 @@ import {
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
-import { installLiveConsole } from '../lib/liveStream';
+import { installLiveConsole } from '../lib/liveShow';
 import { canUseProFeature } from '../lib/tierGates';
 
 export interface AudioData {
@@ -161,7 +161,7 @@ export function useAudioAnalyzer(
     The live stream's console in the Mac app (PLAN.md 37x-4b; the panel is
     37x-4d): `window.__cgLive.start({ url, keyName })` streams the plate's
     canvas and this stream, the one the show hears, whichever source it is
-    (lib/liveStream.ts). Installed from here because this hook is where the
+    (lib/liveStream.ts; the panel and the console share lib/liveShow.ts). Installed from here because this hook is where the
     show's sound and the plate meet; App.tsx is at its size ceiling. Pro
     only, asked at each start; absent on the website, where there is no RTMPS
     client to hand the packets to (`installLiveConsole` does nothing there).

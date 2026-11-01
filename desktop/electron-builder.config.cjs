@@ -50,7 +50,7 @@ module.exports = {
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
-    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js'] },
+    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'abletonLink.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js'] },
   ],
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --
@@ -67,7 +67,9 @@ module.exports = {
   mac: {
     target: [{ target: 'dmg', arch: ['arm64'] }, { target: 'zip', arch: ['arm64'] }],
     category: 'public.app-category.entertainment',
-    icon: '../public/icon-512.png',
+    // macOS's own icon, drawn on its grid by `npm run brand` (PLAN 13-icon); it
+    // was the website's flat 512 tile, edge to edge in the Dock.
+    icon: 'resources/icon.icns',
     identity: signed ? undefined : '-',
     hardenedRuntime: signed,
     gatekeeperAssess: false,

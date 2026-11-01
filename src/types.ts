@@ -52,6 +52,12 @@ export interface LiquidBehaviour {
   /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
   acid?: number;
   /**
+   * The BZ reaction's activator (bromous acid), into its gel: where it lands
+   * the gel fires and a wave runs out from there, as a real dish of it does
+   * where a silver wire touches it (PLAN 25i). Nothing without BZ Reaction on.
+   */
+  bz?: number;
+  /**
    * Ferrofluid: how much of each drop goes into the dark liquid a magnet
    * pulls (the solver's second phase). That liquid never mixes with the dye;
    * the magnet, and the maze field, move it.
@@ -686,7 +692,7 @@ export interface VisualizerSettings {
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
-  bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
+  bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
@@ -824,11 +830,11 @@ export interface VisualizerSettings {
    * and it becomes fine and busy. The other half of playing one.
    */
   kaleidoZoom: number;
-  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, a thin bright ring at it
-  lightPlay: number;          // how much the lamp's direction shows: bubbles shaded as lenses with a caustic arc, dye rims lit on the lamp side and shadowed away from it
+  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, its glass wall a thin dark line
+  lightPlay: number;          // the closeup photographer's softbox above the glass, seen only by Fresnel reflection in a bubble's curved wall (PLAN 38h-7)
   lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
   lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
-  secondLamp: number;         // a second, cooler lamp from the other side of the plate, so two lights play across every bubble and edge
+  secondLamp: number;         // a second, cooler bulb beside the first, adding to one side of the hot spot (lampField)
   iridescence: number;        // thin-film colour running round bubble rims
 
   // Photograph — the macro shot of oil on water rather than the projected show
@@ -844,7 +850,7 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
-  glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
+  glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
   // Macro Closeup — magnified camera that chases a single bead of liquid
@@ -869,7 +875,7 @@ export interface VisualizerSettings {
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
-  macroRelief: number;        // surface relief — per-pixel normals, wet highlights, occlusion
+  macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
   // Every one of these defaults to nothing happening: a look saved before the

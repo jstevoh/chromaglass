@@ -2,6 +2,8 @@
 
 This section is in 3 files, cut between items: `18-physics.md`, `18-physics-2.md`, `18-physics-3.md`.
 
+A second pass, on 2026-10-30, read the code again after 18a–18m had shipped and ranked what still imitates in §38 (`38-realism-audit.md`); it lists only what is not open here, and names the item here that each finding sharpens.
+
 Asked 2026-09-28. The owner's standing rule is to build from the chemistry and physics
 of the liquids, not from a picture of their result, and to name any shortcut kept for
 speed. This section is the audit that rule asked for: every place found in the solver
@@ -59,7 +61,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
 | 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil); 18g-2..5, 18g-7, 18g-8 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
-| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Partly shipped** (#358); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; physical pop mode open |
+| 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Shipped** (#358, then 38b with #603); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; no timers left, the rim drains |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
 | 18k | Smaller ones | Small | Free to small | See each |
 | 18l | A dye has more than one colour | Large: every pool a ramp from pale tint to deep core, mixtures that walk between their dyes, five dyes on the plate | Free | **Shipped** (#281); real dye spectra (18l-1) after |
@@ -276,6 +278,18 @@ its frame rate live. "Free" means no new passes or texture reads.
       shipped** (2026-10-29; found by the first deploy run on the owner's Mac, `npm run
       startup`). `gpu/opening.ts` has a `slosh` flag read by `WebGPUSlosh.prepare` and
       `addSlosh`. Story in `docs/plan-shipped.md` §18a-13i.
+    - **18a-13j. A hand can tip the dish: shipped** (2026-10-31; the owner: "I never saw
+      the control to do that"). The Tip pad (`components/ui/TipPad.tsx`, `lib/tipPad.ts`)
+      in the Tools panel's empty keycaps, at the top of Tilt & Rock and in the phone's
+      Motion sheet: drag the dot to an edge, let go and the dish lies back. `npm run
+      tippad`. Story in `docs/plan-shipped.md` §18a-13j.
+    - **18a-13k. The remote's tilt may pour uphill.** `RemoteControl.tsx` sends
+      `y = (beta − 40)/30`, so the top edge raised reads as +y, and +y in the plate is the
+      top of the screen (`downhill`, Tilt Direction 0): the liquid would run toward the edge
+      that went up. The in-app Tilt (`tiltReading`) has it the right way, and `npm run
+      tippad` ties the pad to that one. Not yet seen on a phone; check by hand with the
+      remote on a tipped plate before changing the sign, and fold it into 18a-13e's turn
+      into the dish's frame.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

@@ -4,6 +4,7 @@ import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { SwitchPill, Toggle, LIT } from '../ui';
 import { TapPad } from '../ui/Playful';
+import { linkLine, tempoSourceName } from '../../lib/tempo';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 
@@ -22,7 +23,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
   const {
     settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, audioSource,
     onAudioSource, audioInputs, audioInputId, onAudioInput, tempo, onTap, readTempo, onTempoClear,
-    onTempoBpm, midiClocked, timecode, focusSection, midi, onOpenSound, keep, shown, goTo, listens,
+    onTempoBpm, onLink, midiClocked, timecode, focusSection, midi, onOpenSound, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
   return (
@@ -77,8 +78,8 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
         <Slider
           label="Bass Boost"
           value={settings.bassBoost}
-          min={1.0}
-          max={3.0}
+          min={0.25}
+          max={5}
           step={0.1}
           onChange={(v: number) => onUpdate({ bassBoost: v })}
           settingKey="bassBoost"
@@ -181,7 +182,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               <span className="text-[13px] font-medium text-text">Tempo</span>
               <span className="font-mono text-[12px] opacity-50" data-testid="tempo-readout">
                 {tempo?.source
-                  ? `${tempo.bpm} bpm \u00b7 ${tempo.source === 'clock' ? 'midi clock' : tempo.source === 'tap' ? 'tapped' : 'set'}`
+                  ? `${tempo.bpm} bpm \u00b7 ${tempoSourceName(tempo.source)}`
                   : 'listening'}
               </span>
             </div>
@@ -219,11 +220,31 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               />
               <span className="text-[12px] opacity-30">off the setlist</span>
             </div>
+            {/*
+              Ableton Link (PLAN.md 13.5-link): only where a show server is
+              there to join it (the Mac app, or `npm run show`), since a page
+              cannot. Off until switched on, and remembered once it is.
+            */}
+            {tempo?.link?.available && onLink && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => onLink(!tempo.link?.on)}
+                  aria-pressed={tempo.link.on}
+                  data-testid="tempo-link"
+                  title="Follow the tempo and the bar of Live, Bitwig, Traktor or any app on this network that speaks Ableton Link"
+                  className={`min-h-9 flex-none rounded-lg border px-3 text-[13px] font-medium transition-all ${tempo.link.on ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                >
+                  Link
+                </button>
+                <span className="text-[12px] opacity-50" data-testid="tempo-link-says">{linkLine(tempo.link)}</span>
+              </div>
+            )}
             <Info>
               The beat clock works the tempo out from what it hears, which is the right answer on a clean feed from the desk and a hard one in a loud room. Three ways to tell it instead.
               {' '}<span className="text-white/70">MIDI clock</span> needs nothing set up: if the desk is sending it down the cable the faders are already on, the show locks to it{midiClocked ? ' \u2014 and it is arriving now' : ''}.
               {' '}<span className="text-white/70">Tap</span> sets the tempo *and* the bar, so tap on the downbeats and the plate is pressed on the downbeats; one tap on its own re-phases a tempo that is already running, which is how to get back on the bar after a fill.
               {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
+              {tempo?.link?.available && <>{' '}<span className="text-white/70">Link</span> follows the tempo and the bar of Live, Bitwig, Traktor or an iPad's AUM on the same network, with no cable, and wins over the others while a session is playing; Listen switches it off.</>}
               {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
             </Info>
             {/*

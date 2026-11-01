@@ -83,7 +83,7 @@
  */
 
 import { HAND_GRIP } from '../../lib/handSolid';
-import { DISH_METRES, OPEN_RIM } from '../../lib/turntable';
+import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
 
 /**
@@ -472,9 +472,11 @@ fn at(q: vec2i, m: i32) -> vec2f {
       radius), A.b = (the ferrofluid's viscosity over the clear liquid's,
       the reference liquid's viscosity over this one's, the glass's own
       velocity halved).
-      k = A.a.x / h², with h in plate widths: A.a.x is 12ν/W², the
-      liquid's kinematic viscosity over the plate's width squared, so the
-      drag is in real seconds whatever grid or look clock the plate runs at.
+      k = A.a.x / h², with h in gap units: A.a.x is 12ν/G², the liquid's
+      kinematic viscosity over G², G the metres in a unit of the gap field
+      (lib/turntable.ts DISH_GAP_FIELD_METRES, PLAN 38r: a fifth of a
+      metre at the 6 mm rest gap, the plate's width, as it was written), so the drag is in real seconds whatever
+      grid or look clock the plate runs at.
 
       Three snapshots of the velocity: \`prev\` before any of this step's
       forces, \`mid\` after the body forces, \`vel\` after the rest. Each
@@ -557,8 +559,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     And a poured liquid's own (PLAN 18d, src/lib/liquidProps.ts): the
     species field carries, for the share r of the column that is glycerine,
     syrup, milk or alcohol, Σ share·ln(ν/ν_water) in g. The rest of the
-    column is the clear liquid, whose ν is in A.a.x (12ν/W², W the plate's
-    width), so the column's viscosity against the clear liquid's is
+    column is the clear liquid, whose ν is in A.a.x (12ν/G², G the gap
+    field's metres), so the column's viscosity against the clear liquid's is
     exp(g − r·ln(ν_clear/ν_water)), the same geometric mixing by share as
     the ferrofluid's above. Glycerine in the default clear liquid is fifty
     times its drag, so where it lies the flow has to go round it (the
@@ -569,7 +571,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let sp = textureLoad(species, min(q, vec2i(textureDimensions(species)) - 1), 0);
   let filmDims = vec2i(textureDimensions(film));
   let fm = clamp(textureLoad(film, min(q * filmDims / n, filmDims - 1), 0).r, 0.0, 1.0);
-  let lnClear = log(max(A.a.x * ${(DISH_METRES * DISH_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
+  let lnClear = log(max(A.a.x * ${(DISH_GAP_FIELD_METRES * DISH_GAP_FIELD_METRES / 12 / WATER_NU).toFixed(4)}, 1e-6));
   let poured = exp(clamp(sp.g - clamp(sp.r, 0.0, 1.0) * lnClear, -9.0, 9.0));
   // Clear light mineral oil (Drakeol / baby oil / light paraffin, ~50 cSt at 20°C, 50x water):
   // Two layers stacked across a pressure-driven Poiseuille gap (oil thickness fm against one
@@ -677,8 +679,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       The bubbles are the old kernel's two terms, word for word, each already
       averaging to zero; making them physical is §18i.
 
-      A.a = (air push, 1/dt, air cover, h0),
-      A.b = (air rate mean, 1/disp, 1 to take the gap as it is without a rate).
+      A.a = (air push, unused, air cover, h0),
+      A.b = (the air's mean per displacement, 1/disp, 1 to take the gap as it is without a rate).
     */
     pourVolume: `${HEAD}${COMMON}
 @group(0) @binding(2) var<storage, read_write> poured: array<f32>;
@@ -714,9 +716,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                  + flux(p + vec2i(0, 1), n).y - flux(p - vec2i(0, 1), n).y);
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
-  let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
-  // No standing air term: a still bubble pushes nothing (see divergence in wgsl/fluid.ts).
   let g = textureLoad(sq, p, 0).r;
+  /*
+    The air arriving since the last step, as the liquid it displaces: the
+    share of the cell it now fills, times the cell's depth in rest gaps, per
+    unit of the step's displacement (A.b.y), in the units of the press's dh
+    and the pour below. Less the plate's mean (A.b.x, the same in the same
+    units), so the cover glass takes up what the bubbles add, as it did.
+
+    It was the share per second of the plate's clock, clamped to ±40 (PLAN
+    15g-8b). On Classic's step (dt 0.0018 s, displacement 0.00065) a bubble
+    arriving whole asked for 541 a second and got 40, and the right source
+    is 1546: the flow carried 2.6% of the liquid the bubble stood on, a
+    growing one 14%, and airExclude deleted the rest and the CPU painted a
+    copy of it back round the rim from the readback mirror, which on a slow
+    machine was frames out of date. No standing air term: a still bubble
+    pushes nothing (see divergence in wgsl/fluid.ts).
+  */
+  let rate = (now - was) * hsGap(g, A.a.w) * A.b.y - A.b.x;
   let k = p.x + p.y * n;
   let dh = select((g - gapBefore[k]) / A.a.w * A.b.y, 0.0, A.b.z > 0.5);
   gapBefore[k] = g;

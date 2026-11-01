@@ -219,7 +219,10 @@ export class FluidInputs extends FluidPasses {
       this.videoVel = pp(RGBA32, 'video flow');
     }
     try {
-      d.queue.copyExternalImageToTexture({ source: src }, { texture: this.videoSrc }, [w, h]);
+      // Turned over in the copy: a frame's rows count down and the grid's up the plate, and the
+      // passes lay the texture's first row on the grid's first, so without it a poured video landed
+      // upside down (PLAN 14ab-13). The loop turns its rows where it reads them (`pourVideoFrameCpu`).
+      d.queue.copyExternalImageToTexture({ source: src, flipY: true }, { texture: this.videoSrc }, [w, h]);
     } catch (e) {
       // A video from another origin without CORS can be played and not read, here or by a canvas.
       if (!this.videoRefused) console.warn('[video pour] the frame could not be read', e);
@@ -563,7 +566,15 @@ export class FluidInputs extends FluidPasses {
    * Pour into the mix: oil, surfactant and acidity (+ acid, − base), each an
    * amount in `what`, as a soft disc at (x, y) in plate units.
    */
-  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void {
+  addLiquidDrop(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number; bz?: number }, amount: number, seconds?: number): void {
+    /*
+      The BZ gel's activator (PLAN 25i, bottles.ts): the gel fires where it
+      lands and a ring runs out from there, the reaction's own colour; it
+      lays none. A whole disc with no wake behind it, so a target wave, not a
+      spiral (those start from a broken wave: the visualizer's seed). Without
+      BZ Reaction the gel is neither stepped nor drawn, so it shows nothing.
+    */
+    if ((what.bz ?? 0) > 0) this.addRxn(x, y, radius, { bz: (what.bz ?? 0) * Math.min(1, amount) });
     const take = Math.min(1, Math.max(0, amount)) * 0.6;
     const soap = (what.soap ?? 0) * amount;
     const body = (what.body ?? 0) * amount;

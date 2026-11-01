@@ -19,6 +19,8 @@ import { SquishSection, OilSection, FerroSection, ReactionsSection } from './set
 import { InteractionSection, LiquidsSection } from './settings/PourSections';
 import { ProjectorsSection, MappingSection, MarkSection, SimulationSection, LayersSection } from './settings/StageSections';
 import { PinContext } from './settings/controls';
+import { FeedbackPane } from './settings/FeedbackPane';
+import { FEEDBACK_PANE } from '../lib/feedback';
 import type { SectionCtx, SettingsPanelProps } from './settings/props';
 
 /*
@@ -43,7 +45,7 @@ const SECTION_CARD = 'mb-5 scroll-mt-4 rounded-2xl border bg-white/[0.02] px-6 p
 const SECTION_GRID = 'md:grid md:grid-cols-2 md:gap-x-7 [&>*]:md:col-span-2 [&>[data-slider]]:md:col-span-1';
 const SECTION_TITLE = 'mb-5 flex items-center gap-2.5 text-[16px] font-semibold tracking-tight text-text [&>svg]:h-7 [&>svg]:w-7 [&>svg]:shrink-0 [&>svg]:rounded-lg [&>svg]:bg-accent-bg [&>svg]:p-1.5 [&>svg]:text-accent-text';
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo, cartoons,
+export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, engineStatus, getLiveEngineStatus, sceneOn = false, onSceneToggle, sceneState = null, cameras = [], sceneDeviceId = '', onSceneDevice, scenePreviewRef, filmSource = 'none', filmName = null, pourName = null, onFilmFile, onPourVideo, onStopPourVideo, onFilmCamera, filmCameraId = '', onFilmCameraDevice, filmCamera = null, filmCameraLost = false, onFilmWindow, onFilmClear, markLoaded = false, mixTakes, backLook, lookId = null, onMarkFile, onMarkClear, audioSource = 'none', onAudioSource, onAudioFile, audioInputs = [], audioInputId = '', onAudioInput, blackout = false, onBlackout, projectorMode = 'ask', onProjectorMode, projectorName = null, output, onOutput, onOutputReset, wakeLock, wallTest, onWallTest, tempo, onTap, readTempo, readEar, spinBpm = 0, onTempoClear, onTempoBpm, onLink, midiClocked = false, timecode = null, focusSection = null, liquids, pins, midi, onOpenMidi, onOpenSound, onClose, onFlickPlate, embed = null, scope = 'all', onGoTo, cartoons,
 }) => {
   const filmInputRef = useRef<HTMLInputElement>(null);
   /*
@@ -231,7 +233,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
     onFilmClear, markLoaded, mixTakes, backLook, onMarkFile, onMarkClear, audioSource,
     onAudioSource, audioInputs, audioInputId, onAudioInput, blackout, onBlackout, projectorMode,
     onProjectorMode, projectorName, output, onOutput, onOutputReset, wakeLock, wallTest,
-    onWallTest, tempo, onTap, readTempo, readEar, spinBpm, onTempoClear, onTempoBpm,
+    onWallTest, tempo, onTap, readTempo, readEar, spinBpm, onTempoClear, onTempoBpm, onLink,
     midiClocked, timecode, focusSection, liquids, pins, midi, onOpenMidi, onOpenSound,
     onFlickPlate, embed, cartoons, filmInputRef, markInputRef, lookAreas, areaColours,
     canCaptureWindow, live, showFrameSplit, blendModes, keep, shown, detectedFactory, goTo,
@@ -346,6 +348,30 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
               </div>
             </div>
           ))}
+          {/*
+            Feedback, under the seven groups and apart from them: it is not a
+            setting, so it is not a row of `SETTINGS_SECTIONS` (no desk panel,
+            no pin, no search hit), and its test id is not `settings-nav-…`,
+            which the checks count as sections with markup. Not in the Stage
+            sheet, which is the room and the machine, and not while a search
+            has turned the rail into a result list.
+          */}
+          {scope !== 'stage' && !q && (
+            <div className="shrink-0 sm:mt-auto sm:border-t sm:border-white/[0.06] sm:pt-2" data-testid="rail-feedback">
+              <button
+                onClick={() => setSection(FEEDBACK_PANE)}
+                aria-current={section === FEEDBACK_PANE ? 'page' : undefined}
+                className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-[7px] text-left text-[13px] transition-colors sm:w-full ${
+                  section === FEEDBACK_PANE
+                    ? 'bg-accent-bg font-medium text-white shadow-[inset_2px_0_0_var(--color-accent)]'
+                    : 'text-white/60 hover:bg-white/[0.05] hover:text-white'
+                }`}
+                data-testid="settings-feedback-nav"
+              >
+                Feedback
+              </button>
+            </div>
+          )}
         </nav>
 
         {/* ── What is in it ─────────────────────────────────── */}
@@ -390,6 +416,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       )}
 
       {sections}
+      {!q && section === FEEDBACK_PANE && <FeedbackPane card={SECTION_CARD} title={SECTION_TITLE} />}
       {isTierGatingEnforced() && getEffectiveTier() !== 'pro' && (
         <section
           data-cg-app-tiles=""

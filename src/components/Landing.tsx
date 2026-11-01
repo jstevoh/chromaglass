@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
+import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /**
  * The page a first visit meets before the sign-in (PLAN.md 34a).
@@ -72,8 +73,9 @@ const STEPS: { n: string; title: string; body: string }[] = [
   { n: '4', title: 'Put it on the wall', body: 'Send the plate to a TV or projector. In the app, your phone becomes the remote.' },
 ];
 
-const TIERS: { name: string; price: string; lines: string[] }[] = [
+const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: string }[] = [
   {
+    id: 'free',
     name: 'Free',
     price: 'In your browser',
     lines: [
@@ -84,8 +86,10 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     ],
   },
   {
+    id: 'home',
     name: 'Home',
     price: '$35',
+    buy: CHECKOUT_HOME_URL,
     lines: [
       'Full-length recording, 1080p and 4K render, no mark',
       'Phone remote',
@@ -95,12 +99,15 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     ],
   },
   {
+    id: 'pro',
     name: 'Pro',
     price: '$199',
+    buy: CHECKOUT_PRO_URL,
     lines: [
       'Everything in Home',
       'OSC and Art-Net / DMX in the Mac app',
       'The finest 1024² grid, and cloud sync of your looks',
+      'Make your own liquids',
     ],
   },
 ];
@@ -254,11 +261,11 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           The whole plate is free in your browser, and it stays free: this is not a trial. Home and Pro add the Mac app and what a show needs:
           full-length recordings with no mark, the phone remote, OSC and Art-Net for a rig. Pay once, no subscription. Start with Home and move to
-          Pro later for the $164 difference. Buying opens soon.
+          Pro later for the $164 difference. The store opens in a new tab: buy with the email you will sign in with, so the app finds your licence.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (
-            <div key={t.name} className="rounded-xl border border-border bg-surface p-5">
+            <div key={t.name} className="flex flex-col rounded-xl border border-border bg-surface p-5">
               <div className="flex items-baseline justify-between">
                 <h3 className="text-[16px] font-medium">{t.name}</h3>
                 <span className="font-mono text-[13px] text-text-2">{t.price}</span>
@@ -266,6 +273,21 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
               <ul className="mt-4 space-y-2 text-[14px] leading-snug text-muted">
                 {t.lines.map((x) => <li key={x}>{x}</li>)}
               </ul>
+              <div className="mt-auto pt-6">
+                {t.buy ? (
+                  <a
+                    href={t.buy}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-cg-landing-buy={t.id}
+                    className={`${btnPrimary} w-full`}
+                  >
+                    Buy {t.name}, {t.price}
+                  </a>
+                ) : (
+                  <button type="button" data-cg-landing-tier-play="" onClick={onPlay} className={`${btnGhost} w-full`}>Play free</button>
+                )}
+              </div>
             </div>
           ))}
         </div>

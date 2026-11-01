@@ -96,8 +96,8 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           label="Grain Fineness"
           disabled={(settings.granulation ?? 0) <= 0.002 && 'needs Granulation above 0'}
           value={settings.grainScale ?? 320}
-          min={60}
-          max={900}
+          min={20}
+          max={1200}
           step={20}
           onChange={(v: number) => onUpdate({ grainScale: v })}
           settingKey="grainScale"
@@ -170,7 +170,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.layerScaleVariety ?? 0.5}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ layerScaleVariety: v })}
           settingKey="layerScaleVariety"
@@ -187,8 +187,8 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
         <Slider
           label="Saturation"
           value={settings.saturationBoost}
-          min={0.5}
-          max={2.0}
+          min={0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ saturationBoost: v })}
           settingKey="saturationBoost"
@@ -255,7 +255,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Hue Journey (min/step)"
           value={settings.hueJourney ?? 0}
           min={0}
-          max={10}
+          max={30}
           step={0.5}
           onChange={(v: number) => onUpdate({ hueJourney: v })}
           settingKey="hueJourney"
@@ -264,7 +264,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Kick Bloom"
           value={settings.kickBloom ?? 1}
           min={0}
-          max={1.5}
+          max={4}
           step={0.05}
           onChange={(v: number) => onUpdate({ kickBloom: v })}
           settingKey="kickBloom"
@@ -273,7 +273,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Melody Walk"
           value={settings.melodyWalk ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ melodyWalk: v })}
           settingKey="melodyWalk"
@@ -350,7 +350,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.backgroundLoop ?? 0}
           min={0}
-          max={1.0}
+          max={1.4}
           step={0.05}
           onChange={(v: number) => onUpdate({ backgroundLoop: v })}
           settingKey="backgroundLoop"
@@ -527,7 +527,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Grain"
           value={settings.stockGrain ?? 0}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ stockGrain: v })}
           settingKey="stockGrain"
@@ -536,7 +536,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Grain Size"
           value={settings.stockGrainSize ?? 2}
           min={1}
-          max={6}
+          max={16}
           step={0.5}
           onChange={(v: number) => onUpdate({ stockGrainSize: v })}
           settingKey="stockGrainSize"
@@ -545,7 +545,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Gate Weave"
           value={settings.stockWeave ?? 0}
           min={0}
-          max={3}
+          max={12}
           step={0.1}
           onChange={(v: number) => onUpdate({ stockWeave: v })}
           settingKey="stockWeave"
@@ -669,7 +669,7 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.gelWheel ?? 0) <= 0.001 && 'needs Gel Wheel above 0'}
           value={settings.gelSpeed ?? 0.5}
           min={0}
-          max={3}
+          max={30}
           step={0.1}
           onChange={(v: number) => onUpdate({ gelSpeed: v })}
           settingKey="gelSpeed"
@@ -813,7 +813,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Chase Speed"
               value={settings.macroChase}
               min={0}
-              max={1}
+              max={3}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroChase: v })}
           settingKey="macroChase"
@@ -823,7 +823,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Shot Length"
               value={settings.macroHold}
               min={1}
-              max={15}
+              max={60}
               step={0.5}
               onChange={(v: number) => onUpdate({ macroHold: v })}
           settingKey="macroHold"
@@ -842,7 +842,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Paint Cells"
               value={settings.macroCells}
               min={0}
-              max={1}
+              max={2}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroCells: v })}
           settingKey="macroCells"
@@ -851,7 +851,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Cell Size"
               value={settings.macroCellScale}
               min={0.15}
-              max={1.5}
+              max={3}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroCellScale: v })}
           settingKey="macroCellScale"
@@ -878,7 +878,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               label="Edge Detail"
               value={settings.macroEdgeDetail}
               min={0}
-              max={1}
+              max={2.5}
               step={0.05}
               onChange={(v: number) => onUpdate({ macroEdgeDetail: v })}
           settingKey="macroEdgeDetail"

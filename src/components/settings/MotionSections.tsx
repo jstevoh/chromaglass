@@ -4,6 +4,7 @@ import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { LIT } from '../ui';
 import { StrobeRing } from '../ui/Playful';
+import { TipPad } from '../ui/TipPad';
 import { SPIN_AUTO_NAMES } from '../../lib/turntable';
 import { Slider, PinChips } from './controls';
 import { AUDIO_FEATURES } from './patchLists';
@@ -103,6 +104,11 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           <Waves size={12} /> Tilt & Rock
         </h3>
         {/* The dish tipped: held by a hand (Gravity, Tilt Direction), sloshed by the music (Slosh) and rocked on the beat (Plate Rock). PLAN 35c. */}
+        {/* And the hand itself, which moves the two faders under it and puts them back on letting go (PLAN 18a-13j). */}
+        <div className="col-span-full flex items-center gap-3">
+          <TipPad settings={settings} onSetting={onUpdate} size={84} testId="tilt-tip-pad" />
+          <p className="min-w-0 text-[12px] leading-snug text-muted">Drag the dot toward an edge: that edge goes down and the liquid runs to it. Let go and the dish lies back, and the liquid sloshes past the middle. A first grab turns Slosh up to half if it was off.</p>
+        </div>
         <Slider
           label="Gravity"
           value={settings.plateUpright ?? 0}
@@ -134,7 +140,7 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
           label="Plate Rock"
           value={settings.plateRock ?? 0.45}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ plateRock: v })}
           settingKey="plateRock"
@@ -167,7 +173,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           label="Rotation Speed"
           value={settings.rotationSpeed}
           min={0}
-          max={1.0}
+          max={1.3}
           step={0.05}
           onChange={(v: number) => onUpdate({ rotationSpeed: v })}
           settingKey="rotationSpeed"
@@ -339,7 +345,7 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           label="Flick Strength"
           value={settings.spinImpulse ?? 0.5}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ spinImpulse: v })}
           settingKey="spinImpulse"
@@ -432,7 +438,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Evaporation Rate"
           value={settings.evaporationRate}
           min={0}
-          max={0.08}
+          max={0.5}
           step={0.0005}
           onChange={(v: number) => onUpdate({ evaporationRate: v })}
           settingKey="evaporationRate"
@@ -450,7 +456,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Swirl"
           value={settings.vorticityConfinement ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
           settingKey="vorticityConfinement"
@@ -459,7 +465,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Dye Weight"
           value={settings.solutalBuoyancy ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
           settingKey="solutalBuoyancy"
@@ -468,7 +474,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Heat Spread"
           value={settings.doubleDiffusion ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
           settingKey="doubleDiffusion"
@@ -494,7 +500,7 @@ export const AutomationSection = ({ c }: { c: SectionCtx }) => {
           label="Evolve Speed"
           value={settings.automateRate}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ automateRate: v })}
           settingKey="automateRate"

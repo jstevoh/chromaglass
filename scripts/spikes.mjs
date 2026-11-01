@@ -188,7 +188,7 @@ try {
     };
     const drawn = await lab.render(S, L, {});
     /*
-      Which domes the plate lights: those with a pixel past 200 (of 255)
+      Which domes the plate lights: those with a pixel past 182 (of 255)
       over the ferrofluid within 0.006 of their top, about two pixels on
       this picture and a third of a dome's width. The plate draws a dome's
       light from the ferrofluid's own height (plate.ts, the film's domes: a
@@ -204,6 +204,18 @@ try {
       top, it read 16 of 28 domes lit against 13.8 half a pitch off (the
       check-skeptic's control, run): with 103 such points over the pool,
       the edges' glints and meniscus lit the places off the tops as often.
+
+      Past 182, not 200, since PLAN 38a (2026-10-31). The bar was set on a
+      plate whose painted hot-spot multiplied the finished picture by 1.096
+      at the hand's magnet (0.36, 0.65) under Magnet Garden's Hot-Spot 0.4
+      and Second Lamp 0.3: the old formula, mix(1, tint·mix(0.78, 1.25,
+      exp(−3.5 d²)), 0.4) times the second lamp's, gives 1.098, 1.094 and
+      1.097 there. The lamp lever leaves that place at the lamp's own light
+      (lampField 1.000 there), so the same glints read 1/1.096 as bright:
+      measured on SwiftShader they were 191 to 249 on the lit domes, and on
+      the GitHub Mac 10 of 25 cleared 200 where 18 of 26 clear 182 here, the
+      count the lifted plate gave. 200 / 1.096 is 182: the same glint, the
+      same bar, without the paint under it.
     */
     const litAt = (px, u, v, r = 0.006) => {
       let best = 0;
@@ -216,7 +228,7 @@ try {
       }
       return best;
     };
-    const onTops = (a, dx = 0, dy = 0) => a.tops.filter(([u, v]) => litAt(drawn, u + dx, v + dy) > 200).length;
+    const onTops = (a, dx = 0, dy = 0) => a.tops.filter(([u, v]) => litAt(drawn, u + dx, v + dy) > 182).length;
     const offTops = (a) => [[0.02, 0], [-0.02, 0], [0, 0.02], [0, -0.02]].reduce((t, [dx, dy]) => t + onTops(a, dx, dy), 0) / 4;
     return {
       mass, mass0, peak,
