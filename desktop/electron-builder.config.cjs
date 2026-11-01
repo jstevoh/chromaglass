@@ -67,7 +67,9 @@ module.exports = {
   mac: {
     target: [{ target: 'dmg', arch: ['arm64'] }, { target: 'zip', arch: ['arm64'] }],
     category: 'public.app-category.entertainment',
-    icon: '../public/icon-512.png',
+    // macOS's own icon, drawn on its grid by `npm run brand` (PLAN 13-icon); it
+    // was the website's flat 512 tile, edge to edge in the Dock.
+    icon: 'resources/icon.icns',
     identity: signed ? undefined : '-',
     hardenedRuntime: signed,
     gatekeeperAssess: false,

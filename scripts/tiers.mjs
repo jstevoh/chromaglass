@@ -13,6 +13,8 @@
  *           mark upload unlocked with Home / Pro keys
  *   - 34a-7a: OSC in, Art-Net out and Art-Net in reach the show on a Pro key
  *           only, refused on a Home key and with none (4b, 4c)
+ *   - 23.19: making, changing and loading your own liquids is Pro; a liquid a
+ *           free tier already has (made before the gate) stays on the shelf (13)
  */
 
 import { chromium } from 'playwright';
@@ -479,6 +481,15 @@ try {
     await ctx.addInitScript((jwk) => {
       window.__cgTestLicensePublicKey = jwk;
     }, testPublicJwk);
+    // A liquid on the shelf from before (13): written once, so the shelf the
+    // app saves back after that is what the later halves read.
+    const LIQUID_NAME = 'Tiers Check Silk';
+    await ctx.addInitScript((name) => {
+      if (localStorage.getItem('chromaglass-custom-liquids')) return;
+      localStorage.setItem('chromaglass-custom-liquids', JSON.stringify([
+        { id: 'custom-tiers-check-silk', name, color: '#c8d0e0', behaviour: { weight: 0.4, polarity: -0.7 } },
+      ]));
+    }, LIQUID_NAME);
     const page = await ctx.newPage();
     await page.goto(`${ORIGIN}/?debug&tierGates=1`);
     await waitFor(
@@ -504,6 +515,27 @@ try {
       freeTiles.length === 7 && freeLogoLocked === 1 && freeMarkFileCount === 0,
       `tiles=${freeTiles.length}, freeLogoLocked=${freeLogoLocked}, markFile=${freeMarkFileCount}`,
     );
+
+    // 13, free half. Making your own liquids is Pro (PLAN.md 23.19). The
+    // Liquids section is in the panel's DOM whichever section is showing, so
+    // it is read by counts, not visibility. The page opened with one liquid
+    // already on the shelf (the init script above), the way a free user has
+    // one made before the gate or under a lapsed key, so the check needs the
+    // gate to close Design, Edit and Load and to leave that bottle on the
+    // shelf: hiding the whole designer, or dropping a non-Pro user's bottles,
+    // fails it as surely as leaving Design open.
+    const liquidsAt = async () => ({
+      design: await page.locator('[data-testid="liquid-design"]').count(),
+      edit: await page.locator('[data-testid="liquid-edit"]').count(),
+      upsell: await page.locator('[data-cg-pro-upsell="liquids"]').count(),
+      buy: (await page.locator('[data-cg-pro-upsell="liquids"] [data-cg-pro-upsell-buy]').textContent().catch(() => null)) ?? '',
+      href: (await page.locator('[data-cg-pro-upsell="liquids"] [data-cg-pro-upsell-buy]').getAttribute('href').catch(() => null)) ?? '',
+      // The button and its hidden input, each: a Load button moved out of the
+      // gate fails the line even with the input still inside it.
+      load: await page.locator('[data-testid="liquid-load"], [data-testid="liquid-file"]').count(),
+      kept: ((await page.locator('[data-testid="liquid-designer"]').textContent()) ?? '').includes(LIQUID_NAME),
+    });
+    const freeLiquids = await liquidsAt();
 
     // Close Settings and open Record panel
     await page.keyboard.press('Escape');
@@ -568,6 +600,7 @@ try {
     const homeRemainingTiles = await page
       .locator('[data-cg-app-tiles] [data-cg-app-tile]')
       .evaluateAll((els) => els.map((e) => e.getAttribute('data-cg-app-tile')));
+    const homeLiquids = await liquidsAt();
     check(
       '10. activating a Home key unlocks custom logo upload and Record/Render, leaving only Pro tiles gated',
       homeRemainingTiles.length === 2 &&
@@ -597,6 +630,18 @@ try {
     await page.click('[data-testid="open-all-settings"]');
     await page.waitForTimeout(500);
     const proTileSectionCount = await page.locator('[data-cg-app-tiles]').count();
+    const proLiquids = await liquidsAt();
+    check(
+      '13. making your own liquids is Pro: Free and Home see the Pro note (Get Pro, Upgrade to Pro) and no Design, Edit or Load, keep a liquid made before on the shelf, and a Pro key opens all three (23.19)',
+      freeLiquids.design === 0 && freeLiquids.edit === 0 && freeLiquids.load === 0 && freeLiquids.upsell === 1 && freeLiquids.kept &&
+        freeLiquids.buy.includes('Get Pro') && freeLiquids.href.includes('lemonsqueezy.com/checkout/buy/') &&
+        homeLiquids.design === 0 && homeLiquids.edit === 0 && homeLiquids.load === 0 && homeLiquids.upsell === 1 && homeLiquids.kept &&
+        homeLiquids.buy.includes('Upgrade to Pro') &&
+        // Home pays the difference: its link is the upgrade checkout, not Pro's full price.
+        homeLiquids.href.includes('lemonsqueezy.com/checkout/buy/') && homeLiquids.href !== freeLiquids.href &&
+        proLiquids.design === 1 && proLiquids.edit === 1 && proLiquids.load === 2 && proLiquids.upsell === 0 && proLiquids.kept,
+      `free=${JSON.stringify(freeLiquids)} home=${JSON.stringify(homeLiquids)} pro=${JSON.stringify(proLiquids)}`,
+    );
     check(
       '11. upgrading to a Pro key unlocks all Pro features and removes all app gate tiles',
       proTileSectionCount === 0,
