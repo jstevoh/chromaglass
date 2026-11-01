@@ -611,6 +611,13 @@ export class FluidPasses extends FluidFields {
         pass.dispatchWorkgroupsIndirect(this.carryInd!, 12 * k);
       }
     }
+    // What a dry core still holds above its film, to the liquid at its rim (airShed in wgsl/fluid.ts).
+    if (gives && this.air) {
+      for (const f of also ? [field, also] : [field]) {
+        this.run(pass, 'airShed', f.write, [f.read, this.air.prev, this.air.field], a0);
+        f.swap();
+      }
+    }
     // And the rest of the way with the glass's drift.
     this.shiftCarried(pass, field, name === 'mixAdvect' ? 'mix' : 'amount');
     if (also) this.shiftCarried(pass, also);
@@ -685,10 +692,10 @@ export class FluidPasses extends FluidFields {
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}`,
-      this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, OPEN_RIM, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+      this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, this.airPush, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev]);
     this.vel.swap();
     this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
@@ -719,7 +726,16 @@ export class FluidPasses extends FluidFields {
       step's is the standard first guess; it is chosen here rather than left
       to whichever clear ran first (PLAN 18a-12).
     */
-    for (let c = 0; c < this.hsCycles; c++) this.hsCycle(pass, 0);
+    /*
+      Twice the V-cycles while there is air on the plate. A bubble's core
+      takes no part in the solve (hsPrep, PLAN 15g-8d), and the step after
+      one lands, the warm start is the step it pushed its liquid out on: in
+      two cycles the flow round it was left 4% short of conserving the
+      liquid, a ring 4% bright in the colour (`npm run bubbledye`, the
+      bubble put down whole, 1.042 against 1.009), in four it is what the
+      plate held. Only then, so a plate with no bubble pays nothing.
+    */
+    for (let c = 0; c < this.hsCycles * (this.airPush > 0 ? 2 : 1); c++) this.hsCycle(pass, 0);
     this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
       [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);
     this.vel.swap();

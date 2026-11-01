@@ -2880,6 +2880,35 @@ to 0.00%, pile no ring (deepest cell 1.01–1.08 of the pool's depth), leave 3.3
 in their middles, and a popped hole fills back. What is left under them is the flow through the
 air (15g-8d); the old plate still multiplies and paints back (15g-8c).
 
+### 15g-8d. The liquid goes round a bubble in the thin solve (shipped)
+
+The thin solve gave the air the liquid's own mobility, so the flow ran straight through a bubble: a
+drifting one's front, where the air arrives, drained through it to its back, where the air leaves,
+and the carries left 6.6% of the pool's colour in its middle (`npm run bubbledye`, 128²), with the
+flow outside it drawn as if no bubble were there.
+
+Now the air standing through a step takes its share of the cell from the liquid's mobility
+(`standingLiquid` in hsPrep), and a cell the air fills through the step has none: no liquid crosses
+its faces (hsDivergence takes u*'s half out of them, `thinFaceVel` carries nothing through them,
+`hsCoarsen`'s rows shut with them), and its pressure is no part of the solve. A cell part air keeps at
+least 5% of its mobility, a jump of twenty at most. The solve runs four V-cycles in place of two
+while there is air (two left the flow 4% short the step after a bubble landed). What a dry core still
+holds above its film is handed to the liquid at its rim (`airShed`, after each amount carry), since
+the donor rule leaves 4–6% in the cells round a bubble put down whole. A bubble's drift reads the
+liquid on a ring a cell and a half past its rim (`src/lib/bubbles.ts`): with no liquid inside it the
+solver's velocity there is nothing, and round a disc in Hele-Shaw flow the disturbance is a dipole
+whose mean on any circle is zero, so the ring's mean is the far flow Taylor and Saffman's 2U doubles.
+
+What was tried: a mobility of a thousandth in place of none let the core's pressure float free and
+seep liquid through cells nearly full of air (5% more colour than the pool held behind a moving
+bubble); flooring the coarse rows at 1e-20 broke the plate into a checkerboard; prolonging the coarse
+correction without the dry coarse cells changed nothing; a donor handing on its whole concentration
+made a ring 1.3 bright, and one mixed with its neighbours' made the pop's ring 1.14.
+
+Lab (`npm run bubbledye`, 128², main → now): left under a whole bubble 1.2% → 0.6%, a growing one
+1.0% → 0.0%, a moving one 6.6% → 0.0%; deepest cell after a pop 1.097 → 1.088; deepest cell round a
+moving bubble 1.019 → 1.031; every total 0.000%. The bar under a bubble is 2% now (was 8%).
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the

@@ -131,6 +131,10 @@ const SPLIT_D = 0.5;
 /** Two rims nearer than this many cells are touching: the film between them is microns, a cell is a millimetre. */
 const CONTACT = 0.05;
 
+/** Eight directions round a pocket, for the ring its drift reads the liquid on (step). */
+const RING_COS = Array.from({ length: 8 }, (_, k) => Math.cos((k * Math.PI) / 4));
+const RING_SIN = Array.from({ length: 8 }, (_, k) => Math.sin((k * Math.PI) / 4));
+
 /** Solver velocity units → cells per second: one step moves v·dt·(N−2) cells at 60 steps/s. */
 const CELLS_PER_UNIT = 0.05 * 190 * 60;
 
@@ -475,7 +479,25 @@ export class BubbleField {
         b.inject -= add;
       }
       if (b.held) { b.held = false; continue; }
-      const [vx, vy] = velocity(b.x, b.y);
+      /*
+        The liquid's own speed where the pocket is, read on a ring just
+        outside its rim, not at its middle (PLAN 15g-8d). The thin solve
+        now gives the air no mobility, so the liquid goes round a pocket
+        and the solver's velocity inside one is nothing; at its middle it
+        would read a still pocket in any flow. Outside it the flow is the
+        far flow U plus the pocket's own disturbance, which round a disc in
+        Hele-Shaw flow is a dipole, cos 2θ/r² in each component: its mean on
+        any circle round the pocket is zero, so the ring's mean is U, the
+        speed Taylor and Saffman's 2U is twice. Eight points, a cell and a
+        half past the rim, so none lands in the rim's soft edge.
+      */
+      let vx = 0, vy = 0;
+      const ring = b.r + 1.5;
+      for (let k = 0; k < 8; k++) {
+        const [ux, uy] = velocity(b.x + ring * RING_COS[k], b.y + ring * RING_SIN[k]);
+        vx += ux * 0.125;
+        vy += uy * 0.125;
+      }
       /*
         Taylor and Saffman: a pocket of inviscid air spanning the gap runs at
         twice the depth-mean liquid speed, slowed by the drag of the film it
@@ -531,7 +553,9 @@ export class BubbleField {
       // a second): the four samples of the strain are spent only on big ones.
       let eps = 0, half = 0, exy = 0;
       if (tau2 > 1e-3) {
-        const h = Math.max(1, b.r);
+        // Twice the radius out, where the pocket's own disturbance of a
+        // strain (R⁴/r³) is an eighth of what it is at the rim (PLAN 15g-8d).
+        const h = Math.max(1, 2 * b.r);
         const [ux1, uy1] = velocity(b.x + h, b.y), [ux0, uy0] = velocity(b.x - h, b.y);
         const [ux3, uy3] = velocity(b.x, b.y + h), [ux2, uy2] = velocity(b.x, b.y - h);
         const k2h = CELLS_PER_UNIT / (2 * h);
