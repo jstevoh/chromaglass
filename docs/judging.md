@@ -2337,7 +2337,21 @@ under the old 0.2 gate (and so smeared nothing) now say 0.
 3. Bad: a dial whose top looks the same as its old top, a look that opens differently than it
    did yesterday, or any plate that blows up at a top.
 
-## 105. OSC out into Resolume (PLAN 13.5-osc)
+## 105. The back plate's grain on the lamp (PLAN 38h-4)
+
+**What changed.** With two plates on a lamp look, the back plate's pools now carry the
+pigment's grain the way the front's do (more or less dye from place to place), where before
+they were nearly flat. The lab shows the back plate's grain at the front's strength in the
+log of the light, and no single-pixel flecks at its edges. What it cannot show is how the
+back plate's mottle reads at 60 fps: drawn alone it is brighter than the front (38h-12), so
+the same grain moves its bright edges more, in patches.
+
+1. Lava Lamp, Two Plates on, Front level at 0 so the back plate shows alone: the pools
+   should look like the front plate's grain, a soft mottle of more and less pigment.
+2. Poster 1969 and Milk Marble the same way: the pools' edges against the bright glass.
+3. Bad: edges that look dithered or "digital", or a mottle that crawls more than the front's.
+
+## 106. OSC out into Resolume (PLAN 13.5-osc)
 
 `npm run oscout` reads the show's OSC out with a decoder of its own and holds the numbers;
 only Resolume can say it reads them.
