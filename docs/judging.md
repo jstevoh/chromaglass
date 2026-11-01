@@ -2350,3 +2350,19 @@ the same grain moves its bright edges more, in patches.
    should look like the front plate's grain, a soft mottle of more and less pigment.
 2. Poster 1969 and Milk Marble the same way: the pools' edges against the bright glass.
 3. Bad: edges that look dithered or "digital", or a mottle that crawls more than the front's.
+
+## 106. OSC out into Resolume (PLAN 13.5-osc)
+
+`npm run oscout` reads the show's OSC out with a decoder of its own and holds the numbers;
+only Resolume can say it reads them.
+
+1. Resolume and the Mac app on the same Mac, a Pro licence in. Resolume: Preferences → OSC →
+   OSC Input on, port 7000. App: Settings → Sound → **OSC out**; the line says "Sending colour,
+   sound and the beat to 127.0.0.1:7000".
+2. In Resolume's Edit OSC mode, give a layer's Hue Rotate the address
+   `/chromaglass/out/colour/hue` and a Strobe effect's trigger `/chromaglass/out/beat`. With
+   music playing, the hue should follow the plate's dye and the strobe land with the plate's
+   kicks, not a frame behind.
+3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
+4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
+   the strobe a steady beat late.

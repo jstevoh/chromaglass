@@ -162,6 +162,9 @@ jobs:
     # iPhone app's remote on, went to `browser2` (PLAN 19k-9), cut where a
     # check builds `dist/` itself, since several after it serve the site
     # without building and would otherwise measure a missing one.
+    # Then widedials (#646, 3:40) joined lab after the soap left it, and lab was
+    # cancelled at the limit twice on #658's run with main merged, in holeline
+    # at 25:00 (it ran 23:23 before). widedials went to lab3, which ran 11:08.
     timeout-minutes: 25
     strategy:
       fail-fast: false
