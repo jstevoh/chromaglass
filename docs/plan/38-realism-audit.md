@@ -320,7 +320,7 @@ written first. Line numbers are as read on main at d07ac31.
     read. Found building 38l.
   - ~~**38l-2. The kick's sheet lifts by the same law**~~ — **Shipped, this PR** (the sheet
     takes the suction's share cell by cell on the dent it holds and node by node on its own
-    solve, so the shader takes it everywhere; `npm run sheet` 18/18; story in
+    solve once the finger has let go (38r-10), so the shader takes it everywhere; `npm run sheet` 18/18; story in
     `docs/plan-shipped.md` §38l).
   - **38l-3. The sheet's suction reads the plate's own gap** (S; Low). The sheet works out
     each cell's share at rest less its own dent, not the plate's gap, which it cannot read
@@ -427,6 +427,9 @@ written first. Line numbers are as read on main at d07ac31.
     1 up to the default 0.45, then geometrically to `ROCK_PAST` = (6 mm/h₀)² = 9 at full,
     the 6 mm gap's Darcy pace, so the dial still runs gentle to extreme at the real gap (#641).
     The default stays real.
+  - ~~**38r-10**~~ The kick's sheet holds against the lift while the finger presses, as the
+    hand holds the glass; `rides`' sheet "is local" line reads a dent and a half out against
+    the sheet's own bowl stamped, not 70 cells against the glass (#650). Story in §38r.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

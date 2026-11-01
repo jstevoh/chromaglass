@@ -115,7 +115,10 @@
   plate holds it and on the solve's own state (out to space, each node
   times its keep, and back to the modes), with the gap the shader will see
   there, rest less the dent. One share for the whole sheet, as before 38l,
-  left the plate's gap 7% of a dent off the sheet's (npm run sheet). On a dome (Plate Shape below zero) the
+  left the plate's gap 7% of a dent off the sheet's (npm run sheet). The
+  solve's own state takes it once the finger has let go: while it presses,
+  the finger holds the sheet against the lift, as a hand holds the glass
+  (step, below). On a dome (Plate Shape below zero) the
   middle rests near the floor: a kick there presses no deeper than the
   dome's rest under it allows (kickRoom), and what the floor still refuses
   of a dent's flank is owed in the shader and paid out of the sheet's next
@@ -739,13 +742,24 @@ export class RhythmSheet {
     this.peak = most / this.gapMetres;
     if (pressing) this.pressedCells += closing;
     /*
-      And the solve's own state, node by node. The sheet is odd about the
+      And the solve's own state, node by node, once the finger has let go.
+      While it presses, the finger holds the sheet where the solve puts it
+      against the glass's lift, as the hand holds the glass down on a kick
+      (KickRelease lays spring/STEFAN_FILM³ of the kick a step to balance
+      it, lib/squish.ts): the plate's dent above still takes the step's
+      keep, and the next step lays what the keep took back with the sheet's
+      own motion, so the plate's gap stays rest less the held dent. Sprung
+      while pressing, the suction took 3.4% of a default kick's volume
+      inside its ring over the nine held steps (1.4% of full's) and the
+      kick no longer landed the stamp's volume by the time it let go, which
+      pressVolume promises: `npm run rides`' default ring, 1.6 cells before
+      38l, read under the 1.5 asked (the lab, 2 mm); held, 1.54. The sheet is odd about the
       plate's edges (the images in sumLoads), so a node past the plate's
       far edge in its box is a plate node mirrored and negated: it takes
       that node's keep, read at that node's gap, which keeps the sheet odd
       and costs a quarter of the nodes.
     */
-    if (sprung) {
+    if (sprung && !pressing) {
       const h = n / 2, restN = this.restN, invN = this.invN;
       for (let jj = 0; jj <= h; jj++) {
         const mj = (n - jj) % n;

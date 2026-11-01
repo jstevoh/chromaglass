@@ -10806,5 +10806,20 @@ climbs geometrically to `ROCK_PAST` = (6 mm/h₀)² = 9 at full, the 6 mm gap's 
 `rockStep` (`lib/plateRock.ts`) hands the solver rockX, rockY and rockGain, and `hsBody` multiplies
 both by it. The default stays real; `rides` reads its "default over 0.4 of full" at the real pace.
 
+*38r-10:* two of `rides`' sheet lines went red at 2 mm (Mac, 404b771). The dent's default ring read
+1.49 cells, printed "1.5", under its 1.5: since 38l-2 the suction's keep ran on the sheet's own
+solve on every sprung step, the nine held ones too, and took 3.4% of a default kick's volume
+inside its ring before the finger let go (1.4% of full's), so the kick no longer landed the
+stamp's volume `pressVolume` promises. The glass's own kick holds against the lift (KickRelease
+lays spring/STEFAN_FILM³ a step); the sheet now does the same, its node keep only once no press
+is live (`lib/sheet.ts` step): 1.54 cells, full 3.33, 2.16 times where the volume is 2.17. The
+"is local" line compared two near-zeros: 70 cells out was 1.75 of the 6 mm dent, where the film
+had carried 0.57 of the stamp out of the disc; on the 2 mm film nothing passes the lip and the
+solve's share inside 70 is -0.10 (the lip's tail), read -0.009 against -0.020. The far ring now
+keeps its place in the dent as the near ring does (a dent and a half out, 36 cells, where the
+solve says 0.71 has left), the solve is stepped as the lab steps it (the app's spring), and the
+yardstick is the sheet's own bowl stamped on the same ring, so the colour's carry law cancels:
+0.627 of the stamp against 0.706 said. The bars stay 25% and 0.6. Both printed to two places now.
+
 *Judged:* the owner, from the 2 mm films (the sheet's dents, Plate Rock's slide), 2026-10-31
 16:39Z: "That looks fine".
