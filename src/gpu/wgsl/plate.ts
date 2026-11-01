@@ -3134,14 +3134,14 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       fluid1.a = clamp((fluid1.a - 0.5) * contrast + 0.5, 0.0, 1.0);
     }
 
-    // The grain after the edge, not before it: see the front plate's.
-    let film1 = fluid1.a;
+    // The grain after the edge, not before it, and the lamp's T^grain: see the front plate's.
+    var lampGrain1 = 1.0;
     if (U.granulation > 0.002 && fluid1.a > 0.004) {
       let grain = max(0.0, 1.0 + U.granulation * pigmentGrain(grain1, fuv1) * 1.6);
       fluid1.a = min(1.0, fluid1.a * grainedDepth(bare1, grain));
       more1 *= grain;
+      lampGrain1 = grain;
     }
-    let grained1 = fluid1.a;
 
     let sharp1 = dof < 0.55;
     var near1 = vec4f(0.0);
@@ -3235,14 +3235,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         the screen there.
         For other looks, they are stacked dishes on one lamp: a second filter in the
         light's path. A mixer row's own blend, above, still lays it as it did: PLAN 18b-5.
-        The grain's factor is recovered from the opacity before and after it
-        (grained1 / film1), as the front plate's is, so grainedDepth stays a
-        single-use expression on both plates: stored and used twice on this one,
-        Metal folded it in a different order when npm run lamp's before-lamp
-        surgery left it one use, 1 ULP that 18e's refraction pushed across a byte.
+        The grain is pigment, T^grain, as on the front plate (PLAN 38h-4): this
+        read grainedDepth's share of the opacity, 1 in a body near opaque, so the
+        back plate's pools lost their grain on the lamp. The raw grain is carried
+        in a var, so grainedDepth keeps its one use (Metal folded it otherwise).
       */
       if (U.lampGround > 0.001) {
-        let filt1 = throughScaled(t1, dish1.x * select(1.0, grained1 / max(film1, 1e-4), film1 > 0.004) * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
+        let filt1 = throughScaled(t1, dish1.x * lampGrain1 * U.mixLevel.z) * reliefOf(fluid1.rgb, tint1, alpha1);
         var lit1 = outColor * filt1;
         if (U.twoProjectors > 0.5 && U.layerCount > 1) {
           lit1 = outColor + lampScreen * filt1;

@@ -164,12 +164,21 @@ written first. Line numbers are as read on main at d07ac31.
     under a red gel a cyan pool's red rises 55 levels past what the gel passed; whether the
     projected path's grade may lift a band past its input is the owner's call, and
     `npm run nolight` asks its lines at a grade of 1 meanwhile.
-  - **38h-4. The back plate's lamp takes the pigment's grain as dye** (S, nil; Low-Medium on
-    two-plate lamp looks). 38h made the front plate's lamp read the grain as T^grain
-    (`lampGrain0`); the back plate's lamp branch still reads `grained1 / film1`, the grain's
-    share of the opacity, which is 1 on a body near opaque. Its note warns that Metal folded
-    `grainedDepth` differently when it had two uses, so carry the raw grain in a var as the
-    front plate does. *Measure:* `npm run grainedge` with the back plate on.
+  - ~~**38h-4**~~ *shipped 2026-10-31.* The back plate's lamp takes the pigment's grain as
+    dye, T^grain (`lampGrain1`), as the front's does. `npm run grainedge` line 4. Story in
+    `docs/plan-shipped.md` §38.
+  - **38h-5. The back plate is drawn brighter than the front, so its grain moves its edges
+    more** (S–M, nil; Low: the back plate shows only with two plates on). Found building
+    38h-4. Drawn alone (front level 0) over the lab's plate, the back plate's grainless
+    picture is 11 levels from the front's on average in Poster 1969 and 66 in Chemical
+    Clock, whose bare glass reads 255 alone against the front's 137: the back plate's
+    branch lacks some of the front's pieces (the chemistry's colour, the gap's scale and
+    the film, the contact shadow). With the same T^grain the brighter picture moves more of
+    its edge past 40 levels: Poster 1969 10%, Milk Marble 4.5% (the front 0.01%), 85% of
+    them in patches, the grain's mottle and not one-pixel flecks. Find which pieces the
+    back branch is missing and give it what is physical for a second dish (its own gap,
+    no contact shadow on the front's screen). *Measure:* `npm run grainedge` line 4 prints
+    the back plate's edge moves; ask them under line 1's bar once the pictures agree.
   - **38h-3. The oil's shadowgraph and the dye's are one term** (with **18e-2**). 38h draws
     the oil's out-of-focus lens from its own ∇²OPL in the oil block, on both sides of its edge;
     where dye crosses the oil's edge `refractionOptics` already takes the oil's share of the

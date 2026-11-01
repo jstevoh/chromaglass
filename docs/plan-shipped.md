@@ -10324,6 +10324,18 @@ model cannot reach one, the PR says what it reached and asks.
     about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
     line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
     term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §99).
+  - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
+    the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
+    opaque, so on a lamp look with two plates the back plate's pools lost their grain. It
+    now takes the grain as pigment, T^grain, as the front does: the raw grain carried in a
+    var (`lampGrain1`), so grainedDepth keeps its one use, the order Metal folded
+    differently when it had two. `npm run grainedge` line 4 draws the back plate alone
+    (front level 0, no satellite droplets) in every lamp look and reads the grain's texture
+    in the log of the light in the dense bodies, (grain − 1)·ln T, which no lamp level or
+    tint can fake: 0.28 to 0.44 of the front plate's before, 1.00 to 1.50 now (bar 0.9);
+    body texture 0.07–0.18 levels before, 0.21–0.39 now; single-pixel flecks at its edges
+    0.55% at most. Found on the way: 38h-5 (the back plate is drawn brighter than the front,
+    so the same grain moves more of its edge past 40 levels, in patches).
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 

@@ -113,8 +113,10 @@ try {
       lab.flush(); await lab.step(30);
     }
   }, { N, STEPS });
-  for (const id of looks) {
-    const row = await page.evaluate(async ({ id, SIZE, FLECK }) => {
+  // The front plate in every look, then the back plate alone in each lamp look (line 4).
+  const lampLooks = await page.evaluate((ids) => ids.filter((id) => (lab.look(id).settings.lampGround ?? 0) > 0), looks);
+  for (const [id, back] of [...looks.map((id) => [id, false]), ...lampLooks.map((id) => [id, true])]) {
+    const row = await page.evaluate(async ({ id, SIZE, FLECK, back }) => {
       const Lk = lab.look(id);
       const g0 = Lk.settings.granulation;
       // What the plate draws of it: the film stock's grain takes the plate's
@@ -125,7 +127,11 @@ try {
       // flips some, grain or not, so it is the plate under the print that is
       // asked here. The print's own edges are benday's (and PLAN 1f).
       const under = (Lk.settings.benDay ?? 0) > 0 ? { benDay: 0 } : {};
-      const shot = async (set) => new Uint8ClampedArray(await lab.render(SIZE, { ...Lk.settings, ...under, ...set }, { zoom: 1, macroAmount: 0, grain: true }));
+      // The back plate alone: two plates, the front's level at 0 (the mixer
+      // fades it to the bare lamp, so the back plate filters the lamp itself),
+      // and no satellite droplets, which still read the front plate's dye.
+      const alone = back ? { layerCount: 2, frontLevel: 0, microDroplets: 0 } : {};
+      const shot = async (set) => new Uint8ClampedArray(await lab.render(SIZE, { ...Lk.settings, ...under, ...alone, ...set }, { zoom: 1, macroAmount: 0, grain: true, backPlate: back }));
       const z = await shot({ granulation: 0 }), g = await shot({}), g2 = await shot({ granulation: Math.min(1, 2 * g0) });
       const W = SIZE, P = W * W;
       const lum = (p) => { const L = new Float32Array(P); for (let i = 0; i < P; i++) L[i] = 0.2126 * p[4 * i] + 0.7152 * p[4 * i + 1] + 0.0722 * p[4 * i + 2]; return L; };
@@ -151,24 +157,41 @@ try {
         return (i) => { let m = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) m += d[i + dy * W + dx]; return d[i] - m / 25; };
       };
       const t1 = texture(Lg), t2 = texture(Lg2);
+      // Line 4's two readings. The grain's texture in the log of the light, in
+      // the dense bodies: on the lamp the picture is lamp × T^k, so
+      // ln(grained / grainless) is (grain − 1)·ln T, whatever the lamp's level
+      // or tint, and it is near 0 under a law that leaves the grain out of a
+      // dense body. Dense: a body pixel under half the bare glass (the grainless
+      // picture's 99th percentile) and over 20 (8-bit rounding is 1/40 there).
+      const sorted = Array.from(Lz).sort((p, q) => p - q), bare = sorted[Math.floor(P * 0.99)];
+      const lr = new Float32Array(P); for (let i = 0; i < P; i++) lr[i] = Math.log((Lg[i] + 0.5) / (Lz[i] + 0.5));
+      const logHi = (i) => { let m = 0; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) m += lr[i + dy * W + dx]; return lr[i] - m / 25; };
+      let dn = 0, dT = 0, lone = 0;
+      // A fleck as line 1 means it, a pixel or two across: moved over FLECK
+      // with at most one of its four neighbours moved as far, as against the
+      // grain's mottle, whose moves come in patches.
+      const far = (i) => moved(g, i) > FLECK;
       let e = 0, eD = 0, eF = 0, b = 0, bT = 0, bT2 = 0;
       for (let y = 3; y < W - 3; y++) for (let x = 3; x < W - 3; x++) {
         const i = y * W + x;
-        if (grad[i] >= hi) { const d = moved(g, i); e++; eD += d; if (d > FLECK) eF++; }
-        else if (grad[i] < lo && Lz[i] > 20) { b++; bT += t1(i) ** 2; bT2 += t2(i) ** 2; }
+        if (grad[i] >= hi) { const d = moved(g, i); e++; eD += d; if (d > FLECK) { eF++; if (far(i - 1) + far(i + 1) + far(i - W) + far(i + W) <= 1) lone++; } }
+        else if (grad[i] < lo && Lz[i] > 20) { b++; bT += t1(i) ** 2; bT2 += t2(i) ** 2; if (Lz[i] < 0.5 * bare) { dn++; dT += logHi(i) ** 2; } }
       }
       if (e < 0.03 * P || b < 0.03 * P) throw new Error(`${id}: ${e} edge and ${b} body pixels: too few to measure`);
       const f = (v, k = 2) => +v.toFixed(k);
-      return { id: under.benDay === 0 ? `${id} (under its print)` : id, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3) };
-    }, { id, SIZE, FLECK });
+      return { id: `${id}${under.benDay === 0 ? ' (under its print)' : ''}${back ? ' (back plate)' : ''}`, back, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3), dense: f(100 * dn / P, 1), logTex: f(Math.sqrt(dT / Math.max(1, dn)), 4), lone: f(100 * lone / e) };
+    }, { id, SIZE, FLECK, back });
     rows.push(row);
-    console.log(`  ${row.id.padEnd(20)} grain ${row.eff}  edges ${row.edge}%  body ${row.body}%  flecks ${row.flecks}%  edge moved ${row.edgeMove}  body texture ${row.texture} (x2 grain: ${row.texture2})`);
+    console.log(`  ${row.id.padEnd(20)} grain ${row.eff}  edges ${row.edge}%  body ${row.body}%  flecks ${row.flecks}%  edge moved ${row.edgeMove}  body texture ${row.texture} (x2 grain: ${row.texture2})  dense ${row.dense}% log texture ${row.logTex}  lone flecks ${row.lone}%`);
   }
 } finally {
   await close();
 }
 
+const f2 = (v) => +v.toFixed(2);
 const worst = (list, k, dir = 1) => list.reduce((m, r) => (dir * r[k] > dir * m[k] ? r : m), list[0]);
+const backRows = rows.filter((r) => r.back);
+rows.splice(0, rows.length, ...rows.filter((r) => !r.back));
 const fl = worst(rows, 'flecks'), em = worst(rows, 'edgeMove');
 const grained = rows.filter((r) => r.eff >= TEXTURE_GRAIN), filmed = rows.filter((r) => r.eff < TEXTURE_GRAIN);
 const tx = worst(grained, 'texture', -1);
@@ -181,6 +204,44 @@ check(`2. the grain is a texture in the bodies (over ${MIN_TEXTURE} levels), and
   `least ${tx?.id} ${tx?.texture} (x2: ${tx?.texture2})${filmed.length ? `; on film, not asked: ${filmed.map((r) => r.id).join(', ')}` : ''}`);
 check('3. every look\'s plate has edges and lit body to measure (each over 3% of the frame)',
   rows.length > 0 && rows.every((r) => r.edge > 3 && r.body > 3), `${rows.length} looks`);
+/*
+  4. The back plate's grain, on the lamp (PLAN 38h-4). 38h made the front
+  plate's lamp take the pigment's grain as more or less pigment, T^grain;
+  the back plate's lamp still took the grain's share of the opacity
+  (grainedDepth), which is 1 in a body near opaque and near the grain only
+  where the dye is thin. Drawn alone (the front's level at 0, and no
+  satellite droplets, which read the front's dye), the back plate is asked
+  what line 2 asks of the front, in every lamp look, and two things more.
+
+  The law, read where the two laws part: in the dense bodies the grain's
+  texture in the log of the light, (grain − 1)·ln T, at least BACK_VS_FRONT
+  of the front plate's in the same look (same dye, same grain field, same
+  law). In the log, not in levels: the back plate alone is drawn brighter
+  than the front (Chemical Clock's bare glass 255 against 137, PLAN 38h-5),
+  and in levels the brighter picture's texture reached the front's under
+  the old law (Chemical Clock 0.114 and 0.99 of the front's passed). In the
+  log, on SwiftShader over the eleven lamp looks: the old law 0.28 to 0.44 of
+  the front's in every one, Chemical Clock 0.44; T^grain 1.00 to 1.50.
+
+  Its edges: the same law in a brighter picture moves more of an edge past
+  FLECK levels (Poster 1969 10% against 0.53%), in patches, the grain's
+  mottle; flecks as line 1 means them, single pixels, are judged under
+  MAX_FLECKS (0.55% at most, Poster 1969; the old law 0.3%), and the patches
+  are printed (38h-5, docs/judging.md).
+*/
+const BACK_VS_FRONT = 0.9;
+const frontOf = new Map(rows.map((r) => [r.id, r]));
+const bgr = backRows.filter((r) => r.eff >= TEXTURE_GRAIN).map((r) => {
+  const fr = frontOf.get(r.id.replace(' (back plate)', ''));
+  return { ...r, frontDense: fr?.dense ?? 0, ofFront: fr ? f2(r.logTex / Math.max(1e-6, fr.logTex)) : 0 };
+});
+const btx = worst(bgr, 'texture', -1), bof = worst(bgr, 'ofFront', -1), bln = worst(backRows, 'lone'), bfl = worst(backRows, 'flecks');
+// GRAINEDGE_ONLY with no lamp look among those named leaves the line unasked, not passed.
+if (!only || backRows.length) check(`4. the back plate alone, in every lamp look with ${TEXTURE_GRAIN} or more grain: a texture in its bodies over ${MIN_TEXTURE} levels that twice the grain takes over ${TEXTURE_RATIO}x, in its dense bodies a log texture at least ${BACK_VS_FRONT} of the front plate's, under ${MAX_FLECKS}% single-pixel flecks at its edges, edges, body and dense body (both plates) each over 3%, 3% and 1%`,
+  backRows.length > 0 && bgr.length > 0
+    && backRows.every((r) => r.edge > 3 && r.body > 3 && r.lone < MAX_FLECKS)
+    && bgr.every((r) => r.texture > MIN_TEXTURE && r.dense > 1 && r.frontDense > 1 && r.ofFront >= BACK_VS_FRONT && (r.g0 >= 1 || r.texture2 > r.texture * TEXTURE_RATIO)),
+  `${backRows.length} lamp looks; least texture ${btx?.id} ${btx?.texture} (x2: ${btx?.texture2}); least log texture of the front's ${bof?.id} ${bof?.ofFront}; single-pixel flecks most ${bln?.id} ${bln?.lone}%; all moves past ${FLECK} most ${bfl?.id} ${bfl?.flecks}% (printed)`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n${checks.length - failed}/${checks.length} passed`);
