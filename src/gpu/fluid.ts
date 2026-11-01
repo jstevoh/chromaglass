@@ -833,7 +833,7 @@ export class WebGPUFluid extends FluidReads {
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
-    const rg = p.rockGain ?? 1, rx = p.rockX * rg, ry = p.rockY * rg;
+    const rockGain = p.rockGain ?? 1;
     const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
       /*
@@ -882,7 +882,7 @@ export class WebGPUFluid extends FluidReads {
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
           this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
-            rockOn ? ROCK_FALL * rx : 0, rockOn ? ROCK_FALL * ry : 0, lift * rx, lift * ry]),
+            rockOn ? ROCK_FALL * rockGain * p.rockX : 0, rockOn ? ROCK_FALL * rockGain * p.rockY : 0, lift * rockGain * p.rockX, lift * rockGain * p.rockY]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();
       });
