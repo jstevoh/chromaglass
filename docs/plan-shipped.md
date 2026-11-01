@@ -585,6 +585,32 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.5-osc. OSC out to a VJ app (2026-11-01)
+
+Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second
+`lights` report (which feeds Art-Net) now carries the ear's fast readings (level, kick,
+bass, snare, hats, note), its eight bands and the beat clock's tempo, and a `beat` message
+the frame the plate's kick count moves. The show server turns them into OSC under
+`/chromaglass/out/`: one bundle a report (thirty-odd addresses as loose packets would be
+six hundred datagrams a second on a venue's Wi-Fi), the beat alone and at once as 1 and
+then 0 50 ms later, a button's press and release. One float per address, because
+Resolume's shortcuts, VDMX and TouchOSC map one address to one value. The plate's colour
+is the layers' mean weighted by fill, so an empty glass sends black, not the colour it
+last held. Nothing under `/out/` is an address OSC in acts on. Pro, asked per packet as OSC
+in is. The switch is the laptop's page's only (`osc-out-enable` from the display; a phone
+is refused), offered only when a server says it is there, remembered on the machine and
+re-asked on connect, as Link is; the same row (`ui/OscOutRow.tsx`) in Settings → Sound and
+on the phone layout. The OSC reader moved from `remote-server.js` into `server/osc.js`
+beside the writer; App's lights effect moved whole into `app/useShowFeed.ts`.
+
+**Measured** (`npm run oscout`, 28/28 in a cloud session, the plate's own beat skipped
+there and run on the fifth Mac shard): a message and a bundle against bytes written by
+hand; the feed's numbers against a plate worked by hand; the page's and server's target
+rules alike on 13 cases; on the real server a report is one 1192-byte datagram of 29
+messages, a beat arrives 1.0 ms after it is sent and is released 50 ms later, a phone
+moves nothing, off and below-Pro send nothing; the built app's switch, refused target,
+its own reports and the switch back on after a reload.
+
 ### 13.4. Control, written up (2026-10-31)
 
 `docs/osc.md` is every address the show server takes over OSC (settings, every

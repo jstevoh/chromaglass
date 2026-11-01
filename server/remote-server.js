@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
 import { startLink } from './abletonLink.js';
+import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, readOsc } from './osc.js';
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
@@ -395,7 +396,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out']);
 
 wss.on('connection', (socket, req) => {
   roles.set(socket, 'unknown');
@@ -468,6 +469,8 @@ wss.on('connection', (socket, req) => {
           // Tells the page Link is here to switch on, which a page with no
           // show server behind it never hears, so it never offers the switch.
           socket.send(linkMessage());
+          // And OSC out's state, which offers its switch the same way.
+          socket.send(oscOutMessage());
         }
       }
       return;
@@ -489,6 +492,24 @@ wss.on('connection', (socket, req) => {
         layers: Array.isArray(message.layers) ? message.layers.slice(0, 64) : [],
         master: typeof message.master === 'number' ? message.master : 1,
       };
+      if (oscOut) sendOscOut(encodeBundle(feedMessages(message)));
+      return;
+    }
+    // A beat the plate pressed on, out to the VJ app at once: 1 now, 0 a
+    // twentieth of a second later, a button's press and release.
+    if (message.type === 'beat') {
+      if (from !== 'display' || !oscOut) return;
+      sendOscOut(encodeOsc('/chromaglass/out/beat', [1]));
+      clearTimeout(beatRelease);
+      beatRelease = setTimeout(() => { beatRelease = null; sendOscOut(encodeOsc('/chromaglass/out/beat', [0])); }, 50);
+      beatRelease.unref?.();
+      return;
+    }
+    // OSC out on, off or somewhere else, from the laptop's own page only, as
+    // Link is: a phone pointing the show's feed at another machine is not a
+    // remote's job.
+    if (message.type === 'osc-out-enable') {
+      if (from === 'display') setOscOut(message.on === true ? oscOutTarget(message.target) : null);
       return;
     }
     // Link on or off, from the laptop's own page only: a phone switching the
@@ -518,90 +539,7 @@ wss.on('connection', (socket, req) => {
 });
 
 // ── OSC in ─────────────────────────────────────────────────────────────
-// A small OSC 1.0 reader: address, type tags, int/float/string/blob/bool
-// arguments, and bundles. Addresses (all under /chromaglass):
-//   /setting/<key> <number>          a setting, e.g. /chromaglass/setting/audioImpact 0.8
-//   /action/<name>                   seed clear drain lucky play pause automate-on|off
-//                                    overlays-on|off seq-play|pause|next|prev|stop
-//                                    preset-next|prev blackout-toggle record-toggle
-//   /preset <id>  or  /preset/<id>   cue a preset by id
-//   /blow x y [amount] [dx dy]       air at a point (0..1, y up)
-//   /drop x y [amount]               dye at a point
-//   /press x y [amount]              press the glass at a point
-//   /tilt x y                        rock the plate (-1..1)
-//   /dye <#rrggbb>                   the dropper's colour
-const readOsc = (buf) => {
-  let off = 0;
-  const str = () => {
-    const end = buf.indexOf(0, off);
-    const s = buf.toString('utf8', off, end < 0 ? buf.length : end);
-    off = ((end < 0 ? buf.length : end) + 4) & ~3;
-    return s;
-  };
-  if (buf.length >= 8 && buf.toString('utf8', 0, 7) === '#bundle') {
-    off = 16;   // skip "#bundle\0" and the time tag
-    const out = [];
-    while (off + 4 <= buf.length) {
-      const size = buf.readInt32BE(off); off += 4;
-      if (size <= 0 || off + size > buf.length) break;
-      out.push(...readOsc(buf.subarray(off, off + size))); off += size;
-    }
-    return out;
-  }
-  const address = str();
-  if (!address.startsWith('/')) return [];
-  const tags = off < buf.length && buf[off] === 44 ? str().slice(1) : '';
-  const args = [];
-  for (const t of tags) {
-    if (t === 'f') { args.push(buf.readFloatBE(off)); off += 4; }
-    else if (t === 'i') { args.push(buf.readInt32BE(off)); off += 4; }
-    else if (t === 'd') { args.push(buf.readDoubleBE(off)); off += 8; }
-    else if (t === 'h') { args.push(Number(buf.readBigInt64BE(off))); off += 8; }
-    else if (t === 's' || t === 'S') args.push(str());
-    else if (t === 'b') { const n = buf.readInt32BE(off); off += 4; args.push(buf.subarray(off, off + n)); off = (off + n + 3) & ~3; }
-    else if (t === 'T') args.push(true);
-    else if (t === 'F') args.push(false);
-    else if (t === 'N') args.push(null);
-    else if (t === 'I') args.push(Infinity);
-    else if (t === 'c' || t === 'r' || t === 'm') { args.push(buf.readUInt32BE(off)); off += 4; }
-    else if (t === 't') { off += 8; }
-  }
-  return [{ address, args }];
-};
-
-const num = (v, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'boolean' ? (v ? 1 : 0) : d);
-const oscToMessage = ({ address, args }) => {
-  const parts = address.split('/').filter(Boolean);
-  if (parts[0] !== 'chromaglass' || parts.length < 2) return null;
-  const [, what, ...rest] = parts;
-  switch (what) {
-    case 'setting': {
-      const key = rest[0];
-      if (!key || !/^[a-zA-Z0-9_]+$/.test(key) || args.length === 0) return null;
-      const v = typeof args[0] === 'string' ? (args[0] === 'true' ? true : args[0] === 'false' ? false : Number(args[0])) : typeof args[0] === 'boolean' ? args[0] : num(args[0]);
-      if (typeof v === 'number' && !Number.isFinite(v)) return null;
-      return { type: 'patch', settings: { [key]: v } };
-    }
-    case 'action': {
-      const name = rest[0] ?? (typeof args[0] === 'string' ? args[0] : null);
-      return name && /^[a-z-]+$/.test(name) && num(args[0], 1) !== 0 ? { type: 'action', action: name } : null;
-    }
-    case 'preset': {
-      // A button bound to /chromaglass/preset/<id> sends 1 on its press and 0
-      // on its release (Resolume, TouchOSC), as it does to an action; the
-      // release cued the preset a second time, clearing and reseeding a plate
-      // that had just been seeded (found writing docs/osc.md, PLAN 13.4).
-      const id = rest[0] ?? (typeof args[0] === 'string' ? args[0] : null);
-      return id && /^[a-zA-Z0-9_-]+$/.test(id) && (rest[0] === undefined || num(args[0], 1) !== 0) ? { type: 'preset', presetId: id } : null;
-    }
-    case 'blow': return { type: 'blow', x: num(args[0], 0.5), y: num(args[1], 0.5), layer: 0, amount: num(args[2], 0.5), ...(args.length >= 5 ? { dx: num(args[3]), dy: num(args[4]) } : {}) };
-    case 'drop': return { type: 'drop', x: num(args[0], 0.5), y: num(args[1], 0.5), layer: 0, amount: num(args[2], 0.5) };
-    case 'press': return { type: 'press', x: num(args[0], 0.5), y: num(args[1], 0.5), layer: 0, amount: num(args[2], 0.5) };
-    case 'tilt': return { type: 'tilt', x: Math.max(-1, Math.min(1, num(args[0]))), y: Math.max(-1, Math.min(1, num(args[1]))) };
-    case 'dye': return typeof args[0] === 'string' && /^#?[0-9a-fA-F]{6}$/.test(args[0]) ? { type: 'dye', color: args[0].startsWith('#') ? args[0] : `#${args[0]}` } : null;
-    default: return null;
-  }
-};
+// The reader and the address space are `osc.js`, beside the writer OSC out uses.
 const isPrivateAddress = (a) => /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1$|fe80:|fc|fd)/.test(a) || a === '::ffff:127.0.0.1' || /^::ffff:(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(a);
 
 let oscStatus = 'off';
@@ -733,6 +671,78 @@ function setLink(on) {
   broadcastTo('display', linkMessage());
 }
 
+// ── OSC out (PLAN.md 13.5-osc) ─────────────────────────────────────────
+//
+// The plate's colour, the ear's readings and the beat, out to a VJ app, the
+// way Art-Net sends the colour to the rig: the page reports them in its
+// `lights` message twenty times a second and each beat as it lands (`beat`),
+// and they leave here as OSC because a page cannot send UDP. Off until the
+// laptop's own page switches it on (Settings, Sound: OSC out) or OSC_OUT names
+// a target at launch; Pro, like OSC in, and asked per packet the same way.
+//
+// One bundle per report, not thirty packets: thirty-odd addresses twenty
+// times a second is six hundred datagrams a second on a venue's Wi-Fi if sent
+// apart, and every receiver we name (Resolume, VDMX, TouchDesigner, Max,
+// TouchOSC) unpacks a bundle. The beat goes alone and at once, so it is not
+// held for the next report: a strobe on the kick that lands up to 50 ms late
+// is a strobe off the kick.
+let oscOut = null;   // { host, port, socket }
+let oscOutSays = 'off';
+// Switched off on purpose (by the page or the Mac app), as against off because
+// this server has just started: the page re-asks only in the second case, so a
+// relaunched server comes back on and an operator's "off" stays off.
+let oscOutStopped = false;
+let beatRelease = null;
+const oscOutMessage = () => JSON.stringify({
+  type: 'osc-out', on: oscOut !== null, target: oscOut ? `${oscOut.host}:${oscOut.port}` : null,
+  pro: proLinks(), says: oscOutSays, stopped: oscOutStopped,
+});
+const sendOscOut = (packet, o = oscOut) => {
+  if (!o || !proLinks()) return;
+  // A send's own failure (EHOSTUNREACH, ENETUNREACH: the VJ machine's Wi-Fi
+  // gone) comes to this callback and not to 'error', so it is treated here as
+  // the socket's error is, and said, rather than streaming on into nothing.
+  // ECONNREFUSED, a port with nobody listening yet, is not one: Resolume opened
+  // after the show is the ordinary order.
+  o.socket.send(packet, o.port, o.host, (err) => { if (err && err.code !== 'ECONNREFUSED') o.fail(err); });
+};
+/** Send OSC out to `{ host, port }`, or stop (null). Exported for the Mac app, beside `setOsc`. */
+export function setOscOut(target) {
+  const old = oscOut;
+  // A beat's 1 already sent is released on the target that got it, or a VJ
+  // app's button switched off inside those 50 ms stays pressed.
+  // The socket closes once that 0 has left: closed straight after a send, the
+  // datagram is dropped (the first run of `npm run oscout` caught a lone 1).
+  const close = () => { try { old?.socket.close(); } catch { /* already */ } };
+  if (beatRelease && old && proLinks()) {
+    clearTimeout(beatRelease); beatRelease = null;
+    old.socket.send(encodeOsc('/chromaglass/out/beat', [0]), old.port, old.host, close);
+  } else close();
+  oscOut = null;
+  oscOutSays = 'off';
+  oscOutStopped = !target;
+  if (target) {
+    const socket = createSocket({ type: 'udp4' });
+    const mine = { ...target, socket };
+    mine.fail = (err) => {
+      if (oscOut === mine) { oscOut = null; oscOutSays = `off (${err.code ?? err.message})`; broadcastTo('display', oscOutMessage()); }
+      try { socket.close(); } catch { /* already */ }
+    };
+    socket.on('error', mine.fail);
+    // A target like 192.168.1.255 reaches every VJ machine on the network,
+    // which a socket has to ask for.
+    socket.bind(() => { try { socket.setBroadcast(true); } catch { /* unicast only */ } });
+    oscOut = mine;
+    oscOutSays = `udp ${target.host}:${target.port}`;
+  }
+  broadcastTo('display', oscOutMessage());
+  return oscOutSays;
+}
+/** What OSC out is doing: `off`, `off (EHOSTUNREACH)` or `udp host:port`. */
+export const oscOutState = () => oscOutSays;
+const OSC_OUT_AT_LAUNCH = oscOutTarget(process.env.OSC_OUT);
+if (OSC_OUT_AT_LAUNCH) setOscOut(OSC_OUT_AT_LAUNCH);
+
 // ── Startup banner ─────────────────────────────────────────────────────
 
 /**
@@ -766,6 +776,7 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log('\n  ChromaGlass show server\n');
   console.log(`  Show key:           ${SHOW_KEY}${process.env.SHOW_KEY ? '' : '  (kept between launches; delete server/.show-key for a new one)'}`);
   console.log(`  Laptop (the show):  http://localhost:${PORT}/`);
+  if (oscOut) console.log(`  OSC out:            ${oscOutSays}  (/chromaglass/out/colour, /sound, /band, /bpm, /beat; docs/osc.md)`);
   if (artnet) console.log(`  Art-Net out:        ${artnetStatus}  (${artnet.count} x ${artnet.order} from channel ${artnet.start}, ${artnet.rate} fps)`);
   if (ARTNET_IN.size > 0) console.log(`  Art-Net in:         udp port ${ARTNET_PORT}${ARTNET_IN_UNIVERSE === null ? '' : ` universe ${ARTNET_IN_UNIVERSE}`}  (${[...ARTNET_IN].map(([c, m]) => `${c}->${m.key}`).join(', ')})`);
   if (OSC_PORT > 0) console.log(`  OSC in:             udp port ${OSC_PORT}${OSC_BIND === '0.0.0.0' ? '' : ` on ${OSC_BIND}`}  (/chromaglass/setting/<key> <n>, /chromaglass/action/<name>, /chromaglass/preset <id>, /blow /drop /press /tilt /dye; every address: docs/osc.md)`);
