@@ -3,7 +3,7 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
-import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
+import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
 import { BeadField, rasterDrops } from '../src/lib/beads';
@@ -546,7 +546,7 @@ const api = {
    * ramps on, for `npm run disc` to run the shader's own text against the
    * physics.
    */
-  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
+  SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_FULL, SPIKE_PITCH, SPIKE_B_REF, MAGNET_RADIUS, magnetReach, magnetDepth,
   /**
    * The magnet's pull in the solver's own units, and the gap's, for `npm run
    * magnetgain` to derive what MAGNET_GAIN is in tesla, metres and seconds

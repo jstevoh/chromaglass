@@ -10889,3 +10889,37 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
+
+## 9t-2 + 38k-7. The pull under the domes, and the plate on the liquid's own onset (2026-11-01)
+
+Built over #625, #640, #645 and #657, landed as one PR. Until it the plate ran on the lab's
+onset, 22 mT (0.18 of the hand's field), where the liquid's own, Cowley and Rosensweig for
+EFH1 under water, is 4.0 mT (38k, #630); and under the standing film's window nothing pulled
+the ferrofluid toward the magnet (`PULL_SHARE` 0), so #625's try at the real onset left a
+dragged drop 7.4 R behind.
+
+- **The pull under the window** (`phaseForce` in `wgsl/fluid/phaseForces.ts`): the plate's
+  Kelvin pull acts there as everywhere, on each cell's own share. A first cut on the
+  layer's mean over a dome's box spread a drop's force over its rim and left it 2.65 R
+  behind. The flux step's payback (`phaseCompress`) runs under the window too, and the
+  window carries each cell's share at the layer's mean speed (`boxVel`/`boxFlux` in
+  `wgsl/fluid/phase.ts`) where it carried a blurred mean that smeared a moving drop.
+  Mac: ferrodrag's lag 1.68 R (bar 2 R).
+- **The onset** (`spikes.ts`): `SPIKE_ONSET` is the liquid's, 0.0326 of the reference
+  field; `SPIKE_FULL` keeps the old ramp's 1.94 × it. `Opening.film` builds the film's
+  pipelines at the opening when a look's own magnet is past it, so `startup` does not
+  wait on them mid-show. Magnet Garden's magnet is 4.6 × the onset and Ferro Paint's 3.0 ×.
+- **Checks re-aimed to what the field now does** (each at length in its comment): past
+  the real onset a drop under a magnet stands up as a cone and a pool gathers into a heap
+  with its domes on top, which is the physics. `ferrodrag` 2 holds a dragged drop's
+  footprint to the same drop held still under the same magnet; `ferrodrag` 5 reads the
+  stale-velocity control on either half of line 4; `standing` 4 counts tops past 1.05, not
+  cells (the field's own smooth heap); `spikes` 1 asks for domes standing past full at the
+  layer's own pitch instead of separate pieces (they stand on a common gathered base),
+  and 5 for domes a second finger stands up past full; `ferrohold` reads the ferrofluid in
+  the drop's half-full cells, not their count (a slumping cone covers as many cells as a
+  standing one); `ferropour` 5 measures Ferro Paint's channels against the ring's drops as
+  poured, since the ring now stands into domes under the look's own field. `disc`'s
+  "every look's own magnet raises none" turned to "is past it".
+- Found along the way: `startup` 1b's red on GitHub's Macs is the intro's 1.5 s frame cap,
+  not this change (19aa-7).

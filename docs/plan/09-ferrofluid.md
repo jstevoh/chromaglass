@@ -107,19 +107,9 @@ Open, from building 9i:
     hundreds), so the domes grow at a scale the grid draws; at the lab's G 4.3 they set
     as bars along the grid. A finer film grid under the magnet (the patch at twice the
     plate's cells) would let it rise.
-  - **9t-2. No pull under the film** (**built, in the PR with 38k-7, Mac CI owed**: the
-    plate's pull now acts under the window as everywhere, on each cell's own share
-    (`phaseForce` in `wgsl/fluid/phaseForces.ts`; a first cut on the layer's mean over
-    a dome's box spread the drop's force over its rim and left it 2.65 R behind), the
-    flux step's payback (`phaseCompress`) runs under the window too, and the window
-    carries each cell's own share at the layer's mean speed, `boxVel`/`boxFlux` in
-    `wgsl/fluid/phase.ts`, where it carried a blurred mean that smeared a moving drop;
-    cloud lab, ferrodrag's drag: lag 1.71 R and level against #625's 7.4 R and main's
-    1.79 R, bar 2 R). Was: the magnet's Kelvin pull is in the film's
-    pressure, worked out from the liquid's susceptibility (EFH1, χ0 2.6), and scaled to
-    nothing: at the whole of it the pool gathered into one heap with no domes on it (the
-    lift being held low, 9t-1), and at a tenth or a quarter its gathering front set the
-    domes along the grid. With 9t-1's finer grid it can come back.
+  - **9t-2. No pull under the film (shipped 2026-11-01, with 38k-7).** The plate's pull
+    acts under the standing film's window on each cell's own share. Story in
+    `docs/plan-shipped.md` §9t-2 + 38k-7.
   - **9t-3. No hysteresis.** Real domes stay a few per cent under the field that raised
     them; turned to 0.95 of the onset on the axis, these were all gone two seconds on.
   - **9t-4. Slower than a real layer.** Domes start a second and a half after the Magnet
@@ -171,7 +161,7 @@ Open, from building 9i:
   the standing-domes plate PR that lab is for, not to a retune of the set-down
   strength here.
   The liquid's onset is now worked out (38k, 4.0 mT, five times under the lab's), and
-  at it this magnet stands its pool up; it waits on 9t-2's pull, then 38k-7.
+  at it this magnet stands its pool up, and since 9t-2 and 38k-7 the plate runs on it.
 - **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
   (**shipped**). Story in `docs/plan-shipped.md` §9x (moved 2026-10-29, 19m).
   Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off
