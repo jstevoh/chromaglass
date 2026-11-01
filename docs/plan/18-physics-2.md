@@ -211,7 +211,10 @@ Open follow-ups:
   diagonal 0.6% → 0.17% a reading in the probe, oillift's rim lens 98.1% → 100.0%. Story in §38r.
 - **18g-10, open. The oil's colour crosses the rim with the water while its oil is held** (S). `oilDye`
   is carried by bodyAdvect, which has no lip: at the rim the colour can part from its oil. Read it with
-  `colourInWater`, then give bodyAdvect the same lip. Found building 18g-9.
+  `colourInWater`, then give bodyAdvect the same lip. And have rimhold's level lines and oillift's rim
+  line sum the oil's colour in the dish too, to the same bars: since the lip they read the oil (.r)
+  only, so a leak of the old kind (outward flow at p′ ≤ 0, or a p′ near zero whose sign differs on
+  Metal) or colour parting from its oil is blind to them (#655's review). Found building 18g-9.
 - **18g-11, open. Oil already past the rim stays there** (S). A splat's tail laid past the rim (0.39 of a
   cell's worth in rimhold's probe) has no way back since 18g-7 and does not drain to the trough as the soap
   does. Found building 18g-9.

@@ -430,6 +430,16 @@ written first. Line numbers are as read on main at d07ac31.
   - ~~**38r-10**~~ The kick's sheet holds against the lift while the finger presses, as the
     hand holds the glass; `rides`' sheet "is local" line reads a dent and a half out against
     the sheet's own bowl stamped, not 70 cells against the glass (#650). Story in §38r.
+  - **38r-11. The sheet's hold is the whole sheet, the glass's is the kick's discs** (S). While a
+    press is live the sheet skips the suction's keep on every node (`lib/sheet.ts` step, 38r-10),
+    the lip past rest and an earlier dent elsewhere included; KickRelease holds only inside the
+    kick's own discs. A named shortcut: scale the keep by one less the press's load weight, and add
+    a sprung row to `npm run sheet` §6 (nine steps at the app's spring, the volume within reach the
+    stamp's to 2%), which §6 asks only unsprung and so let 38l-2's drift through. Found in #655's
+    review. Also there: `rides`' "is local" falloff half reads the glass at 36 cells, its inner
+    disc's kink, where the glass does not fall off (4.5 against 4.2): its 0.6 now asks under 0.64,
+    and a sheet with no lip (about 0.57) would pass it; the 25% half catches that sheet (1.0 against
+    0.71). Ask the falloff against the stamp instead (the lip keeps some back).
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);
