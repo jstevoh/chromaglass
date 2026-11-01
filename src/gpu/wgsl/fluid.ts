@@ -192,6 +192,8 @@ function airLiquid(src: string, name: string, frac: string): string {
 @group(0) @binding(${last + 4}) var airIn: texture_2d<f32>;
 ${airLiquidAt(frac)}
 fn giveAt(q: vec2i, n: i32) -> f32 { return textureLoad(airGive, clamp(q, vec2i(0), vec2i(n - 1)), 0).r; }
+// East, west, north, south, the order airGive writes the inflow shares in.
+const AIR_FACES = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
 fn inAt(q: vec2i, n: i32) -> vec4f { return textureLoad(airIn, clamp(q, vec2i(0), vec2i(n - 1)), 0); }
 // What q holds mixed with what its neighbours hand it at their least (all
 // they hold over their room, airGive), per unit of liquid: the least a
@@ -199,22 +201,25 @@ fn inAt(q: vec2i, n: i32) -> vec4f { return textureLoad(airIn, clamp(q, vec2i(0)
 // where it has no air.
 fn airLeast(${tParam}q: vec2i, n: i32) -> vec4f {
   if (liquidAt(q, n) >= 1.0) { return mx(${t}q, n); }
-  let x = vec2i(1, 0);
-  let y = vec2i(0, 1);
   let i = inAt(q, n);
-  return (mx(${t}q, n)
-    + i.x * mx(${t}q + x, n) * giveAt(q + x, n) + i.y * mx(${t}q - x, n) * giveAt(q - x, n)
-    + i.z * mx(${t}q + y, n) * giveAt(q + y, n) + i.w * mx(${t}q - y, n) * giveAt(q - y, n)) * giveAt(q, n);
+  var held = mx(${t}q, n);
+  // Loops, not four terms written out: the pair carry calls this through
+  // eight fluxes, and written out SwiftShader's compiler lost the device.
+  for (var k = 0; k < 4; k++) {
+    let e = AIR_FACES[k];
+    held += i[k] * mx(${t}q + e, n) * giveAt(q + e, n);
+  }
+  return held * giveAt(q, n);
 }
 // What a donor a with air in it hands on per unit of liquid: its own liquid
 // mixed with the least that comes in this substep (the comment above).
 fn airDonor(${tParam}a: vec2i, n: i32) -> vec4f {
-  let x = vec2i(1, 0);
-  let y = vec2i(0, 1);
   let i = inAt(a, n);
-  return (mx(${t}a, n)
-    + i.x * airLeast(${t}a + x, n) + i.y * airLeast(${t}a - x, n)
-    + i.z * airLeast(${t}a + y, n) + i.w * airLeast(${t}a - y, n)) * giveAt(a, n);
+  var held = mx(${t}a, n);
+  for (var k = 0; k < 4; k++) {
+    if (i[k] > 0.0) { held += i[k] * airLeast(${t}a + AIR_FACES[k], n); }
+  }
+  return held * giveAt(a, n);
 }
 `;
   return (src.slice(0, at) + liquid + src.slice(at))
@@ -264,7 +269,15 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }
 KERNELS.airGiveSub = airGiveKernel(true);
 KERNELS.airGiveThin = airGiveKernel(false);
-KERNELS.bodyAdvectSub = airLiquid(thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub'), 'bodyAdvectSub', 'A.a.x * sub[0]');
+KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
+/*
+  Each carry of amounts twice: as it was, which every step with no air on
+  the plate runs, and taking the air (the Air kernels, airCarry in
+  fluid/passes.ts). One kernel for both, its air reads skipped by a uniform,
+  ran the colour's carry at twice to four times the time under SwiftShader
+  with no bubble on the plate (`npm run thick`'s timing, 156 → 632 ms).
+*/
+KERNELS.bodyAdvectSubAir = airLiquid(KERNELS.bodyAdvectSub, 'bodyAdvectSubAir', 'A.a.x * sub[0]');
 
 /*
   The colour and the poured liquids' species carried together (PLAN 18d-11a):
@@ -284,7 +297,7 @@ KERNELS.bodyAdvectSub = airLiquid(thinFaced(substepped('bodyAdvect'), 'bodyAdvec
   its own format (the colour's DYE_FORMAT, the species' rgba32float). `npm
   run thick` carries a stirred plate both ways and asks for the same fields.
 */
-KERNELS.bodyAdvectPairSub = airLiquid(`${HEAD}
+KERNELS.bodyAdvectPairSub = `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var vel: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
@@ -330,9 +343,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, max(textureLoad(src, p, 0) - d, vec4f(0.0)));
   let d2 = flux(src2, p, x, ce, n) - flux(src2, p - x, x, cw, n) + flux(src2, p, y, cn, n) - flux(src2, p - y, y, cs, n);
   textureStore(dst2, p, max(textureLoad(src2, p, 0) - d2, vec4f(0.0)));
-}`, 'bodyAdvectPairSub', 'A.a.x * sub[0]');
+}`;
+KERNELS.bodyAdvectPairSubAir = airLiquid(KERNELS.bodyAdvectPairSub, 'bodyAdvectPairSubAir', 'A.a.x * sub[0]');
 KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
-KERNELS.bodyAdvectThin = airLiquid(thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin'), 'bodyAdvectThin', 'A.a.x');
+KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
+KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');
 
 /*
   The ferrofluid's carry on a thin gap in as many substeps as the step's flow

@@ -35,11 +35,13 @@ export class FluidPasses extends FluidFields {
    * place of the pressure, then the gap and the mobility.
    */
   protected runThinFaced(pass: GPUComputePassEncoder, name: string, dst: GPUTexture, src: GPUTexture, args: GPUBuffer): void {
-    const pipe = this.pipeline(name, dst.format);
+    // bodyAdvectThin carries amounts, so while there is air it takes it (airLiquid in wgsl/fluid.ts, PLAN 15g-8b);
+    // until its Air kernel is built, the plain carry, which keeps every amount too.
+    const airPipe = name === 'bodyAdvectThin' && this.airCarry ? this.pipeline('bodyAdvectThinAir', dst.format) : null;
+    const pipe = airPipe ?? this.pipeline(name, dst.format);
     if (!pipe) return;
     const ride = this.ride();
-    // bodyAdvectThin carries amounts, so it sees the air (airLiquid in wgsl/fluid.ts, PLAN 15g-8b).
-    const air = name === 'bodyAdvectThin' ? this.airPair() : null;
+    const air = airPipe ? this.airPair() : null;
     if (air) this.airGive(pass, false, args);
     let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'thin faced'), pipe), dst), src), args), this.squeeze.read);
     if (air) at = this.groupAt(at, air[0]);
@@ -563,11 +565,17 @@ export class FluidPasses extends FluidFields {
   protected carrySubsteps(pass: GPUComputePassEncoder, name: 'bodyAdvect' | 'mixAdvect', field: PingPong, args: GPUBuffer, also?: PingPong, argsAt?: GPUBuffer[]): void {
     // With `also` (the species, always rgba32float), bodyAdvect's pair: both fields through the same faces in one pass.
     const kernelName = also ? 'bodyAdvectPairSub' : `${name}Sub`;
-    const pipe = this.pipeline(kernelName, field.format);
+    /*
+      The amounts' carries take the air while there is any (`argsAt`, from
+      airArgs; airLiquid in wgsl/fluid.ts, PLAN 15g-8b), in their Air kernels;
+      until one is built, the plain carry, which keeps every amount too.
+    */
+    const airPipe = argsAt && name === 'bodyAdvect' ? this.pipeline(`${kernelName}Air`, field.format) : null;
+    const pipe = airPipe ?? this.pipeline(kernelName, field.format);
     if (!pipe) return;
+    if (!airPipe) argsAt = undefined;
     const ride = this.ride();
-    // The amounts' carries see the air (airLiquid in wgsl/fluid.ts, PLAN 15g-8b): the step's air before and after it.
-    const air = name === 'bodyAdvect' ? this.airPair() : null;
+    const air = airPipe ? this.airPair() : null;
     const group = (a: GPUBuffer, src: GPUTexture, dst: GPUTexture, src2?: GPUTexture, dst2?: GPUTexture) => {
       let at = this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupAt(this.groupRoot, 'carry'), pipe), a), src), dst);
       if (src2) at = this.groupAt(at, src2);
@@ -580,12 +588,8 @@ export class FluidPasses extends FluidFields {
       }
       return g;
     };
-    /*
-      With `argsAt` (airArgs, only while the carry takes the air), each
-      substep its own arguments, which carry its index, and airGive before
-      each, through the same dispatch.
-    */
-    const gives = !!argsAt && !!air;
+    // Taking the air, each substep its own arguments, which carry its index, and airGive before each, through the same dispatch.
+    const gives = !!air;
     const w = Math.ceil(this.N / 8);
     const a0 = argsAt ? argsAt[0] : args;
     if (gives) this.airGive(pass, true, a0);
