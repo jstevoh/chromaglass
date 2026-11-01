@@ -435,12 +435,17 @@ async function selftest() {
   say(/^\s+shard: \$\{\{ fromJSON\(needs\.reach\.outputs\.shards\) \}\}\s*$/m.test(wf), 'the Mac matrix is the shards reach selected');
   say(/run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.part \}\}/.test(wf) && /run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.shard \}\}/.test(wf), 'Measure and the Mac run their shard from the manifest');
   // The workflow's own tools (which files reach, the runner, the guard on a
-  // PR's bars) are also checks with a selftest; their CI uses are not.
-  const TOOLS = ['scripts/reach.mjs', 'scripts/checks.mjs', 'scripts/checkguard.mjs'];
+  // PR's bars, and since 19ah-6 the watchdog for a PR whose shards went to the
+  // owner's Mac) are also checks with a selftest; their CI uses are not.
+  const TOOLS = ['scripts/reach.mjs', 'scripts/checks.mjs', 'scripts/checkguard.mjs', 'scripts/macwatch.mjs'];
   const ran = new Set(man.checks.flatMap((c) => [...entryFiles(c.run, scripts)]).filter((f) => !TOOLS.includes(f)));
   const npmRan = new Set(man.checks.flatMap((c) => [...npmScriptsOf(c.run, {})]));
+  // A tool's exemption covers its CI use, not its selftest: a step that runs
+  // `--selftest` is that check run beside the manifest, which this rule exists
+  // to catch (the review of 19ah-6).
   const stray = [...wf.matchAll(/^\s+(?:- )?run: (.*)$/gm)].map((m) => m[1])
-    .filter((r) => [...entryFiles(r, scripts)].some((f) => ran.has(f)) || [...npmScriptsOf(r, {})].some((n) => npmRan.has(n)));
+    .filter((r) => [...entryFiles(r, scripts)].some((f) => ran.has(f) || (TOOLS.includes(f) && /--selftest\b/.test(r)))
+      || [...npmScriptsOf(r, {})].some((n) => npmRan.has(n)));
   say(!stray.length, `no step in checks.yml runs a check's script itself${stray.length ? `: ${stray.join('; ')}` : ''}`);
 
   // The trace holds every script esbuild finds each check importing.
