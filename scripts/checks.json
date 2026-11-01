@@ -1477,8 +1477,8 @@
         "kept out, localhost only, locked on Free), the page's libs (the frame decoded, a",
         "slot through MIDI learn's map, transport as a tempo source under Link), then the",
         "built app (a slot moves its setting, the DAW's tempo is the show's, the ear hears",
-        "it), and the plugin's protocol header. Beside rig, which builds nothing either:",
-        "it uses the dist/ the shard already has. --owed: app is 13.7a's; the plugin's",
+        "it). Beside rig, on the dist/ the shard has built; run alone it builds (19k-10).",
+        "--owed: app is 13.7a's; the plugin's",
         "lines run only with `-- --plugin` on a Mac with it built (13.7b, then 13.7c's",
         "Mac shard entry)."
       ]
