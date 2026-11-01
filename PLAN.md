@@ -15,6 +15,8 @@ new file, named here. (The split into files is 19m, 2026-10-29; [`docs/plan/READ
 
 ## Order of work
 
+*Ids with no text of their own before 2026-11-01 (H2c-2 to H2c-10, 10.2-*, 10.3-*, 16a-*, 14a-timers and the rest) are written, each with a pass mark and its check, in §40 and §41; the table at the end of §41 says where every other thin id's text lives.*
+
 
 ### Wave 0. Every change cheaper and faster to ship (lanes E, F)
 
@@ -200,7 +202,7 @@ Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the loa
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
 **R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**; ~~**13.5-link**~~ (shipped
-2026-10-30, owed judging §95), then **13.5-osc** (§30), **13.4-ipad**, later **13.7-ipad**; **31e** halation in the Photograph
+2026-10-30, owed judging §95), ~~**13.5-osc**~~ (shipped 2026-11-01, owed judging §106), **13.4-ipad**, later **13.7-ipad**; **31e** halation in the Photograph
 style (§31).
 
 ### Wave 6. The physics under the look (lane C, one solver change at a time)
@@ -234,15 +236,15 @@ style (§31).
   **25c**, **25f** (after 18f and 18d).
 - **6.10** The realism audit's top picks (§38), each its own thread, in its order: ~~**38a** the lamp
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), ~~**38c**~~ soap conserved, **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), ~~**38h**~~
-  nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; 38h-3 to 38h-6, 38h-8, 38h-9 and 38h-11 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f**, **38g-2**, **38i**, **38j**; **38r** (the rest
-  gap, shipped: one number, #613, then a real 2 mm, #641) is read before 38d and 38i.
+  nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; ~~38h-4~~ the back plate's grain shipped; 38h-3, 38h-5, 38h-6, 38h-8, 38h-9, 38h-11 and 38h-12 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f**, **38g-2**, **38i**, **38j**; **38r** (the rest
+  gap, shipped: one number, #613, then a real 2 mm, #655) is read before 38d and 38i.
 
 ### Wave 7. Reach
 
 - **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
   **12.7**, **12.8**; **12.4a**; later **12.9**. When the owner says go: **12-ship**, **12-play-org**; later **12-link**; **12-mas** not for now.
 - **7.2** VJ software (§13): ~~**13.4**~~ the OSC write-up (shipped 2026-10-31, with ~~**13-icon**~~ and ~~**13-version**~~), **13-win-app** then
-  **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), **13.5** OSC out (Link shipped 2026-10-30),
+  **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), ~~**13.5**~~ OSC out (shipped 2026-11-01; Link 2026-10-30),
   **13-port**, **13-intel**, **13-exit**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
   Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
@@ -332,7 +334,7 @@ Where each batch stands, as of 2026-09-27:
 | 34 | What Photism showed: the page and the app | Asked 2026-10-22 from a screenshot of a competitor's page: a landing page before the sign-in wall (34a, **shipped** as a still hero; 34a-5's words shipped; 34a-7, the page for pros at `/pro`, shipped, and its 34a-7a, OSC and Art-Net gated to Pro; 34a-2 to 34a-4 and the share card open), a looks browser (34b), an analyzer look (34c), Chladni figures (34d), drawn automation lanes (34e), one-button share export (34f), reactions named (34g), a dropped picture as a look (34h); the DAW bridge and Syphon keep their order (34i). Not started |
 | 36 | What the analog operators could not do | Researched 2026-10-27 from the operators' own accounts: a lit-stage grade (36a), span the wall across projectors (36b), a practice plate (36c), show the hands (36d), all proposed; and four open items moved up with the evidence: heat as a stroke (36e, S2; **36e-1, the model and `npm run boil`, shipped**; the GPU build 36e-2's check `npm run boilgpu` written, red until the build), a plate per performer (36f, 14m-guest), room lights follow the wall (36g, 14q), layers at their own speeds (36h) |
 | 37 | Marketing and social media | Asked 2026-10-29: who it is for, the channels (YouTube, Shorts, Reels and TikTok, Reddit and the VJ and synth forums, Show HN, Product Hunt), the launch in order from the day the store goes live, a weekly cadence, who makes what and who posts, and how a sale is traced to a channel (37a–37o). The same day: the week that runs itself, the app filming itself, one Monday approval, a scheduler and YouTube's API (37p–37w), and a whole album performed live every week on YouTube from the Mac app, with a family of looks across it (37x-1 to 37x-9). 37x-4a (the live show research, `docs/live-show.md`) and 37x-4b (the RTMPS client, the wall-clock encoder, the key store, `npm run live`) shipped 2026-10-29; 37x-4c (several destinations, a portrait encode, the health readout, `npm run livedrop`) 2026-10-30; 37x-4d (the Live Show panel in the Mac app, Pro, and the phone's Stop, `npm run liveshow`) 2026-10-30; the rest not started |
-| 38 | Realism audit, after §18 | Audited 2026-10-30 across the fluid, the bubbles and films, the ferrofluid and the optics: twenty shortcuts not already open elsewhere, ranked (38a–38j the top picks: the lamp as a condenser, bubbles without clocks, soap conserved, the labyrinth from the Bond number, oil's σ in N/m, heat as a force, bubbles merging and crowding as pockets, nothing on the plate makes light, milk's scatter conserved, the ferrofluid black by its thickness); **38b, 38g, 38n shipped** (bubbles as pockets in a gap: no clocks, the round rim, Paterson, Durian, the look's own liquid; `npm run bubblephysics`), **38a shipped** (the lamp lever and the aperture, #604; 38a-2 and 38a-3 open), **38h, 38h-2, 38h-7 shipped** (nothing on the plate makes light, every edge lit from beneath, `npm run nolight`; the closeup's bubbles traced and Light Play a softbox, `npm run closeupdepth`; 38h-3 to 38h-6, 38h-8, 38h-9 and 38h-11 open), **38k part shipped** (magnets add as fields, the liquid's onset worked out at 4 mT, #630; the plate on it is 38k-7, after 9t-2), **38l, 38l-2 and 38l-4 shipped** (the glass peels back against the film's suction, Beat Squeeze's sheet with it, a hard press holding a second before it lets go, `npm run stefan`, `npm run sheet`), ~~**38c**~~ soap conserved shipped 2026-10-31 (`npm run soap`), leaving 38c-1 to 38c-4 (38c-3's check `npm run soapbreak` written, owed until the Soap Breakdown dial is built); **38r shipped** (the real 2 mm gap, #641; 38r-1..4 open), the rest open; 38m pictured for the owner, 38o numbered as 32f–32j with 32f and 32g shipped |
+| 38 | Realism audit, after §18 | Audited 2026-10-30 across the fluid, the bubbles and films, the ferrofluid and the optics: twenty shortcuts not already open elsewhere, ranked (38a–38j the top picks: the lamp as a condenser, bubbles without clocks, soap conserved, the labyrinth from the Bond number, oil's σ in N/m, heat as a force, bubbles merging and crowding as pockets, nothing on the plate makes light, milk's scatter conserved, the ferrofluid black by its thickness); **38b, 38g, 38n shipped** (bubbles as pockets in a gap: no clocks, the round rim, Paterson, Durian, the look's own liquid; `npm run bubblephysics`), **38a shipped** (the lamp lever and the aperture, #604; 38a-2 and 38a-3 open), **38h, 38h-2, 38h-7 shipped** (nothing on the plate makes light, every edge lit from beneath, `npm run nolight`; the closeup's bubbles traced and Light Play a softbox, `npm run closeupdepth`; ~~38h-4~~ the back plate's grain shipped; 38h-3, 38h-5, 38h-6, 38h-8, 38h-9, 38h-11 and 38h-12 open), **38k part shipped** (magnets add as fields, the liquid's onset worked out at 4 mT, #630; the plate on it is 38k-7, after 9t-2), **38l, 38l-2 and 38l-4 shipped** (the glass peels back against the film's suction, Beat Squeeze's sheet with it, a hard press holding a second before it lets go, `npm run stefan`, `npm run sheet`), ~~**38c**~~ soap conserved shipped 2026-10-31 (`npm run soap`), leaving 38c-1 to 38c-4 (38c-3's check `npm run soapbreak` written, owed until the Soap Breakdown dial is built); **38r shipped** (the real 2 mm gap, #655; 38r-1..4 open), the rest open; 38m pictured for the owner, 38o numbered as 32f–32j with 32f and 32g shipped |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -372,7 +374,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5a | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-10 | 19 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
-|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ai-5b | 22 |
+|  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-4 | 22 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 18 |
 | 21 | Looks after painters | [`21-painters.md`](docs/plan/21-painters.md) |  | 3 |
 | 22 | Spin the plate | [`22-spin.md`](docs/plan/22-spin.md) |  | 5 |
@@ -395,6 +397,8 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
 | 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) |  | 23 |
 | 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 5 |
+| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) |  | 27 |
+| 41 | Specs for the thin items, part 2: sound and beat, many plates, the fluids (written 2026-11-01) | [`41-specs-sound-plates-fluids.md`](docs/plan/41-specs-sound-plates-fluids.md) |  | 28 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing

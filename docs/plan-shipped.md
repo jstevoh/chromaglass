@@ -585,6 +585,32 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.5-osc. OSC out to a VJ app (2026-11-01)
+
+Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second
+`lights` report (which feeds Art-Net) now carries the ear's fast readings (level, kick,
+bass, snare, hats, note), its eight bands and the beat clock's tempo, and a `beat` message
+the frame the plate's kick count moves. The show server turns them into OSC under
+`/chromaglass/out/`: one bundle a report (thirty-odd addresses as loose packets would be
+six hundred datagrams a second on a venue's Wi-Fi), the beat alone and at once as 1 and
+then 0 50 ms later, a button's press and release. One float per address, because
+Resolume's shortcuts, VDMX and TouchOSC map one address to one value. The plate's colour
+is the layers' mean weighted by fill, so an empty glass sends black, not the colour it
+last held. Nothing under `/out/` is an address OSC in acts on. Pro, asked per packet as OSC
+in is. The switch is the laptop's page's only (`osc-out-enable` from the display; a phone
+is refused), offered only when a server says it is there, remembered on the machine and
+re-asked on connect, as Link is; the same row (`ui/OscOutRow.tsx`) in Settings → Sound and
+on the phone layout. The OSC reader moved from `remote-server.js` into `server/osc.js`
+beside the writer; App's lights effect moved whole into `app/useShowFeed.ts`.
+
+**Measured** (`npm run oscout`, 28/28 in a cloud session, the plate's own beat skipped
+there and run on the fifth Mac shard): a message and a bundle against bytes written by
+hand; the feed's numbers against a plate worked by hand; the page's and server's target
+rules alike on 13 cases; on the real server a report is one 1192-byte datagram of 29
+messages, a beat arrives 1.0 ms after it is sent and is released 50 ms later, a phone
+moves nothing, off and below-Pro send nothing; the built app's switch, refused target,
+its own reports and the switch back on after a reload.
+
 ### 13.4. Control, written up (2026-10-31)
 
 `docs/osc.md` is every address the show server takes over OSC (settings, every
@@ -3989,6 +4015,58 @@ line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven
 out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
 every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
 lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
+
+### 19ak. The Mac runs what a PR reaches, and known flakes report without blocking (2026-11-01)
+
+Asked by the owner on 2026-11-01 ("are we running too many checks on everything?"),
+when four PRs (#627, #643, #656, #659) sat red on lines none of them touched. Three
+savers were already in place and are unchanged: a newer push cancels the older run
+(`concurrency` in `checks.yml`), npm and Chromium are cached, and a PR of documents,
+the sessions' files or the native apps skips the Mac (19h).
+
+- **19ak-1, quarantine.** A check's entry in `scripts/checks.json` can carry
+  `quarantine`: the start of a FAIL line, the plan id that fixes it, and the dates it
+  holds from and until (at most `QUARANTINE_DAYS`, 21). While it holds, on a pull
+  request, a check whose only FAIL lines are quarantined still runs and prints them, as
+  a warning annotation and a ⚠ row in the job summary, and its job stays green. No bar
+  moved: the line and its threshold are the harness's, and main's deploy holds every
+  line to it, so a real regression a quarantine let through a PR is red before it is
+  live. A check that timed out, was killed, exited other than 1, printed a stack, did
+  not reach its own "N/M checks passed" with exactly its FAIL lines counted, read
+  unread or never on the line, or printed any FAIL line not on the list is red as
+  before; so is one past its end date. Adding a quarantine or moving its end later is a
+  check change `checkguard.mjs` makes the PR name (the review of this PR found both
+  holes). `npm run checks` holds all of that with a control each, and that every entry's
+  plan id is an item in `docs/plan/` and its text is in the check's own scripts. First
+  entries, 2026-11-01 to 11-15: startup's "moving for good no later than the old way"
+  (19aa-7; #661 fixes most of it, 19aa-7b the rest), the Blow stroke's "keeps it rather
+  than erasing it" (19aj-1) and the wall's circle (19aj-2).
+- **19ak-2, the site's files select checks on the Mac.** A PR that changed anything
+  under `src/` or `public/` ran all 96 Mac checks. Now `checkReads` (in `checks.mjs`,
+  shared with `quick.mjs`) says what each reads from esbuild's import graph: the 28
+  that open the app or build it read the whole site; the 68 that open only the lab
+  read what their bundles import. The reach job installs esbuild alone (seconds, not
+  `npm ci`), and `reach.mjs` passes the names to each shard (`maconly` →
+  `CHECKS_ONLY`). A file under `server/` selects the Mac checks whose scripts trace it,
+  and no others (nothing under `src/` imports it). Measure is unchanged: it runs in
+  full for any site file. Fails toward running: no esbuild, an entry that would not
+  bundle, or a check the map does not place, and that check runs. Such a run leaves a
+  `mac` "partial" notice, which the deploy gate reads as it reads Measure's, so the
+  deploy of the merge runs every shard on main.
+- **19ak-3a, a re-run skips what passed.** "Re-run all jobs" on a red PR run started
+  all five Mac shards again; on attempt 2 or later `reach.mjs` drops the shards an
+  earlier attempt of the same run passed (`passedEarlier`), since a run's merge commit
+  does not move between attempts. Such an attempt is partial to the deploy gate.
+- **19ak-3c, the Mac waits for the typecheck.** A new `Compiles, before the Mac` job runs
+  `tsc --noEmit` on ubuntu beside `reach`; the Mac shards need it, so a PR that does not
+  compile takes no Mac. Building once for all five shards (19ak-3d) was measured and
+  left: `dist/` is 116 MB against a 15 s build.
+- **Measured** (`scratch/replay.mjs`, not committed: main's last 100 merges replayed
+  through the old and new selection, each check priced at its median over three green
+  five-shard PR runs of 2026-11-01, plus 45 s of setup a shard): 6,526 Mac minutes
+  before, 5,675 after, 13% less; 65.3 → 56.8 a push. The lab's checks all bundle one
+  `scripts/lab-entry.ts`, which imports most of `src/gpu` and `src/lib`, so a solver or
+  library change still runs every lab check (19ak-3).
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -10672,6 +10750,18 @@ model cannot reach one, the PR says what it reached and asks.
     just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
     the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
     38h-11.
+  - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
+    the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
+    opaque, so on a lamp look with two plates the back plate's pools lost their grain. It
+    now takes the grain as pigment, T^grain, as the front does: the raw grain carried in a
+    var (`lampGrain1`), so grainedDepth keeps its one use, the order Metal folded
+    differently when it had two. `npm run grainedge` line 4 draws the back plate alone
+    (front level 0, no satellite droplets) in every lamp look and reads the grain's texture
+    in the log of the light in the dense bodies, (grain − 1)·ln T, which no lamp level or
+    tint can fake: 0.28 to 0.44 of the front plate's before, 1.00 to 1.50 now (bar 0.9);
+    body texture 0.07–0.18 levels before, 0.21–0.39 now; single-pixel flecks at its edges
+    0.55% at most. Found on the way: 38h-12 (the back plate is drawn brighter than the front,
+    so the same grain moves more of its edge past 40 levels, in patches).
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 

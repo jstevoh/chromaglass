@@ -25,6 +25,26 @@ deploy:
   Mac shards (Measure still runs), and the deploy gate never trusts such a run. A PR
   whose Mac-reaching change is only check scripts, manifest entries or the npm scripts
   checks run runs only those checks' shards (PLAN 19k).
+- **The site's files on the Mac** (PLAN.md 19ak-2): a PR that changes `src/`,
+  `public/` or `index.html` runs the Mac checks that read them, not all 96: the 28 that
+  open or build the app always, and of the 68 lab checks those whose bundles import the
+  file (`checkReads` in `scripts/checks.mjs`, esbuild's import graph; the reach job
+  installs esbuild alone). Measure still runs in full. Such a run is "partial" to the
+  deploy gate, so main's deploy runs every shard.
+- **Quarantine** (PLAN.md 19ak-1): a check's entry in `scripts/checks.json` can list
+  known-flaky FAIL lines under `quarantine`, each with its plan id and an end date at
+  most 21 days out. Until then, on a pull request, a check red only on those lines is a
+  warning (⚠ in the job summary) and its job stays green; any other FAIL line, a
+  timeout, a crash, a check that stopped before its closing count, or the end date
+  passing, and it blocks as before. Main's deploy holds every line to its bar. Bars
+  never move for it, and adding one or moving its end later is a check change the PR
+  names (`checkguard`). A red run on a line the PR cannot move is re-run by its
+  **failed jobs** only, never all jobs.
+- **The Mac waits for the typecheck** (`Compiles, before the Mac`, PLAN.md 19ak-3c):
+  `tsc --noEmit` on ubuntu beside `reach`; a PR that does not compile takes no Mac.
+- **A whole run re-run skips the shards that passed** (PLAN.md 19ak-3a): on attempt 2
+  or later of a PR run, `reach` drops the Mac shards an earlier attempt of the same run
+  passed. "Re-run failed jobs" already starts only the red ones.
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
 - A deploy skips the checks when main's new tree is the exact tree its PR's
