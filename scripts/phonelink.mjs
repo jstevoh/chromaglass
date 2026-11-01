@@ -59,7 +59,8 @@
  * that the address is the right one for the page it is on.
  *
  * Runs in a cloud session (no plate needed: the panel is DOM) and in Measure's
- * browser part after `remotemix`, which built `dist/`. `npm run phonelink`
+ * browser2 part after `applink` and `liveshow`, which built `dist/` (PLAN
+ * 19k-9). `npm run phonelink`
  * builds first.
  */
 import { chromium } from 'playwright';

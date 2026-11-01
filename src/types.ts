@@ -831,10 +831,10 @@ export interface VisualizerSettings {
    */
   kaleidoZoom: number;
   dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, its glass wall a thin dark line
-  lightPlay: number;          // how much the lamp's direction shows: bubbles shaded as lenses with a caustic arc, dye rims lit on the lamp side and shadowed away from it
+  lightPlay: number;          // the closeup photographer's softbox above the glass, seen only by Fresnel reflection in a bubble's curved wall (PLAN 38h-7)
   lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
   lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
-  secondLamp: number;         // a second, cooler lamp from the other side of the plate, so two lights play across every bubble and edge
+  secondLamp: number;         // a second, cooler bulb beside the first, adding to one side of the hot spot (lampField)
   iridescence: number;        // thin-film colour running round bubble rims
 
   // Photograph — the macro shot of oil on water rather than the projected show
@@ -875,7 +875,7 @@ export interface VisualizerSettings {
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
-  macroRelief: number;        // surface relief — per-pixel normals, wet highlights, occlusion
+  macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
   // Every one of these defaults to nothing happening: a look saved before the
