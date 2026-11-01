@@ -1030,7 +1030,7 @@
     },
     {
       "name": "The dials held in the solver reach their tops",
-      "shard": "lab",
+      "shard": "lab3",
       "run": "npm run widedials",
       "timeout": 6,
       "why": [
@@ -1038,7 +1038,9 @@
         "Pushes Dye, Drop Height, Background Loop, Glass Smear and Momentum's current",
         "admits the dial's top, no look moved, and on the lab's 128² plate each top",
         "does more than the old one, finite and conserving. 2.5 minutes on software",
-        "WebGPU (cloud, 2026-10-31), so on Linux's lab shard rather than a Mac's."
+        "WebGPU (cloud, 2026-10-31), so on Linux's lab shards rather than a Mac's.",
+        "In lab3 since #658: its 3:40 in lab put that part past its 25 minutes on",
+        "main's merge of #646 (cancelled twice in holeline, after it); lab3 ran 11."
       ]
     },
     {
