@@ -15,7 +15,16 @@ import { WebGPUParticles } from '../particles';
 import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
 import { FluidFields } from './fields';
 
+/**
+ * How much of the plate the air's cover has to change in a step (a bubble of
+ * radius 0.018 of the plate landing whole or popping) for the thin solve to
+ * spend twice its V-cycles on that step and the next (PLAN 15g-8d).
+ */
+const AIR_SETTLE_COVER = 1e-3;
+
 export class FluidPasses extends FluidFields {
+  /** Steps left on which the thin solve runs twice its V-cycles, after a bubble landed or popped (AIR_SETTLE_COVER). */
+  private airSettle = 0;
   /** What each cell with air in it divides its amounts among this substep (airGive), made by the first carry that sees the air. */
   private airGiveTex: GPUTexture | null = null;
   /** And the share of a cell each of its faces brings in this substep (airGive's second output). */
@@ -727,15 +736,24 @@ export class FluidPasses extends FluidFields {
       to whichever clear ran first (PLAN 18a-12).
     */
     /*
-      Twice the V-cycles while there is air on the plate. A bubble's core
-      takes no part in the solve (hsPrep, PLAN 15g-8d), and the step after
-      one lands, the warm start is the step it pushed its liquid out on: in
-      two cycles the flow round it was left 4% short of conserving the
-      liquid, a ring 4% bright in the colour (`npm run bubbledye`, the
-      bubble put down whole, 1.042 against 1.009), in four it is what the
-      plate held. Only then, so a plate with no bubble pays nothing.
+      More V-cycles with air on the plate. A bubble's core takes no part in
+      the solve (hsPrep, PLAN 15g-8d), and the step after one lands, the
+      warm start is the step it pushed its liquid out on: in two cycles the
+      flow round it was left 4% short of conserving the liquid, a ring 4%
+      bright in the colour (`npm run bubbledye`, the bubble put down whole,
+      1.042 against 1.009), in four it is what the plate held. So twice the
+      cycles on the step a bubble lands whole or pops and the step after.
+      A drifting bubble changes the solve a little each step: two cycles
+      left a cell 1.079 of the pool round one, three 1.036, four 1.031, so
+      three while any air is down. Four on every step with air cost the
+      Mac's Bass Drop, whose kicks blow bubbles, its rhythm check's bar
+      (`SQUEEZE_GPU=1` squeeze.mjs: 199 steps in 12 s against 200, where
+      other PRs read 210 to 239).
     */
-    for (let c = 0; c < this.hsCycles * (this.airPush > 0 ? 2 : 1); c++) this.hsCycle(pass, 0);
+    if (Math.abs(this.airCover - this.airCoverPrev) > AIR_SETTLE_COVER) this.airSettle = 2;
+    const settle = this.airSettle > 0 && this.airPush > 0;
+    if (this.airSettle > 0) this.airSettle--;
+    for (let c = 0; c < this.hsCycles + (settle ? this.hsCycles : this.airPush > 0 ? 1 : 0); c++) this.hsCycle(pass, 0);
     this.hsRun(pass, 'hsGradient', `hsGradient:${this.vel.read.label}:${this.squeeze.read.label}`, this.arg('thin gradient', [REST_GAP, 0, 0, 0]),
       [this.vel.read, this.squeeze.read, this.vel.write, this.hsP!, mob, this.press]);
     this.vel.swap();

@@ -2891,8 +2891,10 @@ Now the air standing through a step takes its share of the cell from the liquid'
 (`standingLiquid` in hsPrep), and a cell the air fills through the step has none: no liquid crosses
 its faces (hsDivergence takes u*'s half out of them, `thinFaceVel` carries nothing through them,
 `hsCoarsen`'s rows shut with them), and its pressure is no part of the solve. A cell part air keeps at
-least 5% of its mobility, a jump of twenty at most. The solve runs four V-cycles in place of two
-while there is air (two left the flow 4% short the step after a bubble landed). What a dry core still
+least 5% of its mobility, a jump of twenty at most. The solve runs three V-cycles in place of two
+while there is air, four on the step a bubble lands whole or pops and the step after (two left the
+flow 4% short the step after a bubble landed; four on every step with air cost the Mac's Bass Drop
+a step of the rhythm check's 200). What a dry core still
 holds above its film is handed to the liquid at its rim (`airShed`, after each amount carry), since
 the donor rule leaves 4–6% in the cells round a bubble put down whole. A bubble's drift reads the
 liquid on a ring a cell and a half past its rim (`src/lib/bubbles.ts`): with no liquid inside it the
@@ -2907,7 +2909,7 @@ made a ring 1.3 bright, and one mixed with its neighbours' made the pop's ring 1
 
 Lab (`npm run bubbledye`, 128², main → now): left under a whole bubble 1.2% → 0.6%, a growing one
 1.0% → 0.0%, a moving one 6.6% → 0.0%; deepest cell after a pop 1.097 → 1.088; deepest cell round a
-moving bubble 1.019 → 1.031; every total 0.000%. The bar under a bubble is 2% now (was 8%).
+moving bubble 1.019 → 1.036; every total 0.000%. The bar under a bubble is 2% now (was 8%).
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
