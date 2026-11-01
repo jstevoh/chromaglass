@@ -1245,6 +1245,20 @@
       ]
     },
     {
+      "name": "The Tip pad on the desk and the phone",
+      "shard": "browser",
+      "run": "npm run tippad",
+      "why": [
+        "PLAN 18a-13j (scripts/tippad.mjs, apart from phone.mjs, which may not",
+        "grow): the owner never found a way to slosh the plate. The Tip pad is",
+        "seen in the Tools panel at 1440x900 with nothing opened or scrolled;",
+        "dragged right it stands the plate up toward 90, up toward 0, the keys",
+        "too; a grab with Slosh off puts it at half; let go, Gravity and Tilt",
+        "Direction are the look's own exactly (Lava Lamp's 1/180 too); and the",
+        "phone's Motion sheet has it at 128 px, pouring the same way."
+      ]
+    },
+    {
       "name": "The phone",
       "shard": "browser",
       "run": "npm run phone",

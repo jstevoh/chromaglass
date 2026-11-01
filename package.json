@@ -109,6 +109,7 @@
     "report-worker": "node scripts/report-worker.mjs",
     "feedback-worker": "node --no-warnings scripts/feedback-worker.mjs",
     "feedbackpane": "npm run build && node scripts/feedbackpane.mjs",
+    "tippad": "npm run build && node --experimental-strip-types scripts/tippad.mjs",
     "fingerprint-worker": "node scripts/fingerprint-worker.mjs",
     "license-worker": "node scripts/license-worker.mjs",
     "updates": "node scripts/updates.mjs",
