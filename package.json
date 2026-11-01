@@ -287,7 +287,8 @@
     "melody": "esbuild scripts/melody.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/melody.mjs && node node_modules/.cache/melody.mjs",
     "holeline": "node scripts/holeline.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
-    "soap": "PW_WEBGPU=1 node scripts/soap.mjs"
+    "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
+    "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
