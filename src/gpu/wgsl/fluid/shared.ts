@@ -403,16 +403,18 @@ fn magnetRadius() -> f32 { return S.magRadius; }
 fn magnetEnergy(uv: vec2f, m: vec4f) -> f32 {
   return magnetFieldEnergy(magnetShare(uv, m));
 }
-// All the magnets: the one in Args and the fingers' (S.mags). Their energies
-// add, which is only exact for magnets far enough apart that each one's field
-// is small under the others; two fingers close together pull a little less
-// than one magnet twice as strong would, which a hand does not notice.
+/*
+  All the magnets: the one in Args and the fingers' (S.mags). Their fields
+  add as vectors and the energy is the sum's (PLAN 38k). Until 38k each
+  magnet's energy was added, |B₁|² + |B₂|², which drops the cross term
+  2 B₁·B₂: between two like-poled fingers their B_z add, so the field there
+  is up to twice either's and the liquid is pulled in between them, where
+  the sum of energies drew no such ridge; beside a magnet another's B_ρ
+  can cancel its own. The magnets are all poled the same way, as a hand's
+  would be. One magnet reads exactly as it did (magnetDiscFieldVec).
+*/
 fn magnetsEnergy(uv: vec2f, m: vec4f) -> f32 {
-  var e = magnetEnergy(uv, m);
-  for (var k = 0; k < 3; k++) {
-    if (S.mags[k].w > 0.0) { e += magnetEnergy(uv, S.mags[k]); }
-  }
-  return e;
+  return magnetFieldEnergy(magnetsShare(uv, m, S.mags));
 }
 ${SPIKES_WGSL}
 /*

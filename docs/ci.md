@@ -6,7 +6,7 @@ every session; read this when a PR's checks or a deploy need explaining.
 `.github/workflows/checks.yml`, on every PR and called by `deploy.yml` before a
 deploy:
 
-- **Measure** (ubuntu, five parts side by side, 4–19 min each): typecheck, every script
+- **Measure** (ubuntu, seven parts side by side, 6–21 min each): typecheck, every script
   parsing, the workflows linted (`actionlint`), the shaders compiling on SwiftShader, and
   the node harnesses. A PR whose diff is only check scripts, manifest entries, the npm
   scripts checks run and documents runs only the Measure checks it reaches (PLAN 19k-4;

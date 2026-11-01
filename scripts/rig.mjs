@@ -51,7 +51,7 @@
 
 import { spawn } from 'node:child_process';
 import { createSocket } from 'node:dgram';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import WebSocket from 'ws';
@@ -242,6 +242,8 @@ check('its banner says OSC, Art-Net out and Art-Net in are on',
       osc('/chromaglass/dye', '#ff8800'), (m) => m.type === 'dye' && m.color === '#ff8800'],
     ['a dye without its hash gets one',
       osc('/chromaglass/dye', '33aaff'), (m) => m.type === 'dye' && m.color === '#33aaff'],
+    ['a button\'s press (1.0) on a preset\'s address cues it',
+      osc('/chromaglass/preset/classic', 1), (m) => m.type === 'preset' && m.presetId === 'classic'],
   ];
   for (const [name, packet, ok] of OSC_CASES) {
     const got = await heard(packet);
@@ -259,6 +261,65 @@ check('its banner says OSC, Art-Net out and Art-Net in are on',
   {
     const got = await heard(osc('/composition/layers/1/video/opacity', 0.5));
     check('OSC: another program\'s address on the same port moves nothing', got && got.length === 0, JSON.stringify(got));
+  }
+  {
+    // A Resolume button bound to /chromaglass/preset/<id> sent 1 and then 0,
+    // and both cued the look: the plate cleared and reseeded twice a press.
+    const got = await heard(osc('/chromaglass/preset/classic', 0));
+    check('OSC: a button\'s release (0.0) on a preset\'s address cues nothing, so one press is one cue', got && got.length === 0, JSON.stringify(got));
+  }
+
+  // docs/osc.md is where a VJ learns the addresses (PLAN 13.4). Its tables are
+  // held to the code they name, both ways, so a preset, action or setting added
+  // or renamed in the app turns this red until the page says so; and every line
+  // of its "Try it" block goes over the wire here as the page writes it, and
+  // must arrive as the one message its address names, so the page's examples
+  // are ones that work rather than ones that read right.
+  {
+    const text = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
+    const doc = text('docs/osc.md');
+    const section = (title) => doc.split(/^#+ /m).find((s) => s.startsWith(title)) ?? '';
+    const ticked = (s) => [...s.matchAll(/`([a-zA-Z0-9-]+)`/g)].map((m) => m[1]);
+    const presetIds = [...text('src/presets.ts').matchAll(/^ {4}id: '([^']+)'/gm)].map((m) => m[1]);
+    const actions = (text('src/lib/remoteProtocol.ts').match(/export type RemoteAction =([\s\S]*?\|[^\n]*;)\n/)?.[1] ?? '').split('\n').filter((l) => /^\s*\|/.test(l)).flatMap((l) => [...l.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]));
+    const learnable = [...text('src/lib/midi.ts').matchAll(/\{ key: '([a-zA-Z0-9]+)',\s+label:/g)].map((m) => m[1]);
+    const docPresets = ticked(section('Presets')).filter((id) => id !== 'user-');
+    const docActions = section('Actions').split('\n').filter((l) => l.startsWith('| `')).flatMap((l) => ticked(l.split('|')[1]));
+    const docSettings = [...section('Settings worth a fader').matchAll(/^\| `([a-zA-Z0-9]+)`/gm), ...section('Settings worth a fader').matchAll(/`(globalSpeed|macroZoom|hueJourney)`/g)].map((m) => m[1]);
+    const missing = (want, have) => want.filter((x) => !have.includes(x));
+    // Every `id:` in the file is a preset's own (its dyes and patches carry none), so a
+    // preset written at another indent, which the line above would miss, shows as a gap.
+    const allIds = text('src/presets.ts').match(/^\s+id: '/gm)?.length ?? 0;
+    check('docs/osc.md: its presets are the app\'s built-in presets, every one and no other',
+      presetIds.length > 20 && presetIds.length === allIds && !missing(presetIds, docPresets).length && !missing(docPresets, presetIds).length,
+      `${presetIds.length} in src/presets.ts (${allIds} ids in the file); not on the page: ${missing(presetIds, docPresets).join(' ') || 'none'}; not in the app: ${missing(docPresets, presetIds).join(' ') || 'none'}`);
+    check('docs/osc.md: its actions are the protocol\'s actions, every one and no other',
+      actions.length > 20 && !missing(actions, docActions).length && !missing(docActions, actions).length,
+      `${actions.length} in RemoteAction; not on the page: ${missing(actions, docActions).join(' ') || 'none'}; not in the app: ${missing(docActions, actions).join(' ') || 'none'}`);
+    check('docs/osc.md: every setting it names is one MIDI learn offers',
+      docSettings.length >= 10 && !missing(docSettings, learnable).length,
+      `${docSettings.length} named; not learnable: ${missing(docSettings, learnable).join(' ') || 'none'}`);
+
+    const lines = (doc.match(/```osc\n([\s\S]*?)```/)?.[1] ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+    const wrong = [];
+    for (const line of lines) {
+      const [address, ...words] = line.split(/\s+/);
+      const args = words.map((w) => (/^-?\d*\.?\d+$/.test(w) ? Number(w) : w));
+      const [, , what, name] = address.split('/');
+      const got = await heard(osc(address, ...args));
+      const m = got?.length === 1 ? got[0] : null;
+      const ok = !!m && (
+        what === 'setting' ? m.type === 'patch' && learnable.includes(name) && near(m.settings[name], args[0], 1e-6)
+        : what === 'action' ? m.type === 'action' && m.action === name && actions.includes(name)
+        : what === 'preset' ? m.type === 'preset' && m.presetId === (name ?? args[0]) && presetIds.includes(m.presetId)
+        : what === 'dye' ? m.type === 'dye' && m.color === `#${String(args[0]).replace(/^#/, '')}`
+        : what === 'tilt' ? m.type === 'tilt' && near(m.x, args[0]) && near(m.y, args[1])
+        : m.type === what && near(m.x, args[0]) && near(m.y, args[1]) && near(m.amount, args[2] ?? 0.5)
+          && (args.length < 5 || (near(m.dx, args[3]) && near(m.dy, args[4]))));
+      if (!ok) wrong.push(`${line} → ${got ? JSON.stringify(got).slice(0, 80) : 'nothing'}`);
+    }
+    check('docs/osc.md: every line of "Try it" arrives as the message its address names',
+      lines.length >= 15 && !wrong.length, `${lines.length} lines${wrong.length ? `; wrong: ${wrong.join('; ')}` : ''}`);
   }
 
   // Art-Net out: the page reports the plate, the fixture sees it.
