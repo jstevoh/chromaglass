@@ -301,12 +301,10 @@ written first. Line numbers are as read on main at d07ac31.
     back branch is missing and give it what is physical for a second dish (its own gap,
     no contact shadow on the front's screen). *Measure:* `npm run grainedge` line 4 prints
     the back plate's edge moves; ask them under line 1's bar once the pictures agree.
-  - **38h-3. The oil's shadowgraph and the dye's are one term** (with **18e-2**). 38h draws
-    the oil's out-of-focus lens from its own ∇²OPL in the oil block, on both sides of its edge;
-    where dye crosses the oil's edge `refractionOptics` already takes the oil's share of the
-    derive pass's ∇²OPL, so there it is counted twice. When 18e-2 deflects by ∇OPL, take the
-    oil block's term out. *Measure:* `npm run nolight` line 7 holds with the oil block's
-    shadow gone.
+  - ~~**38h-3**~~ *shipped 2026-11-01.* The oil's shadowgraph and the dye's are one term:
+    `defocusShadow` (`plateTransmit.ts`) draws the whole column's ∇²OPL (dye, oil, pour,
+    film, gap) at the defocus disc's scale; the oil block's own term and refractionOptics'
+    are gone. `npm run nolight` line 13. Story in `docs/plan-shipped.md` §38.
 
 - **38i. Milk's forward scatter takes light from the beam, it does not add it** (S–M, low;
   Medium on the milk looks: today a bright rim rings every pool). After **18j**; sharpens

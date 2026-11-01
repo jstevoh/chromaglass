@@ -10746,6 +10746,22 @@ model cannot reach one, the PR says what it reached and asks.
     body texture 0.07–0.18 levels before, 0.21–0.39 now; single-pixel flecks at its edges
     0.55% at most. Found on the way: 38h-12 (the back plate is drawn brighter than the front,
     so the same grain moves more of its edge past 40 levels, in patches).
+  - **38h-3 (shipped 2026-11-01).** The shadowgraph was two terms. `refractionOptics` drew the
+    dye's from the derive pass's ∇²OPL, masked to the dye's own slope and only over dye; the
+    oil block drew the oil's from the oil alone (38h's ring means). So where dye crossed an
+    oil drop's edge the oil's share was counted twice (in the lab at Focus 0.8 a black arc at
+    10 and a clipped one at 255 along the dye's edge), and a clear pour that moves only the
+    index (glycerine, Δn 0.14) drew its lens only where the dye happened to slope. Now one
+    function, `defocusShadow` (`src/gpu/wgsl/plateTransmit.ts`), takes the oil block's ring-mean
+    Laplacian at the defocus disc's scale off the derive pass's `.w`, the whole column's
+    optical path n·h (dye stand-in, oil, pour, film, gap), divided by water's index, and
+    multiplies the light through the front plate (the back plate's own dye, until 18e-1).
+    Averaging the derive pass's `.z` (∇²OPL) over the disc was tried first and speckled a
+    fresh pour's stair-stepped rim. `npm run nolight` line 13 (new): a clear pour is a lens out
+    of focus, as strong as the oil's of the same size for its index step (summed |ln T| at
+    Focus 0.56, 1.04 of the 1.29 predicted; a doubled index reads 1.75, red; main turns only
+    0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
+    look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
