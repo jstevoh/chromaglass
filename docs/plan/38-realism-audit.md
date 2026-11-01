@@ -286,16 +286,25 @@ written first. Line numbers are as read on main at d07ac31.
     ferrofluid's glint is a fixed key light (with **38j**). The photo style's softbox is a
     print lit from the front and stays. And the lab draws only the derived path, so the
     plain path's rims are checked through the camera's, which shares `meniscus`.
-  - **38h-4. The back plate's lamp takes the pigment's grain as dye** (S, nil; Low-Medium on
-    two-plate lamp looks). 38h made the front plate's lamp read the grain as T^grain
-    (`lampGrain0`); the back plate's lamp branch still reads `grained1 / film1`, the grain's
-    share of the opacity, which is 1 on a body near opaque. Its note warns that Metal folded
-    `grainedDepth` differently when it had two uses, so carry the raw grain in a var as the
-    front plate does. *Measure:* `npm run grainedge` with the back plate on.
-  - ~~**38h-3**~~ *shipped 2026-10-31.* The oil's shadowgraph and the dye's are one term:
+  - ~~**38h-4**~~ *shipped 2026-10-31.* The back plate's lamp takes the pigment's grain as
+    dye, T^grain (`lampGrain1`), as the front's does. `npm run grainedge` line 4. Story in
+    `docs/plan-shipped.md` §38.
+  - **38h-12. The back plate is drawn brighter than the front, so its grain moves its edges
+    more** (S–M, nil; Low: the back plate shows only with two plates on). Found building
+    38h-4. Drawn alone (front level 0) over the lab's plate, the back plate's grainless
+    picture is 11 levels from the front's on average in Poster 1969 and 66 in Chemical
+    Clock, whose bare glass reads 255 alone against the front's 137: the back plate's
+    branch lacks some of the front's pieces (the chemistry's colour, the gap's scale and
+    the film, the contact shadow). With the same T^grain the brighter picture moves more of
+    its edge past 40 levels: Poster 1969 10%, Milk Marble 4.5% (the front 0.01%), 85% of
+    them in patches, the grain's mottle and not one-pixel flecks. Find which pieces the
+    back branch is missing and give it what is physical for a second dish (its own gap,
+    no contact shadow on the front's screen). *Measure:* `npm run grainedge` line 4 prints
+    the back plate's edge moves; ask them under line 1's bar once the pictures agree.
+  - ~~**38h-3**~~ *shipped 2026-11-01.* The oil's shadowgraph and the dye's are one term:
     `defocusShadow` (`plateTransmit.ts`) draws the whole column's ∇²OPL (dye, oil, pour,
     film, gap) at the defocus disc's scale; the oil block's own term and refractionOptics'
-    are gone. `npm run nolight` line 9. Story in `docs/plan-shipped.md` §38.
+    are gone. `npm run nolight` line 13. Story in `docs/plan-shipped.md` §38.
 
 - **38i. Milk's forward scatter takes light from the beam, it does not add it** (S–M, low;
   Medium on the milk looks: today a bright rim rings every pool). After **18j**; sharpens

@@ -585,6 +585,32 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.5-osc. OSC out to a VJ app (2026-11-01)
+
+Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second
+`lights` report (which feeds Art-Net) now carries the ear's fast readings (level, kick,
+bass, snare, hats, note), its eight bands and the beat clock's tempo, and a `beat` message
+the frame the plate's kick count moves. The show server turns them into OSC under
+`/chromaglass/out/`: one bundle a report (thirty-odd addresses as loose packets would be
+six hundred datagrams a second on a venue's Wi-Fi), the beat alone and at once as 1 and
+then 0 50 ms later, a button's press and release. One float per address, because
+Resolume's shortcuts, VDMX and TouchOSC map one address to one value. The plate's colour
+is the layers' mean weighted by fill, so an empty glass sends black, not the colour it
+last held. Nothing under `/out/` is an address OSC in acts on. Pro, asked per packet as OSC
+in is. The switch is the laptop's page's only (`osc-out-enable` from the display; a phone
+is refused), offered only when a server says it is there, remembered on the machine and
+re-asked on connect, as Link is; the same row (`ui/OscOutRow.tsx`) in Settings → Sound and
+on the phone layout. The OSC reader moved from `remote-server.js` into `server/osc.js`
+beside the writer; App's lights effect moved whole into `app/useShowFeed.ts`.
+
+**Measured** (`npm run oscout`, 28/28 in a cloud session, the plate's own beat skipped
+there and run on the fifth Mac shard): a message and a bundle against bytes written by
+hand; the feed's numbers against a plate worked by hand; the page's and server's target
+rules alike on 13 cases; on the real server a report is one 1192-byte datagram of 29
+messages, a beat arrives 1.0 ms after it is sent and is released 50 ms later, a phone
+moves nothing, off and below-Pro send nothing; the built app's switch, refused target,
+its own reports and the switch back on after a reload.
+
 ### 13.4. Control, written up (2026-10-31)
 
 `docs/osc.md` is every address the show server takes over OSC (settings, every
@@ -3271,6 +3297,39 @@ the day they pass.
     Drop's opening builds 61 pipelines (Classic's 56 and these five), all ready, asks for all
     five in its first nine steps and none late, nothing on a frame; Classic 56, no slosh key.
 
+
+- **18a-13j, a hand can tip the dish (shipped 2026-10-31).**
+  - What was reported: the owner, 2026-10-31, "I still haven't been able to try the plate
+    sloshing. I never saw the control to do that." The slosh had been in since 18a-13, but
+    its dial sat in Tilt & Rock, a section no shipped tab puts out, at 0 on every look, and
+    a tip was then two more faders: Gravity raised, Tilt Direction dragged one way and back.
+    Only the phone's Tilt could tip the dish by hand.
+  - What changed: the Tip pad (`components/ui/TipPad.tsx`, the arithmetic in
+    `lib/tipPad.ts`), the dish seen from above with a dot. Drag the dot toward an edge and
+    that edge goes down; let go and Gravity and Tilt Direction are put back as the hand
+    found them, so the liquid sloshes back past the middle. It writes the two settings the
+    phone's Tilt writes, so the liquid's answer is the solver's, and a desk stays a thing
+    that changes settings. On the desk it fills the two keycaps the Tools panel's last row
+    left empty (40 px, read over 72 px of travel, the pointer held past its rim), so it is
+    on Perform and Gig with nothing opened or scrolled; it heads Tilt & Rock; on the phone
+    it is 128 px in the Motion sheet, hidden while Tilt is on. The arrow keys tip it too.
+  - Why settings and not the remote's held-phone path (`setExternalTilt`): that one reaches
+    the dish unturned (18a-13e), so on the twenty-nine looks whose dish turns a tip toward
+    the top would slop wherever the dish had turned to. Tilt Direction is the stage's and
+    is turned into the dish each step (`downhill`).
+  - Why a grab raises Slosh: at 0 a tip only sinks the heavy colour through the gap,
+    slowly, and a pad that seemed to do nothing would be the report again. A grab with the
+    dial under 0.05 puts it at 0.5, where judging §58 asks for the owner's eyes; it stays
+    there and the dial shows it. Gravity goes as the square of the reach past a 6% dead
+    zone: 0.15 of the way out leans 0.01, the rim stands the plate up.
+  - Measured (`npm run tippad`, 16 lines): the compass against the plate's and the phone's;
+    on the built app at 1440×900, the pad seen inside the Tools panel with nothing scrolled
+    (it was first drawn under the keys and sat below the panel's fold: that line went red,
+    and the drags at the pad's place read Gravity 0); dragged right, Gravity 0.9 at 90°,
+    Slosh 0 → 0.5; let go, 0/180° again exactly; Lava Lamp's 1/180° kept through a tip;
+    the phone's pad down, 0.9 at 180°.
+  - What it cannot see here: the liquid. The scheme is `npm run slosh`'s, the kernels
+    `sloshgpu`'s, the look at sixty frames the Mac's (judging §58, §64, and the owner's film).
 ### 18b. The lamp shines through the dye (replaces paint over black)
 
 - **Where:** `plate.ts`, where `bgColor` is black unless the blend is multiply, and the
@@ -3956,6 +4015,58 @@ line, `magnet`'s rewritten drag check, `layout`'s 33 → 31 panels, #340's seven
 out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` revert),
 every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
 lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
+
+### 19ak. The Mac runs what a PR reaches, and known flakes report without blocking (2026-11-01)
+
+Asked by the owner on 2026-11-01 ("are we running too many checks on everything?"),
+when four PRs (#627, #643, #656, #659) sat red on lines none of them touched. Three
+savers were already in place and are unchanged: a newer push cancels the older run
+(`concurrency` in `checks.yml`), npm and Chromium are cached, and a PR of documents,
+the sessions' files or the native apps skips the Mac (19h).
+
+- **19ak-1, quarantine.** A check's entry in `scripts/checks.json` can carry
+  `quarantine`: the start of a FAIL line, the plan id that fixes it, and the dates it
+  holds from and until (at most `QUARANTINE_DAYS`, 21). While it holds, on a pull
+  request, a check whose only FAIL lines are quarantined still runs and prints them, as
+  a warning annotation and a ⚠ row in the job summary, and its job stays green. No bar
+  moved: the line and its threshold are the harness's, and main's deploy holds every
+  line to it, so a real regression a quarantine let through a PR is red before it is
+  live. A check that timed out, was killed, exited other than 1, printed a stack, did
+  not reach its own "N/M checks passed" with exactly its FAIL lines counted, read
+  unread or never on the line, or printed any FAIL line not on the list is red as
+  before; so is one past its end date. Adding a quarantine or moving its end later is a
+  check change `checkguard.mjs` makes the PR name (the review of this PR found both
+  holes). `npm run checks` holds all of that with a control each, and that every entry's
+  plan id is an item in `docs/plan/` and its text is in the check's own scripts. First
+  entries, 2026-11-01 to 11-15: startup's "moving for good no later than the old way"
+  (19aa-7; #661 fixes most of it, 19aa-7b the rest), the Blow stroke's "keeps it rather
+  than erasing it" (19aj-1) and the wall's circle (19aj-2).
+- **19ak-2, the site's files select checks on the Mac.** A PR that changed anything
+  under `src/` or `public/` ran all 96 Mac checks. Now `checkReads` (in `checks.mjs`,
+  shared with `quick.mjs`) says what each reads from esbuild's import graph: the 28
+  that open the app or build it read the whole site; the 68 that open only the lab
+  read what their bundles import. The reach job installs esbuild alone (seconds, not
+  `npm ci`), and `reach.mjs` passes the names to each shard (`maconly` →
+  `CHECKS_ONLY`). A file under `server/` selects the Mac checks whose scripts trace it,
+  and no others (nothing under `src/` imports it). Measure is unchanged: it runs in
+  full for any site file. Fails toward running: no esbuild, an entry that would not
+  bundle, or a check the map does not place, and that check runs. Such a run leaves a
+  `mac` "partial" notice, which the deploy gate reads as it reads Measure's, so the
+  deploy of the merge runs every shard on main.
+- **19ak-3a, a re-run skips what passed.** "Re-run all jobs" on a red PR run started
+  all five Mac shards again; on attempt 2 or later `reach.mjs` drops the shards an
+  earlier attempt of the same run passed (`passedEarlier`), since a run's merge commit
+  does not move between attempts. Such an attempt is partial to the deploy gate.
+- **19ak-3c, the Mac waits for the typecheck.** A new `Compiles, before the Mac` job runs
+  `tsc --noEmit` on ubuntu beside `reach`; the Mac shards need it, so a PR that does not
+  compile takes no Mac. Building once for all five shards (19ak-3d) was measured and
+  left: `dist/` is 116 MB against a 15 s build.
+- **Measured** (`scratch/replay.mjs`, not committed: main's last 100 merges replayed
+  through the old and new selection, each check priced at its median over three green
+  five-shard PR runs of 2026-11-01, plus 45 s of setup a shard): 6,526 Mac minutes
+  before, 5,675 after, 13% less; 65.3 → 56.8 a push. The lab's checks all bundle one
+  `scripts/lab-entry.ts`, which imports most of `src/gpu` and `src/lib`, so a solver or
+  library change still runs every lab check (19ak-3).
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -7887,6 +7998,44 @@ Not a gate and no bar: a rate depends on what was pushed.
   `npm run bassboost`. The reading itself still carries the boost (the mappings, the meter and the
   camera follow it, clipped at 100 as before); the phone's Settings is the same panel.
 
+- **27h-1. Every dial from very gentle to very extreme, the first twenty-five (shipped, #626, 2026-10-31; the owner: "very gentle options and very extreme options (which should be a general principle for all dials)").** Twenty-five dials whose top was timid and whose consumer could
+  simply be let further: Evolve Speed to 3, Plate Rock 3, Kick Bloom 4, Melody Walk 2,
+  Saturation 0 (grey) to 3, Macro Chase 3, Hue Journey 30 min, Bass Boost 0.25 (a cut) to 5,
+  Grain Fineness 20 to 1200 (the uniform's own clamp), Layer Scale Variety 2, Gel Speed 30 rpm,
+  Film Grain 3, Grain Size 16 px, Gate Weave 12 px, Shot Length 60 s, Paint Cells 2, Cell Size
+  3, Edge Detail 2.5, Magnet Strength 3 (at 1 and the default height the spikes were only at
+  onset; full spikes need 1.76), Magnet Size 1.5, Tempo Sync 1.6, Rain Drip 2, Evaporation 0.5,
+  Rotation Speed 1.3 (40 rpm, inside the motor's 45), Flick Strength 2. A curve on the travel
+  (`curve`, and `PANEL_CURVES` in `lib/midi.ts` for the panel's own dials) keeps the gentle
+  end's room where the top went up four times or more. Each widened dial carries its old width
+  as `wanderSpan`, which Evolve's wander is still a fifth of (`dialWindow`, `lib/drift.ts`).
+
+- **27h-2. The dials held inside the solver (shipped, 2026-10-31).** Each of these had its top
+  held a second time inside the solver, so a wider dial alone would have bought dead travel:
+  Swirl, Dye Weight, Heat Spread and Pushes Dye clamped to 1 in both the step's parameters
+  (`sim/fluidSimulation.ts`) and the GPU solver (`gpu/fluid.ts`), Dye Weight a third time in
+  `dyeDensityContrast` (`lib/turntable.ts`), Drop Height to 1, Background Loop to 1, Momentum's
+  lasting current to 0.995 a step, and Glass Smear behind a gate at 0.2 that made its first live
+  step a jump to a fifth of full. Now Swirl, Dye Weight and Heat Spread run to 2, Pushes Dye to
+  1.2, Drop Height to 2, Background Loop to 1.4, Glass Smear to 3 from its first step, and the
+  current keeps up to 0.999 (a sixteen-second memory where 0.995 was three; at exactly 1 it
+  would never answer its forces). The physics at each top: Dye Weight 2 is a dye 28% heavier
+  than its liquid, glycerine against water; Heat Spread 2 is 199 times water's κ, past nature,
+  through an implicit Jacobi that cannot go unstable; Pushes Dye at 1.2 keeps its two
+  passes, each giving a cell's neighbours at most 4 × 0.18 × 1.2 = 0.86 of it, under the 1 where
+  it would overshoot; Swirl is
+  confinement, a look option, which at 1 already keeps an unforced plate stirring (still
+  rising ×1.11 from step 300 to 600) and at 2 feeds itself no more (×1.02). The fourteen looks whose Glass Smear sat at or under 0.2, and so smeared nothing,
+  now say 0, so every look opens as it did. The solver's file is at its size ceiling, so its
+  edits are byte-neutral (193870 bytes, its ceiling) and the reasons live in `gpu/fluid/constants.ts` and
+  `lib/turntable.ts`. `npm run widedials` (17 lines): every clamp admits the dial's top, no look
+  moved, and in the lab on 128² each top does more than the old one, finite and conserving. On
+  main 14 of its 17 lines were red; |curl| at step 60 was 2.91e-4 at Swirl 1 and at 2, now
+  5.49e-4 at 2; a heavy pool's radius grew 0.0239 at Dye Weight 1 and at 2, now 0.0285 at 2;
+  heat's radius 0.0157 at Heat Spread 1 and 2, now 0.0268 at 2; a ferrofluid pool kept 0.791 of
+  its dye at Pushes Dye 1 and 1.2, now 0.763 at 1.2, the plate's total ×1.0000 either way.
+  Each widened dial carries `wanderSpan` 1, so Evolve wanders it no further than before.
+
 ### 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
 
 - **28b. Colour palettes for the lamp** (**shipped**, #330). Pastel Glow and Galaxy each
@@ -10585,7 +10734,19 @@ model cannot reach one, the PR says what it reached and asks.
     just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
     the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
     38h-11.
-  - **38h-3 (shipped 2026-10-31).** The shadowgraph was two terms. `refractionOptics` drew the
+  - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
+    the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
+    opaque, so on a lamp look with two plates the back plate's pools lost their grain. It
+    now takes the grain as pigment, T^grain, as the front does: the raw grain carried in a
+    var (`lampGrain1`), so grainedDepth keeps its one use, the order Metal folded
+    differently when it had two. `npm run grainedge` line 4 draws the back plate alone
+    (front level 0, no satellite droplets) in every lamp look and reads the grain's texture
+    in the log of the light in the dense bodies, (grain − 1)·ln T, which no lamp level or
+    tint can fake: 0.28 to 0.44 of the front plate's before, 1.00 to 1.50 now (bar 0.9);
+    body texture 0.07–0.18 levels before, 0.21–0.39 now; single-pixel flecks at its edges
+    0.55% at most. Found on the way: 38h-12 (the back plate is drawn brighter than the front,
+    so the same grain moves more of its edge past 40 levels, in patches).
+  - **38h-3 (shipped 2026-11-01).** The shadowgraph was two terms. `refractionOptics` drew the
     dye's from the derive pass's ∇²OPL, masked to the dye's own slope and only over dye; the
     oil block drew the oil's from the oil alone (38h's ring means). So where dye crossed an
     oil drop's edge the oil's share was counted twice (in the lab at Focus 0.8 a black arc at

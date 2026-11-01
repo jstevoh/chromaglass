@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
@@ -22,6 +23,8 @@ import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { OscOutRow } from '../ui/OscOutRow';
+import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -229,6 +232,9 @@ export interface PhoneStageProps {
   onTap: () => void;
   /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
   onLink?: (on: boolean) => void;
+  /** OSC out at the show server (PLAN.md 13.5-osc), the desk's own row at a phone's size; null until a server is there. */
+  oscOut?: OscOutLabel | null;
+  onOscOut?: (on: boolean, target?: string) => boolean;
   readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
@@ -1056,6 +1062,9 @@ export function PhoneStage(p: PhoneStageProps) {
               <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
             </div>
           )}
+          {p.oscOut && p.onOscOut && (
+            <div className="mt-2"><OscOutRow oscOut={p.oscOut} onOscOut={p.onOscOut} touch testId="phone-osc-out" /></div>
+          )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
@@ -1087,6 +1096,18 @@ export function PhoneStage(p: PhoneStageProps) {
               <SectionLabel>The song</SectionLabel>
               <SongScore {...p.score} touch />
             </>
+          )}
+          {/*
+            The desk's Tip pad under a thumb (PLAN 18a-13j): for a phone on a stand,
+            an iPad, or a hand that would rather not tip the phone itself. Hidden
+            while Tilt is on, since the phone is then the dish and both would write
+            the same two settings.
+          */}
+          {!p.tilt.on && (
+            <div className="mt-3 flex items-center gap-4" data-testid="phone-tip">
+              <TipPad settings={p.mixer.settings} onSetting={p.mixer.onSetting} size={128} testId="phone-tip-pad" />
+              <p className="min-w-0 text-[13px] leading-snug text-muted">Drag the dot toward an edge and the liquid runs there. Let go and the dish lies flat, and the liquid sloshes back.</p>
+            </div>
           )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
           <div className="mt-3">

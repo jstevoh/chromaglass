@@ -38,7 +38,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { ROOT, loadManifest, parseManifest, entryFiles, npmScriptsOf, trace, reads, runOne, metafilesOf } from './checks.mjs';
+import { ROOT, loadManifest, parseManifest, npmScriptsOf, reads, runOne, checkReads } from './checks.mjs';
 import { shipsToSite } from './reach.mjs';
 
 const args = process.argv.slice(2);
@@ -51,21 +51,13 @@ const man = loadManifest();
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const scripts = pkg.scripts ?? {};
 
-// What each check reads.
-const esbuild = await import('esbuild');
-const traced = new Map(man.checks.map((c) => [c, trace(entryFiles(c.run, scripts))]));
-const bundled = new Set();
-for (const t of traced.values()) for (const f of t) if (/\.(mjs|js|ts|tsx)$/.test(f) && (/^src\//.test(f) || /^scripts\/.*\.(ts|mjs|js)$/.test(f))) bundled.add(f);
-const nodeMeta = await metafilesOf(esbuild, [...bundled].filter((f) => f.startsWith('scripts/') && !f.endsWith('.ts')), 'node');
-const webMeta = await metafilesOf(esbuild, [...bundled].filter((f) => f.startsWith('src/') || f.endsWith('.ts')), 'browser');
+// What each check reads (checks.mjs `checkReads`, which the reach job also
+// asks for a PR's site files, PLAN.md 19ak-2).
+const readsOf = await checkReads(man, scripts, await import('esbuild'));
 const text = (f) => { try { return fs.readFileSync(path.join(ROOT, f), 'utf8'); } catch { return ''; } };
-const SERVES_APP = /node_modules\/\.bin\/vite|['"`]vite['"`]|\bvite (?:preview|dev)\b|npm run (?:dev|preview)\b/;
 const info = new Map();
 for (const c of man.checks) {
-  const r = new Set(traced.get(c));
-  for (const f of traced.get(c)) for (const i of nodeMeta.get(f) ?? webMeta.get(f) ?? []) r.add(i);
-  const files = [...traced.get(c)].filter((f) => /^(scripts|server)\//.test(f));
-  const app = files.some((f) => SERVES_APP.test(text(f)));
+  const { reads: r, files, app } = readsOf.get(c);
   const browser = app || files.some((f) => /from ['"](?:playwright|\.\/chromium\.mjs|\.\/lab\.mjs)['"]/.test(text(f)));
   const mac = man.shards.mac.includes(c.shard);
   // What two checks cannot share at once. Seventy npm scripts start with
