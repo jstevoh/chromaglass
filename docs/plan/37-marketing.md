@@ -429,20 +429,14 @@ rest is routine and the owner's calls.
       film of two known halves alone in the mixer, a keystone on the wall, the Mixer stack
       source's frames decoded: 1920x1080, the film the right way up and round, the mixer's
       grade on it, every edge cell the film's, square, and on a Mac moving), with the panel's Source as `data-testid="live-source"` (values `plate`,
-      `stack`); CI's fifth Mac shard runs it with `--owed=plate,stack` until the builds land.
-    - *37x-4d-6. The stream's frames are black.* (Open; found writing 37x-4d-1's check.)
-      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
-      and a presented WebGPU canvas read outside the frame task that drew it answers black
-      (why the projector window and the pad's picture are copied inside that task:
-      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
-      plate read in its frame was the film with the keystone; the Plate source's decoded
-      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
-      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
-      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
-      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
-      --stack`, red on main. Metal answers the same: CI's fifth Mac shard on #619 decoded
-      (0, 0, 0) in every cell from 50 packets, against the plate's own (30, 104, 251) |
-      (240, 139, 1).
+      `stack`); CI's fifth Mac shard runs it with `--owed=stack` until the build lands (the
+      `plate` line went green with 37x-4d-6). Its frames come the way the plate's now do:
+      see 37x-4d-6.
+    - *37x-4d-6. The stream's frames are black.* *(shipped 2026-10-31.)* The frame task
+      hands the encoder each picture it draws (`lib/liveFrame.ts`, `lib/frameTaps.ts`);
+      story in `docs/plan-shipped.md` §37x-4d-6. The Mixer stack's draw (37x-4d-1) calls
+      `tapLiveFrame('stack', canvas)` from the same task and the panel starts the encoder
+      with `frames: 'stack'`; it can skip its draw unless `liveFrameWanted('stack')`.
     - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
       account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
       new desk; and it would sit on the website's Perform too, where it cannot stream. It
