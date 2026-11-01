@@ -199,7 +199,7 @@ Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the loa
 
 Then: **6-recordset** (after 1.11), **8-pictures**, **5-shutter**, **5-channels**,
 **5-follow-a** (M, an instrument followed in a mix; then 5-follow-b with §17),
-**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**; ~~**13.5-link**~~ (shipped
+**R5-kit** the show kit, **14t-decks**, **15h** the Comb, **9j**; ~~**13.5-link**~~ and its five follow-ups (shipped 2026-11-01; Link
 2026-10-30, owed judging §95), then **13.5-osc** (§30), **13.4-ipad**, later **13.7-ipad**; **31e** halation in the Photograph
 style (§31).
 

@@ -195,6 +195,9 @@ const refreshTier = async () => {
     const s = await licenseManager.currentStatus();
     showTier = s.valid ? s.tier : s.enforced ? 'free' : 'pro';
   } catch { /* keep the last answer */ }
+  // A key taken out, or a Pro key swapped for a Home one, closes Link as it
+  // closes OSC and Art-Net: the session is left, not kept on (13.5-link-gate).
+  if (link && !proLinks()) setLink(false);
   return showTier;
 };
 const proLinks = () => showTier === 'pro';
@@ -714,11 +717,26 @@ if (ARTNET_IN.size > 0) {
 // the earliest-arriving stamp (`TempoSource.linkReading`), so a late frame
 // does not drag the phase. A beat at 200 bpm is 300 ms; a twentieth of a
 // second between readings is only how fast a tempo change is heard.
+//
+// Pro, beside OSC and Art-Net (PLAN.md 13.5-link-gate, 34a-7a): asked below
+// Pro, the server stays out of the session and says why (`locked`), so the
+// page's switch can say "needs Pro" rather than "off" with no reason. The
+// Mac app's menu hears every change (`onLinkChange`), so its tick is the
+// server's state and never a guess.
 let link = null;
 let linkTimer = null;
-const linkMessage = () => JSON.stringify(link ? { type: 'link', on: true, ...link.reading() } : { type: 'link', on: false, peers: 0, bpm: 0, beat: null, playing: false });
+let linkListener = null;
+const linkMessage = () => JSON.stringify(link ? { type: 'link', on: true, ...link.reading() } : { type: 'link', on: false, peers: 0, bpm: 0, beat: null, playing: false, ...(proLinks() ? {} : { locked: true }) });
+/** Whether the show server is in a Link session's room now, for the Mac app's Show menu. */
+export const linkOn = () => link !== null;
+/** One listener (the Mac app's menu), told on/off whenever Link opens or closes. */
+export function onLinkChange(fn) { linkListener = typeof fn === 'function' ? fn : null; }
+const tellLink = () => { try { linkListener?.(link !== null); } catch { /* the menu's trouble is not the server's */ } };
 function setLink(on) {
-  if (on === (link !== null)) { broadcastTo('display', linkMessage()); return; }
+  if (on && !proLinks()) on = false;
+  // Told even when nothing changed: the Mac app's checkbox ticks itself on a
+  // click, and a refusal below Pro has to untick it.
+  if (on === (link !== null)) { broadcastTo('display', linkMessage()); tellLink(); return; }
   if (on) {
     link = startLink({ onError: (err) => console.log(`  Ableton Link: ${err.code ?? err.message}`) });
     linkTimer = setInterval(() => broadcastTo('display', linkMessage()), 50);
@@ -731,6 +749,7 @@ function setLink(on) {
     console.log('  Ableton Link:       off');
   }
   broadcastTo('display', linkMessage());
+  tellLink();
 }
 
 // ── Startup banner ─────────────────────────────────────────────────────

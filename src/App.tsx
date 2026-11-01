@@ -221,7 +221,7 @@ export default function App() {
 
   const { output, setOutput, resetOutput, wallTest, setWallTest, shownOutput } = useOutput();
 
-  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setLinkOn, tempoPanel } = useTempo();
+  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, linkProps, tempoPanel } = useTempo();
 
   const { ambientMode, setAmbientMode, setAmbientModeRef } = useAmbientMode();
 
@@ -3284,7 +3284,7 @@ export default function App() {
             readLevel={readLevel}
             tempo={tempoLabel}
             onTap={tapTempo}
-            onLink={setLinkOn}
+            {...linkProps}
             readTempo={readTempo}
             show={{
               running: sequencer.status.running,

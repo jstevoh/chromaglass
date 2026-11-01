@@ -59,6 +59,16 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
     ipcRenderer.on('chromaglass:ambient', listener);
     return () => ipcRenderer.removeListener('chromaglass:ambient', listener);
   },
+  // The Show menu's Ableton Link item (PLAN.md 13.5-link-menu): the page
+  // switches Link as its own Link button does, so it stays remembered.
+  onLinkMenu(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = (_event, on) => {
+      try { fn(Boolean(on)); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:link', listener);
+    return () => ipcRenderer.removeListener('chromaglass:link', listener);
+  },
   setAmbient(on) {
     ipcRenderer.send('chromaglass:set-ambient', Boolean(on));
   },

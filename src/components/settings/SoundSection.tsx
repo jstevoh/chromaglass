@@ -23,7 +23,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
   const {
     settings, onUpdate, songDetection, onSongDetection, calibration, onRecalibrate, audioSource,
     onAudioSource, audioInputs, audioInputId, onAudioInput, tempo, onTap, readTempo, onTempoClear,
-    onTempoBpm, onLink, midiClocked, timecode, focusSection, midi, onOpenSound, keep, shown, goTo, listens,
+    onTempoBpm, onLink, onLinkTransport, midiClocked, timecode, focusSection, midi, onOpenSound, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
   return (
@@ -237,6 +237,18 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                   Link
                 </button>
                 <span className="text-[12px] opacity-50" data-testid="tempo-link-says">{linkLine(tempo.link)}</span>
+                {/* Live's play and stop on the Sequence (13.5-link-transport): off until asked for. */}
+                {tempo.link.on && onLinkTransport && (
+                  <button
+                    onClick={() => onLinkTransport(!tempo.link?.follows)}
+                    aria-pressed={!!tempo.link.follows}
+                    data-testid="tempo-link-transport"
+                    title="A stop in Live pauses the running Sequence, and Live's next play resumes it"
+                    className={`ml-auto min-h-9 flex-none rounded-lg border px-3 text-[13px] font-medium transition-all ${tempo.link.follows ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                  >
+                    Play/Stop
+                  </button>
+                )}
               </div>
             )}
             <Info>
@@ -244,7 +256,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               {' '}<span className="text-white/70">MIDI clock</span> needs nothing set up: if the desk is sending it down the cable the faders are already on, the show locks to it{midiClocked ? ' \u2014 and it is arriving now' : ''}.
               {' '}<span className="text-white/70">Tap</span> sets the tempo *and* the bar, so tap on the downbeats and the plate is pressed on the downbeats; one tap on its own re-phases a tempo that is already running, which is how to get back on the bar after a fill.
               {' '}A <span className="text-white/70">typed number</span> sets the tempo and leaves the bar alone.
-              {tempo?.link?.available && <>{' '}<span className="text-white/70">Link</span> follows the tempo and the bar of Live, Bitwig, Traktor or an iPad's AUM on the same network, with no cable, and wins over the others while a session is playing; Listen switches it off.</>}
+              {tempo?.link?.available && <>{' '}<span className="text-white/70">Link</span> follows the tempo and the bar of Live, Bitwig, Traktor or an iPad's AUM on the same network, with no cable, and wins over the others while a session is playing; its bar line is the plate's one from the first bar. <span className="text-white/70">Play/Stop</span> lets Live's stop pause a running Sequence and its next play resume it (off, a stop between two tracks changes nothing). Listen switches Link off.</>}
               {' '}Any of them overrides the microphone until <span className="text-white/70">Listen</span>; a MIDI clock that stops sending hands back by itself.
             </Info>
             {/*

@@ -75,24 +75,11 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
      `docs/plan-shipped.md` §13.5-link. **Owed:** the owner's session with Live
      (`docs/judging.md` §95); until it passes, the Pro page keeps Link under "on the way".
-     - **13.5-link-one.** The bar grid (`lib/barGrid.ts`) finds the one by ear; Link
-       already knows it (`TempoReading.bar`, beat zero of the session is every peer's bar
-       line). Let a Link reading set the grid's place, so Accent the One and the song's
-       bar-counted moves land on Live's downbeat from the first bar. *Measure:* `npm run
-       downbeat` with a Link session whose one is not where the onsets put it.
-     - **13.5-link-transport.** Link carries Live's play and stop (`stst`, read and
-       relayed, `playing` on the message) but nothing uses it: a stopped Live could pause
-       the Sequence the way MIDI Stop does. Off by default (a stopped transport in a DJ
-       set is not the end of the show).
-     - **13.5-link-gate.** Link is not behind the licence yet. #586 (34a-7a, open when
-       this shipped) gates OSC and Art-Net as Pro in the show server; Link belongs under
-       the same gate (`setLink` in `server/remote-server.js`), once that lands.
-     - **13.5-link-rescan.** The peer opens its sockets on the interfaces up when Link is
-       switched on; Ableton's library rescans every thirty seconds. A Mac that joins the
-       Wi-Fi after Link is on finds only loopback until Link is switched off and on.
-       Rescan on a timer, as the library does.
-     - **13.5-link-menu.** A Show menu item in the Mac app beside OSC's, for an operator
-       who never opens Settings → Sound.
+     - ~~**13.5-link-one**, **-transport**, **-gate**, **-rescan**, **-menu**~~ **Shipped**
+       (2026-11-01): Live's bar line is the plate's one from the first bar, Play/Stop lets
+       Live's stop pause a running Sequence, Link is Pro, the interfaces are read again
+       every thirty seconds, and the Mac app's Show menu has the switch. Story in
+       `docs/plan-shipped.md` §13.5-link-one. **Owed:** in the same sitting, §95.
    - **13.5-osc**: OSC *out* for the plate's colour, the sound bands and the beat, the
      way Art-Net out already sends the colour to the lighting (`server/artnet.js`), so
      a VJ app's effects can follow the plate.

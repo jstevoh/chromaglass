@@ -229,6 +229,8 @@ export interface PhoneStageProps {
   onTap: () => void;
   /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
   onLink?: (on: boolean) => void;
+  /** Live's play and stop move the Sequence (13.5-link-transport), as on the desk. */
+  onLinkTransport?: (on: boolean) => void;
   readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
@@ -1054,6 +1056,16 @@ export function PhoneStage(p: PhoneStageProps) {
                 Link
               </button>
               <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
+              {p.tempo.link.on && p.onLinkTransport && (
+                <button
+                  onClick={() => p.onLinkTransport?.(!p.tempo.link?.follows)}
+                  aria-pressed={!!p.tempo.link.follows}
+                  data-testid="phone-tempo-link-transport"
+                  className={`ml-auto min-h-11 flex-none rounded-xl border px-4 text-[14px] font-medium ${p.tempo.link.follows ? LIT : 'border-white/10 bg-white/5'}`}
+                >
+                  Play/Stop
+                </button>
+              )}
             </div>
           )}
           <div className="mt-4">

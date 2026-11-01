@@ -22,6 +22,7 @@ export function useTempo() {
     // Link on is remembered on this machine: a show is set up once, and the
     // show server, relaunched with the app, is asked again on every connect.
     try { tempoRef.current.linkWanted = localStorage.getItem(LINK_KEY) === '1'; } catch { /* private window: off */ }
+    try { tempoRef.current.linkTransport = localStorage.getItem(LINK_TRANSPORT_KEY) === '1'; } catch { /* off */ }
   }
   const [tempoLabel, setTempoLabel] = useState<TempoLabel>({ source: null, bpm: 0, taps: 0 });
   const tempoLabelRef = useRef(tempoLabel);
@@ -30,13 +31,14 @@ export function useTempo() {
       const t = tempoRef.current;
       if (!t) return;
       t.read(performance.now());        // lets a stopped MIDI clock lapse
-      const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount, link: t.linkStatus };
+      const next = { source: t.active, bpm: Math.round(t.bpm), taps: t.tapCount, link: { ...t.linkStatus, follows: t.linkTransport } };
       // Compared here, not in an updater that hands back the old value: React
       // still renders the App to find that out whenever anything else is
       // pending, which with the ear running is always (PLAN.md §14f).
       const prev = tempoLabelRef.current;
       if (prev.source === next.source && prev.bpm === next.bpm && prev.taps === next.taps
-        && prev.link?.available === next.link.available && prev.link?.on === next.link.on && prev.link?.peers === next.link.peers) return;
+        && prev.link?.available === next.link.available && prev.link?.on === next.link.on && prev.link?.peers === next.link.peers
+        && prev.link?.locked === next.link.locked && prev.link?.follows === next.link.follows) return;
       tempoLabelRef.current = next;
       setTempoLabel(next);
     }, 250);
@@ -48,6 +50,16 @@ export function useTempo() {
   const setLinkOn = useCallback((on: boolean) => {
     tempoRef.current?.switchLink(on);
     try { localStorage.setItem(LINK_KEY, on ? '1' : '0'); } catch { /* not remembered */ }
+  }, []);
+  // The Mac app's Show menu item (13.5-link-menu) switches Link the way the button does.
+  useEffect(() => {
+    const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { onLinkMenu?: (fn: (on: boolean) => void) => () => void } }).__CHROMAGLASS_NATIVE__;
+    return native?.onLinkMenu?.((on) => setLinkOn(on));
+  }, [setLinkOn]);
+  /** Live's play and stop move the Sequence, or not (13.5-link-transport); remembered on this machine. */
+  const setLinkTransport = useCallback((on: boolean) => {
+    if (tempoRef.current) tempoRef.current.linkTransport = on;
+    try { localStorage.setItem(LINK_TRANSPORT_KEY, on ? '1' : '0'); } catch { /* not remembered */ }
   }, []);
   // "Listen" means the ear again, so it switches Link off too: otherwise the
   // session would take the tempo straight back a twentieth of a second later.
@@ -79,12 +91,16 @@ export function useTempo() {
     and the phone alike (`npm run panel` finds the tap pad polled that way).
   */
   const tempoPanel = useMemo(() => ({
-    tempo: tempoLabel, onTap: tapTempo, onTempoClear: clearTempo, onTempoBpm: setTempoBpm, onLink: setLinkOn,
-  }), [tempoLabel, tapTempo, clearTempo, setTempoBpm, setLinkOn]);
+    tempo: tempoLabel, onTap: tapTempo, onTempoClear: clearTempo, onTempoBpm: setTempoBpm, onLink: setLinkOn, onLinkTransport: setLinkTransport,
+  }), [tempoLabel, tapTempo, clearTempo, setTempoBpm, setLinkOn, setLinkTransport]);
+
+  /** The phone's two Link switches, as one spread (App.tsx is at its size ceiling). */
+  const linkProps = useMemo(() => ({ onLink: setLinkOn, onLinkTransport: setLinkTransport }), [setLinkOn, setLinkTransport]);
 
   return {
-    tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setTempoBpm, setLinkOn, tempoPanel,
+    tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setTempoBpm, setLinkOn, setLinkTransport, linkProps, tempoPanel,
   };
 }
 
 const LINK_KEY = 'chromaglass.link';
+const LINK_TRANSPORT_KEY = 'chromaglass.linkTransport';
