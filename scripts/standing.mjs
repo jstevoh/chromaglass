@@ -34,8 +34,9 @@
  *      to it. Not just past the onset (0.25): there the layer is all but
  *      neutral, its growth going as G − 2, and six seconds left it flat
  *   4. turned down under the onset again, the domes lie back down into the
- *      pool: none left, nothing past 1.2 of full and at most 30 cells near
- *      the magnet past 1.05, and the layer spreading
+ *      pool: none left, nothing past 1.2 of full and no more than one top
+ *      near the magnet past 1.05 (the field's own heap, PLAN 38k-7), and
+ *      the layer spreading
  *      back over the glass (covering 0.3 more of the plate near the magnet
  *      than under it), 0.8 of the onset's field after as long as the
  *      Magnet held them; sinking, not wiped: half a second in, a top still
@@ -103,11 +104,13 @@ try {
         if (!near(x, y)) continue;
         cells++; peak = Math.max(peak, v); if (v >= 0.5) covered++; if (v > 1.05) over++;
       }
-      // Tops: past 2 and the highest within three cells (ties to the first).
+      // Tops: past `least` and the highest within three cells (ties to the
+      // first). Domes are the tops past 2; bumps, the tops past 1.05 (4).
+      const topsPast = (least) => {
       const tops = [];
       for (let y = 3; y < n - 3; y++) for (let x = 3; x < n - 3; x++) {
         if (!near(x, y)) continue;
-        const v = d[x + y * n]; if (v < 2) continue;
+        const v = d[x + y * n]; if (v < least) continue;
         let top = true;
         for (let j = -3; j <= 3 && top; j++) for (let i = -3; i <= 3; i++) {
           if (!i && !j) continue; const w = d[x + i + (y + j) * n];
@@ -115,9 +118,13 @@ try {
         }
         if (top) tops.push([(x + 0.5) / n, (y + 0.5) / n]);
       }
+      return tops;
+      };
+      const tops = topsPast(2);
+      const bumps = topsPast(1.05);
       const nearest = tops.map(([u, v], k) => Math.min(...tops.filter((_, j) => j !== k).map(([a, b]) => Math.hypot(a - u, b - v)))).sort((a, b) => a - b);
       const spacing = nearest.length ? nearest[Math.floor(nearest.length / 2)] : 0;
-      return { mass, cover: covered / cells, peak, over, domes: tops.length, spacing, film: lab.filmSteps() };
+      return { mass, cover: covered / cells, peak, over, domes: tops.length, bumps: bumps.length, bumpOff: bumps.length ? Math.max(...bumps.map(([u, v]) => Math.hypot(u - AT.x, v - AT.y))) : 0, spacing, film: lab.filmSteps() };
     };
     const out = [await read()];
     for (const [over, steps] of legs) {
@@ -193,10 +200,29 @@ try {
     within 0.08; a dome is 35 to 40 across): a layer settling, not domes
     held up. That is a looser reading of the peak than 1.1, named as such
     (PLAN 9t-8), with the count fixed rather than read off the same run.
+
+    Since PLAN 9t-2 the magnet pulls the layer under the film as it does
+    everywhere (wgsl/fluid/phaseForces.ts, phaseForce), and at 0.8 of the
+    onset a magnet still pulls: below the onset the layer does not stand
+    up in domes, but it does gather toward the field's peak into one
+    smooth heap, as a real layer over a magnet bulges long before it
+    spikes (the Kelvin pressure χB²/2μ0 is about 10 Pa at 0.8 of EFH1's
+    4 mT, which would hold a heap millimetres high against the liquids'
+    density difference; the plate's is a few percent of the layer). On the
+    Mac (run 41308840631) the leg ended with no dome, the tallest cell 1.07
+    (lower than the 1.12 of the old reading's last dome) but 271 cells past
+    1.05: the heap, broad and low where a dome held up is narrow and tall.
+    Counting cells past 1.05 counted the field's heap, which the pull
+    makes and the layer should have; what the line is for is domes held
+    up. So the count is of tops: no more than one top past 1.05 within
+    0.08 of the magnet (the heap's, on the highest within three cells, the
+    finder the domes are counted by), where the domes held up under the
+    Magnet are eight or more tops past 2. Nothing past 1.2 and no top past
+    2 stay as they were.
   */
   check('turned down under the onset, they lie back down',
-    e.ran + d.ran === DOWN && e.peak > 1.1 && d.domes === 0 && d.peak < 1.2 && d.over <= 30 && d.cover > h2.cover + 0.3 && h2.domes >= 8,
-    `${h2.domes} domes at the Magnet's field; at 0.8 of the onset's, peak ${e.peak.toFixed(2)} half a second in, ${d.domes} domes and peak ${d.peak.toFixed(2)} after as long as the Magnet held them (past 1.05 near it: ${e.over} cells, then ${d.over}), the plate near it ${d.cover.toFixed(2)} covered (${h2.cover.toFixed(2)} under the Magnet); the film running ${e.ran + d.ran} of ${DOWN} steps`);
+    e.ran + d.ran === DOWN && e.peak > 1.1 && d.domes === 0 && d.peak < 1.2 && d.bumps <= 1 && d.cover > h2.cover + 0.3 && h2.domes >= 8,
+    `${h2.domes} domes at the Magnet's field; at 0.8 of the onset's, peak ${e.peak.toFixed(2)} half a second in, ${d.domes} domes and peak ${d.peak.toFixed(2)} after as long as the Magnet held them (past 1.05 near it: ${e.over} cells, then ${d.over} in ${d.bumps} top${d.bumps === 1 ? '' : 's'}, at most ${d.bumpOff.toFixed(3)} from the axis, limit one top; the same field on a pool that never stood domes: ${u.over} cells past 1.05 in ${u.bumps}, peak ${u.peak.toFixed(2)}), the plate near it ${d.cover.toFixed(2)} covered (${h2.cover.toFixed(2)} under the Magnet); the film running ${e.ran + d.ran} of ${DOWN} steps`);
   const drift = Math.max(...[hand, weak, under].map((r) => Math.abs(r[r.length - 1].mass / r[0].mass - 1)));
   check('and none of the ferrofluid is made or lost', drift < 0.001,
     `the most any run changed it: ${(drift * 100).toFixed(3)}%`);

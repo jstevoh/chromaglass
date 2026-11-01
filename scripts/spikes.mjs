@@ -277,11 +277,26 @@ try {
   const far = await run({ ...FAR, magnetX: AT.x, magnetY: AT.y }, pool, [{ ...AT, near }]);
   /*
     Two fingers, each over a pool of its own, far enough apart that the
-    first's spikes (out to about 0.15) do not reach the second's pool. Under
-    one pool between them the first magnet drew the whole pool to itself and
-    neither parted it, which asked about the pull and not the second magnet.
+    first's spikes do not reach the second's pool. Under one pool between
+    them the first magnet drew the whole pool to itself and neither parted
+    it, which asked about the pull and not the second magnet.
+
+    Corner to corner of the picture since PLAN 38k-7. They were 0.42 apart
+    (0.3, 0.56 and 0.7, 0.44), when the onset was the lab's 22 mT and the
+    first's spikes reached about 0.15. At the liquid's own 4 mT a hand's
+    magnet stands domes out to about 0.4 (the reach goes as the height
+    times the cube root of the axis field over the onset, h·(B/Bc)^⅓, for a
+    field falling as a dipole's), so pool B stood 7 domes with the first
+    finger alone (Mac, run 41308840631) and the line asked about the reach
+    and not the second finger. The lab draws only the middle two thirds of
+    the plate (1/6 to 5/6 each way: the top of this file), and a pool's
+    patch, 0.12 round its magnet, has to be inside it to be lit, so the
+    pools go to the picture's opposite corners, 0.57 apart, B's near edge
+    0.45 from A, where A's field is about 0.6 of the onset. Not mirror
+    images of each other through the middle (0.29, 0.70 and 0.71, 0.31),
+    so a plate drawn mirrored in both axes would not light one at the other.
   */
-  const A = { x: 0.3, y: 0.56, near: 0.12 }, B = { x: 0.7, y: 0.44, near: 0.12 };
+  const A = { x: 0.29, y: 0.70, near: 0.12 }, B = { x: 0.71, y: 0.31, near: 0.12 };
   const pools = [{ ...A, r: 0.12 }, { ...B, r: 0.12 }];
   const two = await run({ ...HAND, magnetX: A.x, magnetY: A.y, extraMagnets: [{ x: B.x, y: B.y }] }, pools, [A, B]);
   const one = await run({ ...HAND, magnetX: A.x, magnetY: A.y }, pools, [A, B]);
