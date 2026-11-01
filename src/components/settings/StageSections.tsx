@@ -7,6 +7,7 @@ import { SwitchPill, Toggle, LIT } from '../ui';
 import { isProLicenseUnlocked } from '../../lib/platform';
 import { CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, getEffectiveTier, isFreeTierGated, isTierGatingEnforced, openAccountSheet } from '../../lib/tierGates';
 import { Slider, PinChips } from './controls';
+import { GpuPassReadout } from './GpuPassReadout';
 import type { SectionCtx } from './props';
 
 /*
@@ -261,6 +262,7 @@ export const SimulationSection = ({ c }: { c: SectionCtx }) => {
               {' · '}{Math.round((live ?? engineStatus).stepsPerSec)} of {Math.round((live ?? engineStatus).stepRate || 60)} steps/s
             </div>
           )}
+          {showFrameSplit && engineStatus && <GpuPassReadout passes={(live ?? engineStatus).gpuPasses} />}
           <select
             value={String(settings.simResolution ?? 'auto')}
             onChange={(e) => {

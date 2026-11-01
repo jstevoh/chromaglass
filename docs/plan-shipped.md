@@ -6951,6 +6951,39 @@ rings 1.0–1.6 ms → 0.07 ms; the bytes across 2.10 MB → 95 KB and 1.05 MB �
 same field a frame both ways, waited out on the GPU: drops 16.5 → 1.6 ms a frame, rings 3.0 → 0.6,
 the bead pass alone 0.50 ms for 502 drops by timestamp query (14ab-15).
 
+## 14ab-16. Which GPU pass a frame's time is in, on the screen (shipped 2026-10-31)
+
+*Asked:* the owner, on a suggestion to use WebGPU timestamp queries: time each pass of the fluid,
+show it in the perf readout on the laptop and the phone, and measure the costliest on the Mac.
+
+*Found:* the timings were already taken. The stage and every solver keep a `GpuProfiler`
+(`gpu/kit.ts`) whenever the device grants 'timestamp-query', because the governor reads the
+frame's GPU cost from them (14aa-3), and `?stages` (H0) opens a pass per solver stage. What they
+reached was `chromaglassDebug().webgpu` and `npm run stages`; nothing on the screen.
+
+*Built:* `lib/gpuPasses.ts` turns the profilers' maps into one list in ms a frame, the solver's
+passes multiplied by the steps a frame takes (a 1.2 ms solve at two steps a frame costs 2.4 and
+outranks a 1.5 ms plate pass), decayed entries of stopped passes dropped. `gpu/gpuTimes.ts`
+reads the maps (and now holds the governor's `gpuFrameMs`/`gpuStepMs` sums, moved from the
+visualizer). The visualizer builds the list once a second, only on a `?debug` page
+(`DEBUG_PAGE`), into `EngineStatus.gpuPasses`; `settings/GpuPassReadout.tsx` draws it under the
+frame split, eight rows and the rest summed, "no timestamps" where the GPU gives none. Nothing
+new runs in the frame. `npm run passtimes` holds the arithmetic and the words with plain objects
+(34 lines; three mutations, no scaling, scaling the drawing, no sort, each fail it), and
+`npm run passtimesapp` the wiring on software WebGPU at a phone's size (the status carries the list,
+the phone's Settings → Simulation draws it inside the screen; the readout unmounted fails 2 lines,
+the status line gone fails 3). Both from the check-skeptic's control, which cut the wiring and kept
+the first version of `passtimes` green.
+
+*Measured* on the owner's Mac (Apple M4, Metal), `npm run stages` on main at 7fc2a78e, Classic, two
+runs a grid alternating (the tables: the project's shared files, `stages-2026-10-31.md`). At 256²,
+sixty steps a second, one a frame: the solver 6.7–7.2 ms a step over both layers and the drawing
+5.3 ms a frame, about 12 of the frame's 16.7 ms. The costliest stages are the thin gap (0.87 ms
+front, 1.16 back) and the dye's advection (0.77, 0.73), then the mix (0.52) and the dye grid (0.45,
+0.28): those four are about two thirds of a step. The back plate is 40% of the solver. At 512²,
+thirty steps a second: 15.7–16.6 ms a step, the dye's advection first (2.34 front), then the mix
+(1.72) and the thin gap (1.43, 1.48 back); the drawing 3.5–3.7 ms a frame.
+
 ## 14ab-13. A poured picture and a poured video land the right way up (shipped 2026-10-30, #591, finished in #596)
 
 14ab-13. The text pour turns its canvas over before it pours ("the plate's rows run from the

@@ -16,6 +16,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
+import { frameGpuMs, framePasses, solverStepMs } from '../gpu/gpuTimes';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
@@ -72,7 +73,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
-import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
+import { STAGE_TIMINGS, DEBUG_PAGE, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
@@ -3053,6 +3054,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const prev = engineStatusRef.current;
           // The label changes rarely; the frame time ticks over once a second.
           if (!prev || prev.label !== status.label || prev.steppedDown !== status.steppedDown || now - engineStatusAtRef.current > 1) {
+            // `?debug`'s pass list, built here once a second and never by the show (PLAN.md 14ab-16).
+            if (DEBUG_PAGE) status.gpuPasses = renderer?.gpuPasses?.(stepsPerSecRef.current, governor.frameMs);
             engineStatusRef.current = status;
             engineStatusAtRef.current = now;
             onEngineStatusRef.current?.(status);
@@ -6465,15 +6468,6 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
        */
       const plate = new WebGPUPlate(s.device, s.format);
       platePass = plate;
-      /** One solver step, every layer: the solver keeps its own profiler, per pass and per step. */
-      const stepMs = (): number => {
-        let ms = 0;
-        for (const f of fluidsRef.current) {
-          if (!(f.gpu instanceof WebGPUFluid)) continue;
-          for (const v of f.gpu.profiler.ms.values()) ms += v;
-        }
-        return ms;
-      };
       const gpuRenderer: PlateRenderer = {
         info: { renderer: s.gpu.label, gpuClass: s.gpu.gpuClass },
         maxTexture: s.device.limits.maxTextureDimension2D,
@@ -6876,18 +6870,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (probe) { probe.dispose(); probe = null; }
           return null;
         }),
-        /**
-         * The drawing, plus one solver step per layer for each step the
-         * loop took. The profiler's numbers are per pass and per step, so
-         * the steps are what turns them into the cost of a frame.
-         */
-        gpuFrameMs: (steps: number) => {
-          if (!stage) return 0;
-          let ms = 0;
-          for (const v of stage.profiler.ms.values()) ms += v;
-          return steps > 0 ? ms + stepMs() * steps : ms;
-        },
-        gpuStepMs: () => (stage ? stepMs() : 0),
+        // What the GPU spent, from the profilers (`gpu/gpuTimes.ts`, PLAN.md 14ab-16).
+        gpuFrameMs: (steps: number) => frameGpuMs(stage, fluidsRef.current, steps),
+        gpuStepMs: () => (stage ? solverStepMs(fluidsRef.current) : 0),
+        gpuPasses: (sps: number, frameMs: number) => framePasses(stage, fluidsRef.current, sps, frameMs),
         debug: () => ({
           webgpu: stage && {
             label: stage.gpu.label, gpuClass: stage.gpu.gpuClass, fallback: stage.gpu.fallback,
