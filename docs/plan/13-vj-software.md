@@ -103,6 +103,11 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      - **13.5-osc-rate.** The report rides the Art-Net report's 50 ms; a VJ app's own
        frame is 16 ms. Measure on the Mac whether a hue on `/colour/hue` steps visibly,
        and send at 30 or 60 Hz only if it does (the beat already goes at once).
+     - **13-pack-imports.** `desktop/electron-builder.config.cjs` copies the server's
+       files by name, so a new module the server imports starts in `npm run show` and
+       fails the packed app only on the Mac's CI (#658: `osc.js`). `npm run desktop`
+       (or `checks`) should fail when a relative import of a packed server file is not
+       on that list.
      - **13.5-osc-scale.** Every value is 0..1 except `/bpm`; Resolume's tempo input
        wants its own range. Write the range a Resolume BPM shortcut takes into docs/osc.md
        once the owner's sitting has read it.
