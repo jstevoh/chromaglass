@@ -257,8 +257,17 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   / the job summary over the next merges and split the browser part next if it passes 21.
 - **19k-8** (E, S): **shipped**, the soap's two checks (`soap`, `soapbreak`) in a sixth Measure
   part `lab3`, since `lab2` ran 24:18 of its 25 minutes with them. Story in `docs/plan-shipped.md` §19k-8.
-- **19k-9** (E, S): the browser part has passed 21: 22:48 of its 25 on #644's run (2026-11-01),
-  29 checks, the slowest the phone (3:16), the layout (3:02) and following a song (2:58). Split
-  it as 19k-6 split the lab, but read first which checks lean on the `dist/` an earlier one
-  built: `followview` skips its build under `CI` ("an earlier step has built dist/"), so a
-  check moved away from the build it leans on measures a missing site, not the change.
+- **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
+  part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
+  `docs/plan-shipped.md` §19k-9.
+- **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
+  `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
+  only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,
+  `opensource`, `clicks -- --app`, `csp`, `intro`, the remote's Mixer, the phone link and
+  every `vite preview` harness run as `node scripts/….mjs`) skips its build under `CI` and
+  serves a `dist/` nobody built. Found while cutting 19k-9; not yet seen red. Fix in
+  `runShard`: when a part's selection leaves out every builder before a selected leaner,
+  run `npm run build` first (or mark builders `always` within their part), with a
+  `npm run checks` self-test line that a lone leaner gets a build.
+  And a nit in the same file: `fmtSecs` rounds the seconds after flooring the minutes, so
+  119.6 s prints "1 min 60 s" (seen on the renders, 2026-11-01).

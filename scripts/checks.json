@@ -9,7 +9,7 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1300,17 +1300,22 @@
     },
     {
       "name": "The iPhone app's remote",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run applink",
       "why": [
         "The iPhone app as the laptop's remote (src/lib/appLink.ts): a real",
         "relay, a stand-in laptop and the app's page from another origin. No",
-        "plate needed, so it runs here rather than on a Mac."
+        "plate needed, so it runs here rather than on a Mac. It opens Measure's",
+        "`browser2` part (PLAN 19k-9) because it builds `dist/` itself: the checks",
+        "after it that serve the site without building (the Mixer, the phone link,",
+        "Draw, the renders, the input picker, the Source, following a song) lean on",
+        "this build or the Live Show's or the shelf's, all in this part. The browser",
+        "part ran 23:43 of its 25 minutes with all 29 (#650's run, 2026-11-01)."
       ]
     },
     {
       "name": "The Live Show panel",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run liveshow",
       "why": [
         "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
@@ -1325,7 +1330,7 @@
     },
     {
       "name": "The remote's Mixer",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node --experimental-strip-types scripts/remotemix.mjs",
       "why": [
         "The remote's Mixer (scripts/remotemix.mjs): the show server and two",
@@ -1337,7 +1342,7 @@
     },
     {
       "name": "The phone link",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node --experimental-strip-types scripts/phonelink.mjs",
       "why": [
         "The Phone · iPad panel's link (scripts/phonelink.mjs, PLAN.md 8f-1): on",
@@ -1349,7 +1354,7 @@
     },
     {
       "name": "The show key",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node scripts/showkey.mjs",
       "why": [
         "The show key (scripts/showkey.mjs, PLAN.md 14m): the show server and a",
@@ -1363,7 +1368,7 @@
     },
     {
       "name": "The remote's Draw screen",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node --experimental-strip-types scripts/draw.mjs",
       "why": [
         "Draw, the remote's first screen (scripts/draw.mjs, PLAN.md 8-draw): a",
@@ -1374,7 +1379,7 @@
     },
     {
       "name": "The wall under Draw's pad",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node --experimental-strip-types scripts/drawwall.mjs",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1389,7 +1394,7 @@
     },
     {
       "name": "The sound's renders",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node scripts/renders.mjs",
       "why": [
         "The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md",
@@ -1404,7 +1409,7 @@
     },
     {
       "name": "The rig's wires",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node scripts/rig.mjs",
       "why": [
         "OSC in, Art-Net out and in, MIDI in and out, as /pro sells them (scripts/rig.mjs,",
@@ -1418,7 +1423,7 @@
     },
     {
       "name": "A click is not a beat, in the app",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run clicks -- --app",
       "why": [
         "The same in the app (scripts/clicks.mjs --app): the microphone a",
@@ -1431,7 +1436,7 @@
     },
     {
       "name": "No pointer on the show",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node scripts/showcursor.mjs",
       "why": [
         "No pointer on the show (scripts/showcursor.mjs, the owner's ask of",
@@ -1443,7 +1448,7 @@
     },
     {
       "name": "The wall after a reload",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "node scripts/rewall.mjs",
       "why": [
         "The wall comes back after the show reloads (scripts/rewall.mjs, S15):",
@@ -1455,7 +1460,7 @@
     },
     {
       "name": "The input picker",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run inputpick",
       "why": [
         "Picking an input changes what the show hears at once (scripts/",
@@ -1466,7 +1471,7 @@
     },
     {
       "name": "The music shelf reaches the show",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run shelf",
       "why": [
         "The tracks that ship play from the show's own origin and drive the plate",
@@ -1479,7 +1484,7 @@
     },
     {
       "name": "The Source opens on Off",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run opensource",
       "why": [
         "The app opens with the sound Source on Off (scripts/opensource.mjs,",
@@ -1491,7 +1496,7 @@
     },
     {
       "name": "Following a song, on the desk and the phone",
-      "shard": "browser",
+      "shard": "browser2",
       "run": "npm run followview",
       "why": [
         "Following a known song by ear (PLAN.md 28g-2): the app's own band",

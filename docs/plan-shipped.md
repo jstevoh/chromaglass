@@ -9566,6 +9566,19 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   drops to about 14. The timeout stays 25: a bigger bound would only hide the next check
   that pushes a part past it. The required names are unchanged, as in 19k-6.
 
+#### 19k-9. The browser part in two
+
+- **19k-9** (E, S): **shipped**, `browser2`. The browser part measured 23:43 of its 25
+  minutes on #650's run of 2026-11-01 (24:11 with setup; 22:48 on #644's): 29 checks, the
+  slowest the phone (3:20), the layout (3:07), following a song (2:59), the switches (1:59)
+  and the renders (1:58). Several checks skip their build under `CI` and serve the `dist/`
+  an earlier check built, so the cut is where a check builds: the first thirteen (the
+  shaders through the intro, 13:20 on that run, builds by the layout, cartoons, Feedback,
+  phone and load) stay in `browser`, and the last sixteen, from `applink` on (10:23, builds
+  by `applink`, `liveshow` and `shelf`), went unchanged and in their order to a seventh part
+  `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
+  moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
