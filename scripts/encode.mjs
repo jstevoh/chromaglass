@@ -106,6 +106,14 @@ try {
       if (counts.on) { counts.dispatches++; counts.by[this.__kernel] = (counts.by[this.__kernel] ?? 0) + 1; }
       return dispatch.apply(this, a);
     };
+    const indirect = GPUComputePassEncoder.prototype.dispatchWorkgroupsIndirect;
+    // Counted apart: the lines above are per direct dispatch, as they were
+    // measured; the multigrid's lines (encode-solve.mjs) read both.
+    counts.indirect = 0;
+    GPUComputePassEncoder.prototype.dispatchWorkgroupsIndirect = function (...a) {
+      if (counts.on) { counts.indirect++; counts.by[this.__kernel] = (counts.by[this.__kernel] ?? 0) + 1; }
+      return indirect.apply(this, a);
+    };
     window.__encode = { counts };
   }, N);
 
@@ -141,13 +149,13 @@ try {
     const ms = [];
     const step = s.step.bind(s);
     s.step = (...a) => { const t = performance.now(); const r = step(...a); ms.push(performance.now() - t); return r; };
-    counts.writes = 0; counts.dispatches = 0; counts.groups = 0; counts.same = 0; counts.by = {}; counts.on = true;
+    counts.writes = 0; counts.dispatches = 0; counts.indirect = 0; counts.groups = 0; counts.same = 0; counts.by = {}; counts.on = true;
     await lab.step(steps, { thinGap: 1, immiscibility: 0.5 });
     counts.on = false;
     s.step = step;
     GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch;
     ms.sort((a, b) => a - b);
-    return { writes: counts.writes, same: counts.same, groups: counts.groups, dispatches: counts.dispatches, by: { ...counts.by }, msMedian: ms[ms.length >> 1], msMax: ms[ms.length - 1], steps: ms.length };
+    return { writes: counts.writes, same: counts.same, groups: counts.groups, dispatches: counts.dispatches, indirect: counts.indirect, by: { ...counts.by }, msMedian: ms[ms.length >> 1], msMax: ms[ms.length - 1], steps: ms.length };
   }, { steps: STEPS, waste: false });
   const control = await sampled(async ({ steps, waste }) => {
     const { counts } = window.__encode;

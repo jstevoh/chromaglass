@@ -71,7 +71,7 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
         }
       }
     }
-    line('4k', '14c-4k: a 3840×2160 stage opens at a share of at most 4.7 Mpx (the 0.75 share)', worst <= 4.7,
+    line('4k', '14c-4k: a 3840×2160 stage opens at a share of at most 4.7 Mpx (the 0.75 share), and not below 4.0', worst <= 4.7 && worst >= 4.0,
       `the most opened on: ${worst.toFixed(2)} Mpx; ${opened.join('  ·  ')}`, worst > 8);
   }
 
@@ -120,6 +120,14 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
     const wallLadder = ladderAt('local', 'strong', 2, P1080);
     const has = typeof QualityGovernor.carry === 'function';
     const rebuild = (from, ladder, start, now) => has ? QualityGovernor.carry(from, ladder.rungs, start, now) : new QualityGovernor(ladder.rungs, start, now);
+    /*
+      And it still governs. A carry that gave up (a governor that never moves
+      again) would make no changes at all and pass the count, so after the
+      ten minutes the machine slows (40 ms frames on every rung) and the
+      governor must step down within 20 s, and it must be on the laptop's
+      own ladder (the check-skeptic).
+    */
+    let after = null;
     const run = (cycle) => {
       let g = new QualityGovernor(laptop.rungs, 1, 0);
       let onWall = false;
@@ -132,13 +140,23 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
         now += ms / 1000;
         if (g.sample(ms / 1000, 1, now, false, ms - 10) && now >= 420) moves.push({ at: now, index: g.rungIndex });
       }
+      if (cycle) {
+        const from = { index: g.rungIndex, rate: g.stepRate };
+        let down = Infinity;
+        for (const end = now + 20; now < end && down === Infinity;) {
+          now += 0.04;
+          g.sample(0.04, 1, now, false, 30);
+          if (g.rungIndex > from.index || g.stepRate < from.rate) down = now - 1020;
+        }
+        after = { down, laptop: g.rungs === laptop.rungs || JSON.stringify(g.rungs) === JSON.stringify(laptop.rungs) };
+      }
       return moves;
     };
     const quiet = run(false), cycled = run(true);
     const firstClimb = (moves) => moves.find((m, i) => i > 0 && m.index < moves[i - 1].index)?.at ?? Infinity;
     line('governor', '14c-governor: a wall opened and closed costs no more rung changes in the next ten minutes than no wall',
-      cycled.length <= quiet.length && firstClimb(cycled) >= firstClimb(quiet) - 5,
-      `${has ? '' : 'no QualityGovernor.carry; '}${cycled.length} changes after the wall (first climb back at ${firstClimb(cycled).toFixed(0)} s) against ${quiet.length} with none (${firstClimb(quiet).toFixed(0)} s)`, !has);
+      cycled.length <= quiet.length && firstClimb(cycled) >= firstClimb(quiet) - 5 && after.laptop && after.down <= 20,
+      `${has ? '' : 'no QualityGovernor.carry; '}${cycled.length} changes after the wall (first climb back at ${firstClimb(cycled).toFixed(0)} s) against ${quiet.length} with none (${firstClimb(quiet).toFixed(0)} s); on the laptop's ladder ${after.laptop}; slowed, it gives something up after ${after.down.toFixed(1)} s`, !has);
   }
 
   // ── 14c-readout: the readout says what the share is of ──

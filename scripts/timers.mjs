@@ -88,7 +88,10 @@ const runTimers = () => {
 {
   const clock = await bundle('src/lib/showClock.ts', 'showClock');
   const pump = typeof clock.pumpShowIntervals === 'function' ? clock.pumpShowIntervals : null;
-  const fade = (hidden) => {
+  // `pumpFirst`: the worker's tick lands before the page's timer in the same
+  // instant, which in Chrome it often does; a pump that fires what the timer
+  // is about to fire shows up only in that order (the check-skeptic).
+  const fade = (hidden, usePump = true, pumpFirst = false) => {
     throttled = hidden;
     let fires = 0;
     const start = vt;
@@ -96,22 +99,23 @@ const runTimers = () => {
     // The worker's tick, every 16 ms, beside the page's own timers.
     for (const end = start + 4000; vt < end;) {
       vt += 16;
+      if (pump && usePump && pumpFirst) pump(vt);
       runTimers();
-      if (pump) pump(vt);
+      if (pump && usePump && !pumpFirst) pump(vt);
     }
     clock.clearShowInterval(h);
     return fires;
   };
   const hidden = fade(true);
-  const visible = fade(false);
+  const visible = Math.max(fade(false), fade(false, true, true));
+  const bare = fade(true, false);
   const most = Math.floor(4000 / 33) + 1;
   console.log(`  a 33 ms look fade over 4 s: ${hidden} steps hidden, ${visible} visible${pump ? '' : ' (no pumpShowIntervals: the worker\'s tick drives nothing)'}`);
   line('hidden', '14a-timers: a 4 s look fade with the window covered steps at least 30 times', hidden >= 30,
     `${hidden} steps${pump ? '' : '; no pumpShowIntervals export in src/lib/showClock.ts'}`, !pump);
-  check('and visible it steps on time and never twice in its period', visible >= most - 2 && visible <= most,
+  check('and visible it steps on time and never twice in its period, the tick before the timer or after it', visible >= most - 2 && visible <= most,
     `${visible} steps against ${most} at most`);
-  check('control: the throttle this models is on (hidden, the page\'s own timer alone, about four)', !pump ? hidden <= 5 : true,
-    pump ? 'not read once the tick pumps' : `${hidden} steps`);
+  check('control: the throttle this models is on (hidden, the page\'s own timer alone, about four)', bare <= 5, `${bare} steps`);
   throttled = false;
 }
 

@@ -52,6 +52,14 @@
   right-hand side; the open plate's, two cold cycles twice a step, at 0.2%.
 */
 const MAIN_DISPATCHES = 269;
+const MAIN_THIN_ZEROS = 14; // mgZero dispatches in a thin-gap step on main
+/*
+  And the indirect dispatches (the carries' substeps), 96 a thin step on main:
+  each owed line counts both, so work moved from one kind to the other is not
+  a saving, and its bar is the plan's removal from the direct count (35% of
+  269 is 95; H2c-3's 14; H2c-2's 150) taken off main's total of 365.
+*/
+const MAIN_TOTAL = 365;
 const MAIN_RESIDUAL_THIN = 6.393e-2;
 const MAIN_RESIDUAL_OPEN = 2.071e-3;
 
@@ -62,9 +70,11 @@ export async function solveLines(page, run, check) {
   const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
   const unknown = [...owed].filter((id) => !SOLVE_OWED.includes(id));
   if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${SOLVE_OWED.join(', ')})`);
-  const line = (id, name, ok, detail) => {
+  // `mainState`: the step still as main's, the only state an owed line is excused in.
+  const line = (id, name, ok, detail, mainState) => {
     if (!owed.has(id)) return check(name, ok, detail);
     if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+    if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
     console.log(` owed  ${name} — ${detail}`);
   };
 
@@ -146,13 +156,15 @@ export async function solveLines(page, run, check) {
   const openAll = await residuals(false, 6, 2);
   const openRes = openAll.reads;
 
+  const zeroThinOf = (r) => per(r.by, 'mgZero', r.steps);
   const per = (by, k, steps = 1) => Object.entries(by).reduce((a, [l, v]) => a + (l === k || l.startsWith(`${k}:`) ? v : 0), 0) / steps; // a thin gap's pipeline is labelled `name:thin`
   const thinStep = run.dispatches / run.steps;
+  const thinTotal = (run.dispatches + run.indirect) / run.steps;
   const mgZero = per(run.by, 'mgZero', run.steps) + per(open.by, 'mgZero');
   const cyclesThin = per(run.by, 'hsRestrict0', run.steps);
   const cyclesOpen = per(open.by, 'mgRestrict0') / 2; // two projections a step on the open plate
   const rt = median(thinRes.map((x) => x.rel)), ro = median(openRes.map((x) => x.rel));
-  console.log(`  the solve: thin gap ${thinStep.toFixed(0)} dispatches a step (main ${MAIN_DISPATCHES}), open plate ${open.dispatches.toFixed(0)}; mgZero ${mgZero.toFixed(0)} a step on the two; V-cycles a projection: thin ${cyclesThin}, open ${cyclesOpen}`);
+  console.log(`  the solve: thin gap ${thinStep.toFixed(0)} dispatches a step and ${(run.indirect / run.steps).toFixed(0)} indirect (main ${MAIN_DISPATCHES} and ${MAIN_TOTAL - MAIN_DISPATCHES}), ${zeroThinOf(run)} of them mgZero; open plate ${open.dispatches.toFixed(0)}; mgZero ${mgZero.toFixed(0)} a step on the two; V-cycles a projection: thin ${cyclesThin}, open ${cyclesOpen}`);
   console.log(`  the residual after a step, ‖r‖/‖b‖ of the 2×2 sums: thin gap median ${rt.toExponential(3)} [${thinRes.map((x) => x.rel.toExponential(2)).join(' ')}], open plate median ${ro.toExponential(3)} [${openRes.map((x) => x.rel.toExponential(2)).join(' ')}]`);
   console.log(`  right-hand sides ‖b‖: thin ${thinRes.map((x) => x.b.toExponential(1)).join(' ')}, open ${openRes.map((x) => x.b.toExponential(1)).join(' ')}`);
 
@@ -164,8 +176,18 @@ export async function solveLines(page, run, check) {
   check(`the thin gap's residual no worse than ${bar} times main's`, Number.isFinite(MAIN_RESIDUAL_THIN) && rt <= bar * MAIN_RESIDUAL_THIN, `${rt.toExponential(3)} against ${(bar * MAIN_RESIDUAL_THIN).toExponential(3)}`);
   check(`the open plate's residual no worse than ${bar} times main's`, Number.isFinite(MAIN_RESIDUAL_OPEN) && ro <= bar * MAIN_RESIDUAL_OPEN, `${ro.toExponential(3)} against ${(bar * MAIN_RESIDUAL_OPEN).toExponential(3)}`);
 
-  line('h2c1', 'H2c-1: a thin-gap step at least 35% fewer dispatches than main', thinStep <= 0.65 * MAIN_DISPATCHES, `${thinStep.toFixed(0)} against at most ${Math.floor(0.65 * MAIN_DISPATCHES)}`);
-  line('h2c3', 'H2c-3: no mgZero dispatch (the first sweep reads zero)', mgZero === 0, `${mgZero.toFixed(0)} a step`);
-  line('h2c2', 'H2c-2: one V-cycle a projection, and a step at least 150 fewer dispatches than main', cyclesThin === 1 && cyclesOpen === 1 && thinStep <= MAIN_DISPATCHES - 150,
-    `${cyclesThin} and ${cyclesOpen} cycles, ${thinStep.toFixed(0)} dispatches against at most ${MAIN_DISPATCHES - 150}`);
+  /*
+    Each owed line asks for the dispatches its item removes as well as the
+    kernel it names, so a zeroing renamed or moved into a buffer clear (which
+    a label count would not see) is not a pass (the check-skeptic). An
+    indirect dispatch is counted too (encode.mjs); none is made today.
+  */
+  const zeroThin = per(run.by, 'mgZero', run.steps);
+  const cut = Math.ceil(0.35 * MAIN_DISPATCHES);
+  line('h2c1', 'H2c-1: a thin-gap step at least 35% fewer dispatches than main', thinTotal <= MAIN_TOTAL - cut, `${thinTotal.toFixed(0)} direct and indirect against at most ${MAIN_TOTAL - cut}`,
+    thinTotal >= MAIN_TOTAL - 2);
+  line('h2c3', 'H2c-3: no mgZero dispatch (the first sweep reads zero), and a thin step that many dispatches lighter', mgZero === 0 && thinTotal <= MAIN_TOTAL - MAIN_THIN_ZEROS,
+    `${mgZero.toFixed(0)} mgZero a step on the two plates, ${thinTotal.toFixed(0)} dispatches a thin step against at most ${MAIN_TOTAL - MAIN_THIN_ZEROS}`, zeroThin === MAIN_THIN_ZEROS);
+  line('h2c2', 'H2c-2: one V-cycle a projection, and a step at least 150 fewer dispatches than main', cyclesThin === 1 && cyclesOpen === 1 && thinTotal <= MAIN_TOTAL - 150,
+    `${cyclesThin} and ${cyclesOpen} cycles, ${thinTotal.toFixed(0)} dispatches against at most ${MAIN_TOTAL - 150}`, cyclesThin === 2 && cyclesOpen === 2);
 }
