@@ -48,7 +48,8 @@ import { readFileSync } from 'node:fs';
   u* + soft, t) is, soft being 0.7 of a mask texel (512 across) over the
   curved part's width.
 */
-const plateSrc = readFileSync(new URL('../src/gpu/wgsl/plate.ts', import.meta.url), 'utf8');
+// The aperture and the indices live in plateTransmit.ts's edge block since PLAN 38h-2, read with the plate.
+const plateSrc = ['plate.ts', 'plateTransmit.ts'].map((f) => readFileSync(new URL(`../src/gpu/wgsl/${f}`, import.meta.url), 'utf8')).join('\n');
 const constant = (name) => {
   const m = plateSrc.match(new RegExp(`const ${name}: f32 = ([0-9.]+);`));
   if (!m) throw new Error(`no ${name} in plate.ts`);
