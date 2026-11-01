@@ -116,19 +116,21 @@ jobs:
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 
-  # Measure, in six parts side by side. As one job it took a median 14.3
+  # Measure, in seven parts side by side. As one job it took a median 14.3
   # minutes and at most 14.9 over 87 green runs on 2026-10-03 against its
   # 15-minute timeout, so the next slow runner would have turned it red with
   # nothing wrong; and its first red step skipped every step after it, so a
   # push with two things wrong found one (PLAN.md 19b). Split by what each
   # step needs: the arithmetic (`logic`, about four minutes, most of it the
   # drops), the sound harnesses that want ffmpeg (`sound`, about six), the
-  # ones that want Chromium (`browser`, about twelve), and the lab on the
-  # CPU rasteriser, in three (`lab`, `lab2` and `lab3`: Chromium, then
-  # `holeline` building three labs on the first, `lampzero` drawing every look
-  # in two labs on the second, the soap's two checks on the third). Every
+  # ones that want Chromium, in two (`browser` and `browser2`, about
+  # fourteen and eleven: the site's pages and desks, then the remote, the
+  # show's wires and the sound in the app), and the lab on the CPU
+  # rasteriser, in three (`lab`, `lab2` and `lab3`: Chromium, then `holeline`
+  # building three labs on the first, `lampzero` drawing every look in two
+  # labs on the second, the soap's two checks on the third). Every
   # check runs whatever failed before it in its part. GitHub's ubuntu runners
-  # are not the queue the Mac's are, so six at once cost the queue nothing.
+  # are not the queue the Mac's are, so seven at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -155,6 +157,11 @@ jobs:
     # room. The two went to a part of their own, `lab3` (PLAN 19k-8), and the
     # bound stays: raising it would only let the next check push a part past
     # it unseen, and an ubuntu runner costs the queue nothing.
+    # The browser part was next: 23:43 of the 25 measuring on #650's run of
+    # 2026-11-01, 24:11 with its setup. Its last sixteen checks, from the
+    # iPhone app's remote on, went to `browser2` (PLAN 19k-9), cut where a
+    # check builds `dist/` itself, since several after it serve the site
+    # without building and would otherwise measure a missing one.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -238,7 +245,7 @@ jobs:
           path: ~/ffmpeg-debs
           key: ffmpeg-debs-${{ steps.image.outputs.os }}-${{ steps.image.outputs.version }}
 
-      # The browser, for the browser, lab, lab2 and lab3 parts' checks.
+      # The browser, for the browser, browser2, lab, lab2 and lab3 parts' checks.
       # The browser is fetched inside the same 25 minutes as the measuring, so a
       # cold download is a red with nothing wrong in the diff (PLAN 19ab). On
       # 2026-10-22 this step took 650 s on the browser shard and 683 s on the lab
@@ -256,10 +263,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -268,7 +275,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -286,7 +293,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0
