@@ -223,7 +223,11 @@ written first. Line numbers are as read on main at d07ac31.
     "no reflectance or 3d feel"): drawn from each bubble's true centre and radius
     (`camBubble`, fitted to the air texels), a ball's middle tinted by the liquid above and
     below it, the softbox 80 times the pad at Light Play 1. `npm run closeupdepth`,
-    `airlens` 9-10. Story in `docs/plan-shipped.md` §38.
+    `airlens` 9-10. The camera's bubble film is the light through it at Film Physics 1,
+    the projector's faint complement, not the reflected gold it wore while painted as if
+    lit from the front (`camFilm`; the flat film mirrors only the lens axis, the softbox
+    is off it): `npm run filmlook` 8-9, the closeup now on a lit ground. Story in
+    `docs/plan-shipped.md` §38.
   - **38h-9. The closeup's dye hole and the grain at zoom, found doing 38h-7 part 2** (S,
     nil). The bubble's rim is now exact, but the solver cuts the dye's hole on its own grid:
     a soft lighter fringe a cell or two wide sits outside each small bubble (the cleared
@@ -231,6 +235,14 @@ written first. Line numbers are as read on main at d07ac31.
     zoom 4 and over. Cut the dye's hole in the plate at the fitted rim instead (the solver
     keeps its own for the flow), and draw the grain at screen scale past the solver's cell.
     *Measure:* the fringe's excess brightness 1 to 1.5 radii out in `npm run closeupdepth`.
+  - **38h-10. filmlook's projected bubble tint is read mostly on the dark band, found doing
+    38h-7's film** (S, nil). `npm run filmlook` line 9 holds the projector's light through the
+    film at yellow over blue -1.0, but thickening every pocket's film to the most it keeps
+    moves that only to -1.2, where the camera's swings +7.0 (the table's sign turns every
+    hundred nanometres). The projector's film pixels are mostly its dark band; the middle's
+    tint is a level or two a channel and falls under the two levels that count a pixel. Count
+    the middle by the bubble's footprint instead and hold the projector's tint to the same
+    thickness swing. *Measure:* the projector's swing in filmlook's thickest-film renders.
   - **38h-8. The rest of the closeup's depth, found doing 38h-7** (M, nil). The owner's
     photos (drops/references) have two more cues the bubbles now show and the rest of the
     closeup does not. *The beads:* an oil drop in water is traced the same way (Snell into

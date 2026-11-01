@@ -3428,16 +3428,16 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         }
         cp = cp * (1.0 - AIR_DARK * blackB);
       }
-      c = mix(c, c * (0.45 + 1.25 * filmC), clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
+      let fm = camFilm(filmC, filmP, irid, F);
 
       /*
-        The camera's bubble lit from beneath (38h-2), traced (38h-7,
-        closeupDepth.ts): through the wall what Fresnel passes of the pad,
-        by reflection the liquid round it (the bright line at the contact)
-        and the softbox Light Play hangs in front. Out to the contact.
+        The camera's bubble lit from beneath, traced (38h-7,
+        closeupDepth.ts): through the wall what Fresnel passes of the pad
+        and the film (camFilm), by reflection the liquid round it (the
+        bright line at the contact) and Light Play's softbox.
       */
       let wallB = 1.0 - smoothstep(1.0 - softB, 1.0, rr);
-      c = mix(c, airColumn(c, rimCol, tB, R, rho) * wall.x + sqrt(rimCol * groundOf(bgColor)) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
+      c = mix(c * fm, airColumn(c, rimCol, tB, R, rho) * fm * wall.x + sqrt(rimCol * groundOf(bgColor)) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
       outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));

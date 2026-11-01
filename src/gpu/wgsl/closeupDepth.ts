@@ -162,6 +162,35 @@ fn airColumn(c: vec3f, rimCol: vec3f, tB: f32, R: f32, rho: f32) -> vec3f {
   let left = clamp(1.0 - min(R, rho) * sqrt(max(0.0, 1.0 - tB * tB)) / max(rho, 1e-6), 0.0, 1.0);
   return c * pow(T, vec3f(left));
 }
+/*
+  The film on the glass over a pocket (the one its own speed laid,
+  Bretherton), as the camera sees it: a multiplier on the light that crosses
+  it. At Film Physics 0 the rainbow every look was made with, as it always
+  was. At 1 the light through the film, 1 - R: 92 to 100 per cent of the
+  pad in pale complements of the reflected colours, the projector's tint
+  exactly (plate.ts, cp), because the camera here is lit from beneath as
+  the projector is and looks through the same film.
+
+  It used to give the camera the reflected colours, the soap's gold, from
+  when its bubble was painted as if lit from the front. Traced, a reflected
+  film colour needs a light on the far side of the mirror from the lens, and
+  there is none: the film lies flat on the glass, so it mirrors the lens
+  axis, and the softbox spans 15 to 55 degrees off it (SOFTBOX_TILT and
+  SOFTBOX_HALF). Its glint lands where the meniscus is 8 to 28 degrees
+  steep, and there the liquid between the air and the glass is
+  rho (1 - cos θ) deep, 5 to 56 microns at half a millimetre: four times
+  and more past the 1.2 microns where a film's colours wash out
+  (lib/filmTable.ts). So the glint stays white.
+  Measured by npm run filmlook: the camera's film adds a faint complement,
+  as the projector's.
+*/
+fn camFilm(filmC: vec3f, filmP: f32, irid: f32, F: f32) -> vec3f {
+  var m = mix(vec3f(1.0), 0.45 + 1.25 * filmC, clamp(irid * (0.25 + 0.95 * F), 0.0, 1.0));
+  if (U.filmPhysics > 0.0) {
+    m = mix(m, mix(vec3f(1.0), filmTableAt(filmP, true), clamp(irid, 0.0, 1.0)), U.filmPhysics);
+  }
+  return m;
+}
 /* The softbox's radiance, the pad's being 1: none at Light Play 0. */
 fn softboxRadiance() -> f32 { return ${SOFTBOX_GAIN.toFixed(1)} * U.lightPlay * U.lightPlay; }
 `;

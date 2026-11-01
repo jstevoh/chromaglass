@@ -10489,6 +10489,21 @@ model cannot reach one, the PR says what it reached and asks.
     through about half the gap of liquid, not all of it. airlens 9 and 10, red since the
     trace (they asked the magnifier's lit ring), restated: the camera sees the liquid
     through the small ball's wall (0.85 to 1.05 of it, 0.89; a camera with no lens reads 3.05) where the projector's aperture darkens it (0.54). Found: 38h-9.
+    *The film, to the camera:* `npm run filmlook` 8-9 went red with the trace (the film added
+    0.1 of colour, bar 1.5). The closeup was drawn on the black ground, and a traced bubble's
+    middle is the pad through the liquid, so every bubble was black and the film had nothing
+    to tint. On a lit ground the old camera passed, wearing the reflected gold (+7.0 yellow
+    over blue), but that was the painted, front-lit bubble's: lit from beneath, the camera
+    looks through the same film as the projector, and a flat film on the glass mirrors only
+    the lens's axis, where the softbox (15 to 55 degrees off it) is not; its glint lands
+    where the liquid behind the meniscus is 5 to 56 microns deep, past any interference.
+    `camFilm` (closeupDepth.ts) gives the camera the light through the film at Film Physics
+    1 (the rainbow at 0, as before), and only on the light that crosses it, so `airColumn`
+    no longer divides the film out of the liquid's transmission. filmlook 8-9 restated on a
+    lit ground: the camera's tint under a quarter of the rainbow's colour, yellow over blue
+    -4.7 (bar -2.3). The check-skeptic passed both with a plain blue cast (-8.0), so line 10
+    thickens every pocket's film to the most it keeps and asks the tint to move: +1.2, the
+    blue cast 0.0 (bar 0.6). Found: 38h-10.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
