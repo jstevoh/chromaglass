@@ -1390,6 +1390,20 @@
       ]
     },
     {
+      "name": "The press kit and store listings are what they say",
+      "shard": "browser2",
+      "run": "npm run presskit",
+      "why": [
+        "The press page (PLAN.md 37k) and the store listings (12.6): /press routed",
+        "before the app's catch-all, every file it links in public/, six stills at",
+        "least 2400 px wide and two faststart clips as long as their captions (read",
+        "from the files), the landing page's prices, each listing field within its",
+        "store's limit with no price or way to buy, the store pictures' sizes and",
+        "alpha, and the page at 360 px and 1280 px with no sideways scroll and every",
+        "picture loaded. No build: it serves public/ as Hosting does."
+      ]
+    },
+    {
       "name": "The Live Show panel",
       "shard": "browser2",
       "run": "npm run liveshow",

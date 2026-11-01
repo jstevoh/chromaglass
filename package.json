@@ -293,7 +293,8 @@
     "bubbledye": "node scripts/bubbledye.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
-    "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs"
+    "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
+    "presskit": "node scripts/presskit.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
