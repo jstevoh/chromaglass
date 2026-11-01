@@ -64,17 +64,58 @@ written first. Line numbers are as read on main at d07ac31.
   check now lets the look's bubbles go every eight seconds, since it measures the kick's
   odds, not a bubble's life.
 
-- **38c. Soap is conserved: no decay, no grid-rate spreading** (S, nil; High on the soap and
-  milk looks). Sharpens **18d-5** (which owes the σ(Γ) law, not these). *Now:* the mix update
-  spreads surfactant at 0.08 cells² a step, about 1.3e-6 m²/s at 384² and 60 Hz on the 0.2 m
-  plate (real surfactant D ≈ 5e-10, about 2,500× slower, and today's number changes with
-  the grid and the frame rate), and multiplies it by 0.1^(dt/10), a tenth every ten
-  seconds (`src/gpu/fluid.ts:1463`, `wgsl/fluid/oil.ts:393`). *Real:* surfactant does not
-  disappear. It adsorbs at the interface up to Γ∞ (Langmuir), the Marangoni flow carries
-  it until ∇σ = 0, and the tension stays lowered where it went, which is why a real soap
-  front stops and the plate *remembers* where soap was. *Measure:* total surfactant on a
-  closed plate held to 1% over a minute; a burst's front stops where σ is level; the
-  spreading the same at two grids.
+- ~~**38c**~~ Soap is conserved: no decay, no grid-rate spreading. Shipped 2026-10-30
+  (`npm run soap`); story in `docs/plan-shipped.md` §38c. What it left:
+  - **38c-1. The Marangoni front at its real speed** (M; High on the soap and milk looks).
+    The named shortcut in `src/gpu/fluid/soap.ts`: K is SOAP_SPREAD, 1.04e-4 m²/s, the
+    old tuned pull, where h·Δσ/μ is about 0.07 on a 2 mm gap; and the surface speed is
+    capped at SOAP_FRONT, 15 mm/s, and the soap's self-spread at 3.9e-6 m²/s, the
+    explicit flux's limits, where a drop of dish soap sends its front out at 0.1 to
+    0.3 m/s (Jensen 1995: r ∝ t^¾). An implicit self-spread, or the similarity
+    solution laid ahead of the explicit one, then the dye's carry on that flow.
+    Also: the surface flow is only where θ has a gradient, so clean surface ahead of a
+    front is not pushed, where on real water the whole surface moves ahead of it.
+    *Measure:* a drop's front radius against Jensen's law at two grids; and `npm run physics`'s
+    burst line measured at a tenth of the plate again, not the drop's own radius (moved in #609).
+  - **38c-2. One soap, not three** (M). A bottle's soap lands twice on a GPU plate:
+    in the mix (.g, this item's) and in the poured liquids' `liquids0.r`, which has its
+    own Marangoni as a body force (`liquidForces`, `wgsl/fluid/forces.ts:42`) that the
+    projection deletes as a pure gradient (the reason marangoniFlux exists), no
+    diffusion, and is carried by MacCormack off a thin gap, which does not conserve.
+    The CPU's `LiquidPhase` (no WebGPU) still fades its soap in 6 s
+    (`DECAY_SECONDS`, `src/lib/liquidPhase.ts:79`). *Measure:* a bottle of soap moves
+    the dye once, by the mix's flux, and its total is kept as `npm run soap` keeps it.
+  - **38c-3. A Soap Breakdown dial** (S; the owner chose it, 2026-10-31). The Soap Bursts
+    dropper (`LiquidVisualizer`) lays a monolayer under each drop every 0.8 to 2.6 s, and
+    kicks add more; with the soap kept, a plate is soaped all over in a few minutes of a
+    show and the drops then do nothing, as a real dish does. The owner's answer: a
+    setting for a real loss, 0 (none, the real value) by default and free to ramp past
+    nature, so a long show keeps bursting: the soap taken up by the oil's interface, or
+    fresh water through the trough, as a first-order rate on the mix's .g in
+    `mixUpdate`, scaled in metres and seconds; MIDI, both desks and the phone's Soap
+    sheet in the same PR. *Measure:* `npm run soapbreak`, written first and red on main
+    (CI runs it with `--owed=law,decay,show,default`; the build takes each id out as it
+    turns green). Its contract: `src/gpu/fluid/soap.ts` exports `soapBreakdownRate(dial)`
+    (0..1 to k in 1/s, exactly 0 at 0, a half-life of an hour or more at 0.01 and ten
+    seconds or less at 1); the step's params carry the dial as `soapBreakdown` and the loss
+    is per real second (`magnetSeconds`), once a step (not in each of an oil look's four
+    mixUpdate substeps), never per frame or by `dt`, so 30 s reads exp(−k·30) within 2% at
+    two step lengths, at three times the dt and on an oil look, and a dial passed as 0 keeps
+    the soap to 2e-4; the TS step turns the dial into k with `soapBreakdownRate` itself and
+    `src/sim/fluidSimulation.ts` fills `soapBreakdown` from the setting; in the tenth minute
+    of a kick track (nine minutes' drops laid at once, the last minute dropped on the
+    kicks) a drop bursts half as well as on clean water or better with the dial at its top,
+    and under a fifth at 0 with every drop kept to 1%; `soapBreakdown` is 0 in
+    DEFAULT_SETTINGS and no look sets it. Proved against a scratch build: a correct loss
+    passes all four (kept 0.3536 against exp(−kt) 0.3536; the drop 73.8% against clean
+    water's 99.5%; bursts come back from a dial of 0.87 on that build's curve); a loss per
+    frame reads 0.84 and 0.71 at the two steps, one scaled by dt 0.044, one in every
+    substep 0.016 on the oil look: all red. Once `soapBreakdownRate` exists, `decay` and
+    `show` are no longer excused as owed, so a dial that never reaches the solver is red.
+  - **38c-4. Acidity diffuses at a grid rate** (S). The same mix update spreads the
+    acidity at 0.04 cells² a step (`fluid.ts`, 'mix update'), about 6.5e-7 m²/s at 384²
+    and 60 Hz, where H⁺ and OH⁻ are 9.3e-9 and 5.3e-9 (and a pH indicator's dye, 4e-10):
+    from metres and seconds, as the soap's now is.
 
 - **38d. The ferrofluid's labyrinth from the magnetic Bond number and the sheet's own
   repulsion** (M, same cost per cell; High: it is the whole maze look). Sharpens **9aa**
@@ -129,6 +170,26 @@ written first. Line numbers are as read on main at d07ac31.
   (τ ≈ h²/κ, seconds) and the glass to the air and by radiation, which
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
+  *Found reading it for the build (2026-10-30), before any of it was built:*
+  - **The heat is not carried on a thin gap.** The temperature lives in the velocity's z,
+    and a thin gap skips the self-advection (`fluid.ts`, step 2's `if (thin) return`), so
+    the lamp's heat stays where it was laid while the flow it drives moves the colour out
+    from under it: a warm patch cannot rise as a thermal, it pushes from a fixed place.
+    The build starts here: carry h·T with the gap's flow, as the dye's amount is carried.
+  - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
+    at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
+    Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in
+    real time, not the 12.4 s its comment says, and the lamp's 0.24 K a unit is 0.026 K/s
+    real, near the physical 1000 W/m² over a 6 mm layer and its two glasses (C ≈ 33 kJ/m²K,
+    0.030 K/s). So the physical model in seconds keeps Classic's heat nearly as it is if
+    Heat Decay is read as the air on the glass: h ≈ 7200·(−ln v) W/m²K puts 0.98 at a
+    strong fan (145, τ ≈ 115 s), 0.998 at still air (τ ≈ 20 min), 0.9 past any fan.
+  - **The current's cap is 0.75 cells a step** (`maxCurrent` in `sim/fluidSimulation.ts`),
+    not the 0.002 the audit read from the lab's BASE; the point stands: past a few
+    hundredths of a kelvin every plume goes at the cap.
+  - Real sizes for the check: water's β ≈ 2.1e-4 /K, so a free column in the reference
+    liquid (22.4 cSt) at the 6 mm rest gap rises 0.27 mm/s per kelvin, a round patch half
+    that (oillift's inclusion law); in water 22 times faster.
 
 - ~~**38g. Bubbles that merge, crowd and stretch like pockets in a gap**~~ **Shipped** (#603):
   the merged pocket starts as long as the pair was end to end and rounds off at Paterson's
@@ -212,24 +273,93 @@ written first. Line numbers are as read on main at d07ac31.
 
 ## Smaller, each worth doing when its area is open
 
-- **38k. The spikes' onset and the magnets' field, in tesla** (S; Medium: which magnets
-  raise domes). Sharpens **29c-3**, **9u**, **9t-1**, **9t-3**. The onset is 0.18 → 0.35 of the
-  hand's magnet by a smoothstep (`wgsl/spikes.ts:49-50, 125`; `standing.ts:34` `LANGEVIN`
-  0.035 on the same scale). Real: Cowley–Rosensweig, μ0Mc² = 2(1 + 1/μr)·√(Δρgσ), and a
-  sudden (subcritical) jump, not a ramp. With it: the internal field, not the applied one
-  (a thin sheet in a normal field has H_in = H0 − M, so at χ 2.6 the layer feels about 0.28
-  of the field at low strength: `spikes.ts:104-106` and the film's lift use the applied B);
-  and several magnets add as *fields*, not energies (`shared.ts:406-414` sums |B_k|², its
-  comment says so; two like-poled fingers' fields add as vectors, up to twice between
-  them; `magnetDiscExact` already gives B_ρ and B_z, which 9v-tilt needs too).
+- **38k. The spikes' onset and the magnets' field, in tesla.** ~~Fields add, the onset
+  worked out~~ **shipped** (#630): several magnets add as vectors, and the liquid's onset,
+  Cowley and Rosensweig's field for EFH1 under water through the layer's inner field, is
+  4.0 mT (`SPIKE_ONSET_REAL`, a share of 0.033), held to an independent solution by
+  `npm run disc` 13/13. The plate still runs on the lab's 0.18 (22 mT): **38k-7**. Story
+  in `docs/plan-shipped.md` §38k.
+  - **38k-7. The plate on the real onset** (S once 9t-2 is in; High: Magnet Garden, Ferro
+    Paint, the set-down magnet). *Shortcut today:* `SPIKE_ONSET` is the lab's 0.18, 5.5×
+    the liquid's, so the looks' own magnets and the hand's set-down one gather a flat
+    pool where a real one raises domes (9u). *Blocked on* **9t-2**: past the onset the
+    standing film takes the pool and has no Kelvin pull, so #625's try at the real onset
+    left a dragged drop 7.4 R behind and turned `ferrodrag`, `ferrodye`, `ferropour` and
+    `startup` red on the Mac (story §38k). *Build, after 9t-2:* `SPIKE_ONSET =
+    SPIKE_ONSET_REAL`, `SPIKE_FULL` at the old 0.35 / 0.18 of it; the opening builds the
+    film's pipelines when a look's own magnet is past the onset (`Opening.film`, so
+    `startup` does not wait on them mid-show); `disc`'s "every look's own magnet raises
+    none" turned to "is past it"; `spikes`, `fingers` and `standing` re-aimed to shares of
+    the onset (38k-5). #625's branch (`claude/project-thread-2kj23l`, 4e8bbc9) has all of
+    it written. *Measure:* those checks on the Mac, and the owner's eyes on Magnet Garden,
+    Ferro Paint and a dragged-and-dropped Magnet, filmed before and after.
+  - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
+    φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
+    from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%
+    and over) moves the onset, the pull (Kelvin's χ in `MAGNET_GAIN`) and the density.
+    Needs `SPIKE_ONSET` as a uniform (shared.ts's `spikeAmp`, the film's lift, `fluid.ts`'s
+    film gate) and `fluid.ts` is 99.6 KB, so a split first (19ai-10).
+  - **38k-2. The pitch and the tension are one number** (S; Low-Medium). The domes' pitch
+    (`SPIKE_PITCH`, 8 mm) sets l_c, so the onset reads σ = Δρ g l_c² = 3.3 mN/m for EFH1
+    under water: low for a hydrocarbon against water (10–30 mN/m without surfactant at the
+    interface). A measured σ would set the pitch (2π l_c, about 14 mm at 10 mN/m) and the
+    onset (5.3 mT) together; the pitch is the look's today.
+  - **38k-3. The film's patches step their own magnet's field** (S). The pull and the drop
+    add the magnets as vectors now; each standing patch (`wgsl/standing.ts`, `lift`) still
+    reads its own magnet alone, so two fingers' domes between them stand on half the field.
+  - **38k-4. The ramp past the onset** (S). `SPIKE_FULL` keeps the old proportion (1.94 ×
+    the onset) when 38k-7 moves it: the solver's gate as domes arrive, not their height, which the film's
+    lift makes. The subcritical jump and its hysteresis are 9t-3's.
+  - **38k-5. The looks' own magnets in the dome checks** (S). `spikes` and `fingers` used
+    Magnet Garden's own magnet as their control under the onset; at the real onset (38k-7)
+    it is 4.6× past it, so the control becomes a magnet at 0.8 of the onset, whose pull is
+    about 3% of Garden's. Add Garden's own magnet as a case that must raise domes, its bar
+    set from the Mac's first reading.
+  - **38k-6. One χ for EFH1** (S, with 38s). `standing.ts`'s `CHI0` is 2.6 and
+    `spikes.ts`'s `FERRO_CHI` 2.64; the drop's pull reads `CHI0`. Import the one number
+    and re-read `ferrodrop` (about 1%).
 
-- **38l. The glass springs back by the second, not by the frame** (M; Medium: every press
-  and lift). Sharpens **18a-5**. `gap += (rest − gap)·gapSpring` with no dt
-  (`wgsl/fluid/gap.ts:239`), so a lift recovers twice as fast at 120 fps as at 60. Real: a
-  lifted glass is held by Stefan suction, F = 3πμR⁴ḣ/(2h³), and a bent one relaxes by its
-  stiffness. The dt is a fix on its own (S) before the law.
+- ~~**38l. The glass springs back by the second, not by the frame**~~ — **Shipped, this PR**
+  (the glass opens against the film's suction, k(h₀ − h)(h/h_s)³ with Press Lift read at
+  the film a full press leaves, STEFAN_FILM 0.30 (38l-4); the dt half already held on a thin gap;
+  `npm run stefan`; story in `docs/plan-shipped.md` §38l).
+  - **38l-1. The liquid's viscosity in the press and the lift** (S; Low-Medium). Stefan's
+    rate goes as 1/μ, and neither the press's closing nor the lift reads the liquid under
+    the palm: glycerine presses and lifts as water does. hsPrep's per-cell μ is there to
+    read. Found building 38l.
+  - ~~**38l-2. The kick's sheet lifts by the same law**~~ — **Shipped, this PR** (the sheet
+    takes the suction's share cell by cell on the dent it holds and node by node on its own
+    solve, so the shader takes it everywhere; `npm run sheet` 18/18; story in
+    `docs/plan-shipped.md` §38l).
+  - **38l-3. The sheet's suction reads the plate's own gap** (S; Low). The sheet works out
+    each cell's share at rest less its own dent, not the plate's gap, which it cannot read
+    (the gap is on the GPU): where a hand presses on a kick's cells the plate's film is
+    thinner than the sheet thinks, so the sheet's part of the dent there lifts at the
+    shallower film's pace. Measured small (a hand press beside a live kick keeps its memory
+    to 0.04%), but on the same cells it is a shortcut. Found building 38l-2.
+  - ~~**38l-4. The glass's stiffness against the hand**~~ — **Shipped, this PR**
+    (STEFAN_FILM 0.25 → 0.30: a held press settles at a·STEFAN_FILM³/k, so the number is
+    the glass's stiffness; the Press tool goes to 0.0045, holds a second and lets go by
+    2.5 s on the Mac; story in `docs/plan-shipped.md` §38l).
+  - **38l-5. A light press barely dents** (M; Medium). Since 38l a held press settles at a
+    dent linear in how hard it presses (F/K), where before even a light press dug deep.
+    The Mac's lighter recipe (one r30 disc at 0.004 every 60 ms, far lighter than the
+    Press tool) went to 0.0129 before and 0.0292 after, and a phone's finger presses are
+    lighter still. The press is laid as a gap change a frame, not a force: model the
+    hand's press as a force over time (the third option the owner was offered), so a
+    soft, long press digs as a soft hand on stiff glass does. Found filming 38l-4.
+  - **38l-6. The lift's step reads the film at its start** (S; Low). `squeezeUpdate` (and
+    the sheet's share in `lib/sheet.ts`) takes 1 − (1 − k)^((h/h_s)³) with the depth held
+    at the step's start, so the glass lags where it opens fastest, the snap once a peeled
+    press passes h_s: `npm run stefan` reads 2.14% of the press between 60 and 120 frames a
+    second at 1 s (bar 3%). A midpoint step (the half step's gap, then the whole step's
+    share) takes it to 0.1% in a model, but tried here it moved stefan's "the rate is
+    k(h/h_s)³" line, which reads the rate at the step's start with the lab's big spring
+    (0.02 a step), 16% off: that line has to read the rate at the step's middle, and the
+    sheet and its check take the same step. Found building 38l-4.
 
-- **38m. Film Physics is built and on in no look** (S, judging only; Medium for the soap and
+- **38m. Film Physics is built and on in no look** — *pictures taken 2026-10-30: six looks at 0 and
+  at 1 in the project's shared files (`film-physics-38m/`), for the owner to pick; judging §101.* (S, judging only; Medium for the soap and
   bubble looks). Airy's thin-film colour through the CIE functions (`src/lib/filmTable.ts`,
   #163) is gated by `filmPhysics`, default 0 and set by no preset (`types.ts:1093`). The
   research's item 8 shipped, and nothing shows it. Photograph the looks with iridescence at
@@ -250,7 +380,8 @@ written first. Line numbers are as read on main at d07ac31.
 - **38n-3. The rock tilts the air too** (S; Low). Bubbles climb by the hold's tilt only
   (`plateSin(tilt, 0)`); the solver also takes the rock's swing (`plateSin(hold, swing)`).
 
-- **38o. The soap film's named shortcuts become items** (M each; Medium: the lace).
+- **38o. The soap film's named shortcuts become items** — *numbered 2026-10-30 as 32f–32j; 32f
+  (the frame's border) and 32g (black spots) shipped, 32h–32j open.* (M each; Medium: the lace).
   §32's notes (lines 51–59) name five shortcuts with no open ids: in-plane gravity on a flat
   plate, ζ 1.5 compressing minutes into 30 s (`src/lib/soapFilm.ts:74`,
   `src/gpu/soapFilm.ts:34`), uniform evaporation, rupture as a 0.5 s relaxation to 8 nm, and

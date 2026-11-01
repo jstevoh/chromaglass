@@ -51,6 +51,32 @@ regulator will bite sooner; recheck every preset's `dyeBudget` in the same PR.
 **Fallback:** the settings default to 0, so a bad look is one slider away from the
 current behaviour.
 
+#### 1i. Thin Film's rings were faceted at the grid's cells (shipped 2026-10-31)
+
+Found from 38m's pictures (the owner: "the edges are super pixelated"). A thin-film ring is
+a contour of the film's amount at sixteen periods per unit, and on the gooey edge's contrast
+(1.2 + 4 × Gooey, 2.4 on Soap Film, 3 at the default) three times that again, so any corner
+in how the amount is read shows many times over. 1h said the dye is read through the
+Catmull-Rom `textureBicubic`; that is true only with no gooey blur. With it (every look) the
+opacity comes from `blurAlpha`, plain bilinear taps a fraction of a cell apart (a third of a
+cell on the lab's 640-pixel plate of 192 cells), whose slope jumps at every texel: a corner in
+every ring in every cell. Fixed in `src/gpu/wgsl/plateThinFilm.ts` (the Thin Film block moved
+out of plate.ts whole, which is over its size budget): where Thin Film draws, in focus and
+with a blur under a cell, the film's amount is read again through a four-tap cubic B-spline
+(C2), and the film is rebuilt from it by the same steps the decode made (the thickness times
+the two depths' ratio, the gooey contrast, the dark blend's scale), so the darkness, gap,
+speckle and grain carry over and only the read changes. Cost: nine taps (B-spline and the
+reference read) on Thin Film's pixels only. A wide blur and a defocused pixel are left as
+they were. *Measured* (`npm run filmrings`, the lab with the film's amount probed out of the
+display pass at sixteen bits; its second difference on each axis folded into eight bins of
+the cell, the bin on the texel centres over the median): defaults 2.8 → 1.15 at zoom 1.3 and
+13.4 → 1.2 at zoom 3; Soap Film 3.2 → 1.2 and 7.6 → 1.3; the film moves 0.007–0.017 at the
+95th percentile (a ring is 0.0625; a read blurred a cell further, run as a mutation, moved it
+0.033–0.050). The pictures' own luminance cannot see it (within 13 % of even both before and
+after: the rings' curvature drowns the corners), which is why the check reads the film. The
+check-skeptic's pass found the first version folding the rows the wrong way up at zoom 3
+(the display pass flips y), which had hidden most of the corner there.
+
 ### 2. Lacing
 
 `src/components/LiquidVisualizer.tsx` (fragment shader)
@@ -2794,6 +2820,27 @@ the straw's bubble presses mid-stroke, and the hand's count has to stay the hand
 on the software plate: 531 cells by the bubble, none by the hand, over a stroke with six
 straw steps). The straw's swing on GitHub's runners is 15g-8; the other
 tools' press and stir are 15g-9.
+
+### 15g-8. The stroke's straw on GitHub's runners (shipped)
+
+On GitHub's Macs the tools check's Blow stroke, "keeps it rather than erasing it" (the pool's
+loss held to a tenth plus five), read +13%, −6.6%, −15%, +16% and −20% across #550 and #623,
+and red on every head of #618 (the glass peel, which leaves the gap at rest and so took away
+what had been hiding it). The owner's Mac kept or gained. Those runners blew the straw 18 to 27
+times a stroke, the owner's Mac 0 to 2, and every straw step blows a bubble whose dye is taken by
+the GPU and put back by the CPU from a readback mirror frames behind (15g-8b).
+
+Why the straw blew mid-stroke: the check's thirty moves were 0.68 of a cell at the plate's scale
+and the hand's cell is floored, so one move in three was no move, and a runner whose frames take
+50 to 80 ms drew the three still frames the straw waits for (BLOW_STRAW_FRAMES, after
+BLOW_DIR_HOLD_MS) in the gap. Now `pacedStroke` in `scripts/tools.mjs` makes as many moves as the
+stroke has whole cells and a quarter in it, read from the pointer's own cell before the press,
+the next after 120 ms or two of the plate's frames, whichever is later: the same distance, the
+same bar. GitHub's Mac (#636): 17 moves in 2.4–2.5 s, 61 wind steps and 0 straw a stroke, the
+pool 356 → 356 and 277 → 279, the push +4.80% and +6.50% against +0.15% to beat.
+
+The solver half (the air carrying its liquid out to the rim, conserving) was built in the same PR
+and taken out of it: it piles the liquid in a narrow ring the plate's checks see. 15g-8b.
 
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
@@ -6033,6 +6080,30 @@ bundle; 0 WebGPU errors; `cost: 2.44 ms a step at 256 × 256 on apple metal-3`);
 wgsl` 142 shaders; `npm run physics` 20/20; `npm run derive` 4/4.
 
 
+### 32f. The frame drains the film (shortcut c; PLAN 38o)
+
+Uniform evaporation no longer stands in for the frame. The frame wears a Plateau border whose
+radius follows hydrostatics, r(z) = 1 / (1/r0 + ρ g z / σ) (on a 64 mm film with r0 = 1 mm the
+top border is 38 µm), and by marginal regeneration it draws out fresh film of Frankel's
+thickness, h_f = 2.68 r Ca^⅔, at the film's own buoyant exchange speed ρ g (h − h_f) / ζ. The
+volume goes to `f.drained`, so sum(h) + drained is conserved. With no evaporation at all the
+noisy 800 nm film drains from the top and goes black there (41% lost in 120 s at r0 = 1 mm).
+`evap` stays as a real evaporation to the air and no longer gates the black marks. The option is
+`border: r0` (m); absent, the film has no border (the closed box C1–C7 ask about). 32d sets it.
+
+### 32g. Black spots on Vrij's clock (shortcut d; PLAN 38o)
+
+The 0.5 s relaxation to 8 nm that deleted the liquid is gone. Each cell keeps Vrij's clock for
+the van der Waals instability of a thin film, τ = 96π²σμh⁵/A² (A = 3.7e-20 J): 40 nm goes black
+in 1.8 s, 55 nm in 8.7, 300 nm in 12 hours. When its clock runs out a cell drops to Newton black
+(8 nm) and hands its liquid to its film neighbours; a neighbour whose own clock has run out takes
+the clock and turns next, so a thin region goes black outward and its liquid ends in a rim of
+thick film at its edge. Spots that meet leave islands of film inside the black, as in the
+photograph. Nothing is lost (C9 to 1e-9). C6 and C7 still pass on the new model, unchanged:
+at 120 s, 4.0% black, 18.4% dark, 13% saturated, 8/12 hues.
+
+Checks: `npm run soapfilm` 32/32 (C8 five lines, C9 four; main's model fails eight of the nine new ones (the 300 nm film staying clear is the ninth) and passes the other 23; four look-alikes from the check review, a border solved for one fixed thickness, sides not graded by hydrostatics, a spot spreading its liquid over the whole film, and a clock read from the time since the film was made, each fail one line), `npm run soapgpu` 32/32 on software WebGPU with three new lines (border cell by cell 0.16% of the reference's change, volume lost 5.359% against 5.359%; 21 black cells against 21; Vrij's step 178 against 178), `npm run soapgpu -- --selftest` 32/32.
+
 ## 33. Bubbles and the closeup, per liquid
 
 ### 33a. No stepped ring round a bubble's hole (this PR)
@@ -7903,6 +7974,37 @@ and the live log-frequency spectrum strip on both the desk and the phone. Story 
   preset menu, the saved list and the phone's look button, Looks sheet and Looks strip (now flicked one slide at
   a time); a round tray clicks one slot when the look on stage changes (`slideTray.ts`, `SlideMount`,
   `SlideTray`). Held by `npm run panel`. Judging §82. Story in `docs/plan-shipped.md` §35.
+
+### 38. Realism audit: what still imitates, after §18 (asked 2026-10-30)
+
+#### 38c. Soap is conserved
+
+  - **38c. Soap is conserved: no decay, no grid-rate spreading (shipped 2026-10-30).**
+    The audit found the mix's soap faded to a tenth every ten seconds, spread by a
+    diffusion of 0.08 cells² a step (about 1.3e-6 m²/s at 384² and 60 Hz, 2,500 times a
+    surfactant's own and four times faster on a grid half as fine), was clamped at 1 by
+    every splat and update, and pulled per cell of difference in two substeps of the
+    frame's whole time whatever the grid. The owner asked for all of §38 with physics at
+    the core and settings free to ramp past it. Now (`src/gpu/fluid/soap.ts`): the mix's
+    .g is the soap a cell holds in monolayers Γ∞, kept; the surface's coverage is
+    θ = min(soap, 1), the rest in the water as micelles; the Marangoni flow is
+    u = −K∇θ in metres and seconds and carries the dye and the monolayer (never the
+    micelles), so a pool of strong soap pulls only at its edge and a plate soaped all
+    over pulls nowhere; molecular diffusion is SOAP_D, 5e-10 m²/s; on a thin gap the
+    open rim takes soap carried past it as it takes the dye, and no surface flow
+    crosses it. The caps that keep the explicit flux stable are in m/s and m²/s, with
+    as many substeps (up to 8) as the grid and step need: at 384² and 60 Hz every
+    number is the old one, so the looks keep their pull. The front's real speed is
+    38c-1. `npm run soap` (11 lines, lab, SwiftShader in about six minutes; its
+    first version's gaps found by the check-skeptic and closed): a stirred, bursting
+    closed plate keeps its soap to 0.00% over a minute (the fade left a millionth);
+    with Soap Bursts at 0 the soap's second moment moves 0.000003 in a minute (the old
+    diffusion, 0.0234), and soapPlan hands the solver D·t/dx² exactly at three grids
+    and steps; a drop on soap adds its whole dome (0.00565), and moves 0.0% of the dye
+    under it, against 99.5% on clean water; a burst's soap spreads 1.477e-3 at 128²,
+    1.463e-3 at 256² and 1.476e-3 at 60 Hz against 20 Hz (4·D_cap·t 1.562e-3), and
+    the dye it carries 3.239e-3, 3.438e-3 and 3.236e-3; on a thin gap soap pushed
+    over the rim leaves (0.00566 to 4e-7) and a pool against it keeps all 0.00565.
 
 ### QA list: what the owner found playing it
 
@@ -10435,6 +10537,82 @@ seven landscapes, which iOS zooms on focus), and the strip's Feedback row.
   overlapping on the paper; doing that keeps the three inks and gives back green,
   orange and purple. Next to QA-15; deferred with it.
 
+## ~~38l. The glass springs back by the second, not by the frame~~ — **Shipped**
+
+The audit (PLAN §38) found `gap += (rest − gap)·gapSpring` with no dt, and the same
+fraction of what is left at any depth. The dt half already held on a thin gap: the app
+hands the solver `glassSpring(Press Lift, dtSeconds)` (sim/fluidSimulation.ts, since the
+presslift work), so the glass at 120 fps takes twice the steps of a sixtieth to come up
+the same way. The law did not: a glass pressed nearly flat came away as easily as one
+barely dented, where two wet glasses part only as fast as the liquid can flow back in
+through the gap that is opening, a resistance that goes as 1/h³ (Stefan,
+F = 3πμR⁴ḣ/2h³, the law the press already closed by).
+
+Now, on a thin gap, `squeezeUpdate` opens the gap at k(h₀ − h)(h/h_s)³, integrated over
+the step with the depth held (the step takes 1 − (1 − k)^((h/h_s)³) of what is left, so
+it never overshoots). k is Press Lift's spring, read at the film a full press leaves,
+h_s = STEFAN_FILM of rest (0.30, 38l-4), not at rest: glass is stiff, so the time a person
+sees is the thin film's, and that is the time Press Lift always set. Read at rest the same
+dial left a full press stuck for minutes. Shallow dents (a tap, a kick) come back (1/h_s)³
+quicker, as stiff glass on a thick film does. The "no delta" update now hands the kernel
+the thin flag too (it was 0, so most steps ran the old spring). The old plate keeps its
+linear spring.
+
+`npm run stefan` (5/5 in software WebGPU): the opening rate over what is left at h/h₀
+0.253 and 0.687 came in ratio 0.0499 against (0.253/0.687)³ = 0.0499 (1 on main, the check
+red there: the deep press never reached the second depth's test on main's flat rate ratio),
+and each rate is k(h/h_s)³ to 0.1%; 60 and 120 fps agree to 0.68% at 0.5 s; a hundredth
+dent comes back at 1.278 a step against the law's 1.278. `npm run presslift` 6/6 with it:
+93% of the ring's shift back after 1 s, all of it by 1.5 s. Found along the way: 38l-1,
+the liquid's viscosity in the press and the lift.
+
+**38l-2, the kick's sheet lifts by the same law (same PR).** Beat Squeeze's rhythm sheet
+(`lib/sheet.ts`) held its dent as the plate's spring would take it, one `keep` for every
+cell and every mode. With the suction in the shader everywhere, the plate's gap parted
+from the sheet's dent by 7% of a dent; with the sheet's cells left on the plain spring, a
+hand press beside a kick lost 27% of its memory (every cell carries a little of the
+sheet, a sum of sines). Now the sheet takes the law cell by cell: on the dent it holds,
+each cell's share (1 − s)^((h/h_s)³) at the gap the shader sees there (Plate Shape's rest
+less the dent, floored), and on its own solve, out to space, each node times its share
+(its images take their mirror's, which keeps the sheet odd), and back to the modes by an
+exact forward transform (`toModes`, toSpace's inverse to 1e-16). The shader's exception
+is gone. `STEFAN_FILM` moved to `lib/sheet.ts` (the gpu constants re-export it) so both
+read one number. `npm run sheet` 18/18 in software WebGPU: the gap against the solve
+0.001% held, 0.001% letting go, 0.027% let go (1% bar); the hand press's memory beside a
+kick 0.04% (2% bar). Its spring line now asks the law one step from the same state, cell
+for cell and node for node, flat and on a dome (1.8e-8 and 1.6e-16 of the depth), and the
+quiet time with the spring's rate at rest (oil 1.017 s against 1.016). The sheet costs
+1.6 ms a step in node on the app's 192 plate (was 0.8): the forward transform 0.5 ms, the
+shares the rest, a short series for e^z near 1 where Math.exp alone took 0.48 ms. Left:
+38l-3, the sheet's share reads its own dent, not the plate's gap.
+
+**And a held kick holds (same PR).** On the Frame Sway looks Beat Squeeze still lays the
+stamped bowl across the dish (KickRelease). Near rest the suction lifts at
+(1/STEFAN_FILM)³ = 64 times Press Lift's rate, so let alone through its 0.15 s hold the
+kick's dent came up a tenth, and `npm run rides`' ring 30 cells out went 3.6 cells against
+its bar of 4 (red on the Mac too). A hand holding the glass balances the glass's
+restoring force through the same film: the press closes at a(h/h₀)³, the lift opens at
+k(h₀ − h)(h/h_s)³, so the hold that keeps the dent where it is lays k·amount/STEFAN_FILM³ a
+step in each disc, at any depth. KickRelease lays it on a thin gap (the sim hands it the
+step's spring); rides holds its kick the same way. Measured in the lab before the change
+(the kick alone): 3.61 cells let alone, 4.30 held, 4.16 with no spring at all.
+
+**38l-4, the glass's stiffness against the hand (same PR).** Filmed on the owner's Mac at
+the first STEFAN_FILM, a quarter, the peel was gone: the app's Press tool held 1.5 s went
+only to 0.0146 of the 0.03 gap (0.0062 before 38l) and was back in 0.6 s, where before the
+hole was still open at 4 s. The press closes at a(h/h₀)³ and the lift opens at
+k(h₀ − h)(h/h_s)³; both go as h³, so the film's viscosity drops out of a held press and it
+settles at a dent of a·STEFAN_FILM³/k at any depth, Hooke's F/K. STEFAN_FILM is then the
+glass's stiffness against the hand, and a quarter never let a press under h_s, where the
+lift is slower than the plain spring. Swept on the Mac (Classic, 192, mean within 0.12 of
+the middle; deepest, then back to 0.0299): 0.28 0.00454, 2.1 s; 0.30 0.00462, 2.6 s; 0.32
+0.00430, 3.1 s; 0.34 0.00428, 3.7 s. 0.30 shipped: filmed, the Press tool goes to 0.0045,
+holds about a second (0.0055 at 0.5 s, 0.0073 at 1 s), peels, and lets go by 2.5 s; a
+light tap (0.001) is back in 0.3 s. The depth sits near the floor for every value past
+0.28 and falls off a cliff below it (0.25 is half as deep), so 0.30 keeps a margin. Left:
+38l-5, a light press barely dents.
+
+
 ## 38b, 38g, 38n. Bubbles as pockets in a gap (#603, 2026-10-30)
 
 Asked by the owner after the second realism audit: "physics at its core", settings may
@@ -10528,3 +10706,39 @@ Gaussian took 7%, and their middle is no longer lifted.
 *Measured:* `npm run lampfield`, 9/9 (on the old plate 1 of its first 7: the law worst 0.165 and 0.813 off,
 the stage 47 levels apart when the lamp moved, the axis 19 levels above the lamp). `npm run heat`
 gained a line: a dark pool at (0.25, 0.25) warmed to 0.767 of the middle one before, 1.000 after.
+
+## 38k. The magnets' field in tesla, and the liquid's onset worked out (#630, 2026-10-31)
+
+The second realism audit found the onset of the ferrofluid's spikes was a share of the hand's
+magnet (0.18 → 0.35 by a smoothstep), set in the lab so that each look's own magnet gathered
+its pool flat and only the hand's raised domes; and that several magnets added their
+energies, |B₁|² + |B₂|², not their fields. This part ships the fields and the derivation;
+the plate keeps the lab's onset until the standing film has its pull (38k-7).
+
+- **Fields add** (`magnetDisc.ts`'s `magnetDiscFieldVec`, `spikes.ts`'s `magnetVec` and
+  `magnetsShare`): `magnetsEnergy` and the drop's pull take |ΣB|. One magnet reads exactly
+  as before; two like-poled fingers pull up to twice as hard between them, as real ones do.
+- **The onset from the liquid** (`spikes.ts`, `ferroOnsetTesla`, `SPIKE_ONSET_REAL`).
+  Cowley and Rosensweig: a layer stands up at μ0 Mc² = 2 (1 + 1/μ̂) √(Δρ g σ). EFH1 (μ0Ms
+  44 mT, χ 2.64, 1210 kg/m³) under water, √(Δρ g σ) = Δρ g l_c with l_c the pitch's
+  1.27 mm: Mc 2.31 kA/m. The layer feels its inner field, H_in = H0 − M (B is continuous
+  through a sheet), so its Langevin M is of H_in, 0.88 kA/m, and the applied field is
+  μ0(H_in + Mc) = 4.0 mT, a share of 0.033 (one share is `SPIKE_B_REF` of an N52 rod's
+  1.45 T, 123 mT). The lab's 0.18 is 22 mT, 5.5× it.
+- **Why the plate does not run on it yet.** #625 lowered `SPIKE_ONSET` to 0.033, and Mac CI
+  (run 41179196537) went red: past the onset the standing film takes the pool, and the film
+  has no Kelvin pull (9t-2, `PULL_SHARE` 0; it steps the plate's pull aside in its window).
+  At the real onset Magnet Garden's own magnet (4.6×), Ferro Paint's (3.0×) and the
+  drag checks' (0.112) all ran the film: a dragged drop lagged 7.4 R and kept 52 of 100
+  half-full cells (`ferrodrag`), Ferro Paint's fingers changed (`ferropour`), the film's
+  async start broke `ferrodye`'s "at 0 the plate is the plate it was", and the opening
+  waited for the film's pipelines (`startup` 1b, 2.14 s). The owner was offered the split
+  (2026-10-31); the onset stays the lab's, a shortcut written in at `spikes.ts` and in 38k-7.
+- **The lift's scale as the onset's** (`wgsl/standing.ts`, `LIFT_ONSET` = 0.18 / 0.035):
+  the same number today, so that when the onset moves G stays the function of the field
+  over the onset it is drawn round at (2 at the onset, 2.8 under the Magnet tool).
+- **Checks.** `npm run disc` 13/13, two new lines: the liquid's onset worked out on its own
+  from the sheet's numbers, by M instead of H, 4.00 mT against `SPIKE_ONSET_REAL`'s 4.00
+  (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
+  vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
+

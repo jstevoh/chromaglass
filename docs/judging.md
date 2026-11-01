@@ -2274,7 +2274,21 @@ moved: every look's own value is where it was, so a look should open exactly as 
 4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
    plate that blows up at a top.
 
-## 101. The back plate's grain on the lamp (PLAN 38h-4)
+## 101. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+
+`filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
+colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
+(right) in the project's shared files, `film-physics-38m/` (`contact.png` has all six).
+
+1. Open Soap Film, then turn Film Physics to 1 (Design desk, camera group). The thin dye's
+   fringes go from loud multi-hue rings to straw, gold, olive-grey and blue-grey: what a real
+   film shows, and quieter (saturation 0.137 to 0.116 on the lab's plate).
+2. Macro Bead, Lacing Run, Oil & Water: zoom to a bubble. Its film tint changes from lilac and
+   pink to the soap film's own colours; small on the projected plate, plain in the closeup.
+3. Pick per look: keep the rainbow, take the real colours, or something between. A look that
+   should be real by its name (Soap Film) is the first candidate for 1.
+
+## 102. The back plate's grain on the lamp (PLAN 38h-4)
 
 **What changed.** With two plates on a lamp look, the back plate's pools now carry the
 pigment's grain the way the front's do (more or less dye from place to place), where before
