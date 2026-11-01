@@ -831,7 +831,7 @@ export interface VisualizerSettings {
    */
   kaleidoZoom: number;
   dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, its glass wall a thin dark line
-  lightPlay: number;          // how strongly the camera's bubble magnifies the liquid behind it (edges take no light from the lamp's side: PLAN 38h-2)
+  lightPlay: number;          // the closeup photographer's softbox above the glass, seen only by Fresnel reflection in a bubble's curved wall (PLAN 38h-7)
   lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
   lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
   secondLamp: number;         // a second, cooler bulb beside the first, adding to one side of the hot spot (lampField)

@@ -215,9 +215,61 @@ written first. Line numbers are as read on main at d07ac31.
     `plateTransmit.ts`), the camera's view through a light box's wider cone. No lamp
     direction is read on the glass. `npm run nolight` lines 9 to 12. Story in
     `docs/plan-shipped.md` §38.
-  - **38h-5. What Light Play and the Second Lamp do now** (S, nil; owner's call). 38h-2
-    took the lamp's side off every edge, so Light Play drives only how much the camera's
-    bubble magnifies the liquid behind it, and the Second Lamp only its share of the hot
+  - ~~**38h-7**~~ *shipped 2026-10-31.* Depth in the closeup's bubbles: the camera's
+    bubble wall traced through Snell, Fresnel and total internal reflection against the
+    light pad's critical cone (`closeupDepth.ts`), the middle the lamp through clear air,
+    the liquid round it seen through the wall (a diverging lens), and Light Play a softbox
+    above the glass seen only in a curved wall. Part 2 (the owner: "low resolution",
+    "no reflectance or 3d feel"): drawn from each bubble's true centre and radius
+    (`camBubble`, fitted to the air texels), a ball's middle tinted by the liquid above and
+    below it, the softbox 80 times the pad at Light Play 1. `npm run closeupdepth`,
+    `airlens` 9-10. The camera's bubble film is the light through it at Film Physics 1,
+    the projector's faint complement, not the reflected gold it wore while painted as if
+    lit from the front (`camFilm`; the flat film mirrors only the lens axis, the softbox
+    is off it): `npm run filmlook` 8-9, the closeup now on a lit ground. On a black-ground
+    look the liquid is its own light, so the column above and below a ball adds it and the
+    wall's dark band goes (the Mac's film, 2026-11-01): `npm run closeupdepth` 5. Story in
+    `docs/plan-shipped.md` §38.
+  - **38h-11. The lamp ground's reflected ray crosses half the liquid, found doing 38h-7 on
+    black** (S, nil). The camera's reflection in a bubble's wall (`camBounce`) takes the
+    liquid's transmission over half the gap on the lamp ground, as tuned by eye; traced, a
+    ray turned back off the upper meniscus crosses rho (1 - cos θ) above and rho (1 + cos θ)
+    over |cos 2θ| below, past the critical angle more than the whole gap. The black ground
+    now takes the whole depth; work the path out per point on both grounds and let the lamp
+    ground's contact line darken to what it is. *Measure:* `npm run closeupdepth` line 2's
+    line before the contact, and the lamp ground's contact against the liquid.
+  - **38h-9. The closeup's dye hole and the grain at zoom, found doing 38h-7 part 2** (S,
+    nil). The bubble's rim is now exact, but the solver cuts the dye's hole on its own grid:
+    a soft lighter fringe a cell or two wide sits outside each small bubble (the cleared
+    dye's antialiasing; on the lamp ground only, 119 against the liquid's 105 just past an
+    18-cell bubble's contact, none on black, measured 2026-11-01), and the dye's grain is a cell-sized noise that reads as coarse at
+    zoom 4 and over. Cut the dye's hole in the plate at the fitted rim instead (the solver
+    keeps its own for the flow), and draw the grain at screen scale past the solver's cell.
+    *Measure:* the fringe's excess brightness 1 to 1.5 radii out in `npm run closeupdepth`.
+  - **38h-10. filmlook's projected bubble tint is read mostly on the dark band, found doing
+    38h-7's film** (S, nil). `npm run filmlook` line 9 holds the projector's light through the
+    film at yellow over blue -1.0, but thickening every pocket's film to the most it keeps
+    moves that only to -1.2, where the camera's swings +7.0 (the table's sign turns every
+    hundred nanometres). The projector's film pixels are mostly its dark band; the middle's
+    tint is a level or two a channel and falls under the two levels that count a pixel. Count
+    the middle by the bubble's footprint instead and hold the projector's tint to the same
+    thickness swing. *Measure:* the projector's swing in filmlook's thickest-film renders.
+  - **38h-8. The rest of the closeup's depth, found doing 38h-7** (M, nil). The owner's
+    photos (drops/references) have two more cues the bubbles now show and the rest of the
+    closeup does not. *The beads:* an oil drop in water is traced the same way (Snell into
+    the oil and out, total internal reflection leaving the oil past asin(1.333/1.47), 65
+    degrees, so a bright line at its contact too), but its rim and camera line are what
+    `droplens` holds on the owner's Mac, so it goes with **33g-2b**, generalising
+    `airWall` to two indices. *The cells:* the dye's relief bends the light the same way,
+    so the dye beyond a dome is seen shifted by its slope (the lensing that shades a dome
+    in a photograph); `macroDetail` has the decoded colour only, so it needs the decode
+    moved to the lensed point first. The softbox reflects off an oil drop by 0.24% at
+    normal incidence, so no glint there unless asked past real. *Measure:* `npm run
+    closeupdepth` lines on a bead and a cell field.
+  - **38h-5. What Light Play and the Second Lamp do now** (S, nil; owner's call). Light
+    Play is decided (38h-7, the owner's "the lighting can do whatever is most realistic and
+    useful"): the closeup photographer's softbox. The Second Lamp is open. 38h-2
+    took the lamp's side off every edge, so the Second Lamp drives only its share of the hot
     spot. A real meaning for both is there to draw: a bulb whose image sits off the
     pupil's centre (the second bulb's, at `SECOND_BULB`) lights edges on one side only,
     the share `pupilPass` gives a bend added to that offset (oblique light, as a
