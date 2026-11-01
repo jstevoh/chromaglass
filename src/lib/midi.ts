@@ -544,7 +544,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
   { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
   { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 30, curve: 2, wanderSpan: 10 },
-  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1 },
+  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1.4, wanderSpan: 1 },
   { key: 'dishVignette',    label: 'Round Dish',       min: 0, max: 1 },
   { key: 'lumia',           label: 'Lumia',            min: 0, max: 1 },
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
@@ -591,7 +591,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
-  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1 },
+  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1.2, wanderSpan: 1 },
   // How firmly the oil and the water each keep their own colour. A fader
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.

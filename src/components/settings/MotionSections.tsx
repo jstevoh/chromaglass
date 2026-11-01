@@ -456,7 +456,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Swirl"
           value={settings.vorticityConfinement ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ vorticityConfinement: v })}
           settingKey="vorticityConfinement"
@@ -465,7 +465,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Dye Weight"
           value={settings.solutalBuoyancy ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ solutalBuoyancy: v })}
           settingKey="solutalBuoyancy"
@@ -474,7 +474,7 @@ export const PhysicsSection = ({ c }: { c: SectionCtx }) => {
           label="Heat Spread"
           value={settings.doubleDiffusion ?? 0}
           min={0}
-          max={1}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ doubleDiffusion: v })}
           settingKey="doubleDiffusion"

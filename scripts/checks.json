@@ -1029,6 +1029,19 @@
       ]
     },
     {
+      "name": "The dials held in the solver reach their tops",
+      "shard": "lab",
+      "run": "npm run widedials",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-2: every clamp the solver puts on Swirl, Dye Weight, Heat Spread,",
+        "Pushes Dye, Drop Height, Background Loop, Glass Smear and Momentum's current",
+        "admits the dial's top, no look moved, and on the lab's 128² plate each top",
+        "does more than the old one, finite and conserving. 2.5 minutes on software",
+        "WebGPU (cloud, 2026-10-31), so on Linux's lab shard rather than a Mac's."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
