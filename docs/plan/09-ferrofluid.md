@@ -148,6 +148,15 @@ Open, from building 9i:
     on a cold cache), and until then the pool only gathers. Starting the build at half
     the onset would build it on every Magnet Garden show, whose own magnet is there;
     starting it when the Magnet tool is picked would not.
+  - **9t-11. A wide pool dragged by the hand creeps and turns to worms.** Filmed on the
+    owner's Mac with 9t-2 and 38k-7 (2026-11-01, Classic, a pool 0.08 in radius, 0.9
+    full, the Magnet held 3 s then dragged 0.17 of the plate in 6 s): the pool stands
+    into a labyrinth of lit, worm-shaped domes and creeps after the hand, the same as on
+    main, where the hand's Magnet was already past the old onset. A small drop keeps up
+    (`ferrodrag`, 1.67 R). Open: whether a pool four pitches wide should gather toward
+    the axis under the pull before it fingers, and how fast a pool that size follows a
+    magnet through a thin gap (Hele-Shaw drag against the Kelvin force over the field's
+    reach), measured against the real thing before anything is tuned.
 - **9u. A set-down magnet still gathers a pool with no domes.** What the hand leaves
   behind (strength 0.8 at the look's height, 0.225 at Classic's Scale) is a field
   share of 0.15 on its axis, under the spikes' onset (0.18, `spikes.ts`), so it pulls

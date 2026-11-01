@@ -2316,3 +2316,16 @@ now reads in depth beside the photos (drops/references).
 4. (Part 2) Zoom all the way in on a small bubble: its rim a clean circle at any zoom, no
    square corners or steps; a small bubble's middle the liquid's colour, paler, with a
    bright glint; a big one's middle the clear lamp.
+
+## 104. The ferrofluid on its real onset (PLAN 9t-2, 38k-7)
+
+Filmed on the owner's Mac before and after (2026-11-01); the films are on one page in the
+project. `spikes`, `standing`, `ferrodrag`, `ferrohold` and `ferropour` check the physics
+in the lab; only the Mac shows whether it reads as ferrofluid.
+
+1. Magnet Garden: the look's own magnet stands the layer up into a field of separate black
+   domes, each lit on top, where it used to gather one flat pool.
+2. Ferro Paint: domes stand up and light under the walking magnet as it passes.
+3. Bad: domes that sit on a grid, flicker, or stand up under a look with no magnet.
+4. Not this change (9t-11): a wide pool dragged by the Magnet turns to worms and creeps,
+   the same before and after.

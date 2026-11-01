@@ -212,9 +212,18 @@ try {
     (line 1 holds them to it) and reads 0.0686 on Metal. The bar keeps the
     old one's strictness: 0.8 of 0.0366 is 0.43 of the poured 0.0686, and
     the bar is 0.4 of it, 0.0274, under the old 0.0293. A scatter that
-    gathered back into drops the ring's size reads near the poured ring,
-    a plate gathered into one pool reads 0.28 (line 6's disc), and both
-    are red; that the scatter moved at all is line 4's.
+    gathered back into drops the ring's size and stayed blobs reads near
+    the poured ring, and a plate gathered into one pool reads 0.28 (line
+    6's disc): both red on the width. Drops that size which then stood up
+    into domes would read narrow, as the ring does; they are what the
+    ring at 240 steps is, and it reads black 12% of the plate (this
+    line's other half asks for a fifth) and worked 50% of the tiles (line
+    3 asks for 90%), so they are red there (the cloud lab, 2026-11-01, the
+    same numbers as the Mac's). The ferrofluid's whole footprint (past
+    0.05) was tried as the width instead, so a stood-up blob would read
+    wide: the scatter's thin film between its channels runs everywhere
+    (0.56 of the plate wide at 240 steps, 3.9 at 720, against the ring's
+    0.077), so it reads nothing. That the scatter moved at all is line 4's.
   */
   check('as channels through the colour, not a pool',
     ringReal && now[LATE].cover > 0.2 && now[LATE].cover < 0.5 && now[EARLY].width < old[0].width * 0.4,

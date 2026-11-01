@@ -333,7 +333,7 @@ written first. Line numbers are as read on main at d07ac31.
   in `docs/plan-shipped.md` §38k.
   - **38k-7. The plate on the real onset (shipped 2026-11-01, with 9t-2).** `SPIKE_ONSET`
     is the liquid's 4.0 mT; the owner's films of Magnet Garden, Ferro Paint and a dragged
-    Magnet are in `docs/judging.md`. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.
+    Magnet are `docs/judging.md` §104. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.
   - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
     φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
     from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%

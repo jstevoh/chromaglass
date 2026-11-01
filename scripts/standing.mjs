@@ -217,12 +217,15 @@ try {
     up. So the count is of tops: no more than one top past 1.05 within
     0.08 of the magnet (the heap's, on the highest within three cells, the
     finder the domes are counted by), where the domes held up under the
-    Magnet are eight or more tops past 2. Nothing past 1.2 and no top past
-    2 stay as they were.
+    Magnet are eight or more tops past 2. And that one top is on the
+    axis, within 0.02 of it, where the field's heap is (Mac, run
+    41316296486: 271 cells past 1.05 in 1 top, 0.003 from the axis): a
+    dome held up off the axis is not the heap. Nothing past 1.2 and no top
+    past 2 stay as they were.
   */
   check('turned down under the onset, they lie back down',
-    e.ran + d.ran === DOWN && e.peak > 1.1 && d.domes === 0 && d.peak < 1.2 && d.bumps <= 1 && d.cover > h2.cover + 0.3 && h2.domes >= 8,
-    `${h2.domes} domes at the Magnet's field; at 0.8 of the onset's, peak ${e.peak.toFixed(2)} half a second in, ${d.domes} domes and peak ${d.peak.toFixed(2)} after as long as the Magnet held them (past 1.05 near it: ${e.over} cells, then ${d.over} in ${d.bumps} top${d.bumps === 1 ? '' : 's'}, at most ${d.bumpOff.toFixed(3)} from the axis, limit one top; the same field on a pool that never stood domes: ${u.over} cells past 1.05 in ${u.bumps}, peak ${u.peak.toFixed(2)}), the plate near it ${d.cover.toFixed(2)} covered (${h2.cover.toFixed(2)} under the Magnet); the film running ${e.ran + d.ran} of ${DOWN} steps`);
+    e.ran + d.ran === DOWN && e.peak > 1.1 && d.domes === 0 && d.peak < 1.2 && d.bumps <= 1 && (d.bumps === 0 || d.bumpOff <= 0.02) && d.cover > h2.cover + 0.3 && h2.domes >= 8,
+    `${h2.domes} domes at the Magnet's field; at 0.8 of the onset's, peak ${e.peak.toFixed(2)} half a second in, ${d.domes} domes and peak ${d.peak.toFixed(2)} after as long as the Magnet held them (past 1.05 near it: ${e.over} cells, then ${d.over} in ${d.bumps} top${d.bumps === 1 ? '' : 's'}, at most ${d.bumpOff.toFixed(3)} from the axis, limit one top, on the axis within 0.02; the same field on a pool that never stood domes: ${u.over} cells past 1.05 in ${u.bumps}, peak ${u.peak.toFixed(2)}), the plate near it ${d.cover.toFixed(2)} covered (${h2.cover.toFixed(2)} under the Magnet); the film running ${e.ran + d.ran} of ${DOWN} steps`);
   const drift = Math.max(...[hand, weak, under].map((r) => Math.abs(r[r.length - 1].mass / r[0].mass - 1)));
   check('and none of the ferrofluid is made or lost', drift < 0.001,
     `the most any run changed it: ${(drift * 100).toFixed(3)}%`);

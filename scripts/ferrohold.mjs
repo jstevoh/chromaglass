@@ -57,7 +57,8 @@
  *     until PLAN 38k-7 at least 60 half-full cells), and its centroid, read from the solver's
  *     phase field and not from the magnet's path, had moved over 0.40 from
  *     the 0.36 it settled at (0.42 measured on software WebGPU; 84 half-full
- *     cells and 0.422 on Metal), so the lag is of a dragged drop.
+ *     cells and 0.422 on Metal before 38k-7, 62 cells and 0.426 after), so
+ *     the lag is of a dragged drop.
  *
  * Controls, measured on the scene before #495 and over steps 60 to 120
  * (software WebGPU, and Metal on the Mac

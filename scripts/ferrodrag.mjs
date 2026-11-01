@@ -278,13 +278,15 @@ try {
     the same magnet held still over where it was poured, for the same 180
     steps: what the field alone does to its footprint. A drag that shears
     the drop apart still takes the dragged count to nothing against a held
-    count of tens, and the held drop has to be there (at least a third of
-    its poured cells) for the line to read anything. The bar is the one it
+    count of tens, and the held drop has to be there (at least half its
+    poured cells; it keeps about two thirds, 64 of 100 in ferrohold's
+    held-still run) for the line to read anything: a magnet that shredded
+    the held drop too would take both counts down together. The bar is the one it
     was, 15%. The poured count is printed beside it.
   */
   check(
     'the drop holds together: dragged, it keeps the half-full area it has held still under the same magnet, within 15%',
-    held1.halfCount >= held0.halfCount / 3 && areaChange <= 0.15,
+    held1.halfCount >= held0.halfCount / 2 && areaChange <= 0.15,
     `dragged ${s0.halfCount} → ${s1.halfCount} cells, held still under the magnet ${held0.halfCount} → ${held1.halfCount} (${(areaRatio * 100).toFixed(1)}% of the held drop's, limit ±15%)`,
   );
 
@@ -323,7 +325,10 @@ try {
       velocity fails line 4, and by a margin, on either of its two halves:
       half a radius further than the real plate went, or a quarter of its
       half-full cells kept or fewer (half line 4's bar of a half) where the
-      real plate kept at least the bar.
+      real plate kept at least the bar, from a drop as big as the real
+      plate's when the deep steps began (at least half its count: Mac run
+      41316296486, 76 against 61; held still 100 → 64), so a control lab that never had a drop is not read as
+      one that smeared it.
 
       Until PLAN 38k-7 only the first margin was read. Then the dragged
       drop was flat, and the stale velocity slid it 1.93 radii (Metal, #528)
@@ -340,7 +345,7 @@ try {
     const offKept = off.s2Half / Math.max(1, off.s1Half);
     check(
       'and it is the deep plate not riding the thin gap\'s last velocity: with it ridden, the same line is red',
-      stale.deep && !stale.ok && (stale.moved - off.moved >= R / 2 || (staleKept <= 0.25 && offKept >= 0.5)),
+      stale.deep && !stale.ok && (stale.moved - off.moved >= R / 2 || (staleKept <= 0.25 && offKept >= 0.5 && stale.s1Half >= 0.5 * off.s1Half)),
       `${stale.text}; ${((stale.moved - off.moved) / R).toFixed(2)}R further than the real plate (bar >= 0.5R), or ${(staleKept * 100).toFixed(0)}% of its half-full cells kept against the real plate's ${(offKept * 100).toFixed(0)}% (bar: at most 25% against at least 50%)`,
     );
   }

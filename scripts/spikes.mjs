@@ -284,7 +284,8 @@ try {
 
   const near = 0.12;
   // A pool the size Magnet Garden's pour gathers into, inside the spikes'
-  // reach (about 0.15 from a hand's magnet): see "Not asserted" above.
+  // reach (about 0.15 from a hand's magnet at the lab's old onset, about 0.4
+  // at the liquid's own since 38k-7): see "Not asserted" above.
   const pool = [{ ...AT, r: 0.14 }];
   const none = await run({ magnetStrength: 0 }, pool, [{ ...AT, near }]);
   const hand = await run({ ...HAND, magnetX: AT.x, magnetY: AT.y }, pool, [{ ...AT, near }]);
@@ -306,9 +307,11 @@ try {
     the plate (1/6 to 5/6 each way: the top of this file), and a pool's
     patch, 0.12 round its magnet, has to be inside it to be lit, so the
     pools go to the picture's opposite corners, 0.57 apart, B's near edge
-    0.45 from A, where A's field is about 0.6 of the onset. Not mirror
-    images of each other through the middle (0.29, 0.70 and 0.71, 0.31),
-    so a plate drawn mirrored in both axes would not light one at the other.
+    0.45 from A, where A's field is about 0.6 of the onset. B sits next to
+    A's mirror through the middle (0.71, 0.30), so a plate drawn mirrored
+    in both axes would light A's domes round B with the first finger
+    alone: the first-alone arm's "at most one lit" (and line 3's mirror
+    patch) is what catches that, not the pools' places.
   */
   const A = { x: 0.29, y: 0.70, near: 0.12 }, B = { x: 0.71, y: 0.31, near: 0.12 };
   const pools = [{ ...A, r: 0.12 }, { ...B, r: 0.12 }];
