@@ -9197,6 +9197,39 @@ fewer), and stamp the reading's time against the frame's.
   (not in AudD's catalogue). Whether a well-known commercial track comes back named is
   the one thing left, and needs a recording no cloud session should send.
 
+#### 14i-guard, 14r. The flash guard in linear light, by quarter-wall and the red rule (shipped 2026-11-01)
+
+**Read in the code.** `luma()` in `src/gpu/wgsl/probe.ts` weighted the canvas's encoded sRGB
+values (`0.2126, 0.7152, 0.0722`), while the guard's thresholds are relative luminance on
+linear light (a strobe between 0.85 and 0.95 read as 0.08, under the 0.10 flash step, though
+in light it is 0.16; a kick from black to 0.3 read 0.3 though in light it is 0.07).
+`src/gpu/probe.ts` divided an older frame's sum by the newest frame's pixel count (`this.pixels`,
+set on resize), so after a pixel-ratio rung change (1.5× to 1×) one reading was 2.25× too
+bright and counted as a flash. And `probeTiles` folded every pixel into one whole-wall sum,
+so a flash of 0.4 over a quarter of the wall read 0.1 as a mean, and the WCAG 2.3.1
+saturated-red rule was not implemented.
+
+*Fix:* `srgbToLinear()` in `src/gpu/wgsl/probe.ts` decodes the canvas's sRGB values with the
+exact IEC 61966-2-1 transfer curve before summing; `probeTiles` partitions the frame on an
+8×8 grid (`PROBE_GROUPS = 64`) and writes each tile's linear R, G, B sums together with the
+tile's pixel count (`vec4f(sumR, sumG, sumB, f32(tilePixels))`) so the count of the frame
+that was summed travels with it through the readback ring; `FlashGuard.sampleTiles(now, tiles)`
+in `src/lib/flashGuard.ts` evaluates every `ceil(cols / 2)` by `ceil(rows / 2)` quarter-wall
+window for both general relative luminance flashes (`FLASH_STEP = 0.1`, `HOLD_STEP = 0.045`,
+`DARK_ENOUGH = 0.8`, `SAFE_AMP = 0.075`) and WCAG saturated-red flashes (`R / (R + G + B) >= 0.8`
+on linear light and `max(0, R - G - B) * 320` changing by more than 20), tracks `state.rule`
+(`'flash'` or `'red'` while holding, `null` otherwise) and `state.counted`, and keeps
+whole-wall `sample(now, luminance)` intact. The desk (`OutputPanel.tsx`, `Desk.tsx`) and the
+phone (`PhoneStage.tsx`, status line only, no control on the phone) name `state.rule` while
+holding. *Measured:* `node --experimental-strip-types scripts/wallflash.mjs` 26/34 → 34/34
+(centred quarter-wall 0.4 flash at 5 Hz dimmed from 5/s to 0/s at settled gain 0.208 vs
+needed 0.208, held by `flash`; quarter-wall saturated red 0.4 flash at 5 Hz dimmed from 5/s
+to 0/s at gain 0.117, held by `red`, and paler red `R/(R+G+B) = 0.79` left alone with 0
+frames touched; 1.5× to 1× rung changes on a still picture counted 0 flashes and touched 0
+frames); `--owed=quarter,red,rung` removed from `scripts/checks.json`. Left open: 14r-2
+(high-contrast spatial patterns), 14r-3 (the Art-Net master's gain, held with Art-Net), and
+14r-4 (the probe's half of the rung line across a canvas resize through the GPU readback ring).
+
 ### 15. Every tool on every liquid
 
 #### 15c. Blow's wind erases colour rather than pushing it
