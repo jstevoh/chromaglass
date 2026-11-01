@@ -229,8 +229,8 @@ style (§31).
   wall's picture: **14i** (then **16c-clip**). Smaller: **0-gridband**, **0-seam**,
   **10-small**, **16c-stack**, **RM-F** then **RM-D**, **RM-desk**.
 - **6.8b** The closeup's ferrofluid drop (§29, the owner, 2026-10-11): ~~**29a**~~ the drop
-  as a lit bead, then ~~**29c**~~ #373 it follows the hand, **29b** the dye on it, **29d** its
-  wake, **29e** the look, **29f** its controls.
+  as a lit bead, then ~~**29c**~~ #373 it follows the hand, ~~**29a-10**~~ the domes' gloss in
+  the closeup, **29b** the dye on it, **29d** its wake, **29e** the look, **29f** its controls.
 - **6.9** Several areas of interest (§25, lane G): ~~**25a**~~ areas of the dish, with Velvet
   Underground, Lumia and Cell Bloom, then **25b** the next looks in its order, **25e**,
   **25c**, **25f** (after 18f and 18d).

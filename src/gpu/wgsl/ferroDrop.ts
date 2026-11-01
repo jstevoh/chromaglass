@@ -346,6 +346,29 @@ fn plateSeen(uv: vec2f, bg: vec3f) -> vec3f {
   the clearest, its foot the most coloured. \`gapUnits\` is the plate's view
   of the gap, in gap units (0.03 at rest); in l_c it is that times the plate
   widths in a unit (lib/turntable.ts DISH_GAP_FIELD_UV, PLAN 38r) over LC_UV.
+
+  In light, then as a camera records it (PLAN 29a-10). The owner, 2026-11-01,
+  after the films of Magnet Garden's domes: "Let's make sure we have 3d in
+  the macro view". In the closeup each dome was a black blob with a dim dot
+  on its top. The domes are steep cones (on a pool held over the hand's
+  Magnet, 90% of a dome's surface is past Snell's window or faces down), so
+  what most of a dome shows is the lamp-lit liquid round it, mirrored at
+  Fresnel's 0.5 to 4%: that is how a black gloss under water shows its
+  shape. But the plate's colours are display values, which the canvas
+  shows as they are (an sRGB-encoded frame, the app's whole look tuned in
+  them), and the reflection multiplied them as if they were light: 2% of a
+  white came out 5 of 255, where a camera records 2% of a white at about 39.
+  The domes' sides went to one black and only the key's glint on the top
+  was left. So the plate's colour is taken back to light (a 2.2 power, the
+  display's own curve near enough at these levels), the reflection worked
+  there, and the result encoded as a camera's frame is. The studio's
+  lights are radiances already, in the pad's units, whose white is 1 both
+  ways. Measured in the lab on that pool at 6x (npm run ferrodrop 11, 12):
+  the domes' brightest channel 3 of 255 in the middle and 1 to 11 across,
+  now 23 and 1 to 38; the key's glint on a plain drop moves from 0.9 to 0.95,
+  and the plate at 1x does not change, since the drop is drawn only in the
+  closeup. Not done the same way yet: the bubbles' walls in the closeup
+  (closeupDepth.ts, PLAN 38h-12).
 */
 fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
   let gapLc = gapUnits * ${DISH_GAP_FIELD_UV} / LC_UV;
@@ -365,12 +388,12 @@ fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
     seen = studio(vec3f(dir * sa, sqrt(1.0 - sa * sa)), key);
   } else if (Rw.z > 0.0) {
     let travel = sinw / Rw.z * (above + gapLc);
-    seen = plateSeen(fuv + dir * travel * LC_UV, bg);
+    seen = pow(max(plateSeen(fuv + dir * travel * LC_UV, bg), vec3f(0.0)), vec3f(2.2));
   } else {
     let travel = h * sinw / max(-Rw.z, 0.05);
-    seen = plateSeen(fuv + dir * travel * LC_UV, bg);
+    seen = pow(max(plateSeen(fuv + dir * travel * LC_UV, bg), vec3f(0.0)), vec3f(2.2));
   }
   let dye = pow(dyeColumnAt(fuv), vec3f(2.0 * above / max(gapLc, 1e-3)));
-  return F * seen * dye;
+  return pow(F * seen * dye, vec3f(1.0 / 2.2));
 }
 `;

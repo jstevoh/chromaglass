@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the Magnet's domes have depth in the closeup (PLAN 29a-10)
+
+- Zoomed in, the domes a magnet stands out of the ferrofluid show a dark glossy sheen down
+  their sides (the lit liquid round them, mirrored) and a glint on each top, where they were
+  flat black blobs. The plate at 1x is unchanged.
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a

@@ -254,6 +254,15 @@ written first. Line numbers are as read on main at d07ac31.
     tint is a level or two a channel and falls under the two levels that count a pixel. Count
     the middle by the bubble's footprint instead and hold the projector's tint to the same
     thickness swing. *Measure:* the projector's swing in filmlook's thickest-film renders.
+  - **38h-12. The bubbles' walls reflect display values, found doing 29a-10** (S, nil).
+    The closeup's ferrofluid now works its reflection in light and encodes it as a camera
+    records it (29a-10): multiplied straight into the display's values, 2% of a white came
+    out 5 of 255 rather than about 39. `closeupDepth.ts` multiplies the plate's colour by
+    Fresnel's reflectance the same way (the wall's bounce, `camBounce`, the second wall's
+    loss), with the softbox's gain (80 times the pad) tuned by eye on top of it. Take the
+    same step there, then set the softbox's gain again against the photos, since the eye's
+    tuning absorbed part of the curve. *Measure:* `npm run closeupdepth`'s wall lines before
+    and after, and a bubble's dark band against encode(R x the liquid behind it).
   - **38h-8. The rest of the closeup's depth, found doing 38h-7** (M, nil). The owner's
     photos (drops/references) have two more cues the bubbles now show and the rest of the
     closeup does not. *The beads:* an oil drop in water is traced the same way (Snell into

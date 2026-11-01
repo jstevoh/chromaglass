@@ -5820,6 +5820,28 @@ spread inside the drop 1 of 255 flat, 177 at Relief / 3D 0.7, its brightest up a
 yellow over it takes the highlight's blue 183 → 2 and its red 209 → 165; the 1x plate 0
 bytes different at any relief.
 
+### 29a-10. The Magnet's domes in the closeup: a dark gloss, not one black
+
+Asked 2026-11-01 by the owner, after the films of Magnet Garden's domes on their real
+onset (#662): "Let's make sure we have 3d in the macro view". Rendered in the lab (a pool
+0.09 of the plate across on 256², held over the hand's Magnet for 160 steps, Magnet
+Garden's settings, 6x), each dome in the closeup was a black blob with a dim red dot on its
+top. The shapes were there: the domes stand 2.2 l_c, with slopes from 0 to 63 degrees, and
+90% of a dome's surface is past Snell's window (49 of 136 cells) or faces down (73). Such a
+surface can show only what it mirrors of the lamp-lit liquid round it, at Fresnel's 0.5 to
+4% under water, and the display multiplied its colours (display values, shown as they are
+on an sRGB canvas) by that reflectance as if they were light: 2% of a white came to 5 of
+255, where a camera records about 39. A 30 times brighter room only grew the dot on the
+top, since the sides do not see the room. Now the plate's colour is taken back to light
+(a 2.2 power), the reflection worked there and encoded as a camera's frame is; the studio's
+lights are radiances already. Measured (`npm run ferrodrop`, 12 checks, the two new on that
+pool): the domes' brightest channel 3 of 255 in the middle and 1 to 11 across (both red on
+main), now 23 and 1 to 38; the ten older lines unchanged in verdict (the drop's light spread
+176 of 255, its brightest up and left, the dye line blue 197 to 0, red 209 to 187, the 1x
+plate 0 bytes different). No setting and no phone change: the phone draws the same plate
+shader. Found along the way: 29a-11 (the ridges), 29a-12 (the dye's amount over a dome),
+38h-12 (the bubbles' walls on display values too). Judging §105.
+
 ### 29c. The drop follows the hand and holds together (#373)
 
 Reported 2026-10-11 (the handoff's `drag-today.png`): a magnet at 0.35–0.5, height 0.2,

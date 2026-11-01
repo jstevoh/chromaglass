@@ -33,6 +33,13 @@
  *  5. Only the closeup: the plate at 1x is the same to the byte whatever
  *     Relief / 3D is, since the drop is drawn as a camera sees it, and the
  *     projector's plate is not a camera's.
+ *  6. The domes the Magnet stands (PLAN 29a-10): the owner, 2026-11-01, "Let's
+ *     make sure we have 3d in the macro view", after the films of Magnet
+ *     Garden's domes. In the closeup they were black blobs, each with a dim
+ *     dot: their sides' reflection, a few percent of the lit liquid round
+ *     them, was multiplied into the display's values as if they were light.
+ *     On a pool held over the hand's Magnet, the domes in the closeup show a
+ *     dark gloss well off black, and it varies across each.
  *
  * Lab only (the real solver and plate shader on software WebGPU); a few
  * minutes on a cloud box, seconds on the Mac.
@@ -180,6 +187,56 @@ try {
     `blue ${cb.toFixed(0)} → ${db.toFixed(0)}, red ${cr.toFixed(0)} → ${dr.toFixed(0)}`);
   // 5. The plate.
   check('the plate at 1x is the same to the byte at any Relief / 3D', result.differ === 0, `${result.differ} bytes differ`);
+
+  // 6. The domes the Magnet stands, in the closeup.
+  const domes = await page.evaluate(async ({ SIZE }) => {
+    await lab.create(256);
+    const cols = [[0.02, 0.36, 2.0], [2.0, 0.4, 0.48], [0.02, 0.8, 1.05]];
+    for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) lab.dye(0.12 + i * 0.25, 0.12 + j * 0.25, 0.16, cols[(i + j) % 3], 1.3);
+    lab.flush(); await lab.step(2);
+    const M = { x: 0.42, y: 0.58 };
+    lab.addPhase(M.x, M.y, 0.09, 0.9);
+    // Magnet Garden's phase settings and the hand's Magnet held under the pool (domes.mjs, spikes.mjs).
+    const over = { ferroLabyrinth: 0.8, phaseSharp: 0.75, phaseTension: 0.3 * 0.45, phaseDisplace: 0,
+      magnetStrength: 0.9, magnetHeight: 0.15 * 0.9, magnetSeconds: 1 / 60, magnetX: M.x, magnetY: M.y };
+    for (let k = 0; k < 160; k += 4) await lab.step(4, over);
+    const f = await lab.phase();
+    let tall = 0; for (const v of f.data) if (v > 1.5) tall++;
+    const settings = (relief) => ({ ...lab.look('magnet-garden').settings, macroRelief: relief });
+    const cam = { zoom: 6, macroAmount: 1, cx: M.x, cy: M.y };
+    const flat = await lab.render(SIZE, settings(0), cam);
+    const lit = await lab.render(SIZE, settings(0.7), cam);
+    const lum = (px, i) => 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
+    // The ferrofluid on screen: what the flat drawing draws black, three pixels in from its edge.
+    const dark = new Uint8Array(SIZE * SIZE);
+    for (let i = 0; i < SIZE * SIZE; i++) dark[i] = lum(flat, i * 4) < 25 ? 1 : 0;
+    const ls = [];
+    for (let y = 3; y < SIZE - 3; y++) for (let x = 3; x < SIZE - 3; x++) {
+      let all = 1;
+      for (let dy = -3; dy <= 3 && all; dy++) for (let dx = -3; dx <= 3; dx++) if (!dark[(y + dy) * SIZE + x + dx]) { all = 0; break; }
+      // The brightest channel: the gloss is the dye's colour mirrored, mostly red under a yellow.
+      if (all) { const i = (y * SIZE + x) * 4; ls.push(Math.max(lit[i], lit[i + 1], lit[i + 2])); }
+    }
+    ls.sort((a, b) => a - b);
+    const q = (t) => ls[Math.floor(ls.length * t)];
+    return { tall, px: ls.length, p10: q(0.1), p50: q(0.5), p90: q(0.9) };
+  }, { SIZE });
+  /*
+    A dome is a steep cone: most of its surface is past Snell's window (its
+    reflection cannot leave through the top glass) or faces down, so what it
+    shows is the lamp-lit liquid round it, mirrored at Fresnel's 0.5 to 4 %.
+    A camera records 2 % of a white at about 39 of 255; multiplied into the
+    display's values as if they were light, it was 5, and the domes were one
+    black (its brightest channel 2 of 255 in the middle). So: the middle of
+    the domes' light a dark gloss well off black, and spread across each,
+    which a flat lift would not be.
+  */
+  check('in the closeup the Magnet\'s domes mirror the lit liquid round them, as a camera records a dark gloss, not one black',
+    domes.tall > 50 && domes.p50 >= 12 && domes.p50 <= 100,
+    `the middle of the domes' light ${domes.p50.toFixed(1)} of 255 over ${domes.px} px (${domes.tall} cells stood past 1.5 full)`);
+  check('and that light runs across each dome, its shape, not a flat grey',
+    domes.p90 - domes.p10 >= 20,
+    `${domes.p10.toFixed(1)} to ${domes.p90.toFixed(1)} from the 10th to the 90th percentile`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
