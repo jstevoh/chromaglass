@@ -114,7 +114,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
   macroDepth: 'Dome shading, contact shadow and a shallow depth of field in the close-up.',
   macroEdgeDetail: 'Breaks up smooth, blown-up edges with a fractal warp so a silhouette stays ragged and real.',
-  macroRelief: 'Surface relief up close: each cell\'s steep rim bends the light from beneath out of the lens, a dark ring.',
+  macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig
   kaleidoscope: 'Mirrors the plate into 2 to 8 folds. Zero is off.',

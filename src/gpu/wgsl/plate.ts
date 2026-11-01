@@ -1061,7 +1061,7 @@ fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool,
 // Control flow here is uniform (branches test uniforms only, masks do the
 // per-pixel work) because the relief pass takes screen-space derivatives of
 // the height field, which are undefined inside divergent branches.
-fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32) -> vec4f {
+fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32, lapK: f32) -> vec4f {
   var col = colIn;
   // The silhouette warp is meant to crinkle blob outlines, not to deform the
   // cells themselves — bent circles read as lumps rather than as bubbles.
@@ -1070,7 +1070,7 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
   let paint = smoothstep(0.02, 0.20, alpha);
 
   // ── Packed cells ────────────────────────────────────────────────
-  var core = 0.0; var rim = 0.0; var fineCore = 0.0; var fineRim = 0.0; var id = 0.0; var k = 0.0;
+  var core = 0.0; var rim = 0.0; var fineCore = 0.0; var fineRim = 0.0; var id = 0.0; var k = 0.0; var seeWall = 0.0;
   var cellSlope = vec2f(0.0);
   if (U.macroCells > 0.005) {
     let freq = U.logicalGrid / max(0.15, U.macroCellScale * 8.0);
@@ -1088,6 +1088,10 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     let seeCoarse = resolved(cell, 0.078, 0.156);
     let seeFine = resolved(cell / 2.9, 0.065, 0.13);
     k = U.macroCells * focus * clumping * seeCoarse;
+    // A cell's wall, from sunken core to ridge, is about 0.4 of the cell
+    // (cellHeight: 1.6 + 1.2 rim widths); the relief's dark ring is resolved
+    // when the wall is, after the cell itself.
+    seeWall = resolved(cell * 0.4, 0.078, 0.156);
 
     // Coarse cells: two generations, half a cycle apart
     let g0 = cellField(p, f, 0.0, 3.2, 0.0, 0.13, U.cellClock);
@@ -1151,14 +1155,22 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     light box cannot show. At 14 times the field the camera's cone lost the
     whole of a pool (in the lab, 2026-10-31), so the field
     keeps its own slope here; the dome a bead has is the beads' block's.
+    A cell's wall is as steep at 4x as at 14x; what the zoom changes is
+    whether the camera resolves it. So the wall's full slope goes through
+    the lens and its dark ring is faded in as the wall is resolved (k
+    times seeWall), not its slope scaled by k: through the pupil's knee a
+    scaled slope left no ring until one zoom and then the whole ring at
+    once, twice the fine structure at 4x as at 14x (npm run microscope,
+    2.09 -> 25.24 -> 14.58).
   */
   if (U.macroRelief > 0.005) {
     let r3 = U.macroRelief;
-    let tilt = cellSlope * k * 1.6 + vec2f(0.0, lace * 0.6);
-    let n = normalize(vec3f(gridNormal.xy / max(gridNormal.z, 1e-3) - tilt * r3 * 2.2, 1.0));
+    let field = gridNormal.xy / max(gridNormal.z, 1e-3) - vec2f(0.0, lace * 0.6) * r3 * 2.2;
+    let nC = normalize(vec3f(field - cellSlope * 1.6 * r3 * 2.2, 1.0));
+    let through = mix(edgePass(dyeBend(normalize(vec3f(field, 1.0))), 1.0), edgePass(dyeBend(nC), 1.0), clamp(k * seeWall, 0.0, 1.0));
     // Recessed cores and grooves sit in their own shadow.
     let ao = 1.0 - clamp(core * k * 0.55 + fineCore * k * 0.25 + lace * 0.4, 0.0, 1.0) * 0.45;
-    col *= mix(1.0, edgePass(dyeBend(n), 1.0) * ao, r3 * paint);
+    col *= mix(1.0, through * ao, r3 * paint) * mix(1.0, camShadow(lapK, r3), paint);
   }
 
   // ── Dome shading — thickness across the bead as a whole ─────────
@@ -2598,7 +2610,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
   if (closeup) {
     let grad0 = clamp((1.0 - normal0.z) * 5.0, 0.0, 1.0);
-    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof);
+    let detail0 = macroDetail(fluid0.rgb, fluid0.a, fuv0, flow0, normal0, grad0, dof, near0.z / max(1.0, near0.w));
     // The film follows what the closeup does to the opacity, as it did when
     // it read fluid0.a here; only the grain is kept out of it.
     film0 = mix(film0, detail0.a * film0 / max(fluid0.a, 1e-4), macroAmt);
@@ -3151,7 +3163,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
 
     if (closeup) {
       let grad1 = clamp((1.0 - normal1.z) * 5.0, 0.0, 1.0);
-      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof), macroAmt);
+      fluid1 = mix(fluid1, macroDetail(fluid1.rgb, fluid1.a, fuv1, flow1, normal1, grad1, dof, near1.z / max(1.0, near1.w)), macroAmt);
     }
 
     // The mixer's grade and level for the back plate, on its own picture.

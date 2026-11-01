@@ -875,7 +875,7 @@ export interface VisualizerSettings {
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
-  macroRelief: number;        // surface relief: each cell's rim and the field's slope bend the light from beneath out of the lens (PLAN 38h-2), and occlusion
+  macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
   // Every one of these defaults to nothing happening: a look saved before the
