@@ -190,6 +190,7 @@
     "airlens": "node scripts/airlens.mjs",
     "filmtable": "node scripts/filmtable.mjs",
     "filmlook": "node scripts/filmlook.mjs",
+    "filmrings": "node scripts/filmrings.mjs",
     "soapfilm": "node scripts/soapfilm.mjs",
     "boil": "node scripts/boil.mjs",
     "soapgpu": "PW_WEBGPU=1 node scripts/soapgpu.mjs",
@@ -217,6 +218,7 @@
     "rides": "node scripts/rides.mjs",
     "sheet": "node scripts/sheet.mjs",
     "oillift": "node scripts/oillift.mjs",
+    "stefan": "node scripts/stefan.mjs",
     "rimhold": "node scripts/rimhold.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
@@ -284,7 +286,9 @@
     "soundpatch": "esbuild scripts/soundpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundpatch.mjs && node node_modules/.cache/soundpatch.mjs",
     "melody": "esbuild scripts/melody.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/melody.mjs && node node_modules/.cache/melody.mjs",
     "holeline": "node scripts/holeline.mjs",
-    "bubblelook": "node scripts/bubblelook.mjs"
+    "bubblelook": "node scripts/bubblelook.mjs",
+    "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
+    "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
