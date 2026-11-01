@@ -94,6 +94,7 @@ jobs:
       shards: ${{ steps.reach.outputs.shards }}
       parts: ${{ steps.reach.outputs.parts }}
       only: ${{ steps.reach.outputs.only }}
+      maconly: ${{ steps.reach.outputs.maconly }}
     steps:
       # Two deep: the pull request's merge commit and the base it was merged
       # into, which is the whole of what the PR changes.
@@ -107,9 +108,22 @@ jobs:
       # job leaves a "carried" notice naming the run, which the deploy gate
       # follows back to it. The earlier runs are read with this job's token
       # (the repository's default is read for every scope).
+      # esbuild alone, at the lockfile's version, for what each check imports
+      # (PLAN.md 19ak-2): a change to src/ or public/ runs only the Mac checks
+      # that open the app and the lab checks whose bundles import it. A few
+      # seconds, where `npm ci` would be most of a minute before any job could
+      # start. If it fails, reach.mjs finds no esbuild and runs every Mac
+      # check for such a change, as before; it never makes this job red.
+      - name: esbuild, to read what each check imports
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          v=$(node -p "require('./package-lock.json').packages['node_modules/esbuild'].version")
+          npm install --prefix "$RUNNER_TEMP/esbuild" --no-audit --no-fund --no-save "esbuild@$v"
       - name: Which files reach a Mac shard
         id: reach
         env:
+          ESBUILD_MODULE: ${{ runner.temp }}/esbuild/node_modules/esbuild/lib/main.js
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
@@ -428,8 +442,12 @@ jobs:
         timeout-minutes: 5
         run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
       # The shard's checks, from scripts/checks.json, as Measure's are.
+      # On a PR whose site files only some Mac checks read, those checks by
+      # name (PLAN.md 19ak-2); empty, every check of the shard.
       - name: The checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
 
   # The one name the rest of the repository knows this stage by.

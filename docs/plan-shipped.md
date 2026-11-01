@@ -3990,6 +3990,45 @@ out of `rides` with the cover glass, rewritten Desk v2 checks, a `SPLAT_FLOATS` 
 every one a real edit of a check, none a comment or prose. Counting a 0 or 1 on rewritten
 lines made it 12 of 50, nearly all `?? 0` and `[0]`, so those are left out.
 
+### 19ak. The Mac runs what a PR reaches, and known flakes report without blocking (2026-11-01)
+
+Asked by the owner on 2026-11-01 ("are we running too many checks on everything?"),
+when four PRs (#627, #643, #656, #659) sat red on lines none of them touched. Three
+savers were already in place and are unchanged: a newer push cancels the older run
+(`concurrency` in `checks.yml`), npm and Chromium are cached, and a PR of documents,
+the sessions' files or the native apps skips the Mac (19h).
+
+- **19ak-1, quarantine.** A check's entry in `scripts/checks.json` can carry
+  `quarantine`: the start of a FAIL line, the plan id that fixes it, and the dates it
+  holds from and until (at most `QUARANTINE_DAYS`, 21). While it holds, a check whose
+  only FAIL lines are quarantined still runs and prints them, as a warning annotation
+  and a ⚠ row in the job summary, and its job stays green. No bar moved: the line and
+  its threshold are the harness's. A check that timed out, was killed, printed a stack,
+  or printed any FAIL line not on the list is red as before; so is one past its end
+  date. `npm run checks` holds all of that with a control each, and that every entry's
+  plan id is an item in `docs/plan/` and its text is in the check's own scripts. First
+  entries, 2026-11-01 to 11-15: startup's "moving for good no later than the old way"
+  (19aa-7; #661 fixes most of it, 19aa-7b the rest), the Blow stroke's "keeps it rather
+  than erasing it" (19aj-1) and the wall's circle (19aj-2).
+- **19ak-2, the site's files select checks on the Mac.** A PR that changed anything
+  under `src/` or `public/` ran all 96 Mac checks. Now `checkReads` (in `checks.mjs`,
+  shared with `quick.mjs`) says what each reads from esbuild's import graph: the 28
+  that open the app or build it read the whole site; the 68 that open only the lab
+  read what their bundles import. The reach job installs esbuild alone (seconds, not
+  `npm ci`), and `reach.mjs` passes the names to each shard (`maconly` →
+  `CHECKS_ONLY`). A file under `server/` selects the Mac checks whose scripts trace it,
+  and no others (nothing under `src/` imports it). Measure is unchanged: it runs in
+  full for any site file. Fails toward running: no esbuild, an entry that would not
+  bundle, or a check the map does not place, and that check runs. Such a run leaves a
+  `mac` "partial" notice, which the deploy gate reads as it reads Measure's, so the
+  deploy of the merge runs every shard on main.
+- **Measured** (`scratch/replay.mjs`, not committed: main's last 100 merges replayed
+  through the old and new selection, each check priced at its median over three green
+  five-shard PR runs of 2026-11-01, plus 45 s of setup a shard): 6,526 Mac minutes
+  before, 5,675 after, 13% less; 65.3 → 56.8 a push. The lab's checks all bundle one
+  `scripts/lab-entry.ts`, which imports most of `src/gpu` and `src/lib`, so a solver or
+  library change still runs every lab check (19ak-3).
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**

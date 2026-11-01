@@ -54,7 +54,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { selectShards, selectMeasure, parseManifest, loadManifest } from './checks.mjs';
+import { selectShards, selectMeasure, parseManifest, loadManifest, checkReads, loadEsbuild } from './checks.mjs';
 
 // Markdown only at the top, in docs/ and in .claude/: a `.md` under src/ or
 // public/ could be imported (`?raw`) or served, and would reach.
@@ -384,7 +384,18 @@ async function selftest() {
     [touch('scripts/never-traced.mjs'), 'parts=["m"] only=', 'a script no check traces runs Measure in full'],
   ];
   for (const [mut, want, what] of MEASURE) {
-    const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1');
+    const got = runDiff(mut, undefined, withManifest).replace(/^.* (parts=)/, '$1').replace(/ maconly=.*$/, '');
+    if (got !== want) bad++;
+    console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
+  }
+  // The Mac's names ride it too (PLAN.md 19ak-2): the checks a change
+  // selects, or empty for every one, which is what a deploy can trust.
+  for (const [mut, want, what] of [
+    [touch('scripts/a.mjs'), 'maconly=["A"]', 'a check\'s script names that check to its shard'],
+    [touch('src/x.ts'), 'maconly=', 'a source file no map can place runs every Mac check'],
+    [touch('scripts/c.mjs'), 'maconly=', 'a change that skips the Mac names none'],
+  ]) {
+    const got = runDiff(mut, undefined, withManifest).replace(/^.* (maconly=)/, '$1');
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} --diff: ${what}${got === want ? '' : ` — got ${got}`}`);
   }
@@ -515,6 +526,7 @@ if (!isMain) {
   // scripts and documents. `only` empty is every check.
   let parts = loadManifest().shards.measure;
   let only = '';
+  let macOnly = '';
   if (event !== 'pull_request' && process.env.CALL_MAC === 'false') {
     // The deploy, when its gate's rule 5 held: the PR's run passed the Mac
     // and the site files it changed are apart from main's newer ones.
@@ -552,12 +564,30 @@ if (!isMain) {
       // change touches, every one otherwise. A tree with no manifest (the
       // selftest's scratch repositories) selects every shard.
       const before = atCommit('HEAD^1', git), after = atCommit('HEAD', git);
+      // What each check reads, so that a change to the site's own files runs
+      // the checks that read them rather than every Mac check (PLAN.md
+      // 19ak-2). Without esbuild (its install in the job failed) there is no
+      // map, and such a file selects every shard as before.
+      let readsOf = null;
+      if (after.manifest && reaching.some((f) => /^(src|public)\/|^index\.html$/.test(f))) {
+        const esbuild = await loadEsbuild();
+        if (esbuild) readsOf = await checkReads(after.manifest, after.pkg?.scripts ?? {}, esbuild, process.cwd());
+        else console.log('::warning title=reach::esbuild did not load, so every Mac check runs for the site\'s files');
+      }
       const picked = after.manifest
-        ? selectShards(reaching, { before, after, root: process.cwd() })
-        : { shards: MAC_SHARDS, why: 'every shard: the tree has no manifest of checks' };
+        ? selectShards(reaching, { before, after, root: process.cwd(), readsOf })
+        : { shards: MAC_SHARDS, names: null, why: 'every shard: the tree has no manifest of checks' };
       shards = picked.shards;
       why = `${why}; ${picked.shards.length ? `shards ${picked.shards.join(', ')}` : 'no Mac shard'} (${picked.why})`;
       if (!shards.length) mac = false;
+      if (mac && picked.names) {
+        macOnly = JSON.stringify(picked.names);
+        const total = after.manifest.checks.filter((c) => after.manifest.shards.mac.includes(c.shard)).length;
+        why = `${why}; ${picked.names.length} of ${total} Mac checks`;
+        // For the deploy gate (deploygate.sh), as Measure's: a run of some of
+        // the Mac's checks is not evidence for a whole tree.
+        console.log(`::notice title=mac::partial: ${picked.names.length} of ${total} Mac checks in ${shards.join(', ')}`);
+      }
     }
     if (mac) {
       const verdict = await carry({
@@ -581,7 +611,7 @@ if (!isMain) {
   console.log(why);
   // The matrix needs a list even when the shards are skipped (`mac=false`),
   // so then it is every shard, which nothing runs.
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\nshards=${JSON.stringify(mac ? shards : MAC_SHARDS)}\nparts=${JSON.stringify(parts)}\nonly=${only}\n`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `mac=${mac}\nshards=${JSON.stringify(mac ? shards : MAC_SHARDS)}\nparts=${JSON.stringify(parts)}\nonly=${only}\nmaconly=${mac ? macOnly : ''}\n`);
 } else {
   await selftest();
 }

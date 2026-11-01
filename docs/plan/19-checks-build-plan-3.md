@@ -420,3 +420,29 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+- **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
+  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
+  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
+  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  (the sample too close) or a frame not yet drawn (the read too early), and measure the
+  feature, not the moment.
+- **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
+  an end date (docs/plan-shipped.md, 19ak).
+- **19ak-2. Shipped:** a PR's site files run only the Mac checks that read them
+  (docs/plan-shipped.md, 19ak).
+- **19ak-3. Open: what would save more Mac time.** Replayed over main's last 100 merges,
+  19ak-2 saves 13%; what still runs every Mac check is the solver and the libraries the
+  lab's one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and
+  `src/lib`), the workflows, and scripts no check traces. In order of size: (a) a red
+  PR run on a line it cannot move is re-run by its failed jobs only, never all jobs (one
+  shard, about 16 minutes, not five, about 80; the steward skill says so now); (b) the
+  lab bundles per check, so a change to the magnet's library runs the magnet's lab
+  checks and not the soap film's; (c) the Mac shards wait for the typecheck, so a PR that
+  does not compile never takes a Mac. Building once on Linux for all five shards was
+  measured and left: a shard's setup, build included, is 20 to 60 s of its ~16 minutes.
+- **19ak-4. Open, found by 19ak-2: `npm run quick` lists every Mac check as "on the Mac
+  only".** Its test for a check that serves the app read the trace, which over-reads (most
+  scripts name `scripts/startup.mjs` in a comment), so all 96 read as serving the app and
+  none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
+  `checkReads` now gives `site` from esbuild's import graph; quick should use it for
+  `here`, once a session has timed the lab checks on software WebGPU.
