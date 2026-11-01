@@ -75,7 +75,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_id)
   if (lid.x == 0u) { partials[wid.x] = sSum[0]; }
 }`,
 
-  /** The partials into one number: the frame's whole sum, in [0]. */
+  /** The partials into the result: the frame's whole sum in [0] and its pixel count in [1]. */
   probeFold: `${HEAD}
 @group(0) @binding(1) var<storage, read> partials: array<f32>;
 @group(0) @binding(2) var<storage, read_write> result: array<f32>;
@@ -91,7 +91,10 @@ fn main(@builtin(local_invocation_id) lid: vec3u) {
   sSum[lid.x] = sum;
   workgroupBarrier();
   fold(lid.x);
-  if (lid.x == 0u) { result[0] = sSum[0]; }
+  if (lid.x == 0u) {
+    result[0] = sSum[0];
+    result[1] = f32(A.width * A.height);
+  }
 }`,
 };
 

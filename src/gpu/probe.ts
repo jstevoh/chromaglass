@@ -29,7 +29,6 @@ export class WebGPUFrameProbe {
   private readonly result: GPUBuffer;
   private readonly ring: ReadbackRing;
   private lum: number | null = null;
-  private pixels = 1;
 
   /** The reduction every frame runs, built before the show opens (`gpu/prepare.ts`). */
   static prepare(device: GPUDevice): Prep[] {
@@ -57,7 +56,6 @@ export class WebGPUFrameProbe {
   /** The two dispatches, into `encoder`. */
   private encode(encoder: GPUCommandEncoder, frame: GPUTexture): void {
     const { width, height } = frame;
-    this.pixels = Math.max(1, width * height);
     const args = new ArrayBuffer(16);
     new Uint32Array(args).set([width, height, PROBE_GROUPS, 0]);
     this.device.queue.writeBuffer(this.args, 0, args);
@@ -79,7 +77,7 @@ export class WebGPUFrameProbe {
   /**
    * Measure the frame just drawn. Its own encoder and submit: the picture is
    * already on its way, and what this queues behind it is two dispatches over
-   * a few hundred thousand texels and four bytes back.
+   * a few hundred thousand texels and the sum with its pixel count back.
    */
   measure(frame: GPUTexture): void {
     const encoder = this.device.createCommandEncoder({ label: 'probe' });
@@ -88,7 +86,13 @@ export class WebGPUFrameProbe {
     this.device.queue.submit([encoder.finish()]);
     if (slot) this.ring.collect(slot);
     const latest = this.ring.latest;
-    if (latest) this.lum = Math.min(1, new Float32Array(latest)[0] / this.pixels);
+    if (latest) {
+      // Divide by the pixel count of the frame that was summed, carried in [1]
+      // through the readback ring, so a pixel-ratio rung step is not a flash.
+      const view = new Float32Array(latest);
+      const pixels = view[1];
+      if (pixels > 0) this.lum = Math.min(1, view[0] / pixels);
+    }
   }
 
   /** The most recent delivered mean luminance, or null before the first read lands. */
@@ -107,10 +111,12 @@ export class WebGPUFrameProbe {
     encoder.copyBufferToBuffer(this.result, 0, read, 0, RESULT_BYTES);
     this.device.queue.submit([encoder.finish()]);
     await read.mapAsync(GPUMapMode.READ);
-    const sum = new Float32Array(read.getMappedRange())[0];
+    const view = new Float32Array(read.getMappedRange());
+    const sum = view[0];
+    const pixels = view[1];
     read.unmap();
     read.destroy();
-    return Math.min(1, sum / this.pixels);
+    return pixels > 0 ? Math.min(1, sum / pixels) : 0;
   }
 
   /**
