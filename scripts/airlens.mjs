@@ -43,7 +43,8 @@ import { readFileSync } from 'node:fs';
   pancake; the band leaves 1 - AIR_DARK of the light; and its inner edge is
   softened over 0.7 of a screen pixel as a fraction of the curved part.
 */
-const plateSrc = readFileSync(new URL('../src/gpu/wgsl/plate.ts', import.meta.url), 'utf8');
+// The aperture and the indices live in plateTransmit.ts's edge block since PLAN 38h-2, read with the plate.
+const plateSrc = ['plate.ts', 'plateTransmit.ts'].map((f) => readFileSync(new URL(`../src/gpu/wgsl/${f}`, import.meta.url), 'utf8')).join('\n');
 const constant = (name) => {
   const m = plateSrc.match(new RegExp(`const ${name}: f32 = ([0-9.]+);`));
   if (!m) throw new Error(`no ${name} in plate.ts`);

@@ -10450,6 +10450,28 @@ model cannot reach one, the PR says what it reached and asks.
     about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
     line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
     term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §99).
+  - **38h-2 (shipped 2026-10-31).** The rest of the light painted from above. The dye's rim on
+    the camera's path brightened the side facing `lampDir` (Light Play), darkened the other,
+    and carried a camera highlight and the second lamp's; the camera's bubble wore a lit
+    crescent, a one-sided meniscus, two reflections of the lamp off its dome and the second
+    lamp's glint (the projected bubble that glint too); the drops' ring added 15% of the plate
+    and a dyed drop its colour as light on the lamp ground; the closeup's relief was Lambert
+    toward a lowered lamp, a Blinn glint and a Fresnel brightening, on the field's slope taken
+    14 times; the camera's line between two dyes added 1.6 of the dye and a quarter of white.
+    Each is now the share of the lamp's light a bend leaves in the lens, by the law the lamp
+    lever already used (`pupilPass`): the bulb's image, BULB_FILL of the aperture, slid off by
+    the bend (`edgePass` in `plateTransmit.ts`, beside `plate.ts`, which shrank 2.2 KB). The
+    camera is lit by a light box, its cone 2.6 times the lens's (matched to the camera's drop
+    line, dark past 0.85 of a ball), so it loses light only on steep walls. The bend is the
+    slope `refractionOptics` already reads (0.35 of the field's gradient) for dye, two
+    refractions of water into air for a bubble's wall. The dyed drop's glow goes as Lamp
+    Ground turns to the lamp, as the plate's own dye does in `onGround`. The closeup's relief
+    keeps the field's own slope (Glossiness's) and the cells' menisci at their old weight:
+    at 14 times the field the camera's cone lost a whole pool in the lab. `npm run nolight`
+    grew lines 9 to 12 (drops clear and dyed, the camera's rims and line, the lamps moved to
+    opposite corners on four views): main 8/12, the branch 12/12. Found: 38h-5 (Light Play and
+    the Second Lamp's real meaning, oblique light, with 18e-2 and 38a-3), 38h-6 (light still
+    made at the back plate's derived line, the camera bubble's film, the ferro glint).
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 

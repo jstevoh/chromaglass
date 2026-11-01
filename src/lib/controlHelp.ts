@@ -72,10 +72,10 @@ export const CONTROL_HELP: Record<string, string> = {
   dishVignette: 'The round edge of a projected dish: dark beyond the rim and a thin bright ring at it.',
 
   // Lamp
-  lightPlay: 'How much the lamp\'s direction shows: bubbles shaded as lenses, dye rims lit on the lamp side.',
+  lightPlay: 'How strongly a bubble magnifies the liquid behind it, up close. Edges take no light from the lamp\'s side.',
   lampMotion: 'How far the light the gloss catches wanders, so highlights keep moving over the liquid. The projector\'s own light stays put.',
   lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
-  secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot, and two lights play across every bubble and edge.',
+  secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
   lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
@@ -114,7 +114,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
   macroDepth: 'Dome shading, contact shadow and a shallow depth of field in the close-up.',
   macroEdgeDetail: 'Breaks up smooth, blown-up edges with a fractal warp so a silhouette stays ragged and real.',
-  macroRelief: 'Surface relief up close: per-pixel bumps, wet highlights and shadowing.',
+  macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig
   kaleidoscope: 'Mirrors the plate into 2 to 8 folds. Zero is off.',

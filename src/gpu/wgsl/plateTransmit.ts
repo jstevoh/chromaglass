@@ -1,3 +1,4 @@
+import { BULB_FILL } from './lampField';
 /**
  * What the plate does with the lamp's light where it once painted light of
  * its own (PLAN 38h): a plate lit from beneath shows transmitted light only,
@@ -21,7 +22,6 @@ export const TRANSMIT_WGSL = /* wgsl */ `
   ask for a surface steeper than the liquid makes. Flat dye is never lit or
   darkened by it, which the old law did by up to a quarter at a lamp's edge.
 */
-const RELIEF_GAIN: f32 = 3.0;
 fn reliefGain(n: vec3f) -> vec3f {
   if (U.glossiness < 0.005) { return n; }
   return normalize(vec3f(n.xy * (1.0 + RELIEF_GAIN * U.glossiness), n.z));
@@ -80,5 +80,128 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
     }
   }
   return outc;
+}
+
+/*
+  The camera's bubble: where in it a point is (PLAN 38h-2), from p, the
+  position field's reading, and R, the bubble's radius in plate uv. The
+  position field is exact where the air covers a texel whole, but its splat
+  discards past the rim, so in the last texel the filtered position stops
+  growing (0.9 of the radius a texel outside the bubble) while the coverage
+  runs on in a square-cornered staircase: with the camera's band dark, the
+  owner saw that as a blocky edge (2026-10-31). So the centre is taken where
+  the field says it is, the field read again there, where it is whole and
+  the position near zero, and the point measured from that corrected centre:
+  the band and the rim are circles of the bubble's own radius. (A step two
+  texels inward was tried first; a bubble two cells across has no whole
+  texel two in, and stayed square.)
+*/
+fn camBubbleAt(fuv: vec2f, p: vec2f, R: f32) -> vec2f {
+  let cEst = fuv - p * R;
+  let airM = textureSampleLevel(air0, samp, cEst, 0.0);
+  if (airM.r <= 0.02) { return p; }
+  return (fuv - (cEst - (airM.gb / airM.r - vec2f(0.5)) * 2.0 * R)) / R;
+}
+`;
+
+/**
+ * The light at an edge (PLAN 38h-2): what a slope does to light coming up
+ * through the glass, for the dye's rims, the boundary line, the camera's
+ * bubble and the closeup's relief. Built into the display shader's LIGHTING
+ * block, after the lamp's pupilPass (lampField.ts) and before the macro's
+ * relief and the VIEW block, which read it; so the indices and the
+ * aperture the drops' optics use (plate.ts, the drops' constants) are
+ * declared here, once, and that block reads them from here.
+ */
+export const EDGE_LIGHT_WGSL = /* wgsl */ `
+const DROP_NA: f32 = 0.25;
+const N_WATER: f32 = 1.333;
+const N_OIL: f32 = 1.47;
+const N_AIR: f32 = 1.0;
+/*
+  Every edge on the plate was lit from a lamp above it: the dye's rim
+  brightened on the side facing the lamp's position and darkened on the
+  other, a camera highlight sat on it, the camera's bubble wore a crescent
+  and two reflections of the lamp, a ring round each oil drop glowed, the
+  closeup's relief was Lambert and a Blinn glint, and the line between two
+  dyes added a quarter of white. The lamp is under the glass. What a slope
+  does to its light is bend it, by the step in index across the surface
+  times the slope, and what the lens then shows is the share of that light
+  still inside its aperture. That is the law the lamp lever already uses
+  (pupilPass, lampField.ts): the bulb's image, a disc BULB_FILL of the
+  aperture across, slid off the aperture's centre. A bend slides it the
+  same way, so an edge is that share against the flat plate's: 1 where the
+  liquid is level, falling to nothing as the bend carries the bulb's whole
+  image past the rim, and never above 1. Symmetric: the lamp sends its
+  light up along the axis, so no side of an edge faces it.
+
+  The camera's view (a photographed look, the closeup) is lit the same way
+  from beneath, by a light box rather than a condenser: its light reaches
+  each point from a cone much wider than the lens takes in, so a ray bent
+  a little is replaced by another from the box, and only a bend past the
+  difference loses light. CAMERA_FILL is that cone in the lens's aperture
+  radii, matched to the camera's line on a drop (the beads' block and the
+  satellite droplets: dark past 0.85 of a ball's radius, where oil in water
+  bends the light 1.6 aperture radii), so the camera's edges and its drops
+  agree: thin dark lines only where the surface is steep.
+*/
+const CAMERA_FILL: f32 = 2.6;
+/** How much steeper than the field Glossiness (the plate) and Macro Relief (the closeup) may make the surface: 1 to 1 + this times. */
+const RELIEF_GAIN: f32 = 3.0;
+fn edgePass(bend: f32, cam: f32) -> f32 {
+  let p = pupilPass(vec3f(bend, bend, 0.0), vec3f(${BULB_FILL.toFixed(6)}, CAMERA_FILL, CAMERA_FILL));
+  // p.z is the light box's share on a level plate (1/fill², the lens being smaller than its cone).
+  return mix(p.x, p.y / p.z, cam);
+}
+/*
+  What gives the closeup its depth (Relief / 3D, PLAN 38h-2): the camera
+  focused a little past the liquid. A curved surface is a lens; on a plane
+  past it the light it bends gathers under a dome and spreads under a
+  hollow, so a swell reads brighter in its middle and a trough darker, the
+  shadowgraph, 1 - dz grad^2 OPL, by the same law and from the same
+  field (the derive pass's grad^2 OPL over the path) the projector's Focus
+  uses in refractionOptics, with its clamp. No light is made: what the
+  middle of a swell gains its flanks lose. Macro Relief is how far past
+  the camera focuses, up to CAMERA_DEFOCUS at 1, the projector's own reach
+  at either end of Focus. It replaced a lamp lowered over the plate, which
+  lit one side of every swell; the macroview check asks this shading of
+  every look (smooth, 2% of the frame or more).
+*/
+const CAMERA_DEFOCUS: f32 = 0.75;
+fn camShadow(lapK: f32, relief: f32) -> f32 {
+  return clamp(1.0 - relief * CAMERA_DEFOCUS * lapK, 0.2, 2.5);
+}
+/*
+  The bend at a dye surface of normal n, in aperture radii: the slope the
+  projector's optics take from the same field (refractionOptics reads the
+  gradient -n.xy/(0.9 n.z) and bends by 0.35 of it), so a rim the derived
+  path and the plain path draw is the same rim.
+*/
+fn dyeBend(n: vec3f) -> f32 { return 0.35 * length(n.xy) / (0.9 * max(n.z, 1e-3) * DROP_NA); }
+/* An air pocket's wall in water, of slope s: two refractions of 1 - n_water/n_air each. */
+fn airBend(s: f32) -> f32 { return 2.0 * N_WATER * (N_WATER / N_AIR - 1.0) * s / DROP_NA; }
+
+/*
+  The dye's rim on the paths that do not derive it (the camera's view, and
+  a projector without the derived field): its relief as the edge's share of
+  the light, weighted by Edge Relief as it always was, and by how much dye
+  there is to have a rim.
+*/
+fn meniscus(color: vec3f, n: vec3f, a: f32, isCamera: bool) -> vec3f {
+  let keep = edgePass(dyeBend(n), select(0.0, 1.0, isCamera));
+  return color * mix(1.0, keep, U.edgeRelief * smoothstep(0.02, 0.2, a));
+}
+
+/*
+  The line between two dyes where the field is not derived (the camera's
+  view, a projector without the derived field), PLAN 38h-2. It brightened
+  the dye by 1.6 times the line and added a quarter of white: light made at
+  an edge. The derived projector's line is the aperture's (refractionOptics
+  bends by 1.1 of the line, in radians); this takes the same bend through
+  edgePass, so on both paths a boundary is a line darker than the dye on
+  either side, thin for the camera's wide cone.
+*/
+fn boundaryShade(e: f32, isCamera: bool) -> f32 {
+  return edgePass(e * 1.1 / DROP_NA, select(0.0, 1.0, isCamera));
 }
 `;
