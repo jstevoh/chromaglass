@@ -84,7 +84,9 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin'];
+/** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
+export const AIR_DISP_LEAST = 1e-5;
 /*
   The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
   substep may carry across a face, in cells, and the most substeps a step

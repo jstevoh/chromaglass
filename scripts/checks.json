@@ -1016,7 +1016,7 @@
     },
     {
       "name": "A bubble's colour goes with its liquid",
-      "shard": "lab",
+      "shard": "lab2",
       "run": "npm run bubbledye",
       "why": [
         "On a thin gap a bubble's colour goes where its liquid goes and none is",
@@ -1025,7 +1025,8 @@
         "of liquid, and the GPU's multiply and the CPU's rim deposit from a",
         "frames-old mirror stand down there. A bubble put down whole, growing,",
         "drifting and popped, each keeping the plate's colour, piling no ring,",
-        "and emptying, and the hole filling back. Lab, so SwiftShader runs it."
+        "and emptying, and the hole filling back. Lab, so SwiftShader runs it,",
+        "in lab2: about nine minutes there, and the lab part is near its time."
       ]
     },
     {

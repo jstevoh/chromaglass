@@ -3,7 +3,7 @@
  * A bubble's colour on a thin gap goes where its liquid goes, and none is
  * made or lost (PLAN 15g-8b).
  *
- *   npm run bubbledye      (the lab: any adapter that computes; in Measure's lab part)
+ *   npm run bubbledye      (the lab: any adapter that computes; in Measure's lab2 part)
  *
  * What was wrong: on a thin gap the GPU multiplied the colour under every
  * bubble away each step (airExclude) and the CPU painted it back as a ring
@@ -116,5 +116,5 @@ try {
   await close();
 }
 failed ||= checks.some((c) => !c.ok);
-console.log(failed ? `\n${checks.filter((c) => !c.ok).length} of ${checks.length} failed` : `\nall ${checks.length} passed`);
+console.log(failed ? `\n${checks.filter((c) => !c.ok).length} of ${checks.length} failed${checks.length < 13 ? ', and the lab stopped before the rest' : ''}` : `\nall ${checks.length} passed`);
 process.exit(failed ? 1 : 0);

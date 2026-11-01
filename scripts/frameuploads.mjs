@@ -199,7 +199,10 @@ thinSim.attachGpu(keeper());
 thinSim.flushDeltas(0.01);
 thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1);
 const thinRim = writtenRows(thinSim).length;
-thinSim.gpu.rbDyeView.fill(0);
+{ // the mirror shows the hole, as on the old plate, so there is something a fill would take
+  const v = thinSim.gpu.rbDyeView, R = 0.04 * L;
+  for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.3 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
+}
 thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array(4), 0);
 const thinFill = writtenRows(thinSim).length;
 check('on a thin gap a bubble\'s rim and its popped hole write nothing', thinRim === 0 && thinFill === 0, `rows ${thinRim} for the rim, ${thinFill} after the pop`);
