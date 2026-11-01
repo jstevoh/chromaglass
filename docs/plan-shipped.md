@@ -9766,22 +9766,6 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
   moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
 
-#### 19k-11. The lab part on GitHub's slow runners
-
-- **19k-11** (E, S): **shipped** (with PLAN 38r part 2, PR #655), `holeline` moved from `lab`
-  to `lab3`. #655's `lab` part was cancelled at 25 minutes in `holeline` on 2026-11-01 and had
-  run 20 on every push since 10-31 21:03Z, every check in it about twice main's deploy run
-  (nolight 2:46 against 85 s, encode 90 s against 49, widedials 3:31 against 1:57, the soap
-  in `lab3` 6:54 against 3:40). Not the branch: in a cloud session the two trees time the same
-  (nolight 4:09 and 3:58, encode 266 and 269 dispatches a step, videoflow's CPU loop 2.25 and
-  2.47 ms a frame, soapbreak 319 and 301 s), and `videoflow`'s printed CPU loop, plain
-  JavaScript the branch does not touch, read 1.40 ms a frame on #655's `lab` runs against
-  0.70 on main's. Read across twenty other branches' `lab` jobs it is the runner: 0.70, 1.05
-  or 1.40 ms, the same branch landing on each on different pushes. On the slow tier `lab`
-  runs about 16 minutes before `holeline` and `holeline` about 10, past 25 since main's
-  `widedials` (#646) joined the part; `lab3` (the soap's two, 11:22 on the slow tier) has the
-  room. The timeout stays 25 and no bar moves.
-
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
