@@ -2,7 +2,7 @@
 /**
  * Does the DAW bridge carry a DAW's automation, transport and audio to the plate?
  *
- *   npm run dawbridge -- --owed=app,plugin     as CI runs it until 13.7a and 13.7b ship
+ *   npm run dawbridge -- --owed=app            as CI runs it until 13.7a ships
  *   npm run dawbridge -- --node                the server and the page's libs, no browser
  *   npm run dawbridge -- --plugin              on a Mac with the plugin built: its
  *                                              self-test's packets, and auval
@@ -28,8 +28,9 @@
  *      and over a tap, each beat where it is heard.
  *   4. The built app (`app`, not with --node): a slot moves the setting it is learned
  *      to, the DAW's tempo becomes the show's, and the ear hears the DAW's audio.
- *   5. The plugin (`plugin`): its protocol header says what the contract says; with
- *      --plugin, its self-test's packets pass the same wires, and auval passes.
+ *   5. The plugin (`plugin`, only with --plugin, on a Mac with it built): its
+ *      protocol header says what the contract says, its self-test's packets pass the
+ *      same wires, and auval passes.
  *
  * What no fake can say is that Live and Logic load the plugin, automate a slot and play
  * the plate on the bar. That is the owner's sitting on the Mac (docs/judging.md).
@@ -248,6 +249,12 @@ line('app', 'its banner says the DAW bridge listens on 127.0.0.1 alone',
 const display = await join_(PORT, 'display', info.displayKey);
 const phone = await join_(PORT, 'controller', info.showKey ?? info.key);
 check('a display with the display key is let in', display.ws.readyState === WebSocket.OPEN && !display.inbox.some((m) => m.type === 'denied'));
+// The phone is there to show the audio is kept from phones; a phone the server turned
+// away would show that of nothing.
+check('a phone with the show key is let in', phone.ws.readyState === WebSocket.OPEN && !phone.inbox.some((m) => m.type === 'denied'));
+// The followed plugin's hello once a second, as the plugin sends it, until its bye: a
+// server that counts "quiet" by hellos must not drop it mid-part (docs/dawbridge.md).
+const heartA = setInterval(() => { pa.hello('inst-a'); }, 1000);
 {
   const sent = now();
   await pa.hello('inst-a');
@@ -260,7 +267,7 @@ check('a display with the display key is let in', display.ws.readyState === WebS
   const names = Array.from({ length: SLOTS }, (_, k) => (k === 3 ? 'Sound Drive' : k === 7 ? 'Go: Fillmore' : ''));
   const at = pa.heard.length;
   display.ws.send(JSON.stringify({ type: 'daw-names', names }));
-  const n = await waitFor(pa.heard, (x) => x.address === A('names'), 500, at);
+  const n = await waitFor(pa.heard, (x) => x.address === A('names') && x.args?.[7] === 'Go: Fillmore', 500, at);
   line('app', 'the page\'s names for the slots reach the plugin as 32 strings',
     n && n.tags === ',' + 's'.repeat(SLOTS) && n.args?.every((v, k) => v === names[k]),
     n ? `${n.tags.length - 1} args, slot 4 "${n.args?.[3]}"` : 'nothing came back');
@@ -285,10 +292,12 @@ check('a display with the display key is let in', display.ws.readyState === WebS
 }
 {
   const at = display.inbox.length;
-  await pa.transport({ playing: 1, bpm: 128, beat: 1234.625, barBeat: 2.625, num: 4, den: 4, ahead: 0.0125 });
+  // 2000.3 is not a float32: a server that rebuilds the position in single precision
+  // is 0.03 beats out (15 ms at 128 bpm), which this sees.
+  await pa.transport({ playing: 1, bpm: 128, beat: 2000.3, barBeat: 0.3, num: 4, den: 4, ahead: 0.0125 });
   const m = await waitFor(display.inbox, (x) => x.type === 'daw-transport', 200, at);
   line('app', 'the transport reaches the display with the song position whole again',
-    m && m.playing === true && m.bpm === 128 && Math.abs(m.beat - 1234.625) < 1e-6 && m.barBeat === 2.625 && m.num === 4 && m.den === 4 && m.ahead === Math.fround(0.0125),
+    m && m.playing === true && m.bpm === 128 && Math.abs(m.beat - (2000 + Math.fround(2000.3 - 2000))) < 1e-9 && m.barBeat === Math.fround(0.3) && m.num === 4 && m.den === 4 && m.ahead === Math.fround(0.0125),
     m ? JSON.stringify({ playing: m.playing, bpm: m.bpm, beat: m.beat, barBeat: m.barBeat, num: m.num, den: m.den, ahead: m.ahead }) : 'no daw-transport');
 }
 {
@@ -348,6 +357,7 @@ check('a display with the display key is let in', display.ws.readyState === WebS
 }
 {
   let at = display.inbox.length, t0 = now();
+  clearInterval(heartA);
   await pa.bye('inst-a');
   const off = await waitFor(display.inbox, (x) => x.type === 'daw' && x.on === false, 300, at);
   at = display.inbox.length;
@@ -375,7 +385,14 @@ check('a display with the display key is let in', display.ws.readyState === WebS
     at = display.inbox.length;
     await pa.hello('inst-lan');
     const fromLoop = await waitFor(display.inbox, (x) => x.type === 'daw' && x.instance === 'inst-lan', 300, at);
-    line('app', 'a hello to the LAN address moves nothing; the same to 127.0.0.1 does', !fromLan && !!fromLoop, `LAN ${fromLan}, loopback ${!!fromLoop}`);
+    // And bound, not filtered: a server on 0.0.0.0 that drops what is not from loopback
+    // passes the two above, but holds the port on the LAN address too, so a socket of
+    // our own cannot take it there.
+    const probe = createSocket('udp4');
+    const bindErr = await new Promise((r) => { probe.once('error', (e) => r(e.code)); probe.bind(BRIDGE, lan, () => r(null)); });
+    try { probe.close(); } catch { /* never bound */ }
+    line('app', 'a hello to the LAN address moves nothing; the same to 127.0.0.1 does; the port is bound to loopback alone',
+      !fromLan && !!fromLoop && bindErr === null, `LAN ${fromLan}, loopback ${!!fromLoop}, ${lan}:${BRIDGE} ${bindErr ?? 'free'}`);
     await pa.bye('inst-lan');
   }
 }
@@ -383,8 +400,11 @@ check('a display with the display key is let in', display.ws.readyState === WebS
 // ── 2. A show that is not Pro ────────────────────────────────────────
 
 {
-  const free = startServer(FREE_PORT, FREE_BRIDGE, { CHROMAGLASS_ENFORCE_TIERS: '1' }, 'free');
+  // No key, and the tiers enforced: unenforced, a show with no key runs as Pro.
+  const free = startServer(FREE_PORT, FREE_BRIDGE, { CHROMAGLASS_ENFORCE_TIERS: '1', CHROMAGLASS_LICENSE_KEY: '' }, 'free');
   const freeInfo = await infoOf(FREE_PORT, free.log);
+  const freeTier = (await fetch(`http://127.0.0.1:${FREE_PORT}/license-info.json`).then((r) => r.json()).catch(() => null))?.tier;
+  check('the second show server runs as Free', freeTier && freeTier !== 'pro', `tier ${freeTier}`);
   const d = await join_(FREE_PORT, 'display', freeInfo.displayKey);
   await pa.hello('inst-free', FREE_BRIDGE);
   await pa.slot(3, 0.75, FREE_BRIDGE);
@@ -419,15 +439,17 @@ check('a display with the display key is let in', display.ws.readyState === WebS
   let slotOk = false, slotDetail = 'no dawSlotSource or dawSlotSettings';
   if (has('dawSlotSource') && has('dawSlotSettings')) {
     const src = lib.dawSlotSource(3);
-    const binding = (source) => ({ id: 'b', source, target: { kind: 'setting', key: 'audioImpact', min: 0, max: 1 }, mode: 'absolute' });
+    const binding = (source) => ({ id: 'b', source, target: { kind: 'setting', key: 'plateRock', min: 0.2, max: 0.7 }, mode: 'absolute' });
     const map = { format: 'chromaglass-midi', version: 1, name: 'dawbridge', bindings: [binding(src)] };
     const ccMap = { ...map, bindings: [binding({ kind: 'cc', channel: 0, number: 3 })] };
     const v = Math.fround(0.123457);
-    const want = valueAt(v, 0, 1, curveOf('audioImpact'));
-    const got = lib.dawSlotSettings(map, 3, v)?.audioImpact;
-    const fromCc = lib.dawSlotSettings(ccMap, 3, v)?.audioImpact;
-    slotOk = src?.kind === 'slot' && src.channel === 0 && src.number === 3 && Math.abs(got - want) < 1e-12 && fromCc === undefined;
-    slotDetail = `source ${JSON.stringify(src)}; Sound Drive ${got} for ${want.toFixed(6)} (a CC step would be ${(Math.round(v * 127) / 127).toFixed(6)}); a CC 3 binding gives ${fromCc}`;
+    const want = valueAt(v, 0.2, 0.7, curveOf('plateRock'));
+    const got = lib.dawSlotSettings(map, 3, v)?.plateRock;
+    const fromCc = lib.dawSlotSettings(ccMap, 3, v)?.plateRock;
+    // Plate Rock has a curve (2) and the binding a part of its travel, so a slot
+    // value written straight into the setting, or along a line, is not this.
+    slotOk = curveOf('plateRock') !== 1 && src?.kind === 'slot' && src.channel === 0 && src.number === 3 && Math.abs(got - want) < 1e-12 && fromCc === undefined;
+    slotDetail = `source ${JSON.stringify(src)}; Plate Rock ${got} for ${want.toFixed(6)} (a CC step would give ${valueAt(Math.round(v * 127) / 127, 0.2, 0.7, curveOf('plateRock')).toFixed(6)}); a CC 3 binding gives ${fromCc}`;
   }
   line('app', 'a slot moves its setting through MIDI learn\'s map at full resolution, and a CC binding is not a slot', slotOk, slotDetail);
 }
@@ -446,28 +468,40 @@ check('a display with the display key is let in', display.ws.readyState === WebS
   const timeOf = (k) => (k <= 16 ? origin + k * P1 : C + (k - 16) * P2);
   const periodAt = (ms) => (ms < C ? P1 : P2);
   t.tap(100); t.tap(600); t.tap(1100);
-  let worst = 0, bars = true, n = 0, followedAt = null;
+  // barBeat is sent a beat ahead of the song's count (a pickup bar), so a reader that
+  // counts the bar from the beat number, as Link's `whole % 4` does, is seen.
+  let worst = 0, bars = true, n = 0, followedAt = null, wrong = 0;
   if (hasDaw) {
     for (let ms = 2000; ms < 14000; ms += 1000 / 60) {
       if (Math.floor(ms / 10) !== Math.floor((ms - 1000 / 60) / 10)) {
         const sentAt = Math.floor(ms / 10) * 10, heard = sentAt + ahead * 1000;
         const beat = beatOf(heard);
-        t.dawReading(sentAt + late(), { type: 'daw-transport', playing: true, bpm: 60000 / periodAt(heard), beat, barBeat: beat % 4, num: 4, den: 4, ahead });
+        t.dawReading(sentAt + late(), { type: 'daw-transport', playing: true, bpm: 60000 / periodAt(heard), beat, barBeat: (beat + 1) % 4, num: 4, den: 4, ahead });
       }
       const r = t.read(ms);
       if (r?.source !== 'daw') continue;
-      // Across the change the beat is judged only once the new tempo is read.
+      // A beat that is not a number, still to come, or more than a beat ago is wrong
+      // whatever else it says (a reader stuck on beat zero would otherwise be judged
+      // against beat zero and pass).
+      if (!Number.isFinite(r.beatAt) || r.beatAt > ms + 2 || r.beatAt <= ms - r.period - 2) { wrong++; continue; }
+      // Across the change the beat is judged only once the new tempo is read, and not
+      // the last 120 bpm beat as the new tempo places it (beat 15, at the old tempo, is
+      // rightly put a few ms off by a reader that has just heard 132).
       if (ms >= C && followedAt === null) {
         if (Math.abs(r.period - P2) < 0.001 * P2) followedAt = ms; else continue;
       }
+      if (r.period === P2 && r.beatAt < C) continue;
+      // The first quarter second is the reader finding the least-late arrival.
+      if (ms < 2250) continue;
       const k = Math.round(beatOf(r.beatAt));
-      if (++n > 4) worst = Math.max(worst, Math.abs(r.beatAt - timeOf(k)));
-      if (r.bar !== k % 4) bars = false;
+      n++;
+      worst = Math.max(worst, Math.abs(r.beatAt - timeOf(k)));
+      if (r.bar !== (k + 1) % 4) bars = false;
     }
   }
   const period = P2, changedAt = C;
-  line('app', 'the DAW\'s transport is the tempo, each beat where it is heard', hasDaw && n > 50 && worst < 2, hasDaw ? `worst ${worst.toFixed(2)} ms over ${n} readings` : 'no TempoSource.dawReading');
-  line('app', 'each beat knows its place in the DAW\'s bar', hasDaw && n > 50 && bars);
+  line('app', 'the DAW\'s transport is the tempo, each beat where it is heard', hasDaw && n > 50 && wrong === 0 && worst < 2, hasDaw ? `worst ${worst.toFixed(2)} ms over ${n} readings, ${wrong} not the last beat` : 'no TempoSource.dawReading');
+  line('app', 'each beat knows its place in the DAW\'s bar, from the DAW\'s barBeat', hasDaw && n > 50 && bars);
   line('app', 'a tempo change in the DAW is followed within a beat', hasDaw && followedAt !== null && followedAt - changedAt < period,
     followedAt !== null ? `${(followedAt - changedAt).toFixed(0)} ms` : 'never followed');
   if (hasDaw) {
@@ -496,7 +530,7 @@ else {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     page.on('pageerror', (e) => console.log('  [pageerror]', e.message.slice(0, 200)));
     const map = JSON.stringify({ format: 'chromaglass-midi', version: 1, name: 'dawbridge', bindings: [
-      { id: 'slot3', source: { kind: 'slot', channel: 0, number: 3 }, target: { kind: 'setting', key: 'audioImpact', min: 0, max: 1 }, mode: 'absolute' },
+      { id: 'slot3', source: { kind: 'slot', channel: 0, number: 3 }, target: { kind: 'setting', key: 'plateRock', min: 0.2, max: 0.7 }, mode: 'absolute' },
     ] });
     await page.addInitScript((m) => {
       try {
@@ -504,6 +538,9 @@ else {
         sessionStorage.setItem('chromaglass-audio-source', 'daw');
       } catch { /* private window */ }
     }, map);
+    // Part 1's display goes, so the page is the one display, as on a show.
+    display.ws.close();
+    phone.ws.close();
     const namesAt = pa.heard.length;
     await pa.hello('inst-app');
     await page.goto(`http://127.0.0.1:${PORT}/?debug&look=classic&play=0`, { waitUntil: 'load' });
@@ -512,20 +549,22 @@ else {
     // The hello once a second, as the plugin sends it, for the rest of this part.
     const beat = setInterval(() => { pa.hello('inst-app'); }, 1000);
     try {
-      const names = await waitFor(pa.heard, (x) => x.address === A('names'), 5000, namesAt);
+      // Part 1 left names on the server (slot 8 "Go: Fillmore"), which it may send on this
+      // hello before the page has said its own: the page's are the ones with slot 8 empty.
+      const names = await waitFor(pa.heard, (x) => x.address === A('names') && x.args?.[7] === '' && x.args?.[3] !== '', 5000, namesAt);
       line('app', 'the app names slot 4 by what it is learned to, and leaves the rest empty',
         names?.args && names.args[3] !== '' && names.args.every((v, k) => k === 3 || v === ''), names ? `slot 4 "${names.args?.[3]}"` : 'no names');
 
       const v = Math.fround(0.123457);
       await pa.slot(3, v);
-      const want = valueAt(v, 0, 1, curveOf('audioImpact'));
+      const want = valueAt(v, 0.2, 0.7, curveOf('plateRock'));
       let got;
       for (let end = Date.now() + 5000; Date.now() < end;) {
-        got = await page.evaluate(() => window.chromaglassCastState().settings.audioImpact);
+        got = await page.evaluate(() => window.chromaglassCastState().settings.plateRock);
         if (Math.abs(got - want) < 1e-6) break;
         await sleep(100);
       }
-      line('app', 'the app: a slot moves the setting it is learned to, at the slot\'s own resolution', Math.abs(got - want) < 1e-6, `Sound Drive ${got} for ${want.toFixed(6)}`);
+      line('app', 'the app: a slot moves the setting it is learned to, at the slot\'s own resolution', Math.abs(got - want) < 1e-6, `Plate Rock ${got} for ${want.toFixed(6)}`);
 
       const t0 = now();
       let reading = null;
@@ -567,30 +606,42 @@ else {
 }
 
 // ── 5. The plugin ────────────────────────────────────────────────────
+//
+// Only with --plugin: the plugin is built on a Mac, and its lines are held where it is
+// built (the owner's Mac for 13.7b; the macOS runner from 13.7c, whose PR takes
+// `plugin` out of --owed in that shard's entry). Its header alone, checked on every
+// run, would let a header with no plugin behind it turn the part green.
 
-{
+if (!PLUGIN) console.log('skip  the plugin: its header, its own packets and auval — pass --plugin on a Mac with it built');
+else {
   const header = 'plugin/dawbridge/Source/BridgeProtocol.h';
   const text = existsSync(header) ? readFileSync(header, 'utf8') : '';
-  const num = (name) => Number(text.match(new RegExp(`\\b${name}\\s*=\\s*(\\d+)`))?.[1]);
+  const num = (name) => Number(text.match(new RegExp(`\\b${name}\\s*(?:=\\s*|\\{\\s*)(\\d+)`))?.[1]);
   const missing = ADDRESSES.filter((a) => !text.includes(`"${a}"`));
   line('plugin', 'the plugin\'s protocol header says what the contract says',
     text && num('kProtocol') === PROTOCOL && num('kSlots') === SLOTS && num('kPort') === CONTRACT_PORT && missing.length === 0,
     text ? `protocol ${num('kProtocol')}, slots ${num('kSlots')}, port ${num('kPort')}${missing.length ? `; missing ${missing.join(' ')}` : ''}` : `no ${header}`);
-}
-if (!PLUGIN) console.log('skip  the plugin\'s own packets and auval — pass --plugin on a Mac with it built');
-else {
   const bin = ['plugin/dawbridge/build/DawBridgeSelfTest_artefacts/Release/DawBridgeSelfTest', 'plugin/dawbridge/build/DawBridgeSelfTest_artefacts/DawBridgeSelfTest'].find(existsSync);
   if (!bin) line('plugin', 'the plugin\'s self-test is built', false, 'no DawBridgeSelfTest under plugin/dawbridge/build');
   else {
-    const at = display.inbox.length, fat = display.frames.length;
-    const run = spawnSync(bin, ['--port', String(BRIDGE)], { timeout: 20_000, encoding: 'utf8' });
+    // A display of its own (part 4 closed part 1's), and the self-test run without
+    // blocking this process: a blocked reader would let the server's buffer for it
+    // fill, and the server drops audio frames for a display that stops reading.
+    const pd = await join_(PORT, 'display', info.displayKey);
+    const out = [];
+    const child = spawn(bin, ['--port', String(BRIDGE)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    child.stdout.on('data', (d) => out.push(String(d)));
+    child.stderr.on('data', (d) => out.push(String(d)));
+    const killer = setTimeout(() => child.kill('SIGKILL'), 20_000);
+    const run = { status: await new Promise((r) => child.on('exit', (code) => r(code))), stdout: out.join('') };
+    clearTimeout(killer);
     await sleep(300);
-    const msgs = display.inbox.slice(at);
+    const msgs = pd.inbox;
     const hi = msgs.find((m) => m.type === 'daw' && m.on === true);
     const tr = msgs.filter((m) => m.type === 'daw-transport' && m.playing);
-    // The self-test plays faster than real time or at it; the beat must still rise
-    // two a second of *song*, so it is judged against the PCM's own clock.
-    const frames = display.frames.slice(fat).filter((fr) => fr.data.toString('ascii', 0, 4) === 'CGPC');
+    // The self-test plays in real time (docs/dawbridge.md): four seconds of song, so
+    // eight beats at 120 and four seconds of audio by the frames' own count.
+    const frames = pd.frames.filter((fr) => fr.data.toString('ascii', 0, 4) === 'CGPC');
     let gapless = frames.length > 0, next = frames[0]?.data.readUInt32LE(12), seconds = 0;
     for (const fr of frames) {
       if (fr.data.readUInt32LE(12) !== next) gapless = false;
@@ -600,7 +651,7 @@ else {
     }
     const lastBeat = tr.at(-1)?.beat ?? 0;
     const slots = msgs.filter((m) => m.type === 'daw-slot' && m.slot === 3).map((m) => m.value);
-    line('plugin', 'the self-test ran', run.status === 0, run.status === 0 ? '' : `exit ${run.status}: ${(run.stderr || run.stdout || '').slice(-300)}`);
+    line('plugin', 'the self-test ran', run.status === 0, run.status === 0 ? '' : `exit ${run.status}: ${run.stdout.slice(-300)}`);
     line('plugin', 'its hello and its transport at 120 bpm in 4/4', !!hi && tr.length > 10 && tr.every((m) => m.bpm === 120 && m.num === 4) && Math.abs(lastBeat - 8) < 0.5,
       `${hi ? hi.host : 'no hello'}; ${tr.length} transports, last beat ${lastBeat.toFixed(2)} of 4 s`);
     line('plugin', 'its audio: four seconds, gap-free', gapless && Math.abs(seconds - 4) < 0.05, `${seconds.toFixed(3)} s in ${frames.length} packets${gapless ? '' : ', with a gap'}`);

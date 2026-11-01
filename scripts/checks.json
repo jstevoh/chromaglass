@@ -1468,7 +1468,7 @@
     {
       "name": "The DAW bridge",
       "shard": "browser2",
-      "run": "npm run dawbridge -- --owed=app,plugin",
+      "run": "npm run dawbridge -- --owed=app",
       "why": [
         "The DAW bridge plugin's contract (PLAN 13.7, docs/dawbridge.md), written ahead",
         "of both halves: a node stand-in for the plugin against the real show server",
@@ -1478,8 +1478,9 @@
         "slot through MIDI learn's map, transport as a tempo source under Link), then the",
         "built app (a slot moves its setting, the DAW's tempo is the show's, the ear hears",
         "it), and the plugin's protocol header. Beside rig, which builds nothing either:",
-        "it uses the dist/ the shard already has. --owed: app is 13.7a's, plugin 13.7b's;",
-        "`-- --plugin` on a Mac with the plugin built adds its self-test and auval."
+        "it uses the dist/ the shard already has. --owed: app is 13.7a's; the plugin's",
+        "lines run only with `-- --plugin` on a Mac with it built (13.7b, then 13.7c's",
+        "Mac shard entry)."
       ]
     },
     {

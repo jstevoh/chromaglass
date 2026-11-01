@@ -73,7 +73,8 @@ Logic differ in whether a lane's title follows.
 - **One plugin at a time.** The first instance to say hello is followed, by the address
   and port its datagrams come from (each instance has its own socket; the slots, the
   transport and the audio carry no instance id). Anything from another address is
-  ignored until the followed one says bye or is quiet for 3 seconds, after which the
+  ignored until the followed one says bye or is quiet (no datagram of any kind from
+  its address) for 3 seconds, after which the
   next hello is followed.
 - **Pro only**, through the same gate as OSC and Link. On a Free or Home show the
   server takes nothing from the bridge and tells the page `locked`.
@@ -89,7 +90,7 @@ JSON, as every other message on the relay:
 { type: 'daw', on: false }                                     // on bye, or 3 s quiet
 { type: 'daw', on: false, locked: true }                       // a hello on a show that is not Pro
 { type: 'daw-slot', slot, value }                              // value as the plugin sent it, a float32 widened
-{ type: 'daw-transport', playing, bpm, beat, barBeat, num, den, ahead }   // beat = whole + fraction
+{ type: 'daw-transport', playing, bpm, beat, barBeat, num, den, ahead }   // playing a boolean; beat = whole + fraction, as a double
 ```
 
 The audio as a **binary** WebSocket frame, to displays only (phones never see it):
@@ -140,22 +141,23 @@ What `npm run dawbridge` imports, so these names and shapes are part of the cont
 ## The plugin (`plugin/dawbridge/`, JUCE, CMake)
 
 - `Source/BridgeProtocol.h` holds `kProtocol = 1`, `kSlots = 32`, `kPort = 9024` and the
-  five addresses above as string constants, spelled exactly as here: the check reads
+  six addresses on this page as string constants, spelled exactly as here: the check reads
   them from that file and compares.
 - An AU effect and a VST3, manufacturer code `Pltr`, AU subtype `Cgbr`
   (`auval -v aufx Cgbr Pltr`). It passes its audio through untouched.
-- A console target `DawBridgeSelfTest` that links the real processor, plays it four
-  seconds at 120 bpm in 4/4 at 48 kHz in blocks of 256 with a 60 Hz kick on every beat,
+- A console target `DawBridgeSelfTest` that links the real processor, plays it, in
+  real time, four seconds at 120 bpm in 4/4 at 48 kHz in blocks of 256 with a 60 Hz kick on every beat,
   moves slot 3 from 0 to 1 over the run, and sends to `--port <n>` (`npm run dawbridge
   -- --plugin` runs it against the real server).
 
 ## What the check holds (`npm run dawbridge`)
 
 Lines with ids, owed on main until the PR that builds them takes the id out of
-`--owed` in `scripts/checks.json`: `app` (13.7a: the server and the page) and `plugin`
-(13.7b). With `--plugin`, on a Mac with the plugin built, the self-test's packets are
-held to the same server lines and `auval` must pass; without it those lines print
-`skip`. The timings: a slot move reaches the display within one frame (16 ms); a PCM
+`--owed` in `scripts/checks.json`: `app` (13.7a: the server and the page, run in
+`browser2` as `--owed=app`) and `plugin` (13.7b). The plugin's lines (its header, its
+self-test's packets held to the same server lines, and `auval`) run only with
+`--plugin`, on a Mac with the plugin built: 13.7b quotes that run from the owner's Mac,
+and 13.7c adds the macOS runner's build and a Mac shard entry without `plugin` owed. The timings: a slot move reaches the display within one frame (16 ms); a PCM
 packet within 5 ms (95th percentile), with no packet lost and every sample as sent; a
 tempo change reaches the page's tempo within a beat; each beat where it fell to 2 ms.
 
