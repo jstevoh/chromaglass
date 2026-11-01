@@ -9,7 +9,7 @@
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
     "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","lab","lab2"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1050,7 +1050,7 @@
     },
     {
       "name": "The soap is kept",
-      "shard": "lab2",
+      "shard": "lab3",
       "run": "npm run soap",
       "why": [
         "The mix's soap is conserved and spreads in metres and seconds (PLAN 38c,",
@@ -1059,7 +1059,27 @@
         "clean water, the spread is the same at 128 and 256 and is what its caps",
         "in m/s and m²/s say, and the thin gap's rim takes only what is past it.",
         "The lab alone, about five minutes on SwiftShader, so it is here and not",
-        "on the Mac."
+        "on the Mac. In `lab3`, with soapbreak, since lab2 ran 24:18 of its 25",
+        "minutes with both (6:39 and 3:47 of it, 2026-11-01) and a PR's run was",
+        "cancelled at the limit: browser, lab and lab2 ran 22:48, 19:49 and 24:18,",
+        "so no Chromium part had ten minutes to spare (PLAN 19k-8)."
+      ]
+    },
+    {
+      "name": "Soap Breakdown keeps a long show bursting",
+      "shard": "lab3",
+      "run": "npm run soapbreak -- --owed=law,decay,show,default",
+      "timeout": 8,
+      "why": [
+        "The Soap Breakdown dial (PLAN 38c-3, scripts/soapbreak.mjs), written ahead of",
+        "its build: soapBreakdownRate's law (0 takes nothing, an hour's half-life or",
+        "more at 0.01, ten seconds or less at the top), the solver's loss as",
+        "exp(-kt) per real second within 2% at two step lengths and three times the",
+        "sim's dt, the tenth minute of a kick track (a drop still bursts with the",
+        "dial up, does nothing at 0, every drop kept at 0), and the setting 0 on",
+        "every look. --owed: each line is excused only in main's state and printed",
+        "as owed until the PR that builds it takes its id out. The lab alone, about",
+        "four minutes on SwiftShader, beside soap in `lab3` (PLAN 19k-8)."
       ]
     },
     {

@@ -14,7 +14,7 @@ name: Checks
 #
 #   reach     which files the PR changed, and whether any of them can reach
 #             a Mac shard (a few seconds).
-#   measure   the harnesses that need no GPU, in five parts side by side,
+#   measure   the harnesses that need no GPU, in six parts side by side,
 #             ten to twenty minutes each, on ubuntu.
 #   webgpu    everything with a picture in it, on a runner with a GPU: the
 #             stage, a show night, the post chain and the wall.
@@ -116,7 +116,7 @@ jobs:
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 
-  # Measure, in five parts side by side. As one job it took a median 14.3
+  # Measure, in six parts side by side. As one job it took a median 14.3
   # minutes and at most 14.9 over 87 green runs on 2026-10-03 against its
   # 15-minute timeout, so the next slow runner would have turned it red with
   # nothing wrong; and its first red step skipped every step after it, so a
@@ -124,11 +124,11 @@ jobs:
   # step needs: the arithmetic (`logic`, about four minutes, most of it the
   # drops), the sound harnesses that want ffmpeg (`sound`, about six), the
   # ones that want Chromium (`browser`, about twelve), and the lab on the
-  # CPU rasteriser, in two halves (`lab` and `lab2`, about twelve and ten:
-  # Chromium, then `holeline` building three labs on one, `lampzero` drawing
-  # every look in two labs on the other). Every check runs whatever failed
-  # before it in its part. GitHub's ubuntu runners are not the queue the Mac's
-  # are, so five at once cost the queue nothing.
+  # CPU rasteriser, in three (`lab`, `lab2` and `lab3`: Chromium, then
+  # `holeline` building three labs on the first, `lampzero` drawing every look
+  # in two labs on the second, the soap's two checks on the third). Every
+  # check runs whatever failed before it in its part. GitHub's ubuntu runners
+  # are not the queue the Mac's are, so six at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -149,6 +149,12 @@ jobs:
     # rest 2.2); the lab part of main's deploys ran 24:52 and 23:29, and a PR's
     # full run was cancelled at the limit. The bound stays; the part is split in
     # two, so the slowest of the five is the browser's, 19:14.
+    # Then soap (#609, 6:39) and soapbreak (#631, 3:47) joined lab2, which ran
+    # 24:18 of the 25 on 2026-11-01 and was cancelled at the limit on two PRs
+    # the same evening; browser and lab ran 22:48 and 19:49, so neither had the
+    # room. The two went to a part of their own, `lab3` (PLAN 19k-8), and the
+    # bound stays: raising it would only let the next check push a part past
+    # it unseen, and an ubuntu runner costs the queue nothing.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -232,7 +238,7 @@ jobs:
           path: ~/ffmpeg-debs
           key: ffmpeg-debs-${{ steps.image.outputs.os }}-${{ steps.image.outputs.version }}
 
-      # The browser, for the browser, lab and lab2 parts' checks.
+      # The browser, for the browser, lab, lab2 and lab3 parts' checks.
       # The browser is fetched inside the same 25 minutes as the measuring, so a
       # cold download is a red with nothing wrong in the diff (PLAN 19ab). On
       # 2026-10-22 this step took 650 s on the browser shard and 683 s on the lab
@@ -250,10 +256,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -262,7 +268,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -280,7 +286,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2","lab3"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0
@@ -462,7 +468,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/checkguard.mjs --diff
 
-  # The one name for the five Measure parts and the check-change guard: green
+  # The one name for the six Measure parts and the check-change guard: green
   # only when all of them are. The guard is under this name because the branch
   # rule requires Measure, so a PR cannot merge past an unnamed change.
   measure:

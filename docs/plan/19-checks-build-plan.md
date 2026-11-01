@@ -255,3 +255,10 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-6** (E, S): **shipped**, Measure's lab part split in two (`lab` about 12 min, `lab2` about 10; the required names unchanged). Story in `docs/plan-shipped.md` §19k-6 (moved 2026-10-29, 19m-2). Open: the browser part
   is now the slowest of the five at 19:14, and holeline alone is 9.3 min; read both in `npm run flakes`
   / the job summary over the next merges and split the browser part next if it passes 21.
+- **19k-8** (E, S): **shipped**, the soap's two checks (`soap`, `soapbreak`) in a sixth Measure
+  part `lab3`, since `lab2` ran 24:18 of its 25 minutes with them. Story in `docs/plan-shipped.md` §19k-8.
+- **19k-9** (E, S): the browser part has passed 21: 22:48 of its 25 on #644's run (2026-11-01),
+  29 checks, the slowest the phone (3:16), the layout (3:02) and following a song (2:58). Split
+  it as 19k-6 split the lab, but read first which checks lean on the `dist/` an earlier one
+  built: `followview` skips its build under `CI` ("an earlier step has built dist/"), so a
+  check moved away from the build it leans on measures a missing site, not the change.
