@@ -2608,14 +2608,14 @@
     {
       "name": "The Live Show streams the picture",
       "shard": "fifth",
-      "run": "npm run liveshow -- --stack --owed=plate,stack",
+      "run": "npm run liveshow -- --stack --owed=plate",
       "why": [
         "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
         "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
         "mixer and a keystone on the wall, streamed and decoded, against the",
         "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
-        "the Plate source's frames are black today and the Mixer stack source is",
-        "not built; printed as owed until the PR that fixes each takes its id out."
+        "the Plate source's frames are black today (37x-4d-6); printed as owed",
+        "until its PR takes plate out."
       ]
     },
     {

@@ -16,7 +16,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
-import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
+import { PipelineCache, forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
@@ -24,17 +24,16 @@ import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPadGrab } from '../gpu/padGrab';
-import { WebGPUPostChain } from '../gpu/post';
+import { WebGPUPostChain, type PostTest } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
 import { prepareLog, prepareShow } from '../gpu/prepare';
 import { openingOf } from '../gpu/opening';
-import { PipelineCache } from '../gpu/kit';
-import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
 import { grabPadPicture, padPictureSender, padPictureWanted, tapPadPicture } from '../lib/padPicture';
+import { liveStackSize, tapLiveStack } from '../lib/liveStream';
 import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } from '../lib/outputConfig';
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
@@ -5398,10 +5397,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         if (mirror) {
           try { mirror(canvas); } catch { /* the projector window went away mid-frame */ }
         }
-        // The remote's Draw, for the same reason and in the same place: a
-        // small copy of this frame while a pad is asking (lib/padPicture.ts).
-        // Not Preview's copy: the pad shows the wall, as the projector does.
-        if (!isDraftRef.current) tapPadPicture(canvas);
+        // The remote's Draw and the Mixer stack stream, in the same frame task
+        // while either asks (lib/padPicture.ts, lib/liveStream.ts).
+        if (!isDraftRef.current) { tapPadPicture(canvas); tapLiveStack(stage?.painted ? projector?.streamCanvas ?? null : null); }
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
@@ -6627,12 +6625,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             } else if (!wantPost && chain) { chain.dispose(); chain = null; }
             const post = chain;
 
-            // The projector, last: flip, corner pin, blanking and grade.
-            // Built the first frame it would change anything and dropped
-            // when the operator resets it, so the common case — no
-            // projector, nothing set — never pays for the extra target or
-            // the extra draw.
-            const wantOut = !outputIsIdentity(view.outputCfg);
+            // The projector, last: flip, corner pin, blanking and grade (or
+            // the Mixer stack stream's square pass while one is on air).
+            const stackSize = isDraftRef.current ? null : liveStackSize();
+            const wantOut = !outputIsIdentity(view.outputCfg) || !!stackSize;
             if (wantOut && !projector) { projector = new WebGPUOutput(s.device, s.format); scopeSoon = 2; }
             else if (!wantOut && projector) { projector.dispose(); projector = null; }
             const out = projector;
@@ -6817,7 +6813,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   plate.drawSource(encoder, kind, out.sourceView(kind, size.width, size.height), size, live,
                     stage?.profiler.renderPass(`plate ${kind}`), stageFormat);
                 }
-                const drew = out.draw(encoder, target, quads, stage?.profiler.renderPass('output'));
+                const drew = out.draw(encoder, target, quads, stage?.profiler.renderPass('output'), stackSize);
                 if (!drew) return false;
               }
               return true;

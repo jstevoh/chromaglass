@@ -10468,6 +10468,30 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-1. Stream the mixer's stack, not only the laptop's plate
+
+  - **37x-4d-1. Stream the mixer's stack, not only the laptop's plate (shipped 2026-11-01, #667).**
+    The Live Show panel streamed `#liquid-canvas`, the laptop's plate, so a show with the film,
+    the mark or a back plate in the mixer streamed the plate without them, while the Wall output
+    (`CastDisplay`'s `#stage-canvas`) carries the wall's keystone, masks and warp, which on a
+    stream would be a skewed picture. The panel (`src/components/LiveShowPanel.tsx`) now offers a
+    Source choice (`data-testid="live-source"`, values `plate` by default and `stack` for Mixer
+    stack), kept in `LiveFormat` (`src/lib/liveShow.ts`) and forwarded to `LiveEncoder`
+    (`src/lib/liveStream.ts`). While a stream with `source: 'stack'` is live, `WebGPUOutput`
+    (`src/gpu/output.ts`) draws a second pass of `this.scene` with `fillOutputUniforms(..., true)`
+    (identity warp, `IDENTITY_CORNERS`, zero masks and feather, neutral gain/gamma, no per-frame
+    allocation) into a WebGPU canvas of the stream's size (`1920x1080` or `1080x1920`), and
+    `LiquidVisualizer.tsx` hands that canvas to `tapLiveStack` inside the frame task beside
+    `tapPadPicture` (zero cost when no Mixer stack stream is live). The phone's live chip only
+    stops a stream and the source is chosen on the Mac before Go live, so there is no phone
+    control. Each destination's health line in the panel also shows the stream's frame time
+    (`ms a frame`). *Measured:* `npm run liveshow -- --stack --owed=plate` 21/21 (`stack` taken
+    out of `--owed` in `scripts/checks.json`; `plate` left owed while #627 is open): 66 frames
+    decoded from 66 packets at `1920x1080`, square in all four corners and every edge row, moving
+    bar (`column 9 then 4, 2.17 s apart`); `npm run liveshow` 33/33; `PW_WEBGPU=1 npm run mixer`
+    68/68; `PW_WEBGPU=1 npm run wallpattern` 21/21; Mac stream frame time from the health line
+    `0.2 ms a frame` for both Mixer stack and Plate at `1080p30` and `1080p60`.
+
 #### 37x-4d. The Live Show panel and the Pro gate
 
   - **37x-4d. The Live Show panel and the Pro gate (shipped 2026-10-30).** The owner asked
