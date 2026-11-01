@@ -31,21 +31,16 @@
  * 0.9, the solver's height 0.12 to 0.14 by Ferrofluid Scale), and falling
  * off the axis as the magnet's does. One share is SPIKE_B_REF of the rod's
  * remanence, 123 mT for an N52 rod (MAGNET_BR; `npm run magnetgain` works
- * the same chain for the pull).
+ * the same chain for the pull). The onset is that field worked out from the
+ * liquid (SPIKE_ONSET below, PLAN 38k): 4.0 mT, a share of 0.033.
  *
- * The peaks start at SPIKE_ONSET, 0.18 (22 mT), and are full by 0.35
- * (SPIKE_FULL; fluid.ts gates the solver's side on the same onset). That
- * onset is a shortcut, set in the lab so that every look's own magnet,
- * held further off (Magnet Garden's at 0.14, Ferro Paint's 0.08), gathers
- * its pool flat and only the hand's raises domes. The liquid's own onset
- * is worked out below (SPIKE_ONSET_REAL, PLAN 38k): 4.0 mT, a share of
- * 0.033, five times lower. It is not the one the plate runs on yet,
- * because past the onset the standing film (standing.ts) takes the pool
- * and the film has no Kelvin pull (PLAN 9t-2): at the real onset Magnet
- * Garden's and Ferro Paint's own magnets would hand their pools to a film
- * that cannot carry them, and a dragged drop is left behind (Mac CI on
- * #625: ferrodrag's lag 7.4 R). PLAN 38k-7 lowers SPIKE_ONSET to the real
- * one once 9t-2 gives the film its pull. The hand's is 0.8 to 1.1 at
+ * Until 38k the onset was 0.18 (22 mT), set in the lab so that every look's
+ * own magnet, held further off (Magnet Garden's at 0.14, Ferro Paint's
+ * 0.08), gathered its pool flat and only the hand's raised domes. A real
+ * magnet strong enough to pull a pool across the dish raises domes on it
+ * (PLAN 9u), and EFH1 under water does so from 4 mT: so now Magnet Garden's
+ * and Ferro Paint's own magnets stand their pools up as the hand's does,
+ * and Ferro Maze's (0.01) still gathers flat. The hand's is 0.8 to 1.1 at
  * Ferrofluid Scale 0.3 to 0.4; a big Scale holds it further off (the
  * solver's height goes as 0.5 + Scale).
  */
@@ -110,13 +105,10 @@ function langevinSlope(x: number): number { return x < 1e-3 ? 1 / 3 : 1 / (x * x
   about 1/(1 + χ), 0.28, of the applied field at a weak one, and M is EFH1's
   Langevin curve of that inner field, M = Ms L(3χH/Ms). Solved for M = Mc:
   H_in 0.88 kA/m, and the applied field B0 = μ0(H_in + Mc) = 4.0 mT, a
-  share of 0.033 of the reference. The lab's 0.18 (SPIKE_ONSET) is 22 mT,
-  where a real layer would already be past onset five times over.
+  share of 0.033 of the reference. The old 0.18 was 22 mT, where the
+  layer would already be past onset five times over.
 
-  SPIKE_ONSET_REAL is the target, printed and held to an independent
-  solution by `npm run disc`; SPIKE_ONSET stays the lab's until the film
-  has its pull (PLAN 9t-2, then 38k-7, which sets SPIKE_ONSET to this and
-  SPIKE_FULL to it times the old ramp's 0.35 / 0.18). SPIKE_FULL is the
+  SPIKE_FULL keeps the old ramp's proportion (0.35 / 0.18): it is the
   solver's gate on what it changes as the domes arrive (spikesOnAxis,
   spikesClose), not the domes' own height, which the film's lift makes
   (standing.ts), and the jump at the onset is the film's (9t-3 has its
@@ -141,11 +133,8 @@ export function ferroOnsetTesla(msTesla = FERRO_MS_TESLA, chi = FERRO_CHI, delta
   }
   return MU0 * (hi + ms * langevinOf(k * hi));
 }
-/** The liquid's onset on the share's scale (0.033): the target, PLAN 38k-7. */
-export const SPIKE_ONSET_REAL = ferroOnsetTesla() / (SPIKE_B_REF * MAGNET_BR);
-/** The onset the plate runs on: the lab's shortcut (22 mT) until the film has its pull (PLAN 9t-2). */
-export const SPIKE_ONSET = 0.18;
-export const SPIKE_FULL = 0.35;
+export const SPIKE_ONSET = ferroOnsetTesla() / (SPIKE_B_REF * MAGNET_BR);
+export const SPIKE_FULL = SPIKE_ONSET * (0.35 / 0.18);
 
 /** A magnet's field on its own axis, on spikeAmp's scale (the onset is SPIKE_ONSET). */
 export function fieldOnAxis(strength: number, height: number, radius = MAGNET_RADIUS): number {

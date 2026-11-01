@@ -33,8 +33,9 @@
  *      single step (a pour rasterised at 256² already has black and colour
  *      in every tile)
  *   5. as channels through the colour, not one pool with holes in it: the
- *      black is under half the plate, and its fingers narrower than the
- *      ring's blobs
+ *      black is under half the plate, and its fingers under 0.4 of the
+ *      width of the ring's drops as they were poured (why 0.4, and why
+ *      at the pour: at the check, below)
  *   6. and a pool reads as one: the same ferrofluid poured as a single
  *      disc falls under 3's bar, so the tiles can see a gathered plate
  *   7. with all the ferrofluid still there
@@ -45,7 +46,8 @@
  * 720, 94%, 32%, 0.0236, 39% moved. Poured as the ring (18 drops): 42% at
  * the pour, 45% after 240, black 17%, fingers 0.0366, 9% moved. The bounds
  * (worked at least 90% at both times against under 70%; moved over 15%;
- * black a fifth to a half; fingers under 0.8 of the ring's) sit between
+ * black a fifth to a half; fingers under 0.8 of the ring's, now 0.4 of
+ * the ring's drops as poured: at line 5) sit between
  * those with room for another GPU's rounding.
  *
  * 6 was first written as the same pour under the magnet at full strength,
@@ -194,9 +196,29 @@ try {
   check('and the playing drew it: the black has moved off the drops it was poured as',
     now[LATE].moved > 0.15,
     `${pct(now[LATE].moved)} of the plate changed between black and colour since the pour`);
+  /*
+    The yardstick for "blobs" is the ring's drops as poured: 18 big round
+    drops, the shape the look had before the scatter, read before a step.
+    Until PLAN 38k-7 it was the ring after the same 240 steps, under 0.8 of
+    it. Then the look's field (its Labyrinth and walking magnet) was
+    under the plate's onset of 22 mT, and the ring's drops stayed blobs
+    the maze nibbled: 0.0366 wide at 240
+    steps on software WebGPU. At the liquid's own onset, 4 mT, the field
+    stands each big drop up into a cluster of domes, which is what a drop
+    of EFH1 that size does in a field past its onset, and the ring read 0.0175 on
+    the Mac (run 41308840631) against the scatter's 0.0232: a dome is
+    narrow, and the ring at 240 steps was no longer a blob to measure
+    against. The ring as poured is the same 18 drops whatever the onset
+    (line 1 holds them to it) and reads 0.0686 on Metal. The bar keeps the
+    old one's strictness: 0.8 of 0.0366 is 0.43 of the poured 0.0686, and
+    the bar is 0.4 of it, 0.0274, under the old 0.0293. A scatter that
+    gathered back into drops the ring's size reads near the poured ring,
+    a plate gathered into one pool reads 0.28 (line 6's disc), and both
+    are red; that the scatter moved at all is line 4's.
+  */
   check('as channels through the colour, not a pool',
-    ringReal && now[LATE].cover > 0.2 && now[LATE].cover < 0.5 && now[EARLY].width < old[EARLY].width * 0.8,
-    `black ${pct(now[LATE].cover)} of the plate; fingers ${now[EARLY].width.toFixed(4)} of the plate wide against the ring's ${old[EARLY].width.toFixed(4)} at the same age`);
+    ringReal && now[LATE].cover > 0.2 && now[LATE].cover < 0.5 && now[EARLY].width < old[0].width * 0.4,
+    `black ${pct(now[LATE].cover)} of the plate; fingers ${now[EARLY].width.toFixed(4)} of the plate wide after ${EARLY} steps, against the ring's drops ${old[0].width.toFixed(4)} as poured (bar under 0.4 of them, ${(old[0].width * 0.4).toFixed(4)}); the ring after ${EARLY} steps, stood up into domes, ${old[EARLY].width.toFixed(4)}`);
   check('and a pool reads as one', pooled[0].worked < 0.9 && Math.abs(pooled[0].mass / now[0].mass - 1) < 0.1,
     `the same ferrofluid (${pooled[0].mass.toFixed(0)} against ${now[0].mass.toFixed(0)}) as one disc: ${pct(pooled[0].worked)} of the tiles`);
   const drift = (r, c) => Math.abs(r[c].mass / r[0].mass - 1);

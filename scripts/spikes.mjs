@@ -12,9 +12,12 @@
  * black domes under a magnet, a star of light and a white point on each,
  * and a ragged edge. So, on a pool a player might hold the Magnet under:
  *
- *   1. held close the way the Magnet tool holds it, the magnet parts the
- *      pool into domes: many peaks, most of them separate pieces, against
- *      the same pool with no magnet and under a look's own magnet
+ *   1. held close the way the Magnet tool holds it, the magnet stands the
+ *      pool up into domes: many peaks, each a cell past full, standing
+ *      about the layer's own wavelength apart (SPIKE_PITCH), against the
+ *      same pool with no magnet and under a magnet below the onset. Until
+ *      PLAN 38k-7 the domes were also to be separate pieces (why not now:
+ *      at the line)
  *   2. so the ferrofluid's outline near it is no longer a blob's: its edge
  *      is at least twice as long, for its area, as with either control
  *   3. the plate lights a point on the domes: at least half of them have a
@@ -23,14 +26,14 @@
  *      magnet is off the plate's middle in both axes, so a plate that drew
  *      its domes mirrored against the solver's would light them round the
  *      mirror, outside the patch counted
- *   4. a look's own magnet, held further off, leaves the pool whole and
- *      unlit: the spikes need a magnet brought up close, as a real one
- *      does, so a look that gathers its ferrofluid with its own magnet still
- *      does. Magnet Garden's, the strongest (0.14 of the hand's field; the
- *      onset is 0.18)
- *   5. a second magnet (a second finger on the phone) raises domes in its
- *      own pool and lights them, where the first alone leaves that pool
- *      (still there) with next to none
+ *   4. a magnet under the onset (0.8 of it) leaves the pool whole and
+ *      unlit: the layer stands up only past the field Cowley and Rosensweig
+ *      give for it (spikes.ts, PLAN 38k). Until 38k this was Magnet Garden's
+ *      own magnet, 0.14 of the hand's field against an onset of 0.18 set
+ *      for it; the real onset is 0.033, and Garden's raises domes now
+ *   5. a second magnet (a second finger on the phone) stands domes up in
+ *      its own pool and lights them, where the first alone leaves that
+ *      pool (still there) with none standing and none lit
  *   6. and none of it makes or loses ferrofluid, or packs a cell past full
  *      away from the domes (a dome is a cell past full: PLAN §9t), and the
  *      tallest dome is between twice and six times full
@@ -74,7 +77,16 @@ const check = (name, ok, detail = '') => {
 // Ferrofluid Scale), 0.135 at the default Scale. A look's own magnet: Magnet
 // Garden's, 0.3 × (0.5 + 0.3), as deriveStep holds it.
 const HAND = { magnetStrength: 0.9, magnetHeight: 0.15 * 0.9 };
-const FAR = { magnetStrength: 0.9, magnetHeight: 0.3 * 0.8 };
+/*
+  The control: a magnet under the onset, at Magnet Garden's depth with its
+  strength set so its axis field is 0.8 of the onset (set once the lab is
+  open, from the onset the solver uses). Until PLAN 38k this was Magnet
+  Garden's own magnet, 0.14 of the hand's field against the lab's onset of
+  0.18; the onset is the liquid's now, 0.033, and Garden's magnet is 4.6
+  times past it and raises domes as the hand's does (PLAN 9u), so the
+  control is what Garden's stood for: a magnet too weak to stand the pool up.
+*/
+let FAR = { magnetStrength: 0, magnetHeight: 0.3 * 0.8 };
 const STEPS = 240;
 const N = 384;
 // Off the middle in both axes (see 3), far enough that the patch a mirrored
@@ -83,6 +95,10 @@ const N = 384;
 const AT = { x: 0.36, y: 0.65 };
 
 const { page, close } = await openLab();
+FAR = { ...FAR, magnetStrength: await page.evaluate((h) => 0.8 * lab.SPIKE_ONSET / lab.fieldOnAxis(1, h), FAR.magnetHeight) };
+const PITCH = await page.evaluate(() => lab.SPIKE_PITCH);
+if (!(PITCH > 0.01 && PITCH < 0.1)) throw new Error(`the lab's SPIKE_PITCH is ${PITCH}`);
+if (!(FAR.magnetStrength > 0.001 && Number.isFinite(FAR.magnetStrength))) throw new Error(`the control magnet's strength is ${FAR.magnetStrength}: the lab's SPIKE_ONSET or fieldOnAxis is missing`);
 try {
   /**
    * Pools of ferrofluid (x, y, r) on a coloured plate, stepped with a magnet
@@ -104,22 +120,26 @@ try {
     const at = (x, y) => d[Math.max(0, Math.min(n - 1, x)) + Math.max(0, Math.min(n - 1, y)) * n];
     const phaseAt = (fx, fy) => at(Math.floor(fx * n), Math.floor(fy * n));
     const around = (mx, my, near) => {
-      const seen = new Uint8Array(n * n); let pieces = 0, open = 0, cells = 0;
       const inside = (x, y) => Math.hypot((x + 0.5) / n - mx, (y + 0.5) / n - my) < near;
-      for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
-        if (!inside(x, y)) continue;
-        cells++; if (d[x + y * n] < 0.5) { open++; continue; }
-        if (seen[x + y * n]) continue;
-        pieces++; const stack = [[x, y]]; seen[x + y * n] = 1;
-        while (stack.length) {
-          const [u, v] = stack.pop();
-          for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            const a = u + du, b = v + dv;
-            if (a < 0 || b < 0 || a >= n || b >= n || seen[a + b * n] || !inside(a, b) || d[a + b * n] < 0.5) continue;
-            seen[a + b * n] = 1; stack.push([a, b]);
+      const count = (past) => {
+        const seen = new Uint8Array(n * n); let pieces = 0, open = 0, cells = 0;
+        for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+          if (!inside(x, y)) continue;
+          cells++; if (d[x + y * n] < past) { open++; continue; }
+          if (seen[x + y * n]) continue;
+          pieces++; const stack = [[x, y]]; seen[x + y * n] = 1;
+          while (stack.length) {
+            const [u, v] = stack.pop();
+            for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const a = u + du, b = v + dv;
+              if (a < 0 || b < 0 || a >= n || b >= n || seen[a + b * n] || !inside(a, b) || d[a + b * n] < past) continue;
+              seen[a + b * n] = 1; stack.push([a, b]);
+            }
           }
         }
-      }
+        return { pieces, open, cells };
+      };
+      const { pieces, open, cells } = count(0.5), piecesFull = count(1.0).pieces;
       /*
         Domes: peaks of the ferrofluid standing clear of what is round them.
         A cell, the 3×3 mean of the phase, that is the highest within 0.012
@@ -156,7 +176,12 @@ try {
         if (v !== (d[x + 1 + y * n] > 0.5)) edge++;
         if (v !== (d[x + (y + 1) * n] > 0.5)) edge++;
       }
-      return { pieces, domes: tops.length, tops, open: open / cells, outline: area ? edge / (2 * Math.sqrt(Math.PI * area)) : 0 };
+      // Standing: tops whose own cell is past full (a dome is a cell past
+      // full, wgsl/standing.ts), and how far apart the tops stand.
+      const standing = tops.filter(([u, v]) => phaseAt(u, v) > 1).length;
+      const nn = tops.map(([u, v]) => Math.min(...tops.filter((t) => t[0] !== u || t[1] !== v).map(([p, q]) => Math.hypot(p - u, q - v)))).filter(Number.isFinite).sort((a, b) => a - b);
+      const spacing = nn.length ? nn[nn.length >> 1] : 0;
+      return { pieces, piecesFull, standing, spacing, domes: tops.length, tops, open: open / cells, outline: area ? edge / (2 * Math.sqrt(Math.PI * area)) : 0 };
     };
     /*
       And what the plate draws: bright points over the ferrofluid near each
@@ -266,33 +291,86 @@ try {
   const far = await run({ ...FAR, magnetX: AT.x, magnetY: AT.y }, pool, [{ ...AT, near }]);
   /*
     Two fingers, each over a pool of its own, far enough apart that the
-    first's spikes (out to about 0.15) do not reach the second's pool. Under
-    one pool between them the first magnet drew the whole pool to itself and
-    neither parted it, which asked about the pull and not the second magnet.
+    first's spikes do not reach the second's pool. Under one pool between
+    them the first magnet drew the whole pool to itself and neither parted
+    it, which asked about the pull and not the second magnet.
+
+    Corner to corner of the picture since PLAN 38k-7. They were 0.42 apart
+    (0.3, 0.56 and 0.7, 0.44), when the onset was the lab's 22 mT and the
+    first's spikes reached about 0.15. At the liquid's own 4 mT a hand's
+    magnet stands domes out to about 0.4 (the reach goes as the height
+    times the cube root of the axis field over the onset, h·(B/Bc)^⅓, for a
+    field falling as a dipole's), so pool B stood 7 domes with the first
+    finger alone (Mac, run 41308840631) and the line asked about the reach
+    and not the second finger. The lab draws only the middle two thirds of
+    the plate (1/6 to 5/6 each way: the top of this file), and a pool's
+    patch, 0.12 round its magnet, has to be inside it to be lit, so the
+    pools go to the picture's opposite corners, 0.57 apart, B's near edge
+    0.45 from A, where A's field is about 0.6 of the onset. Not mirror
+    images of each other through the middle (0.29, 0.70 and 0.71, 0.31),
+    so a plate drawn mirrored in both axes would not light one at the other.
   */
-  const A = { x: 0.3, y: 0.56, near: 0.12 }, B = { x: 0.7, y: 0.44, near: 0.12 };
+  const A = { x: 0.29, y: 0.70, near: 0.12 }, B = { x: 0.71, y: 0.31, near: 0.12 };
   const pools = [{ ...A, r: 0.12 }, { ...B, r: 0.12 }];
   const two = await run({ ...HAND, magnetX: A.x, magnetY: A.y, extraMagnets: [{ x: B.x, y: B.y }] }, pools, [A, B]);
   const one = await run({ ...HAND, magnetX: A.x, magnetY: A.y }, pools, [A, B]);
-  const say = (r) => { const a = r.at[0]; return `${a.domes} domes, ${a.pieces} pieces, outline ${a.outline.toFixed(2)} of a disc's, ${a.lit} of them lit, ${a.off.toFixed(1)} half a pitch off (${a.points} bright points in all)`; };
-  const each = (r) => r.at.map((a) => `${a.domes} domes, ${a.pieces} pieces, ${a.lit} of them lit`).join(' | ');
-  console.log(`  within ${near} of the magnet —\n  no magnet: ${say(none)}\n  the hand's: ${say(hand)}\n  a look's own, further off: ${say(far)}`);
+  const say = (r) => { const a = r.at[0]; return `${a.domes} domes (${a.standing} past full, ${a.spacing.toFixed(3)} apart), ${a.pieces} pieces (${a.piecesFull} past full), outline ${a.outline.toFixed(2)} of a disc's, ${a.lit} of them lit, ${a.off.toFixed(1)} half a pitch off (${a.points} bright points in all)`; };
+  const each = (r) => r.at.map((a) => `${a.domes} domes (${a.standing} past full, ${a.spacing.toFixed(3)} apart), ${a.pieces} pieces (${a.piecesFull} past full), ${a.lit} of them lit`).join(' | ');
+  console.log(`  within ${near} of the magnet —\n  no magnet: ${say(none)}\n  the hand's: ${say(hand)}\n  under the onset (0.8 of it): ${say(far)}`);
   console.log(`  two fingers, at each: ${each(two)}; the first alone: ${each(one)}\n`);
 
   const h = hand.at[0], z = none.at[0], f = far.at[0];
-  check('held close under a pool, the magnet parts it into domes',
-    h.domes >= 8 && h.domes >= 4 * Math.max(1, z.domes, f.domes) && h.pieces >= 8 && h.pieces >= 4 * Math.max(z.pieces, f.pieces),
-    `${h.domes} domes in ${h.pieces} pieces within ${near} of it, against ${z.domes} in ${z.pieces} with none and ${f.domes} in ${f.pieces} under a look's own`);
+  /*
+    Until PLAN 38k-7 this line also asked for 8 separate pieces (runs of
+    cells past half full), four times the controls'. Then nothing pulled
+    the ferrofluid toward the magnet under the standing film (9t-2), so
+    the pool stayed as wide as it was poured and stood up where it lay, a
+    field of domes on a layer thinned between them. With the pull, the
+    pool is drawn in toward the field's peak as it stands up, the way a
+    pool of ferrofluid over a magnet gathers into a heap with its spikes
+    on top, and the domes stand on that common base: on the Mac (#645's
+    head, run 41308840631) 10 domes in 4 pieces, and in the cloud lab 8
+    in 4, 4 also counted past full, so the base between them is past full
+    too. A gathered base is the physics, not a pool left whole: what tells
+    a stood-up layer from a flat one is each dome its own peak past full,
+    and the domes standing at the layer's own wavelength, which is the
+    instability's (Cowley and Rosensweig: SPIKE_PITCH, 2π l_c) and not
+    the finder's (a top is the highest only within 0.012). So: at least 8
+    domes, four times the controls' (as before), all 8 or more past full
+    where the controls have none, their median distance to the next
+    between 0.6 and 1.5 of the pitch. Cloud lab, 2026-11-01: 8 domes, 8
+    past full, 0.032 apart (0.8 of 0.04); with none and under the onset,
+    0 domes. The pieces are printed beside it.
+  */
+  check('held close under a pool, the magnet stands it up into domes at the layer\'s own pitch',
+    h.domes >= 8 && h.domes >= 4 * Math.max(1, z.domes, f.domes) && h.standing >= 8 && z.standing === 0 && f.standing === 0
+      && h.spacing >= 0.6 * PITCH && h.spacing <= 1.5 * PITCH,
+    `${h.domes} domes within ${near} of it, ${h.standing} of them past full, ${h.spacing.toFixed(3)} apart (pitch ${PITCH}, bar 0.6 to 1.5 of it), in ${h.pieces} pieces; against ${z.domes} (${z.standing} past full) in ${z.pieces} with none and ${f.domes} (${f.standing}) in ${f.pieces} under the onset`);
   check('so its outline is no longer a blob\'s', h.outline >= 2 * Math.max(z.outline, f.outline),
-    `the edge ${h.outline.toFixed(2)} times a disc's of the same area, against ${z.outline.toFixed(2)} with none and ${f.outline.toFixed(2)} under a look's own`);
+    `the edge ${h.outline.toFixed(2)} times a disc's of the same area, against ${z.outline.toFixed(2)} with none and ${f.outline.toFixed(2)} under the onset`);
   check('the plate lights a point on the domes', h.lit >= 8 && h.lit >= 0.5 * h.domes && h.lit >= 3 * h.off,
     `${h.lit} of the ${h.domes} domes near it have a bright point on their top, against ${h.off.toFixed(1)} with one half a pitch off it`);
-  check('a look\'s own magnet, further off, leaves the pool whole and unlit', f.domes <= 1 && f.pieces <= 2 && f.lit === 0,
-    `Magnet Garden's: ${f.domes} domes in ${f.pieces} pieces, ${f.lit} lit`);
+  check('a magnet under the onset leaves the pool whole and unlit', f.domes <= 1 && f.pieces <= 2 && f.lit === 0,
+    `at 0.8 of the onset (strength ${FAR.magnetStrength.toFixed(3)} at Magnet Garden's depth): ${f.domes} domes in ${f.pieces} pieces, ${f.lit} lit`);
   const b2 = two.at[1], b1 = one.at[1];
-  check('a second finger raises domes in its own pool, and lights them',
-    b2.domes >= b1.domes + 6 && b2.domes >= 2 * b1.domes && b1.pieces >= 1 && b2.lit >= 4 && b1.lit <= 1,
-    `at the second finger ${b2.domes} domes and ${b2.lit} of them lit, against ${b1.domes} domes in ${b1.pieces} pieces and ${b1.lit} lit with the first alone`);
+  /*
+    Until PLAN 38k-7: at least six more domes than the first alone leaves
+    there, and twice as many. With the pull (line 1) a pool stands up as
+    a gathered heap, fewer domes on a smaller footprint: the second
+    finger's pool stood 5 domes on the Mac (#645's run) and in the cloud
+    lab, where the first's own pool stood 7 and 8. And with the first
+    alone pool B is not flat: the Labyrinth's field ripples it into bumps
+    the finder can count (3 in the cloud lab, 7 on the Mac before the
+    pools were moved apart), none of them past full and none lit, because
+    they are the maze's and not domes standing. So the line reads what a
+    second finger adds: domes standing past full, at least 4 (the bar its
+    lit count always had), and lit, where the first alone stands none and
+    lights at most one. Cloud lab, 2026-11-01: 5 standing and 5 lit,
+    against 0 standing and 0 lit (3 bumps) with the first alone.
+  */
+  check('a second finger stands domes up in its own pool, and lights them',
+    b2.standing >= 4 && b1.standing === 0 && b1.pieces >= 1 && b2.lit >= 4 && b1.lit <= 1,
+    `at the second finger ${b2.domes} domes, ${b2.standing} of them past full and ${b2.lit} lit, against ${b1.domes} domes in ${b1.pieces} pieces, ${b1.standing} past full and ${b1.lit} lit with the first alone`);
   const drift = (r) => Math.abs(r.mass / r.mass0 - 1);
   /*
     Past full only under a magnet's film, where a dome is a cell past full

@@ -15,7 +15,8 @@
  *     centroid follows the magnet within 2 drop radii (2R = 0.044 plate).
  *  2. The drop holds together: surface tension keeps its boundary sharp
  *     against shear, and its half-full area (cells with phase > 0.5) stays
- *     within 15% of its start.
+ *     within 15% of the same drop's held still under the same magnet (the
+ *     field stands it up as a cone past the onset: PLAN 38k-7, below).
  *  3. With no magnet, the drop does not move: its centroid stays within half
  *     a cell of rest over the same 180 steps, and the drop is still there.
  *  4. (`npm run ferrodrag -- --thinoff`, as CI runs it) With Thin
@@ -25,7 +26,8 @@
  *     at least half its half-full cells, and all 120 steps ran deep.
  *  5. (the same) And the control in the run: on a lab whose deep plate rides
  *     the thin gap's last velocity, all 120 steps deep too, line 4 is red,
- *     by half a radius more.
+ *     by half a radius more, or by keeping a quarter of its half-full cells
+ *     or fewer.
  *
  * Why the fourth (PLAN 29c-8's review, 29c-10). The trailing rim is carried
  * on the ferrofluid's own velocity (`phaseVelocity`, written to phaseVelT)
@@ -199,7 +201,34 @@ const scene = async ({ N, R, dragOnly, thinOff }) => {
   }
   const noMag1 = await getStats();
 
-  return { s0, s1, s2, tail, thinSteps, noMag0, noMag1 };
+  // 2's reference: the same drop under the same magnet held still over it,
+  // for the same 180 steps (why: the second line's comment below).
+  await lab.create(N, N);
+  lab.addPhase(0.36, 0.5, R, 1);
+  for (let k = 0; k < 20; k++) {
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 1,
+      magnetStrength: 0,
+    });
+  }
+  const held0 = await getStats();
+  for (let k = 1; k <= steps; k++) {
+    await lab.step(1, {
+      phaseSharp: 0.75,
+      phaseDisplace: 0,
+      thinGap: 1,
+      magnetX: 0.36,
+      magnetY: 0.5,
+      magnetHeight: 0.2,
+      magnetStrength: 0.4,
+      magnetSeconds: 1 / 60,
+    });
+  }
+  const held1 = await getStats();
+
+  return { s0, s1, s2, tail, thinSteps, noMag0, noMag1, held0, held1 };
 };
 
 let control;
@@ -212,10 +241,10 @@ const { page, close } = await openLab();
 try {
   const result = await page.evaluate(scene, { N, R, dragOnly: false, thinOff: THIN_OFF });
 
-  const { s0, s1, s2, tail, noMag0, noMag1 } = result;
+  const { s0, s1, s2, tail, noMag0, noMag1, held0, held1 } = result;
   const lag = Math.abs(s1.cx - 0.66);
   const twoR = 2 * R;
-  const areaRatio = s1.halfCount / s0.halfCount;
+  const areaRatio = s1.halfCount / held1.halfCount;
   const areaChange = Math.abs(areaRatio - 1);
   const noMagMoved = Math.hypot(noMag1.cx - noMag0.cx, noMag1.cy - noMag0.cy);
 
@@ -227,11 +256,36 @@ try {
     `lag ${(lag / R).toFixed(2)}R (cx ${(s1.cx).toFixed(4)} from ${(s0.cx).toFixed(4)} vs magnet 0.6600, limit ${(twoR / R).toFixed(1)}R); ${s0.n01} → ${s1.n01} cells over 0.01`,
   );
 
-  // 2. Holds together (half-full area stays within 15% of start)
+  /*
+    2. Holds together: dragged, the drop keeps the half-full area it has
+    under the same magnet held still over it, within the same 15%.
+
+    Until PLAN 38k-7 this was held to the drop as poured (100 cells past
+    half full on 384²). The magnet here (0.4 at a height of 0.2, about
+    14 mT on its axis) was then under the plate's onset, 22 mT, and a drop
+    under it kept its poured footprint. At the liquid's own onset, 4 mT, it
+    is three and a half times past it, and a real drop of EFH1 under such a
+    magnet stands up: it gathers toward the axis into a cone, its top past
+    the pool's depth (2.3 of it in the lab), on a smaller footprint. On the
+    Mac (run 41308840631) the dragged drop came to 64 cells, one cone, the
+    drop 8.8 mm across where the domes stand 8 mm apart, so the line was
+    counting how the field stands a drop up, which is the physics, and not
+    whether the drag tore it, which is what it is for (PLAN §29: dragged,
+    the drop turned to a crescent and smeared to brown, 0 cells past half
+    full in two seconds).
+
+    So the reference is the same drop, the same 20 settling steps, under
+    the same magnet held still over where it was poured, for the same 180
+    steps: what the field alone does to its footprint. A drag that shears
+    the drop apart still takes the dragged count to nothing against a held
+    count of tens, and the held drop has to be there (at least a third of
+    its poured cells) for the line to read anything. The bar is the one it
+    was, 15%. The poured count is printed beside it.
+  */
   check(
-    'the drop holds together and keeps its half-full area within 15% of start',
-    areaChange <= 0.15,
-    `area ${s0.halfCount} → ${s1.halfCount} cells (${(areaRatio * 100).toFixed(1)}% kept, limit ±15%)`,
+    'the drop holds together: dragged, it keeps the half-full area it has held still under the same magnet, within 15%',
+    held1.halfCount >= held0.halfCount / 3 && areaChange <= 0.15,
+    `dragged ${s0.halfCount} → ${s1.halfCount} cells, held still under the magnet ${held0.halfCount} → ${held1.halfCount} (${(areaRatio * 100).toFixed(1)}% of the held drop's, limit ±15%)`,
   );
 
   // 3. With no magnet, does not move: half a cell over 180 steps, and the drop
@@ -252,6 +306,8 @@ try {
       moved,
       deep: r.thinSteps === 0,
       ok: moved < R && r.s1.cx > 0.55 && r.s1.halfCount > 0 && r.s2.halfCount >= 0.5 * r.s1.halfCount,
+      s1Half: r.s1.halfCount,
+      s2Half: r.s2.halfCount,
       text: `${120 - r.thinSteps} of 120 steps ran deep; moved ${(moved / R).toFixed(2)}R in 120 deep steps (cx ${r.s1.cx.toFixed(4)} → ${r.tail.map((t) => t.cx.toFixed(4)).join(' ')}, limit 1R); half-full ${r.s1.halfCount} → ${r.tail.map((t) => t.halfCount).join(' ')} (limit half kept); ${r.s1.n01} → ${r.s2.n01} cells over 0.01`,
     };
   };
@@ -262,12 +318,30 @@ try {
       off.ok && off.deep,
       off.text,
     );
-    // 5. The control: the same scene on the plate that rides the stale velocity
-    // fails line 4, by more than the real plate's movement again.
+    /*
+      5. The control: the same scene on the plate that rides the stale
+      velocity fails line 4, and by a margin, on either of its two halves:
+      half a radius further than the real plate went, or a quarter of its
+      half-full cells kept or fewer (half line 4's bar of a half) where the
+      real plate kept at least the bar.
+
+      Until PLAN 38k-7 only the first margin was read. Then the dragged
+      drop was flat, and the stale velocity slid it 1.93 radii (Metal, #528)
+      as it smeared it. At the liquid's real onset the drag ends with the
+      drop stood up as a cone (line 2), and on the Mac (run 41308840631) the
+      stale velocity slid it only 0.67 R against the real plate's 0.22 R,
+      0.45 R further, but smeared it from 70 cells past half full to 50 and
+      then 0 by the second reading, where the real plate's went 64 → 80 83
+      80 78. The bug (#495's, keyed off hsP alone) is still caught by line
+      4, by its half-full half, and by as far as a count can be: the
+      control's margin is read on whichever half it fails.
+    */
+    const staleKept = stale.s2Half / Math.max(1, stale.s1Half);
+    const offKept = off.s2Half / Math.max(1, off.s1Half);
     check(
       'and it is the deep plate not riding the thin gap\'s last velocity: with it ridden, the same line is red',
-      stale.deep && !stale.ok && stale.moved - off.moved >= R / 2,
-      `${stale.text}; ${((stale.moved - off.moved) / R).toFixed(2)}R further than the real plate (bar >= 0.5R)`,
+      stale.deep && !stale.ok && (stale.moved - off.moved >= R / 2 || (staleKept <= 0.25 && offKept >= 0.5)),
+      `${stale.text}; ${((stale.moved - off.moved) / R).toFixed(2)}R further than the real plate (bar >= 0.5R), or ${(staleKept * 100).toFixed(0)}% of its half-full cells kept against the real plate's ${(offKept * 100).toFixed(0)}% (bar: at most 25% against at least 50%)`,
     );
   }
 

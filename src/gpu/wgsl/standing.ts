@@ -168,14 +168,13 @@ fn magnetRadius() -> f32 { return F.size.x; }
   hand's magnet at the glass: 0.035, so at the onset (0.18) it is already
   0.81 of the way and under the Magnet tool (0.8) 0.96, and G there is 2.8.
 
-  The scale is written as the onset's over LIFT_ONSET, the 5.14 the onset
-  sits at on that curve (0.18 / 0.035, the same scale today), so that G is
-  a function of the field as a share of the onset: 2 there and 2.8 under
-  the Magnet tool. When the onset becomes the liquid's own, 0.033 (PLAN
-  38k-7, spikes.ts's SPIKE_ONSET_REAL), a fixed 0.035 would lift the hand's
-  domes at a G of 21; this keeps them at the G they are drawn round at.
-  The scale stays a shortcut (9t-1, below); LANGEVIN (film.w) is still what
-  the pull's pressure reads (kelvin), which no plate takes yet (PULL_SHARE).
+  Since PLAN 38k the onset is the real one, 0.033 (spikes.ts), five times
+  lower, and a Langevin scale of 0.035 would lift the hand's domes at a G
+  of 21. So the lift's scale is the onset's over LIFT_ONSET, the 5.14 the
+  onset sat at on the old curve: G is the old function of the field as a
+  share of the onset, 2 there and 3.0 under the Magnet tool. The scale
+  stays a shortcut (9t-1, below); LANGEVIN (film.w) is still what the
+  pull's pressure reads (kelvin), which no plate takes yet (PULL_SHARE).
 
   A shortcut, and the one that sets how the domes look (PLAN 9t). A real
   layer under the hand's magnet is at a G of hundreds, and its pattern far

@@ -329,22 +329,11 @@ written first. Line numbers are as read on main at d07ac31.
   worked out~~ **shipped** (#630): several magnets add as vectors, and the liquid's onset,
   Cowley and Rosensweig's field for EFH1 under water through the layer's inner field, is
   4.0 mT (`SPIKE_ONSET_REAL`, a share of 0.033), held to an independent solution by
-  `npm run disc` 13/13. The plate still runs on the lab's 0.18 (22 mT): **38k-7**. Story
+  `npm run disc` 13/13. The plate runs on it since 38k-7 (shipped 2026-11-01). Story
   in `docs/plan-shipped.md` §38k.
-  - **38k-7. The plate on the real onset** (S once 9t-2 is in; High: Magnet Garden, Ferro
-    Paint, the set-down magnet). *Shortcut today:* `SPIKE_ONSET` is the lab's 0.18, 5.5×
-    the liquid's, so the looks' own magnets and the hand's set-down one gather a flat
-    pool where a real one raises domes (9u). *Blocked on* **9t-2**: past the onset the
-    standing film takes the pool and has no Kelvin pull, so #625's try at the real onset
-    left a dragged drop 7.4 R behind and turned `ferrodrag`, `ferrodye`, `ferropour` and
-    `startup` red on the Mac (story §38k). *Build, after 9t-2:* `SPIKE_ONSET =
-    SPIKE_ONSET_REAL`, `SPIKE_FULL` at the old 0.35 / 0.18 of it; the opening builds the
-    film's pipelines when a look's own magnet is past the onset (`Opening.film`, so
-    `startup` does not wait on them mid-show); `disc`'s "every look's own magnet raises
-    none" turned to "is past it"; `spikes`, `fingers` and `standing` re-aimed to shares of
-    the onset (38k-5). #625's branch (`claude/project-thread-2kj23l`, 4e8bbc9) has all of
-    it written. *Measure:* those checks on the Mac, and the owner's eyes on Magnet Garden,
-    Ferro Paint and a dragged-and-dropped Magnet, filmed before and after.
+  - **38k-7. The plate on the real onset (shipped 2026-11-01, with 9t-2).** `SPIKE_ONSET`
+    is the liquid's 4.0 mT; the owner's films of Magnet Garden, Ferro Paint and a dragged
+    Magnet are in `docs/judging.md`. Story in `docs/plan-shipped.md` §9t-2 + 38k-7.
   - **38k-1. A Magnetite dial** (S–M; Medium, the owner's call). The ferrofluid's loading
     φ sets Ms and χ together (both in proportion to φ; EFH1 is about 8%), so one dial
     from very dilute (no field raises domes: Ms under Mc) to very loaded (past real, 20%
