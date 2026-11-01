@@ -38,7 +38,7 @@
  *      OSCOUT_PLATE=1): without a GPU the plate never presses on a kick.
  *
  * What this cannot stand in for is Resolume's own reading of these bytes: the
- * owner's sitting with Resolume (docs/judging.md §104).
+ * owner's sitting with Resolume (docs/judging.md §105).
  */
 
 import { spawn } from 'node:child_process';

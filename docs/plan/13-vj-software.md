@@ -96,7 +96,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    - ~~**13.5-osc**~~ **Shipped** (2026-11-01): OSC out of the plate's colour, the ear's
      readings and bands, the tempo and the beat, from Settings → Sound and the phone
      layout (`npm run oscout`); story in `docs/plan-shipped.md` §13.5-osc. **Owed:** the
-     owner's sitting with Resolume (`docs/judging.md` §104).
+     owner's sitting with Resolume (`docs/judging.md` §105).
      - **13.5-osc-menu.** A Show menu item in the Mac app beside OSC input's, with Show
        Server Details naming the target, for an operator who never opens Settings
        (`setOscOut` and `oscOutState` are exported for it; with 13.5-link-menu).

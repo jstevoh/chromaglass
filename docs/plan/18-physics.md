@@ -278,6 +278,18 @@ its frame rate live. "Free" means no new passes or texture reads.
       shipped** (2026-10-29; found by the first deploy run on the owner's Mac, `npm run
       startup`). `gpu/opening.ts` has a `slosh` flag read by `WebGPUSlosh.prepare` and
       `addSlosh`. Story in `docs/plan-shipped.md` §18a-13i.
+    - **18a-13j. A hand can tip the dish: shipped** (2026-10-31; the owner: "I never saw
+      the control to do that"). The Tip pad (`components/ui/TipPad.tsx`, `lib/tipPad.ts`)
+      in the Tools panel's empty keycaps, at the top of Tilt & Rock and in the phone's
+      Motion sheet: drag the dot to an edge, let go and the dish lies back. `npm run
+      tippad`. Story in `docs/plan-shipped.md` §18a-13j.
+    - **18a-13k. The remote's tilt may pour uphill.** `RemoteControl.tsx` sends
+      `y = (beta − 40)/30`, so the top edge raised reads as +y, and +y in the plate is the
+      top of the screen (`downhill`, Tilt Direction 0): the liquid would run toward the edge
+      that went up. The in-app Tilt (`tiltReading`) has it the right way, and `npm run
+      tippad` ties the pad to that one. Not yet seen on a phone; check by hand with the
+      remote on a tipped plate before changing the sign, and fold it into 18a-13e's turn
+      into the dish's frame.
 
 ## 18b. The lamp shines through the dye (replaces paint over black)
 **Partly shipped**: Lamp Ground is built (#256) and the looks that go on the lamp are chosen by rule (18b-1, #262); its byte-for-byte line at 0 runs on the CPU rasteriser since 2026-10-11 (`npm run lampzero`, 19z). What is open is below, from 18b-8 on. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.

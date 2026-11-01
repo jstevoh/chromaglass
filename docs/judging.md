@@ -2317,7 +2317,27 @@ now reads in depth beside the photos (drops/references).
    square corners or steps; a small bubble's middle the liquid's colour, paler, with a
    bright glint; a big one's middle the clear lamp.
 
-## 104. OSC out into Resolume (PLAN 13.5-osc)
+## 104. The dials held inside the solver go further (PLAN 27h-2)
+
+Swirl, Dye Weight and Heat Spread now run to 2, Pushes Dye to 1.2, Drop Height to 2, Background
+Loop to 1.4 and Glass Smear to 3; Momentum's lasting current keeps up to 0.999 of itself a step
+(its dial was already 0.8 to 1). Before, the solver held each at its old top, so the far end of
+these dials did nothing. Every look opens as it did: the fourteen looks whose Glass Smear sat
+under the old 0.2 gate (and so smeared nothing) now say 0.
+
+1. Each at its top, on a look that uses it, with music: Swirl at 2 should curl the flow into
+   more and tighter eddies than 1 and settle into that, never blow up; Dye Weight at 2 with
+   Gravity up should sink the colour in faster, heavier fingers; Heat Spread at 2 with Dye
+   Weight should make broader salt fingers; Pushes Dye at 1.2 should clear the colour from
+   under the ferrofluid a little more than 1; Drop Height at 2 should throw the splash further;
+   Background Loop at 1.4 (two layers) should all but still the plate behind the lead.
+2. Glass Smear on the old plate (Thin Gap off): its first steps should now smear a little, where
+   anything under 0.2 did nothing and 0.2 jumped straight to a fifth of full; 3 should drag the
+   colour hard along the glass.
+3. Bad: a dial whose top looks the same as its old top, a look that opens differently than it
+   did yesterday, or any plate that blows up at a top.
+
+## 105. OSC out into Resolume (PLAN 13.5-osc)
 
 `npm run oscout` reads the show's OSC out with a decoder of its own and holds the numbers;
 only Resolume can say it reads them.
@@ -2332,4 +2352,3 @@ only Resolume can say it reads them.
 3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
 4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
    the strobe a steady beat late.
-

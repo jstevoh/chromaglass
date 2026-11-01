@@ -676,7 +676,7 @@ export class WebGPUFluid extends FluidReads {
       reaches ≥ 0.02, where half-float changes survive quantization without loss,
       or whenever doubleDiffusion is elevated.
     */
-    const doubleDiff = Math.max(0, Math.min(1, p.doubleDiffusion ?? 0));
+    const doubleDiff = Math.max(0, Math.min(2, p.doubleDiffusion ?? 0));
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     this.heatSeconds += seconds;
     const heatRate = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff) * n2;
@@ -765,7 +765,7 @@ export class WebGPUFluid extends FluidReads {
       straight through the glass and this is zero either way.
     */
     const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
-    const buoy = Math.max(Math.max(0, Math.min(1, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
+    const buoy = Math.max(Math.max(0, Math.min(2, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
     if (buoy > 0.001) this.ensureMix();
     const mix = this.mix;
     /*
@@ -899,7 +899,7 @@ export class WebGPUFluid extends FluidReads {
       // The spin of the flow the plate actually moved by last step: the
       // velocity carried between steps is capped small (decayVel).
       this.run(pass, 'curl', w, [this.velForced], none);
-      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(1, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
+      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(2, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
       this.vel.swap();
     }, (p.vorticity ?? 0) > 0.001);
     /*
@@ -1452,8 +1452,10 @@ export class WebGPUFluid extends FluidReads {
       under a cell a step, and one exchange moves at most 4·DISPLACE_PUSH of
       a cell's dye, so a single pass let the tip overrun its own colour.
       Off (and not run) at 0, which is every look but the ones that ask.
+
+      Its top, and the other dials' here: PLAN 27h-2, fluid/constants.ts.
     */
-    const displace = Math.max(0, Math.min(1, p.phaseDisplace ?? 0));
+    const displace = Math.max(0, Math.min(1.2, p.phaseDisplace ?? 0));
     stage('phase displace', (pass) => {
       const args = this.arg('phase displace', [DISPLACE_PUSH * displace, DISPLACE_INSIDE * displace, 0, 0]);
       for (let k = 0; k < DISPLACE_ITERS; k++) {

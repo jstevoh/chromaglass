@@ -160,7 +160,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.998,          // heat lingers forever — nebula glow persists
       automateRate: 0.11,        // moderate injection — periodic star bursts
       platePressure: 0.1,        // minimal plate spread — gravity dominates
-      glassSmear: 0.15,          // light smearing — comet-tail streaks
+      glassSmear: 0,             // 0.15 was under the old 0.2 gate and smeared nothing (PLAN 27h-2)
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
       polarity: 0.25,            // low — colors intermingle freely like nebula gas
@@ -593,7 +593,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.995,
       automateRate: 0.22,  // 28a, 28i-2: keeps four bells and their trails filling the navy water (flat <= 0.4) while near-black stays >= 20%
       platePressure: 0.45,
-      glassSmear: 0.15,
+      glassSmear: 0,
       rainDrip: 0.45,
       viscosity: 'thick',
       polarity: 0.85,
@@ -894,7 +894,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.03,       // tends its three veils; at 0.008 a drop came every three minutes and the plate stayed empty
       platePressure: 0.05,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.3,
@@ -962,7 +962,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.16,
       platePressure: 0.15,
-      glassSmear: 0.1,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.75,
@@ -1045,7 +1045,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.22,
       platePressure: 0.55,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
@@ -1121,7 +1121,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.45,
       platePressure: 0.35,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.05,
       viscosity: 'thick',
       polarity: 0.98,            // strong immiscibility — hard color boundaries
@@ -1404,7 +1404,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.995,
       automateRate: 0.14,          // a drop of soap and food colouring now and then keeps the marbling rich
       platePressure: 0.15,
-      glassSmear: 0.1,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.9,               // the colours stay four colours, not one brown one
@@ -1549,7 +1549,7 @@ export const PRESETS: Preset[] = [
       damping: 0.985,
       heatDecay: 0.99,
       automateRate: 0.1,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       evaporationRate: 0.003,
@@ -1604,7 +1604,7 @@ export const PRESETS: Preset[] = [
       damping: 0.985,
       heatDecay: 0.99,
       automateRate: 0.24,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -1721,7 +1721,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.1,
       platePressure: 0.3,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -1937,7 +1937,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.08,
       platePressure: 0.4,
-      glassSmear: 0.15,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
@@ -2003,7 +2003,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.12,
       platePressure: 0.3,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -2087,7 +2087,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.28,
       platePressure: 0.38,
-      glassSmear: 0.15,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       // Two primaries that meet stay two primaries, with a hard seam.
@@ -2186,7 +2186,7 @@ export const PRESETS: Preset[] = [
       damping: 0.988,
       automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
       platePressure: 0.28,
-      glassSmear: 0.18,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
