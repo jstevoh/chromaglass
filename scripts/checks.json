@@ -410,12 +410,14 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs",
+      "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
-        "and nothing looked."
+        "and nothing looked. And the lines written ahead of Wave 4",
+        "(scripts/rungs-owed.mjs): 14c-4k, 14c-governor, 14b-120, 14c-readout and",
+        "H2c-10, owed until each ships."
       ]
     },
     {
@@ -530,6 +532,18 @@
         "A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):",
         "whole fades driven at the show timer's 16 ms, no step past the curve's",
         "steepest, the turn-round, the hand, the cut, and the pads wired."
+      ]
+    },
+    {
+      "name": "The show's timers when nobody is looking",
+      "shard": "logic",
+      "run": "npm run timers -- --owed=hidden,gamepad",
+      "why": [
+        "A look fade with the window covered, Chrome's one-a-second throttle",
+        "modelled in node and the ear's worker tick driven by hand (PLAN 14a-timers),",
+        "and useGamepad's timers with no pad, the real hook on a stand-in React",
+        "(14j-gamepad). Both owed until their builds; the visible fade's line holds",
+        "on main and keeps a pump from doubling a fade's writes."
       ]
     },
     {
@@ -924,14 +938,17 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
         "PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it",
         "makes a dispatch, counted in the page by Chromium's own heap sampler.",
         "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
-        "sits here rather than in the Mac queue."
+        "sits here rather than in the Mac queue. And the multigrid's own lines",
+        "(scripts/encode-solve.mjs): the residual a step leaves, read through the",
+        "solver's restriction kernel against main's, which holds on main; and the",
+        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships."
       ]
     },
     {
