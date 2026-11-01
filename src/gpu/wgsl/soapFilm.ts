@@ -7,8 +7,7 @@
  * for pass into compute shaders so the plate can step a thickness field on the
  * GPU without carrying or running the CPU reference:
  *
- * 1. `soapSetup`: marks any cell that has thinned below 30 nm (`BLACK_THRESHOLD_NM`)
- *    as ruptured, reduces the film's spatial mean thickness `hbar` across the
+ * 1. `soapSetup`: reduces the film's spatial mean thickness `hbar` across the
  *    grid, evaluates the unprojected vertical Darcy buoyancy velocity
  *      v* = (rho * g / zeta) * (h_face - hbar) * 1e-9
  *    on the interior horizontal faces (`j = 1 .. ny - 1`) with all four walls
@@ -39,10 +38,10 @@
  *    sub-steps using second-order upwind reconstruction with the minmod slope
  *    limiter (`sx`, `sy`). Each interior face flux `fx`, `fy` is computed once
  *    into a shared face buffer and used by both adjacent cells, with inflow
- *    into any ruptured cell blocked when `evap > 0` so a torn Newton-black hole
- *    never refills. Finally, when `evap > 0`, uniform evaporation (`evap` nm/s)
- *    thins unruptured film while cells below 30 nm relax exponentially toward
- *    the 8 nm Newton-black equilibrium over `BLACK_RELAX_TAU = 0.5` s.
+ *    into any black cell blocked so a black spot never refills. Then the frame's
+ *    Plateau border takes Frankel's share at each frame cell (32f), optional
+ *    evaporation (`evap` nm/s) thins the film, and black spots turn on Vrij's
+ *    clock and hand their liquid to a rim (32g), as `src/lib/soapFilm.ts` does.
  */
 
 const ARGS = /* wgsl */ `
@@ -51,18 +50,19 @@ struct SoapArgs {
   grid: vec4u,
   // dt, dx, g, evap
   step: vec4f,
-  // scale = (RHO_WATER * g * 1e-9) / zeta, omega, decay = exp(-dt / BLACK_RELAX_TAU), zeta
+  // scale = (RHO_WATER * g * 1e-9) / zeta, omega, 0 (unused), zeta
   phys: vec4f,
   // minIter, maxIter, halfNx = (nx + 1) / 2, 0
   sor: vec4u,
+  // border r0 (m, 0 for none), frankelK = mu rho |g| 1e-9 / (zeta sigma), lift = rho |g| / sigma,
+  // vrij = 96 pi^2 sigma mu / A^2 for h in nm (1e-45 of the SI value)
+  film: vec4f,
 };
 @group(0) @binding(0) var<uniform> U: SoapArgs;
 
 const RHO_WATER: f32 = 1000.0;
 const DEFAULT_ZETA: f32 = 1.5;
-const BLACK_THRESHOLD_NM: f32 = 30.0;
 const NEWTON_BLACK_NM: f32 = 8.0;
-const BLACK_RELAX_TAU: f32 = 0.5;
 
 fn minmod(a: f32, b: f32) -> f32 {
   if (a * b <= 0.0) { return 0.0; }
@@ -94,9 +94,6 @@ var<workgroup> wgMaxStar: f32;
   var pSum = 0.0;
   for (var i = t; i < n; i += 256u) {
     let hi = h[i];
-    if (hi < BLACK_THRESHOLD_NM) {
-      ruptured[i] = 1u;
-    }
     hSum += hi;
     if (resetP == 0u) {
       pSum += p[i];
@@ -300,6 +297,24 @@ const TRANSPORT = /* wgsl */ `${ARGS}
 @group(0) @binding(5) var<storage, read> stats: array<f32>;
 @group(0) @binding(6) var<storage, read_write> slopes: array<vec2f>;
 @group(0) @binding(7) var<storage, read_write> fluxes: array<f32>;
+@group(0) @binding(8) var<storage, read_write> age: array<f32>;
+
+// One side of a frame cell gives its film to the Plateau border (src/lib/soapFilm.ts
+// drainToBorder): Frankel's fresh film h_f = 2.68 r Ca^(2/3) at the buoyant exchange
+// speed V = rho g (h - h_f) / zeta, solved by bisection, then h relaxes toward h_f at V / dx.
+fn borderSide(hc: f32, r: f32, dt: f32, dx: f32, g: f32, zeta: f32) -> f32 {
+  if (hc <= NEWTON_BLACK_NM) { return hc; }
+  let frankel = 2.68 * r * 1e9;
+  var lo = NEWTON_BLACK_NM;
+  var hi = hc;
+  for (var it = 0; it < 32; it++) {
+    let x = 0.5 * (lo + hi);
+    if (x < frankel * pow(U.film.y * (hc - x), 2.0 / 3.0)) { lo = x; } else { hi = x; }
+  }
+  let hf = 0.5 * (lo + hi);
+  let V = RHO_WATER * abs(g) * (hc - hf) * 1e-9 / zeta;
+  return hf + (hc - hf) * exp(-V * dt / dx);
+}
 
 var<workgroup> wgSteps: u32;
 var<workgroup> wgSubDt: f32;
@@ -312,7 +327,6 @@ var<workgroup> wgDtdx: f32;
   let dt = U.step.x;
   let dx = U.step.y;
   let evap = U.step.w;
-  let decay = U.phys.z;
   if (nx == 0u || ny == 0u || dt <= 0.0) { return; }
 
   if (t == 0u) {
@@ -354,7 +368,7 @@ var<workgroup> wgDtdx: f32;
         let vel = uf[idx];
         let cL = row + i - 1u;
         let cR = row + i;
-        let blocked = evap > 0.0 && ((ruptured[cR] != 0u && vel > 0.0) || (ruptured[cL] != 0u && vel < 0.0));
+        let blocked = ((ruptured[cR] != 0u && vel > 0.0) || (ruptured[cL] != 0u && vel < 0.0));
         if (!blocked) {
           let cfl = min(1.0, (abs(vel) * subDt) / dx);
           let hFace = select(
@@ -376,7 +390,7 @@ var<workgroup> wgDtdx: f32;
         let cN = (j - 1u) * nx + i;
         let cS = j * nx + i;
         let vel = vf[idx];
-        let blocked = evap > 0.0 && ((ruptured[cS] != 0u && vel > 0.0) || (ruptured[cN] != 0u && vel < 0.0));
+        let blocked = ((ruptured[cS] != 0u && vel > 0.0) || (ruptured[cN] != 0u && vel < 0.0));
         if (!blocked) {
           let cfl = min(1.0, (abs(vel) * subDt) / dx);
           let hFace = select(
@@ -406,21 +420,98 @@ var<workgroup> wgDtdx: f32;
     workgroupBarrier();
   }
 
+  // The frame's Plateau border, its radius graded by hydrostatics (drainToBorder).
+  let r0 = U.film.x;
+  let g = U.step.z;
+  if (r0 > 0.0 && g != 0.0) {
+    let zeta = U.phys.w;
+    let rOf = 1.0 / (1.0 / r0 + U.film.z * f32(ny) * dx);
+    for (var c = t; c < n; c += 256u) {
+      let j = c / nx;
+      let i = c % nx;
+      let upper = select(j == ny - 1u, j == 0u, g > 0.0);
+      let lower = select(j == 0u, j == ny - 1u, g > 0.0);
+      let left = i == 0u;
+      let right = i + 1u == nx;
+      if (!(upper || lower || left || right) || ruptured[c] != 0u) { continue; }
+      let z = select(f32(j) + 0.5, f32(ny) - 0.5 - f32(j), g > 0.0) * dx;
+      let rSide = 1.0 / (1.0 / r0 + U.film.z * z);
+      var hc = h[c];
+      if (upper) { hc = borderSide(hc, rOf, dt, dx, g, zeta); }
+      if (lower) { hc = borderSide(hc, r0, dt, dx, g, zeta); }
+      if (left) { hc = borderSide(hc, rSide, dt, dx, g, zeta); }
+      if (right) { hc = borderSide(hc, rSide, dt, dx, g, zeta); }
+      h[c] = hc;
+    }
+  }
+
+  // Evaporation, a real loss to the air; never past Newton black.
   if (evap > 0.0) {
     for (var c = t; c < n; c += 256u) {
-      var hc = h[c];
-      if (ruptured[c] != 0u || hc < BLACK_THRESHOLD_NM) {
-        ruptured[c] = 1u;
-        let clamped = min(hc, BLACK_THRESHOLD_NM - 0.1);
-        h[c] = NEWTON_BLACK_NM + (clamped - NEWTON_BLACK_NM) * decay;
-      } else {
-        hc = max(NEWTON_BLACK_NM, hc - evap * dt);
-        if (hc < BLACK_THRESHOLD_NM) {
-          ruptured[c] = 1u;
-          hc = NEWTON_BLACK_NM + (hc - NEWTON_BLACK_NM) * decay;
-        }
-        h[c] = hc;
+      if (ruptured[c] == 0u) { h[c] = max(NEWTON_BLACK_NM, h[c] - evap * dt); }
+    }
+  }
+
+  // Black spots on Vrij's clock (blackSpots in src/lib/soapFilm.ts): the clock,
+  // then which cells turn (a clock run out and the largest among its film
+  // neighbours), then the rim takes their liquid, then they turn. slopes is
+  // free scratch now: x the share each neighbour takes, y 1 for a turning cell.
+  for (var c = t; c < n; c += 256u) {
+    if (ruptured[c] == 0u) {
+      let hh = h[c];
+      age[c] += dt / (U.film.w * hh * hh * hh * hh * hh);
+    }
+  }
+  storageBarrier();
+  workgroupBarrier();
+  for (var c = t; c < n; c += 256u) {
+    var share = vec2f(0.0, 0.0);
+    let a = age[c];
+    if (ruptured[c] == 0u && a >= 1.0) {
+      let j = c / nx;
+      let i = c % nx;
+      var film = 0u;
+      var top = true;
+      var nbs = array<u32, 4>(0u, 0u, 0u, 0u);
+      var k = 0u;
+      if (i > 0u) { nbs[k] = c - 1u; k++; }
+      if (i + 1u < nx) { nbs[k] = c + 1u; k++; }
+      if (j > 0u) { nbs[k] = c - nx; k++; }
+      if (j + 1u < ny) { nbs[k] = c + nx; k++; }
+      for (var q = 0u; q < k; q++) {
+        let nb = nbs[q];
+        if (ruptured[nb] != 0u) { continue; }
+        film++;
+        if (age[nb] > a || (age[nb] == a && nb > c)) { top = false; }
       }
+      if (top && film > 0u) {
+        share = vec2f(max(0.0, h[c] - NEWTON_BLACK_NM) / f32(film), 1.0);
+      }
+    }
+    slopes[c] = share;
+  }
+  storageBarrier();
+  workgroupBarrier();
+  for (var c = t; c < n; c += 256u) {
+    if (ruptured[c] != 0u || slopes[c].y != 0.0) { continue; }
+    let j = c / nx;
+    let i = c % nx;
+    var gain = 0.0;
+    var giver = 0.0;
+    if (i > 0u && slopes[c - 1u].y != 0.0) { gain += slopes[c - 1u].x; giver = max(giver, age[c - 1u]); }
+    if (i + 1u < nx && slopes[c + 1u].y != 0.0) { gain += slopes[c + 1u].x; giver = max(giver, age[c + 1u]); }
+    if (j > 0u && slopes[c - nx].y != 0.0) { gain += slopes[c - nx].x; giver = max(giver, age[c - nx]); }
+    if (j + 1u < ny && slopes[c + nx].y != 0.0) { gain += slopes[c + nx].x; giver = max(giver, age[c + nx]); }
+    if (giver == 0.0) { continue; }
+    h[c] += gain;
+    if (age[c] >= 1.0 && giver > age[c]) { age[c] = giver; }
+  }
+  storageBarrier();
+  workgroupBarrier();
+  for (var c = t; c < n; c += 256u) {
+    if (slopes[c].y != 0.0) {
+      h[c] = NEWTON_BLACK_NM;
+      ruptured[c] = 1u;
     }
   }
 }

@@ -148,7 +148,6 @@ export const OIL_TENSION = 4e-4;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
-export const SOAP_PULL = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
 /**
@@ -405,6 +404,8 @@ export const REST_GAP = DISH_REST_GAP;
 /** The rest gap in metres, and metres per unit of the gap field. */
 export const REST_GAP_METRES = DISH_GAP_METRES;
 export const GAP_METRES = DISH_GAP_FIELD_METRES;
+// The film a full press leaves, as a share of the rest gap (PLAN 38l): lib/sheet.ts owns it, since the rhythm sheet takes the same suction cell by cell.
+export { STEFAN_FILM } from '../../lib/sheet';
 /*
   Real molecular diffusion of food dye in water (PLAN 18h).
   Audit correction: the old Jacobi diffusion rate at default 0.0002 measured an

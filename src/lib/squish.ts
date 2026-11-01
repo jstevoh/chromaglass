@@ -1,4 +1,4 @@
-import { sheetReach } from './sheet.ts';
+import { sheetReach, STEFAN_FILM } from './sheet.ts';
 import { DISH_GAP_METRES } from './turntable.ts';
 /**
  * A hand on the top glass, and the glass coming back up (PLAN.md §10 step 4,
@@ -512,6 +512,19 @@ export const KICK_RELEASE = 1 / 3;
  * still sums to the press exactly, finishing within the same third of a
  * second.
  *
+ * Held, it holds (PLAN 38l). On a thin gap the glass comes back up against
+ * the film's suction at k(h₀ − h)(h/h_s)³ (squeezeUpdate), which for a
+ * kick's shallow dent is (1/STEFAN_FILM)³ times Press Lift's own rate near
+ * rest (37 at 0.30; 64 at the first 0.25, when this was measured): let alone
+ * through its hold the kick's dent across the dish lost
+ * a tenth of its depth, and the ring 30 cells out went 3.6 cells against the
+ * 4.2 it goes held (npm run rides). A hand holding the glass down balances
+ * the glass's restoring force, K(h₀ − h), through the same film: the press
+ * closes at a(h/h₀)³ for its rate a at rest, the lift opens at
+ * k(h₀ − h)(h/h_s)³, so the hold that keeps the dent where it is lays
+ * k·amount/STEFAN_FILM³ a step in each disc, the same at any depth. On the
+ * old plate the spring is the plain one and the hold is nothing.
+ *
  * Counted in seconds of plate time, not steps: the governor halves the
  * step rate on a slow machine and doubles each step's `dtSeconds`, and the
  * release should take the same third of a second either way. What is given
@@ -535,12 +548,20 @@ export class KickRelease {
     this.kicks++;
   }
 
-  /** One step of `dtSeconds`: each kick past its hold gives back its share of the gap, through `cell`. */
-  step(S: number, dtSeconds: number, cell: SquishCell): void {
+  /**
+   * One step of `dtSeconds`: each kick still held holds the glass against
+   * the gap's spring `spring` this step (squeezeUpdate's gapSpring), and each
+   * past its hold gives back its share of the gap, through `cell`.
+   */
+  step(S: number, dtSeconds: number, cell: SquishCell, spring = 0): void {
     const dt = Number.isFinite(dtSeconds) && dtSeconds > 0 ? dtSeconds : 1 / 60;
+    const hold = Number.isFinite(spring) && spring > 0 ? spring / STEFAN_FILM ** 3 : 0;
     for (const k of this.list) {
       k.age += dt;
-      if (k.age <= KICK_HOLD + 1e-9) continue;
+      if (k.age <= KICK_HOLD + 1e-9) {
+        if (k.thin && hold > 0 && k.age > dt + 1e-9) for (const r of k.radii) squishDisc(S, k.x, k.y, r, k.amount * hold, 0, 'press', 0, cell, true);
+        continue;
+      }
       // Smooth cosine ease: zero initial velocity, gentle swell and recoil.
       const p = Math.min(1, (k.age - KICK_HOLD) / KICK_RELEASE);
       const ease = 0.5 * (1 - Math.cos(Math.PI * p));

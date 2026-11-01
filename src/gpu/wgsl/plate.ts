@@ -31,6 +31,7 @@ import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { THIN_FILM_WGSL } from './plateThinFilm';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -1724,6 +1725,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
 }
 ${TRANSMIT_WGSL}
 ${DROP_LENS_WGSL}
+${THIN_FILM_WGSL}
 
 /*
   How near this pixel is to the air of a bubble, 0 beyond the reach of the
@@ -3051,16 +3053,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
+  // Thin Film, its rings read through a smooth spline (plateThinFilm.ts, 1i).
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
-    let thin = smoothstep(0.4, 0.04, film0) * smoothstep(0.004, 0.03, film0);
-    let filmT = film0 * 16.0 + fbm3(fuv0 * 26.0) * 1.4;
-    // The soap film's thickness: the dye amount, with a little of the same
-    // grain centred on it. The rainbow's phase carries 1.4 periods of noise,
-    // which as thickness would be up to 290 nm that is not the dye's, and
-    // would put the thinnest film at straw rather than black.
-    let filmThick = film0 * 16.0 + (fbm3(fuv0 * 26.0) - 0.5) * 0.4;
-    let filmC = filmColourAt(filmT + U.time * 0.02, filmThick);
-    outColor = mix(outColor, outColor * (0.5 + 1.3 * filmC) + filmC * 0.08, thin * U.thinFilm * 0.85);
+    outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
 
   // ── The mixer: the front plate's grade and level ─────────────────
