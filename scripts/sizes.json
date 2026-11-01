@@ -26,7 +26,7 @@
     "scripts/wall.mjs": 135714,
     "src/App.tsx": 215105,
     "src/components/LiquidVisualizer.tsx": 433785,
-    "src/gpu/wgsl/plate.ts": 187746,
+    "src/gpu/wgsl/plate.ts": 188713,
     "src/sim/fluidSimulation.ts": 193870
   }
 }

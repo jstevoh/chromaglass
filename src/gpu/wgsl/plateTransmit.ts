@@ -154,6 +154,24 @@ fn edgePass(bend: f32, cam: f32) -> f32 {
   return mix(p.x, p.y / p.z, cam);
 }
 /*
+  What gives the closeup its depth (Relief / 3D, PLAN 38h-2): the camera
+  focused a little past the liquid. A curved surface is a lens; on a plane
+  past it the light it bends gathers under a dome and spreads under a
+  hollow, so a swell reads brighter in its middle and a trough darker, the
+  shadowgraph, 1 - dz grad^2 OPL, by the same law and from the same
+  field (the derive pass's grad^2 OPL over the path) the projector's Focus
+  uses in refractionOptics, with its clamp. No light is made: what the
+  middle of a swell gains its flanks lose. Macro Relief is how far past
+  the camera focuses, up to CAMERA_DEFOCUS at 1, the projector's own reach
+  at either end of Focus. It replaced a lamp lowered over the plate, which
+  lit one side of every swell; the macroview check asks this shading of
+  every look (smooth, 2% of the frame or more).
+*/
+const CAMERA_DEFOCUS: f32 = 0.75;
+fn camShadow(lapK: f32, relief: f32) -> f32 {
+  return clamp(1.0 - relief * CAMERA_DEFOCUS * lapK, 0.2, 2.5);
+}
+/*
   The bend at a dye surface of normal n, in aperture radii: the slope the
   projector's optics take from the same field (refractionOptics reads the
   gradient -n.xy/(0.9 n.z) and bends by 0.35 of it), so a rim the derived
