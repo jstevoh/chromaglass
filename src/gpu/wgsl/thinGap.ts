@@ -779,7 +779,9 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var<storage, read> mob: array<f32>;
 @group(0) @binding(5) var<storage, read_write> bc: array<f32>;
 ${ROWS0}
+// Zero for a fine cell past the grid: an odd level's last coarse row or column covers one fine cell (fluid/core.ts, the levels).
 fn res0(x: i32, y: i32, n: i32) -> f32 {
+  if (!hsIn(x, y, n)) { return 0.0; }
   let mi = mob[x + y * n];
   if (mi < 0.0) { return 0.0; }
   let s = hsSums0(x, y, n, mi);
@@ -788,7 +790,7 @@ fn res0(x: i32, y: i32, n: i32) -> f32 {
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -839,19 +841,29 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 fn fineFace(x: i32, y: i32, axis: i32, n: i32) -> f32 {
   let qx = x + select(0, 1, axis == 0);
   let qy = y + select(0, 1, axis == 1);
-  if (!hsIn(qx, qy, n)) { return 0.0; }
+  if (!hsIn(x, y, n) || !hsIn(qx, qy, n)) { return 0.0; }
   if (A.a.y > 0.5) { return hsHarm(abs(mf[x + y * n]), abs(mf[qx + qy * n])); }
   return ff[axis * n * n + x + y * n];
 }
 // One row's conductance from a coarse centre to the next: three fine faces in series.
+// A fine face is zero only off the grid. No middle face, no next coarse cell: zero. No
+// third face, on an odd level's last row or column (fluid/core.ts, the levels), the
+// next coarse cell is the one fine cell beyond the middle face, and the row ends at
+// its centre: two faces in series, not three. Read as a face of 1e-20 instead, the
+// edge column's cells had one conductance of 2e-20 and nothing else, the sweeps set
+// their pressure to the residual over it, and the prolongation laid that on the fine
+// cells at the dish's edge: in the 2 mm gap on 130², the flux round a lifted press
+// grew 3% a step from nothing, to 6,000 times the press's own flux by the 300th step.
 fn series(a: f32, b: f32, c: f32) -> f32 {
   if (b <= 0.0) { return 0.0; }
-  return 1.0 / (0.5 / max(a, 1e-20) + 1.0 / b + 0.5 / max(c, 1e-20));
+  var r = 0.5 / max(a, 1e-20) + 1.0 / b;
+  if (c > 0.0) { r += 0.5 / c; }
+  return 1.0 / r;
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -862,10 +874,11 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
             + series(fineFace(x + 1, y, 1, n), fineFace(x + 1, y + 1, 1, n), fineFace(x + 1, y + 2, 1, n));
   fcOut[i] = east;
   fcOut[nc * nc + i] = north;
+  // A fine cell past an odd level's edge is not there, so it is not open either (fineFace, and fluid/core.ts on the levels).
   let a = mf[x + y * n];
-  let b = mf[x + 1 + y * n];
-  let c = mf[x + (y + 1) * n];
-  let d = mf[x + 1 + (y + 1) * n];
+  let b = select(1.0, mf[x + 1 + y * n], x + 1 < n);
+  let c = select(1.0, mf[x + (y + 1) * n], y + 1 < n);
+  let d = select(1.0, mf[x + 1 + (y + 1) * n], x + 1 < n && y + 1 < n);
   let nOpen = select(0, 1, a < 0.0) + select(0, 1, b < 0.0) + select(0, 1, c < 0.0) + select(0, 1, d < 0.0);
   mc[i] = select(1.0, -1.0, nOpen >= 1);
 }`,
@@ -900,14 +913,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(6) var<storage, read_write> bc: array<f32>;
 ${ROWS}
 fn res(x: i32, y: i32, n: i32) -> f32 {
-  if (cell[x + y * n] < 0.0) { return 0.0; }
+  if (!hsIn(x, y, n) || cell[x + y * n] < 0.0) { return 0.0; }
   let s = hsRowSums(x, y, n);
   return b[x + y * n] - (s.x * p[x + y * n] - s.y);
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -928,7 +941,7 @@ fn ec(x: i32, y: i32, k: i32) -> f32 { return e[clamp(x, 0, k - 1) + clamp(y, 0,
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let k = n / 2;
+  let k = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= n * n) { return; }
   if (m[i] < 0.0) { return; }
@@ -950,7 +963,7 @@ fn ec(x: i32, y: i32, k: i32) -> f32 { return e[clamp(x, 0, k - 1) + clamp(y, 0,
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
-  let k = n / 2;
+  let k = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= n * n) { return; }
   if (mob[i] < 0.0) { return; }
