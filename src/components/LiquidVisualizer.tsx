@@ -56,7 +56,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
-import { BarGrid, Accent } from '../lib/barGrid';
+import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -951,9 +951,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
   /*
-    The bar (lib/barGrid.ts): where the beats fall and which of them is the
-    one, heard from the same readings on the same clock as the song's shape,
-    so Accent the One can weigh each kick's press by its place in the bar.
+    The bar (lib/barGrid.ts): where the beats fall and which is the one,
+    heard on the song shape's clock (or told by Link), so Accent the One
+    weighs each kick's press by its place in the bar.
   */
   const barGridRef = useRef(new BarGrid());
   const accentRef = useRef(new Accent());
@@ -2603,10 +2603,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
           }
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
-          // A clock from the desk, a tapped tempo or a typed one, if there is
-          // one. Handed over every frame — the reading carries its own
-          // sequence number, so the clock can tell a new beat from a held one.
-          beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
+          // Link, a desk's clock, taps or a typed bpm, every frame (its seq
+          // tells a new beat from a held one).
+          const tempoNow = clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null;
+          beatClockRef.current.setExternal(nowMs, tempoNow);
           kickRef.current = beatClockRef.current.update(nowMs, heardAt, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
@@ -2627,6 +2627,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
+          tellBar(barGridRef.current, tempoNow, nowMs, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
           /*
             The melody hears every reading whatever the setting, so turning

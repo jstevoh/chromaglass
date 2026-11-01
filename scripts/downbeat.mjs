@@ -60,7 +60,7 @@
 import { analysePcm } from '../src/lib/audioFeatures.ts';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { BarGrid, Accent, accentGain, barLine, OFF_THE_BEAT, STRONG_BEAT, WEAK_BEAT } from '../src/lib/barGrid.ts';
+import { BarGrid, Accent, accentGain, barLine, tellBar, OFF_THE_BEAT, STRONG_BEAT, WEAK_BEAT } from '../src/lib/barGrid.ts';
 import { arrange, rng, SR } from './arrangement.mjs';
 import { kickRock, restingHand } from '../src/lib/plateRock.ts';
 import { kickDepth } from '../src/lib/squish.ts';
@@ -641,6 +641,61 @@ console.log('\nWhat the phone says');
 }
 
 /*
+  The one told by Link (PLAN.md 13.5-link-one). Live knows its downbeat, and
+  the grid takes it from the first bar rather than counting it by ear. To
+  tell taking from hearing, the session's one is put two beats from the
+  song's own (Live's bar line on the song's three, which a drummer's count-in
+  can do): a grid that only heard would name the song's one, and a grid that
+  took Link's names Link's. Then the telling stops, and a second and a half
+  later the ear's own count is back, with everything it heard meanwhile.
+*/
+{
+  const { readings, song } = kept['band 110'];
+  const { beats, beatInBar } = song.truth;
+  const period = 60 / song.truth.bpm;
+  const linkPlace = (q) => (q + 2) % 4;
+  const told = new BarGrid(), ear = new BarGrid();
+  const stopAt = readings[Math.floor(readings.length * 0.6)].time;
+  let b = -1, judged = -1, firstBar = 0, firstBarRight = 0, later = 0, laterRight = 0, after = 0, afterAsEar = 0, earSaysLink = 0;
+  for (const r of readings) {
+    const t = r.time;
+    told.update(r, t); ear.update(r, t);
+    while (b + 1 < beats.length && beats[b + 1] <= t) b++;
+    if (b < 0) continue;
+    if (t < stopAt) told.tell(beats[b], period, linkPlace(beatInBar[b]), t);
+    // Judged once a beat, at the beat itself, in the frame it falls in.
+    if (b === judged) continue;
+    judged = b;
+    const at = beats[b], want = linkPlace(beatInBar[b]);
+    if (t < stopAt) {
+      if (b < 4) { firstBar++; if (told.placeAt(at) === want) firstBarRight++; }
+      else { later++; if (told.placeAt(at) === want) laterRight++; if (ear.placeAt(at) === want) earSaysLink++; }
+    } else if (t > stopAt + 1.5) {
+      after++;
+      if (told.placeAt(at) === ear.placeAt(at)) afterAsEar++;
+    }
+  }
+  check('Link\'s one is the grid\'s from the first bar', firstBar === 4 && firstBarRight === firstBar, `${firstBarRight} of the first bar's ${firstBar} beats on Link's place`);
+  check('and on every beat while Link speaks, two beats from where the onsets put the one', later > 60 && laterRight === later && earSaysLink < later / 4,
+    `${laterRight}/${later} on Link's place; the ear alone put ${earSaysLink} there`);
+  check('once Link stops speaking, the ear\'s own count is back', after > 40 && afterAsEar === after, `${afterAsEar}/${after} beats as the ear alone counts them`);
+  // The frame loop's call: a Link beat at 5 100 ms on the page's clock, the
+  // grid's clock 4 990 s ahead of it, lands at 5 095.1 s on the grid's.
+  const c = new BarGrid();
+  c.update(readings[0], 5095.2);
+  tellBar(c, { period: 500, beatAt: 5100, source: 'link', seq: 1, bar: 1 }, 5200, 5095.2);
+  const tap = new BarGrid();
+  tap.update(readings[0], 5095.2);
+  tellBar(tap, { period: 500, beatAt: 5100, source: 'tap', seq: 1 }, 5200, 5095.2);
+  check('the frame loop\'s call carries Link\'s beat onto the grid\'s clock, and a reading with no bar tells nothing', Math.abs((c.now.beatAt ?? 0) - 5095.1) < 1e-9 && c.now.place === 1 && c.placeAt(5095.6) === 2
+    && tap.now.place === null && tap.now.beatAt === null,
+    `beat at ${c.now.beatAt}, place ${c.now.place}; a tap's reading left the grid at ${tap.now.beatAt}`);
+  const g = new BarGrid();
+  g.update(readings[0], 10); g.tell(9.9, 0.5, 6.2, 10);
+  check('a told place is a place in the bar, and the half bar follows it', g.now.place === 2 && g.now.half === 0 && g.placeAt(10.4) === 3, `place ${g.now.place}, half ${g.now.half}, the next beat ${g.placeAt(10.4)}`);
+}
+
+/*
   Greps, and weak ones: they cannot say the wiring works, only that someone
   did not take it out. Each names a line whose absence would leave every
   check above green while the plate pressed every kick alike. The app's own
@@ -680,6 +735,9 @@ console.log('\nWiring');
     && /const a = kickDepth\(squeezeAmt, bass01, accent\);/.test(vis) && /0\.4 \* squeezeAmt \* bass01 \* accent\)/.test(vis)
     && shoveScales && depthScales,
     `the rock's lean ×${(shove(1.5) / shove(1)).toFixed(3)} and the squeeze's depth ×${(kickDepth(0.9, 0.8, 1.5) / kickDepth(0.9, 0.8, 1)).toFixed(3)} at an accent of 1.5`);
+  check('a tempo that knows the bar tells the grid its one, on the grid\'s clock (13.5-link-one)',
+    /barGridRef\.current\.update\(heard, songClockRef\.current\);\s*tellBar\(barGridRef\.current, tempoNow, nowMs, songClockRef\.current\);/.test(vis)
+    && /const tempoNow = clockIsFixed\(\) \? null : tempoRef\?\.current\?\.read\(nowMs\) \?\? null;\s*beatClockRef\.current\.setExternal\(nowMs, tempoNow\);/.test(vis));
   check('the app reads what the grid knows for the phone', /const bar = report \? barLine\(report\.bar\) : '';/.test(app)
     && /bar: \{ \.\.\.barGridRef\.current\.now \}/.test(vis));
 }

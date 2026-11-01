@@ -75,24 +75,11 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
      `docs/plan-shipped.md` §13.5-link. **Owed:** the owner's session with Live
      (`docs/judging.md` §95); until it passes, the Pro page keeps Link under "on the way".
-     - **13.5-link-one.** The bar grid (`lib/barGrid.ts`) finds the one by ear; Link
-       already knows it (`TempoReading.bar`, beat zero of the session is every peer's bar
-       line). Let a Link reading set the grid's place, so Accent the One and the song's
-       bar-counted moves land on Live's downbeat from the first bar. *Measure:* `npm run
-       downbeat` with a Link session whose one is not where the onsets put it.
-     - **13.5-link-transport.** Link carries Live's play and stop (`stst`, read and
-       relayed, `playing` on the message) but nothing uses it: a stopped Live could pause
-       the Sequence the way MIDI Stop does. Off by default (a stopped transport in a DJ
-       set is not the end of the show).
-     - **13.5-link-gate.** Link is not behind the licence yet. #586 (34a-7a, open when
-       this shipped) gates OSC and Art-Net as Pro in the show server; Link belongs under
-       the same gate (`setLink` in `server/remote-server.js`), once that lands.
-     - **13.5-link-rescan.** The peer opens its sockets on the interfaces up when Link is
-       switched on; Ableton's library rescans every thirty seconds. A Mac that joins the
-       Wi-Fi after Link is on finds only loopback until Link is switched off and on.
-       Rescan on a timer, as the library does.
-     - **13.5-link-menu.** A Show menu item in the Mac app beside OSC's, for an operator
-       who never opens Settings → Sound.
+     - ~~**13.5-link-one**, **-transport**, **-gate**, **-rescan**, **-menu**~~ **Shipped**
+       (2026-11-01): Live's bar line is the plate's one from the first bar, Play/Stop lets
+       Live's stop pause a running Sequence, Link is Pro, the interfaces are read again
+       every thirty seconds, and the Mac app's Show menu has the switch. Story in
+       `docs/plan-shipped.md` §13.5-link-one. **Owed:** in the same sitting, §95.
    - ~~**13.5-osc**~~ **Shipped** (2026-11-01): OSC out of the plate's colour, the ear's
      readings and bands, the tempo and the beat, from Settings → Sound and the phone
      layout (`npm run oscout`); story in `docs/plan-shipped.md` §13.5-osc. **Owed:** the
@@ -145,7 +132,18 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    owner's Mac, an automation lane playing a look change on the bar. The phone rule:
    the link's switch and its slot bindings are in the More sheet.
    Before any of it, the MIDI route in the table above, tried once in Logic and
-   Ableton and written up with step 4. *Not started.*
+   Ableton and written up with step 4 (34a-7e). *Not started.* Off hold 2026-11-01 (the
+   owner), cut into three PRs:
+   - **13.7a** (Claude, first): `docs/dawbridge.md`, the wire contract; the bridge link
+     in the show server (a `bridge` role, localhost only, Pro as OSC and Link are); the
+     page's half (slots through MIDI learn's binding map, transport as a tempo source,
+     PCM as an ear source "DAW"); the phone's More-sheet switch and bindings; and
+     `npm run dawbridge`, the node fake, its real-plugin lines red (`--owed=plugin`).
+   - **13.7b** (Antigravity, after 13.7a; brief in the project's shared files,
+     `antigravity/briefs-2026-11-01-dawbridge.md`): the JUCE AU and VST3 under
+     `desktop/native/dawbridge/`, `auval`, and the owner's Mac in Live and Logic.
+   - **13.7c** (Claude, after 13.7b): signed and notarised with the Mac app's Developer
+     ID, both formats built on the macOS runner, an installer, the Pro page.
    - **13.7-ipad** (later, from §30; after step 7 and §12's iPad app): the iPad sibling.
      An AUv3 that draws nothing, sits on an AUM (or Loopy Pro, Drambo) channel, and
      sends that channel's readings, its notes and the host's transport to the show over

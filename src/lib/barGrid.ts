@@ -100,6 +100,7 @@
  * sample.
  */
 import type { AudioReading } from './audioFeatures.ts';
+import type { TempoReading } from './tempo.ts';
 
 export interface BarNow {
   /** Seconds a beat, 0 while there is no tempo. */
@@ -215,6 +216,14 @@ interface Frame { t: number; onset: number; harmony: number[]; snare: number; ki
 interface Beat { harmony: number[]; snare: number; kick: number; }
 
 const EMPTY: BarNow = { period: 0, beatAt: null, place: null, half: null, beatConfidence: 0, barConfidence: 0 };
+/*
+  How long a place told from outside (`tell`) stands after the last telling,
+  seconds. The teller is Ableton Link (PLAN.md 13.5-link-one), whose readings
+  reach the page twenty times a second and which the tempo source itself
+  holds for a second when they stop (`LINK_HOLD` in tempo.ts); the grid
+  holds as long, and then the ear's own count is the one again.
+*/
+const TOLD_HOLD = 1;
 
 const median = (a: number[]): number => {
   if (!a.length) return -120;
@@ -253,6 +262,10 @@ export class BarGrid {
   private sureOfOne = false;
   private sureOfHalf = false;
   private estimated = 0;
+  // The bar told from outside, and until when it stands (see `tell`).
+  private told: BarNow = { ...EMPTY };
+  private toldUntil = -Infinity;
+  private clockAt = -Infinity;
 
   reset(): void {
     this.frames = [];
@@ -262,6 +275,8 @@ export class BarGrid {
     this.anchorAt = null;
     this.slipSince = null;
     this.grooveFrom = -Infinity;
+    this.toldUntil = -Infinity;
+    this.clockAt = -Infinity;
     this.forget();
   }
 
@@ -276,7 +291,38 @@ export class BarGrid {
     this.sureOfHalf = false;
   }
 
-  get now(): Readonly<BarNow> { return this.state; }
+  get now(): Readonly<BarNow> { return this.clockAt <= this.toldUntil ? this.told : this.state; }
+
+  /**
+   * The bar from a source that knows it rather than hears it: Ableton Link,
+   * whose session's beat zero is every peer's bar line (PLAN.md 13.5-link-one).
+   * `beatAt` is when the latest beat fell and `time` is now, both seconds on
+   * the readings' clock; `period` is seconds a beat; `place` that beat's place
+   * in the bar, 0 the one.
+   *
+   * By ear the one takes bars to find (the evidence has to stand over each of
+   * the other three places), and on a loop of kicks on one chord it may never
+   * be found at all. Live already knows it, so while Link speaks its place is
+   * the grid's from the first bar, and Accent the One and the song's
+   * bar-counted moves land on Live's downbeat even where the onsets would put
+   * it on three. The ear goes on listening underneath, so when the telling
+   * stops (`TOLD_HOLD` later) its own count is back with all it heard.
+   *
+   * Called every frame while Link is the tempo: the one object is filled in
+   * place, never a new one a frame.
+   */
+  tell(beatAt: number, period: number, place: number, time: number): void {
+    if (!(period > 0) || !Number.isFinite(beatAt)) return;
+    const t = this.told;
+    t.period = period;
+    t.beatAt = beatAt;
+    t.place = mod4(Math.round(place));
+    t.half = t.place % 2;
+    t.beatConfidence = 1;
+    t.barConfidence = 1;
+    this.toldUntil = time + TOLD_HOLD;
+    if (time > this.clockAt) this.clockAt = time;
+  }
 
   /**
    * How many estimates it has made. The estimate is the costly part, four a
@@ -299,6 +345,7 @@ export class BarGrid {
   update(reading: AudioReading | null, time: number): void {
     const newest = this.frames.length ? this.frames[this.frames.length - 1].t : null;
     if (newest !== null && (time < newest - 0.5 || time > newest + 5)) this.reset();
+    this.clockAt = time;
     if (!reading || !reading.db) {
       this.lastDb = null;
       if (this.state.beatAt !== null && time - this.state.beatAt > BEAT_WINDOW) this.state = { ...EMPTY };
@@ -320,7 +367,7 @@ export class BarGrid {
    * grid is unsure.
    */
   placeAt(t: number): number | null {
-    const s = this.state;
+    const s = this.now;
     if (s.half === null || s.beatAt === null || !(s.period > 0)) return null;
     const k = Math.round((t - s.beatAt) / s.period);
     if (Math.abs(t - (s.beatAt + k * s.period)) > ON_BEAT * s.period) return OFF_THE_BEAT;
@@ -551,6 +598,20 @@ export class BarGrid {
  * Accent the One: the setting does nothing until the bar is known, and a
  * performer turning it up should see why the plate has not changed yet.
  */
+/**
+ * The frame loop's one call for Link's bar (PLAN.md 13.5-link-one): a tempo
+ * reading that knows the bar (`TempoReading.bar`, only Link's does) tells the
+ * grid its one. The reading's beat is on the page's milliseconds (`nowMs`)
+ * and the grid counts on the readings' seconds (`songClock`); the two run
+ * together, so the beat is carried across by how far apart they stand this
+ * frame. Here rather than in the visualizer, which is over its size budget
+ * and may not grow (`npm run sizes`).
+ */
+export function tellBar(grid: BarGrid, reading: TempoReading | null, nowMs: number, songClock: number): void {
+  if (!reading || reading.bar === undefined || reading.beatAt === null) return;
+  grid.tell(reading.beatAt / 1000 + songClock - nowMs / 1000, reading.period / 1000, reading.bar, songClock);
+}
+
 export function barLine(now: Readonly<BarNow>): string {
   if (now.place !== null) return 'Counting the one';
   if (now.half !== null) return 'Hearing the backbeat, not yet the one';

@@ -585,6 +585,40 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.5-link-one, -transport, -gate, -rescan, -menu. Link's five follow-ups (2026-11-01)
+
+The owner asked on 2026-11-01 for whatever Ableton work was left; these five were the
+follow-ups 13.5-link wrote down when it shipped, done as one PR.
+
+- **13.5-link-one.** `BarGrid.tell(beatAt, period, place, time)` takes the bar from a
+  source that knows it; while told (and `TOLD_HOLD`, a second, after), `now` and
+  `placeAt` are Link's, and the ear keeps listening underneath. The frame loop hands it
+  the tempo reading's `bar`, carried from the page's milliseconds to the grid's seconds
+  by how far apart the two clocks stand that frame. `npm run downbeat`, on the "band 110"
+  song with Link's one put two beats from the song's own: 4/4 of the first bar's beats
+  and 124/124 after on Link's place (the ear alone put 0 there), and 77/77 back to the
+  ear's own count a second and a half after Link stops.
+- **13.5-link-transport.** `TempoSource.linkReading` hands back the transport's edge
+  (`'start'`, `'stop'` or null, and never on joining or leaving a session); with
+  **Play/Stop** on beside Link (desk and phone, remembered on the machine, off by
+  default), a stop pauses a running Sequence and a start resumes only one that Link
+  paused. The plan said "the way MIDI Stop does", but MIDI Stop only hands the tempo
+  back; nothing paused the Sequence before this.
+- **13.5-link-gate.** `setLink` refuses below Pro and says `locked`, which the switch
+  shows as "part of Pro"; a tier that drops while Link is on leaves the session.
+  `npm run tiers` 4d: Pro on, Home and none and a removed key locked, and the Home phase
+  after a Pro one that left Link on finds it already off.
+- **13.5-link-rescan.** `startLink` reads the interfaces every thirty seconds (the
+  library's own period): new addresses get a socket and join the group, gone ones close.
+  `npm run link` part 6: with no interface up nobody is found; loopback "comes up" and the
+  session is found 100 ms later, with no switching.
+- **13.5-link-menu.** Show → Ableton Link (Pro) in the Mac app. It asks the page (which
+  owns the remembered switch) rather than the server, and its tick is the server's state
+  (`onLinkChange`).
+
+**Owed:** the owner's Live sitting (`docs/judging.md` §95) now also covers Live's
+downbeat on the plate's one, Play/Stop on a running Sequence, and the menu item.
+
 ### 13.5-osc. OSC out to a VJ app (2026-11-01)
 
 Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second

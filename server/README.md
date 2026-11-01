@@ -19,7 +19,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 ## Files
 
-- `abletonLink.js`: Ableton Link in, so the show takes the tempo and the bar from the music apps on the network.
+- `abletonLink.js`: Ableton Link in, so the show takes the tempo and the bar from the music apps on the network. `startLink({ listInterfaces, rescanMs })` reads the interfaces again every 30 s. `remote-server.js` exports `linkOn()` and `onLinkChange(fn)` for the Mac app's Show menu; Link is Pro, beside OSC and Art-Net.
 - `account-shows.js`: an account's running shows (served by the show server).
 - `artnet.js`: Art-Net in and out.
 - `osc.js`: OSC both ways: the reader and the address space the show takes in (`readOsc`, `oscToMessage`), the writer and the feed it sends out (`encodeOsc`, `encodeBundle`, `feedMessages`, `oscOutTarget`; PLAN 13.5-osc).

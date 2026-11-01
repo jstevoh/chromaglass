@@ -53,6 +53,8 @@ import { networkInterfaces } from 'node:os';
 
 export const LINK_GROUP = '224.76.78.75';
 export const LINK_PORT = 20808;
+/** How often the interfaces are read again: Ableton's library's own thirty seconds. */
+export const RESCAN_MS = 30_000;
 
 const DISCOVERY = Buffer.from('_asdp_v\x01', 'latin1');
 const MEASURE = Buffer.from('_link_v\x01', 'latin1');
@@ -390,32 +392,42 @@ function ipv4Interfaces() {
  * pings and pongs) at the port it announces. `onChange` is told whenever the
  * session's tempo or membership may have moved; the reading itself is pulled.
  */
-export function startLink({ onError } = {}) {
+export function startLink({ onError, listInterfaces = ipv4Interfaces, rescanMs = RESCAN_MS } = {}) {
   const clock = () => Number(process.hrtime.bigint() / 1000n);
-  const ifaces = ipv4Interfaces().map((i) => ({ ...i, port: 0, socket: null }));
+  const ifaces = [];
   const live = () => ifaces.filter((i) => i.port);
   const send = (buf, port, address, via) => {
     const s = via?.socket ?? live()[0]?.socket;
-    s?.send(buf, port, address, () => { /* a peer that left is not an error */ });
+    // A socket a rescan closed under a measurement in flight throws here, and
+    // synchronously: in the Mac app's main process that would be uncaught.
+    try { s?.send(buf, port, address, () => { /* a peer that left is not an error */ }); } catch { /* closed by a rescan */ }
   };
   const peer = createLinkPeer({ clock, send, interfaces: live });
   const fail = (err) => onError?.(err);
 
+  let groupBound = false;
   const group = createSocket({ type: 'udp4', reuseAddr: true });
   group.on('error', fail);
   group.on('message', (buf, rinfo) => {
     const via = live().find((i) => sameNet(i, rinfo.address)) ?? live()[0];
     peer.receive(buf, rinfo, via);
   });
+  const join = (i) => { try { group.addMembership(LINK_GROUP, i.address); } catch { /* an interface without multicast */ } };
   group.bind(LINK_PORT, () => {
-    for (const i of ifaces) { try { group.addMembership(LINK_GROUP, i.address); } catch { /* an interface without multicast */ } }
+    groupBound = true;
+    for (const i of ifaces) join(i);
   });
 
-  for (const i of ifaces) {
+  const open = (found) => {
+    const i = { ...found, port: 0, socket: null };
+    ifaces.push(i);
+    if (groupBound) join(i);
     const s = createSocket({ type: 'udp4', reuseAddr: true });
     s.on('error', () => { try { s.close(); } catch { /* already */ } i.port = 0; });
     s.on('message', (buf, rinfo) => peer.receive(buf, rinfo, i));
     s.bind(0, i.address, () => {
+      // Closed by a rescan before it was bound: it never joins the list.
+      if (i.closed) { try { s.close(); } catch { /* already */ } return; }
       try {
         s.setMulticastInterface(i.address);
         s.setMulticastLoopback(i.internal);
@@ -424,7 +436,32 @@ export function startLink({ onError } = {}) {
       i.socket = s;
       i.port = s.address().port;
     });
-  }
+  };
+  const close = (i) => {
+    ifaces.splice(ifaces.indexOf(i), 1);
+    i.closed = true;
+    i.port = 0;
+    try { group.dropMembership(LINK_GROUP, i.address); } catch { /* gone with its interface */ }
+    try { i.socket?.close(); } catch { /* already */ }
+  };
+  /*
+    The interfaces again (PLAN.md 13.5-link-rescan). They were read once, when
+    Link was switched on, so a Mac that joined the Wi-Fi afterwards found only
+    loopback until Link was switched off and on, and one that changed network
+    kept a socket on an address it no longer had. Ableton's library rescans
+    every thirty seconds; so does this. An address that is new gets its
+    socket and joins the group; one that is gone is closed. Ones still there
+    are left alone, so a session already measured over them is not dropped.
+  */
+  const rescan = () => {
+    let found;
+    try { found = listInterfaces(); } catch { return; }
+    for (const i of [...ifaces]) if (!found.some((f) => f.address === i.address)) close(i);
+    for (const f of found) if (!ifaces.some((i) => i.address === f.address)) open(f);
+  };
+  rescan();
+  const rescanTimer = setInterval(rescan, rescanMs);
+  rescanTimer.unref?.();
 
   const timer = setInterval(() => peer.tick(), BROADCAST_MS);
   timer.unref?.();
@@ -432,6 +469,7 @@ export function startLink({ onError } = {}) {
     reading: () => peer.reading(),
     stop() {
       clearInterval(timer);
+      clearInterval(rescanTimer);
       peer.stop();
       // The ByeBye goes out before the sockets close.
       setTimeout(() => {
