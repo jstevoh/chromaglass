@@ -1029,6 +1029,19 @@
       ]
     },
     {
+      "name": "The dials held in the solver reach their tops",
+      "shard": "lab",
+      "run": "npm run widedials",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-2: every clamp the solver puts on Swirl, Dye Weight, Heat Spread,",
+        "Pushes Dye, Drop Height, Background Loop, Glass Smear and Momentum's current",
+        "admits the dial's top, no look moved, and on the lab's 128² plate each top",
+        "does more than the old one, finite and conserving. 2.5 minutes on software",
+        "WebGPU (cloud, 2026-10-31), so on Linux's lab shard rather than a Mac's."
+      ]
+    },
+    {
       "name": "A bubble's colour goes with its liquid",
       "shard": "lab2",
       "run": "npm run bubbledye",
@@ -1242,6 +1255,20 @@
         "on a phone in portrait and two landscapes, More → Feedback fits with",
         "nothing covered, 16 px type (13 px was found in every landscape) and",
         "48 px topics; and the phone's Settings strip ends in it too."
+      ]
+    },
+    {
+      "name": "The Tip pad on the desk and the phone",
+      "shard": "browser",
+      "run": "npm run tippad",
+      "why": [
+        "PLAN 18a-13j (scripts/tippad.mjs, apart from phone.mjs, which may not",
+        "grow): the owner never found a way to slosh the plate. The Tip pad is",
+        "seen in the Tools panel at 1440x900 with nothing opened or scrolled;",
+        "dragged right it stands the plate up toward 90, up toward 0, the keys",
+        "too; a grab with Slosh off puts it at half; let go, Gravity and Tilt",
+        "Direction are the look's own exactly (Lava Lamp's 1/180 too); and the",
+        "phone's Motion sheet has it at 128 px, pouring the same way."
       ]
     },
     {

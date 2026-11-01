@@ -232,13 +232,13 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'squish' },
   { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'squish' },
   { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1.6, section: 'master', wanderSpan: 1 },
-  { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 1, section: 'physics' },
+  { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 2, section: 'physics', wanderSpan: 1 },
   { key: 'oilTension', label: "Oil Tension", min: 0, max: 1, section: 'oil' },
   { key: 'surfactantFlow', label: "Soap Bursts", min: 0, max: 1, section: 'oil' },
-  { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 1, section: 'physics' },
+  { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 2, section: 'physics', wanderSpan: 1 },
   { key: 'plateUpright', label: "Gravity", min: 0, max: 1, section: 'tilt' },
   { key: 'tiltDirection', label: "Tilt Direction", min: 0, max: 360, section: 'tilt' },
-  { key: 'doubleDiffusion', label: "Heat Spread", min: 0, max: 1, section: 'physics' },
+  { key: 'doubleDiffusion', label: "Heat Spread", min: 0, max: 2, section: 'physics', wanderSpan: 1 },
   { key: 'ferroLabyrinth', label: "Labyrinth", min: 0, max: 1, section: 'ferro' },
   { key: 'phIndicator', label: "pH Indicator", min: 0, max: 1, section: 'reactions' },
   { key: 'bzReaction', label: "BZ Reaction", min: 0, max: 1, section: 'reactions' },
@@ -246,7 +246,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'thicknessOptics', label: "Layer Depth", min: 0, max: 1, section: 'lamp' },
   { key: 'spectralOptics', label: "Spectral Mix", min: 0, max: 1, section: 'lamp' },
   { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'squish' },
-  { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
+  { key: 'glassSmear', label: "Glass Smear", min: 0, max: 3, section: 'squish', wanderSpan: 1 },
   { key: 'rainDrip', label: "Rain Drip", min: 0, max: 2, section: 'squish', wanderSpan: 1 },
   { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'oil' },
   { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.5, section: 'physics', wanderSpan: 0.08 },
@@ -255,7 +255,7 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
 
 
-  { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
+  { key: 'dropHeight', label: "Drop Height", min: 0, max: 2, section: 'interaction', wanderSpan: 1 },
   /*
     The ceiling is the control's own maximum, which is the only place a
     ceiling can honestly live.

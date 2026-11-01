@@ -15,6 +15,8 @@ new file, named here. (The split into files is 19m, 2026-10-29; [`docs/plan/READ
 
 ## Order of work
 
+*Ids with no text of their own before 2026-11-01 (H2c-2 to H2c-10, 10.2-*, 10.3-*, 16a-*, 14a-timers and the rest) are written, each with a pass mark and its check, in §40 and §41; the table at the end of §41 says where every other thin id's text lives.*
+
 
 ### Wave 0. Every change cheaper and faster to ship (lanes E, F)
 
@@ -395,6 +397,8 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
 | 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) |  | 23 |
 | 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 5 |
+| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) |  | 27 |
+| 41 | Specs for the thin items, part 2: sound and beat, many plates, the fluids (written 2026-11-01) | [`41-specs-sound-plates-fluids.md`](docs/plan/41-specs-sound-plates-fluids.md) |  | 28 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing
