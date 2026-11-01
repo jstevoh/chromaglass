@@ -73,7 +73,7 @@ Free, with nothing to buy and no ads.
 ### App Store: Keywords (100)
 
 ```text
-light show,liquid,psychedelic,visualizer,music,oil,ferrofluid,VJ,projector,lava,fluid,trippy
+light show,liquid,psychedelic,visualizer,music,oil,ferrofluid,VJ,ambient,lava,fluid,trippy
 ```
 
 ### App Store: What's New (4000)

@@ -11052,7 +11052,7 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
 
 
 
-## 37k. A press page, and 12.6 the store listings (this PR, 2026-11-01)
+## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 
 Wave 7's next Claude item after OSC out. **37k**: `chromaglass.art/press`
 (`public/press.html`, a static page like `/pro`, routed in `firebase.json` before
@@ -11070,7 +11070,7 @@ apps (permissions asked on the phone, nothing more sent, no tracking or ad id),
 `docs/store-listings.md` (every field for both stores, the review note, category
 and rating, the App Privacy label and Data safety answers), and Play's 512 icon and
 1024 × 500 feature graphic from `scripts/brand/art.mjs` (`featureGraphic`).
-`npm run presskit` (Measure browser2), 40/40: the files exist, the stills' and
+`npm run presskit` (Measure browser2), 46/46: the files exist, the stills' and
 clips' sizes and lengths read from the files themselves, the clips' index before
 their data, the prices against `Landing.tsx`, each listing field within its limit
 with no price or way to buy, the store pictures' sizes and alpha, and the page at
