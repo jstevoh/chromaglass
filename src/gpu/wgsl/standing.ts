@@ -110,12 +110,15 @@ export const FILM_H0 = 0.3;
 export const PHASE_VIEW_TOP = 8;
 /*
   The most a cell can hold under the film, as a share of full: the layer
-  reaching the top glass. The plate is two glasses 6 mm apart in the middle
-  (lib/turntable.ts DISH_GAP_METRES, PLAN 38r), 4.7 l_c, so a column of
-  ferrofluid can stand 15.6 times a full cell's depth before it touches the
-  glass above. phaseRelax caps the plate's cells at this under the film,
+  reaching the top glass. The plate is two glasses 2 mm apart in the middle
+  (lib/turntable.ts DISH_GAP_METRES, PLAN 38r), 1.56 l_c, so a column of
+  ferrofluid can stand 5.1 times a full cell's depth before it touches the
+  glass above (it was 15.6 in the 6 mm gap before: there the lab's tallest
+  domes, about 1.6 l_c, were a third of the room; now they reach the glass,
+  as a real ferrofluid's peaks in a 2 mm sandwich do, which is 38d's
+  labyrinth). phaseRelax caps the plate's cells at this under the film,
   where it caps them at full everywhere else. The cap is not what shapes a
-  dome (the lab's tallest are a third of it); it is what keeps the plate's
+  dome (in the 6 mm gap the lab's tallest were a third of it); it is what keeps the plate's
   own flow, which carries the layer with the water and is only as
   incompressible as its projection makes it, from piling the layer without
   end where it converges, across the window's edge where the flow and the

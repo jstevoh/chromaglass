@@ -41,7 +41,7 @@ import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
-import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, rockPast, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
@@ -4520,18 +4520,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               The plate takes the swing itself (±1–2 at full), scaled by the
               slider; the phone's tilt joins it. On a thin gap that is the
               plate tipped (× CUR_ROCK, sinθ), and a phone held tipped slides
-              the colour downhill for as long as it is held, as a dish tipped
-              in the hand does (PLAN 27a).
+              the colour downhill while held, as a dish tipped in the hand
+              does (PLAN 27a).
             */
             const rockX = swingX + ext.x * 1.1 * extK;
             const rockY = swingY + ext.y * 1.1 * extK;
             /*
               And the cover glass slides on its film as the pair tips, and
-              drags the liquid with it (lib/plateRock.ts, PLAN 27a-1): what
-              makes a rock show on a look whose colour is spread evenly. Its
-              drag is the look's own liquid's: it swings on a light oil and
-              creeps on glycerine. It is tipped as the solver's plate is
-              (plateSin, as the step's rockX below).
+              drags the liquid with it (lib/plateRock.ts, PLAN 27a-1), so a
+              rock shows on a look whose colour is spread evenly. Its drag is
+              the look's liquid's: it swings on light oil, creeps on glycerine.
+              Tipped as the solver's plate is (plateSin, as rockX below).
 
               Only as far as Frame Sway lets it: the glass drags the whole
               picture, which is the frame moving rather than the liquid, and
@@ -4543,7 +4542,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS,
               coverRoom(currentSettings.frameSway));
             for (const fluid of fluidsRef.current) {
-              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
+              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; fluid.rockGain = rockPast(R);
               fluid.coverX = cover.vx; fluid.coverY = cover.vy;
               fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
               fluid.swingX = swingX; fluid.swingY = swingY;

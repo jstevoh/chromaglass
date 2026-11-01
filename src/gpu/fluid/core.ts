@@ -468,8 +468,35 @@ export class FluidCore {
       size: this.N * this.N * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }));
-    for (let n = this.N; n % 2 === 0 && n / 2 >= 4;) {
-      n /= 2;
+    /*
+      The multigrid's levels, each about half the one above, down to a few
+      cells a side, for both projections (vcycle, hsCycle in passes.ts).
+
+      An odd level is halved too, rounding up: 130 goes 65, 33, 17, 9, 5,
+      and its last row and column of coarse cells cover one fine cell
+      instead of two (the restrictions and hsCoarsen skip the cell that is
+      not there, the prolongations clamp to the coarse edge). The halving
+      used to stop at the first odd level, so 130² had one coarse level,
+      65², and sixteen sweeps on 65² cannot solve a pressure field the size
+      of the plate: a press's pressure is a log r out to the open rim, a
+      mode the sweeps move one cell a step. Warm-started, that solve
+      converges across steps instead of within one, and a pressure a few
+      steps stale is applied to a mobility, h³, that has moved on: while
+      the glass closes the stale pressure is the open plate's and the flux
+      falls short of the volume displaced, while it lifts it is the pressed
+      film's and the flux overshoots, both inward. Measured in the 2 mm gap
+      (\`npm run thingap\`, the press on 130²): the flux out of a box round
+      the press read 4.5% of the gap's volume rate on the press's first
+      step and caught up only on its seventh, the ring went out 92% of the
+      displaced volume's shift, and the release took the ring 18% of that
+      shift past where it began, where 128², halved to 4², read 100% and
+      1%. The 6 mm gap hid it: the pressed film's mobility against the open
+      plate's was four times nearer one there (the drag kΔt under the press
+      40 against 4.5), so the stale pressure was nearer the right one. With
+      every grid halved to the bottom, 130² reads as 128² does.
+    */
+    for (let n = this.N; Math.ceil(n / 2) >= 4;) {
+      n = Math.ceil(n / 2);
       const make = (label: string) => this.disposer.track(device.createBuffer({ label, size: Math.max(16, n * n * 4), usage: GPUBufferUsage.STORAGE }));
       this.mg.push({ n, p: make(`mg p ${n}`), b: make(`mg b ${n}`) });
     }

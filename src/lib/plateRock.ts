@@ -106,6 +106,35 @@ export const ROCK_SWAY_RATE = 0.55;
 export function swayAt(noise: (x: number, y: number) => number, t: number): [number, number] {
   return [noise(t * ROCK_SWAY_RATE, 3.7), noise(7.1, t * ROCK_SWAY_RATE * 0.82)];
 }
+/*
+  Plate Rock past the default goes past real (PLAN 38r-9). The colour a tilt
+  slides is Darcy's: its speed goes as the gap's h², so on the real 2 mm gap
+  (PLAN 38r) a rocked pool slides a ninth as far as it did on the 6 mm gap the
+  looks were tuned on, and full Plate Rock moved the colour 0.105 of the
+  plate's in two seconds (`npm run rides`, the Mac), a ninth of a look's own
+  stir's 0.871: the top of the dial read as a gentle background move. The
+  owner judged the 2 mm films at the default ("that looks fine", 10-31) and
+  asked that every dial run from very gentle to very extreme (10-31), with
+  settings that may ramp past real on the real law (10-30). So up to the
+  default 0.45 the rock is the real 2 mm gap's, and from there to full its
+  pull on the colour (and the oil's lift up the same tilt, so a coloured oil
+  body keeps its buoyancy against it) rises geometrically to ROCK_PAST, the
+  6 mm gap's Darcy pace: (6 mm / 2 mm)² = 9. Full Plate Rock is the old
+  swing, and halfway between, 0.72, about three times real.
+
+  Not a steeper tilt: the tilt (and the cover glass that slides on it, and
+  the lamp that follows it) stays the hand's, so Frame Sway's glass and the
+  rides' dial lines are untouched, and only the gap's mobility for the
+  colour's weight goes past nature, which is what changed.
+*/
+export const ROCK_PAST = (0.006 / DISH_GAP_METRES) ** 2;
+/** The dial below which the rock is the real gap's. */
+export const ROCK_REAL_TO = 0.45;
+/** The rock's pull on the colour for the slider `R`, × the real gap's: 1 up to ROCK_REAL_TO, ROCK_PAST at full. */
+export function rockPast(R = 0): number {
+  if (!(R > ROCK_REAL_TO)) return 1;
+  return ROCK_PAST ** (Math.min(1, (R - ROCK_REAL_TO) / (1 - ROCK_REAL_TO)));
+}
 /** The swing to the plate's tilt (sinθ) the solver takes: × the swing × (dye − mean) on the old plate's current, the tilt itself on a thin gap. */
 export const CUR_ROCK = 0.2;
 
@@ -220,9 +249,9 @@ export function rockSwing(rock: { x: number; y: number }, R: number, swayX: numb
 
   m_A the cover's mass per area (2 mm of glass, 5 kg/m²), R_c the bowl's
   radius of curvature, and τ the film's shear drag
-  on it, which the liquid's viscosity sets: 1.4 s on the default light oil
-  in the 6 mm middle, so the glass swings a few times before it settles, and
-  three hundredths of a second in glycerine, so it creeps. It slides only as
+  on it, which the liquid's viscosity sets: 0.45 s on the default light oil
+  in the 2 mm middle (1.4 s in the 6 mm gap before PLAN 38r), so the glass swings a few times before it settles, and
+  a hundredth of a second in glycerine, so it creeps. It slides only as
   far as the gap between the two glasses' rims lets it (COVER_ROOM), where
   it stops dead: a glass against glass does not bounce.
 
@@ -265,6 +294,17 @@ export const COVER_ROOM = 0.04;
 export const HOLD_TILT = 0.004;
 export function plateSin(hold: number, swing: number): number {
   return hold * 10 + swing * CUR_ROCK;
+}
+/**
+ * The solver's rock for a step (FluidSimulation's params): the plate's sinθ
+ * each way, and the slider's past-real gain, rockPast(R), which the frame loop
+ * sets on every plate beside the swing it hands them all (FluidSimulation's
+ * rockGain). Not the plate's own settings: one Plate Rock tips the whole
+ * stack, so a patch aimed at one plate's Plate Rock would change its slide
+ * and not its swing.
+ */
+export function rockStep(holdX: number, holdY: number, swingX: number, swingY: number, gain = 1): { rockX: number; rockY: number; rockGain: number } {
+  return { rockX: plateSin(holdX, swingX), rockY: plateSin(holdY, swingY), rockGain: gain };
 }
 const G = 9.81;
 /** The film's shear drag on the cover, 1/τ (per second), for the look's Thickness, at the plate's rest gap (DISH_GAP_METRES in the middle). */

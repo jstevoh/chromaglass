@@ -390,7 +390,7 @@ written first. Line numbers are as read on main at d07ac31.
     read. Found building 38l.
   - ~~**38l-2. The kick's sheet lifts by the same law**~~ — **Shipped, this PR** (the sheet
     takes the suction's share cell by cell on the dent it holds and node by node on its own
-    solve, so the shader takes it everywhere; `npm run sheet` 18/18; story in
+    solve once the finger has let go (38r-10), so the shader takes it everywhere; `npm run sheet` 18/18; story in
     `docs/plan-shipped.md` §38l).
   - **38l-3. The sheet's suction reads the plate's own gap** (S; Low). The sheet works out
     each cell's share at rest less its own dent, not the plate's gap, which it cannot read
@@ -466,33 +466,11 @@ written first. Line numbers are as read on main at d07ac31.
   the dye's opacity (`camera.ts:104-118`). Real: cos⁴ vignette, bloom as the lens's PSF on
   linear light with no threshold, and a disc kernel of radius A·|z − z_f|/z_f per layer.
 
-- **38r. The rest gap** (S to read, retune if it moves; Low-Medium). `REST_GAP` 0.03 of a
-  0.2 m plate is 6 mm (`constants.ts:389-401`); a show's glass sandwich is more like 1–3 mm
-  (a guess to confirm with the owner's own glass). Looks would not change (forces are read as
-  terminal speeds), but every h² (memory, mobility contrast, 18a-6's inertia, the
-  labyrinth's N_B in 38d, the halo in 38i) hangs on it. Decide it before 38d and 38i.
-
-  The owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." So 2 mm in the
-  middle at rest (a few millilitres under a top glass about 15 cm across is 1–3 mm; 2 mm is
-  the middle, a judgement and not a measurement), in two parts:
-
-  - **Part 1, one number (shipped, this PR, at 6 mm).** `DISH_GAP_METRES`
-    (`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
-    *gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
-    same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
-    the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
-    rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
-    h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
-    rest gap and greps `src/` for a gap made a length by the plate's width.
-  - **Part 2, 2 mm** (M; Medium-High on the water looks). Set the number, then retune what
-    the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
-    CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
-    of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
-    water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
-    `airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
-    (`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
-    under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
-    `magnetgain` need their windows on τ (#605 has them). Its leftovers, each its own item:
+- ~~**38r. The rest gap**~~ (shipped: part 1 at 6 mm, #613; part 2, 2 mm, #641, with 38r-6,
+  38r-7, 38r-8 and 38r-9). `DISH_GAP_METRES` (`src/lib/turntable.ts`) is the gap's one number,
+  2 mm in the middle at rest, and every reader of h₀ follows it; the owner chose the real 2 mm
+  pace everywhere and judged the films 2026-10-31 ("That looks fine"). Story in
+  `docs/plan-shipped.md` §38r. Its leftovers:
   - **38r-1. Does a sandwich slosh?** (S to decide, M to build). `lib/slosh.ts` solves a
     6 mm layer with a free surface (`SLOSH_REST_DEPTH`): between two glasses there is none,
     and at 2 mm its floating lens (`SLOSH_LENS`, 3.4 mm) would be deeper than the water
@@ -505,10 +483,33 @@ written first. Line numbers are as read on main at d07ac31.
   - **38r-3. A Gap dial** (S). At 2 mm water's drag time is a third of a second, not three:
     a push fades nine times sooner. If a look wants the old glide, the honest dial is the
     gap itself, not a stand-in for inertia.
+    (2026-10-31: the owner chose Liquid amount and Cover weight over a bare Gap dial, so the
+    gap is a result of the plate's volume, 38r-5, written in by its own thread.)
   - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
     three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
     half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
     would slide the picture the same.
+  - ~~**38r-6**~~ `thingap` 5 read the Spin's one-cell mask edge, not the solve's residual:
+    Spin's stir mask is blurred [1 4 1] over a cell's neighbours (#641). Story in §38r.
+  - ~~**38r-7**~~ The rhythm sheet at 2 mm: its waits are on the film's own clock (#641).
+  - ~~**38r-8**~~ The Blow's breath is 14 m/s (#641).
+  - ~~**38r-9**~~ Plate Rock past real above the default: `rockPast` in `lib/plateRock.ts`,
+    1 up to the default 0.45, then geometrically to `ROCK_PAST` = (6 mm/h₀)² = 9 at full,
+    the 6 mm gap's Darcy pace, so the dial still runs gentle to extreme at the real gap (#641).
+    The default stays real.
+  - ~~**38r-10**~~ The kick's sheet holds against the lift while the finger presses, as the
+    hand holds the glass; `rides`' sheet "is local" line reads a dent and a half out against
+    the sheet's own bowl stamped, not 70 cells against the glass (#650). Story in §38r.
+  - **38r-11. The sheet's hold is the whole sheet, the glass's is the kick's discs** (S). While a
+    press is live the sheet skips the suction's keep on every node (`lib/sheet.ts` step, 38r-10),
+    the lip past rest and an earlier dent elsewhere included; KickRelease holds only inside the
+    kick's own discs. A named shortcut: scale the keep by one less the press's load weight, and add
+    a sprung row to `npm run sheet` §6 (nine steps at the app's spring, the volume within reach the
+    stamp's to 2%), which §6 asks only unsprung and so let 38l-2's drift through. Found in #655's
+    review. Also there: `rides`' "is local" falloff half reads the glass at 36 cells, its inner
+    disc's kink, where the glass does not fall off (4.5 against 4.2): its 0.6 now asks under 0.64,
+    and a sheet with no lip (about 0.57) would pass it; the 25% half catches that sheet (1.0 against
+    0.71). Ask the falloff against the stamp instead (the lip keeps some back).
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

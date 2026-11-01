@@ -2366,3 +2366,22 @@ only Resolume can say it reads them.
 3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
 4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
    the strobe a steady beat late.
+
+## 107. The real 2 mm glass gap (PLAN 38r)
+
+The owner judged the 2 mm films on 2026-10-31 ("That looks fine": the rhythm sheet's dents
+and Plate Rock's slide at about half). What only the Mac at 60 fps can say is how the thinner
+film feels across the looks: every push fades nine times sooner, and a kick's dent on the
+default oil lasts seconds.
+
+1. Any water look (Fillmore, Bubble Melt): a stir, a Blow and a flick still carry the colour
+   a hand's width, then stop rather than glide on; nothing looks frozen or treacly.
+2. Plate Rock at the default 0.45: the colour slides as in the films. Raise it to 1: the slide
+   grows to about the old 6 mm one (PLAN 38r-9, past real above the default), smoothly, with
+   no jump where it passes 0.45.
+3. The rhythm sheet with music on the default oil: each kick leaves a dent that eases out over
+   a beat or two, never a ring frozen on the glass.
+4. Clock Glass and a tilted plate: the oil lenses still rise and round up, and a lens against
+   the rim stays inside it (18g-7).
+5. Bad: a look whose motion now reads dead (say which), a dent that never fills, or Plate
+   Rock jumping at the default.

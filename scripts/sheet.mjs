@@ -40,8 +40,8 @@
  *      (1 − s)^((h/h_s)³) of the dent, h = rest − dent and h_s = STEFAN_FILM
  *      of rest, cell for cell on the dent the plate holds and node for node
  *      on the sheet's own solve; and a sheet left alone goes quiet (stops
- *      being stepped) within two frames of when its slowest mode, decaying
- *      at its own rate and the spring's at rest, says.
+ *      being stepped) within two frames of when the dish's modes, each
+ *      decaying at its own rate and the spring's at rest, say.
  *
  *   Lab (the solved sheet laid on a thin gap through its own channel):
  *   9.  The plate's gap is the solve's: rest minus the sheet's dent, cell for
@@ -76,6 +76,19 @@ await build({ stdin: { contents: "export * from './src/lib/sheet.ts'; export { d
 const { RhythmSheet, stampedDepth, stampedVolume, SHEET_DEEPEST, FINGER_SIGMA, SHEET_QUIET, STEFAN_FILM, SHEET_D, dentRadius, kickDepth, kickPress, KICK_HOLD, thicknessViscosity } = await import(`../${out}`);
 
 const T = KICK_HOLD;
+/*
+  The film's own clock. The sheet drains by lubrication, every mode at
+  λ = M k² (D k⁴ + ρg) with M = h₀³/12μ, so a gap three times thinner runs
+  every mode of it 27 times slower and nothing else: the same dent, given
+  back over 27 times the seconds. The times below that are the film's (a
+  wait for the rim, the pace a liquid is compared at, how often a test
+  kicks) were first asked on the 6 mm gap, and are asked here at the same
+  M·t, SLOW times their seconds. The times that are the show's and not the
+  film's stay in seconds: the kick's hold (KICK_HOLD), a step of the app
+  (1/60) and the plate's spring per step. PLAN 38r part 2 made the gap 2 mm
+  and the owner chose the sheet's real pace on it (2026-10-31).
+*/
+const SLOW = (0.006 / DISH_GAP_METRES) ** 3;
 const LIQUIDS = { water: thicknessViscosity(0), 'the default oil': thicknessViscosity(0.45), glycerine: thicknessViscosity(1) };
 const AMOUNT = { def: kickDepth(0.5, 0.7, 1) * kickPress(thicknessViscosity(0.45), 0).share, full: kickDepth(1, 1, 1) * kickPress(thicknessViscosity(0.45), 0).share };
 
@@ -151,7 +164,16 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
   for (let k = 0; k <= 50; k++) { const u = k / 50; for (const [x, y] of [[0, u], [1, u], [u, 0], [u, 1]]) edge = Math.max(edge, Math.abs(s.depthAt(x, y))); }
   const mid = s.depthAt(0.05, 0.3);
   // Kicked twice a second for two minutes about the middle half: the dish's mean gap, against a dent's depth.
-  const kicked = (nu) => {
+  /*
+    Twice a second and for two minutes on the 6 mm film's clock (SLOW): each
+    kick's dent gets the same share of its way back to the rim before the
+    next, so the bar asks what it asked of the solve, that the rim lets the
+    liquid back. The sheet is stepped exactly per mode, so a step of SLOW
+    sixtieths is the sixty it stands for. At the app's own twice a second the
+    2 mm film has a 27th of the time to give each dent back and the dents
+    stand on each other: that is printed, not judged.
+  */
+  const kicked = (nu, dt = SLOW / 60) => {
     const k = new RhythmSheet(); k.setLiquid(nu);
     const L = 96, R = kickPress(nu, 0).radii[0] / 128, buf = new Float32Array(L * L);
     let d = 0;
@@ -160,7 +182,7 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     for (let n = 0; n < 60 * 120; n++) {
       // As the app presses a kick (pressVolume), d the middle the last one reached.
       if (n % 30 === 0) d = k.pressVolume(0.5 + rnd() * 0.5, 0.5 + rnd() * 0.5, stampedVolume(AMOUNT.def, R), R, T);
-      k.step(L, 1 / 60, 0, buf);
+      k.step(L, dt, 0, buf);
       if (n % 300 === 299 && n > 60 * 20) {
         const h = k.heldNow(); let m = 0, c = 0;
         for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { if (Math.hypot((i + 0.5) / L - 0.5, (j + 0.5) / L - 0.5) > 0.47) continue; m += h[i + j * L]; c++; }
@@ -169,9 +191,9 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     }
     return worst;
   };
-  const oil = kicked(LIQUIDS['the default oil']), gly = kicked(LIQUIDS.glycerine);
-  check('the rim holds the sheet at rest and lets the liquid out and back: on every edge under a millionth of a dent by the rim, and kicked twice a second for two minutes the dish\'s mean gap within 2% of a dent of rest on the default oil, 10% in glycerine',
-    edge < 1e-6 * mid && oil < 0.02 && gly < 0.1, `edge ${(edge / mid).toExponential(1)} of the dent; mean gap at most ${(100 * oil).toFixed(1)}% of a dent down on oil, ${(100 * gly).toFixed(1)}% in glycerine (no spring)`);
+  const oil = kicked(LIQUIDS['the default oil']), gly = kicked(LIQUIDS.glycerine), show = kicked(LIQUIDS['the default oil'], 1 / 60);
+  check('the rim holds the sheet at rest and lets the liquid out and back: on every edge under a millionth of a dent by the rim, and kicked twice a second for two minutes of the film\'s clock the dish\'s mean gap within 2% of a dent of rest on the default oil, 10% in glycerine',
+    edge < 1e-6 * mid && oil < 0.02 && gly < 0.1, `edge ${(edge / mid).toExponential(1)} of the dent; mean gap at most ${(100 * oil).toFixed(1)}% of a dent down on oil, ${(100 * gly).toFixed(1)}% in glycerine (no spring); at the app's own twice a second ${(100 * show).toFixed(1)}% on oil (printed, not judged)`);
 }
 // ── 4. The reach ───────────────────────────────────────────────────────
 {
@@ -212,7 +234,8 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
   // And once the rim sets it, the dish's own slowest mode, sin(πx/W) sin(πy/W): water's middle a frame apart as e^(−λ₁/60).
   {
     const s = held(LIQUIDS.water), buf = new Float32Array(64 * 64), W = 0.2;
-    s.step(64, 2 / 60, 0, buf);
+    // Two frames on the 6 mm film's clock (SLOW): the next mode of the dish's (3, 1) at e^(−4λ₁t), e^(−12), of its share.
+    s.step(64, (2 * SLOW) / 60, 0, buf);
     const a = s.depthAt(0.5, 0.5);
     s.step(64, 1 / 60, 0, buf);
     const b = s.depthAt(0.5, 0.5);
@@ -221,10 +244,28 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
     check('and once water\'s dent has reached the rim it goes as the dish\'s slowest mode: its middle a frame apart within 5% of e^(−λ₁/60)', Math.abs(b / a / want - 1) < 0.05,
       `${(b / a).toFixed(3)} a frame against ${want.toFixed(3)} (λ₁ ${lam.toFixed(0)} a second)`);
   }
-  const [w, o, g] = rows;
-  check('and the thicker the liquid the slower: a fifth of a second after the lift water keeps under 1% of its dent, the default oil under 10%, glycerine over 15%',
+  /*
+    Asked a beat at 80 bpm after the lift, three quarters of a second: the
+    longest a set leaves between kicks, so this is whether one kick's dent is
+    gone before the next. It was asked at a fifth of a second (twelve frames)
+    on the 6 mm gap, where water's levelled in a frame. On the 2 mm one the
+    film drains 27 times slower; the hold is the show's 0.18 s and not the
+    film's, so the dent a kick leaves is narrower too and SLOW times a fifth
+    (5.4 s) is no longer the same dent's same moment: there glycerine had
+    given back all but 4.3%. Read on the 2 mm film: at a fifth water 4.7%,
+    the default oil 20.8%, glycerine 34.1%; at half a second 1.6/10.0/21.2;
+    at three quarters 0.7/6.8/16.8; at a second 0.3/5.1/14.0.
+  */
+  const BEAT = 60 / 80;
+  const fifth = Object.values(LIQUIDS).map((nu) => {
+    const s = held(nu), d0 = s.depthAt(0.5, 0.5), buf = new Float32Array(64 * 64);
+    s.step(64, BEAT, 0, buf);
+    return s.live ? s.depthAt(0.5, 0.5) / d0 : 0;
+  });
+  const [w, o, g] = fifth.map((v) => ({ got: [0, 0, v] }));
+  check('and the thicker the liquid the slower: a beat at 80 bpm after the lift water keeps under 1% of its dent, the default oil under 10%, glycerine over 15%',
     w.got[2] < 0.01 && o.got[2] < 0.1 && g.got[2] > 0.15 && w.got[2] < o.got[2] && o.got[2] < g.got[2],
-    rows.map((r) => `${r.name} ${(100 * r.got[2]).toFixed(1)}%`).join(', '));
+    Object.keys(LIQUIDS).map((name, i) => `${name} ${(100 * fifth[i]).toFixed(1)}%`).join(', '));
 }
 // ── 6. As much pushed out as the stamp ─────────────────────────────────
 {
@@ -291,38 +332,70 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
       worst = Math.max(worst, Math.abs(ha[q] - hb[q] * k)); least = Math.min(least, k); most = Math.max(most, k);
     }
     // Every node on the plate (a keep wrong on fifteen nodes in sixteen passed when every fourth was read), from one inverse each.
-    const n = a.n, P = a.plateMetres, wa = Float64Array.from(a.toSpace()), wb = b.toSpace();
+    // The solve's metres to gap units by the film's metres (gapMetres), as step reads them: by the
+    // plate's width (0.2 m a unit) every node read at rest, a 2.2e-2 miss on the 2 mm gap (#641 on #618).
+    const n = a.n, G = a.gapMetres, wa = Float64Array.from(a.toSpace()), wb = b.toSpace();
     for (let j = 0; j <= n / 2; j++) for (let i = 0; i <= n / 2; i++) {
-      const db = wb[i + j * n] / P;
-      worstNode = Math.max(worstNode, Math.abs(wa[i + j * n] / P - db * share(db, restAt(i / (n / 2), j / (n / 2), curve))));
+      const db = wb[i + j * n] / G;
+      worstNode = Math.max(worstNode, Math.abs(wa[i + j * n] / G - db * share(db, restAt(i / (n / 2), j / (n / 2), curve))));
     }
   }
   /*
     Left alone at the app's spring (Classic's glass, 0.00048 a 60th of a second), a full kick goes
-    quiet when the solve says it should: once its last trace (thirty times SHEET_QUIET) is the
-    dish's slowest mode, sin(πx/W) sin(πy/W), that mode's own rate λ₁ = M k₁² (D k₁⁴ + ρg) and the
-    spring's take it under SHEET_QUIET at t₁ + ln(peak/QUIET) / (λ₁ + spring), and the sheet must
-    stop within two frames of it. Asked first as "within the spring's own time" (255 s for an answer
-    of 2), which a sheet that never quieted for minutes would have passed (the review of #452).
+    quiet when the solve says it should. Asked first as "within the spring's own time" (255 s for
+    an answer of 2), which a sheet that never quieted for minutes would have passed (the review of
+    #452). Then against the dish's slowest mode alone, sin(πx/W) sin(πy/W) at its own rate
+    λ₁ = M k₁² (D k₁⁴ + ρg) and the spring's: on the 6 mm gap the dent had that mode's shape long
+    before it was thirty times SHEET_QUIET. On the 2 mm one it has not. The film drains 27 times
+    slower (the default oil's λ₁ 0.15 a second, its (3, 1) 0.90, its (3, 3) 2.3), while the spring
+    against the film's suction (38l) takes the whole dent at its rest's (1/STEFAN_FILM)³, 37 times
+    the share, 1.07 a second: the oil's sheet goes quiet at 3.17 s with its quarter-point still
+    the wrong side of zero (−0.33 of a mode's), so the slowest mode alone had no moment to be asked
+    from (it said −Infinity, #641's run on #618). So it is asked against every mode: once the peak
+    is thirty times SHEET_QUIET, the dent the plate holds is read onto the dish's sine modes
+    (24 × 24, by its own 64 cells), each mode is let go at its own λ and the spring's at rest
+    (exact there: the dent is 0.03% of the gap), and the modes say when no cell's dent is a
+    SHEET_QUIET of the gap. The peak the sheet goes quiet on is the step's before that step's
+    spring, so the modes are read so too. That is the theory the solve must keep: each mode's
+    rate and the spring's share, through the sheet's own transforms and its laying on the plate.
+    Measured: water at 1.283 s (the modes 1.283), the default oil 3.167 s (3.150).
     In water and on the default oil; in glycerine the bending holds the next modes near the
     slowest's rate that late, so it has no one mode to ask against.
   */
   const quiet = [];
+  const MODES = 24, sines = Array.from({ length: MODES }, (_, m) => Float64Array.from({ length: L }, (_, i) => Math.sin((m + 1) * Math.PI * (i + 0.5) / L)));
   for (const name of ['water', 'the default oil']) {
     const nv = LIQUIDS[name], sp = 0.00048;
     const c = new RhythmSheet(); c.setLiquid(nv); c.press(0.5, 0.5, stampedDepth(AMOUNT.full), T);
     const buf = new Float32Array(L * L);
     c.step(L, T, 0, buf);
-    let t = T, t1 = null, p1 = null;
-    while (c.live && t < 60) { c.step(L, 1 / 60, sp, buf); t += 1 / 60; if (p1 === null && c.peak < 30 * SHEET_QUIET) { p1 = c.peak; t1 = t; } }
-    const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nv), k2 = 2 * (Math.PI / 0.2) ** 2, lam = M * k2 * (SHEET_D * k2 * k2 + 9810);
-    // The spring's rate at rest, where a trace thirty times the quiet is (1% of the gap): the full press's share to the (1/STEFAN_FILM)³.
-    const want = t1 + Math.log(p1 / SHEET_QUIET) / (lam - (60 / STEFAN_FILM ** 3) * Math.log(1 - sp));
+    const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nv), W = 0.2;
+    const lamOf = (m, n) => { const k2 = (m * m + n * n) * (Math.PI / W) ** 2; return M * k2 * (SHEET_D * k2 * k2 + 9810); };
+    // The spring's rate at rest, where the trace is: the full press's share to the (1/STEFAN_FILM)³.
+    const spring = -(60 / STEFAN_FILM ** 3) * Math.log(1 - sp);
+    let t = T, t1 = null, modes = null;
+    while (c.live && t < 60) {
+      c.step(L, 1 / 60, sp, buf); t += 1 / 60;
+      if (t1 === null && c.peak < 30 * SHEET_QUIET) {
+        t1 = t; const h = c.heldNow(); modes = [];
+        for (let m = 1; m <= MODES; m++) for (let n = 1; n <= MODES; n++) {
+          let v = 0; for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) v += h[i + j * L] * sines[m - 1][i] * sines[n - 1][j];
+          modes.push([m, n, (v * 4) / (L * L)]);
+        }
+      }
+    }
+    let want = Infinity;
+    for (let f = 1; modes && f < 60 * 60 && want === Infinity; f++) {
+      const dt = f / 60, now = modes.map(([m, n, a]) => [m, n, a * Math.exp(-lamOf(m, n) * dt - spring * (dt - 1 / 60))]).filter((x) => Math.abs(x[2]) > 1e-12);
+      let most = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { let v = 0; for (const [m, n, a] of now) v += a * sines[m - 1][i] * sines[n - 1][j]; most = Math.max(most, Math.abs(v)); }
+      if (most < SHEET_QUIET) want = t1 + dt;
+    }
     quiet.push({ name, t, want, live: c.live });
   }
-  check('the plate\'s spring taken on the sheet against the film\'s suction: let go, a step keeps (1 − s)^((h/h_s)³) of the dent cell for cell and on the solve node for node, flat and on a dome, and a sheet left alone goes quiet within two frames of when its slowest mode says, in water and on the default oil',
+  check('the plate\'s spring taken on the sheet against the film\'s suction: let go, a step keeps (1 − s)^((h/h_s)³) of the dent cell for cell and on the solve node for node, flat and on a dome, and a sheet left alone goes quiet within two frames of when its modes say, in water and on the default oil',
     worst < 1e-6 * 0.008 && worstNode < 1e-6 * 0.008 && least < most && quiet.every((q) => !q.live && Math.abs(q.t - q.want) <= 2 / 60),
-    `worst ${(worst / 0.008).toExponential(1)} of the depth on the plate, ${(worstNode / 0.008).toExponential(1)} on the solve, shares ${least.toFixed(4)} to ${most.toFixed(4)}; quiet ${quiet.map((q) => `${q.name} at ${q.t.toFixed(3)} s, its slowest mode says ${q.want.toFixed(3)}`).join('; ')}`);
+    `worst ${(worst / 0.008).toExponential(1)} of the depth on the plate, ${(worstNode / 0.008).toExponential(1)} on the solve, shares ${least.toFixed(4)} to ${most.toFixed(4)}; quiet ${quiet.map((q) => `${q.name} at ${q.t.toFixed(3)} s, its modes say ${q.want.toFixed(3)}`).join('; ')}`);
 }
 // Its cost, printed: the app pays this each step while the sheet moves.
 {

@@ -27,12 +27,32 @@
  *      1/h², which is the claim everything else here rests on. A disc of dye
  *      carried by the push goes as far as the thickness says: the thin
  *      liquid's travel over the thick's is the ratio of their drag rates, to
- *      5%. The old solver carries it under a twentieth as far as the thick
+ *      5%. The old solver carries it under a tenth as far as even the thinner
  *      one (its clamp cuts the push to MAX_SPEED at the end of the first
- *      step: 0.0006 of the plate against 0.03, measured). And a hand held
- *      pushing at one speed moves the water at that speed, to 5%, not at the
- *      sum of every step's push (what adding them would give is printed:
- *      about fifty times the push after sixty steps of water).
+ *      step: 0.0005 of the plate against 0.0099, measured). It was held
+ *      against the thick one, at a twentieth, while the gap was 6 mm and the
+ *      thick liquid's push lasted eight steps (0.03 of the plate); in the
+ *      2 mm gap (PLAN 38r) its kΔt is 1.12, the push lasts 0.9 of a step
+ *      and carries the dye 0.0035, so the old solver's one clamped step is
+ *      no longer small against it. The thinner liquid's lasts 2.5 steps.
+ *      And a push held at one speed holds the water at that speed, less the
+ *      step's drag, to 5%, not at the sum of every step's push (what adding
+ *      them would give is printed: twenty times the push after sixty steps
+ *      of water). The push is laid flat across the plate, as the fit's is,
+ *      and the speed asked for is s/(1 + kΔt): a push on a thin gap is set
+ *      as a velocity before the step (deltaVel, wgsl/fluid/splats.ts:
+ *      brought up to the push and not past it), and the glass then takes
+ *      its step's share of it, 4.8% of water in the 2 mm gap. Laid as a
+ *      disc, as it was while the gap was 6 mm, the push is mostly divergent
+ *      and the solve gives back only a disc's share of what the drag takes
+ *      each step (a half for a uniform disc in an unbounded layer, 0.37
+ *      measured for a soft one in `npm run airblow`), so a held disc
+ *      settles at s·cσ/(1 − c(1 − σ)): 0.985 of the push at 6 mm, where
+ *      kΔt was 0.0056 and the 5% hid both, and 0.88 at 2 mm (0.875
+ *      measured). That was the model's own arithmetic, not a hand: the
+ *      Finger is a solid in the solve (lib/handSolid.ts, `npm run
+ *      fingerflow` holds the liquid under it to the hand's speed), and the
+ *      velocity push is the pops', the bass press's and the straw's.
  *   2. A press pushes out the liquid it displaces. A ring of dye round a
  *      press (laid over ten steps, as a hand lays one) moves out to where the
  *      ring's area between the old and new radius, times the gap, is the
@@ -56,12 +76,20 @@
  *      floor (0.004 against 0.03) in a uniform flow: Darcy's inclusion says
  *      the flux through it over the flux there without it is 2λ/(1 + λ),
  *      λ the ratio of their mobilities h·c (h³ for a thick liquid). To 40%,
- *      on a disc ten cells across whose edge is a cell wide and a rim a few
- *      radii off: the grid's own error, not the solve's (more V-cycles move
- *      it by 1%), and at a λ this small the disc's stepped edge is most of
- *      what gets through. So it is asked again of water, whose λ is five
+ *      read in a disc twenty cells across in the middle of a press held to
+ *      the floor out to about 0.2 of the plate, a rim a few radii off: the
+ *      grid's own error, not the solve's (more V-cycles move it by 1%), and
+ *      at a λ this small the pressed disc's stepped edge is most of what
+ *      gets through. The press was half that (the floor out to 0.1, read in
+ *      ten cells) while the gap was 6 mm; in the 2 mm gap (PLAN 38r) the
+ *      floor's λ is four times smaller (0.0044 against 0.019: the drag at
+ *      the floor is 12ν/h² of 0.27 mm, kΔt 63) and the edge's leakage is
+ *      not, about 0.006 of the open plate's flux either way, so the ten-cell
+ *      disc read 0.0150 for Darcy's 0.0088 and the twenty-cell one 0.0100
+ *      (software; a 256² grid with the ten-cell press read 0.0106: the edge
+ *      is what it is). So it is asked again of water, whose λ is eight
  *      times the oil's, to 10%: there a mobility that forgot the drag (h
- *      alone) would be 27% high and one with nothing but it (h³) 97% low.
+ *      alone) would be 230% high and one with nothing but it (h³) 93% low.
  *      The old solver, divergence-free in u, carries the same velocity
  *      through it and so the gap ratio of flux, printed; the check asks the
  *      thin gap's to be under half of that as well.
@@ -71,8 +99,10 @@
  *      dish, at its worst over twelve samples 50 steps apart: under 0.005 and
  *      under a fifth of the old solver's, for water and for glycerine. A
  *      field that had died or been zeroed would score 0 here, so the flow
- *      has to be there to be measured: from five seconds on (water takes its
- *      drag time, three seconds, to come up to the stir's speed from rest)
+ *      has to be there to be measured: from five seconds on (water took its
+ *      drag time, three seconds in the 6 mm gap, to come up to the stir's
+ *      speed from rest; a third of a second in the 2 mm one, and the current
+ *      still takes its own time to build)
  *      the flux is at least three tenths of the old solver's at every
  *      sample, and at every sample the fastest cell is no more
  *      than five times the old solver's fastest (a blow-up is wiped to zero
@@ -153,14 +183,16 @@ try {
       for (let k = 0; k < 11; k++) { await lab.step(1, over); speeds.push(await centre()); }
       push.halved = { speeds, gap: sq.gap[sq.n / 2 + (sq.n / 2) * sq.n] };
     }
-    // A hand held still, pushing the water at one speed for sixty steps.
+    // A push held still at one speed on the water for sixty steps, flat
+    // across the plate as the fit's push is (1., and why a disc is not it).
     {
       const over = { thinGap: 1, gapThickness: 0, gapSpring: 0 };
       await lab.create(N, N);
       await lab.step(1, over);
-      for (let k = 0; k < 60; k++) { lab.vel(0.5, 0.5, 0.1, [0.5, 0, 0, 0]); lab.flush(); await lab.step(1, over); }
+      for (let k = 0; k < 60; k++) { lab.vel(0.5, 0.5, PUSH, [0.5, 0, 0, 0]); lab.flush(); await lab.step(1, over); }
       const c = 1 / (1 + kOf(0) * SECONDS);
-      push.held = { speed: await centre(), want: 0.5, added: 0.5 * (1 - Math.pow(c, 60)) / (1 - c) };
+      // Set at the step's start, dragged by the glass for the step: s/(1 + kΔt).
+      push.held = { speed: await centre(), want: 0.5 * c, push: 0.5, kdt: kOf(0) * SECONDS, added: 0.5 * (1 - Math.pow(c, 60)) / (1 - c) };
     }
     out.push = push;
 
@@ -204,7 +236,8 @@ try {
     }
     N = 128; dish = dishOf(N);
 
-    // 4. A tight gap carries less: the light oil, and water.
+    // 4. A tight gap carries less: the light oil, and water. The press's radius, and the disc read in its middle, half of it.
+    const DISC = 0.16;
     const dent = {};
     for (const [name, over] of [['old', { gapSpring: 0 }], ['thin', { thinGap: 1, gapThickness: 0.45, gapSpring: 0 }], ['water', { thinGap: 1, gapThickness: 0, gapSpring: 0 }]]) {
       dent[name] = {};
@@ -214,9 +247,10 @@ try {
         // Held for twenty steps, as a hand holds a Press. Since the thin gap's
         // glass closes as a film under a load does, slowing as h³ (Stefan,
         // squeezeUpdate), one step's dent leaves this disc at 0.008, twice the
-        // floor λ is counted at; held, it reaches the floor out to about 0.1
-        // of the plate, as one step's dent did on the old solver.
-        if (pressed) for (let k = 0; k < 20; k++) { lab.vel(0.5, 0.5, 0.08, [0, 0, 0, -0.2]); lab.flush(); await lab.step(1, over); }
+        // floor λ is counted at; held, it reaches the floor out to about 0.2
+        // of the plate (0.1 at the 0.08 it was laid at while the gap was
+        // 6 mm: 4., and why the disc doubled with the 2 mm gap).
+        if (pressed) for (let k = 0; k < 20; k++) { lab.vel(0.5, 0.5, DISC, [0, 0, 0, -0.2]); lab.flush(); await lab.step(1, over); }
         // Long enough for the press's own flow to be gone before the push.
         await lab.step(40, over);
         lab.vel(0.5, 0.5, 5, [1, 0, 0, 0]); lab.flush();
@@ -224,7 +258,7 @@ try {
         const v = await lab.field('vel'); const sq = await lab.squeeze();
         let q = 0, h = 0, n = 0;
         for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-          if (dish(i, j) >= 0.04) continue;
+          if (dish(i, j) >= DISC / 2) continue;
           const k = i + j * N; q += sq.gap[k] * v[k * 4]; h += sq.gap[k]; n++;
         }
         dent[name][pressed ? 'pressed' : 'open'] = { q: q / n, h: h / n };
@@ -298,14 +332,15 @@ try {
   check('and the thin liquid carries its dye as much further as its drag is slower',
     Math.abs(ratio / (r.k.thick / r.k.thin) - 1) < 0.05,
     `travel ${r.push.thin.travel.toFixed(4)} against ${r.push.thick.travel.toFixed(4)} of the plate, ×${ratio.toFixed(2)} against ×${(r.k.thick / r.k.thin).toFixed(2)}`);
-  check('where the old solver carried it under a twentieth as far as even the thick one',
-    Math.abs(r.push.old.travel) < 0.05 * r.push.thick.travel,
-    `old ${r.push.old.travel.toFixed(5)} of the plate`);
+  // Against the thinner liquid, whose push outlasts the clamp's one step (1., and why not the thick one).
+  check('where the old solver carried it under a tenth as far as even the thinner one',
+    Math.abs(r.push.old.travel) < 0.1 * r.push.thin.travel,
+    `old ${r.push.old.travel.toFixed(5)} of the plate against the thinner liquid's ${r.push.thin.travel.toFixed(4)} and the thick one's ${r.push.thick.travel.toFixed(4)}`);
   {
     const h = r.push.held;
-    check('a hand held pushing at one speed moves the water at that speed, not at the sum of its pushes',
+    check('a push held at one speed holds the water at that speed less the step\'s drag, not at the sum of its pushes',
       Math.abs(h.speed / h.want - 1) < 0.05,
-      `${h.speed.toFixed(4)} after sixty steps against ${h.want}; adding each step's push would have reached ${h.added.toFixed(1)}`);
+      `${h.speed.toFixed(4)} after sixty steps against ${h.want.toFixed(4)}, the push of ${h.push} less the glass's kΔt ${h.kdt.toFixed(4)}; adding each step's push would have reached ${h.added.toFixed(1)}`);
   }
 
   // 2 and 3.

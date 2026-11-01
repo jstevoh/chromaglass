@@ -45,8 +45,8 @@ export const HAND_GRIP = 40;
  * The edge of a finger, in cells of an L-cell plate. A hand's no-slip does
  * not stop at its skin: in a thin layer the drag a solid puts on the liquid
  * beside it reaches out over the Brinkman screening length, h/√12 for a gap
- * h (the in-plane viscosity against the glass's drag), about 1.7 mm in the
- * plate's 6 mm middle (lib/turntable.ts DISH_GAP_METRES). So χ ramps from 1 to 0 over two of those, ending at
+ * h (the in-plane viscosity against the glass's drag), about 0.58 mm in the
+ * plate's 2 mm middle (lib/turntable.ts DISH_GAP_METRES, PLAN 38r). So χ ramps from 1 to 0 over two of those, ending at
  * the finger's radius. It was the numbers' reason too, while the carries
  * crossed faces rebuilt from the cells' velocities (PLAN 18a-8): a hard edge
  * (a cell and a half, the first try) is a forty-fold jump in the liquid's

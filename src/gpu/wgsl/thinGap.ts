@@ -18,7 +18,8 @@
  * the second being only that liquid is conserved: where the glasses close, the
  * liquid between them has to leave sideways. The drag term is the glass itself,
  * the shear across the gap, and its time ρh²/12μ is the plate's memory: about
- * three seconds for water in a 6 mm gap, a tenth of a second for a light oil,
+ * a third of a second for water in the plate's 2 mm gap (PLAN 38r; three
+ * seconds in the 6 mm gap it had before), a hundredth for a light oil,
  * nothing at all for glycerine. That is what decides how long a push lasts, and
  * the clamp was standing in for it.
  *
@@ -60,12 +61,15 @@
  * Re·h/L. For the oils and anything thicker it is under a tenth at the plate's
  * speeds, so the drag has taken a push long before the push has carried itself
  * anywhere, and dropping the carry costs nothing a person can see. For water in
- * the 6 mm middle of the plate it is near 2, so a deep-gapped water look keeps
- * less inertia than real water would. That is a shortcut kept for the step's
+ * the 2 mm middle of the plate it is near 0.2 (it was near 2 in the 6 mm gap
+ * before PLAN 38r: it goes as h²), so even a water look loses little; a
+ * plate opened past rest (the ceiling is 4 mm, near 0.9) keeps less inertia
+ * than real water would. That is a shortcut kept for the step's
  * time (an advection and a projection, the largest part of it), and PLAN §18a
  * has it as its own item to measure on the Water looks.
  * The ferrofluid's share of the carry is taken (phaseMomentum, wgsl/fluid.ts):
- * its drag time in the rest gap is 0.6 s, so a drop dragged at the hand's speed
+ * its drag time in the rest gap is 0.07 s (0.6 s in the 6 mm gap before
+ * PLAN 38r), so a drop dragged at the hand's speed
  * outran its own momentum and fell behind the magnet (PLAN 29c).
  *
  * And the rim is open. The old projection was a closed box, so every source
@@ -474,8 +478,8 @@ fn at(q: vec2i, m: i32) -> vec2f {
       velocity halved).
       k = A.a.x / h², with h in gap units: A.a.x is 12ν/G², the liquid's
       kinematic viscosity over G², G the metres in a unit of the gap field
-      (lib/turntable.ts DISH_GAP_FIELD_METRES, PLAN 38r: a fifth of a
-      metre at the 6 mm rest gap, the plate's width, as it was written), so the drag is in real seconds whatever
+      (lib/turntable.ts DISH_GAP_FIELD_METRES, a fifteenth of a metre at
+      the 2 mm rest gap: PLAN 38r), so the drag is in real seconds whatever
       grid or look clock the plate runs at.
 
       Three snapshots of the velocity: \`prev\` before any of this step's
@@ -790,7 +794,9 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var<storage, read> mob: array<f32>;
 @group(0) @binding(5) var<storage, read_write> bc: array<f32>;
 ${ROWS0}
+// Zero for a fine cell past the grid: an odd level's last coarse row or column covers one fine cell (fluid/core.ts, the levels).
 fn res0(x: i32, y: i32, n: i32) -> f32 {
+  if (!hsIn(x, y, n)) { return 0.0; }
   let mi = mob[x + y * n];
   if (mi < 0.0) { return 0.0; }
   let s = hsSums0(x, y, n, mi);
@@ -799,7 +805,7 @@ fn res0(x: i32, y: i32, n: i32) -> f32 {
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -850,19 +856,29 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 fn fineFace(x: i32, y: i32, axis: i32, n: i32) -> f32 {
   let qx = x + select(0, 1, axis == 0);
   let qy = y + select(0, 1, axis == 1);
-  if (!hsIn(qx, qy, n)) { return 0.0; }
+  if (!hsIn(x, y, n) || !hsIn(qx, qy, n)) { return 0.0; }
   if (A.a.y > 0.5) { return hsHarm(abs(mf[x + y * n]), abs(mf[qx + qy * n])); }
   return ff[axis * n * n + x + y * n];
 }
 // One row's conductance from a coarse centre to the next: three fine faces in series.
+// A fine face is zero only off the grid. No middle face, no next coarse cell: zero. No
+// third face, on an odd level's last row or column (fluid/core.ts, the levels), the
+// next coarse cell is the one fine cell beyond the middle face, and the row ends at
+// its centre: two faces in series, not three. Read as a face of 1e-20 instead, the
+// edge column's cells had one conductance of 2e-20 and nothing else, the sweeps set
+// their pressure to the residual over it, and the prolongation laid that on the fine
+// cells at the dish's edge: in the 2 mm gap on 130², the flux round a lifted press
+// grew 3% a step from nothing, to 6,000 times the press's own flux by the 300th step.
 fn series(a: f32, b: f32, c: f32) -> f32 {
   if (b <= 0.0) { return 0.0; }
-  return 1.0 / (0.5 / max(a, 1e-20) + 1.0 / b + 0.5 / max(c, 1e-20));
+  var r = 0.5 / max(a, 1e-20) + 1.0 / b;
+  if (c > 0.0) { r += 0.5 / c; }
+  return 1.0 / r;
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -873,10 +889,11 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
             + series(fineFace(x + 1, y, 1, n), fineFace(x + 1, y + 1, 1, n), fineFace(x + 1, y + 2, 1, n));
   fcOut[i] = east;
   fcOut[nc * nc + i] = north;
+  // A fine cell past an odd level's edge is not there, so it is not open either (fineFace, and fluid/core.ts on the levels).
   let a = mf[x + y * n];
-  let b = mf[x + 1 + y * n];
-  let c = mf[x + (y + 1) * n];
-  let d = mf[x + 1 + (y + 1) * n];
+  let b = select(1.0, mf[x + 1 + y * n], x + 1 < n);
+  let c = select(1.0, mf[x + (y + 1) * n], y + 1 < n);
+  let d = select(1.0, mf[x + 1 + (y + 1) * n], x + 1 < n && y + 1 < n);
   let nOpen = select(0, 1, a < 0.0) + select(0, 1, b < 0.0) + select(0, 1, c < 0.0) + select(0, 1, d < 0.0);
   mc[i] = select(1.0, -1.0, nOpen >= 1);
 }`,
@@ -911,14 +928,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(6) var<storage, read_write> bc: array<f32>;
 ${ROWS}
 fn res(x: i32, y: i32, n: i32) -> f32 {
-  if (cell[x + y * n] < 0.0) { return 0.0; }
+  if (!hsIn(x, y, n) || cell[x + y * n] < 0.0) { return 0.0; }
   let s = hsRowSums(x, y, n);
   return b[x + y * n] - (s.x * p[x + y * n] - s.y);
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -939,7 +956,7 @@ fn ec(x: i32, y: i32, k: i32) -> f32 { return e[clamp(x, 0, k - 1) + clamp(y, 0,
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let k = n / 2;
+  let k = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= n * n) { return; }
   if (m[i] < 0.0) { return; }
@@ -961,7 +978,7 @@ fn ec(x: i32, y: i32, k: i32) -> f32 { return e[clamp(x, 0, k - 1) + clamp(y, 0,
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
-  let k = n / 2;
+  let k = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= n * n) { return; }
   if (mob[i] < 0.0) { return; }

@@ -62,7 +62,7 @@
  *     under a body force is Darcy's, f · h² / 12μ (wgsl/thinGap.ts, the
  *     header). hsPrep reads every body force as the speed it drives the
  *     *reference* liquid to at the rest gap (Thin Gap's default Thickness,
- *     ν_ref = 22 mm²/s, a light oil; h₀ = 6 mm): the force is k_ref · Δv with
+ *     ν_ref = 22 mm²/s, a light oil; h₀ = 2 mm, PLAN 38r): the force is k_ref · Δv with
  *     k_ref = 12 ν_ref / h₀², a step adds k_ref Δt of it, and the drag
  *     k = 12 ν / h² of the cell's own liquid is taken implicitly, so a cell
  *     of ferrofluid alone settles at Δv · ν_ref / ν_ff, and a drop of it in
@@ -193,9 +193,9 @@ try {
   const K = await page.evaluate(() => ({
     bRef: lab.SPIKE_B_REF, radius: lab.MAGNET_RADIUS, E: lab.MAGNET_E, Bs: lab.MAGNET_BS, gain: lab.MAGNET_GAIN,
     cap: lab.MAGNET_CAP, cells: lab.MAGNET_CELLS, nuRef: lab.NU_REF, nuFf: lab.FERRO_NU, rho: lab.LIQUID_DENSITY,
-    restGap: lab.REST_GAP, L: lab.PLATE_METRES,
+    restGapMetres: lab.REST_GAP_METRES, L: lab.PLATE_METRES,
   }));
-  const L = K.L, h0 = K.restGap * L;
+  const L = K.L, h0 = K.restGapMetres;
   const bRefT = K.bRef * BR;                    // the tesla value of share 1
   const muRef = K.rho * K.nuRef, muFf = K.rho * K.nuFf;
   const perPsi = (EFH1.chi / (2 * MU0)) * bRefT * bRefT / K.E;   // J/m³ per unit of ψ, weak field
@@ -343,8 +343,9 @@ fn magnetRadius() -> f32 { return R; }
   const ratioLin = pull(far.fLin), ratioLang = pull(far.fLang);
   check('units: in the weak field the shader\'s ∇ψ, in the joules a unit of ψ is matched to, is the linear Kelvin force (its law\'s saturation allowed for); this holds ψ\'s units, not the gain, which cancels here', Math.abs(ratioLin * sat / (gainPhys / K.gain) - 1) < 0.05,
     `the linear law's pull over the solver's ${ratioLin.toFixed(3)} at Ferro Maze's magnet (b ${far.share.toFixed(3)}, where the solver's law is ${sat.toFixed(3)} of its quadratic), against GAIN_phys over MAGNET_GAIN, ${(gainPhys / K.gain / sat).toFixed(3)} with the saturation; the Langevin law's ${ratioLang.toFixed(3)}; the EFH1 drop's speed in the oil over the solver's drop's ${far.ratio.toFixed(3)}`);
-  check('MAGNET_GAIN is a tenth of GAIN_phys, the gain the derivation gives at EFH1\'s χ (PLAN 29c-2)', Math.abs(K.gain / gainPhys / 0.10 - 1) < 0.1,
-    `MAGNET_GAIN ${K.gain.toExponential(3)} is ${(K.gain / gainPhys).toFixed(3)} of GAIN_phys ${gainPhys.toExponential(3)} s (0.10 asked, within a tenth)`);
+  // 0.93 since PLAN 38r: GAIN_phys goes as h₀², and the 2 mm gap's is a ninth of the 6 mm gap's, at which this asked 0.10.
+  check('MAGNET_GAIN is the real pull, GAIN_phys, the gain the derivation gives at EFH1\'s χ at the 2 mm rest gap (PLAN 29c-2, 38r)', Math.abs(K.gain / gainPhys / 0.93 - 1) < 0.1,
+    `MAGNET_GAIN ${K.gain.toExponential(3)} is ${(K.gain / gainPhys).toFixed(3)} of GAIN_phys ${gainPhys.toExponential(3)} s (0.93 asked, within a tenth)`);
 
   // ── The solver's drop against the Darcy speed ──
   /*
@@ -353,10 +354,21 @@ fn magnetRadius() -> f32 { return R; }
     guard and not the physics is the drop's speed; and under a weak one
     (0.08), where the speed is Darcy's own. The centroid is read every two
     steps from the switch-on, so the drag time's rise shows beside the
-    steady speed, which is taken over the last twenty steps of sixty: the
-    ferrofluid's own drag time is ρh²/12μ_ff, 0.6 s, thirty-six steps, so
-    the first thirty are still the rise (the first form of this read ten
-    steps at thirty, a fifth under the steady speed).
+    steady speed. The window the speed is read over is set by the physics
+    at both ends: it opens three drag times after the switch-on (the
+    ferrofluid's own drag time is h²/12ν_ff, 0.07 s at the 2 mm gap, four
+    steps, so the rise is over by step twelve; it was 0.6 s, thirty-six
+    steps, in the 6 mm dish, PLAN 38r), and it closes when the drop's near
+    edge reaches the magnet's axis (its centroid within R of it). Past
+    that the pull over the drop is no longer one-signed, its mean goes to
+    nothing while the cells either side of the axis still pull inward, and
+    the drop packs itself under the magnet: the centroid goes on creeping
+    at a speed the mean pull no longer gives, which is not Darcy's law
+    failing but the derivation's premise (one pull over the drop) ending.
+    Read over the last twenty steps of sixty, as this did in the 6 mm dish
+    where the slow rise kept the drop short of the magnet, the 2 mm drop
+    had arrived (its speed 1.3 cells a step by step eight, 0.05 by step
+    sixty) and read 66% over a mean pull of nearly nothing.
 
     Whether the drop holds together under its drag is `npm run ferrodrag`'s
     measure, not this check's. The share is carried at the mixture's
@@ -366,7 +378,11 @@ fn magnetRadius() -> f32 { return R; }
     drop's mixture, share-weighted, at 0.81 of its core's speed with the
     rim's force read against the ferrofluid's own drag, 0.55 before).
   */
-  const N = 384, R = 0.022, D = 0.1, H = 0.2, STEPS = 60, EVERY = 2, LAST = 10;
+  const N = 384, R = 0.022, D = 0.1, H = 0.2, STEPS = 60, EVERY = 2;
+  // The ferrofluid's drag time in steps at the rest gap, and the window's first reading, three of them on.
+  const tauSteps = 60 * h0 * h0 / (12 * K.nuFf);
+  const FIRST = Math.ceil(3 * tauSteps / EVERY);
+  if (FIRST * EVERY >= STEPS - 4 * EVERY) throw new Error(`magnetgain: the rise (3τ = ${(3 * tauSteps).toFixed(0)} steps) leaves no window in ${STEPS} steps`);
   const measure = async (W) => {
     const run = await page.evaluate(async ({ N, R, D, W, H, STEPS, EVERY, alone }) => {
       const centroid = async () => {
@@ -407,8 +423,12 @@ fn magnetRadius() -> f32 { return R; }
       return { path, cells };
     }, { N, R, D, W, H, STEPS, EVERY, alone });
     const last = run.path[run.path.length - 1];
-    const window = run.path.slice(-LAST - 1);
-    const measured = (window[window.length - 1].x - window[0].x) / (LAST * EVERY / 60);   // plate/s toward the magnet
+    // The window: from the rise's end to the last reading with the drop's near edge short of the magnet's axis.
+    let END = run.path.length - 1;
+    while (END > FIRST && run.path[END].x > 0.5 + D - R) END--;
+    if (END - FIRST < 3) throw new Error(`magnetgain: the drop reached the magnet by step ${END * EVERY}, before the rise was over (step ${FIRST * EVERY})`);
+    const window = run.path.slice(FIRST, END + 1);
+    const measured = (window[window.length - 1].x - window[0].x) / ((END - FIRST) * EVERY / 60);   // plate/s toward the magnet
     // The prediction along the window: the shader's ∇ψ·x̂ over the drop's cells, their shape from the end, at each sampled centroid.
     const pred = [];
     for (const c of window) {
@@ -440,7 +460,7 @@ fn magnetRadius() -> f32 { return R; }
     const predicted = pred.reduce((t, p) => t + p.v, 0) / pred.length;
     const speeds = run.path.slice(1).map((c, i) => ((c.x - run.path[i].x) * N / EVERY).toFixed(2)).join(' ');
     console.log(`  Magnet ${W} at depth ${H}, ${D} of the plate from a drop r ${R} (${(R * L * 1e3).toFixed(1)} mm): the centroid's speed every ${EVERY} steps, cells a step: ${speeds}.`);
-    console.log(`    Over the last ${LAST * EVERY} steps ${fmt(measured, 4)} plate/s (${(measured * L * 100).toFixed(2)} cm/s), ${(measured * N / 60).toFixed(2)} cells a step; the pull asked ${pred.map((p) => fmt(p.asked, 3)).join(', ')} plate/s (∇ψ ${fmt(pred[0].dpsi, 0)} to ${fmt(pred[pred.length - 1].dpsi, 0)} per plate), its steepest cell ${fmt(Math.max(...pred.map((p) => p.steepest)), 3)} plate/s, Darcy's drop ${fmt(predicted, 4)} plate/s.`);
+    console.log(`    Over steps ${FIRST * EVERY} to ${END * EVERY} (the rise over at 3τ, ${(3 * tauSteps).toFixed(0)} steps; the drop's edge at the magnet's axis after) ${fmt(measured, 4)} plate/s (${(measured * L * 100).toFixed(2)} cm/s), ${(measured * N / 60).toFixed(2)} cells a step; the pull asked ${pred.map((p) => fmt(p.asked, 3)).join(', ')} plate/s (∇ψ ${fmt(pred[0].dpsi, 0)} to ${fmt(pred[pred.length - 1].dpsi, 0)} per plate), its steepest cell ${fmt(Math.max(...pred.map((p) => p.steepest)), 3)} plate/s, Darcy's drop ${fmt(predicted, 4)} plate/s.`);
     return { measured, predicted, asked: Math.max(...pred.map((p) => p.asked)), steepest: Math.max(...pred.map((p) => p.steepest)) };
   };
   const strong = await measure(0.4);

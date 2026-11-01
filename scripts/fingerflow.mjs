@@ -30,10 +30,13 @@
  *      back the other way at 0.7 to 1.4 times U·a²/d², the dipole of the
  *      flow past a disc in a thin layer: a solid moving through the
  *      liquid, not a push spread over the plate.
- *   2. The colour on the stroke's path goes the stroke's way: the bands'
- *      centre of mass within 0.02 of the path moves at least 2% of the
- *      plate along it (2.2% measured in software, 2.8% on the carries' old
- *      faces), where left alone it moves under 0.5%.
+ *   2. The colour on the stroke's path goes the stroke's way, as far as
+ *      the real liquid carries it: a stripe laid along the path alone moves
+ *      at least three quarters and under twice the drift the potential
+ *      flow round the hand gives it (darcyDrift; 0.062 of the plate), where
+ *      left alone it moves under 0.5%. (Until PLAN 38r part 2, the bands'
+ *      centre of mass within 0.02 of the path, held to 2%: below, at the
+ *      check, why that read the window and not the colour.)
  *   3. A pool of ferrofluid on the path is carried along it by the flow
  *      alone, at least 6% of the plate (13.8% measured; the Finger's
  *      hand-written carry was held to 2% in `npm run ferrohands`), and
@@ -71,6 +74,51 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  Check 2's stripe and what real liquid does to it. A stripe of colour 0.04
+  of the plate wide along the stroke's path, from just ahead of where the
+  hand is put down (0.3, its radius 0.054) to past where it stops (0.7).
+
+  Between two glasses the liquid round a solid moving through it is a
+  potential flow (check 1 holds the solver to it): round a disc of radius a
+  moving at U, u = U·a²·(x² − y², 2xy)/r⁴ from its centre. Every particle
+  of liquid it passes is pushed ahead and round it and left behind further
+  on than it was (Darwin's drift), and the nearer the path, the further:
+  on the path itself the front's stagnation point carries it all the way.
+  darcyDrift follows the stripe's particles through that flow as the hand
+  goes from 0.3 to 0.7 (fourth-order Runge–Kutta, 1600 steps; a particle
+  the disc has swallowed between two steps is set back on its rim) and
+  returns the mean distance they moved along the stroke, in plates: 0.062
+  for this stripe and hand. The solver's colour is read the same way, as
+  the stripe's whole centre of mass before and after, wherever the colour
+  went, so the two are the same measure: the colour's own drift, the
+  feature, not what a window across the path happens to hold.
+*/
+const STRIPE = { w: 0.02, x0: 0.36, x1: 0.75 };
+function darcyDrift(a, from = 0.3, to = 0.7, steps = 1600, n = 600) {
+  const px = [], py = [];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const x = (i + 0.5) / n, y = (j + 0.5) / n;
+    if (Math.abs(y - 0.5) < STRIPE.w && x > STRIPE.x0 && x < STRIPE.x1) { px.push(x); py.push(y); }
+  }
+  const x0 = px.slice(), U = to - from, h = 1 / steps;
+  const vel = (x, y, xc) => { const dx = x - xc, dy = y - 0.5, r2 = dx * dx + dy * dy, r4 = r2 * r2 + 1e-30; return [U * a * a * (dx * dx - dy * dy) / r4, U * a * a * 2 * dx * dy / r4]; };
+  for (let k = 0; k < steps; k++) {
+    const xc = from + U * k * h, xm = xc + U * h / 2, xe = xc + U * h;
+    for (let p = 0; p < px.length; p++) {
+      const x = px[p], y = py[p];
+      const [u1, v1] = vel(x, y, xc), [u2, v2] = vel(x + h / 2 * u1, y + h / 2 * v1, xm);
+      const [u3, v3] = vel(x + h / 2 * u2, y + h / 2 * v2, xm), [u4, v4] = vel(x + h * u3, y + h * v3, xe);
+      let nx = x + h / 6 * (u1 + 2 * u2 + 2 * u3 + u4), ny = y + h / 6 * (v1 + 2 * v2 + 2 * v3 + v4);
+      const dx = nx - xe, dy = ny - 0.5, r = Math.hypot(dx, dy);
+      if (r < a) { nx = xe + dx / r * a; ny = 0.5 + dy / r * a; }
+      px[p] = nx; py[p] = ny;
+    }
+  }
+  let s = 0; for (let p = 0; p < px.length; p++) s += px[p] - x0[p];
+  return s / px.length;
+}
+
 const { page, close } = await openLab();
 try {
   /*
@@ -79,18 +127,20 @@ try {
     `liquid` is what sits on the path besides the colour; `speed` is the
     hand's cells a step on the app's 192-cell plate.
   */
-  const run = (hand, liquid, speed) => page.evaluate(async ({ hand, liquid, speed }) => {
+  const run = (hand, liquid, speed) => page.evaluate(async ({ hand, liquid, speed, STRIPE }) => {
     const N = 384, L = 192;
     const look = lab.look('classic').settings;
     const DT = look.globalSpeed * 0.2;
     const over = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, advection: look.advection, oilTension: liquid === 'oil' ? 0.5 : 0, ferroLabyrinth: liquid === 'maze' ? 0.6 : 0 };
     await lab.create(N, L);
     const s = lab.solver();
-    // Bands of colour across the stroke, a twentieth of the plate apart, in the dish.
+    // Bands of colour across the stroke, a twentieth of the plate apart, in the
+    // dish; or, for check 2, one stripe of colour along the stroke's path alone
+    // (STRIPE), ahead of where the hand is put down.
     const lay = new Array(L * L * 4).fill(0);
     for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
       const x = (i + 0.5) / L, y = (j + 0.5) / L;
-      if (Math.hypot(x - 0.5, y - 0.5) > 0.45 || Math.floor(x * 20) % 2) continue;
+      if (liquid === 'stripe' ? !(Math.abs(y - 0.5) < STRIPE.w && x > STRIPE.x0 && x < STRIPE.x1) : (Math.hypot(x - 0.5, y - 0.5) > 0.45 || Math.floor(x * 20) % 2)) continue;
       const k = (i + j * L) * 4; lay[k] = 1; lay[k + 3] = 1;
     }
     lab.addDye(lay); lab.flush(DT);
@@ -100,21 +150,22 @@ try {
     await lab.step(30, over);
     const read = async () => {
       const d = await lab.field('dye');
-      let bs = 0, bw = 0, dye = 0;
+      let bs = 0, bw = 0, dye = 0, dx = 0;
       for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
         const k = (i + j * L) * 4, x = (i + 0.5) / L, y = (j + 0.5) / L;
-        dye += d[k];
+        dye += d[k]; dx += d[k] * x;
         if (Math.abs(y - 0.5) < 0.02 && x > 0.2 && x < 0.8) { bs += d[k] * x; bw += d[k]; }
       }
       let m = 0, mx = 0;
-      if (liquid !== 'none') {
+      const solo = liquid === 'none' || liquid === 'stripe';
+      if (!solo) {
         const f = liquid === 'oil' ? await s.readChemistry('mix') : await lab.phase();
         const n = f.n, stride = liquid === 'oil' ? 4 : 1;
         for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const v = f.data[(x + y * n) * stride]; m += v; mx += v * (x + 0.5) / n; }
       }
       // A pool or a drop that was poured and is not there is a broken plate, not a pool that did not move.
-      if (liquid !== 'none' && !(m > 0)) throw new Error(`no ${liquid} on the plate to measure`);
-      return { band: bs / bw, dye, mass: m, cx: m > 0 ? mx / m : 0 };
+      if (!solo && !(m > 0)) throw new Error(`no ${liquid} on the plate to measure`);
+      return { band: bw > 0 ? bs / bw : 0, dye, dyeX: dye > 0 ? dx / dye : 0, mass: m, cx: m > 0 ? mx / m : 0 };
     };
     const t0 = await read();
     const r = Math.round(7 * (L / 128));
@@ -159,7 +210,7 @@ try {
     const h = lab.REST_GAP_METRES;
     const tau = h * h / (12 * lab.thinGapViscosity(over.gapThickness));
     return { t0, t1, t2, under, beside, still, speed, a: r - lab.handEdge(L) / 2, d: L / 6, tau, half: 30 / 60 };
-  }, { hand, liquid, speed });
+  }, { hand, liquid, speed, STRIPE });
 
   /*
     A full pool drawn as the pointer draws it, for check 7. The pool is as
@@ -214,7 +265,7 @@ try {
 
   const got = {};
   const only = process.env.FF_RUNS ? process.env.FF_RUNS.split(',') : null;
-  for (const [name, hand, liquid, speed] of [['solid', 'solid', 'none', 2], ['solid fast', 'solid', 'none', 5], ['solid ferro', 'solid', 'ferro', 2], ['solid ferro fast', 'solid', 'ferro', 5], ['solid oil', 'solid', 'oil', 2], ['solid maze fast', 'solid', 'maze', 5], ['push ferro', 'push', 'ferro', 2], ['alone', 'none', 'ferro', 2]]) {
+  for (const [name, hand, liquid, speed] of [['solid', 'solid', 'none', 2], ['solid fast', 'solid', 'none', 5], ['solid ferro', 'solid', 'ferro', 2], ['solid ferro fast', 'solid', 'ferro', 5], ['solid oil', 'solid', 'oil', 2], ['solid maze fast', 'solid', 'maze', 5], ['push ferro', 'push', 'ferro', 2], ['alone', 'none', 'ferro', 2], ['stripe', 'solid', 'stripe', 2], ['stripe alone', 'none', 'stripe', 2]]) {
     if (only && !only.includes(name)) continue;
     const t = Date.now();
     const m = got[name] = await run(hand, liquid, speed);
@@ -259,9 +310,30 @@ try {
   */
   console.log(`  before (the old push on a thin gap): the bands ${pc(band(got['push ferro'] ?? { t0: {}, t1: {} }))}, the pool ${pc(moved(got['push ferro'] ?? { t0: {}, t1: {} }))}; under the hand ${(got['push ferro']?.under ?? NaN).toFixed(2)} cells a step`);
   // 2.
-  check('the colour on the stroke\'s path goes the stroke\'s way, where left alone it barely moves',
-    need('solid', 'alone') && band(got.solid) >= 0.02 && Math.abs(band(got.alone)) < 0.005,
-    need('solid', 'alone') ? `the bands within 0.02 of the path ${pc(band(got.solid))} of the plate along it; left alone ${pc(band(got.alone))}` : 'not run');
+  /*
+    The colour's own drift, against the real liquid's (STRIPE, darcyDrift).
+    This read the bands' centre of mass inside a window 0.02 either side of
+    the path, and held it to 2% of the plate: 2.2% on the 6 mm gap, 1.17%
+    on the 2 mm one (PLAN 38r part 2), though the stripe's colour itself
+    went further there (10.1%, software WebGPU). A window across the path is
+    not the colour on the path: the hand pushes what was in it out to the
+    sides, the bands beside the path flow in behind it, and what the window
+    holds is that exchange, which at 6 mm the liquid's own momentum after
+    the hand tipped forward (its drag time 0.14 s, 0.015 s at 2 mm). Laid
+    on the path alone and read wherever it goes, the colour is measured as
+    the real liquid would carry it: at least three quarters of Darcy's
+    drift and under twice it (a hand that swept the colour ahead of it as
+    a broom would carry the whole stripe to its end, over three times),
+    where left alone it moves under 0.5%.
+  */
+  {
+    const m = got.stripe, still = got['stripe alone'];
+    const darcy = m ? darcyDrift(m.a / 192) : NaN;
+    const drift = (r) => r.t2.dyeX - r.t0.dyeX;
+    check('the colour on the stroke\'s path goes the stroke\'s way, as far as a solid drawn through the liquid carries it, where left alone it barely moves',
+      need('stripe', 'stripe alone') && drift(m) >= 0.75 * darcy && drift(m) < 2 * darcy && Math.abs(drift(still)) < 0.005,
+      need('stripe', 'stripe alone') ? `a stripe along the path ${pc(drift(m))} of the plate along it, against ${pc(darcy)} in the potential flow round a disc of the hand's radius (${(drift(m) / darcy).toFixed(2)}×, bar 0.75 to 2); left alone ${pc(drift(still))}; the bands within 0.02 of the path, the old window, ${pc(band(got.solid ?? { t0: {}, t1: {} }))}` : 'not run');
+  }
   // 3.
   check('a pool of ferrofluid on the path is carried along it by the flow, as far under a fast stroke, and on a Labyrinth',
     need('solid ferro', 'solid ferro fast', 'solid maze fast', 'alone') && moved(got['solid ferro']) >= 0.06 && moved(got['solid ferro']) < 0.4 &&
