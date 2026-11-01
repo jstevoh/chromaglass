@@ -931,7 +931,10 @@ export class FluidSimulation {
     if (count <= 0 && this.prevCount <= 0) return;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
-    for (let k = 0; k < count; k++) {
+    // A thin gap's carries keep a bubble's colour, so no ring and no fill, only the lists (PLAN 15g-8b).
+    const thin = this.gpu.thinGapLive;
+    if (thin) this.fillingHoles = [];
+    for (let k = 0; k < count && !thin; k++) {
       // The packed block, because it carries the fade as its opacity and the
       // Bubble record does not — a bubble part-way in has taken part of the
       // dye, and the ring has to match or the plate gains colour.
@@ -1001,7 +1004,7 @@ export class FluidSimulation {
       // and takes its log: going out to a colour and back would lose the mix.
       if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.rows.rim(b.y, R);
     }
-    this.fillPoppedHoles(packed, count, dye, N);
+    if (!thin) this.fillPoppedHoles(packed, count, dye, N);
     if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
     this.coverPacked.set(packed.subarray(0, count * 4));
     this.coverCount = count;
@@ -2160,16 +2163,15 @@ export class FluidSimulation {
       }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
-    // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
-    // no dye, only the gap given back, which the shader never opens past rest.
-    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
-    // The rhythm sheet's own motion (pressKick): solved a step, its change laid as the gap's,
-    // with the spring the shader will give the gap this step taken on the sheet too (lib/sheet.ts).
+    // The kicks' presses, held against the spring, let go (`pressKick`): only the gap
+    // given back, never past rest.
+    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring);
+    // The rhythm sheet (pressKick): solved a step, laid as the gap's change, with the spring (lib/sheet.ts).
     if (this.sheet.live) {
       if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
       if (!this.sheetGap) this.sheetGap = new Float32Array(this.size * this.size);
       const depth = this.sheet.closed, cells = this.sheet.pressedCells;
-      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap) > 0) {
+      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap, this.lastStep?.plateCurve ?? 0) > 0) {
         this.sheetLaid = true;
         this.dirty = true;
         // As a stroke counts them (applySquish): the cells a held finger closes, and the depth.
@@ -3247,14 +3249,11 @@ export class FluidSimulation {
     const regStepScale = this.seedMean !== null ? 1 / Math.max(0.08, Math.min(1, Math.max(0, this.dt) / 0.05)) : 1;
     const regulatorEvap = Math.min(0.28, Math.min(0.12, over * over * 0.6) * regStepScale);
     /*
-      Only ever upward, and H6 tried the other direction and took it out
-      again. A bubble's exclusion is a multiply, so it destroys the dye it
-      removes, and making this loop symmetric was the first attempt at
-      keeping the plate's colour. It never engaged: the deficit term is
-      quadratic, so a plate 10% under its budget contributed 0.0001. The dye
-      goes back where it physically went instead — a ring at the bubble's
-      rim, in `depositBubbleRims` — which conserves by construction because
-      both halves read the same mirror.
+      Only ever upward. H6 made it symmetric to win back the dye a bubble's
+      multiply destroyed, and it never engaged: the deficit term is
+      quadratic, so a plate 10% under its budget gave 0.0001. A bubble's dye
+      goes where its liquid goes in the thin carries now (PLAN 15g-8b), and
+      off a thin gap back to its rim (`depositBubbleRims`).
     */
     /*
       Per second of the plate's own time, not per step.

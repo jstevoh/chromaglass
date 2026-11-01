@@ -2273,3 +2273,46 @@ moved: every look's own value is where it was, so a look should open exactly as 
 3. Evolve on for five minutes: it should wander the widened dials no further than before.
 4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
    plate that blows up at a top.
+
+## 101. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+
+`filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
+colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
+(right) in the project's shared files, `film-physics-38m/` (`contact.png` has all six).
+
+1. Open Soap Film, then turn Film Physics to 1 (Design desk, camera group). The thin dye's
+   fringes go from loud multi-hue rings to straw, gold, olive-grey and blue-grey: what a real
+   film shows, and quieter (saturation 0.137 to 0.116 on the lab's plate).
+2. Macro Bead, Lacing Run, Oil & Water: zoom to a bubble. Its film tint changes from lilac and
+   pink to the soap film's own colours; small on the projected plate, plain in the closeup.
+3. Pick per look: keep the rainbow, take the real colours, or something between. A look that
+   should be real by its name (Soap Film) is the first candidate for 1.
+
+## 102. Every edge lit from beneath (PLAN 38h-2)
+
+`npm run nolight` lines 9 to 12 show the light from above gone in the lab; only the Mac
+shows whether the closeup still reads. Most of it is the closeup (the macro camera): the
+projected plate changes only where a look has the Second Lamp (its glint on bubbles is gone)
+or dyed beads on the lamp ground (a filter now, darker).
+
+1. Zoom into any look with bubbles: each bubble is a dark ring round a clear middle, as a
+   bubble photographed over a light box is; no white dots, no lit crescent.
+2. The closeup with Macro Cells and Macro Relief up: every cell a dark ring, no white glints,
+   no lit side. Macro Relief turns the rings from nothing to bold.
+3. Lamp Motion and Light Play moving: no edge in the closeup follows the lamp any more.
+4. Bad: a closeup that went dull where its sparkle was liked, or cells that read as black
+   holes; Glossiness steepens the surface the relief reads.
+
+## 103. Depth in the closeup's bubbles (PLAN 38h-7)
+
+`npm run closeupdepth` checks the optics in the lab; only the Mac shows whether the closeup
+now reads in depth beside the photos (drops/references).
+
+1. Zoom into any look with bubbles: each bubble a bright clear middle, the colour round it
+   squeezed into its rim, a thin dark band, and light again at the very edge.
+2. Light Play from 0 to 1: a soft glint grows on each bubble's top-left side; the projected
+   plate does not change.
+3. Bad: bubbles that read as white holes, or a glint that looks pasted on.
+4. (Part 2) Zoom all the way in on a small bubble: its rim a clean circle at any zoom, no
+   square corners or steps; a small bubble's middle the liquid's colour, paler, with a
+   bright glint; a big one's middle the clear lamp.

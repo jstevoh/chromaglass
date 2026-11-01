@@ -39,17 +39,41 @@
  *        Focus 0.2 the same pixels the other way, which a flat gain cannot do
  *   8.   no grain: the same plate drawn at two times of the clock is the same
  *        picture, byte for byte
- *   9.   the shadowgraph is the whole column's, one term (PLAN 38h-3): a clear
- *        pour of glycerine, no dye in it and no oil, is a lens out of focus
- *        as line 7 asks of the oil, and brightens nothing in focus. And as
- *        strong a lens as the oil's for its index step: the two drops are the
- *        same size, so the summed |ln T| each makes just off focus goes as glycerine's
- *        0.142 over water to the oil's 0.8 of 0.137 (1.29), within a quarter. The dye's shadowgraph and the oil's were
- *        drawn apart, the dye's only where the dye itself sloped and the
- *        oil's from the oil alone, so on main the pour drew its lens only
- *        where the wash happened to slope: 301 px against the oil's 1944
  *
- * Every number asked is printed. Run against main before this change it
+ * And the light at the edges (PLAN 38h-2), which was a lamp above the glass:
+ *
+ *   9-10. the oil drops, clear and dyed, on the lamp through the wash: no
+ *        pixel brighter than the wash without them (the rings' rim glowed
+ *        15% of the plate; a dyed drop added its colour as light on the lamp
+ *        ground too), and their band darker; the clear ones' rims also to
+ *        the camera, where the glow was not under the projector's band
+ *   11.  the camera's dye rims and its line between two dyes, where the dye
+ *        is light (Lamp Ground 0): nothing brighter than with both off (the
+ *        rim was lit on the lamp's side, the line added a quarter of white)
+ *   12.  where the two lamps stand draws nothing: the plate, the camera's
+ *        view, the closeup's relief and the camera's bubbles, the same with
+ *        both lamps moved to opposite corners and both to one corner; the relief and the bubbles
+ *        each shown to draw something, so a view that drew nothing cannot pass
+ *
+ * Main before 38h-2 read 8/12 on these (lines 9 to 12 red: the drops 2 and
+ * 91 levels over, 25 on the clear drops' rims to the camera, the camera's
+ * edges 206, the lamps' moves 232 levels on the camera's view, 145 on the
+ * closeup, 138 on the bubbles).
+ *
+ * And the shadowgraph (PLAN 38h-3):
+ *
+ *   13.  it is the whole column's, one term: a clear pour of glycerine, no
+ *        dye in it and no oil, is a lens out of focus as line 7 asks of the
+ *        oil, and brightens nothing in focus. And as strong a lens as the
+ *        oil's for its index step: the two drops are the same size, so the
+ *        summed |ln T| each makes just off focus goes as glycerine's 0.142
+ *        over water to the oil's 0.8 of 0.137 (1.29), within a quarter. The
+ *        dye's shadowgraph and the oil's were drawn apart, the dye's only
+ *        where the dye itself sloped and the oil's from the oil alone, so on
+ *        main the pour drew its lens only where the wash happened to slope:
+ *        301 px against the oil's 1944
+ *
+ * Every number asked is printed. Run against main before 38h it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
  * sheen, the dish's and the rims' glow and the grain each over the plate
  * (the PR's body has the numbers). A branch with the dish's, the rims' and
@@ -72,7 +96,31 @@ const POUR = { x: 0.72, y: 0.72, r: 0.09 };
 const NEAR = 0.56;
 
 const { page, close } = await openLab();
-let r;
+/** Where the lamps stand for line 12: the middle, and opposite corners. */
+/*
+  Where the lamps stand for line 12: the middle, then opposite corners, then
+  both in one corner. Opposite corners alone are point-mirrored, so a term
+  lit from above that was linear in the lamps' directions and weighted alike
+  would cancel there (the review of this check); in one corner it cannot.
+*/
+const LAMPS = [{ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, { x: 0.1, y: 0.9, x2: 0.9, y2: 0.1 }, { x: 0.1, y: 0.9, x2: 0.1, y2: 0.9 }];
+/*
+  The camera's leg of line 9: three round beads on the middle row (so the
+  plate's y, up or down, does not matter), seen in the closeup (Macro 1,
+  where the drops are the camera's), and only the ring 0.8 to 1.1 of each
+  radius read, where the old glow was (25 levels over on main; from 0.9 out
+  it read 0, the camera's contact line darkening it). A round drop is
+  rightly brighter inside its rim, a ball gathering the light behind it
+  toward a camera focused past it: 1 + 0.3 (1 - r)^2, 1.012 at 0.8 of the
+  radius. So the bar there is that gain of the wash and a level each side
+  for rounding (FOCUS_EDGE): the branch reads 3 of its 4. On the plate the old ring's glow sat under the
+  projector's black band and showed one pixel 2 levels over; to the camera,
+  unmasked, it read up to 64.
+*/
+const CAM_BEADS = [[0.3, 3], [0.55, 5], [0.75, 2.5]];
+/** A round drop's own brightening at 0.8 of its radius, to the camera (the beads' block, `focus`). */
+const FOCUS_EDGE = 0.3 * 0.2 * 0.2;
+let r, r2;
 try {
   r = await page.evaluate(async ({ N, SIZE, OIL, POUR, DARK, NEAR }) => {
     await lab.create(N);
@@ -150,6 +198,84 @@ try {
     out.pourNear = await shot({ projectorFocus: NEAR });
     return out;
   }, { N, SIZE, OIL, POUR, DARK, NEAR });
+  r2 = await page.evaluate(async ({ N, SIZE, LAMPS, CAM_BEADS }) => {
+    await lab.create(N);
+    const base = { lampGround: 1, edgeRelief: 0.6, saturationBoost: 1, lampHotspot: 0 };
+    const shot = async (over, cam = {}) => Array.from(await lab.render(SIZE, { ...base, ...over }, { time: 3, ...cam }));
+    lab.dye(0.5, 0.5, 1.2, [0.35, 0.35, 0.35], 0.6);
+    lab.flush(); await lab.step(2);
+    /*
+      The oil drops on the lamp through the wash: a lens over a level wash
+      shows the same wash, so any pixel brighter than the wash without them
+      is light the drops made. Three round ones of 2.5 to 5 cells (the rings
+      the bead field draws), and the same three as dyed drops, the mask as
+      the field rasters it (npm run droplens draws it the same way).
+    */
+    const beads = [{ x: 0.3 * N, y: 0.5 * N, r: 3 }, { x: 0.6 * N, y: 0.4 * N, r: 5 }, { x: 0.68 * N, y: 0.7 * N, r: 2.5 }];
+    const ringMask = new lab.BeadField(N);
+    for (const b of beads) ringMask.beads.push({ age: 5, seed: 0.5, ...b });
+    ringMask.dirty = true;
+    const px = new Uint8ClampedArray(SIZE * 2 * SIZE * 4);
+    lab.rasterDrops(beads.map((b) => ({ age: 5, seed: 0.5, color: [1, 0.48, 0], ...b })), N, SIZE, px, new Float32Array(SIZE * SIZE), new Int32Array(SIZE * SIZE), 1);
+    const dropMask = new OffscreenCanvas(SIZE * 2, SIZE);
+    dropMask.getContext('2d').putImageData(new ImageData(px, SIZE * 2, SIZE), 0, 0);
+    const camMask = new lab.BeadField(N);
+    for (const [x, r] of CAM_BEADS) camMask.beads.push({ age: 5, seed: 0.5, x: x * N, y: 0.5 * N, r });
+    camMask.dirty = true;
+    const out = {
+      camRings: await shot({ beads: 0.8 }, { macroAmount: 1, beadMask: camMask }),
+      camRingsOff: await shot({ beads: 0 }, { macroAmount: 1 }),
+      beadsOff: await shot({ beads: 0 }),
+      rings: await shot({ beads: 0.8 }, { beadMask: ringMask }),
+      drops: await shot({ beads: 0.8, beadDrops: 1 }, { beadMask: dropMask }),
+    };
+    // The two pools of the first plate, and a row of bubbles across them.
+    lab.dye(0.3, 0.62, 0.13, [1.4, 0.3, 0.2], 1.2);
+    lab.dye(0.4, 0.35, 0.1, [0.2, 0.7, 1.3], 1.0);
+    lab.vel(0.35, 0.5, 0.15, [0.01, -0.006, 0, 0]);
+    lab.flush(); await lab.step(40);
+    const bub = [[0.3, 0.6, 5], [0.42, 0.4, 8], [0.6, 0.55, 4]];
+    lab.solver().setBubbles(new Float32Array(bub.flatMap(([u, v, c]) => [u, v, c / N, 1])), bub.length, 0.25,
+      new Float32Array(bub.flatMap((_, i) => [0, 0, ((i + 0.5) / bub.length) * Math.PI * 2 * 0.999, 0])));
+    await lab.step(2, { bubbleClear: 1 });
+    /*
+      The camera's rims and lines, where the dye is light (Lamp Ground 0, a
+      black ground): on the lamp ground the dye's own colour is not what the
+      plate shows, so light added to it there would pass unseen. Glossiness
+      at 1 steepens the relief four times, so the rims have slope to show.
+    */
+    const dyeLight = { lampGround: 0, glossiness: 1 };
+    const cam = { macroAmount: 0.02 };
+    out.camEdges = await shot({ ...dyeLight, edgeRelief: 1, boundaryContrast: 1 }, cam);
+    out.camFlat = await shot({ ...dyeLight, edgeRelief: 0, boundaryContrast: 0 }, cam);
+    /*
+      Where the lamps stand. Both on (Second Lamp 1), Edge Relief, the line,
+      Light Play and the closeup's relief up, the hot spot off (it is the
+      lamp lever's, in stage coordinates, and never followed the lamp): the
+      same plate with the two lamps moved to opposite corners. Light from
+      beneath comes up the axis whatever the bulb's place, so the picture is
+      the same; light from above lit the sides facing the lamp. The cells
+      on (Macro Cells 1): the closeup's relief is their menisci and the
+      field's own slope, and on this plate the field alone is too gentle
+      for the camera's cone to lose any light.
+    */
+    const lit = { secondLamp: 1, edgeRelief: 1, boundaryContrast: 1, lightPlay: 1, macroRelief: 1, macroCells: 1 };
+    const views = {
+      plate: { macroAmount: 0 },
+      camera: { macroAmount: 0.02 },
+      closeup: { zoom: 3, macroAmount: 1, cx: 0.35, cy: 0.5 },
+      bubbles: { zoom: 2, macroAmount: 1, cx: 0.42, cy: 0.5, bubbles: 0.8 },
+    };
+    out.moved = {};
+    for (const [name, v] of Object.entries(views)) {
+      out.moved[name] = [];
+      for (const lamp of LAMPS) out.moved[name].push(await shot(lit, { ...v, lamp }));
+    }
+    // That the closeup's relief and the camera's bubbles draw something at all.
+    out.reliefOff = await shot({ ...lit, macroRelief: 0 }, { ...views.closeup, lamp: LAMPS[0] });
+    out.bubblesOff = await shot(lit, { ...views.bubbles, bubbles: 0, lamp: LAMPS[0] });
+    return out;
+  }, { N, SIZE, LAMPS, CAM_BEADS });
 } finally {
   await close();
 }
@@ -273,6 +399,37 @@ const oilThere = up8 > 20 && down8 > 20;
 }
 
 {
+  const lampR = top(r2.beadsOff);
+  // The closeup shows the middle third of the plate across the frame (1.5 plate widths a frame at zoom 1).
+  const PER = SIZE * 1.5;
+  const onRim = (u, v) => CAM_BEADS.some(([x, rc]) => {
+    const d = Math.hypot((u - 0.5) * SIZE / PER + 0.5 - x, (v - 0.5) * SIZE / PER) / (rc / N);
+    return d >= 0.8 && d <= 1.1;
+  });
+  const rimPx = (() => { let n = 0; for (let i = 0; i < P; i++) if (onRim((i % SIZE + 0.5) / SIZE, (Math.floor(i / SIZE) + 0.5) / SIZE)) n++; return n; })();
+  for (const [i, key, name] of [[9, 'rings', 'the oil drops (Beads 0.8)'], [10, 'drops', 'the dyed drops (Bead Drops 1)']]) {
+    const d = compare(r2[key], r2.beadsOff);
+    const c = i === 9 ? compare(r2.camRings, r2.camRingsOff, (u, v) => onRim(u + 0.5 / SIZE, v + 0.5 / SIZE)) : null;
+    check(`${i}. ${name} on the lamp: no pixel brighter than the wash without them (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+${c ? `; to the camera, no pixel of their rims brighter than a ball's own gathering there (${(FOCUS_EDGE * 100).toFixed(1)}% of the wash, and 2 levels), over a tenth of the rims darker by ${DARK}+` : ''}`,
+      lampR > 100 && lampR < 250 && d.over <= SLACK && d.dark > DOES && (!c || (rimPx > 200 && c.n === rimPx && c.over <= FOCUS_EDGE * lampR + 2 && c.dark > 0.1)),
+      `brightest by ${d.over} levels; ${pct(d.dark)} darker; the wash ${lampR}${c ? `; the camera's rims (${c.n} px) brightest by ${c.over}, ${pct(c.dark)} darker` : ''}`);
+  }
+}
+{
+  const d = compare(r2.camEdges, r2.camFlat);
+  check(`11. the camera's dye rims and two-dye lines (Edge Relief 1, Boundary Contrast 1): no pixel brighter than with them off (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+`,
+    top(r2.camFlat) > 100 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${top(r2.camFlat)}`);
+}
+{
+  const most = (a, b) => { let m = 0; for (let i = 0; i < a.length; i++) if ((i & 3) !== 3) m = Math.max(m, Math.abs(a[i] - b[i])); return m; };
+  const moved = Object.entries(r2.moved).map(([k, [a, ...rest]]) => [k, Math.max(...rest.map((b) => most(a, b)))]);
+  const relief = compare(r2.reliefOff, r2.moved.closeup[0]).dark, bubbles = compare(r2.bubblesOff, r2.moved.bubbles[0]);
+  const bubblesDo = Math.max(bubbles.dark, compare(r2.moved.bubbles[0], r2.bubblesOff).dark);
+  check(`12. where the two lamps stand draws nothing: the plate, the camera's view, the closeup's relief and the camera's bubbles the same (by ${SLACK}) with both lamps moved to opposite corners and both to one corner, the relief and the bubbles each moving over ${pct(DOES)} of the picture`,
+    moved.every(([, m]) => m <= SLACK) && Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark) > DOES && bubblesDo > DOES,
+    `${moved.map(([k, m]) => `${k} ${m}`).join(', ')} levels; the relief moves ${pct(Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark))}, the bubbles ${pct(bubblesDo)}`);
+}
+{
   const inPour = (u, v) => Math.hypot(u - POUR.x, (1 - v) - POUR.y) < POUR.r * 1.3;
   let up = 0, down = 0, turn = 0, seen = 0;
   for (let i = 0; i < P; i++) {
@@ -306,7 +463,7 @@ const oilThere = up8 > 20 && down8 > 20;
   // What the optics predict: each lens as strong as its index step (glycerine 1.4746, the oil 0.8 of 1.47, over water's 1.333).
   const expect = (1.4746 - 1.333) / (0.8 * (1.47 - 1.333));
   const ratio = sPour / Math.max(1, sOil) / expect;
-  check(`9. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8, the other way at 0.2, over 90%), as strong as the oil's for its index step (within a quarter), and in focus brightens nothing (by over ${SLACK})`,
+  check(`13. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8, the other way at 0.2, over 90%), as strong as the oil's for its index step (within a quarter), and in focus brightens nothing (by over ${SLACK})`,
     up > 20 && down > 20 && seen > 20 && turn / seen > 0.9 && ratio > 0.75 && ratio < 1 / 0.75 && d.over <= SLACK,
     `${up} px brighter, ${down} darker at 0.8 (the oil's ${up8 + down8}); summed |ln T| at ${NEAR} ${sPour.toFixed(1)} against the oil's ${sOil.toFixed(1)}, ${ratio.toFixed(2)} of the ${expect.toFixed(2)} the index steps predict; ${turn} of ${seen} turn over at 0.2; in focus brightest by ${d.over} levels`);
 }
