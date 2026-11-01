@@ -2299,3 +2299,6 @@ now reads in depth beside the photos (drops/references).
 2. Light Play from 0 to 1: a soft glint grows on each bubble's top-left side; the projected
    plate does not change.
 3. Bad: bubbles that read as white holes, or a glint that looks pasted on.
+4. (Part 2) Zoom all the way in on a small bubble: its rim a clean circle at any zoom, no
+   square corners or steps; a small bubble's middle the liquid's colour, paler, with a
+   bright glint; a big one's middle the clear lamp.

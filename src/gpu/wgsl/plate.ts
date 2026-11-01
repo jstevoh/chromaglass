@@ -3442,7 +3442,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         and the softbox Light Play hangs in front. Out to the contact.
       */
       let wallB = 1.0 - smoothstep(1.0 - softB, 1.0, rr);
-      c = mix(c, c * wall.x + rimCol * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
+      c = mix(c, airColumn(c, rimCol, tB, R, rho) * wall.x + sqrt(rimCol * groundOf(bgColor)) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
       outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));

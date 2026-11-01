@@ -23,7 +23,7 @@
 export const SOFTBOX_TILT = 0.61;
 export const SOFTBOX_HALF = 0.35;
 /** The softbox's radiance against the light pad's at Light Play 1 (it rises as the square, so the dial's low half is gentle). */
-export const SOFTBOX_GAIN = 25;
+export const SOFTBOX_GAIN = 80;
 
 export const CLOSEUP_DEPTH_WGSL = /* wgsl */ `
 /*
@@ -140,6 +140,27 @@ fn airWallSeen(t: f32, soft: f32, dn: vec2f) -> vec4f {
   let mid = airWallAt(t, dn);
   let side = 0.5 * (airWallAt(t - 0.5 * soft, dn) + airWallAt(t + 0.5 * soft, dn));
   return vec4f(0.5 * (mid.xyz + side.xyz), mid.w);
+}
+/*
+  The liquid above and below the pocket. A bubble wider than the gap is a
+  pancake: its middle is air from glass to glass and the camera sees the pad
+  through it, clear. One narrower than the gap is a ball, and the liquid it
+  did not displace lies above and below it: at its middle a column of
+  2(rho - R) of the gap's 2 rho, toward its rim more. The solver clears the
+  dye from the whole of the pocket's footprint (it is 2D), so that column's
+  colour is put back here, as Beer-Lambert says a part of the depth passes:
+  the liquid's own transmission round the bubble (rimCol against c, the
+  light the ray found where it landed) to the share of the depth left. So a
+  small bubble's middle is the liquid's colour, lighter, as in every macro
+  photograph of bubbles in a dyed liquid, and the softbox's reflection on it
+  shows. Where the ray landed in the liquid already (the band), c is that
+  liquid and nothing more is taken. tB is where on its meniscus (dropBand),
+  the air's half-thickness there min(R, rho) sqrt(1 - tB^2).
+*/
+fn airColumn(c: vec3f, rimCol: vec3f, tB: f32, R: f32, rho: f32) -> vec3f {
+  let T = clamp(rimCol / max(c, vec3f(1e-3)), vec3f(1e-4), vec3f(1.0));
+  let left = clamp(1.0 - min(R, rho) * sqrt(max(0.0, 1.0 - tB * tB)) / max(rho, 1e-6), 0.0, 1.0);
+  return c * pow(T, vec3f(left));
 }
 /* The softbox's radiance, the pad's being 1: none at Light Play 0. */
 fn softboxRadiance() -> f32 { return ${SOFTBOX_GAIN.toFixed(1)} * U.lightPlay * U.lightPlay; }

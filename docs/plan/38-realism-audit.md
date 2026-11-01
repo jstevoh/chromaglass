@@ -158,8 +158,18 @@ written first. Line numbers are as read on main at d07ac31.
     bubble wall traced through Snell, Fresnel and total internal reflection against the
     light pad's critical cone (`closeupDepth.ts`), the middle the lamp through clear air,
     the liquid round it seen through the wall (a diverging lens), and Light Play a softbox
-    above the glass seen only in a curved wall. `npm run closeupdepth`. Story in
-    `docs/plan-shipped.md` §38.
+    above the glass seen only in a curved wall. Part 2 (the owner: "low resolution",
+    "no reflectance or 3d feel"): drawn from each bubble's true centre and radius
+    (`camBubble`, fitted to the air texels), a ball's middle tinted by the liquid above and
+    below it, the softbox 80 times the pad at Light Play 1. `npm run closeupdepth`,
+    `airlens` 9-10. Story in `docs/plan-shipped.md` §38.
+  - **38h-9. The closeup's dye hole and the grain at zoom, found doing 38h-7 part 2** (S,
+    nil). The bubble's rim is now exact, but the solver cuts the dye's hole on its own grid:
+    a soft lighter fringe a cell or two wide sits outside each small bubble (the cleared
+    dye's antialiasing), and the dye's grain is a cell-sized noise that reads as coarse at
+    zoom 4 and over. Cut the dye's hole in the plate at the fitted rim instead (the solver
+    keeps its own for the flow), and draw the grain at screen scale past the solver's cell.
+    *Measure:* the fringe's excess brightness 1 to 1.5 radii out in `npm run closeupdepth`.
   - **38h-8. The rest of the closeup's depth, found doing 38h-7** (M, nil). The owner's
     photos (drops/references) have two more cues the bubbles now show and the rest of the
     closeup does not. *The beads:* an oil drop in water is traced the same way (Snell into

@@ -10367,6 +10367,26 @@ model cannot reach one, the PR says what it reached and asks.
     on the flat glass or the projected plate. `npm run closeupdepth` 4/4 (the base branch
     2/4: no lens, no softbox; lines 1 and 2 tightened to the trace's numbers after it read
     150 and 8 px there). Found: 38h-8 (the beads with 33g-2b, the cells' lensing).
+    Part 2, the same day. The owner, on the first pictures: "Ours still look like low
+    resolution shit. There is no reflectance or 3d feel." Two causes, measured. *The rim:*
+    the camera drew each bubble from the air field's filtered reading, its radius packed in
+    16 log steps (up to 14% off) and its position a coverage-weighted mean that stops
+    growing in the last texel, its edge the coverage's staircase; at grid 192 a 22-cell
+    bubble was a rounded square (the band's outer edge over 96 angles: sd 7.1 px, corners
+    missing). `camBubble` (plateTransmit.ts) reads the covered texels themselves, each of
+    which holds (x - c) / R exactly, fits centre and radius by least squares, and the
+    camera draws from them with an edge one screen pixel wide: sd 0.5 px at grid 192.
+    *The reflectance:* the softbox's glint is real only where the wall is under 24 degrees,
+    over the bubble's middle, and the middle was the pad, white, so the glint clipped into
+    it. A ball narrower than the gap has liquid above and below it, which the 2D solver had
+    cleared; `airColumn` puts back the colour of what is left of the depth by Beer-Lambert
+    from the liquid round it. So a small bubble's middle is the liquid's colour, paler, and
+    the glint shows on it, as in the photos; a pancake's middle is still the clear lamp.
+    The softbox went from 25 to 80 times the pad at Light Play 1 (a strobe in a softbox
+    against a light pad; the default 0.6 is 29). The contact's reflected line sees the pad
+    through about half the gap of liquid, not all of it. airlens 9 and 10, red since the
+    trace (they asked the magnifier's lit ring), restated: the camera sees the liquid
+    through the small ball's wall where the projector's aperture darkens it. Found: 38h-9.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
