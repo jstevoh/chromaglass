@@ -3283,11 +3283,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         clarity, its film colour and its highlight are its own, and its film
         drains and thins as it ages the way a soap film does.
       */
-      // Where in its bubble, from the coverage-weighted position (see wgsl/air.ts).
-      let p = clamp((airC.gb / max(aC, 1e-3) - vec2f(0.5)) * 2.0, vec2f(-1.0), vec2f(1.0));
-      let rr = min(1.0, length(p));
-      let h = sqrt(max(0.0, 1.0 - rr * rr));
-      let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
+      // Where in its bubble (wgsl/air.ts).
+      let p0 = clamp((airC.gb / max(aC, 1e-3) - vec2f(0.5)) * 2.0, vec2f(-1.0), vec2f(1.0));
       /*
         Its size, film and number: packed whole, so read unfiltered —
         and from the largest of the four texels round the point, since just
@@ -3298,7 +3295,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let looks = textureGather(3, air0, samp, fuvBase);
       let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
       // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
-      let R = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
+      let Rq = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
+      // To the camera, its true centre and radius (camBubble, plateTransmit.ts).
+      var geo = vec3f(fuvBase - p0 * Rq, Rq);
+      if (dropCam > 0.001) { geo = mix(geo, camBubble(fuvBase, p0, Rq), dropCam); }
+      let R = geo.z;
+      let p = (fuvBase - geo.xy) / R;
+      let rr = min(1.0, length(p));
+      let h = sqrt(max(0.0, 1.0 - rr * rr));
+      let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
+      // A screen pixel in plate uv (uvToFluid, above).
+      let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
       let film = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
       let id = (floor(look) - floor(look / 8.0) * 8.0 + 0.5) / 8.0;
       let k1 = fract(id * 7.13 + 0.17);
@@ -3307,7 +3314,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let bestD = p;
       // Pressed between two plates it is a lens, flatter than a sphere.
       let n = normalize(vec3f(p * 0.85, h + 0.15));
-      let opac = smoothstep(0.02, 0.28, aC);
+      // The camera's edge: one screen pixel wide, on the rim.
+      let opac = mix(smoothstep(0.02, 0.28, aC), clamp(0.5 + (1.0 - length(p)) * R / spx, 0.0, 1.0), dropCam);
       /*
         The liquid round it: its light and colour, averaged over a ring just
         outside the rim, so one bubble has one tint. It used to be read
@@ -3333,8 +3341,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // half the gap wide: sin θ is how far across it a point is.
       let rho = dropHalfGap(fuvBase);
       let tB = dropBand(rr, R, rho);
-      // A screen pixel in plate uv (uvToFluid, above).
-      let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
       let curvedB = max((1.0 - dropFlat(R, rho)) * R, spx);
       let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
       // Through it, to the camera: the liquid round it, seen through a lens of
@@ -3439,7 +3445,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       c = mix(c, c * wall.x + rimCol * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
-      outColor = mix(outColor, c, mix(opac, wallB, dropCam) * U.bubbleStrength * mix(0.7, 1.0, filmT));
+      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
       /*
         The camera pass (wgsl/camera.ts) bends the screen along this normal,
         which is the camera's dome: on the plate it would lens the window the

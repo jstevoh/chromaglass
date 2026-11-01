@@ -62,6 +62,8 @@ const typesSrc = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8
 const IRID = Number((typesSrc.match(/\n  iridescence: ([0-9.]+),/) ?? [])[1]);
 if (!Number.isFinite(IRID)) throw new Error('no default iridescence in types.ts');
 const N = 192, S = 512, ZOOM = 3;
+// Line 9: the camera's ring against the liquid round it (two faces of Fresnel, a few per cent each), and the projector's.
+const CAM_SEEN = 0.85, PROJ_DARK = 0.7;
 // Screen pixels to a plate unit, as uvToFluid in plate.ts maps them.
 const PER_UNIT = S * 1.5 * ZOOM;
 /*
@@ -203,17 +205,19 @@ try {
     // A small bubble: 2.5 cells, a ball (under half the gap at rest, 3 cells).
     {
       const s = await shoot(0.5, 0.42, 2.5);
-      out.small = { gap: s.gap, mid: s.mid, rad: s.rad, found: s.found, edge: s.edge, band: s.ring(0.4, 0.55).mean };
+      // Each with the liquid well clear of it (1.6 to 2 radii), in the same units: line 9's reference.
+      const at = (v) => ({ band: v.ring(0.4, 0.55).mean, liquid: v.ring(1.6, 2.0).mean });
+      out.small = { gap: s.gap, mid: s.mid, rad: s.rad, found: s.found, edge: s.edge, ...at(s) };
       const c = await shoot(0.5, 0.42, 2.5, { cam: { macroAmount: 1 } });
-      out.smallCam = { band: c.ring(0.4, 0.55).mean };
+      out.smallCam = at(c);
       /*
         Part way into the closeup: the bubble changes view with the drops,
         over the middle fifth of the zoom's fade (dropCam, smoothstep 0.4 to
         0.6), not across the whole of it. At 0.35 of the way it is still the
         projector's, at 0.65 already the camera's.
       */
-      out.early = { band: (await shoot(0.5, 0.42, 2.5, { cam: { macroAmount: 0.35 } })).ring(0.4, 0.55).mean };
-      out.late = { band: (await shoot(0.5, 0.42, 2.5, { cam: { macroAmount: 0.65 } })).ring(0.4, 0.55).mean };
+      out.early = at(await shoot(0.5, 0.42, 2.5, { cam: { macroAmount: 0.35 } }));
+      out.late = at(await shoot(0.5, 0.42, 2.5, { cam: { macroAmount: 0.65 } }));
     }
     // A big one, 12 cells, a pancake: flat but for half the gap round its edge.
     {
@@ -346,12 +350,24 @@ try {
   check('and a narrower one narrows it',
     m.press.gap < 0.8 * m.big.gap && pshift >= 0.5 * predPShift,
     `pressed to ${m.press.gap.toFixed(4)}, the band's edge ${m.press.edge.toFixed(3)} of the radius, out by ${pshift.toFixed(3)} (the gap says ${predPShift.toFixed(3)}; the air field's rim reads it further)`);
-  check('in the closeup the camera\'s bubble is lit where the plate\'s is dark',
-    m.smallCam.band > 3 * m.small.band && m.smallCam.band > 0.35,
-    `${(100 * m.smallCam.band).toFixed(0)}% of its middle from 0.4 to 0.55 of the small bubble, ${(100 * m.small.band).toFixed(0)}% projected`);
+  /*
+    The camera's bubble is not the projector's (PLAN 33g, 38h-7). The
+    projector's aperture darkens the small ball from 0.4 to 0.55 of its
+    radius well below the liquid round it. The camera looks through the same
+    wall, a lens of air that turns its rays outward (closeupDepth.ts), so
+    there it sees the liquid round the bubble, as bright as that liquid but
+    for what Fresnel takes at two faces (over CAM_SEEN of it). Before 38h-7
+    this line asked for the ring lit at a third of the middle and three times
+    the projector's: the camera's bubble was a magnifier then, which a lens of
+    air in water cannot be, and the trace drew it dark there from the start.
+  */
+  const rel = (v) => v.band / Math.max(v.liquid, 1e-3);
+  check(`in the closeup the camera sees the liquid through the small bubble's wall (over ${CAM_SEEN} of it) where the projector's aperture darkens it (under ${PROJ_DARK})`,
+    rel(m.smallCam) > CAM_SEEN && rel(m.small) < PROJ_DARK,
+    `from 0.4 to 0.55 of the radius: the camera ${rel(m.smallCam).toFixed(2)} of the liquid round it, projected ${rel(m.small).toFixed(2)}`);
   check('and the view changes over the middle of the zoom\'s fade, with the drops\'',
-    m.early.band < 0.25 && m.late.band > 0.35,
-    `${(100 * m.early.band).toFixed(0)}% at 0.35 of the way, ${(100 * m.late.band).toFixed(0)}% at 0.65`);
+    rel(m.early) < PROJ_DARK && rel(m.late) > CAM_SEEN,
+    `${rel(m.early).toFixed(2)} of the liquid at 0.35 of the way, ${rel(m.late).toFixed(2)} at 0.65`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

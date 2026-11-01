@@ -83,24 +83,70 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
 }
 
 /*
-  The camera's bubble: where in it a point is (PLAN 38h-2), from p, the
-  position field's reading, and R, the bubble's radius in plate uv. The
-  position field is exact where the air covers a texel whole, but its splat
-  discards past the rim, so in the last texel the filtered position stops
-  growing (0.9 of the radius a texel outside the bubble) while the coverage
-  runs on in a square-cornered staircase: with the camera's band dark, the
-  owner saw that as a blocky edge (2026-10-31). So the centre is taken where
-  the field says it is, the field read again there, where it is whole and
-  the position near zero, and the point measured from that corrected centre:
-  the band and the rim are circles of the bubble's own radius. (A step two
-  texels inward was tried first; a bubble two cells across has no whole
-  texel two in, and stayed square.)
+  The camera's bubble: its true centre and radius in plate uv (PLAN 38h-2,
+  38h-7), from p, the position field's filtered reading at fuv, and R, the
+  packed radius. Neither is good enough to draw a rim from up close. R is
+  packed in 16 steps on a log scale, each 1.28 times the last, so it is off
+  by up to 14%; and filtered p is the coverage-weighted mean of the four
+  texels round the point, so in the last texel it stops growing while the
+  coverage runs on in a square-cornered staircase: the owner saw the edge as
+  blocky, "low resolution" (2026-10-31). A first fix read the field again at
+  the estimated centre; with the radius still a step off, the rim stayed off
+  the hole the solver cut by as much.
+
+  But each texel the air covers holds its own position exactly: g and b are
+  a times a linear function of where the texel's centre is (wgsl/air.ts), so
+  divided by a they give (x - c) / R at a known x with no filtering at all.
+  So the texels themselves are read (textureGather), at the estimated centre
+  and three points half a radius out from it, and x = c + R q is fitted to
+  them by least squares: sixteen exact samples a radius apart fix the centre
+  and the radius to a fraction of a texel (the centre's four alone, on a
+  bubble a texel or two across). Each point is snapped to the corner its
+  four texels share, so the texels gathered are the ones assumed. A fit that
+  does not hold (too few covered texels, a radius more than a step from the
+  packed one, a neighbour's texels mixed in) falls back to the packed radius
+  and the centre the covered texels give for it.
 */
-fn camBubbleAt(fuv: vec2f, p: vec2f, R: f32) -> vec2f {
-  let cEst = fuv - p * R;
-  let airM = textureSampleLevel(air0, samp, cEst, 0.0);
-  if (airM.r <= 0.02) { return p; }
-  return (fuv - (cEst - (airM.gb / airM.r - vec2f(0.5)) * 2.0 * R)) / R;
+fn camBubble(fuv: vec2f, p: vec2f, R: f32) -> vec3f {
+  let n = vec2f(textureDimensions(air0));
+  var c0 = fuv - p * R;
+  var sn = 0.0;
+  var sq = vec2f(0.0);
+  var sx = vec2f(0.0);
+  var sqx = 0.0;
+  var sqq = 0.0;
+  var sc = vec3f(0.0);
+  for (var k = 0; k < 4; k++) {
+    // The centre first; the other three round the centre its texels give,
+    // which every pixel of the bubble agrees on, so they read the same texels.
+    if (k == 1 && sc.z > 0.0) { c0 = sc.xy / sc.z; }
+    let ang = f32(k) * 2.0943951;
+    let b = floor((c0 + vec2f(cos(ang), sin(ang)) * select(0.5 * R, 0.0, k == 0)) * n - 0.5);
+    let at = (b + 1.0) / n;
+    let ga = textureGather(0, air0, samp, at);
+    let gg = textureGather(1, air0, samp, at);
+    let gb = textureGather(2, air0, samp, at);
+    // textureGather's order: (0,1), (1,1), (1,0), (0,0) from the corner texel b.
+    let offs = array<vec2f, 4>(vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0), vec2f(0.0, 0.0));
+    for (var j = 0; j < 4; j++) {
+      let a = ga[j];
+      if (a > 0.1) {
+        let x = (b + offs[j] + 0.5) / n;
+        let q = (vec2f(gg[j], gb[j]) / a - vec2f(0.5)) * 2.0;
+        sn += 1.0; sq += q; sx += x; sqx += dot(q, x); sqq += dot(q, q);
+        sc += a * vec3f(x - R * q, 1.0);
+      }
+    }
+  }
+  let vq = sqq - dot(sq, sq) / max(sn, 1.0);
+  let Rf = (sqx - dot(sq, sx) / max(sn, 1.0)) / max(vq, 1e-6);
+  if (sn < 3.0 || vq < 0.05 || Rf < 0.8 * R || Rf > 1.25 * R) {
+    // Each covered texel's own word for the centre at the packed radius:
+    // the same texels give the same centre, so a bubble too small to fit
+    // still has one rim, not a piece of one per pixel.
+    return select(vec3f(c0, R), vec3f(sc.xy / max(sc.z, 1e-4), R), sc.z > 0.0);
+  }
+  return vec3f((sx - Rf * sq) / sn, Rf);
 }
 `;
 
