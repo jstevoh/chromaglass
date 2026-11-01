@@ -781,8 +781,7 @@ export class WebGPUFluid extends FluidReads {
     if (bodiesOn) this.oilDyeStale = false;
     else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
-    // The oil's σ: on a thin gap it carries the gap's h² (OIL_TENSION_GAP says why), on the old plate not.
-    const tension = thin ? OIL_TENSION_GAP : OIL_TENSION;
+    const pull = oil * (thin ? OIL_TENSION_GAP : OIL_TENSION) * perSecond * N * N, cells = OIL_CELLS / Math.max(disp * N, 1e-9);
     stage('mix force', (pass) => {
       /*
         Gravity in the plate: how far it stands up, toward the bottom of the
@@ -802,7 +801,7 @@ export class WebGPUFluid extends FluidReads {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      const args = this.arg('mix force', [oil * tension * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
+      const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
         gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
@@ -819,7 +818,7 @@ export class WebGPUFluid extends FluidReads {
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {
         this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
-          this.arg('mix film', [oil * tension * perSecond * N * N * FILM_PUSH * hold, OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+          this.arg('mix film', [pull * FILM_PUSH * hold, cells, 0, 0]));
         this.vel.swap();
       }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
@@ -834,8 +833,7 @@ export class WebGPUFluid extends FluidReads {
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
-    // Plate Rock past the default, past real (lib/plateRock.ts rockPast, PLAN 38r-9): the colour's pull and the oil's lift alike.
-    const rockGain = Number.isFinite(p.rockGain) && p.rockGain! > 0 ? p.rockGain! : 1;
+    const rg = p.rockGain ?? 1, rx = p.rockX * rg, ry = p.rockY * rg;
     const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
       /*
@@ -884,7 +882,7 @@ export class WebGPUFluid extends FluidReads {
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
           this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
-            rockOn ? ROCK_FALL * rockGain * p.rockX : 0, rockOn ? ROCK_FALL * rockGain * p.rockY : 0, lift * rockGain * p.rockX, lift * rockGain * p.rockY]),
+            rockOn ? ROCK_FALL * rx : 0, rockOn ? ROCK_FALL * ry : 0, lift * rx, lift * ry]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();
       });
@@ -930,7 +928,7 @@ export class WebGPUFluid extends FluidReads {
       for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     }, swirlOn || this.swirlLive);
     this.swirlLive = swirlOn;
-    const swirlScale = swirlOn ? (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7) : 0;
+    const swirlScale = swirlOn ? perSecond : 0;
 
     /*
       A thin gap takes the stirring in with the other forces, before the
@@ -965,7 +963,7 @@ export class WebGPUFluid extends FluidReads {
         // What the dye rides is the flow itself: the current is in it now.
         if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
           // And the dish's own flow over it, when the dial is up (setSlosh): the unit is the swirl's, plate widths a second to this solver's.
-          const sloshScale = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
+          const sloshScale = perSecond;
           // Each layer's own: the oil's share of the cell (the mix's red) rides the oil's flow, the rest the water's (lib/slosh.ts).
           const sloshOil = !!this.mix && (p.oilTension ?? 0) > 0;
           this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex, sloshOil ? this.mix!.read : this.sloshTex], this.arg('add slosh', [0, sloshOil ? 1 : 0, SLOSH_N, sloshScale]));
@@ -1008,8 +1006,8 @@ export class WebGPUFluid extends FluidReads {
       on show timescales, holding crisp edges across streamlines. Along the flow,
       the Poiseuille parabolic velocity profile across the gap (u(z) = 1.5 ū (1 - 4z²/h²))
       shears dye columns into parabolic sheets with variance σ² ≈ 0.2 |ū|² (Δt)².
-      On show timescales (t ≪ h²/Dm ≈ 25 hours), diffusion has not homogenized
-      across the 2 mm gap (h²/Dm ≈ 3 hours there), so the flow is in the pre-asymptotic, unsteady shear
+      On show timescales (t ≪ h²/Dm ≈ 3 hours at 2 mm), diffusion has not homogenized
+      across the gap, so the flow is in the pre-asymptotic, unsteady shear
       dispersion regime rather than the asymptotic Taylor–Aris limit.
 
       In that pre-asymptotic regime, the parabolic shear is kinematically
