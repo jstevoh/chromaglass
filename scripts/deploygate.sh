@@ -400,7 +400,7 @@ judge() {
       partial=$(measurepartial "$run_id")
       [ -n "$partial" ] || [ "${url##*/}" = "$run_id" ] || partial=$(measurepartial "${url##*/}")
       if [ -n "$partial" ]; then
-        echo "false #$pr's run $url ran only the Measure checks its diff reached ($partial)"; continue
+        echo "false #$pr's run $url ran only the checks its diff reached ($partial)"; continue
       fi
       if [ "$tested" != - ]; then
         ttree=$(treeof "$tested")

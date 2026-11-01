@@ -589,7 +589,10 @@ if (!isMain) {
         console.log(`::notice title=mac::partial: ${picked.names.length} of ${total} Mac checks in ${shards.join(', ')}`);
       }
     }
-    if (mac) {
+    // A run of some Mac checks is not carried from, or onto (19ak-2): the
+    // earlier run's names were its own diff's, and main may since have moved
+    // what this one's reach. It runs; it is the cheaper run anyway.
+    if (mac && !macOnly) {
       const verdict = await carry({
         prNumber: process.env.PR_NUMBER,
         headRef: process.env.GITHUB_HEAD_REF,

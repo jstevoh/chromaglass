@@ -90,23 +90,36 @@ export const SHARED = [
   Mac minutes, and about a third of PR attempts that week were re-runs.
 
   What it will not excuse: a check that timed out or was killed, one that
-  printed a stack (a crash after a quarantined line leaves the lines after it
-  unmeasured), one with as many FAIL lines as the runner keeps (the rest
-  unread), and any FAIL line that is not on the list. An entry has to end
-  within QUARANTINE_DAYS of its start: a quarantine is the time the fix takes,
-  not a place lines go to stay.
+  exited other than 1 or printed a stack (a crash after a quarantined line
+  leaves the lines after it unmeasured), one whose own closing count
+  ("N/M checks passed") is missing or counts other than its FAIL lines red
+  (it stopped early), one with as many FAIL lines as the runner keeps (the
+  rest unread), a quarantined line whose numbers read unread, never, NaN or
+  null (the flake is a reading on the wrong side of its bar, not a missing
+  one), and any FAIL line that is not on the list. And nothing at all off a
+  pull request: main's deploy holds every line to its bar, so a real
+  regression the quarantine let through a PR is red there before it is live.
+  An entry has to end within QUARANTINE_DAYS of its start: a quarantine is
+  the time the fix takes, not a place lines go to stay. Adding one, or moving
+  its end later, is a check change `checkguard.mjs` makes the PR name.
 */
 export const QUARANTINE_DAYS = 21;
 export const MAX_FAILS = 20;
 const failText = (l) => l.replace(/^.*?\bFAIL\b[:\s]*/, '').trim();
-export function quarantined(c, r, today = new Date().toISOString().slice(0, 10)) {
-  if (r.ok || r.timedOut || r.signal || r.stack || !r.fails.length || r.fails.length >= MAX_FAILS) return null;
+export function quarantined(c, r, { today = new Date().toISOString().slice(0, 10), event = process.env.GITHUB_EVENT_NAME } = {}) {
+  if (event !== 'pull_request') return null;
+  if (r.ok || r.code !== 1 || r.timedOut || r.signal || r.stack || !r.fails.length || r.fails.length >= MAX_FAILS) return null;
+  // The harness reached its own end and counted exactly these lines red.
+  if (!r.tally || r.tally.total - r.tally.pass !== r.fails.length) return null;
   const live = (c.quarantine ?? []).filter((q) => q.since <= today && today < q.until);
   if (!live.length) return null;
   const hits = [];
   for (const l of r.fails) {
     const q = live.find((x) => failText(l).startsWith(x.line.trim()));
     if (!q) return null;
+    // A line that could not read its numbers is not the flake that was
+    // quarantined, which is a reading on the wrong side of its bar.
+    if (/\b(unread|never|NaN|null|undefined)\b/.test(failText(l).slice(q.line.trim().length))) return null;
     hits.push({ line: l, q });
   }
   return hits;
@@ -303,7 +316,7 @@ function selectCore(files, { before, after, root = ROOT, docs = false, readsOf =
       // traces is a Worker's, which no Mac check runs. Measure, which runs
       // the Workers' own checks, still takes every check for it.
       const scripts = after.pkg?.scripts ?? {};
-      add(after.manifest.checks.filter((c) => reads(trace(entryFiles(c.run, scripts), root), f)), f);
+      add(after.manifest.checks.filter((c) => after.manifest.shards.mac.includes(c.shard) && reads(trace(entryFiles(c.run, scripts), root), f)), f);
       continue;
     }
     if (/^scripts\//.test(f)) {
@@ -400,6 +413,7 @@ export function runOne(c, { onOut = (b) => process.stdout.write(b), onErr = (b) 
     current = child;
     const fails = [];
     let stack = false;
+    let tally = null;
     let tail = '';
     const keep = (buf) => {
       const text = tail + buf.toString();
@@ -409,6 +423,8 @@ export function runOne(c, { onOut = (b) => process.stdout.write(b), onErr = (b) 
         if (/\bFAIL\b/.test(l) && fails.length < MAX_FAILS) fails.push(l.trim());
         // A stack frame (`    at f (file:12:3)`): the harness threw.
         if (/^\s+at .*:\d+:\d+\)?\s*$/.test(l)) stack = true;
+        const t = /^\s*(\d+)\/(\d+) checks passed\s*$/.exec(l);
+        if (t) tally = { pass: Number(t[1]), total: Number(t[2]) };
       }
     };
     child.stdout.on('data', (b) => { onOut(b); keep(b); });
@@ -429,8 +445,10 @@ export function runOne(c, { onOut = (b) => process.stdout.write(b), onErr = (b) 
       done = true;
       if (timer) clearTimeout(timer);
       if (tail && /\bFAIL\b/.test(tail)) fails.push(tail.trim());
+      const t = /^\s*(\d+)\/(\d+) checks passed\s*$/.exec(tail);
+      if (t) tally = { pass: Number(t[1]), total: Number(t[2]) };
       current = null;
-      resolve({ ok: code === 0 && !timedOut, code, signal, timedOut, fails, stack, secs: (Date.now() - t0) / 1000 });
+      resolve({ ok: code === 0 && !timedOut, code, signal, timedOut, fails, stack, tally, secs: (Date.now() - t0) / 1000 });
     };
     let drain = null;
     child.on('close', (code, signal) => { if (drain) clearTimeout(drain); finish(code, signal); });
@@ -754,24 +772,38 @@ async function selftest() {
   const day = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
   const qd = (line, since = day(-1), until = day(5)) => [{ line, plan: '19ak-1', since, until }];
   const flaky = 'echo "FAIL  the flaky line — 3 against 2"';
+  const tally = (n, m) => `echo "${n}/${m} checks passed"`;
   const qman = parseManifest(JSON.stringify({
-    shards: { measure: ['qa', 'qb'], mac: ['x'] },
+    shards: { measure: ['qa', 'qb', 'qc'], mac: ['x'] },
     checks: [
-      { name: 'held', shard: 'qa', run: `echo " ok  a line that passed"; ${flaky}; exit 1`, quarantine: qd('the flaky line') },
-      { name: 'mixed', shard: 'qb', run: `${flaky}; echo "FAIL  another line"; exit 1`, quarantine: qd('the flaky line') },
-      { name: 'ended', shard: 'qb', run: `${flaky}; exit 1`, quarantine: qd('the flaky line', day(-9), day(-2)) },
+      { name: 'held', shard: 'qa', run: `echo " ok  a line that passed"; ${flaky}; ${tally(1, 2)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'mixed', shard: 'qb', run: `${flaky}; echo "FAIL  another line"; ${tally(0, 2)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'ended', shard: 'qb', run: `${flaky}; ${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line', day(-9), day(-2)) },
       { name: 'crashed', shard: 'qb', run: `${flaky}; node -e 'throw new Error("after the line")'`, quarantine: qd('the flaky line') },
       { name: 'stopped', shard: 'qb', run: `${flaky}; sleep 30 & wait`, timeout: 0.02, quarantine: qd('the flaky line') },
-      { name: 'silent', shard: 'qb', run: 'exit 1', quarantine: qd('the flaky line') },
+      { name: 'silent', shard: 'qb', run: `${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'early', shard: 'qb', run: `${flaky}; echo "the preview server exited" >&2; exit 2`, quarantine: qd('the flaky line') },
+      { name: 'untallied', shard: 'qb', run: `${flaky}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'miscounted', shard: 'qb', run: `${flaky}; ${tally(1, 3)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'unread', shard: 'qb', run: `echo "FAIL  the flaky line — unread against 2"; ${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'onmain', shard: 'qc', run: `${flaky}; ${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line') },
       { name: 'other', shard: 'x', run: 'true' },
     ],
   }));
   const qlog = [];
-  let qa, qb;
+  let qa, qb, qc;
+  const eventWas = process.env.GITHUB_EVENT_NAME;
   const writeErr = process.stderr.write.bind(process.stderr);
   process.stdout.write = (b) => { qlog.push(String(b)); return true; };
   process.stderr.write = (b) => { qlog.push(String(b)); return true; };
-  try { qa = await runShard('qa', qman, null); qb = await runShard('qb', qman, null); } finally { process.stdout.write = write; process.stderr.write = writeErr; }
+  const setEvent = (e) => { if (e == null) delete process.env.GITHUB_EVENT_NAME; else process.env.GITHUB_EVENT_NAME = e; };
+  try {
+    setEvent('pull_request');
+    qa = await runShard('qa', qman, null);
+    qb = await runShard('qb', qman, null);
+    setEvent('push');
+    qc = await runShard('qc', qman, null);
+  } finally { setEvent(eventWas); process.stdout.write = write; process.stderr.write = writeErr; }
   const qt = qlog.join('');
   say(qa === 0 && /⚠ held, red after/.test(qt) && /::warning title=Quarantined%3A held::.*the flaky line/.test(qt), `a check red only on a quarantined line is a warning, and its shard green (exit ${qa})`);
   say(/⚠ FAIL {2}the flaky line — 3 against 2 \[quarantined for 19ak-1 until/.test(qt), 'and its FAIL line is still printed whole, with its plan id and end date');
@@ -780,6 +812,11 @@ async function selftest() {
   say(/✗ crashed/.test(qt), 'a check that threw after a quarantined line is red');
   say(/✗ stopped/.test(qt), 'a check stopped at its timeout is red whatever it printed');
   say(/✗ silent/.test(qt), 'a check red with no FAIL line at all is red');
+  say(/✗ early/.test(qt), 'a check that exited other than 1 after a quarantined line (it stopped early) is red');
+  say(/✗ untallied/.test(qt), 'a check that never printed its closing count is red');
+  say(/✗ miscounted/.test(qt), 'a check whose count has more red than its FAIL lines is red');
+  say(/✗ unread/.test(qt), 'a quarantined line that could not read its numbers is red');
+  say(qc === 1 && /✗ onmain/.test(qt), 'off a pull request (main\'s deploy) a quarantined line blocks');
   const refuses = (q) => { try { parseManifest(JSON.stringify({ shards: { measure: ['m'], mac: ['x'] }, checks: [{ name: 'a', shard: 'm', run: 'true', quarantine: q }, { name: 'b', shard: 'x', run: 'true' }] })); return false; } catch { return true; } };
   say(refuses([{ line: 'the flaky line', since: day(0), until: day(5) }]), 'a quarantine with no plan id is refused');
   say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);
@@ -791,6 +828,8 @@ async function selftest() {
   const noPlan = qs.filter(({ q }) => !new RegExp(`\\*\\*${q.plan.replace(/[-]/g, '\\-')}\\b`).test(planText));
   say(!noPlan.length, `every quarantined line's plan id is an item in docs/plan/ (${qs.length} lines${noPlan.length ? `; not found: ${noPlan.map(({ q }) => q.plan).join(', ')}` : ''})`);
   const noLine = qs.filter(({ c, q }) => ![...trace(entryFiles(c.run, scripts))].some((f) => /\.(mjs|js|ts)$/.test(f) && fs.existsSync(path.join(ROOT, f)) && fs.readFileSync(path.join(ROOT, f), 'utf8').includes(q.line.trim())));
+  const noTally = qs.filter(({ c }) => ![...trace(entryFiles(c.run, scripts))].some((f) => /\.(mjs|js|ts)$/.test(f) && fs.existsSync(path.join(ROOT, f)) && /checks passed/.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))));
+  say(!noTally.length, `every quarantined check prints its closing count, which the quarantine needs${noTally.length ? `; not found: ${noTally.map(({ c }) => c.name).join(', ')}` : ''}`);
   say(!noLine.length, `and its text is in the check's own scripts${noLine.length ? `; not found: ${noLine.map(({ c, q }) => `${c.name}: ${q.line}`).join('; ')}` : ''}`);
   if (bad) { console.log(`\n${bad} FAIL`); process.exitCode = 1; return; }
   console.log('\nall ok');

@@ -33,10 +33,13 @@ deploy:
   deploy gate, so main's deploy runs every shard.
 - **Quarantine** (PLAN.md 19ak-1): a check's entry in `scripts/checks.json` can list
   known-flaky FAIL lines under `quarantine`, each with its plan id and an end date at
-  most 21 days out. Until then a check red only on those lines is a warning (⚠ in the
-  job summary) and its job stays green; any other FAIL line, a timeout, a crash, or the
-  end date passing, and it blocks as before. Bars never move for it. A red run on a line
-  the PR cannot move is re-run by its **failed jobs** only, never all jobs.
+  most 21 days out. Until then, on a pull request, a check red only on those lines is a
+  warning (⚠ in the job summary) and its job stays green; any other FAIL line, a
+  timeout, a crash, a check that stopped before its closing count, or the end date
+  passing, and it blocks as before. Main's deploy holds every line to its bar. Bars
+  never move for it, and adding one or moving its end later is a check change the PR
+  names (`checkguard`). A red run on a line the PR cannot move is re-run by its
+  **failed jobs** only, never all jobs.
 - **WebGPU (macOS)**: the lab and app checks on Metal, sharded into parallel
   jobs; the job named exactly `WebGPU (macOS)` is green only when every shard is, or when `reach` skipped them all.
 - A deploy skips the checks when main's new tree is the exact tree its PR's

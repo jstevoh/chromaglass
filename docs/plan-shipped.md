@@ -4000,12 +4000,17 @@ the sessions' files or the native apps skips the Mac (19h).
 
 - **19ak-1, quarantine.** A check's entry in `scripts/checks.json` can carry
   `quarantine`: the start of a FAIL line, the plan id that fixes it, and the dates it
-  holds from and until (at most `QUARANTINE_DAYS`, 21). While it holds, a check whose
-  only FAIL lines are quarantined still runs and prints them, as a warning annotation
-  and a ⚠ row in the job summary, and its job stays green. No bar moved: the line and
-  its threshold are the harness's. A check that timed out, was killed, printed a stack,
-  or printed any FAIL line not on the list is red as before; so is one past its end
-  date. `npm run checks` holds all of that with a control each, and that every entry's
+  holds from and until (at most `QUARANTINE_DAYS`, 21). While it holds, on a pull
+  request, a check whose only FAIL lines are quarantined still runs and prints them, as
+  a warning annotation and a ⚠ row in the job summary, and its job stays green. No bar
+  moved: the line and its threshold are the harness's, and main's deploy holds every
+  line to it, so a real regression a quarantine let through a PR is red before it is
+  live. A check that timed out, was killed, exited other than 1, printed a stack, did
+  not reach its own "N/M checks passed" with exactly its FAIL lines counted, read
+  unread or never on the line, or printed any FAIL line not on the list is red as
+  before; so is one past its end date. Adding a quarantine or moving its end later is a
+  check change `checkguard.mjs` makes the PR name (the review of this PR found both
+  holes). `npm run checks` holds all of that with a control each, and that every entry's
   plan id is an item in `docs/plan/` and its text is in the check's own scripts. First
   entries, 2026-11-01 to 11-15: startup's "moving for good no later than the old way"
   (19aa-7; #661 fixes most of it, 19aa-7b the rest), the Blow stroke's "keeps it rather
