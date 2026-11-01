@@ -145,6 +145,12 @@ Left, each its own plan item:
     flow outside a moving bubble is not the flow round an obstacle. The real fix is the bubble as
     a second phase in the solve: pressure all but uniform inside it (air's viscosity is a
     fiftieth of water's), the liquid's flux through its faces nothing.
+  - **15g-8e Every carry of what the liquid holds takes the air.** With 15g-8b the colour, the
+    poured liquids, the oil's colour, the reaction and the species riding with the colour move per
+    unit of liquid under a bubble; the species carried alone (`passes.ts`, A.a.y 0), the maze's own
+    path and the oil's mix (`mixAdvectSub`) do not. So under a bubble with Oil Bodies a body's
+    colour and its edge can part, and two setups `npm run thick` holds equal differ under air.
+    Give each the same accounting (airLiquid takes any amount carry), with a lab case per carry.
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event

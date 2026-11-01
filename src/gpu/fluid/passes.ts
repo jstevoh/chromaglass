@@ -16,7 +16,7 @@ import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, TH
 import { FluidFields } from './fields';
 
 export class FluidPasses extends FluidFields {
-  /** What each cell with air in it divides its amounts among this substep (airGive), made with the first bubble. */
+  /** What each cell with air in it divides its amounts among this substep (airGive), made by the first carry that sees the air. */
   private airGiveTex: GPUTexture | null = null;
   /** And the share of a cell each of its faces brings in this substep (airGive's second output). */
   private airInTex: GPUTexture | null = null;
