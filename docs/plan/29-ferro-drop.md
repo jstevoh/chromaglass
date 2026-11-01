@@ -50,7 +50,7 @@ the code's entry points, the checks to add and the scenes to match, in
     steps as it crosses a cell's edge; sample the velocity bilinearly, as the solver's
     advection does.
   - ~~**29a-10. The Magnet's domes were one black in the closeup.**~~ **Shipped** (the owner,
-    2026-11-01: "Let's make sure we have 3d in the macro view"; `npm run ferrodrop` 11-12).
+    2026-11-01: "Let's make sure we have 3d in the macro view"; `npm run ferrodrop` 11-13).
     The drop's reflection is worked in light and encoded as a camera records it, so a dome's
     steep sides show the lit liquid round them as a dark gloss. Story in
     `docs/plan-shipped.md` §29a-10.

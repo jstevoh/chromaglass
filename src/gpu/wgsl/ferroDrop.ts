@@ -363,12 +363,15 @@ fn plateSeen(uv: vec2f, bg: vec3f) -> vec3f {
   display's own curve near enough at these levels), the reflection worked
   there, and the result encoded as a camera's frame is. The studio's
   lights are radiances already, in the pad's units, whose white is 1 both
-  ways. Measured in the lab on that pool at 6x (npm run ferrodrop 11, 12):
-  the domes' brightest channel 3 of 255 in the middle and 1 to 11 across,
-  now 23 and 1 to 38; the key's glint on a plain drop moves from 0.9 to 0.95,
+  ways. Measured in the lab on that pool at 6x (npm run ferrodrop 12, 13,
+  over the pixels past 1.5 full): the domes' brightest channel 2 of 255 in
+  the middle and 1 to 6 across, now 23 and 7 to 38; the key's glint on a plain drop moves from 0.9 to 0.95,
   and the plate at 1x does not change, since the drop is drawn only in the
-  closeup. Not done the same way yet: the bubbles' walls in the closeup
-  (closeupDepth.ts, PLAN 38h-12).
+  closeup. A flat top (a pool, a wide drop) sees the dim tent through
+  Snell's window at 0.43%, which was 2 of 255 and is now about 26 before
+  the dye over it: a black gloss under water is a very dark grey to a
+  camera, not nothing. Not done the same way yet: the bubbles' walls in the
+  closeup (closeupDepth.ts, PLAN 38h-12).
 */
 fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
   let gapLc = gapUnits * ${DISH_GAP_FIELD_UV} / LC_UV;
@@ -394,6 +397,6 @@ fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
     seen = pow(max(plateSeen(fuv + dir * travel * LC_UV, bg), vec3f(0.0)), vec3f(2.2));
   }
   let dye = pow(dyeColumnAt(fuv), vec3f(2.0 * above / max(gapLc, 1e-3)));
-  return pow(F * seen * dye, vec3f(1.0 / 2.2));
+  return pow(max(F * seen * dye, vec3f(0.0)), vec3f(1.0 / 2.2));
 }
 `;

@@ -201,25 +201,43 @@ try {
       magnetStrength: 0.9, magnetHeight: 0.15 * 0.9, magnetSeconds: 1 / 60, magnetX: M.x, magnetY: M.y };
     for (let k = 0; k < 160; k += 4) await lab.step(4, over);
     const f = await lab.phase();
-    let tall = 0; for (const v of f.data) if (v > 1.5) tall++;
     const settings = (relief) => ({ ...lab.look('magnet-garden').settings, macroRelief: relief });
-    const cam = { zoom: 6, macroAmount: 1, cx: M.x, cy: M.y };
+    const Z = 6;
+    const cam = { zoom: Z, macroAmount: 1, cx: M.x, cy: M.y };
     const flat = await lab.render(SIZE, settings(0), cam);
     const lit = await lab.render(SIZE, settings(0.7), cam);
     const lum = (px, i) => 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-    // The ferrofluid on screen: what the flat drawing draws black, three pixels in from its edge.
-    const dark = new Uint8Array(SIZE * SIZE);
-    for (let i = 0; i < SIZE * SIZE; i++) dark[i] = lum(flat, i * 4) < 25 ? 1 : 0;
+    /*
+      Each pixel's place on the plate: the lab draws the plate 1.5 times the
+      frame across at 1x (domes.mjs), Z times that here, about the camera's
+      centre, rows down. The phase there says which pixels are domes (past
+      1.5 full) rather than the flat film between them, which at 6x fills
+      the frame too (the check-skeptic's point: a mask of what the flat
+      drawing draws black is the whole pool). The mapping is held by the
+      flat drawing itself: where the plate says water (under 0.3 full) it
+      must draw the lit dye, or the line below fails rather than measuring
+      the wrong place. (Not the other way round: the flat drawing paints a
+      grey sheen down a dome's sides, the 1x look, so 4 in 10 of the domes'
+      pixels are lit in it; measured 98.4% of water lit, 59.7% of domes
+      dark, with this mapping the best of 1,400 tried scales, turns, flips
+      and offsets.)
+    */
+    const phaseAt = (x, y) => {
+      const u = M.x + ((x + 0.5) / SIZE - 0.5) / (1.5 * Z), v = M.y - ((y + 0.5) / SIZE - 0.5) / (1.5 * Z);
+      const i = Math.min(f.n - 1, Math.max(0, Math.floor(u * f.n))), j = Math.min(f.n - 1, Math.max(0, Math.floor(v * f.n)));
+      return f.data[i + j * f.n];
+    };
+    let agree = 0, judged = 0;
     const ls = [];
-    for (let y = 3; y < SIZE - 3; y++) for (let x = 3; x < SIZE - 3; x++) {
-      let all = 1;
-      for (let dy = -3; dy <= 3 && all; dy++) for (let dx = -3; dx <= 3; dx++) if (!dark[(y + dy) * SIZE + x + dx]) { all = 0; break; }
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+      const p = phaseAt(x, y), k = (y * SIZE + x) * 4;
+      if (p < 0.3) { judged++; if (lum(flat, k) >= 25) agree++; }
       // The brightest channel: the gloss is the dye's colour mirrored, mostly red under a yellow.
-      if (all) { const i = (y * SIZE + x) * 4; ls.push(Math.max(lit[i], lit[i + 1], lit[i + 2])); }
+      if (p > 1.5) ls.push(Math.max(lit[k], lit[k + 1], lit[k + 2]));
     }
     ls.sort((a, b) => a - b);
-    const q = (t) => ls[Math.floor(ls.length * t)];
-    return { tall, px: ls.length, p10: q(0.1), p50: q(0.5), p90: q(0.9) };
+    const q = (t) => ls[Math.floor(ls.length * t)] ?? 0;
+    return { agree: agree / Math.max(judged, 1), px: ls.length, p10: q(0.1), p50: q(0.5), p90: q(0.9) };
   }, { SIZE });
   /*
     A dome is a steep cone: most of its surface is past Snell's window (its
@@ -231,9 +249,11 @@ try {
     the domes' light a dark gloss well off black, and spread across each,
     which a flat lift would not be.
   */
+  check('the closeup\'s pixels are where the plate says (where the plate is water, the flat drawing draws the lit dye)',
+    domes.agree > 0.95, `${(domes.agree * 100).toFixed(1)}% of the water's pixels lit`);
   check('in the closeup the Magnet\'s domes mirror the lit liquid round them, as a camera records a dark gloss, not one black',
-    domes.tall > 50 && domes.p50 >= 12 && domes.p50 <= 100,
-    `the middle of the domes' light ${domes.p50.toFixed(1)} of 255 over ${domes.px} px (${domes.tall} cells stood past 1.5 full)`);
+    domes.px > 2000 && domes.p50 >= 12 && domes.p50 <= 100,
+    `the middle of the domes' light ${domes.p50.toFixed(1)} of 255 over ${domes.px} px of them (past 1.5 full)`);
   check('and that light runs across each dome, its shape, not a flat grey',
     domes.p90 - domes.p10 >= 20,
     `${domes.p10.toFixed(1)} to ${domes.p90.toFixed(1)} from the 10th to the 90th percentile`);

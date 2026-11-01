@@ -5834,9 +5834,10 @@ on an sRGB canvas) by that reflectance as if they were light: 2% of a white came
 255, where a camera records about 39. A 30 times brighter room only grew the dot on the
 top, since the sides do not see the room. Now the plate's colour is taken back to light
 (a 2.2 power), the reflection worked there and encoded as a camera's frame is; the studio's
-lights are radiances already. Measured (`npm run ferrodrop`, 12 checks, the two new on that
-pool): the domes' brightest channel 3 of 255 in the middle and 1 to 11 across (both red on
-main), now 23 and 1 to 38; the ten older lines unchanged in verdict (the drop's light spread
+lights are radiances already. Measured (`npm run ferrodrop`, 13 checks, the three new on that
+pool, read over the pixels the plate says stand past 1.5 full, the screen-to-plate mapping
+held by 98.4% of the water's pixels drawn lit): the domes' brightest channel 2 of 255 in the
+middle and 1 to 6 across (both red on main), now 23 and 7 to 38; the ten older lines unchanged in verdict (the drop's light spread
 176 of 255, its brightest up and left, the dye line blue 197 to 0, red 209 to 187, the 1x
 plate 0 bytes different). No setting and no phone change: the phone draws the same plate
 shader. Found along the way: 29a-11 (the ridges), 29a-12 (the dye's amount over a dome),
