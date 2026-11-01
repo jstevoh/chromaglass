@@ -107,6 +107,23 @@ fn softboxSeen(up: vec3f) -> f32 {
 
   Returns the pad's light through the wall (x), the pad's light by
   reflection (y), the softbox's (z, at its own radiance 1) and the tangent.
+
+  Which light a ray finds depends on the ground. On the lamp ground the
+  light comes from the pad beneath, from one direction, so a ray turned
+  past the pad's cone finds none: the dark band. On the black ground the
+  look draws the liquid as its own light on a black dish (onGround, at
+  Lamp Ground 0: the dye lit from the front and scattering back, as milk
+  does), and that light leaves the liquid every way at once, so a ray
+  turned by the wall still finds the liquid it lands in. Nor does the
+  second wall lose it: what that one reflects goes back across the air to
+  the meniscus opposite and into the liquid there, which is the same light.
+  So on black the ray through the wall keeps all but the first wall's
+  reflection, and that reflection is the y term: the two add to one, and a
+  wall in a liquid that glows the same every way is seen only by how much
+  of the liquid the ray crosses (airColumn) and the black behind a clear
+  window. padLight's cone and the second wall's loss are weighed by the
+  Lamp Ground (38h-7: on the Mac every bubble on a black-ground look drew
+  a black band round a black window).
 */
 fn airWall(s: f32, dn: vec2f) -> vec4f {
   let ci = inverseSqrt(1.0 + s * s);
@@ -116,11 +133,12 @@ fn airWall(s: f32, dn: vec2f) -> vec4f {
   var turn = 0.0;
   if (R < 1.0) {
     turn = asin(min(1.0, N_WATER * sin(th))) - th;
-    through = (1.0 - R) * (1.0 - fresnelR(cos(th + turn), N_AIR, N_WATER)) * padLight(2.0 * turn);
+    let lamp = (1.0 - fresnelR(cos(th + turn), N_AIR, N_WATER)) * padLight(2.0 * turn);
+    through = (1.0 - R) * mix(1.0, lamp, U.lampGround);
   }
   // The reflected ray's angle from straight down: pi - 2θ.
   let back = 3.14159265 - 2.0 * th;
-  let bounced = R * padLight(back);
+  let bounced = R * mix(1.0, padLight(back), U.lampGround);
   let up = vec3f(dn * sin(2.0 * th), cos(2.0 * th));
   let front = R * softboxSeen(up);
   return vec4f(through, bounced, front, tan(min(turn, 1.4)));
@@ -143,24 +161,61 @@ fn airWallSeen(t: f32, soft: f32, dn: vec2f) -> vec4f {
 }
 /*
   The liquid above and below the pocket. A bubble wider than the gap is a
-  pancake: its middle is air from glass to glass and the camera sees the pad
-  through it, clear. One narrower than the gap is a ball, and the liquid it
-  did not displace lies above and below it: at its middle a column of
-  2(rho - R) of the gap's 2 rho, toward its rim more. The solver clears the
-  dye from the whole of the pocket's footprint (it is 2D), so that column's
-  colour is put back here, as Beer-Lambert says a part of the depth passes:
-  the liquid's own transmission round the bubble (rimCol against c, the
-  light the ray found where it landed) to the share of the depth left. So a
-  small bubble's middle is the liquid's colour, lighter, as in every macro
-  photograph of bubbles in a dyed liquid, and the softbox's reflection on it
-  shows. Where the ray landed in the liquid already (the band), c is that
-  liquid and nothing more is taken. tB is where on its meniscus (dropBand),
-  the air's half-thickness there min(R, rho) sqrt(1 - tB^2).
+  pancake: its middle is air from glass to glass and the camera sees the
+  ground through it, clear. One narrower than the gap is a ball, and the
+  liquid it did not displace lies above and below it: at its middle a
+  column of 2(rho - R) of the gap's 2 rho, toward its rim more. The solver
+  clears the dye from the whole of the pocket's footprint (it is 2D), so
+  that column is put back here from the liquid round the bubble, a share
+  frac of the gap's depth of it, over c, the light the ray found where it
+  landed. tB is where on its meniscus (dropBand), the air's half-thickness
+  there min(R, rho) sqrt(1 - tB^2).
+
+  How a part of the depth looks depends on the ground, as onGround does:
+  - On the lamp ground the liquid filters the light from beneath, so by
+    Beer-Lambert a share of the depth passes its transmission to that
+    power: c (rimCol / c)^frac, rimCol being the liquid round it lit.
+  - On the black ground the liquid is its own light (the dye at opacity a
+    over the ground), and a layer that both gives light and hides what is
+    behind it gives S (1 - e^-tau) over the ground's e^-tau: so a share of
+    the depth is the same dye at opacity 1 - (1 - a)^frac over c. That is
+    what was missing: the lamp's law can only take light away, and on
+    black c is black, so a small ball's middle was black where every macro
+    photograph shows the liquid's colour, lighter (the Mac, 2026-11-01).
+  A milky liquid's white body thins with the depth the same way (onGround,
+  milkGap). rimS is the sum over the ring of the dye's colour times its
+  opacity, rimA the sum of the opacities, over the six readings round it.
 */
-fn airColumn(c: vec3f, rimCol: vec3f, tB: f32, R: f32, rho: f32) -> vec3f {
+fn liquidPart(c: vec3f, rimCol: vec3f, rimS: vec3f, rimA: f32, frac: f32, fracBlack: f32) -> vec3f {
   let T = clamp(rimCol / max(c, vec3f(1e-3)), vec3f(1e-4), vec3f(1.0));
+  let lit = c * pow(T, vec3f(frac));
+  if (U.lampGround >= 0.999) { return lit; }
+  let a = clamp(rimA / 6.0, 0.0, 1.0);
+  let aL = 1.0 - pow(1.0 - a, fracBlack);
+  var base = c;
+  if (milkScatter > 0.001) { base = mix(c, vec3f(1.0), milkDiffuseReflectance(milkScatter, milkGap * fracBlack)); }
+  let painted = mix(base, rimS / max(rimA, 1e-4), aL);
+  return mix(painted, lit, U.lampGround);
+}
+fn airColumn(c: vec3f, rimCol: vec3f, rimS: vec3f, rimA: f32, tB: f32, R: f32, rho: f32) -> vec3f {
   let left = clamp(1.0 - min(R, rho) * sqrt(max(0.0, 1.0 - tB * tB)) / max(rho, 1e-6), 0.0, 1.0);
-  return c * pow(T, vec3f(left));
+  return liquidPart(c, rimCol, rimS, rimA, left, left);
+}
+/*
+  The ground by reflection in the wall (airWall's y). On the lamp ground,
+  sqrt(rimCol * lamp): the liquid's transmission over half the depth, as it
+  was tuned against the macro photographs. On black the share is the whole
+  depth: a ray turned back off the upper meniscus has the liquid above that
+  point, rho (1 - cos θ), behind it and goes on down through the rest of the
+  gap, rho (1 + cos θ) over |cos 2θ| of path, which past the critical angle
+  is already more than the gap. So the bright line at the contact is the
+  liquid's own light at its full opacity, the line a black-ground bubble
+  had lost (it read sqrt(rimCol * 0)). Counting the oblique path whole would
+  make the line brighter than the liquid; one depth is the floor of it, and
+  the lamp's half is to be measured the same way (38h-11).
+*/
+fn camBounce(ground: vec3f, rimCol: vec3f, rimS: vec3f, rimA: f32) -> vec3f {
+  return liquidPart(ground, rimCol, rimS, rimA, 0.5, 1.0);
 }
 /*
   The film on the glass over a pocket (the one its own speed laid,

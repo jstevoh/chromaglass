@@ -226,12 +226,23 @@ written first. Line numbers are as read on main at d07ac31.
     `airlens` 9-10. The camera's bubble film is the light through it at Film Physics 1,
     the projector's faint complement, not the reflected gold it wore while painted as if
     lit from the front (`camFilm`; the flat film mirrors only the lens axis, the softbox
-    is off it): `npm run filmlook` 8-9, the closeup now on a lit ground. Story in
+    is off it): `npm run filmlook` 8-9, the closeup now on a lit ground. On a black-ground
+    look the liquid is its own light, so the column above and below a ball adds it and the
+    wall's dark band goes (the Mac's film, 2026-11-01): `npm run closeupdepth` 5. Story in
     `docs/plan-shipped.md` §38.
+  - **38h-11. The lamp ground's reflected ray crosses half the liquid, found doing 38h-7 on
+    black** (S, nil). The camera's reflection in a bubble's wall (`camBounce`) takes the
+    liquid's transmission over half the gap on the lamp ground, as tuned by eye; traced, a
+    ray turned back off the upper meniscus crosses rho (1 - cos θ) above and rho (1 + cos θ)
+    over |cos 2θ| below, past the critical angle more than the whole gap. The black ground
+    now takes the whole depth; work the path out per point on both grounds and let the lamp
+    ground's contact line darken to what it is. *Measure:* `npm run closeupdepth` line 2's
+    line before the contact, and the lamp ground's contact against the liquid.
   - **38h-9. The closeup's dye hole and the grain at zoom, found doing 38h-7 part 2** (S,
     nil). The bubble's rim is now exact, but the solver cuts the dye's hole on its own grid:
     a soft lighter fringe a cell or two wide sits outside each small bubble (the cleared
-    dye's antialiasing), and the dye's grain is a cell-sized noise that reads as coarse at
+    dye's antialiasing; on the lamp ground only, 119 against the liquid's 105 just past an
+    18-cell bubble's contact, none on black, measured 2026-11-01), and the dye's grain is a cell-sized noise that reads as coarse at
     zoom 4 and over. Cut the dye's hole in the plate at the fitted rim instead (the solver
     keeps its own for the flow), and draw the grain at screen scale past the solver's cell.
     *Measure:* the fringe's excess brightness 1 to 1.5 radii out in `npm run closeupdepth`.

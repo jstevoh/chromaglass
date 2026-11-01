@@ -38,6 +38,18 @@
  *   4. Light Play only adds light, only in the closeup, only on the bubble,
  *      and on the side its softbox hangs (above and left on the screen);
  *      on the projected plate it changes no pixel.
+ *   5. On a black-ground look (Lamp Ground 0: the liquid its own light on a
+ *      black dish), a ball narrower than the gap shows the liquid left
+ *      above and below it: its middle over BALL_LIT of the liquid round it
+ *      and under BALL_MAX, the column being a part of the depth (here a
+ *      third, the ball's radius two thirds of the half-gap) and so less
+ *      of the liquid's light. Measured 0.49; a column of the whole depth
+ *      reads 0.87 (the wall's Fresnel and the film take the rest) and
+ *      fails, as the old black middle (0.01) does. The Mac's
+ *      film of 2026-11-01 showed every such middle black, because the
+ *      column was put back by a law that can only darken (Beer-Lambert's,
+ *      the lamp ground's) and on black there was nothing to darken; with
+ *      the column taken out the middle reads the black ground and fails.
  */
 import { openLab } from './lab.mjs';
 
@@ -51,6 +63,7 @@ const check = (name, ok, detail = '') => {
 const N = 384, S = 360, B = 18, ZOOM = 4;
 const DARK = 0.3, LENS = 40, LINE = 0.25, SIDE = 0.25;
 const WINDOW = 0.9;
+const BALL_LIT = 0.25, BALL_MAX = 0.7, BALL = 4, BALL_X = 0.3;
 /** One plate uv is S * 1.5 * zoom pixels (the camera's uvToFluid), so the contact is known before anything is read. */
 const CONTACT = (B / N) * S * 1.5 * ZOOM;
 const EDGE_ZOOM = 12, EDGE_SHIFT = 0.9;
@@ -58,7 +71,7 @@ const EDGE_ZOOM = 12, EDGE_SHIFT = 0.9;
 const { page, close } = await openLab();
 let r;
 try {
-  r = await page.evaluate(async ({ N, S, B, ZOOM, EDGE_ZOOM, EDGE_SHIFT }) => {
+  r = await page.evaluate(async ({ N, S, B, ZOOM, EDGE_ZOOM, EDGE_SHIFT, BALL, BALL_X }) => {
     await lab.create(N);
     const cam = { time: 3, macroAmount: 1, zoom: ZOOM, cx: 0.5, cy: 0.5, bubbles: 1 };
     const base = { bubbles: 1, lampGround: 1, lightPlay: 0 };
@@ -87,8 +100,13 @@ try {
     lab.flush(); await lab.step(2);
     await bubble();
     out.pool = await shot({});
+    // Line 5: a ball, BALL cells against the pancake's half-gap of B / 3, away from
+    // the pancake's hole (the solver's clearing outlives the bubble) and the pool.
+    lab.solver().setBubbles(new Float32Array([BALL_X, 0.5, BALL / N, 1]), 1, 0.25, new Float32Array([0, 0, 0.5, 0]));
+    await lab.step(2, { bubbleClear: 1 });
+    out.ballBlack = await shot({ lampGround: 0 }, { ...cam, cx: BALL_X });
     return out;
-  }, { N, S, B, ZOOM, EDGE_ZOOM, EDGE_SHIFT });
+  }, { N, S, B, ZOOM, EDGE_ZOOM, EDGE_SHIFT, BALL, BALL_X });
 } finally {
   await close();
 }
@@ -153,6 +171,14 @@ let plateMoved = 0; for (let i = 0; i < r.plate0.length; i++) if ((i & 3) !== 3)
 check(`4. Light Play adds light only, only on the bubble, its centre over ${SIDE} of the radius above and left of the middle; the projected plate unchanged`,
   placed && down === 0 && added > 1000 && outsideAdd === 0 && cx < -SIDE * CONTACT && cy < -SIDE * CONTACT && plateMoved <= 1,
   `${down} pixels darker, ${added.toFixed(0)} levels added, ${outsideAdd.toFixed(0)} of them outside the bubble, centred (${cx.toFixed(1)}, ${cy.toFixed(1)}) px from the middle; the plate's most moved channel ${plateMoved}`);
+
+const avg = (px, a, b) => { let t = 0; for (let k = a; k <= b; k++) t += ring(px, k, lum); return t / (b - a + 1); };
+const ballR = (BALL / N) * S * 1.5 * ZOOM;
+const ballMid = avg(r.ballBlack, 0, Math.round(0.3 * ballR));
+const ballLiquid = avg(r.ballBlack, Math.round(2 * ballR), Math.round(2.5 * ballR));
+check(`5. on the black ground a ball's middle is the liquid left above and below it: ${BALL_LIT} to ${BALL_MAX} of the liquid round it`,
+  ballMid > BALL_LIT * ballLiquid && ballMid < BALL_MAX * ballLiquid,
+  `middle ${ballMid.toFixed(1)}, the liquid ${ballLiquid.toFixed(1)} (${(ballMid / ballLiquid).toFixed(2)}); radius ${ballR.toFixed(1)} px`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n${checks.length - failed}/${checks.length} passed`);

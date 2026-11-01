@@ -3333,11 +3333,13 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let centre = fuvBase - p * R;
       var rimCol = vec3f(0.0);
       var rimA = 0.0;
+      var rimS = vec3f(0.0);
       for (var ri = 0; ri < 6; ri++) {
         let ang = f32(ri) * 1.0471976 + id * 6.2831853;
         let rf = decodeFluid(layer0, centre + vec2f(cos(ang), sin(ang)) * (R * 1.5 + 0.004), 0.0, false);
         rimCol += onGround(bgColor, rf, dyeThrough);
         rimA += rf.a;
+        rimS += rf.rgb * rf.a;
       }
       rimCol /= 6.0;
       let rimF = vec4f(rimCol, rimA / 6.0);
@@ -3350,9 +3352,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let tB = dropBand(rr, R, rho);
       let curvedB = max((1.0 - dropFlat(R, rho)) * R, spx);
       let softB = clamp(0.7 * spx / curvedB, 0.02, 0.3);
-      // Through it, to the camera: the liquid round it, seen through a lens of
-      // air (closeupDepth.ts), turned outward across the gap; the projector's
-      // view (below) is the liquid right there, a slab of air being a window.
+      // To the camera, the liquid round it through a lens of air
+      // (closeupDepth.ts); to the projector a slab of air is a window.
       var wall = vec4f(1.0, 0.0, 0.0, 0.0);
       if (dropCam > 0.001) { wall = airWallSeen(tB, softB, outward); }
       let lensUv = fuvBase + outward * (2.0 * rho) * wall.w * dropCam;
@@ -3443,13 +3444,12 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let fm = camFilm(filmC, filmP, irid, F);
 
       /*
-        The camera's bubble lit from beneath, traced (38h-7,
-        closeupDepth.ts): through the wall what Fresnel passes of the pad
-        and the film (camFilm), by reflection the liquid round it (the
-        bright line at the contact) and Light Play's softbox.
+        The camera's bubble, traced (38h-7, closeupDepth.ts): through the
+        wall the ground, the liquid left above and below and the film, by
+        reflection the liquid round it, and Light Play's softbox.
       */
       let wallB = 1.0 - smoothstep(1.0 - softB, 1.0, rr);
-      c = mix(c * fm, airColumn(c, rimCol, tB, R, rho) * fm * wall.x + sqrt(rimCol * groundOf(bgColor)) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
+      c = mix(c * fm, airColumn(c, rimCol, rimS, rimA, tB, R, rho) * fm * wall.x + camBounce(groundOf(bgColor), rimCol, rimS, rimA) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
       outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));

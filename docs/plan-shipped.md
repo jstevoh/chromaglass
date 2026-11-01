@@ -10504,6 +10504,25 @@ model cannot reach one, the PR says what it reached and asks.
     -4.7 (bar -2.3). The check-skeptic passed both with a plain blue cast (-8.0), so line 10
     thickens every pocket's film to the most it keeps and asks the tint to move: +1.2, the
     blue cast 0.0 (bar 0.6). Found: 38h-10.
+    *The black ground, 2026-11-01.* Filmed on the Mac, every bubble on a black-ground look
+    went dark: a black band round a black window, a small ball's middle black with a grey
+    glint. Two laws written for the lamp ground were applied to both. `airColumn` put the
+    liquid above and below a ball back by Beer-Lambert, c (rimCol / c)^left, which can only
+    take light away, and on black c is black. And the wall took the pad's cone (padLight),
+    though on black the liquid is its own light, leaving it every way at once, so a ray
+    turned by the wall still finds it. Now, weighed by the Lamp Ground as `onGround` is:
+    on black the column is the dye at opacity 1 - (1 - a)^left over what the ray found (a
+    layer that gives light and hides what is behind it), the reflected ray the liquid at its
+    full opacity (it crosses at least the gap's depth), and the wall loses only the first
+    surface's reflection, whose share is the reflected term, so the two add to one: in a
+    liquid that glows the same every way, a wall is seen by how much liquid the ray crosses
+    and the black behind a clear window. Lamp ground unchanged (the lab picture's most moved
+    channel 1 level). `npm run closeupdepth` line 5: a ball (a third of the depth left above
+    and below) on black reads 0.49 of the liquid round it, was 0.01; a column of the whole
+    depth reads 0.87 and fails (bar 0.25 to 0.7). The rim on black reads 0.87 of the liquid
+    just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
+    the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
+    38h-11.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
