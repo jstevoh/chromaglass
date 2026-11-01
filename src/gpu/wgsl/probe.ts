@@ -29,8 +29,16 @@ struct ProbeArgs {
 const GROUP = 256u;
 var<workgroup> sSum: array<f32, 256>;
 
-/** Rec. 709 luminance, on the values the canvas carries — as the GL probe's mean does it. */
-fn luma(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
+/** Exact IEC 61966-2-1 sRGB transfer curve to linear light, per channel (0..1). */
+fn srgbToLinear(c: vec3f) -> vec3f {
+  let x = clamp(c, vec3f(0.0), vec3f(1.0));
+  let lo = x / 12.92;
+  let hi = pow((x + vec3f(0.055)) / 1.055, vec3f(2.4));
+  return select(hi, lo, x <= vec3f(0.04045));
+}
+
+/** Rec. 709 relative luminance on linear light (14i-guard), decoded from the sRGB canvas. */
+fn luma(c: vec3f) -> f32 { return dot(srgbToLinear(c), vec3f(0.2126, 0.7152, 0.0722)); }
 
 /** The tree reduction both passes end with. */
 fn fold(lid: u32) {
