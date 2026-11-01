@@ -161,3 +161,81 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
   SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
   line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.
+
+## ~~33i. The camera's dials do something~~ — **Shipped, this PR** (Settings → Camera: Refraction, Aperture, Bloom and Chromatic Aberration act at their own settings with Lens at 0, and are no longer greyed; the shader rebuilt on thin-prism refraction, a thin lens's blur circle, a power-law glow and Abbe dispersion, `src/gpu/wgsl/camera.ts`; the four default to 0 and saved looks and set lists are read as they looked (a look with Lens up has each optic rescaled by Lens, the aperture by Focus too and the bloom by Lens again, within 1.2 to 5.5 levels of the old picture over the lit pixels of a 1024 px frame), `PRESET_VERSION` 3; `npm run lens`: mean change of the frame at a full dial, Lens at 0, was 0.0 for all four on the old pass, now refraction 11.0, aperture 8.1, bloom 21.6, chromatic 4.6 levels on Metal; story in `docs/plan-shipped.md` §33i)
+
+- **33i-1. Shortcuts to replace with the real thing.** (a) Dispersion runs at an Abbe
+  number of about 8, the densest flints; real oils sit near 50 and would show nothing.
+  Replace with per-wavelength refraction of the dye's real index (the plate's liquid
+  table) and let the knob scale the exposure, not the physics. (b) The glow scatters what
+  is over a 0.5 knee because the plate is stored in 8 bits and clips at 1; draw the plate
+  in half floats and scatter true radiance. The glow also only adds light (gain 2.4 on what is
+  over the knee) and takes none from the core, where a real point spread moves it out of the
+  core; conserve it once the plate is in half floats. (c) Refraction displaces the picture by the
+  surface slope; the light's path through the film's thickness is not traced, and the
+  height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
+- **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
+  sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §105); if it
+  costs frames, gather at half resolution for the wide discs. The gather weights also lack
+  the disc-area share (about 64 over the radius squared of the physical strength); a naive
+  area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
+- **33i-3. Lens up on a look still at the defaults is now only the sensor look.** The old
+  defaults (aperture 0.5, bloom 0.4, refraction 0.6) came on with Lens; they no longer
+  do. The shipped looks keep their cameras (checked, 33 looks); Lucky rolls the optics
+  only when it takes the lens, so its output for a given seed moves once.
+- **33i-4. Idea: the cyberpunk look's colour fringing.** It stored 0.35 that never drew
+  (its Lens is 0); the dead value was removed. Give it a visible 0.2 if the owner wants
+  the fringe on that look.
+- **33i-6. A bubble's own lens is gone from the camera.** The old pass added `bub*0.045`
+  to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
+  no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
+  the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
+  closeup misses it first (`docs/judging.md` §105).
+- **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
+  Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`), the aperture's by Focus
+  too (`apertureScale`) and the bloom's by Lens again (`bloomScale`: the old pass sent the glow
+  through the sensor's roll-off before mixing by Lens, so it reached the frame about Lens
+  squared). Over the lit pixels of a 1024 px frame the old defaults sit 2.2 to 3.2 levels from
+  the old pass (4.0% to 8.9% of them moved by 8 or more), an every-optic-at-.8 look 3.6 to 5.5
+  (10.7% to 14.0%), at .25 1.2 to 1.8 (0.7% to 3.8%), the worst of each at Lens .6. The rest is
+  the kernels: the old 12-tap blur and 8-direction glow against the new 64 taps and 60 samples.
+  The old fringe was under half a level, so chromatic maps to about 0.03, and no scale of it can
+  be told from another. And the frame: the old blur circle was a count of pixels and the new one
+  a share of the frame, so the aperture is fitted at 1024 px, about the frame the looks were seen
+  at; on a smaller frame (a phone) a migrated look is softer than it was, on a larger one
+  sharper. A saved look does not record its frame, so the fit cannot follow it. `npm run lens`
+  section 6 holds the bars (4.3, 7.4 and 2.4 levels; 12%, 19% and 5% of the lit pixels) and two
+  controls: the 384 px fit must miss them (11 of 12 looks at Lens 1), and the fitted bloom and
+  refraction at half and one and a half times must sit further from the old picture on most
+  looks (bloom 18 and 18 of 18, refraction 15 and 18).
+- **33i-8. A dial swept through 0 rebuilds the camera pass.** The visualizer builds a new
+  `WebGPUCamera` when `cameraWanted` turns true and disposes it when it turns false
+  (`LiquidVisualizer.tsx`), so each crossing compiles the pass's pipelines again. Before 33i only
+  Lens did that; now any of the five does, and a MIDI knob turned down to 0 and up, or a sound
+  cord dipping a dial to 0 on each beat once 33i-5 adds keys, rebuilds it each time. Measure
+  the hitch on the Mac (a knob swept through 0 ten times, `npm run stutter`'s two-step frames),
+  and if it shows, keep the pass for a few seconds after it stops being wanted.
+- **33i-5. `sceneMap.ts` has no keys for the camera's dials**, so a scene cannot ride
+  them; add them if a scene should (the frame must not move with sound).
+- **33i-9. Evolve wanders the camera.** Evolve's glass theme (`src/lib/drift.ts`) names
+  Refraction, Chromatic Aberration, Aperture and Focus. It never turns a dial on from 0, so a look
+  with the optics at 0 is untouched, but on a look with one up and Lens at 0 it now wanders an
+  optic that draws, where before 33i the same dial drew nothing. And a dial's window reaches a
+  fifth of its range below where the look set it, floored at the dial's minimum, so one set
+  under 0.2 can be walked to exactly 0 by a calm passage at full Evolve Speed: with Lens at 0
+  and nothing else up the pass is torn down and built again on the way back (33i-8). Ask the
+  owner (`docs/judging.md` §105) whether the camera belongs in the glass theme; if it stays, floor
+  an optic's window above 0 as the look's own zero rule does, and `npm run lens` already prints
+  which optics Evolve may wander.
+- **33i-10. A set item's controls and a sequence stage's settings skip the migration.**
+  `SetItem.controls` (`src/lib/setList.ts`) and `ShowStage.settings` (`src/lib/sequencer.ts`)
+  are partial settings laid over a look as it plays, and they are not saved looks, so
+  `upgradeSaved` never reads them. One made before 33i holding an optic beside Lens 0 now draws
+  that optic: an item's controls are the strip's rides when it was captured
+  (`src/app/useSetActions.ts`), so an optic pinned to the strip; a stage's settings are set a key
+  at a time in the sequencer, where Aperture and Bloom could glide before this PR. No shipped set
+  list or sequence sets one (the starter set has no controls, and the five built-in sequences'
+  stages name none of the optics or Lens); the owner's own may. Read such a file's version and
+  zero the four where the item or stage leaves Lens at 0, as a look is read, with a `setlist`
+  line for it.

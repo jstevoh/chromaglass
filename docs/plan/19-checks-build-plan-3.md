@@ -231,7 +231,11 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   clock makes three or four, bar 1.5) and `drawwall`'s "the laptop's own frames reach Draw, at
   least 8 a second" at 7.3/s with the display drawing 14.7 frames/s, each once, each green on the
   same diff's other runs. Both belong in 19ad-1's measurement over a run of shards before any bar
-  moves.
+  moves. Later that day #435's run 41091566768 (95af0bc7) read the same `renders` line red on
+  the phone at 2.3 commits/s (the laptop's line green), the only window over 1.3 in 23 `open`
+  jobs that day, with the same tree's 30 local runs at 1.0; and `startup` red in 19aa-7's
+  shape (the show's own 2.03 s against the control's 0.67 s, the show moving for good 8.9 s
+  earlier), 1 of the same 23.
 
 ## 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 

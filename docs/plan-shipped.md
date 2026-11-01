@@ -6347,6 +6347,128 @@ follows the dye" correlation came out negative; and a ΔE that includes lightnes
 14 on `lava-lamp` from the relief alone. Each was dropped for a line that failed on the
 control before it was trusted on the fix.
 
+### 33i. The camera's dials do something (this PR)
+
+*Reported* (the owner, 2026-10-22, relayed): "the camera controls don't really do much".
+
+Measured on Metal before any change (`npm run lens`, the old pass as `origin/main` has it,
+384 px, nine pours): with Lens at 0 the four optics changed the frame by exactly nothing,
+because the pass multiplied them by Lens and the panel greyed them out until Lens was up;
+with Lens at 1 a full dial moved the frame by a mean of 3.6 levels (refraction), 4.4
+(aperture), 8.8 (bloom) and 0.5 (chromatic aberration) out of 255, a pixel or two of motion.
+
+What was wrong was three things. The gate: `camera` was the master, so the optics could not
+be reached alone, and Focus did nothing without the aperture. The strength: refraction
+multiplied the slope by the dye's height a second time, the blur was a few pixels, the fringe
+a fraction of one. And the model: the blur was sized by the pixel's own height, the glow a
+Gaussian.
+
+Changed, on the physics. Refraction is a thin prism (Snell for small angles, n−1 of 0.4, a
+throw of a quarter of the frame): the plate's normal is already the slope, scaled by how
+much liquid there is. Dispersion is the prism's spread of 1/V of the deviation, plus the
+lens's lateral colour growing with the distance from its axis. Depth of field is a thin
+lens's blur circle, linear in distance from the focal plane and in aperture, with a field
+curvature, gathered as a scatter (each neighbour's disc weighted by one over its area, so a
+sharp ring over a blur stays sharp and a blurred dome bleeds over a sharp ground). The glow
+is a power-law point spread (about r⁻³, a tight halo and a faint wide one). Lens is now only
+the sensor's look (roll-off, vignette, grain); `cameraWanted()` turns the pass on for Lens or
+any one optic, and Focus alone does not (it has nothing to blur). The four optics default to
+0, a saved look or set list at the old version with Lens at 0 reads with them at 0 (they
+were inert), Lucky rolls them only with the lens on, and the shipped looks keep their
+cameras. Refraction and Chromatic Aberration are now MIDI-learnable, and they and Focus glide in a
+sequence stage.
+
+After: a full dial with Lens at 0 moves the frame by a mean of 11.0 (refraction), 8.1
+(aperture), 21.6 (bloom) and 4.6 (chromatic) levels; at Lens 1 10.0, 7.5, 20.7, 3.9 (as
+`npm run lens` reads them on the last push; the first read 11.7, 8.1, 21.9, 4.8). Where
+they work is checked as physics: refraction moves 54% of the steep pixels and 13% of the flat,
+chromatic aberration leaves green alone, bloom only adds light, every dial at 0 draws the
+plate as no pass would, and a plate with no dye gives them nothing to work on. The check
+fails on the old pass on 14 lines. (The 54% and 13% read the slope upside down; see the
+second review below: upright it is 88% and 1%.) The bars were first set as shares of pixels moved, which
+the skeptic showed an old pass at Lens 1 nearly met; they are means now, between the old
+pass's and the new.
+
+Review of the first push found that a saved look with Lens up had changed (the optics no longer
+rode Lens, so the old defaults at Lens 1 sat 8 levels from the old picture, at Lens .3 13). A
+pre-v3 look now has each optic rescaled by Lens times a fitted ratio, fitted against the old pass
+rendered from a frozen copy of it (`scripts/fixtures/camera-before-33i.ts.txt`): 2.0 levels on the
+old defaults. Left as 33i-7.
+
+Merging main a third time (2026-10-27) brought in three things the camera had to fit: checks
+now live in one manifest (19k), so `lens` is an entry in `scripts/checks.json` on the plate shard
+beside the air lens rather than a step in `checks.yml`; the desk's hover lines (8j,
+`src/lib/controlHelp.ts`) still called Lens "the lens as a whole" and Refraction what "the dye and
+the bubbles" bend, both untrue after this PR, so they now say the sensor's look and a thin prism;
+and Evolve's drift (`src/lib/drift.ts`) gained a glass theme that names Refraction and Chromatic
+Aberration, which this PR makes pinnable and so driftable. That is safe for the looks: drift
+leaves a dial the look set to 0 at 0, so it never turns an optic on, and only wanders one a look
+already uses.
+
+Main's size ratchet (19ai-5) held the visualizer and the settings panel to main's size, and
+moving the grain's gate to make room turned up a fault: the visualizer told the plate the camera
+was on only with Lens above 0, but the same flag picks the plate's finish under a post chain, so
+with an optic up and Lens at 0 the plate was drawn into the camera's 8-bit texture with no
+dither. The gate on Lens now lives in `fillPlateUniforms` beside the settings it reads (the
+uniform is the pass and Lens; the finish reads the pass alone). Only the harness's test chain
+reached it.
+
+A second skeptic pass on `npm run lens` (2026-10-29) found seven ways it could pass while
+measuring nothing, and closing them turned up two faults. The lab read the camera's aux texture
+upside down (`scripts/lab-entry.ts` turned only the frame upright under the camera), so
+refraction's steep against flat compared the picture with the slope mirrored: 54.6% against
+12.0%, which loose bars (30%, three times) let through. Read upright it is 88.3% against 0.9%; the
+bars are 60% and 5%, and the mirrored reading is kept as a control that must fail them. And the
+aperture's fit held only at the size it was made at. The old blur circle was a count of pixels
+(nine per unit of height from the focal plane) and the new one is a share of the frame (a
+twentieth), so the fit made at 384 px (0.8) is 1024/384 too strong at the thousand-odd pixels a
+look was seen at. Fitted again at 1024 px with Focus varied, the scale is 0.3 at mid focus and
+falls to 0.15 near Focus 0, where the old circle was widest (`apertureScale`,
+`src/lib/userPresets.ts`): the old defaults at Lens 1 and Focus .05 went from 3.41 levels off the
+old picture to 1.53. The saved looks are now drawn at 1024 px in a second lab built on the old
+shader beside the new one (both are checked to hold the same plate to the level), the 384 fit is
+a control that must miss the bars on a third of the looks at Lens 1 (it misses 7 of 12), and the
+bars are 2.5, 4.5 and 1.5 levels for the three sets, which the migrated looks meet at 1.3–1.9,
+2.6–3.2 and 0.8–1.1. The rest: what Lens keeps of the optics is measured from Lens's own picture
+(the old measure was met by Lens alone, 40.7%); the sound reading cuts names into words, with the
+plate's uniforms as the control that it hears the beat; the dark plate is held to a peak of 0
+under every optic, and a flat wash shows refraction and aperture moving nothing where there is no
+relief while bloom moves 94% of it; the near-zero arm is a turn to 0.002 (a dial at 0 was the off
+picture by construction); and each of the 203 other numbers in the settings, at 1 on its own,
+leaves the pass off. 61 lines, all green; on the old pass 15 of 31 fail.
+
+A third review (2026-10-30: the check-skeptic on `npm run lens` again, and the pre-push review)
+found the glow's migration half fitted and five more ways the check could pass on a fault. The
+old pass sent the glow through the sensor's roll-off before mixing it in by Lens, so the glow
+reached the frame about Lens squared times its dial, not Lens times it, and a look saved at a
+low Lens opened with too much glow: an every-optic-at-.8 look at Lens .3 moved 29.9% of its lit
+pixels by 8 levels or more, and the old defaults there sat 3.45 levels off. Bloom is now read as
+Lens squared times its dial (`bloomScale`, `src/lib/userPresets.ts`): 12.1% and 2.21. The saved
+looks are measured over their lit pixels (the black around the pours is more than half the
+frame, which is 41% to 48% lit, and halved every mean), with bars on the mean and on the share
+moved by 8 (4.3, 7.4 and 2.4 levels; 12%, 19% and 5%), which the migrated looks meet at 2.2–3.2,
+3.6–5.5 and 1.2–1.8 levels; the 384 px fit misses them on 11 of 12 looks at Lens 1, and the
+fitted bloom and refraction taken at half and one and a half times must sit further from the old
+picture on most looks (bloom on all 18 both ways, refraction on 15 and 18). Refraction's
+direction is asked, not only where it moves: a steep pixel must take the colour a tenth of the
+frame along its slope, against the colour as far against it and at half and one and a half times
+the throw (100.0% on all three; patched shaders by hand: a shift that ignored the slope 68.1% on
+the way, the slope backwards 0.0%, its axes swapped 64.8%, half the throw 0.0% on the throw, and
+a picture that did not move at all 88.8% on the way but 7.6% on the throw). Each dial at Lens 1
+must keep three quarters of what it does at Lens 0 (85% to 96%; a Lens that halved two optics
+kept both over the old bar alone). A look that never wrote an optic is read with exactly what
+the old default migrates to, not merely above 0. The visualizer's call that fills the pass's
+uniforms is read and must take each dial from its own setting and the clock from the view, beside
+a copy with the bass added to the bloom that must fail, and `brightness` joins the sound words.
+65 lines, all green; on the old pass 16 of 33 fail. The review also found that Evolve's glass
+theme now wanders an optic that draws at Lens 0 and can walk a light one to 0 (33i-9), and that a
+set item's controls and a sequence stage's settings skip the migration (33i-10).
+
+Left open as 33i-1 to 33i-10 in `docs/plan/33-bubbles-closeup.md`: the Abbe-8 exaggeration, the
+8-bit glow knee, the 64-tap cost and edge hair at aperture 1, Lens-up at the defaults, a dial
+swept through 0 rebuilding the pass, Evolve and the camera, and set items and stages skipping the
+migration.
+
 ## 34. What a competitor's page showed
 
 ### 34a. A landing page before the sign-in wall (2026-10-22)

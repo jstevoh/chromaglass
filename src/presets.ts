@@ -240,7 +240,6 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.55,
       airVelocity: 0.3,
       vibrationFrequency: 0.8,
-      chromaticAberration: 0.35,
       /*
         The pattern for a look's own patches (28f), for a look about hits:
         each kick churns the neon, a hard one harder; the snare's crack curls

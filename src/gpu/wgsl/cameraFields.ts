@@ -15,7 +15,7 @@ import { layOut, wgslStruct, type Field } from '../uniforms';
 
 export const CAMERA_FIELDS: Field[] = [
   { name: 'resolution', type: 'vec2f' },
-  { name: 'amount', type: 'f32', note: 'the camera as a whole, 0..1 (0 = pass-through)' },
+  { name: 'amount', type: 'f32', note: 'the sensor’s look (roll-off, vignette, grain), 0..1; the optics act at their own settings' },
   { name: 'aperture', type: 'f32', note: 'how fast things go soft away from the focal plane' },
   { name: 'bloom', type: 'f32', note: 'glow around the highlights' },
   { name: 'chromatic', type: 'f32', note: 'colour fringing at refracting edges and the frame’s corners' },
@@ -23,7 +23,7 @@ export const CAMERA_FIELDS: Field[] = [
   { name: 'filmic', type: 'f32', note: 'the sensor’s roll-off (ACES) against a straight clamp' },
   { name: 'focus', type: 'f32', note: 'the focal plane, as a height: 0 the glass, 1 the thickest domes' },
   { name: 'grain', type: 'f32' },
-  { name: 'refraction', type: 'f32', note: 'how much the dye and the bubbles bend what is under them' },
+  { name: 'refraction', type: 'f32', note: 'how much the dye’s curved surface bends what is under it (a bubble’s own lens is PLAN 33i-6)' },
   { name: 'time', type: 'f32' },
   { name: 'vignette', type: 'f32' },
 ];

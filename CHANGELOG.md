@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — The camera's dials act on their own (PLAN 33i)
+
+- **Refraction, Aperture, Bloom and Chromatic Aberration** (Settings → Camera) work with Lens at 0 and are no longer greyed until it is up; Lens is now only the sensor's look (roll-off, vignette, grain). The optics are rebuilt on the physics (a thin prism's refraction, a thin lens's blur circle with Focus, a power-law glow, dispersion) and at a full dial move the frame two to nine times as much as before (`npm run lens`). The four default to 0; saved looks and set lists from before read as they looked (with Lens up, within one to six levels of the old picture over its lit pixels, on a frame about a thousand pixels tall), Lucky rolls them only with the lens on, and Refraction and Chromatic Aberration are MIDI-learnable. The camera reads no sound of its own.
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a

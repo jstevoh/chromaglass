@@ -3,6 +3,7 @@
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
 import { WebGPUPlate } from '../src/gpu/plate';
+import { WebGPUCamera, fillCameraUniforms } from '../src/gpu/camera';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
 import { MAGNET_RADIUS } from '../src/gpu/wgsl/magnetDisc';
@@ -678,6 +679,18 @@ const api = {
         it (npm run pixels, the speckle at dye edges).
       */
       grain?: boolean;
+      /*
+        The camera pass over the finished plate, as the app runs it when the
+        Lens or any of the four optics is up (`npm run lens` asks each dial
+        of it): the plate is drawn into the camera's
+        scene texture with its aux attachment, and the camera looks at both.
+        `aux: true` hands back the aux attachment itself (the normal, the
+        height, the bubble mask, RGBA bytes) in place of the picture, so a
+        check can ask what the lens has to bend and blur before it asks what
+        it did.
+      */
+      camera?: { amount?: number; refraction?: number; chromatic?: number; focus?: number; aperture?: number; bloom?: number; [more: string]: number | undefined };
+      aux?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -702,7 +715,9 @@ const api = {
         // The plate's clock can be set apart from the solver's, to ask what
         // the picture does with time alone (in `npm run filmlook`, the film's
         // thickness must not drift with it).
-        settings: { ...DEFAULT_SETTINGS, ...over } as VisualizerSettings, time: cam.time ?? l.time,
+        // The camera's Lens rides in the settings as it does in the app, since the
+        // plate reads it there to decide whether to leave its grain to the camera.
+        settings: { ...DEFAULT_SETTINGS, ...over, ...(cam.camera ? { camera: cam.camera.amount ?? 1 } : {}) } as VisualizerSettings, time: cam.time ?? l.time,
         shot: { cx: cam.cx ?? 0.5, cy: cam.cy ?? 0.5, zoom },
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
@@ -715,7 +730,15 @@ const api = {
         film: cam.film ? { kind: 'file', video: { readyState: 4, videoWidth: fw, videoHeight: fh } } : { kind: 'none', video: null },
     };
     const fluids = cam.backPlate ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }];
-    fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N });
+    fillPlateUniforms(plate.pack, { view, fluids, width: size, height: size, derived: true, grid: l.N, cameraOn: !!cam.camera });
+    const camera = cam.camera ? new WebGPUCamera(device, 'rgba8unorm') : null;
+    if (camera) {
+      const c = cam.camera!;
+      fillCameraUniforms(camera.pack, {
+        time: cam.time ?? l.time, amount: c.amount ?? 1, refraction: c.refraction ?? 0, chromatic: c.chromatic ?? 0,
+        focus: c.focus ?? 0.5, aperture: c.aperture ?? 0, bloom: c.bloom ?? 0, dither: 1,
+      }, size, size);
+    }
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();
     // Asked for the grain and there is none (an adapter without
@@ -740,7 +763,12 @@ const api = {
       flipped too (`flip`).
     */
     const flipped = cam.flip || !!cam.sources?.length;
-    plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    if (camera) {
+      plate.draw(enc, camera.sceneView(size, size), { width: size, height: size }, layers, undefined, true);
+      camera.draw(enc, target.createView(), plate.auxTarget!, undefined, false, 'rgba8unorm');
+    } else {
+      plate.draw(enc, target.createView(), { width: size, height: size }, layers, undefined, flipped);
+    }
     // As the app fills them: the frame's settings with the other rows at
     // nothing, no camera and no chain, so each display does its own finish.
     const owns = (cam.sources ?? []).map((kind) => {
@@ -753,7 +781,8 @@ const api = {
       return { kind: kind as string, tex };
     });
     const row = Math.ceil(size * 4 / 256) * 256;
-    const reads = [{ kind: 'wall', tex: target }, ...owns].map(({ kind, tex }) => {
+    const auxRead = cam.aux && plate.auxTarget ? [{ kind: 'aux', tex: plate.auxTarget }] : [];
+    const reads = [{ kind: 'wall', tex: target }, ...auxRead, ...owns].map(({ kind, tex }) => {
       const buf = device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
       enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: row }, [size, size]);
       return { kind, tex, buf };
@@ -764,17 +793,27 @@ const api = {
       await buf.mapAsync(GPUMapMode.READ);
       const src = new Uint8Array(buf.getMappedRange());
       const out = new Uint8Array(size * size * 4);
+      // The plate draws into the camera's scene the way the app does, flipped
+      // (a texture's rows run the other way from a canvas's), and its aux
+      // attachment with it; the camera turns the picture upright as it reads
+      // the scene, but the aux is read here as stored. Read without turning,
+      // the slope under each pixel was its mirror row's, and the check of
+      // where refraction acts (npm run lens) passed on that mirror: 54.6% of
+      // "steep" pixels moved against 12.0% of "flat", where the right way up
+      // reads 88.3% against 0.9%.
+      const upside = kind === 'aux' ? !!camera || flipped : flipped;
       for (let y = 0; y < size; y++) {
-        const from = flipped ? size - 1 - y : y;
+        const from = upside ? size - 1 - y : y;
         out.set(src.subarray(from * row, from * row + size * 4), y * size * 4);
       }
-      buf.unmap(); buf.destroy(); tex.destroy();
+      buf.unmap(); buf.destroy(); if (kind !== 'aux') tex.destroy();
       pictures[kind] = Array.from(out);
     }
     // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
     lastDrop = await plate.drop.read();
     plate.dispose();
-    return cam.sources ? pictures : pictures.wall;
+    camera?.dispose();
+    return cam.sources ? pictures : cam.aux ? pictures.aux : pictures.wall;
   },
   /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */
   dropHeight() { return lastDrop ? { n: lastDrop.n, h: Array.from(lastDrop.h) } : null; },
