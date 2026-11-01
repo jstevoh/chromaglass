@@ -124,22 +124,33 @@ Left, each its own plan item:
   paced by the plate now (a move each cell and a quarter, the next after 120 ms or two frames):
   0 straw steps on GitHub's Mac, the pool kept 356 → 356 and 277 → 279. Story in
   `docs/plan-shipped.md` §15g-8. What the straw does to the dye when it does blow is 15g-8b.
-  - **15g-8b A bubble's dye accounting across the readback mirror.** On a thin gap the GPU
-    multiplies the dye under every bubble away each step (`airExclude`) and the CPU puts it back as
-    a ring from the readback mirror (`depositBubbleRims`, H6). It conserves only when the mirror,
-    the bubble list and the GPU agree on which cells were covered since the last deposit; a slow
-    machine blowing the straw (a new bubble each hold, on dye drifting in the breath) swings the
-    plate's colour ±15–20% either way. Tried in #636 and taken out of it: the air carrying the
-    liquid under it out across the cell faces in flux form (`airDisplace`, the diff in the owner's
-    handoff folder `air-push-15g8/`). It conserves exactly (lab: a bubble put down whole 0.00%,
-    growing 0.00%, moving −0.31%, against −16%, −31%, −27% for the multiply alone), but the liquid
-    it pushes stops at the first cell with no air and piles in a ring a cell or two wide, 3–4× the
-    plate's depth, where a real incompressible layer shifts the liquid round it outward and leaves
-    no ring. The ring is seen: `npm run holeline`'s "no glow round a hole" (7.45 levels against 6)
-    and, on the Mac, `npm run airlens`'s window and pin-point (the window ×1.10 middle to edge).
-    The real fix moves the outer liquid too: the displacement the divergence source already asks
-    for, carried in flux form where the air arrives so the semi-Lagrangian carry does not leave its
-    copy in the middle (the reason a push or a multiply is needed at all).
+  - ~~**15g-8b A bubble's dye accounting across the readback mirror.**~~ **Shipped**: on a thin
+    gap a bubble's colour goes where its liquid goes. The air's source in the thin solve is no
+    longer clamped at a fortieth of what a bubble put down whole asks; the amounts' carries move
+    colour per unit of liquid, a donor with air in it handing on its liquid mixed with what comes
+    in (airLiquid, airGive); `airExclude` is off a thin gap and `depositBubbleRims` stands down
+    there. Lab (`npm run bubbledye`): whole, growing, drifting and popped bubbles all keep the
+    plate's colour to 0.00% (main −2.6%, −3.2%, −6.4%), no ring (deepest 1.01–1.08), 3.3%, 1.0%
+    and 4.8% left under them. Story in `docs/plan-shipped.md` §15g-8b.
+  - **15g-8c The old plate's bubbles still multiply and paint back.** With Thin Gap off
+    `airExclude` still deletes the colour under a bubble and the CPU's `depositBubbleRims` puts it
+    back as a ring from the readback mirror, frames behind on a slow machine. Every look runs a
+    thin gap, so this is the plate switched off it; the fix is the same accounting in the old
+    carries (a source where the air arrives, colour per unit of liquid), then the CPU's half goes.
+  - **15g-8d Liquid runs through a bubble in the thin solve.** The solve gives the air the
+    liquid's mobility, so a moving bubble's front (a source) drains through it to its back (a
+    sink), and a whole bubble's middle leaves through cells that are emptying too. Between two
+    glasses liquid goes round air. The carries keep every amount anyway, but what runs through
+    leaves 3.3–4.8% of the pool's colour in the bubble's middle (`npm run bubbledye`), and the
+    flow outside a moving bubble is not the flow round an obstacle. The real fix is the bubble as
+    a second phase in the solve: pressure all but uniform inside it (air's viscosity is a
+    fiftieth of water's), the liquid's flux through its faces nothing.
+  - **15g-8e Every carry of what the liquid holds takes the air.** With 15g-8b the colour, the
+    poured liquids, the oil's colour, the reaction and the species riding with the colour move per
+    unit of liquid under a bubble; the species carried alone (`passes.ts`, A.a.y 0), the maze's own
+    path and the oil's mix (`mixAdvectSub`) do not. So under a bubble with Oil Bodies a body's
+    colour and its edge can part, and two setups `npm run thick` holds equal differ under air.
+    Give each the same accounting (airLiquid takes any amount carry), with a lab case per carry.
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event

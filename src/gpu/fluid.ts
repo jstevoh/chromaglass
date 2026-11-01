@@ -49,7 +49,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidReads } from './fluid/reads';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
@@ -503,7 +503,20 @@ export class WebGPUFluid extends FluidReads {
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
-    this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    /*
+      And on the step after the last bubble goes: its hole is a sink in the
+      thin solve (the air leaving, hsDivergence), which is what lets the
+      liquid back in now that nothing paints it back (PLAN 15g-8b).
+    */
+    const hadAir = thin && this.airPush > 0 && this.airCover > 0;
+    /*
+      Not on a plate all but frozen (Advection near 0): the source is per
+      unit of the step's displacement, so a bubble arriving on a step that
+      moves nothing would ask the half-float velocity for more than it holds.
+      The liquid does not move off the air there; it does when the plate
+      moves again and the air does.
+    */
+    this.airPush = (this.air.any || hadAir) && disp > AIR_DISP_LEAST ? (p.bubbleClear ?? 1) : 0;
     this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
     this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
@@ -663,7 +676,7 @@ export class WebGPUFluid extends FluidReads {
       reaches ≥ 0.02, where half-float changes survive quantization without loss,
       or whenever doubleDiffusion is elevated.
     */
-    const doubleDiff = Math.max(0, Math.min(1, p.doubleDiffusion ?? 0));
+    const doubleDiff = Math.max(0, Math.min(2, p.doubleDiffusion ?? 0));
     const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
     this.heatSeconds += seconds;
     const heatRate = (KAPPA_WATER / (PLATE_METRES * PLATE_METRES)) * (1 + 99 * doubleDiff) * n2;
@@ -752,7 +765,7 @@ export class WebGPUFluid extends FluidReads {
       straight through the glass and this is zero either way.
     */
     const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
-    const buoy = Math.max(Math.max(0, Math.min(1, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
+    const buoy = Math.max(Math.max(0, Math.min(2, p.solutalBuoyancy ?? 0)), upright > 0.001 ? 0.5 : 0);
     if (buoy > 0.001) this.ensureMix();
     const mix = this.mix;
     /*
@@ -890,7 +903,7 @@ export class WebGPUFluid extends FluidReads {
       // The spin of the flow the plate actually moved by last step: the
       // velocity carried between steps is capped small (decayVel).
       this.run(pass, 'curl', w, [this.velForced], none);
-      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(1, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
+      this.run(pass, 'confine', this.vel.write, [this.vel.read, w], this.arg('confine', [Math.min(2, p.vorticity ?? 0) * CONFINE, 0, 0, 0]));
       this.vel.swap();
     }, (p.vorticity ?? 0) > 0.001);
     /*
@@ -1058,6 +1071,18 @@ export class WebGPUFluid extends FluidReads {
     */
     const speciesOn = thin && !!this.species && this.speciesLive;
     const rider = speciesOn && this.fuseSpecies ? this.species! : undefined;
+    /*
+      How much of a cell the air takes from the liquid in the amounts' carries
+      on a thin gap (airLiquid in wgsl/fluid.ts, PLAN 15g-8b), and each
+      planned substep's arguments with its index: the bubbles' liquid leaves
+      across the faces as the air arrives, so the carries, not airExclude,
+      empty a bubble on a thin gap.
+    */
+    // Only while there is air, or its hole the step after the last pop (airPush): with none every carry reads a liquid of 1 and airGive does not run.
+    // And only once airGive is built: a carry taking the air reads what it wrote this substep.
+    const airRoom = thin && this.air && this.airPush > 0 && this.airGiveReady() ? Math.max(0, Math.min(1, p.bubbleClear ?? 1)) : 0;
+    this.airCarry = airRoom > 0;
+    const thinAt = this.airCarry ? this.airArgs(airRoom, disp) : undefined;
     let speciesCarried = false;
     stage('advect dye', (pass) => {
       /*
@@ -1118,7 +1143,9 @@ export class WebGPUFluid extends FluidReads {
         // The maze's sixths, or as many as a hand in the liquid needs (handSubs), as the ferrofluid takes.
         const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, thin ? REST_GAP : 0]);
         for (let k = 0; k < handSubs; k++) {
-          if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, flux);
+          // With air on a thin gap each sixth knows how much of the step is done before it (airLiquid).
+          const sixth = this.airCarry ? this.arg(`dye flux ${handSubs} @${k}`, [k / handSubs, airRoom, 0, 0, 0, disp / handSubs, 1, REST_GAP]) : flux;
+          if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, sixth);
           else this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
           /*
@@ -1128,7 +1155,7 @@ export class WebGPUFluid extends FluidReads {
             print it had made moved off.
           */
           if (this.chemLive) {
-            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, flux);
+            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, sixth);
             else this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], flux);
             this.chem.swap();
           }
@@ -1138,11 +1165,12 @@ export class WebGPUFluid extends FluidReads {
         return;
       }
       if (!bodiesOn && thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
+        const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv, undefined, thinAt);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
       if (!bodiesOn) { 
@@ -1175,12 +1203,12 @@ export class WebGPUFluid extends FluidReads {
       }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv, undefined, thinAt);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -1246,11 +1274,17 @@ export class WebGPUFluid extends FluidReads {
       liquid where the bubble is. Skipped entirely when no bubble is on the
       plate, which is most looks — `stage` does not open a pass it is told
       not to, so the profiler reads zero rather than the cost of nothing.
+
+      Only off a thin gap now (PLAN 15g-8b). On a thin gap the bubble's
+      liquid leaves across its cells' faces as the air arrives (the air's
+      source in hsDivergence, carried per unit of liquid by airLiquid), so
+      the colour goes where the liquid goes and none is deleted here, nor
+      painted back by the CPU (depositBubbleRims stands down there).
     */
     stage('air exclude', (pass) => {
       this.run(pass, 'airExclude', this.dye.write, [this.dye.read, this.air!.field], this.arg('air clear', [p.bubbleClear ?? 1, 0, 0, 0]));
       this.dye.swap();
-    }, !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
+    }, !thin && !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
 
     /*
       The second phase, carried and kept sharp (H7).
@@ -1422,8 +1456,10 @@ export class WebGPUFluid extends FluidReads {
       under a cell a step, and one exchange moves at most 4·DISPLACE_PUSH of
       a cell's dye, so a single pass let the tip overrun its own colour.
       Off (and not run) at 0, which is every look but the ones that ask.
+
+      Its top, and the other dials' here: PLAN 27h-2, fluid/constants.ts.
     */
-    const displace = Math.max(0, Math.min(1, p.phaseDisplace ?? 0));
+    const displace = Math.max(0, Math.min(1.2, p.phaseDisplace ?? 0));
     stage('phase displace', (pass) => {
       const args = this.arg('phase displace', [DISPLACE_PUSH * displace, DISPLACE_INSIDE * displace, 0, 0]);
       for (let k = 0; k < DISPLACE_ITERS; k++) {

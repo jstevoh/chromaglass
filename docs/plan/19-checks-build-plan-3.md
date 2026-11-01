@@ -409,7 +409,9 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   kernel naming a variable `from` (a WGSL reserved word) passed `npm run wgsl`, and only
   `soapgpu` failed, at its first pipeline ("soapTransport failed to build"). The compile gate
   should also create each kernel's pipeline and read `getCompilationInfo()`, so a reserved word
-  or a binding over the stage's limit is red there, in seconds.
+  or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
+  plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
+  (`npm run microscope` read 0.00 at every zoom).
 - **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
   rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
   and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share

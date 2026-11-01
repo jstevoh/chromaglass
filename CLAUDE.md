@@ -122,7 +122,7 @@ not a script. Write "`npm run qa`" in a comment, never "npm run qa:".
 
 ## CI
 
-`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, five parts) and
+`checks.yml` runs on every PR and before every deploy: `Measure` (ubuntu, seven parts) and
 `WebGPU (macOS)` (Metal, sharded). What each part runs is `scripts/checks.json`; what
 skips the Mac is `scripts/reach.mjs`; when a deploy trusts a PR's run, or skips the
 checks, is `scripts/deploygate.sh`; the owner's Mac takes main's deploy shards when idle

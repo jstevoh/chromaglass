@@ -683,8 +683,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       The bubbles are the old kernel's two terms, word for word, each already
       averaging to zero; making them physical is §18i.
 
-      A.a = (air push, 1/dt, air cover, h0),
-      A.b = (air rate mean, 1/disp, 1 to take the gap as it is without a rate).
+      A.a = (air push, unused, air cover, h0),
+      A.b = (the air's mean per displacement, 1/disp, 1 to take the gap as it is without a rate).
     */
     pourVolume: `${HEAD}${COMMON}
 @group(0) @binding(2) var<storage, read_write> poured: array<f32>;
@@ -720,9 +720,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
                  + flux(p + vec2i(0, 1), n).y - flux(p - vec2i(0, 1), n).y);
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
-  let rate = clamp((now - was) * A.a.y - A.b.x, -40.0, 40.0);
-  // No standing air term: a still bubble pushes nothing (see divergence in wgsl/fluid.ts).
   let g = textureLoad(sq, p, 0).r;
+  /*
+    The air arriving since the last step, as the liquid it displaces: the
+    share of the cell it now fills, times the cell's depth in rest gaps, per
+    unit of the step's displacement (A.b.y), in the units of the press's dh
+    and the pour below. Less the plate's mean (A.b.x, the same in the same
+    units), so the cover glass takes up what the bubbles add, as it did.
+
+    It was the share per second of the plate's clock, clamped to ±40 (PLAN
+    15g-8b). On Classic's step (dt 0.0018 s, displacement 0.00065) a bubble
+    arriving whole asked for 541 a second and got 40, and the right source
+    is 1546: the flow carried 2.6% of the liquid the bubble stood on, a
+    growing one 14%, and airExclude deleted the rest and the CPU painted a
+    copy of it back round the rim from the readback mirror, which on a slow
+    machine was frames out of date. No standing air term: a still bubble
+    pushes nothing (see divergence in wgsl/fluid.ts).
+  */
+  let rate = (now - was) * hsGap(g, A.a.w) * A.b.y - A.b.x;
   let k = p.x + p.y * n;
   let dh = select((g - gapBefore[k]) / A.a.w * A.b.y, 0.0, A.b.z > 0.5);
   gapBefore[k] = g;

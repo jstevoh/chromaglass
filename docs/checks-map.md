@@ -12,6 +12,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | `src/lib/lookFade.ts`, presets, set list | `desk`, `setlist`, `panel` |
 | areas of the dish and their cords (`src/lib/plateAreas.ts`, `src/lib/areaCords.ts`, a preset's area cords; the indicator's pH, `src/lib/phIndicator.ts`; the hit's regulator, `hitRoomOf` in `src/lib/dyeTarget.ts`) | `areacords` (`-- --node` for the gate and the tables; the lab half with `PW_WEBGPU=1`), `plate`, `desk` |
 | settings, panels, desks (`src/components/**`) | `panel`, `desk`; layout at 1440/1280/1024 in a browser |
+| the Tip pad (`src/components/ui/TipPad.tsx`, `src/lib/tipPad.ts`, the Tools panel in `DeskPanels.tsx`, Tilt & Rock, the phone's Motion sheet) | `tippad`, `phone`, `layout` |
 | Preview's copy (`drafting`, `wallRef` in `src/app/useWallLook.ts`; the visualizer's `draft` and `hidden`), Send to wall | `draftwall` |
 | the phone (`src/components/phone/**`, `src/lib/phone.ts`, the touch handlers in `LiquidVisualizer.tsx`) | `phone` (`PW_WEBGPU=1` for the fingers), `layout` |
 | sound (`src/lib/plateDrone.ts`, `SoundPanel`, `musicLibrary`, `useAudioAnalyzer`, `lib/earClock.ts`, `lib/audioFeatures.ts`, `lib/handSounds.ts`) | `shelf`, `music`, `ears`, `renders` (what the sound re-renders, and whether the plate hears each frame's reading), `kicks`, `clicks` (a click on the laptop is not a beat; `-- --app` in a browser) |

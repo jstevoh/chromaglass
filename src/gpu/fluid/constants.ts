@@ -84,7 +84,9 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin'];
+/** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
+export const AIR_DISP_LEAST = 1e-5;
 /*
   The carries' substeps on a thin gap (carryPlan in wgsl/fluid.ts): what one
   substep may carry across a face, in cells, and the most substeps a step
@@ -173,7 +175,26 @@ export const HEAT_LIFT = 0.06;
 export const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 export const LAMP_HEAT = 6;
-/** Vorticity confinement's push, as a fraction of the local spin, per step. */
+/*
+  Vorticity confinement's push, as a fraction of the local spin, per step.
+  The Swirl dial scales it up to 2 (PLAN 27h-2; fluid.ts holds the top). It
+  puts back the spin the grid smooths away, so it keeps an unforced plate
+  stirring at today's 1 as at 2; at 2 the stir levels off, feeding itself
+  no more than 1 does (`npm run widedials`, 128²: mean speed ×1.02 from step
+  300 to 600 at 2, ×1.11 at 1).
+
+  The other dials whose top fluid.ts holds (27h-2). Heat Spread runs to 2:
+  199 times water's κ (KAPPA_WATER), past nature for a show, through an
+  implicit Jacobi that is stable at any rate; on a fine grid at the top its
+  four passes under-converge, spreading the heat less than asked, never
+  wrongly. Dye Weight runs to 2, a dye 28% heavier than its liquid
+  (dyeDensityContrast, lib/turntable.ts). Pushes Dye runs to 1.2 in the same
+  passes: each of a cell's four neighbours takes at most the push's share of
+  it (k·max(f − f′, 0) + d·min(f, f′) ≤ k, as d < k), so a pass gives away at
+  most 4·DISPLACE_PUSH·s, 0.86 at 1.2, under the 1 where it would overshoot.
+  The step's parameters (sim/fluidSimulation.ts, at its size ceiling) bound
+  Pushes Dye only at 2; its top is held in fluid.ts.
+*/
 export const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 export const CH_SUBSTEPS = 4;

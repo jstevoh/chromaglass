@@ -113,14 +113,19 @@ export function carrierViscosity(viscosity: string | undefined): number {
  * the oil round it. The look's Dye Weight (solutalBuoyancy) already says
  * which of those its dye is when the plate is stood up, so the spun dish
  * reads the same dial: 2% at 0, 15% at 1. So does the slump of a pool on a
- * level plate (PLAN 18m, wgsl/slump.ts). The oil a look pours is lighter
+ * level plate (PLAN 18m, wgsl/slump.ts). The dial runs on to 2 (PLAN 27h-2),
+ * 28%: a dye as heavy against its liquid as glycerine (1.26) is against
+ * water, still a real pair, just not one a light show pours. At 6 mm and
+ * 1024² the slump then asks for 27 substeps against SLUMP_SUBSTEPS' 20, and
+ * the face guard (SLUMP_FACE) holds each to its stable share: the front
+ * still runs faster than at 1, a little under its Froude speed. The oil a look pours is lighter
  * than the water, about 12% (mineral oil 0.85–0.88 against 1.0), and the
  * ferrofluid heavier, about 25% (a light-oil ferrofluid is 1.1–1.2 against a
  * 0.88 oil), both fixed properties of the liquids and so constants in the
  * solver (SPIN_OIL_LIGHT, SPIN_PHASE_HEAVY).
  */
 export function dyeDensityContrast(dyeWeight: number | undefined): number {
-  const w = Math.max(0, Math.min(1, Number.isFinite(dyeWeight) ? dyeWeight! : 0));
+  const w = Math.max(0, Math.min(2, Number.isFinite(dyeWeight) ? dyeWeight! : 0));
   return 0.02 + 0.13 * w;
 }
 
