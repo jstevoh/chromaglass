@@ -283,10 +283,18 @@ try {
   }, { over, pools, places, STEPS, N });
 
   const near = 0.12;
-  // A pool the size Magnet Garden's pour gathers into, inside the spikes'
-  // reach (about 0.15 from a hand's magnet at the lab's old onset, about 0.4
-  // at the liquid's own since 38k-7): see "Not asserted" above.
-  const pool = [{ ...AT, r: 0.14 }];
+  // A pool inside the spikes' reach (about 0.15 from a hand's magnet at the
+  // lab's old onset, about 0.4 at the liquid's own since 38k-7): see "Not
+  // asserted" above. It was 0.14 in radius, the size Magnet Garden's pour
+  // gathered into. Since 38k-7 the pull draws the pool into a heap and the
+  // domes stand on the heap, so how many stand goes as the ferrofluid the
+  // magnet gathers, not the pool's spread: the 0.14 pool's heap stood 10
+  // domes and then 7 on two Mac runs (Metal's float order differs run to
+  // run and the domes' instability amplifies it) and 8 in the cloud lab,
+  // across this line's bar of 8. At 0.18 (1.65 times the ferrofluid) the
+  // heap stands 15 in the cloud lab, 14 past full: the bar is the same,
+  // and the pool is big enough for the line to read it.
+  const pool = [{ ...AT, r: 0.18 }];
   const none = await run({ magnetStrength: 0 }, pool, [{ ...AT, near }]);
   const hand = await run({ ...HAND, magnetX: AT.x, magnetY: AT.y }, pool, [{ ...AT, near }]);
   const far = await run({ ...FAR, magnetX: AT.x, magnetY: AT.y }, pool, [{ ...AT, near }]);
@@ -314,7 +322,7 @@ try {
     patch) is what catches that, not the pools' places.
   */
   const A = { x: 0.29, y: 0.70, near: 0.12 }, B = { x: 0.71, y: 0.31, near: 0.12 };
-  const pools = [{ ...A, r: 0.12 }, { ...B, r: 0.12 }];
+  const pools = [{ ...A, r: 0.15 }, { ...B, r: 0.15 }];
   const two = await run({ ...HAND, magnetX: A.x, magnetY: A.y, extraMagnets: [{ x: B.x, y: B.y }] }, pools, [A, B]);
   const one = await run({ ...HAND, magnetX: A.x, magnetY: A.y }, pools, [A, B]);
   const say = (r) => { const a = r.at[0]; return `${a.domes} domes (${a.standing} past full, ${a.spacing.toFixed(3)} apart), ${a.pieces} pieces (${a.piecesFull} past full), outline ${a.outline.toFixed(2)} of a disc's, ${a.lit} of them lit, ${a.off.toFixed(1)} half a pitch off (${a.points} bright points in all)`; };
@@ -334,16 +342,16 @@ try {
     on top, and the domes stand on that common base: on the Mac (#645's
     head, run 41308840631) 10 domes in 4 pieces, and in the cloud lab 8
     in 4, 4 also counted past full, so the base between them is past full
-    too. A gathered base is the physics, not a pool left whole: what tells
+    too (the 0.14 pool; on the 0.18 pool now, 15 in 4). A gathered base is the physics, not a pool left whole: what tells
     a stood-up layer from a flat one is each dome its own peak past full,
     and the domes standing at the layer's own wavelength, which is the
     instability's (Cowley and Rosensweig: SPIKE_PITCH, 2π l_c) and not
     the finder's (a top is the highest only within 0.012). So: at least 8
     domes, four times the controls' (as before), all 8 or more past full
     where the controls have none, their median distance to the next
-    between 0.6 and 1.5 of the pitch. Cloud lab, 2026-11-01: 8 domes, 8
-    past full, 0.032 apart (0.8 of 0.04); with none and under the onset,
-    0 domes. The pieces are printed beside it.
+    between 0.6 and 1.5 of the pitch. Cloud lab, 2026-11-01, the 0.18
+    pool: 15 domes, 14 past full, 0.033 apart (0.8 of 0.04), 14 lit; with
+    none and under the onset, 0 domes. The pieces are printed beside it.
   */
   check('held close under a pool, the magnet stands it up into domes at the layer\'s own pitch',
     h.domes >= 8 && h.domes >= 4 * Math.max(1, z.domes, f.domes) && h.standing >= 8 && z.standing === 0 && f.standing === 0
@@ -368,8 +376,11 @@ try {
     they are the maze's and not domes standing. So the line reads what a
     second finger adds: domes standing past full, at least 4 (the bar its
     lit count always had), and lit, where the first alone stands none and
-    lights at most one. Cloud lab, 2026-11-01: 5 standing and 5 lit,
-    against 0 standing and 0 lit (3 bumps) with the first alone.
+    lights at most one. The pools are 0.15 in radius (they were 0.12,
+    whose heaps stood 4 to 8 on the Mac, against this bar of 4: the 0.18
+    pool's reason, above). Cloud lab, 2026-11-01: 11 standing and 11 lit,
+    against none standing and none lit with the first alone (the 0.12
+    pools: 5 and 5, against 3 unlit bumps).
   */
   check('a second finger stands domes up in its own pool, and lights them',
     b2.standing >= 4 && b1.standing === 0 && b1.pieces >= 1 && b2.lit >= 4 && b1.lit <= 1,
