@@ -88,7 +88,7 @@
  * until its id is taken out of --owed.
  *
  * The lab alone (scripts/lab.mjs), so it runs on SwiftShader as on Metal;
- * a few minutes, beside `soap` in lab2.
+ * a few minutes, beside `soap` in Measure's lab3 part (PLAN 19k-8).
  */
 import { openLab } from './lab.mjs';
 import { build } from 'esbuild';
