@@ -1026,7 +1026,8 @@
         "frames-old mirror stand down there. A bubble put down whole, growing,",
         "drifting and popped, each keeping the plate's colour, piling no ring,",
         "and emptying, and the hole filling back. Lab, so SwiftShader runs it,",
-        "in lab2: about nine minutes there, and the lab part is near its time."
+        "in lab2: under two minutes on a 128 grid (at 256 it ran nine and pushed",
+        "lab2 past its 25-minute bound)."
       ]
     },
     {

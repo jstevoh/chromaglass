@@ -21,7 +21,9 @@
  * lost 2.6% of a pool's colour to a bubble put down whole, 3.2% to one
  * growing and 6.4% to one drifting across it.
  *
- * The plate: Classic's step and gap, a pool of one colour (depth 1) of
+ * The plate: Classic's step and gap on a 128² grid (at 256² the run takes
+ * nine minutes under SwiftShader and pushed CI's lab2 part past its 25; at
+ * 128² under two), a pool of one colour (depth 1) of
  * radius 0.3 in the middle, one bubble in it, sixty steps:
  *
  *   whole  a bubble of radius 0.05 put down whole and kept;
@@ -47,8 +49,8 @@
  * Why these bars and not tighter: the solve gives the air the liquid's
  * mobility (PLAN 18i), so liquid runs through a bubble, and a carry that
  * counts what comes in at the least it can be leaves some of it behind
- * (3.3% under a whole bubble, 4.8% under a moving one, 1.0% under a growing
- * one), and a whole bubble's middle at the end of its step holds the
+ * (here 1.2% under a whole bubble, 6.6% under a moving one, 1.0% under a
+ * growing one; at 256² 3.3%, 4.8% and 1.0%), and a whole bubble's middle at the end of its step holds the
  * floor's sliver of liquid. The totals are kept to rounding.
  */
 import { openLab } from './lab.mjs';
@@ -69,7 +71,7 @@ let failed = false;
 try {
   for (const kind of ['whole', 'grow', 'move', 'pop']) {
     const r = await page.evaluate(async (kind) => {
-      const N = 256, L = 128;
+      const N = 128, L = 128;
       const look = lab.look('classic').settings;
       const DT = look.globalSpeed * 0.2;
       const over = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, advection: look.advection, bubbleClear: 1 };
