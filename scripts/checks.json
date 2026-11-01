@@ -853,7 +853,7 @@
     },
     {
       "name": "Nothing on the plate makes light",
-      "shard": "lab2",
+      "shard": "lab",
       "run": "npm run nolight",
       "why": [
         "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
