@@ -236,7 +236,7 @@ fn camBounce(ground: vec3f, rimCol: vec3f, rimS: vec3f, rimA: f32) -> vec3f {
   rho (1 - cos θ) deep, 5 to 56 microns at half a millimetre: four times
   and more past the 1.2 microns where a film's colours wash out
   (lib/filmTable.ts). So the glint stays white.
-  Measured by npm run filmlook: the camera's film adds a faint complement,
+  Measured by npm run filmlook, the camera's film adds a faint complement,
   as the projector's.
 */
 fn camFilm(filmC: vec3f, filmP: f32, irid: f32, F: f32) -> vec3f {
