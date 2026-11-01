@@ -358,7 +358,7 @@ rest is routine and the owner's calls.
     - *The picture is the plate's canvas.* `__cgLive` streams `#liquid-canvas`, the laptop's
       plate, not the projector's pass (§31's Wall output, the mixer's stack). A show with a
       projector up should be able to stream what the wall shows; 37x-4d takes it, as a
-      choice in the panel (still open: 37x-4d-1). Found in 37x-4c: the Wall output runs in the projector's own
+      choice in the panel (shipped: 37x-4d-1). Found in 37x-4c: the Wall output runs in the projector's own
       window (`CastDisplay`'s `#stage-canvas`) and carries the wall's keystone, masks and
       warp, which on a stream would be a skewed picture; so the source to offer is the
       mixer's stack before the projector's geometry, not the wall's canvas itself.
@@ -418,18 +418,11 @@ rest is routine and the owner's calls.
     the console and the phone in `src/lib/liveShow.ts`), the phone remote's live chip and
     two-tap Stop on Draw and Controls, `npm run liveshow`; story in `docs/plan-shipped.md`
     §37x-4d. Found building it, for the parts after:
-    - *37x-4d-1. Stream the mixer's stack, not only the laptop's plate.* (Open; moved here
-      from 37x-4b's found item, which 4d was to take.) The panel streams `#liquid-canvas`
-      as the console did. A show with the film, the mark or a back plate in the mixer
-      streams the plate without them. The source to offer is the projector's pass drawn
-      without the wall's geometry (keystone, masks, warp) into a canvas of the stream's
-      size: a GPU change to `src/gpu/output.ts`, measured with `mixer` and `wallpattern`
-      in the lab and the stream's frame time on the Mac, so a PR of its own. The check is
-      written (2026-10-31), red on main: `npm run liveshow -- --stack`'s `stack` line (a
-      film of two known halves alone in the mixer, a keystone on the wall, the Mixer stack
-      source's frames decoded: 1920x1080, the film the right way up and round, the mixer's
-      grade on it, every edge cell the film's, square, and on a Mac moving), with the panel's Source as `data-testid="live-source"` (values `plate`,
-      `stack`); CI's fifth Mac shard runs it with `--owed=plate,stack` until the builds land.
+    - ~~*37x-4d-1. Stream the mixer's stack, not only the laptop's plate.*~~ *(shipped
+      2026-11-01, #667; story in `docs/plan-shipped.md` §37x-4d-1.)* `data-testid="live-source"`
+      (`plate` default, `stack` for the mixer's stack drawn square without the wall's geometry
+      in `src/gpu/output.ts` and tapped inside the frame task via `tapLiveStack`); `stack`
+      leaves `--owed` in `scripts/checks.json` (`npm run liveshow -- --stack --owed=plate` 21/21).
     - *37x-4d-6. The stream's frames are black.* (Open; found writing 37x-4d-1's check.)
       `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
       and a presented WebGPU canvas read outside the frame task that drew it answers black

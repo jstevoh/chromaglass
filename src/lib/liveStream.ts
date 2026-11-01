@@ -117,9 +117,36 @@ export interface LiveOptions {
   audioCodec?: 'aac' | 'opus';
   /** The encoder hint; unset, `start` probes and chooses (see `probeVideoEncoder`). */
   acceleration?: LiveAcceleration;
+  /** Which picture to stream (37x-4d-1): 'plate' (default, #liquid-canvas) or 'stack' (the mixer's stack drawn square). */
+  source?: LiveSource;
 }
 
 export type LiveAcceleration = 'no-preference' | 'prefer-hardware' | 'prefer-software';
+/** Which picture the stream takes (37x-4d-1): the laptop's plate canvas, or the mixer's stack drawn square without the wall's geometry. */
+export type LiveSource = 'plate' | 'stack';
+
+let stackWanted: { width: number; height: number } | null = null;
+let stackTap: ((canvas: HTMLCanvasElement | OffscreenCanvas) => void) | null = null;
+
+/** The stream size the Mixer stack pass should draw this frame, or null when no Mixer stack stream is on air. */
+export function liveStackSize(): { width: number; height: number } | null {
+  return stackWanted;
+}
+
+/** Subscribe to the Mixer stack's frame tap inside the render task while a stream with `source: 'stack'` is on air. */
+export function listenLiveStack(size: { width: number; height: number }, fn: (canvas: HTMLCanvasElement | OffscreenCanvas) => void): () => void {
+  stackWanted = size;
+  stackTap = fn;
+  return () => {
+    if (stackTap === fn) { stackTap = null; stackWanted = null; }
+  };
+}
+
+/** Hand the Mixer stack's canvas to the stream encoder inside the frame task that drew it, beside `tapPadPicture`. */
+export function tapLiveStack(canvas: HTMLCanvasElement | OffscreenCanvas | null): void {
+  if (!canvas || !stackTap) return;
+  try { stackTap(canvas); } catch { /* the stream stopped mid-frame */ }
+}
 
 export interface LiveProbe {
   acceleration: LiveAcceleration;
@@ -345,6 +372,9 @@ export class LiveEncoder {
   private phase: LiveState['phase'] = 'idle';
   private error: string | null = null;
   private stopping = false;
+  private unlistenStack: (() => void) | null = null;
+  private wantStack = true;
+  private lastStageMs = 0;
 
   constructor(opts: LiveOptions) {
     this.opts = opts;
@@ -392,6 +422,14 @@ export class LiveEncoder {
     const { fps, audio, transport } = this.opts;
     const audioBitrate = this.opts.audioBitrate ?? 160000;
     try {
+      let firstStack: (() => void) | null = null;
+      const gotStack = this.opts.source === 'stack' ? new Promise<void>((res) => { firstStack = res; }) : null;
+      if (this.opts.source === 'stack') {
+        const tall = this.outs.every((o) => o.spec.height > o.spec.width);
+        this.unlistenStack = listenLiveStack(tall ? { width: 1080, height: 1920 } : { width: 1920, height: 1080 }, (c) => {
+          if (this.takeStack(c)) { firstStack?.(); firstStack = null; }
+        });
+      }
       // The audio's rate and channels are the track's: read its first chunk before anything is configured.
       let first: AudioData | null = null;
       let firstReadAt = 0;
@@ -425,6 +463,8 @@ export class LiveEncoder {
       const started = await transport.start({ outputs, destinations: this.destinations });
       this.transportState = started.state ?? null;
       if (!started.ok) throw new Error(started.error ?? 'the server refused the stream');
+      if (gotStack) await Promise.race([gotStack, new Promise<void>((res) => setTimeout(res, 20000))]);
+      if (this.stopping) return;
 
       this.t0 = performance.now();
       for (const o of this.outs) {
@@ -453,7 +493,7 @@ export class LiveEncoder {
   /** The frame timer: the next frame at t0 + n/fps, for every output; late ones skipped, never queued. */
   private tick(n: number): void {
     if (this.phase !== 'live') return;
-    const { fps, canvas, keySeconds = 2 } = this.opts;
+    const { fps, canvas, keySeconds = 2, source } = this.opts;
     const frameMs = 1000 / fps;
     const now = performance.now() - this.t0;
     // n is the frame due now; if more than one is due, the ones between are skipped.
@@ -468,12 +508,17 @@ export class LiveEncoder {
       let frame: VideoFrame | null = null;
       try {
         const t = performance.now();
-        frame = new VideoFrame(this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        const src = source === 'stack' ? this.stageOf(o) : this.staged(canvas, o);
+        frame = new VideoFrame(src, { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
         if (i === 0 && o.counts.frames === 0) this.timing.firstEncodeAt = t;
         o.encoder.encode(frame, { keyFrame });
-        if (i === 0) this.timing.grabMs += performance.now() - t;
+        if (i === 0) {
+          this.timing.grabMs += (source === 'stack' ? this.lastStageMs : 0) + (performance.now() - t);
+          this.lastStageMs = 0;
+        }
         if (keyFrame) { o.lastKeyBucket = bucket; o.counts.keyframes++; }
         o.counts.frames++;
+        this.wantStack = true;
       } catch (e) {
         this.fail(e);
         return;
@@ -485,21 +530,45 @@ export class LiveEncoder {
     this.timer = setTimeout(() => this.tick(due + 1), Math.max(0, next - performance.now()));
   }
 
-  /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
-  private staged(canvas: HTMLCanvasElement, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
-    const { width, height, fit } = o.spec;
-    if (canvas.width === width && canvas.height === height) return canvas;
+  /** Copy the Mixer stack's canvas onto each output's 2D stage inside the frame task that drew it (37x-4d-1). */
+  private takeStack(canvas: HTMLCanvasElement | OffscreenCanvas): boolean {
+    if (!this.wantStack || (this.phase !== 'starting' && this.phase !== 'live')) return false;
+    const t0 = performance.now();
+    for (const [i, o] of this.outs.entries()) {
+      this.stage(canvas, o);
+      if (i === 0) this.lastStageMs += performance.now() - t0;
+    }
+    this.wantStack = false;
+    return true;
+  }
+
+  private stageOf(o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
     if (!o.stage) {
+      const { width, height } = o.spec;
       o.stage = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
       o.stageCtx = o.stage.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
     }
+    return o.stage;
+  }
+
+  /** Draw a canvas onto `o.stage` at the output's size and shape. */
+  private stage(canvas: HTMLCanvasElement | OffscreenCanvas, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height, fit } = o.spec;
+    const stage = this.stageOf(o);
     const ctx = o.stageCtx;
     if (!ctx) throw new Error('no 2D context to stage the stream\'s frames on');
     // Cropped, never stretched: a round dish drawn into another shape would be an oval (37x-4b stretched the window's canvas to 16:9).
     const c = liveCrop(canvas.width, canvas.height, width, height, fit);
     if (fit === 'contain') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); }
     ctx.drawImage(canvas, c.sx, c.sy, c.sw, c.sh, c.dx, c.dy, c.dw, c.dh);
-    return o.stage;
+    return stage;
+  }
+
+  /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
+  private staged(canvas: HTMLCanvasElement, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height } = o.spec;
+    if (canvas.width === width && canvas.height === height) return canvas;
+    return this.stage(canvas, o);
   }
 
   private onVideo(o: VideoOut, chunk: EncodedVideoChunk, m?: EncodedVideoChunkMetadata): void {
@@ -605,6 +674,7 @@ export class LiveEncoder {
   private async teardown(): Promise<void> {
     if (this.stopping) return;
     this.stopping = true;
+    if (this.unlistenStack) { this.unlistenStack(); this.unlistenStack = null; }
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     for (const o of this.outs) { try { if (o.encoder && o.encoder.state === 'configured') await o.encoder.flush(); } catch { /* failed already */ } }
     try { if (this.audio && this.audio.state === 'configured') await this.audio.flush(); } catch { /* failed already */ }
@@ -642,6 +712,7 @@ export interface LiveConsoleOptions {
   videoBitrate?: number;
   audioBitrate?: number;
   acceleration?: LiveAcceleration;
+  source?: LiveSource;
 }
 
 /**

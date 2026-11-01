@@ -33,8 +33,9 @@ import { avcCodec, videoBitrate } from './render';
 import {
   LiveEncoder, liveConsolePlan, probeVideoEncoders,
   type LiveConsoleOptions, type LiveDestinationHealth, type LiveStartRequest, type LiveState,
-  type LiveTransport, type LiveTransportState, type LivePacket,
+  type LiveTransport, type LiveTransportState, type LivePacket, type LiveSource,
 } from './liveStream';
+export type { LiveSource } from './liveStream';
 
 // --- The Mac app's bridge ------------------------------------------------------
 
@@ -138,12 +139,12 @@ export function saveDestinations(list: LiveDestination[]): void {
 */
 export const newDestinationId = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join('');
 
-/** The landscape encode's size and the rate of both. The portrait one is 720x1280 (Instagram's and TikTok's). */
-export interface LiveFormat { height: 720 | 1080; fps: 30 | 60 }
-export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 30 };
+/** The landscape encode's size, the rate of both, and which picture is streamed (37x-4d-1). The portrait one is 720x1280 (Instagram's and TikTok's). */
+export interface LiveFormat { height: 720 | 1080; fps: 30 | 60; source?: LiveSource }
+export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 30, source: 'plate' };
 export function loadFormat(): LiveFormat {
   const f = read<Partial<LiveFormat>>(FORMAT_KEY);
-  return { height: f?.height === 720 ? 720 : 1080, fps: f?.fps === 60 ? 60 : 30 };
+  return { height: f?.height === 720 ? 720 : 1080, fps: f?.fps === 60 ? 60 : 30, source: f?.source === 'stack' ? 'stack' : 'plate' };
 }
 export const saveFormat = (f: LiveFormat) => write(FORMAT_KEY, f);
 
@@ -155,6 +156,7 @@ export function liveOptionsFor(list: LiveDestination[], f: LiveFormat): LiveCons
   return {
     destinations: list.map((d) => ({ name: d.name, url: d.url.trim(), keyName: keyNameFor(d), orientation: d.orientation })),
     width: Math.round(f.height * 16 / 9), height: f.height, fps: f.fps,
+    ...(f.source === 'stack' ? { source: 'stack' as const } : {}),
   };
 }
 
@@ -224,8 +226,9 @@ export interface LiveShowState {
   destinations: LiveDestinationHealth[];
   frames: number;
   skipped: number;
+  grabMs: number;
 }
-const IDLE: LiveShowState = { phase: 'idle', test: false, error: null, seconds: 0, names: [], destinations: [], frames: 0, skipped: 0 };
+const IDLE: LiveShowState = { phase: 'idle', test: false, error: null, seconds: 0, names: [], destinations: [], frames: 0, skipped: 0, grabMs: 0 };
 
 let snap: LiveShowState = IDLE;
 const listeners = new Set<() => void>();
@@ -246,7 +249,7 @@ let upload: { heldKbps: number; saturatedKbps: number | null } | null = null;
 function show(s: LiveState): LiveShowState {
   return {
     phase: s.phase, test: testing, error: s.error, seconds: Math.floor(s.seconds), names,
-    destinations: s.transport?.destinations ?? [], frames: s.frames, skipped: s.skipped,
+    destinations: s.transport?.destinations ?? [], frames: s.frames, skipped: s.skipped, grabMs: s.timing.grabMs,
   };
 }
 
@@ -282,7 +285,7 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
   testing = o.test === true;
   names = destinations.map((d) => d.name ?? d.url);
   upload = { heldKbps: 0, saturatedKbps: null };
-  const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration });
+  const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration, source: o.source });
   current = enc;
   publish({ ...IDLE, phase: 'starting', test: testing, names });
   try {
