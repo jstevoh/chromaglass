@@ -14,7 +14,7 @@
  *
  *   1. held close the way the Magnet tool holds it, the magnet parts the
  *      pool into domes: many peaks, most of them separate pieces, against
- *      the same pool with no magnet and under a look's own magnet
+ *      the same pool with no magnet and under a magnet below the onset
  *   2. so the ferrofluid's outline near it is no longer a blob's: its edge
  *      is at least twice as long, for its area, as with either control
  *   3. the plate lights a point on the domes: at least half of them have a
@@ -23,11 +23,11 @@
  *      magnet is off the plate's middle in both axes, so a plate that drew
  *      its domes mirrored against the solver's would light them round the
  *      mirror, outside the patch counted
- *   4. a look's own magnet, held further off, leaves the pool whole and
- *      unlit: the spikes need a magnet brought up close, as a real one
- *      does, so a look that gathers its ferrofluid with its own magnet still
- *      does. Magnet Garden's, the strongest (0.14 of the hand's field; the
- *      onset is 0.18)
+ *   4. a magnet under the onset (0.8 of it) leaves the pool whole and
+ *      unlit: the layer stands up only past the field Cowley and Rosensweig
+ *      give for it (spikes.ts, PLAN 38k). Until 38k this was Magnet Garden's
+ *      own magnet, 0.14 of the hand's field against an onset of 0.18 set
+ *      for it; the real onset is 0.033, and Garden's raises domes now
  *   5. a second magnet (a second finger on the phone) raises domes in its
  *      own pool and lights them, where the first alone leaves that pool
  *      (still there) with next to none
@@ -74,7 +74,16 @@ const check = (name, ok, detail = '') => {
 // Ferrofluid Scale), 0.135 at the default Scale. A look's own magnet: Magnet
 // Garden's, 0.3 × (0.5 + 0.3), as deriveStep holds it.
 const HAND = { magnetStrength: 0.9, magnetHeight: 0.15 * 0.9 };
-const FAR = { magnetStrength: 0.9, magnetHeight: 0.3 * 0.8 };
+/*
+  The control: a magnet under the onset, at Magnet Garden's depth with its
+  strength set so its axis field is 0.8 of the onset (set once the lab is
+  open, from the onset the solver uses). Until PLAN 38k this was Magnet
+  Garden's own magnet, 0.14 of the hand's field against the lab's onset of
+  0.18; the onset is the liquid's now, 0.033, and Garden's magnet is 4.6
+  times past it and raises domes as the hand's does (PLAN 9u), so the
+  control is what Garden's stood for: a magnet too weak to stand the pool up.
+*/
+let FAR = { magnetStrength: 0, magnetHeight: 0.3 * 0.8 };
 const STEPS = 240;
 const N = 384;
 // Off the middle in both axes (see 3), far enough that the patch a mirrored
@@ -83,6 +92,8 @@ const N = 384;
 const AT = { x: 0.36, y: 0.65 };
 
 const { page, close } = await openLab();
+FAR = { ...FAR, magnetStrength: await page.evaluate((h) => 0.8 * lab.SPIKE_ONSET / lab.fieldOnAxis(1, h), FAR.magnetHeight) };
+if (!(FAR.magnetStrength > 0.001 && Number.isFinite(FAR.magnetStrength))) throw new Error(`the control magnet's strength is ${FAR.magnetStrength}: the lab's SPIKE_ONSET or fieldOnAxis is missing`);
 try {
   /**
    * Pools of ferrofluid (x, y, r) on a coloured plate, stepped with a magnet
@@ -266,29 +277,44 @@ try {
   const far = await run({ ...FAR, magnetX: AT.x, magnetY: AT.y }, pool, [{ ...AT, near }]);
   /*
     Two fingers, each over a pool of its own, far enough apart that the
-    first's spikes (out to about 0.15) do not reach the second's pool. Under
-    one pool between them the first magnet drew the whole pool to itself and
-    neither parted it, which asked about the pull and not the second magnet.
+    first's spikes do not reach the second's pool. Under one pool between
+    them the first magnet drew the whole pool to itself and neither parted
+    it, which asked about the pull and not the second magnet.
+
+    Corner to corner of the picture since PLAN 38k-7. They were 0.42 apart
+    (0.3, 0.56 and 0.7, 0.44), when the onset was the lab's 22 mT and the
+    first's spikes reached about 0.15. At the liquid's own 4 mT a hand's
+    magnet stands domes out to about 0.4 (the reach goes as the height
+    times the cube root of the axis field over the onset, h·(B/Bc)^⅓, for a
+    field falling as a dipole's), so pool B stood 7 domes with the first
+    finger alone (Mac, run 41308840631) and the line asked about the reach
+    and not the second finger. The lab draws only the middle two thirds of
+    the plate (1/6 to 5/6 each way: the top of this file), and a pool's
+    patch, 0.12 round its magnet, has to be inside it to be lit, so the
+    pools go to the picture's opposite corners, 0.57 apart, B's near edge
+    0.45 from A, where A's field is about 0.6 of the onset. Not mirror
+    images of each other through the middle (0.29, 0.70 and 0.71, 0.31),
+    so a plate drawn mirrored in both axes would not light one at the other.
   */
-  const A = { x: 0.3, y: 0.56, near: 0.12 }, B = { x: 0.7, y: 0.44, near: 0.12 };
+  const A = { x: 0.29, y: 0.70, near: 0.12 }, B = { x: 0.71, y: 0.31, near: 0.12 };
   const pools = [{ ...A, r: 0.12 }, { ...B, r: 0.12 }];
   const two = await run({ ...HAND, magnetX: A.x, magnetY: A.y, extraMagnets: [{ x: B.x, y: B.y }] }, pools, [A, B]);
   const one = await run({ ...HAND, magnetX: A.x, magnetY: A.y }, pools, [A, B]);
   const say = (r) => { const a = r.at[0]; return `${a.domes} domes, ${a.pieces} pieces, outline ${a.outline.toFixed(2)} of a disc's, ${a.lit} of them lit, ${a.off.toFixed(1)} half a pitch off (${a.points} bright points in all)`; };
   const each = (r) => r.at.map((a) => `${a.domes} domes, ${a.pieces} pieces, ${a.lit} of them lit`).join(' | ');
-  console.log(`  within ${near} of the magnet —\n  no magnet: ${say(none)}\n  the hand's: ${say(hand)}\n  a look's own, further off: ${say(far)}`);
+  console.log(`  within ${near} of the magnet —\n  no magnet: ${say(none)}\n  the hand's: ${say(hand)}\n  under the onset (0.8 of it): ${say(far)}`);
   console.log(`  two fingers, at each: ${each(two)}; the first alone: ${each(one)}\n`);
 
   const h = hand.at[0], z = none.at[0], f = far.at[0];
   check('held close under a pool, the magnet parts it into domes',
     h.domes >= 8 && h.domes >= 4 * Math.max(1, z.domes, f.domes) && h.pieces >= 8 && h.pieces >= 4 * Math.max(z.pieces, f.pieces),
-    `${h.domes} domes in ${h.pieces} pieces within ${near} of it, against ${z.domes} in ${z.pieces} with none and ${f.domes} in ${f.pieces} under a look's own`);
+    `${h.domes} domes in ${h.pieces} pieces within ${near} of it, against ${z.domes} in ${z.pieces} with none and ${f.domes} in ${f.pieces} under the onset`);
   check('so its outline is no longer a blob\'s', h.outline >= 2 * Math.max(z.outline, f.outline),
-    `the edge ${h.outline.toFixed(2)} times a disc's of the same area, against ${z.outline.toFixed(2)} with none and ${f.outline.toFixed(2)} under a look's own`);
+    `the edge ${h.outline.toFixed(2)} times a disc's of the same area, against ${z.outline.toFixed(2)} with none and ${f.outline.toFixed(2)} under the onset`);
   check('the plate lights a point on the domes', h.lit >= 8 && h.lit >= 0.5 * h.domes && h.lit >= 3 * h.off,
     `${h.lit} of the ${h.domes} domes near it have a bright point on their top, against ${h.off.toFixed(1)} with one half a pitch off it`);
-  check('a look\'s own magnet, further off, leaves the pool whole and unlit', f.domes <= 1 && f.pieces <= 2 && f.lit === 0,
-    `Magnet Garden's: ${f.domes} domes in ${f.pieces} pieces, ${f.lit} lit`);
+  check('a magnet under the onset leaves the pool whole and unlit', f.domes <= 1 && f.pieces <= 2 && f.lit === 0,
+    `at 0.8 of the onset (strength ${FAR.magnetStrength.toFixed(3)} at Magnet Garden's depth): ${f.domes} domes in ${f.pieces} pieces, ${f.lit} lit`);
   const b2 = two.at[1], b1 = one.at[1];
   check('a second finger raises domes in its own pool, and lights them',
     b2.domes >= b1.domes + 6 && b2.domes >= 2 * b1.domes && b1.pieces >= 1 && b2.lit >= 4 && b1.lit <= 1,

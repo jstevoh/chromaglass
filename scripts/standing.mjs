@@ -30,12 +30,13 @@
  *   3. the gaps open: within 0.08 of the magnet the plate is no longer
  *      covered (under 0.75 of it past half full, where it was all), and less
  *      of it the stronger the field, as the domes grow taller on the same
- *      volume: under the Magnet less than at 0.35, half way from the onset
+ *      volume: under the Magnet less than at 1.94 times the onset (0.35 of old), half way from the onset
  *      to it. Not just past the onset (0.25): there the layer is all but
  *      neutral, its growth going as G − 2, and six seconds left it flat
  *   4. turned down under the onset again, the domes lie back down into the
- *      pool: none left, nothing past 1.2 of full and at most 30 cells near
- *      the magnet past 1.05, and the layer spreading
+ *      pool: none left, nothing past 1.2 of full and no more than one top
+ *      near the magnet past 1.05 (the field's own heap, PLAN 38k-7), and
+ *      the layer spreading
  *      back over the glass (covering 0.3 more of the plate near the magnet
  *      than under it), 0.8 of the onset's field after as long as the
  *      Magnet held them; sinking, not wiped: half a second in, a top still
@@ -63,14 +64,22 @@ const N = 384;
 const AT = { x: 0.36, y: 0.65 };
 // The hand's height (LiquidVisualizer's magnetFor at the default Scale) and
 // strengths that put its field on its axis where asked, on spikes.ts's
-// scale: 0.8 is the Magnet tool, 0.35 part way past the onset (0.18), 0.144
-// under it (0.8 of the onset).
+// scale: 0.8 is the Magnet tool; the rest are shares of the onset, which is
+// the liquid's since PLAN 38k (0.033, read from the lab below): part way
+// past it at 1.94 times (0.35 when the onset was the lab's 0.18), just past
+// it at 1.11 (0.2), and under it at 0.8 (0.144). The film's lift is the same
+// function of the field over the onset as before (wgsl/standing.ts,
+// LIFT_ONSET), so each leg is the leg it was.
 const HEIGHT = 0.135;
 const REL3 = (HEIGHT / 0.13) ** 3;
 const at = (field) => ({ magnetX: AT.x, magnetY: AT.y, magnetHeight: HEIGHT, magnetStrength: field * REL3 });
+let ONSET = NaN;
+const of = (k) => k * ONSET;
 const RISE = 240;
 
 const { page, close } = await openLab();
+ONSET = await page.evaluate(() => lab.SPIKE_ONSET);
+if (!(ONSET > 0 && Number.isFinite(ONSET))) throw new Error(`the lab's SPIKE_ONSET is ${ONSET}`);
 try {
   /**
    * A pool on a dyed plate under the magnet, stepped in legs of
@@ -95,11 +104,13 @@ try {
         if (!near(x, y)) continue;
         cells++; peak = Math.max(peak, v); if (v >= 0.5) covered++; if (v > 1.05) over++;
       }
-      // Tops: past 2 and the highest within three cells (ties to the first).
+      // Tops: past `least` and the highest within three cells (ties to the
+      // first). Domes are the tops past 2; bumps, the tops past 1.05 (4).
+      const topsPast = (least) => {
       const tops = [];
       for (let y = 3; y < n - 3; y++) for (let x = 3; x < n - 3; x++) {
         if (!near(x, y)) continue;
-        const v = d[x + y * n]; if (v < 2) continue;
+        const v = d[x + y * n]; if (v < least) continue;
         let top = true;
         for (let j = -3; j <= 3 && top; j++) for (let i = -3; i <= 3; i++) {
           if (!i && !j) continue; const w = d[x + i + (y + j) * n];
@@ -107,9 +118,13 @@ try {
         }
         if (top) tops.push([(x + 0.5) / n, (y + 0.5) / n]);
       }
+      return tops;
+      };
+      const tops = topsPast(2);
+      const bumps = topsPast(1.05);
       const nearest = tops.map(([u, v], k) => Math.min(...tops.filter((_, j) => j !== k).map(([a, b]) => Math.hypot(a - u, b - v)))).sort((a, b) => a - b);
       const spacing = nearest.length ? nearest[Math.floor(nearest.length / 2)] : 0;
-      return { mass, cover: covered / cells, peak, over, domes: tops.length, spacing, film: lab.filmSteps() };
+      return { mass, cover: covered / cells, peak, over, domes: tops.length, bumps: bumps.length, bumpOff: bumps.length ? Math.max(...bumps.map(([u, v]) => Math.hypot(u - AT.x, v - AT.y))) : 0, spacing, film: lab.filmSteps() };
     };
     const out = [await read()];
     for (const [over, steps] of legs) {
@@ -127,17 +142,17 @@ try {
   // under the onset for as long as it was held, read 32 steps in (half a
   // second; legs step in fours) and at the end.
   const DOWN = 2 * RISE;
-  const hand = await run([[at(0.8), RISE], [at(0.8), RISE], [at(0.144), 32], [at(0.144), DOWN - 32]]);
+  const hand = await run([[at(0.8), RISE], [at(0.8), RISE], [at(of(0.8)), 32], [at(of(0.8)), DOWN - 32]]);
   // Part way past the onset.
-  const weak = await run([[at(0.35), RISE * 1.5]]);
+  const weak = await run([[at(of(0.35 / 0.18)), RISE * 1.5]]);
   // Brought up to the onset and past it, then turned down under it before any dome rose:
   // the film is running (it stays on down to half the onset), and the layer is flat.
-  const under = await run([[at(0.2), 8], [at(0.144), RISE]]);
+  const under = await run([[at(of(0.2 / 0.18)), 8], [at(of(0.8)), RISE]]);
   console.log(`  near the magnet (within 0.08), the pool as poured: ${fmt(hand[0])}`);
   console.log(`  the Magnet (field 0.8): ${fmt(hand[1])}; as long again: ${fmt(hand[2])}`);
-  console.log(`  then turned down to 0.144, half a second in: ${fmt(hand[3])}; at the end: ${fmt(hand[4])} (the film ran ${hand[3].ran + hand[4].ran} of ${DOWN} steps)`);
-  console.log(`  part way past the onset (0.35): ${fmt(weak[1])}`);
-  console.log(`  under the onset (0.144) from the start: ${fmt(under[2])} (the film ran ${under[2].ran} of ${RISE} steps)\n`);
+  console.log(`  then turned down to 0.8 of the onset (${of(0.8).toFixed(4)}), half a second in: ${fmt(hand[3])}; at the end: ${fmt(hand[4])} (the film ran ${hand[3].ran + hand[4].ran} of ${DOWN} steps)`);
+  console.log(`  part way past the onset (${of(0.35 / 0.18).toFixed(4)}): ${fmt(weak[1])}`);
+  console.log(`  under the onset (${of(0.8).toFixed(4)}) from the start: ${fmt(under[2])} (the film ran ${under[2].ran} of ${RISE} steps)\n`);
 
   const u = under[2];
   /*
@@ -160,7 +175,7 @@ try {
   // the plate too.
   check('and the gaps open, wider the stronger the field',
     h.cover < 0.75 && w.cover < 0.95 && w.domes >= 2 && h.cover < w.cover - 0.03,
-    `covered within 0.08: ${hand[0].cover.toFixed(2)} as poured, ${w.cover.toFixed(2)} at 0.35 (${w.domes} domes), ${h.cover.toFixed(2)} under the Magnet`);
+    `covered within 0.08: ${hand[0].cover.toFixed(2)} as poured, ${w.cover.toFixed(2)} at 1.94 times the onset (${w.domes} domes), ${h.cover.toFixed(2)} under the Magnet`);
   const e = hand[3], d = hand[4];
   /*
     Down, not wiped: half a second in, a top still past full, so the domes
@@ -185,10 +200,29 @@ try {
     within 0.08; a dome is 35 to 40 across): a layer settling, not domes
     held up. That is a looser reading of the peak than 1.1, named as such
     (PLAN 9t-8), with the count fixed rather than read off the same run.
+
+    Since PLAN 9t-2 the magnet pulls the layer under the film as it does
+    everywhere (wgsl/fluid/phaseForces.ts, phaseForce), and at 0.8 of the
+    onset a magnet still pulls: below the onset the layer does not stand
+    up in domes, but it does gather toward the field's peak into one
+    smooth heap, as a real layer over a magnet bulges long before it
+    spikes (the Kelvin pressure χB²/2μ0 is about 10 Pa at 0.8 of EFH1's
+    4 mT, which would hold a heap millimetres high against the liquids'
+    density difference; the plate's is a few percent of the layer). On the
+    Mac (run 41308840631) the leg ended with no dome, the tallest cell 1.07
+    (lower than the 1.12 of the old reading's last dome) but 271 cells past
+    1.05: the heap, broad and low where a dome held up is narrow and tall.
+    Counting cells past 1.05 counted the field's heap, which the pull
+    makes and the layer should have; what the line is for is domes held
+    up. So the count is of tops: no more than one top past 1.05 within
+    0.08 of the magnet (the heap's, on the highest within three cells, the
+    finder the domes are counted by), where the domes held up under the
+    Magnet are eight or more tops past 2. Nothing past 1.2 and no top past
+    2 stay as they were.
   */
   check('turned down under the onset, they lie back down',
-    e.ran + d.ran === DOWN && e.peak > 1.1 && d.domes === 0 && d.peak < 1.2 && d.over <= 30 && d.cover > h2.cover + 0.3 && h2.domes >= 8,
-    `${h2.domes} domes at the Magnet's field; at 0.8 of the onset's, peak ${e.peak.toFixed(2)} half a second in, ${d.domes} domes and peak ${d.peak.toFixed(2)} after as long as the Magnet held them (past 1.05 near it: ${e.over} cells, then ${d.over}), the plate near it ${d.cover.toFixed(2)} covered (${h2.cover.toFixed(2)} under the Magnet); the film running ${e.ran + d.ran} of ${DOWN} steps`);
+    e.ran + d.ran === DOWN && e.peak > 1.1 && d.domes === 0 && d.peak < 1.2 && d.bumps <= 1 && d.cover > h2.cover + 0.3 && h2.domes >= 8,
+    `${h2.domes} domes at the Magnet's field; at 0.8 of the onset's, peak ${e.peak.toFixed(2)} half a second in, ${d.domes} domes and peak ${d.peak.toFixed(2)} after as long as the Magnet held them (past 1.05 near it: ${e.over} cells, then ${d.over} in ${d.bumps} top${d.bumps === 1 ? '' : 's'}, at most ${d.bumpOff.toFixed(3)} from the axis, limit one top; the same field on a pool that never stood domes: ${u.over} cells past 1.05 in ${u.bumps}, peak ${u.peak.toFixed(2)}), the plate near it ${d.cover.toFixed(2)} covered (${h2.cover.toFixed(2)} under the Magnet); the film running ${e.ran + d.ran} of ${DOWN} steps`);
   const drift = Math.max(...[hand, weak, under].map((r) => Math.abs(r[r.length - 1].mass / r[0].mass - 1)));
   check('and none of the ferrofluid is made or lost', drift < 0.001,
     `the most any run changed it: ${(drift * 100).toFixed(3)}%`);

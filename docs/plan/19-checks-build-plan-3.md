@@ -57,6 +57,18 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   so the week after this merges is the evidence. Two more on 2026-10-30 (#550's `open` shard on one head, af60ee4): 2.09 and 2.49 s against 0.72
   and 0.74 s, the show moving for good at 14.3 and 14.6 s against 23.6 and 22.1 s; the third run
   of the shard read it green, and nothing in that diff was on the opening's path.
+  Read on 2026-11-01 (#645's red, run 41308840631): the longest of those stretches, 1.60 s
+  from 2.49 s, sits between the device given (2.51 s) and the first compile asked (4.11 s),
+  and it is the intro's hold (`introStill`, src/lib/intro.ts): `prepareShow` waits for four
+  frames with the intro still, or its 1.5 s cap, and on GitHub's Macs the frames stop right
+  after the device (the longest wait for a frame 2.15 s from 2.65 s), so the cap fires. Two
+  PRs that touch nothing on the opening read the same that day (runs 41308701186 and
+  41290527164: device given 2.09 s, first compile asked 3.60 s, the longest stretch 1.51 s
+  from 2.07 s) and were green because their controls' own ran longer; the cloud's software
+  GPU reads 0.58 s on #645 and 0.54 s on main. So the next step is concrete: the hold's wait
+  is the page waiting on frames the GPU process is not presenting, which 1b should price as
+  14v-7 prices a frame gap with the page idle (or the cap should end when no frame has come
+  in a few hundred ms, the mount frames it waits for having taken 0.30 to 0.39 s).
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
