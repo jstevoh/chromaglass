@@ -2842,6 +2842,44 @@ pool 356 → 356 and 277 → 279, the push +4.80% and +6.50% against +0.15% to b
 The solver half (the air carrying its liquid out to the rim, conserving) was built in the same PR
 and taken out of it: it piles the liquid in a narrow ring the plate's checks see. 15g-8b.
 
+### 15g-8b. A bubble's colour goes with its liquid (shipped)
+
+On a thin gap the GPU multiplied the colour under every bubble away each step (`airExclude`) and
+the CPU painted it back as a ring round the rim from the readback mirror (`depositBubbleRims`,
+H6), which on a slow machine is frames behind the GPU; blowing the straw swung the plate's colour
+15–20% either way. Measured in the lab (Classic's step, a pool of depth 1, one bubble), the GPU's
+half alone lost 2.6% of the pool to a bubble put down whole, 3.2% to one growing, 6.4% to one
+drifting across it.
+
+Two causes. The thin solve's air source (`hsDivergence`) was the share per second clamped to
+±40: on Classic's step (dt 0.0018 s, displacement 0.00065) a bubble arriving whole asked 541 a
+second, got 40, and the right source is 1546 per displacement, so the flow moved 2.6% of the
+liquid the bubble stood on and the multiply deleted the rest. And the carries moved each cell's
+amount per unit of cell, so a cell the air filled over K substeps kept e⁻¹ of its colour.
+
+Now the source is the air's share times the cell's depth per displacement, unclamped; the
+amounts' carries (`bodyAdvectSub`, `bodyAdvectPairSub`, `bodyAdvectThin`) move colour per unit
+of liquid (airLiquid in `src/gpu/wgsl/fluid.ts`), with the air read at the share of the step
+done before each substep. Because the solve gives the air the liquid's mobility, liquid runs
+through a bubble and more crosses a cell in a substep than it holds: the plain donor either made
+colour (+18% under a drifting bubble, the floor's sliver at fifty times its concentration) or,
+capped at what it held, kept what came in (10% left under a whole bubble). So a donor with air
+hands on its liquid mixed with what comes in, over its room (its liquid and the liquid in, or
+the liquid out where more), what comes in counted at the least it can be: a neighbour with air
+at its own amount mixed with its neighbours' over their rooms (`airGive`, a pass before each
+substep while there is air, writes each cell's 1/room and its faces' inflow shares). Never more
+than a cell holds and receives, so nothing made, nothing floored. Counting what comes in at all
+it holds over its liquid kept 0.3% under a whole bubble but made 17% under a drifting one; one
+ring deep kept 6.5% and 7.4%; two rings 3.5% and 5.7%, and 3.3% and 4.8% with the floor's liquid
+(LIQUID_LEAST, nothing divides by it now) at 0.005 rather than 0.02. `airExclude` runs only off a thin gap,
+`depositBubbleRims` stands down on one (keeping its lists), and `airPush` stays on the step
+after the last pop so the hole is a sink the liquid round it flows back into.
+
+`npm run bubbledye` (lab): whole, growing, drifting and popped bubbles keep the plate's colour
+to 0.00%, pile no ring (deepest cell 1.01–1.08 of the pool's depth), leave 3.3%, 1.0% and 4.8%
+in their middles, and a popped hole fills back. What is left under them is the flow through the
+air (15g-8d); the old plate still multiplies and paints back (15g-8c).
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
@@ -9555,6 +9593,30 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   25; the required names `Measure` and `WebGPU (macOS)` are unchanged, since `reach`, `selectMeasure`,
   `deploygate.sh` and the guard read the part names from `shards.measure`.
 
+#### 19k-8. The soap's two checks in a Measure part of their own
+
+- **19k-8** (E, S): **shipped**, `lab3`. `soap` (#609) and `soapbreak` (#631) joined `lab2`,
+  which then ran 24:18 of its 25 minutes on #644's run of 2026-11-01 (soap 6:39, soapbreak
+  3:47) and was cancelled at the limit on two PRs that evening (#647, #650, the second
+  mid-`boilgpu`). No Chromium part had the room: browser, lab and lab2 ran 22:48, 19:49 and
+  24:18 on the same run. The two moved, unchanged and in their order, to a sixth part `lab3`
+  (about 10.5 min plus a minute of setup), which installs Chromium like the others; `lab2`
+  drops to about 14. The timeout stays 25: a bigger bound would only hide the next check
+  that pushes a part past it. The required names are unchanged, as in 19k-6.
+
+#### 19k-9. The browser part in two
+
+- **19k-9** (E, S): **shipped**, `browser2`. The browser part measured 23:43 of its 25
+  minutes on #650's run of 2026-11-01 (24:11 with setup; 22:48 on #644's): 29 checks, the
+  slowest the phone (3:20), the layout (3:07), following a song (2:59), the switches (1:59)
+  and the renders (1:58). Several checks skip their build under `CI` and serve the `dist/`
+  an earlier check built, so the cut is where a check builds: the first thirteen (the
+  shaders through the intro, 13:20 on that run, builds by the layout, cartoons, Feedback,
+  phone and load) stay in `browser`, and the last sixteen, from `applink` on (10:23, builds
+  by `applink`, `liveshow` and `shelf`), went unchanged and in their order to a seventh part
+  `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
+  moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
@@ -10426,6 +10488,103 @@ model cannot reach one, the PR says what it reached and asks.
     about 2.6 KB. Found on the way: 38h-2 (the meniscus, bubbles, rings, glint and boundary
     line still paint light from above) and 38h-3 (the oil's shadowgraph and the dye's as one
     term, with 18e-2). The owner judged it from a before-and-after film on the Mac, 2026-10-31 (`docs/judging.md` §99).
+  - **38h-2 (shipped 2026-10-31).** The rest of the light painted from above. The dye's rim on
+    the camera's path brightened the side facing `lampDir` (Light Play), darkened the other,
+    and carried a camera highlight and the second lamp's; the camera's bubble wore a lit
+    crescent, a one-sided meniscus, two reflections of the lamp off its dome and the second
+    lamp's glint (the projected bubble that glint too); the drops' ring added 15% of the plate
+    and a dyed drop its colour as light on the lamp ground; the closeup's relief was Lambert
+    toward a lowered lamp, a Blinn glint and a Fresnel brightening, on the field's slope taken
+    14 times; the camera's line between two dyes added 1.6 of the dye and a quarter of white.
+    Each is now the share of the lamp's light a bend leaves in the lens, by the law the lamp
+    lever already used (`pupilPass`): the bulb's image, BULB_FILL of the aperture, slid off by
+    the bend (`edgePass` in `plateTransmit.ts`, beside `plate.ts`, which shrank 2.2 KB). The
+    camera is lit by a light box, its cone 2.6 times the lens's (matched to the camera's drop
+    line, dark past 0.85 of a ball), so it loses light only on steep walls. The bend is the
+    slope `refractionOptics` already reads (0.35 of the field's gradient) for dye, two
+    refractions of water into air for a bubble's wall. The dyed drop's glow goes as Lamp
+    Ground turns to the lamp, as the plate's own dye does in `onGround`. The closeup's relief
+    keeps the field's own slope (Glossiness's) and the cells' menisci at their old weight:
+    at 14 times the field the camera's cone lost a whole pool in the lab. `npm run nolight`
+    grew lines 9 to 12 (drops clear and dyed, the camera's rims and line, the lamps moved to
+    opposite corners on four views): main 8/12, the branch 12/12. Found: 38h-5 (Light Play and
+    the Second Lamp's real meaning, oblique light, with 18e-2 and 38a-3), 38h-6 (light still
+    made at the back plate's derived line, the camera bubble's film, the ferro glint).
+  - **38h-7 (shipped 2026-10-31).** Depth in the closeup's bubbles. The owner: "I'd really
+    like the ability to see some aspect of 3D when we zoom in", judged against macro photos
+    of bubbles and drops, "the lighting can do whatever is most realistic and useful". Set
+    beside the photos (drops/references; edges-38h2/closeup-vs-photos.png), the camera's
+    bubble was a fat dark ring round a disc dimmer than air: its wall one small-angle bend
+    through the light box's cone, its middle a mix by eye toward a dimmed tint, the liquid
+    behind it read inward as a magnifier (Light Play's strength), which a pocket of air,
+    lower in index than the water, is not. Now `closeupDepth.ts` traces the wall over the
+    projector's own half-round meniscus (sin θ = how far across it a point is): Snell into
+    the air and out, Fresnel's share each way, total internal reflection past 48.6 degrees,
+    and the light pad seen from the water only inside its critical cone, averaged over the
+    lens's aperture. What falls out, untuned: the liquid round the bubble seen through its
+    wall, squeezed toward the rim (a diverging lens); a dark band where the turn passes the
+    cone; the light back at the contact, where a grazing reflection turns the ray by little.
+    The middle is the pad through the liquid where the ray lands (the clear pocket: 244 of
+    255 in the lab, was 150). Light Play is the photographer's softbox, 35 degrees off the
+    axis toward the screen's top left, half-width 20, radiance 25 v² of the pad's, seen only
+    by Fresnel reflection in a curved wall, so a glint on each bubble's own side and never
+    on the flat glass or the projected plate. `npm run closeupdepth` 4/4 (the base branch
+    2/4: no lens, no softbox; lines 1 and 2 tightened to the trace's numbers after it read
+    150 and 8 px there). Found: 38h-8 (the beads with 33g-2b, the cells' lensing).
+    Part 2, the same day. The owner, on the first pictures: "Ours still look like low
+    resolution shit. There is no reflectance or 3d feel." Two causes, measured. *The rim:*
+    the camera drew each bubble from the air field's filtered reading, its radius packed in
+    16 log steps (up to 14% off) and its position a coverage-weighted mean that stops
+    growing in the last texel, its edge the coverage's staircase; at grid 192 a 22-cell
+    bubble was a rounded square (the band's outer edge over 96 angles: sd 7.1 px, corners
+    missing). `camBubble` (plateTransmit.ts) reads the covered texels themselves, each of
+    which holds (x - c) / R exactly, fits centre and radius by least squares, and the
+    camera draws from them with an edge one screen pixel wide: sd 0.5 px at grid 192.
+    *The reflectance:* the softbox's glint is real only where the wall is under 24 degrees,
+    over the bubble's middle, and the middle was the pad, white, so the glint clipped into
+    it. A ball narrower than the gap has liquid above and below it, which the 2D solver had
+    cleared; `airColumn` puts back the colour of what is left of the depth by Beer-Lambert
+    from the liquid round it. So a small bubble's middle is the liquid's colour, paler, and
+    the glint shows on it, as in the photos; a pancake's middle is still the clear lamp.
+    The softbox went from 25 to 80 times the pad at Light Play 1 (a strobe in a softbox
+    against a light pad; the default 0.6 is 29). The contact's reflected line sees the pad
+    through about half the gap of liquid, not all of it. airlens 9 and 10, red since the
+    trace (they asked the magnifier's lit ring), restated: the camera sees the liquid
+    through the small ball's wall (0.85 to 1.05 of it, 0.89; a camera with no lens reads 3.05) where the projector's aperture darkens it (0.54). Found: 38h-9.
+    *The film, to the camera:* `npm run filmlook` 8-9 went red with the trace (the film added
+    0.1 of colour, bar 1.5). The closeup was drawn on the black ground, and a traced bubble's
+    middle is the pad through the liquid, so every bubble was black and the film had nothing
+    to tint. On a lit ground the old camera passed, wearing the reflected gold (+7.0 yellow
+    over blue), but that was the painted, front-lit bubble's: lit from beneath, the camera
+    looks through the same film as the projector, and a flat film on the glass mirrors only
+    the lens's axis, where the softbox (15 to 55 degrees off it) is not; its glint lands
+    where the liquid behind the meniscus is 5 to 56 microns deep, past any interference.
+    `camFilm` (closeupDepth.ts) gives the camera the light through the film at Film Physics
+    1 (the rainbow at 0, as before), and only on the light that crosses it, so `airColumn`
+    no longer divides the film out of the liquid's transmission. filmlook 8-9 restated on a
+    lit ground: the camera's tint under a quarter of the rainbow's colour, yellow over blue
+    -4.7 (bar -2.3). The check-skeptic passed both with a plain blue cast (-8.0), so line 10
+    thickens every pocket's film to the most it keeps and asks the tint to move: +1.2, the
+    blue cast 0.0 (bar 0.6). Found: 38h-10.
+    *The black ground, 2026-11-01.* Filmed on the Mac, every bubble on a black-ground look
+    went dark: a black band round a black window, a small ball's middle black with a grey
+    glint. Two laws written for the lamp ground were applied to both. `airColumn` put the
+    liquid above and below a ball back by Beer-Lambert, c (rimCol / c)^left, which can only
+    take light away, and on black c is black. And the wall took the pad's cone (padLight),
+    though on black the liquid is its own light, leaving it every way at once, so a ray
+    turned by the wall still finds it. Now, weighed by the Lamp Ground as `onGround` is:
+    on black the column is the dye at opacity 1 - (1 - a)^left over what the ray found (a
+    layer that gives light and hides what is behind it), the reflected ray the liquid at its
+    full opacity (it crosses at least the gap's depth), and the wall loses only the first
+    surface's reflection, whose share is the reflected term, so the two add to one: in a
+    liquid that glows the same every way, a wall is seen by how much liquid the ray crosses
+    and the black behind a clear window. Lamp ground unchanged (the lab picture's most moved
+    channel 1 level). `npm run closeupdepth` line 5: a ball (a third of the depth left above
+    and below) on black reads 0.49 of the liquid round it, was 0.01; a column of the whole
+    depth reads 0.87 and fails (bar 0.25 to 0.7). The rim on black reads 0.87 of the liquid
+    just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
+    the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
+    38h-11.
   - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
     the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
     opaque, so on a lamp look with two plates the back plate's pools lost their grain. It
@@ -10436,7 +10595,7 @@ model cannot reach one, the PR says what it reached and asks.
     in the log of the light in the dense bodies, (grain − 1)·ln T, which no lamp level or
     tint can fake: 0.28 to 0.44 of the front plate's before, 1.00 to 1.50 now (bar 0.9);
     body texture 0.07–0.18 levels before, 0.21–0.39 now; single-pixel flecks at its edges
-    0.55% at most. Found on the way: 38h-5 (the back plate is drawn brighter than the front,
+    0.55% at most. Found on the way: 38h-12 (the back plate is drawn brighter than the front,
     so the same grain moves more of its edge past 40 levels, in patches).
 
 ### 39. Feedback from inside the app (asked 2026-10-30)

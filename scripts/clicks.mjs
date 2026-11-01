@@ -250,7 +250,8 @@ async function app() {
   const { chromium } = await import('playwright');
   const { launchChromium } = await import('./chromium.mjs');
   const { spawn, spawnSync } = await import('node:child_process');
-  // On CI the phone's step has just built dist/; anywhere else build it, so
+  // On CI an earlier check in its part has built dist/ (the shelf's or the
+  // Live Show's, in Measure's browser2, PLAN 19k-9); anywhere else build it, so
   // a stale build is never what is measured.
   if (!process.env.CI) {
     const b = spawnSync('npm', ['run', 'build'], { stdio: ['ignore', 'ignore', 'inherit'] });

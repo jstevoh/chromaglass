@@ -66,7 +66,13 @@ const MID_FRAC = 0.2, DITHER = 3, BAND_DARK = 0.5, BIG_PX = 50;
   shader twice.
 */
 const NEW_LINE = 'cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);';
-const OLD_LINE = 'cp = mix(lensCol, mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * ground), 0.25 + 0.55 * clarity);';
+/*
+  Written out whole: lensCol (the liquid right there, the projector's lensUv
+  being fuvBase), ground (the ring's luminance) and clarity (0.3 to 0.95 by
+  k1) were the camera's too and went with its old mix in 38h-7, and a control
+  that names them builds a shader that does not compile, every frame black.
+*/
+const OLD_LINE = 'let lensF0 = decodeFluid(layer0, fuvBase, 0.0, false);\n        cp = mix(mix(bgColor, lensF0.rgb, lensF0.a), mix(tint, vec3f(1.0), 0.18) * (0.95 + 0.55 * dot(rimCol, vec3f(0.299, 0.587, 0.114))), 0.25 + 0.55 * mix(0.3, 0.95, k1));';
 const CONTROL = {
   name: 'dye-middle',
   setup(b) {

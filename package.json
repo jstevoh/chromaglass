@@ -231,6 +231,7 @@
     "benday": "node scripts/benday.mjs",
     "grainedge": "node scripts/grainedge.mjs",
     "nolight": "node scripts/nolight.mjs",
+    "closeupdepth": "node scripts/closeupdepth.mjs",
     "macroview": "node scripts/macroview.mjs",
     "turing": "node scripts/turing.mjs",
     "royopen": "node scripts/royopen.mjs",
@@ -286,6 +287,7 @@
     "soundpatch": "esbuild scripts/soundpatch.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundpatch.mjs && node node_modules/.cache/soundpatch.mjs",
     "melody": "esbuild scripts/melody.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/melody.mjs && node node_modules/.cache/melody.mjs",
     "holeline": "node scripts/holeline.mjs",
+    "bubbledye": "node scripts/bubbledye.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs"

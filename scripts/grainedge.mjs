@@ -217,7 +217,7 @@ check('3. every look\'s plate has edges and lit body to measure (each over 3% of
   texture in the log of the light, (grain − 1)·ln T, at least BACK_VS_FRONT
   of the front plate's in the same look (same dye, same grain field, same
   law). In the log, not in levels: the back plate alone is drawn brighter
-  than the front (Chemical Clock's bare glass 255 against 137, PLAN 38h-5),
+  than the front (Chemical Clock's bare glass 255 against 137, PLAN 38h-12),
   and in levels the brighter picture's texture reached the front's under
   the old law (Chemical Clock 0.114 and 0.99 of the front's passed). In the
   log, on SwiftShader over the eleven lamp looks: the old law 0.28 to 0.44 of
@@ -227,7 +227,7 @@ check('3. every look\'s plate has edges and lit body to measure (each over 3% of
   FLECK levels (Poster 1969 10% against 0.53%), in patches, the grain's
   mottle; flecks as line 1 means them, single pixels, are judged under
   MAX_FLECKS (0.55% at most, Poster 1969; the old law 0.3%), and the patches
-  are printed (38h-5, docs/judging.md).
+  are printed (38h-12, docs/judging.md).
 */
 const BACK_VS_FRONT = 0.9;
 const frontOf = new Map(rows.map((r) => [r.id, r]));
