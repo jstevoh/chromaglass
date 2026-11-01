@@ -503,7 +503,13 @@ export class WebGPUFluid extends FluidReads {
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
-    this.airPush = this.air.any ? (p.bubbleClear ?? 1) : 0;
+    /*
+      And on the step after the last bubble goes: its hole is a sink in the
+      thin solve (the air leaving, hsDivergence), which is what lets the
+      liquid back in now that nothing paints it back (PLAN 15g-8b).
+    */
+    const hadAir = this.airPush > 0 && this.airCover > 0;
+    this.airPush = this.air.any || hadAir ? (p.bubbleClear ?? 1) : 0;
     this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
     this.airCoverPrev = this.airCover;
     this.airCover = this.air.coverage;
@@ -1054,6 +1060,17 @@ export class WebGPUFluid extends FluidReads {
     */
     const speciesOn = thin && !!this.species && this.speciesLive;
     const rider = speciesOn && this.fuseSpecies ? this.species! : undefined;
+    /*
+      How much of a cell the air takes from the liquid in the amounts' carries
+      on a thin gap (airLiquid in wgsl/fluid.ts, PLAN 15g-8b), and each
+      planned substep's arguments with its index: the bubbles' liquid leaves
+      across the faces as the air arrives, so the carries, not airExclude,
+      empty a bubble on a thin gap.
+    */
+    // Only while there is air, or its hole the step after the last pop (airPush): with none every carry reads a liquid of 1 and airGive does not run.
+    const airRoom = this.air && this.airPush > 0 ? Math.max(0, Math.min(1, p.bubbleClear ?? 1)) : 0;
+    this.airCarry = thin && airRoom > 0;
+    const thinAt = (i: number) => this.arg(`body advect thin @${i}`, [i, airRoom, 0, 0, 0, disp, 1, REST_GAP]);
     let speciesCarried = false;
     stage('advect dye', (pass) => {
       /*
@@ -1114,7 +1131,9 @@ export class WebGPUFluid extends FluidReads {
         // The maze's sixths, or as many as a hand in the liquid needs (handSubs), as the ferrofluid takes.
         const flux = this.arg(`dye flux ${handSubs}`, [0, 0, 0, 0, 0, disp / handSubs, 1, thin ? REST_GAP : 0]);
         for (let k = 0; k < handSubs; k++) {
-          if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read, flux);
+          // On a thin gap each sixth knows how much of the step is done before it, for the air (airLiquid).
+          if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.dye.write, this.dye.read,
+            this.arg(`dye flux ${handSubs} @${k}`, [k / handSubs, airRoom, 0, 0, 0, disp / handSubs, 1, REST_GAP]));
           else this.runPressed(pass, 'bodyAdvect', this.dye.write, [this.dye.read, this.velForced], flux);
           this.dye.swap();
           /*
@@ -1124,7 +1143,8 @@ export class WebGPUFluid extends FluidReads {
             print it had made moved off.
           */
           if (this.chemLive) {
-            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read, flux);
+            if (thin) this.runThinFaced(pass, 'bodyAdvectThin', this.chem.write, this.chem.read,
+              this.arg(`dye flux ${handSubs} @${k}`, [k / handSubs, airRoom, 0, 0, 0, disp / handSubs, 1, REST_GAP]));
             else this.runPressed(pass, 'bodyAdvect', this.chem.write, [this.chem.read, this.velForced], flux);
             this.chem.swap();
           }
@@ -1134,11 +1154,12 @@ export class WebGPUFluid extends FluidReads {
         return;
       }
       if (!bodiesOn && thin) {
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), rider);
+        const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv, undefined, thinAt);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
       if (!bodiesOn) { 
@@ -1171,12 +1192,12 @@ export class WebGPUFluid extends FluidReads {
       }
       if (thin) {
         const thinAdv = this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]);
-        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider);
+        this.carrySubsteps(pass, 'bodyAdvect', this.dye, thinAdv, rider, thinAt);
         speciesCarried = !!rider;
-        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv);
-        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv);
-        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv);
+        this.carrySubsteps(pass, 'bodyAdvect', od, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids0, thinAdv, undefined, thinAt);
+        this.carrySubsteps(pass, 'bodyAdvect', this.liquids1, thinAdv, undefined, thinAt);
+        if (this.chemLive) this.carrySubsteps(pass, 'bodyAdvect', this.chem, thinAdv, undefined, thinAt);
         return;
       }
       const adv = this.arg('body advect', [0, 0, 0, 0, 0, disp, 1, 0]);
@@ -1242,11 +1263,17 @@ export class WebGPUFluid extends FluidReads {
       liquid where the bubble is. Skipped entirely when no bubble is on the
       plate, which is most looks — `stage` does not open a pass it is told
       not to, so the profiler reads zero rather than the cost of nothing.
+
+      Only off a thin gap now (PLAN 15g-8b). On a thin gap the bubble's
+      liquid leaves across its cells' faces as the air arrives (the air's
+      source in hsDivergence, carried per unit of liquid by airLiquid), so
+      the colour goes where the liquid goes and none is deleted here, nor
+      painted back by the CPU (depositBubbleRims stands down there).
     */
     stage('air exclude', (pass) => {
       this.run(pass, 'airExclude', this.dye.write, [this.dye.read, this.air!.field], this.arg('air clear', [p.bubbleClear ?? 1, 0, 0, 0]));
       this.dye.swap();
-    }, !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
+    }, !thin && !!this.air?.any && (p.bubbleClear ?? 1) > 0.001);
 
     /*
       The second phase, carried and kept sharp (H7).

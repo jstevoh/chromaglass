@@ -107,19 +107,26 @@ function writtenRows(sim) {
 }
 const allRest = (sim) => writtenRows(sim).length === 0 && sim.dyeAdd.every((v) => v === 0) && sim.velAdd.every((v) => v === 0);
 
+/*
+  The bubbles' rim and fill run only with Thin Gap off now (PLAN 15g-8b): on
+  a thin gap the carries keep a bubble's colour and the CPU stands down, so
+  their frames are laid on the old plate, the one place they still write,
+  and one more check below asks that on a thin gap they write nothing.
+*/
+const oldPlate = (lay) => (s) => { s.gpu.thinGapLive = false; try { lay(s); } finally { s.gpu.thinGapLive = true; } };
 /** The frames: what a show's writers do between two steps, each a few rows somewhere, and once the whole plate. */
 const frames = [
   ['a tool\'s few cells', (s) => { for (let x = 90; x < 96; x++) s.addDensity(x, 40, 0.3, 1, 0.4, 0.2); s.addVelocity(92, 41, 0.5, -0.2); s.addTemp(93, 42, 0.1); }],
   // Radii in the 128-cell units the tools are given in (LiquidVisualizer's hand: 7).
   ['a hand in the liquid', (s) => s.fingerDrag(100, 120, 7, 0.05, 0.6, 0.2)],
   ['a breath on the film', (s) => s.blowWind(60, 150, 10, 1, 0.5, 0.5)],
-  ['a bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1); }],
-  ['the bubble popped, its hole filled', (s) => {
+  ['a bubble\'s rim', oldPlate((s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1); })],
+  ['the bubble popped, its hole filled', oldPlate((s) => {
     // The mirror shows the hole the bubble left, so there is something to fill.
     const v = s.gpu.rbDyeView, R = 0.04 * L;
     for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.3 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
     s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
-  }],
+  })],
   ['a hand elsewhere, two flushes after the last', (s) => s.fingerDrag(30, 20, 5, 0.05, -0.4, 0.3)],
   ['a breath elsewhere, its grid by rows', (s) => s.blowWind(120, 60, 10, 1, -0.5, 0.3)],
   /*
@@ -128,12 +135,12 @@ const frames = [
     marking the rim's rows for the fill left rows unsent past R = 22 cells
     (the review of 14ab-4).
   */
-  ['a big bubble\'s rim', (s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.5, 0.2, 1]), 1); }],
-  ['the big bubble popped, its hole filled', (s) => {
+  ['a big bubble\'s rim', oldPlate((s) => { s.rbSeq++; s.depositBubbleRims(new Float32Array([0.5, 0.5, 0.2, 1]), 1); })],
+  ['the big bubble popped, its hole filled', oldPlate((s) => {
     const v = s.gpu.rbDyeView, R = 0.2 * L;
     for (let y = 0; y < L; y++) for (let x = 0; x < L; x++) if (Math.hypot(x - 0.5 * L, y - 0.5 * L) < R) v.fill(0, (x + y * L) * 4, (x + y * L) * 4 + 4);
     s.rbSeq++; s.depositBubbleRims(new Float32Array(4), 0);
-  }],
+  })],
   ['a tool\'s few cells again', (s) => s.addDensity(150, 170, 0.2)],
   ['and the next step', (s) => s.addDensity(150, 171, 0.2)],
   ['the room\'s stir, the whole plate', (s) => { for (let i = 0; i < AREA; i++) s.vx[i] += 1e-3; s.markDirty(); }],
@@ -185,6 +192,17 @@ const few = rowsRun[at].bytes, all = wholeRun[at].bytes;
 check('a step of a few cells after another sends their rows and nothing else', few === 2 * L * 36, `${MB(all)} → ${MB(few)}, against ${MB(2 * L * 36)} for rows 170 and 171`);
 const sum = (r) => r.reduce((a, f) => a + f.bytes, 0);
 console.log(`  over the ${frames.length} frames: ${MB(sum(wholeRun))} → ${MB(sum(rowsRun))}`);
+
+// On a thin gap a bubble, put down and popped, writes nothing: the carries keep its colour (PLAN 15g-8b).
+const thinSim = new FluidSimulation(L, 0, 0, 0.1);
+thinSim.attachGpu(keeper());
+thinSim.flushDeltas(0.01);
+thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array([0.5, 0.3, 0.04, 1]), 1);
+const thinRim = writtenRows(thinSim).length;
+thinSim.gpu.rbDyeView.fill(0);
+thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array(4), 0);
+const thinFill = writtenRows(thinSim).length;
+check('on a thin gap a bubble\'s rim and its popped hole write nothing', thinRim === 0 && thinFill === 0, `rows ${thinRim} for the rim, ${thinFill} after the pop`);
 
 // Controls.
 const sneak = new FluidSimulation(L, 0, 0, 0.1);

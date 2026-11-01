@@ -1015,6 +1015,20 @@
       ]
     },
     {
+      "name": "A bubble's colour goes with its liquid",
+      "shard": "lab",
+      "run": "npm run bubbledye",
+      "why": [
+        "On a thin gap a bubble's colour goes where its liquid goes and none is",
+        "made or lost (PLAN.md 15g-8b, scripts/bubbledye.mjs): the air's arrival",
+        "is the thin solve's source unclamped, the carries move colour per unit",
+        "of liquid, and the GPU's multiply and the CPU's rim deposit from a",
+        "frames-old mirror stand down there. A bubble put down whole, growing,",
+        "drifting and popped, each keeping the plate's colour, piling no ring,",
+        "and emptying, and the hole filling back. Lab, so SwiftShader runs it."
+      ]
+    },
+    {
       "name": "No line round a bubble's hole",
       "shard": "lab",
       "run": "npm run holeline",
