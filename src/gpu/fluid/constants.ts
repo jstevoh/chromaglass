@@ -164,7 +164,6 @@ export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
-export const SOAP_PULL = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
 /**
