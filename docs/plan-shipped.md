@@ -11050,3 +11050,43 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
+## 38c-3. Soap Breakdown: a first-order surfactant loss in real seconds (2026-11-01)
+
+`src/gpu/fluid/soap.ts`, `src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/oil.ts`,
+`src/gpu/solverTypes.ts`, `src/sim/fluidSimulation.ts`, `src/types.ts`,
+`src/lib/readout.ts`, `src/components/settings/ChemistrySections.tsx`,
+`src/components/phone/PhoneStage.tsx`, `src/components/RemoteControl.tsx`,
+`src/lib/deskPins.ts`, `src/lib/midi.ts`, `src/lib/sceneMap.ts`,
+`src/lib/controlHelp.ts`, `src/lib/drift.ts`
+
+Since 38c (#609) conserved soap on the plate, the Soap Bursts dropper (`LiquidVisualizer`)
+soaps the whole dish in a few minutes of a show and later drops do nothing, as a real
+closed dish does. The owner chose (2026-10-31) a setting for a real loss — soap taken up
+by the oil's interface or washed through the trough — at `0` (none, the real closed-dish
+value) by default on every look, and free to ramp up so a long show keeps bursting.
+
+- **The rate law** (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`): maps the dial
+  `0..1` to $k$ in $\text{s}^{-1}$ in $d\Gamma/dt = -k\Gamma$. At `0` it returns `0`
+  exactly; above `0`, the half-life $\ln 2 / k = 7200 \cdot (10 / 7200)^d\text{ s}$ steps
+  logarithmically from $1.87\text{ h}$ at `0.01` ($4.5\text{ min}$ at `0.5`) down to
+  $10.00\text{ s}$ at `1`.
+- **Per real second, once per step** (`soapPlan` in `src/gpu/fluid/soap.ts`, `mixUpdate`
+  in `src/gpu/wgsl/fluid/oil.ts`, `src/gpu/fluid.ts`): `soapPlan` writes the step's
+  retention factor $\exp(-k \cdot s)$ into `out[5]` from `magnetSeconds` (never frames or
+  the look's `dt`), and `fluid.ts` passes it as `A.b.x` to `mixUpdate` on the first
+  substep only (`k === 0`, and `1` on the remaining Cahn–Hilliard oil substeps).
+- **The control** (`soapBreakdown`, default `0` in `DEFAULT_SETTINGS`, untouched by all 33
+  presets and excluded from Evolve's drift in `NOT_THE_LOOK`): in Settings → Oil & Soap
+  under Soap Bursts, MIDI-learnable, pinnable on both desks, on the phone's Dye sheet when
+  Soap is in hand (and on the remote while Soap Bursts is on), displaying `'Off'` at `0`
+  and the half-life (`1.9h`, `4m`, `20s`, `10s`) via `readSetting` in `src/lib/readout.ts`.
+- **Measured:** `npm run soapbreak`, 4/4 (`law`, `decay`, `show`, `default`, all removed
+  from `--owed` in `scripts/checks.json`): $k(0) = 0$, half-life $1.87\text{ h}$ at
+  `0.01` and $10.00\text{ s}$ at `1`; after $30\text{ s}$ at dial `0.895` (half-life
+  $20.00\text{ s}$), kept `0.3536`, `0.3535`, `0.3536`, `0.3536` across $0.1\text{ s}$
+  steps, $0.05\text{ s}$ steps, $3\times\text{ dt}$ and an oil look against
+  $\exp(-kt) = 0.3536$, and `1.000003` at `0`; in the tenth minute of a kick track, a drop
+  clears `73.8%` of the dye in its radius in $2\text{ s}$ at `1` (`0.0%` at `0`, `99.5%`
+  on clean water), with bursts returning from dial `0.87` ($25\text{ s}$ half-life).
+
+

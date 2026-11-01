@@ -203,6 +203,15 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ surfactantFlow: v })}
           settingKey="surfactantFlow"
         />
+        <Slider
+          label="Soap Breakdown"
+          value={settings.soapBreakdown ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ soapBreakdown: v })}
+          settingKey="soapBreakdown"
+        />
         {/*
           A clear oil film against the glass that tears into lace (PLAN §20b):
           how thick it is laid. Thin tears at once over the dish's dust, thick

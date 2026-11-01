@@ -170,7 +170,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'squish', name: 'Squish Plate', category: 'chemistry',
     terms: 'plate pressure press squeeze film hele-shaw gap thin gap thickness plate shape dome depth drag press lift viscosity thick thin smear glass drip rain' },
   { id: 'oil', name: 'Oil & Soap', category: 'chemistry',
-    terms: 'oil tension bodies soap bursts surfactant clear film lace polarity repulsion repel immiscible water alcohol surface tension' },
+    terms: 'oil tension bodies soap bursts breakdown half-life surfactant clear film lace polarity repulsion repel immiscible water alcohol surface tension' },
   { id: 'ferro', name: 'Ferrofluid', category: 'chemistry',
     terms: 'ferrofluid magnet magnetic domain size phase edge pushes dye labyrinth maze detail spikes walk strength height lattice' },
   { id: 'reactions', name: 'Reactions', category: 'chemistry',

@@ -116,6 +116,8 @@ export interface GpuStepParams {
   filmDust?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
+  /** First-order surfactant loss dial (0..1, 0 = none; soapBreakdownRate in soap.ts). */
+  soapBreakdown?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */
   solutalBuoyancy?: number;
   /** How far the plate stands up (0 flat on the projector, 1 upright). */

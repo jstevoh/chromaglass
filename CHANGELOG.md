@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Soap Breakdown (PLAN 38c-3)
+
+- A new **Soap Breakdown** control (`soapBreakdown`, Settings → Oil & Soap under Soap Bursts,
+  MIDI, both desks, the remote while Soap Bursts is on, and the phone's Dye sheet with Soap
+  in hand; `0` by default on every look): a first-order surfactant loss $d\Gamma/dt = -k\Gamma$
+  on the mix's `.g` channel in `mixUpdate` (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`),
+  scaled by the step's real seconds (`magnetSeconds`), never by frames or the look's Speed,
+  and shown on the desk as its half-life ($\ln 2 / k$, from `1.9h` at `0.01` down to `10s` at
+  `1`). At `0` (`Off`), all soap is conserved on the plate; turning it up clears soap over the
+  chosen half-life so a long show keeps bursting (`npm run soapbreak`).
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a
