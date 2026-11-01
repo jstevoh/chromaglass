@@ -93,15 +93,143 @@ const OVER_FOR_MS = 250;
 const ATTACK_S = 0.35;
 const RELEASE_S = 1.2;
 
+export type FlashGuardRule = 'flash' | 'red';
+
+export interface FlashGuardTiles {
+  cols: number;
+  rows: number;
+  r: Float32Array;
+  g: Float32Array;
+  b: Float32Array;
+  pixels: Float32Array;
+}
+
 export interface FlashGuardState {
   /** Flashes a second, from the spacing of the ones in the last second. */
   rate: number;
   /** Whether the guard is currently holding the show back. */
   engaged: boolean;
+  /** Which rule is holding the show back ('flash' or 'red'), or null while it does not. */
+  rule: FlashGuardRule | null;
+  /** Flashes counted, by either rule, since reset(). */
+  counted: number;
   /** The excursion the source is producing, before the guard's own correction. */
   amplitude: number;
   /** The gain last handed back. */
   gain: number;
+}
+
+interface ChannelTracker {
+  rising: boolean;
+  turn: number;
+  turnSat: boolean;
+  last: number;
+  lastSat: boolean;
+  flashes: number[];
+  amp: number;
+  engaged: boolean;
+  lastFlashAt: number;
+  overSince: number;
+  rate: number;
+}
+
+interface QuarterWindow {
+  tiles: number[];
+  lum: ChannelTracker;
+  red: ChannelTracker;
+}
+
+function makeChannel(initial: number, sat: boolean): ChannelTracker {
+  return {
+    rising: true,
+    turn: initial,
+    turnSat: sat,
+    last: initial,
+    lastSat: sat,
+    flashes: [],
+    amp: 0,
+    engaged: false,
+    lastFlashAt: -Infinity,
+    overSince: -1,
+    rate: 0,
+  };
+}
+
+function stepChannel(
+  tr: ChannelTracker,
+  now: number,
+  dt: number,
+  val: number,
+  sat: boolean,
+  darkEnough: number,
+  gain: number,
+): boolean {
+  const step = tr.engaged ? HOLD_STEP * gain : FLASH_STEP;
+  let counted = false;
+  if (tr.rising && val < tr.last) {
+    const span = tr.last - tr.turn;
+    if (span > step - 1e-9 && tr.turn < darkEnough && (tr.lastSat || tr.turnSat)) {
+      tr.flashes.push(now);
+      tr.lastFlashAt = now;
+      const source = span / Math.max(MIN_GAIN, gain);
+      tr.amp = tr.amp > 0 ? tr.amp + (source - tr.amp) * 0.6 : source;
+      counted = true;
+    }
+    tr.rising = false;
+    tr.turn = tr.last;
+    tr.turnSat = tr.lastSat;
+  } else if (!tr.rising && val > tr.last) {
+    tr.rising = true;
+    tr.turn = tr.last;
+    tr.turnSat = tr.lastSat;
+  }
+  tr.last = val;
+  tr.lastSat = sat;
+
+  while (tr.flashes.length && now - tr.flashes[0] > WINDOW_MS * 1.6) tr.flashes.shift();
+  if (now - tr.lastFlashAt > WINDOW_MS) tr.amp *= Math.max(0, 1 - dt);
+
+  const n = tr.flashes.length;
+  let rate = 0;
+  if (n >= 3) {
+    const gaps: number[] = [];
+    for (let i = 1; i < n; i++) gaps.push(tr.flashes[i] - tr.flashes[i - 1]);
+    gaps.sort((a, b) => a - b);
+    const mid = gaps[gaps.length >> 1];
+    if (mid > 0) rate = 1000 / mid;
+  }
+  tr.rate = rate;
+
+  let most = 0;
+  for (let i = 0; i < n; i++) {
+    let c = 0;
+    for (let j = i; j < n && tr.flashes[j] < tr.flashes[i] + WINDOW_MS; j++) c++;
+    if (c > most) most = c;
+  }
+  const over = most > MAX_PER_SECOND && rate > MAX_PER_SECOND + 0.05;
+  if (!over) tr.overSince = -1;
+  else if (tr.overSince < 0) tr.overSince = now;
+  if (over && now - tr.overSince >= OVER_FOR_MS) tr.engaged = true;
+  else if (tr.engaged && now - tr.lastFlashAt > RELEASE_AFTER_MS) tr.engaged = false;
+
+  return counted;
+}
+
+function windowMeanRgb(tiles: FlashGuardTiles, indices: number[]): [number, number, number] {
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let k = 0; k < indices.length; k++) {
+    const i = indices[k];
+    r += tiles.r[i];
+    g += tiles.g[i];
+    b += tiles.b[i];
+    n += tiles.pixels[i];
+  }
+  if (!(n > 0)) return [0, 0, 0];
+  return [
+    Math.max(0, Math.min(1, r / n)),
+    Math.max(0, Math.min(1, g / n)),
+    Math.max(0, Math.min(1, b / n)),
+  ];
 }
 
 export class FlashGuard {
@@ -114,29 +242,46 @@ export class FlashGuard {
   /** The excursion of recent flashes, at the source (the gain divided back out). */
   private amp = 0;
   private engaged = false;
+  private rule: FlashGuardRule | null = null;
+  private counted = 0;
   private lastFlashAt = -Infinity;
   /** When the rate first went over the line and stayed there, or -1. */
   private overSince = -1;
   private gain = 1;
   private lastAt = -1;
   private seeded = false;
+  private tileCols = 0;
+  private tileRows = 0;
+  private windows: QuarterWindow[] = [];
 
   /** The measured rate, kept for the readout rather than recomputed by callers. */
   private rate = 0;
 
   get state(): FlashGuardState {
-    return { rate: this.rate, engaged: this.engaged, amplitude: this.amp, gain: this.gain };
+    return {
+      rate: this.rate,
+      engaged: this.engaged,
+      rule: this.rule,
+      counted: this.counted,
+      amplitude: this.amp,
+      gain: this.gain,
+    };
   }
 
   reset(): void {
     this.flashes = [];
     this.amp = 0;
     this.engaged = false;
+    this.rule = null;
+    this.counted = 0;
     this.lastFlashAt = -Infinity;
     this.overSince = -1;
     this.gain = 1;
     this.lastAt = -1;
     this.seeded = false;
+    this.tileCols = 0;
+    this.tileRows = 0;
+    this.windows = [];
   }
 
   /**
@@ -174,6 +319,7 @@ export class FlashGuard {
       if (span >= step && this.turn < DARK_ENOUGH) {
         this.flashes.push(now);
         this.lastFlashAt = now;
+        this.counted++;
         // Divided back out by the gain in force, so what is tracked is the
         // *source's* excursion and not the already-attenuated one. Tracking
         // the delivered span instead winds the controller up: every new flash
@@ -248,6 +394,7 @@ export class FlashGuard {
     else if (this.overSince < 0) this.overSince = now;
     if (over && now - this.overSince >= OVER_FOR_MS) this.engaged = true;
     else if (this.engaged && now - this.lastFlashAt > RELEASE_AFTER_MS) this.engaged = false;
+    this.rule = this.engaged ? 'flash' : null;
 
     // ── The gain ─────────────────────────────────────────────────────
     // Multiplicative: nudge by the ratio of what is safe to what is arriving,
@@ -265,6 +412,102 @@ export class FlashGuard {
       // out from the source's own excursion.
       want = Math.max(MIN_GAIN, Math.min(1, SAFE_AMP / this.amp));
     }
+    const speed = want < this.gain ? dt / ATTACK_S : dt / RELEASE_S;
+    this.gain += Math.max(-speed, Math.min(speed, want - this.gain));
+    this.gain = Math.max(MIN_GAIN, Math.min(1, this.gain));
+    return this.gain;
+  }
+
+  /**
+   * One frame's delivered per-tile linear-light R, G, B sums and pixel counts,
+   * evaluated over every quarter-wall window (`ceil(cols / 2)` by
+   * `ceil(rows / 2)` tiles) for both general relative luminance flashes and
+   * WCAG 2.3.1 saturated-red flashes (14i-guard, 14r).
+   */
+  sampleTiles(now: number, tiles: FlashGuardTiles): number {
+    const { cols, rows } = tiles;
+    const redScale = FLASH_STEP / (20 / 320);
+
+    if (!this.seeded || cols !== this.tileCols || rows !== this.tileRows) {
+      this.seeded = true;
+      this.tileCols = cols;
+      this.tileRows = rows;
+      this.lastAt = now;
+      this.windows = [];
+      const wc = Math.ceil(cols / 2);
+      const wr = Math.ceil(rows / 2);
+      for (let y0 = 0; y0 + wr <= rows; y0++) {
+        for (let x0 = 0; x0 + wc <= cols; x0++) {
+          const idx: number[] = [];
+          for (let y = y0; y < y0 + wr; y++) {
+            for (let x = x0; x < x0 + wc; x++) idx.push(y * cols + x);
+          }
+          const [mr, mg, mb] = windowMeanRgb(tiles, idx);
+          const lum = 0.2126 * mr + 0.7152 * mg + 0.0722 * mb;
+          const red = Math.max(0, mr - mg - mb) * redScale;
+          const sat = mr + mg + mb > 0 && mr / (mr + mg + mb) >= 0.8;
+          this.windows.push({
+            tiles: idx,
+            lum: makeChannel(lum, true),
+            red: makeChannel(red, sat),
+          });
+        }
+      }
+      return 1;
+    }
+
+    const dt = Math.max(1e-4, Math.min(0.25, (now - this.lastAt) / 1000));
+    this.lastAt = now;
+
+    let countedThisFrame = false;
+    let maxRate = 0;
+    let maxAmp = 0;
+    let wantFlash = Infinity;
+    let wantRed = Infinity;
+
+    for (let w = 0; w < this.windows.length; w++) {
+      const win = this.windows[w];
+      const [mr, mg, mb] = windowMeanRgb(tiles, win.tiles);
+      const lum = 0.2126 * mr + 0.7152 * mg + 0.0722 * mb;
+      const red = Math.max(0, mr - mg - mb) * redScale;
+      const sat = mr + mg + mb > 0 && mr / (mr + mg + mb) >= 0.8;
+
+      if (stepChannel(win.lum, now, dt, lum, true, DARK_ENOUGH, this.gain)) {
+        countedThisFrame = true;
+      }
+      if (stepChannel(win.red, now, dt, red, sat, Infinity, this.gain)) {
+        countedThisFrame = true;
+      }
+
+      if (win.lum.rate > maxRate) maxRate = win.lum.rate;
+      if (win.red.rate > maxRate) maxRate = win.red.rate;
+      if (win.lum.amp > maxAmp) maxAmp = win.lum.amp;
+      if (win.red.amp > maxAmp) maxAmp = win.red.amp;
+
+      if (win.lum.engaged && win.lum.amp > 0) {
+        const wWant = Math.max(MIN_GAIN, Math.min(1, SAFE_AMP / win.lum.amp));
+        if (wWant < wantFlash) wantFlash = wWant;
+      }
+      if (win.red.engaged && win.red.amp > 0) {
+        const wWant = Math.max(MIN_GAIN, Math.min(1, SAFE_AMP / win.red.amp));
+        if (wWant < wantRed) wantRed = wWant;
+      }
+    }
+
+    if (countedThisFrame) this.counted++;
+    this.rate = maxRate;
+    this.amp = maxAmp;
+
+    let want = 1;
+    if (wantFlash < Infinity || wantRed < Infinity) {
+      this.engaged = true;
+      want = Math.min(1, wantFlash, wantRed);
+      this.rule = wantRed < wantFlash ? 'red' : 'flash';
+    } else {
+      this.engaged = false;
+      this.rule = null;
+    }
+
     const speed = want < this.gain ? dt / ATTACK_S : dt / RELEASE_S;
     this.gain += Math.max(-speed, Math.min(speed, want - this.gain));
     this.gain = Math.max(MIN_GAIN, Math.min(1, this.gain));

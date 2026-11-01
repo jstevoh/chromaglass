@@ -15,25 +15,34 @@
  * WebGL probe already stood.
  */
 
+import type { FlashGuardTiles } from '../lib/flashGuard';
 import { Disposer, PipelineCache, type Prep, ReadbackRing, bindGroup } from './kit';
 import { PROBE_GROUPS, PROBE_KERNELS, SOLID_WGSL } from './wgsl/probe';
 
-/** Enough for the one number, at a size a buffer copy is happy with. */
+/** Four 32-bit floats per tile: linear R, G, B sums and the tile's pixel count. */
 const RESULT_BYTES = 16;
 
 export class WebGPUFrameProbe {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
   private readonly args: GPUBuffer;
-  private readonly partials: GPUBuffer;
   private readonly result: GPUBuffer;
   private readonly ring: ReadbackRing;
   private lum: number | null = null;
+  private hasTiles = false;
+  private readonly tileStore: FlashGuardTiles = {
+    cols: 8,
+    rows: 8,
+    r: new Float32Array(PROBE_GROUPS),
+    g: new Float32Array(PROBE_GROUPS),
+    b: new Float32Array(PROBE_GROUPS),
+    pixels: new Float32Array(PROBE_GROUPS),
+  };
 
   /** The reduction every frame runs, built before the show opens (`gpu/prepare.ts`). */
   static prepare(device: GPUDevice): Prep[] {
     const cache = PipelineCache.for(device, 'probe');
-    return (['probeTiles', 'probeFold'] as const).map((name) => cache.computePrep(name, PROBE_KERNELS[name]));
+    return (['probeTiles'] as const).map((name) => cache.computePrep(name, PROBE_KERNELS[name]));
   }
 
   constructor(private readonly device: GPUDevice) {
@@ -42,18 +51,15 @@ export class WebGPUFrameProbe {
       label: 'probe args', size: 16,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
-    this.partials = this.disposer.track(device.createBuffer({
-      label: 'probe partials', size: PROBE_GROUPS * 4,
-      usage: GPUBufferUsage.STORAGE,
-    }));
+    const bytes = PROBE_GROUPS * RESULT_BYTES;
     this.result = this.disposer.track(device.createBuffer({
-      label: 'probe result', size: RESULT_BYTES,
+      label: 'probe tiles', size: bytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }));
-    this.ring = new ReadbackRing(device, this.disposer, RESULT_BYTES, 3, 'probe');
+    this.ring = new ReadbackRing(device, this.disposer, bytes, 3, 'probe');
   }
 
-  /** The two dispatches, into `encoder`. */
+  /** The 8x8 tile reduction into `encoder`. */
   private encode(encoder: GPUCommandEncoder, frame: GPUTexture): void {
     const { width, height } = frame;
     const args = new ArrayBuffer(16);
@@ -61,23 +67,19 @@ export class WebGPUFrameProbe {
     this.device.queue.writeBuffer(this.args, 0, args);
 
     const tiles = this.pipelines.computePipeline('probeTiles', PROBE_KERNELS.probeTiles);
-    const fold = this.pipelines.computePipeline('probeFold', PROBE_KERNELS.probeFold);
-    if (!tiles || !fold) return;
+    if (!tiles) return;
 
     const pass = encoder.beginComputePass({ label: 'probe' });
     pass.setPipeline(tiles);
-    pass.setBindGroup(0, bindGroup(this.device, tiles, [this.args, frame.createView(), this.partials]));
+    pass.setBindGroup(0, bindGroup(this.device, tiles, [this.args, frame.createView(), this.result]));
     pass.dispatchWorkgroups(PROBE_GROUPS);
-    pass.setPipeline(fold);
-    pass.setBindGroup(0, bindGroup(this.device, fold, [this.args, this.partials, this.result]));
-    pass.dispatchWorkgroups(1);
     pass.end();
   }
 
   /**
    * Measure the frame just drawn. Its own encoder and submit: the picture is
-   * already on its way, and what this queues behind it is two dispatches over
-   * a few hundred thousand texels and the sum with its pixel count back.
+   * already on its way, and what this queues behind it is one dispatch over
+   * the 8x8 tiles and the 64 linear RGB + pixel-count partials back.
    */
   measure(frame: GPUTexture): void {
     const encoder = this.device.createCommandEncoder({ label: 'probe' });
@@ -87,36 +89,66 @@ export class WebGPUFrameProbe {
     if (slot) this.ring.collect(slot);
     const latest = this.ring.latest;
     if (latest) {
-      // Divide by the pixel count of the frame that was summed, carried in [1]
-      // through the readback ring, so a pixel-ratio rung step is not a flash.
+      // Unpack each tile's linear R, G, B sums and the pixel count of the frame
+      // that was summed, carried through the readback ring so a pixel-ratio rung
+      // change is not a flash.
       const view = new Float32Array(latest);
-      const pixels = view[1];
-      if (pixels > 0) this.lum = Math.min(1, view[0] / pixels);
+      const { r, g, b, pixels } = this.tileStore;
+      let sumR = 0, sumG = 0, sumB = 0, totalPixels = 0;
+      for (let i = 0; i < PROBE_GROUPS; i++) {
+        const base = i * 4;
+        const tr = view[base];
+        const tg = view[base + 1];
+        const tb = view[base + 2];
+        const tp = view[base + 3];
+        r[i] = tr;
+        g[i] = tg;
+        b[i] = tb;
+        pixels[i] = tp;
+        sumR += tr;
+        sumG += tg;
+        sumB += tb;
+        totalPixels += tp;
+      }
+      if (totalPixels > 0) {
+        this.lum = Math.min(1, (0.2126 * sumR + 0.7152 * sumG + 0.0722 * sumB) / totalPixels);
+        this.hasTiles = true;
+      }
     }
   }
 
   /** The most recent delivered mean luminance, or null before the first read lands. */
   get luminance(): number | null { return this.lum; }
 
+  /** The most recent delivered 8x8 tile sums and pixel counts, or null before the first read lands. */
+  get tiles(): FlashGuardTiles | null { return this.hasTiles ? this.tileStore : null; }
+
   /**
    * The same measurement, waited for. A stall: for the harness's check of the
    * reduction, never the render loop.
    */
   async measureNow(frame: GPUTexture): Promise<number> {
+    const bytes = PROBE_GROUPS * RESULT_BYTES;
     const encoder = this.device.createCommandEncoder({ label: 'probe now' });
     this.encode(encoder, frame);
     const read = this.device.createBuffer({
-      size: RESULT_BYTES, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      size: bytes, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
     });
-    encoder.copyBufferToBuffer(this.result, 0, read, 0, RESULT_BYTES);
+    encoder.copyBufferToBuffer(this.result, 0, read, 0, bytes);
     this.device.queue.submit([encoder.finish()]);
     await read.mapAsync(GPUMapMode.READ);
     const view = new Float32Array(read.getMappedRange());
-    const sum = view[0];
-    const pixels = view[1];
+    let sumR = 0, sumG = 0, sumB = 0, totalPixels = 0;
+    for (let i = 0; i < PROBE_GROUPS; i++) {
+      const base = i * 4;
+      sumR += view[base];
+      sumG += view[base + 1];
+      sumB += view[base + 2];
+      totalPixels += view[base + 3];
+    }
     read.unmap();
     read.destroy();
-    return pixels > 0 ? Math.min(1, sum / pixels) : 0;
+    return totalPixels > 0 ? Math.min(1, (0.2126 * sumR + 0.7152 * sumG + 0.0722 * sumB) / totalPixels) : 0;
   }
 
   /**
@@ -157,5 +189,6 @@ export class WebGPUFrameProbe {
   dispose(): void {
     this.disposer.dispose();
     this.lum = null;
+    this.hasTiles = false;
   }
 }
