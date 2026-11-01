@@ -63,7 +63,9 @@ const IRID = Number((typesSrc.match(/\n  iridescence: ([0-9.]+),/) ?? [])[1]);
 if (!Number.isFinite(IRID)) throw new Error('no default iridescence in types.ts');
 const N = 192, S = 512, ZOOM = 3;
 // Line 9: the camera's ring against the liquid round it (two faces of Fresnel, a few per cent each), and the projector's.
-const CAM_SEEN = 0.85, PROJ_DARK = 0.7;
+const CAM_SEEN = 0.85, CAM_MAX = 1.05, PROJ_DARK = 0.7;
+// Line 10: part way in, each view within this of its own (0.35 the projector's, 0.65 the camera's).
+const FADE_NEAR = 0.05;
 // Screen pixels to a plate unit, as uvToFluid in plate.ts maps them.
 const PER_UNIT = S * 1.5 * ZOOM;
 /*
@@ -356,18 +358,20 @@ try {
     radius well below the liquid round it. The camera looks through the same
     wall, a lens of air that turns its rays outward (closeupDepth.ts), so
     there it sees the liquid round the bubble, as bright as that liquid but
-    for what Fresnel takes at two faces (over CAM_SEEN of it). Before 38h-7
+    for what Fresnel takes at two faces (over CAM_SEEN of it, and never
+    brighter than it, CAM_MAX: a camera that read the cleared hole, no lens,
+    reads three times the liquid there; the check-skeptic's control). Before 38h-7
     this line asked for the ring lit at a third of the middle and three times
     the projector's: the camera's bubble was a magnifier then, which a lens of
     air in water cannot be, and the trace drew it dark there from the start.
   */
   const rel = (v) => v.band / Math.max(v.liquid, 1e-3);
-  check(`in the closeup the camera sees the liquid through the small bubble's wall (over ${CAM_SEEN} of it) where the projector's aperture darkens it (under ${PROJ_DARK})`,
-    rel(m.smallCam) > CAM_SEEN && rel(m.small) < PROJ_DARK,
+  check(`in the closeup the camera sees the liquid through the small bubble's wall (${CAM_SEEN} to ${CAM_MAX} of it) where the projector's aperture darkens it (under ${PROJ_DARK})`,
+    rel(m.smallCam) > CAM_SEEN && rel(m.smallCam) < CAM_MAX && rel(m.small) < PROJ_DARK,
     `from 0.4 to 0.55 of the radius: the camera ${rel(m.smallCam).toFixed(2)} of the liquid round it, projected ${rel(m.small).toFixed(2)}`);
   check('and the view changes over the middle of the zoom\'s fade, with the drops\'',
-    rel(m.early) < PROJ_DARK && rel(m.late) > CAM_SEEN,
-    `${rel(m.early).toFixed(2)} of the liquid at 0.35 of the way, ${rel(m.late).toFixed(2)} at 0.65`);
+    Math.abs(rel(m.early) - rel(m.small)) < FADE_NEAR && Math.abs(rel(m.late) - rel(m.smallCam)) < FADE_NEAR,
+    `${rel(m.early).toFixed(2)} of the liquid at 0.35 of the way (the projector's ${rel(m.small).toFixed(2)}), ${rel(m.late).toFixed(2)} at 0.65 (the camera's ${rel(m.smallCam).toFixed(2)}), each within ${FADE_NEAR}`);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

@@ -10386,7 +10386,7 @@ model cannot reach one, the PR says what it reached and asks.
     against a light pad; the default 0.6 is 29). The contact's reflected line sees the pad
     through about half the gap of liquid, not all of it. airlens 9 and 10, red since the
     trace (they asked the magnifier's lit ring), restated: the camera sees the liquid
-    through the small ball's wall where the projector's aperture darkens it. Found: 38h-9.
+    through the small ball's wall (0.85 to 1.05 of it, 0.89; a camera with no lens reads 3.05) where the projector's aperture darkens it (0.54). Found: 38h-9.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
