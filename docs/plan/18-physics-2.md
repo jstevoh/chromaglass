@@ -218,6 +218,10 @@ Open follow-ups:
 - **18g-11, open. Oil already past the rim stays there** (S). A splat's tail laid past the rim (0.39 of a
   cell's worth in rimhold's probe) has no way back since 18g-7 and does not drain to the trough as the soap
   does. Found building 18g-9.
+- ~~**18g-12**~~ An overflow takes the body, not the foot (`lipHolds`, #655): the lip let oil over
+  wherever p′ > 0, and a level lens at the grid's edge turns water out over the rim beside it, which
+  took the profile's foot (rimhold edge 98.5%, 0.9% in its last 3 s on the Mac). Only a cell of the
+  body (c ≥ ½) crosses now: edge 100.0%, diagonal 0.01% a reading. Story in §38r.
 
 - **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
   applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's

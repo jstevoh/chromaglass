@@ -165,6 +165,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     Only the oil's face is held: the oil's own packing (mixRelax) shares
     what piles against the lip back into its body, as it does against a
     hand. On a closed plate there is no rim and nothing changes.
+
+    And an overflow takes the body, not the foot (PLAN 18g-12). A lens
+    flattened against the rim at the middle of the grid's edge, the plate
+    level (rimhold's first line), turns the water beside it: in at its
+    contact, out over the rim along its flanks, and where water goes out
+    p′ is above zero, so the lip as first written opened there and the
+    water took the profile's foot with it, cell after cell: 1.55% of the
+    lens in six seconds, 0.3% a second and not slowing (the Mac read 98.5%
+    kept, 0.9% in the last three seconds against a bar of 0.5%; this
+    cloud's lab the same, the oil all found in the strip past the rim).
+    With the lip holding every face (p′ ignored) the same lens lost
+    nothing, so all of it was crossing where p′ > 0. A cell under half oil
+    is on the water's side of the interface the profile stands for, so its
+    oil is the diffuse interface's, not a body's, and a real overflow
+    carries none of it: the lip lets oil over only from a cell of the body
+    (c ≥ ½) with p′ above zero. Measured on the edge lens: 100.0% kept
+    over the six seconds, nothing past the rim. A pour still takes a lens
+    laid across the rim, whose rim cells are its body (rimhold's pour).
   */
   mixAdvect: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -180,12 +198,13 @@ fn mm(a: vec3f, b: vec3f) -> vec3f {
   return select(vec3f(0.0), select(max(a, b), min(a, b), a > vec3f(0.0)), a * b > vec3f(0.0));
 }
 // The lip (above): the face a → a + e crosses the rim outward, with the flow's
-// sign c, and the dish's cell behind it is not above the trough's pressure.
+// sign c, and the dish's cell behind it is not above the trough's pressure
+// or is not the body's (under half oil: the interface's foot, 18g-12).
 fn lipHolds(a: vec2i, e: vec2i, c: f32, n: i32) -> bool {
   let ra = rimSide(a, f32(n));
   if (ra == rimSide(a + e, f32(n))) { return false; }
   let dish = select(a, a + e, ra);
-  return ((c >= 0.0) != ra) && packedAt(dish.x, dish.y, n) <= 0.0;
+  return ((c >= 0.0) != ra) && (packedAt(dish.x, dish.y, n) <= 0.0 || mx(dish, n).r < 0.5);
 }
 fn flux(a: vec2i, e: vec2i, n: i32) -> vec3f {
   let b = a + e;

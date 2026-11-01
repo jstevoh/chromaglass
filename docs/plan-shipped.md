@@ -11082,5 +11082,18 @@ has p′ > 0, an overflow (a pour, a press, a gap closing); soap, acid and inwar
 probe's last three readings 0.57% → 0.17% (rimhold whole times out in the cloud at 2 mm; the Mac
 reads it); rimhold's pour still crosses (full/weak 1.049/1.018, bars > 0.25 and 0.6–1.5).
 
+*18g-12, the foot:* with the lip in, the Mac's rimhold turned red on the other level line, the lens
+at the middle of the grid's edge: 98.5% kept, 0.9% in the last three seconds against 0.0% at a
+hundredth of the tension (it was 97.3% and steady before the lip). The cloud lab reproduced it (the
+probe, 540 steps a reading: 113.16 → 111.41 cells' worth in the dish over six readings, 0.3% a reading
+and not slowing, all of it found in the strip past the rim). With the lip held on every face, p′
+ignored, the same lens lost nothing, so the oil was crossing where p′ > 0: a lens flattened against
+the rim turns the water beside it, in at its contact and out over the rim along its flanks, and the
+outflow is p′ above zero. What it carried was the Cahn–Hilliard profile's foot. A cell under half oil
+is on the water's side of the interface the profile stands for, so the lip now lets oil over only from
+a cell of the body (c ≥ ½) with p′ above zero. Cloud lab: the edge lens 100.0% kept, nothing past the
+rim; the diagonal 113.13 → 113.12 over its last three readings (0.01%, was 0.17%); oillift 9/9, its rim
+lens 100.0%; rimhold's pour still crosses (weak/full 0.97/0.99 of what the volume carries, bars 0.6–1.5 and > 0.25; 1.018/1.049 under the first lip).
+
 *Judged:* the owner, from the 2 mm films (the sheet's dents, Plate Rock's slide), 2026-10-31
 16:39Z: "That looks fine".
