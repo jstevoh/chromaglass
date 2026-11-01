@@ -2673,7 +2673,7 @@
     {
       "name": "The wall",
       "shard": "tools",
-      "run": "npm run wall -- --owed=quarter,red,rung",
+      "run": "npm run wall",
       "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",

@@ -220,12 +220,7 @@ both requests and a busy flag of the local matcher's own. *Measure:* extend
   ten times. Bicubic smooths between texels but cannot put the lost levels back, so
   slow gradients can terrace. `docs/webgpu-plan.md` calls it "probably gone"; nothing
   measures it. Sample the float fields or pack to `rgba16float`.
-- *The flash guard reads screen values, not light.* `luma()` in `wgsl/probe.ts`
-  weights the canvas's encoded values, while the guard's thresholds are relative
-  luminance, which is defined on linear light. A strobe between 0.85 and 0.95 reads as
-  0.08, under the 0.10 flash step, though in light it is 0.16, so bright strobes go
-  uncounted; a kick from black to 0.3 reads 0.3 but is 0.07, so dark shows are dimmed
-  for nothing. This is a safety item: decode to linear before the weights.
+- ~~*The flash guard reads screen values, not light*~~ (**14i-guard**, **shipped** with 14r: exact IEC 61966-2-1 sRGB decode before Rec. 709 weights in `src/gpu/wgsl/probe.ts`; story in `docs/plan-shipped.md` §14r).
 - *Keystone and corner pins* resample the whole frame bilinearly at the same size
   (`output.ts`), which softens by up to half a pixel and turns pixel-scale grain into
   a fixed pattern. Catmull-Rom (the plate's `textureBicubic`) and the grain after the
@@ -396,34 +391,12 @@ master the App sends, beside `npm run lights` (which checks the bytes): at Dimme
 through a Pacing fade to black and a blackout's fade, the master follows the wall's
 brightness within a frame; a two-colour plate sends one of its colours, not grey.
 
-## 14r. The flash guard reads one number for the whole wall
+## ~~14r. The flash guard reads one number for the whole wall~~
 
-**Read in the code.** `flashGuard.ts` watches the frame's mean luminance (`probeTiles`
-folds every pixel into one sum, `wgsl/probe.ts`). The photosensitivity guidance it is
-written against counts a flash over a quarter of the screen: a flash of 0.4 over a
-quarter of the wall reads 0.1 as a mean, at the line, and a smaller patch never counts.
-The separate rule for saturated red is not implemented, and nothing looks at
-high-contrast patterns, of which Ferro Maze (a black labyrinth on a white table, 9d) is
-the case. The room's lights (14q) are not guarded. And the probe divides an older
-frame's sum by the current frame's pixel count (`probe.ts`), so after a pixel-ratio rung
-change (1.5× to 1×) one reading is 2.25× too bright and then drops back, which the guard
-counts as a flash.
+**Shipped** (with **14i-guard**; `node --experimental-strip-types scripts/wallflash.mjs` 26/34 → 34/34, `--owed=quarter,red,rung` removed from `scripts/checks.json`). Story in `docs/plan-shipped.md` §14r. Left open from it:
 
-*Fix, after 14i's decode to linear light:* keep the probe's per-workgroup partials as
-tiles; luminance and a red ratio per tile, counted over quarter-wall windows; the pixel
-count kept with its sum; the same gain on the Art-Net master. No control on the phone,
-by design; the guard's line on the desk and the phone names the rule that is holding.
-*Measure:* `npm run wall`'s traces with a quarter-wall flash of 0.4 at 5 Hz (counted), a
-full-wall red flash (counted by the red rule) and a 1.5× to 1× rung change (not counted).
-Written ahead of the build (2026-10-31, the Antigravity brief of that day), red on main:
-`scripts/wallflash.mjs`'s `tileTraces`, whose header is the contract (the guard's
-`sampleTiles(now, tiles)` entry beside `sample()`, per-tile linear R, G, B sums and pixel
-counts, `state.rule` and `state.counted`). CI runs `npm run wall -- --owed=quarter,red,rung`;
-the PR that ships a line takes its id out of the flag. A control beside each holds on main.
-Beside the three, under the same ids, what the tile entry must leave alone (2.5 Hz on the
-wall and on a quarter, one hard hit, letting go, a red under the saturation line) and how far
-it dims (0.208 for the quarter), after the check's review found a guard that dimmed to its
-floor at any movement passed the three alone.
+- *14r-2. High-contrast spatial patterns.* (Open.) Nothing in the flash guard looks at high-contrast spatial patterns (WCAG/Harding striped grating rule), of which Ferro Maze (a black labyrinth on a white table, 9d) is the case.
+- *14r-3. The flash guard's gain on the Art-Net master.* (Open, held while Art-Net is held; see also 14q for the room's lights.) Scale the Art-Net master by the flash guard's gain so the room's pars do not strobe while the wall is held back.
 - *14r-4. The probe's half of the rung line has no check.* (Open.) The `rung` trace hands the
   guard readings that carry their own frame's count, as the contract says the probe will, so
   it passes whatever `src/gpu/probe.ts` does with the readback ring. A GPU line (the probe

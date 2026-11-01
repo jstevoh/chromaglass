@@ -5405,7 +5405,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
         // The flash guard: what the frame just read, folded into the gain the
         // next one is drawn with.
-        if (lum !== null) flashGainRef.current = flashRef.current.sample(showNow(), lum);
+        if (lum !== null) flashGainRef.current = flashRef.current.sampleTiles(showNow(), lum);
         else if (flashGainRef.current !== 1) { flashRef.current.reset(); flashGainRef.current = 1; }
       }
 
@@ -6864,14 +6864,14 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
 
           // ── What the audience just saw ───────────────────────
-          // The delivered frame, reduced on the GPU to one number, a frame
+          // The delivered frame, reduced on the GPU to tiles, a frame
           // or two behind. The reading goes back rather than
           // the verdict: the loop folds it into the gain that reaches the
           // next frame's view.
           if (view.outputCfg.flashGuard && frame) {
             if (!probe) probe = new WebGPUFrameProbe(s.device);
             probe.measure(frame);
-            return probe.luminance;
+            return probe.tiles;
           }
           if (probe) { probe.dispose(); probe = null; }
           return null;

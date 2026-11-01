@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { LogIn, User } from 'lucide-react';
+import { getFlashGuardRule, subscribeFlashGuardRule } from '../../lib/flashGuard';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
 import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
@@ -88,6 +89,8 @@ export function Desk(p: DeskProps) {
    */
   const [gesture, setGesture] = useState<{ id: string; x: number; y: number; w: number; h: number } | null>(null);
   const browserButton = useRef<HTMLButtonElement | null>(null);
+  const liveRule = useSyncExternalStore(subscribeFlashGuardRule, getFlashGuardRule);
+  const heldRule = p.status.flashRule !== undefined ? p.status.flashRule : liveRule;
 
   // ── Panels in their own windows (PLAN.md 8g) ────────────────────────
   /*
@@ -627,6 +630,7 @@ export function Desk(p: DeskProps) {
             {l.floating.length > 0 && ` · ${l.floating.length} floating`}
             {p.status.phone > 0 ? ` · ${p.status.phone} phone${p.status.phone === 1 ? '' : 's'} linked` : ''}
             {p.status.rec ? ` · rec ${p.status.rec}` : ''}
+            {heldRule ? ` · flash limit holding (${heldRule})` : ''}
             {p.status.engine ? ` · ${p.status.engine}` : ''}
           </span>
         </span>

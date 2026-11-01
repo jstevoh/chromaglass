@@ -12,6 +12,7 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
 import type { PostTest } from '../gpu/post';
 import { type OutputConfig } from '../lib/outputConfig';
+import { type FlashGuardTiles } from '../lib/flashGuard';
 import { type MacroShot } from '../lib/macroCamera';
 import { type GpuClass } from '../lib/platform';
 import { type SongEvent, type SongShapeState } from '../lib/songShape';
@@ -192,7 +193,7 @@ export interface PlateRenderer {
    */
   attachSolver(fluid: FluidSimulation, wantRes: number): boolean;
   /** One frame. Returns what the flash guard read, or null when it is off. */
-  drawFrame(view: FrameView, fluids: FluidSimulation[]): number | null;
+  drawFrame(view: FrameView, fluids: FluidSimulation[]): FlashGuardTiles | null;
   /**
    * What the GPU spent on a frame that took `steps` solver steps, in
    * milliseconds — the drawing and the solver together, from timestamp
