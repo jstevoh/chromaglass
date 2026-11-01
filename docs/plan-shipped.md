@@ -2842,6 +2842,44 @@ pool 356 → 356 and 277 → 279, the push +4.80% and +6.50% against +0.15% to b
 The solver half (the air carrying its liquid out to the rim, conserving) was built in the same PR
 and taken out of it: it piles the liquid in a narrow ring the plate's checks see. 15g-8b.
 
+### 15g-8b. A bubble's colour goes with its liquid (shipped)
+
+On a thin gap the GPU multiplied the colour under every bubble away each step (`airExclude`) and
+the CPU painted it back as a ring round the rim from the readback mirror (`depositBubbleRims`,
+H6), which on a slow machine is frames behind the GPU; blowing the straw swung the plate's colour
+15–20% either way. Measured in the lab (Classic's step, a pool of depth 1, one bubble), the GPU's
+half alone lost 2.6% of the pool to a bubble put down whole, 3.2% to one growing, 6.4% to one
+drifting across it.
+
+Two causes. The thin solve's air source (`hsDivergence`) was the share per second clamped to
+±40: on Classic's step (dt 0.0018 s, displacement 0.00065) a bubble arriving whole asked 541 a
+second, got 40, and the right source is 1546 per displacement, so the flow moved 2.6% of the
+liquid the bubble stood on and the multiply deleted the rest. And the carries moved each cell's
+amount per unit of cell, so a cell the air filled over K substeps kept e⁻¹ of its colour.
+
+Now the source is the air's share times the cell's depth per displacement, unclamped; the
+amounts' carries (`bodyAdvectSub`, `bodyAdvectPairSub`, `bodyAdvectThin`) move colour per unit
+of liquid (airLiquid in `src/gpu/wgsl/fluid.ts`), with the air read at the share of the step
+done before each substep. Because the solve gives the air the liquid's mobility, liquid runs
+through a bubble and more crosses a cell in a substep than it holds: the plain donor either made
+colour (+18% under a drifting bubble, the floor's sliver at fifty times its concentration) or,
+capped at what it held, kept what came in (10% left under a whole bubble). So a donor with air
+hands on its liquid mixed with what comes in, over its room (its liquid and the liquid in, or
+the liquid out where more), what comes in counted at the least it can be: a neighbour with air
+at its own amount mixed with its neighbours' over their rooms (`airGive`, a pass before each
+substep while there is air, writes each cell's 1/room and its faces' inflow shares). Never more
+than a cell holds and receives, so nothing made, nothing floored. Counting what comes in at all
+it holds over its liquid kept 0.3% under a whole bubble but made 17% under a drifting one; one
+ring deep kept 6.5% and 7.4%; two rings 3.5% and 5.7%, and 3.3% and 4.8% with the floor's liquid
+(LIQUID_LEAST, nothing divides by it now) at 0.005 rather than 0.02. `airExclude` runs only off a thin gap,
+`depositBubbleRims` stands down on one (keeping its lists), and `airPush` stays on the step
+after the last pop so the hole is a sink the liquid round it flows back into.
+
+`npm run bubbledye` (lab): whole, growing, drifting and popped bubbles keep the plate's colour
+to 0.00%, pile no ring (deepest cell 1.01–1.08 of the pool's depth), leave 3.3%, 1.0% and 4.8%
+in their middles, and a popped hole fills back. What is left under them is the flow through the
+air (15g-8d); the old plate still multiplies and paints back (15g-8c).
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
@@ -9554,6 +9592,30 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   `bubblelook` and the four account checks (about 10). Both install Chromium; the timeout stays
   25; the required names `Measure` and `WebGPU (macOS)` are unchanged, since `reach`, `selectMeasure`,
   `deploygate.sh` and the guard read the part names from `shards.measure`.
+
+#### 19k-8. The soap's two checks in a Measure part of their own
+
+- **19k-8** (E, S): **shipped**, `lab3`. `soap` (#609) and `soapbreak` (#631) joined `lab2`,
+  which then ran 24:18 of its 25 minutes on #644's run of 2026-11-01 (soap 6:39, soapbreak
+  3:47) and was cancelled at the limit on two PRs that evening (#647, #650, the second
+  mid-`boilgpu`). No Chromium part had the room: browser, lab and lab2 ran 22:48, 19:49 and
+  24:18 on the same run. The two moved, unchanged and in their order, to a sixth part `lab3`
+  (about 10.5 min plus a minute of setup), which installs Chromium like the others; `lab2`
+  drops to about 14. The timeout stays 25: a bigger bound would only hide the next check
+  that pushes a part past it. The required names are unchanged, as in 19k-6.
+
+#### 19k-9. The browser part in two
+
+- **19k-9** (E, S): **shipped**, `browser2`. The browser part measured 23:43 of its 25
+  minutes on #650's run of 2026-11-01 (24:11 with setup; 22:48 on #644's): 29 checks, the
+  slowest the phone (3:20), the layout (3:07), following a song (2:59), the switches (1:59)
+  and the renders (1:58). Several checks skip their build under `CI` and serve the `dist/`
+  an earlier check built, so the cut is where a check builds: the first thirteen (the
+  shaders through the intro, 13:20 on that run, builds by the layout, cartoons, Feedback,
+  phone and load) stay in `browser`, and the last sixteen, from `applink` on (10:23, builds
+  by `applink`, `liveshow` and `shelf`), went unchanged and in their order to a seventh part
+  `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
+  moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
 
 ### 21. Looks after painters
 
