@@ -3300,6 +3300,7 @@ export class FluidSimulation {
       insurance against something that does not happen.
     */
     const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
+    const c01 = (v = 0) => Math.max(0, Math.min(1, v));
 
     return {
       dt, visc, nu,
@@ -3373,16 +3374,17 @@ export class FluidSimulation {
       magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
-      oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
-      oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
-      filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
-      surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
+      oilTension: c01(settings.oilTension),
+      oilBodies: c01(settings.oilBodies),
+      filmHold: c01(settings.filmHold),
+      surfactantFlow: c01(settings.surfactantFlow),
+      soapBreakdown: c01(settings.soapBreakdown),
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).
       clearFilm: this.layerIndex === 0 ? Math.max(0, Math.min(1, settings.clearFilm ?? 0)) : 0,
       solutalBuoyancy: Math.max(0, Math.min(2, settings.solutalBuoyancy ?? 0)),
-      plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
+      plateUpright: c01(settings.plateUpright),
       ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(2, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),

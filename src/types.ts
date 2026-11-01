@@ -480,6 +480,13 @@ export interface VisualizerSettings {
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
+   * Soap Breakdown (PLAN 38c-3): first-order loss of soap on the plate
+   * (dΓ/dt = −k Γ in real seconds, shown as the half-life ln(2)/k), for soap
+   * taken up by the oil's interface or washed through the trough. 0 is none
+   * (all soap kept), the real dish and the default on every look.
+   */
+  soapBreakdown: number;
+  /**
    * A clear film against the glass (PLAN §20b): 0 none; up, a clear oil film
    * that thick (1 is 0.86 of the gap) laid over the plate, which tears open
    * into a lace of holes by its own physics (dewetting: thin parts and the
@@ -975,6 +982,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
   surfactantFlow: 0,
+  soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
   solutalBuoyancy: 0,
   plateUpright: 0,

@@ -174,6 +174,7 @@ export const CONTROL_HELP: Record<string, string> = {
   polarity: 'How polar the liquid is against water. Water is zero, oil is negative, and like dissolves like, so unlike liquids repel.',
   vorticityConfinement: 'Spins small eddies back up that a grid solver smooths away. Flair rather than physics.',
   surfactantFlow: 'Soap drops the tension and the surface streams away, carrying dye. It stays: on a plate soaped all over, more does nothing.',
+  soapBreakdown: 'How fast soap on the plate is taken up by the oil or washed through the trough, as a half-life. Zero keeps all of it.',
   solutalBuoyancy: 'Dye makes the liquid heavier. Upright, it sinks in fingers; flat, it slumps out along the glass.',
   plateUpright: 'How far the plate stands up, from flat on the projector to upright on the wall, which sets what gravity can do.',
   tiltDirection: 'Which way the tilted plate runs downhill, as a compass on the screen. Zero is toward the top.',

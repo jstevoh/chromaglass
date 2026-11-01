@@ -67,7 +67,7 @@ export class WebGPUFluid extends FluidReads {
    */
   static swirlHeldOff = false;
   /** The step's soap numbers (soapPlan), kept so a frame makes none. */
-  private readonly soapNums = new Float64Array(5);
+  private readonly soapNums = new Float64Array(6);
 
   /**
    * The kernels a step runs, on any look a show can open on, built before
@@ -1249,7 +1249,7 @@ export class WebGPUFluid extends FluidReads {
       reading the same soap the dye was moved by. In metres and seconds, in
       as many substeps as the grid and the step need (soapPlan, PLAN 38c).
     */
-    const sp = soapPlan(soap, p.magnetSeconds ?? 1 / 60, N, this.soapNums);
+    const sp = soapPlan(soap, p.magnetSeconds ?? 1 / 60, N, this.soapNums, p.soapBreakdown ?? 0);
     const soapRim = thin ? OPEN_RIM : 0;
     stage('marangoni', (pass) => {
       const k = this.arg('marangoni', [sp[1], 0, sp[2], sp[3], soapRim, 0, 0, 0]);
@@ -1503,8 +1503,8 @@ export class WebGPUFluid extends FluidReads {
           this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
-            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04])
-            : this.arg('mix update oil', [0.012, 0, 0, 0]));
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5]])
+            : this.arg('mix update oil', [0.012, 0, 0, 0, 1]));
           m.swap();
         }
       }

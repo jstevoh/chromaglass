@@ -1099,7 +1099,7 @@
     {
       "name": "Soap Breakdown keeps a long show bursting",
       "shard": "lab3",
-      "run": "npm run soapbreak -- --owed=law,decay,show,default",
+      "run": "npm run soapbreak",
       "timeout": 8,
       "why": [
         "The Soap Breakdown dial (PLAN 38c-3, scripts/soapbreak.mjs), written ahead of",

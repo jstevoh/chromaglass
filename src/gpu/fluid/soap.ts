@@ -19,7 +19,10 @@
  *
  * - **An amount, kept.** The mix's .g is the soap a cell holds, in units of
  *   the full monolayer Γ∞ that saturates a surface (Langmuir). Nothing
- *   takes it off a closed plate. On a thin gap it leaves only as the dye
+ *   takes it off a closed plate unless Soap Breakdown is turned up
+ *   (`soapBreakdownRate`, PLAN 38c-3: dΓ/dt = −k Γ in real seconds, for soap
+ *   taken up by the oil or washed through the trough; 0 by default). On a
+ *   thin gap it leaves as the dye
  *   does, carried by the liquid over the open rim into the trough
  *   (`OPEN_RIM`, decayDye's rule): the surface flow is not let across the
  *   rim, because the trough is full of the same soapy overflow and has no
@@ -93,14 +96,27 @@ export const SOAP_SPREAD_CELLS = 0.12;
 export const SOAP_SUBSTEPS = 8;
 
 /**
+ * The first-order loss rate k (1/s) in dΓ/dt = −k Γ for Soap Breakdown (PLAN
+ * 38c-3): the soap taken up by the oil's interface or washed through the
+ * trough, in real seconds (never frames or the look's Speed). 0 is k = 0
+ * exactly (all soap kept); above 0 the half-life ln(2)/k steps logarithmically
+ * from 2 hours at 0+ (1.9 h at 0.01) down to 10 s at 1.
+ */
+export function soapBreakdownRate(dial: number): number {
+  if (!(dial > 0)) return 0;
+  return Math.LN2 / (7200 * (10 / 7200) ** Math.min(1, dial));
+}
+
+/**
  * The step's soap numbers, written into `out` (no object a frame):
  *   [0] substeps, [1] k (cells a substep per unit θ across a face),
  *   [2] the face speed's cap in cells a substep, [3] the self-spread's cap in
- *   cells² a substep, [4] the molecular diffusion in cells² for the step.
+ *   cells² a substep, [4] the molecular diffusion in cells² for the step,
+ *   [5] the step's retention exp(−k·seconds) for Soap Breakdown (1 at 0).
  * `dial` is Soap Bursts (0..1, the share of Δσ), `seconds` the step's time,
- * `n` the grid's edge.
+ * `n` the grid's edge, `breakdown` Soap Breakdown (0..1).
  */
-export function soapPlan(dial: number, seconds: number, n: number, out: Float64Array): Float64Array {
+export function soapPlan(dial: number, seconds: number, n: number, out: Float64Array, breakdown = 0): Float64Array {
   const dx = PLATE_METRES / n;
   const s = Math.max(0, seconds);
   const front = SOAP_FRONT * s / dx;
@@ -112,5 +128,6 @@ export function soapPlan(dial: number, seconds: number, n: number, out: Float64A
   out[2] = Math.min(SOAP_CELLS, SOAP_FRONT * h / dx);
   out[3] = Math.min(SOAP_SPREAD_CELLS, SOAP_SPREAD_MAX * h / (dx * dx));
   out[4] = SOAP_D * s / (dx * dx);
+  out[5] = breakdown > 0 ? Math.exp(-soapBreakdownRate(breakdown) * s) : 1;
   return out;
 }
