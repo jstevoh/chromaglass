@@ -40,8 +40,8 @@
  *      (1 − s)^((h/h_s)³) of the dent, h = rest − dent and h_s = STEFAN_FILM
  *      of rest, cell for cell on the dent the plate holds and node for node
  *      on the sheet's own solve; and a sheet left alone goes quiet (stops
- *      being stepped) within two frames of when its slowest mode, decaying
- *      at its own rate and the spring's at rest, says.
+ *      being stepped) within two frames of when the dish's modes, each
+ *      decaying at its own rate and the spring's at rest, say.
  *
  *   Lab (the solved sheet laid on a thin gap through its own channel):
  *   9.  The plate's gap is the solve's: rest minus the sheet's dent, cell for
@@ -332,45 +332,70 @@ const solveAt = (s) => s.profile(0.5, 0.5, MM.length, 0.002 / 0.2);
       worst = Math.max(worst, Math.abs(ha[q] - hb[q] * k)); least = Math.min(least, k); most = Math.max(most, k);
     }
     // Every node on the plate (a keep wrong on fifteen nodes in sixteen passed when every fourth was read), from one inverse each.
-    const n = a.n, P = a.plateMetres, wa = Float64Array.from(a.toSpace()), wb = b.toSpace();
+    // The solve's metres to gap units by the film's metres (gapMetres), as step reads them: by the
+    // plate's width (0.2 m a unit) every node read at rest, a 2.2e-2 miss on the 2 mm gap (#641 on #618).
+    const n = a.n, G = a.gapMetres, wa = Float64Array.from(a.toSpace()), wb = b.toSpace();
     for (let j = 0; j <= n / 2; j++) for (let i = 0; i <= n / 2; i++) {
-      const db = wb[i + j * n] / P;
-      worstNode = Math.max(worstNode, Math.abs(wa[i + j * n] / P - db * share(db, restAt(i / (n / 2), j / (n / 2), curve))));
+      const db = wb[i + j * n] / G;
+      worstNode = Math.max(worstNode, Math.abs(wa[i + j * n] / G - db * share(db, restAt(i / (n / 2), j / (n / 2), curve))));
     }
   }
   /*
     Left alone at the app's spring (Classic's glass, 0.00048 a 60th of a second), a full kick goes
-    quiet when the solve says it should: once its last trace (thirty times SHEET_QUIET) is the
-    dish's slowest mode, sin(πx/W) sin(πy/W), that mode's own rate λ₁ = M k₁² (D k₁⁴ + ρg) and the
-    spring's take it under SHEET_QUIET at t₁ + ln(peak/QUIET) / (λ₁ + spring), and the sheet must
-    stop within two frames of it. Asked first as "within the spring's own time" (255 s for an answer
-    of 2), which a sheet that never quieted for minutes would have passed (the review of #452).
-    Its last trace is that mode once the dent has its shape, a quarter of the way
-    in at half its middle (sin²(π/4)) to 0.2%, not only once it is thirty
-    times SHEET_QUIET: on the 6 mm gap the two came together, but on the 2 mm
-    one the oil's next mode, (3, 1), outlives the slowest's lead over it,
-    4λ₁, a 0.58th of a second, for seconds; at thirty times QUIET (2.2 s) the
-    oil's quarter-point was 0.15 of its middle, and from there its slowest
-    mode said 21.7 s against the solve's 15.3. The mode's own shape says when.
+    quiet when the solve says it should. Asked first as "within the spring's own time" (255 s for
+    an answer of 2), which a sheet that never quieted for minutes would have passed (the review of
+    #452). Then against the dish's slowest mode alone, sin(πx/W) sin(πy/W) at its own rate
+    λ₁ = M k₁² (D k₁⁴ + ρg) and the spring's: on the 6 mm gap the dent had that mode's shape long
+    before it was thirty times SHEET_QUIET. On the 2 mm one it has not. The film drains 27 times
+    slower (the default oil's λ₁ 0.15 a second, its (3, 1) 0.90, its (3, 3) 2.3), while the spring
+    against the film's suction (38l) takes the whole dent at its rest's (1/STEFAN_FILM)³, 37 times
+    the share, 1.07 a second: the oil's sheet goes quiet at 3.17 s with its quarter-point still
+    the wrong side of zero (−0.33 of a mode's), so the slowest mode alone had no moment to be asked
+    from (it said −Infinity, #641's run on #618). So it is asked against every mode: once the peak
+    is thirty times SHEET_QUIET, the dent the plate holds is read onto the dish's sine modes
+    (24 × 24, by its own 64 cells), each mode is let go at its own λ and the spring's at rest
+    (exact there: the dent is 0.03% of the gap), and the modes say when no cell's dent is a
+    SHEET_QUIET of the gap. The peak the sheet goes quiet on is the step's before that step's
+    spring, so the modes are read so too. That is the theory the solve must keep: each mode's
+    rate and the spring's share, through the sheet's own transforms and its laying on the plate.
+    Measured: water at 1.283 s (the modes 1.283), the default oil 3.167 s (3.150).
     In water and on the default oil; in glycerine the bending holds the next modes near the
     slowest's rate that late, so it has no one mode to ask against.
   */
   const quiet = [];
+  const MODES = 24, sines = Array.from({ length: MODES }, (_, m) => Float64Array.from({ length: L }, (_, i) => Math.sin((m + 1) * Math.PI * (i + 0.5) / L)));
   for (const name of ['water', 'the default oil']) {
     const nv = LIQUIDS[name], sp = 0.00048;
     const c = new RhythmSheet(); c.setLiquid(nv); c.press(0.5, 0.5, stampedDepth(AMOUNT.full), T);
     const buf = new Float32Array(L * L);
     c.step(L, T, 0, buf);
-    let t = T, t1 = null, p1 = null;
-    while (c.live && t < 60) { c.step(L, 1 / 60, sp, buf); t += 1 / 60; if (p1 === null && c.peak < 30 * SHEET_QUIET && Math.abs(c.depthAt(0.25, 0.25) / c.depthAt(0.5, 0.5) / 0.5 - 1) < 0.002) { p1 = c.peak; t1 = t; } }
-    const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nv), k2 = 2 * (Math.PI / 0.2) ** 2, lam = M * k2 * (SHEET_D * k2 * k2 + 9810);
-    // The spring's rate at rest, where a trace thirty times the quiet is (1% of the gap): the full press's share to the (1/STEFAN_FILM)³.
-    const want = t1 + Math.log(p1 / SHEET_QUIET) / (lam - (60 / STEFAN_FILM ** 3) * Math.log(1 - sp));
+    const M = DISH_GAP_METRES ** 3 / (12 * 1000 * nv), W = 0.2;
+    const lamOf = (m, n) => { const k2 = (m * m + n * n) * (Math.PI / W) ** 2; return M * k2 * (SHEET_D * k2 * k2 + 9810); };
+    // The spring's rate at rest, where the trace is: the full press's share to the (1/STEFAN_FILM)³.
+    const spring = -(60 / STEFAN_FILM ** 3) * Math.log(1 - sp);
+    let t = T, t1 = null, modes = null;
+    while (c.live && t < 60) {
+      c.step(L, 1 / 60, sp, buf); t += 1 / 60;
+      if (t1 === null && c.peak < 30 * SHEET_QUIET) {
+        t1 = t; const h = c.heldNow(); modes = [];
+        for (let m = 1; m <= MODES; m++) for (let n = 1; n <= MODES; n++) {
+          let v = 0; for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) v += h[i + j * L] * sines[m - 1][i] * sines[n - 1][j];
+          modes.push([m, n, (v * 4) / (L * L)]);
+        }
+      }
+    }
+    let want = Infinity;
+    for (let f = 1; modes && f < 60 * 60 && want === Infinity; f++) {
+      const dt = f / 60, now = modes.map(([m, n, a]) => [m, n, a * Math.exp(-lamOf(m, n) * dt - spring * (dt - 1 / 60))]).filter((x) => Math.abs(x[2]) > 1e-12);
+      let most = 0;
+      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) { let v = 0; for (const [m, n, a] of now) v += a * sines[m - 1][i] * sines[n - 1][j]; most = Math.max(most, Math.abs(v)); }
+      if (most < SHEET_QUIET) want = t1 + dt;
+    }
     quiet.push({ name, t, want, live: c.live });
   }
-  check('the plate\'s spring taken on the sheet against the film\'s suction: let go, a step keeps (1 − s)^((h/h_s)³) of the dent cell for cell and on the solve node for node, flat and on a dome, and a sheet left alone goes quiet within two frames of when its slowest mode says, in water and on the default oil',
+  check('the plate\'s spring taken on the sheet against the film\'s suction: let go, a step keeps (1 − s)^((h/h_s)³) of the dent cell for cell and on the solve node for node, flat and on a dome, and a sheet left alone goes quiet within two frames of when its modes say, in water and on the default oil',
     worst < 1e-6 * 0.008 && worstNode < 1e-6 * 0.008 && least < most && quiet.every((q) => !q.live && Math.abs(q.t - q.want) <= 2 / 60),
-    `worst ${(worst / 0.008).toExponential(1)} of the depth on the plate, ${(worstNode / 0.008).toExponential(1)} on the solve, shares ${least.toFixed(4)} to ${most.toFixed(4)}; quiet ${quiet.map((q) => `${q.name} at ${q.t.toFixed(3)} s, its slowest mode says ${q.want.toFixed(3)}`).join('; ')}`);
+    `worst ${(worst / 0.008).toExponential(1)} of the depth on the plate, ${(worstNode / 0.008).toExponential(1)} on the solve, shares ${least.toFixed(4)} to ${most.toFixed(4)}; quiet ${quiet.map((q) => `${q.name} at ${q.t.toFixed(3)} s, its modes say ${q.want.toFixed(3)}`).join('; ')}`);
 }
 // Its cost, printed: the app pays this each step while the sheet moves.
 {
