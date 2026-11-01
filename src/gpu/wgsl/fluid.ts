@@ -82,7 +82,202 @@ function thinFaced(src: string, name: string): string {
     .replace(block, '  let ve = thinFaceVel(a, e, n);\n')
     .replace(new RegExp(`(@group\\(0\\) @binding\\(${last}\\)[^\\n]*\\n)`), `$1${bindings}`);
 }
+/*
+  The carries of what the liquid holds, with the air in the cell taking room
+  from the liquid (PLAN 15g-8b): each face carries the donor cell's amount per
+  unit of *liquid* in it, not per unit of cell.
+
+  What the colour is: an amount per unit of plate, h·C, with C what a unit of
+  liquid holds. Where a bubble stands, part of the cell's depth is air, so
+  the liquid in it is h·(1 − a) and the amount h·(1 − a)·C, and what a face
+  carries out of it is C times the liquid crossing, the amount over the
+  cell's liquid. The thin solve's flow is that liquid: the air arriving is a
+  source in it (hsDivergence), so the liquid a bubble stands on leaves its
+  cells across their faces, and the liquid round the bubble, which the
+  source pushes outward and which has no air in it, moves on as one
+  incompressible sheet, every amount kept, no ring piled at the rim.
+
+  Divided by the cell rather than the liquid, a cell the air was filling
+  kept the share it had left a step, then that share of what was left, and
+  so on: a cell covered in four steps kept a third of its colour, and one
+  covered in one step of K substeps e⁻¹ of it. What the multiply after it
+  (airExclude) then deleted was that third, and what the CPU painted back
+  round the rim (depositBubbleRims) was its copy in a mirror frames old.
+  Divided by the liquid, a cell the air fills empties exactly as it fills.
+
+  The air is the step's own, the field before it and after it (air.prev and
+  air.field), at the share of the step done before this substep: the plan's
+  share times the substep's index for the planned carries, or the fraction
+  itself in the maze's sixths. A.a.y is how much of the cell the air takes
+  (bubbleClear, which scales the air's source in hsDivergence too), 0 for a
+  carry the air does not touch, which reads a liquid of exactly 1 and takes
+  the plain carry. Where either cell of a face has air the face is first
+  order: a near-empty cell's slope points out to the full liquid past the
+  rim, and the bound below needs to know exactly what a face brings.
+
+  A donor with air in it hands on its liquid mixed with what comes in. The
+  solve gives the air the liquid's mobility (PLAN 18i), so liquid runs
+  through a bubble: a whole bubble's middle leaves through the cells round
+  it, which are emptying too, and a moving bubble's front (a source) drains
+  through it to its back (a sink). In a substep more liquid then crosses a
+  cell than it holds, and the plain donor, all it holds over its liquid,
+  either hands on more than it has (the floor made 18% more colour than a
+  pool had, under a bubble drifting across it, the lab) or, capped at what
+  it holds, keeps what came in (a whole bubble kept 10% of its colour under
+  it). So a cell hands on C = (its amount + what comes in) / room, room its
+  liquid and all the liquid coming in, or all going out where that is more:
+  never more than it holds and receives, so nothing is made and nothing
+  floored, every amount kept.
+
+  What comes in it counts at the least it can be, so a cell never hands on
+  colour it has not received. The neighbour's own C needs its neighbours',
+  and theirs, as far as the liquid runs through the air in a substep, which
+  is the bubble's width: so a neighbour with air is counted at what it holds
+  mixed with what its own neighbours hold over their room (airGive, a pass
+  before each substep, writes each cell's 1/room and the shares its faces
+  bring in), which is never more than it hands on, since each further ring
+  only adds. Two rings deep: the lab's whole bubble keeps 3.3% of the pool's
+  colour under it, a moving one 4.8% and a growing one 1.0% (one ring kept
+  6.5% and 7.4%), every total to the hundredth of a percent, where main
+  deleted 2.6–6.4% of the colour and painted a ring. The rest is the flow
+  through the air itself, which a two-phase solve takes away (PLAN 18i).
+  Counting what comes in at all it holds over its liquid instead kept 0.3%
+  under a whole bubble but made 17% under a moving one, where the floor
+  cells' concentrations run high. LIQUID_LEAST, the liquid a cell all air
+  still holds (the film wetting the glass), only keeps a room from nothing
+  now: nothing divides by it. At 0.02 the two rings kept 3.5% and 5.7%.
+*/
+const LIQUID_LEAST = 0.005;
+/** How much liquid a cell holds at this substep, for the air's carries and airGive. */
+function airLiquidAt(frac: string): string {
+  return `fn liquidAt(q: vec2i, n: i32) -> f32 {
+  if (A.a.y <= 0.0) { return 1.0; }
+  let c = clamp(q, vec2i(0), vec2i(n - 1));
+  let was = clamp(textureLoad(airWas, c, 0).r, 0.0, 1.0);
+  let now = clamp(textureLoad(airNow, c, 0).r, 0.0, 1.0);
+  return max(1.0 - A.a.y * mix(was, now, clamp(${frac}, 0.0, 1.0)), ${LIQUID_LEAST.toFixed(4)});
+}
+`;
+}
+/** The shares of a cell crossing its faces this substep, for airGive. */
+function airFaceShares(share: string): string {
+  return `fn airFaceC(a: vec2i, e: vec2i, n: i32) -> f32 {
+  let b = a + e;
+  if (b.x < 0 || b.y < 0 || b.x >= n || b.y >= n || a.x < 0 || a.y < 0 || a.x >= n || a.y >= n) { return 0.0; }
+  return clamp(thinFaceVel(a, e, n) * A.b.y * ${share} * f32(n), -0.45, 0.45);
+}
+// The share of a cell crossing each of a's faces this substep, outward
+// positive: east, west, north, south.
+fn airFaces(a: vec2i, n: i32) -> vec4f {
+  let x = vec2i(1, 0);
+  let y = vec2i(0, 1);
+  return vec4f(airFaceC(a, x, n), -airFaceC(a - x, x, n), airFaceC(a, y, n), -airFaceC(a - y, y, n));
+}
+`;
+}
+function airLiquid(src: string, name: string, frac: string): string {
+  const last = Math.max(...[...src.matchAll(/@binding\((\d+)\)/g)].map((m) => Number(m[1])));
+  const outA = /return c \* \((mx\(((?:t, )?)a, n\)) \+ 0\.5 \* \(1\.0 - c\) \* s\);/;
+  const outB = /return c \* \((mx\((?:t, )?b, n\)) - 0\.5 \* \(1\.0 \+ c\) \* s\);/;
+  const at = src.indexOf('fn flux(');
+  if (!outA.test(src) || !outB.test(src) || at < 0 || src.split('fn flux(').length !== 2) {
+    throw new Error(`${name} cannot take the air's room: its upwind values or its flux moved`);
+  }
+  // The pair carry reads either of its two textures through one mx(t, …).
+  const t = src.match(outA)![2];
+  const tParam = t ? 't: texture_2d<f32>, ' : '';
+  const liquid = `@group(0) @binding(${last + 1}) var airWas: texture_2d<f32>;
+@group(0) @binding(${last + 2}) var airNow: texture_2d<f32>;
+@group(0) @binding(${last + 3}) var airGive: texture_2d<f32>;
+@group(0) @binding(${last + 4}) var airIn: texture_2d<f32>;
+${airLiquidAt(frac)}
+fn giveAt(q: vec2i, n: i32) -> f32 { return textureLoad(airGive, clamp(q, vec2i(0), vec2i(n - 1)), 0).r; }
+// East, west, north, south, the order airGive writes the inflow shares in.
+const AIR_FACES = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
+fn inAt(q: vec2i, n: i32) -> vec4f { return textureLoad(airIn, clamp(q, vec2i(0), vec2i(n - 1)), 0); }
+// What q holds mixed with what its neighbours hand it at their least (all
+// they hold over their room, airGive), per unit of liquid: the least a
+// neighbour q with air hands on this substep. All it holds, first order,
+// where it has no air.
+fn airLeast(${tParam}q: vec2i, n: i32) -> vec4f {
+  if (liquidAt(q, n) >= 1.0) { return mx(${t}q, n); }
+  let i = inAt(q, n);
+  var held = mx(${t}q, n);
+  // Loops, not four terms written out: the pair carry calls this through
+  // eight fluxes, and written out SwiftShader's compiler lost the device.
+  for (var k = 0; k < 4; k++) {
+    let e = AIR_FACES[k];
+    held += i[k] * mx(${t}q + e, n) * giveAt(q + e, n);
+  }
+  return held * giveAt(q, n);
+}
+// What a donor a with air in it hands on per unit of liquid: its own liquid
+// mixed with the least that comes in this substep (the comment above).
+fn airDonor(${tParam}a: vec2i, n: i32) -> vec4f {
+  let i = inAt(a, n);
+  var held = mx(${t}a, n);
+  for (var k = 0; k < 4; k++) {
+    if (i[k] > 0.0) { held += i[k] * airLeast(${t}a + AIR_FACES[k], n); }
+  }
+  return held * giveAt(a, n);
+}
+`;
+  return (src.slice(0, at) + liquid + src.slice(at))
+    .replace(outA, `let la = liquidAt(a, n);
+    let lb = liquidAt(b, n);
+    if (la >= 1.0 && lb >= 1.0) { return c * ($1 + 0.5 * (1.0 - c) * s); }
+    if (la >= 1.0) { return c * $1; }
+    return c * airDonor(${t}a, n);`)
+    .replace(outB, `let la = liquidAt(a, n);
+  let lb = liquidAt(b, n);
+  if (la >= 1.0 && lb >= 1.0) { return c * ($1 - 0.5 * (1.0 + c) * s); }
+  if (lb >= 1.0) { return c * $1; }
+  return c * airDonor(${t}b, n);`);
+}
+/*
+  airGive: one over what a cell with air in it divides its liquid's amount
+  among this substep, its liquid and all that comes in, or all that goes out
+  where that is more (the comment above airLiquid). 1 where the cell has no
+  air. Run before each substep of an amount's carry while there is air on
+  the plate, so a carry reads its neighbours' without rebuilding their faces.
+*/
+function airGiveKernel(planned: boolean): string {
+  const sub = planned ? '@group(0) @binding(5) var<storage, read> sub: array<f32>;\n' : '';
+  const b = planned ? 6 : 5;
+  return `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var give: texture_storage_2d<r32float, write>;
+@group(0) @binding(4) var<storage, read> pr: array<f32>;
+${sub}@group(0) @binding(${b}) var sq: texture_2d<f32>;
+@group(0) @binding(${b + 1}) var<storage, read> mob: array<f32>;
+@group(0) @binding(${b + 2}) var airWas: texture_2d<f32>;
+@group(0) @binding(${b + 3}) var airNow: texture_2d<f32>;
+@group(0) @binding(${b + 4}) var inflow: texture_storage_2d<rgba32float, write>;
+${THIN_FACE}
+${airLiquidAt(planned ? 'A.a.x * sub[0]' : 'A.a.x')}
+${airFaceShares(planned ? 'sub[0]' : '1.0')}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  let l = liquidAt(p, n);
+  let o = airFaces(p, n);
+  let room = max(l + dot(max(-o, vec4f(0.0)), vec4f(1.0)), dot(max(o, vec4f(0.0)), vec4f(1.0)));
+  textureStore(give, p, vec4f(select(1.0 / room, 1.0, l >= 1.0), 0.0, 0.0, 1.0));
+  textureStore(inflow, p, max(-o, vec4f(0.0)));
+}`;
+}
+KERNELS.airGiveSub = airGiveKernel(true);
+KERNELS.airGiveThin = airGiveKernel(false);
 KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
+/*
+  Each carry of amounts twice: as it was, which every step with no air on
+  the plate runs, and taking the air (the Air kernels, airCarry in
+  fluid/passes.ts). One kernel for both, its air reads skipped by a uniform,
+  ran the colour's carry at twice to four times the time under SwiftShader
+  with no bubble on the plate (`npm run thick`'s timing, 156 → 632 ms).
+*/
+KERNELS.bodyAdvectSubAir = airLiquid(KERNELS.bodyAdvectSub, 'bodyAdvectSubAir', 'A.a.x * sub[0]');
 
 /*
   The colour and the poured liquids' species carried together (PLAN 18d-11a):
@@ -149,8 +344,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d2 = flux(src2, p, x, ce, n) - flux(src2, p - x, x, cw, n) + flux(src2, p, y, cn, n) - flux(src2, p - y, y, cs, n);
   textureStore(dst2, p, max(textureLoad(src2, p, 0) - d2, vec4f(0.0)));
 }`;
+KERNELS.bodyAdvectPairSubAir = airLiquid(KERNELS.bodyAdvectPairSub, 'bodyAdvectPairSubAir', 'A.a.x * sub[0]');
 KERNELS.mixAdvectSub = thinFaced(substepped('mixAdvect'), 'mixAdvectSub');
 KERNELS.bodyAdvectThin = thinFaced(KERNELS.bodyAdvect, 'bodyAdvectThin');
+KERNELS.bodyAdvectThinAir = airLiquid(KERNELS.bodyAdvectThin, 'bodyAdvectThinAir', 'A.a.x');
 
 /*
   The ferrofluid's carry on a thin gap in as many substeps as the step's flow
