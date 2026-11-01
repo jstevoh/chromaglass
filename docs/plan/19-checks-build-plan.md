@@ -260,6 +260,9 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
   part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
   `docs/plan-shipped.md` §19k-9.
+- **19k-11** (E, S): **shipped**, `holeline` from `lab` to `lab3`: GitHub's ubuntu runners
+  come in speed tiers about 2x apart, and on the slow one `lab` ran past its 25 minutes. Story
+  in `docs/plan-shipped.md` §19k-11.
 - **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
   `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
   only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,

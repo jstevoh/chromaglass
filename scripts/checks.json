@@ -1059,7 +1059,7 @@
     },
     {
       "name": "No line round a bubble's hole",
-      "shard": "lab",
+      "shard": "lab3",
       "run": "npm run holeline",
       "why": [
         "No line round a bubble's hole in one dye (PLAN.md 33a,",
@@ -1072,7 +1072,12 @@
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
         "with airNear's mask taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
-        "so it sits here beside lampzero rather than in the Mac queue."
+        "so it sits in a Linux lab part rather than in the Mac queue. In `lab3`",
+        "since 2026-11-01 (PLAN 19k-11): GitHub's ubuntu runners come in speed",
+        "tiers about 2x apart (videoflow's printed CPU loop reads 0.7, 1.05 or",
+        "1.4 ms a frame on the same code), and on the slow tier `lab` ran 25",
+        "minutes and was cancelled in this check, 10:02 of it, where the fast",
+        "tier ran the whole part in 14."
       ]
     },
     {
