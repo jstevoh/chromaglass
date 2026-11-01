@@ -121,10 +121,7 @@ a post sees them in the first minute.
   descriptions, clips, captions). Once 37p to 37s run, the owner's part is the Monday
   approval (37q) and answering; once 37x runs, the album is the week's YouTube video and
   its peaks are the week's three cuts.
-- **37k. A press page.** *(S; Claude.)* `chromaglass.art/press`: what it is in two
-  sentences, the prices, six stills and two clips to download, the logo files from
-  `brand/`, `support@chromaglass.art`. For a reviewer, a podcast or a newsletter that
-  writes back; built on the phone layout like every page.
+- ~~**37k. A press page.**~~ Shipped 2026-11-01 (this PR): `chromaglass.art/press`, checked by `npm run presskit`; story in `docs/plan-shipped.md` §37k.
 - **37l. Knowing what worked.** *(S–M; Claude, with the owner's sign-in for the
   dashboards.)* The site has no analytics today (no counter in `src/` or `index.html`,
   checked 2026-10-29), so nothing says which post sent a buyer. The funnel is views →

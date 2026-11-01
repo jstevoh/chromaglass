@@ -11050,3 +11050,29 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
+
+
+## 37k. A press page, and 12.6 the store listings (this PR, 2026-11-01)
+
+Wave 7's next Claude item after OSC out. **37k**: `chromaglass.art/press`
+(`public/press.html`, a static page like `/pro`, routed in `firebase.json` before
+the app's catch-all): the two sentences with a copy button, the facts (prices from
+the landing page, what it runs on, the LLC, `support@`), six stills at 2560 × 1440
+and two 20-second 1080p60 clips with sound, the logo as SVG and large PNGs. The
+media are the owner's Mac recording the real app (the 34a-6 site films of 10-29,
+cut on the Mac: stills are the films' 30-second frame where no `still.png` was
+written, clips the 20 seconds with the most frame-to-frame movement, H.264 CRF 22
+capped at 4.3 Mb/s, +faststart), not the lab, because a press picture promises
+what the app looks like. Credits with ISRCs: `public/press/MEDIA.md`. The cards
+show the landing page's small webp of each look and link the full JPEG, so a phone
+loads about 120 KB of pictures. **12.6**: the privacy page's section for the phone
+apps (permissions asked on the phone, nothing more sent, no tracking or ad id),
+`docs/store-listings.md` (every field for both stores, the review note, category
+and rating, the App Privacy label and Data safety answers), and Play's 512 icon and
+1024 × 500 feature graphic from `scripts/brand/art.mjs` (`featureGraphic`).
+`npm run presskit` (Measure browser2), 40/40: the files exist, the stills' and
+clips' sizes and lengths read from the files themselves, the clips' index before
+their data, the prices against `Landing.tsx`, each listing field within its limit
+with no price or way to buy, the store pictures' sizes and alpha, and the page at
+360 and 1280 px with no sideways scroll and every picture loaded. Left open:
+12.6-shots (the phone's own screenshots) and 12.6-label.

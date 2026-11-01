@@ -36,6 +36,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `npm run cisecrets` (any workflow: keys only in main's environments, read-only tokens, pinned outside actions), `npm run actionlint` (a pinned release, fetched on first use); `npm run macqueue -- --hours 24` for the Mac time before and after |
 | a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
+| the press page (`public/press.html`, `public/press/**`), `docs/store-listings.md`, `docs/brand/store/`, the tier prices in `src/components/Landing.tsx` | `presskit` |
 
 `npm run quick` is this table made executable (PLAN 19k): it reads
 `scripts/checks.json`, works out what each check reads (its scripts, the `src/` files
