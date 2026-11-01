@@ -118,7 +118,18 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    owner's Mac, an automation lane playing a look change on the bar. The phone rule:
    the link's switch and its slot bindings are in the More sheet.
    Before any of it, the MIDI route in the table above, tried once in Logic and
-   Ableton and written up with step 4. *Not started.*
+   Ableton and written up with step 4 (34a-7e). *Not started.* Off hold 2026-11-01 (the
+   owner), cut into three PRs:
+   - **13.7a** (Claude, first): `docs/dawbridge.md`, the wire contract; the bridge link
+     in the show server (a `bridge` role, localhost only, Pro as OSC and Link are); the
+     page's half (slots through MIDI learn's binding map, transport as a tempo source,
+     PCM as an ear source "DAW"); the phone's More-sheet switch and bindings; and
+     `npm run dawbridge`, the node fake, its real-plugin lines red (`--owed=plugin`).
+   - **13.7b** (Antigravity, after 13.7a; brief in the project's shared files,
+     `antigravity/briefs-2026-11-01-dawbridge.md`): the JUCE AU and VST3 under
+     `desktop/native/dawbridge/`, `auval`, and the owner's Mac in Live and Logic.
+   - **13.7c** (Claude, after 13.7b): signed and notarised with the Mac app's Developer
+     ID, both formats built on the macOS runner, an installer, the Pro page.
    - **13.7-ipad** (later, from §30; after step 7 and §12's iPad app): the iPad sibling.
      An AUv3 that draws nothing, sits on an AUM (or Loopy Pro, Drambo) channel, and
      sends that channel's readings, its notes and the host's transport to the show over
