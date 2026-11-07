@@ -2646,7 +2646,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let t0 = milkTransmission(through0, vel0, fuv0, layerGap0);
     milkScatter = sc0;
     milkGap = layerGap0;
-    outColor = onGround(filmDyePaint(outColor, ft0), vec4f(filmDyePaint(fluid0.rgb, ft0), fluid0.a),
+    outColor = onGround(filmDyePaint(outColor, ft0, 1.0), vec4f(filmDyePaint(fluid0.rgb, ft0, 0.0), fluid0.a),
       throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4) * lampGrain0, film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0) * ft0);
     milkScatter = 0.0;
 

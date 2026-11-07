@@ -35,10 +35,12 @@
  * fourteen units deep (`FILM_DYE_DEPTH`), very gentle to very extreme.
  *
  * On the black ground (Lamp Ground 0, the dye painted as light) a filter over
- * black is black, so the film's dye is painted the way the water's is: its
- * tint, the light it lets through normalised to its brightest channel, over
- * what is beneath at the share of the lamp it takes away. The two grounds
- * then show the same film the same depth of dye.
+ * black is black, so over clear water the film's dye is painted the way the
+ * water's is: its tint, the light it lets through normalised to its
+ * brightest channel, at the share of the lamp it takes away. Over the
+ * water's own painted dye it filters that light instead, so the two dyes
+ * mix as filters on both grounds (a first try painted the tint over
+ * everything, and the cobalt pools vanished under a yellow film).
  *
  * At strength 0, and wherever there is no film, both are exactly 1 and the
  * colour passed through untouched: the plate is the plate it was, byte for
@@ -68,13 +70,17 @@ fn filmDyeThrough(h: f32, gap: f32) -> vec3f {
 }
 
 /*
-  The painted ground's share of it (Lamp Ground 0): c, what is beneath,
-  filtered by the dye and then laid under the dye's own tint at the share of
-  the light the dye takes. With T = 1 it is c itself.
+  The painted ground's share of it (Lamp Ground 0), for c, what is beneath:
+  on the bare ground (paint 1) the dye's own tint laid over it at the share
+  of the light the dye takes, since clear water there is black and a filter
+  over black shows nothing; over the water's painted dye (paint 0) that
+  light is filtered by the film, as the lamp would be, so a cobalt pool
+  under a yellow film goes the dark green the lamp ground shows, not yellow.
+  onGround mixes the two by the water dye's opacity. With T = 1 it is c.
 */
-fn filmDyePaint(c: vec3f, T: vec3f) -> vec3f {
+fn filmDyePaint(c: vec3f, T: vec3f, paint: f32) -> vec3f {
   if (U.filmDye.w <= 0.0) { return c; }
-  let a = 1.0 - min(T.r, min(T.g, T.b));
+  let a = (1.0 - min(T.r, min(T.g, T.b))) * paint;
   return mix(c * T, T / max(max(T.r, max(T.g, T.b)), 1e-3), a);
 }
 `;

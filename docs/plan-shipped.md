@@ -4212,7 +4212,7 @@ The plan as written before it was built:
 
 ### 20b-13. The film's own dye
 
-**Shipped (this PR), behind Film Dye (`clearFilmDye`, 0 in every look) and its colour
+**Shipped (#684), behind Film Dye (`clearFilmDye`, 0 in every look) and its colour
 (`clearFilmDyeColor`, a warm yellow); judging §108.** Asked through the owner's lace still
 (yellow lacy veins and cells, fine spatter, over lavender, cobalt and coral). In the lab a
 yellow Oil Bodies sheet with water holes held lace for about a second and then Cahn–Hilliard
