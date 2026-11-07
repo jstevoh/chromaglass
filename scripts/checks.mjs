@@ -504,6 +504,27 @@ export function buildFirst(all, list, scripts) {
   }
   return false;
 }
+/*
+  How long a shard's checks may run before the run's page says so (PLAN
+  19k-13). The jobs' bounds (`timeout-minutes` in checks.yml, 25 for both)
+  are room for a slow runner, not the line slowness is read at: a bound set
+  where the shards already ran would cancel a green shard on its next slow
+  runner, as 20 did to three Mac shards on 2026-11-07, and a bound set far
+  past them says nothing until it is hit. So the line is drawn apart from
+  the bound. On the Mac, 18 minutes of checks: with the 0:39 to 3:07 a
+  GitHub Mac spends before its first check, that is where the old 20-minute
+  bound began cancelling, and every shard ran under it but plate's slowest
+  (18:19) on those eleven attempts. In Measure, 21: 19k-11b's line for a
+  part on the slow runner tier. Past it, a warning names the shard and its
+  time; the shard stays green, and the next rebalance (or a sixth shard) is
+  read from these warnings, not from cancelled runs.
+*/
+export const ROOM = { mac: 18, measure: 21 };
+export function roomWarning(shard, secs, manifest) {
+  const kind = manifest.shards.mac.includes(shard) ? 'mac' : 'measure';
+  if (secs <= ROOM[kind] * 60) return null;
+  return `::warning title=${escProp(`${shard}: ${fmtSecs(secs)} of checks`)}::${escData(`Past the ${ROOM[kind]} minutes a ${kind === 'mac' ? 'Mac shard' : 'Measure part'}'s checks are held to (PLAN.md 19k-13); the job's bound is room for a slow runner, so move a check out before it is reached`)}`;
+}
 const SITE_BUILD = { name: 'The site, built first', run: 'node node_modules/vite/bin/vite.js build', timeout: 5 };
 
 // `only`: the names of the checks to run (reach.mjs's Measure selection,
@@ -558,9 +579,11 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
   const held = results.filter(({ r, q }) => !r.ok && q);
   const total = results.reduce((s, { r }) => s + r.secs, 0);
   console.log(`\n${results.length - red.length - held.length} of ${results.length} checks green on ${shard} in ${fmtSecs(total)}${held.length ? `; red on quarantined lines only: ${held.map(({ c }) => c.name).join('; ')}` : ''}${red.length ? `; red: ${red.map(({ c }) => c.name).join('; ')}` : ''}`);
+  const room = roomWarning(shard, total, manifest);
+  if (room) console.log(room);
   if (process.env.GITHUB_STEP_SUMMARY) {
     const rows = results.map(({ c, r, q }) => `| ${r.ok ? '✓' : q ? '⚠' : '✗'} | ${c.name.replace(/\|/g, '\\|')} | \`${c.run.replace(/\|/g, '\\|').replace(/`/g, "'")}\` | ${Math.round(r.secs)} |`);
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}${room ? ' ⚠ past its room line (PLAN.md 19k-13)' : ''}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
   }
   return red.length ? 1 : 0;
 }
@@ -824,6 +847,25 @@ async function selftest() {
   say(left === '', 'and it is ended with the check\'s group, so it holds no port for the next');
   say(!/other/.test(text), 'only the shard asked for runs');
   say(!/^\S*\s*(ok|FAIL)\s+(green|red|slow)/m.test(text), 'the runner\'s own lines never read as a harness\'s ok or FAIL line to flakes.mjs');
+
+  // The room line (19k-13): past it a shard warns and stays green; under it,
+  // nothing. And each job's bound leaves a slow runner's setup (three
+  // minutes, the most a GitHub Mac spent before its first check) past the
+  // line, so the warning comes on runs before a cancel would.
+  const roomMan = { shards: { measure: ['m'], mac: ['x'] } };
+  const macOver = roomWarning('x', ROOM.mac * 60 + 20, roomMan);
+  say(/^::warning title=x%3A 18 min 20 s of checks::.*Mac shard/.test(macOver ?? ''), `a Mac shard past ${ROOM.mac} minutes of checks is a warning naming it and its time (${macOver?.slice(0, 50)})`);
+  say(roomWarning('x', ROOM.mac * 60 - 20, roomMan) === null, 'and one under it is not');
+  say(roomWarning('m', ROOM.mac * 60 + 20, roomMan) === null && /Measure part/.test(roomWarning('m', ROOM.measure * 60 + 20, roomMan) ?? ''), `a Measure part is held to its own ${ROOM.measure} minutes, not the Mac's`);
+  const boundOf = (jobName) => {
+    const at = wf.indexOf(`    name: ${jobName}`);
+    const m = at < 0 ? null : /^    timeout-minutes: (\d+)$/m.exec(wf.slice(at));
+    return m ? Number(m[1]) : null;
+  };
+  const bounds = { mac: boundOf('WebGPU (macOS) · ${{ matrix.shard }}'), measure: boundOf('Measure · ${{ matrix.part }}') };
+  const SETUP_MIN = 3;
+  say(bounds.mac >= ROOM.mac + SETUP_MIN && bounds.measure >= ROOM.measure + SETUP_MIN, `each job's bound is at least ${SETUP_MIN} minutes past its room line (Mac ${bounds.mac} for ${ROOM.mac}, Measure ${bounds.measure} for ${ROOM.measure})`);
+  say(!(20 >= ROOM.mac + SETUP_MIN), 'control: the old 20-minute Mac bound would not be');
 
   // Quarantine (19ak-1): a check red only on a quarantined line is said and
   // does not block; every other way of being red still does.
