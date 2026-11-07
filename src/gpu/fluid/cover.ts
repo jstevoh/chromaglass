@@ -20,9 +20,19 @@ export class FluidCover extends FluidReads {
   private coverMl = COVER_FULL_ML;
   /** Poured since the last step, m³ (pour). */
   private coverPoured = 0;
-  /** The cover's gap, in gap units (0.03 is 2 mm): the uniform S.cover, and what the field was last laid or shifted to. */
-  protected coverGap = DISH_REST_GAP;
   private coverLaid = DISH_REST_GAP;
+
+  /**
+   * The cover's gap over the 2 mm the solver's constants were worked out at,
+   * squared: what a Darcy speed in the gap (the colour's fall down a tipped
+   * plate, ROCK_FALL; the oil's rise, OIL_LIFT; the oil's tension pull,
+   * OIL_TENSION_GAP) is multiplied by on a live cover, since each is
+   * Δρ g h²/12μ or σ-driven flow with the same h² mobility. 1 at the default.
+   */
+  protected get coverH2(): number {
+    const r = this.coverGap / DISH_REST_GAP;
+    return r * r;
+  }
 
   /**
    * The glass on its liquid, one step (lib/cover.ts coverStep): the dial's
@@ -46,6 +56,14 @@ export class FluidCover extends FluidReads {
     this.coverGap = h / DISH_GAP_FIELD_METRES;
   }
 
+  /** The cover's gap, metres, and in gap units. */
+  get coverMetres(): number {
+    return this.coverGap * DISH_GAP_FIELD_METRES;
+  }
+  get coverUnits(): number {
+    return this.coverGap;
+  }
+
   /**
    * A pour's volume goes into the ledger as well as into the thin solve: the
    * take of a column over a dome of πr²/2 at the live gap (lib/liquidProps.ts
@@ -57,7 +75,7 @@ export class FluidCover extends FluidReads {
     super.pour(x, y, radius, take, sp, volume);
     if (volume && radius > 0 && take > 0 && this.hsPour) {
       const r = radius * DISH_METRES;
-      this.coverPoured += take * (Math.PI * r * r) / 2 * this.coverGap * DISH_GAP_FIELD_METRES;
+      this.coverPoured += take * (Math.PI * r * r) / 2 * this.coverMetres;
     }
   }
 

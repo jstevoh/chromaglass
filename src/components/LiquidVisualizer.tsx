@@ -258,6 +258,9 @@ interface LiquidVisualizerProps {
 }
 
 import type { LiquidVisualizerHandle } from './visualizerHandle';
+
+/** Held to 0..1 (a score of the frame loop's dials). */
+const c01 = (v: number) => Math.max(0, Math.min(1, v));
 export type { LiquidVisualizerHandle };
 
 
@@ -275,7 +278,7 @@ function rgbToHex(r: number, g: number, b: number): string {
   const peak = Math.max(r, g, b);
   const k = peak > 0.001 ? 0.85 / peak : 0;
   const to = (v: number) => {
-    const n = Math.round(Math.max(0, Math.min(1, v * k)) * 255);
+    const n = Math.round(c01(v * k) * 255);
     return n.toString(16).padStart(2, '0');
   };
   return peak <= 0.001 ? '#111111' : `#${to(r)}${to(g)}${to(b)}`;
@@ -1127,7 +1130,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     // gate, since holding it over an emptying plate is harmless.
     switch (g.tool) {
       case 'magnet':
-        magnetHandRef.current = { x: Math.max(0, Math.min(1, g.x)), y: Math.max(0, Math.min(1, g.y)), at: showNow() };
+        magnetHandRef.current = { x: c01(g.x), y: c01(g.y), at: showNow() };
         return;
       /*
         A hand on the dish from anywhere but this screen's pointer: the
@@ -1643,7 +1646,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     pace: (sample) => { paceTargetRef.current = { activity: sample.activity, dim: sample.dim }; },
     pour: (gust = 0.8) => {
       const energy = Math.min(1, audioDataRef.current?.energy ?? 0);
-      floodPour(Math.max(0, Math.min(1, gust)), energy, frameBubblesRef.current, DICE.pour, DICE.pour);
+      floodPour(c01(gust), energy, frameBubblesRef.current, DICE.pour, DICE.pour);
     },
     stepDyes: () => {
       const w = paletteWindowRef.current;
@@ -2602,7 +2605,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             heardKicksRef.current.n++;
             heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
           }
-          const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
+          const trust = isActiveRef.current && currentAudioData ? c01(currentSettings.beatPrediction ?? 0) : 0;
           // Link, a desk's clock, taps or a typed bpm, every frame (its seq
           // tells a new beat from a held one).
           const tempoNow = clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null;
@@ -3073,7 +3076,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             the reaction, so the bottle did nothing on a look without
             Chemistry, and the first fed nothing, so neither grew.
           */
-          const chemAmt = Math.max(0, Math.min(1, currentSettings.chemistry ?? 0));
+          const chemAmt = c01(currentSettings.chemistry ?? 0);
           const lead = fluidsRef.current[0];
           const poured = !!leadGpu?.reagentLive;
           // No reaction on the plate: nothing is printed, and the plate shows the dye itself.
@@ -3090,7 +3093,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const feed = 0.03 + p * 0.01;
               const kill = 0.055 + p * 0.005;
               const w = Math.pow(2, ((currentSettings.chemistryWidth ?? 0.5) - 0.5) * 4);
-              const print0 = Math.max(0, Math.min(1, currentSettings.turingPrint ?? 0));
+              const print0 = c01(currentSettings.turingPrint ?? 0);
               /*
                 The map drifts (PLAN 26d-6): the clock is plain seconds of the plate's own
                 time, advanced by the frame's share of a second and by nothing the sound
@@ -3099,7 +3102,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 constant map every other look and today's print run on.
               */
               turingClockRef.current += sixtieths / 60;
-              const driftWanted = print0 > 0 ? Math.max(0, Math.min(1, currentSettings.turingDrift ?? 0)) : 0;
+              const driftWanted = print0 > 0 ? c01(currentSettings.turingDrift ?? 0) : 0;
               // Slewed, never stepped (TURING_DRIFT_PER_SECOND); a print that is off starts the next one from 0.
               const chemIterations = Math.max(1, Math.min(10, Math.round(sixtieths * 2.5)));
               const driftStep = TURING_DRIFT_PER_SECOND / TURING_ITERATIONS_PER_SECOND * chemIterations;
@@ -3130,8 +3133,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // One verdict per frame on whether the camera has anything to say, so
         // every solver step this frame stirs from the same reading rather than
         // re-deciding. A reading that has stopped arriving is not the room.
-        const roomDrive = Math.max(0, Math.min(1, currentSettings.sceneDrive ?? 0));
-        const roomHands = Math.max(0, Math.min(1, currentSettings.sceneHands ?? 0));
+        const roomDrive = c01(currentSettings.sceneDrive ?? 0);
+        const roomHands = c01(currentSettings.sceneHands ?? 0);
         const roomFresh = (() => {
           if ((roomDrive <= 0 && roomHands <= 0) || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = sceneRef?.current ?? null;
@@ -3153,7 +3156,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           running, so a film that is only a slide costs exactly what it
           always did.
         */
-        const filmDrive = Math.max(0, Math.min(1, currentSettings.filmDrive ?? 0));
+        const filmDrive = c01(currentSettings.filmDrive ?? 0);
         const filmReading = (() => {
           if (filmDrive <= 0 || !isActiveRef.current || drainFrameRef.current > 0) return null;
           const r = filmSenseRef?.current ?? null;
@@ -4465,7 +4468,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (R > 0 && kickStep) kickRock(rock, bass01, accent, barGridRef.current.placeAt(accentAt), barGridRef.current.now.period);
             // The rhythm plate: on a kick the projectionist presses the top
             // glass and the dye spreads out in a ring, then relaxes back.
-            const squeezeAmt = Math.max(0, Math.min(1, currentSettings.beatSqueeze ?? 0));
+            const squeezeAmt = c01(currentSettings.beatSqueeze ?? 0);
             if (squeezeAmt > 0 && kickStep && accent > 0 && isActiveRef.current && drainFrameRef.current === 0) {
               const leadPlate = fluidsRef.current[0];
               if (leadPlate) {
@@ -4540,7 +4543,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             */
             const cover = coverRef.current;
             stepCover(cover, plateSin(tiltX, rockX), plateSin(tiltY, rockY),
-              coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS,
+              coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS, 1000, currentSettings.coverWeight, fluidsRef.current[0]?.gpu?.coverMetres), simStepS,
               coverRoom(currentSettings.frameSway));
             for (const fluid of fluidsRef.current) {
               fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; fluid.rockGain = rockPast(R);
@@ -4551,7 +4554,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
             // ── Oil beads ───────────────────────────────────────
             {
-              const beadAmt = Math.max(0, Math.min(1, currentSettings.beads ?? 0));
+              const beadAmt = c01(currentSettings.beads ?? 0);
               const beads = beadsRef.current;
               if (beadAmt <= 0) {
                 if (beads.beads.length) beads.clear();
@@ -4604,7 +4607,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             }
 
             // ── Bubbles ─────────────────────────────────────────
-            const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
+            const bubbleAmt = c01(currentSettings.bubbles ?? 0);
             const bubbles = bubblesRef.current;
             // A look with no bubbles of its own keeps the ones blown by hand.
             if (bubbleAmt <= 0) {
@@ -4820,7 +4823,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               average to nothing at all — measured as no visible change at any
               setting before it was made coherent.
             */
-            const wander = Math.max(0, Math.min(1, currentSettings.spinWander ?? 0));
+            const wander = c01(currentSettings.spinWander ?? 0);
             if (wander > 0.001) {
               /*
                 A wall clock, not the simulation's.
@@ -4873,7 +4876,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               those looks have always had, and reaches a flick's worth at the
               top for anyone who wants the bass actually turning the plate.
             */
-            const audioDepth = Math.max(0, Math.min(1, currentSettings.spinAudioDepth ?? 0));
+            const audioDepth = c01(currentSettings.spinAudioDepth ?? 0);
 
             // Use realDt only — never timeMultiplier, which spikes with audio energy
             const musicSpeed = Math.abs(rotationMod) * (0.3 + audioDepth * 26);
@@ -4998,7 +5001,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               An angle that accumulates cannot be allowed to go non-finite
               (the note above); dishFrame returns a finite turn or none.
             */
-            const tau = dragSeconds(carrierViscosity(currentSettings.viscosity));
+            const tau = dragSeconds(carrierViscosity(currentSettings.viscosity), fluidsRef.current[0]?.gpu?.coverUnits);
             const frame = dishFrame(spinVelRef.current[l] ?? 0, dishNow, liquidSpinRef.current[l] ?? 0, realDt, tau);
             if (Number.isFinite(frame.liquid)) liquidSpinRef.current[l] = frame.liquid;
             if (fluidsRef.current[l]) {
@@ -5204,7 +5207,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // jump on every kick reads as the frame moving. The hot-spot stays on
         // the stage's axis whatever this does (wgsl/lampField.ts, 38a).
         {
-          const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
+          const motion = c01(currentSettings.lampMotion ?? 0);
           const rock = rockRef.current;
           const lamp = lampRef.current;
           const [rockLx, rockLy] = lampRock(rock, currentSettings.plateRock, currentSettings.frameSway);
@@ -5234,7 +5237,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // by the same number made a plate at the new default nearly
         // invisible — the harness caught it as "0 pixels changed".
         {
-          const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
+          const bubbleAmt = c01(currentSettings.bubbles ?? 0);
           // And the ones blown by hand on a look with none of its own.
           const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack() : 0;
           bubbleDebugRef.current = {
@@ -6600,7 +6603,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // all need the finished picture to sample from. Built the first
             // frame it would do anything and dropped when it would not, so
             // a show without a camera never pays for the second target.
-            const camAmt = Math.max(0, Math.min(1, view.settings.camera ?? 0));
+            const camAmt = c01(view.settings.camera ?? 0);
             if (camAmt > 0.001 && !camera) { camera = new WebGPUCamera(s.device, s.format); scopeSoon = 2; }
             else if (camAmt <= 0.001 && camera) { camera.dispose(); camera = null; }
             const cam = camera;
@@ -7102,7 +7105,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       const shot = macroShotRef.current;
       const z = Math.max(0.0001, shot.zoom);
       // As the plate's uniforms have it: gathered back to one plate as the closeup comes in.
-      const spread = Math.max(0, Math.min(1, settingsRef.current.dishSpread ?? 0)) * (1 - macroAmountOf(settingsRef.current));
+      const spread = c01(settingsRef.current.dishSpread ?? 0) * (1 - macroAmountOf(settingsRef.current));
       if (spread > 0.001) {
         // The layers are spread into dishes: this layer's dish is its whole plate.
         const aspect = rect.width / Math.max(1, rect.height);

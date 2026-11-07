@@ -50,8 +50,8 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP } from './stepping';
 import { rimCount, rimMask } from '../lib/rimMask';
 
-/** A dial's 0..1, absent as 0 (the params builder's dozen of them). */
-const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
+/** A dial from 0 to its top (1 unless said), absent as 0: the params builder's score of them. */
+const c01 = (v: number | undefined, top = 1) => Math.max(0, Math.min(top, v ?? 0));
 
 export class FluidSimulation {
   size: number;
@@ -530,7 +530,7 @@ export class FluidSimulation {
       if (this.thinGap && g.pour) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
-        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
+        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds, g.coverMetres), speciesOf(what));
       }
       if (('active' in what) && (g as any).addActive) {
         (g as any).addActive(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.active as number) * amount);
@@ -2866,7 +2866,7 @@ export class FluidSimulation {
 
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
-    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
+    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * c01(settings.backgroundLoop, 1.4);
 
     /*
       The timestep, stretched to whatever rate the loop is stepping at (H2b).
@@ -3118,7 +3118,7 @@ export class FluidSimulation {
       music, and a loud track still cannot triple a calm look's (lib/stir.ts).
     */
     let turbScale = stirOf(settings.turbulenceScale ?? 0, audioData ? audioData.energy : null, settings.audioImpact ?? 0.45);
-    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
+    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * c01(settings.backgroundLoop, 1.4);
     let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
     if (audioData) {
@@ -3377,7 +3377,7 @@ export class FluidSimulation {
       extraMagnets: this.extraMagnets,
       magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
-      vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
+      vorticity: c01(settings.vorticityConfinement, 2),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
       filmHold: c01(settings.filmHold),
@@ -3386,17 +3386,17 @@ export class FluidSimulation {
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).
       clearFilm: this.layerIndex === 0 ? c01(settings.clearFilm) : 0,
-      solutalBuoyancy: Math.max(0, Math.min(2, settings.solutalBuoyancy ?? 0)),
+      solutalBuoyancy: c01(settings.solutalBuoyancy, 2),
       plateUpright: c01(settings.plateUpright),
       ...this.downhill(settings.tiltDirection ?? 180),
-      doubleDiffusion: Math.max(0, Math.min(2, settings.doubleDiffusion ?? 0)),
+      doubleDiffusion: c01(settings.doubleDiffusion, 2),
       ferroLabyrinth: c01(settings.ferroLabyrinth),
       mazeDetail: c01(settings.mazeDetail),
-      phaseDisplace: Math.max(0, Math.min(2, settings.phaseDisplace ?? 0)),
+      phaseDisplace: c01(settings.phaseDisplace, 2),
       bzReaction: c01(settings.bzReaction),
       liesegang: c01(settings.liesegang),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
-      depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
+      depthDrag: c01(settings.depthDrag, 3),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
@@ -3461,7 +3461,7 @@ export class FluidSimulation {
       */
       spinDish: this.dishSpin - this.liquidSpin,
       spinLiquid: this.liquidSpin,
-      spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
+      spinTau: dragSeconds(carrierViscosity(settings.viscosity), this.gpu?.coverUnits),
       spinNu: carrierViscosity(settings.viscosity),
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
       particles: settings.particles ?? 0,

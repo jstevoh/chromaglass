@@ -15,7 +15,7 @@ import { WebGPUParticles } from '../particles';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { RowUploads } from '../../lib/deltaRows';
-import { MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
+import { REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
   readonly N: number;
@@ -47,6 +47,8 @@ export class FluidCore {
   protected readonly squeeze: PingPong;
   /** The plate shape the gap was last laid at; a change re-seeds it. */
   protected lastCurve: number | null = null;
+  /** The cover glass's gap on its liquid, in gap units (0.03 is 2 mm): the uniform S.cover, stepped by fluid/cover.ts (PLAN 38r-5). */
+  protected coverGap = REST_GAP;
   protected readonly phase: PingPong;
   /**
    * The pressure, in a storage buffer rather than a texture (H2).

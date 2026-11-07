@@ -975,7 +975,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   depthDrag: 0,
   thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
-  liquidMl: 62.83185307179586,     // A·2 mm under the 0.1 m cover (lib/cover.ts COVER_FULL_ML): today's gap
+  liquidMl: 62.83185307179587,     // A·2 mm under the 0.1 m cover (lib/cover.ts COVER_FULL_ML): today's gap
   coverWeight: 157.07963267948966, // a 2 mm float glass, 5 kg/m² (COVER_GLASS_G)
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it

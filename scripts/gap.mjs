@@ -81,6 +81,7 @@ await build({
       "export { FORCE_KERNELS } from './src/gpu/wgsl/fluid/forces.ts';",
       "export { FERRO_DROP_WGSL, GAP_LC } from './src/gpu/wgsl/ferroDrop.ts';",
       "export * as C from './src/lib/cover.ts';",
+      "export { DEFAULT_SETTINGS } from './src/types.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
   },
@@ -316,6 +317,32 @@ const rk4 = (h0, P, sig, mu, t) => {
   const metres = /this\.coverGap = h \/ DISH_GAP_FIELD_METRES;/.test(cover) && /\[this\.lastCurve, p\.plateCurve, this\.coverLaid, this\.coverGap\]/.test(cover);
   check('the solver packs the cover\'s gap (gap units, h over the metres in a unit) as S.cover at 51, before the step\'s kernels, and a cover that moves shifts the field',
     packed && field && metres, `packed ${packed}, struct ${field}, units and reshape ${metres}`);
+}
+
+// 18
+{
+  /*
+    The readers of the rest gap follow the cover (PLAN 38r-5). The numbers: a
+    pour's share halves on a glass twice as high, the cover's drag μ/(m h)
+    is today's at the defaults and halves for a glass twice as heavy, and the
+    settings' defaults are the lib's own, so a look made today is the same
+    plate. The solver's: each Darcy speed (colour's fall, oil's lift, oil's
+    pull) carries (h/h₀)², the breath and the glass's drag and the slump read
+    the cover's metres, and hsPrep's hand forcing is taken at S.cover.
+  */
+  const d = L.DEFAULT_SETTINGS;
+  const share = L.pourShare(0.1, 1e-6, 1 / 60, 2 * H0) / L.pourShare(0.1, 1e-6, 1 / 60);
+  const drag = L.coverDrag(0.45, 1000, C.COVER_GLASS_G, H0) / L.coverDrag(0.45), heavy = L.coverDrag(0.45, 1000, 2 * C.COVER_GLASS_G, H0) / L.coverDrag(0.45);
+  const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), passes = readFileSync('src/gpu/fluid/passes.ts', 'utf8'), thin = readFileSync('src/gpu/wgsl/thinGap.ts', 'utf8');
+  const solver = [
+    /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX/.test(fluid), /-OIL_LIFT \* this\.coverH2/.test(fluid),
+    /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /const b = this\.coverGap \* GAP_METRES;/.test(passes), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
+    /\(A\.a\.x \/ \(S\.cover \* S\.cover\) \* A\.a\.y\)/.test(thin),
+  ];
+  check('the rest gap\'s readers follow the cover: a pour\'s share, the cover\'s drag, and the solver\'s Darcy speeds, breath, glass drag, slump and hand forcing; the dials\' defaults are the lib\'s',
+    near(share, 0.5, 1e-12) && near(drag, 1, 1e-12) && near(heavy, 0.5, 1e-12) && solver.every(Boolean)
+      && d.liquidMl === C.COVER_FULL_ML && d.coverWeight === C.COVER_GLASS_G,
+    `share ×${share}, drag ×${drag.toFixed(6)} (heavy ×${heavy}), solver ${solver.map((b) => (b ? 1 : 0)).join('')}, defaults ${d.liquidMl} mL / ${d.coverWeight} g`);
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall ok');
