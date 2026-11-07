@@ -4142,6 +4142,43 @@ the sessions' files or the native apps skips the Mac (19h).
   cases. Measured with `npm run reach` as attempt 2 of a real green run (41350181902,
   Node's fetch through the proxy): 2 FAIL before, 97 ok and 0 FAIL after.
 
+### 19al. The handoff between the two tools waits on whoever notices (2026-11-07)
+
+**19al-1, 19al-2, 19al-3 shipped** 2026-11-07, rebuilt on that day's `main` from #450
+(written 2026-10-24 as 19ae, closed unmerged by an idle-draft sweep; 19ae has since gone
+to the phone check). What went wrong on 2026-10-24: the Mac watcher's wait for
+Antigravity's CI died, and two PRs that had gone green sat for two hours before anyone
+looked; all five open Antigravity PRs had fallen behind `main` and conflicted, and #355
+(13 days old) broke when `main` was merged in; five sat as review-owed at once. The Mac
+queue was not the hold-up: `npm run macqueue -- --hours 48` read a PR shard's mean wait
+at 7 minutes, and no Mac job running for 2,274 of the 2,880 minutes. The time went in the
+hops between tools, each waiting on a process or a person to notice. In the two weeks #450
+sat as a draft, the same thing kept happening by hand (#485 sat green 2.5 hours on
+2026-10-25), and Antigravity was told to post its own `READY` line in the meantime.
+
+Changed (19al-1): `.github/workflows/ready.yml` runs when `Checks` finishes. If the run
+tested the PR's current head and it is green, it labels the PR `ready-for-review` and
+comments `READY #<n> <item> head <sha>`; a push or a red run of the head takes the label
+off. Only `antigravity/` branches and PRs labelled `review-owed`. It never checks out the
+PR's code, and the PR's own text reaches the shell only through environment variables.
+Its push job is skipped on a PR with no label to take off, so it adds nothing to the
+checks of every other PR. `docs/handoff.md` gains "Small and short-lived" (one plan item,
+about 400 lines, a day; `main` merged in once, just before review) and "Ready, review,
+merge" (which PRs owe a review before merge; verdicts `PASS`/`CHANGES #<n> head <sha>`; a
+re-review reads only the commits since; merge pinned with `--match-head-commit`). The
+owner chose (19al-2) that the reviewing Claude session merges on its own `PASS` rather
+than waiting for Antigravity's next run, which can be a day or more off when it is out of
+credit. And (19al-3) "Who takes what", last written 2026-10-06 around lane numbers since
+shipped, now carries the owner's 2026-11-01 split: Antigravity builds everything with a
+number to hit, Claude Code keeps briefs and checks, root causes, sign-in, payments,
+Workers and CI, and reviews by risk; a PR with two `CHANGES` comes to Claude Code instead
+of a third round, and one escape puts its class back on review before merge for a week.
+`AGENTS.md`, `CLAUDE.md` and `docs/ci.md` carry the short form. `scripts/reach.mjs` lists
+`ready.yml` with the workflows that never run a Mac shard.
+
+Measured: see the PR (#696 or the one that carries this), which quotes the stubbed-`gh`
+cases, `npm run actionlint` and `npm run reach`.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
