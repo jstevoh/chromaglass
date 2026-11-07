@@ -67,7 +67,7 @@
  * has K = 0, and the harmonic mean would hold the front still forever).
  *
  * The shortcuts (PLAN 18m-1, 18m-1a). A pool poured to the dye's cap of six
- * units (2.13 mm deep in a 6 mm gap) is past where the viscous Poiseuille law
+ * units (2.13 mm deep, the whole of the 2 mm gap: PLAN 38r) is past where the viscous Poiseuille law
  * holds (its Reynolds number in water is near 30): in that slumping regime a
  * gravity current's front runs at its Froude speed Fr √(g′η(1 − η/b)) with
  * Fr = 1.19 (Huppert and Simpson 1980, J. Fluid Mech. 99). Each cell in

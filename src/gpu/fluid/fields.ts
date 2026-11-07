@@ -13,6 +13,7 @@ import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { AIR_CAPACITY, CARRY_SUBSTEPS, CARRY_PAIRS, FILM_GRID, LIES_B0, BZ_GRID, LIES_GRID, SWIRL_DISH_MIN, SWIRL_SPIN_MIN, liftGrid, GRAIN_PERIOD, VEL, R32, type FieldStats } from './constants';
 import { FluidCore } from './core';
+import { WARM_FIT } from '../wgsl/thinWarm';
 
 export class FluidFields extends FluidCore {
   /** The same, for the hands (PlateSolver.thinGapLive). */
@@ -354,6 +355,9 @@ export class FluidFields extends FluidCore {
       // carries read it (THIN_FACE); hsGradient hands phaseAdvect's area form c·P
       // in that one (wgsl/thinGap.ts, hsGradient).
       this.hsP = buf('thin gap pressure', this.N);
+      // The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12).
+      this.hsWarm = this.disposer.track(this.device.createBuffer({ label: 'thin warm start', size: (WARM_FIT + 4) * 4, usage: GPUBufferUsage.STORAGE }));
+      this.hsP2 = buf('thin gap pressure before', this.N);
       this.hsGap = buf('thin gap before', this.N);
       this.hsPour = this.disposer.track(this.device.createBuffer({ label: 'thin pour', size: Math.max(16, this.N * this.N * 4), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
       this.hsMobC = this.mg.map((lv) => buf(`thin gap rim ${lv.n}`, lv.n));

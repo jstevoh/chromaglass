@@ -28,7 +28,7 @@ export const DYE_KERNELS: Record<string, string> = {
 @group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
 
 fn inDish(p: vec2i) -> bool {
-  return S.thinGap < 0.5 || length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)};
+  return S.thinGap < 0.5 || !pastOpenRim(p);
 }
 
 fn getDye(p: vec2i, n: i32) -> vec4f {
@@ -177,7 +177,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   var d = textureLoad(dye, p, 0);
   // PLAN 18g: Colour leaves by flushing over the open rim (OPEN_RIM = 0.5), not by fading.
   // Liquid and dye carried past the circular dish rim spill into the overflow trough and leave the plate.
-  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
+  if (S.thinGap > 0.5 && pastOpenRim(p)) {
     d = vec4f(0.0);
   } else {
     // Named regulator shortcut (PLAN 18g / 28d-A, until 18c-2/18g-4 carry a separate

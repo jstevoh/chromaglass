@@ -64,6 +64,7 @@
  * of a step on SwiftShader, about fifteen minutes in all here.
  */
 import { openLab } from './lab.mjs';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -129,13 +130,28 @@ try {
     against, and check 2 read nothing. The bar is unchanged (the bump's
     travel within 12% of 6h(1 − h) of the dye's), and a harder stir only
     makes "stays whole for 20 s" harder to pass.
+
+    And nine times that again at the 2 mm gap (PLAN 38r), for the same
+    reason. A kick is laid as the speed it drives the water to against the
+    glass (wgsl/thinGap.ts hsPrep: the force is k₀ times it, k₀ = 12ν/h₀²,
+    added for one step), and the drag then takes it back in the gap's own
+    time τ = h²/12ν, so the distance a kick carries the dye is its speed
+    times τ, which goes as h²: in the 2 mm sandwich a kick a second carries
+    a ninth of what it did in the 6 mm dish. Measured: the 0.8 film's dye
+    moved 1.2 cells in three seconds at 6 mm and 0.1 at 2 mm, the 0.4
+    film's 4.5 and 0.5, and at 0.1 of a cell the bump's travel is again
+    nothing to time against. So the kick is scaled by (6 mm / h₀)², the
+    same kick carrying the dye the same few cells, and the wave's law it
+    is timed against is linear in the water's speed. The twenty seconds
+    of "stays whole" are the harder for it.
   */
+  const KICK = (0.006 / DISH_GAP_METRES) ** 2;
   const stir = async () => {
-    await page.evaluate(() => {
-      lab.vel(0.4, 0.45, 0.3, [2.5, -1.5, 0, 0]);
-      lab.vel(0.65, 0.6, 0.25, [-2.0, 2.0, 0, 0]);
+    await page.evaluate((k) => {
+      lab.vel(0.4, 0.45, 0.3, [2.5 * k, -1.5 * k, 0, 0]);
+      lab.vel(0.65, 0.6, 0.25, [-2.0 * k, 2.0 * k, 0, 0]);
       lab.flush();
-    });
+    }, KICK);
   };
   const stirEach = async (seconds, over) => {
     for (let s = 0; s < seconds; s++) { await stir(); await page.evaluate((o) => lab.step(60, o), over); }

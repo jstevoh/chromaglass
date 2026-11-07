@@ -7,8 +7,9 @@
  *
  *   npm run turntable
  *
- *   1. the drag time h²/12ν at the plate's 6 mm rest gap: water 3 s, the
- *      thick liquid 0.15 s, oil 0.06 s (the numbers every note quotes);
+ *   1. the drag time h²/12ν at the plate's 2 mm rest gap (PLAN 38r): water
+ *      0.33 s, the thick liquid 0.017 s, oil 0.0067 s (it was 3, 0.15 and
+ *      0.06 s at the 6 mm gap before);
  *   2. the liquid follows a dish spun up from rest to 63% in one drag time,
  *      the same at 60 and 144 frames a second, and water takes twenty times
  *      as long as the thick liquid;
@@ -40,10 +41,10 @@
  *      the dish, the liquid and the picture's angle stay exactly zero for ten
  *      minutes, so the change is nothing where nothing turns;
  *  11. a flick on a dish of water: the picture is still while the glass goes
- *      round (under a tenth of the dish's speed after a tenth of a second),
- *      and comes up to the dish with the drag time τ: the liquid's speed is
- *      the exact answer for a dish coasting on its bed to 2% at 1 s and
- *      3 s, at 60 and at 144 frames a second. On the thick liquid it is
+ *      round (under a tenth of the dish's speed after a frame), and comes up
+ *      to the dish with the drag time τ: the liquid's speed is the exact
+ *      answer for a dish coasting on its bed to 2% at a quarter of τ and at
+ *      τ, at 60 and at 144 frames a second. On the thick liquid it is
  *      with the dish within half a second;
  *  12. a look's steady motor: the picture turns at the motor's speed and
  *      ends Ωτ behind where the rigid picture did, to 2%, so a slow look
@@ -51,7 +52,8 @@
  *  13. a look's music sway, through the water: the liquid is a first-order
  *      filter of the dish with corner 1/τ, so at a swing every eight seconds
  *      (four bars at 120 bpm) the picture's sway is 1/√(1 + (ωτ)²) of the
- *      dish's, 0.39 on water and 0.99 on the thick liquid, to 3%: the
+ *      dish's, 0.97 on water and 1.00 on the thick liquid at the 2 mm gap
+ *      (0.39 and 0.99 at the 6 mm gap before PLAN 38r), to 3%: the
  *      measure of what 22h changes on the nine thin looks with music;
  *  14. the turntable's share reaches the liquid: a look's flick and a
  *      turntable turning half as fast the other way leave the water going
@@ -84,8 +86,10 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.abs(b);
 
 // 1
 const tw = dragSeconds(WATER_NU), tt = dragSeconds(THICK_NU), to = dragSeconds(OIL_NU);
-check('the drag time at the rest gap: water 3 s, thick 0.15 s, oil 0.06 s',
-  near(tw, 3, 0.01) && near(tt, 0.15, 0.01) && near(to, 0.06, 0.01), `${tw.toFixed(3)}, ${tt.toFixed(3)}, ${to.toFixed(3)} s`);
+// h²/12ν at the real sandwich's 2 mm (PLAN 38r), worked here from the millimetres, not from the code's constant.
+const rest = 0.002 ** 2 / 12;
+check('the drag time at the 2 mm rest gap: water 0.33 s, thick 0.017 s, oil 0.0067 s',
+  near(tw, rest / WATER_NU, 0.01) && near(tt, rest / THICK_NU, 0.01) && near(to, rest / OIL_NU, 0.01), `${tw.toFixed(3)}, ${tt.toFixed(3)}, ${to.toFixed(3)} s`);
 check('the look\'s Viscosity picks the liquid', carrierViscosity('thin') === WATER_NU && carrierViscosity('thick') === THICK_NU);
 
 // 2
@@ -94,7 +98,8 @@ const follow = (tau, fps, seconds) => {
   for (let t = 0; t < seconds - 1e-9; t += 1 / fps) w = liquidFollow(w, 2, 1 / fps, tau);
   return w;
 };
-const at60 = follow(tt, 60, 0.15), at144 = follow(tt, 144, 0.15);
+// Water's drag time, 20 frames at 60 (the thick liquid's is one frame at the 2 mm gap, too short to see a curve in).
+const at60 = follow(tw, 60, tw), at144 = follow(tw, 144, tw);
 check('the liquid reaches 63% of the dish in one drag time', near(at60, 2 * (1 - Math.exp(-1)), 0.03), `${(at60 / 2).toFixed(3)} of the dish at 60 fps`);
 check('and the frame rate does not change it', near(at144, at60, 0.03), `${(at144 / 2).toFixed(3)} at 144 fps`);
 const reach = (tau) => { let w = 0, t = 0; while (w < 2 * (1 - Math.exp(-1)) && t < 60) { w = liquidFollow(w, 2, 1 / 240, tau); t += 1 / 240; } return t; };
@@ -104,7 +109,8 @@ check('water takes twenty times as long as the thick liquid', near(reach(tw) / r
 {
   let w = 0, dishA = 0, liqA = 0;
   const O = 1.2;
-  for (let k = 0; k < 60 * 30; k++) { w = liquidFollow(w, O, 1 / 60, tw); dishA += O / 60; liqA += w / 60; }
+  // The liquid's angle as the frame turns the picture, exactly over each frame (dishFrame's turn), not its speed at the frame's end times the frame.
+  for (let k = 0; k < 60 * 30; k++) { const f = dishFrame(O, 0, w, 1 / 60, tw); w = f.liquid; dishA += O / 60; liqA += f.turn; }
   check('at a steady speed the picture trails the dish by Ω τ', near(dishA - liqA, O * tw, 0.02), `${(dishA - liqA).toFixed(3)} rad, Ω τ = ${(O * tw).toFixed(3)}`);
 }
 
@@ -294,17 +300,18 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
     }
     return { look, liq };
   };
-  const early = run(60, 0.1, tw);
+  const early = run(60, 1 / 60, tw);
   check('a flick on water: the picture stays put while the glass goes round', early.liq < 0.1 * early.look,
-    `liquid ${early.liq.toFixed(3)} against the dish's ${early.look.toFixed(3)} rad/s after 0.1 s`);
+    `liquid ${early.liq.toFixed(3)} against the dish's ${early.look.toFixed(3)} rad/s after a frame`);
   const errs = [];
-  for (const fps of [60, 144]) for (const t of [1, 3]) {
+  // A quarter and one drag time of water at the 2 mm gap (1 s and 3 s at the 6 mm gap before PLAN 38r), whole frames at both rates.
+  for (const fps of [60, 144]) for (const t of [1 / 12, 1 / 3]) {
     const got = run(fps, t, tw).liq, want = exact(t, tw);
     errs.push(Math.abs(got - want) / want);
   }
   const worst = Math.max(...errs);
   check('and comes up to the dish with the water\'s drag time, at any frame rate', worst < 0.02,
-    `worst ${(100 * worst).toFixed(2)}% off the exact answer at 1 s and 3 s, 60 and 144 fps; at 3 s ${run(60, 3, tw).liq.toFixed(3)} of ${run(60, 3, tw).look.toFixed(3)} rad/s`);
+    `worst ${(100 * worst).toFixed(2)}% off the exact answer at 1/12 s and 1/3 s, 60 and 144 fps; at 1/3 s ${run(60, 1 / 3, tw).liq.toFixed(3)} of ${run(60, 1 / 3, tw).look.toFixed(3)} rad/s`);
   /*
     And the picture's angle, which is what the room sees: the liquid's speed
     integrated over each frame exactly, so a frame that took a quarter of a
@@ -345,12 +352,12 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
 
 // 13
 {
-  const sway = (tau) => {
+  const sway = (tau, period = 8) => {
     // The dish swung every eight seconds; amplitudes read over the last of
     // 60 s, once the start has died away. The dish's speed itself, not the
     // motor's: the flywheel's dry friction bends a sine near its zeros, and
     // what is measured here is the liquid's filter, not the flywheel's.
-    const w = 2 * Math.PI / 8, fps = 60;
+    const w = 2 * Math.PI / period, fps = 60;
     let liq = 0, aDish = 0, aLiq = 0;
     for (let k = 0; k < fps * 60; k++) {
       const t = k / fps;
@@ -361,6 +368,15 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
     return { ratio: aLiq / aDish, want: 1 / Math.sqrt(1 + (w * tau) ** 2) };
   };
   const water = sway(tw), thick = sway(tt);
+  /*
+    At the 2 mm gap water's τ is a third of a second, so an eight-second swing
+    comes through at 0.97 and a sway with no filter at all (1.0) is only 3.4%
+    off it: the line below would barely tell them apart. A swing every two
+    seconds (a bar at 120 bpm), ωτ ≈ 1, is where the filter shows: 0.69.
+  */
+  const quick = sway(tw, 2);
+  check('and a sway every two seconds through water is cut to 1/√(1 + (ωτ)²), well short of the dish\'s', near(quick.ratio, quick.want, 0.03) && quick.ratio < 0.8,
+    `${quick.ratio.toFixed(3)} of the dish's sway, want ${quick.want.toFixed(3)}`);
   check('a look\'s music sway through water is filtered by its drag time', near(water.ratio, water.want, 0.03),
     `${water.ratio.toFixed(3)} of the dish's sway, 1/√(1 + (ωτ)²) = ${water.want.toFixed(3)}`);
   check('and through the thick liquid hardly at all', near(thick.ratio, thick.want, 0.03) && thick.ratio > 0.98,
@@ -371,7 +387,7 @@ const BED = (0.04 + 0.25 * 1.2) * 0.8;
 {
   // A look flicked to Ω0 and a turntable held at −Ω0/2: the water goes to Ω0/2.
   let liq = 0;
-  for (let k = 0; k < 60 * 3; k++) liq = dishFrame(1.2, -0.6, liq, 1 / 60, tw).liquid;
+  for (let k = 0; k < Math.round(60 * tw); k++) liq = dishFrame(1.2, -0.6, liq, 1 / 60, tw).liquid;
   check('the turntable\'s share reaches the same liquid', near(liq, 0.6 * (1 - Math.exp(-1)), 0.02),
     `${liq.toFixed(4)} rad/s after one drag time, the drag time says ${(0.6 * (1 - Math.exp(-1))).toFixed(4)}`);
 

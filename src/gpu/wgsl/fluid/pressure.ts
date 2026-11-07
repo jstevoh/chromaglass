@@ -351,14 +351,16 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var<storage, read> pr: array<f32>;
 @group(0) @binding(4) var<storage, read_write> bc: array<f32>;
 ${PACKED}
+// Zero for a fine cell past the grid: an odd level's last coarse row or column covers one fine cell (core.ts, the levels).
 fn res0(x: i32, y: i32, n: i32) -> f32 {
+  if (x >= n || y >= n) { return 0.0; }
   let s = packedAt(x - 1, y, n) + packedAt(x + 1, y, n) + packedAt(x, y - 1, n) + packedAt(x, y + 1, n);
   return textureLoad(dv, vec2i(x, y), 0).r - (4.0 * packedAt(x, y, n) - s);
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -372,13 +374,14 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var<storage, read_write> bc: array<f32>;
 fn at(x: i32, y: i32, n: i32) -> f32 { return p[clamp(x, 0, n - 1) + clamp(y, 0, n - 1) * n]; }
 fn res(x: i32, y: i32, n: i32) -> f32 {
+  if (x >= n || y >= n) { return 0.0; }
   let s = at(x - 1, y, n) + at(x + 1, y, n) + at(x, y - 1, n) + at(x, y + 1, n);
   return b[x + y * n] - (4.0 * at(x, y, n) - s);
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let nc = n / 2;
+  let nc = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= nc * nc) { return; }
   let x = 2 * (i % nc);
@@ -436,7 +439,7 @@ fn ec(x: i32, y: i32, m: i32) -> f32 { return e[clamp(x, 0, m - 1) + clamp(y, 0,
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
-  let m = n / 2;
+  let m = (n + 1) / 2;
   let i = i32(id.x);
   if (i >= n * n) { return; }
   let x = i % n;
