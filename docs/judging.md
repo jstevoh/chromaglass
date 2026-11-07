@@ -2374,3 +2374,21 @@ only Resolume can say it reads them.
 3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
 4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
    the strobe a steady beat late.
+
+## 107. The moiré pack's sheets on the wall (PLAN 42a)
+
+`npm run moire` holds the optics (the fringe's frequency, the product of two sheets, no false
+moiré, the gap's defocus, the liquid bending the lower sheet, off is off) on the lab plate;
+only the wall can say whether the six looks read as the real transparencies do.
+
+1. Load each look in the look menu's **Moiré pack** group: Moiré Star, Moiré Ripple,
+   Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel, with a song playing.
+2. Settings → **Moiré Sheets**: turn **Moiré Turn** slowly through 0. The fringes should
+   widen to nothing at 0 and sweep faster as it leaves; **Flip** on two Spokes should cross
+   into diamonds like the shop's video.
+3. Pour dye onto Moiré Ripple: each pool should drag the fringes round its edge, more with a
+   larger **Moiré Gap**, and the fine lines should go soft past about 10 mm while the
+   fringes stay.
+4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
+   not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
+   42a-5).

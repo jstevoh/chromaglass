@@ -141,6 +141,9 @@ const SECTION_OF: Record<string, string> = {
   turingInk: 'reactions',
   turingDrift: 'reactions',
   gelWheel: 'lamp',
+  moireAmount: 'moire',
+  moireAngle: 'moire',
+  moireSpin: 'moire',
   beatLead: 'audio-input',
   filmDrive: 'film',
   // The four masters, with the patch bay they pull down.
@@ -199,6 +202,12 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'sceneDeadzone', label: "Deadzone", min: 0, max: 1, section: 'room' },
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
   { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 30, section: 'lamp', wanderSpan: 3 },
+  // The moiré pack's sheets (PLAN 42a); the ink, turn and spin are MIDI's.
+  { key: 'moireSlide', label: "Moiré Slide", min: -0.5, max: 0.5, section: 'moire' },
+  { key: 'moireRatio', label: "Moiré Scale", min: 0.5, max: 2, section: 'moire' },
+  { key: 'moireDensity', label: "Moiré Lines", min: 4, max: 400, section: 'moire' },
+  { key: 'moireGap', label: "Moiré Gap (mm)", min: 0, max: 20, section: 'moire' },
+  { key: 'moireCurl', label: "Moiré Curl", min: 0, max: 1, section: 'moire' },
   { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: LAMP_WARMTH_MAX, section: 'lamp' },
   // Film stock (F1): what the whole show is photographed on, as against the
   // `film*` settings, which drive the projector that plays video through dye.

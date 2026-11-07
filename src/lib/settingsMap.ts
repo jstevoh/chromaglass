@@ -151,6 +151,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   */
   { id: 'lamp', name: 'Lamp & Light', category: 'look',
     terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
+  /*
+    The moiré pack (PLAN 42a): two printed sheets on the stage, the lower one
+    seen through the liquid. Its own section, not a Mixer row: the sheets lie
+    on the stage at a fixed place, under the glass and on it.
+  */
+  { id: 'moire', name: 'Moiré Sheets', category: 'look',
+    terms: 'moire moiré sheets transparency transparencies interference fringes lines rings spokes spiral dots quasicrystal inks groove zoom grid turn spin overlay pack' },
   { id: 'stock', name: 'Film Stock', category: 'look',
     terms: 'film stock 16mm super 8 slide reversal negative faded grain gate weave projector curve toe shoulder period sixties' },
   { id: 'camera', name: 'Lens', category: 'look',
@@ -270,16 +277,17 @@ export const groupOfSetting = (key: string | null | undefined): string | undefin
 };
 
 /**
- * The five controls that set a *pace*, which wear a snail at the slow end of
+ * The six controls that set a *pace*, which wear a snail at the slow end of
  * the travel and a hare at the fast one (PLAN 35d). A pace is how fast
  * something runs by itself, so Master Speed, Evolve Speed, the gel wheel's
- * and the macro camera's chase, and the kaleidoscope's spin. A control that
+ * and the macro camera's chase, the kaleidoscope's spin and the moiré
+ * sheet's spin. A control that
  * is a rate of something else (a Flow, a Rate of rain) is not one of them.
- * `bipolar` is the spin that runs backwards below zero: the hare is at both
+ * `bipolar` is a spin that runs backwards below zero: the hare is at both
  * ends, the snail at the stop in the middle.
  */
 export const PACE_KEYS: Record<string, { bipolar?: boolean }> = {
-  globalSpeed: {}, automateRate: {}, gelSpeed: {}, macroChase: {}, kaleidoSpin: { bipolar: true },
+  globalSpeed: {}, automateRate: {}, gelSpeed: {}, macroChase: {}, kaleidoSpin: { bipolar: true }, moireSpin: { bipolar: true },
 };
 export const paceOf = (key: string | null | undefined): { bipolar?: boolean } | undefined => (key ? PACE_KEYS[key] : undefined);
 

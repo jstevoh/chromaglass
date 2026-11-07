@@ -1,10 +1,13 @@
 import { VisualizerSettings } from './types';
+import { MOIRE_LOOKS } from './presetsMoire';
 
 export interface Preset {
   id: string;
   name: string;
   description: string;
   settings: Partial<VisualizerSettings>;
+  /** The art pack a look sells in, when it needs one beyond the app (PLAN 23, 42a). */
+  pack?: 'moire';
 }
 
 /*
@@ -2222,6 +2225,17 @@ export const PRESETS: Preset[] = [
     }
   },
 ];
+
+/*
+  The moiré pack's looks (PLAN 42a; presetsMoire.ts), each laid over the look
+  it starts from, with that look's patches kept and the sheets' added.
+*/
+for (const m of MOIRE_LOOKS) {
+  const from = PRESETS.find(p => p.id === m.from);
+  if (!from) continue;
+  const cords = [...(from.settings.sceneMappings ?? []), ...(m.settings.sceneMappings ?? [])];
+  PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
+}
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

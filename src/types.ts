@@ -713,6 +713,22 @@ export interface VisualizerSettings {
   turingDrift: number;        // how far the print's feed and kill wander across the plate over 30 to 90 s, so the pattern keeps changing once it has grown (26d-6); 0 is the constant map
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
+  /*
+    The moiré pack (PLAN 42a; lib/moire.ts, gpu/wgsl/plateMoire.ts): two
+    printed transparencies on the stage, A under the glass (seen through the
+    liquid) and B on the cover, B turned, slid and scaled against A.
+  */
+  moireAmount: number;        // how dense the sheets' ink is: 0 takes them off, 1 is a good print (2% through the ink)
+  moireSheetA: string;        // the lower sheet's design (MOIRE_SHEETS)
+  moireSheetB: string;        // the upper sheet's design
+  moireAngle: number;         // the upper sheet's turn, degrees
+  moireSpin: number;          // the upper sheet's spin, turns a minute (negative turns it back)
+  moireSlide: number;         // the upper sheet slid sideways, in frame heights
+  moireRatio: number;         // the upper sheet's line pitch against the lower's (1 the same print)
+  moireDensity: number;       // lines per frame height on the lower sheet
+  moireGap: number;           // each sheet's distance from the liquid, mm: the lens's defocus and the liquid's bend
+  moireCurl: number;          // the one shape dial the designs share (sweep, starts, wave height, wiggle, twist)
+  moireFlip: boolean;         // the upper sheet laid face down, mirrored: two spoke or spiral sheets cross into flowers
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
@@ -1106,6 +1122,17 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turingDrift: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
+  moireAmount: 0,
+  moireSheetA: 'spokes',
+  moireSheetB: 'spokes',
+  moireAngle: 4,
+  moireSpin: 0,
+  moireSlide: 0,
+  moireRatio: 1,
+  moireDensity: 48,
+  moireGap: 3,
+  moireCurl: 0.3,
+  moireFlip: true,
   filmMix: 0.7,
   filmKey: 0.18,
   // A film is a slide until it is asked to be a force: a look saved before

@@ -854,6 +854,22 @@
       ]
     },
     {
+      "name": "The moiré sheets are optics, and off is off",
+      "shard": "lab2",
+      "run": "npm run moire",
+      "why": [
+        "The moiré pack's two printed sheets (PLAN 42a), on the real plate",
+        "shader: every look without them draws byte for byte as a lab built",
+        "with their call taken out; two gratings beat at the difference of",
+        "their frequencies; two sheets pass the product of their",
+        "transmissions; a sheet finer than the pixels is flat grey, no false",
+        "moiré; the gap defocuses the lines and keeps the fringe; the liquid",
+        "bends the lower sheet and not the upper; the spin's clock and the",
+        "Turn are one angle. On SwiftShader beside lampzero, which compares two",
+        "compiled programs the same way and for the same reason."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",
