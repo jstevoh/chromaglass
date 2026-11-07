@@ -22,7 +22,7 @@
     {
       "name": "The scripts parse",
       "shard": "logic",
-      "run": "for f in scripts/*.mjs server/*.js; do node --check \"$f\" || exit 1; done",
+      "run": "for f in scripts/*.mjs server/*.js mcp/*.js; do node --check \"$f\" || exit 1; done",
       "always": true,
       "why": [
         "Every script parses (PLAN.md 19b). `tsc` reads only a handful of the",
@@ -1486,6 +1486,21 @@
         "over the cap are turned away; and the server restarted under a linked",
         "phone and laptop comes back without anyone touching either. No GPU;",
         "dist/ is the phone step's build."
+      ]
+    },
+    {
+      "name": "The owner's assistant link",
+      "shard": "browser2",
+      "run": "npm run assistant",
+      "why": [
+        "The assistant role and its guard (PLAN 44b-44d, 44g; scripts/assistant.mjs): the real",
+        "MCP server over stdio against the real show server, a stand-in display that echoes",
+        "its state late as the app's does, and a phone. The owner's switch (off, from this Mac",
+        "only, closed when turned off), Suggest, Play and Full, glides, Undo ten deep, the",
+        "pace, the hand winning, a phone never starting the stream, the plate's picture, the",
+        "notes; the room keys against lookFade.ts; nothing public naming it. Then eighteen",
+        "mutants, each a rule removed from a copy of server/, each of which must fail its",
+        "own line. No GPU, no build; about a minute."
       ]
     },
     {

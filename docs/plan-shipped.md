@@ -11407,3 +11407,39 @@ their data, the prices against `Landing.tsx`, each listing field within its limi
 with no price or way to buy, the store pictures' sizes and alpha, and the page at
 360 and 1280 px with no sideways scroll and every picture loaded. Left open:
 12.6-shots (the phone's own screenshots) and 12.6-label.
+
+## 44b, 44c, 44d, 44g. The owner's AI assistant plays the show (2026-11-07)
+
+Asked 2026-11-07; the owner's answer: build it for the owner's own use, not sold or
+promoted, so it is dormant on every show but one with the owner's switch on, is not
+shipped inside the Mac app, and no public page names it (`npm run assistant` fails if
+one does). Then: no limit on what it controls ("Full"), let it see the plate, let it
+learn the owner's taste. **44b**: a fourth hello role, `assistant`, in
+`server/remote-server.js`: admitted only from the laptop (`isLaptop`), with the show
+key, while the switch says suggest, play or full (`readAssistantMode`: the
+`CHROMAGLASS_ASSISTANT` variable, or one word in `CHROMAGLASS_ASSISTANT_FILE`, which
+the Mac app points at `assistant` in its userData). The relay re-reads the switch every
+second and closes a linked assistant when it goes off; refusals never count towards the
+wrong-key lockout. Display states and the Draw picture go to the assistant (the picture
+only within three seconds of its asking); `cue-look` and `assistant-live` reach the
+display only from the guard, so a phone still cannot start a stream. **44d**: the guard
+is `server/assistant.js`, in the relay rather than the page because the relay is the one
+door every assistant message passes and it checks in node: Suggest arms (a library look,
+or one made from a base, `src/lib/assistantLook.ts` stripping the room on the page's
+side), Play adds Go, settings, gestures, the sequencer and Undo, Full adds everything
+else (the room's settings, blackout, clear, drain, recording, `startSavedLive`). In
+every mode a numeric setting glides (smoothstep, 0.5 to 30 s, default 1), Undo walks
+back ten changes (a Go by the display's Back), and a key the performer moved in the
+last ten seconds (a phone's, OSC's or Art-Net's patch, or a change in the display's
+snapshot that is not the assistant's own echo, which also stops the key's glide) is
+refused; Undo of a Go or a blackout is refused once the performer has changed it since,
+a Go with nothing armed is refused, and the switch changing stops every glide; Suggest and Play cap a look
+change at one per 4 s, four changes and ten gestures a second, Full at thirty messages
+a second. **44c**: `mcp/chromaglass-mcp.js`, no dependencies, 19 tools, a craft guide
+in its `instructions`, the owner's notes in a file outside the repo, and `look_at_plate`
+returning the remote's 480-px Draw picture as an image. **44g**: `npm run assistant`
+(Measure browser2), 40 lines and 18 mutants green on 2026-11-07, about 65 s (three
+of the mutants added after a review pass found a desk move mid-glide overridden, Undo
+reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
+main's relay taking an `assistant` hello as a phone's, with the switch off and from
+another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).

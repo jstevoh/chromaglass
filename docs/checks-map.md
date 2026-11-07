@@ -20,6 +20,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the patch bay's cords (`src/lib/sceneMap.ts`, a cord's gate, gain or dragged band; `CordGate` in `lib/areaCords.ts`) | `soundcords` (`-- --controls` until PLAN 30a is built), `scene`, `areacords -- --node` |
 | the cartoons (`src/lib/cartoons.ts`, `public/video/cartoons/`, `CartoonShelf.tsx`), the video pour (`pourVideo`, `pourVideoFrom` in `src/app/usePour.ts`) | `cartoons` (a new cartoon gets its row in `public/video/cartoons/SOURCES.md` first), `phone`, `layout` |
 | `src/lib/crashLog.ts`, `CrashReportButton.tsx` | `crash` (in a cloud session its device-loss, stall and screenshot checks skip) |
+| the owner's assistant link (`server/assistant.js`, `server/assistant-room-keys.json`, the `assistant` role in `server/remote-server.js`, `mcp/`, `src/lib/assistantLook.ts`; `RIG_KEYS` or `SETUP_KEYS` in `src/lib/lookFade.ts`) | `assistant` (a room key changed: `node scripts/assistant.mjs --write` first) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
 | Settings → Feedback (`server/feedback-worker.js`, `feedback-schema.sql`, `wrangler.feedback.toml`, `src/lib/feedback*.ts`, `FeedbackPane.tsx`) | `feedback-worker`, `feedbackpane` (the pane on the desk and the phone), `phone` |
 | `scripts/watch.mjs` | `npm run watch -- --selftest` and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |

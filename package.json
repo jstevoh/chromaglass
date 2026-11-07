@@ -29,6 +29,7 @@
     "detail": "node scripts/detail.mjs",
     "lights": "node scripts/lights.mjs",
     "oscout": "npm run build && node --experimental-strip-types scripts/oscout.mjs",
+    "assistant": "node scripts/assistant.mjs",
     "rig": "npm run build && node scripts/rig.mjs",
     "showkey": "npm run build && node scripts/showkey.mjs",
     "shapes": "node --experimental-strip-types scripts/shapes.mjs",
