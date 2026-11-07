@@ -1163,6 +1163,27 @@
       ]
     },
     {
+      "name": "A song's title painted as ink, then swept away",
+      "shard": "lab3",
+      "run": "npm run inktitle -- --owed=cue,mask,lands,sweep,kept,setting,wired",
+      "timeout": 9,
+      "why": [
+        "The Live Show's ink titles (PLAN 37x-10, scripts/inktitle.mjs), written ahead",
+        "of their build: the cue (one title a song, the switch, 40 characters), the",
+        "ink (the palette's or a chosen colour), the mask (upright, on the wall, where",
+        "asked, small to the plate's width), and in the solver a title poured with",
+        "pourInk that reads at 0.8 or better half a second after it lands and adds",
+        "the dye it says, still reads at 0.7 at 3 s and at 0.3 or worse by 12 s at the",
+        "default sweep (by 2 s at the top, a drift at 0.01), with its dye still on the",
+        "plate: swept by the flow, never faded. Then the settings (off by default, no",
+        "look sets them) and the wiring (the app pours and washes, no shader draws a",
+        "title, the phone has the switch). --owed: each line is excused only in main's",
+        "state and printed as owed until the PR that builds it takes its id out. On",
+        "main it opens no browser; built, the lab steps 1,200 times, about six minutes",
+        "on SwiftShader, beside soapbreak in lab3."
+      ]
+    },
+    {
       "name": "A bubble's middle is the plate",
       "shard": "lab2",
       "run": "npm run bubblelook",
