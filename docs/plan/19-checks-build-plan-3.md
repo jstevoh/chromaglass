@@ -51,6 +51,16 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   waits the full 30 s (it prints "never drew fifteen frames"; not yet counted in the logs);
   it could wait for the plate to draw at all instead, now that each window holds itself
   open for its frames.
+- **19aa-15. A pull request's Measure selection runs a `browser2` check without the build
+  it leans on (found 2026-11-07).** `browser2`'s later checks (the Mixer, the phone link,
+  Draw, the renders, the input picker, the Source, following a song) serve `dist/` that the
+  iPhone app's remote, the Live Show's or the shelf's check built before them. `selectMeasure`
+  (scripts/checks.mjs, 19k-4) picks only the entries a diff reaches, so #673, which touched
+  `renders.mjs` alone, ran it with no `dist/` and it was red after 1 s. `renders` now builds
+  when `dist/` is missing (19aa-13's PR); the others still have the trap. The general fix
+  is in the selection: an entry that serves the site without building should name it (an
+  entry field such as `"serves": "dist"`) and the part should build once when such an entry
+  is picked and its builder is not.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s

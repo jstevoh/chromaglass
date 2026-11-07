@@ -86,7 +86,21 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+/*
+  The site it serves, built here when nothing built it first. In Measure's
+  `browser2` part this leans on the iPhone app's remote building `dist/`
+  before it, and that holds in a full run; but a pull request runs only the
+  checks its diff reaches (PLAN 19k-4), and #673, which touched this script
+  alone, ran it with nothing built ("The directory "dist" does not exist",
+  red after 1 s). Built only when missing, so a full run still costs nothing.
+*/
+if (!existsSync('dist/index.html')) {
+  console.log('  (no dist/ here: building it first)');
+  execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], { stdio: 'inherit' });
+}
 
 const PORT = Number(process.env.RENDERS_PORT ?? 4333);
 // Where a plate draws: the Mac, or a machine that says it has one.
