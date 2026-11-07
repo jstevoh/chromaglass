@@ -39,10 +39,14 @@ own. Check: `npm run moire`.
     hand. A Turn Sheet tool (drag round the centre sets the turn, a flick spins it), on the
     desk, the phone's pad and the remote, as the Spin tool is built (`SpinHand`); the
     visualizer has no room until its tool handling moves to a module (19ai-10).
-  - **42a-4. Defocus's contrast reversal.** The lens's disc is taken as a box of the same
-    variance, which keeps the loss of contrast and not the jinc's reversal of a pitch finer
-    than its first zero (the "spurious resolution" a real defocused grating shows). Replace
-    with the disc's own transfer function if the owner sees the difference on the wall.
+  - **42a-4. Defocus, two shortcuts.** Each sheet is blurred by the lens's disc taken as a
+    tent of the same variance, which keeps the loss of contrast and not the jinc's reversal
+    of a pitch finer than its first zero; and the two blurred sheets are then multiplied,
+    where the lens averages their product over its cone. For sheets either side of the
+    liquid a ray crosses them displaced opposite ways, so the fringe blurs as a grating of
+    kA + kB: at the default 3 mm and 48 lines, to 0.91 of its contrast where the shader
+    draws 0.95, and further apart at a deep gap. Do the cone's average per harmonic pair if
+    the owner sees the difference on the wall.
   - **42a-5. The closeup through the sheets.** The macro closeup is a camera on the plate and
     draws no sheets; a closeup of a moiré look shows the liquid alone. Draw the sheets in
     plate coordinates at the closeup's zoom.
