@@ -30,6 +30,7 @@
  *   fluid/passes.ts     FluidPasses: the passes a step runs (projection, thin gap, carries)
  *   fluid/inputs.ts     FluidInputs: deltas, splats, pours, chemistry, hand-over
  *   fluid/reads.ts      FluidReads: readbacks, the stats, the checks' reads
+ *   fluid/cover.ts      FluidCover: the cover glass on its liquid, the gap's shape (38r-5)
  *   gpu/fluid.ts        WebGPUFluid: `step`, the pipelines built ahead and the statics
  *
  * The members were moved, not written again; one another file reaches is `protected` where
@@ -50,7 +51,7 @@ import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
 import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
-import { FluidReads } from './fluid/reads';
+import { FluidCover } from './fluid/cover';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
 
@@ -58,7 +59,7 @@ import { OPEN_RIM } from '../lib/turntable';
 export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, STEFAN_FILM, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
 export type { FieldStats } from './fluid/constants';
 
-export class WebGPUFluid extends FluidReads {
+export class WebGPUFluid extends FluidCover {
   /**
    * For `npm run swirlcost` (PLAN 22k): the same plate with the swirl held
    * off, to read what it costs, and how many steps ran it of how many were
@@ -561,50 +562,7 @@ export class WebGPUFluid extends FluidReads {
 
     // 1. Hele-Shaw squeeze-film flow
     stage('squeeze', (pass) => {
-      /*
-        A new plate shape is a new pair of glasses, not a press.
-
-        The gap springs toward its rest dome at `gapSpring`, which is tuned
-        for a press lifting — about a second — and measures as a time constant
-        near half a minute on a slow plate. That is right for a press and
-        wrong for the dome itself: turning Plate Shape up is swapping the
-        glasses, and the answer should be the shape they are, not a shape they
-        reach ninety seconds later. Measured before this: eight seconds after
-        setting the curve to 1, the gap had moved a sixth of the way.
-
-        So the gap is *shifted* by the change, in `gapReshape`, which leaves a
-        press's own dent in place and does not touch the rate. Re-laying it
-        outright was the first version and it is a trap: the plate shape is a
-        per-plate patch target, so a sound or camera mapping can drive it every
-        frame, and a reset would wipe a live press sixty times a second.
-      */
-      if (this.lastCurve === null) {
-        /*
-          A plate that has just appeared is laid at the shape it is meant to
-          have, absolutely.
-
-          This branch is not a formality. The ladder builds a new solver a few
-          seconds into a show, and the clear that comes with it lays the gap
-          flat — so a plate whose shape was already set came back flat and
-          then crept toward its dome at the spring's rate. Measured: the dome
-          held for six seconds, snapped to 0.03 everywhere, and started over.
-          Adopting the current shape without laying it is what caused that.
-        */
-        for (const t of [this.squeeze.a, this.squeeze.b]) {
-          this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
-        }
-        this.lastCurve = p.plateCurve;
-        this.hsPrimed = false;
-        this.phaseGapPrimed = false;
-      } else if (this.lastCurve !== p.plateCurve) {
-        this.run(pass, 'gapReshape', this.squeeze.write, [this.squeeze.read],
-          this.arg('gap reshape', [this.lastCurve, p.plateCurve, 0, 0]));
-        this.squeeze.swap();
-        this.lastCurve = p.plateCurve;
-        // New glasses, not a press: a thin gap takes the new shape as it is.
-        this.hsPrimed = false;
-        this.phaseGapPrimed = false;
-      }
+      this.gapShape(pass, p);
       if (!deltasApplied) {
         // A.a.y the thin gap, for the glass's suction on its way up (PLAN 38l), as the delta's update has it.
         this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze no delta', [0, this.thinLive ? 1 : 0, 0, 0]));
