@@ -11242,4 +11242,10 @@ residual of the warm start as it was, one pressure scaled and the pair is taken,
 keeps its start. `npm run encode -- --owed=h2c1,h2c3,h2c2`, cloud lab at 512²: thin residual
 1.965e-1 → 4.355e-2 (bar 6.713e-2; one pressure scaled alone read 7.551e-2), its half-strength
 control 0.548 → passes, open plate 2.079e-3 unchanged; dispatches 266 → 269 a step (the slump's
-substeps went 4 → 1 at 2 mm, its own physics, and the fit adds 3), 11/11.
+substeps went 4 → 1 at 2 mm, its own physics, and the fit adds 3), 11/11. Then the Mac's open shard caught a cost: fitted by the residual, the start threw away the
+plate-wide pressure two cycles a step build up (a residual barely sees a smooth error), and `npm run
+flush`'s glycerine dish kept 0.805 of its glycerine against the volume's 0.750 (0.754 before). Fitted
+by the solve's own energy instead (the Ritz choice, G summed over faces): `encode`'s thin residual
+1.072e-2, flush 0.759. A solve run to convergence (10 cycles) reads 0.757 on that line with or
+without the fit, so the old 0.754 was two cycles' error falling on the volume's side of the 1% bar
+(0.7575); see 38r-15.

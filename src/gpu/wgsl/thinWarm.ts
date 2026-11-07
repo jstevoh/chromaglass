@@ -35,21 +35,25 @@
  * by a force (a tipped plate, a magnet, a hand), whose pressure does not
  * fall at all. So the guess is fitted to whichever the plate is doing
  * this step: a·P₁ + a′·P₂, the last two steps' pressures, with the a and
- * a′ that leave the least residual b − a·AP₁ − a′·AP₂, read from this
- * step's own b and the solve's own operator (least squares over the two;
- * a Krylov start over the pressure's own history). A steady flow reads
- * a ≈ 1, a′ ≈ 0 and keeps its warm start; a dying one reads its decay,
- * and the second pressure takes the drift of its shape as it dies. On the
- * check's plate at 2 mm, with no V-cycle after it, the last pressure alone
- * left 2.6 of b, scaled by its best a (0.35) 0.38, and the two fitted 0.29
- * (a scratch probe's least squares on the check's own 2×2 sums). The
- * guesses are compared by the residual each would leave, computed from
- * the same sums (‖b‖² − 2a·h + aᵀGa), and the least is taken among the warm
- * start as it was, the last pressure scaled and the two fitted, so the
- * start is never further from the answer, in the residual, than the warm
- * start it replaces, whatever the plate does; and a pair too nearly
- * parallel to fit (a steady flow's two pressures) falls back to one. What
- * the solve converges to is unchanged.
+ * a′ that leave the least error in the solve's own energy, ‖x − p‖_A for
+ * the answer x of A x = b (the Ritz, or Galerkin, choice: G a = h with
+ * G = PᵢᵀAPⱼ and h = Pᵢᵀb, all from this step's b and the solve's own
+ * operator, never needing x). A steady flow reads a ≈ 1, a′ ≈ 0 and keeps
+ * its warm start; a dying one reads its decay, and the second pressure takes
+ * the drift of its shape. The guesses compared are the warm start as it
+ * was, the last pressure scaled and the pair, by the energy each leaves
+ * (−2a·h + aᵀGa), so the start is never further from the answer, in the
+ * energy, than the warm start it replaces.
+ *
+ * Why the energy and not the residual. The first version took the a that
+ * left the least residual ‖b − A p‖. A residual barely sees a smooth error
+ * (A of a smooth field is small), so that fit threw away the plate-wide
+ * pressure two cycles a step had built up over many steps: `npm run flush`'s
+ * glycerine dish, flushed with a quarter of its volume of water, kept 0.805
+ * of its glycerine against the volume's 0.750 (0.754 before). The energy
+ * weighs a smooth error as the flow does. Its G is summed over faces
+ * (energy() below), not as P·(AP) over cells, whose differences nearly
+ * cancel on a smooth P in f32 (both read the same here, 0.759).
  *
  * Three dispatches: each of WARM_GROUPS workgroups sums its share of the
  * six dot products, one workgroup adds those and writes the two
@@ -60,11 +64,11 @@
 
 /** The workgroups (64 threads each) that sum the warm start's dot products; each thread strides over the grid, so any grid fits under the 65535-workgroup limit. */
 export const WARM_GROUPS = 1024;
-/** Floats each group leaves in the warm buffer: ⟨b,b⟩, ⟨b,AP₁⟩, ⟨b,AP₂⟩, ⟨AP₁,AP₁⟩, ⟨AP₁,AP₂⟩, ⟨AP₂,AP₂⟩, and two spare. */
+/** Floats each group leaves in the warm buffer: a spare, ⟨b,P₁⟩, ⟨b,P₂⟩, P₁ᵀAP₁, P₁ᵀAP₂, P₂ᵀAP₂, and two spare. */
 export const WARM_STRIDE = 8;
 /** Where hsWarmFit leaves the two coefficients, after the groups' sums. */
 export const WARM_FIT = WARM_STRIDE * WARM_GROUPS;
-/** The least sin² of the angle between AP₁ and AP₂ the pair is fitted at; nearer parallel than that, f32 sums cannot tell them apart, and one is fitted alone. */
+/** The least sin² of the angle between P₁ and P₂ in the energy the pair is fitted at; nearer parallel than that, f32 sums cannot tell them apart, and one is fitted alone. */
 export const WARM_APART = 1e-3;
 
 export function thinWarmKernels(HEAD: string, COMMON: string, ROWS0: string): Record<string, string> {
@@ -82,11 +86,10 @@ export function thinWarmKernels(HEAD: string, COMMON: string, ROWS0: string): Re
   }`;
   return {
     /*
-      The six sums over the cells the solve solves (inside the rim and not
-      air: a cell held at p = 0, or a dry one, takes no part), AP₁ and AP₂
-      from hsSums0 as hsRestrict0 takes AP. hsSums0 reads `pr`, so P₂'s
-      is the same sum written out over `p2`. Each thread steps through
-      the grid WARM_GROUPS·64 cells at a time; each group writes its six.
+      The sums over the cells the solve solves (inside the rim and not air:
+      a cell held at p = 0, or a dry one, takes no part): b·P₁, b·P₂ and the
+      energy's three by faces. Each thread steps through the grid
+      WARM_GROUPS·64 cells at a time; each group writes its sums.
     */
     hsWarmDot: `${HEAD}${COMMON}
 @group(0) @binding(2) var dv: texture_2d<f32>;
@@ -94,20 +97,29 @@ export function thinWarmKernels(HEAD: string, COMMON: string, ROWS0: string): Re
 @group(0) @binding(4) var<storage, read> mob: array<f32>;
 @group(0) @binding(5) var<storage, read> p2: array<f32>;
 @group(0) @binding(6) var<storage, read_write> warm: array<f32>;
-${ROWS0}
-fn ap2(x: i32, y: i32, n: i32, mi: f32) -> f32 {
-  var den = 0.0;
-  var num = 0.0;
-  var o = array<vec2i, 4>(vec2i(-1, 0), vec2i(1, 0), vec2i(0, -1), vec2i(0, 1));
+/*
+  The energy's sums by faces, not by cells: Pᵀ·AP summed over cells is each
+  cell's P times a sum of differences that nearly cancel on a smooth P, and
+  in f32 the cancellation was the sum. Over faces it is Σ M_f ΔP₁ΔP₂, every
+  term of one sign for P₁ against itself. Each face between two solved
+  cells once (toward +x and +y), and each face to a cell held at the rim's
+  zero, whose ΔP is the cell's own P. Off the grid there is no face, as in
+  hsSums0; a dry cell's face is zero (hsHarm of a zero mobility).
+*/
+fn energy(x: i32, y: i32, n: i32, mi: f32, p1: f32, q2: f32) -> vec3f {
+  var e = vec3f(0.0);
+  var o = array<vec2i, 4>(vec2i(1, 0), vec2i(0, 1), vec2i(-1, 0), vec2i(0, -1));
   for (var k = 0; k < 4; k++) {
     let q = vec2i(x, y) + o[k];
     if (!hsIn(q.x, q.y, n)) { continue; }
     let mn = mob[q.x + q.y * n];
     let f = hsHarm(mi, abs(mn));
-    den += f;
-    if (mn >= 0.0) { num += f * p2[hsPacked(q.x, q.y, n)]; }
+    var d = vec2f(0.0);
+    if (mn < 0.0) { d = vec2f(p1, q2); }
+    else if (k < 2 && mn > 0.0) { let j = hsPacked(q.x, q.y, n); d = vec2f(p1 - pr[j], q2 - p2[j]); }
+    e += f * vec3f(d.x * d.x, d.x * d.y, d.y * d.y);
   }
-  return den * p2[hsPacked(x, y, n)] - num;
+  return e;
 }
 var<workgroup> pa: array<vec4f, 64>;
 var<workgroup> pb: array<vec2f, 64>;
@@ -121,12 +133,12 @@ fn main(@builtin(global_invocation_id) id: vec3u, @builtin(local_invocation_inde
     if (mi <= 0.0) { continue; }
     let x = i % n;
     let y = i / n;
-    let s = hsSums0(x, y, n, mi);
-    let a1 = s.x * pr[hsPacked(x, y, n)] - s.y;
-    let a2 = ap2(x, y, n, mi);
+    let p1 = pr[hsPacked(x, y, n)];
+    let q2 = p2[hsPacked(x, y, n)];
+    let e = energy(x, y, n, mi, p1, q2);
     let b = textureLoad(dv, vec2i(x, y), 0).r;
-    va += vec4f(b * b, b * a1, b * a2, a1 * a1);
-    vb += vec2f(a1 * a2, a2 * a2);
+    va += vec4f(0.0, b * p1, b * q2, e.x);
+    vb += e.yz;
   }
 ${TREE}
   if (li == 0u) {
@@ -138,12 +150,13 @@ ${TREE}
 
     /*
       The groups' sums added, and the coefficients (a, a′) of the guess
-      that leaves the least residual of three: (1, 0), the warm start as it
-      was; (h₁/G₁₁, 0), the last pressure scaled; and the pair's least
-      squares, G⁻¹h, when the two are apart enough to fit. Each is judged
-      by ‖b − a·AP₁ − a′·AP₂‖² = ‖b‖² − 2(a h₁ + a′ h₂) + a²G₁₁ + 2aa′G₁₂ +
-      a′²G₂₂, from the same sums. Nothing to fit (a first step, a cleared
-      plate: AP₁ is zero) or sums that are not numbers keep (1, 0).
+      that leaves the least error in the energy, of three: (1, 0), the warm
+      start as it was; (h₁/G₁₁, 0), the last pressure scaled; and the
+      pair's Ritz fit, G⁻¹h, when the two are apart enough to fit. Each is
+      judged by ‖x − p‖²_A less ‖x‖²_A, −2(a h₁ + a′ h₂) + a²G₁₁ + 2aa′G₁₂
+      + a′²G₂₂, from the same sums (slot 0, bb, is zero and only shifts
+      them all). Nothing to fit (a first step, a cleared plate: G₁₁ is
+      zero) or sums that are not numbers keep (1, 0).
     */
     hsWarmFit: `${HEAD}
 @group(0) @binding(2) var<storage, read_write> warm: array<f32>;

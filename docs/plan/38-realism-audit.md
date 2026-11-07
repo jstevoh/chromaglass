@@ -510,7 +510,8 @@ written first. Line numbers are as read on main at d07ac31.
     0.71). Ask the falloff against the stamp instead (the lip keeps some back).
   - ~~**38r-12**~~ The thin solve's warm start fitted to the step: at 2 mm the flow dies inside a
     step and last step's P alone was a worse guess than zero; now the last two pressures are fitted
-    to this step's b (`wgsl/thinWarm.ts`), `encode`'s thin residual 1.965e-1 → 4.355e-2 (#655).
+    to this step's b in the solve's own energy (`wgsl/thinWarm.ts`), `encode`'s thin residual
+    1.965e-1 → 1.072e-2 (#655).
     Story in §38r.
   - **38r-13. The open rim makes a source the solve then has to remove** (M; found in #655's
     38r-12). A divergence-free flow dying under an even drag needs no pressure, yet on the check's
@@ -524,6 +525,12 @@ written first. Line numbers are as read on main at d07ac31.
     change, for the check's author). At 2 mm the slump runs 1 substep, not 4, and the warm start's
     fit adds 3, so the total matches main's 365 by chance; any physics that moves an adaptive
     substep count reads as "H2c-1 built and misses". Count the multigrid's own kernels instead.
+  - **38r-15. A flushed glycerine dish keeps 0.9% too much at 2 mm, solved to convergence** (S–M;
+    found in #655's 38r-12). `npm run flush`'s line 3 asks 0.750 of the glycerine left to 1%. Ten
+    V-cycles a step read 0.757 (0.93%); two cycles from the old warm start read 0.754 and from the
+    fitted one 0.759, each the solve's own error either side of it. Find where the 0.7% stays (the
+    rim's lip, 18g-12, passes only a body cell's overflow; the held strip past the rim) and fix that,
+    so the line holds on any start; the bar is not moved.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);
