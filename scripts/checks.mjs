@@ -58,6 +58,7 @@
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -857,15 +858,51 @@ async function selftest() {
   say(/^::warning title=x%3A 18 min 20 s of checks::.*Mac shard/.test(macOver ?? ''), `a Mac shard past ${ROOM.mac} minutes of checks is a warning naming it and its time (${macOver?.slice(0, 50)})`);
   say(roomWarning('x', ROOM.mac * 60 - 20, roomMan) === null, 'and one under it is not');
   say(roomWarning('m', ROOM.mac * 60 + 20, roomMan) === null && /Measure part/.test(roomWarning('m', ROOM.measure * 60 + 20, roomMan) ?? ''), `a Measure part is held to its own ${ROOM.measure} minutes, not the Mac's`);
-  const boundOf = (jobName) => {
-    const at = wf.indexOf(`    name: ${jobName}`);
-    const m = at < 0 ? null : /^    timeout-minutes: (\d+)$/m.exec(wf.slice(at));
+  /*
+    And the runner prints it, on the step's stdout where GitHub makes it an
+    annotation, and marks the summary's heading (the pre-push review: the
+    lines above call roomWarning alone, so a runShard that dropped it read
+    green). The fake 'm' run above took seconds, under its line; the fake Mac
+    shard 'x' is run again with the Mac's line at zero, so its one check is
+    past it.
+  */
+  say(!/::warning title=m%3A/.test(text), 'the runner prints no room warning for a shard under its line');
+  const macLine = ROOM.mac;
+  const sumFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'checks-room-')), 'summary.md');
+  const sumWas = process.env.GITHUB_STEP_SUMMARY;
+  const roomLog = [];
+  ROOM.mac = 0;
+  process.env.GITHUB_STEP_SUMMARY = sumFile;
+  process.stdout.write = (b) => { roomLog.push(String(b)); return true; };
+  let roomCode;
+  try { roomCode = await runShard('x', fake, null); } finally {
+    process.stdout.write = write;
+    ROOM.mac = macLine;
+    if (sumWas === undefined) delete process.env.GITHUB_STEP_SUMMARY; else process.env.GITHUB_STEP_SUMMARY = sumWas;
+  }
+  const sum = fs.existsSync(sumFile) ? fs.readFileSync(sumFile, 'utf8') : '';
+  say(roomCode === 0 && /^::warning title=x%3A \d+ s of checks::/m.test(roomLog.join('')), `and prints one for a shard past it, which stays green (exit ${roomCode})`);
+  say(/^### x: .*⚠ past its room line/m.test(sum), 'and marks the job summary\'s heading');
+
+  // Each job's bound, read from checks.yml, against its line.
+  const boundOf = (yml, jobName) => {
+    const at = yml.indexOf(`    name: ${jobName}`);
+    const m = at < 0 ? null : /^    timeout-minutes: (\d+)$/m.exec(yml.slice(at));
     return m ? Number(m[1]) : null;
   };
-  const bounds = { mac: boundOf('WebGPU (macOS) · ${{ matrix.shard }}'), measure: boundOf('Measure · ${{ matrix.part }}') };
+  const MAC_JOB = 'WebGPU (macOS) · ${{ matrix.shard }}';
+  const roomy = (yml) => {
+    const b = { mac: boundOf(yml, MAC_JOB), measure: boundOf(yml, 'Measure · ${{ matrix.part }}') };
+    return { b, ok: b.mac >= ROOM.mac + SETUP_MIN && b.measure >= ROOM.measure + SETUP_MIN };
+  };
   const SETUP_MIN = 3;
-  say(bounds.mac >= ROOM.mac + SETUP_MIN && bounds.measure >= ROOM.measure + SETUP_MIN, `each job's bound is at least ${SETUP_MIN} minutes past its room line (Mac ${bounds.mac} for ${ROOM.mac}, Measure ${bounds.measure} for ${ROOM.measure})`);
-  say(!(20 >= ROOM.mac + SETUP_MIN), 'control: the old 20-minute Mac bound would not be');
+  const roomNow = roomy(wf);
+  say(roomNow.ok, `each job's bound is at least ${SETUP_MIN} minutes past its room line (Mac ${roomNow.b.mac} for ${ROOM.mac}, Measure ${roomNow.b.measure} for ${ROOM.measure})`);
+  // Control: the same workflow with the Mac job's bound put back to 20.
+  const macAt = wf.indexOf(`    name: ${MAC_JOB}`);
+  const old = macAt < 0 ? wf : wf.slice(0, macAt) + wf.slice(macAt).replace(/^    timeout-minutes: \d+$/m, '    timeout-minutes: 20');
+  const was = roomy(old);
+  say(was.b.mac === 20 && was.b.measure === roomNow.b.measure && !was.ok, `control: with the Mac job's bound at 20 it reads ${was.b.mac} and is not (Measure still ${was.b.measure})`);
 
   // Quarantine (19ak-1): a check red only on a quarantined line is said and
   // does not block; every other way of being red still does.
