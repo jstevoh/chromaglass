@@ -1236,7 +1236,7 @@ export class WebGPUFluid extends FluidReads {
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
       const damp = (field: PingPong) => {
-        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
         this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
         this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
         field.swap();

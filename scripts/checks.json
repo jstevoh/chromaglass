@@ -1743,11 +1743,15 @@
     },
     {
       "name": "A drop slumps under its own weight",
-      "shard": "plate",
+      "shard": "tools",
       "run": "npm run slump",
       "why": [
         "A drop of ink on a level plate slumps out along the lower glass as a",
-        "viscous gravity current, its front where Huppert's law puts it (PLAN 18m)."
+        "viscous gravity current, its front where Huppert's law puts it (PLAN 18m).",
+        "On tools since 18m-5a, which runs it with the grid filter on and adds a",
+        "glycerine run without it (55 s on Metal): on #498 plate was killed at its",
+        "20 minutes twice, in ferro.mjs, with every check before it passed, where",
+        "tools ran in 14."
       ]
     },
     {

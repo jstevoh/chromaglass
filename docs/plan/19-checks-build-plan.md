@@ -283,7 +283,10 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   cancelled about a second past its bound, every check green (green on re-run); on main's
   deploy 671 it ran 18:07. The slowest: Areas that listen 1:42, A drop slumps 1:05, the
   Finger drags 0:58, the physics 0:56. Every other Mac shard ran 15:49 to 16:49 on that run,
-  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way.
+  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way. On
+  2026-11-07 18m-5a moved `npm run slump` (now about 2:00, with its added filter-off run)
+  from plate to tools, which held it at 15.7 minutes on #498's runs; read both shards'
+  times on the next deploys before moving anything else.
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
