@@ -172,6 +172,8 @@ Every address, each action and preset by name, the settings worth a fader, a sta
 /chromaglass/dye #rrggbb               the dropper's colour
 ```
 
+**OSC out** goes the other way (Pro): *Settings → Sound*, under the tempo, sends the plate's colour, the ear's levels and bands, the tempo and each beat the plate presses on to a VJ app, to `127.0.0.1:7000` (Resolume's input, on this Mac) or any `address:port` typed beside it, so a Resolume layer's hue can follow the dye and a strobe land on the plate's kick. Every address is under `/chromaglass/out/`, listed in [osc.md](osc.md#osc-out-the-plate-to-a-vj-app). The phone layout has the same row.
+
 ### From Resolume
 
 Resolume's OSC output speaks Resolume's own addresses (`/composition/layers/1/video/opacity`), not ours, so each control you want to send needs a custom output address set in its shortcut editor. Resolume's manual ([OSC, Custom OSC Messages and Destinations](https://resolume.com/support/en/osc#custom-osc-messages), Arena and Avenue 7) describes the route:

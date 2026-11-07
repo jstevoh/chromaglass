@@ -33,7 +33,7 @@ About 160 files, grouped; a name is its file.
 
 **Accounts and licence.** accountLicense: account key. accountShows: shows directory. authFlag: signed-in cache. cloudSync, cloudSyncApp: Pro sync. firebaseAuth: sign-in. licenseKey: key check. macSeat: Mac seats. tierGates: tier gates. useSignedIn: accounts on.
 
-**Mac and iPhone bridges.** appLink: iPhone app link. castProtocol: casting. macApp: Mac download. padPicture: remote's picture. remoteProtocol: phone remote.
+**Mac and iPhone bridges.** appLink: iPhone app link. castProtocol: casting. macApp: Mac download. oscOut: OSC out's switch, its target rule and what is remembered (PLAN 13.5-osc; the server's `osc.js` sends). padPicture: remote's picture. remoteProtocol: phone remote.
 
 **App infrastructure.** appVersion: `APP_VERSION`, the release's name. bench: grid sweep. checkHooks: the checks' `?debug` doors. crashLog: black box. feedback: Settings → Feedback's note and its send (PLAN 39a); feedbackScrub: what a note must not carry. platform: where it runs. showPath: site paths. unhandled: exhaustive switch.
 

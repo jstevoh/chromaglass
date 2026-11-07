@@ -624,12 +624,18 @@ export function manifestChanges(oldText, newText) {
     if (was.run !== is.run) diffs.push({ field: 'command', from: was.run, to: is.run });
     if (env(was) !== env(is)) diffs.push({ field: 'env', from: env(was) || '(none)', to: env(is) || '(none)' });
     if ((was.timeout ?? null) !== (is.timeout ?? null)) diffs.push({ field: 'timeout', from: String(was.timeout ?? 'none'), to: String(is.timeout ?? 'none') });
+    // A quarantine (PLAN.md 19ak-1) stops a line blocking a PR: one added, or
+    // one whose end moved later, is a looser check, named by the check's name.
+    // One taken off or ended sooner is not.
+    const qs = (c) => (c.quarantine ?? []).map((q) => `"${q.line}" (${q.plan}) until ${q.until}`).join('; ') || '(none)';
+    const looser = (is.quarantine ?? []).filter((q) => !(was.quarantine ?? []).some((o) => o.line === q.line && o.until >= q.until));
+    if (looser.length) diffs.push({ field: 'quarantine', from: qs(was), to: qs(is), dates: true });
     for (const d of diffs) {
       const before = (clean(d.from).match(NUM) ?? []).map(value), after = (clean(d.to).match(NUM) ?? []).map(value);
       // The numbers in one and not the other, as a bag.
       const left = [...after];
       const gone = before.filter((v) => { const i = left.indexOf(v); if (i >= 0) { left.splice(i, 1); return false; } return true; });
-      out.push({ file, line: 0, kind: 'manifest', what: `the check "${was.name}": its ${d.field} changed`, from: d.from, to: d.to, words: [was.name], need: [...gone, ...left].map(String), code: `${d.from.slice(0, 70)} → ${d.to.slice(0, 70)}` });
+      out.push({ file, line: 0, kind: 'manifest', what: `the check "${was.name}": its ${d.field} changed`, from: d.from, to: d.to, words: [was.name], need: d.dates ? [] : [...gone, ...left].map(String), code: `${d.from.slice(0, 70)} → ${d.to.slice(0, 70)}` });
     }
   }
   return out;
@@ -882,6 +888,13 @@ function selftest() {
   t(manifestChanges(base, mf(other, qa)).length === 0, 'a reorder is not');
   t(manifestChanges(base, mf({ ...qa, why: ['reworded'] }, other)).length === 0, 'nor is the prose');
   t(manifestChanges(base, mf(qa, other, { name: 'A new one', shard: 'a', run: 'npm run slosh' })).length === 0, 'nor a new entry');
+  {
+    const q = (until) => [{ line: 'the flaky line', plan: '19ak-1', since: '2026-11-01', until }];
+    t(manifestChanges(base, mf({ ...qa, quarantine: q('2026-11-15') }, other)).length === 1, 'a quarantine added is a change to name (19ak-1)');
+    t(manifestChanges(mf({ ...qa, quarantine: q('2026-11-15') }, other), mf({ ...qa, quarantine: q('2026-11-20') }, other)).length === 1, 'and so is its end moved later');
+    t(manifestChanges(mf({ ...qa, quarantine: q('2026-11-15') }, other), mf({ ...qa, quarantine: q('2026-11-10') }, other)).length === 0, 'but not its end moved sooner');
+    t(manifestChanges(mf({ ...qa, quarantine: q('2026-11-15') }, other), mf(qa, other)).length === 0, 'nor a quarantine taken off');
+  }
   c = manifestChanges(base, mf(other));
   t(c.length === 1 && c[0].removed && c[0].words[0] === 'The app, every look', 'a removed entry is one change', c.map((x) => x.what).join('; '));
   t(names('The app, every look: removed, its looks are measured by gallery.yml now on the Mac', c[0]), 'named as removed with a reason, it passes');

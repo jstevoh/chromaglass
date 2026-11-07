@@ -91,6 +91,9 @@ import { WATER_NU } from '../../lib/liquidProps';
  * its packed-plane reader, which are passed in rather than imported so this
  * file does not import the module that spreads it into its kernel table.
  */
+/** The least share of its mobility a cell part air keeps (standingLiquid in hsPrep, PLAN 15g-8d). */
+const AIR_RIM_LEAST = 0.05;
+
 export function thinGapKernels(HEAD: string, W: string, NOISE: string): Record<string, string> {
   /*
     Shared by every kernel below: where a cell sits in the packed level-0
@@ -534,6 +537,45 @@ fn at(q: vec2i, m: i32) -> vec2f {
 @group(0) @binding(9) var<storage, read_write> mob: array<f32>;
 @group(0) @binding(10) var species: texture_2d<f32>;
 @group(0) @binding(11) var film: texture_2d<f32>;
+@group(0) @binding(12) var air: texture_2d<f32>;
+@group(0) @binding(13) var airPrev: texture_2d<f32>;
+/*
+  The liquid a cell's air leaves to flow in, as a share of its mobility
+  (PLAN 15g-8d). Between two glasses a pocket of air spanning the gap is
+  not liquid: the liquid goes round it, as round a post. The solve gave the
+  air the liquid's own mobility, so the flow ran straight through a bubble:
+  a drifting one's front, where the air arrives and the liquid has to
+  leave, drained through it to its back, where the air leaves and the
+  liquid comes back, and the carries, which take the colour where the
+  liquid goes, left 6.6% of the pool's colour in its middle
+  (\`npm run bubbledye\`) and drew the flow outside it as if it were not
+  there.
+
+  The air standing through the step (the least of the field before it and
+  after it) takes its share of the cell from the liquid's mobility; the air
+  arriving or leaving does not, because that is the liquid being pushed out
+  or let back in, which has to cross the cell's faces (hsDivergence's
+  source). A cell the air fills through the step has none at all: no liquid
+  crosses its faces (hsDivergence, thinFaceVel), its pressure is no part of
+  the solve, and what it holds stays until the air leaves (airShed in
+  wgsl/fluid.ts sees to the little the carries leave there). Not a small
+  number in its place: at a thousandth the pressure inside a bubble,
+  joined to the rest by faces a thousand times weaker, floated free, and
+  where a drifting bubble's back let the liquid in again it brought that
+  pressure with it, and liquid still seeped through the core at a cell
+  nearly full of air, piling 5% more colour than the pool held behind it.
+
+  A cell at the rim, part air, keeps at least AIR_RIM_LEAST of its
+  mobility, so a cell all but full of air is never a jump of more than
+  twenty from the liquid beside it, inside what the multigrid's coarse
+  faces were built to take (a press's dent is fifty; hsCoarsen).
+*/
+fn standingLiquid(q: vec2i, clear: f32) -> f32 {
+  let k = min(q, vec2i(textureDimensions(air)) - 1);
+  let stand = min(clamp(textureLoad(air, k, 0).r, 0.0, 1.0), clamp(textureLoad(airPrev, k, 0).r, 0.0, 1.0));
+  let l = 1.0 - clamp(clear, 0.0, 1.0) * stand;
+  return select(max(l, ${AIR_RIM_LEAST.toFixed(2)}), 0.0, l <= 0.0);
+}
 
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
@@ -619,7 +661,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let grip = chi * ${HAND_GRIP.toFixed(1)} * (1.0 + kdt);
   if (grip > 0.0) { ustar += grip * hs.xy / max(hs.z, 1e-6) / max(S.l * S.disp, 1e-9); }
   let c = 1.0 / (1.0 + kdt + grip);
-  var mo = hsGap(g, A.a.z) * c;
+  var mo = hsGap(g, A.a.z) * c * standingLiquid(q, A.a.w);
   /*
     Past the rim the liquid is open to the air: p is held at zero there.
     And on the grid's own edge, which the rim touches at the middle of
@@ -634,7 +676,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     driftCells; PLAN 27a-1).
   */
   let d = uvOf(id) - vec2f(0.5);
-  if (length(d) >= A.a.w || q.x == 0 || q.y == 0 || q.x == n - 1 || q.y == n - 1) { mo = -mo; }
+  if (length(d) >= ${OPEN_RIM.toFixed(2)} || q.x == 0 || q.y == 0 || q.x == n - 1 || q.y == n - 1) { mo = -mo; }
   mob[q.x + q.y * n] = mo;
   /*
     Under a hand what is stored is u* + K·Δt·U, which the gradient takes
@@ -676,8 +718,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       mean is taken off it, because the rim is open: that uniform sink is
       what made a press push nothing in particular.
 
-      The bubbles are the old kernel's two terms, word for word, each already
-      averaging to zero; making them physical is §18i.
+      The bubbles are the old kernel's two terms, each already averaging to
+      zero: the air arriving as a source, and the air standing as no
+      mobility (hsPrep, PLAN 15g-8d), so the liquid goes round a bubble.
 
       A.a = (air push, unused, air cover, h0),
       A.b = (the air's mean per displacement, 1/disp, 1 to take the gap as it is without a rate).
@@ -701,6 +744,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(7) var<storage, read> mob: array<f32>;
 @group(0) @binding(8) var<storage, read_write> gapBefore: array<f32>;
 @group(0) @binding(9) var<storage, read_write> poured: array<f32>;
+const DRY_FACES = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
 fn flux(p: vec2i, n: i32) -> vec2f {
   let c = clamp(p, vec2i(0), vec2i(n - 1));
   var w = textureLoad(vel, c, 0).xy * abs(mob[c.x + c.y * n]);
@@ -712,8 +756,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
-  let div = 0.5 * (flux(p + vec2i(1, 0), n).x - flux(p - vec2i(1, 0), n).x
+  var div = 0.5 * (flux(p + vec2i(1, 0), n).x - flux(p - vec2i(1, 0), n).x
                  + flux(p + vec2i(0, 1), n).y - flux(p - vec2i(0, 1), n).y);
+  /*
+    A face of a cell the air fills (no mobility, hsPrep) carries nothing:
+    not the pressure's flux, whose coefficient is zero there, and not u*'s
+    either, which the centred sum above takes as the mean of the two cells
+    and so half the liquid's beside it. Left in, that half pushed liquid
+    into the air with nothing to answer it, and the air's pressure rose
+    without bound. So each such face is taken back out, and the dry cell's
+    own equation is p = anything, b = 0. With no air every face stays and
+    the sum is the one it was.
+  */
+  let dry = mob[p.x + p.y * n] == 0.0;
+  for (var k = 0; k < 4; k++) {
+    let e = DRY_FACES[k];
+    let q = p + e;
+    if (q.x < 0 || q.y < 0 || q.x >= n || q.y >= n) { continue; }
+    if (dry || mob[q.x + q.y * n] == 0.0) { div -= 0.5 * dot(flux(p, n) + flux(q, n), vec2f(e)); }
+  }
   let now = clamp(textureLoad(air, p, 0).r, 0.0, 1.0);
   let was = clamp(textureLoad(airPrev, p, 0).r, 0.0, 1.0);
   let g = textureLoad(sq, p, 0).r;
@@ -749,7 +810,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   poured[k] = 0.0;
   let q = rate * A.a.x - dh + pour;
   var b = -div / S.n + q / (S.n * S.n);
-  if (!(abs(b) < 1e30)) { b = 0.0; }
+  if (!(abs(b) < 1e30) || dry) { b = 0.0; }
   textureStore(dst, p, vec4f(b, 0.0, 0.0, 0.0));
 }`,
 
@@ -855,9 +916,13 @@ fn fineFace(x: i32, y: i32, axis: i32, n: i32) -> f32 {
   return ff[axis * n * n + x + y * n];
 }
 // One row's conductance from a coarse centre to the next: three fine faces in series.
+// Any of them shut (a bubble's core, PLAN 15g-8d) shuts the row: floored at
+// 1e-20 instead, a coarse cell walled by two shut rows read a conductance of
+// 1e-20, its correction came out 1e20 times its residual, and the plate's
+// colour broke into a checkerboard the step after a bubble stood.
 fn series(a: f32, b: f32, c: f32) -> f32 {
-  if (b <= 0.0) { return 0.0; }
-  return 1.0 / (0.5 / max(a, 1e-20) + 1.0 / b + 0.5 / max(c, 1e-20));
+  if (a <= 0.0 || b <= 0.0 || c <= 0.0) { return 0.0; }
+  return 1.0 / (0.5 / a + 1.0 / b + 0.5 / c);
 }
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {

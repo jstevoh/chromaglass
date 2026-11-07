@@ -113,7 +113,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
           label="Glass Smear"
           value={settings.glassSmear}
           min={0}
-          max={1.0}
+          max={3}
           step={0.05}
           onChange={(v: number) => onUpdate({ glassSmear: v })}
           settingKey="glassSmear"
@@ -289,7 +289,7 @@ export const FerroSection = ({ c }: { c: SectionCtx }) => {
           label="Pushes Dye"
           value={settings.phaseDisplace ?? 0}
           min={0}
-          max={1}
+          max={1.2}
           step={0.05}
           onChange={(v: number) => onUpdate({ phaseDisplace: v })}
           settingKey="phaseDisplace"

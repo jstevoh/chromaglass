@@ -54,7 +54,12 @@ picks it up in its next build. `detectTier()` already reads Electron as the
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
-   against the plate's own frame. *Not started.*
+   against the plate's own frame. *Not started.* **Check written** (2026-11-01,
+   `scripts/desktop-syphon.mjs`, run by desktop.yml with `DESKTOP_OWED: syphon`):
+   the add-on loads, a Show-menu checkbox `syphon-out` (off at start) serves "ChromaGlass"
+   with at least 30 frames a second published and each released, through
+   `globalThis.__chromaglassSyphon` in the main process; skipped off a Mac. The build
+   takes `syphon` out of `DESKTOP_OWED`.
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
 4. ~~**Control, written up**~~ **Shipped** (2026-10-31): `docs/osc.md`, every address with a starter Resolume map and a TouchDesigner script (`docs/osc/chromaglass_touchdesigner.py`), held to the code by `npm run rig`. Story in `docs/plan-shipped.md` §13.4. **Owed:** the maps tried in Resolume and TouchDesigner, the owner's sitting in `docs/judging.md` §93.
@@ -93,10 +98,24 @@ picks it up in its next build. `detectTier()` already reads Electron as the
        Rescan on a timer, as the library does.
      - **13.5-link-menu.** A Show menu item in the Mac app beside OSC's, for an operator
        who never opens Settings → Sound.
-   - **13.5-osc**: OSC *out* for the plate's colour, the sound bands and the beat, the
-     way Art-Net out already sends the colour to the lighting (`server/artnet.js`), so
-     a VJ app's effects can follow the plate.
-   *Not started.*
+   - ~~**13.5-osc**~~ **Shipped** (2026-11-01): OSC out of the plate's colour, the ear's
+     readings and bands, the tempo and the beat, from Settings → Sound and the phone
+     layout (`npm run oscout`); story in `docs/plan-shipped.md` §13.5-osc. **Owed:** the
+     owner's sitting with Resolume (`docs/judging.md` §106).
+     - **13.5-osc-menu.** A Show menu item in the Mac app beside OSC input's, with Show
+       Server Details naming the target, for an operator who never opens Settings
+       (`setOscOut` and `oscOutState` are exported for it; with 13.5-link-menu).
+     - **13.5-osc-rate.** The report rides the Art-Net report's 50 ms; a VJ app's own
+       frame is 16 ms. Measure on the Mac whether a hue on `/colour/hue` steps visibly,
+       and send at 30 or 60 Hz only if it does (the beat already goes at once).
+     - **13-pack-imports.** `desktop/electron-builder.config.cjs` copies the server's
+       files by name, so a new module the server imports starts in `npm run show` and
+       fails the packed app only on the Mac's CI (#658: `osc.js`). `npm run desktop`
+       (or `checks`) should fail when a relative import of a packed server file is not
+       on that list.
+     - **13.5-osc-scale.** Every value is 0..1 except `/bpm`; Resolume's tempo input
+       wants its own range. Write the range a Resolume BPM shortcut takes into docs/osc.md
+       once the owner's sitting has read it.
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
    (§11), not through a virtual camera. *Not started.* Beside the Mixer layer, the
    picture can also be poured into the liquid as dye that the flow then carries (the

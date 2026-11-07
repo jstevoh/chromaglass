@@ -350,7 +350,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           disabled={(settings.layerCount ?? 1) < 2 && !backLook && 'needs 2 Layers'}
           value={settings.backgroundLoop ?? 0}
           min={0}
-          max={1.0}
+          max={1.4}
           step={0.05}
           onChange={(v: number) => onUpdate({ backgroundLoop: v })}
           settingKey="backgroundLoop"

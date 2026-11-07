@@ -202,23 +202,23 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   project's shared files (`dials/survey-2026-10-31.md`). The rule it leaves: the bottom step is
   barely there, the top is past nature with the law still at the core, the default and every
   look's value stay where they are, and Evolve never takes a dial to its far end on its own.
-  - **27h-1, shipped (this PR).** Twenty-five dials whose top was timid and whose consumer could
-    simply be let further: Evolve Speed to 3, Plate Rock 3, Kick Bloom 4, Melody Walk 2,
-    Saturation 0 (grey) to 3, Macro Chase 3, Hue Journey 30 min, Bass Boost 0.25 (a cut) to 5,
-    Grain Fineness 20 to 1200 (the uniform's own clamp), Layer Scale Variety 2, Gel Speed 30 rpm,
-    Film Grain 3, Grain Size 16 px, Gate Weave 12 px, Shot Length 60 s, Paint Cells 2, Cell Size
-    3, Edge Detail 2.5, Magnet Strength 3 (at 1 and the default height the spikes were only at
-    onset; full spikes need 1.76), Magnet Size 1.5, Tempo Sync 1.6, Rain Drip 2, Evaporation 0.5,
-    Rotation Speed 1.3 (40 rpm, inside the motor's 45), Flick Strength 2. A curve on the travel
-    (`curve`, and `PANEL_CURVES` in `lib/midi.ts` for the panel's own dials) keeps the gentle
-    end's room where the top went up four times or more. Each widened dial carries its old width
-    as `wanderSpan`, which Evolve's wander is still a fifth of (`dialWindow`, `lib/drift.ts`).
-  - **27h-2, open. Dials whose top is held in the solver** (`src/sim/fluidSimulation.ts` is at its
-    size ceiling and four open PRs edit it, so these wait for a quiet moment): Swirl (`min(1)`,
-    to 2), Dye Weight (three clamps, to 2), Heat Spread (to 2, under the Jacobi's limit), Momentum
-    (0.995 clamp, to 0.999), Drop Height (to 2), Background Loop (to 1.4), Glass Smear (a gate at
-    0.2 makes its first step a jump to a fifth of full; to 3 with no gate), Pushes Dye (to 1.2),
-    Buoyancy (the current's cap).
+  - **27h-1, shipped (#626).** Twenty-five dials let further where their consumer allowed it;
+    story in `docs/plan-shipped.md` §27h-1.
+  - **27h-2, shipped (this PR).** The dials whose top the solver held a second time: Swirl,
+    Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
+    1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
+    `docs/plan-shipped.md` §27h-2; `npm run widedials`.
+  - **27h-2b, open. Buoyancy's top is the lasting current's cap.** The dial already runs to 2
+    and nothing clamps it, but the current it drives is held to ¾ of a cell a step
+    (`maxCurrent`, a CFL limit, not a choice), so past where a warm plate reaches the cap more
+    Buoyancy buys nothing. The honest way further is substeps for the current when its force
+    asks more than a step can carry, as the slump and the ferrofluid have; measure where the
+    cap binds on Lava Lamp first.
+  - **27h-2c, open. Dye Weight past 1 on a deep 1024² pool.** At 6 mm and 1024² the slump asks
+    27 substeps at Dye Weight 2 against `SLUMP_SUBSTEPS`' 20, and the face guard holds it:
+    stable, the front a little under its Froude speed. 38r part 2's 2 mm gap takes this back
+    under 20 (about 16); if it does not land, raise the cap (a SHOUTING_CASE number: name it
+    under Check changes).
   - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
     `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
     the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate

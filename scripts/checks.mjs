@@ -59,7 +59,7 @@
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.json');
@@ -71,6 +71,59 @@ export const SHARED = [
   'scripts/chromium.mjs', 'scripts/frame.mjs', 'scripts/lab.mjs', 'scripts/lab-entry.ts',
   'scripts/checks.mjs',
 ];
+
+/*
+  Quarantine (PLAN.md 19ak-1). A line that goes red on runs whose change could
+  not have moved it, and that has a plan item open to fix it, can be put on its
+  check's entry as `quarantine`: the start of the FAIL line, the plan id, and
+  the dates it holds from and until. While it holds, a check whose only FAIL
+  lines are quarantined ones still runs and still prints them, as a warning
+  annotation and a row marked ⚠ in the summary, but does not turn its job red.
+  Its bar does not move: the line's numbers and threshold are the harness's,
+  untouched, and the day the quarantine ends the line blocks again.
+
+  Why. On 2026-11-01 four PRs (#627, #643, #656, #659) sat red on three lines
+  none of them touched: startup's "moving for good no later than the old way"
+  (19aa-7, 18 reds in 116 runs of the open shard), the Blow stroke's "keeps it
+  rather than erasing it" (19aj-1, reading the runner's frame rate) and the
+  wall's circle (19aj-2). Each red was a re-run of all five shards, about 80
+  Mac minutes, and about a third of PR attempts that week were re-runs.
+
+  What it will not excuse: a check that timed out or was killed, one that
+  exited other than 1 or printed a stack (a crash after a quarantined line
+  leaves the lines after it unmeasured), one whose own closing count
+  ("N/M checks passed") is missing or counts other than its FAIL lines red
+  (it stopped early), one with as many FAIL lines as the runner keeps (the
+  rest unread), a quarantined line whose numbers read unread, never, NaN or
+  null (the flake is a reading on the wrong side of its bar, not a missing
+  one), and any FAIL line that is not on the list. And nothing at all off a
+  pull request: main's deploy holds every line to its bar, so a real
+  regression the quarantine let through a PR is red there before it is live.
+  An entry has to end within QUARANTINE_DAYS of its start: a quarantine is
+  the time the fix takes, not a place lines go to stay. Adding one, or moving
+  its end later, is a check change `checkguard.mjs` makes the PR name.
+*/
+export const QUARANTINE_DAYS = 21;
+export const MAX_FAILS = 20;
+const failText = (l) => l.replace(/^.*?\bFAIL\b[:\s]*/, '').trim();
+export function quarantined(c, r, { today = new Date().toISOString().slice(0, 10), event = process.env.GITHUB_EVENT_NAME } = {}) {
+  if (event !== 'pull_request') return null;
+  if (r.ok || r.code !== 1 || r.timedOut || r.signal || r.stack || !r.fails.length || r.fails.length >= MAX_FAILS) return null;
+  // The harness reached its own end and counted exactly these lines red.
+  if (!r.tally || r.tally.total - r.tally.pass !== r.fails.length) return null;
+  const live = (c.quarantine ?? []).filter((q) => q.since <= today && today < q.until);
+  if (!live.length) return null;
+  const hits = [];
+  for (const l of r.fails) {
+    const q = live.find((x) => failText(l).startsWith(x.line.trim()));
+    if (!q) return null;
+    // A line that could not read its numbers is not the flake that was
+    // quarantined, which is a reading on the wrong side of its bar.
+    if (/\b(unread|never|NaN|null|undefined)\b/.test(failText(l).slice(q.line.trim().length))) return null;
+    hits.push({ line: l, q });
+  }
+  return hits;
+}
 
 export function parseManifest(text, where = 'scripts/checks.json') {
   const m = JSON.parse(text);
@@ -91,7 +144,19 @@ export function parseManifest(text, where = 'scripts/checks.json') {
     if (c.always != null && c.always !== true) bad(`${at}'s always is not true`);
     if (c.always && !measure.includes(c.shard)) bad(`${at} is always but not on a Measure shard`);
     if (c.why != null && !(Array.isArray(c.why) && c.why.every((l) => typeof l === 'string'))) bad(`${at}'s why is not a list of lines`);
-    const extra = Object.keys(c).filter((k) => !['name', 'shard', 'run', 'env', 'timeout', 'why', 'always'].includes(k));
+    if (c.quarantine != null) {
+      if (!Array.isArray(c.quarantine) || !c.quarantine.length) bad(`${at}'s quarantine is not a list of lines`);
+      for (const q of c.quarantine) {
+        const keys = Object.keys(q ?? {}).sort().join(',');
+        if (keys !== 'line,plan,since,until') bad(`${at}'s quarantine entry needs exactly line, plan, since and until (has ${keys})`);
+        if (typeof q.line !== 'string' || q.line.trim().length < 12) bad(`${at}'s quarantined line is not the start of a FAIL line (12 characters or more)`);
+        if (!/^\d+[a-z]*-\d+[a-z]?$/.test(q.plan)) bad(`${at}'s quarantined line names no plan id (${q.plan})`);
+        const d = (x) => (/^\d{4}-\d\d-\d\d$/.test(x) ? Date.parse(`${x}T00:00:00Z`) : NaN);
+        const days = (d(q.until) - d(q.since)) / 86_400_000;
+        if (!(days > 0 && days <= QUARANTINE_DAYS)) bad(`${at}'s quarantine runs ${q.since} to ${q.until}: it has to end, within ${QUARANTINE_DAYS} days`);
+      }
+    }
+    const extra = Object.keys(c).filter((k) => !['name', 'shard', 'run', 'env', 'timeout', 'why', 'always', 'quarantine'].includes(k));
     if (extra.length) bad(`${at} has keys the runner does not read: ${extra.join(', ')}`);
     const key = `${c.shard}\u0000${c.name}`;
     if (seen.has(key)) bad(`${at} is named twice on ${c.shard}`);
@@ -204,9 +269,13 @@ export function diffEntries(before, after) {
 */
 // Not a Markdown file anywhere: one under src/ or public/ is the site's.
 const DOC = /^[^/]+\.md$|^docs\/|^\.claude\/|^LICENSE[^/]*$/;
-function selectCore(files, { before, after, root = ROOT, docs = false }) {
+// The site's own files, which a Mac check reads either through the lab's
+// bundles or by opening the built app (`checkReads`, 19ak-2).
+const SITE_OWN = /^(src|public)\/|^index\.html$/;
+function selectCore(files, { before, after, root = ROOT, docs = false, readsOf = null, mac = false }) {
   const hit = [];
   const why = [];
+  const site = [];
   const every = (w) => ({ all: true, hit: [], why: `every check: ${w}` });
   const running = (pred) => {
     const out = [];
@@ -239,6 +308,17 @@ function selectCore(files, { before, after, root = ROOT, docs = false }) {
       continue;
     }
     if (SHARED.includes(f)) return every(`${f} is shared by every app or lab check`);
+    if (mac && /^server\//.test(f)) {
+      // The Workers' and the remote's code (19ak-2). Nothing under src/
+      // imports from server/ (reach.mjs), so a Mac check reads a file there
+      // only through its own scripts, which the trace follows (a `node
+      // server/...` in its npm script, a path it names); one that none
+      // traces is a Worker's, which no Mac check runs. Measure, which runs
+      // the Workers' own checks, still takes every check for it.
+      const scripts = after.pkg?.scripts ?? {};
+      add(after.manifest.checks.filter((c) => after.manifest.shards.mac.includes(c.shard) && reads(trace(entryFiles(c.run, scripts), root), f)), f);
+      continue;
+    }
     if (/^scripts\//.test(f)) {
       const scripts = after.pkg?.scripts ?? {};
       const cs = after.manifest.checks.filter((c) => reads(trace(entryFiles(c.run, scripts), root), f));
@@ -251,7 +331,17 @@ function selectCore(files, { before, after, root = ROOT, docs = false }) {
       add(after.manifest.checks.filter((c) => reads(trace(entryFiles(c.run, scripts), root), f)), f);
       continue;
     }
+    if (readsOf && SITE_OWN.test(f)) {
+      const cs = after.manifest.checks.filter((c) => { const i = readsOf.get(c); return !i || i.site || reads(i.reads, f); });
+      hit.push(...cs);
+      site.push(f);
+      continue;
+    }
     return every(f);
+  }
+  if (site.length) {
+    const cs = [...new Set(hit.filter((c) => after.manifest.checks.includes(c) && readsOf.has(c) && !readsOf.get(c).site))];
+    why.push(`${site.length} site file${site.length === 1 ? '' : 's'} (${site.slice(0, 3).join(', ')}${site.length > 3 ? ', …' : ''}): the checks that open the app, and ${cs.length} lab check${cs.length === 1 ? '' : 's'} importing them`);
   }
   return { all: false, hit, why: why.join('; ') || 'nothing that reaches a check' };
 }
@@ -260,10 +350,15 @@ function selectCore(files, { before, after, root = ROOT, docs = false }) {
 // filters the rest first). Every shard when any file cannot be placed.
 export function selectShards(files, ctx) {
   const mac = ctx.after.manifest.shards.mac;
-  const r = selectCore(files, ctx);
-  if (r.all) return { shards: [...mac], why: r.why };
+  const r = selectCore(files, { ...ctx, mac: true });
+  if (r.all) return { shards: [...mac], names: null, why: r.why };
   const sel = new Set(r.hit.map((c) => c.shard));
-  return { shards: mac.filter((s) => sel.has(s)), why: r.why };
+  // The checks to run in those shards, by name (19ak-2): null when that is
+  // every check of every Mac shard, which is the run a deploy can trust.
+  const names = [...new Set(r.hit.filter((c) => mac.includes(c.shard)).map((c) => c.name))];
+  const every = ctx.after.manifest.checks.filter((c) => mac.includes(c.shard));
+  const full = every.every((c) => names.includes(c.name));
+  return { shards: mac.filter((s) => sel.has(s)), names: full ? null : names, why: r.why };
 }
 
 /*
@@ -279,7 +374,9 @@ export function selectShards(files, ctx) {
 export function selectMeasure(files, ctx) {
   const m = ctx.after.manifest;
   const measure = m.shards.measure;
-  const r = selectCore(files, { ...ctx, docs: true });
+  // Measure keeps running in full for the site's files: it is not behind the
+  // Mac's queue, and its harnesses read src/ in ways no bundle shows.
+  const r = selectCore(files, { ...ctx, docs: true, readsOf: null, mac: false });
   if (r.all) return { all: true, names: [], parts: [...measure], why: r.why };
   const keys = new Set(r.hit.map((c) => `${c.shard}\u0000${c.name}`));
   const picked = m.checks.filter((c) => measure.includes(c.shard) && (c.always || keys.has(`${c.shard}\u0000${c.name}`)));
@@ -315,12 +412,20 @@ export function runOne(c, { onOut = (b) => process.stdout.write(b), onErr = (b) 
     });
     current = child;
     const fails = [];
+    let stack = false;
+    let tally = null;
     let tail = '';
     const keep = (buf) => {
       const text = tail + buf.toString();
       const lines = text.split('\n');
       tail = lines.pop();
-      for (const l of lines) if (/\bFAIL\b/.test(l) && fails.length < 20) fails.push(l.trim());
+      for (const l of lines) {
+        if (/\bFAIL\b/.test(l) && fails.length < MAX_FAILS) fails.push(l.trim());
+        // A stack frame (`    at f (file:12:3)`): the harness threw.
+        if (/^\s+at .*:\d+:\d+\)?\s*$/.test(l)) stack = true;
+        const t = /^\s*(\d+)\/(\d+) checks passed\s*$/.exec(l);
+        if (t) tally = { pass: Number(t[1]), total: Number(t[2]) };
+      }
     };
     child.stdout.on('data', (b) => { onOut(b); keep(b); });
     child.stderr.on('data', (b) => { onErr(b); keep(b); });
@@ -340,8 +445,10 @@ export function runOne(c, { onOut = (b) => process.stdout.write(b), onErr = (b) 
       done = true;
       if (timer) clearTimeout(timer);
       if (tail && /\bFAIL\b/.test(tail)) fails.push(tail.trim());
+      const t = /^\s*(\d+)\/(\d+) checks passed\s*$/.exec(tail);
+      if (t) tally = { pass: Number(t[1]), total: Number(t[2]) };
       current = null;
-      resolve({ ok: code === 0 && !timedOut, code, signal, timedOut, fails, secs: (Date.now() - t0) / 1000 });
+      resolve({ ok: code === 0 && !timedOut, code, signal, timedOut, fails, stack, tally, secs: (Date.now() - t0) / 1000 });
     };
     let drain = null;
     child.on('close', (code, signal) => { if (drain) clearTimeout(drain); finish(code, signal); });
@@ -388,21 +495,28 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     console.log(`::group::Run ${c.run}`);
     const r = await runOne(c);
     console.log('::endgroup::');
-    results.push({ c, r });
+    const q = quarantined(c, r);
+    results.push({ c, r, q });
     const how = r.timedOut ? `stopped at its ${c.timeout}-minute timeout` : r.code != null ? `exit ${r.code}` : `ended by ${r.signal}`;
     if (r.ok) console.log(`✓ ${c.name}, ${fmtSecs(r.secs)}`);
-    else {
+    else if (q) {
+      // Red only on quarantined lines (PLAN.md 19ak-1): said, not blocking.
+      console.log(`⚠ ${c.name}, red after ${fmtSecs(r.secs)} on quarantined lines only (${how})`);
+      for (const { line, q: e } of q) console.log(`    ⚠ ${line} [quarantined for ${e.plan} until ${e.until}]`);
+      console.log(`::warning title=${escProp(`Quarantined: ${c.name}`)}::${escData(q.map(({ line, q: e }) => `${line} [${e.plan}, until ${e.until}]`).join('\n'))}`);
+    } else {
       console.log(`✗ ${c.name}, red after ${fmtSecs(r.secs)} (${how})`);
       for (const l of r.fails) console.log(`    ✗ ${l}`);
       console.log(`::error title=${escProp(c.name)}::${escData([`${c.run}: ${how}`, ...r.fails].join('\n'))}`);
     }
   }
-  const red = results.filter(({ r }) => !r.ok);
+  const red = results.filter(({ r, q }) => !r.ok && !q);
+  const held = results.filter(({ r, q }) => !r.ok && q);
   const total = results.reduce((s, { r }) => s + r.secs, 0);
-  console.log(`\n${results.length - red.length} of ${results.length} checks green on ${shard} in ${fmtSecs(total)}${red.length ? `; red: ${red.map(({ c }) => c.name).join('; ')}` : ''}`);
+  console.log(`\n${results.length - red.length - held.length} of ${results.length} checks green on ${shard} in ${fmtSecs(total)}${held.length ? `; red on quarantined lines only: ${held.map(({ c }) => c.name).join('; ')}` : ''}${red.length ? `; red: ${red.map(({ c }) => c.name).join('; ')}` : ''}`);
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const rows = results.map(({ c, r }) => `| ${r.ok ? '✓' : '✗'} | ${c.name.replace(/\|/g, '\\|')} | \`${c.run.replace(/\|/g, '\\|').replace(/`/g, "'")}\` | ${Math.round(r.secs)} |`);
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length} of ${results.length} green, ${fmtSecs(total)}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
+    const rows = results.map(({ c, r, q }) => `| ${r.ok ? '✓' : q ? '⚠' : '✗'} | ${c.name.replace(/\|/g, '\\|')} | \`${c.run.replace(/\|/g, '\\|').replace(/`/g, "'")}\` | ${Math.round(r.secs)} |`);
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
   }
   return red.length ? 1 : 0;
 }
@@ -433,6 +547,7 @@ async function selftest() {
   say(/^\s+part: \$\{\{ fromJSON\(needs\.reach\.outputs\.parts\) \}\}\s*$/m.test(wf), 'Measure\'s matrix is the parts reach selected (the manifest\'s measure shards unless the diff is only checks and documents)');
   say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.only \}\}/.test(wf), 'and the names reach selected are passed to the part\'s runner');
   say(/^\s+shard: \$\{\{ fromJSON\(needs\.reach\.outputs\.shards\) \}\}\s*$/m.test(wf), 'the Mac matrix is the shards reach selected');
+  say(/CHECKS_ONLY: \$\{\{ needs\.reach\.outputs\.maconly \}\}/.test(wf) && /ESBUILD_MODULE: /.test(wf), 'and the Mac\'s names are passed to the shard\'s runner, read with the esbuild the reach job installs (19ak-2)');
   say(/run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.part \}\}/.test(wf) && /run: node scripts\/checks\.mjs --ci \$\{\{ matrix\.shard \}\}/.test(wf), 'Measure and the Mac run their shard from the manifest');
   // The workflow's own tools (which files reach, the runner, the guard on a
   // PR's bars) are also checks with a selftest; their CI uses are not.
@@ -554,6 +669,35 @@ async function selftest() {
   say(pick(['package.json'], now, { manifest: man, pkg: { ...pkg, dependencies: { ...pkg.dependencies, 'left-pad': '1.0.0' } } }) === allMac, 'a changed dependency selects every shard');
   say(pick(['package.json', 'scripts/checks.json'], now, (() => { const m = structuredClone(man); m.checks.push({ name: 'A new one', shard: mac2, run: ['npm', 'run', 'brand-new'].join(' ') }); return { manifest: m, pkg: { ...pkg, scripts: { ...pkg.scripts, 'brand-new': 'node scripts/tools.mjs' } } }; })()) === mac2, 'a new check with its new npm script selects its shard');
 
+  // The site's own files on the Mac (19ak-2), with what each check reads as
+  // esbuild finds it here. A desk's panel is read by the checks that open the
+  // app and by no lab check; the solver by the lab checks too; a shader file a
+  // harness reads by its path (`benday.mjs` reads plate.ts as text) by that
+  // harness; and with no map at all, a site file is every shard, as it was.
+  {
+    const esb = await loadEsbuild();
+    if (!esb) say(false, 'esbuild loads, to read what each check imports (npm ci)');
+    else {
+      const readsOf = await checkReads(man, scripts, esb);
+      const macChecks = man.checks.filter((c) => man.shards.mac.includes(c.shard));
+      const siteN = macChecks.filter((c) => readsOf.get(c).site).length;
+      const sel = (files, r = readsOf) => selectShards(files, { before: now, after: now, readsOf: r });
+      const has = (r, name) => r.names == null || r.names.includes(name);
+      const desk = sel(['src/components/desk/DeskHeader.tsx']);
+      const opensApp = macChecks.filter((c) => readsOf.get(c).site).map((c) => c.name);
+      say(desk.names && desk.names.length === siteN && opensApp.every((n) => desk.names.includes(n)) && !has(desk, 'The physics'),
+        `a desk panel runs the ${siteN} Mac checks that open the app and none of the ${macChecks.length - siteN} that read only the lab (${desk.names?.length} named)`);
+      say(siteN >= 10 && siteN < macChecks.length && has(sel(['src/gpu/fluid.ts']), 'The physics') && has(sel(['src/gpu/fluid.ts']), 'The microscope'), 'the solver runs the lab\'s checks that import it, the physics and the microscope among them');
+      say(has(sel(['src/gpu/wgsl/plate.ts']), 'The Ben-Day print'), 'a file a harness reads by its path selects that harness');
+      say(readsOf.get(man.checks.find((c) => c.name === 'Every tool does what it says')).site && readsOf.get(man.checks.find((c) => c.name === 'A show night')).site, 'a check that serves the app reads the whole site');
+      say(sel(['src/components/desk/DeskHeader.tsx'], null).shards.join(',') === allMac && sel(['src/components/desk/DeskHeader.tsx'], null).names == null, 'with no map a site file selects every Mac check, as before 19ak-2');
+      say(sel(['src/components/desk/DeskHeader.tsx', 'vite.config.ts']).names == null, 'a build file beside it selects every Mac check');
+      const missing = new Map(readsOf);
+      missing.delete(man.checks.find((c) => c.name === 'The physics'));
+      say(has(sel(['src/components/desk/DeskHeader.tsx'], missing), 'The physics'), 'a check the map does not place runs');
+    }
+  }
+
   // The deploy gate's reading of a run that was only partly measured
   // (19k-4) fails closed: its `api` replaced by a stub, the function itself
   // taken out of deploygate.sh. A failed call or a run with no reach job is
@@ -570,6 +714,7 @@ async function selftest() {
     const stub = (jobsOut, notesOut) => `api() { case "$1" in actions/runs/*) ${jobsOut};; check-runs/*) ${notesOut};; esac; }`;
     const ok = jobs();
     say(ask(stub(`echo '${ok}'`, `echo '[{"title":"measure","message":"partial: 6 checks in logic"}]'`)).startsWith('partial'), 'a run whose reach job said partial is partial');
+    say(ask(stub(`echo '${ok}'`, `echo '[{"title":"mac","message":"partial: 25 of 96 Mac checks in show, tools"}]'`)).startsWith('partial'), 'a run whose reach job said it ran some of the Mac\'s checks is partial (19ak-2)');
     say(ask(stub(`echo '${ok}'`, `echo '[{"title":"carried","message":"x"}]'`)) === '', 'a run whose reach job said nothing of it ran in full');
     say(ask(stub('return 22', 'echo []')).startsWith('partial'), 'a run whose jobs cannot be read is partial (fails closed)');
     say(ask(stub(`echo '${ok}'`, 'return 22')).startsWith('partial'), 'a run whose annotations cannot be read is partial');
@@ -621,6 +766,71 @@ async function selftest() {
   say(left === '', 'and it is ended with the check\'s group, so it holds no port for the next');
   say(!/other/.test(text), 'only the shard asked for runs');
   say(!/^\S*\s*(ok|FAIL)\s+(green|red|slow)/m.test(text), 'the runner\'s own lines never read as a harness\'s ok or FAIL line to flakes.mjs');
+
+  // Quarantine (19ak-1): a check red only on a quarantined line is said and
+  // does not block; every other way of being red still does.
+  const day = (n) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const qd = (line, since = day(-1), until = day(5)) => [{ line, plan: '19ak-1', since, until }];
+  const flaky = 'echo "FAIL  the flaky line — 3 against 2"';
+  const tally = (n, m) => `echo "${n}/${m} checks passed"`;
+  const qman = parseManifest(JSON.stringify({
+    shards: { measure: ['qa', 'qb', 'qc'], mac: ['x'] },
+    checks: [
+      { name: 'held', shard: 'qa', run: `echo " ok  a line that passed"; ${flaky}; ${tally(1, 2)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'mixed', shard: 'qb', run: `${flaky}; echo "FAIL  another line"; ${tally(0, 2)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'ended', shard: 'qb', run: `${flaky}; ${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line', day(-9), day(-2)) },
+      { name: 'crashed', shard: 'qb', run: `${flaky}; node -e 'throw new Error("after the line")'`, quarantine: qd('the flaky line') },
+      { name: 'stopped', shard: 'qb', run: `${flaky}; sleep 30 & wait`, timeout: 0.02, quarantine: qd('the flaky line') },
+      { name: 'silent', shard: 'qb', run: `${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'early', shard: 'qb', run: `${flaky}; echo "the preview server exited" >&2; exit 2`, quarantine: qd('the flaky line') },
+      { name: 'untallied', shard: 'qb', run: `${flaky}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'miscounted', shard: 'qb', run: `${flaky}; ${tally(1, 3)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'unread', shard: 'qb', run: `echo "FAIL  the flaky line — unread against 2"; ${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'onmain', shard: 'qc', run: `${flaky}; ${tally(0, 1)}; exit 1`, quarantine: qd('the flaky line') },
+      { name: 'other', shard: 'x', run: 'true' },
+    ],
+  }));
+  const qlog = [];
+  let qa, qb, qc;
+  const eventWas = process.env.GITHUB_EVENT_NAME;
+  const writeErr = process.stderr.write.bind(process.stderr);
+  process.stdout.write = (b) => { qlog.push(String(b)); return true; };
+  process.stderr.write = (b) => { qlog.push(String(b)); return true; };
+  const setEvent = (e) => { if (e == null) delete process.env.GITHUB_EVENT_NAME; else process.env.GITHUB_EVENT_NAME = e; };
+  try {
+    setEvent('pull_request');
+    qa = await runShard('qa', qman, null);
+    qb = await runShard('qb', qman, null);
+    setEvent('push');
+    qc = await runShard('qc', qman, null);
+  } finally { setEvent(eventWas); process.stdout.write = write; process.stderr.write = writeErr; }
+  const qt = qlog.join('');
+  say(qa === 0 && /⚠ held, red after/.test(qt) && /::warning title=Quarantined%3A held::.*the flaky line/.test(qt), `a check red only on a quarantined line is a warning, and its shard green (exit ${qa})`);
+  say(/⚠ FAIL {2}the flaky line — 3 against 2 \[quarantined for 19ak-1 until/.test(qt), 'and its FAIL line is still printed whole, with its plan id and end date');
+  say(qb === 1 && /✗ mixed/.test(qt), 'a quarantined line beside one that is not is red');
+  say(/✗ ended/.test(qt), 'a quarantine past its end date excuses nothing');
+  say(/✗ crashed/.test(qt), 'a check that threw after a quarantined line is red');
+  say(/✗ stopped/.test(qt), 'a check stopped at its timeout is red whatever it printed');
+  say(/✗ silent/.test(qt), 'a check red with no FAIL line at all is red');
+  say(/✗ early/.test(qt), 'a check that exited other than 1 after a quarantined line (it stopped early) is red');
+  say(/✗ untallied/.test(qt), 'a check that never printed its closing count is red');
+  say(/✗ miscounted/.test(qt), 'a check whose count has more red than its FAIL lines is red');
+  say(/✗ unread/.test(qt), 'a quarantined line that could not read its numbers is red');
+  say(qc === 1 && /✗ onmain/.test(qt), 'off a pull request (main\'s deploy) a quarantined line blocks');
+  const refuses = (q) => { try { parseManifest(JSON.stringify({ shards: { measure: ['m'], mac: ['x'] }, checks: [{ name: 'a', shard: 'm', run: 'true', quarantine: q }, { name: 'b', shard: 'x', run: 'true' }] })); return false; } catch { return true; } };
+  say(refuses([{ line: 'the flaky line', since: day(0), until: day(5) }]), 'a quarantine with no plan id is refused');
+  say(refuses(qd('the flaky line', day(0), day(QUARANTINE_DAYS + 1))), `a quarantine longer than ${QUARANTINE_DAYS} days is refused`);
+  say(refuses(qd('flaky')), 'a quarantined line too short to name one FAIL line is refused');
+  say(!refuses(qd('the flaky line')), 'and a whole entry is taken');
+  // The real ones: each names a check that has the line, and a plan id the plan has.
+  const planText = fs.readdirSync(path.join(ROOT, 'docs/plan')).map((f) => fs.readFileSync(path.join(ROOT, 'docs/plan', f), 'utf8')).join('\n');
+  const qs = man.checks.flatMap((c) => (c.quarantine ?? []).map((q) => ({ c, q })));
+  const noPlan = qs.filter(({ q }) => !new RegExp(`\\*\\*${q.plan.replace(/[-]/g, '\\-')}\\b`).test(planText));
+  say(!noPlan.length, `every quarantined line's plan id is an item in docs/plan/ (${qs.length} lines${noPlan.length ? `; not found: ${noPlan.map(({ q }) => q.plan).join(', ')}` : ''})`);
+  const noLine = qs.filter(({ c, q }) => ![...trace(entryFiles(c.run, scripts))].some((f) => /\.(mjs|js|ts)$/.test(f) && fs.existsSync(path.join(ROOT, f)) && fs.readFileSync(path.join(ROOT, f), 'utf8').includes(q.line.trim())));
+  const noTally = qs.filter(({ c }) => ![...trace(entryFiles(c.run, scripts))].some((f) => /\.(mjs|js|ts)$/.test(f) && fs.existsSync(path.join(ROOT, f)) && /checks passed/.test(fs.readFileSync(path.join(ROOT, f), 'utf8'))));
+  say(!noTally.length, `every quarantined check prints its closing count, which the quarantine needs${noTally.length ? `; not found: ${noTally.map(({ c }) => c.name).join(', ')}` : ''}`);
+  say(!noLine.length, `and its text is in the check's own scripts${noLine.length ? `; not found: ${noLine.map(({ c, q }) => `${c.name}: ${q.line}`).join('; ')}` : ''}`);
   if (bad) { console.log(`\n${bad} FAIL`); process.exitCode = 1; return; }
   console.log('\nall ok');
 }
@@ -652,11 +862,11 @@ const ESBUILD = {
     },
   }],
 };
-export async function metafilesOf(esbuild, files, platform = 'node') {
+export async function metafilesOf(esbuild, files, platform = 'node', root = ROOT) {
   const out = new Map();
-  const norm = (i) => { const p = i.replace(/^query:/, ''); return path.isAbsolute(p) ? path.relative(ROOT, p) : p; };
+  const norm = (i) => { const p = i.replace(/^query:/, ''); return path.isAbsolute(p) ? path.relative(root, p) : p; };
   const build = async (list) => {
-    const r = await esbuild.build({ ...ESBUILD, platform, entryPoints: list.map((f) => path.join(ROOT, f)) });
+    const r = await esbuild.build({ ...ESBUILD, absWorkingDir: root, outdir: path.join(root, 'scratch', 'checks-meta'), outbase: root, platform, entryPoints: list.map((f) => path.join(root, f)) });
     for (const o of Object.values(r.metafile.outputs)) {
       if (!o.entryPoint) continue;
       out.set(norm(o.entryPoint), Object.keys(o.inputs).map(norm));
@@ -672,6 +882,72 @@ export async function metafilesOf(esbuild, files, platform = 'node') {
   };
   await tryBuild(files);
   return out;
+}
+
+/*
+  What each check reads, for `quick.mjs` and for the Mac's selection on a pull
+  request whose diff touches the site's own files (PLAN.md 19ak-2):
+    - `reads`: its scripts, traced as above, and every src/ file esbuild finds
+      them or an entry they name (a `src/...` string, the lab's
+      `scripts/*-entry.ts`) importing, which is how most harnesses reach the
+      code;
+    - `app`: one of the scripts the trace reaches starts vite (quick.mjs's old
+      test, kept for what it decides there);
+    - `site`: the check reads the whole of the built site, so any change to
+      src/, public/ or index.html selects it. True unless the check's own
+      scripts, by esbuild's exact import graph rather than the trace (which
+      over-reads: a comment naming scripts/startup.mjs is in most of them),
+      open the lab (`scripts/lab.mjs`) and nothing else: they start no vite,
+      name no dist/, run no build, and every entry they bundle was read. A
+      check this cannot place is a site check, so what it cannot see runs.
+  On 2026-11-01 that was 68 of the 96 Mac checks reading only the lab's
+  bundles, and 28 opening the app; a change to the desks or the phone's
+  panels is read by those 28 and by none of the 68.
+*/
+export const SERVES_APP = /node_modules\/\.bin\/vite|['"`]vite['"`]|\bvite (?:preview|dev)\b|npm run (?:dev|preview)\b/;
+export async function checkReads(man, scripts, esbuild, root = ROOT) {
+  const text = (f) => { try { return fs.readFileSync(path.join(root, f), 'utf8'); } catch { return ''; } };
+  const traced = new Map(man.checks.map((c) => [c, trace(entryFiles(c.run, scripts), root)]));
+  const bundled = new Set();
+  for (const t of traced.values()) for (const f of t) if (/\.(mjs|js|ts|tsx)$/.test(f) && (/^src\//.test(f) || /^scripts\/.*\.(ts|mjs|js)$/.test(f))) bundled.add(f);
+  const nodeMeta = await metafilesOf(esbuild, [...bundled].filter((f) => f.startsWith('scripts/') && !f.endsWith('.ts')), 'node', root);
+  const webMeta = await metafilesOf(esbuild, [...bundled].filter((f) => f.startsWith('src/') || f.endsWith('.ts')), 'browser', root);
+  const metaOf = (f) => nodeMeta.get(f) ?? webMeta.get(f);
+  const out = new Map();
+  for (const c of man.checks) {
+    const r = new Set(traced.get(c));
+    let unread = false;
+    for (const f of traced.get(c)) {
+      if (!bundled.has(f)) continue;
+      const meta = metaOf(f);
+      if (!meta) unread = true;
+      else for (const i of meta) r.add(i);
+    }
+    const files = [...traced.get(c)].filter((f) => /^(scripts|server)\//.test(f));
+    const own = new Set();
+    for (const e of entryFiles(c.run, scripts)) {
+      own.add(e);
+      const meta = metaOf(e);
+      if (!meta && /\.(mjs|js|ts)$/.test(e)) unread = true;
+      for (const i of meta ?? []) if (/^(scripts|server)\//.test(i)) own.add(i);
+    }
+    const cmds = [c.run, ...[...npmScriptsOf(c.run, scripts)].map((n) => scripts[n] ?? '')].join('\n');
+    const whole = unread || !own.has('scripts/lab.mjs') || /\bnpm run build\b|\bvite build\b/.test(cmds)
+      || [...own].some((f) => SERVES_APP.test(text(f)) || /['"`/]dist['"`/]/.test(text(f)));
+    out.set(c, { reads: r, files, app: files.some((f) => SERVES_APP.test(text(f))), site: whole });
+  }
+  return out;
+}
+
+// esbuild, from the repository's packages or, in the reach job, which runs
+// before `npm ci`, from the copy it installs alone (ESBUILD_MODULE). Null when
+// neither loads: the selection then takes every Mac check for a site file.
+export async function loadEsbuild() {
+  const specs = [process.env.ESBUILD_MODULE && pathToFileURL(process.env.ESBUILD_MODULE).href, 'esbuild'].filter(Boolean);
+  for (const s of specs) {
+    try { return await import(s); } catch { /* the next */ }
+  }
+  return null;
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);

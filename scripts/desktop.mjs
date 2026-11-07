@@ -98,6 +98,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signLicenseKey } from '../server/license-key.js';
 import { systemAudioLine } from './desktop-audio.mjs';
+import { syphonLine } from './desktop-syphon.mjs';
 import { startRtmpListener, summarize } from './rtmpListener.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -725,6 +726,9 @@ try {
   // caps frames drawn in the app at 60 Hz through DrawGate, and holds the
   // machine's opening rung.
   await systemAudioLine({ page, electronApp, check, sleep, createSocket });
+
+  // Syphon out (13.2): the add-on loads and publishes; owed until it ships (scripts/desktop-syphon.mjs).
+  await syphonLine({ electronApp, check, skip, sleep });
 
   // The ladder's governor exists once the renderer is up; the line below
   // fails a show without one, so wait for it to be there before the toggle

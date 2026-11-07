@@ -94,6 +94,7 @@ jobs:
       shards: ${{ steps.reach.outputs.shards }}
       parts: ${{ steps.reach.outputs.parts }}
       only: ${{ steps.reach.outputs.only }}
+      maconly: ${{ steps.reach.outputs.maconly }}
     steps:
       # Two deep: the pull request's merge commit and the base it was merged
       # into, which is the whole of what the PR changes.
@@ -107,9 +108,22 @@ jobs:
       # job leaves a "carried" notice naming the run, which the deploy gate
       # follows back to it. The earlier runs are read with this job's token
       # (the repository's default is read for every scope).
+      # esbuild alone, at the lockfile's version, for what each check imports
+      # (PLAN.md 19ak-2): a change to src/ or public/ runs only the Mac checks
+      # that open the app and the lab checks whose bundles import it. A few
+      # seconds, where `npm ci` would be most of a minute before any job could
+      # start. If it fails, reach.mjs finds no esbuild and runs every Mac
+      # check for such a change, as before; it never makes this job red.
+      - name: esbuild, to read what each check imports
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          v=$(node -p "require('./package-lock.json').packages['node_modules/esbuild'].version")
+          npm install --prefix "$RUNNER_TEMP/esbuild" --no-audit --no-fund --no-save "esbuild@$v"
       - name: Which files reach a Mac shard
         id: reach
         env:
+          ESBUILD_MODULE: ${{ runner.temp }}/esbuild/node_modules/esbuild/lib/main.js
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
@@ -162,6 +176,9 @@ jobs:
     # iPhone app's remote on, went to `browser2` (PLAN 19k-9), cut where a
     # check builds `dist/` itself, since several after it serve the site
     # without building and would otherwise measure a missing one.
+    # Then widedials (#646, 3:40) joined lab after the soap left it, and lab was
+    # cancelled at the limit twice on #658's run with main merged, in holeline
+    # at 25:00 (it ran 23:23 before). widedials went to lab3, which ran 11:08.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -365,9 +382,35 @@ jobs:
   # setup is about half a minute (checkout, Node, npm ci, Chromium, the
   # build), so a run costs that much more Mac time and needs five runners
   # at once rather than four, but holds each for less.
+  # The Mac waits for the typecheck (PLAN.md 19ak-3c). A PR that does not
+  # compile used to take five Mac runners for the length of its first red
+  # check, and every check after it ran as well; on ubuntu `tsc --noEmit` is
+  # about half a minute after `npm ci`, beside `reach`, which the Mac waits for
+  # anyway. It is a gate, not a check: Measure's "The typecheck"
+  # (`scripts/checks.json`) is the one that reports, with its backtick hint,
+  # and this job runs the compiler itself so that no step here runs a
+  # manifest check's script (`npm run checks`). When it is red the Mac
+  # shards are skipped and `WebGPU (macOS)` is red with it. Building the app
+  # once here for all five shards was measured and left: `dist/` is 116 MB
+  # (the films in public/), whose upload and five downloads would cost more
+  # than the 15 s build each shard does now.
+  typecheck:
+    name: Compiles, before the Mac
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
+
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
-    needs: reach
+    needs: [reach, typecheck]
     if: ${{ needs.reach.outputs.mac == 'true' }}
     # GitHub's Mac, or the owner's (PLAN.md 19ah) for a shard `deploy.yml`'s
     # probe named. The repository is public, so a self-hosted runner must
@@ -428,8 +471,12 @@ jobs:
         timeout-minutes: 5
         run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
       # The shard's checks, from scripts/checks.json, as Measure's are.
+      # On a PR whose site files only some Mac checks read, those checks by
+      # name (PLAN.md 19ak-2); empty, every check of the shard.
       - name: The checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
 
   # The one name the rest of the repository knows this stage by.

@@ -37,6 +37,7 @@ comments, which moved with it.
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
 | `useRemote` | the phone remote's link, both ways |
+| `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
 | `useSongScore` | a song's show while it plays, and its score |
 | `useSongRendering` | a song rendered to a film |
 | `useControllers` | MIDI, the gamepad, the projector window |

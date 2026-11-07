@@ -7,7 +7,9 @@
     "one), never a new step in the workflow. `why` is the step's old comment: what the",
     "check measures and why it is where it is. `always`, on a Measure check, keeps it in",
     "the selection when a PR's diff reaches only some Measure checks (PLAN.md 19k-4): the",
-    "cheap ones that hold the rest. `scripts/checks.mjs` holds the rules."
+    "cheap ones that hold the rest. `quarantine` (PLAN.md 19ak-1) lists a check's",
+    "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
+    "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
   "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
@@ -408,12 +410,14 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs",
+      "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
-        "and nothing looked."
+        "and nothing looked. And the lines written ahead of Wave 4",
+        "(scripts/rungs-owed.mjs): 14c-4k, 14c-governor, 14b-120, 14c-readout and",
+        "H2c-10, owed until each ships."
       ]
     },
     {
@@ -528,6 +532,18 @@
         "A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):",
         "whole fades driven at the show timer's 16 ms, no step past the curve's",
         "steepest, the turn-round, the hand, the cut, and the pads wired."
+      ]
+    },
+    {
+      "name": "The show's timers when nobody is looking",
+      "shard": "logic",
+      "run": "npm run timers -- --owed=hidden,gamepad",
+      "why": [
+        "A look fade with the window covered, Chrome's one-a-second throttle",
+        "modelled in node and the ear's worker tick driven by hand (PLAN 14a-timers),",
+        "and useGamepad's timers with no pad, the real hook on a stand-in React",
+        "(14j-gamepad). Both owed until their builds; the visible fade's line holds",
+        "on main and keeps a pump from doubling a fade's writes."
       ]
     },
     {
@@ -922,14 +938,17 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
         "PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it",
         "makes a dispatch, counted in the page by Chromium's own heap sampler.",
         "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
-        "sits here rather than in the Mac queue."
+        "sits here rather than in the Mac queue. And the multigrid's own lines",
+        "(scripts/encode-solve.mjs): the residual a step leaves, read through the",
+        "solver's restriction kernel against main's, which holds on main; and the",
+        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships."
       ]
     },
     {
@@ -1026,6 +1045,21 @@
         "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
         "page in Chromium and requests a WebGPU adapter before running the solver,",
         "and checks.yml installs Chromium only on the browser, lab and lab2 parts."
+      ]
+    },
+    {
+      "name": "The dials held in the solver reach their tops",
+      "shard": "lab3",
+      "run": "npm run widedials",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-2: every clamp the solver puts on Swirl, Dye Weight, Heat Spread,",
+        "Pushes Dye, Drop Height, Background Loop, Glass Smear and Momentum's current",
+        "admits the dial's top, no look moved, and on the lab's 128² plate each top",
+        "does more than the old one, finite and conserving. 2.5 minutes on software",
+        "WebGPU (cloud, 2026-10-31), so on Linux's lab shards rather than a Mac's.",
+        "In lab3 since #658: its 3:40 in lab put that part past its 25 minutes on",
+        "main's merge of #646 (cancelled twice in holeline, after it); lab3 ran 11."
       ]
     },
     {
@@ -1355,6 +1389,21 @@
         "Draw, the renders, the input picker, the Source, following a song) lean on",
         "this build or the Live Show's or the shelf's, all in this part. The browser",
         "part ran 23:43 of its 25 minutes with all 29 (#650's run, 2026-11-01)."
+      ]
+    },
+    {
+      "name": "OSC out reaches a VJ app",
+      "shard": "browser2",
+      "run": "npm run oscout",
+      "why": [
+        "OSC out (PLAN.md 13.5-osc; scripts/oscout.mjs): the writer against bytes",
+        "laid out by hand and read by a decoder written in the check, the feed's",
+        "numbers against a plate worked by hand, the page's and the server's",
+        "target rule against each other, the real show server with a socket where",
+        "Resolume would be (a bundle a report, the beat at once and released, a",
+        "phone refused, Pro only), then the built app's switch in Settings, its",
+        "own reports, and the switch remembered over a reload. No GPU: the plate's",
+        "own beat is the fifth Mac shard's line."
       ]
     },
     {
@@ -2383,6 +2432,7 @@
       "name": "The show opens without stopping",
       "shard": "open",
       "run": "npm run startup",
+      "quarantine": [{ "line": "and it is moving for good no later than the old way was", "plan": "19aa-7", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "The show opens without stopping (scripts/startup.mjs): what the look",
         "opens with is built before it opens and the rest behind it, none is",
@@ -2405,6 +2455,8 @@
         "The pigment's grain inside the dye, not at its edge: in every look the",
         "grain moves almost no pixel of a dye edge by a fleck's worth (it made",
         "the edges a dithered fringe, \"very digital\"), and the bodies keep it.",
+        "Line 4 asks the same of the back plate alone on every lamp look, and",
+        "that its grain is pigment, T^grain, as the front's is (PLAN 38h-4).",
         "In the open shard (the plate shard is near its timeout), and after the",
         "opening's check, so a timing check never follows four minutes of",
         "renders: with this one before it, startup's first frame waited 2.27 s",
@@ -2530,6 +2582,7 @@
       "name": "Every tool does what it says",
       "shard": "tools",
       "run": "node scripts/tools.mjs",
+      "quarantine": [{ "line": "and keeps it rather than erasing it", "plan": "19aj-1", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "Every other tool in the hand (asked for: \"check all of the tools to",
         "make sure they work in expected ways\"): each does what it says and",
@@ -2601,6 +2654,17 @@
       ]
     },
     {
+      "name": "OSC out carries the plate's beat",
+      "shard": "fifth",
+      "run": "npm run oscout",
+      "why": [
+        "The same check as Measure's (PLAN.md 13.5-osc), on Metal, where the plate",
+        "runs: its reports carry its own layers, and a beat the plate presses on",
+        "reaches the VJ app's socket as it lands. SwiftShader's plate presses on no",
+        "kick, so that line is skipped there and said."
+      ]
+    },
+    {
       "name": "A drop lands only where it is dropped",
       "shard": "fifth",
       "run": "node scripts/mirror.mjs",
@@ -2645,6 +2709,7 @@
       "name": "The wall",
       "shard": "tools",
       "run": "npm run wall -- --owed=quarter,red,rung",
+      "quarantine": [{ "line": "a circle leaves the corners of its quad dark", "plan": "19aj-2", "since": "2026-11-01", "until": "2026-11-15" }],
       "why": [
         "And the projector's geometry, on a GPU: which pixels are black, and",
         "how many times a second the whole screen is allowed to change.",

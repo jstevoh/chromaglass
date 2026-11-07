@@ -41,6 +41,7 @@ import { LEARNABLE_SETTINGS, curveOf, settingKeyOf, valueAt, travelOf, handValue
 import { readSetting } from '../src/lib/readout';
 import { QualityGovernor, STEP_RATES } from '../src/lib/governor';
 import { DrawGate } from '../src/lib/drawGate';
+import { owedLines } from './rungs-owed.mjs';
 
 const checks = [];
 const check = (what, ok, detail = '') => checks.push([what, ok, detail]);
@@ -897,6 +898,9 @@ for (const devicePx of [1, 1.5, 2, 3]) {
   }
   globalThis.window = saved;
 }
+
+// The lines written ahead of their builds (scripts/rungs-owed.mjs says which and why).
+await owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW, QualityGovernor, DrawGate });
 
 let failed = 0;
 for (const [what, ok, detail] of checks) {

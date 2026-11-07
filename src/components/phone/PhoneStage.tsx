@@ -23,6 +23,8 @@ import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { OscOutRow } from '../ui/OscOutRow';
+import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -230,6 +232,9 @@ export interface PhoneStageProps {
   onTap: () => void;
   /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
   onLink?: (on: boolean) => void;
+  /** OSC out at the show server (PLAN.md 13.5-osc), the desk's own row at a phone's size; null until a server is there. */
+  oscOut?: OscOutLabel | null;
+  onOscOut?: (on: boolean, target?: string) => boolean;
   readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
@@ -1056,6 +1061,9 @@ export function PhoneStage(p: PhoneStageProps) {
               </button>
               <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
             </div>
+          )}
+          {p.oscOut && p.onOscOut && (
+            <div className="mt-2"><OscOutRow oscOut={p.oscOut} onOscOut={p.onOscOut} touch testId="phone-osc-out" /></div>
           )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
