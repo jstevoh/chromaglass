@@ -145,7 +145,7 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      the `CGPC` audio frame, the exports the check imports), and `npm run dawbridge`, a
      fake plugin against the real show server and the built app, red on main with its
      lines owed as `app` and `plugin`.
-   - **13.7a** (the app's half, Antigravity's lane): `server/dawBridge.js` beside
+   - **13.7a** (the app's half, Antigravity's lane, in flight): `server/dawBridge.js` beside
      `abletonLink.js`, Pro only; `src/lib/dawBridge.ts`; slots in MIDI learn's map
      (kind `'slot'`), the DAW as a tempo source ranked under Link, and the ear's source
      "DAW". Done when it takes `app` out of `--owed` in `scripts/checks.json` and the
