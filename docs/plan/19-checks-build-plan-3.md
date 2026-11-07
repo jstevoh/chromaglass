@@ -38,29 +38,24 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   --check 'holding the Press lifts nothing'` a week after merge.
 - **19aa-13. `renders` and `squeeze` hold a window until it has the frames or steps its
   line asks (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-13.
-- **19aa-14. `renders`' "the App renders for its clock and no more" reds on GitHub's Macs:
-  commits outrun renders (found 2026-11-07).** Six `open` shard runs on five PRs read the
-  line at 1.6 to 2.3 commits a second against a bar of 1.5, with plenty of frames (85 to
-  110 a window) and the band lines green beside them: "no sound, the Perform desk" on #435
-  (10-30, 1.3 renders/s and 2.3 commits/s), #595 (2.0) and #670 (2.3); "a gamepad stick
-  sweeping" on #605 (1.6); "a gamepad trigger held" on #640 and #669 (1.7). Commits above
-  renders means something besides the App commits about once a second in a 3 s window; the
-  earlier sighting is 19ad-6. Find which component commits (React's devtools hook can name
-  the fiber `onCommitFiberRoot` was given) before any bar moves. Also seen: `open()` waits
-  up to 30 s for one second of fifteen frames, so a page on a Mac drawing under fifteen
-  waits the full 30 s (it prints "never drew fifteen frames"; not yet counted in the logs);
-  it could wait for the plate to draw at all instead, now that each window holds itself
-  open for its frames.
-- **19aa-15. A pull request's Measure selection runs a `browser2` check without the build
-  it leans on (found 2026-11-07).** `browser2`'s later checks (the Mixer, the phone link,
-  Draw, the renders, the input picker, the Source, following a song) serve `dist/` that the
-  iPhone app's remote, the Live Show's or the shelf's check built before them. `selectMeasure`
-  (scripts/checks.mjs, 19k-4) picks only the entries a diff reaches, so #673, which touched
-  `renders.mjs` alone, ran it with no `dist/` and it was red after 1 s. `renders` now builds
-  when `dist/` is missing (19aa-13's PR); the others still have the trap. The general fix
-  is in the selection: an entry that serves the site without building should name it (an
-  entry field such as `"serves": "dist"`) and the part should build once when such an entry
-  is picked and its builder is not.
+- **19aa-14. `renders`' "the App renders for its clock and no more": the dye bottle
+  committed on its own (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-14.
+- **19aa-14b. `open()` waits up to 30 s for one second of fifteen frames (found
+  2026-11-07, open).** A page on a Mac drawing under fifteen a second waits the full 30 s
+  (it prints "never drew fifteen frames"; not yet counted in the logs). Now that each
+  window holds itself open for its 45 frames (19aa-13), it could wait only for the plate
+  to draw at all.
+- **19aa-14c. The cloud's software WebGPU loses the app's device every nine seconds or so
+  (found 2026-11-07, open).** `PW_WEBGPU=1` with the app (not the lab), under Xvfb: "WebGPU
+  device lost: destroyed" with no `destroy()` call from the page (a wrapped
+  `GPUDevice.prototype.destroy` never ran), then "A valid external Instance reference no
+  longer exists" and a `requestAdapter` that returns null for two seconds. Each loss and
+  recovery commits the plate's own `glLost`/`glEpoch` state, so `renders` with a plate
+  read there is red for that alone (1.3 renders, 2.0 commits a second). Probably
+  SwiftShader's GPU process going down under the plate's work at that rate; find which,
+  before any app check leans on software WebGPU for its commits.
+- **19aa-15. A pull request's Measure part builds the site first when a full run would
+  have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s

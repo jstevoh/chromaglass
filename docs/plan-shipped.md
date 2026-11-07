@@ -585,6 +585,40 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.5-link-one, -transport, -gate, -rescan, -menu. Link's five follow-ups (2026-11-01)
+
+The owner asked on 2026-11-01 for whatever Ableton work was left; these five were the
+follow-ups 13.5-link wrote down when it shipped, done as one PR.
+
+- **13.5-link-one.** `BarGrid.tell(beatAt, period, place, time)` takes the bar from a
+  source that knows it; while told (and `TOLD_HOLD`, a second, after), `now` and
+  `placeAt` are Link's, and the ear keeps listening underneath. The frame loop hands it
+  the tempo reading's `bar`, carried from the page's milliseconds to the grid's seconds
+  by how far apart the two clocks stand that frame. `npm run downbeat`, on the "band 110"
+  song with Link's one put two beats from the song's own: 4/4 of the first bar's beats
+  and 124/124 after on Link's place (the ear alone put 0 there), and 77/77 back to the
+  ear's own count a second and a half after Link stops.
+- **13.5-link-transport.** `TempoSource.linkReading` hands back the transport's edge
+  (`'start'`, `'stop'` or null, and never on joining or leaving a session); with
+  **Play/Stop** on beside Link (desk and phone, remembered on the machine, off by
+  default), a stop pauses a running Sequence and a start resumes only one that Link
+  paused. The plan said "the way MIDI Stop does", but MIDI Stop only hands the tempo
+  back; nothing paused the Sequence before this.
+- **13.5-link-gate.** `setLink` refuses below Pro and says `locked`, which the switch
+  shows as "part of Pro"; a tier that drops while Link is on leaves the session.
+  `npm run tiers` 4d: Pro on, Home and none and a removed key locked, and the Home phase
+  after a Pro one that left Link on finds it already off.
+- **13.5-link-rescan.** `startLink` reads the interfaces every thirty seconds (the
+  library's own period): new addresses get a socket and join the group, gone ones close.
+  `npm run link` part 6: with no interface up nobody is found; loopback "comes up" and the
+  session is found 100 ms later, with no switching.
+- **13.5-link-menu.** Show → Ableton Link (Pro) in the Mac app. It asks the page (which
+  owns the remembered switch) rather than the server, and its tick is the server's state
+  (`onLinkChange`).
+
+**Owed:** the owner's Live sitting (`docs/judging.md` §95) now also covers Live's
+downbeat on the plate's one, Play/Stop on a running Sequence, and the menu item.
+
 ### 13.5-osc. OSC out to a VJ app (2026-11-01)
 
 Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second
@@ -9683,6 +9717,45 @@ helpers that name none. `prepush-reviewer` and `check-skeptic` name opus (they j
   bar moved: the 45 frames and 200 steps are still asked, every ratio is over the window's
   frames, squeeze's counts are rates over its own seconds; a plate under 4.5 frames or steps
   a second still fills no window and is red. Each line prints how long its windows took.
+
+#### 19aa-14. `renders`' quiet Perform desk committed more than the App rendered
+
+- **19aa-14. The picked dye bottle moves its own level and never commits for it (shipped
+  2026-11-07).** Six `open` shard runs on five PRs read "the App renders for its clock and
+  no more" at 1.6 to 2.3 commits a second for 1.0 to 1.3 App renders, with 85 to 142
+  frames a window: #595 and #670 (the quiet Perform desk's second window, 2.0 and 2.3),
+  #605 (phone, a gamepad stick, 1.6), #640 and #669 (a gamepad trigger, 1.7), and an
+  older #435. Never where no plate draws. The devtools hook in `renders` now names each
+  commit's topmost components that rendered (their prop names and first element, which
+  survive minifying) and counts GPU devices lost, printed beside any commits ceiling that
+  reads more commits than renders. The culprit was `LiveBottle`, the bottle in hand on
+  the desk's shelf and the phone's Dye button: its level, polled from the plate's mean
+  density every 0.4 s, was React state, so each move of a twentieth was a commit of its
+  own and React's state hook added one more on the next poll that set the same value (its
+  eager bail-out is skipped while the fiber still carries the last update's lane).
+  `shownRoom`'s hysteresis (October) had stopped a reading at rest flipping on a rounding
+  boundary, but a plate whose mean drifts or hunts by more than the 0.004 it was measured
+  against still crosses a step now and then. Now the level lives in a ref and the poll
+  writes the liquid's top, a clear liquid's surface line and `data-level` on the SVG, as
+  the VU needle does. A new `renders` phase makes the reading move where no plate draws
+  (the App's handle on the plate answers 0.30 and 0.40 by turns every 0.7 s): "the bottle
+  in hand: it shows a Dye Budget reading that moves" (9 levels in 6 s, both screens) and
+  "and the page commits for the App's clock and no more while it moves", which read 2.7
+  and 3.0 commits a second with main's bottle, every extra one named as the bottle, and
+  1.0 with this one. Found along the way: 19aa-14b, 19aa-14c.
+
+#### 19aa-15. A pull request's Measure part ran checks without the build they lean on
+
+- **19aa-15. A part run on a selection builds the site first when a full run would have
+  (shipped 2026-11-07).** `browser2`'s later checks (the Mixer, the phone link, Draw, the
+  input picker, the Source, following a song) serve the `dist/` that the iPhone remote's,
+  the Live Show's or the shelf's `vite build` made before them in a full run; a pull request
+  runs only the checks its diff reaches (19k-4), and #673 ran the renders with nothing
+  built. `runShard` now builds once, first, when a picked check had a builder before it
+  in the manifest's order and no picked check before it builds (`buildFirst`, read from
+  the commands through their npm scripts, so a new entry needs no field). `npm run checks`
+  holds it with five lines; by hand, with `dist/` removed and only the Mixer picked, the
+  part built the site and the Mixer read 19/19.
 
 #### 19c. Checks that can pass without measuring, and checks nothing runs
 

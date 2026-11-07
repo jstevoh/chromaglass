@@ -184,6 +184,17 @@ export function useRemote({
   };
   const padPictureRef = useRef<PadPictureSender | null>(null);
   const linkAskedRef = useRef(-Infinity);
+  /*
+    Live's play and stop, when the operator asked for them (PLAN.md
+    13.5-link-transport): a stop pauses a running Sequence, and a start
+    resumes only a Sequence that Link paused, so Live never starts a show
+    nobody started. The newest sequencer is read through a ref, because a
+    reading twenty times a second is no reason to rebuild the handler.
+  */
+  const sequencerRef = useRef(sequencer);
+  sequencerRef.current = sequencer;
+  const linkPausedRef = useRef(false);
+  const linkPausedIdRef = useRef<string | null>(null);
   const remoteLinkRef = useRef<((m: RemoteMessage) => void) | null>(null);
 
   const remoteLink = useRemoteLink({
@@ -305,13 +316,23 @@ export function useRemote({
         case 'link': {
           const t = tempoRef.current;
           if (!t) break;
-          t.linkReading(performance.now(), message);
+          const edge = t.linkReading(performance.now(), message);
+          const seq = sequencerRef.current;
+          // A Sequence played, stopped or switched by hand since Link paused
+          // it is the operator's again: Live's next play must not start it.
+          if (linkPausedRef.current && (seq.status.running || seq.status.sequenceId !== linkPausedIdRef.current)) linkPausedRef.current = false;
+          if (edge && t.linkTransport) {
+            if (edge === 'stop' && seq.status.running) { linkPausedRef.current = true; linkPausedIdRef.current = seq.status.sequenceId; seq.pause(); }
+            else if (edge === 'start' && linkPausedRef.current) { linkPausedRef.current = false; seq.play(); }
+          }
+          if (edge === 'stop' && !t.linkTransport) linkPausedRef.current = false;
           // The operator wanted Link on and the server says it is off: a server
           // just started (the Mac app relaunches it) or this page just
           // connected. Asked again at most every two seconds, so a server that
           // will not switch it on is not asked twenty times a second.
           const at = performance.now();
-          if (t.linkWanted && !message.on && at - linkAskedRef.current > 2000) {
+          // Below Pro (`locked`) every ten seconds, so a key filed later still opens it.
+          if (t.linkWanted && !message.on && at - linkAskedRef.current > (message.locked ? 10000 : 2000)) {
             linkAskedRef.current = at;
             remoteLinkRef.current?.({ type: 'link-enable', on: true });
           }

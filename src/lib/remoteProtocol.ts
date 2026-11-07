@@ -148,7 +148,7 @@ export type RemoteMessage =
    * moment of sending, so its fraction is the beat's phase and its value modulo
    * four is the bar's (beat zero is every peer's bar line); null while no session is joined.
    */
-  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean }
+  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean; locked?: boolean }
   /** Display → relay: switch Link on or off. The relay takes it from the laptop's own page only. */
   | { type: 'link-enable'; on: boolean }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */

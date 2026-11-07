@@ -2167,6 +2167,14 @@ from the same reading of the protocol, so only Live can say the two agree.
 6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
+7. (13.5-link-one, 2026-11-01) A look with Accent the One up: the plate's heaviest kick lands on
+   Live's bar line from the first bar, not after a few bars of listening, also when the song's
+   own downbeat sounds weak.
+8. (13.5-link-transport) Start a Sequence, switch **Play/Stop** on beside Link, stop Live: the
+   Sequence pauses; play Live: it resumes. With Play/Stop off, Live's stop changes nothing.
+9. (13.5-link-menu) Show → **Ableton Link (Pro)** in the Mac app switches Link as the button does,
+   and its tick follows the button. (13.5-link-rescan) Switch Link on with the Wi-Fi off, then turn
+   the Wi-Fi on: Live on another machine is found within half a minute.
 
 ## 96. Colour that answers the music (PLAN 25i)
 
