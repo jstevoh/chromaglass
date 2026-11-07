@@ -447,3 +447,5 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
   `checkReads` now gives `site` from esbuild's import graph; quick should use it for
   `here`, once a session has timed the lab checks on software WebGPU.
+- **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
+  children run as a first attempt (docs/plan-shipped.md, 19ak).
