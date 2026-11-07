@@ -24,6 +24,7 @@ holds the three longest:
 | `PourSections.tsx` | `interaction`, `liquids` |
 | `StageSections.tsx` | `projectors`, `mapping`, `mark`, `simulation`, `layers` |
 | `FeedbackPane.tsx` | not a section: Feedback, the rail's last row under the groups, and the phone's More → Feedback sheet (PLAN 39a) |
+| `GpuPassReadout.tsx` | not a section: `?debug`'s GPU pass list under the Simulation section's frame split (PLAN 14ab-16) |
 | `controls.tsx` | `Slider` and `PinChips` (with `PinContext`), which every section draws |
 | `patchLists.ts` | what a patch listens to and is plugged into |
 | `props.ts` | `SettingsPanelProps` and `SectionCtx` |
