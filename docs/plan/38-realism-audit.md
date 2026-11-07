@@ -533,7 +533,12 @@ written first. Line numbers are as read on main at d07ac31.
       glycerine (about 1000 mm²/s, against 22 at Thickness 0.45) lets the glass down in
       1.4 s where Stefan's τ ∝ μ says about a minute. Give the cover the plate's
       h³-weighted mean of the species' ν (what the thin solve's mobility already reads).
-      Found by `npm run flush` (38r-5), whose glycerine settles at the dial's pace.
+      Found by `npm run flush` (38r-5), whose glycerine settles at the dial's pace. Two
+      consequences for that check when this lands: its SETTLE is computed from the dial's ν
+      and must take the glycerine's, or its glycerine lines go red; and the glycerine flush
+      went from a quarter of the dish to a fifth because water fingered to 0.8 of the
+      radius through the too-fast settle (mean front about 0.52), so re-run the quarter
+      then and go back to it if the fingers stay inside.
   - ~~**38r-6**~~ `thingap` 5 read the Spin's one-cell mask edge, not the solve's residual:
     Spin's stir mask is blurred [1 4 1] over a cell's neighbours (#641). Story in §38r.
   - ~~**38r-7**~~ The rhythm sheet at 2 mm: its waits are on the film's own clock (#641).

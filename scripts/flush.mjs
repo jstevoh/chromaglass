@@ -26,6 +26,8 @@
  *      the carry's spreading of the ring's width does not move it. With
  *      no volume a pour of water lays nothing at all (the plate before
  *      18c), and the ring drifts by less than a hundredth of that.
+ *      And the first of those pours lifts the floating glass by its volume
+ *      over the dish, Q/A, less a step of settle (0.95 to 1).
  *   2. Glycerine poured as volume is all accounted for: the species' total
  *      is the sum of the pours' shares (f·πr²/2 a dome), to 1%, and the
  *      flow each made has carried it off its disc: no cell is fuller than
@@ -196,14 +198,17 @@ try {
       lab.flush();
       await lab.step(1, STILL);
       const before = await ringR2();
-      let V = 0;
+      let V = 0, lift = null;
       for (let k = 0; k < POURS; k++) {
+        const h = lab.coverMetres();
         V += pourOf(RP, TAKE);
         lab.addSpecies(0.5, 0.5, RP, TAKE, 'water', volume);
         await lab.step(1, STILL);
+        // The first pour's lift of the glass, against its volume spread over the dish (Q/A), a step of settle after.
+        if (k === 0) lift = { rose: lab.coverMetres() - h, want: pourOf(RP, TAKE) * H0 / (Math.PI * 0.25) };
       }
       await lab.step(SETTLE, STILL);
-      out[volume ? 'ring' : 'ringFlat'] = { before, after: await ringR2(), V };
+      out[volume ? 'ring' : 'ringFlat'] = { before, after: await ringR2(), V, lift };
     }
     // 2. Glycerine poured as volume, into clear liquid, half a column a pour.
     {
@@ -272,6 +277,18 @@ try {
   const f = (x, d = 3) => (Number.isFinite(x) ? x.toFixed(d) : String(x));
   const ring = r.ring, flat = r.ringFlat;
   const grew = ring.after - ring.before, want = ring.V / Math.PI, flatGrew = flat.after - flat.before;
+  /*
+    The settle hides how far a pour lifted the glass: whatever the lift, the
+    same volume leaves over the rim in the end (check-skeptic, 38r-5). So the
+    first pour's lift is read itself: a dome of V lifts the glass by V/A, less
+    one step of the Stefan settle (about 1% at the dish's τ of 1.4 s), and a
+    pour that never reached the cover's ledger, or reached it at the wrong
+    gap, reads 0 or a different factor.
+  */
+  const lf = ring.lift;
+  check('a pour under the glass lifts it by its volume over the dish',
+    lf && lf.rose > 0.95 * lf.want && lf.rose < 1.001 * lf.want,
+    lf ? `${(lf.rose * 1e6).toFixed(3)} µm for ${(lf.want * 1e6).toFixed(3)} µm of Q/A (${f(lf.rose / lf.want, 4)})` : 'not read');
   check('water poured at the middle pushes a ring of colour out by the volume poured',
     Math.abs(grew / want - 1) < 0.05 && Math.abs(flatGrew) < 0.01 * want,
     `mean r² ${f(ring.before, 5)} → ${f(ring.after, 5)}, grew ${f(grew, 5)} against V/π ${f(want, 5)} (${f(grew / want)}); with no volume a pour of water lays nothing, as before 18c, and the ring drifts ${f(flatGrew, 5)}`);
