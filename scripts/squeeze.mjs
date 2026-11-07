@@ -201,12 +201,29 @@ try {
     none to ask about. On the tapped beat a 12 s window holds about two
     dozen (30 at 150 bpm); the hold stays as the floor under a plate that stalls.
   */
+  /*
+    And held open, the same way and under the same 45 s, until the plate has
+    stepped STEPS_ASKED times (PLAN 19aa-13). The line below asks 200 steps
+    of each window so the squeeze had a plate stepping under its kicks to
+    press, and a stalled one is red; in a fixed 12 s that also asked about
+    seventeen steps a second, which no line claims. On #656's fifth shard
+    a GitHub Mac read 185 and 258 steps, then 187 and 329 on the re-run,
+    stepping 11 to 24 times a second, and the line went red twice with
+    every other line green. The 200 is still asked
+    and every other line is a rate over the window's own seconds, so a
+    longer window changes no bar; a plate under 4.5 steps a second never
+    fills one and is red as before. The seconds each window took are
+    printed in the line. Only where the line is asked (SQUEEZE_GPU=1): a
+    software plate that cannot step 200 times skips it below, and holding
+    its windows to 45 s would only slow the run.
+  */
+  const STEPS_ASKED = 200;
   const window_ = async (ms) => {
     const a = await read();
     const t0 = Date.now();
     await page.waitForTimeout(ms);
     let b = await read();
-    while (b.kicks - a.kicks < 6 && Date.now() - t0 < 45_000) {
+    while ((b.kicks - a.kicks < 6 || (NEED_GPU && b.steps - a.steps < STEPS_ASKED)) && Date.now() - t0 < 45_000) {
       await page.waitForTimeout(1000);
       b = await read();
     }
@@ -269,10 +286,10 @@ try {
     // unknown look falls back to a random one, and a stalled plate presses
     // nothing while the kicks, counted a frame, go on.
     check('on Bass Drop at Beat Squeeze 0.8, then at 0, the plate stepping throughout',
-      on.squeeze === 0.8 && off.squeeze === 0 && on.steps >= 200 && off.steps >= 200,
-      `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps`);
+      on.squeeze === 0.8 && off.squeeze === 0 && on.steps >= STEPS_ASKED && off.steps >= STEPS_ASKED,
+      `Beat Squeeze ${on.squeeze} then ${off.squeeze}; ${on.steps} and ${off.steps} steps in ${on.seconds.toFixed(1)} and ${off.seconds.toFixed(1)} s`);
     // Which seconds lost the steps, when they are short: the climb, a stall, or the squeeze's own cost.
-    if (on.steps < 200 || off.steps < 200) showTimeline();
+    if (on.steps < STEPS_ASKED || off.steps < STEPS_ASKED) showTimeline();
     /*
       At the tapped 150 bpm the clock beats every 400 ms, and still does
       after both windows: tapped, the tempo stays until it is cleared. (Its

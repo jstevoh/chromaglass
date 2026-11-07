@@ -9663,6 +9663,27 @@ helpers that name none. `prepush-reviewer` and `check-skeptic` name opus (they j
   ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
   touched (#441, #474 and the #402 finish thread are in it).
 
+#### 19aa-13. `renders` and `squeeze` timed their windows and asked a rate no line claims
+
+- **19aa-13. A window held until it has the frames or steps its line asks (shipped
+  2026-11-07).** `renders` measured each window for a fixed 3 s, and the lines that read
+  frames ask 45 of them, so on the Mac every such line also asked fifteen frames a second.
+  GitHub's Macs draw that page at 11 to 19, and "the band: the ear is reading" with "the
+  plate hears a new reading" went red with their ratios green: 16 Mac reds in `npm run
+  flakes`, never on Linux; #435 (11-01), #546 (10-28, 10-29) and #645 (11-01) at 40 to 43
+  frames in one phone window with readings on 0.98 to 1.00 of the frames, and #656 twice
+  (laptop 18.3 readings a second for 11.3 frames a second). Now `heldOpen` keeps a window
+  open past its three seconds until the plate has drawn 45 frames, at most 10 s; the band,
+  fader, quiet-page and gamepad windows all take it. The counts with a ceiling (renders,
+  commits, what React is told, the desk's moves) are still read over the first three
+  seconds, so a burst is not spread over a longer window (check-skeptic). `squeeze`'s window was a fixed 12 s
+  against 200 steps (about seventeen a second); #656's fifth shard read 185 and 258, then
+  187 and 329, every other line green. It is now held, under its existing 45 s cap, until
+  200 steps as well as six kicks (with `SQUEEZE_GPU=1` only, where the line is asked). No
+  bar moved: the 45 frames and 200 steps are still asked, every ratio is over the window's
+  frames, squeeze's counts are rates over its own seconds; a plate under 4.5 frames or steps
+  a second still fills no window and is red. Each line prints how long its windows took.
+
 #### 19c. Checks that can pass without measuring, and checks nothing runs
 
 - ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
