@@ -89,7 +89,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let fo = clamp((1.0 - d) * A.a.z * S.n / 1.5 + 0.5, 0.0, 1.0) * A.a.w;
   let m = textureLoad(src, p, 0) + A.b * vec4f(fo, f, f, f);
-  textureStore(dst, p, vec4f(clamp(m.r, 0.0, 1.0), clamp(m.g, 0.0, 1.0), clamp(m.b, -1.0, 1.0), m.a));
+  // The soap is not held at a monolayer: a second drop on the first is more
+  // soap in the water, as micelles (PLAN 38c, src/gpu/fluid/soap.ts).
+  textureStore(dst, p, vec4f(clamp(m.r, 0.0, 1.0), clamp(m.g, 0.0, 64.0), clamp(m.b, -1.0, 1.0), m.a));
 }`,
 
   /*

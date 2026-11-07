@@ -6,6 +6,10 @@
 import { createPortal } from 'react-dom';
 import { usePortalBody } from './portalBody';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../lib/toolAmount';
+import { PIN_RANGE } from '../lib/deskPins';
+
+/** Magnet Size's top, the registry's (it runs on to 1.5, PLAN 27h-1). */
+const MAGNET_SIZE_MAX = PIN_RANGE.get('magnetSize')?.max ?? 1;
 
 export function ToolAmount({ tool, value, onChange, className = '' }: {
   tool: string;
@@ -120,9 +124,9 @@ export function ToolOptions({ tool, value, onChange, at, onClose, magnetSize, on
             <input
               type="range"
               className="set-range"
-              style={{ '--fill': `${magnetSize! * 100}%` } as React.CSSProperties}
+              style={{ '--fill': `${magnetSize! / MAGNET_SIZE_MAX * 100}%` } as React.CSSProperties}
               min={0}
-              max={1}
+              max={MAGNET_SIZE_MAX}
               step={0.05}
               value={magnetSize}
               aria-label="Magnet size: how far its pull reaches"

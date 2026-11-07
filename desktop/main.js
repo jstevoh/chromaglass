@@ -537,6 +537,9 @@ function showDetails() {
     show.oscMode === 'off'
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // Where a VJ finds the whole address space and the starter maps (PLAN 13.4):
+    // the details are the one place the app names OSC beside its port.
+    'Every OSC address, with Resolume and TouchDesigner maps: github.com/jstevoh/chromaglass/blob/main/docs/osc.md',
     // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
     // details say so, rather than an open port that answers nothing. Not a
     // dialog on the menu's pick: on a Mac a message box is a sheet on the
@@ -629,6 +632,24 @@ function buildMenu() {
             ['local', 'This Mac only'],
             ['network', 'From the network'],
           ].map(([mode, label]) => ({ id: `osc-${mode}`, label, type: 'radio', checked: show.oscMode === mode, click: () => setOscMode(mode) })),
+        },
+        /*
+          Ableton Link, for an operator who never opens Settings → Sound
+          (PLAN.md 13.5-link-menu). The page owns the switch (it remembers it
+          and asks the server again on every connect), so the menu asks the
+          page rather than the server: a menu that switched the server alone
+          would be switched straight back by the page two seconds later. The
+          tick is the server's own state, rebuilt on each change it reports.
+        */
+        {
+          id: 'link',
+          label: 'Ableton Link (Pro)',
+          type: 'checkbox',
+          checked: !!showServer?.linkOn?.(),
+          click: (item) => {
+            if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send('chromaglass:link', item.checked);
+            else buildMenu();
+          },
         },
       ],
     },
@@ -728,7 +749,14 @@ async function start() {
     enforced: initialStatus.enforced,
   };
   showServer = await import(pathToFileURL(SERVER).href);
+  // The tick set in place, not the menu rebuilt: a rebuild closes a menu the
+  // operator has open, and below Pro the page asks again every few seconds.
+  showServer.onLinkChange?.((on) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById('link');
+    if (item && item.checked !== on) item.checked = on;
+  });
   await serverUp(show.port);
+  buildMenu();
   // What the check reads from the main process (scripts/desktop.mjs): the choice, and what the socket did with it.
   globalThis.__chromaglassOsc = { mode: show.oscMode, state: showServer.oscState?.() };
 

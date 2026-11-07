@@ -36,6 +36,26 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reads six times across the same 600 ms and wants four held (a press laid once and not
   renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
   --check 'holding the Press lifts nothing'` a week after merge.
+- **19aa-13. `renders` and `squeeze` hold a window until it has the frames or steps its
+  line asks (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-13.
+- **19aa-14. `renders`' "the App renders for its clock and no more": the dye bottle
+  committed on its own (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-14.
+- **19aa-14b. `open()` waits up to 30 s for one second of fifteen frames (found
+  2026-11-07, open).** A page on a Mac drawing under fifteen a second waits the full 30 s
+  (it prints "never drew fifteen frames"; not yet counted in the logs). Now that each
+  window holds itself open for its 45 frames (19aa-13), it could wait only for the plate
+  to draw at all.
+- **19aa-14c. The cloud's software WebGPU loses the app's device every nine seconds or so
+  (found 2026-11-07, open).** `PW_WEBGPU=1` with the app (not the lab), under Xvfb: "WebGPU
+  device lost: destroyed" with no `destroy()` call from the page (a wrapped
+  `GPUDevice.prototype.destroy` never ran), then "A valid external Instance reference no
+  longer exists" and a `requestAdapter` that returns null for two seconds. Each loss and
+  recovery commits the plate's own `glLost`/`glEpoch` state, so `renders` with a plate
+  read there is red for that alone (1.3 renders, 2.0 commits a second). Probably
+  SwiftShader's GPU process going down under the plate's work at that rate; find which,
+  before any app check leans on software WebGPU for its commits.
+- **19aa-15. A pull request's Measure part builds the site first when a full run would
+  have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
@@ -405,6 +425,13 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   now; the header comes back (or the pointers move to the README) with the next edit there.
 - **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
   a pure move (docs/plan-shipped.md, 19ai-7).
+- **19ai-8. `npm run wgsl` passes a shader that will not build.** Found 2026-10-30 (32g): a
+  kernel naming a variable `from` (a WGSL reserved word) passed `npm run wgsl`, and only
+  `soapgpu` failed, at its first pipeline ("soapTransport failed to build"). The compile gate
+  should also create each kernel's pipeline and read `getCompilationInfo()`, so a reserved word
+  or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
+  plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
+  (`npm run microscope` read 0.00 at every zoom).
 - **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
   rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
   and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
@@ -413,3 +440,32 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
   measure over a fixed number of plate steps, not wall time, so its bar means the same on
   every runner.
+- **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
+  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
+  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
+  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  (the sample too close) or a frame not yet drawn (the read too early), and measure the
+  feature, not the moment.
+- **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
+  an end date (docs/plan-shipped.md, 19ak).
+- **19ak-2. Shipped:** a PR's site files run only the Mac checks that read them
+  (docs/plan-shipped.md, 19ak).
+- **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
+  saves 13%; what still runs every Mac check is the solver and the libraries the lab's
+  one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
+  the workflows, and scripts no check traces. (a) **Shipped:** a whole run re-run skips
+  the shards an earlier attempt passed, and the steward skill re-runs failed jobs only
+  (docs/plan-shipped.md, 19ak). (b) **Open:** the lab bundles per check, so a change to
+  the magnet's library runs the magnet's lab checks and not the soap film's. (c)
+  **Shipped:** the Mac shards wait for `tsc --noEmit`. (d) **Measured and left:**
+  building the app once on ubuntu for all five shards. `dist/` is 116 MB (the films in
+  public/) against a 15 s build, so the upload and five downloads would cost more than
+  the builds they replace.
+- **19ak-4. Open, found by 19ak-2: `npm run quick` lists every Mac check as "on the Mac
+  only".** Its test for a check that serves the app read the trace, which over-reads (most
+  scripts name `scripts/startup.mjs` in a comment), so all 96 read as serving the app and
+  none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
+  `checkReads` now gives `site` from esbuild's import graph; quick should use it for
+  `here`, once a session has timed the lab checks on software WebGPU.
+- **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
+  children run as a first attempt (docs/plan-shipped.md, 19ak).

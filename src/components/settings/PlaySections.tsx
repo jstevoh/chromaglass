@@ -95,7 +95,7 @@ export const MasterSection = ({ c }: { c: SectionCtx }) => {
           label="Tempo Sync"
           value={settings.tempoSync ?? 0.5}
           min={0}
-          max={1}
+          max={1.6}
           step={0.05}
           onChange={(v: number) => onUpdate({ tempoSync: v })}
           settingKey="tempoSync"

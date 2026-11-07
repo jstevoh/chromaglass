@@ -86,7 +86,21 @@
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
+/*
+  The site it serves, built here when nothing built it first. In Measure's
+  `browser2` part this leans on the iPhone app's remote building `dist/`
+  before it, and that holds in a full run; but a pull request runs only the
+  checks its diff reaches (PLAN 19k-4), and #673, which touched this script
+  alone, ran it with nothing built ("The directory "dist" does not exist",
+  red after 1 s). Built only when missing, so a full run still costs nothing.
+*/
+if (!existsSync('dist/index.html')) {
+  console.log('  (no dist/ here: building it first)');
+  execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], { stdio: 'inherit' });
+}
 
 const PORT = Number(process.env.RENDERS_PORT ?? 4333);
 // Where a plate draws: the Mac, or a machine that says it has one.
@@ -126,7 +140,7 @@ const sample = (page) => page.evaluate(() => {
   const rd = window.chromaglassDebug?.()?.riding ?? { frames: 0, laid: 0 };
   return {
     rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0, offered: window.__offered ?? 0,
-    t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN,
+    t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN, whoAt: window.__who?.length ?? 0, lost: window.__lost ?? 0,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
   };
@@ -180,10 +194,64 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
       loads; this is the smallest one it accepts.
     */
     window.__commits = 0;
+    /*
+      And who: each commit's topmost components that rendered, named, so a
+      red ceiling says what besides the App committed (PLAN 19aa-14: six
+      GitHub Mac runs read 1.6 to 2.3 commits a second for 1.0 to 1.3 App
+      renders, and nothing said whose). A fiber rendered in this commit when
+      it was not in the last commit's tree (React swaps in the alternate of
+      every fiber it worked on) and carries PerformedWork (flag 1; a fiber
+      cloned for a bailout has it cleared). The names are a production
+      build's, minified, so the label is what survives minifying: the
+      component's prop names and the first element it draws. The App
+      itself is the label whose count matches its renders.
+    */
+    window.__who = [];
+    /*
+      And the GPU devices lost (LiquidVisualizer's loss handler logs each one):
+      a loss and its recovery commit the plate's own state twice, without
+      the App, so a window holding one reads two commits over the App's. The
+      cloud's software WebGPU loses its device every nine seconds or so and
+      reads the very 2.0 commits a second #595 did, all of them the plate's.
+    */
+    window.__lost = 0;
+    const error = console.error.bind(console);
+    console.error = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('WebGPU device lost')) window.__lost++; error(...a); };
+    let seen = new Set();
+    const label = (f) => {
+      const keys = Object.keys(f.memoizedProps ?? {}).filter(k => k !== 'children').slice(0, 4).join(',');
+      let h = f.child;
+      while (h && typeof h.type !== 'string') h = h.child;
+      const el = h?.stateNode;
+      const testId = el?.getAttribute?.('data-testid');
+      const cls = typeof el?.className === 'string' ? el.className.split(' ')[0] : '';
+      return `{${keys || 'no props'}}<${h?.type ?? '?'}${testId ? ` ${testId}` : cls ? `.${cls}` : ''}>`;
+    };
+    const tops = (root) => {
+      const now = new Set();
+      const out = [];
+      const stack = [[root.current.child, false]];
+      while (stack.length) {
+        const [first, under] = stack.pop();
+        for (let f = first; f; f = f.sibling) {
+          now.add(f);
+          const worked = !seen.has(f) && (f.flags & 1) === 1 && f.alternate !== null && typeof f.type !== 'string';
+          if (worked && !under) out.push(label(f));
+          if (f.child) stack.push([f.child, under || worked]);
+        }
+      }
+      seen = now;
+      // A commit whose only work was a mount, or a render that bailed out, names no one, and says so.
+      return out.length ? out : ['(no component re-rendered: a mount or a bail-out)'];
+    };
     window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
       supportsFiber: true, renderers: new Map(), inject() { return 1; }, checkDCE() {},
       onScheduleFiberRoot() {}, onPostCommitFiberRoot() {}, onCommitFiberUnmount() {},
-      onCommitFiberRoot() { window.__commits++; },
+      onCommitFiberRoot(_id, root) {
+        window.__commits++;
+        window.__root = root;
+        try { window.__who.push(...tops(root)); } catch { window.__who.push('(unnamed: the walk threw)'); }
+      },
     };
   }, { source, desk, fader, map: FADER_MAP, pad });
   await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
@@ -193,9 +261,10 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
   await page.waitForTimeout(5000);
   /*
     And, where a plate draws, until it draws: a second at a time, at most
-    thirty, until one second holds the fifteen frames the lines below ask of
-    each window (45 in 3 s). What was seen (`npm run flakes`, the week to
-    2026-10-24): the laptop's band lines red on 8 of 191 Mac runs, every one
+    thirty, until one second holds fifteen frames, the rate at which the
+    lines below fill a three-second window (on a slower plate they hold
+    a window open past three seconds for their 45 frames: `heldOpen`).
+    What was seen (`npm run flakes`, the week to 2026-10-24): the laptop's band lines red on 8 of 191 Mac runs, every one
     in the first window and every second window fine, the plate drawing 0.0,
     1.7, 1.9, 9.9, 10.8, 12.2, 13.6 and 14.5 frames a second there against
     16.5 to 28.4 in the next. Five seconds in, the page was still opening on
@@ -221,19 +290,73 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
   return { page, ctx };
 }
 
-/** Two windows of three seconds each, both held to the bars: a burst in either is red. */
+/*
+  Two windows, both held to the bars: a burst in either is red. Each is at
+  least three seconds and, where a plate draws, held open until the plate
+  has drawn FRAMES_ASKED frames, at most WINDOW_CAP_MS (PLAN 19aa-13).
+
+  It was a fixed three seconds until 2026-11-07, and the lines that read
+  frames ask 45 of them, so on the Mac it asked fifteen frames a second as
+  well as what each line says. GitHub's Macs draw this page at 11 to 19
+  frames a second, so "the ear is reading" went red 16 times there with its
+  ratio green: #656 read 18.3 a second for 11.3 frames a second, and #546,
+  #645 and #435 had a reading on 0.98 to 1.00 of the frames, each its own,
+  over 40 to 43 frames in one phone window. No line claims a frame rate: the ear promises a reading on
+  every frame the plate draws, whatever rate the machine keeps, and the 45
+  is there so a ratio is taken over enough frames to mean something. So the
+  window is held until it has them, and every bar is unchanged: the counts
+  with a ceiling are still rates over the first three seconds, the ratios
+  are over the whole window's frames, and the 45 is still asked by each
+  line. A plate drawing under 4.5
+  frames a second never fills a window and is red as before. How long each
+  window took is printed beside the line, and a window held past three
+  seconds says so.
+*/
+const FRAMES_ASKED = 45;
+const WINDOW_CAP_MS = 10_000;
+/** The window from `a` held open past `b` until the plate has drawn FRAMES_ASKED frames, or the cap. */
+async function heldOpen(page, a, b) {
+  // Both counters move on every live frame (LiquidVisualizer's loop); the lines read one or the other.
+  while (PLATE && Math.min(b.frames - a.frames, b.rideFrames - a.rideFrames) < FRAMES_ASKED && b.t - a.t < WINDOW_CAP_MS) {
+    await page.waitForTimeout(250);
+    b = await sample(page);
+  }
+  return b;
+}
+/** Who committed between two samples, as `label ×n`, most first (see the devtools hook in `open`). */
+async function whoBetween(page, a, b) {
+  const names = await page.evaluate(([i, j]) => window.__who.slice(i, j), [a.whoAt, b.whoAt]);
+  const n = new Map();
+  for (const x of names) n.set(x, (n.get(x) ?? 0) + 1);
+  const lost = b.lost - a.lost;
+  return ([...n].sort((p, q) => q[1] - p[1]).map(([k, v]) => `${k} ×${v}`).join(', ') || 'nothing') + (lost ? `, ${lost} GPU device${lost > 1 ? 's' : ''} lost` : '');
+}
+/** Printed beside a commits ceiling: who, for each window, when anything besides the App's own renders committed. */
+const whoFor = (w) => (w.some(x => x.commits > x.renders + 0.2) ? `; committed: ${w.map(x => x.who).join(' | ')}` : '');
 async function measure(page) {
   const out = [];
   for (let i = 0; i < 2; i++) {
     const a = await sample(page);
     await page.waitForTimeout(3000);
-    const b = await sample(page);
+    const b3 = await sample(page);
+    const b = await heldOpen(page, a, b3);
     const s = (b.t - a.t) / 1000;
+    /*
+      The counts with a ceiling (renders, commits, what React is told, the
+      desk's moves) are read over the first three seconds whatever the
+      window, as they always were (check-skeptic): spread over a held window
+      of up to ten, a burst of renders that was red at +5 a second in three
+      would read under its bar. What is asked per frame is read over the
+      whole window: the frames, what the ear and the plate did on them, and
+      the desk's moves beside the plate's (one ratio, one window).
+    */
+    const s3 = (b3.t - a.t) / 1000;
     out.push({
-      renders: (b.renders - a.renders) / s,
-      commits: (b.commits - a.commits) / s,
+      renders: (b3.renders - a.renders) / s3,
+      commits: (b3.commits - a.commits) / s3,
+      published: (b3.published - a.published) / s3,
+      deskMoves: (b3.deskMoves - a.deskMoves) / s3,
       reads: (b.reads - a.reads) / s,
-      published: (b.published - a.published) / s,
       frames: b.frames - a.frames,
       frameRate: (b.frames - a.frames) / s,
       fresh: b.fresh - a.fresh,
@@ -241,13 +364,16 @@ async function measure(page) {
       rideFrames: b.rideFrames - a.rideFrames,
       rideRate: (b.rideFrames - a.rideFrames) / s,
       laid: b.laid - a.laid,
-      deskMoves: (b.deskMoves - a.deskMoves) / s,
+      heldDeskMoves: (b.deskMoves - a.deskMoves) / s,
       drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
       offered: (b.offered - a.offered) / s,
+      seconds: s,
+      who: await whoBetween(page, a, b3),
     });
   }
   return out;
 }
+const heldFor = (w) => (w.some(x => x.seconds > 3.5) ? ` (frames over windows of ${w.map(x => x.seconds.toFixed(1)).join(' and ')} s)` : '');
 
 /*
   What else may render the App, a second, beside the ear's ten: the Perform
@@ -273,8 +399,8 @@ try {
         runner's app has drawn 28 a second).
       */
       check(`${screen.name}, the band: the ear is reading`,
-        w.every(x => (PLATE ? x.frames >= 45 && x.reads >= 0.9 * x.frameRate : x.reads >= 45)),
-        w.map(x => `${f(x.reads)}/s${PLATE ? ` for ${f(x.frameRate)} frames/s` : ''}`).join(', '));
+        w.every(x => (PLATE ? x.frames >= FRAMES_ASKED && x.reads >= 0.9 * x.frameRate : x.reads >= 45)),
+        w.map(x => `${f(x.reads)}/s${PLATE ? ` for ${f(x.frameRate)} frames/s, ${x.frames} frames` : ''}`).join(', ') + heldFor(w));
       check(`${screen.name}, the band: React is told what the ear heard eight to ten and a half times a second`,
         w.every(x => x.published >= 8 && x.published <= 10.5), w.map(x => `${f(x.published)}/s`).join(', '));
       check(`${screen.name}, the band: the App renders for each of those and at most ${ALLOWED_EXTRA} a second besides`,
@@ -284,11 +410,11 @@ try {
         // A floor too: every App render React finishes is a commit, so a
         // counter the devtools hook stopped feeding (React swallows its own
         // errors injecting it) reads 0 and must not pass as "nothing".
-        w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', '));
+        w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', ') + whoFor(w));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
-        check(hears, w.every(x => x.frames >= 45 && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
-          w.map(x => `${x.fresh} new and ${x.ownFrame} its own of ${x.frames} frames`).join(', '));
+        check(hears, w.every(x => x.frames >= FRAMES_ASKED && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
+          w.map(x => `${x.fresh} new and ${x.ownFrame} its own of ${x.frames} frames`).join(', ') + heldFor(w));
       } else skip(hears, `no plate draws here (${w.map(x => x.frames).join(', ')} frames); held on the Mac`);
       await ctx.close();
     }
@@ -369,7 +495,7 @@ try {
         frame whose newest message differs from the last frame's): a working
         ride reads close to 1.0 there. A plate fed by React's 7 to 10.5 a
         second changes at most that often, against a floor of 0.9 of the
-        frames offered, which is 12.6 and up at the 45 frames in 3 s this
+        frames offered, which is 12.6 and up at the 45 frames a window this
         asks (the stub offers a new value on nearly every frame below 30 a
         second). The quarter over the desk's stays whatever the rate: it
         fails a plate fed by React by itself, at any rate the line allows.
@@ -379,8 +505,8 @@ try {
       */
       const laidLine = `${screen.name}, a fader: the plate's Dimmer moves on nine frames in ten that were offered a new value, and more often than the desk's`;
       if (PLATE) {
-        check(laidLine, w.every(x => x.rideFrames >= 45 && x.offered > 0 && x.drawnMoves >= 0.9 * x.offered && x.drawnMoves >= 1.25 * x.deskMoves && x.laid > 0),
-          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.offered)} offered a new value (${(x.drawnMoves / Math.max(1e-9, x.offered)).toFixed(2)}) of ${f(x.rideRate)} frames/s, for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
+        check(laidLine, w.every(x => x.rideFrames >= FRAMES_ASKED && x.offered > 0 && x.drawnMoves >= 0.9 * x.offered && x.drawnMoves >= 1.25 * x.heldDeskMoves && x.laid > 0),
+          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.offered)} offered a new value (${(x.drawnMoves / Math.max(1e-9, x.offered)).toFixed(2)}) of ${f(x.rideRate)} frames/s, for ${f(x.heldDeskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', ') + heldFor(w));
       } else skip(laidLine, `no plate draws here (${w.map(x => x.rideFrames).join(', ')} frames); held on the Mac`);
       // Let go, and give the last tenth of a second time to reach React.
       const at = await page.evaluate(() => { clearInterval(window.__sweep); return window.__faderAt; });
@@ -391,8 +517,8 @@ try {
       const still = await measure(page);
       const stillLine = `${screen.name}, a fader let go: no frame lays a ride, and the App renders for its clock alone (0.6 to 1.5 a second)`;
       check(stillLine,
-        still.every(x => x.laid === 0 && x.renders >= 0.6 && x.renders <= 1.5) && (!PLATE || still.every(x => x.rideFrames >= 45)),
-        still.map(x => `${x.laid} laid of ${x.rideFrames} frames, ${f(x.renders)} renders/s`).join(', '));
+        still.every(x => x.laid === 0 && x.renders >= 0.6 && x.renders <= 1.5) && (!PLATE || still.every(x => x.rideFrames >= FRAMES_ASKED)),
+        still.map(x => `${x.laid} laid of ${x.rideFrames} frames, ${f(x.renders)} renders/s`).join(', ') + heldFor(still));
       await page.evaluate(() => cancelAnimationFrame(window.__deskWatch));
       await ctx.close();
     }
@@ -407,8 +533,91 @@ try {
         quiet for the wrong reason.
       */
       check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= 45)),
-        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', '));
+        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= FRAMES_ASKED)),
+        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + heldFor(w) + whoFor(w));
+      await ctx.close();
+    }
+    {
+      /*
+        The bottle in hand, with a Dye Budget reading that moves (PLAN 19aa-14).
+        The quiet page above went red on GitHub's Macs at 2.0 and 2.3 commits
+        a second for the App's 1.3 (#595, #670), and its gamepad windows at
+        1.6 and 1.7 (#605, #640, #669), only where a plate draws: the bottle
+        held its level in React state, and a plate whose mean density drifts
+        moves the level a twentieth now and then, a commit of its own each
+        time and one more on the next poll. Where no plate draws the reading
+        never moves, so the lines above could not see it here. So the reading
+        is made to move: the App's handle on the plate (the ref its
+        `readDyeRoom` reads, found among the App's hooks by the `dyeRoom` it
+        carries) answers a level that crosses two twentieths and back every
+        0.7 s, wider than `shownRoom`'s hysteresis, as a hunting plate's
+        would. Then the bottle has to show it (its `data-level` changes at
+        least three times in the window: a bottle that stopped polling
+        would pass the commits line by being still) and the page commits
+        no more than the App's clock. Before the bottle moved its own level,
+        this read 2.7 and 3.0 commits a second on both screens, every
+        extra one the bottle's, named by the devtools hook.
+      */
+      const { page, ctx } = await open(browser, screen, { source: 'none', desk: 'perform' });
+      const testId = screen.touch ? 'phone-dye-bottle' : 'bottle-in-hand';
+      const patched = await page.evaluate((testId) => {
+        let v = null;
+        const stack = [window.__root?.current?.child];
+        while (stack.length && !v) {
+          for (let f = stack.pop(); f && !v; f = f.sibling) {
+            for (let k = f.memoizedState; k && typeof k === 'object' && 'next' in k; k = k.next) {
+              const r = k.memoizedState;
+              if (r && typeof r === 'object' && 'current' in r && typeof r.current?.dyeRoom === 'function') { v = r; break; }
+            }
+            if (f.child) stack.push(f.child);
+          }
+        }
+        if (!v) return false;
+        /*
+          A reading two twentieths away from the last on every ask: the bottle
+          is the one thing that asks (the App's `readDyeRoom`), every 0.4 s,
+          so each of its polls has a move to draw. One stand-in per handle the
+          visualizer hands over (its imperative handle is made again on its
+          renders).
+        */
+        let flip = false;
+        const moving = () => ((flip = !flip) ? 0.30 : 0.40);
+        const standIn = (h) => h && new Proxy(h, { get: (t, k) => (k === 'dyeRoom' ? moving : t[k]) });
+        let real = v.current, shown = standIn(real);
+        Object.defineProperty(v, 'current', { configurable: true, get: () => shown, set: (x) => { real = x; shown = standIn(x); } });
+        /*
+          What the bottle draws, read off the page every 50 ms: the level it
+          says and where its liquid stands (the rect's top, which is what a
+          viewer sees move), with the App's renders at that moment. A
+          change with no App render since the one before is the bottle's
+          own poll drawing; a bottle that drew only when the App's clock
+          re-rendered it would change about once a second and show none.
+        */
+        window.__levels = [];
+        window.__levelWatch = setInterval(() => {
+          const el = document.querySelector(`[data-testid="${testId}"]`);
+          const l = el?.getAttribute('data-level') ?? null;
+          const y = Number(el?.querySelector('rect[data-liquid]')?.getAttribute('y'));
+          if (window.__levels.at(-1)?.l !== l || !Object.is(window.__levels.at(-1)?.y, y)) window.__levels.push({ l, y, renders: window.chromaglassCastState().appRenders });
+        }, 50);
+        return true;
+      }, testId);
+      await page.waitForTimeout(1500);
+      const l0 = await page.evaluate(() => window.__levels.length);
+      const w = await measure(page);
+      const levels = await page.evaluate((n) => window.__levels.slice(Math.max(0, n - 1)), l0);
+      const seen = levels.slice(1);
+      // The levels planted and no other (a plate's own drift on the Mac cannot pass for them), the liquid where each says, and drawn by the bottle itself.
+      const planted = seen.every((x, i) => (x.l === '0.30' || x.l === '0.40') && (i === 0 || x.l !== seen[i - 1].l));
+      const drawn = seen.every((x) => Math.abs(x.y - (21 - 13.7 * Number(x.l))) < 1e-6);
+      const own = seen.filter((x, i) => x.renders === levels[i].renders).length;
+      check(`${screen.name}, the bottle in hand: it draws a Dye Budget reading that moves, on its own poll`,
+        patched && seen.length >= 8 && planted && drawn && own >= 5,
+        patched ? `${seen.length} levels in ${w.reduce((s, x) => s + x.seconds, 0).toFixed(1)} s, ${own} with no App render since the last (${seen.slice(0, 5).map(x => `${x.l} at y ${x.y.toFixed(2)}`).join(', ')}${seen.length > 5 ? ', …' : ''})${planted ? '' : '; not the planted levels'}${drawn ? '' : '; the liquid is not where the level says'}` : 'found no handle carrying dyeRoom among the App\'s hooks');
+      check(`${screen.name}, the bottle in hand: and the page commits for the App's clock and no more while it moves (0.6 to 1.5 a second)`,
+        patched && w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5),
+        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s`).join(', ') + whoFor(w));
+      await page.evaluate(() => clearInterval(window.__levelWatch));
       await ctx.close();
     }
     {
@@ -443,14 +652,16 @@ try {
         places.push(await page.evaluate(() => { const r = document.querySelector('[data-testid="gamepad-cursor"]'); return r ? `${r.style.left},${r.style.top}` : null; }));
         await page.waitForTimeout(250);
       }
+      // Its clock's renders over these three seconds, its frames over the held window (as in `measure`).
       const b = await sample(page);
+      const bf = await heldOpen(page, a, b);
       const s = (b.t - a.t) / 1000;
       const moved = new Set(places.filter(Boolean)).size;
       check(`${screen.name}, a gamepad stick sweeping: the ring is on the page and changes place`,
         places.every(Boolean) && moved >= 5 && (await ringAt())?.on, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
       check(`${screen.name}, a gamepad stick sweeping: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || b.frames - a.frames >= 45),
-        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s`);
+        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || bf.frames - a.frames >= FRAMES_ASKED),
+        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s; ${bf.frames - a.frames} frames in ${((bf.t - a.t) / 1000).toFixed(1)} s` + whoFor([{ renders: (b.renders - a.renders) / s, commits: (b.commits - a.commits) / s, who: await whoBetween(page, a, b) }]));
       // The stick let go and the right trigger held: the ring swells and stays where it is.
       await page.evaluate(() => { clearInterval(window.__sweep); window.__pad.axes = [0, 0, 0, 0]; window.__pad.rt = 1; });
       await page.waitForTimeout(1000);
@@ -458,12 +669,13 @@ try {
       const c = await sample(page);
       await page.waitForTimeout(3000);
       const d = await sample(page);
+      const df = await heldOpen(page, c, d);
       const after = await ringAt();
       const held = after ? after.width : null;
       const s2 = (d.t - c.t) / 1000;
       check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the App renders for its clock and no more`,
-        held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || d.frames - c.frames >= 45),
-        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s`);
+        held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || df.frames - c.frames >= FRAMES_ASKED),
+        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s; ${df.frames - c.frames} frames in ${((df.t - c.t) / 1000).toFixed(1)} s` + whoFor([{ renders: (d.renders - c.renders) / s2, commits: (d.commits - c.commits) / s2, who: await whoBetween(page, c, d) }]));
       await ctx.close();
     }
   }

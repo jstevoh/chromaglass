@@ -194,4 +194,49 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27g-1, open. The readings that clip.** Presets' bass mappings (`getAudioValue`, clipped at
     100) and the camera's punch still saturate at a high boost, as the reading did. Whether the
     boost should reach them as a gain on their depth too is the owner's call once he has felt this.
+- **27h. Every dial runs from very gentle to very extreme (the owner, 2026-10-31: "Let's have
+  very gentle options and very extreme options (which should be a general principle for all
+  dials)").** A survey read the 127 dials that set an amount (positions, switches, masters and
+  mixer strips left out; the dials an open PR owns left to it): what the stored value does in the
+  solver or the shader, what its first step does and what its top does. The whole table is in the
+  project's shared files (`dials/survey-2026-10-31.md`). The rule it leaves: the bottom step is
+  barely there, the top is past nature with the law still at the core, the default and every
+  look's value stay where they are, and Evolve never takes a dial to its far end on its own.
+  - **27h-1, shipped (#626).** Twenty-five dials let further where their consumer allowed it;
+    story in `docs/plan-shipped.md` §27h-1.
+  - **27h-2, shipped (this PR).** The dials whose top the solver held a second time: Swirl,
+    Dye Weight and Heat Spread to 2, Pushes Dye to 1.2, Drop Height to 2, Background Loop to
+    1.4, Glass Smear to 3 with no gate, Momentum's lasting current to 0.999. Story in
+    `docs/plan-shipped.md` §27h-2; `npm run widedials`.
+  - **27h-2b, open. Buoyancy's top is the lasting current's cap.** The dial already runs to 2
+    and nothing clamps it, but the current it drives is held to ¾ of a cell a step
+    (`maxCurrent`, a CFL limit, not a choice), so past where a warm plate reaches the cap more
+    Buoyancy buys nothing. The honest way further is substeps for the current when its force
+    asks more than a step can carry, as the slump and the ferrofluid have; measure where the
+    cap binds on Lava Lamp first.
+  - **27h-2c, open. Dye Weight past 1 on a deep 1024² pool.** At 6 mm and 1024² the slump asks
+    27 substeps at Dye Weight 2 against `SLUMP_SUBSTEPS`' 20, and the face guard holds it:
+    stable, the front a little under its Froude speed. 38r part 2's 2 mm gap takes this back
+    under 20 (about 16); if it does not land, raise the cap (a SHOUTING_CASE number: name it
+    under Check changes).
+  - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
+    `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
+    the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate
+    Boundary Glow near 0.45), Gate Edge (clamp the mix, let the width grow).
+  - **27h-4, open. Dead bottoms that need a re-map, not a range** (each must give today's value
+    at today's default): Iridescence never reaches off (a 0.25 floor), Beat Prediction's lower
+    half never locks (the lock asks trust × confidence ≥ 0.5), Sensitivity's trim never goes
+    under 0.5, Film Key cannot key nothing out, Room Hands' 0.05 floor, Phase Edge's mobility
+    floor (a third of its top), Gravity forces Dye Weight to 0.5 from its first step, Ferrofluid
+    lays the whole pour at its first step, Macro Chase has no lazy end (1 a second at 0).
+  - **27h-5, open. Dials that cross zero or run backwards need a bipolar or inverted curve:**
+    Kaleido Spin and Spin Rate (the looks' 1 rpm sits in the middle 1% of the throw), LED
+    Rotation Speed (its phase is `time × v`, so a move jumps the ring: integrate it first, as the
+    kaleidoscope's is, then widen to 20 with a curve).
+  - **27h-6, open. Ceilings that are a measured choice, to be asked of the owner, not moved:**
+    Diffusion Rate (0.0002, cut for the step's cost; the survey reads it as under the pass's own
+    skip threshold everywhere, which wants measuring), Room Drive and Film Drive (`ROOM_MAX`
+    bounds a camera-to-screen feedback loop), Sound Drive (four separate caps), Frame Sway (the
+    owner's rule, 0).
+  - **Judging.** Films of each widened dial's two ends on the Mac: `docs/judging.md`.
 - **Judging.** How the three feel at 60 fps with real music: `docs/judging.md`.

@@ -93,7 +93,7 @@ function song(S) {
   const noise = createNoise2D(() => ((seed = (seed * 16807) % 2147483647) / 2147483647));
   const rock = { x: 0, y: 0, vx: 0, vy: 0, phase: 0 };
   const cover = { x: 0, y: 0, vx: 0, vy: 0 };
-  const R = Math.max(0, Math.min(1, S.plateRock ?? 0));
+  const R = Math.max(0, Math.min(3, S.plateRock ?? 0));
   const drag = L.coverDrag(S.gapThickness ?? THIN);
   const dt = 1 / FPS, every = Math.round(FPS * 60 / BPM);
   const slide = [], lamp = [], tilt = [];

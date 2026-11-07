@@ -225,9 +225,9 @@ export class FluidSimulation {
    * run where the finger was.
    */
   readonly pressLift = new PressLifts();
-  /** Cells each presser's strokes have pressed on this plate (a kick's are Beat Squeeze's), and how deep, summed over those cells. */
-  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0 };
-  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0 };
+  /** Cells each presser (lib/squish.ts Presser) has pressed on this plate, and how deep, summed over them. */
+  readonly pressedCells: Record<Presser, number> = { hand: 0, kick: 0, bubble: 0 };
+  readonly pressedDepth: Record<Presser, number> = { hand: 0, kick: 0, bubble: 0 };
   /**
    * Beat Squeeze's kicks, given back (lib/squish.ts `KickRelease`): each
    * kick's press is held a moment and then let go over a third of a second,
@@ -931,7 +931,10 @@ export class FluidSimulation {
     if (count <= 0 && this.prevCount <= 0) return;
     const dye = this.gpu.rbDyeView;
     const N = this.size;
-    for (let k = 0; k < count; k++) {
+    // A thin gap's carries keep a bubble's colour, so no ring and no fill, only the lists (PLAN 15g-8b).
+    const thin = this.gpu.thinGapLive;
+    if (thin) this.fillingHoles = [];
+    for (let k = 0; k < count && !thin; k++) {
       // The packed block, because it carries the fade as its opacity and the
       // Bubble record does not — a bubble part-way in has taken part of the
       // dye, and the ring has to match or the plate gains colour.
@@ -1001,7 +1004,7 @@ export class FluidSimulation {
       // and takes its log: going out to a colour and back would lose the mix.
       if (depositRim(this.dyeTarget(), N, b.x, b.y, R, mass, aR, aG, aB)) this.rows.rim(b.y, R);
     }
-    this.fillPoppedHoles(packed, count, dye, N);
+    if (!thin) this.fillPoppedHoles(packed, count, dye, N);
     if (this.coverPacked.length < count * 4) this.coverPacked = new Float32Array(Math.max(4, count * 4));
     this.coverPacked.set(packed.subarray(0, count * 4));
     this.coverCount = count;
@@ -2160,16 +2163,15 @@ export class FluidSimulation {
       }, this.thinGap);
       this.lastLift = { x: lift.x, y: lift.y, cells };
     }
-    // The kicks' presses, let go (`pressKick`): no Fingering, so no spokes and
-    // no dye, only the gap given back, which the shader never opens past rest.
-    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell);
-    // The rhythm sheet's own motion (pressKick): solved a step, its change laid as the gap's,
-    // with the spring the shader will give the gap this step taken on the sheet too (lib/sheet.ts).
+    // The kicks' presses, held against the spring, let go (`pressKick`): only the gap
+    // given back, never past rest.
+    this.kickRelease.step(this.size, this.dtSeconds, this.squishCell, this.lastStep?.gapSpring);
+    // The rhythm sheet (pressKick): solved a step, laid as the gap's change, with the spring (lib/sheet.ts).
     if (this.sheet.live) {
       if (!this.gpu || !this.thinGap) { this.sheet.forget(); return; }
       if (!this.sheetGap) this.sheetGap = new Float32Array(this.size * this.size);
       const depth = this.sheet.closed, cells = this.sheet.pressedCells;
-      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap) > 0) {
+      if (this.sheet.step(this.size, this.dtSeconds, this.lastStep?.gapSpring ?? 0, this.sheetGap, this.lastStep?.plateCurve ?? 0) > 0) {
         this.sheetLaid = true;
         this.dirty = true;
         // As a stroke counts them (applySquish): the cells a held finger closes, and the depth.
@@ -2691,7 +2693,7 @@ export class FluidSimulation {
         // is — so a real drop from the dropper or the bench splashes, and the
         // faint pulse the music lays down on every frame (which also takes this
         // shape) does not.
-        const h = Math.max(0, Math.min(1, this.dropHeight));
+        const h = Math.max(0, Math.min(2, this.dropHeight));
         // Impact grows as the square root of the height (the speed a fall
         // reaches does), so the middle of the slider already splashes.
         const e = Math.sqrt(h) * Math.min(1.5, amount / 5);
@@ -2859,7 +2861,7 @@ export class FluidSimulation {
 
     // Plates behind the lead are the background loop: the same show, slower
     // and calmer, that the live plate is worked over.
-    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
+    if (this.layerIndex > 0) dynamicSpeed *= 1 - 0.7 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
 
     /*
       The timestep, stretched to whatever rate the loop is stepping at (H2b).
@@ -2926,7 +2928,7 @@ export class FluidSimulation {
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
     if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
-    if (settings.glassSmear > 0.2) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
+    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
     // 8.9. The lasting current joins the flow the dye is about to ride.
@@ -3111,7 +3113,7 @@ export class FluidSimulation {
       music, and a loud track still cannot triple a calm look's (lib/stir.ts).
     */
     let turbScale = stirOf(settings.turbulenceScale ?? 0, audioData ? audioData.energy : null, settings.audioImpact ?? 0.45);
-    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1, settings.backgroundLoop ?? 0));
+    if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
     let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
     if (audioData) {
@@ -3168,7 +3170,7 @@ export class FluidSimulation {
     const immiscibility = polarity * 0.04 * (0.4 + tension * 1.2);
 
     let smearX = 0, smearY = 0;
-    if (settings.glassSmear > 0.2) {
+    if (settings.glassSmear > 0) {
       const t = time * 0.3;
       smearX = noise2D(t, 100) * settings.glassSmear * 12.0 * dt;
       smearY = noise2D(100, t) * settings.glassSmear * 12.0 * dt;
@@ -3247,14 +3249,11 @@ export class FluidSimulation {
     const regStepScale = this.seedMean !== null ? 1 / Math.max(0.08, Math.min(1, Math.max(0, this.dt) / 0.05)) : 1;
     const regulatorEvap = Math.min(0.28, Math.min(0.12, over * over * 0.6) * regStepScale);
     /*
-      Only ever upward, and H6 tried the other direction and took it out
-      again. A bubble's exclusion is a multiply, so it destroys the dye it
-      removes, and making this loop symmetric was the first attempt at
-      keeping the plate's colour. It never engaged: the deficit term is
-      quadratic, so a plate 10% under its budget contributed 0.0001. The dye
-      goes back where it physically went instead — a ring at the bubble's
-      rim, in `depositBubbleRims` — which conserves by construction because
-      both halves read the same mirror.
+      Only ever upward. H6 made it symmetric to win back the dye a bubble's
+      multiply destroyed, and it never engaged: the deficit term is
+      quadratic, so a plate 10% under its budget gave 0.0001. A bubble's dye
+      goes where its liquid goes in the thin carries now (PLAN 15g-8b), and
+      off a thin gap back to its rim (`depositBubbleRims`).
     */
     /*
       Per second of the plate's own time, not per step.
@@ -3373,7 +3372,7 @@ export class FluidSimulation {
       extraMagnets: this.extraMagnets,
       magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
-      vorticity: Math.max(0, Math.min(1, settings.vorticityConfinement ?? 0)),
+      vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
       oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
       filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
@@ -3382,13 +3381,13 @@ export class FluidSimulation {
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).
       clearFilm: this.layerIndex === 0 ? Math.max(0, Math.min(1, settings.clearFilm ?? 0)) : 0,
-      solutalBuoyancy: Math.max(0, Math.min(1, settings.solutalBuoyancy ?? 0)),
+      solutalBuoyancy: Math.max(0, Math.min(2, settings.solutalBuoyancy ?? 0)),
       plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
       ...this.downhill(settings.tiltDirection ?? 180),
-      doubleDiffusion: Math.max(0, Math.min(1, settings.doubleDiffusion ?? 0)),
+      doubleDiffusion: Math.max(0, Math.min(2, settings.doubleDiffusion ?? 0)),
       ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
       mazeDetail: Math.max(0, Math.min(1, settings.mazeDetail ?? 0)),
-      phaseDisplace: Math.max(0, Math.min(1, settings.phaseDisplace ?? 0)),
+      phaseDisplace: Math.max(0, Math.min(2, settings.phaseDisplace ?? 0)),
       bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
       liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
@@ -3425,7 +3424,7 @@ export class FluidSimulation {
       // The lasting current. Damping is its drag per step — the first thing that
       // control has ever visibly done — and the cap keeps a step's travel under
       // ¾ of a cell whatever the Speed and Advection.
-      currentDamp: Math.max(0.8, Math.min(0.995, settings.damping || 0.99)),
+      currentDamp: Math.max(0.8, Math.min(0.999, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
       rockX: plateSin(this.tiltX, this.rockX),
       rockY: plateSin(this.tiltY, this.rockY),

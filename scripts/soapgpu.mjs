@@ -436,6 +436,48 @@ try {
       `${bg} black cells at 10 s against the reference's ${bc} (${blackOf(h0)} at the start)`);
   }
 
+  /*
+    PLAN 32f and 32g: the frame's Plateau border and the black spots, held to
+    the reference (soapfilm.mjs C8 and C9 hold the reference to the laws).
+    The border: the noisy film with a 1 mm bottom border and no evaporation
+    for 3 s, cell by cell (the same 5%-of-its-change bar) and the volume it
+    loses (within 2%: a solver with no border loses none).
+    The spots: a 40 nm patch in a still 300 nm film for 5 s, where the
+    reference blackens the patch from its thinnest cell out and pushes the
+    liquid into a rim; the GPU must blacken as many cells (within 10%), keep
+    the liquid (float32: 1e-5), and do it on Vrij's clock, a uniform 40 nm
+    film going black on the same step as the reference's.
+  */
+  {
+    const nx = 32, ny = 64, f = film({ noise: 0.3, seed: 9 }), h0 = Array.from(f.h);
+    const s = scenario({ nx, ny, h: h0, steps: 60, reads: [60], opts: { border: 1e-3 } });
+    const [G, C] = [await gpu(s), cpu(s)];
+    const ref = rms(diff(C.reads[60].h, h0)), err = rms(G.reads[60].h, C.reads[60].h) / ref;
+    const total = (h) => h.reduce((a, x) => a + x, 0), lostC = total(h0) - total(C.reads[60].h), lostG = total(h0) - total(G.reads[60].h);
+    check('32f with a Plateau border the film drains as the reference\'s does (cell by cell within 5% of its change, the volume lost within 2%)',
+      ref > 0 && err <= 0.05 && lostC > 0 && Math.abs(lostG / lostC - 1) <= 0.02,
+      `RMS difference ${(100 * err).toFixed(3)}% of the reference's change; lost ${(100 * lostG / total(h0)).toFixed(3)}% against the reference's ${(100 * lostC / total(h0)).toFixed(3)}%`);
+
+    const sp = createSoapFilm({ nx: 32, ny: 32, noise: 0, h0: 300 });
+    patch(sp, 16, 16, 3, 40);
+    const p0 = Array.from(sp.h), ss = scenario({ nx: 32, ny: 32, h: p0, steps: 100, reads: [100], opts: { g: 0 } });
+    const [Gs, Cs] = [await gpu(ss), cpu(ss)];
+    const blk = (h) => h.filter((v) => v <= 8.01).length, [bg, bc] = [blk(Gs.reads[100].h), blk(Cs.reads[100].h)];
+    const drift = Math.abs(total(Gs.reads[100].h) - total(p0)) / total(p0);
+    // Cell by cell too: a shader that blackened as many cells but spread the liquid over the film would match the count.
+    const spRef = rms(diff(Cs.reads[100].h, p0)), spErr = rms(Gs.reads[100].h, Cs.reads[100].h) / spRef;
+    check('32g a thin patch goes black as the reference\'s does (black cells within 10%, cell by cell within 1% of its change) and keeps its liquid (1e-5)',
+      bc > 0 && Math.abs(bg / bc - 1) <= 0.1 && spRef > 0 && spErr <= 0.01 && drift < 1e-5,
+      `${bg} black cells against the reference's ${bc}; RMS difference ${(100 * spErr).toFixed(3)}% of the reference's change; total drift ${drift.toExponential(1)}`);
+
+    const u = Array(64).fill(40), su = scenario({ nx: 8, ny: 8, h: u, dt: 0.01, steps: 200, reads: Array.from({ length: 200 }, (_, k) => k + 1), opts: { g: 0 } });
+    const [Gu, Cu] = [await gpu(su), cpu(su)];
+    const first = (R) => { for (let k = 1; k <= 200; k++) if (R.reads[k].h.some((v) => v <= 8.01)) return k; return Infinity; };
+    const [kg, kc] = [first(Gu), first(Cu)];
+    check('32g Vrij\'s clock: a uniform 40 nm film goes black on the reference\'s step (within one)', Number.isFinite(kc) && Math.abs(kg - kc) <= 1,
+      `step ${kg} against the reference's ${kc} (dt 0.01 s)`);
+  }
+
   const work = await page.evaluate(() => window.__work);
   check('the work is the GPU\'s: every step submits to the GPU and every read maps a buffer', selftest || (work.steps > 0 && work.idleSteps === 0 && work.idleReads === 0),
     selftest ? 'not asked of the control, which is the CPU reference by design' : `${work.idleSteps} of ${work.steps} steps submitted nothing, ${work.idleReads} of ${work.reads} reads mapped nothing`);
