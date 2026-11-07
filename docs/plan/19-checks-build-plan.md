@@ -260,23 +260,30 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
   part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
   `docs/plan-shipped.md` §19k-9.
-- **19k-11, open** (E, S). **Budget the Linux parts against GitHub's slow runners.** The ubuntu
-  runners come in speed tiers about 2x apart (videoflow's printed CPU loop, plain JavaScript, reads
-  0.70, 1.05 or 1.40 ms a frame across twenty branches' `lab` jobs, the same branch on different tiers
-  from push to push), and a part sized on the fast tier is cancelled on the slow one: #655 drew the slow
-  tier six times running: `lab` was cancelled in holeline before #658 moved `widedials` to `lab3`, and
-  with holeline moved there too (#655's first fix, reverted) `lab3` ran 24:51 of its 25 (holeline
-  10:23, soap 6:53, soapbreak 3:59, widedials 3:36) while `lab` ran 12:26. Main's split today is
-  about 22:50 and 14:30 on that tier, inside 25 but not by much. Size every
-  Linux part to finish inside 21 minutes at 1.40 ms (printing the tier in the job summary, from
-  videoflow's line), and split a part that does not. Found on #655 (PLAN 38r part 2).
+- **19k-11** (E, S): **shipped** in part, `holeline` in an eighth Measure part `lab4` (#690),
+  since `lab` was cancelled in it at 25 minutes on main's deploys 667 and 670 and on both of
+  #688's attempts, all on the slow runner tier. Story in `docs/plan-shipped.md` §19k-11. Open:
+  19k-11b.
   - **19k-11a, shipped 2026-11-07 (#688).** `lab` was cancelled at 25:00 on both of #688's
     attempts, on the slow tier: the first in holeline at ten minutes, the second with all 11
     checks green in 24:34 (holeline 10:19), the job's own setup taking it past the limit;
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
-    checks it controls) and `beadmask` (0:46) moved to `lab3`: `lab` about 20:20 at that rate,
-    `lab3` about 12:40. Only the shard moved; no command, bar or input. The part sized at 1.40 ms
-    and the tier printed in the summary are still open.
+    checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
+    #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
+  slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
+  0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
+  the tier in each part's job summary (from videoflow's line, or a few milliseconds of the same
+  loop in `checks.mjs` for the parts that do not run videoflow), and read every part's time at
+  1.40 ms over the next merges: split any that would pass 21 there. Each part draws its own
+  runner, so only `lab`, which runs videoflow, knows its tier today: on deploy 670 `lab2` and
+  `lab3` ran 11:38 and 11:49 as jobs on runners whose tier nothing printed.
+- **19k-13, open** (E, S). **The Mac's plate shard at its 20 minutes.** On #690's run the
+  plate shard's 41 checks took 19:08 after 46 s of setup on a GitHub Mac, and the job was
+  cancelled about a second past its bound, every check green (green on re-run); on main's
+  deploy 671 it ran 18:07. The slowest: Areas that listen 1:42, A drop slumps 1:05, the
+  Finger drags 0:58, the physics 0:56. Every other Mac shard ran 15:49 to 16:49 on that run,
+  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way.
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1035,7 +1035,7 @@
     },
     {
       "name": "The oil beads' mask drawn on the GPU",
-      "shard": "lab3",
+      "shard": "lab",
       "run": "npm run beadmask",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1050,7 +1050,7 @@
     },
     {
       "name": "The slosh dish on the GPU",
-      "shard": "lab3",
+      "shard": "lab",
       "run": "npm run sloshgpu",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1108,7 +1108,7 @@
     },
     {
       "name": "No line round a bubble's hole",
-      "shard": "lab",
+      "shard": "lab4",
       "run": "npm run holeline",
       "why": [
         "No line round a bubble's hole in one dye (PLAN.md 33a,",
@@ -1121,7 +1121,11 @@
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
         "with airNear's mask taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
-        "so it sits here beside lampzero rather than in the Mac queue."
+        "so it sits here beside lampzero rather than in the Mac queue.",
+        "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
+        "(PLAN 19k-11): on GitHub's slow ubuntu tier (videoflow's CPU loop 1.39 ms",
+        "a frame) `lab` reached it at 14:15 and was cancelled at its 25 minutes",
+        "while it ran, every check before it green; it takes 8 to 10.5 minutes alone."
       ]
     },
     {
