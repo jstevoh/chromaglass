@@ -3,8 +3,18 @@
 Asked 2026-11-07: should the app have a skill or an interface so that the assistants
 people already use (Claude, ChatGPT, Gemini) can make looks and drive the show? "Make a
 slow purple look for this song", "pour blue on the next drop", "build me a set for these
-six tracks". **Design only: nothing here is built until the owner answers 44-0.** Its
-priority is below the YouTube launch (§37x) and the Release kit (§43).
+six tracks".
+
+**The owner's answer (2026-11-07): build it for the owner's own use now; do not sell,
+market or promote it.** So it is a private tool: dormant on every show but the owner's
+(a switch only the owner sets), not shipped inside the Mac app, and named nowhere a
+visitor or customer reads (the landing page, the guide, the press page, the store
+listings, the app's menus); `npm run assistant` fails if a public page names it. The
+owner then asked for it with no limit on what it may control ("Full" mode, the live
+stream included), for the assistant to see the plate, to learn the owner's taste, and
+for control over the internet (44h, the next piece). The public pieces of the first
+design (44a's page and `llms.txt`, 44e's menu and guide section, the tier) are parked
+until the owner says otherwise.
 
 ## What the app already has to build on
 
@@ -81,99 +91,69 @@ through cords and preset patches, and the plate shader is untouched.
 
 ## Items
 
-- **44-0. The owner's call: the tier, and whether to go remote.** Recommended: 44a free
-  for everyone (it is files, and presets as files are free already); the live connection
-  (44b–44f) **Pro**, beside OSC in and Art-Net, since it rides the same show server and is
-  the same kind of pro integration (§23's table); the remote connector (44h) not built
-  until local has people asking for it. The alternative worth weighing: Suggest mode
-  (44d) in Home, since the phone remote is Home and Suggest can do less than the phone.
-- **44a. A page for assistants.** *(S. Works in all three today.)* `public/assistants.md`,
-  served at `chromaglass.art/assistants.md`, pointed at by a new `public/llms.txt` and by the guide: what
-  a look is, the look keys with each one's travel and its one line of help (generated
-  from `LEARNABLE_SETTINGS` in `src/lib/midi.ts` and `src/lib/controlHelp.ts`, never
-  written by hand), the built-in looks by id, the liquids, and the set-list and song-show
-  file shapes, with three worked examples ("slow purple for a ballad", "a drop that
-  pours", "a six-song set"). Its check, `npm run assistantdoc`: every example on the page
-  loads through the real readers (`readSetListFile`, `parseFile`) with no key unknown, and
-  the key table matches the code, so the page cannot rot. Phone: the files load on the
-  phone as they do on the desk. Pass: the three examples load, and a page with a key
-  renamed fails.
-- **44b. The assistant role on the show server.** *(S. Claude's lane: it is the show
-  server's security.)* A fourth `hello` role, `assistant`, beside `display`, `controller`
-  and `mirror`: admitted only from the laptop itself, only with the show key, only at the
-  tier 44-0 picks (the relay already knows it, `proLinks()`), and only while the
-  Assistant switch (44d) is not Off. The display is told how many are connected, as it is
-  for phones. Its own role, not a controller with a new name, so the display can hold it
-  to 44d's limits and never mistake it for the performer's phone.
-- **44c. The local MCP server.** *(M.)* `mcp/chromaglass-mcp.js`, its own folder and
-  package like `desktop/` (it uses the MCP SDK, which `server/` must not import), shipped
-  inside the Mac app. It finds the show server on `127.0.0.1` (port 3000, or
-  `CHROMAGLASS_PORT`), reads the key from `/remote-info.json`, joins as `assistant`, and
-  turns MCP calls into the remote messages above. It runs with no Node installed, on the
-  app's own Electron (`ELECTRON_RUN_AS_NODE=1`). What it offers:
-  - Resources (read): the show now (the `state` snapshot, trimmed to the look's keys),
-    the library of looks, the look keys with travel and help (44a's table), the song
-    playing and its sections where a song map has them, the beat clock's tempo.
-  - Tools that need only Suggest: `make_look` (a name, a base look and the keys to change:
-    saved to the library, the plate untouched), `cue_look` (arm one for the performer's
-    Go), `make_song_show` (a song show with its actions, saved; the app plays it when that
-    song comes on), `describe_show` (the state in words).
-  - Tools that need Play: `go` (fire the armed look over its fade), `set` (look keys only,
-    glided), `pour`, `blow`, `press`, `tilt`, `dye`, `on_next` (one song action at the
-    next section, bar or Nth kick), the sequencer's transport, and `undo`.
-  - Never offered: clear, drain, blackout, record, the live stream, overlays, the rig and
-    setup keys, OSC, Art-Net, Link, MIDI maps, the licence, files, quitting. Clear and
-    drain stay possible inside a song show, where the performer saw them in the plan.
-- **44d. The guard.** *(M. Ships in the same PR as 44c; the display enforces it, not the
-  MCP server, because the server is the side an assistant controls.)*
-  - **The switch.** *Show → Assistant: Off / Suggest / Play*, Off at every launch. On the
-    desk's status line and the phone's, with one press to Off; `assistant-off` as a desk
-    action, so MIDI and OSC can learn it. Suggest is the first step on.
-  - **Limits.** A look change at most every 4 s; settings at most four patches a second,
-    merged, each glided over at least half a second through the look fade (never a jump);
-    gestures at most ten a second. Over a limit the call is refused with the reason, which
-    the assistant reads and can say.
-  - **The hand wins.** A key the performer moved in the last ten seconds is refused to
-    the assistant, so it never fights a fader under a finger.
-  - **Undo.** The display keeps the look's keys from before each of the assistant's last
-    ten changes; Undo glides back to the one before, on the desk, the phone, MIDI and as a
-    tool.
-  - **Flashes.** Everything the assistant sets passes `src/lib/flashGuard.ts`'s limits as
-    the desk's own patches do (check that every patch path does before relying on it).
-  - **Text is data.** What the show hands back (a track's name from song ID, a shared
-    look's name) is marked as data in every tool's answer, so a title cannot instruct the
-    assistant.
-- **44e. Connecting an assistant.** *(S. AG lane: UI and copy.)* *Show → Connect an
-  assistant…* in the Mac app: a Claude Desktop extension file (`.mcpb`) that installs on a
-  double-click, and the config lines for Claude Code, the Gemini CLI, the Codex CLI and
-  Cursor, each with a Copy button and the app's own path filled in. A section of
-  `docs/guide.md` with the same, and a line in Show Server Details naming who is
-  connected. Phone: the phone shows the Assistant switch, its mode, the armed look's
-  "from your assistant" label, and Undo.
+- **44-0. The owner's call.** Answered 2026-11-07: the owner's own tool, not sold or
+  promoted; no tier. Revisit only if the owner decides to offer it.
+- **44a. A page for assistants.** *Parked (public).* `public/assistants.md` and
+  `public/llms.txt` with the look, set-list and song-show formats, generated from the
+  code, and its check `npm run assistantdoc`. Not built while the tool stays private;
+  the know-how it would hold went into the MCP server's own guide instead (44c).
+- **44b.** The assistant role on the show server, behind the owner's switch: **shipped** (`npm run assistant`; story in `docs/plan-shipped.md` §44).
+- **44c.** The local MCP server (`mcp/chromaglass-mcp.js`), with its show guide, the owner's notes and a picture of the plate: **shipped** (`npm run assistant`).
+- **44d.** The guard (Suggest / Play / Full, glides, Undo, the hand wins, the pace): **shipped** (`npm run assistant`).
+- **44g.** The check, with a mutant per rule: **shipped** (`npm run assistant`).
+- **44d-2. The switch on the desk and the phone.** *(S, AG lane, only if the owner wants
+  it visible.)* Today the switch is a file (see the shipped story) and Off is deleting
+  it. A desk status line with one press to Off, `assistant-off` as a learnable action,
+  and Undo on the phone, all hidden unless the switch file exists. Pass: `panel`, `desk`
+  and `phone`, and the line absent on a show without the file.
+- **44d-3. The guard counts the sequencer and auto-pilot as the hand.** The guard tells
+  the performer's moves from its own by the display's snapshots, so a setting the
+  sequencer or auto-pilot moves is read as the performer's and refused to the assistant
+  for ten seconds. Conservative (never fights), but with auto-pilot on the assistant
+  can move almost nothing. Fix: the display marks which of its changes were a person's
+  (`laterWrites` in `lib/lookFade.ts` already tracks desk writes). Pass: an
+  `npm run assistant` line with the stand-in's sequencer moving a key the assistant
+  may still set.
+- **44d-4. A glide fights a fader the desk moves mid-glide.** A phone's or OSC's patch
+  cancels the key's glide at once (`onPerformer`); a desk move is only seen in the next
+  snapshot, so up to a glide's remaining steps land over it. Glides default to 1 s.
+  Fix with 44d-3's marking. Pass: a desk move mid-glide stops the glide within 100 ms.
+- **44c-2. Save a made look to the library.** `arm_new_look` arms a look for Go; saving
+  it is the desk's own Save after Go. A `save-look` message needs the user-preset store,
+  which lives in `App.tsx` (over 100 KB, so it cannot grow): split that piece out first
+  (19ai), then add the message and the tool. Pass: a made look appears in the library
+  after a reload.
+- **44c-3. The settings' travel and help for the assistant.** `get_settings` gives
+  values, not ranges or meaning, so the assistant learns a setting's travel by
+  `sanitizePatch` clamping it. Generate a table from `PIN_RANGE` (`lib/deskPins.ts`),
+  `LEARNABLE_SETTINGS` (`lib/midi.ts`) and `lib/controlHelp.ts` at build time into a
+  JSON the MCP server reads (it cannot read TypeScript). Pass: the table's keys match
+  the code's, checked in `npm run assistant`.
+- **44c-4. A bigger picture.** `look_at_plate` rides the remote's Draw picture, at most
+  480 px wide (`PAD_PICTURE_MAX_WIDTH`), enough to judge mud and balance, not fine
+  detail. A one-off still at 1024 px for the assistant, through the same grab
+  (`gpu/padGrab.ts`). Pass: the image's width read from its JPEG header.
 - **44f. A pour as a song action.** *(S.)* `songShows.ts` has no *what* that drops a
   colour: `dyes` takes the look's next palette, and `burst` presses. Add `{ do: 'pour';
-  color; amount }` so "blue on the next drop" is a song action and not a timed call. The
-  check is `npm run songs`, extended: a pour at the second drop fires on the frame the
-  section starts and not before.
-- **44g. The check, written first.** *(S. Claude's lane: written and shown red on main
-  before the build, the builder removes the id from `--owed`.)* `npm run assistant`:
-  starts the show server and a stand-in display, drives the MCP server over stdio with a
-  real MCP client, and asserts, from the messages the display receives: each tool sends
-  the message it should; Off refuses the role; Suggest refuses `go`, `set` and gestures;
-  a rig key is refused; the fifth patch inside a second is refused; a key moved by the
-  stand-in performer is refused for ten seconds; Undo restores the keys exactly; a
-  below-tier key is refused. Each assertion also run against a mutant that drops the
-  rule, which must fail.
-- **44h. A remote connector, if 44-0 says so.** *(L.)* For ChatGPT, the Gemini app and
-  claude.ai: an MCP endpoint on a Cloudflare Worker (Streamable HTTP over HTTPS), OAuth
-  with the person's ChromaGlass account (Firebase sign-in, as `account-shows.js` already
-  verifies), and a Durable Object per account that the Mac app's show server holds an
-  outbound WebSocket to, so nothing on the Mac listens on the internet. The Mac still
-  enforces 44d; the cloud only relays. Owed before it is built: the vendors' own pages
-  read (which transports, which plans, the review each store asks for), the running cost
-  measured, and a security review (Claude's lane). Not started until local has users.
+  color; amount }` so "blue on the next drop" is a song action and not a timed call,
+  and a `make_song_show` / `on_next` tool so the assistant can program it. The check is
+  `npm run songs`, extended: a pour at the second drop fires on the frame the section
+  starts and not before.
+- **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
+  lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
+  ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
+  over HTTPS), OAuth that admits the owner's ChromaGlass account alone (Firebase
+  sign-in, as `account-shows.js` already verifies), and a Durable Object the Mac app's
+  show server holds an outbound WebSocket to, joining the relay as the same
+  `assistant` role, so nothing on the Mac listens on the internet and the guard (44d)
+  still decides everything on the Mac. Owed first: the vendors' current pages on
+  custom connectors read (transport, auth), the running cost (expected inside the
+  Workers free tier for one user), and a security review. Its check: the Worker
+  against a stand-in Mac relay, a token for any other account refused, the switch off
+  closing the tunnel. Pass: `npm run assistant` driven through the Worker as well as
+  over stdio.
 
-## Order, if the owner says yes
+## Order
 
-44a first (one day, all three assistants, no tier question), then 44g, then 44b with
-44c and 44d as one PR and 44e as the AG brief, then 44f. 44h waits on 44-0 and on demand.
+44h next, in its own PR; then 44c-3 and 44f; 44d-2 to 44d-4, 44c-2 and 44c-4 as they
+are wanted.
