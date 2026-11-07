@@ -472,6 +472,34 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 
 const fmtSecs = (s) => (s >= 90 ? `${Math.floor(s / 60)} min ${String(Math.round(s % 60)).padStart(2, '0')} s` : `${Math.round(s)} s`);
 
+/*
+  Whether a part run on a selection must build the site first (PLAN 19aa-15).
+  A part runs its checks in the manifest's order, and in full the ones that
+  serve `dist/` without building it lean on one before them that does:
+  browser2's Mixer, phone link, Draw, input picker, Source and follow-song on
+  the iPhone remote's, the Live Show's or the shelf's `vite build`. A pull
+  request runs only the checks its diff reaches (19k-4), and #673, which
+  touched renders.mjs alone, ran that one with nothing built: red after 1 s
+  on "The directory "dist" does not exist". So the rule is the full run's
+  own: when a picked check had a builder before it in the full order and
+  none of the picked ones before it builds, the part builds once, first,
+  and every check sees the site a full run would have shown it. Read from
+  the commands (through their npm scripts), so a new check needs no field
+  to be safe, and a part whose picked checks build for themselves, or need
+  nothing built, pays nothing.
+*/
+const buildsSite = (run, scripts) => [run, ...[...npmScriptsOf(run, scripts)].map((n) => scripts[n] ?? '')].some((r) => /\bvite(?:\.js)? build\b/.test(r));
+export function buildFirst(all, list, scripts) {
+  let builtInFull = false, builtHere = false;
+  for (const c of all) {
+    const picked = list.includes(c);
+    if (picked && builtInFull && !builtHere) return true;
+    if (buildsSite(c.run, scripts)) { builtInFull = true; if (picked) builtHere = true; }
+  }
+  return false;
+}
+const SITE_BUILD = { name: 'The site, built first', run: 'node node_modules/vite/bin/vite.js build' };
+
 // `only`: the names of the checks to run (reach.mjs's Measure selection,
 // CHECKS_ONLY in the job), or null for all of them. The rest are named in a
 // notice, so a log never shows a check missing without saying it was left out.
@@ -489,6 +517,16 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
   if (!list.length) {
     console.log(`${shard}: none of its ${all.length} checks is reached by this change`);
     return 0;
+  }
+  if (only && buildFirst(all, list, pkgScripts())) {
+    console.log(`${shard}: a check picked here leans on a build an unpicked one makes in a full run, so the site is built first (PLAN.md 19aa-15)`);
+    console.log(`::group::Run ${SITE_BUILD.run}`);
+    const b = await runOne(SITE_BUILD);
+    console.log('::endgroup::');
+    if (!b.ok) {
+      console.log(`::error title=${escProp(SITE_BUILD.name)}::${escData(`${SITE_BUILD.run}: exit ${b.code}`)}`);
+      return 1;
+    }
   }
   const results = [];
   for (const c of list) {
@@ -723,6 +761,20 @@ async function selftest() {
     say(ask(stub(`echo '${ok}'`, `echo '{"message":"rate limited"}'`)).startsWith('partial'), 'a run whose annotations are an error object is partial');
     say(ask(stub(`echo '{"jobs":[{"name":"Measure · logic","id":1}]}'`, 'echo []')).startsWith('partial'), 'a run with no reach job is partial');
     say(ask(stub(`echo 'not json'`, 'echo []')).startsWith('partial'), 'a run whose jobs are not JSON is partial');
+  }
+
+  // A selection that leaves out the build a picked check leans on builds first (19aa-15).
+  {
+    const sc = { build: 'vite build', site: 'npm run build && node scripts/a.mjs' };
+    const B = { name: 'b', run: 'npm run site' }, U = { name: 'u', run: 'node scripts/u.mjs' }, U0 = { name: 'u0', run: 'node scripts/u0.mjs' };
+    const all = [U0, B, U];
+    say(buildFirst(all, [U], sc), 'a check picked without the builder before it builds first (renders on #673)');
+    say(!buildFirst(all, [B, U], sc), 'not when the builder before it is picked too');
+    say(!buildFirst(all, [U0], sc), 'nor for a check no builder comes before in a full run');
+    say(!buildFirst(all, all, sc), 'nor for a full part');
+    const b2 = man.checks.filter((c) => c.shard === 'browser2');
+    const renders = b2.filter((c) => c.name === "The sound's renders");
+    say(renders.length === 1 && buildFirst(b2, renders, pkg.scripts ?? {}), 'and browser2 with the renders alone picked builds first');
   }
 
   // The runner: a green check, a red one with its FAIL line kept, a timeout

@@ -140,7 +140,7 @@ const sample = (page) => page.evaluate(() => {
   const rd = window.chromaglassDebug?.()?.riding ?? { frames: 0, laid: 0 };
   return {
     rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0, offered: window.__offered ?? 0,
-    t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN,
+    t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN, whoAt: window.__who?.length ?? 0, lost: window.__lost ?? 0,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
   };
@@ -194,10 +194,62 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
       loads; this is the smallest one it accepts.
     */
     window.__commits = 0;
+    /*
+      And who: each commit's topmost components that rendered, named, so a
+      red ceiling says what besides the App committed (PLAN 19aa-14: six
+      GitHub Mac runs read 1.6 to 2.3 commits a second for 1.0 to 1.3 App
+      renders, and nothing said whose). A fiber rendered in this commit when
+      it was not in the last commit's tree (React swaps in the alternate of
+      every fiber it worked on) and carries PerformedWork (flag 1; a fiber
+      cloned for a bailout has it cleared). The names are a production
+      build's, minified, so the label is what survives minifying: the
+      component's prop names and the first element it draws. The App
+      itself is the label whose count matches its renders.
+    */
+    window.__who = [];
+    /*
+      And the GPU devices lost (LiquidVisualizer's loss handler logs each one):
+      a loss and its recovery commit the plate's own state twice, without
+      the App, so a window holding one reads two commits over the App's. The
+      cloud's software WebGPU loses its device every nine seconds or so and
+      reads the very 2.0 commits a second #595 did, all of them the plate's.
+    */
+    window.__lost = 0;
+    const error = console.error.bind(console);
+    console.error = (...a) => { if (typeof a[0] === 'string' && a[0].startsWith('WebGPU device lost')) window.__lost++; error(...a); };
+    let seen = new Set();
+    const label = (f) => {
+      const keys = Object.keys(f.memoizedProps ?? {}).filter(k => k !== 'children').slice(0, 4).join(',');
+      let h = f.child;
+      while (h && typeof h.type !== 'string') h = h.child;
+      const el = h?.stateNode;
+      const testId = el?.getAttribute?.('data-testid');
+      const cls = typeof el?.className === 'string' ? el.className.split(' ')[0] : '';
+      return `{${keys || 'no props'}}<${h?.type ?? '?'}${testId ? ` ${testId}` : cls ? `.${cls}` : ''}>`;
+    };
+    const tops = (root) => {
+      const now = new Set();
+      const out = [];
+      const stack = [[root.current.child, false]];
+      while (stack.length) {
+        const [first, under] = stack.pop();
+        for (let f = first; f; f = f.sibling) {
+          now.add(f);
+          const worked = !seen.has(f) && (f.flags & 1) === 1 && f.alternate !== null && typeof f.type !== 'string';
+          if (worked && !under) out.push(label(f));
+          if (f.child) stack.push([f.child, under || worked]);
+        }
+      }
+      seen = now;
+      return out;
+    };
     window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
       supportsFiber: true, renderers: new Map(), inject() { return 1; }, checkDCE() {},
       onScheduleFiberRoot() {}, onPostCommitFiberRoot() {}, onCommitFiberUnmount() {},
-      onCommitFiberRoot() { window.__commits++; },
+      onCommitFiberRoot(_id, root) {
+        window.__commits++;
+        try { window.__who.push(...tops(root)); } catch { window.__who.push('(unnamed: the walk threw)'); }
+      },
     };
   }, { source, desk, fader, map: FADER_MAP, pad });
   await page.goto(`http://localhost:${PORT}/?debug&look=classic&dpr=0.35&play=0`, { waitUntil: 'load' });
@@ -269,6 +321,16 @@ async function heldOpen(page, a, b) {
   }
   return b;
 }
+/** Who committed between two samples, as `label ×n`, most first (see the devtools hook in `open`). */
+async function whoBetween(page, a, b) {
+  const names = await page.evaluate(([i, j]) => window.__who.slice(i, j), [a.whoAt, b.whoAt]);
+  const n = new Map();
+  for (const x of names) n.set(x, (n.get(x) ?? 0) + 1);
+  const lost = b.lost - a.lost;
+  return ([...n].sort((p, q) => q[1] - p[1]).map(([k, v]) => `${k} ×${v}`).join(', ') || 'nothing') + (lost ? `, ${lost} GPU device${lost > 1 ? 's' : ''} lost` : '');
+}
+/** Printed beside a commits ceiling: who, for each window, when anything besides the App's own renders committed. */
+const whoFor = (w) => (w.some(x => x.commits > x.renders + 0.2) ? `; committed: ${w.map(x => x.who).join(' | ')}` : '');
 async function measure(page) {
   const out = [];
   for (let i = 0; i < 2; i++) {
@@ -304,6 +366,7 @@ async function measure(page) {
       drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
       offered: (b.offered - a.offered) / s,
       seconds: s,
+      who: await whoBetween(page, a, b3),
     });
   }
   return out;
@@ -345,7 +408,7 @@ try {
         // A floor too: every App render React finishes is a commit, so a
         // counter the devtools hook stopped feeding (React swallows its own
         // errors injecting it) reads 0 and must not pass as "nothing".
-        w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', '));
+        w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', ') + whoFor(w));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
         check(hears, w.every(x => x.frames >= FRAMES_ASKED && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
@@ -469,7 +532,7 @@ try {
       */
       check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
         w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= FRAMES_ASKED)),
-        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + heldFor(w));
+        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + heldFor(w) + whoFor(w));
       await ctx.close();
     }
     {
@@ -513,7 +576,7 @@ try {
         places.every(Boolean) && moved >= 5 && (await ringAt())?.on, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
       check(`${screen.name}, a gamepad stick sweeping: the App renders for its clock and no more (0.6 to 1.5 a second)`,
         (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || bf.frames - a.frames >= FRAMES_ASKED),
-        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s; ${bf.frames - a.frames} frames in ${((bf.t - a.t) / 1000).toFixed(1)} s`);
+        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s; ${bf.frames - a.frames} frames in ${((bf.t - a.t) / 1000).toFixed(1)} s` + whoFor([{ renders: (b.renders - a.renders) / s, commits: (b.commits - a.commits) / s, who: await whoBetween(page, a, b) }]));
       // The stick let go and the right trigger held: the ring swells and stays where it is.
       await page.evaluate(() => { clearInterval(window.__sweep); window.__pad.axes = [0, 0, 0, 0]; window.__pad.rt = 1; });
       await page.waitForTimeout(1000);
@@ -527,7 +590,7 @@ try {
       const s2 = (d.t - c.t) / 1000;
       check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the App renders for its clock and no more`,
         held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || df.frames - c.frames >= FRAMES_ASKED),
-        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s; ${df.frames - c.frames} frames in ${((df.t - c.t) / 1000).toFixed(1)} s`);
+        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s; ${df.frames - c.frames} frames in ${((df.t - c.t) / 1000).toFixed(1)} s` + whoFor([{ renders: (d.renders - c.renders) / s2, commits: (d.commits - c.commits) / s2, who: await whoBetween(page, c, d) }]));
       await ctx.close();
     }
   }
