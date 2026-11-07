@@ -60,6 +60,19 @@
  * edges 206, the lamps' moves 232 levels on the camera's view, 145 on the
  * closeup, 138 on the bubbles).
  *
+ * And the shadowgraph (PLAN 38h-3):
+ *
+ *   13.  it is the whole column's, one term: a clear pour of glycerine, no
+ *        dye in it and no oil, is a lens out of focus as line 7 asks of the
+ *        oil, and brightens nothing in focus. And as strong a lens as the
+ *        oil's for its index step: the two drops are the same size, so the
+ *        summed |ln T| each makes just off focus goes as glycerine's 0.142
+ *        over water to the oil's 0.8 of 0.137 (1.29), within a quarter. The
+ *        dye's shadowgraph and the oil's were drawn apart, the dye's only
+ *        where the dye itself sloped and the oil's from the oil alone, so on
+ *        main the pour drew its lens only where the wash happened to slope:
+ *        301 px against the oil's 1944
+ *
  * Every number asked is printed. Run against main before 38h it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
  * sheen, the dish's and the rims' glow and the grain each over the plate
@@ -77,6 +90,10 @@ const check = (name, ok, detail = '') => {
 const N = 128, SIZE = 256, SLACK = 1, DARK = 8, DOES = 0.002;
 /** Where the oil goes: the wash, away from the pools, so the plate under it is the lamp through the wash alone. */
 const OIL = { x: 0.72, y: 0.28, r: 0.09 };
+/** Where the clear pour goes (line 9): the wash's far corner from the oil and the pools. */
+const POUR = { x: 0.72, y: 0.72, r: 0.09 };
+/** Line 9's strength is read just off Focus's middle, where the transport is still linear in the path and nothing clips. */
+const NEAR = 0.56;
 
 const { page, close } = await openLab();
 /** Where the lamps stand for line 12: the middle, and opposite corners. */
@@ -105,7 +122,7 @@ const CAM_BEADS = [[0.3, 3], [0.55, 5], [0.75, 2.5]];
 const FOCUS_EDGE = 0.3 * 0.2 * 0.2;
 let r, r2;
 try {
-  r = await page.evaluate(async ({ N, SIZE, OIL, DARK }) => {
+  r = await page.evaluate(async ({ N, SIZE, OIL, POUR, DARK, NEAR }) => {
     await lab.create(N);
     /*
       The grade at 1, a plain transfer. Saturation Boost pushes each channel
@@ -166,13 +183,21 @@ try {
     out.waterFocus = await shot({ projectorFocus: 0.5 });
     out.water8 = await shot({ projectorFocus: 0.8 });
     out.water2 = await shot({ projectorFocus: 0.2 });
+    out.waterNear = await shot({ projectorFocus: NEAR });
     s.addMix(OIL.x, OIL.y, OIL.r, { oil: 0.8 });
     await lab.step(1);
     out.oilFocus = await shot({ projectorFocus: 0.5 });
     out.oil8 = await shot({ projectorFocus: 0.8 });
     out.oil2 = await shot({ projectorFocus: 0.2 });
+    out.oilNear = await shot({ projectorFocus: NEAR });
+    // A clear pour, no dye in it, onto the wash away from the oil and the pools: glycerine, n 1.4746.
+    lab.addSpecies(POUR.x, POUR.y, POUR.r, 50, 'glycerine', false);
+    out.pourFocus = await shot({ projectorFocus: 0.5 });
+    out.pour8 = await shot({ projectorFocus: 0.8 });
+    out.pour2 = await shot({ projectorFocus: 0.2 });
+    out.pourNear = await shot({ projectorFocus: NEAR });
     return out;
-  }, { N, SIZE, OIL, DARK });
+  }, { N, SIZE, OIL, POUR, DARK, NEAR });
   r2 = await page.evaluate(async ({ N, SIZE, LAMPS, CAM_BEADS }) => {
     await lab.create(N);
     const base = { lampGround: 1, edgeRelief: 0.6, saturationBoost: 1, lampHotspot: 0 };
@@ -403,6 +428,44 @@ const oilThere = up8 > 20 && down8 > 20;
   check(`12. where the two lamps stand draws nothing: the plate, the camera's view, the closeup's relief and the camera's bubbles the same (by ${SLACK}) with both lamps moved to opposite corners and both to one corner, the relief and the bubbles each moving over ${pct(DOES)} of the picture`,
     moved.every(([, m]) => m <= SLACK) && Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark) > DOES && bubblesDo > DOES,
     `${moved.map(([k, m]) => `${k} ${m}`).join(', ')} levels; the relief moves ${pct(Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark))}, the bubbles ${pct(bubblesDo)}`);
+}
+{
+  const inPour = (u, v) => Math.hypot(u - POUR.x, (1 - v) - POUR.y) < POUR.r * 1.3;
+  let up = 0, down = 0, turn = 0, seen = 0;
+  for (let i = 0; i < P; i++) {
+    const x = i % SIZE, y = Math.floor(i / SIZE);
+    if (!inPour(x / SIZE, y / SIZE)) continue;
+    const g8 = r.pour8[4 * i + 1] - r.oil8[4 * i + 1];
+    const g2 = r.pour2[4 * i + 1] - r.oil2[4 * i + 1];
+    if (g8 > 2) up++;
+    if (g8 < -2) down++;
+    if (Math.abs(g8) > 2 && Math.abs(g2) > 2) { seen++; if (Math.sign(g8) !== Math.sign(g2)) turn++; }
+  }
+  /*
+    The strength, not only the area: the count of pixels past 2 levels fills
+    most of the drop's disc for any lens over about 1%, so a pour drawn at
+    half or twice its optical path would count the same (the review of this
+    line). And at 0.8 the lobes clip, so a sum of levels there moved only
+    1.43 times when the pour's index step was doubled. So the strength is
+    read at Focus NEAR, where exp(-Δz ∇²OPL/n) is still about linear: the
+    sum of |ln(picture / without the drop)| over the drop and the defocus
+    disc's reach past it (0.07 of the plate covers R to Focus 0.8), against
+    the oil's.
+  */
+  const reach = (o) => (u, v) => Math.hypot(u - o.x, (1 - v) - o.y) < o.r * 1.3 + 0.07;
+  const strength = (pic, base, o) => {
+    const keep = reach(o); let sum = 0;
+    for (let i = 0; i < P; i++) if (keep((i % SIZE) / SIZE, Math.floor(i / SIZE) / SIZE)) sum += Math.abs(Math.log((pic[4 * i + 1] + 0.5) / (base[4 * i + 1] + 0.5)));
+    return sum;
+  };
+  const sPour = strength(r.pourNear, r.oilNear, POUR), sOil = strength(r.oilNear, r.waterNear, OIL);
+  const d = compare(r.pourFocus, r.oilFocus, inPour);
+  // What the optics predict: each lens as strong as its index step (glycerine 1.4746, the oil 0.8 of 1.47, over water's 1.333).
+  const expect = (1.4746 - 1.333) / (0.8 * (1.47 - 1.333));
+  const ratio = sPour / Math.max(1, sOil) / expect;
+  check(`13. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8, the other way at 0.2, over 90%), as strong as the oil's for its index step (within a quarter), and in focus brightens nothing (by over ${SLACK})`,
+    up > 20 && down > 20 && seen > 20 && turn / seen > 0.9 && ratio > 0.75 && ratio < 1 / 0.75 && d.over <= SLACK,
+    `${up} px brighter, ${down} darker at 0.8 (the oil's ${up8 + down8}); summed |ln T| at ${NEAR} ${sPour.toFixed(1)} against the oil's ${sOil.toFixed(1)}, ${ratio.toFixed(2)} of the ${expect.toFixed(2)} the index steps predict; ${turn} of ${seen} turn over at 0.2; in focus brightest by ${d.over} levels`);
 }
 
 const failed = checks.filter((c) => !c.ok).length;

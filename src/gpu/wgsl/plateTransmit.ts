@@ -42,6 +42,50 @@ fn gelFilter(uv: vec2f) -> vec3f {
 }
 
 /*
+  The shadowgraph: what a column of liquid does to the light when the
+  projector's lens is focused off it (PLAN 38h-3). Whatever bends the light,
+  dye, oil, a pour of glycerine, a film or a thicker gap, bends it by the
+  slope of the optical path through the column, OPL = n·h, and a plane Δz
+  past the plate sees the light gathered where that path is curved: the
+  transport 1 - Δz·∇²OPL, whose first order exp(-Δz ∇²OPL/n) stays positive
+  as light must. The derive pass writes the whole column's OPL (.w), so this
+  is one term for all of it. It was two: refractionOptics drew the dye's
+  from the derive pass's ∇²OPL, masked to the dye's own slope and only over
+  dye, so a pour that moved only the index drew nothing; and the oil block
+  drew the oil's from the oil alone, so where dye crossed an oil drop's edge
+  the oil's share was counted twice (a black and a bright arc there, in the
+  lab at Focus 0.8).
+
+  The wall sees the plate through the lens's defocus disc, so the Laplacian
+  is taken at the disc's scale, as the difference of two ring means (sixteen
+  taps and eight), 4 (mean over R - mean over R/3) / (R² - R²/9), with R the
+  derive pass's spacing widened as the disc grows with Δz, scaled to its
+  9-tap stencil (50 e² ∇²): the oil block's own law, now read off the whole
+  path. Read cell by cell, the oil's rings were stair-stepped (the owner:
+  "really pixelated at the edge ... super digital"); averaging the derive
+  pass's own ∇²OPL over the disc instead left a fresh pour's stair-stepped
+  rim speckled, since a Laplacian of steps is mostly cell-sized spikes, where
+  the path itself is only steps. Nothing at Focus's middle, where Δz is 0,
+  and so nothing on any look as it ships. The gain is the one both terms
+  had, Boundary Contrast's.
+*/
+fn defocusShadow(t: texture_2d<f32>, uv: vec2f) -> f32 {
+  let dz = (U.projectorFocus - 0.5) * 1.5;
+  if (abs(dz) <= 0.001) { return 1.0; }
+  let e = 3.0 / U.logicalGrid;
+  let R = e * (1.0 + 4.0 * abs(dz));
+  var outer = 0.0;
+  var inner = 0.0;
+  for (var k = 0; k < 16; k++) {
+    let d = vec2f(cos(f32(k) * 0.3926991), sin(f32(k) * 0.3926991));
+    outer += tex2(t, uv + d * R).w;
+    if (k % 2 == 1) { inner += tex2(t, uv + d * (R / 3.0)).w; }
+  }
+  let lap = (outer / 16.0 - inner / 8.0) * 4.0 / (R * R * (8.0 / 9.0)) * 50.0 * e * e;
+  return clamp(exp(-dz * (lap / N_WATER) * max(1.0, U.boundaryContrast * 2.0)), 0.2, 2.5);
+}
+
+/*
   Satellite droplets: the hundreds of tiny beads that sit on the glass around
   every drop in a macro photograph, each cell of a jittered grid one small
   ball of oil. They were shaded as if a lamp shone down on them, a white dot
