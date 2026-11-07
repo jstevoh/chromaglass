@@ -317,8 +317,14 @@ const still = () => [0, 0];
     the rim), which pushes the rim out at 2εR·cos 2θ against τ₂'s pull back:
     it settles at deformation 2ε·τ₂. Here ε is chosen for D = 0.25.
   */
+  /*
+    Held for five of its τ₂, so what is read is where it settles and not the
+    way there: 2.6 s for this 20-cell pocket at the 2 mm gap (PLAN 38r), where
+    the 4 s this ran at the 6 mm gap (τ₂ 0.28 s) is only 1.6 of them and the
+    stretch read 0.230, 79% of the law, which is 1 − e^(−1.56) of it.
+  */
   const eLow = 0.125 / tau;
-  const low = run(r, eLow, 4);
+  const low = run(r, eLow, Math.ceil(5 * tau));
   const D = 2 * eLow * tau, want = Math.sqrt((1 + D) / (1 - D)) - 1;
   check('held in a strain ε it settles at deformation 2ε·τ₂ along the stretching axis',
     low.split === 0 && Math.abs(low.b.sx / want - 1) < 0.05 && Math.abs(low.b.sy) < 0.01 * want,
@@ -338,10 +344,17 @@ const still = () => [0, 0];
     for (let t = 0; t < 30; t++) f.step(dt, push, 0, 0, 0);
     return (2 * r - Math.hypot(c.x - a.x, c.y - a.y)) / r;
   };
-  const small = pressed(3), big = pressed(14);
+  /*
+    The small pair is 1.5 cells (1.6 mm): a millimetre pocket, whose τ₂ at
+    the 2 mm gap is a millisecond, what the 3-cell pair's was at the 6 mm gap
+    this was written on (τ₂ goes as R³/b²). At 2 mm a 3-cell pair's is 9 ms,
+    half a frame, and a push squeezes it 2% of its radius: it is no longer
+    the small pocket the law says stays round (PLAN 38r).
+  */
+  const small = pressed(1.5), big = pressed(14);
   check('pushed together, big pockets squeeze flat against each other and small ones stay round',
     big > 20 * Math.max(small, 1e-6) && big > 0.01,
-    `overlap ${(small * 100).toFixed(3)} % of the radius at 3 cells, ${(big * 100).toFixed(2)} % at 14`);
+    `overlap ${(small * 100).toFixed(3)} % of the radius at 1.5 cells, ${(big * 100).toFixed(2)} % at 14`);
 
   const f = new BubbleField(N);
   const s = put(f, 90, 96, 4), b = put(f, 90 + 4 + 12 - 2, 96, 12);

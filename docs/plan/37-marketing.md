@@ -121,10 +121,7 @@ a post sees them in the first minute.
   descriptions, clips, captions). Once 37p to 37s run, the owner's part is the Monday
   approval (37q) and answering; once 37x runs, the album is the week's YouTube video and
   its peaks are the week's three cuts.
-- **37k. A press page.** *(S; Claude.)* `chromaglass.art/press`: what it is in two
-  sentences, the prices, six stills and two clips to download, the logo files from
-  `brand/`, `support@chromaglass.art`. For a reviewer, a podcast or a newsletter that
-  writes back; built on the phone layout like every page.
+- ~~**37k. A press page.**~~ Shipped 2026-11-01 (#666): `chromaglass.art/press`, checked by `npm run presskit`; story in `docs/plan-shipped.md` §37k.
 - **37l. Knowing what worked.** *(S–M; Claude, with the owner's sign-in for the
   dashboards.)* The site has no analytics today (no counter in `src/` or `index.html`,
   checked 2026-10-29), so nothing says which post sent a buyer. The funnel is views →
@@ -513,6 +510,44 @@ rest is routine and the owner's calls.
   song's chapter is a link in the cuts' captions; the albums are one playlist ("Albums")
   beside 37b's three. The 60-second look videos (37b) continue less often, as the site's
   library.
+- **37x-10. The song's title painted as ink, then swept away.** *(build, M; Antigravity
+  from the brief; its check shipped 2026-11-07, `npm run inktitle`, red on main and owed.)*
+  A stream's viewer needs to know what is playing, and the 1920s legends their credit. The
+  first idea, a lower third drawn over the picture's corner for eight seconds, the owner
+  replaced on 2026-11-07: "let titles get painted on as ink and then swept away". When a
+  song starts and the switch is on, its artist and title (two lines, each clipped at 40
+  characters) are rasterised once into a mask and poured into the dye field as ink, at
+  the solver's own grid (`pourInk`, sampled from the mask as the video pour samples its
+  frame, 14ab-2); then a wash, a real flow added to the step's velocity, drifts and stirs
+  it until the letters break up. Nothing in the plate's shaders knows about titles
+  (physics writes, rendering reads), so the title is on the wall, in the stream and in
+  every recording at once, and the dye it leaves behind stays in the show as colour.
+  - *The dials.* `inkTitle` (the switch, off by default; the Live Show panel and the phone
+    turn it on), `inkTitleColor` ('' is the look's palette, its first colour, or a chosen
+    colour), `inkTitleSize` (small to the plate's width, never off the wall: a long title
+    shrinks to fit), `inkTitleY` (where it lands, up the plate) and `inkTitleSweep` (a
+    slow drift at 0.01 that still reads after 6 s, gone by 12 s at the default, by 2 s at
+    the top). No look sets any of them.
+  - *When.* The identified song (`TrackIdentity` from the song ID, 14z) changes while the
+    switch is on: `inkTitleCue` gives one title a song, keyed by its isrc, else artist
+    and title, and none for a song with no title. The album show's queue (37x-7) knows its
+    track list ahead; feeding the cue from it instead of the ear, so a title lands on the
+    song's first beat rather than when the ear recognises it, is 37x-10b.
+  - *The check.* `npm run inktitle` (scripts/inktitle.mjs): readable means the dye in the
+    title's box follows the letters, the correlation of the dye's density with the mask
+    at its best shift (a title that slid away intact still counts as readable). 0.8 or
+    better half a second after it lands, strokes four times the dye of their gaps, the
+    dye added as poured within 10%; 0.7 or better at 3 s; 0.3 or worse by 12 s; 90% of
+    its dye still on the plate when it is gone (swept, not faded). A throwaway reference
+    build passed every lab line (0.922 at landing, gone by 8 s at the dial's middle,
+    2 s at the top) before the check was committed.
+  - *Phone version.* A "Title" switch in Live Show on the phone (the remote's Live Show
+    chip, `LiveRemoteChip.tsx`, or the phone's own Live Show sheet), same setting.
+  - *Owed after the build.* The owner judges it on the Mac's film on two or three looks
+    (the lab measures a still plate; a busy look's own flow may break a title up before
+    3 s, and how a look's flow treats it is taste): docs/judging.md takes a section then.
+  - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the
+    show's own track list and its clock, so the title lands on the song's first beat.
 
 ## Who does what
 

@@ -41,7 +41,7 @@ import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, lookMotor, lookMotorRate } from '../lib/turntable';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
-import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
+import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, rockPast, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
@@ -56,7 +56,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
-import { BarGrid, Accent } from '../lib/barGrid';
+import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -951,9 +951,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
   /*
-    The bar (lib/barGrid.ts): where the beats fall and which of them is the
-    one, heard from the same readings on the same clock as the song's shape,
-    so Accent the One can weigh each kick's press by its place in the bar.
+    The bar (lib/barGrid.ts): where the beats fall and which is the one,
+    heard on the song shape's clock (or told by Link), so Accent the One
+    weighs each kick's press by its place in the bar.
   */
   const barGridRef = useRef(new BarGrid());
   const accentRef = useRef(new Accent());
@@ -2603,10 +2603,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
           }
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
-          // A clock from the desk, a tapped tempo or a typed one, if there is
-          // one. Handed over every frame — the reading carries its own
-          // sequence number, so the clock can tell a new beat from a held one.
-          beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
+          // Link, a desk's clock, taps or a typed bpm, every frame (its seq
+          // tells a new beat from a held one).
+          const tempoNow = clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null;
+          beatClockRef.current.setExternal(nowMs, tempoNow);
           kickRef.current = beatClockRef.current.update(nowMs, heardAt, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
@@ -2627,6 +2627,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
+          tellBar(barGridRef.current, tempoNow, nowMs, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
           /*
             The melody hears every reading whatever the setting, so turning
@@ -4520,18 +4521,17 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               The plate takes the swing itself (±1–2 at full), scaled by the
               slider; the phone's tilt joins it. On a thin gap that is the
               plate tipped (× CUR_ROCK, sinθ), and a phone held tipped slides
-              the colour downhill for as long as it is held, as a dish tipped
-              in the hand does (PLAN 27a).
+              the colour downhill while held, as a dish tipped in the hand
+              does (PLAN 27a).
             */
             const rockX = swingX + ext.x * 1.1 * extK;
             const rockY = swingY + ext.y * 1.1 * extK;
             /*
               And the cover glass slides on its film as the pair tips, and
-              drags the liquid with it (lib/plateRock.ts, PLAN 27a-1): what
-              makes a rock show on a look whose colour is spread evenly. Its
-              drag is the look's own liquid's: it swings on a light oil and
-              creeps on glycerine. It is tipped as the solver's plate is
-              (plateSin, as the step's rockX below).
+              drags the liquid with it (lib/plateRock.ts, PLAN 27a-1), so a
+              rock shows on a look whose colour is spread evenly. Its drag is
+              the look's liquid's: it swings on light oil, creeps on glycerine.
+              Tipped as the solver's plate is (plateSin, as rockX below).
 
               Only as far as Frame Sway lets it: the glass drags the whole
               picture, which is the frame moving rather than the liquid, and
@@ -4543,7 +4543,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               coverDrag(currentSettings.gapThickness ?? THIN_GAP_THICKNESS), simStepS,
               coverRoom(currentSettings.frameSway));
             for (const fluid of fluidsRef.current) {
-              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY;
+              fluid.tiltX = tiltX; fluid.tiltY = tiltY; fluid.rockX = rockX; fluid.rockY = rockY; fluid.rockGain = rockPast(R);
               fluid.coverX = cover.vx; fluid.coverY = cover.vy;
               fluid.extTiltX = ext.x * extK; fluid.extTiltY = ext.y * extK;
               fluid.swingX = swingX; fluid.swingY = swingY;

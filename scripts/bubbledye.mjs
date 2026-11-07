@@ -46,18 +46,21 @@
  *      depth thirty steps after, since a hole is a sink the liquid round it
  *      flows into (airPush stays on the step after the last pop).
  *
- * Why these bars and not tighter: the solve gives the air the liquid's
- * mobility (PLAN 18i), so liquid runs through a bubble, and a carry that
- * counts what comes in at the least it can be leaves some of it behind
- * (here 1.2% under a whole bubble, 6.6% under a moving one, 1.0% under a
- * growing one; at 256² 3.3%, 4.8% and 1.0%), and a whole bubble's middle at the end of its step holds the
- * floor's sliver of liquid. The totals are kept to rounding.
+ * LEFT_MOST was 0.08 while the solve gave the air the liquid's mobility,
+ * so liquid ran through a bubble and the carries left 1.2% under a whole
+ * one, 6.6% under a moving one and 1.0% under a growing one. With standing
+ * air shut in the solve (PLAN 15g-8d, hsPrep's standingLiquid) the liquid
+ * goes round it: 0.6%, 0.0% and 0.0%, so 0.02 now, three times the worst.
+ * Only the moving bubble tells the two apart (6.6% on main fails it); the
+ * whole and growing ones read 1.2% and 1.0% on main and hold the bar
+ * against a step back past that. A region with no cells in it throws
+ * rather than reading an empty bubble. The totals are kept to rounding.
  */
 import { openLab } from './lab.mjs';
 
 const TOTAL_KEPT = 0.1;
 const PEAK_MOST = 1.25;
-const LEFT_MOST = 0.08;
+const LEFT_MOST = 0.02;
 const HOLE_BACK = 0.5;
 
 const checks = [];
@@ -87,7 +90,8 @@ try {
           const v = d[(i + j * L) * 4 + 3]; t += v; mx = Math.max(mx, v);
           if (br > 0 && Math.hypot((i + 0.5) / L - bx, (j + 0.5) / L - by) < br * 0.6) { inside += v; nIn++; }
         }
-        return { t, mx, inside: nIn ? inside / nIn : 0 };
+        if (br > 0 && !nIn) throw new Error('no cells under the bubble to read');
+        return { t, mx, inside: inside / Math.max(nIn, 1) };
       };
       const t0 = await read(0, 0, 0);
       const put = (x, y, rr) => s.setBubbles(new Float32Array([x, y, rr, 1]), 1, 0.25, new Float32Array(4));

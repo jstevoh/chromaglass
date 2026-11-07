@@ -130,7 +130,18 @@ forms and a 15 % cut.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*
 6. **A privacy policy page** on Firebase Hosting, and the store listings: text,
-   screenshots from the lab and a real phone, icons, the feature graphic. *Not started.*
+   screenshots from the lab and a real phone, icons, the feature graphic. ***Built***
+   *but the screenshots* (2026-11-01): the privacy page (23.13) has a section for
+   the phone apps; every listing field for both stores is in `docs/store-listings.md`,
+   held to its store's limit by `npm run presskit`, with the App Privacy label and
+   Play's Data safety answers; Play's icon and feature graphic are drawn by
+   `npm run brand` (`docs/brand/store/`). Story in `docs/plan-shipped.md` §12.6.
+   - **12.6-shots** *(owner's phone)*: the screenshots, 6.9" iPhone at 1320 × 2868
+     and two to eight Android phone shots, taken from TestFlight and the closed test
+     (step 7), not from the lab or a desktop browser: a store screenshot promises
+     what the phone draws, and only the phone's own GPU shows its grid and frame.
+   - **12.6-label**: the App Privacy row for email and user id depends on whether the
+     iPhone app shows sign-in, which 12-ship decides; settle the label there.
 7. **TestFlight and the closed test** *(owner)*: a full set played on each phone,
    watching heat, battery and audio routing; a by-hand check in `docs/judging.md`.
    *Not started.*

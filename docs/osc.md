@@ -174,8 +174,43 @@ plate's hands (`drop`, `blow`, `press`, `tilt`, `dye`). Its header says how to w
 it, and how a CHOP Execute DAT plays a CHOP's channels, named after settings, as
 settings.
 
+## OSC out: the plate to a VJ app
+
+The show also *sends* OSC: the plate's colour, what the ear hears and each beat the plate
+presses on, so a Resolume layer's hue can sit on the dye and a strobe can land on the kick
+the plate itself pressed on (PLAN 13.5-osc). Turn it on in *Settings → Sound*, under the
+tempo: **OSC out**, beside where it sends. It goes to `127.0.0.1:7000` (Resolume's own OSC
+input port, on this Mac) until you type another `address:port`: another machine's Wi-Fi
+address, or the network's broadcast address (`192.168.1.255:7000`) for every machine on it.
+The switch is offered only where a show server is there to send the UDP (the Mac app, or
+`npm run show`; `OSC_OUT=host:port` turns it on at launch), is remembered on this machine,
+and is the same row on the phone layout. It is **Pro**, like OSC in: below Pro the line
+beside it says so and nothing leaves.
+
+Each report goes as one bundle, twenty times a second; the beat goes alone the moment it
+lands. One float per address, which is what Resolume's shortcuts, VDMX and TouchOSC map:
+
+```
+/chromaglass/out/colour/red        0..1   the plate's colour, each layer weighted by how full it is
+/chromaglass/out/colour/green      0..1
+/chromaglass/out/colour/blue       0..1
+/chromaglass/out/colour/hue        0..1   0 red, 0.33 green, 0.67 blue
+/chromaglass/out/colour/brightness 0..1   its brightest channel
+/chromaglass/out/layer/1/red       0..1   each layer the same way (green, blue, fill), from 1
+/chromaglass/out/master            0..1   the room's dimmer the rig gets; 0 in a blackout
+/chromaglass/out/sound/level       0..1   the ear's fast readings: level kick bass snare hats note
+/chromaglass/out/band/1            0..1   the ear's eight bands, 1 lowest
+/chromaglass/out/bpm               bpm    the beat clock's tempo, 0 before it has one
+/chromaglass/out/beat              1, 0   1 on each beat, 0 a twentieth of a second later
+```
+
+In Resolume, *Preferences → OSC → OSC Input* on port 7000, then *Shortcuts → Edit OSC*,
+click the parameter (a layer's hue, a strobe's trigger) and give it the address above. In
+TouchDesigner an *OSC In CHOP* on port 7000 makes a channel of each address. Nothing under
+`/chromaglass/out/` is an address the show acts on, so an app that echoes what it hears
+back to port 9000 does not drive the show with its own feed. `npm run oscout` checks the
+bytes, the numbers and the switch.
+
 ## What OSC does not do yet
 
-- Talk back: the plate's colour, the sound bands and the beat out over OSC, for a VJ
-  app to follow (PLAN 13.5-osc).
 - Scale a 0 to 1 slider to a setting with another travel (PLAN 34a-7i).

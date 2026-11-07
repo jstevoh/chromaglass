@@ -431,8 +431,8 @@ export const KICK_HOLD = RELEASE_MS / 1000;
   runs out from under the sheet fast enough for the bend to spread before the
   kick lets go, a thick one holds the sheet up round the finger. (As the
   lubrication equation has it, which is the liquid's own pace only in
-  glycerine: in 6 mm of the default oil the layer's viscous time h²/ν is
-  1.6 s, a hundred times the dent's, and the liquid's inertia rings the
+  glycerine: in 2 mm of the default oil the layer's viscous time h²/ν is
+  0.18 s (1.6 s in the 6 mm gap before PLAN 38r), still many times the dent's, and the liquid's inertia rings the
   sheet; PLAN 27f-8(f).)
 
   That was 27f-3, and its reach left out the liquid's weight. A sheet

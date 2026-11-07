@@ -176,7 +176,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   height the lens focuses on is the dye's column (`aux.z`), not the gap's real depth.
 - **33i-2. Depth of field costs 64 taps a pixel and leaves hair at aperture 1.** Where a
   sharp dye ramp sits over a defocused ground the stochastic disc leaves a faint noise
-  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §105); if it
+  along the edge. Measure it on Metal at a full frame (`docs/judging.md` §109); if it
   costs frames, gather at half resolution for the wide discs. The gather weights also lack
   the disc-area share (about 64 over the radius squared of the physical strength); a naive
   area weight is noisier, so the wide discs are somewhat fainter than a real lens's.
@@ -191,7 +191,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   to the refraction and shrank the blur by `1-bub*0.5` where a bubble sat; the new one reads
   no bubble mask (`aux.w`). A bubble is a diverging lens (a gas pocket in a liquid): bend by
   the bubble's own slope, and let Aperture treat it as the thing it is. Judge whether the
-  closeup misses it first (`docs/judging.md` §105).
+  closeup misses it first (`docs/judging.md` §109).
 - **33i-7. Saved looks with Lens up are close, not identical.** Each optic is rescaled by
   Lens times a fitted ratio (`OPTIC_SCALE`, `src/lib/userPresets.ts`), the aperture's by Focus
   too (`apertureScale`) and the bloom's by Lens again (`bloomScale`: the old pass sent the glow
@@ -225,7 +225,7 @@ within 15 %; on the plate's own liquid, every number today's check prints unchan
   fifth of its range below where the look set it, floored at the dial's minimum, so one set
   under 0.2 can be walked to exactly 0 by a calm passage at full Evolve Speed: with Lens at 0
   and nothing else up the pass is torn down and built again on the way back (33i-8). Ask the
-  owner (`docs/judging.md` §105) whether the camera belongs in the glass theme; if it stays, floor
+  owner (`docs/judging.md` §109) whether the camera belongs in the glass theme; if it stays, floor
   an optic's window above 0 as the look's own zero rule does, and `npm run lens` already prints
   which optics Evolve may wander.
 - **33i-10. A set item's controls and a sequence stage's settings skip the migration.**

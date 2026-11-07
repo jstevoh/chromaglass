@@ -143,7 +143,8 @@ import { useCastFeed } from './app/useCastFeed';
 import { useRecording } from './app/useRecording';
 import { useGlides } from './app/useGlides';
 import { useRowFades } from './app/useRowFades';
-import { useRemote } from './app/useRemote';
+import { useRemote, type OscOutHear } from './app/useRemote';
+import { useShowFeed } from './app/useShowFeed';
 import { useSongScore } from './app/useSongScore';
 import { useSongRendering } from './app/useSongRendering';
 import { useControllers } from './app/useControllers';
@@ -221,7 +222,7 @@ export default function App() {
 
   const { output, setOutput, resetOutput, wallTest, setWallTest, shownOutput } = useOutput();
 
-  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setLinkOn, tempoPanel } = useTempo();
+  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, linkProps, tempoPanel } = useTempo();
 
   const { ambientMode, setAmbientMode, setAmbientModeRef } = useAmbientMode();
 
@@ -1972,6 +1973,7 @@ export default function App() {
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
+  const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
     remoteLink,
   } = useRemote({
@@ -1982,7 +1984,7 @@ export default function App() {
     setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
     togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
-    runActionRef, runAction, tempoRef,
+    runActionRef, runAction, tempoRef, oscOutHearRef,
   });
 
   const {
@@ -2013,32 +2015,10 @@ export default function App() {
   ], [userPresets.presets]);
   relaySendRef.current = remoteLink.send;
 
-  /*
-    The plate's colour, out to the lighting rig.
-
-    The same `layerReport` the bench draws its tabs from, twenty times a second
-    to the show server, which turns it into Art-Net (see `server/artnet.js`).
-    The par cans wash the room in whatever the dye is doing instead of whatever
-    was set before the doors opened.
-
-    Faster than the bench's poll because a light that lags the screen by half a
-    second reads as broken, and it costs nothing when nothing is listening: no
-    relay, no socket, no send. It carries no React state, so the loop never
-    causes a render.
-  */
-  useEffect(() => {
-    if (remoteLink.status !== 'connected') return;
-    const id = setInterval(() => {
-      const layers = wallRef.current?.layerReport?.();
-      if (!layers?.length) return;
-      // The plate's own brightness, so the room dims when the glass thins
-      // rather than sitting at full on an empty plate. Blackout is black.
-      const fill = layers.reduce((a, l) => a + l.fill, 0) / layers.length;
-      const master = blackoutRef.current ? 0 : Math.min(1, fill * 1.6);
-      relaySendRef.current?.({ type: 'lights', layers: layers.map(l => ({ colour: l.colour, fill: l.fill })), master });
-    }, 50);
-    return () => clearInterval(id);
-  }, [remoteLink.status]);
+  // The plate's colour to the rig, and colour, sound and beat to a VJ app (OSC out).
+  const { oscOut, onOscOut } = useShowFeed({
+    connected: remoteLink.status === 'connected', relaySendRef, wallRef, blackoutRef, hear, tempoRef, oscOutHearRef,
+  });
 
   // ── MIDI controller and game controller ─────────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
@@ -2263,6 +2243,8 @@ export default function App() {
       wallTest={wallTest}
       onWallTest={setWallTest}
       {...tempoPanel}
+      oscOut={oscOut}
+      onOscOut={onOscOut}
       readTempo={readTempo}
       readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
@@ -3284,7 +3266,9 @@ export default function App() {
             readLevel={readLevel}
             tempo={tempoLabel}
             onTap={tapTempo}
-            onLink={setLinkOn}
+            {...linkProps}
+            oscOut={oscOut}
+            onOscOut={onOscOut}
             readTempo={readTempo}
             show={{
               running: sequencer.status.running,
@@ -3330,8 +3314,8 @@ export default function App() {
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             projectorFocus={settings.projectorFocus ?? 0.5}
             onProjectorFocus={(v) => updateSettings({ projectorFocus: v })}
-            clearFilm={settings.clearFilm ?? 0}
-            onClearFilm={(v) => updateSettings({ clearFilm: v })}
+            film={settings}
+            onFilm={updateSettings}
             slosh={settings.slosh ?? 0}
             onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}

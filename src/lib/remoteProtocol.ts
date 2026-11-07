@@ -128,14 +128,14 @@ export interface RemoteState {
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror'; key?: string }
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant'; key?: string }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
    * minutes, `retryMs` from now. A locked phone waits that long rather than
    * knocking again, since every knock while locked is refused unread.
    */
-  | { type: 'denied'; reason: 'key' | 'locked'; retryMs?: number }
+  | { type: 'denied'; reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop'; retryMs?: number }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -148,7 +148,7 @@ export type RemoteMessage =
    * moment of sending, so its fraction is the beat's phase and its value modulo
    * four is the bar's (beat zero is every peer's bar line); null while no session is joined.
    */
-  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean }
+  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean; locked?: boolean }
   /** Display → relay: switch Link on or off. The relay takes it from the laptop's own page only. */
   | { type: 'link-enable'; on: boolean }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
@@ -161,13 +161,54 @@ export type RemoteMessage =
    * twenty of these a second — and the browser could not send the UDP itself
    * in any case.
    */
-  | { type: 'lights'; layers: { colour: string; fill: number }[]; master: number }
+  | {
+      type: 'lights'; layers: { colour: string; fill: number }[]; master: number;
+      /** The ear's fast readings, 0..1 (`oscOut.ts`'s SOUND_OUT), for OSC out (PLAN.md 13.5-osc); absent while nothing is heard. */
+      sound?: Record<string, number>;
+      /** The ear's bands, 0..1, low to high. */
+      bands?: number[];
+      /** The beat clock's tempo, 0 before it has one. */
+      bpm?: number;
+    }
+  /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
+  | { type: 'beat' }
+  /**
+   * Relay → display: where OSC out goes and whether it is sending (PLAN.md
+   * 13.5-osc). Sent on hello, which is how a page learns there is a show
+   * server to switch it on at; `pro` false means the server holds its packets.
+   */
+  | {
+      type: 'osc-out'; on: boolean; target: string | null; pro: boolean; says: string;
+      /** Off because someone switched it off (this page, another, the Mac app), not because the server has just started: the page does not switch it back on. */
+      stopped?: boolean;
+    }
+  /** Display → relay: OSC out on at `target` ("host:port"), or off. The relay takes it from the laptop's own page only. */
+  | { type: 'osc-out-enable'; on: boolean; target?: string }
   /** Relay → display, when a controller joins and needs a snapshot. */
   | { type: 'request-state' }
   /** Display → controllers. */
   | { type: 'state'; state: RemoteState }
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
+  /**
+   * The owner's assistant (PLAN 44b–44d; the relay's guard is
+   * `server/assistant.js`, the program the assistant talks to
+   * `mcp/chromaglass-mcp.js`). Only the relay's guard sends the first two to
+   * the display, and the relay drops either from anyone else, so a phone can
+   * still end a stream and never start one.
+   *
+   * `cue-look`: arm a look the assistant made, a base from the library with
+   * its own settings over it (`lib/assistantLook.ts`), for the performer's Go.
+   * `assistant-live`: start the live stream to the saved destinations, or the
+   * test ones; Full mode only. The rest pass between the relay and the
+   * assistant and never reach the display: the switch's mode, the guard's
+   * answer to a numbered message, and Undo.
+   */
+  | { type: 'cue-look'; name: string; base: string | null; settings: Partial<VisualizerSettings> }
+  | { type: 'assistant-live'; test: boolean }
+  | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
+  | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
+  | { type: 'assistant-undo' }
   | { type: 'preset'; presetId: string }
   /**
    * Arm a look without sending it. `null` disarms.

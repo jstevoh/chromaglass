@@ -323,9 +323,10 @@ try {
       const { displayKey } = await (await fetch(`${LINK_ORIGIN}/remote-info.json`)).json();
       ws = new WebSocket(`ws://127.0.0.1:${LINK_PORT}/remote-ws`);
       await new Promise((done, fail) => { ws.once('open', done); ws.once('error', fail); });
-      const got = { osc: 0, artIn: 0 };
+      const got = { osc: 0, artIn: 0, link: null };
       ws.on('message', (d) => {
         let m; try { m = JSON.parse(String(d)); } catch { return; }
+        if (m.type === 'link') got.link = m;
         if (m.type !== 'patch') return;
         if (m.settings?.audioImpact !== undefined) got.osc += 1;
         if (m.settings?.colorSpeed !== undefined) got.artIn += 1;
@@ -338,6 +339,10 @@ try {
       const phase = async (settle = 400) => {
         await new Promise((r) => setTimeout(r, settle)); // the server's renewal after a key is filed, with room
         got.osc = 0; got.artIn = 0; rigPackets = 0;
+        // Link (13.5-link-gate): whether it was still on from the phase before,
+        // then the laptop's page asking for it, as its Link button does.
+        const linkWasOn = got.link?.on === true;
+        ws.send(JSON.stringify({ type: 'link-enable', on: true }));
         for (let i = 0; i < 10; i++) {
           level = (level + 37) % 256;
           tx.send(oscMessage('/chromaglass/setting/audioImpact', level / 255), oscPort, '127.0.0.1');
@@ -346,7 +351,7 @@ try {
         }
         await new Promise((r) => setTimeout(r, 200));
         const tier = (await (await fetch(`${LINK_ORIGIN}/license-info.json`)).json()).tier;
-        return { tier, osc: got.osc, artOut: rigPackets, artIn: got.artIn };
+        return { tier, osc: got.osc, artOut: rigPackets, artIn: got.artIn, linkWasOn, link: got.link?.on === true, locked: got.link?.locked === true };
       };
       const post = async (path, key) => {
         const r = await fetch(`${LINK_ORIGIN}${path}`, {
@@ -381,13 +386,27 @@ try {
       const proFiled = await phase(2600);
       await fileDirect(homeKey);
       const homeFiled = await phase(2600);
-      const say = (p) => `${p.tier}: osc ${p.osc}, art-net out ${p.artOut}, art-net in ${p.artIn}`;
+      const say = (p) => `${p.tier}: osc ${p.osc}, art-net out ${p.artOut}, art-net in ${p.artIn}, link ${p.link ? 'on' : p.locked ? 'locked' : 'off'}`;
       const open = (p) => p.tier === 'pro' && p.osc >= 8 && p.artOut >= 15 && p.artIn >= 8;
       const refused = (p) => p.osc === 0 && p.artOut === 0 && p.artIn === 0;
       check(
         '4b. with a Pro key, OSC in, Art-Net out and Art-Net in all reach the show, whether the key came through the server or straight into its licence file',
         open(pro) && open(proFiled),
         `${say(pro)}; filed straight: ${say(proFiled)}`,
+      );
+      /*
+        4d. Link is Pro beside them (PLAN.md 13.5-link-gate). Asked for below
+        Pro it stays out of the session and says "locked", so the switch can
+        say why; and a Pro key swapped for a Home one closes it, not only the
+        next ask (the Home phase follows a Pro one that left Link on).
+      */
+      const linkOpen = (p) => p.link && !p.locked;
+      const linkShut = (p) => !p.link && p.locked;
+      check(
+        '4d. Ableton Link joins on a Pro key, is refused and says so on Home or none, and a Pro key swapped for Home leaves the session',
+        linkOpen(pro) && linkOpen(proFiled) && linkShut(none) && linkShut(home) && linkShut(removed) && linkShut(homeFiled)
+          && home.linkWasOn === false && homeFiled.linkWasOn === false && pro.linkWasOn === false,
+        `${[none, pro, home, removed, proFiled, homeFiled].map((p) => `${p.tier} ${p.linkWasOn ? 'was on, ' : ''}${p.link ? 'on' : p.locked ? 'locked' : 'off'}`).join('; ')}`,
       );
       check(
         '4c. with a Home key, with no key in an enforced launch, and once the key is removed, OSC and Art-Net (out and in) are refused',

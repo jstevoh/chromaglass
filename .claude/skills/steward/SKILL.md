@@ -30,6 +30,7 @@ A long log is best read by a subagent told to quote the `FAIL` lines verbatim.
 | **This PR broke it** | The failing claim touches code in the diff | Fix the code |
 | **The check is wrong** | It reads NaN, null or 0 for everything; or it asserts a moment of the plate rather than the feature | Fix the check so it measures the feature, and say why in a comment above it |
 | **Red on `main` too** | The same check fails on main's last deploy run | Port the fix if one exists; otherwise one PR comment naming the check, why it is not this PR's, and the proposed patch |
+| **A flake on a line the PR cannot move** | The red line reads code the diff does not touch, and it has gone red on other PRs | Re-run the failed jobs only, never all jobs (one shard, about 16 Mac minutes, against about 80 for five). If it has a plan item and is red on two unrelated PRs, quarantine it in `scripts/checks.json` (PLAN.md 19ak-1) in a PR of its own: the line, the plan id, an end date at most 21 days out |
 | **Margin** | A value at or just past its limit, passing on the next commit | Look at the spread over the last runs before touching the limit; it is drift noise only if it is |
 
 Seen before, and the first thing to check:

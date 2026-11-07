@@ -2,6 +2,8 @@
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
+import { FILM_DYE_DEPTH } from '../src/gpu/wgsl/filmDye';
+import { FILM_PRECURSOR } from '../src/gpu/wgsl/film';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { WebGPUCamera, fillCameraUniforms } from '../src/gpu/camera';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
@@ -427,6 +429,9 @@ const api = {
   },
   /** The thickest film Clear Film lays, as a share of the gap (FILM_MAX in src/gpu/fluid.ts). */
   filmMax: FILM_MAX,
+  // The clear film's dye and the precursor its path is read above (PLAN 20b-13, `npm run lace` 8).
+  filmDyeDepth: FILM_DYE_DEPTH,
+  filmPrecursor: FILM_PRECURSOR,
   async phase() {
     const f = await lab!.solver.readPhase();
     if (!f) return null;

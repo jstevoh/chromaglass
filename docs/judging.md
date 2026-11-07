@@ -2166,6 +2166,14 @@ from the same reading of the protocol, so only Live can say the two agree.
 6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
+7. (13.5-link-one, 2026-11-01) A look with Accent the One up: the plate's heaviest kick lands on
+   Live's bar line from the first bar, not after a few bars of listening, also when the song's
+   own downbeat sounds weak.
+8. (13.5-link-transport) Start a Sequence, switch **Play/Stop** on beside Link, stop Live: the
+   Sequence pauses; play Live: it resumes. With Play/Stop off, Live's stop changes nothing.
+9. (13.5-link-menu) Show → **Ableton Link (Pro)** in the Mac app switches Link as the button does,
+   and its tick follows the button. (13.5-link-rescan) Switch Link on with the Wi-Fi off, then turn
+   the Wi-Fi on: Live on another machine is found within half a minute.
 
 ## 96. Colour that answers the music (PLAN 25i)
 
@@ -2336,7 +2344,72 @@ under the old 0.2 gate (and so smeared nothing) now say 0.
 3. Bad: a dial whose top looks the same as its old top, a look that opens differently than it
    did yesterday, or any plate that blows up at a top.
 
-## 105. The camera's dials (PLAN 33i)
+## 105. The back plate's grain on the lamp (PLAN 38h-4)
+
+**What changed.** With two plates on a lamp look, the back plate's pools now carry the
+pigment's grain the way the front's do (more or less dye from place to place), where before
+they were nearly flat. The lab shows the back plate's grain at the front's strength in the
+log of the light, and no single-pixel flecks at its edges. What it cannot show is how the
+back plate's mottle reads at 60 fps: drawn alone it is brighter than the front (38h-12), so
+the same grain moves its bright edges more, in patches.
+
+1. Lava Lamp, Two Plates on, Front level at 0 so the back plate shows alone: the pools
+   should look like the front plate's grain, a soft mottle of more and less pigment.
+2. Poster 1969 and Milk Marble the same way: the pools' edges against the bright glass.
+3. Bad: edges that look dithered or "digital", or a mottle that crawls more than the front's.
+
+## 106. OSC out into Resolume (PLAN 13.5-osc)
+
+`npm run oscout` reads the show's OSC out with a decoder of its own and holds the numbers;
+only Resolume can say it reads them.
+
+1. Resolume and the Mac app on the same Mac, a Pro licence in. Resolume: Preferences → OSC →
+   OSC Input on, port 7000. App: Settings → Sound → **OSC out**; the line says "Sending colour,
+   sound and the beat to 127.0.0.1:7000".
+2. In Resolume's Edit OSC mode, give a layer's Hue Rotate the address
+   `/chromaglass/out/colour/hue` and a Strobe effect's trigger `/chromaglass/out/beat`. With
+   music playing, the hue should follow the plate's dye and the strobe land with the plate's
+   kicks, not a frame behind.
+3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
+4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
+   the strobe a steady beat late.
+
+## 107. The real 2 mm glass gap (PLAN 38r)
+
+The owner judged the 2 mm films on 2026-10-31 ("That looks fine": the rhythm sheet's dents
+and Plate Rock's slide at about half). What only the Mac at 60 fps can say is how the thinner
+film feels across the looks: every push fades nine times sooner, and a kick's dent on the
+default oil lasts seconds.
+
+1. Any water look (Fillmore, Bubble Melt): a stir, a Blow and a flick still carry the colour
+   a hand's width, then stop rather than glide on; nothing looks frozen or treacly.
+2. Plate Rock at the default 0.45: the colour slides as in the films. Raise it to 1: the slide
+   grows to about the old 6 mm one (PLAN 38r-9, past real above the default), smoothly, with
+   no jump where it passes 0.45.
+3. The rhythm sheet with music on the default oil: each kick leaves a dent that eases out over
+   a beat or two, never a ring frozen on the glass.
+4. Clock Glass and a tilted plate: the oil lenses still rise and round up, and a lens against
+   the rim stays inside it (18g-7).
+5. Bad: a look whose motion now reads dead (say which), a dent that never fills, or Plate
+   Rock jumping at the default.
+
+## 108. A coloured clear film (Film Dye, PLAN 20b-13)
+
+Settings → Oil & Soap → **Clear Film**, then **Film Dye** and its swatch beside it (also the
+phone's Dye sheet, the remote and MIDI). 0 in every look. On Lamp Ground 1 over a lavender
+or blue look, Clear Film about 0.35 (tears over the dust in a second or two), Film Dye about
+0.5 with the yellow it opens with:
+
+1. The lace is yellow and the holes are the water's colour, clean, not yellow-tinted.
+2. Thick veins and the beads the ligaments break into read a deeper, warmer yellow than the
+   thin film; with Spectral Optics up a thick film goes orange rather than only darker.
+3. Film Dye from 0 up: a faint cream first, the swatch's yellow at the middle, a deep amber
+   at the top; nothing jumps.
+4. On Lamp Ground 0 the film shows as yellow light over black and the holes as the colour.
+5. Bad: the holes tinted, the lace flat (one yellow regardless of thickness), or the plate
+   changing when Film Dye is 0.
+
+## 109. The camera's dials (PLAN 33i)
 
 Settings → Camera, with Lens at 0: turn Refraction, Aperture, Bloom and Chromatic Aberration up one
 at a time on a plate with a few pours. Each should visibly matter by about half way, and none should

@@ -220,12 +220,17 @@ check('and it is the dial: at full Frame Sway the same song slides the default l
   ROCK_LEAN), at the default rock the glass rests about 5 mm off the middle
   (R_c sinθ, 2.6 degrees) and swings to under 2 cm, inside half the room as
   well as all of it, so the default look slides the same at Frame Sway 0.5
-  and 1 (0.343% either way): the dial has nothing to hold. It is read where
-  the glass does reach the rim, the same song at full Plate Rock.
+  and 1 (0.219% either way at the 2 mm gap): the dial has nothing to hold. It is read where
+  the glass does reach the rim, the same song at full Plate Rock, on water:
+  since the plate's film is 2 mm and not 6 (PLAN 38r) its shear holds the
+  cover three times as hard, and on the default light oil even full Plate
+  Rock left the glass inside half the room (0.489% at half against 0.487%
+  at full); on water's thinner film it still reaches the rim.
 */
-const fullRock = song({ ...base, plateRock: 1, frameSway: 1 }), halfRock = song({ ...base, plateRock: 1, frameSway: 0.5 });
-check('half way slides it less than full and more than none (at full Plate Rock, where the glass reaches the rim)',
-  halfRock.slidePeak > 0 && halfRock.slidePeak < fullRock.slidePeak && half.beat === 0.5,
+const water = { ...base, plateRock: 1, gapThickness: 0 };
+const fullRock = song({ ...water, frameSway: 1 }), halfRock = song({ ...water, frameSway: 0.5 });
+check('half way slides it less than full and more than none (at full Plate Rock on water, where the glass reaches the rim)',
+  halfRock.slidePeak > 0 && halfRock.slidePeak < 0.85 * fullRock.slidePeak && half.beat === 0.5,
   `${pc(halfRock.slidePeak)} against ${pc(fullRock.slidePeak)}; at the default rock ${pc(half.slidePeak)} against ${pc(full.slidePeak)}`);
 check('and the plate\'s own tilt still swings with the kicks at Frame Sway 0 (Plate Rock moves the heavier colour, the liquid\'s motion)',
   off.tiltPeak > 0.05 && Math.abs(off.tiltPeak - full.tiltPeak) < 1e-12, `sinθ up to ${off.tiltPeak.toFixed(3)}, the same as at full`);

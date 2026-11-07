@@ -204,6 +204,31 @@ export function shareCard(words) {
 }
 
 /**
+ * Google Play's feature graphic (PLAN.md 12.6): the share card's drawing at the
+ * 1024 × 500 the Play listing asks for, the block of mark, name and line moved
+ * up to sit in the middle of the shorter card and the burst pulled in from an
+ * edge that Play may crop behind its own buttons. Drawn here and not cropped
+ * from the share card, because a crop of 1200 × 630 to Play's wider shape cuts
+ * the tagline's second line in half.
+ */
+export function featureGraphic(words) {
+  const W = 1024, H = 500;
+  const back = burst({ cx: 820, cy: 250, s: 1.3, id: 'fk', detail: 'high' });
+  const scale = 0.7, lx = 72, ly = 105;
+  const inner = lockup(words, { detail: 'high' }).replace(/^<svg[^>]*>/, '').replace(/<\/svg>\n$/, '');
+  const [line1, line2] = words.tagline;
+  const textX = r1(lx + 236 * scale);
+  const defs = radial('feature', [['0%', '#0a3a5c'], ['60%', '#031627'], ['100%', '#00070f']], 'cx="30%" cy="35%" r="90%"') + back.defs;
+  const body = `<rect width="${W}" height="${H}" fill="url(#feature)"/>`
+    + `<g opacity="0.28">${back.body}</g>`
+    + `<g transform="translate(${lx} ${ly}) scale(${scale})">${inner}</g>`
+    + `<g fill="#d9f3f7" opacity="0.72">`
+    + `<path transform="translate(${textX} ${ly + 205})" d="${line1.d}"/>`
+    + `<path transform="translate(${textX} ${ly + 257})" d="${line2.d}"/></g>`;
+  return svg(`0 0 ${W} ${H}`, defs, body);
+}
+
+/**
  * The intro's three layers (src/lib/intro.ts), apart, because they move
  * apart: the burst turns, the hub with its C stays upright over it, and the
  * name sits under both. Drawn on no ground: the intro's own liquid is the
