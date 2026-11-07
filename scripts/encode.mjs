@@ -55,7 +55,8 @@
  *   - a writeBuffer made by hand inside the window is counted.
  */
 import { openLab } from './lab.mjs';
-import { solveLines } from './encode-solve.mjs';
+import { solveLines, gridLines } from './encode-solve.mjs';
+import { owedLines, installAirCounter } from './encode-owed.mjs';
 
 const N = Number(process.env.ENCODE_GRID ?? 512);
 const STEPS = Number(process.env.ENCODE_STEPS ?? 30);
@@ -67,7 +68,33 @@ const check = (name, ok, detail = '') => {
 };
 
 const { page, close } = await openLab();
+if (process.argv.includes('--grids')) {
+  /*
+    H2c-10's residual clause, on its own (encode-solve.mjs `gridLines`): five
+    fresh solvers, one of them 1000², which is minutes under SwiftShader, so
+    it is its own entry in scripts/checks.json, in a Measure part with room.
+  */
+  try {
+    const flag = process.argv.find((a) => a.startsWith('--owed='));
+    const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+    const unknown = [...owed].filter((id) => id !== 'grid32');
+    if (unknown.length) check('every id in --owed is a line of encode --grids', false, `unknown: ${unknown.join(', ')} (known: grid32)`);
+    const { worst, grids } = await gridLines(page, check);
+    const name = 'H2c-10: a pinned grid (514, 1000, 777, 100) solves to within twice the 512² plate\'s residual';
+    const detail = `worst ${worst.toFixed(2)}x, at ${grids.join(', ')}`;
+    const ok = worst <= 2;
+    if (!owed.has('grid32')) check(name, ok, detail);
+    else if (ok) check(name, false, `${detail}; it passes, so it is no longer owed: take "grid32" out of --owed`);
+    else if (grids.every((g) => g % 32 === 0)) check(name, false, `${detail}; owed, but the grids are rounded and it misses`);
+    else console.log(` owed  ${name} — ${detail}`);
+  } finally { await close(); }
+  const failed = checks.filter((c) => !c.ok);
+  console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
+  process.exit(failed.length ? 1 : 0);
+}
 try {
+  // Before the solver is made: its air pair is made on its first step (encode-owed.mjs, H2c-8).
+  await page.evaluate(installAirCounter);
   await page.evaluate(async (n) => {
     await lab.create(n);
     lab.dye(0.5, 0.5, 0.2, [1, 0.6, 0.3], 3);
@@ -188,6 +215,7 @@ try {
   check('no args buffer is written with what it already holds', run.same === 0, `${run.same} of ${run.writes} writes (${perStep(run.writes).toFixed(1)} a step)`);
   check('no bind group is made on a step after the first ones', run.groups === 0, `${run.groups} made in ${run.steps} steps`);
 
+  await owedLines(page, check);
   await solveLines(page, run, check);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
