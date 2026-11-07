@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the liquid's amount sets the gap: Liquid and Cover Weight (PLAN 38r-5)
+
+- The plate now knows how much liquid is under its cover glass. Two dials, Liquid (mL) and
+  Cover Weight (g), set the gap between the glasses through the real physics: the glass
+  floats on the liquid while the meniscus at its edge holds it, and squeezes the extra out
+  over the rim, by Stefan's law, when it cannot. Pours lift the glass. The defaults are
+  today's 2 mm plate.
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a

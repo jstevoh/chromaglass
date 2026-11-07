@@ -100,6 +100,25 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
             settingKey="gapThickness"
           />
         )}
+        {/* The liquid under the cover and the glass on it (PLAN 38r-5): the gap is what they make. */}
+        <Slider
+          label="Liquid"
+          value={settings.liquidMl ?? 62.83}
+          min={9}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ liquidMl: v })}
+          settingKey="liquidMl"
+        />
+        <Slider
+          label="Cover Weight"
+          value={settings.coverWeight ?? 157}
+          min={0}
+          max={1000}
+          step={5}
+          onChange={(v: number) => onUpdate({ coverWeight: v })}
+          settingKey="coverWeight"
+        />
         <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}

@@ -50,6 +50,9 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP } from './stepping';
 import { rimCount, rimMask } from '../lib/rimMask';
 
+/** A dial's 0..1, absent as 0 (the params builder's dozen of them). */
+const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
+
 export class FluidSimulation {
   size: number;
   dt: number;
@@ -102,6 +105,8 @@ export class FluidSimulation {
    * solver with the first finger's magnet (GpuStepParams.extraMagnets).
    */
   extraMagnets: readonly { x: number; y: number }[] = [];
+  /** A two-finger pinch's hand on the cover glass, −1 lifting to 1 pressing (lib/playGesture.ts, PLAN 38r-5). */
+  coverHand = 0;
   /** The magnet's radius, Magnet Size's (magnetFor; gpu/wgsl/magnetDisc.ts). */
   magnetRadius = MAGNET_RADIUS;
   /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
@@ -3141,7 +3146,7 @@ export class FluidSimulation {
       number (both solvers halve it).
     */
     {
-      const vf = Math.max(0, Math.min(1, settings.vibrationFrequency ?? 0));
+      const vf = c01(settings.vibrationFrequency);
       if (vf > 0.005) {
         const energy = audioData ? Math.min(1, audioData.energy) : 0;
         vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
@@ -3326,7 +3331,7 @@ export class FluidSimulation {
       // is the strength that measured well on the projector, and at 1.0 it stops
       // three-quarters of the way up, short of where a bright rim appears along
       // boundaries and thin dye goes blocky.
-      sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
+      sharpness: (s => s * (0.225 - 0.09 * s))(c01(settings.sharpness)),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, immiscibility,
@@ -3373,28 +3378,29 @@ export class FluidSimulation {
       magnetRadius: this.magnetRadius,
       magnetSeconds: Math.max(0, Math.min(0.1, this.dtSeconds)),
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
-      oilTension: Math.max(0, Math.min(1, settings.oilTension ?? 0)),
-      oilBodies: Math.max(0, Math.min(1, settings.oilBodies ?? 0)),
-      filmHold: Math.max(0, Math.min(1, settings.filmHold ?? 0)),
-      surfactantFlow: Math.max(0, Math.min(1, settings.surfactantFlow ?? 0)),
+      oilTension: c01(settings.oilTension),
+      oilBodies: c01(settings.oilBodies),
+      filmHold: c01(settings.filmHold),
+      surfactantFlow: c01(settings.surfactantFlow),
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).
-      clearFilm: this.layerIndex === 0 ? Math.max(0, Math.min(1, settings.clearFilm ?? 0)) : 0,
+      clearFilm: this.layerIndex === 0 ? c01(settings.clearFilm) : 0,
       solutalBuoyancy: Math.max(0, Math.min(2, settings.solutalBuoyancy ?? 0)),
-      plateUpright: Math.max(0, Math.min(1, settings.plateUpright ?? 0)),
+      plateUpright: c01(settings.plateUpright),
       ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(2, settings.doubleDiffusion ?? 0)),
-      ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
-      mazeDetail: Math.max(0, Math.min(1, settings.mazeDetail ?? 0)),
+      ferroLabyrinth: c01(settings.ferroLabyrinth),
+      mazeDetail: c01(settings.mazeDetail),
       phaseDisplace: Math.max(0, Math.min(2, settings.phaseDisplace ?? 0)),
-      bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
-      liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
+      bzReaction: c01(settings.bzReaction),
+      liesegang: c01(settings.liesegang),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
       gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
+      liquidMl: settings.liquidMl, coverGrams: settings.coverWeight, coverHand: this.coverHand,
       /*
         The half-life the comment above means is in seconds, and `this.dt`
         is not one: it is the look's step, Speed × 0.2, so on Classic

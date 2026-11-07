@@ -165,6 +165,8 @@ export const CONTROL_HELP: Record<string, string> = {
   clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',
   gapThickness: 'How thick the liquid is in the thin gap, from water to glycerine. Sets how long a push lasts.',
+  liquidMl: 'How much liquid is under the cover glass. More lifts the glass; past what its edge holds, the extra squeezes out over the rim.',
+  coverWeight: 'How heavy the cover glass is. A heavier glass sits lower and squeezes out what its edge cannot hold.',
   plateCurve: 'The shape of the gap between the glasses. Below zero they touch in the middle, above it the liquid pools there.',
   depthDrag: 'How much the gap\'s depth slows the liquid, so it creeps where the glasses are close.',
   platePressure: 'How hard the top glass presses the liquid when it is squeezed.',

@@ -162,6 +162,7 @@ const SECTION_OF: Record<string, string> = {
   clearFilm: 'oil',
   thinGap: 'squish',
   gapThickness: 'squish',
+  liquidMl: 'squish', coverWeight: 'squish',
   pacing: 'automation',
   songFollow: 'automation',
   spinRpm: 'spin',

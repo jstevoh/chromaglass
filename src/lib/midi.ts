@@ -606,6 +606,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // to coast and the plate loosens.
   { key: 'thinGap',         label: 'Thin Gap',         min: 0, max: 1, step: 1 },
   { key: 'gapThickness',    label: 'Thickness',        min: 0, max: 1 },
+  // The liquid under the cover and the glass's weight (PLAN 38r-5). A fader
+  // up pours liquid in at the rim and the glass rises; down wicks it off.
+  // The weight on a squared curve, so the default 157 g sits two fifths up
+  // and the bottom of the travel is a whisper of a glass.
+  { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
+  { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.
