@@ -36,12 +36,22 @@
  *      the pour into the column, (was + f)/(1 + f), and then let the pour's
  *      own flow carry f of it out, counting that outflow twice: it read
  *      0.495, half of every pour gone, glycerine into glycerine adding
- *      nothing at all.
- *   3. A dish of glycerine flushed with clear liquid: a quarter of the
- *      dish's volume of water poured at the middle pushes a quarter of the
- *      glycerine over the rim and leaves the rest, 0.75 of the dish, to 1%
- *      (the front stays well inside the rim, so what left was all
- *      glycerine). 18d-1's fade over the run would read 4% low. The dish is
+ *      nothing at all. And under the floating glass (38r-5) the share is of
+ *      the column as tall as the glass stands: a pour adds f·g/h₀, which
+ *      the species' splat first left out and read 0.9675.
+ *   3. A dish of glycerine flushed with clear liquid: a fifth of the
+ *      dish's volume of water poured at the middle pushes a fifth of the
+ *      glycerine over the rim and leaves the rest, 0.8 of the dish, to 1%,
+ *      and the front stays inside the rim, so what left was all glycerine:
+ *      no cell between 0.8 and 0.9 of the radius is less than 0.9 of it.
+ *      It was a quarter until 38r-5. Water pushing glycerine between two
+ *      glasses fingers (Saffman–Taylor: the thin liquid into the thick is
+ *      unstable), and under the floating glass the flush runs on through
+ *      the glass's seven-second settle, so a quarter's fingers reached the
+ *      rim (glycerine down to 0.05 of the column at 0.8–0.9 of the radius)
+ *      and water left with it, 0.739 left against the volume's 0.724. The
+ *      claim is the volume's, so the water is kept off the rim and the
+ *      claim checked, not the bar moved. 18d-1's fade over the run would read 4% low. The dish is
  *      full to the rim and no further first, to 2%: a rim that never took
  *      the corners off would read 1.27.
  *   4. And the water is where it was poured: the middle of the dish is
@@ -62,7 +72,43 @@
  */
 import { openLab } from './lab.mjs';
 import { HELD_POUR, pourShare } from '../src/lib/liquidProps.ts';
-import { DISH_METRES, DISH_GAP_METRES } from '../src/lib/turntable.ts';
+import { DISH_METRES, DISH_GAP_METRES, thicknessViscosity } from '../src/lib/turntable.ts';
+import { build } from 'esbuild';
+
+/*
+  The glass these checks pour under. Since 38r-5 the cover floats: a pour
+  lifts it by V/A, and only what the meniscus at its edge cannot hold, 2σ
+  sinθ/h against the glass's weight, is squeezed back out by Stefan. Under
+  the default 157 g glass on 63 mL the edge holds the glass up to 2.41 mm at
+  this Thickness, so a pour at 2 mm mostly raised the glass and spilled
+  nothing: the ring at r was pushed by Q(1 − r²/R²), not Q (measured 0.856 of
+  V/π, and 1 − r̄²/R² at the ring is 0.86), and a quarter of the dish of water
+  pushed 1.4% of the glycerine out, not 25% (0.986 left). Both are right for
+  a floating glass; what these lines measure, volume conserved between two
+  glasses with the gap h₀ everywhere, needs the gap to be h₀ when they read.
+  So the glass here is the one whose weight the edge holds at exactly the
+  dish's 2 mm, w = 2σ sinθ/h₀ · A/g for the carrier at Thickness 0.45 (about
+  190 g): the dish is full to its edge, every pour past it is pushed out, and
+  each reading waits for the Stefan settle back to 2 mm, SETTLE steps, the
+  time the lib's own exact settle takes to bring a glass lifted by a quarter
+  of the dish back to within a thousandth of h₀ (the flushes' worst case).
+  No bar moved: the input is the glass, named under Check changes in its PR.
+*/
+const THICK = 0.45;
+const cover = 'node_modules/.cache/flush-cover.mjs';
+await build({
+  stdin: { contents: "export * from './src/lib/cover.ts';", resolveDir: '.', loader: 'ts' },
+  bundle: true, format: 'esm', platform: 'node', outfile: cover, logLevel: 'warning',
+});
+const C = await import(`../${cover}`);
+const SIGMA = C.carrierTension(thicknessViscosity(THICK));
+const HOLD_P = C.holdPressure(SIGMA, DISH_GAP_METRES);
+const HOLD_G = HOLD_P * C.COVER_AREA / C.GRAVITY * 1000;
+let SETTLE = 0;
+for (let h = 1.25 * DISH_GAP_METRES; h - DISH_GAP_METRES > 1e-3 * DISH_GAP_METRES && SETTLE < 6000; SETTLE++) {
+  h = C.stefanSettle(h, HOLD_P, SIGMA, 1000 * thicknessViscosity(THICK), 1 / 60);
+}
+console.log(`the glass: ${HOLD_G.toFixed(1)} g, held at ${(C.holdGap(SIGMA, HOLD_P) * 1000).toFixed(3)} mm; ${SETTLE} steps (${(SETTLE / 60).toFixed(1)} s) to settle a quarter-dish lift to a thousandth`);
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -90,12 +136,15 @@ const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 try {
-  const r = await page.evaluate(async () => {
+  const r = await page.evaluate(async ({ THICK, HOLD_G, SETTLE, H0 }) => {
     const N = 128, out = {};
-    // Still: no spring in the gap, no stirring, nothing but the pours.
-    const STILL = { thinGap: 1, gapThickness: 0.45, gapSpring: 0 };
+    // Still: no spring in the gap, no stirring, nothing but the pours, under the glass the edge holds at 2 mm.
+    const STILL = { thinGap: 1, gapThickness: THICK, gapSpring: 0, coverGrams: HOLD_G };
     // A pour's volume in plate areas (times the rest gap): its dome, f·πr²/2, with f at most 1.
     const domeOf = (r, take) => Math.min(1, take) * Math.PI * r * r / 2;
+    // And the volume a pour brings, in the same units: its take is of the column it lands in, which is as tall
+    // as the glass stands at that moment (lifted by the pours before it), so a dome at the live gap over h₀.
+    const pourOf = (r, take) => domeOf(r, take) * lab.coverMetres() / H0;
     const fresh = async () => {
       await lab.create(N, N);
       // One step first: the thin gap's buffers, the pours' among them, are built on its first step.
@@ -113,14 +162,17 @@ try {
     };
     const shares = async () => {
       const s = await lab.field('species');
-      let total = 0, mid = 0, midCells = 0, most = 0, r2 = 0;
+      let total = 0, mid = 0, midCells = 0, most = 0, r2 = 0, outer = 1;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const v = s[(i + j * N) * 4];
         const x = (i + 0.5) / N - 0.5, y = (j + 0.5) / N - 0.5;
         total += v; most = Math.max(most, v); r2 += v * (x * x + y * y);
         if (Math.hypot((i + 0.5) / N - 0.5, (j + 0.5) / N - 0.5) < 0.04) { mid += v; midCells++; }
+        // The least glycerine between 0.8 and 0.9 of the dish's radius: where water got to, near the rim.
+        const rr = Math.hypot(x, y) / 0.5;
+        if (rr >= 0.8 && rr < 0.9) outer = Math.min(outer, v);
       }
-      return { total: total / (N * N), mid: mid / Math.max(1, midCells), most, r2: r2 / Math.max(total, 1e-9) };
+      return { total: total / (N * N), mid: mid / Math.max(1, midCells), most, r2: r2 / Math.max(total, 1e-9), outer };
     };
     const dyeShares = async () => {
       const d = await lab.field('dye');
@@ -144,39 +196,45 @@ try {
       lab.flush();
       await lab.step(1, STILL);
       const before = await ringR2();
+      let V = 0;
       for (let k = 0; k < POURS; k++) {
+        V += pourOf(RP, TAKE);
         lab.addSpecies(0.5, 0.5, RP, TAKE, 'water', volume);
         await lab.step(1, STILL);
       }
-      await lab.step(5, STILL);
-      out[volume ? 'ring' : 'ringFlat'] = { before, after: await ringR2(), V: POURS * domeOf(RP, TAKE) };
+      await lab.step(SETTLE, STILL);
+      out[volume ? 'ring' : 'ringFlat'] = { before, after: await ringR2(), V };
     }
     // 2. Glycerine poured as volume, into clear liquid, half a column a pour.
     {
       await fresh();
       const GP = 0.05, GT = 0.5, GN = 30;
+      let want = 0;
       for (let k = 0; k < GN; k++) {
+        want += pourOf(GP, GT);
         lab.addSpecies(0.5, 0.5, GP, GT, 'glycerine', true);
         await lab.step(1, STILL);
       }
-      await lab.step(5, STILL);
-      out.poured = { ...(await shares()), want: GN * domeOf(GP, GT) };
+      await lab.step(SETTLE, STILL);
+      out.poured = { ...(await shares()), want };
     }
-    // 3, 4. A dish of glycerine (a full column out past the rim), flushed with water.
+    // 3, 4. A dish of glycerine (a full column out past the rim), flushed with a fifth of it of water.
     {
       await fresh();
       lab.addSpecies(0.5, 0.5, 0.75, 50, 'glycerine', false);
       await lab.step(1, STILL);
       const full = await shares();
       const dish = Math.PI * 0.25;
-      const FP = 0.05, n = Math.round(dish / 4 / domeOf(FP, 1));
+      const FP = 0.05, n = Math.round(dish / 5 / domeOf(FP, 1));
+      let V = 0;
       for (let k = 0; k < n; k++) {
+        V += pourOf(FP, 1);
         lab.addSpecies(0.5, 0.5, FP, 1, 'water', true);
         await lab.step(1, STILL);
       }
-      await lab.step(5, STILL);
+      await lab.step(SETTLE, STILL);
       const after = await shares();
-      out.flush = { full, after, dish, V: n * domeOf(FP, 1), pours: n };
+      out.flush = { full, after, dish, V, pours: n };
     }
     // 6, 7. A dish of colour flushed with water: colour leaves by being pushed out of the rim.
     {
@@ -187,13 +245,15 @@ try {
       const full = await dyeShares();
       const dish = Math.PI * 0.25;
       const FP = 0.05, n = Math.round(dish / 4 / domeOf(FP, 1));
+      let V = 0;
       for (let k = 0; k < n; k++) {
+        V += pourOf(FP, 1);
         lab.addSpecies(0.5, 0.5, FP, 1, 'water', true);
         await lab.step(1, STILL);
       }
-      await lab.step(5, STILL);
+      await lab.step(SETTLE, STILL);
       const after = await dyeShares();
-      out.dyeFlush = { full, after, dish, V: n * domeOf(FP, 1), pours: n };
+      out.dyeFlush = { full, after, dish, V, pours: n };
     }
     // 8. A still dish loses no colour through its rim: over 30 steps with no pours (evapFactor 1), dye is conserved.
     {
@@ -207,7 +267,7 @@ try {
       out.dyeStill = { before, after };
     }
     return out;
-  });
+  }, { THICK, HOLD_G, SETTLE, H0: DISH_GAP_METRES });
 
   const f = (x, d = 3) => (Number.isFinite(x) ? x.toFixed(d) : String(x));
   const ring = r.ring, flat = r.ringFlat;
@@ -221,9 +281,9 @@ try {
     `species ${f(p.total, 5)} of the dish against ${f(p.want, 5)} poured (${f(p.total / p.want, 4)}); fullest cell ${f(p.most)}; its mean r² ${f(p.r2, 5)} against a full disc of that area's ${f(discR2, 5)}`);
   const fl = r.flush;
   const insideFull = fl.full.total / fl.dish, left = fl.after.total / fl.full.total, wantLeft = 1 - fl.V / fl.dish;
-  check('a quarter of the dish of water pushes a quarter of the glycerine over the rim',
-    Math.abs(insideFull - 1) < 0.02 && Math.abs(left / wantLeft - 1) < 0.01,
-    `the dish ${f(insideFull)} glycerine; ${fl.pours} pours of water, ${f(fl.V / fl.dish)} of its volume, leave ${f(left)} of it (the volume says ${f(wantLeft)}; with 18d-1's fade it would have been less, with no rim more)`);
+  check('a fifth of the dish of water pushes a fifth of the glycerine over the rim, and no water reaches it',
+    Math.abs(insideFull - 1) < 0.02 && Math.abs(left / wantLeft - 1) < 0.01 && fl.after.outer > 0.9,
+    `the dish ${f(insideFull)} glycerine; ${fl.pours} pours of water, ${f(fl.V / fl.dish)} of its volume, leave ${f(left)} of it (the volume says ${f(wantLeft)}; with 18d-1's fade it would have been less, with no rim more); the least glycerine at 0.8–0.9 of the radius ${f(fl.after.outer)}`);
   check('the middle of the flushed dish is clear liquid again', fl.after.mid < 0.05,
     `glycerine's share at the middle ${f(fl.after.mid)} (it was ${f(fl.full.mid)})`);
 

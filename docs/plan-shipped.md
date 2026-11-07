@@ -11389,7 +11389,22 @@ mass) and the spin's drag time. Two dials, Liquid 9–150 mL (62.83 default) and
 Measured: `npm run gap` 11 → 18 lines, all ok; the settle against an RK4 of the ODE to 1e-4
 at five times for water and thick; a 4 mL pour raises the glass 127.3 µm (Q/A) and spills
 nothing; 20 mL more settles it to h_hold with the bead full and 3.34 mL run off, the ledger
-to 1e-12. Left: 38r-16 (the pinch and the air edge), 38r-17, 38r-18, 38r-19.
+to 1e-12. Left: 38r-16 (the pinch and the air edge), 38r-17, 38r-18, 38r-19, 38r-20.
+
+The floating glass broke two things `npm run flush` caught. Its lines assume the gap is
+h₀ everywhere, and a pour now lifts the glass by Q/A: the ring at r was pushed by
+Q(1 − r²/R²) (0.856 of V/π) and a quarter of the dish of water flushed 1.4% of the
+glycerine, not 25%. Its glass is now the one the edge holds at exactly 2 mm (189 g at
+Thickness 0.45), it waits out the Stefan settle (435 steps, from the lib's own
+`stefanSettle`), and it counts each pour at the gap the glass stood at
+(`lab.coverMetres`). That found the second: the species' splat added a share f of a
+rest-gap column where the column is as tall as the glass stands, so glycerine poured
+under a lifted glass was 3.4% short (0.9675); it adds f·g/h₀ now, as the thin solve's
+source and the ledger do (`wgsl/fluid/splats.ts`), 0.9991. The glycerine flush is a
+fifth of the dish, not a quarter: water fingering into glycerine (Saffman–Taylor) ran
+on through the seven-second settle and reached 0.8–0.9 of the radius, so water left
+with the glycerine (0.739 against 0.724); the line now also checks no water got there
+(0.974 of the column at the least). No bar moved.
 
 ## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 

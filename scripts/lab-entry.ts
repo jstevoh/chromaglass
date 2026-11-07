@@ -325,6 +325,8 @@ const api = {
     return sp;
   },
   async speciesShare() { return lab!.solver.speciesShare(); },
+  /** The floating glass's gap, metres, as the last step left it (lib/cover.ts; `npm run flush` waits on it). */
+  coverMetres() { return lab!.solver.coverMetres; },
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },

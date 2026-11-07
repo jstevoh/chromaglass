@@ -528,6 +528,12 @@ written first. Line numbers are as read on main at d07ac31.
       back: the physics of a flat glass on a flat plate. A watch-glass pair's bowl keeps the
       squeezed liquid up its sides and gravity returns it; if the owner's glasses are a bowl,
       the bead is the bowl's annulus (ρ g Δz back-pressure), not l_c.
+    - **38r-20. The glass settles at the Thickness dial's pace, not the liquid's under it**
+      (S-M). `coverStep` is told `thinGapViscosity(gapThickness)`, so a dish of poured
+      glycerine (about 1000 mm²/s, against 22 at Thickness 0.45) lets the glass down in
+      1.4 s where Stefan's τ ∝ μ says about a minute. Give the cover the plate's
+      h³-weighted mean of the species' ν (what the thin solve's mobility already reads).
+      Found by `npm run flush` (38r-5), whose glycerine settles at the dial's pace.
   - ~~**38r-6**~~ `thingap` 5 read the Spin's one-cell mask edge, not the solve's residual:
     Spin's stir mask is blurred [1 4 1] over a cell's neighbours (#641). Story in §38r.
   - ~~**38r-7**~~ The rhythm sheet at 2 mm: its waits are on the film's own clock (#641).

@@ -290,7 +290,7 @@ export class FluidPasses extends FluidFields {
   protected stepSpecies(pass: GPUComputePassEncoder, carry = true): void {
     const sp = this.species!;
     if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
-    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
+    this.run(pass, 'speciesSplat', sp.write, [sp.read, this.squeeze.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
   }
 
