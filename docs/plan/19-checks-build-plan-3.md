@@ -384,8 +384,11 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 - **19ah-6. Built: two shards at once on the owner's Mac.** Asked 2026-10-29 (the first
   deploy on the Mac, run 40929715769, ran its five shards one after another in 51.5
   minutes). Each runner takes one job, so a second runner on the same Mac is the whole of
-  it, but 74 harnesses served on fixed ports, many shared (4351: `bottles`, `mirror`,
-  `moving`, `render-app`), and `macports.sh` made a second shard wait. Now every harness
+  it, but the harnesses served on fixed ports, many shared (4351: `bottles`, `mirror`,
+  `moving`, `render-app`), and `macports.sh` made a second shard wait. Closed unmerged as
+  #570 and rebuilt on main 2026-11-07, with the nine harnesses written since converted too
+  (`assistant`, `dawbridge`, `feedbackpane`, `liveshow`, `loopseam`, `openingtime`, `oscout`,
+  `rig`, `tippad`): 86 scripts on 60 ports. Now every harness
   asks `scripts/ports.mjs` for its port, which adds `HARNESS_PORT_SHIFT` (a block of
   10000; unset everywhere but a runner's `.env`, so GitHub's machines and sessions keep
   their ports); `macrunner-setup.sh --runners 2` adds `owner-mac-2` in
