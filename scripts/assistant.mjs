@@ -49,6 +49,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
+import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import WebSocket from 'ws';
 
@@ -462,6 +463,19 @@ const walk = (p) => {
 };
 for (const p of PUBLIC) walk(p);
 say(named.length === 0, `nothing public names the assistant link (${named.join(', ') || 'none'})`);
+
+// The packed Mac app carries every file the show server loads: it lists them
+// one by one (desktop/electron-builder.config.cjs), and a new import missing
+// from the list is a Mac app that cannot start (PR #683's first Mac run).
+const packed = createRequire(import.meta.url)('../desktop/electron-builder.config.cjs');
+const serverFilter = (packed.files ?? []).find((f) => typeof f === 'object' && f.to === 'server')?.filter ?? [];
+const needed = new Set(['assistant-room-keys.json']);
+for (const f of ['remote-server.js', 'assistant.js']) {
+  needed.add(f);
+  for (const m of readFileSync(join(ROOT, 'server', f), 'utf8').matchAll(/from\s+'\.\/([\w.-]+)'/g)) needed.add(m[1]);
+}
+const unpacked = [...needed].filter((f) => !serverFilter.includes(f));
+say(unpacked.length === 0, `the packed Mac app carries every server file the show server and the guard load (${unpacked.join(', ') || 'none missing'})`);
 
 // The scenario against the real server/.
 console.log('\nThe scenario, against server/:');
