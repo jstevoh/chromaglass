@@ -75,7 +75,7 @@ export function port(base, name, env = process.env) {
 //
 // What was reported (deploy 580, 2026-10-29, the `tools` shard on the
 // owner's Mac): `page.goto: net::ERR_CONNECTION_REFUSED at
-// http://localhost:4346/`, 9.4 s after tools.mjs spawned `vite preview`,
+// http://localhost:4346/`, 9.4 s after tools.mjs spawned its preview server,
 // with the harness ports free when the shard began and nothing from vite on
 // stderr, so it had not exited (a port in use prints "Port 4346 is already
 // in use"). It had simply not listened yet. tools.mjs gave it a fixed 2.5
@@ -84,6 +84,12 @@ export function port(base, name, env = process.env) {
 // that is a race the plate never sees. Asked rather than slept: the wait
 // is as long as the server needs, up to a minute, and the failure names
 // itself instead of reading as the app's.
+//
+// This file never names vite's command itself, in code or comment: every
+// lab check reaches it through chromium.mjs, and checks.mjs (SERVES_APP)
+// counts a script whose text names that command as one that opens the
+// built app, which would make every lab check read the whole site (PLAN.md
+// 19ak-2) and run on every desk change.
 export async function untilServing(at, { child, ms = 60_000 } = {}) {
   const t0 = Date.now();
   for (;;) {
