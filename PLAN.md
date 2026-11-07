@@ -257,7 +257,7 @@ style (§31).
   **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
   **23.7**.
   Art packs (§42): ~~**42a**~~ the moiré pack's sheets (2026-11-07), ~~**42a-2**~~ selling it to Home
-  (2026-11-07), then **42a-3** a hand on the sheet, **42a-5** the landing page's pack line.
+  (2026-11-07), then **42a-3** a hand on the sheet, **42a-10** Song Groove's missing fringes.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
   13.1-sign), then **24.4**.

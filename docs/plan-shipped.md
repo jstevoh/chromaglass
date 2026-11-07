@@ -11251,3 +11251,23 @@ says it is on the licence once bought; the Moiré Sheets section and the phone's
 have a Get it button beside Try. Checks: `npm run license-worker` 13g–13m (filed, refunded,
 upgraded, held; forcing the signed packs empty fails 13h and 13j), `npm run tiers` 14 (locked
 on Free and Home, the Buy link carries the email, open on a Home key that names the pack).
+
+## 42a-8. The website sells the moiré pack (2026-11-07)
+
+The owner asked for the pack on the website with demo pictures once the store product existed.
+The landing page now has a card under its three price cards: what the pack is, $15 on Home and
+in Pro, four of its six looks as pictures, and a Buy that opens the store's live checkout in a
+new tab (its own `data-cg-landing-pack`, so the Home and Pro count of `data-cg-landing-buy` is
+unchanged). The pack is an add-on, not a tier, which is why it sits under the cards rather than
+as a fourth beside them. `pro.html`'s tier table gains a row for it.
+
+The pictures are frames the app drew on the Mac's GPU, about 22 s after each look opened from
+`/show?debug&look=<id>`, cropped to 8:5 from the plate's own read-back (`grabFrame`). They are
+960x600 for a 480x300 box, unlike the other landing looks: a pattern of fine lines scaled down
+by the browser beats against the screen's pixels and draws a moiré of its own that is not the
+app's. Song Groove came out with no fringes at all and is left off (42a-10); Quasicrystal
+Garden read as scattered specks at this size and is left off too.
+
+`npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
+card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
+four pictures load at 960 px wide.

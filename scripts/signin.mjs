@@ -612,10 +612,26 @@ try {
       const buys = [...document.querySelectorAll('[data-cg-landing-buy]')];
       const buyBad = buys.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
         || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad };
+      // The moiré pack's card under them (PLAN 42a-2): its own Buy, held to the same rules, and
+      // its four pictures each loaded from a file that exists (a lazy image is asked for here by
+      // scrolling the card into view, and naturalWidth is 0 for a file that 404s).
+      const pack = [...document.querySelectorAll('[data-cg-landing-pack]')];
+      const packBad = pack.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
+        || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
+      const card = document.querySelector('[data-cg-landing-moire]');
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad, pack: pack.length, packBad, card: !!card };
     }) : null;
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong` : 'landing page not drawn'}`);
+    let pics = -1;
+    if (f?.card) {
+      pics = await p.evaluate(async () => {
+        const imgs = [...document.querySelectorAll('[data-cg-landing-moire] img')];
+        imgs.forEach((i) => { i.loading = 'eager'; });
+        await Promise.all(imgs.map((i) => (i.complete ? null : new Promise((ok) => { i.onload = i.onerror = ok; }))));
+        return imgs.filter((i) => i.naturalWidth >= 960).length;
+      });
+    }
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0 && f.pack === 1 && f.packBad === 0 && pics === 4;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong; moiré card ${f.card ? `${f.pack} Buy, ${f.packBad} wrong, ${pics} pictures at 960 px` : 'missing'}` : 'landing page not drawn'}`);
     await c.close();
   }
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));

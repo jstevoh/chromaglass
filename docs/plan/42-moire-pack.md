@@ -35,13 +35,21 @@ own. Check: `npm run moire`.
     key, the store's Moiré Pack product ($15 once) re-signing the buyer's Home key, the account
     sheet's Buy line and the section's Get it (`npm run license-worker` 13g–13p, `npm run tiers`
     14); story in `docs/plan-shipped.md` §42a-2.
-  - **42a-5. The landing page sells the pack.** `Landing.tsx`'s price table names Home and Pro
-    only; a Home buyer meets the pack in the app. A line under Home ("Moiré pack, $15 once")
-    with the same checkout link, and `npm run press`'s price check reading it.
-  - **42a-6. A pack bought before Home is held, not refunded.** The Worker holds a pack order
+  - ~~**42a-8. The website sells the pack.**~~ **Shipped** (2026-11-07, with 42a-2): a card
+    under the landing page's price cards with four frames of the pack drawn on the Mac's GPU
+    (`public/landing/moire/`, 960x600 for a 480x300 box so the fine lines do not beat against
+    the screen), its own Buy, and a row in `pro.html`'s tier table (`npm run signin` 11b reads
+    the card, its Buy and that all four pictures load). It was numbered 42a-5 here by mistake,
+    a number the closeup item below already held.
+  - **42a-9. A pack bought before Home is held, not refunded.** The Worker holds a pack order
     with no Home key on file (`holdOrder`, reason `pack with no Home key`) for the owner to
     refund by hand. If buyers do this, file the pack against the email and apply it when the
     Home key is filed, rather than asking the owner to refund.
+  - **42a-10. Song Groove shows no fringes in a still.** Photographed for the website on the
+    Mac's GPU 18 s after it opened (`?look=moire-groove`, the other five drawing their
+    fringes in the same run), the frame was Cell Bloom's dye and grain with no sheet lines
+    anywhere. Either the groove's lines are finer than a pixel at 256² and the gap's blur
+    takes them, or the lamp is not under them; find which, and make the look read.
   - **42a-3. A hand on the sheet.** The real thing is played by turning the top sheet with a
     hand. A Turn Sheet tool (drag round the centre sets the turn, a flick spins it), on the
     desk, the phone's pad and the remote, as the Spin tool is built (`SpinHand`); the
