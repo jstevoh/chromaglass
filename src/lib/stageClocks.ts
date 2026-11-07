@@ -1,6 +1,6 @@
 /**
  * The clocks of the things on the stage that turn on their own: the gel
- * wheel over the lamp and the moiré pack's upper sheet (PLAN 42a). Each is in
+ * wheel over the lamp and the moiré pack's upper sheet (PLAN 45a). Each is in
  * turns, kept in [0, 1), and advanced once a frame by the visualizer's loop on
  * the frame's real seconds, so a change of speed changes the rate from where
  * the wheel or the sheet stands, rather than jumping it to speed * time.

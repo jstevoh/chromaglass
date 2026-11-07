@@ -3314,8 +3314,8 @@ export default function App() {
             onTwoProjectors={(v) => updateSettings({ twoProjectors: v })}
             projectorFocus={settings.projectorFocus ?? 0.5}
             onProjectorFocus={(v) => updateSettings({ projectorFocus: v })}
-            clearFilm={settings.clearFilm ?? 0}
-            onClearFilm={(v) => updateSettings({ clearFilm: v })}
+            film={settings}
+            onFilm={updateSettings}
             slosh={settings.slosh ?? 0}
             onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}

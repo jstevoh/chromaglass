@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The moiré pack's sheets are optics, and off is off (PLAN 42a).
+ * The moiré pack's sheets are optics, and off is off (PLAN 45a).
  *
  *   npm run moire        (the lab, on SwiftShader: two labs, about four minutes)
  *

@@ -297,6 +297,8 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Clear Film, which pours over the whole dish: the same list again.
 // Nor Two Projectors, which switches the rig between one lamp and two.
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+  // Its dye (PLAN 20b-13), dissolved in the oil: a hand's, not the beat's (sceneMap NOT_A_TARGET).
+  'clearFilmDye',
   // Frame Sway is a hand's alone (the owner, 2026-10-11): a kick routed to it would slide the whole frame on the beat (lib/plateRock.ts).
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
@@ -555,7 +557,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turingInk',       label: 'Turing Print Ink', min: 0, max: 1 },
   { key: 'turingDrift',     label: 'Turing Print Drift', min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
-  // The moiré pack's sheets (PLAN 42a): the ink, and the upper sheet's turn
+  // The moiré pack's sheets (PLAN 45a): the ink, and the upper sheet's turn
   // and spin, the three a hand on the real stage plays.
   { key: 'moireAmount',     label: 'Moiré Sheets',     min: 0, max: 1 },
   { key: 'moireAngle',      label: 'Moiré Turn',       min: -180, max: 180 },
@@ -605,6 +607,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.
   { key: 'clearFilm',       label: 'Clear Film',       min: 0, max: 1 },
+  // Its dye (PLAN 20b-13): a fader deepens the lace's colour from clear.
+  { key: 'clearFilmDye',    label: 'Film Dye',         min: 0, max: 1 },
   // The plate as a thin gap (PLAN §18a). A switch, stepped, so a pad or the
   // top half of a fader turns it on; and the liquid's thickness in it on a
   // fader, because thinning the liquid mid-song is a gesture: pushes start

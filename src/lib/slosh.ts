@@ -48,7 +48,8 @@
  *     e² = 2 |S| ρ / (g ρ₁ (ρ − ρ₁))
  *
  * which for a light mineral oil (S ≈ −6 mN/m: water 72, oil 30, the oil-water
- * interface 48) is 3.4 mm, a little over half the plate's 6 mm. A lens at that
+ * interface 48) is 3.4 mm, a little over half the 6 mm this dish is solved at (and deeper
+ * than the plate's real 2 mm sandwich: SLOSH_REST_DEPTH, PLAN 38r-1). A lens at that
  * thickness keeps its shape (the plate's own Oil Tension holds its outline), and
  * a lens of fixed shape on water is a raft: it is pushed by the slope of the
  * water's pressure head under it, h + b + r h₁ + P (the head at the floor, which
@@ -161,7 +162,16 @@
 export const SLOSH_N = 64;
 /** The dish's width, in the units the solver counts plate widths in: 1. The rim is the inscribed circle. */
 export const SLOSH_RADIUS = 0.5;
-/** Rest depth in plate widths: the plate's 6 mm gap (lib/turntable.ts DISH_REST_GAP). */
+/*
+  Rest depth in plate widths: 6 mm, the gap the plate had before PLAN 38r and
+  not its 2 mm now (lib/turntable.ts DISH_GAP_METRES). Kept, and named a
+  shortcut (PLAN 38r-1): a slosh is a free surface's wave, and between two
+  glasses there is none, so the real sandwich does not slosh at all; what
+  this solves is a dish whose liquid can heap, and at 2 mm its floating
+  lens (SLOSH_LENS, 3.4 mm) would be deeper than the water it floats on.
+  Whether the tilt's slosh becomes the open dish's (no top glass) or the
+  sandwich's creeping flow is 38r-1's question.
+*/
 export const SLOSH_REST_DEPTH = 0.03;
 /** The plate's width in metres (lib/turntable.ts DISH_METRES). */
 export const SLOSH_PLATE_METRES = 0.2;

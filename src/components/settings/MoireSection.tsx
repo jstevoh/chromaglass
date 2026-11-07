@@ -7,7 +7,7 @@ import { Slider } from './controls';
 import type { SectionCtx } from './props';
 
 /*
-  Moiré Sheets (PLAN 42a): the moiré pack's two printed transparencies on the
+  Moiré Sheets (PLAN 45a): the moiré pack's two printed transparencies on the
   stage. The phone's Looks sheet draws the same controls from the same lists
   (phone/PhoneMoire.tsx), and both ask `useMoirePreview` whether they move.
 

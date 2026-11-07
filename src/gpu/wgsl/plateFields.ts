@@ -34,6 +34,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'mixPos', type: 'vec4f', note: 'the rows of the LED ring, the back plate, the film and the logo in the stack of seven, 0 the bottom' },
   { name: 'mixPos2', type: 'vec4f', note: 'the rows of the gel wheel, the lumia and the front plate (everything under it is the lamp), and the top row' },
   { name: 'mixBlend', type: 'vec4f', note: 'the blends of the LED ring, the gel wheel, the lumia and the film: 0 own, 1 screen, 2 add, 3 multiply, 4 key' },
+  { name: 'filmDye', type: 'vec4f', note: "the clear film's dye (PLAN 20b-13, filmDye.ts): rgb what one unit lets through, w the dial (0 none)" },
   { name: 'gel0', type: 'vec3f' },
   { name: 'gel1', type: 'vec3f' },
   { name: 'gel2', type: 'vec3f' },
@@ -148,7 +149,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
-  /* The moiré sheets on the stage (plateMoire.ts, lib/moire.ts; PLAN 42a). */
+  /* The moiré sheets on the stage (plateMoire.ts, lib/moire.ts; PLAN 45a). */
   { name: 'moireAmount', type: 'f32', note: 'how dense the two sheets\' ink is: 0 takes them off the stage' },
   { name: 'moireSheetA', type: 'f32', note: 'the lower sheet\'s design, an index into MOIRE_SHEETS (0 none)' },
   { name: 'moireSheetB', type: 'f32', note: 'the upper sheet\'s design' },

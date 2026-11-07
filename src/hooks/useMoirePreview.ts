@@ -5,7 +5,7 @@ import type { VisualizerSettings } from '../types';
 
 /**
  * Whether the moiré pack's controls are live here, and the minute's try of
- * it a copy without the pack gets (PLAN 42a). The desk's Moiré Sheets
+ * it a copy without the pack gets (PLAN 45a). The desk's Moiré Sheets
  * section and the phone's Looks sheet both call this, so the two hands play
  * by one rule.
  *

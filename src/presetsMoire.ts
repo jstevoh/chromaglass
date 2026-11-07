@@ -1,7 +1,7 @@
 import type { VisualizerSettings } from './types';
 
 /**
- * The moiré pack's looks (PLAN 42a): six of the house looks with a pair of
+ * The moiré pack's looks (PLAN 45a): six of the house looks with a pair of
  * the pack's sheets on the stage. Each starts from a look that already
  * ships, so the liquid is one people know, and sets only what the sheets
  * need: which two, how they sit, and the lamp.

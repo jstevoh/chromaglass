@@ -1,5 +1,5 @@
 /**
- * The moiré sheets (PLAN 42a): two printed transparencies on the projector's
+ * The moiré sheets (PLAN 45a): two printed transparencies on the projector's
  * stage, one under the glass and one laid on the cover, the way a liquid light
  * crew stacks a pair of line sheets on the overhead and turns the top one by
  * hand. Built into the display shader through `TRANSMIT_WGSL` (plateTransmit.ts),
@@ -26,7 +26,7 @@ export const MOIRE_WGSL = /* wgsl */ `
   15 mm, 1.8 mm, which greys lines 4 mm apart to a third of their contrast.
 
   The two sheets are blurred each on its own and then multiplied, and that is
-  a shortcut (PLAN 42a-4). What the lens does is average the product over its
+  a shortcut (PLAN 45a-4). What the lens does is average the product over its
   cone, and a ray of the cone crosses the lower sheet (D below the liquid) and
   the upper (D above) displaced the opposite ways, so the fringe, the
   difference of two gratings of frequencies kA and kB, is blurred as a
@@ -79,7 +79,7 @@ const MOIRE_TAU: f32 = 6.28318530718;
   whose 1-D projection has variance r^2/4. The disc's own transfer function is
   a jinc, which reverses the contrast of a pitch finer than its first zero;
   the tent keeps the loss of contrast and not that reversal (a shortcut,
-  PLAN 42a-4).
+  PLAN 45a-4).
 */
 fn moireS2(v: f32, c: f32) -> f32 {
   let t = fract(v);
@@ -216,7 +216,7 @@ fn moireSheet(id: f32, p: vec2f, L: f32, W: f32, inkT: f32, curl: f32) -> vec3f 
   above the liquid and is seen straight.
 
   The closeup is a camera on the plate, not the projector, and is not drawn
-  through the sheets (PLAN 42a-5).
+  through the sheets (PLAN 45a-5).
 */
 fn moireSheets(uv: vec2f, normal0: vec3f) -> vec3f {
   let amt = clamp(U.moireAmount, 0.0, 1.0) * (1.0 - clamp(U.macroOn, 0.0, 1.0));

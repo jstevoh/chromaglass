@@ -29,6 +29,7 @@
     "detail": "node scripts/detail.mjs",
     "lights": "node scripts/lights.mjs",
     "oscout": "npm run build && node --experimental-strip-types scripts/oscout.mjs",
+    "assistant": "node scripts/assistant.mjs",
     "rig": "npm run build && node scripts/rig.mjs",
     "showkey": "npm run build && node scripts/showkey.mjs",
     "shapes": "node --experimental-strip-types scripts/shapes.mjs",
@@ -63,6 +64,7 @@
     "seed": "esbuild scripts/seed.mjs --bundle --platform=node --format=esm --log-level=warning --external:typescript --external:playwright --external:esbuild --outfile=node_modules/.cache/seed.mjs && node node_modules/.cache/seed.mjs",
     "record": "node --experimental-strip-types scripts/record.mjs",
     "setlist": "esbuild scripts/setlist.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/setlist.mjs && node node_modules/.cache/setlist.mjs",
+    "stillwait": "esbuild scripts/stillwait.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/stillwait.mjs && node node_modules/.cache/stillwait.mjs",
     "sanitize": "esbuild scripts/sanitize.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/sanitize.mjs && node node_modules/.cache/sanitize.mjs",
     "steadycam": "node scripts/steadycam.mjs",
     "holdjump": "esbuild scripts/holdjump.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/holdjump.mjs && node node_modules/.cache/holdjump.mjs",
@@ -297,7 +299,9 @@
     "bubblelook": "node scripts/bubblelook.mjs",
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
-    "presskit": "node scripts/presskit.mjs"
+    "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
+    "presskit": "node scripts/presskit.mjs",
+    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

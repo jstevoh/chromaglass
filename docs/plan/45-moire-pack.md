@@ -1,4 +1,4 @@
-# 42. The moiré pack: printed sheets on the stage, sold as an art pack
+# 45. The moiré pack: printed sheets on the stage, sold as an art pack
 
 **Asked 2026-11-03** by the owner, from a liquid light shop's post of its moiré transparency
 sets (two printed line sheets stacked on the overhead, the top one turned by hand): "let's
@@ -18,7 +18,7 @@ every pool and drop into its fringes, the way a moiré deflectometer measures a 
 the exact box integral of the printed square wave, so the screen's grid adds no moiré of its
 own. Check: `npm run moire`.
 
-- **42a. The sheets on the plate, the desk, the phone and six looks** (**shipped**, this
+- **45a. The sheets on the plate, the desk, the phone and six looks** (**shipped**, this
   PR). Ten designs (`lib/moire.ts` `MOIRE_SHEETS`): Lines, Rings, Spokes, Spiral, Dot
   Screen, Waves, and ours, Quasicrystal (five-fold, never repeats), Colour Inks (cyan,
   magenta and yellow at the printer's screen angles), Song Groove (a record's groove, its
@@ -31,15 +31,15 @@ own. Check: `npm run moire`.
   (`presetsMoire.ts`). Gate: `canUseMoirePack` in tierGates, open where tiers are not
   enforced, Pro where they are; a look of the pack opens the account sheet when locked.
   Found while building it, not done:
-  - **42a-2. Selling it to Home.** The licence names a tier only (`LicensePayload`); it
+  - **45a-2. Selling it to Home.** The licence names a tier only (`LicensePayload`); it
     needs a `packs` list in the signed payload, the Worker a Lemon Squeezy product for the
     pack (the owner makes it in the store) that adds `moire` to the buyer's key, and the
     account sheet a Buy line. The Worker deploy waits for the owner's words.
-  - **42a-3. A hand on the sheet.** The real thing is played by turning the top sheet with a
+  - **45a-3. A hand on the sheet.** The real thing is played by turning the top sheet with a
     hand. A Turn Sheet tool (drag round the centre sets the turn, a flick spins it), on the
     desk, the phone's pad and the remote, as the Spin tool is built (`SpinHand`); the
     visualizer has no room until its tool handling moves to a module (19ai-10).
-  - **42a-4. Defocus, two shortcuts.** Each sheet is blurred by the lens's disc taken as a
+  - **45a-4. Defocus, two shortcuts.** Each sheet is blurred by the lens's disc taken as a
     tent of the same variance, which keeps the loss of contrast and not the jinc's reversal
     of a pitch finer than its first zero; and the two blurred sheets are then multiplied,
     where the lens averages their product over its cone. For sheets either side of the
@@ -47,11 +47,11 @@ own. Check: `npm run moire`.
     kA + kB: at the default 3 mm and 48 lines, to 0.91 of its contrast where the shader
     draws 0.95, and further apart at a deep gap. Do the cone's average per harmonic pair if
     the owner sees the difference on the wall.
-  - **42a-5. The closeup through the sheets.** The macro closeup is a camera on the plate and
+  - **45a-5. The closeup through the sheets.** The macro closeup is a camera on the plate and
     draws no sheets; a closeup of a moiré look shows the liquid alone. Draw the sheets in
     plate coordinates at the closeup's zoom.
-  - **42a-6. The phone's look list.** The phone groups looks in `App.tsx`'s `phoneLooks`, so
+  - **45a-6. The phone's look list.** The phone groups looks in `App.tsx`'s `phoneLooks`, so
     the pack's six sit in Light show there rather than in their own group; the desk's menu
     groups them. Needs room in `App.tsx` (over budget) or the grouping moved to a lib.
-  - **42a-7. Judging on the wall.** How the six looks and the defocus read at 60 fps on a real
+  - **45a-7. Judging on the wall.** How the six looks and the defocus read at 60 fps on a real
     projector (`docs/judging.md`).

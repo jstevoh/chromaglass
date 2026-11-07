@@ -4,7 +4,7 @@ import { useMoirePreview } from '../../hooks/useMoirePreview';
 import type { VisualizerSettings } from '../../types';
 
 /**
- * The moiré pack's sheets on the phone's Looks sheet (PLAN 42a): the same
+ * The moiré pack's sheets on the phone's Looks sheet (PLAN 45a): the same
  * lists and the same try-it rule as the desk's Moiré Sheets section
  * (settings/MoireSection.tsx), cut to what a thumb plays: which two sheets,
  * how dense their ink, and the upper sheet's turn and spin. The rest (slide,

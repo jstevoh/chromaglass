@@ -4210,6 +4210,32 @@ The plan as written before it was built:
   punches a hole where it lands. Both are in the phone's bottle picker and on MIDI,
   like every other bottle.
 
+### 20b-13. The film's own dye
+
+**Shipped (#684), behind Film Dye (`clearFilmDye`, 0 in every look) and its colour
+(`clearFilmDyeColor`, a warm yellow); judging §108.** Asked through the owner's lace still
+(yellow lacy veins and cells, fine spatter, over lavender, cobalt and coral). In the lab a
+yellow Oil Bodies sheet with water holes held lace for about a second and then Cahn–Hilliard
+pulled the veins to blobs by three seconds at any oil tension 0.08–0.9, so the still's lace
+is a dyed film dewetting, which Clear Film already does; it lacked a colour.
+
+- `src/gpu/wgsl/filmDye.ts`: `filmDyeThrough(h, gap)` is Beer–Lambert over the film's path
+  above its precursor, `lampThrough(colour, FILM_DYE_DEPTH × strength² × (h − h_p) × gap)`,
+  so Spectral Optics' dichromatism comes with it; `filmDyePaint` lays it on the black ground
+  (20b-14). Applied at the front plate's composite, after `throughScaled` (the dish edge and
+  grain scale the water's dye, not the film's). Exactly 1 at strength 0 or no film.
+- `FILM_PRECURSOR` (0.06) is now exported from `film.ts` (its `F_HP`, same text in the
+  shader): a hole on the precursor holds no dye, so the water's colour comes through clean
+  (with h read whole, a hole at full strength lost 82% of its blue; above h_p, 10%).
+- `plate.ts` shrank 123 bytes (its clear-film comment moved to the module).
+- `npm run lace` 8, on a thin dusty film torn into lace over clear water and a pool: at 0 the
+  picture is the undyed one byte for byte; the green absorbance is Beer–Lambert's at a
+  quarter, a half and all of the dial to within 15%, scales as the square, and as h − h_p
+  between thick and thin film; the red (all let through) does not move; the holes move under
+  a fifth of the film; on black the film is painted yellow.
+- Controls beside Clear Film, shown while there is a film: the desk (slider and swatch),
+  the phone's Dye sheet (slider and swatch), the remote, MIDI (`clearFilmDye`), help, pins.
+
 ### 18c. A pour adds liquid, not only colour
 
 **18c-1** (2026-10-05): a bottle's pour is volume, on a thin gap (`npm run flush`, judging
@@ -9900,6 +9926,27 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
   moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
 
+#### 19k-11. holeline in a Measure part of its own
+
+- **19k-11** (E, S): **shipped** in part, `lab4`. GitHub's ubuntu runners come in speed tiers
+  about 2x apart (videoflow's printed CPU loop, plain JavaScript, reads 0.70, 1.05 or 1.40 ms a
+  frame across twenty branches' `lab` jobs, the same branch on different tiers from push to
+  push), and a part sized on the fast tier is cancelled on the slow one. #655 drew the slow tier
+  six times running: `lab` was cancelled in holeline before #658 moved `widedials` to `lab3`,
+  and with holeline moved to `lab3` too (#655's first fix, reverted) that part ran 24:51 of its
+  25 (holeline 10:23, soap 6:53, soapbreak 3:59, widedials 3:36). Then main's deploys 667 and
+  670 of 2026-11-07 were cancelled the same way: on 670 (1.39 ms a frame) `lab` reached
+  holeline at 14:15, every check before it green, and was cancelled at 25:16 with holeline
+  10:28 in; on 671 (1.06 ms) the same part ran 19:54, holeline 8:13. No part had ten minutes
+  to spare on the slow tier, so holeline moved, unchanged, to an eighth part `lab4` (#690),
+  which installs Chromium like the others. #688 (19k-11a) had meanwhile moved `sloshgpu`,
+  `soapgpu --selftest` and `beadmask` from `lab` to `lab3`; with holeline gone from `lab`,
+  `sloshgpu` and `beadmask` went back, and `soapgpu` stays beside the soap checks it controls.
+  On the slow tier that leaves `lab` about 13:20, `lab3` about 15:20 and `lab4` about 11
+  (#690's own run, on faster runners: lab 12:01, lab4 5:28). The timeout stays 25 and no bar
+  moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
+  job summary, and every part read against it).
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
@@ -11201,6 +11248,161 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
 
+## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
+
+*Asked:* the owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." The rest gap had
+been 6 mm (`REST_GAP` 0.03 of a 0.2 m plate); a show's sandwich, a few millilitres under a top
+glass about 15 cm across, is 1 to 3 mm. 2 mm is the middle, a judgement and not a measurement.
+
+*Part 1 (#613), one number at 6 mm:* `DISH_GAP_METRES`
+(`src/lib/turntable.ts`) is the gap's only size. The field keeps 0.03 at rest, now in
+*gap units* (h₀/0.03), so every press, kick and check written in those numbers reads the
+same; a reader that needs a length multiplies by `DISH_GAP_FIELD_METRES` (`GAP_METRES` in
+the solver) or `DISH_GAP_FIELD_UV`, never by the plate's width. The gap kernels take the
+rest, floor and ceiling from the lib. Still 6 mm, so nothing moves: 38d and 38i can read
+h₀ from the constant now. `npm run gap` holds every reader to its SI physics at the
+rest gap and greps `src/` for a gap made a length by the plate's width.
+
+*Part 2 (#641), 2 mm:* `DISH_GAP_METRES` 0.006 → 0.002, then everything the thinner film changes
+retuned on the physics, never on a bar (the owner chose the real pace everywhere, the rhythm
+sheet included, 2026-10-31 12:26Z). What it changes: water's drag time 3 s → 0.33 s; every Darcy
+speed under a force a ninth (h²); the sheet's lubrication M = h³/12μ 27 times slower. The colour's
+weight down a rocked plate (`ROCK_FALL` 12 → 1.33) and the oil's tension on a thin gap
+(`OIL_TENSION_GAP`) now carry h² as the oil's lift already did; the Blow's breath is 14 m/s
+(38r-8). The oil's Cahn–Hilliard relaxation and its overfull share stop at the open rim
+(`RIM_SIDE`, `wgsl/fluid/oil.ts`), which was 18g-7's slow loss on the diagonal (a tilted lens's
+oil past the rim 1.71 → 0.03 at 27 s). PR #605 had tried it in one go; its CI numbers and the
+checks it moved are #641's body, every bar and input named under Check changes.
+
+(M; Medium-High on the water looks). Set the number, then retune what
+the thinner film changes on the physics, never on a bar. PR #605 tried it in one go and
+CI measured: `slump` (middle depth 0.233 mm against 0.212), `dish` (oil gripped at 0.27
+of A·r; drift 3.98× against 2.87×), `thingap` (held hand 0.4375, tight disc 0.0150,
+water 0.0800, glycerine conservation 0.0059), `fingerflow` (stroke moves 1.17%),
+`airblow`, `oillift` (lens 0.15 mm/s against 0.71), `sheet` (M 27× smaller), `ferrodrop`
+(`GAP_LC` 1.57 caps a drop at 1.314 against a sessile 1.510) and `lace` (the lab's stir
+under 9× the drag; scale it by the drag ratio, as 20c did). `turntable`, `framesway` and
+`magnetgain` need their windows on τ (#605 has them). All are retuned in #641.
+
+*38r-6:* (S to decide, M to
+build). The glycerine line (|∇·(hu)| under 0.005 of the flux) reads 0.0059 at 2 mm, and
+it is not liquid lost: six V-cycles for two move it by 0.3%, a flat plate reads it too,
+and it goes away with no dye laid (0.00054) or with the look's Spin off (0.00056).
+Spin's stir (forcesB) is a curl noise masked by the dye, `min(1, d)` where `d > 0.05`,
+a force with a one-cell step at every pool's edge; glycerine takes a step's force whole
+at kΔt 50 (0.85 of it at the 6 mm gap's 5.6: the same stir on a liquid with that kΔt in
+the 2 mm gap, Thickness 0.68, reads 0.0049), and the check's central difference of the
+cell velocities reads the grid-scale pressure that step leaves as a divergence (the
+solve conserves its own face fluxes). It peaks at 50 steps as the pools slump their
+edges sharp and falls to 0.0012 by five seconds. Either read the solve's own fluxes
+(hsP and the mobility through a lab readback) or give Spin's mask the width a real
+stir has. Shipped: Spin's mask blurred [1 4 1].
+
+*38r-7:* (M). Its film drains a twenty-seventh as fast
+(h³/12μ), so `npm run sheet` reads five lines red on this branch with no retune
+(water keeps 4.7% of its dent a fifth of a second after the lift against under 1%, the
+oil 20.8% against 10%; the dish's slowest mode 0.750 a frame against 0.947; the mean
+gap 5.4% of a dent down kicked twice a second against 2%; the oil quiet at 15.3 s
+against 21.7): the paces in the check's header are the 6 mm dent's. The sheet's own
+metres are now the film's (`gapMetres`, this PR), which changes nothing it lays.
+`rides` reads the sheet's ring at three quarters of the dent's zero (19 cells of 25 on
+the lab's 192, as 30 of 40 was), since a 2 mm dent is narrower. Shipped: the check's waits on the film's own clock
+(SLOW = (6 mm/h₀)³), `SHEET_NODE=1 npm run sheet` 11/11 (6/11 at 2 mm before the retune).
+
+*38r-8:* (S, shipped this PR). τh/2μ goes as the gap, so
+the 8 m/s breath the Blow was tuned at moved the 2 mm film a third as far (`tools` read
++0.03% for +0.15%); the breath is set where it moves the film as the 6 mm one did,
+1.18 Pa (lib/breath.ts says why that and not C_f). The surface tears at Amount 0.39
+now, not 0.67 (`blowrange` reads the gentle breaths at 0.35). 15g-6's recording would
+settle the number either way.
+
+*38r-9:* at 2 mm full Plate Rock slid a pool a ninth as far as at 6 mm (rides, Mac: 0.105 against a
+third of the stir, 0.29). The owner judged the half slide fine and every dial runs gentle to
+extreme (2026-10-31), so above the default 0.45 the rock's pull on the colour and the oil's lift
+climbs geometrically to `ROCK_PAST` = (6 mm/h₀)² = 9 at full, the 6 mm gap's Darcy pace;
+`rockStep` (`lib/plateRock.ts`) hands the solver rockX, rockY and rockGain, and `hsBody` multiplies
+both by it. The default stays real; `rides` reads its "default over 0.4 of full" at the real pace.
+
+*38r-10:* two of `rides`' sheet lines went red at 2 mm (Mac, 404b771). The dent's default ring read
+1.49 cells, printed "1.5", under its 1.5: since 38l-2 the suction's keep ran on the sheet's own
+solve on every sprung step, the nine held ones too, and took 3.4% of a default kick's volume
+inside its ring before the finger let go (1.4% of full's), so the kick no longer landed the
+stamp's volume `pressVolume` promises. The glass's own kick holds against the lift (KickRelease
+lays spring/STEFAN_FILM³ a step); the sheet now does the same, its node keep only once no press
+is live (`lib/sheet.ts` step): 1.54 cells, full 3.33, 2.16 times where the volume is 2.17. The
+"is local" line compared two near-zeros: 70 cells out was 1.75 of the 6 mm dent, where the film
+had carried 0.57 of the stamp out of the disc; on the 2 mm film nothing passes the lip and the
+solve's share inside 70 is -0.10 (the lip's tail), read -0.009 against -0.020. The far ring now
+keeps its place in the dent as the near ring does (a dent and a half out, 36 cells, where the
+solve says 0.71 has left), the solve is stepped as the lab steps it (the app's spring), and the
+yardstick is the sheet's own bowl stamped on the same ring, so the colour's carry law cancels:
+0.627 of the stamp against 0.706 said. The bars stay 25% and 0.6. Both printed to two places now.
+
+*18g-9, the lip:* the last two red lines at 2 mm, rimhold's diagonal lens (0.6% lost in its last
+three readings, bar 0.5%) and oillift's rim lens (98.1% kept, bar 98.5%), were oil crossing the
+open rim with no overflow behind it. The suspect, the Rhie–Chow term across the jump to the held
+cell's zero, was refuted by reading the solve back (p′ in the lens's rim cells −2e-5 against its
+core's 3e-3; the pressure term across its rim faces inward throughout). Level, a lens pulling off the
+rim drew water in at its contact and out through the faces beside it, carrying the Cahn–Hilliard
+profile's foot (c ≈ 0.014) over, which the relaxation (closed at the rim since 18g-7) never brought
+back. Tilted, the lens drifted on through the rim into the held strip along the grid's wall at 3% of
+its free speed; at 6 mm the old window ended as the lens arrived, so main's green measured the
+approach, not the hold. Now a rim face carries the oil outward only while the dish's cell behind it
+has p′ > 0, an overflow (a pour, a press, a gap closing); soap, acid and inward faces are unchanged
+(`lipHolds`, `wgsl/fluid/carry.ts`). Cloud lab: oillift 9/9, the rim lens 100.0%; the diagonal
+probe's last three readings 0.57% → 0.17% (rimhold whole times out in the cloud at 2 mm; the Mac
+reads it); rimhold's pour still crosses (full/weak 1.049/1.018, bars > 0.25 and 0.6–1.5).
+
+*18g-12, the foot:* with the lip in, the Mac's rimhold turned red on the other level line, the lens
+at the middle of the grid's edge: 98.5% kept, 0.9% in the last three seconds against 0.0% at a
+hundredth of the tension (it was 97.3% and steady before the lip). The cloud lab reproduced it (the
+probe, 540 steps a reading: 113.16 → 111.41 cells' worth in the dish over six readings, 0.3% a reading
+and not slowing, all of it found in the strip past the rim). With the lip held on every face, p′
+ignored, the same lens lost nothing, so the oil was crossing where p′ > 0: a lens flattened against
+the rim turns the water beside it, in at its contact and out over the rim along its flanks, and the
+outflow is p′ above zero. What it carried was the Cahn–Hilliard profile's foot. A cell under half oil
+is on the water's side of the interface the profile stands for, so the lip now lets oil over only from
+a cell of the body (c ≥ ½) with p′ above zero. Cloud lab: the edge lens 100.0% kept, nothing past the
+rim; the diagonal 113.13 → 113.12 over its last three readings (0.01%, was 0.17%); oillift 9/9, its rim
+lens 100.0%; rimhold's pour still crosses (weak/full 0.97/0.99 of what the volume carries, bars 0.6–1.5 and > 0.25; 1.018/1.049 under the first lip).
+
+*Judged:* the owner, from the 2 mm films (the sheet's dents, Plate Rock's slide), 2026-10-31
+16:39Z: "That looks fine".
+
+*38r-12:* main's #668 put the multigrid's residual into `npm run encode` with main's bars, read at
+6 mm: the thin gap's ‖r‖/‖b‖ after a step, 6.393e-2, held at 1.05×. At 2 mm it read 1.965e-1, and
+the same tree at 6 mm read main's to the digit. Not the operator: the check's plate has an even
+mobility at both gaps (0.4718 inside the rim at 2 mm, 0.8894 at 6 mm), and a V-cycle cuts the
+residual about as much at either (2.5× from the third to the fourth). The first guess: the solve
+starts from the last step's P, and with no cycle at all that left 2.6 of b at 2 mm (0.8 at 6 mm),
+worse than zero. The stir's flow dies on h²/12ν, under a step at 2 mm (kΔt 1.1 against 0.12), so last
+step's pressure was two to three times too big. Nearly all that is left sits in the cells just inside
+the open rim. Now the guess is a·P₁ + a′·P₂, the last two pressures fitted by least squares to this
+step's b through the solve's own operator (`wgsl/thinWarm.ts`, three dispatches), and the least
+residual of the warm start as it was, one pressure scaled and the pair is taken, so a steady flow
+keeps its start. `npm run encode -- --owed=h2c1,h2c3,h2c2`, cloud lab at 512²: thin residual
+1.965e-1 → 4.355e-2 (bar 6.713e-2; one pressure scaled alone read 7.551e-2), its half-strength
+control 0.548 → passes, open plate 2.079e-3 unchanged; dispatches 266 → 269 a step (the slump's
+substeps went 4 → 1 at 2 mm, its own physics, and the fit adds 3), 11/11. Then the Mac's open shard caught a cost: fitted by the residual, the start threw away the
+plate-wide pressure two cycles a step build up (a residual barely sees a smooth error), and `npm run
+flush`'s glycerine dish kept 0.805 of its glycerine against the volume's 0.750 (0.754 before). Fitted
+by the solve's own energy instead (the Ritz choice, G summed over faces): `encode`'s thin residual
+1.072e-2, flush 0.759. A solve run to convergence (10 cycles) reads 0.757 on that line with or
+without the fit, so the old 0.754 was two cycles' error falling on the volume's side of the 1% bar
+(0.7575); see 38r-15.
+
+*38r-15:* where the 0.7% stayed. A probe in the lab, the flush's glycerine dish at 20 V-cycles a
+step: the carries' faces let out over the rim exactly the water poured (127.54 against 127.55 in
+the lab's units), and still the glycerine left read 0.757, and the last ring inside the rim read
+1.06 a cell. The piles were not in the ring but on the grid's own edge: hsPrep holds the air's
+pressure in the cells on the box's wall as well as past the rim's radius (PLAN 27a-1), and the
+species' rim (speciesSplat) and the colour's (decayDye) cleared by the radius alone. So four strips
+of sixteen cells, where the inscribed rim meets the wall, inside the radius and past the solve's
+rim, took what the flow pushed out and nothing took it off: 2.07 a cell at the +x edge, 0.99% of
+the dish's glycerine. Now one predicate, `pastOpenRim` in `wgsl/fluid/shared.ts`, is the solve's
+rim, the species' and the colour's, and the colour's spreading stops at the same edge
+(dyeDisperse). `PW_WEBGPU=1 npm run flush`: glycerine left 0.759 → 0.751 (the volume says 0.750),
+the colour 0.776 → 0.750, the full dish 1.002 → 0.997 of its area; 9/9, no bar moved.
 
 ## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 
@@ -11226,3 +11428,39 @@ their data, the prices against `Landing.tsx`, each listing field within its limi
 with no price or way to buy, the store pictures' sizes and alpha, and the page at
 360 and 1280 px with no sideways scroll and every picture loaded. Left open:
 12.6-shots (the phone's own screenshots) and 12.6-label.
+
+## 44b, 44c, 44d, 44g. The owner's AI assistant plays the show (2026-11-07)
+
+Asked 2026-11-07; the owner's answer: build it for the owner's own use, not sold or
+promoted, so it is dormant on every show but one with the owner's switch on, is not
+shipped inside the Mac app, and no public page names it (`npm run assistant` fails if
+one does). Then: no limit on what it controls ("Full"), let it see the plate, let it
+learn the owner's taste. **44b**: a fourth hello role, `assistant`, in
+`server/remote-server.js`: admitted only from the laptop (`isLaptop`), with the show
+key, while the switch says suggest, play or full (`readAssistantMode`: the
+`CHROMAGLASS_ASSISTANT` variable, or one word in `CHROMAGLASS_ASSISTANT_FILE`, which
+the Mac app points at `assistant` in its userData). The relay re-reads the switch every
+second and closes a linked assistant when it goes off; refusals never count towards the
+wrong-key lockout. Display states and the Draw picture go to the assistant (the picture
+only within three seconds of its asking); `cue-look` and `assistant-live` reach the
+display only from the guard, so a phone still cannot start a stream. **44d**: the guard
+is `server/assistant.js`, in the relay rather than the page because the relay is the one
+door every assistant message passes and it checks in node: Suggest arms (a library look,
+or one made from a base, `src/lib/assistantLook.ts` stripping the room on the page's
+side), Play adds Go, settings, gestures, the sequencer and Undo, Full adds everything
+else (the room's settings, blackout, clear, drain, recording, `startSavedLive`). In
+every mode a numeric setting glides (smoothstep, 0.5 to 30 s, default 1), Undo walks
+back ten changes (a Go by the display's Back), and a key the performer moved in the
+last ten seconds (a phone's, OSC's or Art-Net's patch, or a change in the display's
+snapshot that is not the assistant's own echo, which also stops the key's glide) is
+refused; Undo of a Go or a blackout is refused once the performer has changed it since,
+a Go with nothing armed is refused, and the switch changing stops every glide; Suggest and Play cap a look
+change at one per 4 s, four changes and ten gestures a second, Full at thirty messages
+a second. **44c**: `mcp/chromaglass-mcp.js`, no dependencies, 19 tools, a craft guide
+in its `instructions`, the owner's notes in a file outside the repo, and `look_at_plate`
+returning the remote's 480-px Draw picture as an image. **44g**: `npm run assistant`
+(Measure browser2), 40 lines and 18 mutants green on 2026-11-07, about 65 s (three
+of the mutants added after a review pass found a desk move mid-glide overridden, Undo
+reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
+main's relay taking an `assistant` hello as a phone's, with the switch off and from
+another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).
