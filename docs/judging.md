@@ -2410,3 +2410,12 @@ or blue look, Clear Film about 0.35 (tears over the dust in a second or two), Fi
 5. Bad: the holes tinted, the lace flat (one yellow regardless of thickness), or the plate
    changing when Film Dye is 0.
 
+## 110. A network display over https (PLAN 14m-https)
+
+Start the show on the Mac (`npm run remote` or the Mac app) and open the network display address
+it prints, `https://<laptop-ip>:3443/?cast=true&key=…`, on a second computer, a tablet or a
+TV's browser on the same Wi-Fi. The browser should warn once that the connection is not
+private; choose Advanced, then Proceed (Safari: Show Details, then visit this website). The
+plate should then come up and follow the laptop, as a projector on HDMI does. Say which
+browsers took it, and whether the warning came back on a later visit (it should not on the same
+device, unless the laptop's Wi-Fi address changed).

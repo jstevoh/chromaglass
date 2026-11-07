@@ -53,3 +53,6 @@ desktop/release/
 server/.show-key
 server/.assistant
 server/.license.json
+
+# The show server's https certificate (PLAN 14m-https), made on its first launch.
+server/.tls/

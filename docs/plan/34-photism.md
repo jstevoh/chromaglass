@@ -103,8 +103,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
     variables when the show server starts, which a Finder launch never sets, though
     `desktop/README.md` says it works "with no terminal". A Show menu item or a Settings → Wall
     card for host, universe, fixtures, order and the in-map, kept in the app's settings.
-  - **34a-7d. Network displays cannot start over the Wi-Fi.** A `?cast` page at an `http://`
-    address gets no WebGPU (14m-https, #443), so "more screens on other computers" is not sold yet.
+  - **34a-7d. Network displays cannot start over the Wi-Fi.** The show server now serves them over
+    https (14m-https, shipped); "more screens on other computers" can be sold once the owner has seen
+    a TV or a second computer take it (judging §110).
   - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
