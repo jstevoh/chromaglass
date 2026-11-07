@@ -23,10 +23,12 @@ import { signLicenseKey, normalizePacks } from './license-key.js';
   The store's product for each pack, test mode's and live mode's (Lemon Squeezy numbers
   them apart), built in so a deploy that forgets a setting still files the pack, and a
   later store can add its own as a Worker setting (comma separated), as the tiers' lists
-  do (`LS_HOME_PRODUCT_IDS`). Read from the dashboard when the product was made.
+  do (`LS_HOME_PRODUCT_IDS`). Read from the dashboard when the product was made on
+  2026-11-07: 1509032 is the test-mode Moiré Pack and 1509029 the live one (ids are global
+  across the two modes, so the test one is not near Home's 1450525).
 */
 export const PACK_PRODUCTS = {
-  moire: { setting: 'LS_MOIRE_PRODUCT_IDS', builtIn: [] },
+  moire: { setting: 'LS_MOIRE_PRODUCT_IDS', builtIn: [1509032, 1509029] },
 };
 
 function listed(list, id, builtIn) {

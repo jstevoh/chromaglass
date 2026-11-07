@@ -26,4 +26,5 @@ export function buildCheckoutUrl(baseUrl: string, email?: string | null): string
   signs the buyer's Home key again with the pack in it (server/license-packs.js), so the
   checkout needs the email the Home key was filed under, which `buildCheckoutUrl` fills in.
 */
-export const CHECKOUT_MOIRE_URL = '';
+export const CHECKOUT_MOIRE_URL =
+  'https://chromaglass.lemonsqueezy.com/checkout/buy/d44108b9-47c1-4ba8-b488-6fcffe36150c';

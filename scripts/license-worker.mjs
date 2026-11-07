@@ -43,6 +43,7 @@ import { build } from 'esbuild';
 import worker from '../server/license-worker.js';
 import { generatePair, restoreBackup, revokeIds, rotate } from './licenserotate.mjs';
 import { verifyLicenseKey } from '../server/license-key.js';
+import { packForProduct } from '../server/license-packs.js';
 import { createServerLicenseManager } from '../server/server-license.js';
 
 const checks = [];
@@ -1059,6 +1060,18 @@ let bobProToken = '';
     '13m. a product named "Moiré Pack" on no list is held as an unknown product',
     unlisted.ignored === 'unknown product' && (await tokenPacks((await keysOf(envP, 'xia@example.com'))[0])) === '-',
     `${unlisted.ignored}`,
+  );
+
+  // 13q. The store's own Moiré Pack products, test 1509032 and live 1509029 (read from the
+  // dashboard 2026-11-07), file as the pack on a Worker with no LS_MOIRE_PRODUCT_IDS
+  // setting at all, so a deploy that forgets the setting still sells the pack; and Home's
+  // own products (test 1450525, live 1479217) are never taken for it.
+  const bare13q = [1509032, 1509029].map((id) => packForProduct({}, id));
+  const homes13q = [1450525, 1479217].map((id) => packForProduct({}, id));
+  check(
+    '13q. the store\'s Moiré Pack products file as the pack with no setting, and Home\'s never do',
+    bare13q.every((p) => p === 'moire') && homes13q.every((p) => p === null),
+    `pack ${bare13q.join(',')}, home ${homes13q.join(',')}`,
   );
 }
 
