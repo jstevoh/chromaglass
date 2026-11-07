@@ -580,6 +580,19 @@
       ]
     },
     {
+      "name": "The opening's wait for its frames",
+      "shard": "logic",
+      "run": "npm run stillwait",
+      "why": [
+        "The opening's wait for the page's frames before its first compile",
+        "(src/lib/stillWait.ts, PLAN.md 19aa-7), on made-up timelines: four",
+        "frames waited for whenever they come, half a second of the page free",
+        "with no frame ends it (the GPU process holding them, 43 of 116 Mac",
+        "openings), a busy or held page is never read as starved, and nothing",
+        "waits past the old 1.5 s cap."
+      ]
+    },
+    {
       "name": "The one Record button",
       "shard": "logic",
       "run": "npm run record",
@@ -1022,7 +1035,7 @@
     },
     {
       "name": "The oil beads' mask drawn on the GPU",
-      "shard": "lab",
+      "shard": "lab3",
       "run": "npm run beadmask",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1037,7 +1050,7 @@
     },
     {
       "name": "The slosh dish on the GPU",
-      "shard": "lab",
+      "shard": "lab3",
       "run": "npm run sloshgpu",
       "env": {"PW_WEBGPU":"1"},
       "why": [
@@ -1051,15 +1064,15 @@
     },
     {
       "name": "The draining soap film on the GPU (control)",
-      "shard": "lab",
+      "shard": "lab3",
       "run": "npm run soapgpu -- --selftest",
       "why": [
         "The draining soap film's GPU check against its CPU control (PLAN 32c,",
         "scripts/soapgpu.mjs --selftest, scripts/soapgpu-cpu.ts): the CPU reference",
         "in the GPU solver's contract through every scenario and bar of soapgpu.",
-        "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
+        "In Measure's lab3 part rather than logic because soapgpu.mjs opens the lab",
         "page in Chromium and requests a WebGPU adapter before running the solver,",
-        "and checks.yml installs Chromium only on the browser, lab and lab2 parts."
+        "and checks.yml installs Chromium only on the browser and lab parts."
       ]
     },
     {
@@ -2002,7 +2015,7 @@
       "run": "npm run sloshgpu",
       "why": [
         "The slosh dish's kernels against the TypeScript reference, on Metal",
-        "(the same check runs on SwiftShader in Measure's lab part)."
+        "(the same check runs on SwiftShader in Measure's lab3 part)."
       ]
     },
     {
