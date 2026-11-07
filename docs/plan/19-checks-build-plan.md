@@ -270,6 +270,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   about 22:50 and 14:30 on that tier, inside 25 but not by much. Size every
   Linux part to finish inside 21 minutes at 1.40 ms (printing the tier in the job summary, from
   videoflow's line), and split a part that does not. Found on #655 (PLAN 38r part 2).
+- **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
+  whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
+  deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
+  cancelled open at 19:27, a slow runner; 669 also read reds in oscout, ears and startup 1b, 19aa-7,
+  each green on the runs either side). Before #655 fifth ran 17:14 and 17:48. `mirror` (85 s, the
+  shard's last) moved to `show`, which ran 15:56 and 16:23 on those deploys; no bound moves. The
+  same day deploy 667 was cancelled in `lab` at 24:30 of its 25, all eleven green: 19k-11 again.
 - **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
   `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
   only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,
