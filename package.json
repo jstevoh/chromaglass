@@ -34,6 +34,7 @@
     "shapes": "node --experimental-strip-types scripts/shapes.mjs",
     "timecode": "node --experimental-strip-types scripts/timecode.mjs",
     "link": "node --experimental-strip-types scripts/link.mjs",
+    "dawbridge": "node --experimental-strip-types scripts/dawbridge.mjs",
     "cellride": "node --experimental-strip-types scripts/cellride.mjs",
     "scene": "esbuild scripts/scene.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/scene.mjs && node node_modules/.cache/scene.mjs",
     "soundcords": "esbuild scripts/soundcords.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/soundcords.mjs && node node_modules/.cache/soundcords.mjs",
@@ -249,6 +250,7 @@
     "beams": "node scripts/beams.mjs",
     "wallpattern": "node --experimental-strip-types scripts/wallpattern.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
+    "timers": "node scripts/timers.mjs",
     "backplate": "node scripts/backplate.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",
     "phonelink": "npm run build && node --experimental-strip-types scripts/phonelink.mjs",
@@ -293,7 +295,8 @@
     "bubbledye": "node scripts/bubbledye.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
-    "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs"
+    "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
+    "presskit": "node scripts/presskit.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

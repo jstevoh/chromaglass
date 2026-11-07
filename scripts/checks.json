@@ -410,12 +410,14 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs",
+      "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
-        "and nothing looked."
+        "and nothing looked. And the lines written ahead of Wave 4",
+        "(scripts/rungs-owed.mjs): 14c-4k, 14c-governor, 14b-120, 14c-readout and",
+        "H2c-10, owed until each ships."
       ]
     },
     {
@@ -530,6 +532,18 @@
         "A Mixer row taken out over bars and brought back (PLAN.md §11 step 4):",
         "whole fades driven at the show timer's 16 ms, no step past the curve's",
         "steepest, the turn-round, the hand, the cut, and the pads wired."
+      ]
+    },
+    {
+      "name": "The show's timers when nobody is looking",
+      "shard": "logic",
+      "run": "npm run timers -- --owed=hidden,gamepad",
+      "why": [
+        "A look fade with the window covered, Chrome's one-a-second throttle",
+        "modelled in node and the ear's worker tick driven by hand (PLAN 14a-timers),",
+        "and useGamepad's timers with no pad, the real hook on a stand-in React",
+        "(14j-gamepad). Both owed until their builds; the visible fade's line holds",
+        "on main and keeps a pump from doubling a fade's writes."
       ]
     },
     {
@@ -924,14 +938,17 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
         "PLAN.md Wave 4.1, H2c-4): the bytes it allocates and the writes it",
         "makes a dispatch, counted in the page by Chromium's own heap sampler.",
         "JavaScript's cost, which is the same on SwiftShader as on Metal, so it",
-        "sits here rather than in the Mac queue."
+        "sits here rather than in the Mac queue. And the multigrid's own lines",
+        "(scripts/encode-solve.mjs): the residual a step leaves, read through the",
+        "solver's restriction kernel against main's, which holds on main; and the",
+        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships."
       ]
     },
     {
@@ -1390,6 +1407,20 @@
       ]
     },
     {
+      "name": "The press kit and store listings are what they say",
+      "shard": "browser2",
+      "run": "npm run presskit",
+      "why": [
+        "The press page (PLAN.md 37k) and the store listings (12.6): /press routed",
+        "before the app's catch-all, every file it links in public/, six stills at",
+        "least 2400 px wide and two faststart clips as long as their captions (read",
+        "from the files), the landing page's prices, each listing field within its",
+        "store's limit with no price or way to buy, the store pictures' sizes and",
+        "alpha, and the page at 360 px and 1280 px with no sideways scroll and every",
+        "picture loaded. No build: it serves public/ as Hosting does."
+      ]
+    },
+    {
       "name": "The Live Show panel",
       "shard": "browser2",
       "run": "npm run liveshow",
@@ -1495,6 +1526,24 @@
         "tempo moved by each. On the dist/ the phone's step built. The plate's colours on",
         "the fixture need a plate that reports its dye back, so those two lines skip here",
         "and are the owner's, run on the Mac (docs/judging.md §93 step 0), not a Mac shard's."
+      ]
+    },
+    {
+      "name": "The DAW bridge",
+      "shard": "browser2",
+      "run": "npm run dawbridge -- --owed=app",
+      "why": [
+        "The DAW bridge plugin's contract (PLAN 13.7, docs/dawbridge.md), written ahead",
+        "of both halves: a node stand-in for the plugin against the real show server",
+        "with a Pro key (hello, slots within a frame at full float, transport, CGPC audio",
+        "bit for bit within 5 ms, names back, one plugin at a time, bye and quiet, phones",
+        "kept out, localhost only, locked on Free), the page's libs (the frame decoded, a",
+        "slot through MIDI learn's map, transport as a tempo source under Link), then the",
+        "built app (a slot moves its setting, the DAW's tempo is the show's, the ear hears",
+        "it). Beside rig, on the dist/ the shard has built; run alone it builds (19k-10).",
+        "--owed: app is 13.7a's; the plugin's",
+        "lines run only with `-- --plugin` on a Mac with it built (13.7b, then 13.7c's",
+        "Mac shard entry)."
       ]
     },
     {

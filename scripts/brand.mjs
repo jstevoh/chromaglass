@@ -23,6 +23,11 @@
  *   docs/brand/…                    the same at full detail, plus the sizes other
  *                                   services ask for (Google's sign-in screen,
  *                                   profile pictures)
+ *   docs/brand/store/…              Google Play's 512 icon and 1024 × 500 feature
+ *                                   graphic (PLAN 12.6; the App Store's icon is the
+ *                                   iPhone app's own 1024 above)
+ *   public/press/logo/…             the press page's downloads (PLAN 37k): the icon
+ *                                   and the lockup as SVG and as large PNGs
  *
  * The words come from `scripts/brand/words.json` — the letters already turned
  * into shapes — so this needs no font installed. `scripts/brand/outline.mjs`
@@ -33,7 +38,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
-import { icon, lockup, shareCard, introLayers } from './brand/art.mjs';
+import { icon, lockup, shareCard, featureGraphic, introLayers } from './brand/art.mjs';
 
 const words = JSON.parse(fs.readFileSync('scripts/brand/words.json', 'utf8'));
 
@@ -53,6 +58,15 @@ const intro = introLayers(words, { detail: 'medium' });
 write('public/intro-burst.svg', intro.burst);
 write('public/intro-hub.svg', intro.hub);
 write('public/intro-name.svg', intro.name);
+write('public/press/logo/chromaglass-icon.svg', icon({ shape: 'tile', detail: 'high' }));
+// The lockup's SVG at the headers' detail: at full detail it is 112 KB, over
+// `npm run sizes`'s 100 KB for a new file, and the difference (more points on
+// the filaments) does not show at any size a page prints it. The PNG below is
+// drawn from the full detail.
+write('public/press/logo/chromaglass-lockup.svg', lockup(words, { detail: 'medium' }));
+const pressLockup = lockup(words, { detail: 'high' });
+// The lockup's PNG keeps its own shape at 2400 wide, the width a print layout asks for.
+const [, , lw, lh] = pressLockup.match(/viewBox="([^"]+)"/)[1].split(/\s+/).map(Number);
 
 // Rasterised by the browser, the one renderer every place these end up agrees with.
 const PNG = [
@@ -68,6 +82,12 @@ const PNG = [
   ['public/og-card.png', shareCard(words), 1200, 630],
   ['docs/brand/google-logo-120.png', icon({ shape: 'tile' }), 120, 120],
   ['docs/brand/avatar-800.png', icon({ shape: 'square', scale: 0.8 }), 800, 800],
+  // Play draws its own rounded mask over a full-bleed square, and keeps the
+  // middle of it, so the dish is inset as the profile picture's is.
+  ['docs/brand/store/play-icon-512.png', icon({ shape: 'square', scale: 0.8 }), 512, 512],
+  ['docs/brand/store/play-feature-1024x500.png', featureGraphic(words), 1024, 500],
+  ['public/press/logo/chromaglass-icon-1024.png', icon({ shape: 'tile' }), 1024, 1024],
+  ['public/press/logo/chromaglass-lockup-2400.png', pressLockup, 2400, Math.round(2400 * lh / lw)],
 ];
 
 console.log('PNG');

@@ -585,6 +585,40 @@ seconds; the beat clock's kicks once a beat, each in its beat's frame; and over 
 on loopback, within 0.01 ms. Mutations caught: the beat without its origin, joining by
 the library's merge rule instead of listening first.
 
+### 13.5-link-one, -transport, -gate, -rescan, -menu. Link's five follow-ups (2026-11-01)
+
+The owner asked on 2026-11-01 for whatever Ableton work was left; these five were the
+follow-ups 13.5-link wrote down when it shipped, done as one PR.
+
+- **13.5-link-one.** `BarGrid.tell(beatAt, period, place, time)` takes the bar from a
+  source that knows it; while told (and `TOLD_HOLD`, a second, after), `now` and
+  `placeAt` are Link's, and the ear keeps listening underneath. The frame loop hands it
+  the tempo reading's `bar`, carried from the page's milliseconds to the grid's seconds
+  by how far apart the two clocks stand that frame. `npm run downbeat`, on the "band 110"
+  song with Link's one put two beats from the song's own: 4/4 of the first bar's beats
+  and 124/124 after on Link's place (the ear alone put 0 there), and 77/77 back to the
+  ear's own count a second and a half after Link stops.
+- **13.5-link-transport.** `TempoSource.linkReading` hands back the transport's edge
+  (`'start'`, `'stop'` or null, and never on joining or leaving a session); with
+  **Play/Stop** on beside Link (desk and phone, remembered on the machine, off by
+  default), a stop pauses a running Sequence and a start resumes only one that Link
+  paused. The plan said "the way MIDI Stop does", but MIDI Stop only hands the tempo
+  back; nothing paused the Sequence before this.
+- **13.5-link-gate.** `setLink` refuses below Pro and says `locked`, which the switch
+  shows as "part of Pro"; a tier that drops while Link is on leaves the session.
+  `npm run tiers` 4d: Pro on, Home and none and a removed key locked, and the Home phase
+  after a Pro one that left Link on finds it already off.
+- **13.5-link-rescan.** `startLink` reads the interfaces every thirty seconds (the
+  library's own period): new addresses get a socket and join the group, gone ones close.
+  `npm run link` part 6: with no interface up nobody is found; loopback "comes up" and the
+  session is found 100 ms later, with no switching.
+- **13.5-link-menu.** Show → Ableton Link (Pro) in the Mac app. It asks the page (which
+  owns the remembered switch) rather than the server, and its tick is the server's state
+  (`onLinkChange`).
+
+**Owed:** the owner's Live sitting (`docs/judging.md` §95) now also covers Live's
+downbeat on the plate's one, Play/Stop on a running Sequence, and the menu item.
+
 ### 13.5-osc. OSC out to a VJ app (2026-11-01)
 
 Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second
@@ -2906,6 +2940,37 @@ to 0.00%, pile no ring (deepest cell 1.01–1.08 of the pool's depth), leave 3.3
 in their middles, and a popped hole fills back. What is left under them is the flow through the
 air (15g-8d); the old plate still multiplies and paints back (15g-8c).
 
+### 15g-8d. The liquid goes round a bubble in the thin solve (shipped)
+
+The thin solve gave the air the liquid's own mobility, so the flow ran straight through a bubble: a
+drifting one's front, where the air arrives, drained through it to its back, where the air leaves,
+and the carries left 6.6% of the pool's colour in its middle (`npm run bubbledye`, 128²), with the
+flow outside it drawn as if no bubble were there.
+
+Now the air standing through a step takes its share of the cell from the liquid's mobility
+(`standingLiquid` in hsPrep), and a cell the air fills through the step has none: no liquid crosses
+its faces (hsDivergence takes u*'s half out of them, `thinFaceVel` carries nothing through them,
+`hsCoarsen`'s rows shut with them), and its pressure is no part of the solve. A cell part air keeps at
+least 5% of its mobility, a jump of twenty at most. The solve runs three V-cycles in place of two
+while there is air, four on the step a bubble lands whole or pops and the step after (two left the
+flow 4% short the step after a bubble landed; four on every step with air cost the Mac's Bass Drop
+a step of the rhythm check's 200). What a dry core still
+holds above its film is handed to the liquid at its rim (`airShed`, after each amount carry), since
+the donor rule leaves 4–6% in the cells round a bubble put down whole. A bubble's drift reads the
+liquid on a ring a cell and a half past its rim (`src/lib/bubbles.ts`): with no liquid inside it the
+solver's velocity there is nothing, and round a disc in Hele-Shaw flow the disturbance is a dipole
+whose mean on any circle is zero, so the ring's mean is the far flow Taylor and Saffman's 2U doubles.
+
+What was tried: a mobility of a thousandth in place of none let the core's pressure float free and
+seep liquid through cells nearly full of air (5% more colour than the pool held behind a moving
+bubble); flooring the coarse rows at 1e-20 broke the plate into a checkerboard; prolonging the coarse
+correction without the dry coarse cells changed nothing; a donor handing on its whole concentration
+made a ring 1.3 bright, and one mixed with its neighbours' made the pop's ring 1.14.
+
+Lab (`npm run bubbledye`, 128², main → now): left under a whole bubble 1.2% → 0.6%, a growing one
+1.0% → 0.0%, a moving one 6.6% → 0.0%; deepest cell after a pop 1.097 → 1.088; deepest cell round a
+moving bubble 1.019 → 1.036; every total 0.000%. The bar under a bubble is 2% now (was 8%).
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the
@@ -4067,6 +4132,15 @@ the sessions' files or the native apps skips the Mac (19h).
   before, 5,675 after, 13% less; 65.3 → 56.8 a push. The lab's checks all bundle one
   `scripts/lab-entry.ts`, which imports most of `src/gpu` and `src/lib`, so a solver or
   library change still runs every lab check (19ak-3).
+- **19ak-5, a re-run no longer turns the logic shard red** (2026-11-07). 19ak-3a's skip
+  read `GITHUB_RUN_ATTEMPT` and `GITHUB_RUN_ID`, and `reach.mjs`'s selftest spawned its
+  scratch-tree `--diff` children with the job's whole environment. On attempt 2 a child
+  read the real run's jobs, found every Mac shard passed in attempt 1 and answered
+  `mac=false`, so "a changed script reaches, every shard in a tree with no manifest" and
+  "a Mac script moved to docs/x.md still reaches" failed on every re-run (#656's). The
+  children now run as attempt 1 of no run (`childEnv`); the skip keeps its own mocked
+  cases. Measured with `npm run reach` as attempt 2 of a real green run (41350181902,
+  Node's fetch through the proxy): 2 FAIL before, 97 ok and 0 FAIL after.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -9623,6 +9697,66 @@ helpers that name none. `prepush-reviewer` and `check-skeptic` name opus (they j
   ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
   touched (#441, #474 and the #402 finish thread are in it).
 
+#### 19aa-13. `renders` and `squeeze` timed their windows and asked a rate no line claims
+
+- **19aa-13. A window held until it has the frames or steps its line asks (shipped
+  2026-11-07).** `renders` measured each window for a fixed 3 s, and the lines that read
+  frames ask 45 of them, so on the Mac every such line also asked fifteen frames a second.
+  GitHub's Macs draw that page at 11 to 19, and "the band: the ear is reading" with "the
+  plate hears a new reading" went red with their ratios green: 16 Mac reds in `npm run
+  flakes`, never on Linux; #435 (11-01), #546 (10-28, 10-29) and #645 (11-01) at 40 to 43
+  frames in one phone window with readings on 0.98 to 1.00 of the frames, and #656 twice
+  (laptop 18.3 readings a second for 11.3 frames a second). Now `heldOpen` keeps a window
+  open past its three seconds until the plate has drawn 45 frames, at most 10 s; the band,
+  fader, quiet-page and gamepad windows all take it. The counts with a ceiling (renders,
+  commits, what React is told, the desk's moves) are still read over the first three
+  seconds, so a burst is not spread over a longer window (check-skeptic). `squeeze`'s window was a fixed 12 s
+  against 200 steps (about seventeen a second); #656's fifth shard read 185 and 258, then
+  187 and 329, every other line green. It is now held, under its existing 45 s cap, until
+  200 steps as well as six kicks (with `SQUEEZE_GPU=1` only, where the line is asked). No
+  bar moved: the 45 frames and 200 steps are still asked, every ratio is over the window's
+  frames, squeeze's counts are rates over its own seconds; a plate under 4.5 frames or steps
+  a second still fills no window and is red. Each line prints how long its windows took.
+
+#### 19aa-14. `renders`' quiet Perform desk committed more than the App rendered
+
+- **19aa-14. The picked dye bottle moves its own level and never commits for it (shipped
+  2026-11-07).** Six `open` shard runs on five PRs read "the App renders for its clock and
+  no more" at 1.6 to 2.3 commits a second for 1.0 to 1.3 App renders, with 85 to 142
+  frames a window: #595 and #670 (the quiet Perform desk's second window, 2.0 and 2.3),
+  #605 (phone, a gamepad stick, 1.6), #640 and #669 (a gamepad trigger, 1.7), and an
+  older #435. Never where no plate draws. The devtools hook in `renders` now names each
+  commit's topmost components that rendered (their prop names and first element, which
+  survive minifying) and counts GPU devices lost, printed beside any commits ceiling that
+  reads more commits than renders. The culprit was `LiveBottle`, the bottle in hand on
+  the desk's shelf and the phone's Dye button: its level, polled from the plate's mean
+  density every 0.4 s, was React state, so each move of a twentieth was a commit of its
+  own and React's state hook added one more on the next poll that set the same value (its
+  eager bail-out is skipped while the fiber still carries the last update's lane).
+  `shownRoom`'s hysteresis (October) had stopped a reading at rest flipping on a rounding
+  boundary, but a plate whose mean drifts or hunts by more than the 0.004 it was measured
+  against still crosses a step now and then. Now the level lives in a ref and the poll
+  writes the liquid's top, a clear liquid's surface line and `data-level` on the SVG, as
+  the VU needle does. A new `renders` phase makes the reading move where no plate draws
+  (the App's handle on the plate answers 0.30 and 0.40 by turns every 0.7 s): "the bottle
+  in hand: it shows a Dye Budget reading that moves" (9 levels in 6 s, both screens) and
+  "and the page commits for the App's clock and no more while it moves", which read 2.7
+  and 3.0 commits a second with main's bottle, every extra one named as the bottle, and
+  1.0 with this one. Found along the way: 19aa-14b, 19aa-14c.
+
+#### 19aa-15. A pull request's Measure part ran checks without the build they lean on
+
+- **19aa-15. A part run on a selection builds the site first when a full run would have
+  (shipped 2026-11-07).** `browser2`'s later checks (the Mixer, the phone link, Draw, the
+  input picker, the Source, following a song) serve the `dist/` that the iPhone remote's,
+  the Live Show's or the shelf's `vite build` made before them in a full run; a pull request
+  runs only the checks its diff reaches (19k-4), and #673 ran the renders with nothing
+  built. `runShard` now builds once, first, when a picked check had a builder before it
+  in the manifest's order and no picked check before it builds (`buildFirst`, read from
+  the commands through their npm scripts, so a new entry needs no field). `npm run checks`
+  holds it with five lines; by hand, with `dist/` removed and only the Mixer picked, the
+  part built the site and the Mixer read 19/19.
+
 #### 19c. Checks that can pass without measuring, and checks nothing runs
 
 - ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
@@ -10746,6 +10880,22 @@ model cannot reach one, the PR says what it reached and asks.
     body texture 0.07–0.18 levels before, 0.21–0.39 now; single-pixel flecks at its edges
     0.55% at most. Found on the way: 38h-12 (the back plate is drawn brighter than the front,
     so the same grain moves more of its edge past 40 levels, in patches).
+  - **38h-3 (shipped 2026-11-01).** The shadowgraph was two terms. `refractionOptics` drew the
+    dye's from the derive pass's ∇²OPL, masked to the dye's own slope and only over dye; the
+    oil block drew the oil's from the oil alone (38h's ring means). So where dye crossed an
+    oil drop's edge the oil's share was counted twice (in the lab at Focus 0.8 a black arc at
+    10 and a clipped one at 255 along the dye's edge), and a clear pour that moves only the
+    index (glycerine, Δn 0.14) drew its lens only where the dye happened to slope. Now one
+    function, `defocusShadow` (`src/gpu/wgsl/plateTransmit.ts`), takes the oil block's ring-mean
+    Laplacian at the defocus disc's scale off the derive pass's `.w`, the whole column's
+    optical path n·h (dye stand-in, oil, pour, film, gap), divided by water's index, and
+    multiplies the light through the front plate (the back plate's own dye, until 18e-1).
+    Averaging the derive pass's `.z` (∇²OPL) over the disc was tried first and speckled a
+    fresh pour's stair-stepped rim. `npm run nolight` line 13 (new): a clear pour is a lens out
+    of focus, as strong as the oil's of the same size for its index step (summed |ln T| at
+    Focus 0.56, 1.04 of the 1.29 predicted; a doubled index reads 1.75, red; main turns only
+    0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
+    look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
@@ -11089,4 +11239,27 @@ value) by default on every look, and free to ramp up so a long show keeps bursti
   clears `73.8%` of the dye in its radius in $2\text{ s}$ at `1` (`0.0%` at `0`, `99.5%`
   on clean water), with bursts returning from dial `0.87` ($25\text{ s}$ half-life).
 
+## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 
+Wave 7's next Claude item after OSC out. **37k**: `chromaglass.art/press`
+(`public/press.html`, a static page like `/pro`, routed in `firebase.json` before
+the app's catch-all): the two sentences with a copy button, the facts (prices from
+the landing page, what it runs on, the LLC, `support@`), six stills at 2560 × 1440
+and two 20-second 1080p60 clips with sound, the logo as SVG and large PNGs. The
+media are the owner's Mac recording the real app (the 34a-6 site films of 10-29,
+cut on the Mac: stills are the films' 30-second frame where no `still.png` was
+written, clips the 20 seconds with the most frame-to-frame movement, H.264 CRF 22
+capped at 4.3 Mb/s, +faststart), not the lab, because a press picture promises
+what the app looks like. Credits with ISRCs: `public/press/MEDIA.md`. The cards
+show the landing page's small webp of each look and link the full JPEG, so a phone
+loads about 120 KB of pictures. **12.6**: the privacy page's section for the phone
+apps (permissions asked on the phone, nothing more sent, no tracking or ad id),
+`docs/store-listings.md` (every field for both stores, the review note, category
+and rating, the App Privacy label and Data safety answers), and Play's 512 icon and
+1024 × 500 feature graphic from `scripts/brand/art.mjs` (`featureGraphic`).
+`npm run presskit` (Measure browser2), 46/46: the files exist, the stills' and
+clips' sizes and lengths read from the files themselves, the clips' index before
+their data, the prices against `Landing.tsx`, each listing field within its limit
+with no price or way to buy, the store pictures' sizes and alpha, and the page at
+360 and 1280 px with no sideways scroll and every picture loaded. Left open:
+12.6-shots (the phone's own screenshots) and 12.6-label.

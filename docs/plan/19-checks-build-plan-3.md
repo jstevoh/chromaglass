@@ -36,6 +36,26 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reads six times across the same 600 ms and wants four held (a press laid once and not
   renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
   --check 'holding the Press lifts nothing'` a week after merge.
+- **19aa-13. `renders` and `squeeze` hold a window until it has the frames or steps its
+  line asks (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-13.
+- **19aa-14. `renders`' "the App renders for its clock and no more": the dye bottle
+  committed on its own (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-14.
+- **19aa-14b. `open()` waits up to 30 s for one second of fifteen frames (found
+  2026-11-07, open).** A page on a Mac drawing under fifteen a second waits the full 30 s
+  (it prints "never drew fifteen frames"; not yet counted in the logs). Now that each
+  window holds itself open for its 45 frames (19aa-13), it could wait only for the plate
+  to draw at all.
+- **19aa-14c. The cloud's software WebGPU loses the app's device every nine seconds or so
+  (found 2026-11-07, open).** `PW_WEBGPU=1` with the app (not the lab), under Xvfb: "WebGPU
+  device lost: destroyed" with no `destroy()` call from the page (a wrapped
+  `GPUDevice.prototype.destroy` never ran), then "A valid external Instance reference no
+  longer exists" and a `requestAdapter` that returns null for two seconds. Each loss and
+  recovery commits the plate's own `glLost`/`glEpoch` state, so `renders` with a plate
+  read there is red for that alone (1.3 renders, 2.0 commits a second). Probably
+  SwiftShader's GPU process going down under the plate's work at that rate; find which,
+  before any app check leans on software WebGPU for its commits.
+- **19aa-15. A pull request's Measure part builds the site first when a full run would
+  have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
@@ -447,3 +467,5 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
   `checkReads` now gives `site` from esbuild's import graph; quick should use it for
   `here`, once a session has timed the lab checks on software WebGPU.
+- **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
+  children run as a first attempt (docs/plan-shipped.md, 19ak).

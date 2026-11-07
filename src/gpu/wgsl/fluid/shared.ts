@@ -266,6 +266,8 @@ fn tfGap(q: vec2i) -> f32 { return max(textureLoad(sq, q, 0).r, 0.004) / A.b.w; 
 // The velocity through the face a → a + e, both cells inside the grid.
 fn thinFaceVel(a: vec2i, e: vec2i, n: i32) -> f32 {
   let b = a + e;
+  // Nothing through a bubble's core, which the solve shut (hsPrep's standingLiquid, PLAN 15g-8d).
+  if (mob[a.x + a.y * n] == 0.0 || mob[b.x + b.y * n] == 0.0) { return 0.0; }
   let ha = tfGap(a);
   let hb = tfGap(b);
   let face = 0.5 * (dot(textureLoad(vel, a, 0).xy, vec2f(e)) * ha + dot(textureLoad(vel, b, 0).xy, vec2f(e)) * hb)
