@@ -406,6 +406,33 @@ const api = {
   },
   async field(which: 'dye' | 'vel' | 'oilDye' | 'species') { return Array.from(await lab!.solver.readField(which)); },
   /**
+   * The air field as the splat left it (gpu/air.ts): its grid, and per texel
+   * the coverage, g, b and the packed look (wgsl/air.ts), as numbers, or null
+   * with no bubble on the plate. For `npm run bubbleedge`, which asks every
+   * texel where its bubble is (PLAN 38h-13).
+   */
+  async airField() {
+    const air = (lab!.solver as unknown as { air?: { field: GPUTexture } }).air;
+    if (!air) return null;
+    const device = lab!.solver['device'] as GPUDevice;
+    const tex = air.field, n = tex.width, row = Math.ceil(n * 8 / 256) * 256;
+    const buf = device.createBuffer({ size: row * n, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = device.createCommandEncoder({ label: 'lab air read' });
+    enc.copyTextureToBuffer({ texture: tex }, { buffer: buf, bytesPerRow: row }, [n, n]);
+    device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const raw = new Uint16Array(buf.getMappedRange().slice(0));
+    buf.unmap(); buf.destroy();
+    // Half floats by hand: sign, five bits of exponent, ten of mantissa.
+    const half = (h: number) => {
+      const e = (h >> 10) & 31, m = h & 1023, sg = h >> 15 ? -1 : 1;
+      return sg * (e === 0 ? m / 1024 * 2 ** -14 : e === 31 ? (m ? NaN : Infinity) : (1 + m / 1024) * 2 ** (e - 15));
+    };
+    const data: number[] = new Array(n * n * 4);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n * 4; x++) data[y * n * 4 + x] = half(raw[y * row / 2 + x]);
+    return { n, data };
+  },
+  /**
    * The clear film (PLAN §20b), read back: its grid, and its thickness and
    * solvent cell by cell (n × n each), or null with no film on the plate.
    */

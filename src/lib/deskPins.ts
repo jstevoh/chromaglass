@@ -353,12 +353,24 @@ export type DeskSurface = 'perform' | 'design';
  *
  * It used to be a constant inside the bench, which is why the bench could not
  * be changed — the eight were the right eight and also the only eight.
+ *
+ * And none of them a ride (PLAN 38h-13). Six of the eight were: Speed,
+ * Turbulence, Soap Bursts, Beat Press, Zoom and Evolve Speed. Since a control
+ * is drawn once on a tab and the Rides keep theirs (`drawnElsewhere`), the
+ * Perform tab, which has both panels out, drew the Recipe as Swirl and
+ * Gravity and a line naming the six on the Rides: the owner, 2026-11-07,
+ * "the recipe box only has two controls?". The six are the hand's mid-set
+ * and stay the Rides'; the Recipe keeps Swirl and Gravity and takes six that
+ * build a look and that nothing else on Perform draws: how much dye, how it
+ * fingers, the air in it, the ground under it, the film on it and the glow
+ * round it. On Build, with no Rides out, the six are a click away on the
+ * Rides or by Choose, as any control is.
  */
 export const DEFAULT_RECIPE: (keyof VisualizerSettings)[] = [
   // Granulation is off the strip: it made a few jagged cuts in the dye and
   // read as a fault. The physics dials in its place each do something large.
-  'globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright',
-  'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate',
+  'vorticityConfinement', 'plateUpright', 'dyeBudget', 'fingering',
+  'bubbles', 'lampGround', 'iridescence', 'bloom',
 ];
 
 /*
@@ -407,6 +419,7 @@ const SHIPPED: Record<DeskSurface, string[][]> = {
   ],
   design: [
     ['globalSpeed', 'turbulenceScale', 'audioImpact', 'beatSqueeze', 'bloom', 'granulation', 'macroZoom', 'automateRate'],
+    ['globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate'],
   ],
 };
 const sameSet = (a: readonly string[], b: readonly string[]) =>

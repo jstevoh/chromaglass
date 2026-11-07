@@ -104,8 +104,23 @@ fn rimAt(theta: f32, rim: vec4f) -> f32 {
   return 1.0 + f * FINGER_REACH * lobe * len;
 }
 
+/*
+  The texel and how deep it is: 1 - a, so of two bubbles' discs over one
+  texel the depth test keeps the whole of the one that covers it most (see
+  the pipeline in gpu/air.ts). It was a max blend, channel by channel, and
+  where two pockets pressed together a texel kept one bubble's coverage,
+  the other's g and the larger look: a texel that lied about where it was,
+  which the closeup drew as square chunks between the two (PLAN 38h-13).
+  The coverage is the larger of the two either way, so the solver's field
+  is what it was.
+*/
+struct AirOut {
+  @location(0) texel: vec4f,
+  @builtin(frag_depth) depth: f32,
+};
+
 @fragment
-fn fs(in: VOut) -> @location(0) vec4f {
+fn fs(in: VOut) -> AirOut {
   // A texel, in units of this bubble's radius (before anything is discarded).
   let px = fwidth(in.local.x);
   let r = length(in.local);
@@ -140,6 +155,6 @@ fn fs(in: VOut) -> @location(0) vec4f {
     The field is read y-down, and the quad's local position is clip space's y-up.
   */
   let q = clamp(in.local / max(edge, 1e-3), vec2f(-1.0), vec2f(1.0));
-  return vec4f(a, a * (0.5 + 0.5 * q.x), a * (0.5 - 0.5 * q.y), in.look.x);
+  return AirOut(vec4f(a, a * (0.5 + 0.5 * q.x), a * (0.5 - 0.5 * q.y), in.look.x), 1.0 - a);
 }
 `;

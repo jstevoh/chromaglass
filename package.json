@@ -303,7 +303,8 @@
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
     "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
     "presskit": "node scripts/presskit.mjs",
-    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs"
+    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
+    "bubbleedge": "node scripts/bubbleedge.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

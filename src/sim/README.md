@@ -13,7 +13,7 @@ the component.
   `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
-- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom, Turing's rates, the currents.
+- `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom (`macroZoomOf` and `MACRO_PRESET_ZOOM` re-exported from `lib/macroCamera.ts`, where the desks read them), Turing's rates, the currents.
 
 ## Contracts
 

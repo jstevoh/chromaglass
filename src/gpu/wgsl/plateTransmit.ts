@@ -128,8 +128,10 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
 
 /*
   The camera's bubble: its true centre and radius in plate uv (PLAN 38h-2,
-  38h-7), from p, the position field's filtered reading at fuv, and R, the
-  packed radius. Neither is good enough to draw a rim from up close. R is
+  38h-7, 38h-13), from c00, one texel's word for its centre (camPick), R,
+  the packed radius, and look, the packed size, film and number that tell
+  its texels from a neighbour's. It once started from p, the position
+  field's filtered reading at the pixel. Neither is good enough to draw a rim from up close. R is
   packed in 16 steps on a log scale, each 1.28 times the last, so it is off
   by up to 14%; and filtered p is the coverage-weighted mean of the four
   texels round the point, so in the last texel it stops growing while the
@@ -151,14 +153,12 @@ fn microDrops(c: vec3f, p: vec2f, keep: f32, cam: f32, pxCell: f32) -> vec3f {
   packed one, a neighbour's texels mixed in) falls back to the packed radius
   and the centre the covered texels give for it.
 */
-fn camBubble(fuv: vec2f, p: vec2f, R: f32) -> vec3f {
+fn camBubble(c00: vec2f, R: f32, look: f32) -> vec3f {
   let n = vec2f(textureDimensions(air0));
-  var c0 = fuv - p * R;
-  var sn = 0.0;
-  var sq = vec2f(0.0);
-  var sx = vec2f(0.0);
-  var sqx = 0.0;
-  var sqq = 0.0;
+  var c0 = c00;
+  var xs: array<vec2f, 16>;
+  var qs: array<vec2f, 16>;
+  var m = 0;
   var sc = vec3f(0.0);
   for (var k = 0; k < 4; k++) {
     // The centre first; the other three round the centre its texels give,
@@ -170,27 +170,140 @@ fn camBubble(fuv: vec2f, p: vec2f, R: f32) -> vec3f {
     let ga = textureGather(0, air0, samp, at);
     let gg = textureGather(1, air0, samp, at);
     let gb = textureGather(2, air0, samp, at);
+    let gl = textureGather(3, air0, samp, at);
     // textureGather's order: (0,1), (1,1), (1,0), (0,0) from the corner texel b.
     let offs = array<vec2f, 4>(vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0), vec2f(0.0, 0.0));
     for (var j = 0; j < 4; j++) {
       let a = ga[j];
-      if (a > 0.1) {
-        let x = (b + offs[j] + 0.5) / n;
-        let q = (vec2f(gg[j], gb[j]) / a - vec2f(0.5)) * 2.0;
-        sn += 1.0; sq += q; sx += x; sqx += dot(q, x); sqq += dot(q, q);
-        sc += a * vec3f(x - R * q, 1.0);
+      // Only this bubble's own texels: a neighbour pressed against it has
+      // its own centre in its g and b (camPick).
+      if (a > 0.1 && abs(gl[j] * 2048.0 + 0.5 - look) < 0.5) {
+        xs[m] = (b + offs[j] + 0.5) / n;
+        qs[m] = (vec2f(gg[j], gb[j]) / a - vec2f(0.5)) * 2.0;
+        sc += a * vec3f(xs[m] - R * qs[m], 1.0);
+        m++;
       }
     }
   }
-  let vq = sqq - dot(sq, sq) / max(sn, 1.0);
-  let Rf = (sqx - dot(sq, sx) / max(sn, 1.0)) / max(vq, 1e-6);
-  if (sn < 3.0 || vq < 0.05 || Rf < 0.8 * R || Rf > 1.25 * R) {
+  /*
+    Fitted twice. Where two bubbles' splats overlap, the field keeps the
+    larger of each channel on its own (air.ts blends by max), so a texel
+    there can carry one bubble's coverage, the other's g and the larger
+    look, and pass every test above while lying about where it is. Those
+    are few and far off the line every true texel lies on exactly, so the
+    second fit keeps only the texels within a fifth of a texel and 3% of
+    the radius of the first.
+  */
+  var fit = vec3f(c00, R);
+  var ok = false;
+  for (var fitN = 0; fitN < 2; fitN++) {
+    var sn = 0.0;
+    var sq = vec2f(0.0);
+    var sx = vec2f(0.0);
+    var sqx = 0.0;
+    var sqq = 0.0;
+    for (var i = 0; i < m; i++) {
+      if (fitN == 0 || length(xs[i] - fit.xy - fit.z * qs[i]) < 0.2 / n.x + 0.03 * fit.z) {
+        sn += 1.0; sq += qs[i]; sx += xs[i]; sqx += dot(qs[i], xs[i]); sqq += dot(qs[i], qs[i]);
+      }
+    }
+    let vq = sqq - dot(sq, sq) / max(sn, 1.0);
+    let Rf = (sqx - dot(sq, sx) / max(sn, 1.0)) / max(vq, 1e-6);
+    ok = !(sn < 3.0 || vq < 0.05 || Rf < 0.8 * R || Rf > 1.25 * R);
+    if (!ok) { break; }
+    fit = vec3f((sx - Rf * sq) / sn, Rf);
+  }
+  if (!ok) {
     // Each covered texel's own word for the centre at the packed radius:
     // the same texels give the same centre, so a bubble too small to fit
     // still has one rim, not a piece of one per pixel.
-    return select(vec3f(c0, R), vec3f(sc.xy / max(sc.z, 1e-4), R), sc.z > 0.0);
+    return select(vec3f(c00, R), vec3f(sc.xy / max(sc.z, 1e-4), R), sc.z > 0.0);
   }
-  return vec3f((sx - Rf * sq) / sn, Rf);
+  return fit;
+}
+
+/*
+  Which bubble a pixel of the closeup is in (PLAN 38h-13).
+
+  What was reported (the owner, 2026-11-07): the closeup "has really
+  pixelated bubble edges". Photographed in the lab on Classic at the Close-up
+  button's 4x, three faults, each a grid cell wide on the screen (25 pixels
+  there, a 256 grid seen 4x on a 1080 line):
+
+  - Square chunks where two bubbles sit close. A pixel took its bubble from
+    the four air texels round it: the size and number from the largest of
+    the four, where it was from the filtered g and b. Between two bubbles
+    those four belong to both, so a pixel drew a circle that was neither
+    bubble's, and the pixels sharing those four texels all drew the same
+    wrong one: a square.
+  - Flat cuts off a rim. The bubble was drawn only where the filtered
+    coverage passed 0.02, but its rim is a fitted circle (camBubble) on the
+    line where the coverage reaches nothing, and the splat's coverage falls
+    away over the last quarter of the radius (air.ts). Between the two the
+    filtered coverage crosses 0.02 along the bilinear contour, which runs
+    straight across a texel: a rim with flats.
+  - A blocky polygon in the window (camLanding, below).
+
+  Every covered texel knows its own bubble exactly: g and b over a are where
+  in it the texel sits, linear across it, and a is the size, film and number
+  packed (air.ts). So each of the four gives a whole bubble, its centre
+  x - R q and radius R, and the pixel is in the one it is deepest inside,
+  length(fuv - c) / R the least. Pixels of one bubble then start camBubble
+  from that bubble and fit it from its own texels only, so they agree on one
+  circle; and the camera draws where some texel round the pixel holds any
+  air, its circle deciding the rim, rather than where the filtered coverage
+  happens to pass a threshold. Returns the centre, the packed radius and the
+  packed look; the look is -1 where no texel round the pixel holds air.
+*/
+fn camPick(fuv: vec2f) -> vec4f {
+  let n = vec2f(textureDimensions(air0));
+  let b = floor(fuv * n - 0.5);
+  let ga = textureGather(0, air0, samp, fuv);
+  let gg = textureGather(1, air0, samp, fuv);
+  let gb = textureGather(2, air0, samp, fuv);
+  let gl = textureGather(3, air0, samp, fuv);
+  let offs = array<vec2f, 4>(vec2f(0.0, 1.0), vec2f(1.0, 1.0), vec2f(1.0, 0.0), vec2f(0.0, 0.0));
+  var best = vec4f(fuv, 0.004, -1.0);
+  var deep = 1e9;
+  for (var j = 0; j < 4; j++) {
+    let a = ga[j];
+    if (a > 1e-3) {
+      let x = (b + offs[j] + 0.5) / n;
+      let q = (vec2f(gg[j], gb[j]) / a - vec2f(0.5)) * 2.0;
+      let look = gl[j] * 2048.0 + 0.5;
+      let R = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
+      let c = x - R * q;
+      let s = length(fuv - c) / R;
+      if (s < deep) { deep = s; best = vec4f(c, R, floor(look)); }
+    }
+  }
+  return best;
+}
+
+/*
+  Where the camera's ray through a bubble lands, and the light it finds
+  there (PLAN 38h-13). The solver takes the dye out of the pocket's
+  footprint on its grid, so the hole in the dye is the circle as a grid of
+  cells sees it, blurred over a cell or two each side of the rim. Read
+  straight, the ray landing in the window found that: what dye the rim's
+  cells kept, a dark blocky polygon inside a black-ground bubble and a pale
+  one inside a lamp-ground bubble, a grid cell to a step at 4x. But the
+  pocket is air from glass to glass: a ray landing inside its circle meets
+  no liquid at all (the liquid above and below a ball is airColumn's, put
+  back from the ring round it). And one landing outside meets the liquid,
+  which the grid can only tell from the cells clear of the blur, so it is
+  read at least two cells out from the rim, along the same line from the
+  centre. The step between is the circle's, a screen pixel and a half wide
+  and inside it, so the rim's own pixel, where the traced wall gives way to
+  this light (wallB), meets the liquid outside without a line of ground.
+*/
+fn camLanding(L: vec2f, geo: vec3f, spx: f32, bg: vec3f) -> vec3f {
+  let cell = 1.0 / f32(textureDimensions(layer0).x);
+  let d = L - geo.xy;
+  let r = length(d);
+  let out = geo.xy + d / max(r, 1e-6) * max(r, geo.z + 2.0 * cell);
+  let liquid = onGround(bg, decodeFluid(layer0, out, 0.0, false), dyeThrough);
+  return mix(groundOf(bg), liquid, smoothstep(geo.z - 2.0 * spx, geo.z - 0.5 * spx, r));
 }
 `;
 

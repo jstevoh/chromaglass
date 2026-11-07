@@ -47,8 +47,9 @@ export const BEFORE_LAMP = {
       // Each call site of the two composites back to the mix it was.
       for (const [fn, n, to] of [
         ['chemOnGround', 3, (x) => x[1]],
-        // 3 since 38h-7: the closeup bubble's window reads the liquid through onGround too.
-        ['onGround', 3, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
+        // 3 since 38h-7, when the closeup bubble's window read the liquid through onGround too;
+        // 2 since 38h-13, when that read moved to camLanding in plateTransmit.ts (rewritten below).
+        ['onGround', 2, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
       ]) {
         let at = 0, done = 0;
         const call = new RegExp(`(?<![\\w])${fn}\\(`, 'g');
@@ -69,6 +70,22 @@ export const BEFORE_LAMP = {
       if (/U\.lampGround/.test(s.replace(/fn (?:onGround|chemOnGround|groundOf)\([\s\S]*?\n\}/g, ''))) {
         throw new Error('lamp: the before-lamp control left a read of U.lampGround outside the two composites');
       }
+      return { contents: s, loader: 'ts' };
+    });
+    /*
+      The closeup bubble's window (camLanding, PLAN 38h-13) is a piece of the
+      plate shader kept beside plate.ts: its one onGround read goes back to
+      the mix and its ground to the black one, as the plate's own do above.
+    */
+    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plateTransmit\.ts$/ }, (a) => {
+      let s = readFileSync(a.path, 'utf8');
+      const edit = (what, re, to, n) => {
+        const found = s.match(re)?.length ?? 0;
+        if (found !== n) throw new Error(`lamp: the before-lamp control found ${found} of ${n} ${what} in wgsl/plateTransmit.ts`);
+        s = s.replace(re, to);
+      };
+      edit('window reads through the lamp', /onGround\(bg, decodeFluid\(layer0, out, 0\.0, false\), dyeThrough\)/g, 'mix(bg, decodeFluid(layer0, out, 0.0, false).rgb, decodeFluid(layer0, out, 0.0, false).a)', 1);
+      edit('window grounds', /groundOf\(bg\)/g, 'bg', 1);
       return { contents: s, loader: 'ts' };
     });
   },

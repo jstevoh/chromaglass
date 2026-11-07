@@ -11051,6 +11051,43 @@ model cannot reach one, the PR says what it reached and asks.
     0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
     look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
+  - **38h-13 (shipped 2026-11-07).** The closeup's bubbles drawn from their circles. The
+    owner, on the live site: "close up has really pixelated bubble edges ... where is the
+    macro zoom control? ... the recipe box only has two controls?" Photographed in the lab on
+    Classic at the Close-up button's 4x on a 256 grid (a cell 25 screen pixels), three faults
+    a cell wide: square chunks between two bubbles sitting close, flat cuts off a rim, a
+    blocky polygon in the window. Causes: (1) the air splat blended by max channel by
+    channel, so a texel two discs overlapped carried one bubble's coverage, the other's g and
+    the larger look, and named a centre neither had (4 of 68 texels in a pair pressed a fifth
+    of their radii, the worst 3.96 cells off); (2) a pixel took its bubble from the four
+    texels round it, the look from the largest and the position filtered, and was drawn only
+    where the filtered coverage passed 0.02, a bilinear contour that runs straight across a
+    texel inside the fitted rim; (3) the window read the dye the solver left in the rim's
+    cells. Now the splat writes all four channels of the disc covering a texel most (the
+    depth test on 1 - a: the same coverage as the max); `camPick` takes from each of the four
+    texels a whole bubble (its centre x - R q, its packed size) and gives the pixel the one it
+    is deepest in, drawn wherever any of the four holds air; `camBubble` starts from that
+    bubble, fits only texels with its look and fits again without the ones off the first
+    line; `camLanding` gives a ray landing inside the circle the ground and one outside the
+    liquid two cells out. `npm run bubbleedge` (new): the same bubbles laid half a cell apart
+    on the grid draw the same picture: one bubble 2.01 -> 0.74 levels, a pressed pair 4.59 ->
+    1.18 (99th percentile 82 -> 8), on black 2.39 -> 0.07 over the corners' floor; the field
+    0 texels out of place. 0/4 before, 4/4 after. The zoom: every Close-up button flipped
+    `macroMode` alone, so the frame went to the look's 4x with the slider at 1 and the desk's
+    chip (drawn past 1) never came; out, a look with its own zoom stayed zoomed. One
+    `closeupToggled` (lib/macroCamera.ts, with `macroZoomOf` moved beside it) for the recipe,
+    the rail, the palette, the pads and the phone remote; the chip, the slider and the wheel
+    read `macroZoomOf`. The recipe: six of its eight defaults were rides, drawn once on a tab
+    and kept by the Rides (`drawnElsewhere`), so Perform drew Swirl and Gravity; its defaults
+    are now eight of its own (`npm run desklayout`: 2 of 8 drawn before, 8 of 8 after, and a desk that stored the old eight opens on the new; `npm run holdjump`: the toggle in and out, and no control flipping the flag alone).
+    `npm run airlens` line 9 asked the camera's ring through a small ball for the liquid
+    itself (0.85 to 1.05 of it), which main met only on the lab's half-cleared hole (two
+    solver steps; 1.54 at fourteen, as clear as the live plate keeps it). It now asks for
+    the light between the liquid round it and a ray traced through the sphere (1.86 read,
+    2.26 traced over the ring; main 0.89), the window no longer reading the hole at all.
+    Found: 38h-14 (a wall looking into its neighbour's coarse hole) and 38h-15 (the camera's
+    ring through a small ball darker than the traced ray).
+
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
 #### 39a. Settings → Feedback, mailed and kept

@@ -21,7 +21,8 @@
  *
  *   npm run holdjump
  */
-import { MacroCamera, holdWhereItIs } from '../src/lib/macroCamera.ts';
+import { MacroCamera, holdWhereItIs, closeupToggled, macroZoomOf } from '../src/lib/macroCamera.ts';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { stream } from '../src/lib/rng.ts';
 
 let failed = 0, passed = 0;
@@ -79,6 +80,26 @@ for (const from of ['auto', 'follow']) {
     && same(holdWhereItIs({ macroCamera: 'follow' }, 'auto', here), { macroCamera: 'follow' })
     && same(holdWhereItIs({ macroCamera: 'hold', macroAimX: 0.9, macroAimY: 0.1 }, 'auto', here), { macroCamera: 'hold', macroAimX: 0.9, macroAimY: 0.1 })
     && same(holdWhereItIs({ macroCamera: 'hold' }, 'follow', () => null), { macroCamera: 'hold' }));
+}
+
+/*
+  The Close-up control moves the zoom, not the flag alone (PLAN 38h-13). The
+  owner, 2026-11-07, "where is the macro zoom control?": every Close-up
+  button flipped macroMode, so in, the frame went to a closeup look's 4x with
+  the slider at 1 and the desk's zoom chip (drawn past 1) never came; out, a
+  look with a zoom of its own stayed zoomed. In from the plate lands at a
+  zoom the chip shows; out from any zoom, a closeup look's included, lands
+  on the plate; and no control in the app flips the flag on its own.
+*/
+{
+  const states = [{}, { macroMode: false, macroZoom: 1 }, { macroMode: true }, { macroMode: true, macroZoom: 3.5 }, { macroMode: false, macroZoom: 3 }];
+  const flipped = states.map((s) => ({ s, z0: macroZoomOf(s), z1: macroZoomOf({ ...s, ...closeupToggled(s) }), out: closeupToggled(s) }));
+  check('Close-up from the plate goes in at a zoom the chip and slider show; from any zoom it comes out to the plate',
+    flipped.every(({ z0, z1, out }) => (z0 > 1.05 ? z1 === 1 : z1 > 1.05 && (out.macroZoom ?? 1) > 1.05)),
+    flipped.map(({ z0, z1 }) => `${z0}x -> ${z1}x`).join(', '));
+  const walk = (d) => readdirSync(d).flatMap((f) => { const p = `${d}/${f}`; return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(f) ? [p] : []; });
+  const flags = walk('src').filter((p) => /macroMode: !/.test(readFileSync(p, 'utf8')));
+  check('and no control in the app flips the closeup flag on its own (each writes closeupToggled)', flags.length === 0, flags.join(', ') || 'none');
 }
 
 console.log(`\n${passed}/${passed + failed} checks passed`);

@@ -13,9 +13,11 @@
  * exists because a per-pixel loop over forty was already as much as the
  * compositor could afford; this is what makes hundreds possible later.
  *
- * The blend is `max`, not `add`. Two overlapping bubbles do not make a cell
- * twice as empty — 1 already means no liquid at all — so the field saturates
- * the way the thing it describes does.
+ * The coverage is the larger of two overlapping bubbles', not their sum. Two
+ * overlapping bubbles do not make a cell twice as empty — 1 already means no
+ * liquid at all — so the field saturates the way the thing it describes does.
+ * It was a max blend; it is the depth test now, so that the larger coverage
+ * brings its own bubble's other three channels with it (`splatRecipe`).
  */
 
 import { AIR_SPLAT_WGSL } from './wgsl/air';
@@ -53,12 +55,18 @@ function splatRecipe(device: GPUDevice): RenderRecipe {
       entryPoint: 'fs',
       targets: [{
         format: 'rgba16float' as GPUTextureFormat,
-        blend: {
-          color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
-          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
-        },
       }],
     },
+    /*
+      Not a max blend: the depth test, on 1 - coverage (wgsl/air.ts, fs).
+      Blended channel by channel, a texel two discs overlapped kept the
+      larger of each channel on its own, one bubble's coverage beside the
+      other's position and look, and the closeup drew those texels as
+      square chunks between pressed pockets (PLAN 38h-13). Tested on depth,
+      the disc that covers a texel most writes all four channels: the same
+      coverage as the max, and a position and look that belong to it.
+    */
+    depthStencil: { format: 'depth32float' as GPUTextureFormat, depthWriteEnabled: true, depthCompare: 'less' as GPUCompareFunction },
     primitive: { topology: 'triangle-strip' as GPUPrimitiveTopology },
   });
 }
@@ -81,6 +89,8 @@ export class WebGPUAir {
     nowhere else the previous one survives.
   */
   private readonly fields: [GPUTexture, GPUTexture];
+  /** Which disc wins a texel two overlap: the one covering it most (`splatRecipe`). */
+  private readonly depth: GPUTexture;
   private which = 0;
   private live = 0;
   /** The list as last handed over, for the coverage the source needs. */
@@ -135,6 +145,12 @@ export class WebGPUAir {
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     }));
     this.fields = [one('air a'), one('air b')];
+    this.depth = this.disposer.track(device.createTexture({
+      label: 'air depth',
+      size: [grid, grid],
+      format: 'depth32float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    }));
   }
 
   /** The air as it is now. */
@@ -201,6 +217,7 @@ export class WebGPUAir {
         storeOp: 'store',
         clearValue: { r: 0, g: 0, b: 0, a: 0 },
       }],
+      depthStencilAttachment: { view: viewOf(this.depth), depthLoadOp: 'clear', depthStoreOp: 'discard', depthClearValue: 1 },
       timestampWrites: timing?.('air splat'),
     });
     if (this.live > 0 && pipeline) {

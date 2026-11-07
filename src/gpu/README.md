@@ -20,7 +20,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 
 ## Files
 
-- `air.ts`: bubbles as a field the solver carries.
+- `air.ts`: bubbles as a field the solver carries; where discs overlap, the depth test keeps the whole texel of the one covering it most (PLAN 38h-13).
 - `camera.ts`: refraction, depth of field, bloom, grain.
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.
 - `ferroDrop.ts`: the closeup's ferrofluid drop.

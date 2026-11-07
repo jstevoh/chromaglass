@@ -912,6 +912,19 @@
       ]
     },
     {
+      "name": "The closeup's bubbles drawn from their circles",
+      "shard": "lab2",
+      "run": "npm run bubbleedge",
+      "why": [
+        "The owner saw the closeup's bubble edges as pixelated (PLAN 38h-13): square",
+        "chunks between close bubbles, flat cuts off rims and a blocky window, the",
+        "grid showing through. The air field's texels each name their own bubble,",
+        "and the same bubbles laid half a cell apart on the grid draw the same",
+        "picture, on the lamp and the black ground. 0 of 4 before the fix, 4 of 4",
+        "after. About half a minute in the lab, beside closeupdepth."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",

@@ -3224,7 +3224,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (U.bubbleStrength > 0.001) {
     let airC = textureSampleLevel(air0, samp, fuvBase, 0.0);
     let aC = airC.r;
-    if (aC > 0.02) {
+    var pk = vec4f(-1.0);
+    if (dropCam > 0.001) { pk = camPick(fuvBase); }
+    if (aC > 0.02 || pk.w >= 0.0) {
       /*
         Each bubble drawn as the one it is.
 
@@ -3241,19 +3243,18 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // Where in its bubble (wgsl/air.ts).
       let p0 = clamp((airC.gb / max(aC, 1e-3) - vec2f(0.5)) * 2.0, vec2f(-1.0), vec2f(1.0));
       /*
-        Its size, film and number: packed whole, so read unfiltered —
-        and from the largest of the four texels round the point, since just
-        past a small bubble's rim the filtered coverage is still there while
-        the nearest texel is already empty, and read from that the rim was
-        drawn as a different, tiny bubble: a square halo round each one.
+        Its size, film and number, packed whole so read unfiltered: from the
+        largest of the four texels round the point (a filtered read drew a
+        square halo round each bubble), or to the camera the bubble whose
+        circle it is (camPick).
       */
       let looks = textureGather(3, air0, samp, fuvBase);
-      let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
+      let look = select(max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0, pk.w, pk.w >= 0.0) + 0.5;
       // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
       let Rq = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
       // To the camera, its true centre and radius (camBubble).
       var geo = vec3f(fuvBase - p0 * Rq, Rq);
-      if (dropCam > 0.001) { geo = mix(geo, camBubble(fuvBase, p0, Rq), dropCam); }
+      if (pk.w >= 0.0) { geo = mix(geo, camBubble(pk.xy, Rq, look), select(dropCam, 1.0, aC <= 0.02)); }
       let R = geo.z;
       let p = (fuvBase - geo.xy) / R;
       let rr = min(1.0, length(p));
@@ -3310,7 +3311,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // tenth of the wetting film's hue, as the projector's (38h-7: it was a
       // mix, by eye, toward a dimmed tint that left a bubble's middle darker
       // than the liquid round it, which a pocket of air never is).
-      var c = onGround(bgColor, decodeFluid(layer0, lensUv, 0.0, false), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
+      var c = camLanding(lensUv, geo, spx, bgColor) * mix(vec3f(1.0), tint, 0.1 * k1);
 
       // The film: interference colour, strongest at a glancing angle (the
       // rim), as thick as the pocket's own speed laid it (Bretherton,

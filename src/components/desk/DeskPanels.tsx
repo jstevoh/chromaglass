@@ -12,6 +12,7 @@ import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import { PINNABLE, PIN_RANGE, type DeskSpec } from '../../lib/deskPins';
+import { closeupToggled, macroZoomOf } from '../../lib/macroCamera';
 import { PANEL_BY_ID, drawnElsewhere, whereIs } from '../../lib/deskLayout';
 import { relayInfo, type RelayInfo } from '../../lib/remoteProtocol';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
@@ -548,9 +549,9 @@ function RecipeBody({ p }: { p: DeskProps }) {
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
         <Button
           full height={32}
-          pressed={!!p.settings.macroMode}
+          pressed={macroZoomOf(p.settings) > 1.05}
           title="The closeup camera, in among the drops (M). Lit while it is on."
-          onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
+          onClick={() => p.onSetting(closeupToggled(p.settings))}
           midiKey="action:macro-toggle"
           testId="macro-button"
         >

@@ -9,6 +9,7 @@ import { FEEDBACK_PANE } from '../lib/feedback';
 import { SETTINGS_SECTIONS, sectionSearchText } from '../lib/settingsMap';
 import type { Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
+import { closeupToggled, macroZoomOf } from '../lib/macroCamera';
 import type { ScreenLike } from '../hooks/useCastSession';
 import type { Recorder } from '../hooks/useRecorder';
 import type { Cue } from '../components/desk/deskProps';
@@ -136,7 +137,7 @@ export function useCommandPalette({
       { id: 'drain',     name: 'Drain the plate',           kind: 'Actions', run: () => setDrainTrigger(v => v + 1) },
       { id: 'freeze',    name: isActive ? 'Freeze the liquid' : 'Thaw the liquid', kind: 'Actions', kbd: 'F', run: () => setIsActive(v => !v) },
       { id: 'evolve',    name: isAutomated ? 'Stop evolving' : 'Evolve on its own', kind: 'Actions', run: () => setIsAutomated(v => !v) },
-      { id: 'macro',     name: settings.macroMode ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings({ macroMode: !settings.macroMode }) },
+      { id: 'macro',     name: macroZoomOf(settings) > 1.05 ? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: () => updateSettings(closeupToggled(settings)) },
       { id: 'record-video',       name: recordingAny ? 'Stop recording' : `Record: ${makesText(recordChoice)}`, kind: 'Actions', kbd: 'R', run: toggleRecording },
       { id: 'record-performance', name: perfLive ? 'Stop the take' : 'Record a take (your strokes and drops, replayable)', kind: 'Actions', kbd: 'T', run: togglePerformance },
       { id: 'record-studio',      name: 'Record options…', kind: 'Actions', run: () => setShowRecordPanel(true) },

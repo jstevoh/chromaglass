@@ -62,8 +62,8 @@ const typesSrc = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8
 const IRID = Number((typesSrc.match(/\n  iridescence: ([0-9.]+),/) ?? [])[1]);
 if (!Number.isFinite(IRID)) throw new Error('no default iridescence in types.ts');
 const N = 192, S = 512, ZOOM = 3;
-// Line 9: the camera's ring against the liquid round it (two faces of Fresnel, a few per cent each), and the projector's.
-const CAM_SEEN = 0.85, CAM_MAX = 1.05, PROJ_DARK = 0.7;
+// Line 9: the camera's ring well over the liquid round it (CAM_OVER: no bubble drawn reads 1, give or take the lab's grain) and never over the traced ray's light; the projector's under PROJ_DARK.
+const CAM_OVER = 1.5, PROJ_DARK = 0.7;
 // Line 10: part way in, each view within this of its own (0.35 the projector's, 0.65 the camera's).
 const FADE_NEAR = 0.05;
 // Screen pixels to a plate unit, as uvToFluid in plate.ts maps them.
@@ -236,7 +236,9 @@ try {
       const win = (s) => { const w = s.ring(0, 0.6); return { dome: s.ring(0, 0.2).mean / s.ring(0.4, 0.6).mean, glint: w.top / w.median, peak: w.max / w.median, rgb: w.rgb, chroma: w.chroma, plateChroma: s.ring(0, 0.6, s.off).chroma }; };
       const s = await shoot(0.5, 0.5, 12);
       out.big = { gap: s.gap, mid: s.mid, rad: s.rad, found: s.found, liquid: s.liquid, edge: s.edge, ...win(s), band: s.ring(0.86, 0.9).mean };
-      out.bigCam = win(await shoot(0.5, 0.5, 12, { cam: { macroAmount: 1 } }));
+      const bc = await shoot(0.5, 0.5, 12, { cam: { macroAmount: 1 } });
+      // And the lamp through its clear middle, near the frame's middle as the small one's liquid is (line 9).
+      out.bigCam = { ...win(bc), lamp: bc.ring(0, 0.2).mean };
       out.film = win(await shoot(0.5, 0.5, 12, { set: { iridescence: 1 } }));
       /*
         The glasses bowed apart in the middle (plateCurve +0.5), so the gap
@@ -356,19 +358,58 @@ try {
     The camera's bubble is not the projector's (PLAN 33g, 38h-7). The
     projector's aperture darkens the small ball from 0.4 to 0.55 of its
     radius well below the liquid round it. The camera looks through the same
-    wall, a lens of air that turns its rays outward (closeupDepth.ts), so
-    there it sees the liquid round the bubble, as bright as that liquid but
-    for what Fresnel takes at two faces (over CAM_SEEN of it, and never
-    brighter than it, CAM_MAX: a camera that read the cleared hole, no lens,
-    reads three times the liquid there; the check-skeptic's control). Before 38h-7
-    this line asked for the ring lit at a third of the middle and three times
-    the projector's: the camera's bubble was a magnifier then, which a lens of
-    air in water cannot be, and the trace drew it dark there from the start.
+    wall, a lens of air that turns its rays outward (closeupDepth.ts), and
+    what it sees there is the lamp through the liquid that ray crosses: above
+    the ball, then, bent twice, from the ball's underside to the glass. A
+    ball narrower than the gap leaves only part of the depth for it, so the
+    ring is brighter than the liquid round it (all of the depth) and darker
+    than the lamp through a clear window (none of it).
+
+    So the bar is the ray traced, here, through a sphere of the laid radius
+    centred in the half gap the solver reads, at each point of the ring:
+    Snell at both faces, the path in liquid over the gap's depth as the
+    share s, and by Beer-Lambert the light lamp (liquid / lamp)^s, which is
+    L^(1 - s) of the liquid round it, L the lamp as the big pancake's clear
+    middle shows it in the same view, against the small one's liquid (both
+    near the frame's middle, clear of the dish's vignette). The camera reads
+    well over the liquid round it (over CAM_OVER: a frame with no bubble
+    drawn reads 1, give or take the lab's grain; the ray crosses less than
+    all of the depth) and never over the trace averaged over the ring's
+    area, as the reading is. A camera with no lens, or a magnifier that
+    pulls its landings inward, lands inside the circle and reads the lamp
+    through the pixel's straight column (airColumn): about 3.6 to 4.1 of the
+    liquid, over that average (the check-skeptic's controls). The trace
+    asks for a ball (R under the half gap) and a share of the depth between
+    0 and 1, or the line throws. Between CAM_OVER and the trace is
+    open work, 38h-15: the shader puts back the pixel's own column of liquid
+    over the light it lands on (airColumn) and reads a landing outside the
+    circle as the liquid's whole depth, so it draws the ring darker than the
+    ray says (1.86 of the liquid where the trace averages 2.26).
+
+    Until 38h-13 this line asked for the ring at the liquid itself (0.85 to
+    1.05 of it). That was the lab's plate, not the lens: two solver steps
+    leave a small bubble's hole half cleared, the camera's landing read that
+    half dye, and so main passed at 2 steps and read 1.54 at 14, when the
+    hole is as clear as the live plate keeps it. The window now draws from
+    the circle, not the hole (camLanding), so the reading no longer depends
+    on how many steps the solver has had.
   */
   const rel = (v) => v.band / Math.max(v.liquid, 1e-3);
-  check(`in the closeup the camera sees the liquid through the small bubble's wall (${CAM_SEEN} to ${CAM_MAX} of it) where the projector's aperture darkens it (under ${PROJ_DARK})`,
-    rel(m.smallCam) > CAM_SEEN && rel(m.smallCam) < CAM_MAX && rel(m.small) < PROJ_DARK,
-    `from 0.4 to 0.55 of the radius: the camera ${rel(m.smallCam).toFixed(2)} of the liquid round it, projected ${rel(m.small).toFixed(2)}`);
+  const traced = (R, rho, b) => {
+    const ti = Math.asin(b), tr = Math.asin(Math.min(1, NW / NAIR * b)), dl = tr - ti;
+    const z1 = R * Math.cos(ti), z2 = z1 - 2 * R * Math.cos(tr) * Math.cos(dl);
+    return ((rho - z1) + (z2 + rho) / Math.cos(2 * dl)) / (2 * rho);
+  };
+  const L = m.bigCam.lamp / Math.max(m.smallCam.liquid, 1e-3), rhoS = halfAt(m.small.gap);
+  const bs = Array.from({ length: 16 }, (_, k) => 0.4 + 0.15 * (k + 0.5) / 16);
+  const ss = bs.map((b) => traced(2.5 / N, rhoS, b));
+  if (!(2.5 / N < rhoS) || ss.some((v) => !(v > 0 && v < 1))) throw new Error(`the trace needs a ball in the gap: R ${2.5 / N}, half gap ${rhoS}, shares ${ss.map((v) => v.toFixed(2))}`);
+  const span = ss.map((v) => L ** (1 - v));
+  // Weighted by the ring's area (b db), as the reading averages its pixels.
+  const lo = Math.min(...span), hi = span.reduce((a, v, k) => a + v * bs[k], 0) / bs.reduce((a, b) => a + b, 0);
+  check(`in the closeup the camera sees the lamp through the liquid the small bubble's wall bends its rays across (over ${CAM_OVER} of the liquid round it, never over the traced light averaged over the ring) where the projector's aperture darkens it (under ${PROJ_DARK})`,
+    L > 1.5 && rel(m.smallCam) > CAM_OVER && rel(m.smallCam) <= hi && rel(m.small) < PROJ_DARK,
+    `from 0.4 to 0.55 of the radius: the camera ${rel(m.smallCam).toFixed(2)} of the liquid round it, traced ${lo.toFixed(2)} at least, ${hi.toFixed(2)} over the ring (the lamp ${L.toFixed(2)} of the liquid); projected ${rel(m.small).toFixed(2)}`);
   check('and the view changes over the middle of the zoom\'s fade, with the drops\'',
     Math.abs(rel(m.early) - rel(m.small)) < FADE_NEAR && Math.abs(rel(m.late) - rel(m.smallCam)) < FADE_NEAR,
     `${rel(m.early).toFixed(2)} of the liquid at 0.35 of the way (the projector's ${rel(m.small).toFixed(2)}), ${rel(m.late).toFixed(2)} at 0.65 (the camera's ${rel(m.smallCam).toFixed(2)}), each within ${FADE_NEAR}`);

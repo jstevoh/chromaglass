@@ -221,6 +221,8 @@ written first. Line numbers are as read on main at d07ac31.
     zoom 4 and over. Cut the dye's hole in the plate at the fitted rim instead (the solver
     keeps its own for the flow), and draw the grain at screen scale past the solver's cell.
     *Measure:* the fringe's excess brightness 1 to 1.5 radii out in `npm run closeupdepth`.
+    (2026-11-07: inside the rim this is done, 38h-13's `camLanding` cuts the window at the
+    fitted circle; the fringe outside it is what is left.)
   - **38h-10. filmlook's projected bubble tint is read mostly on the dark band, found doing
     38h-7's film** (S, nil). `npm run filmlook` line 9 holds the projector's light through the
     film at yellow over blue -1.0, but thickening every pocket's film to the most it keeps
@@ -276,6 +278,28 @@ written first. Line numbers are as read on main at d07ac31.
     back branch is missing and give it what is physical for a second dish (its own gap,
     no contact shadow on the front's screen). *Measure:* `npm run grainedge` line 4 prints
     the back plate's edge moves; ask them under line 1's bar once the pictures agree.
+  - ~~**38h-13**~~ *shipped 2026-11-07.* The closeup's bubbles drawn from their circles, not
+    the grid (the owner: "really pixelated bubble edges"): the air field's depth test keeps
+    one bubble per texel, `camPick` gives each pixel the bubble it is deepest in, `camBubble`
+    fits it from its own texels twice, `camLanding` cuts the window at the circle. `npm run
+    bubbleedge` 4/4 (0/4 before). Story in `docs/plan-shipped.md` §38.
+  - **38h-14. A bubble's wall looking into its neighbour reads the neighbour's coarse hole,
+    found doing 38h-13** (S, nil; Low: only pressed pairs). A ray the wall turns outward
+    lands past the rim and `camLanding` reads the liquid two cells out along it; between
+    two pressed pockets that point is in the other pocket's hole as the grid cut it, so the
+    window grows a squarish tab toward the neighbour (bubbleedge's pair on the lamp ground,
+    the 99th percentile's 8 levels). The landing should test the neighbour's circle too
+    (camPick's other candidates) and find air there. *Measure:* bubbleedge line 3's 99th
+    percentile under 4.
+  - **38h-15. The camera's ring through a small ball is darker than the ray says, found
+    doing 38h-13** (S, nil; Low). Traced through a sphere (Snell at both faces, the path
+    in liquid over the gap), the ring from 0.4 to 0.55 of a 2.5-cell ball should read 2.26
+    of the liquid round it on the lamp ground, averaged; the shader draws 1.86, because
+    `airColumn` puts back the pixel's own column over the light the ray lands on, and a
+    landing outside the circle reads the liquid's whole depth. Until 38h-13 `airlens`
+    asked for 0.85 to 1.05 of the liquid, which main met only on the lab's half-cleared
+    hole (two solver steps; 1.54 at fourteen). *Measure:* airlens line 9 within 5% of the
+    trace's average over the ring.
   - ~~**38h-3**~~ *shipped 2026-11-01.* The oil's shadowgraph and the dye's are one term:
     `defocusShadow` (`plateTransmit.ts`) draws the whole column's ∇²OPL (dye, oil, pour,
     film, gap) at the defocus disc's scale; the oil block's own term and refractionOptics'

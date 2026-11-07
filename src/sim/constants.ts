@@ -9,6 +9,7 @@
  * this file.
  */
 import { VisualizerSettings } from '../types';
+import { macroZoomOf } from '../lib/macroCamera';
 
 /**
  * Where the closeup is fully itself, and what a look that only says "macro"
@@ -22,14 +23,12 @@ import { VisualizerSettings } from '../types';
  */
 export const MACRO_FULL_ZOOM = 2.0;
 
-/** A preset or a saved show that sets `macroMode` with no zoom of its own. */
-export const MACRO_PRESET_ZOOM = 4.0;
-
-/** The zoom the frame is asked for: the slider's, or a macro look's own. */
-export function macroZoomOf(s: VisualizerSettings): number {
-  const setZoom = s.macroZoom ?? 1;
-  return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
-}
+/*
+  The closeup look's own zoom and the zoom the frame is asked for live in
+  lib/macroCamera.ts, beside the Close-up toggle, so the desks and the phone
+  read the same answer this file's macroAmountOf does (PLAN 38h-13).
+*/
+export { MACRO_PRESET_ZOOM, macroZoomOf } from '../lib/macroCamera';
 
 /**
  * How far into the closeup, 0 at the plate and 1 from MACRO_FULL_ZOOM on,

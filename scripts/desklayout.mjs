@@ -41,7 +41,7 @@ import {
   renameTab, sanitizeTabs, saveTabs, setTabLayout, storedForm, tabForStored,
 } from '../src/lib/deskTabs.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
-import { PINNABLE, DEFAULT_RIDES, DEFAULT_RECIPE } from '../src/lib/deskPins.ts';
+import { PINNABLE, DEFAULT_RIDES, DEFAULT_RECIPE, loadPins } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
 import { settingsSource } from './settingsSource.mjs';
@@ -386,8 +386,25 @@ console.log('\n The operations');
   const { n, left } = drawn(perform);
   check('on Perform the Rides keep every one of theirs, the Recipe the rest of its own, and Fluid Physics and Macro give theirs up',
     rides.every(k => n.get(k)?.join() === 'rides') && recipe.filter(k => !rides.includes(k)).every(k => n.get(k)?.join() === 'recipe')
-    && left.get('physics:vorticityConfinement') === 'recipe' && left.get('macro:macroZoom') === 'rides' && left.get('recipe:globalSpeed') === 'rides',
+    && left.get('physics:vorticityConfinement') === 'recipe' && left.get('macro:macroZoom') === 'rides'
+    // A ride picked onto the Recipe still goes to the Rides (the strip's defaults share none now, PLAN 38h-13).
+    && drawnElsewhere(perform, 'recipe', [...recipe, 'globalSpeed'], rides, [...recipe, 'globalSpeed']).get('globalSpeed') === 'rides',
     `Swirl on ${n.get('vorticityConfinement')?.join()}; Zoom on ${n.get('macroZoom')?.join()}; Speed on ${n.get('globalSpeed')?.join()}`);
+  /*
+    And the Recipe is a strip on Perform, not two knobs and a list of what is
+    elsewhere. Its defaults shared six of eight with the Rides, so with both
+    out it drew Swirl and Gravity: the owner, 2026-11-07, "the recipe box only
+    has two controls?" (PLAN 38h-13). With the Rides out, it draws all of its own.
+  */
+  check('on Perform, with the Rides out, the Recipe draws all of its own',
+    openPanels(perform).includes('rides') && openPanels(perform).includes('recipe') && recipe.length >= 8 && recipe.every(k => n.get(k)?.join() === 'recipe'),
+    `the Recipe draws ${recipe.filter(k => n.get(k)?.join() === 'recipe').length} of ${recipe.length}`);
+  // A desk that stored the old eight (older builds wrote the strip the first time it opened) reads the new ones.
+  const OLD_RECIPE = ['globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate'];
+  localStorage.setItem('chromaglass-recipe-keys', JSON.stringify(OLD_RECIPE));
+  const loaded = loadPins('design', DEFAULT_RECIPE).map(String);
+  localStorage.removeItem('chromaglass-recipe-keys');
+  check('and a desk that stored the old eight opens on the new ones', loaded.join() === recipe.join() && loaded.join() !== OLD_RECIPE.join(), loaded.join(', '));
   // Closing the Rides gives the Recipe its whole strip back: nothing was taken off it, only not drawn twice.
   const back = drawn(closePanel(perform, 'rides'));
   check('and with the Rides closed the Recipe draws all of its own again',
