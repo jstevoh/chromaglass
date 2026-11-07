@@ -79,7 +79,7 @@ have the evidence). A change merged today waits a median 90 minutes to be live, 
   and limits. **Shipped, this PR** (`npm run showkey` 11 of 33 → 33 of 33, `npm run
   fingerprint-worker` 7 → 19 of 19). 14m-mark and 14m-lan shipped in the follow-up
   (`npm run phonelink` 29 → 36 of 36), and the live Worker answered a lookup (14o-smoke).
-  14m-https shipped (`npm run netdisplay` 5 → 11 of 11). Left: 14m-guest, 14m-tunnel, 14m-budget, 14o-count.
+  14m-https shipped (`npm run netdisplay` 3 → 11 of 11). Left: 14m-guest, 14m-tunnel, 14m-budget, 14o-count.
 - **1.2** ~~**14n**~~ (B, S): one `sanitizePatch` for the socket, MIDI map files and loaded looks. **Shipped, #322** (`sanitizePatch`, `npm run sanitize`, `npm run remotemix`: malformed patches/gestures dropped, MIDI writes sanitized, DEFAULT_SETTINGS and all 41 presets intact).
 - **1.3** ~~**S19**~~, ~~**S18**~~ (C, S each): ~~the particle dispatch at 1024²~~, and ~~finite guards on the
   carried fields~~ (`npm run finite`). **S20** after them (C+G, M).

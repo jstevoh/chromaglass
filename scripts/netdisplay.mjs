@@ -80,12 +80,17 @@ const stop = (r) => new Promise((resolve) => {
   try { process.kill(-r.proc.pid, 'SIGTERM'); } catch { resolve(); }
 });
 
-/** GET over https, taking the self-signed certificate; the body and the peer's certificate. */
+/**
+ * GET over https, taking the self-signed certificate; the body and the peer's
+ * certificate. The certificate is the one the server presented on the wire,
+ * not the file in TLS_DIR, so line 2 asks what a display's browser is shown.
+ */
 const getTls = (path) => new Promise((resolve, reject) => {
-  const req = request({ host: 'localhost', port: HTTPS_PORT, path, rejectUnauthorized: false }, (res) => {
+  const req = request({ host: 'localhost', port: HTTPS_PORT, path, rejectUnauthorized: false, agent: false }, (res) => {
+    const peer = res.socket.getPeerCertificate?.() ?? null;
     let body = '';
     res.on('data', d => { body += d; });
-    res.on('end', () => resolve({ status: res.statusCode, body }));
+    res.on('end', () => resolve({ status: res.statusCode, body, peer }));
   });
   req.on('error', reject);
   req.end();
@@ -112,17 +117,27 @@ try {
   let tls = null;
   try { tls = await getTls('/remote-info.json'); } catch (e) { tls = { status: 0, body: String(e?.message ?? e) }; }
   check(`the show server answers https on port ${HTTPS_PORT} and tells the laptop so`,
-    tls.status === 200 && info.httpsPort === HTTPS_PORT, `https ${tls.status || tls.body}, httpsPort ${info.httpsPort}`);
+    tls.status === 200 && tls.body.includes('"chromaglass":"relay"') && info.httpsPort === HTTPS_PORT, `https ${tls.status || tls.body}, httpsPort ${info.httpsPort}`);
   check('the http port still answers, with the keys for the laptop', !!info.key && !!info.displayKey, `key ${info.key ? 'given' : 'none'}`);
   const printed = relay.said();
   check('it prints the https address for a network display, and says the browser warns once',
     hosts.length > 0 && hosts.every(h => printed.includes(`https://${h}:${HTTPS_PORT}/?cast=true&key=${KEY}`)) && /warns once/.test(printed),
     hosts.length ? hosts.join(' ') : 'no LAN address');
 
-  let names = '';
-  try { names = new X509Certificate(readFileSync(join(TLS_DIR, 'cert.pem'))).subjectAltName ?? ''; } catch (e) { names = `unreadable: ${e?.message ?? e}`; }
+  // The names are split and matched whole, so 192.0.2.20 cannot stand in for
+  // 192.0.2.2; and the certificate read is the one the server presented, held
+  // against the file it made, so a server serving some other certificate fails.
+  let names = [];
+  let sameAsFile = false;
+  let why = '';
+  try {
+    const onDisk = new X509Certificate(readFileSync(join(TLS_DIR, 'cert.pem')));
+    sameAsFile = !!tls.peer?.raw && Buffer.compare(tls.peer.raw, onDisk.raw) === 0;
+    names = String(tls.peer?.subjectaltname ?? '').split(/,\s*/).filter(Boolean);
+  } catch (e) { why = `unreadable: ${e?.message ?? e}`; }
   check('its certificate names localhost and every LAN address it prints',
-    names.includes('DNS:localhost') && hosts.every(h => names.includes(`IP Address:${h}`)), names.slice(0, 160));
+    sameAsFile && names.includes('DNS:localhost') && hosts.every(h => names.includes(`IP Address:${h}`)),
+    why || `${sameAsFile ? 'the one it made' : 'not the one in TLS_DIR'}: ${names.join(', ').slice(0, 160)}`);
 
   const lan = hosts[0];
   if (lan) {
@@ -139,11 +154,19 @@ try {
       : await page.evaluate(() => ({ secure: window.isSecureContext, gpu: !!navigator.gpu, words: document.body?.innerText ?? '' }));
     check('the network display at that https address is a secure page with WebGPU',
       seen.secure && seen.gpu, `secure ${seen.secure}, WebGPU ${seen.gpu}`);
-    check('and does not stop on the start-up failure screen', !opened && !/could not start/.test(seen.words), seen.words.replace(/\s+/g, ' ').slice(0, 120) || 'a plate, no words');
+    // With no GPU adapter (a cloud session, Measure) the page stops on "needs
+    // WebGPU … no GPU", which is the machine, not the address; what this line
+    // refuses is the insecure-page failure ("could not start. GPUTextureUsage
+    // is not defined"). Whether the plate is drawn is the Mac's (judging §110).
+    check('and does not stop on the start-up failure screen', !opened && !/could not start/.test(seen.words),
+      `${seen.words.replace(/\s+/g, ' ').slice(0, 120) || 'a plate, no words'}${/needs WebGPU/.test(seen.words) ? ' (no GPU adapter here: the Mac draws it)' : ''}`);
     check('and joins the relay: the laptop is told one network display is on', joined >= 0,
       joined >= 0 ? `within ${(joined / 1000).toFixed(1)} s` : `counts heard: ${laptop.counts.join(' ') || 'none'}`);
-    await page.goto(`http://${lan}:${PORT}/?cast=true&key=${KEY}`, { waitUntil: 'load' });
-    const plain = await page.evaluate(() => window.isSecureContext);
+    // A fresh page: after a refused https goto the first one sits on Chromium's
+    // error page, and navigating it again throws instead of printing this line.
+    const plainPage = await context.newPage();
+    const plain = await plainPage.goto(`http://${lan}:${PORT}/?cast=true&key=${KEY}`, { waitUntil: 'load' })
+      .then(() => plainPage.evaluate(() => window.isSecureContext), (e) => `not opened: ${String(e?.message ?? e).split('\n')[0]}`);
     check('the control: the same page at the http address is not a secure page', plain === false, `secure ${plain}`);
     await context.close();
     laptop.ws.close();

@@ -324,7 +324,7 @@ Left open from it:
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
 - ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
 - ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- ~~**14m-https**~~ (M): a network display at a Wi-Fi address starts, over https on `PORT + 443` with a self-signed certificate. **Shipped** (`npm run netdisplay` 5 → 11 of 11). Story in `docs/plan-shipped.md`. Left: **14m-https-wall** (S, the Mac): a TV's or a second Mac's browser takes the warning once and draws the plate (judging §110).
+- ~~**14m-https**~~ (M): a network display at a Wi-Fi address starts, over https on `PORT + 443` with a self-signed certificate. **Shipped** (`npm run netdisplay` 3 → 11 of 11). Story in `docs/plan-shipped.md`. Left: **14m-https-wall** (S, the Mac): a TV's or a second Mac's browser takes the warning once and draws the plate (judging §110).
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years

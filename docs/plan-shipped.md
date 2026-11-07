@@ -2419,8 +2419,8 @@ warning made into a setup step; the tunnel leaves the room; a WebGL copy of the 
 a second renderer. The server prints and the desk's Cast menu shows the https address with the
 warning's words; the phone's remote stays on http (it needs no GPU and so no warning).
 The address list sits in `src/components/NetworkDisplayAddresses.tsx`, since `App.tsx` may not
-grow. `npm run netdisplay`: 11 of 11; on main's server before it, 5 of 11 (the first six fail:
-no https port, no certificate, the display never opens). Built in #443, closed while idle drafts
+grow. `npm run netdisplay`: 11 of 11; on main's server before it, 3 of 11 (eight fail: no
+https port, no certificate, the display never opens, no http-only fallback said). Built in #443, closed while idle drafts
 were cleared, and carried onto main in the PR that shipped it.
 
 ### 14o. The song-ID Worker is open to anyone
