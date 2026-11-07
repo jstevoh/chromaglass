@@ -243,6 +243,8 @@ async function handleWebhook(request, env, cors) {
   }
 
   if (event === 'order_pack') {
+    // Only a store order names its pack (by product); our own JSON cannot say which.
+    if (!pack) return json({ error: 'unknown pack' }, 400, cors);
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
     const done = await addPack({ env, email, orderId: orderId || keyId, pack, privateJwk, readEmailKeys });
     if (done.held) return await holdOrder(env, cors, keyId, { reason: done.held, email, productId: lsProductId, status: lsStatus, pack });

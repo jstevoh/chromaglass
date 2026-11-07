@@ -75,6 +75,21 @@ async function resign(env, record, packs, packOrders, privateJwk) {
   const kept = normalizePacks(packs);
   if (kept.length) next.packs = kept;
   if (Object.keys(packOrders).length) next.packOrders = packOrders;
+  // An upgraded key keeps the Home it replaced (`replaces`), which a refunded upgrade
+  // files again (`refileHome`). That Home was copied with the packs it had then, so a
+  // pack refunded on the Pro key must come off it too, or refunding the upgrade later
+  // would hand back a pack the buyer had their money back for.
+  if (next.replaces && typeof next.replaces === 'object') {
+    const old = next.replaces;
+    const replaces = { ...old };
+    delete replaces.packs;
+    delete replaces.packOrders;
+    const oldPacks = normalizePacks(old.packs).filter((p) => kept.includes(p));
+    const oldOrders = Object.fromEntries(Object.entries(old.packOrders || {}).filter(([p]) => p in packOrders));
+    if (oldPacks.length) replaces.packs = oldPacks;
+    if (Object.keys(oldOrders).length) replaces.packOrders = oldOrders;
+    next.replaces = replaces;
+  }
   return next;
 }
 

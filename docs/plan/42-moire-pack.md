@@ -33,7 +33,7 @@ own. Check: `npm run moire`.
   Found while building it, not done:
   - ~~**42a-2. Selling it to Home.**~~ **Shipped** (2026-11-07): a `packs` list in the signed
     key, the store's Moiré Pack product ($15 once) re-signing the buyer's Home key, the account
-    sheet's Buy line and the section's Get it (`npm run license-worker` 13g–13m, `npm run tiers`
+    sheet's Buy line and the section's Get it (`npm run license-worker` 13g–13p, `npm run tiers`
     14); story in `docs/plan-shipped.md` §42a-2.
   - **42a-5. The landing page sells the pack.** `Landing.tsx`'s price table names Home and Pro
     only; a Home buyer meets the pack in the app. A line under Home ("Moiré pack, $15 once")

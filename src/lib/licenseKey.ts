@@ -24,6 +24,23 @@ export function normalizePacks(list: unknown): string[] {
   return [...new Set(names)].sort().slice(0, 16);
 }
 
+/**
+ * Whether the account's key listed under the held key's own id should replace it
+ * (PLAN.md 42a-2). The Worker signs a key again under the same id when a pack is bought
+ * or refunded (the packs change) and when Home is upgraded (the tier rises, the packs
+ * carried over). Take it when the tier is higher, or the tier is the same and the packs
+ * differ; never when the tier is lower, so a stale listing cannot downgrade a copy.
+ * Kept pure, beside the payload it reads, so `npm run license-worker` can hold it.
+ */
+export function sameIdKeyWins(
+  held: { tier: LicenseTier; packs?: unknown },
+  listed: { tier: LicenseTier; packs?: unknown },
+): boolean {
+  const rank: Record<LicenseTier, number> = { free: 0, home: 1, pro: 2 };
+  if (rank[listed.tier] !== rank[held.tier]) return rank[listed.tier] > rank[held.tier];
+  return normalizePacks(listed.packs).join(',') !== normalizePacks(held.packs).join(',');
+}
+
 export interface LicenseStatus {
   valid: boolean;
   tier: LicenseTier;

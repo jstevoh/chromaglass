@@ -19,7 +19,7 @@
  * here only on demand, so a build without it (every check, a fork) carries none.
  */
 
-import { activateLocalLicenseKey, getCachedLicenseStatus, normalizePacks, retireStoredLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
+import { activateLocalLicenseKey, getCachedLicenseStatus, retireStoredLicenseKey, sameIdKeyWins, verifyLicenseKey, type LicenseTier } from './licenseKey';
 import { getCachedEmail } from './authFlag';
 import { getActiveLicenseInfo, getMarketingOptIn, hasExplicitMarketingChoice, setMarketingOptIn, syncMarketingPreferenceToServer } from './tierGates';
 
@@ -177,12 +177,14 @@ async function pick(all: Array<{ id?: string; token: string; tier: LicenseTier }
     // on top of Home, or refunded, re-signs the Home key with its `packs` changed and
     // keeps the id, so the rank test below would keep the old token, which still
     // verifies but names the old packs. Read the listed token's packs and take it when
-    // they differ; a token that cannot be read leaves the held key as it is.
+    // they differ; a token that cannot be read leaves the held key as it is. An upgrade
+    // signs the Pro key under the Home's id too, with the same packs, so a higher tier
+    // under the same id is taken as well; a lower one never is (this path must not
+    // downgrade a copy that holds Pro while the account lists a stale Home).
     if (held.valid && k.id && k.id === held.id) {
       const same = await verifyLicenseKey(k.token);
       if (!same.valid) continue;
-      const listedPacks = normalizePacks(same.payload.packs);
-      if (listedPacks.join(',') === normalizePacks(held.packs).join(',')) return { state: 'active', tier: held.tier };
+      if (!sameIdKeyWins(held, same.payload)) return { state: 'active', tier: held.tier };
       const status = await activateLocalLicenseKey(k.token);
       if (status.valid) return { state: 'active', tier: status.tier };
       return { state: 'active', tier: held.tier };

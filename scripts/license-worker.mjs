@@ -1013,6 +1013,46 @@ let bobProToken = '';
     `unpacked ${amyUn.unpacked}, keys ${amyKeys.map((k) => k.tier).join('+')}, packs ${await tokenPacks(amyKeys[0])}`,
   );
 
+  // 13n. Then refunding the upgrade refiles the Home without the refunded pack: the Pro
+  // record's copy of the Home it replaced must lose the pack too (`replaces`).
+  await postWebhook(envP, lsOrder('amy@example.com', 'ord_amy_up', { productId: 777002, status: 'refunded', event: 'order_refunded' }));
+  const amyBack = await keysOf(envP, 'amy@example.com');
+  check(
+    '13n. refunding the upgrade after the pack was refunded refiles the Home with no pack',
+    amyBack.length === 1 && amyBack[0].tier === 'home' && (await tokenPacks(amyBack[0])) === '-' && !amyBack[0].packOrders,
+    `keys ${amyBack.map((k) => k.tier).join('+')}, packs ${await tokenPacks(amyBack[0])}, orders ${JSON.stringify(amyBack[0]?.packOrders ?? null)}`,
+  );
+
+  // 13o. Our own JSON naming the pack event cannot say which pack, so it is refused, not filed.
+  const barePack = await postWebhook(envP, { event: 'order_pack', email: 'amy@example.com', orderId: 'ord_amy_bare' });
+  check('13o. an order_pack without a store product is refused (400)', barePack.status === 400, `status ${barePack.status}`);
+
+  // 13p. The device's half: which key listed under the held key's id replaces it
+  // (accountLicense pick() asks sameIdKeyWins). A pack bought or refunded changes the
+  // packs; an upgrade raises the tier with the packs unchanged (the review of 42a-2
+  // found pick() kept every upgrade buyer on Home when it compared packs alone).
+  const lk = await import(`data:text/javascript;base64,${Buffer.from((await build({
+    entryPoints: [new URL('../src/lib/licenseKey.ts', import.meta.url).pathname],
+    bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
+    define: { 'import.meta.env': JSON.stringify({}) },
+  })).outputFiles[0].text).toString('base64')}`);
+  const wins = [
+    lk.sameIdKeyWins({ tier: 'home' }, { tier: 'home', packs: ['moire'] }),
+    lk.sameIdKeyWins({ tier: 'home', packs: ['moire'] }, { tier: 'home' }),
+    lk.sameIdKeyWins({ tier: 'home' }, { tier: 'pro' }),
+    lk.sameIdKeyWins({ tier: 'home', packs: ['moire'] }, { tier: 'pro', packs: ['moire'] }),
+  ];
+  const keeps = [
+    lk.sameIdKeyWins({ tier: 'home', packs: ['moire'] }, { tier: 'home', packs: ['moire'] }),
+    lk.sameIdKeyWins({ tier: 'pro' }, { tier: 'home', packs: ['moire'] }),
+    lk.sameIdKeyWins({ tier: 'pro', packs: ['moire'] }, { tier: 'home', packs: ['moire'] }),
+  ];
+  check(
+    '13p. a key re-signed under the held id is taken for a pack bought or refunded and for an upgrade, never for the same key or a lower tier',
+    wins.every(Boolean) && keeps.every((v) => !v),
+    `take ${wins.join(',')}, keep ${keeps.map((v) => !v).join(',')}`,
+  );
+
   // 13m. A pack product on no list is an unknown product, as any other: held, nothing signed.
   const unlisted = await (await postWebhook(envP, lsOrder('xia@example.com', 'ord_xia_x', { productId: 777099, name: 'Moiré Pack' }))).json();
   check(
