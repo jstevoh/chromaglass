@@ -110,7 +110,7 @@ export interface LiquidType {
   color: string;
   /**
    * The liquid's own colour, with no dye in it: what a dish's depth of it
-   * (the 6 mm rest gap) lets through of the lamp's light, per channel.
+   * (6 mm, the rest gap before PLAN 38r; 38r-5) lets through of the lamp's light, per channel.
    * White is clear. A bottle without one is a dye (Ink, the owner's own),
    * and its colour is all it is. See lib/liquidColour.ts for how a dye
    * picked for it tints it.

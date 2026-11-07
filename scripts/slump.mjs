@@ -26,9 +26,13 @@
  *      8% (the radius at 2% of the pool's peak, from the area over that,
  *      which is within a hair of r_N for his profile (1 − r²/r_N²)^⅓)
  *   3. and the pool is as deep as the law says, within 8%: its middle
- *      H = 4V/(3π r_N²). The front goes as K^(1/8), so check 2 alone passes
+ *      H = 4V/(3π r_N²) on an open layer, and with the top glass 2 mm over
+ *      it (PLAN 38r) the radial solve of the same equation with the glass's
+ *      (1 − η/b)³ in, 9% deeper; the solve with no glass is held to
+ *      Huppert's H to 2%. The front goes as K^(1/8), so check 2 alone passes
  *      a rate half what it should be; the depth goes as K^(−1/4), and a copy
- *      of the kernels at ×0.7 and ×1.4 reads +12% and −6.3% (×1: +2.2%)
+ *      of the kernels at ×0.7 and ×1.4 reads +12% and −6.3% (×1: +2.2%, at
+ *      the 6 mm gap)
  *   4. it got there along the law: the radius grows as t^0.10 to t^0.15
  *      between 5 and 30 s (a blur's goes as t^½, a drop that sits as t^0)
  *   5. its edge is a front, not a blur: the radius at half the peak is at
@@ -40,7 +44,7 @@
  *   7. the same drop in glycerine (Thickness 1, a thousand times water's
  *      viscosity) slumps as slowly as the same equation says: its middle at
  *      20 s within 5% of a radial solve of ∂η/∂t = ∇·((g′/3ν) η³(1 − η/b)³ ∇η)
- *      from the same paraboloid in a 6 mm gap, worked out here on the CPU
+ *      from the same paraboloid in the 2 mm gap, worked out here on the CPU
  *      (3.94 units of 5.6; water's is down to 0.68 by then), and still all
  *      there. Not its front: at 256² a front that moves under a cell reads up
  *      to a cell wide (4.50 mm on Metal against the solve's 4.04), and
@@ -231,9 +235,24 @@ report('2. in water the front at 30 s is where Huppert\'s law puts it',
   Math.abs(w30.front / law30 - 1) <= 0.08,
   `${mm(w30.front)} against ${mm(law30)} (${((w30.front / law30 - 1) * 100).toFixed(1)}%; g′ ${g0.toFixed(3)}, ν ${nuWater.toExponential(1)})`);
 
+/*
+  Check 3's depth. Huppert's law is the open layer's: the current's flux is
+  (g′/3ν)η³∇η with nothing above it. Between two glasses the dye's exchange
+  flow with the clear liquid over it goes as η³(1 − η/b)³ (wgsl/slump.ts),
+  and at the 2 mm rest gap (PLAN 38r) the middle at 30 s is a tenth of the
+  gap deep, where (1 − η/b)³ is 0.72: the current is that much stiffer, and
+  it stands deeper by about its −¼ power, 9%. In the 6 mm gap this was
+  written on it was 3%, inside the 8%. So the depth is asked of the radial
+  solve of the plate's own equation (check 7's, here in water on coarser
+  rings, a few seconds), and the solve is held to Huppert's depth with the
+  glass taken away, to 2%, so the reference is still the law where the law
+  holds and only the glass is added to it.
+*/
 const H = 4 * V / (3 * Math.PI * (law30 / 1000) ** 2) * 1000, depth = w30.peak * dyeLayer * 1000;
-report('3. and as deep in its middle as the law says', Math.abs(depth / H - 1) <= 0.08,
-  `${depth.toFixed(3)} mm against ${H.toFixed(3)} mm (${((depth / H - 1) * 100).toFixed(1)}%)`);
+const glassed = radialMiddle(g0, nuWater, water[0].peak, 0.004, 30, DISH_GAP_METRES, 300, 4e-5) * dyeLayer * 1000;
+const open = radialMiddle(g0, nuWater, water[0].peak, 0.004, 30, Infinity, 300, 4e-5) * dyeLayer * 1000;
+report('3. and as deep in its middle as the law says, with the glass over it', Math.abs(depth / glassed - 1) <= 0.08 && Math.abs(open / H - 1) <= 0.02,
+  `${depth.toFixed(3)} mm against ${glassed.toFixed(3)} mm (${((depth / glassed - 1) * 100).toFixed(1)}%); the solve with no glass ${open.toFixed(3)} mm, Huppert's ${H.toFixed(3)} mm`);
 
 const growth = (a, b, ta, tb) => Math.log(b.front / a.front) / Math.log(tb / ta);
 const exponent = growth(w5, w30, 5, 30);
@@ -256,14 +275,13 @@ const still = (rows, T) => Math.abs(at(rows, T).front - rows[0].front) < 0.5 && 
   is a thousandth of water's, so a stable step is long); far too slow in
   water, where Huppert's law is the reference instead.
 */
-function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = DISH_GAP_METRES) {
-  const n = 600, dr = 2e-5, G = gPrime / (3 * nuv);
-  const h = new Float64Array(n), dh = new Float64Array(n);
+function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = DISH_GAP_METRES, n = 600, dr = 2e-5) {
+  const G = gPrime / (3 * nuv);
+  const h = new Float64Array(n), dh = new Float64Array(n), flux = new Float64Array(n - 1);
   for (let i = 0; i < n; i++) { const r = (i + 0.5) * dr; h[i] = Math.max(0, 1 - (r / R) ** 2) * peakUnits * dyeLayer; }
   let t = 0;
   while (t < T) {
     let most = 0;
-    const flux = new Float64Array(n - 1);
     for (let i = 0; i < n - 1; i++) {
       const e = 0.5 * (h[i] + h[i + 1]), k = G * e ** 3 * Math.max(0, 1 - e / gap) ** 3;
       most = Math.max(most, k);

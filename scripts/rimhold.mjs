@@ -50,6 +50,7 @@
  * Linux box's software WebGPU anywhere else (PW_WEBGPU=1).
  */
 import { openLab } from './lab.mjs';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -58,13 +59,26 @@ const check = (name, ok, detail = '') => {
 };
 
 const R = 0.06;   // the lens's radius, in plates (oillift's)
+/*
+  Check 1 reads a lens against the rim settling there: six readings, the
+  last three after it has. Every speed the surface tension gives the oil
+  between two glasses goes as h² (Darcy: h²/12μ times σ∇κ, OIL_TENSION_GAP),
+  so on the 2 mm gap (PLAN 38r) the lens settles nine times slower than on
+  the 6 mm one it was written on, and six seconds caught it settling: the
+  lens at the middle of the grid's edge lost 2.9% of its oil over the rim in
+  the first nine seconds and then nothing, but read a second apart that
+  first loss fell across the window's last three (1.2% against 0.1%, red).
+  The readings are a second times (6 mm / h)² apart, 9 s at 2 mm, as
+  \`npm run oillift\`'s rim (4) is; "a second" below is one of them.
+*/
+const SECOND = Math.round(60 * (0.006 / DISH_GAP_METRES) ** 2);
 
 const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 let r;
 try {
-  r = await page.evaluate(async ({ R }) => {
+  r = await page.evaluate(async ({ R, SECOND }) => {
     const N = 128, out = {};
     const T = { thinGap: 1, gapThickness: 0.45, gapSpring: 0, oilTension: 0.9, oilBodies: 1, diff: 0 };
     /*
@@ -89,7 +103,7 @@ try {
       await lab.create(N, N);
       lab.solver().addMix(at[0], at[1], R, { oil: 1 });
       const trace = [await oil()];
-      for (let k = 0; k < seconds; k++) { await lab.step(60, over); trace.push(await oil()); }
+      for (let k = 0; k < seconds; k++) { await lab.step(SECOND, over); trace.push(await oil()); }
       return trace;
     };
     // 1.
@@ -136,7 +150,7 @@ try {
     out.pour = await pour(T);
     out.pourWeak = await pour({ ...T, oilTension: 0.009 });
     return out;
-  }, { R });
+  }, { R, SECOND });
 } finally {
   await close();
 }

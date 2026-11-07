@@ -21,8 +21,12 @@
  *
  *   1. A breath gentler than the speed the surface tears at (the blowing
  *      number N_B = ρ_air U² / 2√(ρgσ) past 1, about 5.4 m/s against a firm
- *      breath's 8) takes no air in: no bubbles from three seconds of wind at
- *      Amount 0.05, 0.25 or 0.5, where the old rule laid as many as at 1.
+ *      breath's 14) takes no air in: no bubbles from three seconds of wind at
+ *      Amount 0.05, 0.25 or 0.35, where the old rule laid as many as at 1.
+ *      It was asked at 0.5 while a firm breath was 8 m/s (the tearing speed
+ *      at Amount 0.67); the 2 mm gap took the firm breath to 14 m/s to move
+ *      the film as the 6 mm one did (lib/breath.ts, PLAN 38r), so the surface
+ *      tears at Amount 0.39 and the gentle breaths are read below that.
  *   2. A firm breath, the default Amount 1, takes air in as often as it did:
  *      ten spawns a second, within a fifth over ten seconds of steps.
  *   3. And a second at 120 steps a second takes in what a second at 60 does
@@ -80,7 +84,7 @@ function wind(a, { seconds = 3, rate = 60, old = false } = {}) {
 }
 
 console.log(`  the surface tears at ${AIR_TAKEN_FROM.toFixed(2)} m/s (N_B = 1); a firm breath ${breathSpeed(1).toFixed(1)} m/s, N_B ${blowingNumber(breathSpeed(1)).toFixed(2)}; Amount 5 ${breathSpeed(25).toFixed(0)} m/s, N_B ${blowingNumber(breathSpeed(25)).toFixed(1)}`);
-const AMOUNTS = [0.05, 0.25, 0.5, 0.7, 1, 2, 5];
+const AMOUNTS = [0.05, 0.25, 0.35, 0.5, 0.7, 1, 2, 5];
 const now = {}, was = {};
 for (const a of AMOUNTS) {
   now[a] = wind(a); was[a] = wind(a, { old: true });
@@ -89,8 +93,8 @@ for (const a of AMOUNTS) {
 
 // 1.
 check('a breath gentler than the speed the surface tears at takes no air in',
-  [0.05, 0.25, 0.5].every((a) => now[a].spawns === 0 && now[a].bubbles === 0) && was[0.05].bubbles > 0,
-  `Amount 0.05 / 0.25 / 0.5: ${[0.05, 0.25, 0.5].map((a) => now[a].bubbles).join(' / ')} bubbles (before ${[0.05, 0.25, 0.5].map((a) => was[a].bubbles).join(' / ')})`);
+  [0.05, 0.25, 0.35].every((a) => now[a].spawns === 0 && now[a].bubbles === 0) && was[0.05].bubbles > 0,
+  `Amount 0.05 / 0.25 / 0.35: ${[0.05, 0.25, 0.35].map((a) => now[a].bubbles).join(' / ')} bubbles (before ${[0.05, 0.25, 0.35].map((a) => was[a].bubbles).join(' / ')})`);
 
 // 2. and 3.
 {

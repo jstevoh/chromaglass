@@ -8,7 +8,32 @@
  * the one table every pass is asked for by name.
  */
 
+import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
+
+/*
+  The open rim for the mix's own evolution (PLAN 18g-7): which side of it a
+  cell is on, on a thin gap. The rim is open to flow: what the liquid
+  carries over it goes, as the colour does (18g). But the oil's
+  Cahn–Hilliard relaxation is not a flow, it is the oil's own diffusion down
+  its chemical potential, and it read its neighbours past the rim as if the
+  rim were not there: a body against the rim relaxed its edge into the
+  cells past it, and they, with no body of their own, took it. In the lab a
+  lens of radius 0.06 laid against the rim at a hundredth of the looks'
+  tension (\`npm run oillift\`, held by a 6° tilt) lost 6% of its oil over
+  54 s, almost all of it while spread along the rim; with the plate level
+  it lost 1.4%. The dye's diffusion has had the zero-flux condition at the
+  rim since 18g (dyeDisperse): mixMu and mixUpdate take the same, a
+  neighbour across the rim read as the cell itself, so neither ∇c nor ∇μ
+  has a face there and nothing crosses by relaxation. ∇c·n = 0 is
+  Cahn–Hilliard's own natural condition at a wall, and it sets the edge
+  meeting the rim square, the 90° that 18g-8 says the rim has no better
+  number for yet.
+*/
+export const RIM_SIDE = /* wgsl */ `
+fn rimSide(p: vec2i, n: f32) -> bool {
+  return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
+}`;
 
 export const OIL_KERNELS: Record<string, string> = {
   /*
@@ -305,14 +330,19 @@ fn bad(p: vec2i, n: i32) -> vec2f {
   return vec2f(max(c - 1.0, 0.0) + min(c, 0.0), 1.0);
 }
 fn pair(a: f32, b: vec2f) -> f32 { return select(0.0, 0.24 * (a - b.x), b.y > 0.5); }
+${RIM_SIDE}
+// Not across the open rim (RIM_SIDE): the share is the oil's own packing, not a flow.
+fn pairN(a: f32, p: vec2i, e: vec2i, n: i32) -> f32 {
+  return select(pair(a, bad(p + e, n)), 0.0, rimSide(p, f32(n)) != rimSide(p + e, f32(n)));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = i32(S.n);
   let m = textureLoad(src, p, 0);
   let e = max(m.r - 1.0, 0.0) + min(m.r, 0.0);
-  let out = pair(e, bad(p + vec2i(1, 0), n)) + pair(e, bad(p - vec2i(1, 0), n))
-          + pair(e, bad(p + vec2i(0, 1), n)) + pair(e, bad(p - vec2i(0, 1), n));
+  let out = pairN(e, p, vec2i(1, 0), n) + pairN(e, p, vec2i(-1, 0), n)
+          + pairN(e, p, vec2i(0, 1), n) + pairN(e, p, vec2i(0, -1), n);
   let outVal = vec4f(m.r - out, m.gba);
   textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));
 }`,
@@ -405,12 +435,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
 fn mm4(p: vec2i, n: f32) -> vec4f { return textureLoad(src, clampP(p, n), 0); }
+${RIM_SIDE}
+// A neighbour across the open rim reads as this cell: no flux through that face (RIM_SIDE).
+fn mmN(p: vec2i, e: vec2i, n: f32, m: vec4f) -> vec4f {
+  return select(mm4(p + e, n), m, rimSide(p, n) != rimSide(clampP(p + e, n), n));
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let n = S.n;
   let m = mm4(p, n);
-  let lap = mm4(p + vec2i(1, 0), n) + mm4(p - vec2i(1, 0), n) + mm4(p + vec2i(0, 1), n) + mm4(p - vec2i(0, 1), n) - 4.0 * m;
+  let lap = mmN(p, vec2i(1, 0), n, m) + mmN(p, vec2i(-1, 0), n, m) + mmN(p, vec2i(0, 1), n, m) + mmN(p, vec2i(0, -1), n, m) - 4.0 * m;
   // Not clamped to 0..1: Cahn–Hilliard overshoots a little either side of an
   // interface and its own double well brings it back, where a clamp would
   // make or destroy oil every step (measured: the oil swung ±30%). The wide
