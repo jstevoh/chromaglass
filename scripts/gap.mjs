@@ -105,14 +105,14 @@ check(`the rest gap is ${MM}, and the field's rest number times its metres is th
 {
   const src = ['gapRest', 'squeezeUpdate', 'gapReshape'].map((k) => L.GAP_KERNELS[k] ?? '').join('\n');
   // The rest is the cover's gap less the dome (PLAN 38r-5): the dome's scale is the rest number, the mean the cover's uniform or the reshape's two covers.
-  const restAt = [...src.matchAll(/clamp\((S\.cover|A\.a\.[zw]) - ([0-9.]+) \*/g)];
+  const restAt = [...src.matchAll(/clamp\((S\.cover|A\.a\.[zw]) - ([0-9.]+) \* (S\.plateCurve|A\.a\.[xy]) \*/g)];
   const rests = restAt.map((m) => Number(m[2]));
-  const means = restAt.map((m) => m[1]).join(' ');
+  const means = restAt.map((m) => `${m[1]}:${m[3]}`).join(' ');
   const clamps = [...src.matchAll(/, (0\.00[0-9]+), (0\.0[0-9]+)\)/g)].map((m) => [Number(m[1]), Number(m[2])]);
   const floors = [...src.matchAll(/max\(([0-9.]+), /g)].map((m) => Number(m[1]));
   check('the gap kernels lay the rest number, floor and ceiling the lib holds, and no other',
     // Exactly as many as the three kernels write (4 rests, 5 clamps, 3 floors), so one written another way is missed by count.
-    rests.length === 4 && rests.every((v) => v === L.DISH_REST_GAP) && means === 'S.cover S.cover A.a.z A.a.w'
+    rests.length === 4 && rests.every((v) => v === L.DISH_REST_GAP) && means === 'S.cover:S.plateCurve S.cover:S.plateCurve A.a.z:A.a.x A.a.w:A.a.y'
       && clamps.length === 5 && clamps.every(([a, b]) => a === L.DISH_GAP_RANGE[0] && b === L.DISH_GAP_RANGE[1])
       && floors.length === 3 && floors.every((v) => v === L.DISH_GAP_RANGE[0]),
     `rests ${[...new Set(rests)].join(', ')} (${rests.length}) about ${means}; clamps ${[...new Set(clamps.map((c) => c.join('–')))].join(', ')} (${clamps.length}); floors ${[...new Set(floors)].join(', ')}`);
@@ -217,11 +217,13 @@ check(`the rest gap is ${MM}, and the field's rest number times its metres is th
 */
 const C = L.C;
 const R = W / 2, A = Math.PI * R * R, SIN60 = Math.sin(Math.PI / 3);
-const WATER = { nu: 1e-6, sigma: 0.072, mu: 1e-3 }, THICK = { nu: 2e-5, sigma: 0.072 - 0.007 * Math.log10(20) / 3, mu: 2e-2 };
+// σ of glycerine-water, tabulated (CRC; Takamura et al. 2012): water, 50%, 70%, 85% by mass, against ν.
+const TABLE = [[1e-6, 0.072], [6e-6, 0.070], [2.2e-5, 0.0675], [1e-4, 0.0655]];
+const WATER = { nu: 1e-6, sigma: 0.072, mu: 1e-3 }, THICK = { nu: 2.2e-5, sigma: 0.0675, mu: 2.2e-2 };
 const glassG = 5 * A * 1000, weight = (glassG / 1000) * G / A;
 const rk4 = (h0, P, sig, mu, t) => {
   const f = (h) => -(2 / 3) * h ** 3 * (P - 2 * sig * SIN60 / h) / (mu * R * R);
-  const tau = mu * R * R / (P * h0 ** 3), n = Math.max(2000, Math.ceil(t / (tau / 100)));
+  const tau = mu * R * R / (P * h0 ** 2), n = Math.max(2000, Math.ceil(t / (tau / 100)));
   let h = h0; const dt = t / n;
   for (let i = 0; i < n; i++) { const a = f(h), b = f(h + a * dt / 2), c = f(h + b * dt / 2), d = f(h + c * dt); h += (a + 2 * b + 2 * c + d) * dt / 6; }
   return h;
@@ -242,8 +244,8 @@ const rk4 = (h0, P, sig, mu, t) => {
   check(`the edge's meniscus holds 2σ sinθ/h (θ 60°, σ water ${WATER.sigma}): ${hold.toFixed(1)} Pa at ${MM} against the glass's ${weight.toFixed(1)} Pa; h_hold 2σ sinθ/(w g); the bead 2πR·(π/4)·l_c²`,
     near(C.holdPressure(C.carrierTension(1e-6), H0), hold, 1e-12) && hold > weight && near(C.weightPressure(glassG), weight, 1e-12)
       && near(C.holdGap(C.carrierTension(1e-6), weight), hHold, 1e-12) && near(C.beadCapacity(C.carrierTension(1e-6)), bead, 1e-12)
-      && near(C.carrierTension(2e-5), THICK.sigma, 1e-12),
-    `h_hold ${(hHold * 1000).toFixed(3)} mm, bead ${(bead * 1e6).toFixed(2)} mL, σ thick ${C.carrierTension(2e-5).toFixed(4)}`);
+      && TABLE.every(([nu, sg]) => near(C.carrierTension(nu), sg, 0.02)),
+    `h_hold ${(hHold * 1000).toFixed(3)} mm, bead ${(bead * 1e6).toFixed(2)} mL, σ against the table ${TABLE.map(([nu, sg]) => `${C.carrierTension(nu).toFixed(4)}/${sg}`).join(' ')}`);
 }
 
 // 14
@@ -279,9 +281,15 @@ const rk4 = (h0, P, sig, mu, t) => {
   const hHold = 2 * WATER.sigma * SIN60 / weight;
   const lc = Math.sqrt(WATER.sigma / (1000 * G)), bead = 2 * Math.PI * R * (Math.PI / 4) * lc * lc;
   const sum = s.plate + s.bead + s.off;
-  check(`a pour under the glass raises it by Q/A and spills nothing below h_hold; past it the glass settles to h_hold, the bead fills, the rest runs off; plate + bead + off = everything put in`,
-    near(rise, 4e-6 / A, 1e-9) && Math.abs(s.h - hHold) < 1e-6 && near(s.bead, bead, 1e-9) && s.off > 0 && near(sum, s.added, 1e-12) && near(s.added, (C.COVER_FULL_ML + 24) * 1e-6, 1e-12),
-    `4 mL raised it ${(rise * 1e6).toFixed(1)} µm (Q/A ${(4e-6 / A * 1e6).toFixed(1)}); +20 mL settled at ${(s.h * 1000).toFixed(4)} mm (h_hold ${(hHold * 1000).toFixed(4)}), bead ${(s.bead * 1e6).toFixed(2)} mL, off ${(s.off * 1e6).toFixed(2)} mL; ledger ${(sum * 1e6).toFixed(4)} of ${(s.added * 1e6).toFixed(4)} mL`);
+  // The dial down 10 mL: wicked off the bead first, the rest from under the glass; then down past everything, to the floor's full film.
+  const before = { ...s };
+  C.coverAdd(s, -10e-6);
+  const wick = s.bead === 0 && near(before.plate - s.plate, 10e-6 - before.bead, 1e-9) && near(s.added, before.added - 10e-6, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12) && near(s.h, s.plate / A, 1e-12);
+  C.coverAdd(s, -1);
+  const floor = near(s.plate, A * C.COVER_FLOOR_M, 1e-12) && near(s.h, C.COVER_FLOOR_M, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12);
+  check(`a pour under the glass raises it by Q/A and spills nothing below h_hold; past it the glass settles to h_hold, the bead fills, the rest runs off; the dial down wicks the bead then the plate, never under the floor's film; plate + bead + off = everything put in`,
+    near(rise, 4e-6 / A, 1e-9) && Math.abs(before.h - hHold) < 1e-6 && near(before.bead, bead, 1e-9) && before.off > 0 && near(sum, before.added, 1e-12) && near(before.added, (C.COVER_FULL_ML + 24) * 1e-6, 1e-12) && wick && floor,
+    `4 mL raised it ${(rise * 1e6).toFixed(1)} µm (Q/A ${(4e-6 / A * 1e6).toFixed(1)}); +20 mL settled at ${(before.h * 1000).toFixed(4)} mm (h_hold ${(hHold * 1000).toFixed(4)}), bead ${(before.bead * 1e6).toFixed(2)} mL, off ${(before.off * 1e6).toFixed(2)} mL; ledger ${(sum * 1e6).toFixed(4)} of ${(before.added * 1e6).toFixed(4)} mL; dial down ${wick}, floor ${floor}`);
 }
 
 // 16
@@ -302,10 +310,22 @@ const rk4 = (h0, P, sig, mu, t) => {
   for (let i = 0; i < 60; i++) C.coverStep(s, 1 / 60, { nu: 1e-6, grams: glassG, hand: -0.3 });
   const lifted = s.h;
   for (let i = 0; i < 60; i++) C.coverStep(s, 1 / 60, { nu: 1e-6, grams: glassG, hand: 0 });
+  // The lift's own rate, on the thick carrier where it is slow enough to see: press to fill the bead, then a gentle lift (about −1 Pa) for 0.2 s against an RK4 of dh/dt = −(2/3)h³P/(μR²).
+  const g = C.coverNew(C.COVER_FULL_ML);
+  for (let i = 0; i < 60; i++) C.coverStep(g, 1 / 60, { nu: THICK.nu, grams: glassG, hand: 0.02 });
+  const g0 = g.h, Plift = weight - 0.05 * 1000;
+  for (let i = 0; i < 12; i++) C.coverStep(g, 1 / 60, { nu: THICK.nu, grams: glassG, hand: -0.05 });
+  let hr = g0;
+  for (let i = 0, n = 20000, dt = 0.2 / n; i < n; i++) {
+    const f = (h) => -(2 / 3) * h ** 3 * Plift / (THICK.mu * R * R);
+    const a = f(hr), b = f(hr + a * dt / 2), c = f(hr + b * dt / 2), e = f(hr + c * dt);
+    hr += (a + 2 * b + 2 * c + e) * dt / 6;
+  }
+  const liftRate = near(g.h - g0, hr - g0, 1e-3) && g.bead > 0;
   check(`a light press settles the glass to 2σ sinθ/(w g + hand), filling the bead and running off past it; a lift past the glass's weight draws the bead back, bead/A higher, and stops; let go, the edge holds it there`,
     Math.abs(pressed - want) < 1e-6 && near(beadIn, bead, 1e-9) && near(off, (H0 - want) * A - bead, 1e-6)
-      && near(lifted, want + bead / A, 1e-6) && s.bead === 0 && near(s.h, lifted, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12),
-    `pressed to ${(pressed * 1000).toFixed(4)} mm (want ${(want * 1000).toFixed(4)}), bead ${(beadIn * 1e6).toFixed(2)} mL, off ${(off * 1e6).toFixed(2)} mL; lifted to ${(lifted * 1000).toFixed(4)} mm (want ${((want + bead / A) * 1000).toFixed(4)}), held at ${(s.h * 1000).toFixed(4)}`);
+      && near(lifted, want + bead / A, 1e-6) && s.bead === 0 && near(s.h, lifted, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12) && liftRate,
+    `pressed to ${(pressed * 1000).toFixed(4)} mm (want ${(want * 1000).toFixed(4)}), bead ${(beadIn * 1e6).toFixed(2)} mL, off ${(off * 1e6).toFixed(2)} mL; lifted to ${(lifted * 1000).toFixed(4)} mm (want ${((want + bead / A) * 1000).toFixed(4)}), held at ${(s.h * 1000).toFixed(4)}; a gentle lift rose ${((g.h - g0) * 1e9).toFixed(1)} nm in 0.2 s (RK4 ${((hr - g0) * 1e9).toFixed(1)})`);
 }
 
 // 17
@@ -313,8 +333,10 @@ const rk4 = (h0, P, sig, mu, t) => {
   // The solver lays the cover's gap: the uniform is packed from the ledger, and the gap kernels read it.
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), cover = readFileSync('src/gpu/fluid/cover.ts', 'utf8'), shared = readFileSync('src/gpu/wgsl/fluid/shared.ts', 'utf8');
   const packed = /f\[51\] = this\.coverGap;/.test(fluid) && /this\.coverAdvance\(p\);\n\s*this\.writeSim\(p, disp\);/.test(fluid);
-  const field = /lampHeat: f32,[\s\S]*?cover: f32,\n\};/.test(shared);
-  const metres = /this\.coverGap = h \/ DISH_GAP_FIELD_METRES;/.test(cover) && /\[this\.lastCurve, p\.plateCurve, this\.coverLaid, this\.coverGap\]/.test(cover);
+  // Nothing but comments between lampHeat (50) and cover, so the field is slot 51.
+  const field = /lampHeat: f32,\n(\s*\/\/[^\n]*\n)*\s*cover: f32,\n\};/.test(shared);
+  const metres = /this\.coverGap = h \/ DISH_GAP_FIELD_METRES;/.test(cover) && /\[this\.lastCurve, p\.plateCurve, this\.coverLaid, this\.coverGap\]/.test(cover)
+    && /else if \(this\.lastCurve !== p\.plateCurve \|\| this\.coverGap !== this\.coverLaid\)/.test(cover) && /\n\s*this\.coverLaid = this\.coverGap;/.test(cover);
   check('the solver packs the cover\'s gap (gap units, h over the metres in a unit) as S.cover at 51, before the step\'s kernels, and a cover that moves shifts the field',
     packed && field && metres, `packed ${packed}, struct ${field}, units and reshape ${metres}`);
 }
@@ -335,6 +357,7 @@ const rk4 = (h0, P, sig, mu, t) => {
   const drag = L.coverDrag(0.45, 1000, C.COVER_GLASS_G, H0) / L.coverDrag(0.45), heavy = L.coverDrag(0.45, 1000, 2 * C.COVER_GLASS_G, H0) / L.coverDrag(0.45);
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), passes = readFileSync('src/gpu/fluid/passes.ts', 'utf8'), thin = readFileSync('src/gpu/wgsl/thinGap.ts', 'utf8');
   const solver = [
+    /get coverH2\(\): number \{\s*const r = this\.coverGap \/ DISH_REST_GAP;\s*return r \* r;/.test(readFileSync('src/gpu/fluid/cover.ts', 'utf8')),
     /OIL_TENSION_GAP \* this\.coverH2/.test(fluid), /ROCK_FALL \* this\.coverH2 \* rockGain \* p\.rockX/.test(fluid), /-OIL_LIFT \* this\.coverH2/.test(fluid),
     /const h0 = this\.coverGap \* GAP_METRES;/.test(fluid), /const b = this\.coverGap \* GAP_METRES;/.test(passes), /const hc = this\.coverGap \* GAP_METRES;/.test(passes),
     /\(A\.a\.x \/ \(S\.cover \* S\.cover\) \* A\.a\.y\)/.test(thin),

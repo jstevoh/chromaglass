@@ -72,13 +72,14 @@ export const COVER_TOP_M = DISH_GAP_RANGE[1] * DISH_GAP_FIELD_METRES;
 export const HAND_PA = 1000;
 
 /**
- * The carrier's surface tension from its kinematic viscosity: 0.072 N/m for
- * water (1 mm²/s), falling to 0.065 for the thick glycerine-water carriers
- * (1000 mm²/s), on log ν, as glycerine-water does to within a few percent.
+ * The carrier's surface tension from its kinematic viscosity: glycerine-water
+ * falls from water's 0.072 N/m (1 mm²/s) to glycerine's 0.063 (about
+ * 1200 mm²/s) close to linearly in log ν, 2.8 mN/m a decade: 0.0698 at half
+ * glycerine (6 mm²/s, tabulated 0.070), 0.0682 at 70% (22 mm²/s, 0.0675),
+ * 0.0664 at 85% (100 mm²/s, 0.0655). `npm run gap` holds it to those.
  */
 export function carrierTension(nu: number): number {
-  const t = Math.max(0, Math.min(1, Math.log10(Math.max(1e-6, nu) / 1e-6) / 3));
-  return 0.072 - 0.007 * t;
+  return Math.max(0.063, 0.072 - 0.0028 * Math.log10(Math.max(1e-6, nu) / 1e-6));
 }
 
 /** What the meniscus pinned at the cover's edge holds at gap h: 2σ sinθ / h. */
@@ -152,11 +153,13 @@ export interface CoverState {
   off: number;
   added: number;
   h: number;
+  /** The carrier's σ at the last step, for the bead's size (water's until a step has run). */
+  sigma: number;
 }
 
 export function coverNew(ml: number): CoverState {
   const v = Math.max(0, ml) * 1e-6;
-  const s = { plate: v, bead: 0, off: 0, added: v, h: 0 };
+  const s = { plate: v, bead: 0, off: 0, added: v, h: 0, sigma: 0.072 };
   return coverSettleTop(s);
 }
 
@@ -169,13 +172,13 @@ export function coverNew(ml: number): CoverState {
  */
 function coverSettleTop(s: CoverState): CoverState {
   const top = COVER_AREA * COVER_TOP_M;
-  if (s.plate > top) { coverSpill(s, s.plate - top); }
+  if (s.plate > top) { coverSpill(s, s.plate - top, beadCapacity(s.sigma)); }
   s.h = Math.max(COVER_FLOOR_M, s.plate / COVER_AREA);
   return s;
 }
 
 /** Liquid leaving under the glass's edge: into the bead up to its capacity, the rest off the dish. */
-function coverSpill(s: CoverState, v: number, cap = beadCapacity(0.072)): void {
+function coverSpill(s: CoverState, v: number, cap: number): void {
   s.plate -= v;
   const room = Math.max(0, cap - s.bead);
   const into = Math.min(room, v);
@@ -218,6 +221,7 @@ export interface CoverInputs {
  */
 export function coverStep(s: CoverState, dt: number, k: CoverInputs): number {
   const sigma = carrierTension(k.nu);
+  s.sigma = sigma;
   const mu = DENSITY * Math.max(1e-7, k.nu);
   const hand = Math.max(-1, Math.min(1, Number.isFinite(k.hand) ? k.hand : 0));
   const P = weightPressure(k.grams) + hand * HAND_PA;
