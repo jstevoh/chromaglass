@@ -703,17 +703,53 @@ async function selftest() {
         'a lab check that only steps the solver does not read the plate\'s shader, and one that draws the plate does (19ak-3b)');
       say(labChecks.every((c) => readsOf.get(c).reads.has('src/gpu/fluid.ts')) && plateSel.names && labChecks.some((c) => !plateSel.names.includes(c.name)),
         `every one of the ${labChecks.length} lab checks reads the solver, and the plate's shader runs ${labChecks.filter((c) => plateSel.names?.includes(c.name)).length} of them`);
-      const entry = labParts(fs.readFileSync(path.join(ROOT, LAB_ENTRY), 'utf8'));
-      const lost = [...entry.imports].filter((s) => !entry.specsOf(null).has(s));
-      say(!lost.length && entry.keys.length > 40, `the reading of ${LAB_ENTRY} finds ${entry.keys.length} parts and reaches every one of its ${entry.imports.size} imports${lost.length ? `; not ${lost.join(', ')}` : ''}`);
+      // Held to the TypeScript compiler's own reading of the file, not to
+      // itself: the api's parts as the syntax tree has them, and the imports
+      // each names directly, every one of which the text reading must give
+      // that part. (A first reading took one part a line, and lost the 25
+      // listed several to a line; a union over its own parts could not see it.)
+      const entryText = fs.readFileSync(path.join(ROOT, LAB_ENTRY), 'utf8');
+      const entry = labParts(entryText);
+      let ts = null;
+      try { ts = (await import('typescript')).default; } catch { /* below */ }
+      if (!ts) say(false, 'typescript loads, to hold the lab\'s reading to the compiler\'s (npm ci)');
+      else {
+        const sf = ts.createSourceFile(LAB_ENTRY, entryText, ts.ScriptTarget.Latest, true);
+        const bind = new Map();
+        for (const st of sf.statements) {
+          if (!ts.isImportDeclaration(st) || st.importClause?.isTypeOnly) continue;
+          const spec = st.moduleSpecifier.text;
+          const b = st.importClause?.namedBindings;
+          if (st.importClause?.name) bind.set(st.importClause.name.text, spec);
+          if (b && ts.isNamespaceImport(b)) bind.set(b.name.text, spec);
+          if (b && ts.isNamedImports(b)) for (const e of b.elements) if (!e.isTypeOnly) bind.set(e.name.text, spec);
+        }
+        let api = null;
+        const find = (n) => { if (ts.isVariableDeclaration(n) && n.name.getText() === 'api' && n.initializer && ts.isObjectLiteralExpression(n.initializer)) api = n.initializer; else ts.forEachChild(n, find); };
+        find(sf);
+        const tsParts = new Map();
+        for (const p of api?.properties ?? []) {
+          const name = p.name?.getText();
+          if (!name) continue;
+          const specs = new Set();
+          const walk = (n) => { if (ts.isTypeNode(n)) return; if (ts.isIdentifier(n) && bind.has(n.text)) specs.add(bind.get(n.text)); ts.forEachChild(n, walk); };
+          walk(p);
+          tsParts.set(name, specs);
+        }
+        const notRead = [...tsParts.keys()].filter((k) => !entry.keys.includes(k));
+        const extra = entry.keys.filter((k) => !tsParts.has(k));
+        const short = [...tsParts].filter(([k, specs]) => [...specs].some((s) => !entry.specsOf([k]).has(s))).map(([k]) => k);
+        say(tsParts.size > 40 && !notRead.length && !extra.length && !short.length,
+          `the reading of ${LAB_ENTRY} finds the compiler's ${tsParts.size} parts and gives each the imports it names${notRead.length ? `; missed ${notRead.slice(0, 6).join(', ')}` : ''}${extra.length ? `; invented ${extra.slice(0, 6).join(', ')}` : ''}${short.length ? `; short on ${short.slice(0, 6).join(', ')}` : ''}`);
+      }
       const toy = labParts([
         "import { a } from './a';", "import { b, type T } from './b';", "import type { U } from './u';", "import { c } from './c';", "import { d } from './d';",
         'type L = { t: T; u: U };', 'let lab: L | null = null;', 'function help() { return c(); }',
-        'const api = {', '  create() { return a(); },', '  one() { return help(); },', '  two() { return this.one() + d; },', '  three: b,', '};',
+        'const api = {', '  create() { return a(); },', '  one() { return help(); },', '  two() { return this.one() + d; },', '  three: b,', '  c, d,', '};',
       ].join('\n'));
       const specs = (k) => [...toy.specsOf(k)].sort().join(' ');
-      say(specs([]) === './a' && specs(['one']) === './a ./c' && specs(['two']) === './a ./c ./d' && specs(['three']) === './a ./b' && specs(null) === './a ./b ./c ./d',
-        'a part reaches its imports through the file\'s helpers and the parts it calls; a type is no import, and create is every check\'s');
+      say(specs([]) === './a' && specs(['one']) === './a ./c' && specs(['two']) === './a ./c ./d' && specs(['three']) === './a ./b' && specs(['d']) === './a ./d' && specs(null) === './a ./b ./c ./d',
+        'a part reaches its imports through the file\'s helpers and the parts it calls, two parts on one line are two; a type is no import, and create is every check\'s');
       say(labKeysOf(["await page.evaluate(() => lab.step(4)); // lab.render(x)"])?.size === 1 && labKeysOf(['lab[name]()']) === null,
         'a check\'s parts are the names it calls on lab. in its code, not its comments, and every part for lab[name]');
       const missing = new Map(readsOf);
@@ -996,8 +1032,13 @@ export async function checkReads(man, scripts, esbuild, root = ROOT) {
     }
     // A check that opens the lab reads of src/ what its view names or
     // imports, and of the lab's page the parts it calls (19ak-3b).
+    // Only for a check whose processes are the repository's own scripts run
+    // by node: one bundled into node_modules/.cache first (`npm run seed`)
+    // runs where lab.mjs's guard cannot place it, so it keeps the trace's.
     const view = viewOf(c);
-    if (!unread && view.files.has('scripts/lab.mjs')) {
+    const cmdsOf = [c.run, ...[...npmScriptsOf(c.run, scripts)].map((n) => scripts[n] ?? '')].join('\n');
+    const plain = [...entryFiles(c.run, scripts)].every((f) => /^scripts\/.*\.(mjs|js)$/.test(f)) && !/\bnode\s+(?!scripts\/)\S+\.m?js\b/.test(cmdsOf);
+    if (!unread && plain && view.files.has('scripts/lab.mjs')) {
       const src = new Set();
       for (const f of new Set([...view.files, ...view.named])) {
         if (/^src\//.test(f)) src.add(f);

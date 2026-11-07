@@ -4073,7 +4073,7 @@ the sessions' files or the native apps skips the Mac (19h).
   or a lab page its code never names, so a misreading is red on its first run, never a
   quiet skip. Measured (`scratch/replay.mjs`, not committed: main's last 100 merges
   through the 19ak-2 and the new selection, each check priced at its time on PR run
-  41350181902's five Mac shards): 6,374 → 5,743 Mac check runs, 5,626 → 5,369 check
+  41350181902's five Mac shards): 6,374 → 5,743 Mac check runs, 5,626 → 5,370 check
   minutes (4.6%). The lever was smaller than 19ak-3 guessed: of the 34 merges that
   touched the lab's bundle, 17 touched the solver, which every lab check must run,
   and the 28 checks that open the app, most of the Mac's minutes, run for any site

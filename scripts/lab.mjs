@@ -62,20 +62,22 @@ export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], ta
   page.on('pageerror', (e) => console.log('  [lab error]', e.message.slice(0, 300)));
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => window.labReady === true);
-  // Every part the page reads off the lab, for the guard at close().
-  if (entry === LAB_ENTRY) {
-    await page.evaluate(() => {
-      const used = new Set();
-      const api = window.lab;
-      window.labUsed = used;
-      window.lab = new Proxy(api, { get(o, k, r) { if (typeof k === 'string' && k in o) used.add(k); return Reflect.get(o, k, r); } });
-    });
-  }
+  // Every part the page reads off the lab, for the guard at close(): on any
+  // entry that hands out the lab (render-lab-entry.ts adds to it).
+  await page.evaluate(() => {
+    if (!window.lab) return;
+    const used = new Set();
+    const api = window.lab;
+    window.labUsed = used;
+    window.lab = new Proxy(api, { get(o, k, r) { if (typeof k === 'string' && k in o) used.add(k); return Reflect.get(o, k, r); } });
+  });
   return {
     page, js, close: async () => {
-      const used = entry === LAB_ENTRY ? await page.evaluate(() => [...(window.labUsed ?? [])]).catch(() => null) : null;
+      // undefined: the page has no lab, or it was loaded again and lost the
+      // record; null: the page is gone (it crashed, which fails its check).
+      const used = await page.evaluate(() => (window.labUsed ? [...window.labUsed] : window.lab ? 'reloaded' : undefined)).catch(() => null);
       await browser.close(); server.close();
-      guard(entry, used);
+      guard(path.normalize(entry), used);
     },
   };
 }
@@ -98,12 +100,23 @@ function guard(entry, used) {
   const files = scriptsOf(main, ROOT);
   const texts = [...files].map((f) => readFileSync(path.join(ROOT, f), 'utf8'));
   const fail = (why) => { console.log(`FAIL lab reach (19ak-3b): ${why}`); process.exit(1); };
+  const named = new Set([...files, ...[...files].flatMap((f, i) => [...namedPaths(texts[i], f, ROOT)])]);
   if (entry !== LAB_ENTRY) {
-    const named = new Set([...files].flatMap((f, i) => [...namedPaths(texts[i], f, ROOT)]));
-    if (!named.has(path.normalize(entry))) fail(`${main} opens the lab page ${entry}, which its code never names as a string, so the Mac's selection would not read it`);
-    return;
+    // A page the check writes itself (`npm run soapgpu` writes one per
+    // solver module into node_modules/.cache): what it imports from the
+    // repository must be named in the check's code, as a page under scripts/
+    // must be.
+    const inRepo = /^scripts\//.test(entry);
+    const wants = inRepo ? [entry] : [...readFileSync(path.join(ROOT, entry), 'utf8').matchAll(/\bfrom\s*['"]([^'"]+)['"]|^\s*import\s*['"]([^'"]+)['"]/gm)]
+      .map((m) => m[1] ?? m[2]).filter((s) => s.startsWith('.') || path.isAbsolute(s))
+      .map((s) => path.relative(ROOT, path.resolve(ROOT, path.dirname(entry), s))).filter((p) => !p.startsWith('..'));
+    const unnamed = wants.filter((p) => !named.has(p) && !named.has(p.replace(/\.(ts|tsx|js|mjs)$/, '')));
+    if (unnamed.length) fail(`${main} opens a lab page that reads ${unnamed.join(', ')}, which its code never names as a string, so the Mac's selection would not read it`);
+    // A page under scripts/ is read whole, its lab with it: no part to miss.
+    if (inRepo) return;
   }
-  if (!used) return;
+  if (used === 'reloaded') fail(`${main}'s lab page was loaded again after openLab, so the record of the parts it used is gone; wrap the lab again after the reload`);
+  if (!Array.isArray(used)) return;
   const seen = labKeysOf(texts);
   if (seen == null) return;
   const parts = labParts(readFileSync(path.join(ROOT, LAB_ENTRY), 'utf8'));

@@ -90,6 +90,14 @@ export function labParts(text) {
     if (b.name === 'api') {
       let key = null;
       for (const l of b.lines.slice(1)) {
+        // Several values handed out as they are, on one line (`  BeadField,
+        // rasterDrops,`): each is a part of its own, which reads its name.
+        const list = /^ {2}([A-Za-z_$][\w$]*(?:\s*,\s*[A-Za-z_$][\w$]*)+)\s*,?\s*$/.exec(l);
+        if (list) {
+          for (const n of list[1].split(',').map((x) => x.trim())) keyBody.set(n, (keyBody.get(n) ?? '') + n + '\n');
+          key = null;
+          continue;
+        }
         const k = /^ {2}(?:async\s+)?(?:get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*(?:[(:,]|$)/.exec(l);
         if (k) { key = k[1]; keyBody.set(key, (keyBody.get(key) ?? '') + l + '\n'); } else if (key) keyBody.set(key, keyBody.get(key) + l + '\n');
       }
@@ -189,7 +197,7 @@ export function resolveSpec(spec, root, from = LAB_ENTRY) {
 
 /*
   The scripts a running check is made of, for `lab.mjs`'s guard: the check's
-  own file and the relative imports it makes, followed. This is a subset of
+  own file and the relative imports its code makes, followed. This is a subset of
   what `checks.mjs`'s trace reads for the same check (the trace also follows
   every path string), so a part this finds the reach scan finds too.
 */
@@ -202,7 +210,7 @@ export function scriptsOf(file, root) {
     let text;
     try { text = fs.readFileSync(path.join(root, f), 'utf8'); } catch { continue; }
     out.add(f);
-    for (const m of text.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)['"](\.\.?\/[^'"]+)['"]/gm)) {
+    for (const m of codeOf(text).matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)['"](\.\.?\/[^'"]+)['"]/gm)) {
       const p = path.normalize(path.join(path.dirname(f), m[1]));
       if (/\.(mjs|js)$/.test(p) && p.startsWith('scripts/')) todo.push(p);
     }
