@@ -64,6 +64,16 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   in Sound… steps aside while Music & Drone is on the tab, the set's button says "Save set", and
   `npm run shelf` reaches the shelf through Setup and runs in the browser shard. Story in
   `docs/plan-shipped.md` §35c-5.
+- ~~**35c-6** The Recipe a strip of its own, and the Rides shown whole.~~ **Shipped** 2026-11-07:
+  the Recipe adds six controls no ride has (8 of its own on Perform, was 2), and the Rides are one
+  line each so all eight, Macro Zoom among them, show under the Bottles at 1440×900 and 1512×860
+  (was 3 and 2). Story in `docs/plan-shipped.md` §35c-6. Left from it:
+  - **35c-6a** At 1280×800 the Rides show 7 of 8 (Evolve Speed under the fold), and the right
+    column still scrolls with its scrollbar hidden, so a strip longer than the column says nothing
+    about what is below. A fade at the cut, or the Bottles folding to one row when the column is short.
+  - **35c-6b** On Perform at 1440 the deck's Macro panel (and Squish, Lens) start off the right of
+    the screen, and the deck's sideways scroll has no mark either: the closeup's own dials (aim,
+    camera, depth) are as hard to find as its zoom was.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

@@ -348,16 +348,30 @@ export const onSettingStep = (key: string, value: number): number => {
 export type DeskSurface = 'perform' | 'design';
 
 /**
- * What Design's recipe starts as: the eight a look is actually built from.
+ * What Design's recipe starts as: the controls a look is actually built from.
  *
  * It used to be a constant inside the bench, which is why the bench could not
  * be changed — the eight were the right eight and also the only eight.
+ *
+ * The owner (2026-11-07): "the recipe box only has two controls?" The first
+ * eight are the owner's, and six of them (Speed, Turbulence, Soap Bursts, Beat
+ * Squeeze, Macro Zoom, Evolve Speed) are rides too. Since a tab could hold
+ * both strips, one control is drawn in one place (`drawnElsewhere` in
+ * deskLayout.ts) and the Rides keep theirs, so on the Perform tab that ships
+ * the Recipe drew Swirl and Gravity and a line saying where the rest were.
+ * The rule is right; the strip was a copy of the other one. The six after
+ * the owner's eight are look-building controls that no ride and no panel on
+ * Perform's deck already has: the oil's tension, the bubbles, the colour's
+ * saturation and sheen, the lamp's warmth and the hue's journey. On Perform
+ * the Recipe draws eight of its own again, and on a tab without the Rides it
+ * draws all fourteen (`MAX_PINS`). `npm run desklayout` counts them.
  */
 export const DEFAULT_RECIPE: (keyof VisualizerSettings)[] = [
   // Granulation is off the strip: it made a few jagged cuts in the dye and
   // read as a fault. The physics dials in its place each do something large.
   'globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright',
   'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate',
+  'oilTension', 'bubbles', 'saturationBoost', 'iridescence', 'lampWarmth', 'hueJourney',
 ];
 
 /*
@@ -406,6 +420,7 @@ const SHIPPED: Record<DeskSurface, string[][]> = {
   ],
   design: [
     ['globalSpeed', 'turbulenceScale', 'audioImpact', 'beatSqueeze', 'bloom', 'granulation', 'macroZoom', 'automateRate'],
+    ['globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate'],
   ],
 };
 const sameSet = (a: readonly string[], b: readonly string[]) =>

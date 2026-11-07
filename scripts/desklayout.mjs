@@ -388,6 +388,16 @@ console.log('\n The operations');
     rides.every(k => n.get(k)?.join() === 'rides') && recipe.filter(k => !rides.includes(k)).every(k => n.get(k)?.join() === 'recipe')
     && left.get('physics:vorticityConfinement') === 'recipe' && left.get('macro:macroZoom') === 'rides' && left.get('recipe:globalSpeed') === 'rides',
     `Swirl on ${n.get('vorticityConfinement')?.join()}; Zoom on ${n.get('macroZoom')?.join()}; Speed on ${n.get('globalSpeed')?.join()}`);
+  /*
+    The owner (2026-11-07): "the recipe box only has two controls?" The rule
+    above was right and the Recipe still came out as Swirl and Gravity, because
+    six of its eight were rides too. What is drawn on the Recipe on the tab
+    that ships has to be a strip in its own right: at least eight of its own,
+    two full rows of its four-wide knobs. Two (the build before the fix) fails.
+  */
+  const recipeOwn = recipe.filter(k => n.get(k)?.join() === 'recipe');
+  check('on Perform the Recipe draws at least eight controls of its own, not two and a list of where the rest went',
+    recipeOwn.length >= 8, `the Recipe draws ${recipeOwn.length}: ${recipeOwn.join(', ')}`);
   // Closing the Rides gives the Recipe its whole strip back: nothing was taken off it, only not drawn twice.
   const back = drawn(closePanel(perform, 'rides'));
   check('and with the Rides closed the Recipe draws all of its own again',

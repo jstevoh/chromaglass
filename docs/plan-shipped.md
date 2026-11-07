@@ -6833,6 +6833,27 @@ Checks. `panel` asks each pair from both ends (the home there, the copy gone), i
 main's components, 264/264 after (two more for the leftovers); the no-controller check that asked for the Rides' button now asks
 for the MIDI light's words and no second route.
 
+### 35c-6. The Recipe a strip of its own, and the Rides shown whole (shipped 2026-11-07)
+
+The owner, 2026-11-07: "where is the macro zoom control? and the recipe box only has two
+controls? lets fix that." Neither had been deleted. 35c-4's rule (one control, one place on a
+tab, the Rides keep theirs) was right, but six of the Recipe's eight (Speed, Turbulence, Soap
+Bursts, Beat Squeeze, Macro Zoom, Evolve Speed) were rides too, so on the Perform tab that ships
+the Recipe drew Swirl and Gravity and a line saying where the rest were. Macro Zoom's one copy
+was the seventh of the Rides, which on Perform sit under the Bottles: at 1440×900 the right
+column left them room for three of their 88 px two-line rows, and the strip scrolled with its
+scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off the right of the deck.
+
+- The Recipe keeps the owner's eight and adds six look-building controls no ride and no panel on
+  Perform's deck has: Oil Tension, Bubbles, Saturation, Iridescence, Lamp Warmth, Hue Journey
+  (`DEFAULT_RECIPE`, 14 = `MAX_PINS`). The old eight read as the default, so a strip saved as
+  them gets the new one. `npm run desklayout`: the Recipe draws 8 of its own on Perform (2 before).
+- The owner chose denser faders (of: a zoom on the plate bar, Macro Zoom to the top of the Rides,
+  denser faders). The Rides are one line each (`Slider dense`: name, travel, value; 24 px rows on
+  an 18 px handle; full rows still on touch), and Choose shares the bottom row with Mixer and
+  Drain. `npm run layout`: every ride shows whole, Macro Zoom among them, at 1440×900 (3 of 8
+  before) and 1512×860 (2 of 8 before).
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
