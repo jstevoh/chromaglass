@@ -36,6 +36,21 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reads six times across the same 600 ms and wants four held (a press laid once and not
   renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
   --check 'holding the Press lifts nothing'` a week after merge.
+- **19aa-13. `renders` and `squeeze` hold a window until it has the frames or steps its
+  line asks (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-13.
+- **19aa-14. `renders`' "the App renders for its clock and no more" reds on GitHub's Macs:
+  commits outrun renders (found 2026-11-07).** Six `open` shard runs on five PRs read the
+  line at 1.6 to 2.3 commits a second against a bar of 1.5, with plenty of frames (85 to
+  110 a window) and the band lines green beside them: "no sound, the Perform desk" on #435
+  (10-30, 1.3 renders/s and 2.3 commits/s), #595 (2.0) and #670 (2.3); "a gamepad stick
+  sweeping" on #605 (1.6); "a gamepad trigger held" on #640 and #669 (1.7). Commits above
+  renders means something besides the App commits about once a second in a 3 s window; the
+  earlier sighting is 19ad-6. Find which component commits (React's devtools hook can name
+  the fiber `onCommitFiberRoot` was given) before any bar moves. Also seen: `open()` waits
+  up to 30 s for one second of fifteen frames, so a page on a Mac drawing under fifteen
+  waits the full 30 s (it prints "never drew fifteen frames"; not yet counted in the logs);
+  it could wait for the plate to draw at all instead, now that each window holds itself
+  open for its frames.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s

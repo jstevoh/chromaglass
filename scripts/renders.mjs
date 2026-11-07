@@ -193,9 +193,10 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
   await page.waitForTimeout(5000);
   /*
     And, where a plate draws, until it draws: a second at a time, at most
-    thirty, until one second holds the fifteen frames the lines below ask of
-    each window (45 in 3 s). What was seen (`npm run flakes`, the week to
-    2026-10-24): the laptop's band lines red on 8 of 191 Mac runs, every one
+    thirty, until one second holds fifteen frames, the rate at which the
+    lines below fill a three-second window (on a slower plate they hold
+    a window open past three seconds for their 45 frames: `heldOpen`).
+    What was seen (`npm run flakes`, the week to 2026-10-24): the laptop's band lines red on 8 of 191 Mac runs, every one
     in the first window and every second window fine, the plate drawing 0.0,
     1.7, 1.9, 9.9, 10.8, 12.2, 13.6 and 14.5 frames a second there against
     16.5 to 28.4 in the next. Five seconds in, the page was still opening on
@@ -221,19 +222,63 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
   return { page, ctx };
 }
 
-/** Two windows of three seconds each, both held to the bars: a burst in either is red. */
+/*
+  Two windows, both held to the bars: a burst in either is red. Each is at
+  least three seconds and, where a plate draws, held open until the plate
+  has drawn FRAMES_ASKED frames, at most WINDOW_CAP_MS (PLAN 19aa-13).
+
+  It was a fixed three seconds until 2026-11-07, and the lines that read
+  frames ask 45 of them, so on the Mac it asked fifteen frames a second as
+  well as what each line says. GitHub's Macs draw this page at 11 to 19
+  frames a second, so "the ear is reading" went red 16 times there with its
+  ratio green: #656 read 18.3 a second for 11.3 frames a second, and #546,
+  #645 and #435 had a reading on 0.98 to 1.00 of the frames, each its own,
+  over 40 to 43 frames in one phone window. No line claims a frame rate: the ear promises a reading on
+  every frame the plate draws, whatever rate the machine keeps, and the 45
+  is there so a ratio is taken over enough frames to mean something. So the
+  window is held until it has them, and every bar is unchanged: the counts
+  with a ceiling are still rates over the first three seconds, the ratios
+  are over the whole window's frames, and the 45 is still asked by each
+  line. A plate drawing under 4.5
+  frames a second never fills a window and is red as before. How long each
+  window took is printed beside the line, and a window held past three
+  seconds says so.
+*/
+const FRAMES_ASKED = 45;
+const WINDOW_CAP_MS = 10_000;
+/** The window from `a` held open past `b` until the plate has drawn FRAMES_ASKED frames, or the cap. */
+async function heldOpen(page, a, b) {
+  // Both counters move on every live frame (LiquidVisualizer's loop); the lines read one or the other.
+  while (PLATE && Math.min(b.frames - a.frames, b.rideFrames - a.rideFrames) < FRAMES_ASKED && b.t - a.t < WINDOW_CAP_MS) {
+    await page.waitForTimeout(250);
+    b = await sample(page);
+  }
+  return b;
+}
 async function measure(page) {
   const out = [];
   for (let i = 0; i < 2; i++) {
     const a = await sample(page);
     await page.waitForTimeout(3000);
-    const b = await sample(page);
+    const b3 = await sample(page);
+    const b = await heldOpen(page, a, b3);
     const s = (b.t - a.t) / 1000;
+    /*
+      The counts with a ceiling (renders, commits, what React is told, the
+      desk's moves) are read over the first three seconds whatever the
+      window, as they always were (check-skeptic): spread over a held window
+      of up to ten, a burst of renders that was red at +5 a second in three
+      would read under its bar. What is asked per frame is read over the
+      whole window: the frames, what the ear and the plate did on them, and
+      the desk's moves beside the plate's (one ratio, one window).
+    */
+    const s3 = (b3.t - a.t) / 1000;
     out.push({
-      renders: (b.renders - a.renders) / s,
-      commits: (b.commits - a.commits) / s,
+      renders: (b3.renders - a.renders) / s3,
+      commits: (b3.commits - a.commits) / s3,
+      published: (b3.published - a.published) / s3,
+      deskMoves: (b3.deskMoves - a.deskMoves) / s3,
       reads: (b.reads - a.reads) / s,
-      published: (b.published - a.published) / s,
       frames: b.frames - a.frames,
       frameRate: (b.frames - a.frames) / s,
       fresh: b.fresh - a.fresh,
@@ -241,13 +286,15 @@ async function measure(page) {
       rideFrames: b.rideFrames - a.rideFrames,
       rideRate: (b.rideFrames - a.rideFrames) / s,
       laid: b.laid - a.laid,
-      deskMoves: (b.deskMoves - a.deskMoves) / s,
+      heldDeskMoves: (b.deskMoves - a.deskMoves) / s,
       drawnMoves: (b.drawnMoves - a.drawnMoves) / s,
       offered: (b.offered - a.offered) / s,
+      seconds: s,
     });
   }
   return out;
 }
+const heldFor = (w) => (w.some(x => x.seconds > 3.5) ? ` (frames over windows of ${w.map(x => x.seconds.toFixed(1)).join(' and ')} s)` : '');
 
 /*
   What else may render the App, a second, beside the ear's ten: the Perform
@@ -273,8 +320,8 @@ try {
         runner's app has drawn 28 a second).
       */
       check(`${screen.name}, the band: the ear is reading`,
-        w.every(x => (PLATE ? x.frames >= 45 && x.reads >= 0.9 * x.frameRate : x.reads >= 45)),
-        w.map(x => `${f(x.reads)}/s${PLATE ? ` for ${f(x.frameRate)} frames/s` : ''}`).join(', '));
+        w.every(x => (PLATE ? x.frames >= FRAMES_ASKED && x.reads >= 0.9 * x.frameRate : x.reads >= 45)),
+        w.map(x => `${f(x.reads)}/s${PLATE ? ` for ${f(x.frameRate)} frames/s, ${x.frames} frames` : ''}`).join(', ') + heldFor(w));
       check(`${screen.name}, the band: React is told what the ear heard eight to ten and a half times a second`,
         w.every(x => x.published >= 8 && x.published <= 10.5), w.map(x => `${f(x.published)}/s`).join(', '));
       check(`${screen.name}, the band: the App renders for each of those and at most ${ALLOWED_EXTRA} a second besides`,
@@ -287,8 +334,8 @@ try {
         w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', '));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
-        check(hears, w.every(x => x.frames >= 45 && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
-          w.map(x => `${x.fresh} new and ${x.ownFrame} its own of ${x.frames} frames`).join(', '));
+        check(hears, w.every(x => x.frames >= FRAMES_ASKED && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
+          w.map(x => `${x.fresh} new and ${x.ownFrame} its own of ${x.frames} frames`).join(', ') + heldFor(w));
       } else skip(hears, `no plate draws here (${w.map(x => x.frames).join(', ')} frames); held on the Mac`);
       await ctx.close();
     }
@@ -369,7 +416,7 @@ try {
         frame whose newest message differs from the last frame's): a working
         ride reads close to 1.0 there. A plate fed by React's 7 to 10.5 a
         second changes at most that often, against a floor of 0.9 of the
-        frames offered, which is 12.6 and up at the 45 frames in 3 s this
+        frames offered, which is 12.6 and up at the 45 frames a window this
         asks (the stub offers a new value on nearly every frame below 30 a
         second). The quarter over the desk's stays whatever the rate: it
         fails a plate fed by React by itself, at any rate the line allows.
@@ -379,8 +426,8 @@ try {
       */
       const laidLine = `${screen.name}, a fader: the plate's Dimmer moves on nine frames in ten that were offered a new value, and more often than the desk's`;
       if (PLATE) {
-        check(laidLine, w.every(x => x.rideFrames >= 45 && x.offered > 0 && x.drawnMoves >= 0.9 * x.offered && x.drawnMoves >= 1.25 * x.deskMoves && x.laid > 0),
-          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.offered)} offered a new value (${(x.drawnMoves / Math.max(1e-9, x.offered)).toFixed(2)}) of ${f(x.rideRate)} frames/s, for ${f(x.deskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', '));
+        check(laidLine, w.every(x => x.rideFrames >= FRAMES_ASKED && x.offered > 0 && x.drawnMoves >= 0.9 * x.offered && x.drawnMoves >= 1.25 * x.heldDeskMoves && x.laid > 0),
+          w.map(x => `${f(x.drawnMoves)}/s drawn on ${f(x.offered)} offered a new value (${(x.drawnMoves / Math.max(1e-9, x.offered)).toFixed(2)}) of ${f(x.rideRate)} frames/s, for ${f(x.heldDeskMoves)} on the desk, ${x.laid} of ${x.rideFrames} frames laid`).join(', ') + heldFor(w));
       } else skip(laidLine, `no plate draws here (${w.map(x => x.rideFrames).join(', ')} frames); held on the Mac`);
       // Let go, and give the last tenth of a second time to reach React.
       const at = await page.evaluate(() => { clearInterval(window.__sweep); return window.__faderAt; });
@@ -391,8 +438,8 @@ try {
       const still = await measure(page);
       const stillLine = `${screen.name}, a fader let go: no frame lays a ride, and the App renders for its clock alone (0.6 to 1.5 a second)`;
       check(stillLine,
-        still.every(x => x.laid === 0 && x.renders >= 0.6 && x.renders <= 1.5) && (!PLATE || still.every(x => x.rideFrames >= 45)),
-        still.map(x => `${x.laid} laid of ${x.rideFrames} frames, ${f(x.renders)} renders/s`).join(', '));
+        still.every(x => x.laid === 0 && x.renders >= 0.6 && x.renders <= 1.5) && (!PLATE || still.every(x => x.rideFrames >= FRAMES_ASKED)),
+        still.map(x => `${x.laid} laid of ${x.rideFrames} frames, ${f(x.renders)} renders/s`).join(', ') + heldFor(still));
       await page.evaluate(() => cancelAnimationFrame(window.__deskWatch));
       await ctx.close();
     }
@@ -407,8 +454,8 @@ try {
         quiet for the wrong reason.
       */
       check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= 45)),
-        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', '));
+        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= FRAMES_ASKED)),
+        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + heldFor(w));
       await ctx.close();
     }
     {
@@ -443,14 +490,16 @@ try {
         places.push(await page.evaluate(() => { const r = document.querySelector('[data-testid="gamepad-cursor"]'); return r ? `${r.style.left},${r.style.top}` : null; }));
         await page.waitForTimeout(250);
       }
+      // Its clock's renders over these three seconds, its frames over the held window (as in `measure`).
       const b = await sample(page);
+      const bf = await heldOpen(page, a, b);
       const s = (b.t - a.t) / 1000;
       const moved = new Set(places.filter(Boolean)).size;
       check(`${screen.name}, a gamepad stick sweeping: the ring is on the page and changes place`,
         places.every(Boolean) && moved >= 5 && (await ringAt())?.on, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
       check(`${screen.name}, a gamepad stick sweeping: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || b.frames - a.frames >= 45),
-        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s`);
+        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || bf.frames - a.frames >= FRAMES_ASKED),
+        `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s; ${bf.frames - a.frames} frames in ${((bf.t - a.t) / 1000).toFixed(1)} s`);
       // The stick let go and the right trigger held: the ring swells and stays where it is.
       await page.evaluate(() => { clearInterval(window.__sweep); window.__pad.axes = [0, 0, 0, 0]; window.__pad.rt = 1; });
       await page.waitForTimeout(1000);
@@ -458,12 +507,13 @@ try {
       const c = await sample(page);
       await page.waitForTimeout(3000);
       const d = await sample(page);
+      const df = await heldOpen(page, c, d);
       const after = await ringAt();
       const held = after ? after.width : null;
       const s2 = (d.t - c.t) / 1000;
       check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the App renders for its clock and no more`,
-        held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || d.frames - c.frames >= 45),
-        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s`);
+        held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || df.frames - c.frames >= FRAMES_ASKED),
+        `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s; ${df.frames - c.frames} frames in ${((df.t - c.t) / 1000).toFixed(1)} s`);
       await ctx.close();
     }
   }
