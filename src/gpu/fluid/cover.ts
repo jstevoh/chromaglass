@@ -9,8 +9,64 @@
 
 import { FluidReads } from './reads';
 import type { GpuStepParams } from '../solverTypes';
+import { THIN_GAP_THICKNESS, thinGapViscosity } from './constants';
+import { DISH_METRES, DISH_REST_GAP, DISH_GAP_FIELD_METRES } from '../../lib/turntable';
+import { COVER_FULL_ML, COVER_GLASS_G, coverNew, coverAdd, coverStep, type CoverState } from '../../lib/cover';
 
 export class FluidCover extends FluidReads {
+  /** The liquid's ledger under the glass (lib/cover.ts); null until the first step, and again after a clear. */
+  protected cover: CoverState | null = null;
+  /** The Liquid dial as last read, so a turn of it is liquid added or taken off. */
+  private coverMl = COVER_FULL_ML;
+  /** Poured since the last step, m³ (pour). */
+  private coverPoured = 0;
+  /** The cover's gap, in gap units (0.03 is 2 mm): the uniform S.cover, and what the field was last laid or shifted to. */
+  protected coverGap = DISH_REST_GAP;
+  private coverLaid = DISH_REST_GAP;
+
+  /**
+   * The glass on its liquid, one step (lib/cover.ts coverStep): the dial's
+   * turn and the step's pours into the ledger, then the glass settles or
+   * lifts. Before writeSim, so the step's kernels read this step's cover.
+   */
+  protected coverAdvance(p: GpuStepParams): void {
+    const ml = Number.isFinite(p.liquidMl) ? p.liquidMl! : COVER_FULL_ML;
+    if (!this.cover) {
+      this.cover = coverNew(ml);
+      this.coverPoured = 0;
+    } else if (ml !== this.coverMl) coverAdd(this.cover, (ml - this.coverMl) * 1e-6);
+    this.coverMl = ml;
+    if (this.coverPoured > 0) coverAdd(this.cover, this.coverPoured);
+    this.coverPoured = 0;
+    const h = coverStep(this.cover, Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60)), {
+      nu: thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS),
+      grams: Number.isFinite(p.coverGrams) ? p.coverGrams! : COVER_GLASS_G,
+      hand: p.coverHand ?? 0,
+    });
+    this.coverGap = h / DISH_GAP_FIELD_METRES;
+  }
+
+  /**
+   * A pour's volume goes into the ledger as well as into the thin solve: the
+   * take of a column over a dome of πr²/2 at the live gap (lib/liquidProps.ts
+   * pourShare, the other way round). The glass rises by it next step, and the
+   * solve's source and the glass's rise cancel at the rim: a pour under a
+   * glass the edge still holds spills nothing.
+   */
+  pour(x: number, y: number, radius: number, take: number, sp: Parameters<FluidReads['pour']>[4], volume = true): void {
+    super.pour(x, y, radius, take, sp, volume);
+    if (volume && radius > 0 && take > 0 && this.hsPour) {
+      const r = radius * DISH_METRES;
+      this.coverPoured += take * (Math.PI * r * r) / 2 * this.coverGap * DISH_GAP_FIELD_METRES;
+    }
+  }
+
+  /** A cleared plate is a fresh one: the dial's liquid, the glass where it rests on it. */
+  clear(): void {
+    super.clear();
+    this.cover = null;
+  }
+
   /** The gap's shape: laid on a new plate, shifted on a new curve (the squeeze stage's first job). */
   protected gapShape(pass: GPUComputePassEncoder, p: GpuStepParams): void {
     /*
@@ -48,14 +104,23 @@ export class FluidCover extends FluidReads {
       this.lastCurve = p.plateCurve;
       this.hsPrimed = false;
       this.phaseGapPrimed = false;
-    } else if (this.lastCurve !== p.plateCurve) {
+    } else if (this.lastCurve !== p.plateCurve || this.coverGap !== this.coverLaid) {
       this.run(pass, 'gapReshape', this.squeeze.write, [this.squeeze.read],
-        this.arg('gap reshape', [this.lastCurve, p.plateCurve, 0, 0]));
+        this.arg('gap reshape', [this.lastCurve, p.plateCurve, this.coverLaid, this.coverGap]));
       this.squeeze.swap();
+      /*
+        New glasses, not a press: a thin gap takes the new shape as it is. A
+        cover moving on its liquid is the other case. It is a squeeze, so the
+        solve is left primed and hsDivergence turns the shift, through its
+        gap from before, into flow: liquid drawn in at the rim under a rising
+        glass that nothing poured, pushed out over it under a settling one.
+      */
+      if (this.lastCurve !== p.plateCurve) {
+        this.hsPrimed = false;
+        this.phaseGapPrimed = false;
+      }
       this.lastCurve = p.plateCurve;
-      // New glasses, not a press: a thin gap takes the new shape as it is.
-      this.hsPrimed = false;
-      this.phaseGapPrimed = false;
     }
+    this.coverLaid = this.coverGap;
   }
 }

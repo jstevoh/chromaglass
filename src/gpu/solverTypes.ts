@@ -147,6 +147,16 @@ export interface GpuStepParams {
   /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
   gapThickness?: number;
   /**
+   * The liquid on the plate and the cover glass on it (PLAN 38r-5,
+   * lib/cover.ts): Liquid in mL (a change is liquid added or wicked off at the
+   * rim), Cover weight in grams, and a two-finger pinch's hand on the glass,
+   * −1 lifting to 1 pressing. Absent, the plate holds today's 62.8 mL under a
+   * 157 g glass, which is today's 2 mm.
+   */
+  liquidMl?: number;
+  coverGrams?: number;
+  coverHand?: number;
+  /**
    * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
    * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the
    * lab sets it, to hold a check against a ferrofluid as thick as the clear

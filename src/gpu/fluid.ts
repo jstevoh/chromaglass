@@ -406,6 +406,7 @@ export class WebGPUFluid extends FluidCover {
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     f[49] = p.surfaceClear ? 1 : 0;
     f[50] = fin(p.dimmer, 1) * LAMP_HEATING;
+    f[51] = this.coverGap;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -484,6 +485,7 @@ export class WebGPUFluid extends FluidCover {
     if (!thin) this.hsPrimed = false;
     if (!this.phaseLive) this.phaseGapPrimed = false;
     this.thinLive = thin;
+    this.coverAdvance(p);
     this.writeSim(p, disp);
     if (p.rawSim) {
       p.rawSim(this.simF);
