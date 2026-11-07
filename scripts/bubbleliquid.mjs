@@ -100,7 +100,7 @@
  * check runs the plate's own liquid, and `default` here is why it may.
  */
 import { build } from 'esbuild';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const OWED_IDS = ['cell', 'default', 'bretherton', 'local', 'drain', 'shape', 'rim', 'dissolve', 'wired'];
@@ -129,8 +129,14 @@ const { BubbleField } = await bundle('src/lib/bubbles.ts');
 const { makeRng } = await bundle('src/lib/rng.ts');
 const { DEFAULT_LIQUID_TYPES } = await bundle('src/bottles.ts');
 const { DISH_GAP_METRES } = await bundle('src/lib/turntable.ts');
+/*
+  A bubbleLiquid.ts that is there and does not build is red, not main's: a
+  broken file must not keep every line excused as owed.
+*/
 let bl = null;
-try { bl = await bundle('src/lib/bubbleLiquid.ts'); } catch { bl = null; }
+if (existsSync('src/lib/bubbleLiquid.ts')) {
+  try { bl = await bundle('src/lib/bubbleLiquid.ts'); } catch (e) { check('src/lib/bubbleLiquid.ts builds', false, String(e?.message ?? e).split('\n')[0]); bl = {}; }
+}
 const liquidAtCell = typeof bl?.liquidAtCell === 'function' ? bl.liquidAtCell : null;
 const pouredOf = typeof bl?.pouredOf === 'function' ? bl.pouredOf : null;
 const hasSpecies = typeof BubbleField.prototype.species === 'function';
@@ -153,6 +159,16 @@ const shelf = (id) => {
   return { sigma: b.tension / 1000, rho: b.density * 1000, lnNu: Math.log((b.viscosity / b.density) * 1e-6 / NU_W) };
 };
 const ALCOHOL = shelf('alcohol'), SYRUP = shelf('syrup'), GLYCERINE = shelf('glycerine');
+/*
+  Where a whole-liquid line pours: rows below the middle (y past 112.5 of
+  192), and the pockets put at y 140, inside it. Not the whole plate: a
+  pour over everything lets a build that reads one liquid for the plate
+  (its middle, its mean share, the first pocket's cell) pass every line,
+  as the check-skeptic showed on the first draft of this file. A pocket
+  read at the plate's middle here reads the clear oil.
+*/
+const LOW_ROWS = (ix, iy) => iy >= L / 2 + 4;
+const POCKET_Y = 140;
 
 /** A snapshot with share `r` of liquid `liq` wherever `where(ix, iy)` says, nothing elsewhere. */
 const snapshot = (liq, r = 1, where = () => true) => {
@@ -182,7 +198,7 @@ const put = (f, x, y, r) => {
 const still = () => [0, 0];
 const rel = (a, b) => Math.abs(a / b - 1);
 const pct = (x) => `${(x * 100).toFixed(2)}%`;
-const pour = (f, liq, where) => f.species(snapshot(liq, 1, where), { sigma: liq.sigma, rho: liq.rho });
+const pour = (f, liq, where = LOW_ROWS) => f.species(snapshot(liq, 1, where), { sigma: liq.sigma, rho: liq.rho });
 
 // ── cell ─────────────────────────────────────────────────────────────
 if (!api) line('cell', 'the liquid at a cell is the plate\'s with nothing poured, and the poured mix by the thin gap\'s rule', false, missing, mains);
@@ -209,7 +225,7 @@ else {
     && halfLiq.mu < arithmetic / 4
     && rel(inPool, wantWhole.mu) < 0.005 && outPool === plate.mu
     && ret === out
-    && rel(gly.sigma, 0.0634) < 1e-6 && rel(gly.rho, 1261) < 1e-6
+    && rel(gly.sigma, GLYCERINE.sigma) < 1e-9 && rel(gly.rho, GLYCERINE.rho) < 1e-9
     && own.sigma === plate.sigma && rel(own.rho, 1100) < 1e-6;
   line('cell', 'the liquid at a cell is the plate\'s with nothing poured, and the poured mix by the thin gap\'s rule', ok,
     `nothing poured ${same(none, plate) && same(empty, plate) ? 'the plate to the bit' : 'NOT the plate'}; glycerine μ ${(whole.mu * 1000).toFixed(0)} mPa·s (want ${(wantWhole.mu * 1000).toFixed(0)}), σ ${(whole.sigma * 1000).toFixed(1)} mN/m, ρ ${whole.rho.toFixed(0)}; half and half μ ${(halfLiq.mu * 1000).toFixed(1)} mPa·s (Arrhenius ${(wantHalf.mu * 1000).toFixed(1)}, arithmetic ${(arithmetic * 1000).toFixed(0)}); pool at x 40 ${(inPool * 1000).toFixed(0)}, at x 56 ${(outPool * 1000).toFixed(1)} mPa·s; out ${ret === out ? 'filled' : 'a new object'}; glycerine bottle σ ${gly.sigma} ρ ${gly.rho}, owner's bottle σ ${own.sigma} ρ ${own.rho}`,
@@ -221,17 +237,20 @@ else {
 const scenario = (prep) => {
   const f = field(11);
   prep(f);
-  put(f, 80, 96, 3); put(f, 80 + 6 * 0.94, 96, 3);           // pressed: merges after its drain (4 s or so)
+  put(f, 80, 96, 3); put(f, 80 + 6 * 0.94, 96, 3);           // pressed: merges after its drain (about 7 s in the oil)
   put(f, 60, 60, 2); put(f, 130, 70, 5); put(f, 110, 130, 8);
-  put(f, 96 + N / 2 - 4.5, 96, 3);                             // at the rim: leaves
-  const shear = (x, y) => [0.004 * Math.sin(y / 20) + (x < 83 ? 0.01 : -0.01) * (Math.abs(y - 96) < 6 ? 1 : 0), 0.003 * Math.cos(x / 25)];
+  put(f, 96 + N / 2 - 2.5, 96, 3);                             // its edge past the open rim (OPEN_RIM 0.5): leaves at once
+  // The pair sits in a still box that presses it together; the rest of the plate shears. The tilt and the shake come after the merge (about 434 steps), or they carry the pair apart before its film drains.
+  const shear = (x, y) => (Math.abs(x - 83) < 14 && Math.abs(y - 96) < 14) ? [x < 83 ? 0.01 : -0.01, 0] : [0.004 * Math.sin(y / 20), 0.003 * Math.cos(x / 25)];
   const trace = [];
-  for (let t = 0; t < 420; t++) {
-    f.step(dt, shear, 0.00005, -0.0001, t > 300 ? 0.3 : 0);
+  let merges = 0, pops = 0;
+  for (let t = 0; t < 900; t++) {
+    f.step(dt, shear, t > 500 ? 0.00005 : 0, t > 500 ? -0.0001 : 0, t > 600 ? 0.3 : 0);
+    for (const e of f.events) { if (e.kind === 'merge') merges++; else if (e.kind === 'pop') pops++; }
     for (const b of f.bubbles) trace.push(b.x, b.y, b.r, b.film, b.sx, b.sy);
     trace.push(f.bubbles.length);
   }
-  return { trace, events: f.bubbles.length };
+  return { trace, left: f.bubbles.length, merged: merges, popped: pops };
 };
 if (!api) line('default', 'with nothing poured every pocket moves to the bit as the plate\'s own liquid moves it', false, missing, mains);
 else {
@@ -239,10 +258,12 @@ else {
   const nulled = scenario((f) => f.species(null, null));
   const nothing = scenario((f) => f.species(snapshot(GLYCERINE, 0), { sigma: GLYCERINE.sigma, rho: GLYCERINE.rho }));
   const eq = (a, b) => a.trace.length === b.trace.length && a.trace.every((v, i) => Object.is(v, b.trace[i]));
+  // The scenario must do what it says, or a build wrong in the merge or at the rim passes it: one merge, one pocket out.
+  const did = bare.merged === 1 && bare.popped === 1 && bare.left === 4 && bare.trace.every(Number.isFinite);
   let diffAt = -1;
   for (let i = 0; i < Math.max(bare.trace.length, nothing.trace.length); i++) if (!Object.is(bare.trace[i], nothing.trace[i])) { diffAt = i; break; }
-  line('default', 'with nothing poured every pocket moves to the bit as the plate\'s own liquid moves it', eq(bare, nulled) && eq(bare, nothing),
-    `${bare.trace.length} numbers over 420 steps (${bare.events} pockets left); species(null) ${eq(bare, nulled) ? 'identical' : 'differs'}, an empty snapshot ${eq(bare, nothing) ? 'identical' : `differs from number ${diffAt}`}`,
+  line('default', 'with nothing poured every pocket moves to the bit as the plate\'s own liquid moves it', did && eq(bare, nulled) && eq(bare, nothing),
+    `${bare.trace.length} numbers over 900 steps (${bare.merged} merge, ${bare.popped} out at the rim, ${bare.left} pockets left${bare.trace.every(Number.isFinite) ? '' : ', NOT all finite'}); species(null) ${eq(bare, nulled) ? 'identical' : 'differs'}, an empty snapshot ${eq(bare, nothing) ? 'identical' : `differs from number ${diffAt}`}`,
     mains);
 }
 
@@ -254,7 +275,7 @@ else {
     const plate = plateOf(f);
     if (liq) pour(f, liq);
     const want = liq ? expected(plate, liq, 1) : plate;
-    const b = put(f, 70, 96, 4);
+    const b = put(f, 70, POCKET_Y, 4);
     const u = 0.04, flow = () => [u, 0];
     const x0 = b.x;
     for (let t = 0; t < 60; t++) f.step(dt, flow, 0, 0, 0);
@@ -295,7 +316,7 @@ else {
     const plate = plateOf(f);
     if (liq) pour(f, liq);
     const want = liq ? expected(plate, liq, 1) : plate;
-    const a = put(f, 80, 96, 6), c = put(f, 80 + 12 * 0.94, 96, 6);
+    const a = put(f, 80, POCKET_Y, 6), c = put(f, 80 + 12 * 0.94, POCKET_Y, 6);
     const mid = (a.x + c.x) / 2;
     const press = (x) => [x < mid ? 0.002 : -0.002, 0];
     let frames = 0;
@@ -318,7 +339,7 @@ else {
     const plate = plateOf(f);
     if (liq) pour(f, liq);
     const want = liq ? expected(plate, liq, 1) : plate;
-    const b = put(f, 96, 96, 20);
+    const b = put(f, 96, POCKET_Y, 20);
     b.sx = 0.3; b.sy = 0;
     const R = b.r * M;
     f.step(dt, still, 0, 0, 0);
@@ -337,7 +358,8 @@ else {
   const empty = (liq) => {
     const f = field();
     const plate = plateOf(f);
-    if (liq) pour(f, liq);
+    // Its pocket is at the right-hand rim, mid-height: the pool is the right-hand columns.
+    if (liq) pour(f, liq, (ix) => ix >= L / 2 + 4);
     const want = liq ? expected(plate, liq, 1) : plate;
     const r = 6;
     const b = put(f, 96 + N / 2 - r - 0.5, 96, r);
@@ -363,7 +385,7 @@ else {
     if (liq) pour(f, liq);
     const want = liq ? expected(plate, liq, 1) : plate;
     f.dissolve = 1e9;
-    const b = put(f, 96, 96, 10);
+    const b = put(f, 96, POCKET_Y, 10);
     const a0 = b.r * b.r;
     f.step(dt, still, 0, 0, 0);
     return { got: a0 - b.r * b.r, want };
@@ -379,19 +401,23 @@ else {
 // ── wired ────────────────────────────────────────────────────────────
 {
   const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
-  const types = /speciesSnapshot\?\s*\(/.test(read('src/gpu/solverTypes.ts'));
-  const reads = /speciesSnapshot\s*\(/.test(read('src/gpu/fluid/reads.ts'));
+  const types = /^\s*speciesSnapshot\?\s*\(/m.test(read('src/gpu/solverTypes.ts'));
+  const reads = /^\s*(async\s+)?speciesSnapshot\s*\(/m.test(read('src/gpu/fluid/reads.ts'));
   const callers = [];
   const walk = (dir) => {
     for (const e of readdirSync(dir)) {
       const p = join(dir, e);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|tsx)$/.test(e) && !/src\/lib\/bubble(s|Liquid)\.ts$/.test(p) && /\.species\(/.test(read(p))) callers.push(p);
+      else if (/\.(ts|tsx)$/.test(e) && !/src\/lib\/bubble(s|Liquid)\.ts$/.test(p)) {
+        // A caller that hands in the snapshot it read, on the thin gap: not any `.species(null)` anywhere.
+        const t = read(p);
+        if (/\.species\(/.test(t) && /speciesSnapshot\s*\(/.test(t) && /thinGap/.test(t)) callers.push(p);
+      }
     }
   };
   walk('src');
   line('wired', 'the solver reads the species back for the bubbles, and the app hands it to them', types && reads && callers.length > 0,
-    `solverTypes ${types ? 'says' : 'does not say'} speciesSnapshot, reads.ts ${reads ? 'does it' : 'does not'}, ${callers.length ? `handed in by ${callers.join(', ')}` : 'nothing calls .species('}`,
+    `solverTypes ${types ? 'says' : 'does not say'} speciesSnapshot, reads.ts ${reads ? 'does it' : 'does not'}, ${callers.length ? `handed in by ${callers.join(', ')}` : 'no file calls .species( with a speciesSnapshot read on the thin gap'}`,
     !types);
 }
 
