@@ -2710,12 +2710,15 @@
     },
     {
       "name": "A drop lands only where it is dropped",
-      "shard": "fifth",
+      "shard": "show",
       "run": "node scripts/mirror.mjs",
       "why": [
         "A drop lands where it is dropped: on the Design desk, on either layer,",
         "the cell under the hand changes and its mirror image across the middle",
-        "does not (reported: an echo of the gesture \"in the mirrored section\")."
+        "does not (reported: an echo of the gesture \"in the mirrored section\").",
+        "In show since PLAN 19k-12: fifth ran 18:45 of its checks on #655's run",
+        "(this one last, 85 s) and its 20-minute job was cancelled on two deploys",
+        "running, every check green; show ran 15:56 and 16:23 on the same two."
       ]
     },
     {
