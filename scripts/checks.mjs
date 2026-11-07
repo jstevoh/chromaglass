@@ -765,8 +765,8 @@ async function selftest() {
 
   // A selection that leaves out the build a picked check leans on builds first (19aa-15).
   {
-    const sc = { build: 'vite build', site: 'npm run build && node scripts/a.mjs' };
-    const B = { name: 'b', run: 'npm run site' }, U = { name: 'u', run: 'node scripts/u.mjs' }, U0 = { name: 'u0', run: 'node scripts/u0.mjs' };
+    const sc = { build: 'vite build' };
+    const B = { name: 'b', run: 'npm run build && node scripts/a.mjs' }, U = { name: 'u', run: 'node scripts/u.mjs' }, U0 = { name: 'u0', run: 'node scripts/u0.mjs' };
     const all = [U0, B, U];
     say(buildFirst(all, [U], sc), 'a check picked without the builder before it builds first (renders on #673)');
     say(!buildFirst(all, [B, U], sc), 'not when the builder before it is picked too');
