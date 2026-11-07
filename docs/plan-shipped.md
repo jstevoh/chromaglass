@@ -1284,7 +1284,14 @@ when it updates its seeding tied with the cloud and the answer held nothing to m
 the next edit there then wiped the other's tabs. A store seeded on a device that has
 synced before sets `refetch` in its meta, and the next answer is asked for from `since
 0` (one full download, kept until an answer arrives, so offline does not lose it).
-Judging §110.
+The review of #697 found the first meeting could still be missed: a device that edits its
+tabs again before its first answer (offline at the venue, or while the live Worker does not
+yet take the store) stamped the edit with the clock, so its whole list beat the account's
+on the server and the merge never ran. A stamp still waiting for that meeting now keeps
+its mark and its oldest time through such an edit (14i). It also found a "(here)" tab could
+take the id of one an earlier meeting had kept, and a full strip of nine dropped this
+device's arrangement of a shipped tab though that adds no tab (14j). Both fail without
+the fix. Judging §110.
 
 #### 8-v2. Desk v2: one desk, three layouts (2026-10-10)
 

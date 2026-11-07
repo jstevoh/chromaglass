@@ -302,7 +302,13 @@ export function createCloudSync(deps: SyncDeps) {
         const h = contentHash(spec, v);
         const s = own(stamps, id);
         if (s && !s.del && s.h === h) continue;
-        stamps[id] = first ? { t: 0, h, dirty: true, first: true } : { t: clock(m), h, dirty: true };
+        // A value still waiting for its first meeting with the account's keeps its
+        // `first` mark and its oldest-there-is time through an edit made before
+        // that meeting (offline at a venue, or the Worker not yet taking the
+        // store): stamped with the clock, the push would beat the account's value
+        // on the server and the merge in `apply` would never see it (the review
+        // of #697; check 14i). The meeting itself, `apply`, gives it a real time.
+        stamps[id] = first || (s && !s.del && s.first) ? { t: 0, h, dirty: true, first: true } : { t: clock(m), h, dirty: true };
         touched = true;
       }
       for (const [id, s] of Object.entries(stamps)) {

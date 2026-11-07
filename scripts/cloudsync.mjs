@@ -478,6 +478,27 @@ check(
     `K ${(K.use(), shape(loadTabs()))}; N ${(N.use(), shape(loadTabs()))}`,
   );
 
+  // A device edits its tabs again before its first answer arrives (offline at the
+  // venue): the edit keeps the first meeting's mark, so the account's tabs are
+  // merged in and not overwritten by the newer whole list (the review of #697).
+  await fileKey('tabs-i@example.com', 'pro');
+  const P = device('laptop 4', 'tabs-i@example.com');
+  const Q = device('mac app 4', 'tabs-i@example.com');
+  P.use(); saveTabs(renameTab(loadTabs(), 'perform', 'OnP'));
+  await round(P);
+  Q.online = false;
+  Q.use(); saveTabs(renameTab(loadTabs(), 'sequence', 'Q first'));
+  await Q.sync.sync(true);
+  Q.use(); saveTabs(renameTab(loadTabs(), 'sequence', 'Q again'));
+  Q.sync.scan();
+  Q.online = true;
+  await round(Q, P, Q, P, Q);
+  check(
+    '14i. a device that edits its tabs again before it first hears from the account still joins the account\'s tabs',
+    has(P, 'OnP', 'Q again') && has(Q, 'OnP', 'Q again') && sameOn(P, Q),
+    `P ${(P.use(), shape(loadTabs()))}; Q ${(Q.use(), shape(loadTabs()))}`,
+  );
+
   // And the merge itself, unit by unit, so a lost tab is named.
   const raw = (tabs) => JSON.stringify({ v: 1, tabs });
   const merged = JSON.parse(mergeStoredTabs(
@@ -489,6 +510,21 @@ check(
     merged === 'perform:P | sequence:Sequence | setup:Setup | tab-a:A' &&
       JSON.parse(mergeStoredTabs(raw([{ id: 'perform', name: 'Perform' }, { id: 'sequence', name: 'Sequence' }]), raw([{ id: 'perform', name: 'Perform' }]))).tabs.length === 1,
     merged,
+  );
+  // A tab kept as "(here)" never takes the id of one this device already kept so,
+  // and a full strip of nine still takes this device's arrangement of a shipped tab.
+  const again = JSON.parse(mergeStoredTabs(
+    raw([{ id: 'setup', name: 'Mine' }, { id: 'setup-here', name: 'Old here' }]),
+    raw([{ id: 'setup', name: 'Theirs' }]),
+  )).tabs;
+  const nine = [{ id: 'perform', name: 'Perform' }, { id: 'sequence', name: 'Sequence' }, { id: 'setup', name: 'Setup' },
+    ...[1, 2, 3, 4, 5, 6].map((n) => ({ id: `tab-${n}`, name: `T${n}` }))];
+  const full = JSON.parse(mergeStoredTabs(raw([{ id: 'perform', name: 'P' }]), raw(nine))).tabs;
+  check(
+    '14j. merging: ids stay unique when this device already holds a "(here)" tab, and a full strip keeps this device\'s arrangement of a shipped tab',
+    new Set(again.map((x) => x.id)).size === again.length && again.length === 3 && again.some((x) => x.name === 'Old here') &&
+      full.length === 9 && full[0].name === 'P',
+    `${again.map((x) => `${x.id}:${x.name}`).join(' | ')}; full first ${full[0].id}:${full[0].name}, ${full.length} tabs`,
   );
 }
 

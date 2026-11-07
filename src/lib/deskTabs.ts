@@ -244,18 +244,21 @@ export function mergeStoredTabs(localRaw: string, incomingRaw: string): string {
   const local = list(localRaw); const incoming = list(incomingRaw);
   if (!local || !incoming) return incomingRaw;
   const out = [...incoming];
-  const taken = new Set(incoming.map(r => r.id));
-  const names = new Set(incoming.map(r => String(r.name).toLowerCase()));
+  // Every id and name either list holds, so a tab kept as "(here)" never takes the
+  // id of a tab of this device's added after it (one kept as "(here)" by an
+  // earlier meeting), which loading would drop as a duplicate (the review of #697).
+  const taken = new Set([...incoming, ...local].map(r => r.id));
+  const names = new Set([...incoming, ...local].map(r => String(r.name).toLowerCase()));
   for (const mine of local) {
-    if (out.length >= TABS_MAX) break;
     const there = incoming.findIndex(r => r.id === mine.id);
     if (there < 0) {
-      if (!pristine(mine)) out.push(mine);
+      if (!pristine(mine) && out.length < TABS_MAX) out.push(mine);
     } else if (!pristine(mine) && JSON.stringify(mine) !== JSON.stringify(incoming[there])) {
       if (pristine(incoming[there])) {
-        // Arranged here, still as shipped there: this device's arrangement keeps the tab's place.
+        // Arranged here, still as shipped there: this device's arrangement keeps the
+        // tab's place. It adds no tab, so a full strip does not stop it.
         out[there] = mine;
-      } else {
+      } else if (out.length < TABS_MAX) {
         let id = `${mine.id}-here`;
         while (taken.has(id)) id += 'x';
         let name = cleanName(`${mine.name} (here)`).slice(0, TAB_NAME_MAX);
