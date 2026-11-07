@@ -77,7 +77,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'flowRate', type: 'f32', note: 'plate-uv per unit of cellClock per unit of velocity, for advecting procedural detail' },
   { name: 'gelAngle', type: 'f32' },
   { name: 'gelWheel', type: 'f32', note: 'rotating four-segment gel over the lamp, or over the lens (the mixer order)' },
-  { name: 'glossiness', type: 'f32', note: 'specular intensity, 0 = flat backlit dye' },
+  { name: 'glossiness', type: 'f32', note: 'relief gain on the dye surface, 0 = the real slope (plateTransmit.ts)' },
   { name: 'gooey', type: 'f32' },
   { name: 'grainMix', type: 'f32', note: 'crossfade between the two phases' },
   { name: 'grainOn', type: 'f32', note: '1 when the solver is carrying the coordinates' },

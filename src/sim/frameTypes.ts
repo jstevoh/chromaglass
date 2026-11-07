@@ -17,6 +17,7 @@ import { type GpuClass } from '../lib/platform';
 import { type SongEvent, type SongShapeState } from '../lib/songShape';
 import { type BarNow } from '../lib/barGrid';
 import { type FluidSimulation } from './fluidSimulation';
+import type { BeadField } from '../lib/beads';
 
 /*
   How wide a tool lays the bottle: its own reach, but never wider than the
@@ -154,12 +155,13 @@ export interface FrameView {
    */
   audio: { pitchClass: number; brightness: number; beatPhase: number; beatSway: number };
   /**
-   * The oil beads' mask, on the frames the beads moved and it was redrawn —
-   * null on every other frame, and whenever the beads are off. The show
-   * decides when it changes so that both engines upload the same picture on
-   * the same frames rather than each asking the bead field in its own way.
+   * The oil beads, on the frames they moved and their mask is to be drawn
+   * again (on the GPU, from their list: PLAN 14ab-6) — null on every other
+   * frame, and whenever the beads are off. The show decides when it changes
+   * so that both engines draw the same mask on the same frames rather than
+   * each asking the bead field in its own way.
    */
-  beadMask: CanvasImageSource | null;
+  beadMask: BeadField | null;
   /** Where the frame is going: the projector's shape, and the effects. */
   outputCfg: OutputConfig;
   postForce: boolean;

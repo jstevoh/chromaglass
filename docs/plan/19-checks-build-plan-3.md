@@ -36,6 +36,26 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reads six times across the same 600 ms and wants four held (a press laid once and not
   renewed reads one or two); the lift half is as it was. Judge with `npm run flakes --
   --check 'holding the Press lifts nothing'` a week after merge.
+- **19aa-13. `renders` and `squeeze` hold a window until it has the frames or steps its
+  line asks (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-13.
+- **19aa-14. `renders`' "the App renders for its clock and no more": the dye bottle
+  committed on its own (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-14.
+- **19aa-14b. `open()` waits up to 30 s for one second of fifteen frames (found
+  2026-11-07, open).** A page on a Mac drawing under fifteen a second waits the full 30 s
+  (it prints "never drew fifteen frames"; not yet counted in the logs). Now that each
+  window holds itself open for its 45 frames (19aa-13), it could wait only for the plate
+  to draw at all.
+- **19aa-14c. The cloud's software WebGPU loses the app's device every nine seconds or so
+  (found 2026-11-07, open).** `PW_WEBGPU=1` with the app (not the lab), under Xvfb: "WebGPU
+  device lost: destroyed" with no `destroy()` call from the page (a wrapped
+  `GPUDevice.prototype.destroy` never ran), then "A valid external Instance reference no
+  longer exists" and a `requestAdapter` that returns null for two seconds. Each loss and
+  recovery commits the plate's own `glLost`/`glEpoch` state, so `renders` with a plate
+  read there is red for that alone (1.3 renders, 2.0 commits a second). Probably
+  SwiftShader's GPU process going down under the plate's work at that rate; find which,
+  before any app check leans on software WebGPU for its commits.
+- **19aa-15. A pull request's Measure part builds the site first when a full run would
+  have (shipped 2026-11-07).** Story in `docs/plan-shipped.md` §19aa-15.
 - **19aa-7. Startup's "moving for good no later than the old way" 7 of 192 (read 2026-10-25;
   the cause is not found, a breakdown is printed).** The 7 reds read the show's own wait 1.79
   to 3.04 s against the control's 0.74 to 1.07 s, and the show moving for good 2.4 to 7.6 s
@@ -54,7 +74,9 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   that the page's timer ticked on time in (printed, not judged; no bar moved). The next
   step is to read that line on the week's reds and, if it is the page seen free, price it
   the way 14v-7 does the frame gaps, with the same synthetic cases. The reds are 4% of runs,
-  so the week after this merges is the evidence.
+  so the week after this merges is the evidence. Two more on 2026-10-30 (#550's `open` shard on one head, af60ee4): 2.09 and 2.49 s against 0.72
+  and 0.74 s, the show moving for good at 14.3 and 14.6 s against 23.6 and 22.1 s; the third run
+  of the shard read it green, and nothing in that diff was on the opening's path.
 - **19aa-2. `followview`'s timing (shipped 2026-10-18).** Story in `docs/plan-shipped.md`
   §19aa-2 (moved 2026-10-29, 19m).
 - **19aa-3. The API scripts never print the token (shipped 2026-10-19).** `scripts/ghapi.mjs`; `npm run ghapi`. Story in `docs/plan-shipped.md`.
@@ -116,6 +138,22 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   0.232 from its mirror, not 0.4; a fling (0.14) and the mirror's radius (0.12) reach 0.26.
   The stroke moved to (0.1, 0.3) to (0.25, 0.3), 0.44 from its mirror, and a line asks for
   the clearance each run. Story in `docs/plan-shipped.md` §19ac-3.
+- **19ac-4. `mirror`'s "and nowhere else" named the hand's own drop (shipped 2026-10-30).**
+  Since #512 the check photographs the Perform tab's preview, a wide window on the dish
+  where a cell is 0.055 of the plate tall and 0.154 wide, and a held drop reaches two cells
+  up its column (0.11 of the plate, 22 to 25 against a drift of 8 to 9) where the check
+  counted "round the hand" as one cell each way. Red on deploys 570, 576 and 580. The cells
+  under the drop are now the ones within DROP_REACH (0.14) of the hand on the plate, read
+  with `plateAt`; the bar is unchanged. Story in `docs/plan-shipped.md` §19ac-4.
+- **19ac-5. `bottles`' other splatter red, "off the hand by 0.041 and 0.056", is unexplained
+  and has not printed its strays yet.** Two of 183 Mac runs (before 2026-10-25); none since
+  the line prints every pour away from the stroke with `down` and `lays` (#477, #562). The
+  fling alone cannot do it: a splatter logs one pour a step (its first droplet), 50 to 70 a
+  stroke, each 0.023 to 0.14 from the hand in a direction from a seeded stream, so the
+  mean offset's spread is about 0.008 an axis and 0.04 is a 4e-6 to 3e-4 run, not one in
+  ninety. The suspects are pours logged while the mouse was up and the pointer moving to
+  the next stroke (each adds up to 0.5 to the mean), and the look's ring (`lays`). Judge
+  the next red by its strays before changing anything.
 
 ## 19ad. The `open` shard flakes on four unrelated faults
 
@@ -137,6 +175,9 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   reading in sixty-one is a real path through the code (a first frame, a resize, a
   reading taken before the wall asked) or noise; "allow one" would be the wrong fix if
   the one is a genuine route. Found while measuring 0-tap and 19ab (PRs #429, #444).
+  A third presentation on 2026-10-30 (#550, f3f052e): **68 ask, 0 frame, 0 tick over 71 frames
+  asked for**, the "fewer is an ask the ear missed" side of the same line, three in two seconds
+  with no stray reading against a bar of two; the same diff read the line green on four other runs.
 
 - **19ad-2. The same shard failed with no check having failed, and with a check that is
   green seven times out of seven on the owner's Mac.** Two more presentations on PR
@@ -199,6 +240,18 @@ Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build
   mirror over a run of shards (`npm run flakes`) against how many a stroke's geometry
   allows, then state the bar as that (the mirror reading should be the hand's own
   flipped path, not the fling's reach). Seeded or recorded flings would settle it.
+
+- **19ad-6. `scene`'s worst-frame line goes red without a number, and the `open` shard has
+  more marginal lines than 19ad-1 lists.** On 2026-10-30 (#550, f3f052e) `Measure · logic` read
+  "the costliest frame of each room, the cold first one included, is under 20 ms" red with
+  nothing after the dash: the line judges `Math.max(worst)` and prints no value, so a red
+  cannot be told from a stall of 21 ms or 200. It should print the worst frame and the room it
+  came from. The same day the `open` shard also read `renders`' "no sound, the Perform desk: the
+  App renders for its clock and no more" at 1.7 commits/s (five commits in a 3 s window where the
+  clock makes three or four, bar 1.5) and `drawwall`'s "the laptop's own frames reach Draw, at
+  least 8 a second" at 7.3/s with the display drawing 14.7 frames/s, each once, each green on the
+  same diff's other runs. Both belong in 19ad-1's measurement over a run of shards before any bar
+  moves.
 
 ## 19ae. A phone check reads its dye across a plate rebuild and calls it a fault
 
@@ -292,8 +345,20 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
 The owner approved splitting the files sessions read most (the plan page of 2026-10-28;
-the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves) and 19ai-5.
+the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai-2 (the lighter `CLAUDE.md` and the folder maps), 19ai-3 and 19ai-4 (the plan's items 3 and 5, one PR of pure moves), 19ai-5, and 19ai-6 and 19ai-7 (the plan's items 7 and 8, the solver's two GPU files, each split by pass with a table of old lines to new files in its PR so a branch caught mid-move can re-apply its edit), 19ai-8, and 19ai-9 (the settings panel).
 
+- **19ai-1. Shipped: a lighter `CLAUDE.md`.** 18,082 → 12,008 bytes loaded on every step;
+  the checks table to `docs/checks-map.md`, CI to `docs/ci.md`, the domain map and the
+  splits to `docs/architecture.md` (story in `docs/plan-shipped.md` §19ai-1).
+- **19ai-2. Shipped: a `README.md` per folder** (`src/gpu`, `src/gpu/fluid`, `src/gpu/wgsl`,
+  `src/gpu/wgsl/fluid`, `src/sim`, `src/lib`, `src/hooks`, `src/components/desk`,
+  `src/components/phone`, `server`, `scripts`; `src/app` and `src/components/settings`
+  came with their splits). A PR that changes a folder's exports updates its README.
+- **19ai-10. Open: the frame loop, a piece at a time.** The visualizer's frame loop is one
+  `useEffect` of about 5,500 lines (most of `LiquidVisualizer.tsx`'s 434 KB). Not split in
+  one move: a PR that changes a piece of it first moves that piece to its own module (a
+  function taking the frame's state, no per-frame allocation) in its own commit, held
+  against the checks that read the file as text (19ai-3a), then changes it.
 - **19ai-3. Shipped.** `components/LiquidVisualizer.tsx` was 670,805 bytes, and 255 KB of it
   was module code above the component. Story in `docs/plan-shipped.md` §19ai-3 (moved
   2026-10-29, 19m).
@@ -306,9 +371,33 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-4. Shipped.** `src/lib/checkHooks.ts` declares on `Window` every name the checks
   reach the app by: 44 (the plan counted 38), each with its shape, the file that sets it and
   whether it needs `?debug`. Types only; the setters keep their casts, so no setter moved.
-- **19ai-4a. Open.** A setter that is next edited drops its cast and assigns
-  `window.<name>`, so the declaration is checked by the compiler and not only read. The App
-  ones go with 19ai-8 (`App()` into domain hooks), which starts after this.
+- **19ai-4a. Shipped with 19ai-8 for App's setters** (the story in `docs/plan-shipped.md`).
+  The plate's setters in `LiquidVisualizer.tsx` still cast, and drop theirs when next edited.
+- **19ai-8. Shipped: `App()` into its domains' hooks** (`src/app/`, 34 hooks; `App.tsx` 372,525
+  → 215,830 bytes; the story in `docs/plan-shipped.md`). A check that reads App's source as
+  text reads `scripts/appSource.mjs`, App and its hooks as one text.
+- **19ai-8a. Open: what stayed in `App()`.** The settings' writers at its heart (the ride,
+  the drift, `updateSettings`, `applyPreset`, the saved-look document, `lookPhase` and
+  `magnetInHand`, the automation's effect: about 30 KB) were left, because they reach
+  forward to `settingsRef`, `setDocDirty` and `lookFadeRef` declared after them, and a
+  verbatim move cannot take them without reordering more than it moves; likewise the
+  overlay's keys (they set panels declared later), the cue functions and `runAction`. Next
+  is the 97 KB JSX return, which is components rather than hooks: the overlay, the desks'
+  props and the phone's props as their own files.
+- **19ai-8b. Open: hooks that take App whole.** A verbatim move keeps every name a run read,
+  so `useCommandPalette` takes 52 parameters, `useRemote` 48, `useWallLook` 37. Once
+  19ai-8a has moved the settings' writers, the ones that read a domain's state and its
+  setters can take that domain's hook result instead of its pieces.
+- **19ai-9. Shipped: the settings panel's sections into `src/components/settings/`**
+  (`SettingsPanel.tsx` 201,442 → 23,916 bytes; the story in `docs/plan-shipped.md`). A check
+  that reads the panel's markup as text reads `scripts/settingsSource.mjs`, the panel and
+  its sections as one text.
+- **19ai-9a. Open, found along the way: the panel's seventy-two props.** App hands
+  `SettingsPanel` its props one by one (thirteen for the film and the pour, eight for the
+  tempo), and the panel hands them on to its sections in `SectionCtx`. Once 19ai-8b gives
+  each domain one hook result, the panel can take the film's or the tempo's whole, as its
+  sections read them; until then a new value a section reads is four edits for one name
+  (App, the props, `SectionCtx` and the object the panel builds).
 - **19ai-5. Shipped: `npm run sizes`, a size ratchet.** Story in `docs/plan-shipped.md`
   §19ai-5 (moved 2026-10-29, 19m).
 - **19ai-5c. Shipped with 19ai-3: a move carries its ceiling.** Story in
@@ -323,3 +412,60 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-3 and 19ai
 - **19ai-5b. Open: the ledgers come out.** 19m (PLAN.md split by section) takes PLAN.md and
   the archive off the list; `docs/guide.md` and `docs/judging.md` want the same split by
   part of the app; `scripts/checks.json` could be one file per shard.
+- **19ai-6. Shipped:** `wgsl/fluid.ts` split into one file a pass under
+  `src/gpu/wgsl/fluid/`, every kernel's text byte-identical (docs/plan-shipped.md, 19ai-6).
+- **19ai-6a. Open, found along the way.** About sixty comments across `src/` and
+  `scripts/` point at "`kernel` in wgsl/fluid.ts"; they still land on the map in that
+  file's header, which names each pass's file. Repoint one when its file is next touched,
+  not in a sweep of its own (it would collide with every open branch for nothing).
+- **19ai-6b. Open, found by 19ai-2: `wgsl/fluid.ts` has no map.** 19ai-6a says the
+  index's header names each pass's file, and the pass files' headers point there ("that
+  file's header says what the WGSL port changes everywhere"), but the index opens with its
+  imports and no header. `src/gpu/wgsl/fluid/README.md` lists the files in step order for
+  now; the header comes back (or the pointers move to the README) with the next edit there.
+- **19ai-7. Shipped:** `src/gpu/fluid.ts` split into a class chain under `src/gpu/fluid/`,
+  a pure move (docs/plan-shipped.md, 19ai-7).
+- **19ai-8. `npm run wgsl` passes a shader that will not build.** Found 2026-10-30 (32g): a
+  kernel naming a variable `from` (a WGSL reserved word) passed `npm run wgsl`, and only
+  `soapgpu` failed, at its first pipeline ("soapTransport failed to build"). The compile gate
+  should also create each kernel's pipeline and read `getCompilationInfo()`, so a reserved word
+  or a binding over the stage's limit is red there, in seconds. Again 2026-11-01 (38h-2): a
+  plate-shader local named `pass` passed `npm run wgsl` and drew a black plate in the lab
+  (`npm run microscope` read 0.00 at every zoom).
+- **19aj-1. Open, found by #603: "keeps it rather than erasing it" reads the runner's frame
+  rate.** The Blow stroke in `scripts/tools.mjs` steps the plate 272 times on the owner's Mac
+  and 83–144 on GitHub's, so the pool it starts from (about 609 against 300–360) and the share
+  of straw steps in the stroke move with the machine. On GitHub's Macs it went 301 → 242 on a
+  PR that does not touch the bubbles (run 41129450339, green on re-run) and 325 → 284 on #603,
+  where the owner's Mac reads 609 → 613 and 612 → 657 for the same code. The check should
+  measure over a fixed number of plate steps, not wall time, so its bar means the same on
+  every runner.
+- **19aj-2. Open, found 2026-11-01: the wall's "a circle leaves the corners of its quad
+  dark" goes red on PRs that do not touch the wall.** Quarantined until 2026-11-15 (19ak-1)
+  so it reports without blocking. The corner patch it reads (0.26–0.31, 0.11–0.20 of a
+  64×36 grid) sits close to the circle's edge; find whether the red runs read a lit edge
+  (the sample too close) or a frame not yet drawn (the read too early), and measure the
+  feature, not the moment.
+- **19ak-1. Shipped:** known-flaky lines report and do not block, each with a plan id and
+  an end date (docs/plan-shipped.md, 19ak).
+- **19ak-2. Shipped:** a PR's site files run only the Mac checks that read them
+  (docs/plan-shipped.md, 19ak).
+- **19ak-3. What would save more Mac time.** Replayed over main's last 100 merges, 19ak-2
+  saves 13%; what still runs every Mac check is the solver and the libraries the lab's
+  one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
+  the workflows, and scripts no check traces. (a) **Shipped:** a whole run re-run skips
+  the shards an earlier attempt passed, and the steward skill re-runs failed jobs only
+  (docs/plan-shipped.md, 19ak). (b) **Open:** the lab bundles per check, so a change to
+  the magnet's library runs the magnet's lab checks and not the soap film's. (c)
+  **Shipped:** the Mac shards wait for `tsc --noEmit`. (d) **Measured and left:**
+  building the app once on ubuntu for all five shards. `dist/` is 116 MB (the films in
+  public/) against a 15 s build, so the upload and five downloads would cost more than
+  the builds they replace.
+- **19ak-4. Open, found by 19ak-2: `npm run quick` lists every Mac check as "on the Mac
+  only".** Its test for a check that serves the app read the trace, which over-reads (most
+  scripts name `scripts/startup.mjs` in a comment), so all 96 read as serving the app and
+  none of the 68 lab checks runs under `PW_WEBGPU=1` as its header says it should.
+  `checkReads` now gives `site` from esbuild's import graph; quick should use it for
+  `here`, once a session has timed the lab checks on software WebGPU.
+- **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
+  children run as a first attempt (docs/plan-shipped.md, 19ak).

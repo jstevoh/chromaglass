@@ -11,15 +11,23 @@
  *           cap + ChromaGlass mark), unlocked with Home / Pro keys
  *   - 23.6: Free-tier logo layer restricted to the ChromaGlass mark, custom
  *           mark upload unlocked with Home / Pro keys
+ *   - 34a-7a: OSC in, Art-Net out and Art-Net in reach the show on a Pro key
+ *           only, refused on a Home key and with none (4b, 4c)
+ *   - 23.19: making, changing and loading your own liquids is Pro; a liquid a
+ *           free tier already has (made before the gate) stays on the shelf (13)
  */
 
 import { chromium } from 'playwright';
 import { launchChromium } from './chromium.mjs';
 import { execSync, spawn } from 'node:child_process';
+import { createSocket } from 'node:dgram';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import WebSocket from 'ws';
+import { ARTNET_PORT, encodeArtDmx } from '../server/artnet.js';
 import { signLicenseKey } from '../server/license-key.js';
+import { createServerLicenseManager } from '../server/server-license.js';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -249,6 +257,174 @@ try {
     );
   }
 
+  /*
+    4b, 4c. OSC and Art-Net are Pro (PLAN.md 34a-7a). Until then the server
+    never asked: a Home key drove the show over OSC and fed the rig. A second
+    server, enforced the way the packed Mac app is, with OSC on a free port,
+    Art-Net out aimed at a socket here and Art-Net in mapped to one setting,
+    and a display that counts what reaches it. Each phase sends real packets
+    and counts what arrives, not what a status string claims:
+      none (enforced, so free) -> refused
+      Pro                      -> all three arrive (the path works, so the
+                                  refusals around it are the gate's doing)
+      Home over the Pro key    -> refused again, at run time, no restart
+      the key removed          -> refused (free), so removal is read too
+      Pro, then Home, filed straight into the licence file, the way the
+      Mac app's main process files them (desktop/main.js), not through
+      this server's endpoints -> open, then refused, after the server's
+      two-second renewal: the endpoints renew the tier on the spot, so
+      without these two phases the renewal could be deleted and every
+      line above stay green (the check's review, 2026-10-30)
+    The Home phase follows Pro on purpose: a gate that never read the tier
+    at all, or read it once at start, passes "free refused" and fails here.
+  */
+  {
+    const freeUdp = () => new Promise((done) => {
+      const u = createSocket('udp4');
+      u.bind(0, '127.0.0.1', () => { const { port } = u.address(); u.close(() => done(port)); });
+    });
+    const oscMessage = (address, f) => {
+      const pad = (b) => Buffer.concat([b, Buffer.alloc(4 - (b.length % 4))]);
+      const arg = Buffer.alloc(4);
+      arg.writeFloatBE(f);
+      return Buffer.concat([pad(Buffer.from(address)), pad(Buffer.from(',f')), arg]);
+    };
+    const LINK_PORT = PORT + 1;
+    const LINK_ORIGIN = `http://127.0.0.1:${LINK_PORT}`;
+    const oscPort = await freeUdp();
+    const rig = createSocket({ type: 'udp4', reuseAddr: true });
+    let rigPackets = 0;
+    rig.on('message', () => { rigPackets += 1; });
+    await new Promise((done) => rig.bind(0, '127.0.0.1', done));
+    const linkDir = mkdtempSync(join(tmpdir(), 'cg-tiers-links-'));
+    const linkProc = spawn(process.execPath, ['server/remote-server.js'], {
+      env: {
+        ...process.env,
+        PORT: String(LINK_PORT),
+        OSC_PORT: String(oscPort),
+        OSC_BIND: '127.0.0.1',
+        ARTNET_HOST: '127.0.0.1',
+        ARTNET_PORT: String(rig.address().port),
+        ARTNET_RATE: '30',
+        ARTNET_IN: '1:colorSpeed',
+        ARTNET_IN_UNIVERSE: '7',
+        REMOTE_DIST: DIST,
+        SHOW_KEY_FILE: join(linkDir, 'show-key'),
+        CHROMAGLASS_LICENSE_FILE: join(linkDir, 'license.json'),
+        CHROMAGLASS_ENFORCE_TIERS: '1',
+        LICENSE_PUBLIC_KEY: JSON.stringify(testPublicJwk),
+      },
+      stdio: 'ignore',
+    });
+    const tx = createSocket('udp4');
+    let ws = null;
+    try {
+      if (!(await waitForServer(`${LINK_ORIGIN}/remote-info.json`))) throw new Error('the links server did not start');
+      const { displayKey } = await (await fetch(`${LINK_ORIGIN}/remote-info.json`)).json();
+      ws = new WebSocket(`ws://127.0.0.1:${LINK_PORT}/remote-ws`);
+      await new Promise((done, fail) => { ws.once('open', done); ws.once('error', fail); });
+      const got = { osc: 0, artIn: 0, link: null };
+      ws.on('message', (d) => {
+        let m; try { m = JSON.parse(String(d)); } catch { return; }
+        if (m.type === 'link') got.link = m;
+        if (m.type !== 'patch') return;
+        if (m.settings?.audioImpact !== undefined) got.osc += 1;
+        if (m.settings?.colorSpeed !== undefined) got.artIn += 1;
+      });
+      ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey }));
+      let level = 0;
+      // A second of a controller and a desk at work: an OSC fader and a DMX
+      // channel that change every packet (the Art-Net in map passes only a
+      // channel that moved), and the rig's socket counting what was sent.
+      const phase = async (settle = 400) => {
+        await new Promise((r) => setTimeout(r, settle)); // the server's renewal after a key is filed, with room
+        got.osc = 0; got.artIn = 0; rigPackets = 0;
+        // Link (13.5-link-gate): whether it was still on from the phase before,
+        // then the laptop's page asking for it, as its Link button does.
+        const linkWasOn = got.link?.on === true;
+        ws.send(JSON.stringify({ type: 'link-enable', on: true }));
+        for (let i = 0; i < 10; i++) {
+          level = (level + 37) % 256;
+          tx.send(oscMessage('/chromaglass/setting/audioImpact', level / 255), oscPort, '127.0.0.1');
+          tx.send(encodeArtDmx(7, i + 1, new Uint8Array([level, 0, 0, 0])), ARTNET_PORT, '127.0.0.1');
+          await new Promise((r) => setTimeout(r, 100));
+        }
+        await new Promise((r) => setTimeout(r, 200));
+        const tier = (await (await fetch(`${LINK_ORIGIN}/license-info.json`)).json()).tier;
+        return { tier, osc: got.osc, artOut: rigPackets, artIn: got.artIn, linkWasOn, link: got.link?.on === true, locked: got.link?.locked === true };
+      };
+      const post = async (path, key) => {
+        const r = await fetch(`${LINK_ORIGIN}${path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ key, machineId: 'links-mac' }),
+        });
+        if (!r.ok) throw new Error(`${path} answered ${r.status}`);
+      };
+      // The Mac app's way: its own manager on the server's licence file. It
+      // verifies the key against this process's public key, lent for the call.
+      const fileDirect = async (key) => {
+        const before = process.env.LICENSE_PUBLIC_KEY;
+        process.env.LICENSE_PUBLIC_KEY = JSON.stringify(testPublicJwk);
+        try {
+          const r = await createServerLicenseManager({ filePath: join(linkDir, 'license.json') }).activate(key, 'links-mac');
+          if (r.status !== 200) throw new Error(`filing straight to the licence file answered ${r.status}`);
+        } finally {
+          if (before === undefined) delete process.env.LICENSE_PUBLIC_KEY;
+          else process.env.LICENSE_PUBLIC_KEY = before;
+        }
+      };
+      await new Promise((r) => setTimeout(r, 2200)); // past the first renewal, so "free" is the tier read and not the unknown before it
+      const none = await phase();
+      await post('/license-activate', proKey);
+      const pro = await phase();
+      await post('/license-activate', homeKey);
+      const home = await phase();
+      await post('/license-deactivate', homeKey);
+      const removed = await phase();
+      await fileDirect(proKey);
+      const proFiled = await phase(2600);
+      await fileDirect(homeKey);
+      const homeFiled = await phase(2600);
+      const say = (p) => `${p.tier}: osc ${p.osc}, art-net out ${p.artOut}, art-net in ${p.artIn}, link ${p.link ? 'on' : p.locked ? 'locked' : 'off'}`;
+      const open = (p) => p.tier === 'pro' && p.osc >= 8 && p.artOut >= 15 && p.artIn >= 8;
+      const refused = (p) => p.osc === 0 && p.artOut === 0 && p.artIn === 0;
+      check(
+        '4b. with a Pro key, OSC in, Art-Net out and Art-Net in all reach the show, whether the key came through the server or straight into its licence file',
+        open(pro) && open(proFiled),
+        `${say(pro)}; filed straight: ${say(proFiled)}`,
+      );
+      /*
+        4d. Link is Pro beside them (PLAN.md 13.5-link-gate). Asked for below
+        Pro it stays out of the session and says "locked", so the switch can
+        say why; and a Pro key swapped for a Home one closes it, not only the
+        next ask (the Home phase follows a Pro one that left Link on).
+      */
+      const linkOpen = (p) => p.link && !p.locked;
+      const linkShut = (p) => !p.link && p.locked;
+      check(
+        '4d. Ableton Link joins on a Pro key, is refused and says so on Home or none, and a Pro key swapped for Home leaves the session',
+        linkOpen(pro) && linkOpen(proFiled) && linkShut(none) && linkShut(home) && linkShut(removed) && linkShut(homeFiled)
+          && home.linkWasOn === false && homeFiled.linkWasOn === false && pro.linkWasOn === false,
+        `${[none, pro, home, removed, proFiled, homeFiled].map((p) => `${p.tier} ${p.linkWasOn ? 'was on, ' : ''}${p.link ? 'on' : p.locked ? 'locked' : 'off'}`).join('; ')}`,
+      );
+      check(
+        '4c. with a Home key, with no key in an enforced launch, and once the key is removed, OSC and Art-Net (out and in) are refused',
+        none.tier === 'free' && refused(none) &&
+          home.tier === 'home' && refused(home) &&
+          removed.tier === 'free' && refused(removed) &&
+          homeFiled.tier === 'home' && refused(homeFiled),
+        `${say(none)}; ${say(home)}; removed ${say(removed)}; filed straight ${say(homeFiled)}`,
+      );
+    } finally {
+      ws?.terminate();
+      tx.close();
+      rig.close();
+      linkProc.kill('SIGTERM');
+      rmSync(linkDir, { recursive: true, force: true });
+    }
+  }
+
   browser = await launchChromium(chromium);
 
   // 5 & 6. Unlicensed sign-in gate (23.11) and offline license key unlock (23.4 & 23.11)
@@ -324,6 +500,15 @@ try {
     await ctx.addInitScript((jwk) => {
       window.__cgTestLicensePublicKey = jwk;
     }, testPublicJwk);
+    // A liquid on the shelf from before (13): written once, so the shelf the
+    // app saves back after that is what the later halves read.
+    const LIQUID_NAME = 'Tiers Check Silk';
+    await ctx.addInitScript((name) => {
+      if (localStorage.getItem('chromaglass-custom-liquids')) return;
+      localStorage.setItem('chromaglass-custom-liquids', JSON.stringify([
+        { id: 'custom-tiers-check-silk', name, color: '#c8d0e0', behaviour: { weight: 0.4, polarity: -0.7 } },
+      ]));
+    }, LIQUID_NAME);
     const page = await ctx.newPage();
     await page.goto(`${ORIGIN}/?debug&tierGates=1`);
     await waitFor(
@@ -349,6 +534,27 @@ try {
       freeTiles.length === 7 && freeLogoLocked === 1 && freeMarkFileCount === 0,
       `tiles=${freeTiles.length}, freeLogoLocked=${freeLogoLocked}, markFile=${freeMarkFileCount}`,
     );
+
+    // 13, free half. Making your own liquids is Pro (PLAN.md 23.19). The
+    // Liquids section is in the panel's DOM whichever section is showing, so
+    // it is read by counts, not visibility. The page opened with one liquid
+    // already on the shelf (the init script above), the way a free user has
+    // one made before the gate or under a lapsed key, so the check needs the
+    // gate to close Design, Edit and Load and to leave that bottle on the
+    // shelf: hiding the whole designer, or dropping a non-Pro user's bottles,
+    // fails it as surely as leaving Design open.
+    const liquidsAt = async () => ({
+      design: await page.locator('[data-testid="liquid-design"]').count(),
+      edit: await page.locator('[data-testid="liquid-edit"]').count(),
+      upsell: await page.locator('[data-cg-pro-upsell="liquids"]').count(),
+      buy: (await page.locator('[data-cg-pro-upsell="liquids"] [data-cg-pro-upsell-buy]').textContent().catch(() => null)) ?? '',
+      href: (await page.locator('[data-cg-pro-upsell="liquids"] [data-cg-pro-upsell-buy]').getAttribute('href').catch(() => null)) ?? '',
+      // The button and its hidden input, each: a Load button moved out of the
+      // gate fails the line even with the input still inside it.
+      load: await page.locator('[data-testid="liquid-load"], [data-testid="liquid-file"]').count(),
+      kept: ((await page.locator('[data-testid="liquid-designer"]').textContent()) ?? '').includes(LIQUID_NAME),
+    });
+    const freeLiquids = await liquidsAt();
 
     // Close Settings and open Record panel
     await page.keyboard.press('Escape');
@@ -413,6 +619,7 @@ try {
     const homeRemainingTiles = await page
       .locator('[data-cg-app-tiles] [data-cg-app-tile]')
       .evaluateAll((els) => els.map((e) => e.getAttribute('data-cg-app-tile')));
+    const homeLiquids = await liquidsAt();
     check(
       '10. activating a Home key unlocks custom logo upload and Record/Render, leaving only Pro tiles gated',
       homeRemainingTiles.length === 2 &&
@@ -442,6 +649,18 @@ try {
     await page.click('[data-testid="open-all-settings"]');
     await page.waitForTimeout(500);
     const proTileSectionCount = await page.locator('[data-cg-app-tiles]').count();
+    const proLiquids = await liquidsAt();
+    check(
+      '13. making your own liquids is Pro: Free and Home see the Pro note (Get Pro, Upgrade to Pro) and no Design, Edit or Load, keep a liquid made before on the shelf, and a Pro key opens all three (23.19)',
+      freeLiquids.design === 0 && freeLiquids.edit === 0 && freeLiquids.load === 0 && freeLiquids.upsell === 1 && freeLiquids.kept &&
+        freeLiquids.buy.includes('Get Pro') && freeLiquids.href.includes('lemonsqueezy.com/checkout/buy/') &&
+        homeLiquids.design === 0 && homeLiquids.edit === 0 && homeLiquids.load === 0 && homeLiquids.upsell === 1 && homeLiquids.kept &&
+        homeLiquids.buy.includes('Upgrade to Pro') &&
+        // Home pays the difference: its link is the upgrade checkout, not Pro's full price.
+        homeLiquids.href.includes('lemonsqueezy.com/checkout/buy/') && homeLiquids.href !== freeLiquids.href &&
+        proLiquids.design === 1 && proLiquids.edit === 1 && proLiquids.load === 2 && proLiquids.upsell === 0 && proLiquids.kept,
+      `free=${JSON.stringify(freeLiquids)} home=${JSON.stringify(homeLiquids)} pro=${JSON.stringify(proLiquids)}`,
+    );
     check(
       '11. upgrading to a Pro key unlocks all Pro features and removes all app gate tiles',
       proTileSectionCount === 0,
@@ -514,9 +733,16 @@ try {
         floatingNudgeWhilePro === 0 &&
         nudgeText.includes('ChromaGlass Pro') &&
         // Home opens the Mac app too (PLAN.md 23.17b, 23.17d), so the card
-        // sells what Pro alone adds there, never the app itself.
+        // sells what Pro alone adds there, never the app itself. It sold
+        // "several projectors with edge blending" until PLAN.md 34a-7 found
+        // the app drives one output. It names cloud sync now, which a Pro key
+        // alone opens (CloudSyncCard). It named neither OSC nor Art-Net while
+        // a Home key had both; 34a-7a gated them (4b, 4c above), and the card
+        // still sells the grid's headroom it is shown for.
         !nudgeText.includes('plus the Mac app') &&
-        nudgeText.includes('several projectors') &&
+        !nudgeText.includes('several projectors') &&
+        !nudgeText.includes('OSC') &&
+        nudgeText.includes('cloud sync') &&
         !nudgeText.includes('git clone') &&
         !nudgeText.includes('Run it locally') &&
         nudgeCtaHref.includes('lemonsqueezy.com/checkout/buy/') &&

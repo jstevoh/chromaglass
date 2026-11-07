@@ -1286,8 +1286,9 @@ to the monitor:
 
 With the projector window up (or a cast), put the plate bar on **Preview** and change the
 look: pick another, ride a few sliders, clear the plate. The wall should carry on with
-the look it had, while the desk's preview shows the copy. Then press **Send to wall**
-(⌘⏎): the wall should fade to the copy's look over the Go's fade.
+the look it had, while the desk's preview shows the copy. Then click **Wall** in the
+header (or ⌘⏎; the plate bar's Send to wall button went in PLAN 35c-4): the wall should
+fade to the copy's look over the Go's fade.
 
 - Does the wall stay exactly as it was while you build? The dimmer, the mixer and the
   music still move it on purpose; nothing else should.
@@ -1474,6 +1475,15 @@ lamp. The lab's numbers are in `docs/plan-shipped.md` §33g; the Mac's are unmea
   and Lacing Run at their own zoom: Cell Bloom should read as three turning pools of
   silicone and oil, Macro Bead as domed wet beads, Lacing Run as lacing without cells.
   Say whether Cell Bloom's name should change now that it has none.
+
+  *(33g-2a, 2026-10-30.)* In the closeup the oil beads are laid twice the size scale, and
+  Macro Bead's Beads dial is 0.7 (was 0.35). Open Macro Bead and Lens Pools (Cell Bloom,
+  renamed) and look at 3x to 5x: the beads should read as glass lenses with the plate upside
+  down in them and a dark ring, big enough to be the picture. Say whether they are too big
+  or too many (the factor is `MACRO_BEAD_SCALE` in `lib/beads.ts`, the dial the look's
+  Beads), and whether the lens beads over the dye's dark ground look like glass or like
+  holes. Beads already on a plate keep their size until they retire, so switch looks, not
+  only zoom, to see the full effect.
 
 ## 60. The kick's dye burst is clumps, and has a dial (PLAN 27f-1)
 
@@ -2002,3 +2012,365 @@ real song. (§88 is the stutter, §89 the headers.)
    land on the same hits as before this change: the readings are the same to the bit on the checks' songs.
 4. Bad: a ring that lags behind the stick, jumps to a corner when it first appears, or stays after the stick is
    released; a beat that used to fire and does not.
+
+## 91. The wall's "isn't full screen" chip goes when it should, and can be hidden (PLAN 14af)
+
+The chip at the top of the desk that says the wall window isn't full screen. It used to be
+stuck there, unexplained, with no way to close it.
+
+1. Send to wall with a projector (or a second screen) connected. The wall should fill its
+   screen by itself, and no chip should show on the laptop.
+2. Click the wall and press Escape. Within half a second the laptop should show "The wall
+   window isn't full screen, so its title bar shows on the wall". Click **Make it full
+   screen**: the wall fills again and the chip goes.
+3. Escape on the wall again, then in the Mac app use the wall window's green button instead:
+   the chip should go too (the window's own full screen has no title bar in the app).
+4. Escape once more and click the chip's X: it should stay away until a new wall window is
+   opened, even though the wall is still framed.
+5. Bad: a chip that stays up over a wall with no title bar; a button that does nothing and
+   says nothing; an X that comes back a second later.
+
+## 92. The live stream, to an unlisted YouTube broadcast (PLAN 37x-4b)
+
+The lab streams to its own server and measures the stream; only a real platform can say it
+takes ours, and only a camera can say the sound and the plate agree after the Mac's
+system-audio path. Unlisted, never public, until you say so.
+
+1. In YouTube Studio, Go live → Stream, an **unlisted** broadcast; copy the stream key. Open the
+   Mac app, the console (View → Toggle Developer Tools), and `docs/live-show.md`'s four lines
+   with that key. Within thirty seconds Studio's preview should show the plate, "Excellent
+   connection", no dropped frames in `__cgLive.state()`.
+2. Open the album in Qobuz or YouTube Music with the app's sound source on *System audio*.
+   Watch the broadcast on a phone (it runs twenty or so seconds behind): a hit in the music
+   should bloom the plate right after the hit, as it does on the laptop, not before it.
+3. Clap once in front of the laptop's camera with the microphone as the source: in the
+   broadcast, the clap and the plate's bloom should fall together within a frame or two.
+4. Stop with `__cgLive.stop()`; the broadcast should end cleanly in Studio within a few seconds.
+5. Bad: Studio never shows a picture (the key or the RTMPS path), the sound runs ahead of or
+   behind the plate by more than a frame or two (the Mac's clock, the plan's note under
+   37x-4b), frames dropped with a good upload, or the app's frame rate falling while live
+   (`npm run stutter`'s two-step frames, 37x-4c).
+6. Several at once (37x-4c), with whichever second account exists (Twitch, Kick, a Facebook
+   Page; or a second unlisted YouTube stream): keep both keys in the store, then
+   `await __cgLive.start({ destinations: [{ name: 'youtube', url: 'rtmps://a.rtmps.youtube.com/live2', keyName: 'youtube' }, { name: 'twitch', url: 'rtmps://live.twitch.tv/app', keyName: 'twitch' }] })`.
+   Both previews should show the plate; `(await __cgLive.state()).transport.destinations`
+   gives each one's kbps, seconds behind and dropped frames. `measuredAt` should read
+   `server` for YouTube (it acknowledges what it receives; if it reads `socket`, the
+   seconds-behind figure only sees the Mac's own buffer: say so).
+7. If Instagram or TikTok live is open to the account: add a destination with
+   `orientation: 'portrait'`. On a phone it should fill the screen with the middle of the plate,
+   sharp, not squeezed; the landscape one beside it unchanged.
+8. Turn the Wi-Fi off for ten seconds and on again while live: each destination should come
+   back on its own within half a minute (`reconnects: 1`), the broadcast resuming, not a new
+   one. A wrong key on one destination should fail that one alone, once, with the
+   platform's words, while the others stream.
+9. The panel (37x-4d), instead of the console: + Panel → Live Show. Add the unlisted YouTube
+   broadcast (paste its key; the field should empty and say "Key kept"), press **For tests**
+   on it, and **Test**: the same picture as step 1. Add a second destination, leave it on,
+   and press **Go live**: it should ask "Go live to …? Press again" and do nothing until the
+   second press (use the unlisted one turned on, not a public key). While live, each row
+   should show its Mb/s and seconds behind; on the phone remote a red Live chip with the
+   clock on Draw and Controls, and two taps on it should stop the stream on the Mac. After
+   a stream, the line under the buttons should name the upload the stream carried.
+
+## 93. The rig, with free programs: OSC, Art-Net, MIDI, Ableton, Resolume (PLAN 34a-7f)
+
+`npm run rig` plays every part of a rig with sockets of its own: an OSC sender, a fixture, a
+lighting desk, a controller and a DAW's clock, against the real show server with a Pro key. It
+cannot say that the programs a buyer owns send and read what it does. One sitting, about an
+hour, all free. Install first: **QLC+ 4** (qlcplus.org, open source), **TouchDesigner**
+(derivative.ca, the free Non-Commercial key with a Derivative account), **Ableton Live 12
+trial** (ableton.com/trial, 30 days, an Ableton account), **Resolume Arena demo**
+(resolume.com/download, a watermark and a spoken reminder, no time limit), **Protokol**
+(hexler.net, free), and for the video route **OBS** with **DistroAV** (`brew install --cask
+distroav`, which asks for the free NDI runtime). Syphon, NDI and Ableton Link out of the app
+are "on the way" on `/pro`, so there is nothing of ours to test there yet (no Syphon Simple
+Client or LinkHut this time).
+
+0. In the repo on the Mac: `npm run rig`. Every line ok, including the two the cloud skips
+   (the plate's colours on the fixture, and an OSC blackout blacking out the rig).
+1. **OSC in, from TouchDesigner.** Mac app → Show → OSC input → *This Mac only*. In
+   TouchDesigner add an **OSC Out DAT** (network address 127.0.0.1, port 9000), then in the
+   Textport: `op('oscout1').sendOSC('/chromaglass/setting/audioImpact', [0.8])`. Sound Impact
+   on the Design desk reads 0.8. Then `sendOSC('/chromaglass/action/blackout-toggle', [1])`:
+   the plate goes black, sent again it comes back; and `sendOSC('/chromaglass/dye',
+   ['#ff8800'])` makes the dropper orange. Bad: nothing moves (the Show menu, the port), or a
+   value arrives scaled wrong.
+2. **OSC in, from Resolume.** Arena demo → Preferences → OSC: output on, 127.0.0.1, port 9000.
+   Shortcuts → Edit OSC, a new preset, click a layer's opacity slider, tick OSC *output*, pick
+   *custom* and type `/chromaglass/setting/audioImpact`. Move the slider: Sound Impact follows.
+   Say whether the custom address was there; if Resolume can only send its own addresses, the
+   page's "send it from Resolume" needs a line on how (PLAN 34a-7g).
+3. **Art-Net out, into QLC+.** Quit the app, then start it from Terminal so it reads the
+   settings (34a-7c: there is no panel yet):
+   `ARTNET_HOST=127.0.0.1 ARTNET_FIXTURES=4 /Applications/ChromaGlass.app/Contents/MacOS/ChromaGlass`.
+   QLC+ → Inputs/Outputs → universe 1: tick Art-Net *Input* on 127.0.0.1 and *Passthrough*;
+   open the **DMX Monitor**. Channels 1–12 should move with the plate's colours (four RGB
+   fixtures), dim when the glass thins, and go to zero on a blackout. Bad: all zero on a full
+   plate, colours that lag the screen by more than a beat, or channels out of order.
+4. **Art-Net in, from QLC+.** In QLC+ untick universe 1's Art-Net input (it holds port 6454)
+   and tick Art-Net *Output* to 127.0.0.1 instead. Start the app from Terminal with
+   `ARTNET_IN=1:audioImpact` and no `ARTNET_HOST` (with both, the app ignores the universe it
+   sends on, which here is QLC+'s universe 1, Art-Net 0). In QLC+'s **Simple Desk**, move
+   channel 1: Sound Impact follows, 0 to 255 as 0 to 1.
+5. **MIDI clock and CC, from Ableton.** Audio MIDI Setup → MIDI Studio → IAC Driver: *Device is
+   online*. In Live → Settings → Link, Tempo & MIDI: IAC Driver Bus 1 output, **Sync** and
+   **Track** on. In the app, Settings → Inputs → Controller: MIDI on, input IAC Driver Bus 1;
+   Settings → Sound → Tempo: MIDI clock. Press Play in Live at 128 BPM: the app's tempo reads
+   128 within a few beats, and Stop in Live stops the show. Change Live's tempo to 100: the app
+   follows. Then a MIDI track sending to IAC with a CC lane; MIDI-learn it to a control in the
+   app and play: the control rides the automation, on the bar it was drawn on.
+6. **MIDI out, into Protokol.** In the app's MIDI section pick IAC Driver Bus 1 as the LED
+   output too; open Protokol's MIDI tab. Moving a learned control from the screen sends one CC
+   per change on that control's number (not a stream, and nothing while your hand is on it).
+7. **Video into Resolume.** OBS: a Window Capture of the app's projector window, then Tools →
+   DistroAV NDI Settings → Main Output on. In the Resolume demo's Sources, the OBS NDI source
+   appears; drop it on a layer: the plate plays in Resolume at full frame rate. This is the
+   route `/pro` gives for Resolume, MadMapper and TouchDesigner until Syphon and NDI ship.
+
+Write down, per step, ok or what you saw. A step that fails is an item in PLAN §34a-7.
+
+## 94. The melody walks across the plate (PLAN 24.3-place)
+
+Aurora Borealis and Oil & Water now let go of a drop for each note of a tune, low notes on one side of the plate and
+high notes on the other. Melody Walk is in the desk's Show section (beside Kick Bloom) and the remote's sliders, 0 on
+every other look.
+
+1. Load Oil & Water, play a song with a clear lead (a piano, a voice, a synth line) through the microphone. A bead
+   of amber oil should land for most notes, left for low and right for high, a harder note a bigger bead; a tune
+   that goes up and comes back should draw there and back.
+2. Load Aurora Borealis with the same song: jade and lavender drops along the top of the curtains.
+3. Turn Melody Walk to 0 on each: no drops. Turn it up on Classic: a row of drops across the middle.
+4. Play a song with only drums: nothing should land. A song with a loud kick under a lead: the lead should still
+   land (about two notes in three; 24.3-place-2).
+5. Bad: a drop that lands a note late (a tenth of a second is the design), a drop for every kick or snare, drops
+   that all pile up at one end, or the plate filling with oil from a long song.
+6. Decide: is the line in the right place on each look, which looks want one next, and should the music's colour
+   (True Synesthesia) move to the finer pitch (24.3-place-4)?
+
+## 95. Ableton Link with Live (PLAN 13.5-link)
+
+`npm run link` plays a Link session against the show server with a stand-in for Live written
+from the same reading of the protocol, so only Live can say the two agree.
+
+1. Live and the Mac app on the same Mac. In Live, Preferences → Link, Tempo & MIDI → Link on,
+   and the Link button in the transport bar lit. In the app, Settings → Sound → Tempo → **Link**.
+   Within a second or two the line beside it says "following 1 app", the tempo readout says
+   Live's tempo and "Link", and Live's transport bar says **1 Link**.
+2. Play a four-on-the-floor clip at 124. The plate's kicks should land with Live's kick, the
+   same way a MIDI clock's do; Beat Lead at 0. Change Live's tempo to 132 mid-clip: the readout
+   follows within half a second and the kicks stay on the beat.
+3. With the app open *first* and Live opened after: Live keeps its own tempo (the app must
+   never hand Live its 120).
+4. On two machines on the same Wi-Fi (Live on one, the app on the other): as step 2.
+5. Link off: Live's count goes back to 0 within a second, the readout to "listening".
+6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
+   prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
+   clock offset), Live's tempo changing when the app joins.
+7. (13.5-link-one, 2026-11-01) A look with Accent the One up: the plate's heaviest kick lands on
+   Live's bar line from the first bar, not after a few bars of listening, also when the song's
+   own downbeat sounds weak.
+8. (13.5-link-transport) Start a Sequence, switch **Play/Stop** on beside Link, stop Live: the
+   Sequence pauses; play Live: it resumes. With Play/Stop off, Live's stop changes nothing.
+9. (13.5-link-menu) Show → **Ableton Link (Pro)** in the Mac app switches Link as the button does,
+   and its tick follows the button. (13.5-link-rescan) Switch Link on with the Wi-Fi off, then turn
+   the Wi-Fi on: Live on another machine is found within half a minute.
+
+## 96. Colour that answers the music (PLAN 25i)
+
+Three looks now take their colour from the music without a hue being turned. `npm run areacords`
+holds the arithmetic and the plate in the lab; only a real plate says whether it reads as music.
+
+1. Load **Poster, 1969** and play a song with a clear lead (a voice, a synth line, a piano) through
+   the microphone. The kick pours into the left shape; the colour of each pour should follow the
+   tune: notes C to D# orange, E to G ultramarine, G# to B purple. A tune that moves should leave
+   a run of colours in the shape; a held note, the same colour pour after pour.
+2. Load **Red Cabbage** with a song with drums. Each snare should bloom pink in the left well and
+   each kick turn the right well green, with no pink or green paint poured: the colour should come
+   up through the violet where the drop landed and spread as the liquid moves. Where the two
+   meet across the middle they should go back to violet.
+3. Load **Chemical Clock** with the same song. Each kick should start a ring in one of three
+   places (upper left, upper right, bottom), taking them in turn; a ring passing through a place
+   should hold back the next touch there until the gel recovers.
+4. Bad: Poster's colour changing on the drums rather than the tune, a pour that changes colour
+   halfway (a pour keeps the bottle it was picked up with), Red Cabbage's wells saturating to one
+   flat colour within a minute, or Chemical Clock's rings coming so often they wash the spirals out.
+5. Decide: which other looks should hear the note (25i-1), and whether Chemical Clock wants the
+   snare and hats touching places of their own as well.
+6. After the fixes filmed on the Mac (25i-6): Poster's kick pours should now show in the left shape
+   on a plate already at its fill; Red Cabbage's acid well should stand on the left on every night
+   (the dish set square), its pink deepening to red only as far as vinegar goes and the green to
+   yellow-green, with a run of colours across each front; Chemical Clock's gel should keep turning
+   while the song plays, a ring from each kick's place and from the bottom place on each snare.
+
+## 97. The oil beads drawn on the GPU (PLAN 14ab-6)
+
+The beads' mask is drawn by the plate now, not by a canvas and an upload. `npm run beadmask`
+holds the drops to the CPU's drawing to a level, but the rings' edges were the canvas's
+antialiasing and are now each pixel's coverage, so an edge can sit a few levels apart.
+
+1. Fillmore with Oil Beads at 0.8 and Drops at 0, then Drops at 1, a minute of each with
+   music. The beads should look as they did: rings with a thin dark rim, drops with their
+   colours, walls and passengers. Nothing should flicker, lag a frame behind the flow, or
+   draw a bead where none is.
+2. The closeup at 3x on a crowd of rings: their rims should be as thin and even as before,
+   with no staircase of dark squares round the edge (droplens's old fault).
+3. The governor's readout with Drops at 1, before this change and after if you have the
+   last build: the frame should be cheaper, most on the busiest crowds.
+4. Bad: a stripe or square of mask missing (a tile the list did not reach), drops drawn
+   upside down against the flow, a passenger outside its drop.
+
+## 98. The projector's light: the lamp lever (PLAN 38a)
+
+`npm run lampfield` proves the law on a bare lab stage; only the Mac at 60 fps says how it
+looks on a moving plate. The Hot-Spot is now a projector's lamp lever: the plate is never
+brighter than the lamp, and nothing in the light moves.
+
+1. Any look, Hot-Spot 0: the plate looks as it did before this change, to the eye.
+2. A look that sets Hot-Spot (Sunburst at 0.8, the looks at 0.4 or 0.5): the middle is no
+   longer lifted and warm; the corners fall away a little at 0.4, a lot at 0.8. Raise Lamp
+   Motion to 1 on a still plate: the light on the stage stays put (only the gloss moves).
+3. Hot-Spot 1 on a light look with Lamp Ground up: a lit middle, dark sides, and a faint
+   coloured edge where it falls away (the condenser's glass), not a soft Gaussian.
+4. Second Lamp 1 with Hot-Spot 0.7: one side lit a little more and a little cooler, the
+   middle still white.
+5. Bad: a look that relied on the old lift now reads dim in the middle (say which), or the
+   edge colour reads as a painted ring rather than glass.
+
+## 99. Nothing on the plate makes light (PLAN 38h)
+
+`npm run nolight` shows each painted light gone in the lab; only the Mac at 60 fps shows
+whether the looks still read. Every change darkens or leaves alone; none brightens.
+Filmed before and after on the owner's Mac (2026-10-31) and judged from the phone page:
+"Looks great". One change came after the film: on the lamp-ground looks (Chemical Clock,
+Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
+
+1. Microdroplets up on any look (Settings → Look): the hundreds of tiny beads are now small
+   clear lenses with a dark ring, no white dot. In the closeup (camera), a brighter middle
+   and a thin contact line.
+2. A look with oil (Oil on Water, Clock Glass): at Focus's middle the oil's body is no longer
+   a touch brighter than the water. Turn Focus up and down: a bright and a dark caustic
+   round each oil body, swapping sides as Focus passes the middle.
+3. Gel Wheel up: the lamp goes the gel's colours and darker, never brighter than the bare
+   lamp; a deep red gel passes little green or blue.
+4. The looks with Glossiness set (twelve, 0.12 to 0.5; Ferro Paint highest, then Velvet
+   Underground and Splodascope): the dye no longer reads as lit domes; flat colour stays
+   flat and edges and ripples darken a little more. Glossiness 1 by hand is now four times
+   the real relief, the strongest it goes.
+5. Dish Vignette and Dish Spread: the rim is a thin dark line, not a warm bright one.
+6. No grain on the plate with the camera off; with the camera or a film stock on, the
+   grain is theirs as before. On Chemical Clock and Lava Lamp the dye's body keeps a fine
+   mottle of more and less pigment, which is the dye's own grain and not the plate's.
+7. Bad: a look that went dull or flat where it had sparkle the owner liked (say which, and
+   Glossiness can be turned up past where it was: it now steepens the real surface), black
+   doughnut droplets that read as dirt, a caustic ring that looks drawn.
+
+## 100. Every dial from very gentle to very extreme (PLAN 27h-1)
+
+Twenty-five dials go further than they did (the list is in PLAN 27h-1). The looks have not
+moved: every look's own value is where it was, so a look should open exactly as before.
+
+1. Any look, each widened dial at its first step and at its top, with music. The first step
+   should be barely there; the top should be more than nature, never black, one flat colour or
+   frozen. Magnet Strength at 3 over ferrofluid should stand the spikes up full, which 1 never
+   did at the default height. Saturation at 0 is a grey plate.
+2. The curved dials (Gel Speed, Film Grain, Grain Size, Gate Weave, Grain Fineness, Shot Length,
+   Bass Boost, Evaporation, Flick Strength, Evolve Speed, Plate Rock, Kick Bloom, Hue Journey,
+   Macro Zoom): the look's own value should sit a third or so along the slider, not hard
+   against the left stop, on the panel, a pinned desk fader, the phone and a MIDI fader alike.
+3. Evolve on for five minutes: it should wander the widened dials no further than before.
+4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
+   plate that blows up at a top.
+
+## 101. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+
+`filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
+colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
+(right) in the project's shared files, `film-physics-38m/` (`contact.png` has all six).
+
+1. Open Soap Film, then turn Film Physics to 1 (Design desk, camera group). The thin dye's
+   fringes go from loud multi-hue rings to straw, gold, olive-grey and blue-grey: what a real
+   film shows, and quieter (saturation 0.137 to 0.116 on the lab's plate).
+2. Macro Bead, Lacing Run, Oil & Water: zoom to a bubble. Its film tint changes from lilac and
+   pink to the soap film's own colours; small on the projected plate, plain in the closeup.
+3. Pick per look: keep the rainbow, take the real colours, or something between. A look that
+   should be real by its name (Soap Film) is the first candidate for 1.
+
+## 102. Every edge lit from beneath (PLAN 38h-2)
+
+`npm run nolight` lines 9 to 12 show the light from above gone in the lab; only the Mac
+shows whether the closeup still reads. Most of it is the closeup (the macro camera): the
+projected plate changes only where a look has the Second Lamp (its glint on bubbles is gone)
+or dyed beads on the lamp ground (a filter now, darker).
+
+1. Zoom into any look with bubbles: each bubble is a dark ring round a clear middle, as a
+   bubble photographed over a light box is; no white dots, no lit crescent.
+2. The closeup with Macro Cells and Macro Relief up: every cell a dark ring, no white glints,
+   no lit side. Macro Relief turns the rings from nothing to bold.
+3. Lamp Motion and Light Play moving: no edge in the closeup follows the lamp any more.
+4. Bad: a closeup that went dull where its sparkle was liked, or cells that read as black
+   holes; Glossiness steepens the surface the relief reads.
+
+## 103. Depth in the closeup's bubbles (PLAN 38h-7)
+
+`npm run closeupdepth` checks the optics in the lab; only the Mac shows whether the closeup
+now reads in depth beside the photos (drops/references).
+
+1. Zoom into any look with bubbles: each bubble a bright clear middle, the colour round it
+   squeezed into its rim, a thin dark band, and light again at the very edge.
+2. Light Play from 0 to 1: a soft glint grows on each bubble's top-left side; the projected
+   plate does not change.
+3. Bad: bubbles that read as white holes, or a glint that looks pasted on.
+4. (Part 2) Zoom all the way in on a small bubble: its rim a clean circle at any zoom, no
+   square corners or steps; a small bubble's middle the liquid's colour, paler, with a
+   bright glint; a big one's middle the clear lamp.
+
+## 104. The dials held inside the solver go further (PLAN 27h-2)
+
+Swirl, Dye Weight and Heat Spread now run to 2, Pushes Dye to 1.2, Drop Height to 2, Background
+Loop to 1.4 and Glass Smear to 3; Momentum's lasting current keeps up to 0.999 of itself a step
+(its dial was already 0.8 to 1). Before, the solver held each at its old top, so the far end of
+these dials did nothing. Every look opens as it did: the fourteen looks whose Glass Smear sat
+under the old 0.2 gate (and so smeared nothing) now say 0.
+
+1. Each at its top, on a look that uses it, with music: Swirl at 2 should curl the flow into
+   more and tighter eddies than 1 and settle into that, never blow up; Dye Weight at 2 with
+   Gravity up should sink the colour in faster, heavier fingers; Heat Spread at 2 with Dye
+   Weight should make broader salt fingers; Pushes Dye at 1.2 should clear the colour from
+   under the ferrofluid a little more than 1; Drop Height at 2 should throw the splash further;
+   Background Loop at 1.4 (two layers) should all but still the plate behind the lead.
+2. Glass Smear on the old plate (Thin Gap off): its first steps should now smear a little, where
+   anything under 0.2 did nothing and 0.2 jumped straight to a fifth of full; 3 should drag the
+   colour hard along the glass.
+3. Bad: a dial whose top looks the same as its old top, a look that opens differently than it
+   did yesterday, or any plate that blows up at a top.
+
+## 105. The back plate's grain on the lamp (PLAN 38h-4)
+
+**What changed.** With two plates on a lamp look, the back plate's pools now carry the
+pigment's grain the way the front's do (more or less dye from place to place), where before
+they were nearly flat. The lab shows the back plate's grain at the front's strength in the
+log of the light, and no single-pixel flecks at its edges. What it cannot show is how the
+back plate's mottle reads at 60 fps: drawn alone it is brighter than the front (38h-12), so
+the same grain moves its bright edges more, in patches.
+
+1. Lava Lamp, Two Plates on, Front level at 0 so the back plate shows alone: the pools
+   should look like the front plate's grain, a soft mottle of more and less pigment.
+2. Poster 1969 and Milk Marble the same way: the pools' edges against the bright glass.
+3. Bad: edges that look dithered or "digital", or a mottle that crawls more than the front's.
+
+## 106. OSC out into Resolume (PLAN 13.5-osc)
+
+`npm run oscout` reads the show's OSC out with a decoder of its own and holds the numbers;
+only Resolume can say it reads them.
+
+1. Resolume and the Mac app on the same Mac, a Pro licence in. Resolume: Preferences → OSC →
+   OSC Input on, port 7000. App: Settings → Sound → **OSC out**; the line says "Sending colour,
+   sound and the beat to 127.0.0.1:7000".
+2. In Resolume's Edit OSC mode, give a layer's Hue Rotate the address
+   `/chromaglass/out/colour/hue` and a Strobe effect's trigger `/chromaglass/out/beat`. With
+   music playing, the hue should follow the plate's dye and the strobe land with the plate's
+   kicks, not a frame behind.
+3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
+4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
+   the strobe a steady beat late.

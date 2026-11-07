@@ -156,6 +156,12 @@ try {
     input.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
   }, { testId, value });
+  /*
+    A control is drawn once on a tab (`drawnElsewhere` in lib/deskLayout.ts):
+    with the Rides out, Speed and Evolve Speed are theirs and not the
+    Recipe's, so the control is looked for on the Rides first.
+  */
+  const setControl = async (key, value) => await setSlider(`ride-${key}`, value) || await setSlider(`recipe-${key}`, value);
 
   // Only the plate, not the desk around it. A full-page shot at 1200x800 is
   // a megapixel of mostly-static UI to encode, decode and walk three times
@@ -194,7 +200,7 @@ try {
   // nothing to blend into and would flatter any version of this shader.
   // Developed, not settled: the age of the plate is what this wait is for.
   await developPlate(page, 9000);
-  const slowed = await setSlider('recipe-globalSpeed', 0.005) && await setSlider('recipe-automateRate', 0);
+  const slowed = await setControl('globalSpeed', 0.005) && await setControl('automateRate', 0);
   check('the plate can be slowed down to be photographed', slowed, slowed ? 'Speed and Evolve on the bench' : 'no recipe sliders found');
   await page.evaluate(() => window.chromaglassDebug().bubbles.clear());
   await settlePlate(page, 1500);
@@ -425,7 +431,7 @@ try {
       That is not a loosened gate: it is the difference between measuring the
       liquid and measuring the tripod.
     */
-    await setSlider('recipe-globalSpeed', 0.05);
+    await setControl('globalSpeed', 0.05);
     let flat = await refill(), took = 0;
     for (const t of [2, 4, 6, 8, 10, 12, 15, 18, 21, 24]) {
       if (flat && flat.inD > flat.outD * 0.5) break;

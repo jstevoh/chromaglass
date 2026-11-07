@@ -109,7 +109,13 @@
   ceiling at rest (the ring is the sheet past rest). The gap's spring, which
   the shader runs on every cell, pulls the laid dent back toward rest too,
   so the sheet's own state takes the same spring each step, and what is laid
-  is only the sheet's own motion. On a dome (Plate Shape below zero) the
+  is only the sheet's own motion. That spring is the glass coming back up
+  against the film's suction (PLAN 38l): the share it keeps goes with the
+  gap cubed, so it is taken cell by cell (STEFAN_FILM), on the dent as the
+  plate holds it and on the solve's own state (out to space, each node
+  times its keep, and back to the modes), with the gap the shader will see
+  there, rest less the dent. One share for the whole sheet, as before 38l,
+  left the plate's gap 7% of a dent off the sheet's (npm run sheet). On a dome (Plate Shape below zero) the
   middle rests near the floor: a kick there presses no deeper than the
   dome's rest under it allows (kickRoom), and what the floor still refuses
   of a dent's flank is owed in the shader and paid out of the sheet's next
@@ -123,9 +129,13 @@
   where the film drains an eighth as fast); the sheet's rim is the plate's
   square, the dish's is its circle; the gap under it is the plate's 6 mm
   middle everywhere, not the dome; the force is set from the stamp's
-  volume, not a hand's; and (f) the layer drains by lubrication, which is
-  the liquid's pace only in glycerine (above).
+  volume, not a hand's; (f) the layer drains by lubrication, which is
+  the liquid's pace only in glycerine (above); and (g) the suction's gap is
+  rest less the sheet's own dent, not the plate's gap, so a hand pressing
+  on the same cells deepens the plate's film without slowing the sheet's
+  lift there (PLAN 38l-2).
 */
+import { DISH_GAP_METRES } from './turntable.ts';
 
 /** Cells across the sheet's own grid (a power of two). */
 export const SHEET_N = 128;
@@ -145,6 +155,47 @@ export const SHEET_DEEPEST = 0.02;
 export const SHEET_QUIET = 1e-5;
 /** The tightest the gap closes (plate widths): squeezeUpdate's floor. */
 export const GAP_FLOOR = 0.004;
+/*
+  The film a full press leaves, as a share of the rest gap: where Press
+  Lift's half-life is read for the glass coming back up against the film's
+  suction (PLAN 38l, squeezeUpdate in gpu/wgsl/fluid/gap.ts, and the sheet's
+  own dent below, which must take the same law or the two part). The share
+  of a dent the glass keeps over a step is (1 − spring)^((h/h_s)³), h_s =
+  STEFAN_FILM of the rest gap, h/rest held between 0 and 2.
+
+  Why 0.30 and not the quarter it was first. The hand's press closes the
+  film by the same law (Stefan, squeezeUpdate's inverseSqrt): a(h/h₀)³
+  against the lift's k(h₀ − h)(h/h_s)³. Both go as h³, so the film's
+  viscosity drops out of a held press and it settles where the push
+  balances the glass, a dent of a·STEFAN_FILM³/k at any depth: Hooke's
+  F/K, as a hand on a real glass does. So this number is the glass's
+  stiffness against the hand, and it sets how deep a press goes as its
+  cube. At a quarter the Press tool held 1.5 s on the owner's Mac went to
+  0.0146 of a 0.03 gap, where it used to go to 0.0062, and was back in
+  0.6 s (it used to still be open at 4 s): never under h_s, where the lift
+  is slower than the plain spring was, so no press peeled. The Mac's
+  sweep is in PLAN 38l-4. Shallower dents, a tap or a kick's, still come
+  back (1/STEFAN_FILM)³ times Press Lift's rate near rest: stiff glass on
+  a thick film.
+
+  Here and not in gpu/fluid/constants.ts (which re-exports it) because
+  this file stands alone and the shader already reads lib.
+*/
+export const STEFAN_FILM = 0.30;
+
+/*
+  e^z for the suction's share, which the sheet takes on every cell of the
+  app's grid each step (37 000 on its 192). Math.exp measured 0.48 ms over
+  those in node, a step's whole sheet without the suction being 0.8 ms;
+  near 1, where a step's share always is at the app's springs (z about
+  −0.03 at rest), the series to z⁴ is within |z|⁵/120, under 3e-9 of the
+  share below |z| = 0.05, and took 0.19 ms. Past it (Press Lift near full),
+  Math.exp.
+*/
+function expNear0(z: number): number {
+  return z > -0.05 ? 1 + z * (1 + z * (0.5 + z * (1 / 6 + z * (1 / 24)))) : Math.exp(z);
+}
+
 
 /**
  * The gap's rest at plate fraction (x, y) under Plate Shape `curve`, as the
@@ -258,7 +309,7 @@ export class RhythmSheet {
     this.plateMetres = opts.plateMetres ?? 0.2;
     // 0.1 mm of polyester (E 4 GPa, ν 0.4): lib/squish.ts SHEET_D, written out so this file stands alone.
     this.D = opts.D ?? (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4));
-    this.h0 = opts.h0 ?? 0.006;
+    this.h0 = opts.h0 ?? DISH_GAP_METRES;
     const n = this.n, n2 = n * n;
     const side = this.span * this.plateMetres;
     this.dx = side / n;
@@ -462,6 +513,41 @@ export class RhythmSheet {
     return out;
   }
 
+  /**
+   * The sheet in real space on its own grid (metres) back into its modes:
+   * toSpace's exact inverse, so the suction's share can be taken node by
+   * node and the solve go on from it exactly. The forward transform as the
+   * inverse of the conjugate, conj(ifft(conj w)); along the rows two at a
+   * time (the second row as the imaginary part, split again by the
+   * Hermitian halves), then down the columns for the x-frequencies 0 to
+   * n/2, the rest their conjugates. About what toSpace costs.
+   */
+  private toModes(w: Float64Array): void {
+    const n = this.n, h = n / 2, tr = this.tr, ti = this.ti, cr = this.cr, ci = this.ci, wr = this.wr, wi = this.wi;
+    for (let j = 0; j < n; j += 2) {
+      for (let i = 0; i < n; i++) { tr[i] = w[i + j * n]; ti[i] = -w[i + (j + 1) * n]; }
+      ifft1(tr, ti, 0, 1, n, this.cos, this.sin, this.rev);
+      // Z = conj(tr + i ti) is row j's spectrum A plus i times row j+1's B: A_k = (Z_k + Z*_{n−k})/2, B_k = (Z_k − Z*_{n−k})/2i.
+      const o1 = j * (h + 1), o2 = (j + 1) * (h + 1);
+      for (let k = 0; k <= h; k++) {
+        const m = (n - k) % n;
+        cr[o1 + k] = 0.5 * (tr[k] + tr[m]); ci[o1 + k] = 0.5 * (ti[m] - ti[k]);
+        cr[o2 + k] = -0.5 * (ti[k] + ti[m]); ci[o2 + k] = 0.5 * (tr[m] - tr[k]);
+      }
+    }
+    // toSpace takes a = 1/side² and the unnormalised inverse, so the modes are the plain sum times side²/n².
+    const side = this.span * this.plateMetres, c = (side * side) / (n * n);
+    for (let i = 0; i <= h; i++) {
+      for (let j = 0; j < n; j++) { tr[j] = cr[i + j * (h + 1)]; ti[j] = -ci[i + j * (h + 1)]; }
+      ifft1(tr, ti, 0, 1, n, this.cos, this.sin, this.rev);
+      for (let j = 0; j < n; j++) { wr[i + j * n] = tr[j] * c; wi[i + j * n] = -ti[j] * c; }
+    }
+    for (let i = h + 1; i < n; i++) for (let j = 0; j < n; j++) {
+      const q = (n - i) + ((n - j) % n) * n;
+      wr[i + j * n] = wr[q]; wi[i + j * n] = -wi[q];
+    }
+  }
+
   /** The sheet's dent now (plate widths, positive closes the gap) at plate fraction (x, y): for the checks. */
   depthAt(x: number, y: number): number {
     const w = this.toSpace();
@@ -532,13 +618,41 @@ export class RhythmSheet {
   }
 
   /**
+   * The rest gap under Plate Shape `curve` (plate widths) and 1/(STEFAN_FILM·rest), on
+   * the app's L grid and on the sheet's own nodes over the plate (its images take
+   * these), kept until the grid or the shape changes.
+   */
+  private restL: Float64Array | null = null;
+  private invL: Float64Array | null = null;
+  private restN = new Float64Array(0);
+  private invN = new Float64Array(0);
+  private restKey = '';
+  private restFor(L: number, curve: number): void {
+    const key = `${L} ${curve}`;
+    if (key === this.restKey) return;
+    this.restKey = key;
+    const n = this.n, h = n / 2, step = this.dx / this.plateMetres;
+    this.restL = new Float64Array(L * L); this.invL = new Float64Array(L * L);
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+      const r = plateRest((i + 0.5) / L, (j + 0.5) / L, curve);
+      this.restL[i + j * L] = r; this.invL[i + j * L] = 1 / (STEFAN_FILM * Math.max(r, GAP_FLOOR));
+    }
+    if (this.restN.length !== n * n) { this.restN = new Float64Array(n * n); this.invN = new Float64Array(n * n); }
+    for (let j = 0; j <= h; j++) for (let i = 0; i <= h; i++) {
+      const r = plateRest(i * step, j * step, curve);
+      this.restN[i + j * n] = r; this.invN[i + j * n] = 1 / (STEFAN_FILM * Math.max(r, GAP_FLOOR));
+    }
+  }
+
+  /**
    * One step of `dtSeconds`: the sheet moved exactly, and its change laid on
    * an L × L plate, added into `out` as the gap's change (plate widths,
    * negative closes it). `spring` is the share of the way back to rest the
    * plate's own spring takes the gap this step (squeezeUpdate's gapSpring),
-   * which the laid dent takes too. Returns the cells laid.
+   * which the laid dent takes too, cell by cell against the film's suction
+   * on Plate Shape `curve`'s rest (STEFAN_FILM). Returns the cells laid.
    */
-  step(L: number, dtSeconds: number, spring: number, out: Float32Array): number {
+  step(L: number, dtSeconds: number, spring: number, out: Float32Array, curve = 0): number {
     if (!this.live) return 0;
     const pressing = this.presses.some((p) => p.age < p.hold);
     const dt = Number.isFinite(dtSeconds) && dtSeconds > 0 ? dtSeconds : 1 / 60;
@@ -559,7 +673,10 @@ export class RhythmSheet {
     if (!this.held || this.heldL !== L) this.sampleFor(L);
     const held = this.held!, at0 = this.at0!, at1 = this.at1!, wt = this.wt!, n = this.n;
     const w = this.toSpace();
-    const keep = 1 - Math.max(0, Math.min(1, Number.isFinite(spring) ? spring : 0));
+    const lnFree = Math.log(1 - Math.max(0, Math.min(1, Number.isFinite(spring) ? spring : 0)));
+    const sprung = lnFree < 0, P = this.plateMetres;
+    if (sprung) this.restFor(L, curve);
+    const restL = this.restL!, invL = this.invL!;
     let cells = 0, most = 0, laid = 0, closed = 0, closing = 0;
     for (let j = 0; j < L; j++) {
       const r0 = at0[j] * n, r1 = at1[j] * n, ty = wt[j];
@@ -568,8 +685,12 @@ export class RhythmSheet {
         const a0 = at0[i], a1 = at1[i], tx = wt[i];
         const now = (1 - ty) * ((1 - tx) * w[a0 + r0] + tx * w[a1 + r0]) + ty * ((1 - tx) * w[a0 + r1] + tx * w[a1 + r1]);
         const change = now - held[idx];
-        // Held as the plate will hold it after its spring: the next step's change is the sheet's own.
-        held[idx] = now * keep;
+        // Held as the plate will hold it after its spring, at the gap the shader sees there: the next step's change is the sheet's own.
+        if (sprung) {
+          // The suction's share (STEFAN_FILM), on the cached rest: this runs on every cell of the app's grid each step.
+          const x = Math.min(2 / STEFAN_FILM, Math.max(GAP_FLOOR, restL[idx] - now / P) * invL[idx]);
+          held[idx] = now * expNear0(lnFree * x * x * x);
+        } else held[idx] = now;
         most = Math.max(most, Math.abs(now));
         if (change === 0) continue;
         const g = -change / this.plateMetres;
@@ -583,7 +704,29 @@ export class RhythmSheet {
     this.closed += closed;
     this.peak = most / this.plateMetres;
     if (pressing) this.pressedCells += closing;
-    if (keep < 1) for (let q = 0; q < this.wr.length; q++) { this.wr[q] *= keep; this.wi[q] *= keep; }
+    /*
+      And the solve's own state, node by node. The sheet is odd about the
+      plate's edges (the images in sumLoads), so a node past the plate's
+      far edge in its box is a plate node mirrored and negated: it takes
+      that node's keep, read at that node's gap, which keeps the sheet odd
+      and costs a quarter of the nodes.
+    */
+    if (sprung) {
+      const h = n / 2, restN = this.restN, invN = this.invN;
+      for (let jj = 0; jj <= h; jj++) {
+        const mj = (n - jj) % n;
+        for (let ii = 0; ii <= h; ii++) {
+          const q = ii + jj * n, mi = (n - ii) % n;
+          const x = Math.min(2 / STEFAN_FILM, Math.max(GAP_FLOOR, restN[q] - w[q] / P) * invN[q]);
+          const keep = expNear0(lnFree * x * x * x);
+          // The node and its three images (on the plate's edges and middle lines some are the node itself, which is zero there).
+          w[q] *= keep;
+          if (mi !== ii) w[mi + jj * n] *= keep;
+          if (mj !== jj) { w[ii + mj * n] *= keep; if (mi !== ii) w[mi + mj * n] *= keep; }
+        }
+      }
+      this.toModes(w);
+    }
     this.steps++;
     // Quiet: nothing pressing and nowhere a dent a three-thousandth of the gap. What is left is the plate's spring's.
     if (this.presses.length === 0 && most / this.plateMetres < SHEET_QUIET) this.forget();
@@ -655,7 +798,7 @@ const reachCache = new Map<string, number>();
  * effects (the slosh dish's press, the beads, the lift's fingers; lib/squish.ts
  * dentRadius) take the solved dent's width without a solve.
  */
-export function sheetReach(nu: number, hold: number, h0 = 0.006, density = 1000, D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4))): number {
+export function sheetReach(nu: number, hold: number, h0 = DISH_GAP_METRES, density = 1000, D = (4e9 * 1e-4 ** 3) / (12 * (1 - 0.4 * 0.4))): number {
   const key = `${nu}:${hold}:${h0}:${density}:${D}`;
   const hit = reachCache.get(key);
   if (hit !== undefined) return hit;

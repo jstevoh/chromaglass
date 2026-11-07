@@ -52,6 +52,7 @@ import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { makeRng } from '../src/lib/rng.ts';
+import { appSource } from './appSource.mjs';
 
 let failed = 0;
 const check = (name, ok, detail = '') => {
@@ -402,7 +403,7 @@ console.log('\nWhat it never touches');
 // ── The pieces are connected ────────────────────────────────────────
 console.log('\nThe pieces are connected');
 {
-  const app = readFileSync('src/App.tsx', 'utf8');
+  const app = appSource();
   check('App drives the planner and glides its moves', /new SlowEvolve\(/.test(app) && /\.step\(/.test(app) && /evolvePalette/.test(app));
   // A glide lasts up to 90 s, so a look laid, opened, faded to or taken back must stop it.
   const lets = ['const applyPreset', 'const applyUserPreset', 'const fadeSettingsTo', 'const revertLook'].filter(f => {

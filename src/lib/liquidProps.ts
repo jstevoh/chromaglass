@@ -30,7 +30,7 @@
  * a little faster than water, not a little slower.
  */
 import type { LiquidBehaviour } from '../types';
-import { DISH_METRES, DISH_REST_GAP } from './turntable.ts';
+import { DISH_METRES, DISH_GAP_METRES } from './turntable.ts';
 
 /** What speciesOf reads of a bottle: its behaviour, or the deposit made from it (lib/liquidPhase.ts). */
 type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index' | 'scatter'>;
@@ -121,13 +121,13 @@ export const HELD_POUR = 0.5e-6;
  *
  * `radius` is in plate widths. With `seconds`, a held bottle's stream for
  * that long: HELD_POUR·seconds over the dome the pour lands as, half the
- * disc's area times the 6 mm rest gap. Without, a one-shot dose (a drop
+ * disc's area times the rest gap (lib/turntable.ts DISH_GAP_METRES). Without, a one-shot dose (a drop
  * that falls, the automation's): `amount` is the share, as the body's is.
  */
 export function pourShare(radius: number, amount: number, seconds?: number): number {
   if (!(amount > 0)) return 0;
   if (seconds === undefined) return Math.min(1, amount);
   const r = radius * DISH_METRES;
-  const dome = (Math.PI * r * r) / 2 * DISH_REST_GAP * DISH_METRES;
+  const dome = (Math.PI * r * r) / 2 * DISH_GAP_METRES;
   return Math.min(1, (amount * HELD_POUR * Math.max(0, seconds)) / dome);
 }

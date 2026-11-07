@@ -96,6 +96,7 @@
  * the best part of an hour; on Metal under a minute.
  */
 import { openLab } from './lab.mjs';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const { page, close } = await openLab();
 const failed = [];
@@ -255,7 +256,7 @@ const still = (rows, T) => Math.abs(at(rows, T).front - rows[0].front) < 0.5 && 
   is a thousandth of water's, so a stable step is long); far too slow in
   water, where Huppert's law is the reference instead.
 */
-function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = 0.006) {
+function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = DISH_GAP_METRES) {
   const n = 600, dr = 2e-5, G = gPrime / (3 * nuv);
   const h = new Float64Array(n), dh = new Float64Array(n);
   for (let i = 0; i < n; i++) { const r = (i + 0.5) * dr; h[i] = Math.max(0, 1 - (r / R) ** 2) * peakUnits * dyeLayer; }

@@ -23,8 +23,10 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
   - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
     rows): legible, but a third way of saying off; make them `disabled` with the reason.
-  - "All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".
-  - "Sound" in the layout switch next to the Sound dot that opens the same panel.
+  - ~~"All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".~~ The
+    status bar's alone since 35c-5.
+  - ~~"Sound" in the layout switch next to the Sound dot that opens the same panel.~~ Gone with the
+    layout switch: the tabs are Perform, Sequence and Setup (found in 35c-5's sweep).
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
     folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
     draw them once, once it takes a title per option and a number id.
@@ -41,12 +43,27 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   2026-10-29, 19m).
 - ~~**35c-2** One home per setting, second half.~~ **Shipped**: Flash Limit's one switch, each Impact master under its source's Drive, Plate Spin, Squish Plate in Build's deck, the sequencer button, Takes as a pointer. Story in `docs/plan-shipped.md` §35c-2 (moved 2026-10-29, 19m-2).
 - **35c-3** One home for **MIDI on** and the **audio source**. *Shipped*: Settings' Controller section is MIDI's one home, the Sound sheet the source's. Story in `docs/plan-shipped.md` §35c-3 (moved 2026-10-29, 19m-2). Left from it:
-  - The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
-    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.
+  - ~~The Sound sheet's microphone picker (`sound-input-picker`) and Settings' Input
+    (`audio-input`) are still two pickers for the one device; the dot lands on Settings'.~~
+    Settings' Input alone since 35c-5.
   - 35b-2's pin picker and command palette still list by section, not by the seven groups.
   - Each Drive/Impact pair (now side by side under its source) is still two knobs: whether
     each becomes one Strength per input is undecided, and 14ad-2 waits on it (from 35c-2's
     first statement, moved 2026-10-29, 19m-2).
+- ~~**35c-4** One control, one place on a tab; Send to wall is the Wall.~~ **Shipped** 2026-10-29:
+  the plate bar's Send to wall button gone (the header's Wall sends Preview's copy), and the Rides,
+  Recipe and section panels never draw one control twice on a tab. Story in `docs/plan-shipped.md`
+  §35c-4. Left from it:
+  - The Recipe's and Rides' Choose list does not say a control is drawn on another panel of the
+    tab, so picking Speed onto the Recipe beside the Rides answers with the line under the dials,
+    not in the list where the pick was made.
+- ~~**35c-5** One home each, the second sweep.~~ **Shipped** 2026-10-30: All settings… in the status
+  bar alone, Beat Prediction in Sound alone (the rides' Follow beat switch gone), the no-controller
+  route the header's MIDI light alone, the plates' music route in Plate Spin alone, the microphone in
+  Settings' Input alone (the Sound sheet says which and leads there). Then the three the sweep left, on the owner's "fix all this stuff": Change
+  in Sound… steps aside while Music & Drone is on the tab, the set's button says "Save set", and
+  `npm run shelf` reaches the shelf through Setup and runs in the browser shard. Story in
+  `docs/plan-shipped.md` §35c-5.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

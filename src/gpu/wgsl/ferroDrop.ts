@@ -70,6 +70,7 @@
  */
 import { SPIKES_WGSL, SPIKE_PITCH } from './spikes';
 import { FILM_H0, PHASE_VIEW_TOP } from './standing';
+import { DISH_GAP_FIELD_UV, DISH_GAP_METRES, DISH_METRES } from '../../lib/turntable';
 
 const W = '@compute @workgroup_size(8, 8)';
 
@@ -107,8 +108,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let phase = unpack2x16unorm(textureLoad(view, vec2i(id.xy), 0).x).x * ${PHASE_VIEW_TOP}.0;
   let chi = clamp((phase - 0.2) / 0.6, 0.0, 1.0);
   let p = (vec2f(id.xy) + 0.5) / f32(n);
-  var b = 0.0;
-  for (var k = 0; k < 4; k++) { b += magnetShare(p, A.mags[k]); }
+  // The magnets' fields add as vectors (PLAN 38k; until then their |B| did).
+  let b = magnetsShare(p, A.mags[0], array<vec4f, 3>(A.mags[1], A.mags[2], A.mags[3]));
   textureStore(dst, vec2i(id.xy), vec4f(chi, kelvin(b / A.more.x), 0.0, 0.0));
 }`;
 
@@ -190,6 +191,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, q, vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), z, 2.0));
 }`;
 
+/* The plate's gap at rest (lib/turntable.ts DISH_GAP_METRES, PLAN 38r), in l_c: the most a drop can stand before the top glass (gpu/ferroDrop.ts). */
+export const GAP_LC = DISH_GAP_METRES / DISH_METRES / (SPIKE_PITCH / (2 * Math.PI));
 export const DROP_KERNELS = { dropSource: SOURCE, dropMean: MEAN, dropRelax: RELAX, packVelDrop: PACK } as const;
 
 /*
@@ -340,9 +343,12 @@ fn plateSeen(uv: vec2f, bg: vec3f) -> vec3f {
   The dye: the water over the drop is the gap less the drop's height, and
   the light goes down through it and back up, so the reflection is filtered
   by the column's dye to the power 2(1 − h/gap): the top of a tall drop is
-  the clearest, its foot the most coloured.
+  the clearest, its foot the most coloured. \`gapUnits\` is the plate's view
+  of the gap, in gap units (0.03 at rest); in l_c it is that times the plate
+  widths in a unit (lib/turntable.ts DISH_GAP_FIELD_UV, PLAN 38r) over LC_UV.
 */
-fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapLc: f32) -> vec3f {
+fn ferroDropSeen(fuv: vec2f, key: vec3f, bg: vec3f, gapUnits: f32) -> vec3f {
+  let gapLc = gapUnits * ${DISH_GAP_FIELD_UV} / LC_UV;
   let e = 0.5 / U.gridSize;
   let h = dropHeight(fuv);
   let hx = (dropHeight(fuv + vec2f(e, 0.0)) - dropHeight(fuv - vec2f(e, 0.0))) / (2.0 * e) * LC_UV;

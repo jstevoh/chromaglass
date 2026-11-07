@@ -37,15 +37,11 @@ Perform and Design desks), **phone**, **wall** (the show screen or projector), *
   0.05, 1 and 5 of its Amount, against what the dial's ends should mean (the Spray's
   mist, the Press's pressure, the Finger's drag, capped at 0.25 in `fingerDrag`, so its
   Amount stops doing anything past about 1.7). Found with QA-20; not measured yet.
-- **QA-20b** Blow's push on `npm run tools` (Mac) spreads widely from run to run: on
-  twelve runs of 9 and 10 October the stroke out to the left moved the pool 0.08% to
-  2.62% and the one to the right 0.28% to 2.11%, against the lab's 2.72% and 2.82%
-  (`npm run airblow`); #335's run went red on 0.08% against 0.15% to beat with 44 of 46
-  steps laid as air, on a branch that did not touch Blow. Not QA-20's bubbles: the
-  check runs with Bubbles 0 (`scripts/tools.mjs`, its settings). Neither the way (left
-  read lower on 8 runs, right on 4) nor the steps laid as air (44 to 54 where printed) follows it,
-  so the spread is in what the app does between the pointer's moves and the steps
-  (15g-7 is the same question); the next read is the stroke's breath per step, printed.
+- ~~**QA-20b** Blow's push on `npm run tools` (Mac) spreads widely from run to run (0.08% to
+  2.62% on twelve runs of 9 and 10 October against the lab's 2.72%).~~ **Fixed with 15g-7**
+  (#623): what the app did between the pointer's moves and the steps was the pointer
+  handler's press of the glass on every pointer event, thirty a stroke, against the breath's
+  steps, which came with the runner's pace.
 
 - ~~**QA-3** Picking a liquid pours it (Ferrofluid turns up before the hand pours).~~ #269
   live (PLAN 15i).

@@ -381,7 +381,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                     <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$164</span> once</span>
                   </div>
                   <p className="mt-1 text-[12px] leading-snug text-text-2">
-                    Pay the difference for several projectors, video out, Art-Net, OSC and your own logo.
+                    Pay the difference for OSC, Art-Net, the 1024² grid and cloud sync.
                   </p>
                 </a>
               ) : (
@@ -406,7 +406,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                   >
                     <span className="text-[13px] font-medium text-text">Pro</span>
                     <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$199</span> once</span>
-                    <span className="mt-1.5 text-[12px] leading-snug text-text-2">All of Home, plus several projectors, video out, Art-Net, OSC.</span>
+                    <span className="mt-1.5 text-[12px] leading-snug text-text-2">All of Home, plus OSC, Art-Net, the 1024² grid and cloud sync.</span>
                   </a>
                 </div>
               )}

@@ -36,6 +36,8 @@ import type { RemoteMessage } from './remoteProtocol';
 
 /** Frames a second at most. Enough to see where a drop landed while the finger is still down. */
 export const PAD_PICTURE_FPS = 15;
+/** Pictures taken and not yet sent, at most: enough for a slow show's trip (see `tapGrab`). */
+export const PAD_PICTURE_IN_FLIGHT = 8;
 /** The picture's width range, in pixels; a remote asks for its frame's width inside it. */
 export const PAD_PICTURE_MIN_WIDTH = 160;
 export const PAD_PICTURE_MAX_WIDTH = 480;
@@ -116,12 +118,24 @@ export class PadPictureSender {
    * half a frame of slack it takes 15 when the frames allow, and every
    * frame when they come slower than that.
    *
-   * Up to three in flight, not one: a picture's round trip (the read, the
+   * Several in flight, not one: a picture's round trip (the read, the
    * post to the worker and its answer) waits for gaps between the page's
    * frames, and one at a time came to 4.3 a second on the Mac's show at 18
    * frames. The pace is the due time's; the round trip only delays each
    * picture by those frames. Answers can come back out of order; one older
    * than a picture already sent is dropped.
+   *
+   * How many: the trip is counted in frames, so the slower the show draws,
+   * the longer it is in time, and it is longest exactly when every frame is
+   * needed. Three were enough at 18 and 30 frames a second, and on a Mac
+   * runner starved to 14 they came to 6.3 pictures a second (#390, #436):
+   * the read waits behind the plate's own frames queued on the GPU, about
+   * seven frames there for the whole trip, 480 ms, so three places gave
+   * three pictures a trip. `npm run drawwall` makes that trip on its
+   * stand-in (each read held four frames) and read 6.0 a second at 14
+   * frames with three, 14.3 with eight. Eight cover a trip of half a second
+   * at the pace's fifteen; a fast show never has more than one or two out,
+   * and the GPU's slots (`gpu/padGrab.ts`) are made only when one is.
    */
   tapGrab(grab: PadGrab, frameWidth: number, frameHeight: number): void {
     this.grabbedAt = this.now();
@@ -129,6 +143,7 @@ export class PadPictureSender {
       const read = grab(w, h);
       if (!read) return false;
       read.then((pixels) => {
+        if (this.inflight.has(seq)) this.readAt.set(seq, this.now());
         const worker = pixels && this.encoder();
         if (!pixels || !worker) { done(null, 0); return; }
         this.post(worker, seq, { pixels, w, h }, [pixels.buffer], done);
@@ -198,10 +213,12 @@ export class PadPictureSender {
     const t = this.now();
     // An encode that never answered in two seconds is given up on, so it
     // cannot hold a place in flight until a reload.
-    for (const [s, at] of this.inflight) if (t - at > 2000) { this.inflight.delete(s); this.waiting.delete(s); }
-    if (this.inflight.size >= IN_FLIGHT || t < this.due - 8) return;
+    for (const [s, at] of this.inflight) if (t - at > 2000) { this.inflight.delete(s); this.waiting.delete(s); this.readAt.delete(s); this.encodeMs.delete(s); }
     const live = this.leases.filter(l => l.until > t);
     if (live.length === 0 || frameWidth === 0 || frameHeight === 0) return;
+    this.trace.frames++;
+    if (t < this.due - 8) return;
+    if (this.inflight.size >= PAD_PICTURE_IN_FLIGHT) { this.trace.full++; return; }
     // The widest frame asking: the iPad's, when a phone and an iPad both are.
     const width = Math.max(...live.map(l => l.width));
     const aspect = frameWidth / frameHeight;
@@ -210,15 +227,23 @@ export class PadPictureSender {
     const seq = ++this.seq;
     this.inflight.set(seq, t);
     const done: Done = (src, size) => {
-      if (!this.inflight.delete(seq)) return;   // answered after the watchdog gave up on it
+      const taken = this.inflight.get(seq);
+      if (taken === undefined || !this.inflight.delete(seq)) return;   // answered after the watchdog gave up on it
       this.waiting.delete(seq);
+      const read = this.readAt.get(seq), enc = this.encodeMs.get(seq);
+      this.readAt.delete(seq);
+      this.encodeMs.delete(seq);
+      this.trace.answered++;
+      const trips = this.trace.trips;
+      trips.push([read === undefined ? -1 : Math.round(read - taken), enc === undefined ? -1 : Math.round(enc), Math.round(this.now() - taken)]);
+      if (trips.length > 60) trips.shift();
       if (!src || seq < this.last) return;
       this.last = seq;
       this.sent++;
       this.bytes += size;
       this.send({ type: 'picture', src, w, h, aspect, seq });
     };
-    if (!start(w, h, seq, done)) { this.inflight.delete(seq); return; }
+    if (!start(w, h, seq, done)) { this.inflight.delete(seq); this.trace.refused++; return; }
     this.due = Math.max(this.due + 1000 / PAD_PICTURE_FPS, t);
   }
 
@@ -229,12 +254,28 @@ export class PadPictureSender {
     worker.postMessage({ ...job, quality: QUALITY, seq }, transfer);
   }
 
+  /** When each picture in flight came back from the GPU (`tapGrab`), and how long the worker's own encode of it took. */
+  private readAt = new Map<number, number>();
+  private encodeMs = new Map<number, number>();
+  /**
+   * Where the pictures' time goes, for `chromaglassDebug().padPicture` and the
+   * check that reads it (`npm run drawwall`): frames offered while a remote
+   * asked, frames passed over because every place in flight was taken, starts
+   * the grab refused (no slot), pictures answered, and the last sixty round trips as [taken to
+   * read back, the worker's own encode, taken to encoded] in ms (-1: not
+   * known, as the canvas's way has no read step).
+   */
+  readonly trace = { frames: 0, full: 0, refused: 0, answered: 0, trips: [] as [number, number, number][] };
+
   private due = -Infinity;
   /** When the engine last took a frame on the GPU (`tapGrab`). */
   private grabbedAt = -Infinity;
   private worker: Worker | null | undefined;
   /** The worker's answers still awaited: seq → what to do with it. */
   private waiting = new Map<number, Done>();
+
+  /** What `chromaglassDebug().padPicture` says: the counts, the ways, and the trace. */
+  get debug() { return { sent: this.sent, bytes: this.bytes, wanted: this.wanted, via: this.via, from: this.from, trace: this.trace }; }
 
   /** Where the frames are read: on the GPU by the WebGPU engine, or from the canvas (for the checks). */
   get from(): 'gpu' | 'canvas' { return this.now() - this.grabbedAt < 1000 ? 'gpu' : 'canvas'; }
@@ -252,10 +293,11 @@ export class PadPictureSender {
       const w = new Worker(url);
       URL.revokeObjectURL(url);
       // Only answers still awaited: one the watchdog gave up on is dropped.
-      w.onmessage = (e: MessageEvent<{ seq: number; src: string | null; size: number }>) => {
+      w.onmessage = (e: MessageEvent<{ seq: number; src: string | null; size: number; ms?: number }>) => {
         const done = this.waiting.get(e.data.seq);
         if (!done) return;
         this.waiting.delete(e.data.seq);
+        if (typeof e.data.ms === 'number') this.encodeMs.set(e.data.seq, e.data.ms);
         done(e.data.src, e.data.size);
       };
       // A worker that fails is not asked again: the pictures go by `toBlob`.
@@ -273,8 +315,6 @@ export class PadPictureSender {
   }
 }
 
-/** Pictures taken and not yet sent, at most. */
-const IN_FLIGHT = 3;
 
 /**
  * The worker: a bitmap or the GPU's bytes in, a JPEG data URL out. The bytes
@@ -286,6 +326,7 @@ const ENCODER = `
 let c = null, cpu = null;
 onmessage = async (e) => {
   const { bmp, pixels, w, h, quality, seq } = e.data;
+  const t0 = performance.now();
   try {
     let canvas;
     if (pixels) {
@@ -299,7 +340,7 @@ onmessage = async (e) => {
       canvas = c;
     }
     const blob = await canvas.convertToBlob({ type: 'image/jpeg', quality });
-    postMessage({ seq, src: new FileReaderSync().readAsDataURL(blob), size: blob.size });
+    postMessage({ seq, src: new FileReaderSync().readAsDataURL(blob), size: blob.size, ms: performance.now() - t0 });
   } catch (err) {
     postMessage({ seq, src: null, size: 0 });
   }

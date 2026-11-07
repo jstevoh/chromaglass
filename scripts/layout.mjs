@@ -226,8 +226,10 @@ try {
     }, id);
     // The plate bar is the same bar in every layout: Send to wall was missing
     // from one desk once (panel.mjs, "the same actions on both"), so each is
-    // looked for, once and visible, in all three.
-    const ACTIONS = ['send-to-wall', 'save-look', 'plate-mode-segmented', 'blackout-button', 'panel-browser-button', 'layer-segmented'];
+    // looked for, once and visible, in all three. Send to wall is the
+    // header's Wall since the owner took the plate bar's button away
+    // (2026-10-29), so it is the Wall that is looked for.
+    const ACTIONS = ['dot-wall', 'save-look', 'plate-mode-segmented', 'blackout-button', 'panel-browser-button', 'layer-segmented'];
     for (const mode of ['perform', 'sequence', 'setup']) {
       await clickOn(`mode-segmented-${mode}`);
       await settle(800);
@@ -235,6 +237,19 @@ try {
       const wrong = ACTIONS.filter((_, i) => counts[i] !== 1);
       check(`on ${mode}, the plate bar and the header carry the same actions`,
         (await layoutIs(mode)) && wrong.length === 0, wrong.length ? wrong.map(t => `${t} ×${counts[ACTIONS.indexOf(t)]}`).join(', ') : ACTIONS.length + ' actions');
+      /*
+        One control, one place on a tab (PLAN 35c-4): the owner saw Speed,
+        Turbulence and four more twice on Perform, on the Rides and the
+        Recipe, Zoom three times and Swirl twice. `desklayout` holds the rule
+        in node; this counts what the desk actually drew, so a panel that
+        stopped applying it is caught here.
+      */
+      const drawn = await page.evaluate(() => [...document.querySelectorAll('[data-testid]')]
+        .map(e => e.dataset.testid.match(/^(?:ride|recipe|knob)-([a-zA-Z]+)$/)?.[1])
+        .filter(k => k && k !== 'pick' && k !== 'picker' && k !== 'elsewhere'));
+      const twice = [...new Set(drawn.filter((k, i) => drawn.indexOf(k) !== i))];
+      check(`on ${mode}, no control is drawn twice`, twice.length === 0,
+        twice.length ? twice.join(', ') : `${drawn.length} controls`);
     }
 
     await clickOn('mode-segmented-perform');

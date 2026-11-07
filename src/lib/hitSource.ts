@@ -11,7 +11,7 @@
  * the onsets: a level is loud between hits too, so a patch that wanted the
  * accent, a bead thrown harder on a harder kick, had nothing to read.
  *
- * Five things, each 0..1:
+ * Six things, each 0..1:
  *
  *   - **kickHit**, **snareHit**, **hatsHit**: how hard that drum's last hit
  *     was, against its own hardest of late (the analyser's onset strength),
@@ -19,7 +19,9 @@
  *   - **anyHit**: the kick's or the snare's, whichever is up;
  *   - **pitch**: the note the analyser hears, low to high over five octaves
  *     (C1 to C6), glided between notes so a frame of a wrong octave is not
- *     heard, and let go to 0 when there is nothing to hear.
+ *     heard, and let go to 0 when there is nothing to hear;
+ *   - **noteClass**: which of the twelve notes the lead is playing, C to B,
+ *     whatever its octave (PLAN 25i). Not a level but a name, read below.
  *
  * ## Why a hit is read when its time moves, at the strength it was given
  *
@@ -46,8 +48,40 @@
 
 import type { AudioReading } from './audioFeatures.ts';
 
-export const HIT_FEATURES = ['anyHit', 'kickHit', 'snareHit', 'hatsHit', 'pitch'] as const;
+export const HIT_FEATURES = ['anyHit', 'kickHit', 'snareHit', 'hatsHit', 'pitch', 'noteClass'] as const;
 export type HitFeature = typeof HIT_FEATURES[number];
+
+/*
+  Which note the lead is on, as a cord can read it (PLAN 25i, "colour that
+  answers the music"). The colour organ's idea, Castel's and Rimington's and
+  behind Wilfred's Lumia: each of the twelve notes has its colour, so a
+  melody is heard as a run of colours. A cord on it picks one of an area's
+  bottles by the note (AreaHands.picked), and the music's colour is the
+  bottle the note chose, not a hue dial turned.
+
+  A name, not a level, and read as one everywhere a level would be shaped:
+  no gate (a gate opens on a level crossing a line; C is not louder than B),
+  no Sound Impact (a master turns a level down; a note turned down is
+  another note), nothing for a MIDI fader or Sound Learn to follow
+  (lib/midi.ts MAPPABLE_SOURCES leaves it out).
+
+  Read off `pitchFine`, the melody's own pitch between the bins and above a
+  kick's body (lib/pitchFine.ts, PLAN 24.3-place), and not `pitch`, which is
+  mostly the bass line's bin (the showreel's song: 72% of frames in the
+  octave above C1). A pitch class is the one reading an octave error cannot
+  move, which is the error a pitch tracker makes most. A new note is taken
+  once it has held for the ear's settle (`pitchSettleS`, eight readings),
+  so a frame of a neighbour on a note's attack does not pick a bottle; and
+  with no lead heard the last note is kept, as the bottle stays in the hand
+  until the next note asks for another. The value is the class's middle,
+  (k + ½)/12, so a cord cutting it into an area's bottles never lands on an
+  edge between two.
+*/
+const CLASS_FEATURES: ReadonlySet<string> = new Set(['noteClass']);
+/** A reading that names (which note) rather than measures (how much): no gate, no master. */
+export const isClassFeature = (f: unknown): boolean => typeof f === 'string' && CLASS_FEATURES.has(f);
+/** The settle a new note must hold for when the ear does not say its own: eight readings at 60 a second. */
+const NOTE_SETTLE_S = 0.13;
 
 /** What each is called on a panel, the desk's and the phone's alike. */
 export const HIT_FEATURE_LABELS: Record<HitFeature, string> = {
@@ -56,6 +90,7 @@ export const HIT_FEATURE_LABELS: Record<HitFeature, string> = {
   snareHit: 'Snare hit',
   hatsHit: 'Hats hit',
   pitch: 'Pitch',
+  noteClass: 'Note (C to B)',
 };
 
 /** A quarter of a second, half a beat at 120: one hit is mostly gone before the next. */
@@ -75,14 +110,17 @@ const DRUMS = [['kick', 'kickHit'], ['snare', 'snareHit'], ['hats', 'hatsHit']] 
 const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : Number.isFinite(x) ? x : 0);
 
 export class HitSource {
-  private v: Record<HitFeature, number> = { anyHit: 0, kickHit: 0, snareHit: 0, hatsHit: 0, pitch: 0 };
+  private v: Record<HitFeature, number> = { anyHit: 0, kickHit: 0, snareHit: 0, hatsHit: 0, pitch: 0, noteClass: 0 };
+  /** The note being listened to before it is taken (a class 0..11), and for how long, in seconds. */
+  private noteHeard: { k: number; held: number } | null = null;
   private hitAt: Record<'kick' | 'snare' | 'hats', number | null> = { kick: null, snare: null, hats: null };
   private pitchHeard = false;
   private last: number | null = null;
 
   /** Forget: a stop, a render starting, a new stream. */
   reset(): void {
-    this.v = { anyHit: 0, kickHit: 0, snareHit: 0, hatsHit: 0, pitch: 0 };
+    this.v = { anyHit: 0, kickHit: 0, snareHit: 0, hatsHit: 0, pitch: 0, noteClass: 0 };
+    this.noteHeard = null;
     this.hitAt = { kick: null, snare: null, hats: null };
     this.pitchHeard = false;
     this.last = null;
@@ -119,6 +157,18 @@ export class HitSource {
       // than pushing its control for as long as the show runs silent.
       this.pitchHeard = false;
       v.pitch *= Math.exp(-dt / PITCH_GLIDE);
+    }
+
+    const fine = reading?.pitchFine ?? 0;
+    if (reading && fine > 0) {
+      const k = ((Math.round(fine) % 12) + 12) % 12;
+      const settle = Math.min(0.25, Math.max(0.03, reading.pitchSettleS ?? NOTE_SETTLE_S));
+      if (this.noteHeard?.k === k) this.noteHeard.held += dt;
+      else this.noteHeard = { k, held: 0 };
+      if (this.noteHeard.held >= settle - 1e-9) v.noteClass = (k + 0.5) / 12;
+    } else {
+      // A rest, or a reading with no lead in it: the last note stays taken, and the next starts afresh.
+      this.noteHeard = null;
     }
   }
 

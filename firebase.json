@@ -8,6 +8,14 @@
     ],
     "rewrites": [
       {
+        "source": "/pro",
+        "destination": "/pro.html"
+      },
+      {
+        "source": "/press",
+        "destination": "/press.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

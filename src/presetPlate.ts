@@ -222,7 +222,7 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // Oil will not wet the ferrofluid, so the pools stand apart from it.
   'oil-and-water':      ['oil', 'water', 'oil'],
   'red-cabbage':        ['acid', 'base', 'water'],
-  'chemical-clock':     ['water'],
+  'chemical-clock':     ['water', 'activator'],  // the gel's touches (PLAN 25i), in its areas
   'magnet-garden':      ['water', 'oil'],
   'ferro-paint':        ['water', 'oil', 'water'],
   // Wax that is heavier than the liquid round it, and a liquid thick enough

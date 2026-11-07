@@ -9,6 +9,7 @@ import { isPadPicture, type PadPictureMessage } from '../lib/padPicture';
 import { MARK_URL } from '../brand';
 import { LIT } from './ui';
 import { LensCap } from './ui/Playful';
+import { LiveRemoteChip } from './LiveRemoteChip';
 
 /**
  * Draw (PLAN §8-draw, the Desk v2 design's #3c phone and #3d iPad): the
@@ -449,6 +450,8 @@ export function DrawScreen(p: DrawScreenProps) {
         data-linked={p.connected ? 'true' : 'false'}
         data-layout="tablet"
       >
+        {/* On air from the Mac app (PLAN 37x-4d): over the plate's top edge, where a glance finds it. */}
+        <LiveRemoteChip live={p.state?.live ?? null} action={p.action} className="absolute left-1/2 top-[64px] z-10 -translate-x-1/2" />
         <header className="col-span-3 flex items-center gap-3 border-b border-border px-6">
           <img src={MARK_URL} alt="" className="h-5 w-5" draggable={false} />
           <span className="text-[14px] font-semibold">Draw</span>
@@ -532,6 +535,7 @@ export function DrawScreen(p: DrawScreenProps) {
       <div className="relative h-full w-full">
         {/* The wall's box sits between the header and the bottom bar. */}
         <div className="absolute inset-x-0 top-[64px]" style={{ bottom: foot }}>{pad}</div>
+        <LiveRemoteChip live={p.state?.live ?? null} action={p.action} className="absolute left-1/2 top-[72px] z-10 -translate-x-1/2" />
         <header className="absolute inset-x-4 top-3 flex items-center gap-2">
           <span className={`flex h-9 min-w-0 items-center gap-2 rounded-full px-3.5 text-[13px] font-semibold ${GLASS}`} data-testid="draw-linked">
             {linkDot}

@@ -7,9 +7,9 @@ import { wallAsked, plateFrame } from '../lib/earClock';
 import { DrawGate, refreshStamp, stampFallbacks, stampMisses } from '../lib/drawGate';
 import { StepClock } from '../lib/stepClock';
 import { VisualizerSettings, LiquidType } from '../types';
-import { dyeRoomOf, lookTarget as dyeLookTarget, sparseDark as isSparseDark } from '../lib/dyeTarget';
+import { dyeRoomOf, lookTarget as dyeLookTarget, pourRoomOf, sparseDark as isSparseDark } from '../lib/dyeTarget';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, phasePourShape, LIQUIDS_BY_ID, WORKING_DYES, dyesOnPlate } from '../presetPlate';
-import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
+import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, layAngle, pointInArea, pickArea, type PlateArea } from '../lib/plateAreas';
 import { phasePour } from '../lib/phasePour';
 import { magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -45,17 +45,18 @@ import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, step
 import { canvasPixelsFor, detectTier, effectiveLadderTier, qualityLadder, renderScale, type EngineStatus } from '../lib/platform';
 import { QualityGovernor } from '../lib/governor';
 import { BubbleField, MAX_BUBBLES } from '../lib/bubbles';
-import { BeadField } from '../lib/beads';
+import { BeadField, beadPopulation } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
-import { AreaHands, fluidSink, type AreaSink } from '../lib/areaCords';
+import { AreaHands, type AreaSink } from '../lib/areaCords';
 import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
-import { BarGrid, Accent } from '../lib/barGrid';
+import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
+import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -67,9 +68,10 @@ import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
+import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
@@ -255,179 +257,8 @@ interface LiquidVisualizerProps {
   output?: OutputConfig;
 }
 
-export interface LiquidVisualizerHandle {
-  /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
-  render: () => VisualizerRender | null;
-  /** The quality governor running the show. */
-  governor: () => QualityGovernor | null;
-  injectImage: (imageData: ImageData) => void;
-  pourVideo: (video: HTMLVideoElement) => void;
-  stopPourVideo: () => void;
-  /**
-   * Pour words into the lead plate: each row drawn at the biggest size its
-   * share of the box allows, in `colour` (default: the look's brightest dye;
-   * 'contrast' picks an ink that reads against the plate as it is), level on
-   * the frame whatever angle the plate is turned to.
-   */
-  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; columns?: [number, number] }) => void;
-  /** Kicks heard (or predicted) since the plate started: a count to take differences of. */
-  kicks: () => number;
-  /**
-   * The song's shape (`lib/songShape.ts`): where the song is now, and the
-   * builds, drops and breakdowns heard lately, each numbered so a reader that
-   * polls can take only the ones it has not seen.
-   */
-  songShape: () => SongShapeReport;
-  /**
-   * Where the closeup camera is pointed, in plate uv, or null while there is
-   * no closeup (MacroCamera.centre): what Hold aims at, so it stays put (QA-12).
-   */
-  macroCentre: () => { x: number; y: number } | null;
-  /** Move the look's working dyes on by one, the way the hue journey would. */
-  stepDyes: () => void;
-  /** Where a paced scene is (`lib/scenePacing.ts`); the plate follows it at its own rate. 1 and 1 is no pacing. */
-  pace: (sample: PaceSample) => void;
-  /** A flood across a good share of the lead plate, `gust` (0..1, default 0.8) its size and force. */
-  pour: (gust?: number) => void;
-  /**
-   * Clear the plate and seed it as `presetId`; a user preset passes its own dyes, injection styles and liquids.
-   * `phase` is the Ferrofluid (and its Scale) the look asks for, when the caller knows it: the look's settings
-   * reach the plate a render after this call, so without it the ferrofluid is laid by the last look's.
-   */
-  applyPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }, phase?: LookPhase) => void;
-  /** The dyes, injection styles and liquids in force, for saving the current look as a preset. */
-  /** What is on each live layer: how full it is, and the colour of it. */
-  layerReport: () => { index: number; fill: number; colour: string }[];
-  /** What is left of the Dye Budget on the layer in hand, 0 to 1: the bottle's level (PLAN 35e). */
-  dyeRoom: () => number;
-  describePlate: () => { contract: number[] | null; injectStyles: string[]; liquids: string[] };
-  /**
-   * Take on a preset's dyes, injection style and liquids without clearing the
-   * plate — the sequencer's way of changing stage, and the desk's Go.
-   *
-   * `extras` is how a user preset gets adopted. Its dyes are not in the maps
-   * here (they live in the saved file), so before this took them the only way
-   * to register them was `applyPreset` — which clears. A sequence that
-   * changed to one of your own looks cut the plate to black; the built-ins
-   * next to it did not.
-   */
-  adoptPreset: (presetId: string, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
-  /** A pressed look change over `seconds`: the old dye thins while the new palette pours in. */
-  /** A look fading in over `seconds`; `phase` as for applyPreset: what the incoming look asks of the ferrofluid, laid half way. */
-  handoff: (seconds: number, phase?: LookPhase) => void;
-  /**
-   * Send a look to the back plate alone (PLAN.md §16a), or `null` to have it
-   * follow the front again. Over `seconds`: its solver settings fade the way
-   * a Go's do, its old dye thins and the look's own is laid in, and from then
-   * on it pours the look's dyes, styles and liquids while the front pours
-   * its own. `extras` is a user preset's dyes, as for `adoptPreset`.
-   */
-  sendBack: (presetId: string | null, look: VisualizerSettings | null, seconds: number, name?: string | null, extras?: { contract?: number[] | null; injectStyles?: string[] | null; liquids?: string[] | null }) => void;
-  /** Restrict the working palette to `size` of the contract's dyes, led by `lead`; null size = all of them. */
-  setPaletteWindow: (size: number | null, lead: number) => void;
-  setInjectStyle: (styles: string[]) => void;
-  /** What the automation may pour, as liquid ids. An empty list is a plate with only dye on it. */
-  setPlateLiquids: (ids: string[]) => void;
-  /** Pin the color harmony to a specific palette-index set (music intelligence). */
-  setHarmony: (indices: number[]) => void;
-  /** User palette lock — overrides auto-rotation, drains, seeds and music. Pass null to unlock. */
-  setHarmonyLock: (indices: number[] | null) => void;
-  /**
-   * Evolve turns the palette for the dye still to come (lib/slowEvolve.ts: at a
-   * drop or a breakdown, or every few minutes with no music). Nothing already
-   * on the plate changes colour; a palette lock or a hue journey keeps its own.
-   */
-  evolvePalette: () => void;
-  /** Fire a themed dye burst for a lyric word-trigger. */
-  triggerTheme: (theme: string, energy?: number) => void;
-  /** Re-fire a recorded manual gesture (performance replay). Normalized coords; `layer` defaults to the active one. */
-  /**
-   * A gesture from any hand: mouse, phone pad, pen, gamepad or MIDI. `amount`
-   * (0..1, default 0.5) scales the drop's size or the puff's strength, so a
-   * pen pressed harder drops more dye; `dx`/`dy` give a blow its direction
-   * (a pen's tilt, a stick's push) instead of a radial puff.
-   */
-  applyGesture: (g: { tool: string; x: number; y: number; dx?: number; dy?: number; color?: string; clear?: boolean; layer?: number; amount?: number; id?: number }) => void;
-  /**
-   * A point on the wall (the drawn picture, normalised, y up) as the plate's
-   * point under it, through the camera: the plate is wider than the wall,
-   * turns with the dish and is magnified by the closeup. `turned` false
-   * leaves the dish's turn out, for a hand on the dish (Spin reads its
-   * angle as the room sees it). The point itself, until the canvas is up.
-   */
-  wallToPlate: (u: number, v: number, layer?: number, turned?: boolean) => { x: number; y: number };
-  /** A tilt from outside — the phone's gyroscope — in −1..1 per axis. Fades out if not refreshed. */
-  setExternalTilt: (x: number, y: number) => void;
-  /** Where the picture sits on screen (letterboxed when a stage is attached), for overlays that track the plate. */
-  drawnRect: () => DOMRect | null;
-  /** What the dye is doing, cheaply, for an instrument that plays the plate. */
-  plateReading: (voices: number) => { wetness: number; colour: [number, number, number]; cells: number[]; flow: number; swirl: number } | null;
-  /** Film projector: a video file, the camera, or another window, shown through the dye. */
-  loadFilmFile: (file: File) => Promise<void>;
-  /** A film by address, from the app's own origin (a cartoon on the shelf, lib/cartoons.ts): it streams, where a file is read whole first. */
-  loadFilmUrl: (url: string) => Promise<void>;
-  /**
-   * A camera's picture as the film (lib/cameras.ts): `deviceId` from the
-   * film's camera picker, '' for the browser's pick (a phone's back camera,
-   * pointed at a dish). `onEnded` fires when the camera is unplugged, and the
-   * answer says which camera opened and whether the chosen one was missing.
-   */
-  startFilmCamera: (deviceId?: string, onEnded?: () => void) => Promise<{ label: string | null; fellBack: boolean }>;
-  /**
-   * A window, a tab or a screen, picked from the browser's own chooser.
-   *
-   * `onEnded` fires if the capture stops from the browser's side — the Stop
-   * sharing button, or the tab being closed — which is the one way a film
-   * source can go away without the app asking. Without it the panel goes on
-   * saying "window live" over a projector showing nothing.
-   */
-  /**
-   * Capture a tab, window or screen as the film.
-   *
-   * `onBlank` fires when the capture yields nothing but black pixels, which a
-   * window playing hardware-accelerated video does — see the note at the
-   * implementation. The plate cannot tell that from a very dark film, so the
-   * operator is told.
-   */
-  startFilmWindow: (onEnded?: () => void, onBlank?: () => void) => Promise<void>;
-  clearFilm: () => void;
-  /**
-   * A logo or title card laid over the finished frame.
-   *
-   * Not `injectImage`, which pours a picture into the plate as dye: that is
-   * the lovely thing to do with an image and the wrong thing to do with a
-   * client's mark, which has to stay readable for three hours. This one sits
-   * over the top and does not dissolve.
-   *
-   * Composited in the shader rather than as an element over the canvas, so it
-   * reaches everything that reads the canvas: the projector window, a cast to
-   * another screen, the recorder, and another machine capturing this window.
-   */
-  loadMark: (source: CanvasImageSource, width: number, height: number) => void;
-  clearMark: () => void;
-  /**
-   * Fire the envelopes — a MIDI note, a pad, a finger on the phone.
-   *
-   * On the handle rather than reached through settings because it is an event,
-   * and because the thing firing it should not have to know what an envelope
-   * is. `velocity` scales how far they swing, so a hard note hits harder.
-   */
-  fireEnvelopes: (velocity?: number) => void;
-  /**
-   * The element the film is playing in, so it can be read back as a sensor
-   * as well as shown through the dye. Null when nothing is loaded.
-   *
-   * Handed out rather than copied: there is one film, and a second video
-   * element decoding the same source would double the cost and still drift a
-   * frame from what is on the plate.
-   */
-  filmVideoEl: () => HTMLVideoElement | null;
-  /**
-   * A second display mirrors this canvas pixel for pixel: render at its size
-   * (the projector's pixels) and letterbox it here. Null returns to the window.
-   */
-  setStage: (size: { width: number; height: number } | null) => void;
-}
+import type { LiquidVisualizerHandle } from './visualizerHandle';
+export type { LiquidVisualizerHandle };
 
 
 // ─── React Component ─────────────────────────────────────────────────
@@ -643,6 +474,27 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     fluid.addTemp(rx, ry, 1.2);
     doseArea(fluid, layer, area, rx, ry, 0.8);
   };
+  /**
+   * One note of the melody, let go as a drop (lib/melodyWalk.ts, PLAN
+   * 24.3-place): a real dropper drop of the look's dye at the place its pitch
+   * names, with a dose of the look's liquid (or the line's own, Oil and Water's
+   * oil) where it lands, so neighbours merge or hold apart as the liquids do.
+   * `gain` is Melody Walk; a harder note is a bigger drop. The dye is held
+   * under the look's fill as every music pour is (`room`, the regulator of
+   * PLAN 28d-A); the liquid has its own headroom (pourLiquid).
+   */
+  const layMelodyDrop = (fluid: FluidSimulation, layer: number, d: MelodyDrop, line: MelodyLine, gain: number, room: number) => {
+    const x = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.x * GRID_SIZE)));
+    const y = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.y * GRID_SIZE)));
+    const vol = gain * (0.3 + 0.7 * d.strength * d.strength);
+    // The pitch walks the line's dyes, low to high; a line with none walks the look's working set.
+    const dyes = line.dyes && line.dyes.length > 0 ? line.dyes : harmonyOf(layer);
+    const c = harmonyCycle(dyes, d.along * (dyes.length - 1));
+    if (room > 0.001) fluid.autoInject('drop', x, y, 4.5 * vol * room, c.r, c.g, c.b, 0.5);
+    fluid.addTemp(x, y, 0.5 * vol);
+    if (line.liquid) pourLiquid(fluid, line.liquid, x, y, vol);
+    else doseLiquid(fluid, liquidsOf(layer), x, y, vol);
+  };
   /** Pour into an area: its own liquid while the bottles are the look's, else one of the bottles picked. */
   const doseArea = (fluid: FluidSimulation, layer: number, a: PlateArea, x: number, y: number, strength: number) => {
     if (areaBottlesRef.current || (layer >= 1 && backDyesRef.current)) pourLiquid(fluid, a.liquid, x, y, strength);
@@ -747,9 +599,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
   const videoPourRef = useRef<HTMLVideoElement | null>(null);
-  const videoFlowCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoFlowCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const videoFlowPrevRef = useRef<Uint8ClampedArray | null>(null);
+  /** The video the pour's last frame was of, and that frame for the CPU's loop (lib/videoFlow.ts). */
+  const videoFlowRef = useRef<VideoPourState>({ source: null, prev: null });
+  /** The frame drawn at the grid's size and read back, for a solver with no pass of its own; null when it cannot be read (another origin's video). */
+  const readVideoFrame = (v: CanvasImageSource, S: number): Uint8ClampedArray | null => {
+    if (!videoFlowCtxRef.current) {
+      const c = document.createElement('canvas');
+      c.width = S; c.height = S;
+      videoFlowCtxRef.current = c.getContext('2d', { willReadFrequently: true });
+    }
+    const ctx = videoFlowCtxRef.current;
+    if (!ctx) return null;
+    try {
+      ctx.drawImage(v, 0, 0, S, S);
+      return ctx.getImageData(0, 0, S, S).data;
+    } catch { return null; }
+  };
 
   const filmRef = useRef<{ video: HTMLVideoElement | null; kind: 'none' | 'file' | 'camera' | 'window'; stream: MediaStream | null; url: string | null }>({ video: null, kind: 'none', stream: null, url: null });
   const filmVideo = () => {
@@ -823,7 +689,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const rotationAnglesRef = useRef<number[]>([]);
   /*
     The plate's angular velocity, in radians a second, one per layer.
-    
+
     Rotation used to be a speed and nothing else: the angle took
     `rotationSpeed * dt` every frame and the plate turned at exactly what the
     slider said. A plate is a thing with mass resting on something, so this
@@ -1073,13 +939,21 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     next frame.
   */
   const hitSourceRef = useRef(new HitSource());
+  /**
+   * The melody (lib/melodyWalk.ts, PLAN 24.3-place): the walk hears every
+   * reading, the drops it lets go of wait here for the next running step that
+   * lays them (with the area cords'), and the line is the look's.
+   */
+  const melodyWalkRef = useRef(new MelodyWalk());
+  const melodyQueueRef = useRef<MelodyDrop[]>([]);
+  const melodyLineRef = useRef<MelodyLine>(melodyLine(null));
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
   /*
-    The bar (lib/barGrid.ts): where the beats fall and which of them is the
-    one, heard from the same readings on the same clock as the song's shape,
-    so Accent the One can weigh each kick's press by its place in the bar.
+    The bar (lib/barGrid.ts): where the beats fall and which is the one,
+    heard on the song shape's clock (or told by Link), so Accent the One
+    weighs each kick's press by its place in the bar.
   */
   const barGridRef = useRef(new BarGrid());
   const accentRef = useRef(new Accent());
@@ -1499,7 +1373,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     for (const fluid of laid) fluid.clearAll();
     bubblesRef.current.clear();
     fluidsRef.current[0]?.gpu?.clearChemistry?.();
-    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? DICE.lay.angle() : a));
+    rotationAnglesRef.current = rotationAnglesRef.current.map((a, i) => (i < laid.length ? layAngle(presetId, DICE.lay.angle()) : a));
     spinVelRef.current = spinVelRef.current.map((v, i) => (i < laid.length ? 0 : v));
     // The turntable likewise: a kept back plate keeps its dish turning.
     dishSpinRef.current = dishSpinRef.current.map((v, i) => (i < laid.length ? 0 : v));
@@ -1567,6 +1441,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     injectStyleRef.current = PRESET_INJECT_STYLES[presetId] || ['drop'];
     plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
     areasRef.current = plateAreas(presetId);
+    melodyLineRef.current = melodyLine(presetId);
     areaBottlesRef.current = true;
     areaKicksRef.current = 0;
     // The plate is laid with its liquids as well as its dye, rather than
@@ -1699,7 +1574,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
       videoPourRef.current?.pause();
       videoPourRef.current = video;
-      videoFlowPrevRef.current = null;   // the last video's frame is no reference for this one's motion
+      videoFlowRef.current.source = null;   // the last video's frame is no reference for this one's motion
       video.play().catch(() => { /* plays on the next gesture */ });
     },
     stopPourVideo: () => {
@@ -1840,6 +1715,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // preset's liquids are what gets poured, and into its areas if it has any.
       plateLiquidsRef.current = PRESET_LIQUIDS[presetId] ?? [];
       areasRef.current = plateAreas(presetId);
+      melodyLineRef.current = melodyLine(presetId);
       areaBottlesRef.current = true;
       if (!harmonyLockRef.current) {
         const contract = presetContractRef.current;
@@ -2727,10 +2603,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
           }
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
-          // A clock from the desk, a tapped tempo or a typed one, if there is
-          // one. Handed over every frame — the reading carries its own
-          // sequence number, so the clock can tell a new beat from a held one.
-          beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
+          // Link, a desk's clock, taps or a typed bpm, every frame (its seq
+          // tells a new beat from a held one).
+          const tempoNow = clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null;
+          beatClockRef.current.setExternal(nowMs, tempoNow);
           kickRef.current = beatClockRef.current.update(nowMs, heardAt, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
@@ -2751,7 +2627,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
+          tellBar(barGridRef.current, tempoNow, nowMs, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
+          /*
+            The melody hears every reading whatever the setting, so turning
+            Melody Walk up mid-song finds its armed note as it is; it queues drops only while the dial is up, and only a few (a
+            plate that stalls for a second does not catch up with a flood).
+          */
+          {
+            const dropsNow = melodyWalkRef.current.update(heard, melodyLineRef.current);
+            if ((currentSettings.melodyWalk ?? 0) > 0) {
+              for (const d of dropsNow) melodyQueueRef.current.push(d);
+              if (melodyQueueRef.current.length > 4) melodyQueueRef.current.splice(0, melodyQueueRef.current.length - 4);
+            } else melodyQueueRef.current.length = 0;
+          }
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
@@ -3314,173 +3203,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
 
         // ── Video Pour (Transparency & Optical Flow) ──
-
-
+        /*
+          The video's dye and its motion as flow (lib/videoFlow.ts). On the
+          WebGPU solver the frame goes to the GPU and is worked out there
+          (PLAN 14ab-2): this was a 192² getImageData, a 147 KB copy and
+          thirty-six thousand addDensity calls every frame, and every row of
+          the deltas sent across each step. Otherwise it runs here as it did.
+        */
         if (videoPourRef.current && !videoPourRef.current.paused && videoPourRef.current.readyState >= 2) {
-
-
           videoPourReadsRef.current++;
-          const v = videoPourRef.current;
-
-
           const fluid = fluidsRef.current[0];
-
-
-          if (fluid) {
-
-
-            const S = fluid.size;
-
-
-            if (!videoFlowCanvasRef.current) {
-
-
-              const c = document.createElement('canvas');
-
-
-              c.width = S; c.height = S;
-
-
-              videoFlowCanvasRef.current = c;
-
-
-              videoFlowCtxRef.current = c.getContext('2d', { willReadFrequently: true });
-
-
-            }
-
-
-            const ctx = videoFlowCtxRef.current;
-
-
-            if (ctx) {
-
-
-              ctx.drawImage(v, 0, 0, S, S);
-
-
-              const imgData = ctx.getImageData(0, 0, S, S);
-
-
-              const data = imgData.data;
-
-
-              const prev = videoFlowPrevRef.current;
-
-
-              const flowStrength = 0.8;
-
-
-              
-
-
-              for (let y = 1; y < S - 1; y++) {
-
-
-                for (let x = 1; x < S - 1; x++) {
-
-
-                  const i = (y * S + x) * 4;
-
-
-                  const r = data[i], g = data[i+1], b = data[i+2];
-
-
-                  const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-
-
-                  
-
-
-                  // Luma-key transparency: Dark pixels are ignored
-
-
-                  if (lum > 15) {
-
-
-                    const alpha = lum / 255.0;
-
-
-                    fluid.addDensity(x, y, alpha * 0.15, r/255.0, g/255.0, b/255.0);
-
-
-                  }
-
-
-                  
-
-
-                  // Optical Flow Velocity
-
-
-                  if (prev) {
-
-
-                    const prevLum = 0.299 * prev[i] + 0.587 * prev[i+1] + 0.114 * prev[i+2];
-
-
-                    const diff = lum - prevLum;
-
-
-                    if (Math.abs(diff) > 10) {
-
-
-                      const lumX = (0.299 * data[i+4] + 0.587 * data[i+5] + 0.114 * data[i+6]) - 
-
-
-                                   (0.299 * data[i-4] + 0.587 * data[i-3] + 0.114 * data[i-2]);
-
-
-                      const lumY = (0.299 * data[i + S*4] + 0.587 * data[i + S*4 + 1] + 0.114 * data[i + S*4 + 2]) - 
-
-
-                                   (0.299 * data[i - S*4] + 0.587 * data[i - S*4 + 1] + 0.114 * data[i - S*4 + 2]);
-
-
-                      const gradMag2 = lumX * lumX + lumY * lumY;
-
-
-                      if (gradMag2 > 1) {
-
-
-                        // Flow velocity formula: - (dI/dt) * Grad(I) / |Grad(I)|^2
-
-
-                        const vx = -diff * lumX / gradMag2 * flowStrength;
-
-
-                        const vy = -diff * lumY / gradMag2 * flowStrength;
-
-
-                        fluid.addVelocity(x, y, vx, vy);
-
-
-                      }
-
-
-                    }
-
-
-                  }
-
-
-                }
-
-
-              }
-
-
-              videoFlowPrevRef.current = new Uint8ClampedArray(data);
-
-
-            }
-
-
-          }
-
-
+          if (fluid) pourVideoFrame(fluid, videoPourRef.current, videoFlowRef.current, readVideoFrame);
         }
-
 
         for (let simStep = 0; simStep < simSteps; simStep++) {
           // The room stirs the lead plate: it is ambient, not a tool, so it
@@ -3635,7 +3369,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     af.addVelocity(px, py, (-ddy / dd) * w, (ddx / dd) * w);
                   }
                 }
-                
+
                 if (activeLayerRef.current === 0) beadsRef.current.disturb(x, y, 18 * GRID_SCALE, 0.15);
               } else if (tool === 'blow') {
                 /*
@@ -3878,7 +3612,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
-            const rate = Math.max(0, Math.min(1, currentSettings.automateRate ?? 0.12));
+            const rate = Math.max(0, Math.min(3, currentSettings.automateRate ?? 0.12));
             /*
               What the hands hear: the song over the last half minute, and its
               section. Not the frame's energy, treble and spectral centroid,
@@ -4335,7 +4069,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const pitchClass = currentAudioData?.features?.pitchClass ?? 0;
                 // Normalize pitchClass (0-11) to a full circle (0 - 2PI)
                 const pitchAngle = (pitchClass / 12.0) * Math.PI * 2;
-                
+
                 // Each audio feature carries a different color from the harmony,
                 // offset by the true musical pitch so chords paint distinct colors!
                 /*
@@ -4431,7 +4165,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // other look keeps `treble01 * 1.1` in the 50%-white mix it always had.
                   const clearPhase = activeFluid.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
                   const lookTarget = dyeLookTarget(activeFluid.seedMean, currentSettings.dyeBudget ?? 0.85, activeFluid.seedBudget);
-                  const pourRoom = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - activeFluid.meanDensity / Math.max(0.06, lookTarget)) * 2.5));
+                  const pourRoom = clearPhase ? 0 : pourRoomOf(activeFluid.meanDensity / Math.max(0.06, lookTarget));
                   const pourDt = Math.min(1, Math.max(0.04, activeFluid.dt / 0.05)) * pourRoom;
                   const sparseDark = isSparseDark(currentSettings.lampGround, lookTarget);
                   const contStyle = () => { const st = aStyle(); return sparseDark && (st === 'spray' || st === 'splatter') ? 'drop' : st; };
@@ -4492,7 +4226,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     its own and read as Beat Squeeze, which sits at 0 on every
                     look but Bass Drop.
                   */
-                  const bloomGain = Math.max(0, Math.min(1.5, currentSettings.kickBloom ?? 1));
+                  const bloomGain = Math.max(0, Math.min(4, currentSettings.kickBloom ?? 1));
                   if (kickRef.current.kick && simStep === 0 && bloomGain > 0) {
                     // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
@@ -4639,8 +4373,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               plate the music plays, in its areas, every running step, read
               from the same sources the patch bay folds this frame. Apart from
               the music's hands above because a cord need not be on the sound
-              at all (the room, a film, an LFO), and its pours are held under
-              the look's fill as the music's are (28d-A's regulator).
+              at all (the room, a film, an LFO). The regulator on its pours
+              is AreaHands.lay's, by how full the plate is (28d-A).
             */
             if (isActiveRef.current && drainFrameRef.current === 0) {
               const hands = areaHandsRef.current;
@@ -4653,11 +4387,28 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const acts = hands.step(currentSettings.sceneMappings, own ? null : areasOf(activeLayerRef.current), (m, band) => cordReading(patchCtx, m, patchNow, band), simStepS);
               const af = fluidsRef.current[activeLayerRef.current];
               if (af && acts.length > 0) {
-                const target = dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget);
-                const room = Math.max(0, Math.min(1, (1.0 - af.meanDensity / Math.max(0.06, target)) * 2.5));
+                const fill = af.meanDensity / Math.max(0.06, dyeLookTarget(af.seedMean, currentSettings.dyeBudget ?? 0.85, af.seedBudget));
                 let sink = areaSinksRef.current.get(af);
-                if (!sink) { sink = fluidSink(af, GRID_SCALE); areaSinksRef.current.set(af, sink); }
-                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], room);
+                if (!sink) { sink = areaSink(af); areaSinksRef.current.set(af, sink); }
+                hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], fill);
+              }
+            }
+            /*
+              The melody's drops (lib/melodyWalk.ts), on the plate the music
+              plays, on the first running step after the walk let them go. The
+              queue is emptied whatever happens here, so a stopped or
+              draining plate does not hold a flood of notes for the moment it
+              runs again.
+            */
+            if (melodyQueueRef.current.length > 0) {
+              const drops = melodyQueueRef.current.splice(0);
+              const mf = fluidsRef.current[activeLayerRef.current];
+              const gain = Math.max(0, Math.min(2, currentSettings.melodyWalk ?? 0));
+              if (mf && gain > 0 && isActiveRef.current && drainFrameRef.current === 0) {
+                const target = dyeLookTarget(mf.seedMean, currentSettings.dyeBudget ?? 0.85, mf.seedBudget);
+                const clearPhase = mf.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
+                const room = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - mf.meanDensity / Math.max(0.06, target)) * 2.5));
+                for (const d of drops) layMelodyDrop(mf, activeLayerRef.current, d, melodyLineRef.current, gain, room);
               }
             }
             /*
@@ -4684,7 +4435,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // leans a small sway keeps it alive.
           {
             const rock = rockRef.current;
-            const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
+            const R = Math.max(0, Math.min(3, currentSettings.plateRock ?? 0));
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const kickStep = kickRef.current.kick && simStep === 0;
             /*
@@ -4821,7 +4572,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
                 if (simStep === 0 && beadFrameRef.current++ % 30 === 0) {
                   const dens = fluidsRef.current[0]?.readDensity;
-                  beads.populate(Math.round(60 + 360 * beadAmt), 0.8 + 0.4 * beadAmt, dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
+                  beads.populate(...beadPopulation(beadAmt, currentSettings.macroMode), dens ? (bx, by) => dens[Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx))) + Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by))) * GRID_SIZE] : undefined);
                 }
                 if (isActiveRef.current && drainFrameRef.current === 0) {
                   const lead0 = fluidsRef.current[0];
@@ -4871,7 +4622,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // Fewer than it used to be, on purpose. A field of forty reads as
               // foam on a shower door; three or four reading as air trapped in
               // the oil is the thing the references actually show.
-              const room = bubbles.bubbles.filter((b) => !b.daughter).length < 3 + Math.round(14 * bubbleAmt);
+              const room = bubbles.bubbles.length < 3 + Math.round(14 * bubbleAmt);
               const onset = kickStep;
               /*
                 And only as hard as Sound Drive lets the music reach the
@@ -4915,21 +4666,23 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               const vx = lead?.readVx, vy = lead?.readVy;
               const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
               const qk = particleFlowScale(lead, currentSettings);
+              bubbles.liquid(currentSettings);
               bubbles.step(simStepS, (bx, by) => {
                 if (!vx || !vy) return [0, 0];
                 const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
                 const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
                 return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-              }, tiltX, tiltY, 0.5 + bubbleAmt, treble01 * 0.6);
+              }, tiltX, tiltY, treble01 * 0.6);
               // A bubble is air between the plates: the dye cannot sit under
               // it. A standing squeeze on each footprint keeps pumping the
               // dye out to the rim, so the field flows round the bubbles
               // instead of sliding underneath them as if they were painted on.
+              // The bubble's press, not the hand's (lib/squish.ts Presser): a held Blow's straw bubble is one, and `npm run tools` counts the hand's alone.
               if (lead) {
                 for (const b of bubbles.bubbles) {
                   if (b.r < 1.2) continue;
                   const bx = Math.round(b.x), by = Math.round(b.y);
-                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035);
+                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
                 }
               }
               // A pop is an inward cavity collapse into the void left behind.
@@ -5447,11 +5200,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // See the note in the fragment source.
         if (isActiveRef.current) kaleidoPhaseRef.current += (currentSettings.kaleidoSpin ?? 0) * realDt * 6.283185307179586;
 
-        // The lamp wanders slowly under the plate, and with Frame Sway up
-        // the plate's own rock moves it too — a tilted plate is lit from a
-        // new side. Off by default: the lamp jumping a twentieth of the plate
-        // on every kick lights the whole frame from somewhere else in time
-        // with the beat, which reads as the frame moving (lib/plateRock.ts).
+        // The gloss's light wanders slowly, and with Frame Sway up the
+        // plate's rock moves it too (lib/plateRock.ts); off by default, as a
+        // jump on every kick reads as the frame moving. The hot-spot stays on
+        // the stage's axis whatever this does (wgsl/lampField.ts, 38a).
         {
           const motion = Math.max(0, Math.min(1, currentSettings.lampMotion ?? 0));
           const rock = rockRef.current;
@@ -5469,7 +5221,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Second-layer throw: zoom grows with the setting, drift is a slow
         // Lissajous so the two scales slide past each other.
         {
-          const variety = Math.max(0, Math.min(1, currentSettings.layerScaleVariety ?? 0));
+          const variety = Math.max(0, Math.min(2, currentSettings.layerScaleVariety ?? 0));
           const view = layer1ViewRef.current;
           view.zoom = 1 + variety * 1.6;
           view.dx = Math.sin(time * 0.05) * 0.07 * variety;
@@ -5485,7 +5237,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         {
           const bubbleAmt = Math.max(0, Math.min(1, currentSettings.bubbles ?? 0));
           // And the ones blown by hand on a look with none of its own.
-          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack(0.5 + bubbleAmt) : 0;
+          const count = bubbleAmt > 0 || bubblesRef.current.anyBlown ? bubblesRef.current.pack() : 0;
           bubbleDebugRef.current = {
             count: Math.min(MAX_BUBBLES, count),
             strength: Math.min(0.9, 0.35 + bubbleAmt * 0.8),
@@ -5496,10 +5248,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // The frame the effects run on.
         fxFrameRef.current = fxHoldRef.current ?? (fxFrameRef.current + 1) >>> 0;
 
-        // The beads' mask: redrawn only on the frames they moved, which is
-        // what `render()` answers with — null means the last upload still
-        // stands. Off, it is not drawn at all, and the shader is told 0.
-        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.render() : null;
+        // The beads, on the frames they moved (`moved()`; null: the last
+        // mask stands), drawn on the GPU (14ab-6). Off, the shader is told 0.
+        const beadMask = (currentSettings.beads ?? 0) > 0 ? beadsRef.current.moved() : null;
 
         // ── The frame, handed to whatever draws it ────────────
         // The renderer reads the show's state through `view` and nothing
@@ -5614,11 +5365,11 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           filmGain: filmGainRef.current,
           mark: markRef.current,
           film: filmRef.current,
-          audio: { 
-            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0, 
-            brightness: audioDataRef.current?.features?.brightness ?? 0, 
-            beatPhase: beatClockRef.current?.period > 0 
-                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0 
+          audio: {
+            pitchClass: audioDataRef.current?.features?.pitchClass ?? 0,
+            brightness: audioDataRef.current?.features?.brightness ?? 0,
+            beatPhase: beatClockRef.current?.period > 0
+                ? (((time * 1000 - beatClockRef.current.nextBeat) / beatClockRef.current.period) % 1.0 + 1.0) % 1.0
                 : 0,
             // How far the beat may turn and breathe the frame (Frame Sway, lib/plateRock.ts).
             beatSway: frameSway(currentSettings.frameSway),
@@ -5790,6 +5541,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // before, so it starts fresh with the song it is about to hear.
       songShapeRef.current.reset();
       hitSourceRef.current.reset();
+      melodyWalkRef.current.reset();
+      melodyQueueRef.current.length = 0;
       // The bar too, for the same reason: its beats are on the old clock.
       barGridRef.current.reset();
       accentRef.current.reset();
@@ -6083,7 +5836,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const debugState = () => ({
         engine: engineStatusRef.current?.label ?? '',
         /** The remote's Draw picture (lib/padPicture.ts): sent, their bytes, and whether a pad is asking. */
-        padPicture: (() => { const s = padPictureSender(); return s ? { sent: s.sent, bytes: s.bytes, wanted: s.wanted, via: s.via, from: s.from } : null; })(),
+        padPicture: padPictureSender()?.debug ?? null,
         /** A wall point as the plate's, as a remote's touch is mapped (PLAN 8-draw-a). */
         wallToPlate: (u: number, v: number, layer = activeLayerRef.current, turned = true) => wallPointRef.current?.(u, v, layer, turned) ?? null,
         /** Frames through the loop since the page loaded, live or rendered. */
@@ -6555,8 +6308,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       try {
         // What the look now up turns on: the opening's, or the one on when a
         // lost device is replaced mid-show (`gpu/opening.ts`).
-        // The intro held still while the render pipelines compile (`Quiet`
-        // in gpu/prepare.ts says why).
+        // The intro held still until the opening is built (`Quiet` in
+        // gpu/prepare.ts says why).
         const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
@@ -6812,7 +6565,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             .filter((f): f is NonNullable<typeof f> => !!f);
           if (fields.length && stage) {
             // The three pictures the page hands over, on the frames they
-            // change: the beads' mask when they moved, the mark on the
+            // change: the beads when they moved, the mark on the
             // frame it arrives, and the film's frame every frame it plays.
             // The uniforms are told about each of them in `plateUniforms`,
             // under the same conditions, or the shader would be drawing a
@@ -6823,7 +6576,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // frame the size of which changed between measuring and copying,
             // a cross-origin image — and a throw here used to end the loop.
             // A picture that will not upload is left out of this frame.
-            if (view.beadMask) upload('beads', () => plate.setSource('beads', view.beadMask!));
+            if (view.beadMask) upload('beads', () => plate.setBeads(view.beadMask!));
             const mk = view.mark;
             if (!mk) { plate.setSource('mark', null); chain?.setMark(null, 0, 0); }
             else if (mk.dirty) {
@@ -7457,41 +7210,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         picture on the wall without anything having been clicked.
       */
       if (!isMouseDownRef.current) return;
-      if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        /*
-          Not under the Finger either: it carries the dye it touches
-          (carryDye) and does not press the glass. A press here is a squeeze-
-          film source, a flow that spreads out from under it, and dye
-          advected through a spreading flow is copied over more plate than it
-          came from: a stroke is thirty of these, and npm run tools measured
-          the Finger adding dye (512 -> 1484 against +216 left alone) after
-          its own carry had been made to conserve.
-        */
-        /*
-          Nor under the Drop: it puts paint down and that is all. Reported
-          twice as a "press or blow" going off with every drop; whatever else
-          is found, a drop that also squeezes the film and shoves it along the
-          stroke is not a drop.
-        */
-        if (activeToolRef.current === 'dropper') return;
-        /*
-          And the Finger neither presses nor stirs: its carry moves the dye.
-          With the stir's vertical sign put right it pushed along the stroke,
-          and a push through the film spreads the dye it carries over more
-          plate than it came from, the same copying the press did (npm run
-          tools: 310 -> 459 against +57 left alone).
-        */
-        if (activeToolRef.current === 'finger') return;
-        activeFluid.applySquish(x, y, 8, 0.005);
-        const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
-        // The plate's uv counts up and CSS counts down (getTransformedMousePos):
-        // unflipped, a stroke up the screen shoved the liquid down it.
-        const sx = e.movementX, sy = -e.movementY;
-        const mx = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale * 5;
-        const my = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale * 5;
-        activeFluid.addVelocity(x, y, mx, my);
-      }
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
+      // The plate's uv counts up and CSS counts down (getTransformedMousePos):
+      // unflipped, a stroke up the screen shoved the liquid down it.
+      const sx = e.movementX, sy = -e.movementY;
+      stirAlongMove(activeFluid, activeToolRef.current, x, y, (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale, (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale);
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -7673,10 +7397,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (!h) continue;
           h.x = x; h.y = y;
         }
-        // Not under the magnet, the finger or the drop, as for the mouse above.
-        if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && activeToolRef.current !== 'dropper' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-          activeFluid.applySquish(x, y, 8, 0.005);
-        }
+        // The press as for the mouse above, and no stir, which a touch never had (stirAlongMove: not under the finger, the drop or the blow).
+        if (activeFluid && activeToolRef.current !== 'magnet') stirAlongMove(activeFluid, activeToolRef.current, x, y, 0, 0);
       }
     };
 

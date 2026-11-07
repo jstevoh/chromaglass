@@ -59,12 +59,46 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
     ipcRenderer.on('chromaglass:ambient', listener);
     return () => ipcRenderer.removeListener('chromaglass:ambient', listener);
   },
+  // The Show menu's Ableton Link item (PLAN.md 13.5-link-menu): the page
+  // switches Link as its own Link button does, so it stays remembered.
+  onLinkMenu(fn) {
+    if (typeof fn !== 'function') return () => {};
+    const listener = (_event, on) => {
+      try { fn(Boolean(on)); } catch { /* ignore */ }
+    };
+    ipcRenderer.on('chromaglass:link', listener);
+    return () => ipcRenderer.removeListener('chromaglass:link', listener);
+  },
   setAmbient(on) {
     ipcRenderer.send('chromaglass:set-ambient', Boolean(on));
   },
   // A sign-in that must finish in the real browser (PLAN.md 23.17d): main.js
   // opens only this app's own address.
   openInBrowser: (url) => ipcRenderer.invoke('chromaglass:open-browser', String(url)),
+  // The laptop's "Make it full screen" for the projector window this show
+  // opened (main.js `fillProjector`): no gesture needed from this side.
+  fillProjector: () => ipcRenderer.invoke('chromaglass:fill-projector'),
+  // The live stream (PLAN.md 37x-4b; src/lib/liveStream.ts is the page's
+  // side, desktop/live.js the other). The page names a key; it never holds
+  // one. `packet` is send, not invoke: thirty frames and fifty audio packets a
+  // second have nothing to wait for.
+  live: {
+    start: (req) => ipcRenderer.invoke('chromaglass:live-start', req),
+    config: (cfg) => ipcRenderer.invoke('chromaglass:live-config', cfg),
+    packet: (p) => ipcRenderer.send('chromaglass:live-packet', p),
+    stop: () => ipcRenderer.invoke('chromaglass:live-stop'),
+    state: () => ipcRenderer.invoke('chromaglass:live-state'),
+    onEvent: (fn) => {
+      const listener = (_e, ev) => { try { fn(ev); } catch { /* the page's own error */ } };
+      ipcRenderer.on('chromaglass:live-event', listener);
+      return () => ipcRenderer.removeListener('chromaglass:live-event', listener);
+    },
+    keys: {
+      set: (name, key) => ipcRenderer.invoke('chromaglass:live-key-set', String(name), String(key)),
+      list: () => ipcRenderer.invoke('chromaglass:live-key-list'),
+      remove: (name) => ipcRenderer.invoke('chromaglass:live-key-remove', String(name)),
+    },
+  },
   updates: {
     state: () => ipcRenderer.invoke('chromaglass:update-state'),
     act: () => ipcRenderer.invoke('chromaglass:update-act'),

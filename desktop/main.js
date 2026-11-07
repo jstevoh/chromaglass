@@ -23,7 +23,7 @@
  */
 
 import inspector from 'node:inspector';
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, screen, session, shell, systemPreferences } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, safeStorage, screen, session, shell, systemPreferences } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
 import { createSocket } from 'node:dgram';
@@ -33,6 +33,8 @@ import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
+import { wireLive } from './liveSession.js';
+import { makeKeyStore } from './keys.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -452,17 +454,42 @@ function projectorWindowOptions(features) {
   };
 }
 
-function fillOnLoad(win) {
-  const fill = () => {
-    if (win.isDestroyed()) return;
-    // `true`: run as if from a gesture, which is what the page's full screen asks for.
-    win.webContents.executeJavaScript(
-      "document.fullscreenElement ? true : document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)",
-      true,
-    ).catch(() => { /* closed before it loaded */ });
-  };
-  win.webContents.on('did-finish-load', fill);
+/*
+  Fill a projector window's screen. The page's own full screen first, run as
+  if from a gesture (`true`), which is what it asks for and what the page
+  reads back (`document.fullscreenElement`). If that is refused, the window's
+  own full screen: on a plain window like this one it hides the title bar
+  just the same, and the show counts a window whose page covers its screen
+  as filling it (useCastSession's `readWindowFullscreen`).
+*/
+async function fillProjector(win) {
+  if (win.isDestroyed()) return false;
+  const page = await win.webContents.executeJavaScript(
+    "document.fullscreenElement ? true : document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => true, () => false)",
+    true,
+  ).catch(() => false);   // closed before it loaded
+  if (!page && !win.isDestroyed()) win.setFullScreen(true);
+  return !win.isDestroyed() && (page || win.isFullScreen());
 }
+
+function fillOnLoad(win) {
+  win.webContents.on('did-finish-load', () => { void fillProjector(win); });
+}
+
+/*
+  The projector windows each show window opened, so the laptop's "Make it
+  full screen" (ProjectorFillChip) can ask for its own again. Once the page
+  has loaded, nothing puts a window back that left full screen (Escape on
+  the wall, or the Mac moving it out of its Space), and a click on the show
+  has to reach the projector's page to do it; from here it needs no gesture.
+  Only a window this sender opened is touched.
+*/
+const projectorsOf = new Map();
+ipcMain.handle('chromaglass:fill-projector', async (e) => {
+  const mine = [...(projectorsOf.get(e.sender.id) ?? [])].filter((w) => !w.isDestroyed());
+  const filled = await Promise.all(mine.map(fillProjector));
+  return filled.some(Boolean);
+});
 
 /** What each projector window was opened with, for the check to see which screen the page chose. */
 const opened = [];
@@ -479,7 +506,14 @@ function wireWindow(win) {
     if (/^https?:/.test(url)) void shell.openExternal(url);
     return { action: 'deny' };
   });
-  win.webContents.on('did-create-window', (child) => { wireWindow(child); fillOnLoad(child); });
+  win.webContents.on('did-create-window', (child) => {
+    wireWindow(child);
+    fillOnLoad(child);
+    const id = win.webContents.id;
+    if (!projectorsOf.has(id)) projectorsOf.set(id, new Set());
+    projectorsOf.get(id).add(child);
+    child.on('closed', () => projectorsOf.get(id)?.delete(child));
+  });
   win.webContents.on('will-navigate', (e, url) => {
     if (isOurs(url)) return;
     e.preventDefault();
@@ -503,6 +537,15 @@ function showDetails() {
     show.oscMode === 'off'
       ? 'OSC in: off (Show menu > OSC input turns it on)'
       : `OSC in: UDP port ${show.osc}, ${show.oscMode === 'local' ? 'from this Mac only' : 'from anyone on the network'} (/chromaglass/setting/<key>, /action/<name>, /preset/<id>)`,
+    // Where a VJ finds the whole address space and the starter maps (PLAN 13.4):
+    // the details are the one place the app names OSC beside its port.
+    'Every OSC address, with Resolume and TouchDesigner maps: github.com/jstevoh/chromaglass/blob/main/docs/osc.md',
+    // The server refuses OSC and Art-Net below Pro (PLAN.md 34a-7a); the
+    // details say so, rather than an open port that answers nothing. Not a
+    // dialog on the menu's pick: on a Mac a message box is a sheet on the
+    // show window, and a window with a sheet up does not close, so the app
+    // hung at quit in desktop.yml's packed check (no Pro key in that run).
+    ...(showServer?.linkTier && !showServer.linkTier().pro ? ['OSC in and Art-Net need a Pro licence: packets are ignored until one is in.'] : []),
     ...(show.port !== 3000 ? ['', `Port 3000 was taken, so this show is on ${show.port}. Looks saved on 3000 are not in this one.`] : []),
   ];
   void dialog.showMessageBox(showWindow ?? undefined, { type: 'info', message: 'The show server', detail: lines.join('\n'), buttons: ['OK'] });
@@ -583,12 +626,30 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
         {
-          label: 'OSC input',
+          label: 'OSC input (Pro)',
           submenu: [
             ['off', 'Off'],
             ['local', 'This Mac only'],
             ['network', 'From the network'],
           ].map(([mode, label]) => ({ id: `osc-${mode}`, label, type: 'radio', checked: show.oscMode === mode, click: () => setOscMode(mode) })),
+        },
+        /*
+          Ableton Link, for an operator who never opens Settings → Sound
+          (PLAN.md 13.5-link-menu). The page owns the switch (it remembers it
+          and asks the server again on every connect), so the menu asks the
+          page rather than the server: a menu that switched the server alone
+          would be switched straight back by the page two seconds later. The
+          tick is the server's own state, rebuilt on each change it reports.
+        */
+        {
+          id: 'link',
+          label: 'Ableton Link (Pro)',
+          type: 'checkbox',
+          checked: !!showServer?.linkOn?.(),
+          click: (item) => {
+            if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send('chromaglass:link', item.checked);
+            else buildMenu();
+          },
         },
       ],
     },
@@ -652,6 +713,15 @@ async function start() {
     void shell.openExternal(url);
     return true;
   });
+  // The live stream (PLAN.md 37x-4b): the page encodes, this process speaks
+  // RTMPS (live.js), and the stream keys stay in the keychain store (keys.js),
+  // where a packed app alone can read them. Headless until the panel (37x-4d):
+  // the page's `window.__cgLive` drives it from the console and the check.
+  wireLive(ipcMain, {
+    keys: makeKeyStore({ file: join(app.getPath('userData'), 'live-keys.json'), safeStorage }),
+    isPackaged: app.isPackaged,
+    send: (channel, payload) => { if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send(channel, payload); },
+  });
   const licenseFile = process.env.CHROMAGLASS_LICENSE_FILE ?? join(app.getPath('userData'), 'license.json');
   process.env.CHROMAGLASS_LICENSE_FILE = licenseFile;
   // The server reads its settings from the environment, as it does in a terminal.
@@ -679,7 +749,14 @@ async function start() {
     enforced: initialStatus.enforced,
   };
   showServer = await import(pathToFileURL(SERVER).href);
+  // The tick set in place, not the menu rebuilt: a rebuild closes a menu the
+  // operator has open, and below Pro the page asks again every few seconds.
+  showServer.onLinkChange?.((on) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById('link');
+    if (item && item.checked !== on) item.checked = on;
+  });
   await serverUp(show.port);
+  buildMenu();
   // What the check reads from the main process (scripts/desktop.mjs): the choice, and what the socket did with it.
   globalThis.__chromaglassOsc = { mode: show.oscMode, state: showServer.oscState?.() };
 
@@ -705,6 +782,13 @@ async function start() {
       if (!w.isDestroyed()) w.destroy();
     }
     app.quit();
+    // And out, whatever holds the quit up. On CI's Mac a run whose projector
+    // window had been in and out of the Mac's own full screen just before
+    // stayed running with its port taken after the show was closed
+    // (PLAN 14af; run 40942225503), and an app left running with no window
+    // keeps the show's port from the next launch. `will-quit` exits at once
+    // when the quit goes through; this is only for when it does not.
+    setTimeout(() => app.exit(0), 3000).unref?.();
   });
   const query = process.env.CHROMAGLASS_QUERY ?? '';
   await showWindow.loadURL(`http://localhost:${show.port}/${query}`);

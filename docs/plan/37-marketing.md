@@ -121,10 +121,7 @@ a post sees them in the first minute.
   descriptions, clips, captions). Once 37p to 37s run, the owner's part is the Monday
   approval (37q) and answering; once 37x runs, the album is the week's YouTube video and
   its peaks are the week's three cuts.
-- **37k. A press page.** *(S; Claude.)* `chromaglass.art/press`: what it is in two
-  sentences, the prices, six stills and two clips to download, the logo files from
-  `brand/`, `support@chromaglass.art`. For a reviewer, a podcast or a newsletter that
-  writes back; built on the phone layout like every page.
+- ~~**37k. A press page.**~~ Shipped 2026-11-01 (#666): `chromaglass.art/press`, checked by `npm run presskit`; story in `docs/plan-shipped.md` §37k.
 - **37l. Knowing what worked.** *(S–M; Claude, with the owner's sign-in for the
   dashboards.)* The site has no analytics today (no counter in `src/` or `index.html`,
   checked 2026-10-29), so nothing says which post sent a buyer. The funnel is views →
@@ -350,26 +347,119 @@ rest is routine and the owner's calls.
     150 followers), that simulcasting is allowed everywhere since Twitch dropped its rule
     in 2023, and the three designs weighed. YouTube's first enable takes up to 24 hours,
     so the owner enables it before the first show.
-  - **37x-4b. The encoder and one destination.** *(build, M.)* `desktop/live.js`: an RTMPS
-    client (handshake, AMF0 `connect`/`createStream`/`publish`, FLV audio and video tags in
-    RTMP chunks, the AVC and AAC sequence headers from the encoders' descriptions) fed over
-    IPC by a `LiveMuxer` in `lib/render.ts` that takes the Record encoders' packets instead
-    of a file; a `live` check in the lab against a local RTMP listener (the check's own
-    `scripts/rtmpListener.mjs`, pure node) that records what arrives as FLV and measures
-    the audio seconds, the frame rate and the sync; the keys in the Keychain
-    (`desktop/keys.js`). Headless: a `chromaglass:live-*` IPC the panel (37x-4d) will call,
-    driven first from the console and the check.
-  - **37x-4c. Several destinations, and a vertical one.** *(build, M.)* The same packets
-    written to N sockets, a socket that falls behind dropping its own frames (never the
-    others'), a reconnect with the key still held; a second encode of a 9:16 crop for
-    Instagram and TikTok; the health readout per destination (bitrate out, frames dropped,
-    seconds behind, reconnects).
-  - **37x-4d. The Live Show panel and the Pro gate.** *(build, M.)* The panel in the Mac
-    app's Perform desk: destinations added by name with a pasted key (the key field never
-    echoes), orientation per destination, a Test (an unlisted YouTube broadcast), Go live
-    and Stop, the health readout, and a warning when the summed bitrate passes the measured
-    upload. Pro only through §23's `canUseProFeature`; absent on the website. Phone: the
-    Play screen's live state and Stop (`remoteProtocol.ts`), through the relay.
+  - **37x-4b. The encoder and one destination.** *(shipped 2026-10-29, #577.)* `desktop/live.js`
+    (the RTMPS client), `desktop/rtmp.js` (the wire), `desktop/keys.js` (the key store),
+    `src/lib/liveStream.ts` (the wall-clock encoder), `window.__cgLive` in the Mac app, and
+    `npm run live` against `scripts/rtmpListener.mjs`; story in `docs/plan-shipped.md` §37x-4b.
+    Found building it, for the parts after:
+    - *The picture is the plate's canvas.* `__cgLive` streams `#liquid-canvas`, the laptop's
+      plate, not the projector's pass (§31's Wall output, the mixer's stack). A show with a
+      projector up should be able to stream what the wall shows; 37x-4d takes it, as a
+      choice in the panel (still open: 37x-4d-1). Found in 37x-4c: the Wall output runs in the projector's own
+      window (`CastDisplay`'s `#stage-canvas`) and carries the wall's keystone, masks and
+      warp, which on a stream would be a skewed picture; so the source to offer is the
+      mixer's stack before the projector's geometry, not the wall's canvas itself.
+    - *The sound's clock, on the Mac.* The stream stamps the audio on the track's own
+      timestamps, which Chromium puts on `performance.now()`'s clock (measured, the lab);
+      the Mac's system-audio path (#550) schedules each captured chunk into a context 5 to
+      60 ms after it was heard, so the stream's sound may sit that far behind the plate's
+      reaction to it. Measure on the Mac with a clap on camera (judging §92), and if it
+      shows, stamp the tap's chunks with the time they were captured.
+    - *The encoder's own keyframes.* OpenH264 (the lab) starts a new group whenever the
+      picture changes a lot, on top of the one asked for every two seconds; the check allows
+      it. VideoToolbox should not; `npm run live` on the Mac shard says.
+    - *The app's encoder on GitHub's Mac.* (Open; 37x-4c added the measurement.) On GitHub's macOS runner (a virtual machine with
+      no GPU of its own) the packed app encodes 640x360 at 170 ms a frame under every
+      WebCodecs hint (`__cgLive.probe()`: no-preference 171, prefer-software 198 ms, hardware
+      unsupported), while the lab's Chromium on the same kind of machine holds 30 fps at
+      that size (`npm run live -- --codec aac`, the fifth shard). Electron's build reaches a
+      different encoder than Chromium's there; find which (`chrome://gpu`'s video encode
+      line in the app, `media_use_openh264` in Electron's build args). The app's check
+      line wants the frames the probe says the machine can make, so the runner measures
+      the bridge, not its own encoder; judging §92 measures the real rate on the owner's Mac.
+      37x-4c's probe also times the default and software encoders on frames made from a
+      buffer of pixels, no canvas: in the cloud's Electron under xvfb the canvas-made frames
+      cost 11 to 17 ms a frame and buffer-made ones 3.6 to 4.7, so the canvas's readback is
+      a cost of its own; the next Mac run's `desktop` line says whether it is the 171 ms.
+    - *Dropping on a slow upload is counted, not yet measured.* (Shipped in 37x-4c:
+      `npm run livedrop`.)
+  - **37x-4c. Several destinations, and a vertical one.** *(shipped 2026-10-30.)*
+    `desktop/liveSession.js` (one encode written to N sockets, each dropping and
+    reconnecting on its own), a portrait encode of the plate's middle, the health readout,
+    `npm run livedrop` against a throttled listener; story in `docs/plan-shipped.md`
+    §37x-4c. Found building it, for the parts after:
+    - *A slow upload stalls the stream before it drops.* The bound is two seconds of
+      stream not yet at the server; past it video is dropped until it is back under one.
+      With a link at a quarter of the bitrate (`livedrop`'s throttle) the backlog already
+      written takes nine seconds to drain, so the server's copy runs up to 7.5 s behind
+      before it recovers: what OBS does too, and a viewer sees a stall. What OBS adds,
+      and this should: lower the encode's bitrate when a destination stays behind (its
+      "dynamic bitrate"), per output, since every destination on an output shares its
+      encode (the slow one's bitrate for all of them, or a third encode for it).
+    - *The portrait encode is a crop, upscaled.* 720x1280 from a 1920x1080 plate is a 607
+      by 1080 slice scaled by 1.19; at 1080x1920 it would be 1.78 and soft. A plate drawn
+      for the portrait frame (the plate's own render at 9:16, a second view of the same
+      dish) would be sharp; weigh it when 37x-4d's panel offers 1080x1920.
+    - *Whether the platforms acknowledge.* The seconds-behind readout is exact when the
+      server sends RTMP Acknowledgements (the client asks every 256 KB, not OBS's 2.5 MB);
+      on one that does not it sees only the Mac's own buffer, and the kernel's (4.7 MB on
+      loopback, measured) hides a slow link for seconds: the review throttled `livedrop`'s
+      non-acknowledging listener like the slow one, and the readout peaked at 1.29 s while
+      about 7 s of stream were queued, never dropping. `measuredAt` in the readout says
+      which; judging §92 step 6 reads it on YouTube. If a platform does not acknowledge,
+      the fix is a second measure for it: the socket's bytes not yet sent against the
+      upload rate the client has seen, or the kernel's own queue (`TCP_NOTSENT_LOWAT` on
+      macOS, which node does not expose; a small native module would).
+  - **37x-4d. The Live Show panel and the Pro gate.** *(shipped 2026-10-30.)* The Live
+    Show panel in the Mac app (`src/components/LiveShowPanel.tsx`, one controller for it,
+    the console and the phone in `src/lib/liveShow.ts`), the phone remote's live chip and
+    two-tap Stop on Draw and Controls, `npm run liveshow`; story in `docs/plan-shipped.md`
+    §37x-4d. Found building it, for the parts after:
+    - *37x-4d-1. Stream the mixer's stack, not only the laptop's plate.* (Open; moved here
+      from 37x-4b's found item, which 4d was to take.) The panel streams `#liquid-canvas`
+      as the console did. A show with the film, the mark or a back plate in the mixer
+      streams the plate without them. The source to offer is the projector's pass drawn
+      without the wall's geometry (keystone, masks, warp) into a canvas of the stream's
+      size: a GPU change to `src/gpu/output.ts`, measured with `mixer` and `wallpattern`
+      in the lab and the stream's frame time on the Mac, so a PR of its own. The check is
+      written (2026-10-31), red on main: `npm run liveshow -- --stack`'s `stack` line (a
+      film of two known halves alone in the mixer, a keystone on the wall, the Mixer stack
+      source's frames decoded: 1920x1080, the film the right way up and round, the mixer's
+      grade on it, every edge cell the film's, square, and on a Mac moving), with the panel's Source as `data-testid="live-source"` (values `plate`,
+      `stack`); CI's fifth Mac shard runs it with `--owed=plate,stack` until the builds land.
+    - *37x-4d-6. The stream's frames are black.* (Open; found writing 37x-4d-1's check.)
+      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
+      and a presented WebGPU canvas read outside the frame task that drew it answers black
+      (why the projector window and the pad's picture are copied inside that task:
+      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
+      plate read in its frame was the film with the keystone; the Plate source's decoded
+      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
+      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
+      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
+      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
+      --stack`, red on main. Metal answers the same: CI's fifth Mac shard on #619 decoded
+      (0, 0, 0) in every cell from 50 packets, against the plate's own (30, 104, 251) |
+      (240, 139, 1).
+    - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
+      account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
+      new desk; and it would sit on the website's Perform too, where it cannot stream. It
+      is one press away in + Panel (search "live"). If the owner wants it on Perform by
+      default, the shipped layout gains it only when `nativeLive()` is there.
+    - *37x-4d-3. The upload is measured by the last stream.* There is no server of ours to
+      time an upload against, so the panel's warning reads what the last stream showed:
+      the sum the destinations acknowledged while all kept up (enough for that much), and
+      the sum while one was a second behind by the server's own count (all the link
+      carries). A Test to one unlisted destination proves only its own rate: the advice
+      says "never filled the link" rather than guess. A destination that does not
+      acknowledge (37x-4c's item) cannot fill the measure either.
+    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width the app
+      goes to the phone layout (`usePhoneLayout`), which has no Live Show and no live chip:
+      a stream running there keeps running, unseen. Small, since the Mac app is the
+      laptop at the desk; the fix is the remote's `LiveRemoteChip` on `PhonePlay`.
+    - *37x-4d-5. Instagram's and TikTok's keys are per stream.* The panel keeps a key until
+      it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
+      change it each stream, the row could clear the key when a stream ends and say so,
+      rather than fail the next show with last week's key.
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.

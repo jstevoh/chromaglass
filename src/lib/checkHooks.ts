@@ -19,10 +19,14 @@
  * that sets it gives it, the file that sets it, and whether it is there only
  * with `?debug` on the page's address (most are: a visitor's show carries
  * none of the plate's back doors). It is types only and changes nothing at
- * run time; the setters still cast as they did, so the move that added it
- * touched no setter. A new hook is a line here in the same PR as its setter,
- * and a setter that is next edited can drop its cast and assign
- * `window.<name>` directly, which this declaration then checks.
+ * run time. It landed with the setters still casting as they did, so the
+ * move that added it touched no setter; App's setters of the names declared
+ * here, which moved into its hooks under `src/app/` (PLAN 19ai-8), then dropped their casts and assign
+ * `window.<name>` directly (19ai-4a), so the compiler holds each of them to the
+ * shape written here. Doing so found two that were looser here than the code
+ * that sets them (`chromaglassTool`, `chromaglassBench`). A new hook is a line
+ * here in the same PR as its setter, and the plate's setters, which still
+ * cast, drop theirs when they are next edited.
  *
  * Not here: the windows' own bridges, which the app's code (not a check)
  * reads across `window.opener` (`__chromaglassMirror`, `__chromaglassFrame`,
@@ -37,6 +41,7 @@
  */
 import type { VisualizerSettings } from '../types';
 import type { OutputConfig } from './outputConfig';
+import type { BenchOptions } from './bench';
 
 declare global {
   interface Window {
@@ -51,7 +56,7 @@ declare global {
     /** The video pour and the film's video, for `npm run cartoons`. */
     __cgVideo?: () => unknown;
 
-    // ── The show and the desks (App.tsx, `?debug`) ──
+    // ── The show and the desks (App's hooks in `src/app/`, most in `useCheckHooks.ts`; `?debug`) ──
 
     /** The tempo the show is following now, or null. */
     chromaglassTempo?: () => unknown;
@@ -73,8 +78,8 @@ declare global {
     chromaglassAmbient?: (on?: boolean) => boolean;
     /** The patch sanitiser a saved look goes through (`lib/sanitizePatch`). */
     chromaglassSanitizePatch?: (patch: unknown) => unknown;
-    /** Pick the hand's tool. */
-    chromaglassTool?: (tool: string) => void;
+    /** Pick the hand's tool: one of the tools `activeTool` names in App. */
+    chromaglassTool?: (tool: 'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin') => void;
     /** Pick the layer a tool lays on, 0 or 1. */
     chromaglassLayer?: (layer: number) => void;
     /** Pick the bottle a tool pours from. */
@@ -98,7 +103,7 @@ declare global {
     /** Pour rows of text onto the plate. */
     chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => unknown;
     /** Start the bench (`npm run bench`). */
-    chromaglassBench?: (opts?: unknown) => void;
+    chromaglassBench?: (opts?: BenchOptions) => void;
     /** The cast session as the show sees it. */
     chromaglassCastState?: () => unknown;
     /** What a render could leave running in the live show: fades and glides on the film's clock. */
@@ -110,7 +115,7 @@ declare global {
 
     // ── Set by a check, read by the app ──
 
-    /** An array a check puts here to have every level a take writes pushed onto it (App.tsx `traceFade`); nothing is kept when it is absent. */
+    /** An array a check puts here to have every level a take writes pushed onto it (`src/app/useRowFades.ts`, `traceFade`); nothing is kept when it is absent. */
     __cgFadeLog?: unknown[];
     /** The licence key's public key, swapped for a test pair by the licence checks (`lib/licenseKey.ts`). */
     __cgTestLicensePublicKey?: JsonWebKey;

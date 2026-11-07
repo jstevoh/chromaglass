@@ -37,19 +37,7 @@ export const FREE_RECORD_MAX_SECONDS = 15;
 export const FREE_RENDER_MAX_HEIGHT = 720;
 export const FREE_SITE_LOGO_TEXT = 'ChromaGlass';
 
-export const CHECKOUT_HOME_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/e4ac2797-90f4-413a-b423-d9b73b41cdaa';
-export const CHECKOUT_PRO_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/08ac3a98-9a0b-4630-ab3f-fef720ca215c';
-export const CHECKOUT_UPGRADE_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/4f942048-d8c3-473a-a5ce-4622e28af245';
-
-export function buildCheckoutUrl(baseUrl: string, email?: string | null): string {
-  const clean = email?.trim();
-  if (!clean || !clean.includes('@')) return baseUrl;
-  const sep = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${sep}checkout[email]=${encodeURIComponent(clean)}`;
-}
+export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, buildCheckoutUrl } from './checkoutLinks';
 
 export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
@@ -149,17 +137,23 @@ export const APP_FEATURE_TILES: AppTileSpec[] = [
     tier: 'home',
     summary: 'In the ChromaGlass app — put your own band mark or SVG on the glass instead of the ChromaGlass mark.',
   },
+  // The two Pro tiles sold several projectors with edge blending and MIDI out,
+  // and neither ships: the app drives one projector output (mapped into up to
+  // sixteen surfaces, on every tier), and MIDI out is only a controller's LEDs
+  // (PLAN.md 34a-7, which checked every claim against the code for the Pro
+  // page, public/pro.html). They now name what a Pro key does open. The first
+  // keeps its id because `npm run tiers` counts the tiles by it.
   {
     id: 'multi-projector',
-    title: 'Multi-projector & edge blend',
+    title: '1024² grid & cloud sync',
     tier: 'pro',
-    summary: 'In the ChromaGlass app (Pro) — span multiple projectors with feathered overlap.',
+    summary: 'Pro — the finest fluid grid, and your looks, sets and MIDI map the same in every browser you sign in to.',
   },
   {
     id: 'pro-io',
-    title: 'OSC, Art-Net / DMX & MIDI Out',
+    title: 'OSC & Art-Net / DMX',
     tier: 'pro',
-    summary: 'In the ChromaGlass app (Pro) — lock into lighting desks, Resolume, TouchDesigner and house rigs.',
+    summary: 'In the ChromaGlass app (Pro) — Resolume, TouchDesigner and lighting desks drive the show, and the room’s lights follow the plate.',
   },
 ];
 

@@ -220,6 +220,13 @@ the longest shard went from 18.4 minutes to 15.0. Story in `docs/plan-shipped.md
 19w it trusted no PR run and every deploy re-ran the whole Mac, about 55 minutes from merge
 to live. Story in `docs/plan-shipped.md` §19w-1 (moved 2026-10-29, 19m).
 
+### 19w-2. The plate shard is back near its timeout (2026-10-28)
+The plate shard took 18.5 minutes on PR #540's run 40683027073 and 16.7 on main's deploy
+40655786829, against `timeout-minutes: 20`. On #540's run 40697987644 it was cancelled at
+20:21, inside `npm run fx`, with nothing red before it, on a PR that changed no file the shard
+runs. That is past 19w's "about 15 minutes" line. Even the shards again from `scripts/checks.json`
+(`npm run macqueue` for the times) before a sixth.
+
 ## 19x. A moved bar names itself
 
 **Shipped** (2026-10-11): CI fails a PR that changes a check's bar or input, or turns a

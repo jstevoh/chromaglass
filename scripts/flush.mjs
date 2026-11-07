@@ -62,7 +62,7 @@
  */
 import { openLab } from './lab.mjs';
 import { HELD_POUR, pourShare } from '../src/lib/liquidProps.ts';
-import { DISH_METRES, DISH_REST_GAP } from '../src/lib/turntable.ts';
+import { DISH_METRES, DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -79,7 +79,7 @@ const check = (name, ok, detail = '') => {
 */
 {
   const r = 3 / 128, steps = 60;
-  const dome = Math.PI * (r * DISH_METRES) ** 2 / 2 * DISH_REST_GAP * DISH_METRES;
+  const dome = Math.PI * (r * DISH_METRES) ** 2 / 2 * DISH_GAP_METRES;
   const one = pourShare(r, 1, 1 / steps);
   const mL = one * dome * steps * 1e6;
   check('a held Dropper pours 0.5 mL a second, unclipped', Math.abs(mL - HELD_POUR * 1e6) < 1e-9 && one < 1 && pourShare(r, 0.35) === 0.35,

@@ -32,7 +32,7 @@ import { getAudioValue, type AudioFeatureKey } from '../constants.ts';
 import { BandRange, SOURCE_NAMES, sourceValue, type SourceName } from './audioFeatures.ts';
 import { CordGate } from './areaCords.ts';
 import type { ModulatorFeature, Modulators } from './modulators';
-import type { HitSource } from './hitSource.ts';
+import { isClassFeature, type HitSource } from './hitSource.ts';
 import type { AudioData } from '../hooks/useAudioAnalyzer';
 import type { PatchSource, SceneFeature, SceneMapping, VisualizerSettings } from '../types';
 import { PINNABLE, onStep } from './deskPins.ts';
@@ -242,7 +242,9 @@ function liveValue(
   // (the source has let its values fall by then anyway).
   if (source === 'hits') {
     if (ctx.soundImpact <= 0 || !ctx.hits || !ctx.sound?.features) return null;
-    return { value: ctx.hits.value(feature), impact: ctx.soundImpact };
+    // A note is a name (hitSource.ts noteClass): Sound Impact at zero still
+    // silences it, but turned half down it would read as another note.
+    return { value: ctx.hits.value(feature), impact: isClassFeature(feature) ? 1 : ctx.soundImpact };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".

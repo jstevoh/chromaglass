@@ -39,8 +39,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { launchChromium } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
-import { PINNABLE, PIN_RANGE } from '../src/lib/deskPins.ts';
-import { DEFAULT_RIDES } from '../src/components/desk/DeskPanels.tsx';
+import { PINNABLE, PIN_RANGE, DEFAULT_RIDES } from '../src/lib/deskPins.ts';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 import { readingOf } from './judge.mjs';
 

@@ -72,14 +72,16 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VOut {
   o.rim = f;
   /*
     Its size (16 steps on a log scale, 0.004 to 0.16 of the plate, so a
-    small bubble's size is as well told as a large one's), its film's age (16 steps)
-    and a number of its own (8, from its finger phase, random per bubble),
-    as one whole number under 2048, which half floats hold exactly.
+    small bubble's size is as well told as a large one's), its film (16
+    steps of the log of the film its own speed laid on the glass, bubbles.ts
+    pack; it was the film's age, which a pocket between glasses does not
+    have) and a number of its own (8, from its finger phase, random per
+    bubble), as one whole number under 2048, which half floats hold exactly.
   */
   let sizeQ = floor(clamp(log2(max(d.z, 1e-4) / 0.004) / 5.321928, 0.0, 1.0) * 15.0 + 0.5);
-  let ageQ = floor(clamp(f.w, 0.0, 1.0) * 15.0 + 0.5);
+  let filmQ = floor(clamp(f.w, 0.0, 1.0) * 15.0 + 0.5);
   let idQ = floor(fract(f.z / 6.2831853) * 7.99);
-  o.look = vec2f((sizeQ * 128.0 + ageQ * 8.0 + idQ) / 2048.0, 0.0);
+  o.look = vec2f((sizeQ * 128.0 + filmQ * 8.0 + idQ) / 2048.0, 0.0);
   return o;
 }
 

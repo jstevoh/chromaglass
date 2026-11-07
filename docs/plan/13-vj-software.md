@@ -54,13 +54,15 @@ picks it up in its next build. `detectTier()` already reads Electron as the
 2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
    server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
    the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
-   against the plate's own frame. *Not started.*
+   against the plate's own frame. *Not started.* **Check written** (2026-11-01,
+   `scripts/desktop-syphon.mjs`, run by desktop.yml with `DESKTOP_OWED: syphon`):
+   the add-on loads, a Show-menu checkbox `syphon-out` (off at start) serves "ChromaGlass"
+   with at least 30 frames a second published and each released, through
+   `globalThis.__chromaglassSyphon` in the main process; skipped off a Mac. The build
+   takes `syphon` out of `DESKTOP_OWED`.
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
-4. **Control, written up** (one PR): the OSC address space documented where a VJ
-   finds it (the show server's page and `docs/`), plus a starter Resolume OSC map and
-   a TouchDesigner OSC Out example that play presets, actions and settings. Works
-   on the website with `npm run show` too. *Not started.*
+4. ~~**Control, written up**~~ **Shipped** (2026-10-31): `docs/osc.md`, every address with a starter Resolume map and a TouchDesigner script (`docs/osc/chromaglass_touchdesigner.py`), held to the code by `npm run rig`. Story in `docs/plan-shipped.md` §13.4. **Owed:** the maps tried in Resolume and TouchDesigner, the owner's sitting in `docs/judging.md` §93.
    - **13.4-ipad** (from §30): the same write-up for playing the show from an iPad in
      AUM, with no new code. The iPad joins a network MIDI session, which a Mac shows to
      Chrome as a Web MIDI port; AUM's MIDI matrix then sends clock, notes, CC and Program
@@ -72,16 +74,35 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    first (§30, 2026-10-11: Link is the shared clock of the iPad's music apps, AUM, Loopy
    Pro, Drambo, Koala, as well as of Resolume, VDMX and TouchDesigner, and VS offers it
    as a clock source):
-   - **13.5-link**: Ableton Link in, feeding the beat clock the way MIDI clock does
-     (`beatClock.setExternal`), with tempo and phase; "Link" as a tempo source in the
-     Sound sheet. A page cannot join Link, so it is the Mac app's and the show server's,
-     which fits §23's rule that paid is what a page cannot do. On the phone, Link's
-     switch, its peers and its tempo in the More sheet. *Measure:* a node Link peer at
-     a tempo and a phase the clock reaches within a beat, and follows when it changes.
-   - **13.5-osc**: OSC *out* for the plate's colour, the sound bands and the beat, the
-     way Art-Net out already sends the colour to the lighting (`server/artnet.js`), so
-     a VJ app's effects can follow the plate.
-   *Not started.*
+   - ~~**13.5-link**~~ **Shipped** (2026-10-30, #588): the show server joins a Link
+     session (`server/abletonLink.js`, the protocol spoken in Node, no native addon) and
+     the page's tempo source takes its tempo, beat and bar; the Link switch in Settings →
+     Sound → Tempo and on the phone's Sound sheet. `npm run link` 27/27. Story in
+     `docs/plan-shipped.md` §13.5-link. **Owed:** the owner's session with Live
+     (`docs/judging.md` §95); until it passes, the Pro page keeps Link under "on the way".
+     - ~~**13.5-link-one**, **-transport**, **-gate**, **-rescan**, **-menu**~~ **Shipped**
+       (2026-11-01): Live's bar line is the plate's one from the first bar, Play/Stop lets
+       Live's stop pause a running Sequence, Link is Pro, the interfaces are read again
+       every thirty seconds, and the Mac app's Show menu has the switch. Story in
+       `docs/plan-shipped.md` §13.5-link-one. **Owed:** in the same sitting, §95.
+   - ~~**13.5-osc**~~ **Shipped** (2026-11-01): OSC out of the plate's colour, the ear's
+     readings and bands, the tempo and the beat, from Settings → Sound and the phone
+     layout (`npm run oscout`); story in `docs/plan-shipped.md` §13.5-osc. **Owed:** the
+     owner's sitting with Resolume (`docs/judging.md` §106).
+     - **13.5-osc-menu.** A Show menu item in the Mac app beside OSC input's, with Show
+       Server Details naming the target, for an operator who never opens Settings
+       (`setOscOut` and `oscOutState` are exported for it; with 13.5-link-menu).
+     - **13.5-osc-rate.** The report rides the Art-Net report's 50 ms; a VJ app's own
+       frame is 16 ms. Measure on the Mac whether a hue on `/colour/hue` steps visibly,
+       and send at 30 or 60 Hz only if it does (the beat already goes at once).
+     - **13-pack-imports.** `desktop/electron-builder.config.cjs` copies the server's
+       files by name, so a new module the server imports starts in `npm run show` and
+       fails the packed app only on the Mac's CI (#658: `osc.js`). `npm run desktop`
+       (or `checks`) should fail when a relative import of a packed server file is not
+       on that list.
+     - **13.5-osc-scale.** Every value is 0..1 except `/bpm`; Resolume's tempo input
+       wants its own range. Write the range a Resolume BPM shortcut takes into docs/osc.md
+       once the owner's sitting has read it.
 6. **Video in from a VJ app** (one PR): Syphon and NDI arrive as a Mixer source
    (§11), not through a virtual camera. *Not started.* Beside the Mixer layer, the
    picture can also be poured into the liquid as dye that the flow then carries (the
@@ -116,7 +137,26 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    owner's Mac, an automation lane playing a look change on the bar. The phone rule:
    the link's switch and its slot bindings are in the More sheet.
    Before any of it, the MIDI route in the table above, tried once in Logic and
-   Ableton and written up with step 4. *Not started.*
+   Ableton and written up with step 4 (34a-7e). Off hold 2026-11-01 (the owner),
+   cut into four PRs, the wire between
+   the halves written first so the two builders work apart:
+   - ~~**13.7-check**~~ (shipped 2026-11-07): the contract, `docs/dawbridge.md` (OSC
+     over UDP on `127.0.0.1:9024`, every address and argument, the page's messages and
+     the `CGPC` audio frame, the exports the check imports), and `npm run dawbridge`, a
+     fake plugin against the real show server and the built app, red on main with its
+     lines owed as `app` and `plugin`.
+   - **13.7a** (the app's half, Antigravity's lane): `server/dawBridge.js` beside
+     `abletonLink.js`, Pro only; `src/lib/dawBridge.ts`; slots in MIDI learn's map
+     (kind `'slot'`), the DAW as a tempo source ranked under Link, and the ear's source
+     "DAW". Done when it takes `app` out of `--owed` in `scripts/checks.json` and the
+     check is green in `browser2`. The phone rule: the bridge's state and its slot
+     bindings in the More sheet.
+   - **13.7b** (the plugin, Antigravity's lane, after 13.7a): `plugin/dawbridge/` in
+     JUCE, `BridgeProtocol.h` and the `DawBridgeSelfTest` target as the contract says;
+     its PR quotes `npm run dawbridge -- --plugin` and `auval` from the owner's Mac.
+   - **13.7c** (Claude: signing): the macOS runner builds the AU and VST3, signs and
+     notarises them with the Mac app's Developer ID, and a Mac shard runs the check
+     without `plugin` owed. Then the owner's sitting in Logic and Live.
    - **13.7-ipad** (later, from §30; after step 7 and §12's iPad app): the iPad sibling.
      An AUv3 that draws nothing, sits on an AUM (or Loopy Pro, Drambo) channel, and
      sends that channel's readings, its notes and the host's transport to the show over
@@ -204,8 +244,7 @@ network):
   the port), which needs `relayInfo()` to learn the relay's address another way.
 - Built for Apple silicon only. An Intel Mac needs an `x64` (or universal) target in
   `desktop/electron-builder.config.cjs`, about doubling the build.
-- The icon is the website's (`public/icon-512.png`), a flat square in the Dock. A
-  Mac icon has its own shape and shadow (a 1024 px `.icns`).
+- ~~**13-icon**~~ **Shipped** (2026-10-31): the Mac app's own `.icns`, drawn on macOS's grid by `npm run brand`. Story in `docs/plan-shipped.md` §13-icon. **Owed:** how it sits in the Dock beside the other apps, on the owner's Mac after the next release.
 - **13-update** (**shipped** ad hoc, asked 2026-10-25; the story is in
   `docs/plan-shipped.md` §13) Story in `docs/plan-shipped.md` §13-update (moved 2026-10-29,
   19m).
@@ -215,10 +254,7 @@ network):
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published
     with `--latest=false`, or every installed app looks for `latest-mac.yml` in it
     and reports an error.
-  - **13-version**: a release is `<major>.<minor>.<run number>` (1.3.N) while the site
-    packed inside keeps `package.json`'s 1.3.0, so the About box and anything the page
-    reports (the cast hello's version, 14k) disagree with the release by name. Pass the
-    release's version to the site's build, or bump `package.json` in the release.
+  - ~~**13-version**~~ **Shipped** (2026-10-31): the site inside a release is built with the release's version. Story in `docs/plan-shipped.md` §13-version.
   - **13-exit** (found 2026-10-25): the first launch from /Applications on the owner's
     Mac exited by itself after a few seconds, with no crash report; the second has
     stayed up. The app writes nothing about why it quits. Write the main process's

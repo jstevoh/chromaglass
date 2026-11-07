@@ -23,14 +23,17 @@
  *   only the light through a film, 92 to 100 per cent of the lamp in pale
  *   complements, so what the film adds falls under a quarter of the
  *   rainbow's.
- * - The closeup's bubbles, the camera's, keep a coloured film, the
- *   reflected soap colours. A bubble's film runs about 1.6 times thicker in
- *   its middle than at its rim (one rainbow period to 207 nm of soap): 250
- *   to 390 nm for a middling one, where soap goes blue, green-gold and
- *   orange, so over the bubble it turns gold where the rainbow turned it
- *   blue and violet. Less colour than the rainbow's, and that is the
- *   physics too: the rainbow is never grey, a film often is.
- * - And the projector's tint is the gold's complement, a faint blue.
+ * - The closeup's bubbles, the camera's, do the same since the camera was
+ *   traced (38h-7): it is lit from beneath as the projector is and looks
+ *   through the same film, so it sees the light through it too. A
+ *   reflected film colour would need a light mirrored in the film, and the
+ *   film lies flat on the glass while Light Play's softbox hangs 15 to 55
+ *   degrees off the lens's axis (camFilm in wgsl/closeupDepth.ts).
+ * - And both tints are the complement of the gold the film reflects. A
+ *   bubble's film runs about 1.6 times thicker in its middle than at its
+ *   rim (one rainbow period to 207 nm of soap): 250 to 390 nm for a
+ *   middling one, where soap reflects blue, green-gold and orange, so the
+ *   light through it is a faint blue.
  *
  * Mutations the check-skeptic ran against the first version of this, which
  * passed it and are what the checks above were added for: the whole plate
@@ -112,12 +115,27 @@ async function scene(labels) {
   await shot('film1Later', { thinFilm: 1, filmPhysics: 1 }, { ...plate, time: T + 60 });
   const bs = [], sizes = [4, 5, 6, 8, 10, 12, 14];
   for (const rad of sizes) bs.push(0.25 + rnd() * 0.5, 0.25 + rnd() * 0.5, rad / N, 1);
-  lab.solver().setBubbles(new Float32Array(bs), sizes.length, 0.05, new Float32Array(sizes.length * 4));
+  /*
+    Each pocket's film is the one its own speed laid on the glass (PLAN 38n;
+    bubbles.ts packs it in the byte that was the film's age, a log scale
+    from Ca 1e-6 to 1e-2): these seven drifted at capillary numbers from
+    3e-5 to 3e-4, a tenth to a third of a millimetre a second in the default
+    oil, a plate at rest. Zeros there would now be the thinnest film a still
+    pocket can keep, where they used to be a fresh one with a random
+    thickness of its own.
+  */
+  const rim = new Float32Array(sizes.length * 4);
+  const span = Math.log10(Math.pow(1e-2, 2 / 3) / 1e-4);
+  sizes.forEach((_, k) => {
+    const Ca = 3e-5 * Math.pow(10, k / (sizes.length - 1));
+    rim[k * 4 + 3] = Math.log10(Math.cbrt(Ca * Ca) / 1e-4) / span;
+  });
+  lab.solver().setBubbles(new Float32Array(bs), sizes.length, 0.05, rim);
   await lab.step(3);
   const QUIET = { macroCells: 0, macroLacing: 0, macroDepth: 0, macroEdgeDetail: 0, macroRelief: 0 };
   const views = {
     plate: [{ lampGround: 1 }, { zoom: 1.3, macroAmount: 0, view: true, cx: 0.5, cy: 0.5 }],
-    closeup: [QUIET, { zoom: 3, macroAmount: 1, view: true, cx: 0.5, cy: 0.5 }],
+    closeup: [{ ...QUIET, lampGround: 1 }, { zoom: 3, macroAmount: 1, view: true, cx: 0.5, cy: 0.5 }],
   };
   // A bubble's film wobbles with the clock (0.08 of a period, every 15.7 s),
   // so the bubbles are asked at three clocks a third of that apart and the
@@ -131,12 +149,33 @@ async function scene(labels) {
       await shot(`${v}1${k}`, { ...quiet, iridescence: 0.9, filmPhysics: 1 }, { ...at, bubbles: 0.8 });
     }
   }
+  /*
+    The same seven pockets again with the thickest film a pocket keeps
+    (Ca 1e-2, the byte at 1), at the first clock, labelled T. The light
+    through a film follows its thickness: soap's transmitted yellow over blue
+    swings sign every hundred nanometres or so (+0.03 at 250 nm, -0.03 at
+    310, +0.03 at 414: lib/filmTable.ts), so a tint that is the film's moves
+    when the film thickens, where a blue cast laid over the bubble (the
+    check-skeptic's mutation, which passed lines 8 and 9 at -8.0) stays
+    where it was.
+  */
+  if (want('closeup1T')) {
+    rim.fill(0); for (let k = 0; k < sizes.length; k++) rim[k * 4 + 3] = 1;
+    lab.solver().setBubbles(new Float32Array(bs), sizes.length, 0.05, rim);
+    await lab.step(3);
+    const [quiet, cam] = views.closeup, at = { ...cam, time: T };
+    await shot('closeupNoneT', { ...quiet, iridescence: 0 }, { ...at, bubbles: 0 });
+    await shot('closeupFlatT', { ...quiet, iridescence: 0 }, { ...at, bubbles: 0.8 });
+    await shot('closeup0T', { ...quiet, iridescence: 0.9, filmPhysics: 0 }, { ...at, bubbles: 0.8 });
+    await shot('closeup1T', { ...quiet, iridescence: 0.9, filmPhysics: 1 }, { ...at, bubbles: 0.8 });
+  }
   return r;
 }
 
 const CLOCKS = [0, 1, 2];
 const ALL = ['bare0', 'bare1', 'film0', 'filmHalf', 'film1', 'bare0Later', 'film0Later', 'film1Later',
-  ...CLOCKS.flatMap((k) => ['None', 'Flat', '0', '1'].flatMap((s) => [`plate${s}${k}`, `closeup${s}${k}`]))];
+  ...CLOCKS.flatMap((k) => ['None', 'Flat', '0', '1'].flatMap((s) => [`plate${s}${k}`, `closeup${s}${k}`])),
+  'closeupNoneT', 'closeupFlatT', 'closeup0T', 'closeup1T'];
 const AT_ZERO = ['bare0', 'film0', 'plate00', 'closeup00'];
 
 // The scene's renders, from base64 back to bytes (see `shot` in `scene`).
@@ -215,7 +254,7 @@ check('with no film on the plate, Film Physics changes nothing', differ(m.bare0,
     `${off.toFixed(2)} levels a channel from the midpoint of 0 and 1 (the slider made a switch at a half reads 7.6)`);
 }
 
-// ── The bubbles: the projector's tint and the camera's gold ──────────
+// ── The bubbles: the light through the film, to projector and camera ─
 /*
   "Colour" is chroma, max - min of a pixel's channels, and "yellow over
   blue" is (r + g) / 2 - b, each averaged over the bubbles' own pixels
@@ -233,39 +272,75 @@ check('with no film on the plate, Film Physics changes nothing', differ(m.bare0,
   is a dark ring on something lit) and, with `withFilm`, counts a pixel
   the film changes by more than two levels a channel as the bubble's too,
   so the middle that carries the film's faint tint is measured and not only
-  its band. The closeup keeps the first rule alone.
+  its band. The closeup does the same since the camera was traced (38h-7):
+  its bubble's middle is the pad through the liquid there, so on the
+  default black ground every bubble was black with a white glint and the
+  film had nothing to tint (it added 0.1 of colour where the bar is 1.5).
+  A bubble photographed against a light box is a ring on something lit.
 */
-const bubbleStats = (v, withFilm = false) => {
+const bubbleStats = (v, withFilm = false, clocks = CLOCKS, rainbowRule = true) => {
   let n = 0, c0 = 0, c1 = 0, cf = 0, moved = 0, y0 = 0, y1 = 0, yf = 0;
   const chroma = (a, i) => Math.max(...px(a, i)) - Math.min(...px(a, i));
   const yellow = (a, i) => (a[i] + a[i + 1]) / 2 - a[i + 2];
-  for (const k of CLOCKS) {
+  for (const k of clocks) {
   const none = m[`${v}None${k}`], flat = m[`${v}Flat${k}`], r0 = m[`${v}0${k}`], r1 = m[`${v}1${k}`];
   for (let i = 0; i < none.length; i += 4) {
-    if (sum3(flat, none, i) < 0.1 * 255 * 3 && !(withFilm && (sum3(r0, flat, i) > 6 || sum3(r1, flat, i) > 6))) continue;
+    if (sum3(flat, none, i) < 0.1 * 255 * 3 && !(withFilm && ((rainbowRule && sum3(r0, flat, i) > 6) || sum3(r1, flat, i) > 6))) continue;
     n++; cf += chroma(flat, i); c0 += chroma(r0, i); c1 += chroma(r1, i);
     yf += yellow(flat, i); y0 += yellow(r0, i); y1 += yellow(r1, i);
     moved += sum3(r1, r0, i);
   }
   }
-  return { n, add0: (c0 - cf) / n, add1: (c1 - cf) / n, moved: moved / n, yRainbow: (y0 - yf) / n, ySoap: (y1 - yf) / n };
+  return { n, add0: (c0 - cf) / n, add1: (c1 - cf) / n, moved: moved / n, yRainbow: (y0 - yf) / n, ySoap: (y1 - yf) / n, yAt1: y1 / n };
 };
 {
   const p = bubbleStats('plate', true);
   check('the projected bubbles\' film fades to a faint tint, the light through a film', p.n > 2000 && p.add0 > 10 && p.add1 < 0.25 * p.add0,
     `colour the film adds ${p.add1.toFixed(1)} against the rainbow's ${p.add0.toFixed(1)}, over ${p.n} bubble pixels`);
-  const c = bubbleStats('closeup');
-  check('the closeup\'s bubbles keep a coloured film, the soap\'s own gold',
-    c.n > 2000 && c.add0 > 5 && c.add1 > 1.5 && c.ySoap > 3 && c.moved > 10,
-    `colour the film adds ${c.add1.toFixed(1)} (the rainbow's ${c.add0.toFixed(1)}), yellow over blue ${c.ySoap.toFixed(1)} (the rainbow's ${c.yRainbow.toFixed(1)}), ${c.moved.toFixed(1)} apart from the rainbow per pixel`);
+  const c = bubbleStats('closeup', true);
   /*
-    A lower bound as well as a sign: a projector film taken out altogether
-    reads 0 here, to the level. The complement measured -1.2 to -1.9 at
-    single clocks, -1.4 averaged over three; the bar is half of that.
+    The camera's film is the light through it as the projector's is (camFilm),
+    so it is held to the projector's rule: a faint tint, under a quarter of
+    the colour the rainbow adds, and still a film (it moves the pixels from
+    the rainbow's). On the old camera, which wore the reflected gold, the
+    film added 5.4 against the rainbow's 12.2 and yellow over blue read +7.0.
+    Here the colour it adds is below nothing (-4.0): the liquid's faint
+    yellow-green, which the flat bubble carries, is cancelled by the film's
+    blue.
   */
-  check('and the projector\'s tint is its complement, the light the film lets by',
-    c.ySoap > 3 && p.ySoap <= -0.7,
+  check('the closeup\'s bubbles, lit from beneath like the projector\'s, keep only the light through the film',
+    c.n > 2000 && c.add0 > 5 && c.add1 < 0.25 * c.add0 && c.moved > 10,
+    `colour the film adds ${c.add1.toFixed(1)} against the rainbow's ${c.add0.toFixed(1)}, ${c.moved.toFixed(1)} apart from the rainbow per pixel, over ${c.n} bubble pixels`);
+  /*
+    A lower bound as well as a sign: a film taken out altogether reads 0
+    here, to the level, and the reflected gold +7.0. The projector's
+    complement measured -1.2 to -1.9 at single clocks, -1.4 averaged over
+    three when its bar was set at half of that, and reads -1.0 today; the
+    camera's -4.7 averaged over three (its pixels are mostly the bubbles'
+    windows, where the projector's are mostly its dark band), its bar half
+    of that.
+  */
+  check('and both tints are the complement of the soap\'s gold, the light the film lets by',
+    c.ySoap <= -2.3 && p.ySoap <= -0.7,
     `yellow over blue: the camera's ${c.ySoap.toFixed(1)}, the projector's ${p.ySoap.toFixed(1)}`);
+  /*
+    Both sides at one clock, the pixels counted those the film itself
+    changes (or the bubble's band), and yellow over blue read on the render
+    at Film Physics 1 itself, not less the one at Iridescence 0: that one
+    still wears a quarter of the rainbow (the camera's bubble always has),
+    which follows the thickness too, and either way a blue cast laid over
+    the bubble whatever its film (the check-skeptic's mutation) moved +5.8
+    and +6.6. Read so, the film moves +1.2 and that blue cast 0.0, to the
+    tenth; the bar is half the film's. The projector's tint moved -0.2
+    (-1.0 to -1.2), too little to hold it to: its film pixels are mostly its
+    dark band, the middle's tint under the two levels a channel that count
+    a pixel (38h-10).
+  */
+  const cT = bubbleStats('closeup', true, ['T'], false), cN = bubbleStats('closeup', true, [0], false);
+  const dc = cT.yAt1 - cN.yAt1;
+  check('and the camera\'s tint is the film\'s: thickened, it moves',
+    Math.abs(dc) > 0.6 && cT.n > 2000,
+    `yellow over blue at Film Physics 1, ${cN.yAt1.toFixed(1)} with the film each pocket's speed laid, ${cT.yAt1.toFixed(1)} with the thickest (${dc >= 0 ? '+' : ''}${dc.toFixed(1)}); colour the film adds ${cT.add1.toFixed(1)} against the rainbow's ${cT.add0.toFixed(1)}`);
 }
 
 const failed = checks.filter((c) => !c.ok);

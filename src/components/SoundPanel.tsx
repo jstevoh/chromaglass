@@ -40,7 +40,7 @@ const SOURCES: ReadonlyArray<{
 ];
 
 export function SoundPanel({
-  source, onSource, inputs, inputId, onInput,
+  source, onSource, inputs, inputId, onPickMic,
   playing, time, loop, onLoop, onToggle, onSeek,
   nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle,
   ambientMode = false, onAmbientMode, onClose, embed = false,
@@ -50,7 +50,8 @@ export function SoundPanel({
   onSource: (s: AudioSource) => void;
   inputs: { id: string; label: string }[];
   inputId: string;
-  onInput: (id: string) => void;
+  /** Opens Settings at Sound's Input, where the microphone is picked (PLAN 35c-5). */
+  onPickMic: () => void;
   playing: boolean;
   time: { t: number; d: number };
   loop: boolean;
@@ -244,18 +245,27 @@ export function SoundPanel({
           </div>
         )}
 
-        {source === 'microphone' && inputs.length > 0 && (
-          <div className="mt-3">
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-widest text-muted">Which microphone</p>
-            <select
-              value={inputId}
-              onChange={e => onInput(e.target.value)}
-              className="w-full rounded-lg border border-border bg-black/30 px-3 py-2 text-[12px] text-text"
-              data-testid="sound-input-picker"
+        {/*
+          Which microphone, said and not picked. A select here was the second
+          picker for the one device, beside Settings' Input (where the Mic
+          light lands, and where the advice about a USB feed from the desk
+          is): on the Setup tab both stood on screen at once, and one could
+          be changed while the other was read (PLAN 35c-5). The sheet keeps
+          the source, which is its own; the device is Settings', one click on.
+        */}
+        {source === 'microphone' && (
+          <div className="mt-3 flex items-center gap-2" data-testid="sound-input-state">
+            <p className="min-w-0 flex-1 truncate text-[12px] text-muted">
+              Hearing <span className="text-text">{inputs.find(i => i.id === inputId)?.label || 'the default microphone'}</span>
+            </p>
+            <button
+              onClick={() => { if (!embed) onClose(); onPickMic(); }}
+              className="h-8 shrink-0 rounded-lg border border-border bg-black/30 px-3 text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="Pick the microphone or audio interface in Settings → Sound"
+              data-testid="sound-input-open"
             >
-              <option value="">Whatever the system offers</option>
-              {inputs.map(i => <option key={i.id} value={i.id}>{i.label}</option>)}
-            </select>
+              Change…
+            </button>
           </div>
         )}
 

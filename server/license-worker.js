@@ -123,28 +123,91 @@ async function handleWebhook(request, env, cors) {
   // Support both our direct JSON payload and Lemon Squeezy's native JSON:API webhook payload
   const lsAttr = body.data?.attributes || {};
   const lsItem = lsAttr.first_order_item || {};
-  const lsProductName = String(lsItem.product_name || lsItem.variant_name || '').toLowerCase();
   const lsProductId = Number(lsItem.product_id || 0);
+  // Lemon Squeezy numbers a store's live products afresh, apart from its test-mode copies
+  // (1450525 Home, 1450531 Pro, 1450532 Upgrade), so the live ones (1479217 Home, 1479219 Pro,
+  // 1479218 Upgrade) are built in beside them, so a deploy that forgets the settings cannot hold
+  // every paid order, and a later store can add its own as Worker settings
+  // (`LS_HOME_PRODUCT_IDS`, `LS_PRO_PRODUCT_IDS`, `LS_UPGRADE_PRODUCT_IDS`, comma separated). A Lemon Squeezy order files a key only for a
+  // product on one of the three lists. Until 2026-10-28 an id on none of them fell back to the
+  // product's name ("pro", "upgrade") and, failing that, to a Home key, so anything else sold in
+  // the store, or a product reworded, would have handed out a Home key for whatever it cost
+  // (the security audit, finding 5). An order for a product we do not know answers 200 so the
+  // store does not retry, files nothing, and is held for the owner (`holdOrder`). Our own direct
+  // JSON (no `data.attributes`, signed with the same secret) names its tier itself and is untouched.
+  // The test Home id was written as 1450530 when the list went in; the store's test Home is
+  // 1450525 (read from the dashboard and from its own order_created of 2026-10-24, whose
+  // `first_order_item.product_id` is 1450525), so every paid test Home order was being held as
+  // an unknown product. The live ids were read from the dashboard the same day and match.
+  const isLs = Boolean(body.data && typeof body.data === 'object' && body.data.attributes);
+  const lsStatus = String(lsAttr.status || '').toLowerCase();
+  const productKind = !isLs
+    ? null
+    : productIdIn(env.LS_UPGRADE_PRODUCT_IDS, lsProductId, [1450532, 1479218])
+      ? 'upgrade'
+      : productIdIn(env.LS_PRO_PRODUCT_IDS, lsProductId, [1450531, 1479219])
+        ? 'pro'
+        : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, [1450525, 1479217])
+          ? 'home'
+          : 'unknown';
   const rawEvent = String(body.event || body.meta?.event_name || '');
-  const isLsUpgrade =
-    rawEvent === 'order_created' &&
-    (lsProductId === 1450532 || lsProductName.includes('upgrade'));
+  const isLsUpgrade = rawEvent === 'order_created' && productKind === 'upgrade';
   const event = isLsUpgrade ? 'order_upgraded' : rawEvent;
 
   const rawEmail = body.email || lsAttr.user_email || body.meta?.custom_data?.email || '';
   const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
   const rawOrderId = body.orderId || body.data?.id || lsItem.order_id || '';
   const orderId = rawOrderId ? String(rawOrderId).trim() : '';
+
+  // A test-mode order is one nobody paid for: Lemon Squeezy's checkout takes its published test
+  // card, so anyone who finds the buy link could otherwise mint a real signed key for nothing. A
+  // test order (`meta.test_mode`, or the order's own `test_mode`) files nothing unless the buyer's
+  // email is on `TEST_MODE_EMAILS` (comma separated, a Worker secret, never committed), which is
+  // how the owner proves the path end to end. It answers 200 so the store does not retry; a
+  // payload without the flag (our own direct JSON) is untouched. Found in the review of #428
+  // (2026-10-22): until this, the account sheet's Buy buttons (#394) handed a signed key to anyone
+  // who paid with the test card.
+  const flagged = (v) => v === true || v === 'true';
+  if (flagged(body.meta?.test_mode) || flagged(lsAttr.test_mode)) {
+    const allowed = String(env.TEST_MODE_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !allowed.includes(email)) return json({ ok: true, ignored: 'test mode' }, 200, cors);
+  }
   const keyId =
     (typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : '') ||
     (orderId ? `key_${orderId}` : `key_${Date.now().toString(36)}_${rand(6)}`);
 
+  // A Lemon Squeezy order files a key only when its product is one we sell and the order is
+  // paid. `order_created` also fires for an order still `pending` (a payment that has not
+  // cleared) or `failed`, and until 2026-10-28 every one of them was minted a key (the
+  // security audit, finding 6). A held order files nothing; the owner sees it in KV under
+  // `held:<order>` and in the Worker's log, and a paid order Lemon Squeezy re-sends files its
+  // key as normal.
+  if (isLs && (event === 'order_created' || event === 'order_upgraded')) {
+    if (productKind === 'unknown') {
+      return await holdOrder(env, cors, keyId, { reason: 'unknown product', email, productId: lsProductId, status: lsStatus });
+    }
+    if (lsStatus !== 'paid') {
+      return await holdOrder(env, cors, keyId, { reason: 'not paid', email, productId: lsProductId, status: lsStatus });
+    }
+    // The paid `order_created` of an order already refunded, delivered again (the store retries a
+    // webhook it thinks failed, and its dashboard can resend one), would file the key the refund
+    // took away: the payload still says `paid`, only the order's later events say otherwise
+    // (the review of #560). A refund leaves `refunded:<order>`, and a created order whose key id
+    // is already revoked is the same order; both are held, not filed.
+    const alreadyRefunded =
+      (orderId && (await env.LICENSE_KV.get(`refunded:${orderId}`))) ||
+      (event === 'order_created' && (await readKeyById(env, keyId))?.revoked);
+    if (alreadyRefunded) {
+      return await holdOrder(env, cors, keyId, { reason: 'order already refunded', email, productId: lsProductId, status: lsStatus });
+    }
+  }
+
   if (event === 'order_created' || event === 'license_created') {
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
-    const tier =
-      body.tier === 'pro' || lsProductId === 1450531 || lsProductName.includes('pro')
-        ? 'pro'
-        : 'home';
+    const tier = (isLs ? productKind === 'pro' : body.tier === 'pro') ? 'pro' : 'home';
     const now = typeof body.issuedAt === 'number' ? body.issuedAt : Date.now();
     const updatesUntil = typeof body.updatesUntil === 'number' ? body.updatesUntil : now + ONE_YEAR_MS;
     const maxMachines = typeof body.maxMachines === 'number' ? body.maxMachines : MAX_MACHINES_PER_KEY;
@@ -183,6 +246,12 @@ async function handleWebhook(request, env, cors) {
           (orderId && k.orderId === orderId) ||
           k.tier === 'home'),
     );
+    // An Upgrade is priced ($164) as Pro less the Home the buyer already holds. With no Home key
+    // on file for this email it was minting a Pro key anyway, which undercut Pro at $199 (the
+    // security audit, finding 5); now it is held for the owner, who refunds it or files the Home.
+    if (!target) {
+      return await holdOrder(env, cors, keyId, { reason: 'upgrade with no Home key', email, productId: lsProductId, status: lsStatus });
+    }
     const now = typeof body.issuedAt === 'number' ? body.issuedAt : Date.now();
     const updatesUntil = typeof body.updatesUntil === 'number' ? body.updatesUntil : now + ONE_YEAR_MS;
     const maxMachines = target?.maxMachines ?? MAX_MACHINES_PER_KEY;
@@ -235,6 +304,18 @@ async function handleWebhook(request, env, cors) {
   }
 
   if (event === 'order_refunded') {
+    // Lemon Squeezy sends `order_refunded` for a partial refund too (a goodwill $10 back), with
+    // the order's status `partial_refund`; only `refunded` is the whole order given back. Until
+    // 2026-10-28 any of them revoked the buyer's licence (the security audit, finding 6). A
+    // partial refund answers 200 and changes nothing. Our own direct JSON refund (no
+    // `data.attributes`) is the owner's word and revokes as before.
+    if (isLs && lsStatus !== 'refunded') {
+      console.log(`licence worker: order_refunded ${orderId || '?'} left alone, order status "${lsStatus || 'missing'}" is not a full refund`);
+      return json({ ok: true, ignored: 'not a full refund', status: lsStatus || null }, 200, cors);
+    }
+    // Remembered so the same order's `order_created`, delivered again, is not filed (see the
+    // gate above). Written for the owner's direct refund too; only a Lemon Squeezy order reads it.
+    if (orderId) await env.LICENSE_KV.put(`refunded:${orderId}`, JSON.stringify({ at: Date.now() }));
     let targetEmail = email;
     let targetId = typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : orderId ? `key_${orderId}` : '';
 
@@ -387,6 +468,15 @@ async function handlePostPreferences(request, env, cors) {
 // ── POST /activate & /deactivate ─────────────────────────────────
 
 async function handleActivate(request, env, cors, activate) {
+  // These two routes ask for nothing but the key, which is public the moment a buyer pastes it
+  // anywhere, so whoever holds one could fill the owner's two seats or clear them as fast as
+  // they could send (the security audit, finding 15). Each address gets `ACTIVATE_PER_ADDRESS`
+  // asks an hour (60), counted before the key is even read, so guessing at keys is slowed too,
+  // and each key `ACTIVATE_PER_KEY` (20) once its signature is good. A Mac asks about twice a
+  // start, so an owner never meets either; a refused ask answers 429 with the seconds to wait.
+  const retry = await takeActivateTurn(request, env, 'ip', addressOf(request), env.ACTIVATE_PER_ADDRESS, 60);
+  if (retry) return tooMany(retry, cors);
+
   const rawBody = await readCapped(request, MAX_BYTES);
   if (rawBody == null) return json({ error: 'too large' }, 413, cors);
 
@@ -409,6 +499,8 @@ async function handleActivate(request, env, cors, activate) {
   }
 
   const keyId = verified.payload.id;
+  const retryKey = await takeActivateTurn(request, env, 'key', keyId, env.ACTIVATE_PER_KEY, 20);
+  if (retryKey) return tooMany(retryKey, cors);
   const storedKey = await readKeyById(env, keyId);
   if (storedKey?.revoked) {
     return json({ ok: false, error: 'key revoked' }, 401, cors);
@@ -617,6 +709,59 @@ async function getGoogleJwks(env, kid) {
     return jwksCache.keys;
   })().finally(() => { jwksInFlight = null; });
   return jwksInFlight;
+}
+
+// The address Cloudflare saw the request come from; none outside Cloudflare (the local checks),
+// where there is nobody to count.
+function addressOf(request) {
+  return request.headers.get('CF-Connecting-IP') || '';
+}
+
+/**
+ * Takes one of `who`'s asks this hour from the Worker's KV, or returns the seconds until the
+ * next hour when they are spent. KV is eventually consistent and takes no atomic add, so two
+ * asks in the same instant can both read the same count: the limit is a brake on a script that
+ * sends hundreds, not an exact meter. The counter dies with its hour (`expirationTtl`).
+ */
+async function takeActivateTurn(request, env, kind, who, limitSetting, fallback) {
+  if (!who) return 0;
+  const limit = Number(limitSetting) > 0 ? Number(limitSetting) : fallback;
+  const hour = Math.floor(Date.now() / 3_600_000);
+  const k = `rl:activate:${kind}:${who}:${hour}`;
+  const used = Number(await env.LICENSE_KV.get(k)) || 0;
+  if (used >= limit) return Math.max(1, Math.ceil(((hour + 1) * 3_600_000 - Date.now()) / 1000));
+  await env.LICENSE_KV.put(k, String(used + 1), { expirationTtl: 3700 });
+  return 0;
+}
+
+function tooMany(seconds, cors) {
+  return new Response(JSON.stringify({ ok: false, error: 'too many requests', retryAfter: seconds }), {
+    status: 429,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Content-Type-Options': 'nosniff',
+      'Retry-After': String(seconds),
+      ...cors,
+    },
+  });
+}
+
+/**
+ * An order we will not file a key for, kept where the owner can find it. Answers 200: the
+ * store's retries would only repeat the same refusal. `held:<id>` is never read by the Worker.
+ */
+async function holdOrder(env, cors, id, why) {
+  console.log(`licence worker: held ${id}: ${JSON.stringify(why)}`);
+  await env.LICENSE_KV.put(`held:${id}`, JSON.stringify({ ...why, id, at: Date.now() }));
+  return json({ ok: true, ignored: why.reason }, 200, cors);
+}
+
+function productIdIn(list, id, builtIn) {
+  if (!id) return false;
+  if (builtIn.includes(id)) return true;
+  return String(list || '')
+    .split(',')
+    .some((v) => Number(v.trim()) === id);
 }
 
 async function readEmailKeys(env, email) {

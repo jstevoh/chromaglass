@@ -162,13 +162,56 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
   intro took nothing out on any of them, so there is nothing to read yet.
 - **Shipped, 14v-9: the webpage loads only itself first, and leaves the GPU for Play**
   (2026-10-28). `npm run loadtime` 4a to 4d; the story is in `docs/plan-shipped.md` §14v.
-- **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac.** CI's Mac, PR
-  #511's run 40619521397 (2026-10-28): first step 13.44 s, the device given at 4.33 s,
-  56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles over three lanes,
-  median 0.32 s; `fluid/deltaVel:rgba16float` 2.67 s, `fluid/liquidForces:rgba16float`
-  2.66 s, `fluid/squeezeUpdate` 1.40 s, `plate/display` 1.03 s). The two slowest are
-  the next thing to read: why each takes eight times the median, and whether the
-  opening needs them before its first step.
+- **14v-10. The plate's opening is 8.75 s of compiling on a cold Mac: read (2026-10-28),
+  nothing to ship from it.** CI's Mac, PR #511's run 40619521397: first step 13.44 s, the
+  device given at 4.33 s, 56 pipelines built ahead from 4.34 to 13.09 s (25.5 s of compiles
+  over three lanes, median 0.32 s; `fluid/deltaVel:rgba16float` 2.67 s,
+  `fluid/liquidForces:rgba16float` 2.66 s). What was read, and what it says:
+  - *The slow ones are not big.* deltaVel and liquidForces are 5 and 7 kB of source like the
+    rest (their own code 0.6 and 2.5 kB), and are slow on only some runs. What is slow on every
+    cold opening is whatever compute kernel is asked at 6 to 7.7 s, as the last render
+    pipeline settles: the dampGrid kernels on seven of eight CI openings of 2026-10-28 (1.1 to
+    2.8 s, asked within 0.01 s of the end of "held still"), and on all twelve below,
+    `scaleDye`, 0.3 kB of its own code, among them at 2.2 to 2.6 s. It is not the intro
+    starting to move: held still to the end, the same kernels took as long. It lines up with
+    the render pipelines' first draws reaching the GPU (inferred from the times; the plate's
+    first draw on a new device was 1.42 s of GPU time in #181), which is the next thing to
+    time: those first uses handed over after the compute kernels instead.
+  - *Neither way round it opens sooner.* `npm run openingtime` (new; not a check: it opens
+    the show several ways, interleaved, each on an emptied shader cache) on PR #540's run
+    40683027073, three openings each: as shipped, first step 13.91, 14.78, 14.32 s; the intro
+    held still to the end of the opening 14.77, 13.54, 13.65 s; six lanes once no render
+    pipeline is left 14.41, 13.68, 13.57 s; both 13.47, 13.65, 14.31 s. Six lanes doubled
+    every compile (median 0.69 s against 0.36) and built no faster, so the Mac's compiler
+    sets the pace, not the lanes. Both flags were taken out again. And the first step came at 13.5 to 14.8 s
+    on all twelve whether the device came at 0.2 s or 5.5 s: the later the device, the faster
+    the builds (9.1 s from 5.47 s, 11.5 s from 2.17 s), so part of the opening is the GPU
+    process warming up, not this file's compiles. Emptying every `com.apple.metal` cache, as
+    CI does, clears the browser's own shaders too; a returning visitor is never that cold.
+  - *How cold a deploy leaves a returning visitor.* A Mac compiles a pipeline again only when
+    its source text changes. Over the 99 commits to main since 2026-09-27 that changed shader
+    source: 42 changed no fluid kernel, 42 changed one to five, and the median was one. The
+    plate's display (1 to 2 s cold) changed in 38. Ten changed the shared `Sim` struct (a
+    field added, renamed or re-laid), and each of those changed all of the 79 to 119 kernels
+    then, since every kernel starts with `SIM_STRUCT`. Giving each kernel only the helpers it
+    uses would spare the 24 of 124 that never read `S` on those ten. That is not worth the
+    code, since 100 still read the struct.
+  - *The stall reaches the frames.* `npm run startup` went red on #540's run 40741268086 (main's
+    opening; the PR changed nothing it runs): no frame for 2.35 s from 8.70 s, 0.13 s after the
+    intro stopped being held still (8.57 s), `fluid/dampGridCurv` under way. 14v-11 (below)
+    since holds the intro still to the end of the opening, which the twelve timed openings
+    above say costs the opening nothing. The render pipelines' first draws handed over after
+    the compute kernels is the other way round the stall itself, untimed.
+  - Left: on the owner's own Mac (not CI's virtual GPU), the cold opening and a
+    warm one after a deploy that changed only the display. The first needs the owner's OK
+    to empty the shader cache (`npm run openingtime -- --cold`); the second needs no
+    emptying. What is left to cut is the count of compiles: the item below.
+- **Shipped, 14v-11: the intro holds still until the whole opening is built** (2026-10-29,
+  the owner's choice: never a stutter, even if it moves later). It let go at the last render
+  compile with the solver's kernels still compiling, and #540's run 40741268086 went red on
+  startup's "no stop in the opening" 0.13 s after (2.35 s from 8.70 s). `Quiet.go` now comes
+  once the opening's last build has settled and its first uses are paid; `npm run intro`
+  lines 9 and 9b hold it to that. The Mac's `startup` check 4 is the real test.
 - *Fewer compiles: kernels that run back to back fused.* With the lanes busy, the
   opening is the sum of its compiles over three: 0.33 s median each with three in
   flight. The solver's small kernels are each a full compile however little they do
@@ -265,21 +308,24 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
 
 - ~~**14ab-1** *The video pour pauses and plays its video every frame* (a bug).~~ Story in
   `docs/plan-shipped.md` §14ab-1 (moved 2026-10-29, 19m).
-- **14ab-2** *The video pour's optical flow is a CPU loop* over a 192² `getImageData`
-  each frame, with a new 147 KB array each time, calling `addDensity`/`addVelocity` per
-  pixel. `fluid.pourImage` already takes a video on the GPU; the frame differencing
-  belongs in a compute pass beside it.
+- ~~**14ab-2** *The video pour's optical flow is a CPU loop*~~ **Shipped** (#584, `npm run videoflow`: no loop and no rows sent while a video pours, the deltas the CPU loop's to 1.7e-7). Story in `docs/plan-shipped.md` §14ab-2.
 - ~~**14ab-3** *Every frame reads both fields back and averages them on the CPU*~~ **Shipped** (#549, `npm run framereads`: a still plate 60 → 0 readbacks asked in thirty frames). Story in `docs/plan-shipped.md` §14ab-3.
-- **14ab-4** *A CPU pour uploads the whole grid every step* (`flushDeltas`: about 1.3 MB
-  through three to five `writeTexture`s and the upsamples), for a few changed cells.
-  Splat records on the GPU (`applySplats`) are the path; what still goes through the
-  delta grids is the bubbles' rims, the hands, the breath and the room stir.
-  A smaller first step, seen with 14ab-3: upload only the rows the CPU wrote since the
-  last flush together with the rows the last upload wrote (zeros there now), since the
-  fold reads the whole delta texture and a stale row would be folded in again.
+- ~~**14ab-4** *A CPU pour uploads the whole grid every step*~~ **Shipped** (#579, `npm run frameuploads`: a cell after a cell 1.33 MB → 14 KB, the flush 318 → 18 µs). Story in `docs/plan-shipped.md` §14ab-4.
 - ~~**14ab-5** *The plate, post chain, camera, output and particles make their bind groups and views every frame*~~ **Shipped** (#549, `npm run framegroups`: 12 groups and 64 views a frame → 0 and 0). Story in `docs/plan-shipped.md` §14ab-5.
-- **14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*, with a
-  gradient per bead (`beads.ts`); a drawn splat pass on the GPU would do it.
+- ~~**14ab-6** *The beads redraw a 512² canvas and upload it every frame they move*~~ **Shipped** (`npm run beadmask`: the drops' mask rasterDrops' to a level, the frame's CPU 16–19 ms → 0.4–0.6 ms, 2.1 MB → 95 KB across). Story in `docs/plan-shipped.md` §14ab-6.
+- **14ab-14** (open; found with 14ab-6) *The rings' edges were the canvas's antialiasing, now
+  the distance plus a half.* Both the GPU's rings and rasterDrops' drops take a pixel's
+  coverage as the distance to the edge plus a half, which is off by up to a tenth of a pixel
+  (26 levels) at a corner and round a bead a pixel or two across: `npm run beadmask` reads 27
+  rim pixels past 24 levels of 59,000. The beads' true share of a pixel (an exact circle's
+  area, or four by four samples on the edge pixels alone) would close it for both, and the
+  drops' check would move with it. Judge by eye at 3x in the closeup first (`docs/judging.md`).
+- ~~**14ab-15** *The beads' passes are not timed on the GPU.*~~ **Measured** 2026-10-30 on the
+  owner's Mac (Apple M4, Metal), `scratch/beadbench.mjs` (not kept: the same field a frame, the
+  old way and the new, each waited out with `onSubmittedWorkDone`, 200 frames, twice): drops 16.5
+  ms → 1.6 ms a frame (closeup sizes 23.0 → 1.6), rings 3.0 → 0.6; the `bead mask` pass alone by
+  timestamp query 0.50 ms for 502 drops (0.57 at closeup sizes), 0.11 ms for rings. No bar in CI:
+  the Mac shards' runners are not the owner's GPU, and the lab shard's is software.
 - ~~**14ab-7** *The ear allocates every frame*: two byte arrays (14f's open line), two
   `Float64Array`s, and seventeen onset detectors each doing slice, sort, map and sort on
   their history.~~ Shipped; story in `docs/plan-shipped.md` §14ab-7 (moved 2026-10-29, 19m).
@@ -296,6 +342,62 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   comments say a starved runner's late timers part the two windows' frames by themselves. Find
   a measure of the gate's fault that holds at a quarter of the display's refreshes, or a
   starvation reading that sets the line aside and says so. The bar itself stays where it is.
+- **14ab-12** (**closed** 2026-10-30, measured on the owner's Mac, #590; found with 14ab-2)
+  *A pour's splats fold at once, and the fold runs the step's forces.* `applySplats` ends with
+  `foldDeltas`, which besides adding the deltas runs `liquidForces` (a dt-scaled push from the
+  soap, the bodies and the polar liquid) and `squeezeUpdate` (the gap's own update, which the
+  step runs itself when no deltas were applied). So a frame whose tools lay splats would run
+  those once more than a frame that lays none.
+
+  *What was measured.* Soap Film (`look=soap-film`, liquids soap and water in
+  `PRESET_LIQUIDS`), a still plate (no motor, no sound, no automation, drop height 0),
+  `sim=256`, the Dropper with the Soap bottle held at one spot (0.523, 0.409 of the plate)
+  for ten seconds through the real pointer, or not pressed at all. A is main at `0d961bbb`;
+  B is main with `applySplats` folding the dye and flow alone (the diff is on #590). Four
+  A/B pairs with the tool, two without, A/B/A/B, on the owner's Mac (adapter
+  `apple metal-3`, Chromium headed). Read on the GPU's own fields: the flow speed in a ring
+  0.04 to 0.10 plate widths round the spot (`readField('vel')`), the soap that
+  `liquidForces` pushes from (`liquids0.r`) as its rms radius and the radius holding 90% of
+  it, and the gap within 0.02 of the spot (`readSqueeze`). And, by wrapping the solver's
+  methods for the run, how often each was called.
+
+  | ten seconds of the Dropper | A (4 runs) | B (4 runs) |
+  |---|---|---|
+  | ring flow at 10 s, mean | 0.204, 0.234, 0.234, 0.265 | 0.242, 0.332, 0.192, 0.282 |
+  | ring flow at 10 s, max | 0.375, 0.441, 0.439, 0.488 | 0.443, 0.625, 0.358, 0.509 |
+  | soap rms radius at 2 / 5 / 10 s | 0.0313–0.0314 / 0.0442–0.0444 / 0.0592–0.0607 | 0.0290–0.0314 / 0.0426–0.0447 / 0.0580–0.0594 |
+  | soap r90 at 10 s | 0.0813, 0.0814, 0.0813, 0.0833 | 0.0792, 0.0813, 0.0814, 0.0813 |
+  | gap at the spot, 2 to 10 s | 0.03000 | 0.03000 |
+  | steps in the 10 s | 601–638 | 576–604 |
+  | `applySplats` calls | 0 | 0 |
+  | folds (`applyDeltas`) / steps, most folds between two steps | = steps, 1 | = steps, 1 |
+
+  With no tool (A twice, B twice): ring flow 1.8e-6, 4.8e-6 (A) and 4.3e-7, 2.7e-8 (B), no
+  soap within 0.3 of the spot, the gap 0.03000, every step one fold and none skipped (599 to
+  603 steps, as many folds). The two arms agree there, so the patch did not touch the step.
+
+  *Verdict: B does not differ from A beyond the spread, and cannot.* The ring flow scatters
+  by 0.19 to 0.33 run to run in either arm (the stream churns and the reads are by the wall
+  clock); the soap's radius agrees to 2e-4 wherever the run took about 600 steps (B's
+  0.0290 at 2 s is its one run that took 576). The reason is in the counts: **nothing calls
+  `applySplats`.** No `SplatList` is made anywhere in `src/`, `scripts/` or the lab; the
+  Dropper lays CPU deltas (`addDensity`, `liquid.deposit`) that go through `flushDeltas` →
+  `applyDeltas` → `foldDeltas` once a step at most, and a step that flushed skips its own
+  `squeezeUpdate` (`step(p, applied)`), so the gap's update runs once a step either way and
+  `liquidForces` once a flushed step. A second fold before a step is possible only through
+  `pullStateFromGpu`'s flush, which clears `dirty`, so the step after it does not fold
+  again. Nothing to fix in `fluid.ts`, so no 14ab-12a. Seen on the way and left for whoever
+  next owns them: on Soap Film every step flushed even with no tool (603 of 603), so there
+  the liquids' forces run once a step whatever 15e-1 says of a plate nothing is laid in; and
+  `applySplats` with `gpu/splats.ts` is code nothing runs.
+- ~~**14ab-13** *Is a poured video upside down?*~~ **Shipped** (#591, finished in #596): it was, and an uploaded picture too; both turned where their rows are taken (`flipY` in the solver's copy, the loop's row read, `uprightPicture` for an upload), `npm run videoflow` asks which way up. Story in `docs/plan-shipped.md` §14ab-13.
+- **14ab-11** (open, found with 14ab-4) *The deltas' whole-grid writers and the GPU's whole
+  passes.* The writers that still set `dirty = true` send all 192² rows: the room's and the
+  film's stir (whole by nature), but also a press, a lift, a carry, a pop and the liquids'
+  step, which know their discs and could say them with `rows.add` as the hand does. And on
+  the GPU, `applyDeltas` still upsamples the three delta grids and folds them over the
+  whole plate each flush; a dispatch over the written bands' rows (scaled to N) would do.
+  `npm run frameuploads` holds whichever writer moves to rows to its own scan.
 
 ## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 
@@ -342,6 +444,8 @@ Open, found building it:
   shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
   data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
   lower bitrate; the check holds a feature under 30 MB.
+- **14ac-7** *The cartoons were not in Settings → Film.* **Shipped** (2026-10-29): the Film
+  section lists the shelf under its demo loops. Story in `docs/plan-shipped.md` §14ac.
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 

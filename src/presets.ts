@@ -1,4 +1,4 @@
-import { VisualizerSettings, AudioMappings } from './types';
+import { VisualizerSettings } from './types';
 
 export interface Preset {
   id: string;
@@ -6,13 +6,6 @@ export interface Preset {
   description: string;
   settings: Partial<VisualizerSettings>;
 }
-
-const DEFAULT_MAPPINGS: AudioMappings = {
-  velocity: 'mid',
-  density: 'bass',
-  color: 'treble',
-  rotation: 'none',
-};
 
 /*
   Rotation Speed, retuned when the motor's stir went (PLAN 22j).
@@ -167,7 +160,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.998,          // heat lingers forever — nebula glow persists
       automateRate: 0.11,        // moderate injection — periodic star bursts
       platePressure: 0.1,        // minimal plate spread — gravity dominates
-      glassSmear: 0.15,          // light smearing — comet-tail streaks
+      glassSmear: 0,             // 0.15 was under the old 0.2 gate and smeared nothing (PLAN 27h-2)
       rainDrip: 0.0,             // no dripping — weightless space
       viscosity: 'thin',         // thin — fluid fragments into filaments and streams
       polarity: 0.25,            // low — colors intermingle freely like nebula gas
@@ -500,6 +493,8 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.15,
       ledColor: '#020818',
       secondLamp: 0.35,
+      // A drop per note along the top; Oil & Water's is amber oil (24.3-place).
+      melodyWalk: 0.7,
       sceneMappings: [
         /*
           Both read 0 until 28f: `note` and `tonalMid` are the `bands`
@@ -598,7 +593,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.995,
       automateRate: 0.22,  // 28a, 28i-2: keeps four bells and their trails filling the navy water (flat <= 0.4) while near-black stays >= 20%
       platePressure: 0.45,
-      glassSmear: 0.15,
+      glassSmear: 0,
       rainDrip: 0.45,
       viscosity: 'thick',
       polarity: 0.85,
@@ -899,7 +894,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.03,       // tends its three veils; at 0.008 a drop came every three minutes and the plate stayed empty
       platePressure: 0.05,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.3,
@@ -967,7 +962,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.16,
       platePressure: 0.15,
-      glassSmear: 0.1,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.75,
@@ -1050,7 +1045,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.22,
       platePressure: 0.55,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 1.0,
@@ -1083,7 +1078,8 @@ export const PRESETS: Preset[] = [
       */
       sceneMappings: [
         { source: 'hits', feature: 'kickHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
-        { source: 'bands', feature: 'band2', setting: 'areaHue', area: 0, depth: 0.6 },
+        // The lead's note picks the kick's bottle (PLAN 25i): C to D#, orange; E to G, ultramarine; G# to B, purple. A depth only says it is on (a look's cords stay at 0.6 or under for the fade).
+        { source: 'hits', feature: 'noteClass', setting: 'areaHue', area: 0, depth: 0.6 },
         { source: 'hits', feature: 'snareHit', setting: 'areaStir', area: 1, depth: 0.45, threshold: 0.35, attack: 0.02, release: 0.3 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
@@ -1105,7 +1101,7 @@ export const PRESETS: Preset[] = [
       macroDepth: 0.6,
       macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
-      beads: 0.35,            // oil drops on the plate, each a lens on the colour under it
+      beads: 0.7,             // each a lens on the colour under it
       globalSpeed: 0.06,
       surge: 0.55,        // beads visibly travel — the whole point
       layerCount: 1,
@@ -1125,7 +1121,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.45,
       platePressure: 0.35,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.05,
       viscosity: 'thick',
       polarity: 0.98,            // strong immiscibility — hard color boundaries
@@ -1163,7 +1159,7 @@ export const PRESETS: Preset[] = [
   },
   {
     id: 'cell-bloom',
-    name: 'Cell Bloom',
+    name: 'Lens Pools',
     description: 'Three small pools turning under a magnifier on violet: silicone in magenta and ultramarine, and a lavender pool of oil between them.',
     settings: {
       macroMode: true,
@@ -1408,7 +1404,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.995,
       automateRate: 0.14,          // a drop of soap and food colouring now and then keeps the marbling rich
       platePressure: 0.15,
-      glassSmear: 0.1,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.9,               // the colours stay four colours, not one brown one
@@ -1553,7 +1549,7 @@ export const PRESETS: Preset[] = [
       damping: 0.985,
       heatDecay: 0.99,
       automateRate: 0.1,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       evaporationRate: 0.003,
@@ -1565,6 +1561,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.2,
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
+      melodyWalk: 0.8,
       /*
         Immiscible oil and water between glass (PLAN 28i-3b): kicks push water
         fingers into the amber oil pools, snares shear the meniscus, and the
@@ -1607,7 +1604,7 @@ export const PRESETS: Preset[] = [
       damping: 0.985,
       heatDecay: 0.99,
       automateRate: 0.24,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -1626,7 +1623,9 @@ export const PRESETS: Preset[] = [
         Two pH wells that cancel where they meet (PLAN 25i-2, 28i-3b): the
         snare drops acid into the left well (area 0, blooming pink), the kick
         drops base into the right well (area 1, turning green), and mid
-        harmony stirs the two fronts together across the dish.
+        harmony stirs the two fronts together across the dish. Each hit a
+        drop of the reagent itself (an area of a reagent, areaCords.ts), so
+        the pink and the green are the indicator's, never a dye poured.
       */
       sceneMappings: [
         { source: 'hits', feature: 'snareHit', setting: 'areaPour', area: 0, depth: 0.45, threshold: 0.35, attack: 0.01, release: 0.25 },
@@ -1681,14 +1680,18 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.12,
       lampHotspot: 0.4,
       /*
-        The Belousov-Zhabotinsky gel dish (PLAN 28i-2, 28i-3b): bass and mid
-        harmony shift the ferroin oxidation weight so the dish alternates
-        between red/blue spiral fronts and the multi-hue indicator bath (>=6
-        colour changes/min), while snares shear wave tips into spiral pairs.
+        The Belousov-Zhabotinsky gel dish (PLAN 28i-2, 28i-3b, 25i): the
+        kick's own beat dose touches its three places in turn and the snare
+        drops activator in the third, so each fires and a ring runs out
+        (an area of a reagent, areaCords.ts), and snares shear wave tips into
+        spiral pairs. The reaction keeps its own time: bass and mid harmony
+        used to turn BZ Reaction down by 0.58 and 0.55, which under any song
+        took it to nought, where the gel is neither stepped nor drawn, so no
+        ring showed at all (filmed on the owner's Mac, 2026-10-31). Nothing
+        a band plays changes a dish's chemistry.
       */
       sceneMappings: [
-        { source: 'bands', feature: 'tonalLow', setting: 'bzReaction', depth: -0.58 },
-        { source: 'bands', feature: 'tonalMid', setting: 'bzReaction', depth: -0.55 },
+        { source: 'hits', feature: 'snareHit', setting: 'areaPour', area: 2, depth: 0.25, threshold: 0.35, attack: 0.01, release: 0.25 },
         { source: 'hits', feature: 'snareHit', setting: 'vorticityConfinement', depth: 0.25 },
       ],
       audioMappings: { velocity: 'bass', density: 'bass', color: 'treble', rotation: 'none' },
@@ -1718,7 +1721,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.1,
       platePressure: 0.3,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -1934,7 +1937,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.08,
       platePressure: 0.4,
-      glassSmear: 0.15,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.85,
@@ -2000,7 +2003,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.99,
       automateRate: 0.12,
       platePressure: 0.3,
-      glassSmear: 0.2,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,
@@ -2084,7 +2087,7 @@ export const PRESETS: Preset[] = [
       heatDecay: 0.985,
       automateRate: 0.28,
       platePressure: 0.38,
-      glassSmear: 0.15,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       // Two primaries that meet stay two primaries, with a hard seam.
@@ -2183,7 +2186,7 @@ export const PRESETS: Preset[] = [
       damping: 0.988,
       automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
       platePressure: 0.28,
-      glassSmear: 0.18,
+      glassSmear: 0,
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.8,

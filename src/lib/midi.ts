@@ -15,7 +15,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types.ts';
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
-import { HIT_FEATURES, HIT_FEATURE_LABELS, type HitFeature } from './hitSource.ts';
+import { HIT_FEATURES, HIT_FEATURE_LABELS, isClassFeature, type HitFeature } from './hitSource.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
@@ -163,8 +163,10 @@ export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', '
  * sources and the bands, and the hits as levels (`hitSource.ts`): how hard
  * each drum's last hit was, falling over a quarter second, and the note.
  * Levels and not triggers: a kick as a *moment* is `kick` above, and fires.
+ * And not the note's name (`noteClass`, PLAN 25i): a fader riding it would
+ * jump from one end to the other between B and C, a level it is not.
  */
-export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES];
+export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES.filter(f => !isClassFeature(f))];
 
 const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 0 : 1)}k` : `${Math.round(f)}`);
 /**
@@ -376,7 +378,24 @@ export const settingKeyOf = (midiKey: string | null | undefined): keyof Visualiz
 };
 
 export const curveOf = (key: keyof VisualizerSettings): number =>
-  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? 1;
+  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? PANEL_CURVES[key] ?? 1;
+
+/**
+ * The curve of a panel control MIDI does not learn, for the same reason.
+ *
+ * The owner, 2026-10-31: "very gentle options and very extreme options (which
+ * should be a general principle for all dials)". Widening a dial's top by four
+ * or ten times on a straight throw pushes the look's own value into the first
+ * few percent of the travel, where the gentle end has no room left: Gel Speed
+ * at 30 rpm put the looks' half a turn a minute at 1.7% of the slider. A curve
+ * gives the gentle end its travel back and leaves every stored value alone.
+ * Kept here rather than in `deskPins.ts`, which reads this file, so that every
+ * surface asks `curveOf` and nobody has two tables to keep together.
+ */
+export const PANEL_CURVES: Partial<Record<keyof VisualizerSettings, number>> = {
+  gelSpeed: 2, stockGrain: 2, stockGrainSize: 2, stockWeave: 2, grainScale: 2,
+  macroHold: 2, bassBoost: 2, evaporationRate: 3, spinImpulse: 1.5,
+};
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -395,8 +414,16 @@ export const valueAt = (t: number, min: number, max: number, curve = 1): number 
  * values readable and the travel smooth to the bottom.
  */
 export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
-  const v = valueAt(t, min, max, curve);
-  return v === 0 ? 0 : Number(v.toPrecision(3));
+  /*
+    The three figures are the distance above the bottom, not the value. Every
+    curved control started at 0 until Macro Zoom took a curve (PLAN 27h-1),
+    whose bottom is 1: there 1.8% of the travel is 1.005, three figures made
+    it 1.00, and the knob jumped back to the stop (`npm run rungs`, worst 1.8%
+    off). Measured from its own bottom a control keeps its fine end whatever
+    number that end is, and a bottom of 0 rounds exactly as before.
+  */
+  const above = valueAt(t, min, max, curve) - min;
+  return above === 0 ? min : min + Number(above.toPrecision(3));
 };
 
 /** The inverse: where a value sits on the control, 0..1. */
@@ -461,19 +488,27 @@ export const MIDI_BANKS = 4;
  * difference. `npm run panel` holds the two together now.
  *
  * `step` marks a control that only takes whole steps; see `deskPins.ts`.
+ *
+ * `wanderSpan` is the width the travel had before the dial was widened to its
+ * extreme (the owner, 2026-10-31: every dial from very gentle to very
+ * extreme). The hand and a fader reach `max`; Evolve's wander is still a
+ * fifth of this old width (`dialWindow`, `drift.ts`), so a slow drift moves a
+ * widened dial by what it always moved it by and never walks a look out to
+ * the far end on its own. The far end is the performer's to take.
  */
-export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number }[] = [
+export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number; wanderSpan?: number }[] = [
   { key: 'dimmer',          label: 'Dimmer',           min: 0, max: 1 },
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
-  { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
+  { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3, curve: 3 },
   { key: 'twoProjectors',   label: 'Two Projectors',   min: 0, max: 1, step: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
-  { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
+  { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
-  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 1.5 },
+  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 4, curve: 1.5, wanderSpan: 1.5 },
+  { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 2, wanderSpan: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },
@@ -483,7 +518,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
-  { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
+  { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'projectorFocus',  label: 'Projector Focus',  min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
@@ -505,11 +540,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
+  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
-  { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
-  { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 10 },
-  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1 },
+  { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
+  { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 30, curve: 2, wanderSpan: 10 },
+  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1.4, wanderSpan: 1 },
   { key: 'dishVignette',    label: 'Round Dish',       min: 0, max: 1 },
   { key: 'lumia',           label: 'Lumia',            min: 0, max: 1 },
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
@@ -549,14 +584,14 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
   // The Magnet's size (lib/magnetSize.ts): a knob to grow the hedgehog under a held magnet.
-  { key: 'magnetSize',      label: 'Magnet Size',      min: 0, max: 1 },
+  { key: 'magnetSize',      label: 'Magnet Size',      min: 0, max: 1.5, wanderSpan: 1 },
   // The film's colours, the rainbow to a real soap film's. A fader because
   // the mix between them is a look of its own, not only the two ends.
   { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
-  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1 },
+  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1.2, wanderSpan: 1 },
   // How firmly the oil and the water each keep their own colour. A fader
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.
@@ -739,56 +774,7 @@ export class SoftTakeover {
   reset(): void { this.lastSeen.clear(); this.picked.clear(); this.wrote.clear(); }
 }
 
-// ── Pad colours ─────────────────────────────────────────────────────
-// Launchpad and APC mini mk2 pads take a velocity that indexes a palette of
-// 128 colours. A coarse copy of that palette is enough to light each preset
-// pad in its lead dye: the nearest entry is chosen by colour distance.
-const PAD_PALETTE: [number, number, number, number][] = [
-  [0, 0, 0, 0], [1, 0.11, 0.11, 0.11], [2, 0.49, 0.49, 0.49], [3, 1, 1, 1],
-  [4, 1, 0.37, 0.37], [5, 1, 0, 0], [6, 0.35, 0, 0], [7, 0.1, 0, 0],
-  [8, 1, 0.74, 0.43], [9, 1, 0.33, 0], [10, 0.35, 0.11, 0], [11, 0.1, 0.05, 0],
-  [12, 1, 0.98, 0.57], [13, 1, 1, 0], [14, 0.35, 0.35, 0], [15, 0.1, 0.1, 0],
-  [16, 0.7, 1, 0.3], [17, 0.33, 1, 0], [18, 0.1, 0.35, 0], [19, 0.05, 0.1, 0],
-  [20, 0.35, 1, 0.35], [21, 0, 1, 0], [22, 0, 0.35, 0], [23, 0, 0.1, 0],
-  [24, 0.35, 1, 0.5], [25, 0, 1, 0.33], [26, 0, 0.35, 0.11], [27, 0, 0.1, 0.05],
-  [28, 0.35, 1, 0.75], [29, 0, 1, 0.6], [30, 0, 0.35, 0.2], [31, 0, 0.1, 0.05],
-  [32, 0.35, 1, 1], [33, 0, 1, 1], [34, 0, 0.35, 0.35], [35, 0, 0.1, 0.1],
-  [36, 0.35, 0.75, 1], [37, 0, 0.6, 1], [38, 0, 0.2, 0.35], [39, 0, 0.05, 0.1],
-  [40, 0.35, 0.5, 1], [41, 0, 0.33, 1], [42, 0, 0.11, 0.35], [43, 0, 0.03, 0.1],
-  [44, 0.35, 0.35, 1], [45, 0, 0, 1], [46, 0, 0, 0.35], [47, 0, 0, 0.1],
-  [48, 0.6, 0.35, 1], [49, 0.33, 0, 1], [50, 0.1, 0, 0.35], [51, 0.03, 0, 0.1],
-  [52, 1, 0.35, 1], [53, 1, 0, 1], [54, 0.35, 0, 0.35], [55, 0.1, 0, 0.1],
-  [56, 1, 0.35, 0.6], [57, 1, 0, 0.33], [58, 0.35, 0, 0.11], [59, 0.1, 0, 0.03],
-  [60, 1, 0.13, 0], [61, 0.6, 0.23, 0], [62, 0.47, 0.35, 0], [63, 0.25, 0.4, 0],
-  [64, 0, 0.35, 0.03], [65, 0, 0.35, 0.3], [66, 0, 0.2, 0.5], [67, 0, 0, 1],
-  [68, 0, 0.27, 0.35], [69, 0.13, 0, 0.8], [70, 0.49, 0.49, 0.49], [71, 0.13, 0.13, 0.13],
-  [72, 1, 0, 0], [73, 0.74, 1, 0.19], [74, 0.68, 0.92, 0.03], [75, 0.33, 1, 0.03],
-  [76, 0.05, 0.53, 0], [77, 0, 1, 0.53], [78, 0, 0.66, 1], [79, 0, 0.16, 1],
-  [80, 0.24, 0, 1], [81, 0.5, 0, 1], [82, 0.71, 0.1, 0.5], [83, 0.24, 0.1, 0],
-  [84, 1, 0.3, 0], [85, 0.52, 0.9, 0], [86, 0.35, 1, 0], [87, 0, 1, 0],
-  [88, 0, 1, 0], [89, 0.23, 1, 0.43], [90, 0, 0.9, 0.79], [91, 0.35, 0.6, 1],
-  [92, 0.27, 0.35, 0.85], [93, 0.5, 0.35, 0.85], [94, 0.85, 0.13, 1], [95, 1, 0, 0.35],
-  [96, 1, 0.5, 0], [97, 0.72, 0.7, 0], [98, 0.5, 1, 0], [99, 0.5, 0.35, 0.1],
-  [100, 0.2, 0.15, 0], [101, 0.05, 0.3, 0.1], [102, 0, 0.35, 0.4], [103, 0.1, 0.1, 0.25],
-  [104, 0.06, 0.13, 0.4], [105, 0.4, 0.2, 0.1], [106, 0.65, 0.05, 0], [107, 0.85, 0.35, 0.1],
-  [108, 0.85, 0.65, 0.1], [109, 0.6, 0.9, 0.1], [110, 0.35, 0.65, 0.1], [111, 0.1, 0.1, 0.2],
-  [112, 0.85, 0.9, 0.35], [113, 0.5, 1, 0.75], [114, 0.6, 0.6, 1], [115, 0.6, 0.35, 1],
-  [116, 0.25, 0.25, 0.25], [117, 0.45, 0.45, 0.45], [118, 0.9, 1, 1], [119, 0.65, 0, 0],
-  [120, 0.2, 0, 0], [121, 0.1, 0.8, 0], [122, 0.05, 0.25, 0], [123, 0.7, 0.55, 0],
-  [124, 0.25, 0.2, 0], [125, 0.7, 0.35, 0], [126, 0.3, 0.1, 0], [127, 0.05, 0.05, 0],
-];
-
-/** The pad velocity whose palette colour is nearest to an RGB (0..1) colour. */
-export function padVelocityFor(r: number, g: number, b: number, dim = false): number {
-  const k = dim ? 0.35 : 1;
-  let best = 0, bestD = Infinity;
-  for (const [v, pr, pg, pb] of PAD_PALETTE) {
-    if (v === 0) continue;
-    const d = (pr - r * k) ** 2 + (pg - g * k) ** 2 + (pb - b * k) ** 2;
-    if (d < bestD) { bestD = d; best = v; }
-  }
-  return best;
-}
+export { padVelocityFor } from './padColours.ts';
 
 export function serializeMidiMap(map: MidiMap): string { return JSON.stringify(map, null, 2) + '\n'; }
 

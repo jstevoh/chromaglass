@@ -24,6 +24,8 @@ import { PACK_KERNELS, PACKED_VEL_FORMAT } from './wgsl/pack';
 import { FerroDrop } from './ferroDrop';
 import { groupOf, viewOf } from './groupCache';
 import { DROP_KERNELS } from './wgsl/ferroDrop';
+import { BeadMask } from './beadMask';
+import type { BeadField } from '../lib/beads';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -130,6 +132,8 @@ export class WebGPUPlate {
   readonly pack: UniformPack;
   /** The ferrofluid drop's surface in the closeup (PLAN §29a), packed into the lead plate's flow. */
   readonly drop: FerroDrop;
+  /** The oil beads' mask, drawn here from their list rather than uploaded as a picture (PLAN 14ab-6). */
+  readonly beads: BeadMask;
 
   private layers: LayerTargets[] = [];
   private sources = new Map<string, Source>();
@@ -169,6 +173,7 @@ export class WebGPUPlate {
       cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
       ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
+      ...BeadMask.prepare(cache),
       // Into a texture rather than the canvas: the camera's, in the canvas's
       // format, and the film stock's picture.
       ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
@@ -180,6 +185,7 @@ export class WebGPUPlate {
     this.pipelines = PipelineCache.for(device, 'plate');
     this.pack = new UniformPack(PLATE_LAYOUT);
     this.drop = new FerroDrop(device, this.pipelines, this.disposer);
+    this.beads = new BeadMask(device, this.pipelines, this.disposer);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -243,24 +249,53 @@ export class WebGPUPlate {
    */
   setSource(name: string, image: CanvasImageSource | null, width = 0, height = 0): void {
     if (image && (width <= 0 || height <= 0)) [width, height] = pictureSize(image);
-    const have = this.sources.get(name);
+    // A picture for the beads stands in place of a list not yet drawn.
+    if (name === 'beads') this.beads.cancel();
     if (!image || width <= 0 || height <= 0) {
+      const have = this.sources.get(name);
       if (have) { this.disposer.release(have.texture); this.sources.delete(name); }
       return;
     }
+    this.device.queue.copyExternalImageToTexture(
+      { source: image as GPUCopyExternalImageSource },
+      { texture: this.sourceAt(name, width, height) },
+      [width, height],
+    );
+  }
+
+  /**
+   * The beads' mask from the field itself, on a frame they moved (PLAN
+   * 14ab-6): their list is written across now and the mask drawn on the GPU
+   * at the head of the next `draw`, into the texture a picture of it would
+   * have been copied into. `setSource('beads', …)` still takes a picture
+   * (the checks hand the CPU's drawing in that way).
+   */
+  setBeads(field: BeadField): void {
+    const [width, height] = this.beads.set(field);
+    this.sourceAt('beads', width, height);
+  }
+
+  /** The texture a source is kept in, made again when its size changes. */
+  private sourceAt(name: string, width: number, height: number): GPUTexture {
+    const have = this.sources.get(name);
     if (!have || have.width !== width || have.height !== height) {
       if (have) this.disposer.release(have.texture);
+      // Storage as well, for the beads' mask drawn by a compute pass, and
+      // read back by its check.
       const texture = this.disposer.track(this.device.createTexture({
         label: `source ${name}`, size: [width, height], format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+          | (name === 'beads' ? GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC : 0),
       }));
       this.sources.set(name, { texture, width, height });
     }
-    this.device.queue.copyExternalImageToTexture(
-      { source: image as GPUCopyExternalImageSource },
-      { texture: this.sources.get(name)!.texture },
-      [width, height],
-    );
+    return this.sources.get(name)!.texture;
+  }
+
+  /** Draw the beads' mask if a list is waiting: once a frame, before anything samples it. */
+  private drawBeads(encoder: GPUCommandEncoder): void {
+    const mask = this.sources.get('beads');
+    if (this.beads.pending && mask) this.beads.draw(encoder, mask.texture);
   }
 
   private source(name: string): GPUTexture {
@@ -299,6 +334,7 @@ export class WebGPUPlate {
     if (!fields.length) return;
     const grid = fields[0].dye.width;
     this.ensureLayers(fields.length, grid);
+    this.drawBeads(encoder);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
     // The pack's one number is the grid, which changes with a rung and not
     // with a frame: written when it does, not sixty times a second (14ab-5).

@@ -84,9 +84,11 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 // journey's narrower window (two of three areas came out one colour).
 {
   // What `deposit` (lib/liquidPhase.ts) does anything with: a liquid whose
-  // every one of these is zero returns from it having poured nothing.
+  // every one of these is zero returns from it having poured nothing. The BZ
+  // activator (PLAN 25i) goes where the acid does, to the GPU through
+  // onDeposit (gpu/fluid/inputs.ts addLiquidDrop: the gel fires).
   const pours = (l) => !!l.behaviour && !l.behaviour.magnetic
-    && ['soap', 'body', 'repel', 'weight', 'polarity', 'acid'].some(k => (l.behaviour[k] ?? 0) !== 0);
+    && ['soap', 'body', 'repel', 'weight', 'polarity', 'acid', 'bz'].some(k => (l.behaviour[k] ?? 0) !== 0);
   const pourable = new Set(DEFAULT_LIQUID_TYPES.filter(pours).map(l => l.id));
   const finite = (...v) => v.every(Number.isFinite);
   const bad = [];
@@ -379,10 +381,10 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
 
   // The model above is a model. These two read the shipped solvers, so a gate
   // quietly put back the way it was fails here rather than in a show.
-  const shader = fs.readFileSync(process.cwd() + '/src/gpu/wgsl/fluid.ts', 'utf8');
+  const shader = fs.readFileSync(process.cwd() + '/src/gpu/wgsl/fluid/dye.ts', 'utf8');
   const gpuGate = /fn gate\(a: vec4f, b: vec4f\) -> f32 \{ return min\(a\.a, b\.a\)/.test(shader);
   check('the GPU solver reads its gate from the thickness, not from the channel',
-    gpuGate, gpuGate ? '' : 'gate() in gpu/wgsl/fluid.ts is back to per-channel');
+    gpuGate, gpuGate ? '' : 'gate() in fluid/dye.ts is back to per-channel');
   const cpu = fs.readFileSync(process.cwd() + '/src/sim/fluidSimulation.ts', 'utf8');
   const cpuBody = cpu.slice(cpu.indexOf('private sharpenDye'), cpu.indexOf('private advectMacCormack'));
   const cpuGate = cpuBody.includes('this.shpA.set(this.density)') && /gate\(a, ga\[/.test(cpuBody);

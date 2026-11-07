@@ -41,11 +41,14 @@ export const BEFORE_LAMP = {
       edit('lamp grounds', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ lampBg = [^\n]*\}/g, '', 1);
       edit('front plate levels', /mixLevelled\(groundOf\(bgColor\)/g, 'mixLevelled(bgColor', 1);
       edit('decodes through the lamp', /\n[ \t]*if \(U\.lampGround > 0\.001\) \{ dyeThrough = [^\n]*\}/g, '', 2);
+      // A dyed drop's own glow fades as the ground turns to the lamp (PLAN 38h-2): before the lamp, it was whole.
+      edit('dyed drops through the lamp', / \* \(1\.0 - U\.lampGround\)/g, '', 1);
       edit('back plates through the lamp', /if \(U\.lampGround > 0\.001\) \{[\s\S]*?\} else \{\n\s*outColor = painted1;\n\s*\}/g, 'outColor = painted1;', 1);
       // Each call site of the two composites back to the mix it was.
       for (const [fn, n, to] of [
         ['chemOnGround', 3, (x) => x[1]],
-        ['onGround', 2, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
+        // 3 since 38h-7: the closeup bubble's window reads the liquid through onGround too.
+        ['onGround', 3, (x) => `mix(${x[0]}, ${x[1]}.rgb, ${x[1]}.a)`],
       ]) {
         let at = 0, done = 0;
         const call = new RegExp(`(?<![\\w])${fn}\\(`, 'g');

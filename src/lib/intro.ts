@@ -19,8 +19,9 @@
  * plate's first frame (`introPlateFrame`), cross-fading into it: it never
  * holds the plate back, it is only ever up while there is nothing to see.
  *
- * It starts still, and moves once the opening's render pipelines are built
- * (`introMove`, from `Quiet` in `gpu/prepare.ts`). What was reported: the
+ * It starts still, and moves once the opening is built, every pipeline of
+ * it and their first uses (`introMove`, from `Quiet` in `gpu/prepare.ts`,
+ * which says why the end and not, as first, the last render pipeline). What was reported: the
  * Mac's `npm run startup` went red on "no stop in the opening" on about half
  * of 10 October's runs, across PRs that never touched the opening (2.17 and
  * 2.57 s against a 2 s bar). What was measured: over the open shard's 176
@@ -65,7 +66,7 @@ interface IntroRecord {
   reason?: IntroOut;
   /** When it was gone from the page. */
   gone?: number;
-  /** The stretches it was held still while the opening's render pipelines compiled, [from, to] (`introStill`). */
+  /** The stretches it was held still while the opening built, [from, to] (`introStill`). */
   still?: [number, number | null][];
 }
 
@@ -176,9 +177,9 @@ export function introPlateFrame(stepped: boolean): void {
 }
 
 /**
- * Held still while the opening's first fills and render pipelines compile
- * (`Quiet` in `gpu/prepare.ts` says why: a moving intro there stopped the
- * page's frames for as long as the display compiled). Paused, not hidden: the
+ * Held still while the opening builds (`Quiet` in `gpu/prepare.ts` says
+ * why: a moving intro there stopped the page's frames for as long as the
+ * display compiled, and later as long as a solver kernel did). Paused, not hidden: the
  * picture stays exactly where it was and moves on from there. The first
  * opening finds it still already, from the first paint (the top of this file
  * says why); a later one, a lost device's replacement, holds it here.
