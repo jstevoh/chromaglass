@@ -29,7 +29,11 @@ deploy:
   `public/` or `index.html` runs the Mac checks that read them, not all 96: the 28 that
   open or build the app always, and of the 68 lab checks those whose bundles import the
   file (`checkReads` in `scripts/checks.mjs`, esbuild's import graph; the reach job
-  installs esbuild alone). Measure still runs in full. Such a run is "partial" to the
+  installs esbuild alone). A lab check reads only the parts of `lab-entry.ts` its code
+  calls on `lab.` (`scripts/labparts.mjs`, 19ak-3b): the solver always, the plate's
+  shader only if it draws the plate. `lab.mjs` fails a check whose run used a part the
+  scan did not see (`FAIL lab reach`): name the part as `lab.<part>` in its code. Measure
+  still runs in full. Such a run is "partial" to the
   deploy gate, so main's deploy runs every shard.
 - **Quarantine** (PLAN.md 19ak-1): a check's entry in `scripts/checks.json` can list
   known-flaky FAIL lines under `quarantine`, each with its plan id and an end date at

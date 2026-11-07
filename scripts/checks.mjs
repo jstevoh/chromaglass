@@ -60,6 +60,7 @@ import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { LAB_ENTRY, labParts, labKeysOf, resolveSpec, namedPaths } from './labparts.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.json');
@@ -69,7 +70,7 @@ const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.
 // list), and `checks.mjs` runs every shard.
 export const SHARED = [
   'scripts/chromium.mjs', 'scripts/frame.mjs', 'scripts/lab.mjs', 'scripts/lab-entry.ts',
-  'scripts/checks.mjs',
+  'scripts/labparts.mjs', 'scripts/checks.mjs',
 ];
 
 /*
@@ -692,6 +693,29 @@ async function selftest() {
       say(readsOf.get(man.checks.find((c) => c.name === 'Every tool does what it says')).site && readsOf.get(man.checks.find((c) => c.name === 'A show night')).site, 'a check that serves the app reads the whole site');
       say(sel(['src/components/desk/DeskHeader.tsx'], null).shards.join(',') === allMac && sel(['src/components/desk/DeskHeader.tsx'], null).names == null, 'with no map a site file selects every Mac check, as before 19ak-2');
       say(sel(['src/components/desk/DeskHeader.tsx', 'vite.config.ts']).names == null, 'a build file beside it selects every Mac check');
+      // The lab's page read part by part (19ak-3b): a check that only steps
+      // the solver does not read the plate's shader, one that draws the plate
+      // does, and the solver itself is read by every lab check.
+      const byName = (n) => readsOf.get(man.checks.find((c) => c.name === n));
+      const labChecks = macChecks.filter((c) => !readsOf.get(c).site);
+      const plateSel = sel(['src/gpu/wgsl/plate.ts']);
+      say(!byName('The physics').reads.has('src/gpu/wgsl/plate.ts') && byName('The physics').reads.has('src/gpu/fluid.ts') && byName('The ferrofluid\'s spikes').reads.has('src/gpu/wgsl/plate.ts'),
+        'a lab check that only steps the solver does not read the plate\'s shader, and one that draws the plate does (19ak-3b)');
+      say(labChecks.every((c) => readsOf.get(c).reads.has('src/gpu/fluid.ts')) && plateSel.names && labChecks.some((c) => !plateSel.names.includes(c.name)),
+        `every one of the ${labChecks.length} lab checks reads the solver, and the plate's shader runs ${labChecks.filter((c) => plateSel.names?.includes(c.name)).length} of them`);
+      const entry = labParts(fs.readFileSync(path.join(ROOT, LAB_ENTRY), 'utf8'));
+      const lost = [...entry.imports].filter((s) => !entry.specsOf(null).has(s));
+      say(!lost.length && entry.keys.length > 40, `the reading of ${LAB_ENTRY} finds ${entry.keys.length} parts and reaches every one of its ${entry.imports.size} imports${lost.length ? `; not ${lost.join(', ')}` : ''}`);
+      const toy = labParts([
+        "import { a } from './a';", "import { b, type T } from './b';", "import type { U } from './u';", "import { c } from './c';", "import { d } from './d';",
+        'type L = { t: T; u: U };', 'let lab: L | null = null;', 'function help() { return c(); }',
+        'const api = {', '  create() { return a(); },', '  one() { return help(); },', '  two() { return this.one() + d; },', '  three: b,', '};',
+      ].join('\n'));
+      const specs = (k) => [...toy.specsOf(k)].sort().join(' ');
+      say(specs([]) === './a' && specs(['one']) === './a ./c' && specs(['two']) === './a ./c ./d' && specs(['three']) === './a ./b' && specs(null) === './a ./b ./c ./d',
+        'a part reaches its imports through the file\'s helpers and the parts it calls; a type is no import, and create is every check\'s');
+      say(labKeysOf(["await page.evaluate(() => lab.step(4)); // lab.render(x)"])?.size === 1 && labKeysOf(['lab[name]()']) === null,
+        'a check\'s parts are the names it calls on lab. in its code, not its comments, and every part for lab[name]');
       const missing = new Map(readsOf);
       missing.delete(man.checks.find((c) => c.name === 'The physics'));
       say(has(sel(['src/components/desk/DeskHeader.tsx'], missing), 'The physics'), 'a check the map does not place runs');
@@ -903,6 +927,12 @@ export async function metafilesOf(esbuild, files, platform = 'node', root = ROOT
   On 2026-11-01 that was 68 of the 96 Mac checks reading only the lab's
   bundles, and 28 opening the app; a change to the desks or the phone's
   panels is read by those 28 and by none of the 68.
+
+  Of `lab-entry.ts`, a lab check reads only the parts its code calls on
+  `lab.` (19ak-3b, labparts.mjs), and of src/ only what its own process
+  imports or names in code (`viewOf` below), so the plate's shader is read by
+  the lab checks that draw the plate (25 of the 68 on 2026-11-07) and the
+  solver by all of them. `lab.mjs` fails a run that used a part this missed.
 */
 export const SERVES_APP = /node_modules\/\.bin\/vite|['"`]vite['"`]|\bvite (?:preview|dev)\b|npm run (?:dev|preview)\b/;
 export async function checkReads(man, scripts, esbuild, root = ROOT) {
@@ -913,15 +943,68 @@ export async function checkReads(man, scripts, esbuild, root = ROOT) {
   const nodeMeta = await metafilesOf(esbuild, [...bundled].filter((f) => f.startsWith('scripts/') && !f.endsWith('.ts')), 'node', root);
   const webMeta = await metafilesOf(esbuild, [...bundled].filter((f) => f.startsWith('src/') || f.endsWith('.ts')), 'browser', root);
   const metaOf = (f) => nodeMeta.get(f) ?? webMeta.get(f);
+  // The lab's page, read part by part (19ak-3b, labparts.mjs): its imports'
+  // own graphs, so a check is given only the parts of the lab it calls.
+  const parts = bundled.has(LAB_ENTRY) ? labParts(text(LAB_ENTRY)) : null;
+  const partFiles = new Map(parts ? [...parts.imports].map((s) => [s, resolveSpec(s, root)]) : []);
+  const partMeta = await metafilesOf(esbuild, [...new Set(partFiles.values())].filter(Boolean), 'browser', root);
+  /*
+    What a lab check's own process runs and reads: its entry scripts, what
+    esbuild finds them importing, and every path they name in their code
+    (comments taken out), scripts named followed the same way. The trace
+    above over-reads on purpose, through comments too, which stays right for
+    which scripts a change reaches; for which of the site's files a lab check
+    reads it gave every lab check the whole site's graphics (lab.mjs's
+    chromium.mjs names scripts/desktop.mjs in a comment, whose graph reaches
+    src/lib/render.ts and the output, and live-entry.ts, the whole lab page).
+  */
+  const viewOf = (c) => {
+    const files = new Set();
+    const named = new Set();
+    const todo = [...entryFiles(c.run, scripts)];
+    while (todo.length) {
+      const f = todo.pop();
+      if (files.has(f)) continue;
+      files.add(f);
+      if (!/^(scripts|server)\/.*\.(mjs|js|cjs|ts)$/.test(f)) continue;
+      for (const i of metaOf(f) ?? []) if (/^(scripts|server)\//.test(i)) todo.push(i);
+      for (const n of namedPaths(text(f), f, root)) { named.add(n); if (/^(scripts|server)\/.*\.(mjs|js|cjs)$/.test(n)) todo.push(n); }
+    }
+    return { files, named };
+  };
+  const labReads = (view) => {
+    const keys = labKeysOf([...view.files].filter((f) => f !== LAB_ENTRY && /\.(mjs|js|ts)$/.test(f)).map(text));
+    if (!parts || keys == null) return null;
+    const got = new Set([LAB_ENTRY]);
+    for (const s of parts.specsOf(keys)) {
+      const file = partFiles.get(s);
+      const meta = file && partMeta.get(file);
+      if (!meta) return null; // an import read no further: the whole page
+      for (const i of meta) got.add(i);
+    }
+    return got;
+  };
   const out = new Map();
   for (const c of man.checks) {
-    const r = new Set(traced.get(c));
+    let r = new Set(traced.get(c));
     let unread = false;
     for (const f of traced.get(c)) {
       if (!bundled.has(f)) continue;
       const meta = metaOf(f);
       if (!meta) unread = true;
       else for (const i of meta) r.add(i);
+    }
+    // A check that opens the lab reads of src/ what its view names or
+    // imports, and of the lab's page the parts it calls (19ak-3b).
+    const view = viewOf(c);
+    if (!unread && view.files.has('scripts/lab.mjs')) {
+      const src = new Set();
+      for (const f of new Set([...view.files, ...view.named])) {
+        if (/^src\//.test(f)) src.add(f);
+        const meta = (f === LAB_ENTRY && labReads(view)) || (bundled.has(f) || view.files.has(f) ? metaOf(f) : null);
+        for (const i of meta ?? []) if (/^src\//.test(i)) src.add(i);
+      }
+      r = new Set([...[...r].filter((f) => !/^src\//.test(f)), ...src]);
     }
     const files = [...traced.get(c)].filter((f) => /^(scripts|server)\//.test(f));
     const own = new Set();

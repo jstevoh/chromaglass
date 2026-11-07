@@ -4057,6 +4057,27 @@ the sessions' files or the native apps skips the Mac (19h).
   all five Mac shards again; on attempt 2 or later `reach.mjs` drops the shards an
   earlier attempt of the same run passed (`passedEarlier`), since a run's merge commit
   does not move between attempts. Such an attempt is partial to the deploy gate.
+- **19ak-3b, a lab check reads the parts of the lab it calls.** Every physics check
+  opens one lab page, `scripts/lab-entry.ts`, whose 27 imports from src/ are the
+  solver, the plate renderer, the projector and the hands' and presets' libraries, so
+  a check read that whole bundle; the trace's comments added more (lab.mjs's
+  chromium.mjs names scripts/desktop.mjs in one, whose graph reaches the output and
+  `live-entry.ts`). Now `scripts/labparts.mjs` reads lab-entry.ts's `api` part by part
+  (which imports each part uses, through the file's helpers and the parts it calls) and
+  a check's code for the parts it names on `lab.`, comments taken out; `checkReads`
+  gives a lab check of src/ only what its own process imports or names in code, and of
+  the lab page only those parts' graphs. The solver is every lab check's (`create`
+  builds it); the plate's shader is read by the 25 of 68 that draw the plate.
+  `lab.mjs` records each part the page gives out and at `close()` fails the check
+  (`FAIL lab reach`) on a part whose imports the scan of the running script missed,
+  or a lab page its code never names, so a misreading is red on its first run, never a
+  quiet skip. Measured (`scratch/replay.mjs`, not committed: main's last 100 merges
+  through the 19ak-2 and the new selection, each check priced at its time on PR run
+  41350181902's five Mac shards): 6,374 → 5,743 Mac check runs, 5,626 → 5,369 check
+  minutes (4.6%). The lever was smaller than 19ak-3 guessed: of the 34 merges that
+  touched the lab's bundle, 17 touched the solver, which every lab check must run,
+  and the 28 checks that open the app, most of the Mac's minutes, run for any site
+  file.
 - **19ak-3c, the Mac waits for the typecheck.** A new `Compiles, before the Mac` job runs
   `tsc --noEmit` on ubuntu beside `reach`; the Mac shards need it, so a PR that does not
   compile takes no Mac. Building once for all five shards (19ak-3d) was measured and

@@ -9,7 +9,8 @@ The checks, one script per check (about 265 `.mjs` files), and the helpers they 
 - `quick.mjs`: `npm run quick` runs the checks your diff from `origin/main` reaches, side by side; `-- --dry` says which and why.
 - `chromium.mjs`: `launchChromium`, `chromiumPath`; `PW_WEBGPU=1` gives the app software WebGPU off a Mac.
 - `frame.mjs`: `installFrameReader`, `waitForShow`, `settlePlate`, `frameOf`: photograph the plate and wait on the solver.
-- `lab.mjs`: `openLab`: the solver in a page with no canvas (`lab-entry.ts`).
+- `lab.mjs`: `openLab`: the solver in a page with no canvas (`lab-entry.ts`). At `close()` it holds the parts the page gave out to `labparts.mjs`'s scan of the running script, and fails the check on a part the scan missed (19ak-3b).
+- `labparts.mjs`: `labParts`, `labKeysOf`, `namedPaths`, `scriptsOf`, `codeOf`, `resolveSpec`: which imports of `lab-entry.ts` each part of the lab uses, and which parts a check calls, so `checkReads` gives a lab check only the site files it reaches (19ak-3b).
 
 ## Kinds of check
 

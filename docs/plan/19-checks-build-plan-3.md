@@ -435,12 +435,22 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   one bundle imports (`scripts/lab-entry.ts` imports most of `src/gpu` and `src/lib`),
   the workflows, and scripts no check traces. (a) **Shipped:** a whole run re-run skips
   the shards an earlier attempt passed, and the steward skill re-runs failed jobs only
-  (docs/plan-shipped.md, 19ak). (b) **Open:** the lab bundles per check, so a change to
-  the magnet's library runs the magnet's lab checks and not the soap film's. (c)
+  (docs/plan-shipped.md, 19ak). (b) **Shipped:** a lab check reads only the parts of
+  the lab page it calls, so a change to the plate's shader or a hand's library runs the
+  lab checks that use it (docs/plan-shipped.md, 19ak-3b). (c)
   **Shipped:** the Mac shards wait for `tsc --noEmit`. (d) **Measured and left:**
   building the app once on ubuntu for all five shards. `dist/` is 116 MB (the films in
   public/) against a 15 s build, so the upload and five downloads would cost more than
   the builds they replace.
+- **19ak-5. Open, found by 19ak-3b: the trace follows paths named in comments.** It
+  over-reads on purpose, but the price is high: `scripts/chromium.mjs`, which every lab
+  and app check imports, names `scripts/desktop.mjs` and `scripts/frame.mjs` in its
+  comments, so a change to the Mac app's harness or the frame helpers reaches every
+  check through the trace. 19ak-3b reads a lab check's site files from its code alone
+  (`viewOf` in `checks.mjs`, `codeOf` in `labparts.mjs`); the same for which scripts a
+  check reaches would need the trace's own guard (`npm run checks` holds it to
+  esbuild's graph) to allow for paths named only in a comment. Measure it by replaying
+  main's merges that changed only scripts.
 - **19ak-4. Open, found by 19ak-2: `npm run quick` lists every Mac check as "on the Mac
   only".** Its test for a check that serves the app read the trace, which over-reads (most
   scripts name `scripts/startup.mjs` in a comment), so all 96 read as serving the app and

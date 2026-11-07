@@ -14,6 +14,11 @@ import { launchChromium } from './chromium.mjs';
 import { build } from 'esbuild';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { LAB_ENTRY, labParts, labKeysOf, namedPaths, scriptsOf } from './labparts.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
  * `entry` swaps the page's script for one that imports lab-entry.ts and adds
@@ -57,5 +62,52 @@ export async function openLab({ entry = 'scripts/lab-entry.ts', plugins = [], ta
   page.on('pageerror', (e) => console.log('  [lab error]', e.message.slice(0, 300)));
   await page.goto(`http://localhost:${port}/`);
   await page.waitForFunction(() => window.labReady === true);
-  return { page, js, close: async () => { await browser.close(); server.close(); } };
+  // Every part the page reads off the lab, for the guard at close().
+  if (entry === LAB_ENTRY) {
+    await page.evaluate(() => {
+      const used = new Set();
+      const api = window.lab;
+      window.labUsed = used;
+      window.lab = new Proxy(api, { get(o, k, r) { if (typeof k === 'string' && k in o) used.add(k); return Reflect.get(o, k, r); } });
+    });
+  }
+  return {
+    page, js, close: async () => {
+      const used = entry === LAB_ENTRY ? await page.evaluate(() => [...(window.labUsed ?? [])]).catch(() => null) : null;
+      await browser.close(); server.close();
+      guard(entry, used);
+    },
+  };
+}
+
+/*
+  The guard on what the Mac's selection reads of this check (PLAN.md 19ak-3b).
+  A pull request that changes the site's files runs only the lab checks whose
+  reads it touches, and a check's reads of the lab's page are the parts its
+  scripts name on `lab.` (labparts.mjs). Here, at the end of every run, the
+  parts the page really gave out are held to that scan of the running
+  script and what it imports: a part whose imports the scan did not reach,
+  or a lab page the scripts never name, would let a change to those files
+  skip this check, so the check fails, by name, the first time it runs. The
+  fix is to name the part as `lab.<part>` in the check's code, not to loosen
+  this.
+*/
+function guard(entry, used) {
+  const main = process.argv[1] && path.relative(ROOT, path.resolve(process.argv[1]));
+  if (!main || !/^scripts\/.*\.(mjs|js)$/.test(main)) return;
+  const files = scriptsOf(main, ROOT);
+  const texts = [...files].map((f) => readFileSync(path.join(ROOT, f), 'utf8'));
+  const fail = (why) => { console.log(`FAIL lab reach (19ak-3b): ${why}`); process.exit(1); };
+  if (entry !== LAB_ENTRY) {
+    const named = new Set([...files].flatMap((f, i) => [...namedPaths(texts[i], f, ROOT)]));
+    if (!named.has(path.normalize(entry))) fail(`${main} opens the lab page ${entry}, which its code never names as a string, so the Mac's selection would not read it`);
+    return;
+  }
+  if (!used) return;
+  const seen = labKeysOf(texts);
+  if (seen == null) return;
+  const parts = labParts(readFileSync(path.join(ROOT, LAB_ENTRY), 'utf8'));
+  const have = parts.specsOf(seen);
+  const missed = used.filter((k) => [...parts.specsOf([k])].some((s) => !have.has(s)));
+  if (missed.length) fail(`${main} used ${missed.map((k) => `the part ${k}`).join(', ')}, which the scan of its scripts (${[...files].join(', ')}) did not see; a change to ${[...new Set(missed.flatMap((k) => [...parts.specsOf([k])].filter((s) => !have.has(s))))].join(', ')} would skip this check`);
 }
