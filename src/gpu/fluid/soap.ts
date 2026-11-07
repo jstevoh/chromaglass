@@ -113,10 +113,14 @@ export function soapBreakdownRate(dial: number): number {
  *   [2] the face speed's cap in cells a substep, [3] the self-spread's cap in
  *   cells² a substep, [4] the molecular diffusion in cells² for the step,
  *   [5] the step's retention exp(−k·seconds) for Soap Breakdown (1 at 0).
- * `dial` is Soap Bursts (0..1, the share of Δσ), `seconds` the step's time,
- * `n` the grid's edge, `breakdown` Soap Breakdown (0..1).
+ * `dial` is Soap Bursts (0..1, the share of Δσ), `seconds` the step's time
+ * (a 60th when a caller has none, as the solver's step without real seconds
+ * is), `n` the grid's edge, `breakdown` Soap Breakdown (0..1; none when left
+ * out). Both defaults live here, not at the call in `../fluid.ts`, which sits
+ * at its 100 KB limit (`npm run sizes`).
  */
-export function soapPlan(dial: number, seconds: number, n: number, out: Float64Array, breakdown = 0): Float64Array {
+export function soapPlan(dial: number, seconds: number | undefined, n: number, out: Float64Array, breakdown = 0): Float64Array {
+  seconds ??= 1 / 60;
   const dx = PLATE_METRES / n;
   const s = Math.max(0, seconds);
   const front = SOAP_FRONT * s / dx;

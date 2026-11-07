@@ -1251,7 +1251,7 @@ export class WebGPUFluid extends FluidReads {
       reading the same soap the dye was moved by. In metres and seconds, in
       as many substeps as the grid and the step need (soapPlan, PLAN 38c).
     */
-    const sp = soapPlan(soap, p.magnetSeconds ?? 1 / 60, N, this.soapNums, p.soapBreakdown ?? 0);
+    const sp = soapPlan(soap, p.magnetSeconds, N, this.soapNums, p.soapBreakdown);
     const soapRim = thin ? OPEN_RIM : 0;
     stage('marangoni', (pass) => {
       const k = this.arg('marangoni', [sp[1], 0, sp[2], sp[3], soapRim, 0, 0, 0]);
