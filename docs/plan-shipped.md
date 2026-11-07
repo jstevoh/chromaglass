@@ -4098,6 +4098,15 @@ the sessions' files or the native apps skips the Mac (19h).
   before, 5,675 after, 13% less; 65.3 → 56.8 a push. The lab's checks all bundle one
   `scripts/lab-entry.ts`, which imports most of `src/gpu` and `src/lib`, so a solver or
   library change still runs every lab check (19ak-3).
+- **19ak-5, a re-run no longer turns the logic shard red** (2026-11-07). 19ak-3a's skip
+  read `GITHUB_RUN_ATTEMPT` and `GITHUB_RUN_ID`, and `reach.mjs`'s selftest spawned its
+  scratch-tree `--diff` children with the job's whole environment. On attempt 2 a child
+  read the real run's jobs, found every Mac shard passed in attempt 1 and answered
+  `mac=false`, so "a changed script reaches, every shard in a tree with no manifest" and
+  "a Mac script moved to docs/x.md still reaches" failed on every re-run (#656's). The
+  children now run as attempt 1 of no run (`childEnv`); the skip keeps its own mocked
+  cases. Measured with `npm run reach` as attempt 2 of a real green run (41350181902,
+  Node's fetch through the proxy): 2 FAIL before, 97 ok and 0 FAIL after.
 
 ### 20b. A clear film that tears (the thin-film equation)
 

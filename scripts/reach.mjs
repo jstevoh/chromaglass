@@ -316,6 +316,16 @@ async function selftest() {
     if (got !== want) bad++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}`);
   }
+  // The environment every child `--diff` below runs in. It is this job's, so
+  // the child finds node, git and the token, but never this run's attempt:
+  // on a re-run (GITHUB_RUN_ATTEMPT 2) a child that inherited it read the real
+  // run's jobs, found the Mac shards that passed in attempt 1, and dropped them
+  // from its answer, so the cases that want every shard got `mac=false` and the
+  // logic shard went red on every re-run (#656's, PLAN.md 19ak-5). The child's
+  // answer is about its scratch tree, never about this run, so it is always a
+  // first attempt of no run; the re-run skip has its own cases, on
+  // `passedEarlier` with mocked jobs.
+  const childEnv = (extra) => ({ ...process.env, GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '', ...extra });
   // And `--diff` itself, on a scratch repository with GitHub's shape: a base,
   // a PR branch, and a merge commit whose second parent is the PR's head.
   const runDiff = (changes, prHead, base = () => {}) => {
@@ -346,7 +356,7 @@ async function selftest() {
         stdio: 'pipe',
         // No base branch, so carry() answers at once without the network: the
         // carry is driven by its own cases below, against a mocked API.
-        env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out },
+        env: childEnv({ GITHUB_EVENT_NAME: 'pull_request', GITHUB_BASE_REF: '', PR_HEAD: prHead ?? head, GITHUB_OUTPUT: out }),
       });
       return fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
     } catch {
@@ -435,7 +445,7 @@ async function selftest() {
   const call = (env) => {
     const out = path.join(os.tmpdir(), `reach-call-${process.pid}`);
     fs.writeFileSync(out, '');
-    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: { ...process.env, ...env, GITHUB_OUTPUT: out } });
+    execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--diff'], { stdio: 'pipe', env: childEnv({ ...env, GITHUB_OUTPUT: out }) });
     const r = fs.readFileSync(out, 'utf8').trim().replace(/\n/g, ' ');
     fs.rmSync(out);
     return r;
