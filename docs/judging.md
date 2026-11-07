@@ -2393,3 +2393,20 @@ default oil lasts seconds.
    the rim stays inside it (18g-7).
 5. Bad: a look whose motion now reads dead (say which), a dent that never fills, or Plate
    Rock jumping at the default.
+
+## 108. A coloured clear film (Film Dye, PLAN 20b-13)
+
+Settings → Oil & Soap → **Clear Film**, then **Film Dye** and its swatch beside it (also the
+phone's Dye sheet, the remote and MIDI). 0 in every look. On Lamp Ground 1 over a lavender
+or blue look, Clear Film about 0.35 (tears over the dust in a second or two), Film Dye about
+0.5 with the yellow it opens with:
+
+1. The lace is yellow and the holes are the water's colour, clean, not yellow-tinted.
+2. Thick veins and the beads the ligaments break into read a deeper, warmer yellow than the
+   thin film; with Spectral Optics up a thick film goes orange rather than only darker.
+3. Film Dye from 0 up: a faint cream first, the swatch's yellow at the middle, a deep amber
+   at the top; nothing jumps.
+4. On Lamp Ground 0 the film shows as yellow light over black and the holes as the colour.
+5. Bad: the holes tinted, the lace flat (one yellow regardless of thickness), or the plate
+   changing when Film Dye is 0.
+
