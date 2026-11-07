@@ -69,7 +69,7 @@ nothing. A loop that needs less of a crossfade (a periodic stir locked to the ba
   *Measure:* a new check renders two seconds at 1080x1920 and reads back an MP4 of
   exactly that size whose plate reaches all four edges (no letterbox rows of black), on
   the Mac shard; `panel` for the new choice.
-- **43b. A seamless loop, for a Canvas.** *(M.)* A Loop length (3 to 8 s, default 8) in
+- **43b. A seamless loop, for a Canvas.** *(M, in flight.)* A Loop length (3 to 8 s, default 8) in
   Render: it renders the loop plus a search window, picks the pair of frames one loop
   apart with the least difference, crossfades the film's last half second into its first,
   and writes H.264 MP4 with no audio track, from the song's loudest stretch by the offline
