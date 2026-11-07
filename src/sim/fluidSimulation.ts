@@ -21,7 +21,7 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { PRESET_CONTRACTS } from '../presetPlate';
+import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
 import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
@@ -32,7 +32,7 @@ import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, type 
 import { OPEN_RIM, carrierViscosity, dragSeconds, dyeDensityContrast } from '../lib/turntable';
 import { DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
-import { frameSway, plateSin } from '../lib/plateRock';
+import { frameSway, rockStep } from '../lib/plateRock';
 import type { GpuStepParams, PlateSolver, SolverCarry } from '../gpu/solverTypes';
 import { pourPictureCpu } from '../lib/videoFlow';
 import { depositRim, fillHole, type DyeTarget } from '../lib/bubbleDye';
@@ -139,15 +139,15 @@ export class FluidSimulation {
    * sitting there, including after it has mixed into something else.
    */
   meanColor: [number, number, number] = [0, 0, 0];
-  /** Plate tilt this step — a uniform acceleration, set by the show each step. */
+  /** Plate tilt this step, a uniform acceleration set by the show. */
   tiltX = 0;
   tiltY = 0;
-  /** The plate's rock as the render loop last set it (not scaled to a tilt): drives the current. */
   /** How far a dropped liquid falls, 0–1 (set each frame from Drop Height), and the plate's Fingering for its splash. */
   dropHeight = 0;
   dropFingering = 0;
-  rockX = 0;
-  rockY = 0;
+  /** The rock as the frame loop set it (not a tilt), and its gain past real (rockPast,
+   PLAN 38r-9). */
+  rockX = 0; rockY = 0; rockGain = 1;
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts, stepCover): drags the liquid at half its speed on a thin gap. */
   coverX = 0;
   coverY = 0;
@@ -1318,12 +1318,6 @@ export class FluidSimulation {
   }
 
   /**
-   * A look's own seed laid at `w` of its strength (0..1): what `seedPreset`
-   * adds, scaled, on top of what is there. The four dye arrays are the
-   * state on the CPU path and the pending deltas on the GPU path, and a seed
-   * only adds to them, so the difference it made can be scaled either way.
-   */
-  /**
    * What `lay` would put on the plate, as a picture to add later rather than
    * dye added now: the dye it lays is taken back out and returned (its
    * velocity stays, laid once). A look change lays the incoming look a share
@@ -1356,6 +1350,11 @@ export class FluidSimulation {
     this.dirty = true;
   }
 
+  /**
+   * A look's own seed laid at `w` of its strength (0..1), on top of what is
+   * there. A seed only adds to the four dye arrays (the state on the CPU
+   * path, the deltas pending on the GPU), so what it added scales either way.
+   */
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = Math.max(0, Math.min(1, w));
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
@@ -1369,7 +1368,8 @@ export class FluidSimulation {
     return harmony;
   }
 
-  seedPreset(presetId: string, noise2D: (x: number, y: number) => number): number[] {
+  seedPreset(look: string, noise2D: (x: number, y: number) => number): number[] {
+    const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
@@ -1428,7 +1428,7 @@ export class FluidSimulation {
         }
       }
       this.seedMean = Math.max(0, dishSum() - beforeMean);
-      this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
+      this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
       return harmony;
     }
 
@@ -2086,7 +2086,7 @@ export class FluidSimulation {
     }
 
     this.seedMean = Math.max(0, dishSum() - beforeMean);
-    this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
+    this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
     return harmony;
   }
 
@@ -3426,8 +3426,7 @@ export class FluidSimulation {
       // ¾ of a cell whatever the Speed and Advection.
       currentDamp: Math.max(0.8, Math.min(0.999, settings.damping || 0.99)),
       currentBuoy: Math.max(0, settings.buoyancy ?? 0) * CUR_BUOY,
-      rockX: plateSin(this.tiltX, this.rockX),
-      rockY: plateSin(this.tiltY, this.rockY),
+      ...rockStep(this.tiltX, this.tiltY, this.rockX, this.rockY, this.rockGain),
       coverX: this.coverX,
       coverY: this.coverY,
       currentGrav: Math.max(0, settings.centerGravity ?? 0) * CUR_GRAV,

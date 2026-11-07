@@ -89,7 +89,7 @@ try {
     },
     testPrivateJwk,
   );
-  // The same Home key signed again with the moiré pack on it (PLAN.md 42a-2): what the
+  // The same Home key signed again with the moiré pack on it (PLAN.md 45a-2): what the
   // licence Worker files when a Home buyer buys the pack (server/license-packs.js).
   const homeMoireKey = await signLicenseKey(
     {
@@ -540,7 +540,7 @@ try {
       .locator('#settings-mark [data-cg-free-logo-mark="ChromaGlass"]')
       .count();
     const freeMarkFileCount = await page.locator('#settings-mark #mark-file').count();
-    // The moiré pack's note in the Moiré Sheets section (PLAN.md 42a): drawn while the pack
+    // The moiré pack's note in the Moiré Sheets section (PLAN.md 45a): drawn while the pack
     // is not on this copy. Read on Free, on Home, and on Home with the pack (14 below).
     const moireNote = () => page.locator('[data-testid="moire-pack-note"]').count();
     const freeMoireNote = await moireNote();
@@ -644,7 +644,7 @@ try {
       `remainingTiles=${JSON.stringify(homeRemainingTiles)}`,
     );
 
-    // 14. The moiré pack on Home (PLAN.md 42a-2): a plain Home key leaves the pack locked
+    // 14. The moiré pack on Home (PLAN.md 45a-2): a plain Home key leaves the pack locked
     // and the account sheet offers it; the same key signed again with `packs: ['moire']`
     // opens it, and the sheet says it is on the licence. Read by the section's own note
     // and the sheet's own lines, on the same page, so the key is the only thing changed.

@@ -922,7 +922,7 @@ let bobProToken = '';
     `pro ${umaKeys.map((k) => k.tier).join('+')}, home then upgrade ${tiaKeys.map((k) => k.tier).join('+')}`,
   );
 
-  // 13g–13m. The moiré pack, sold on top of Home (PLAN.md 42a-2, server/license-packs.js). A pack is
+  // 13g–13m. The moiré pack, sold on top of Home (PLAN.md 45a-2, server/license-packs.js). A pack is
   // not a tier: its order signs the buyer's Home key again under the same id with `packs: ['moire']`,
   // and its refund signs it again without. Each line reads the signed token itself, not only the
   // record, because the app trusts the token: a record that says `packs` over a token that names
@@ -1030,7 +1030,7 @@ let bobProToken = '';
 
   // 13p. The device's half: which key listed under the held key's id replaces it
   // (accountLicense pick() asks sameIdKeyWins). A pack bought or refunded changes the
-  // packs; an upgrade raises the tier with the packs unchanged (the review of 42a-2
+  // packs; an upgrade raises the tier with the packs unchanged (the review of 45a-2
   // found pick() kept every upgrade buyer on Home when it compared packs alone).
   const lk = await import(`data:text/javascript;base64,${Buffer.from((await build({
     entryPoints: [new URL('../src/lib/licenseKey.ts', import.meta.url).pathname],

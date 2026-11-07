@@ -727,6 +727,9 @@ async function start() {
   // The server reads its settings from the environment, as it does in a terminal.
   process.env.PORT = String(show.port);
   process.env.SHOW_KEY = show.key;
+  // The owner's assistant switch (PLAN 44b): one word in this file, read by
+  // the show server every second. No file, as on every customer's Mac, is off.
+  process.env.CHROMAGLASS_ASSISTANT_FILE ??= join(app.getPath('userData'), 'assistant');
   process.env.OSC_PORT = String(show.oscMode === 'off' ? 0 : show.osc);
   process.env.OSC_BIND = OSC_BINDS[show.oscMode] ?? OSC_BINDS.local;
   const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);

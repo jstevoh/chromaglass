@@ -1,5 +1,5 @@
 /**
- * The moiré pack (PLAN 42a): the sheet designs, their names as the desks and
+ * The moiré pack (PLAN 45a): the sheet designs, their names as the desks and
  * the phone show them, and how long a copy without the pack may try them.
  *
  * A pair of printed transparencies on the stage, one under the glass and one

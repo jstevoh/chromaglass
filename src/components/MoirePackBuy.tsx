@@ -1,7 +1,7 @@
 import { CHECKOUT_MOIRE_URL, buildCheckoutUrl, hasLicensePack } from '../lib/tierGates';
 
 /**
- * The moiré pack in the account sheet's store (PLAN.md 42a-2). The owner chose on
+ * The moiré pack in the account sheet's store (PLAN.md 45a-2). The owner chose on
  * 2026-11-07 to sell it as an add-on to Home, $15 once, and to include it in Pro, so
  * what this shows hangs on the tier held here:
  * - Home without the pack: the Buy card. The checkout carries the account's email,

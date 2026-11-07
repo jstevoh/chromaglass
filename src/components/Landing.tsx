@@ -74,7 +74,7 @@ const STEPS: { n: string; title: string; body: string }[] = [
 ];
 
 /*
-  The moiré pack (PLAN.md 42a-2), $15 on Home and in Pro: four of its six looks, each a frame
+  The moiré pack (PLAN.md 45a-2), $15 on Home and in Pro: four of its six looks, each a frame
   the app drew on this Mac's GPU two dozen seconds after the look was opened (a still a page
   load away, like LOOKS above). Kept at 960x600 for a 480x300 box: a pattern of fine lines
   scaled down in the browser beats against the screen's own pixels, so these are the one set
@@ -305,7 +305,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </div>
           ))}
         </div>
-        {/* The moiré pack (PLAN.md 42a-2): an add-on to Home, not a tier, so it sits under the
+        {/* The moiré pack (PLAN.md 45a-2): an add-on to Home, not a tier, so it sits under the
             cards rather than beside them. Its checkout files the pack onto the Home key held by
             the email it is bought with, hence the line about the email. On a phone the pictures
             are a row to swipe, as the looks above are. */}

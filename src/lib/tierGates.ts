@@ -22,7 +22,7 @@ export interface NativeLicenseBridge {
   exp?: number | null;
   error?: string | null;
   enforced?: boolean;
-  /** The art packs the Mac's held key names (PLAN 42a-2), read from its signed payload by desktop/main.js. */
+  /** The art packs the Mac's held key names (PLAN 45a-2), read from its signed payload by desktop/main.js. */
   packs?: string[];
 }
 
@@ -195,7 +195,7 @@ export function getActiveLicenseInfo(): {
   email: string | null;
   id: string | null;
   error: string | null;
-  /** The art packs the held key names (PLAN 42a-2); empty for a key that names none. */
+  /** The art packs the held key names (PLAN 45a-2); empty for a key that names none. */
   packs: string[];
 } {
   const cached = getCachedLicenseStatus();
@@ -251,18 +251,18 @@ export function canUseProFeature(): boolean {
 }
 
 /**
- * Whether this copy may put the moiré pack's sheets on the stage (PLAN 42a).
+ * Whether this copy may put the moiré pack's sheets on the stage (PLAN 45a).
  * Everything is open where tiers are not enforced (a self-run copy, the
  * checks, development); where they are, Pro includes every art pack
  * (PLAN 23) and Home buys this one as an add-on, which the licence names
- * in its signed `packs` (PLAN 42a-2). Like every site gate, a nudge.
+ * in its signed `packs` (PLAN 45a-2). Like every site gate, a nudge.
  */
 export function canUseMoirePack(): boolean {
   return !isTierGatingEnforced() || canUseProFeature() || (canUseHomeFeature() && hasLicensePack('moire'));
 }
 
 /**
- * Whether the licence held here names an art pack bought on top of Home (PLAN 42a-2).
+ * Whether the licence held here names an art pack bought on top of Home (PLAN 45a-2).
  * The pack is in the key's signed payload (`packs`), so it verifies offline as the
  * tier does: the account sheet's verified key first, then the Mac's own (the Mac
  * verifies its key in the main process and hands the page what it read). A key signed

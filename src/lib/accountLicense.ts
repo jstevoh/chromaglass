@@ -173,7 +173,7 @@ async function pick(all: Array<{ id?: string; token: string; tier: LicenseTier }
   const held = getActiveLicenseInfo();
   let refused: { tier: LicenseTier; error: string } | null = null;
   for (const k of offered) {
-    // The held key signed again under its own id (PLAN.md 42a-2): a moiré pack bought
+    // The held key signed again under its own id (PLAN.md 45a-2): a moiré pack bought
     // on top of Home, or refunded, re-signs the Home key with its `packs` changed and
     // keeps the id, so the rank test below would keep the old token, which still
     // verifies but names the old packs. Read the listed token's packs and take it when

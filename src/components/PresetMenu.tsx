@@ -51,7 +51,7 @@ const GROUPS: { label: string; pick: (p: Preset) => boolean }[] = [
   { label: 'Closeup', pick: (p) => !!p.settings.macroMode },
   { label: 'Photograph', pick: (p) => p.settings.renderStyle === 'photo' },
   { label: 'Light show', pick: (p) => !p.pack && !p.settings.macroMode && p.settings.renderStyle !== 'photo' },
-  // The moiré pack's looks (PLAN 42a), together, so the pack reads as one thing.
+  // The moiré pack's looks (PLAN 45a), together, so the pack reads as one thing.
   { label: 'Moiré pack', pick: (p) => p.pack === 'moire' },
 ];
 const GROUP_ORDER = ['Light show', 'Photograph', 'Closeup', 'Moiré pack'];

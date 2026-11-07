@@ -20,7 +20,7 @@ export const DEFAULT_PUBLIC_JWK = {
 export const MAX_MACHINES_PER_KEY = 2;
 
 /*
-  The art packs a key carries (PLAN.md 42a-2). A pack is an add-on sold to Home
+  The art packs a key carries (PLAN.md 45a-2). A pack is an add-on sold to Home
   (Pro includes every pack), so it rides in the same signed payload as the tier
   rather than in a key of its own: a buyer holds one key, the Mac's seats stay
   counted against one id, and a gig with no network still knows what was paid

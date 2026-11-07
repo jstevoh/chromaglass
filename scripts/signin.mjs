@@ -612,7 +612,7 @@ try {
       const buys = [...document.querySelectorAll('[data-cg-landing-buy]')];
       const buyBad = buys.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
         || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
-      // The moiré pack's card under them (PLAN 42a-2): its own Buy, held to the same rules, and
+      // The moiré pack's card under them (PLAN 45a-2): its own Buy, held to the same rules, and
       // its four pictures each loaded from a file that exists (a lazy image is asked for here by
       // scrolling the card into view, and naturalWidth is 0 for a file that 404s).
       const pack = [...document.querySelectorAll('[data-cg-landing-pack]')];

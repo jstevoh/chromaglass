@@ -104,7 +104,7 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
         if (VALID_ON_NEW_SONG.has(value)) out.onNewSong = value as VisualizerSettings['onNewSong'];
       } else if (key.endsWith('Blend')) {
         if (VALID_ROW_BLEND.has(value)) (out as Record<string, unknown>)[key] = value;
-      } else if (key === 'paperA' || key === 'paperB' || key === 'ledColor') {
+      } else if (key === 'paperA' || key === 'paperB' || key === 'ledColor' || key === 'clearFilmDyeColor') {
         if (HEX_COLOR_REGEX.test(value)) (out as Record<string, unknown>)[key] = value;
       } else if (key === 'mixOrder') {
         if (value.length <= 64 && /^[a-z ]+$/.test(value)) out.mixOrder = value;

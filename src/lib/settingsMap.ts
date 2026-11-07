@@ -152,7 +152,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   { id: 'lamp', name: 'Lamp & Light', category: 'look',
     terms: 'light play motion hotspot second lamp iridescence projector bulb lumia aurora wilfred chemistry reaction coral sensual laboratory boyle gel wheel colour color rpm warmth halogen exposure grade transmission light through dye thickness depth pale deep' },
   /*
-    The moiré pack (PLAN 42a): two printed sheets on the stage, the lower one
+    The moiré pack (PLAN 45a): two printed sheets on the stage, the lower one
     seen through the liquid. Its own section, not a Mixer row: the sheets lie
     on the stage at a fixed place, under the glass and on it.
   */

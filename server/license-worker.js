@@ -153,7 +153,7 @@ async function handleWebhook(request, env, cors) {
           : packForProduct(env, lsProductId)
             ? 'pack'
             : 'unknown';
-  // An art pack (PLAN.md 42a-2, server/license-packs.js) signs the buyer's Home key again with
+  // An art pack (PLAN.md 45a-2, server/license-packs.js) signs the buyer's Home key again with
   // the pack in it, as an Upgrade signs it again as Pro; its order is filed as `order_pack`.
   const pack = productKind === 'pack' ? packForProduct(env, lsProductId) : null;
   const rawEvent = String(body.event || body.meta?.event_name || '');
@@ -337,7 +337,7 @@ async function handleWebhook(request, env, cors) {
     // gate above). Written for the owner's direct refund too; only a Lemon Squeezy order reads it.
     if (orderId) await env.LICENSE_KV.put(`refunded:${orderId}`, JSON.stringify({ at: Date.now() }));
     // A pack's own order refunded takes the pack off the key it is on and leaves the key
-    // (PLAN.md 42a-2); its order id is no key's, so the lines below would revoke nothing.
+    // (PLAN.md 45a-2); its order id is no key's, so the lines below would revoke nothing.
     const unpacked = await removePack({ env, email, orderId, privateJwk, readEmailKeys });
     if (unpacked) return json({ ok: true, unpacked: unpacked.pack, id: unpacked.record.id }, 200, cors);
     let targetEmail = email;
@@ -407,7 +407,7 @@ async function refileHome(env, pro, upgradeOrderId, privateJwk) {
   const issuedAt = typeof was.issuedAt === 'number' ? was.issuedAt : pro.issuedAt;
   const updatesUntil = typeof was.updatesUntil === 'number' ? was.updatesUntil : pro.updatesUntil;
   const maxMachines = typeof was.maxMachines === 'number' ? was.maxMachines : pro.maxMachines;
-  // The packs the Home carried before the upgrade come back with it (PLAN.md 42a-2).
+  // The packs the Home carried before the upgrade come back with it (PLAN.md 45a-2).
   const packs = packFields(was);
   const token = await signLicenseKey(
     { id, tier: 'home', email: pro.email, issuedAt, updatesUntil, maxMachines, ...(packs.packs ? { packs: packs.packs } : {}) },
@@ -449,7 +449,7 @@ async function handleGetKeys(request, env, cors) {
       updatesUntil: k.updatesUntil,
       maxMachines: k.maxMachines,
       // The packs the token carries, so the app can see a key it already holds was signed
-      // again with a pack (PLAN.md 42a-2) without opening every token.
+      // again with a pack (PLAN.md 45a-2) without opening every token.
       ...(Array.isArray(k.packs) && k.packs.length ? { packs: k.packs } : {}),
     }));
 

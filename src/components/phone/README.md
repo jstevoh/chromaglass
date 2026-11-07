@@ -22,7 +22,7 @@ The app laid out for a thumb: the phone's stage for performing and Play for list
 - `AreaPicker.tsx`: area picked on a plate thumbnail.
 - `BandStrip.tsx`: the band, dragged on a spectrum.
 - `PhonePlay.tsx`: Play.
-- `PhoneMoire.tsx`: `PhoneMoire`, the moiré pack's sheets on the Looks sheet (the desk's lists and try-it rule, PLAN 42a).
+- `PhoneMoire.tsx`: `PhoneMoire`, the moiré pack's sheets on the Looks sheet (the desk's lists and try-it rule, PLAN 45a).
 - `PhoneStage.tsx`: the stage.
 
 ## Checks

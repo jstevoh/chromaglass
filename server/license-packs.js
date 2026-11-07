@@ -1,4 +1,4 @@
-// Art packs sold on top of Home (PLAN.md 42a-2): the Worker's side of the moiré pack.
+// Art packs sold on top of Home (PLAN.md 45a-2): the Worker's side of the moiré pack.
 //
 // The owner chose on 2026-11-07 to sell the moiré pack as an add-on to Home, about $15,
 // and to include it in Pro. A pack is not a tier, so it does not get a key of its own:

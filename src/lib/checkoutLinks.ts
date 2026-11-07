@@ -22,7 +22,7 @@ export function buildCheckoutUrl(baseUrl: string, email?: string | null): string
 }
 
 /*
-  The moiré pack (PLAN.md 42a-2): $15 once, bought on top of Home; Pro includes it. Its order
+  The moiré pack (PLAN.md 45a-2): $15 once, bought on top of Home; Pro includes it. Its order
   signs the buyer's Home key again with the pack in it (server/license-packs.js), so the
   checkout needs the email the Home key was filed under, which `buildCheckoutUrl` fills in.
 */

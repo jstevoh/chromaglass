@@ -6,7 +6,7 @@ export interface Preset {
   name: string;
   description: string;
   settings: Partial<VisualizerSettings>;
-  /** The art pack a look sells in, when it needs one beyond the app (PLAN 23, 42a). */
+  /** The art pack a look sells in, when it needs one beyond the app (PLAN 23, 45a). */
   pack?: 'moire';
 }
 
@@ -2227,13 +2227,22 @@ export const PRESETS: Preset[] = [
 ];
 
 /*
-  The moiré pack's looks (PLAN 42a; presetsMoire.ts), each laid over the look
-  it starts from, with that look's patches kept and the sheets' added.
+  The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
+  it starts from. Its cords are that look's, and a sheet's cord takes the
+  place of the last of them: a look carries two or three fast cords
+  (PLAN 28i-3b, `npm run soundpatch`), and the first version, which added the
+  sheet's to the house look's three, made four, too many for a hand to read
+  on the wall. A pack look laid over a look with areas adds none: its areas'
+  cords are the music there, and a plate-wide one beside them is the
+  redundancy 28i-3b turns away. The plate itself (dyes, pours, dish, areas)
+  is the house look's under the pack look's id (presetPlate.ts).
 */
 for (const m of MOIRE_LOOKS) {
   const from = PRESETS.find(p => p.id === m.from);
   if (!from) continue;
-  const cords = [...(from.settings.sceneMappings ?? []), ...(m.settings.sceneMappings ?? [])];
+  const own = m.settings.sceneMappings ?? [];
+  const house = from.settings.sceneMappings ?? [];
+  const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
   PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
 }
 

@@ -187,6 +187,8 @@ export interface GpuStepParams {
   currentBuoy: number;      // heat rising: × the temperature field
   rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
   rockY: number;
+  /** Plate Rock past real (lib/plateRock.ts rockPast): × the rock's pull on the colour and the oil's lift on a thin gap; 1 is the real gap's. */
+  rockGain?: number;
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts): on a thin gap the liquid is dragged toward half of it, as by Glass Smear. */
   coverX?: number;
   coverY?: number;

@@ -13,7 +13,7 @@ export interface LicensePayload {
   maxMachines: number;
   exp?: number;
   upgradeFrom?: string;
-  /** The art packs bought on top of the tier, e.g. `moire` (PLAN.md 42a-2); absent on a key with none. */
+  /** The art packs bought on top of the tier, e.g. `moire` (PLAN.md 45a-2); absent on a key with none. */
   packs?: string[];
 }
 
@@ -26,7 +26,7 @@ export function normalizePacks(list: unknown): string[] {
 
 /**
  * Whether the account's key listed under the held key's own id should replace it
- * (PLAN.md 42a-2). The Worker signs a key again under the same id when a pack is bought
+ * (PLAN.md 45a-2). The Worker signs a key again under the same id when a pack is bought
  * or refunded (the packs change) and when Home is upgraded (the tier rises, the packs
  * carried over). Take it when the tier is higher, or the tier is the same and the packs
  * differ; never when the tier is lower, so a stale listing cannot downgrade a copy.

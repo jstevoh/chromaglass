@@ -170,7 +170,7 @@ export function createServerLicenseManager(options = {}) {
           email: check.email,
           id: check.id,
           exp: check.exp,
-          // The art packs bought on top of Home (PLAN.md 42a-2), from the signed payload,
+          // The art packs bought on top of Home (PLAN.md 45a-2), from the signed payload,
           // so the Mac's page gates the pack's sheets as the account sheet's key would.
           packs: Array.isArray(check.payload?.packs) ? check.payload.packs : [],
           machineId: state.active.machineId || machineId,

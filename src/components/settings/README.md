@@ -19,7 +19,7 @@ holds the three longest:
 | `PatchesSection.tsx` | `patches` |
 | `MidiSection.tsx` | `midi` |
 | `LookSections.tsx` | `look`, `show`, `camera`, `stock`, `lamp`, `macro` |
-| `MoireSection.tsx` | `moire`, the moiré pack's sheets (PLAN 42a) |
+| `MoireSection.tsx` | `moire`, the moiré pack's sheets (PLAN 45a) |
 | `MotionSections.tsx` | `kaleidoscope`, `tilt`, `spin`, `physics`, `automation` |
 | `ChemistrySections.tsx` | `squish`, `oil`, `ferro`, `reactions` |
 | `PourSections.tsx` | `interaction`, `liquids` |

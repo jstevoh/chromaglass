@@ -154,7 +154,7 @@ export async function rotate({ kv, privateJwk, publicJwk, keepEmails, keepIds = 
         updatesUntil: record.updatesUntil,
         maxMachines: record.maxMachines,
         ...(record.upgradeFrom ? { upgradeFrom: record.upgradeFrom } : {}),
-        // A pack bought on top of the tier (PLAN.md 42a-2) is part of what the key says it paid for.
+        // A pack bought on top of the tier (PLAN.md 45a-2) is part of what the key says it paid for.
         ...(Array.isArray(record.packs) && record.packs.length ? { packs: record.packs } : {}),
       },
       privateJwk,

@@ -30,6 +30,7 @@ import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, read
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
+import { createAssistantGuard, readAssistantMode } from './assistant.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -258,7 +259,9 @@ const server = createServer((req, res) => {
 // Displays and controllers each broadcast to the other side. There is no
 // state here at all: the display is authoritative and re-sends a snapshot
 // whenever a controller joins, which keeps this process restartable
-// mid-show without anything getting out of sync.
+// mid-show without anything getting out of sync. The one exception is the
+// assistant's guard (`assistant.js`): its pace, its Undo and who moved what
+// last, all of which a restart forgets, which leaves the show itself intact.
 //
 // The door, before any of that (PLAN 14m). A browser lets any web page open a
 // socket to any address, this machine's included, and sends the page's Origin
@@ -399,7 +402,35 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply']);
+
+// ── The assistant (PLAN 44b) ───────────────────────────────────────────
+// The owner's own AI assistant, joined from this Mac (`mcp/chromaglass-mcp.js`).
+// Dormant unless the owner's switch says otherwise (`readAssistantMode`): every
+// other show refuses the role. Its rules are `assistant.js`; the relay only
+// holds the door, re-reads the switch every second, and closes a connected
+// assistant the moment the switch goes off.
+const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
+const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-undo']);
+let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
+const assistantMode = () => assistantNow;
+const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
+// A picture of the plate goes to an assistant only while it has asked in the
+// last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
+let assistantWantsPicture = -Infinity;
+const assistantWatch = setInterval(() => {
+  const mode = readAssistantMode(process.env, ASSISTANT_FILE);
+  if (mode === assistantNow) return;
+  assistantNow = mode;
+  console.log(`  assistant switch: ${mode}`);
+  broadcastTo('assistant', JSON.stringify({ type: 'assistant-mode', mode }));
+  // Whatever the assistant set gliding stops where it is: a glide begun in
+  // Full must not carry a room setting on into Suggest, or past Off.
+  guard.stop();
+  // Cut, not a closing handshake a stalled socket could sit in for half a minute.
+  if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();
+}, 1000);
+assistantWatch.unref?.();
 
 wss.on('connection', (socket, req) => {
   roles.set(socket, 'unknown');
@@ -426,7 +457,16 @@ wss.on('connection', (socket, req) => {
     if (message.type === 'hello') {
       // One hello a socket: a second would be a free guess past the lock.
       if (roles.get(socket) !== 'unknown') return;
-      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : 'controller';
+      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : message.role === 'assistant' ? 'assistant' : 'controller';
+      // Only from this Mac, and only while the owner's switch is on. Not a
+      // guess at the key, so it never counts towards a lockout.
+      const notHere = role === 'assistant' && !laptop ? 'not-laptop' : role === 'assistant' && assistantMode() === 'off' ? 'off' : null;
+      if (notHere) {
+        console.log(`  assistant refused: ${notHere}`);
+        socket.send(JSON.stringify({ type: 'denied', reason: notHere === 'off' ? 'assistant-off' : 'not-laptop' }));
+        socket.close();
+        return;
+      }
       const locked = laptop ? 0 : lockedFor(address);
       if (locked > 0) {
         console.log(`  ${role} refused: ${address} is locked out for ${Math.ceil(locked / 60_000)} min`);
@@ -465,6 +505,10 @@ wss.on('connection', (socket, req) => {
         broadcastTo('display', JSON.stringify({ type: 'request-cast' }));
         broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
       }
+      if (role === 'assistant') {
+        socket.send(JSON.stringify({ type: 'assistant-mode', mode: assistantMode() }));
+        broadcastTo('display', JSON.stringify({ type: 'request-state' }));
+      }
       if (role === 'display') {
         const phoneCount = [...wss.clients].filter(c => roles.get(c) === 'controller').length;
         if (socket.readyState === 1) {
@@ -482,6 +526,31 @@ wss.on('connection', (socket, req) => {
     const from = roles.get(socket);
     // Nothing is relayed for a socket that never said hello with the key.
     if (from === 'unknown' || RELAY_ONLY.has(message.type)) return;
+    // The assistant's every message goes through the guard, and only what it
+    // passes reaches the display. A picture request is looking, not touching,
+    // so any mode on may ask.
+    if (from === 'assistant') {
+      let reply;
+      if (assistantMode() === 'off') {
+        reply = { ok: false, reason: 'the assistant is switched off' };
+      } else if (message.type === 'pad-picture') {
+        assistantWantsPicture = Date.now();
+        broadcastTo('display', JSON.stringify({ type: 'pad-picture', width: Number(message.width) || 480 }));
+        reply = { ok: true };
+      } else {
+        reply = guard.handle(message, assistantMode());
+      }
+      if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...reply }));
+      return;
+    }
+    // What only the guard may hand the display: a look the assistant made, and
+    // the live stream. From a phone or a page they are dropped.
+    if (ASSISTANT_ONLY.has(message.type)) return;
+    if (from === 'display' && message.type === 'state') {
+      guard.onDisplayState(message.state);
+      broadcastTo('assistant', raw);
+    }
+    if (from === 'display' && message.type === 'picture' && Date.now() - assistantWantsPicture < 3000) broadcastTo('assistant', raw);
     // The show itself — settings and audio bands, thirty times a second —
     // goes only to the network displays; phones never see it.
     if (from === 'display' && message.type === 'cast') {
@@ -522,7 +591,9 @@ wss.on('connection', (socket, req) => {
       return;
     }
     if (from === 'mirror') return;   // a display only listens
-    // Displays talk to phones; phones talk to displays.
+    // Displays talk to phones; phones talk to displays. A phone's patch is
+    // the performer's hand, which the assistant then leaves alone.
+    if (from === 'controller') guard.onPerformer(message);
     broadcastTo(from === 'display' ? 'controller' : 'display', raw, socket);
   });
 
@@ -538,6 +609,8 @@ wss.on('connection', (socket, req) => {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
     }
+    // The last assistant gone: nothing it started keeps gliding.
+    if (role === 'assistant' && ![...wss.clients].some(c => c !== socket && roles.get(c) === 'assistant')) guard.stop();
   });
 });
 
@@ -573,7 +646,7 @@ export function setOsc(port, host = '127.0.0.1') {
     try { msgs = readOsc(buf); } catch { return; }
     for (const m of msgs) {
       const out = oscToMessage(m);
-      if (out) broadcastTo('display', JSON.stringify(out));
+      if (out) { guard.onPerformer(out); broadcastTo('display', JSON.stringify(out)); }
     }
   });
   return new Promise((done) => {
@@ -637,7 +710,7 @@ if (ARTNET_IN.size > 0) {
     // is heard, as before, for a desk that drives nothing else.
     if (ARTNET_IN_UNIVERSE !== null && packet.universe !== ARTNET_IN_UNIVERSE) return;
     const settings = patchFromUniverse(packet.data, ARTNET_IN, seen);
-    if (settings) broadcastTo('display', JSON.stringify({ type: 'patch', settings }));
+    if (settings) { guard.onPerformer({ type: 'patch', settings }); broadcastTo('display', JSON.stringify({ type: 'patch', settings })); }
   });
   listen.bind(ARTNET_PORT, '0.0.0.0');
 }

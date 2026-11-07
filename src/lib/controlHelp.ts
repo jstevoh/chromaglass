@@ -171,6 +171,7 @@ export const CONTROL_HELP: Record<string, string> = {
   filmHold: 'The water film between two oil drops holds them apart, so they crowd without merging until pressed. Needs Oil Tension.',
   oilTension: 'Surface tension between oil and water: oil rounds into drops, threads break into beads, drops merge.',
   clearFilm: 'Pours a clear oil film over the dish. Thin spots and dust tear it open into a lace of holes (dewetting).',
+  clearFilmDye: 'Dyes the clear film, so the lace takes a colour, deeper where it is thick, and its holes show the water.',
   thinGap: 'Treats the plate as a thin gap between two glasses, so a push coasts and viscosity matters.',
   gapThickness: 'How thick the liquid is in the thin gap, from water to glycerine. Sets how long a push lasts.',
   plateCurve: 'The shape of the gap between the glasses. Below zero they touch in the middle, above it the liquid pools there.',

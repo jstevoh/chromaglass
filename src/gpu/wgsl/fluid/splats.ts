@@ -114,11 +114,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     here, and its flow dilutes what it lands in by pushing it aside. A.b.w
     0 lays the liquid as though poured long ago, with no volume: f of the
     column replaced (a check's pool in place, \`npm run thick\`). A.a.z of 0
-    is the rim instead: what the flow has carried past A.b.w from the
-    middle has gone over the dish's open rim and is taken off.
+    is the rim instead: what the flow has carried past the dish's open rim
+    (pastOpenRim: its radius, and the grid's edge where the rim meets the wall)
+    has gone over it and is taken off.
 
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
-    scatter, index, the mode; the rim's radius for the rim).
+    scatter, index, the mode; the rim's radius for the rim, which pastOpenRim
+    now holds itself).
   */
   liquidSplat0: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -162,7 +164,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let p = vec2i(id.xy);
   let was = textureLoad(src, p, 0);
   if (A.a.z <= 0.0) {
-    textureStore(dst, p, select(was, vec4f(0.0), length(uvOf(id) - vec2f(0.5)) >= A.b.w));
+    // Taken off where the thin solve's open rim is (pastOpenRim), its edge cells with it.
+    textureStore(dst, p, select(was, vec4f(0.0), pastOpenRim(p)));
     return;
   }
   let d = length(uvOf(id) - A.a.xy) / A.a.z;
