@@ -3102,7 +3102,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 constant map every other look and today's print run on.
               */
               turingClockRef.current += sixtieths / 60;
-              const driftWanted = print0 > 0 ? c01(currentSettings.turingDrift ?? 0) : 0;
+              const driftWanted = print0 > 0 ? Math.max(0, Math.min(1, currentSettings.turingDrift ?? 0)) : 0;
               // Slewed, never stepped (TURING_DRIFT_PER_SECOND); a print that is off starts the next one from 0.
               const chemIterations = Math.max(1, Math.min(10, Math.round(sixtieths * 2.5)));
               const driftStep = TURING_DRIFT_PER_SECOND / TURING_ITERATIONS_PER_SECOND * chemIterations;
