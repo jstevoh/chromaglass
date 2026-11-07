@@ -211,6 +211,7 @@
     "videoflow": "node scripts/videoflow.mjs",
     "straw": "node scripts/straw.mjs",
     "bubblephysics": "node scripts/bubblephysics.mjs",
+    "bubbleliquid": "node scripts/bubbleliquid.mjs",
     "lift": "node scripts/lift.mjs",
     "heldpress": "node scripts/heldpress.mjs",
     "pressoil": "node scripts/pressoil.mjs",

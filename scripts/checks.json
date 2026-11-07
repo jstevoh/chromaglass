@@ -490,6 +490,21 @@
       ]
     },
     {
+      "name": "Bubbles know their liquid",
+      "shard": "logic",
+      "run": "npm run bubbleliquid -- --owed=cell,default,bretherton,local,drain,shape,rim,dissolve,wired",
+      "why": [
+        "PLAN 33f (scripts/bubbleliquid.mjs), written ahead of its build: each pocket",
+        "reads the poured liquid under it from the species field, so its Bretherton",
+        "lead, tilt climb, film drainage, Paterson relaxation, rim emptying and",
+        "dissolving follow its own cell's mu, sigma and rho (alcohol, oil, syrup,",
+        "glycerine, each within 1-5% of the law), two pockets in one field each at",
+        "their own, and nothing poured moves nothing to the bit. --owed: each line",
+        "is excused only in main's state and printed as owed until the PR that",
+        "builds it takes its id out. Node only, a few seconds."
+      ]
+    },
+    {
       "name": "Blow's range",
       "shard": "logic",
       "run": "npm run blowrange",
