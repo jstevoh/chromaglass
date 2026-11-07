@@ -241,13 +241,15 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
         }
       }
       seen = now;
-      return out;
+      // A commit whose only work was a mount, or a render that bailed out, names no one, and says so.
+      return out.length ? out : ['(no component re-rendered: a mount or a bail-out)'];
     };
     window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
       supportsFiber: true, renderers: new Map(), inject() { return 1; }, checkDCE() {},
       onScheduleFiberRoot() {}, onPostCommitFiberRoot() {}, onCommitFiberUnmount() {},
       onCommitFiberRoot(_id, root) {
         window.__commits++;
+        window.__root = root;
         try { window.__who.push(...tops(root)); } catch { window.__who.push('(unnamed: the walk threw)'); }
       },
     };
@@ -533,6 +535,89 @@ try {
       check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
         w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= FRAMES_ASKED)),
         w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + heldFor(w) + whoFor(w));
+      await ctx.close();
+    }
+    {
+      /*
+        The bottle in hand, with a Dye Budget reading that moves (PLAN 19aa-14).
+        The quiet page above went red on GitHub's Macs at 2.0 and 2.3 commits
+        a second for the App's 1.3 (#595, #670), and its gamepad windows at
+        1.6 and 1.7 (#605, #640, #669), only where a plate draws: the bottle
+        held its level in React state, and a plate whose mean density drifts
+        moves the level a twentieth now and then, a commit of its own each
+        time and one more on the next poll. Where no plate draws the reading
+        never moves, so the lines above could not see it here. So the reading
+        is made to move: the App's handle on the plate (the ref its
+        `readDyeRoom` reads, found among the App's hooks by the `dyeRoom` it
+        carries) answers a level that crosses two twentieths and back every
+        0.7 s, wider than `shownRoom`'s hysteresis, as a hunting plate's
+        would. Then the bottle has to show it (its `data-level` changes at
+        least three times in the window: a bottle that stopped polling
+        would pass the commits line by being still) and the page commits
+        no more than the App's clock. Before the bottle moved its own level,
+        this read 2.7 and 3.0 commits a second on both screens, every
+        extra one the bottle's, named by the devtools hook.
+      */
+      const { page, ctx } = await open(browser, screen, { source: 'none', desk: 'perform' });
+      const testId = screen.touch ? 'phone-dye-bottle' : 'bottle-in-hand';
+      const patched = await page.evaluate((testId) => {
+        let v = null;
+        const stack = [window.__root?.current?.child];
+        while (stack.length && !v) {
+          for (let f = stack.pop(); f && !v; f = f.sibling) {
+            for (let k = f.memoizedState; k && typeof k === 'object' && 'next' in k; k = k.next) {
+              const r = k.memoizedState;
+              if (r && typeof r === 'object' && 'current' in r && typeof r.current?.dyeRoom === 'function') { v = r; break; }
+            }
+            if (f.child) stack.push(f.child);
+          }
+        }
+        if (!v) return false;
+        /*
+          A reading two twentieths away from the last on every ask: the bottle
+          is the one thing that asks (the App's `readDyeRoom`), every 0.4 s,
+          so each of its polls has a move to draw. One stand-in per handle the
+          visualizer hands over (its imperative handle is made again on its
+          renders).
+        */
+        let flip = false;
+        const moving = () => ((flip = !flip) ? 0.30 : 0.40);
+        const standIn = (h) => h && new Proxy(h, { get: (t, k) => (k === 'dyeRoom' ? moving : t[k]) });
+        let real = v.current, shown = standIn(real);
+        Object.defineProperty(v, 'current', { configurable: true, get: () => shown, set: (x) => { real = x; shown = standIn(x); } });
+        /*
+          What the bottle draws, read off the page every 50 ms: the level it
+          says and where its liquid stands (the rect's top, which is what a
+          viewer sees move), with the App's renders at that moment. A
+          change with no App render since the one before is the bottle's
+          own poll drawing; a bottle that drew only when the App's clock
+          re-rendered it would change about once a second and show none.
+        */
+        window.__levels = [];
+        window.__levelWatch = setInterval(() => {
+          const el = document.querySelector(`[data-testid="${testId}"]`);
+          const l = el?.getAttribute('data-level') ?? null;
+          const y = Number(el?.querySelector('rect[data-liquid]')?.getAttribute('y'));
+          if (window.__levels.at(-1)?.l !== l || !Object.is(window.__levels.at(-1)?.y, y)) window.__levels.push({ l, y, renders: window.chromaglassCastState().appRenders });
+        }, 50);
+        return true;
+      }, testId);
+      await page.waitForTimeout(1500);
+      const l0 = await page.evaluate(() => window.__levels.length);
+      const w = await measure(page);
+      const levels = await page.evaluate((n) => window.__levels.slice(Math.max(0, n - 1)), l0);
+      const seen = levels.slice(1);
+      // The levels planted and no other (a plate's own drift on the Mac cannot pass for them), the liquid where each says, and drawn by the bottle itself.
+      const planted = seen.every((x, i) => (x.l === '0.30' || x.l === '0.40') && (i === 0 || x.l !== seen[i - 1].l));
+      const drawn = seen.every((x) => Math.abs(x.y - (21 - 13.7 * Number(x.l))) < 1e-6);
+      const own = seen.filter((x, i) => x.renders === levels[i].renders).length;
+      check(`${screen.name}, the bottle in hand: it draws a Dye Budget reading that moves, on its own poll`,
+        patched && seen.length >= 8 && planted && drawn && own >= 5,
+        patched ? `${seen.length} levels in ${w.reduce((s, x) => s + x.seconds, 0).toFixed(1)} s, ${own} with no App render since the last (${seen.slice(0, 5).map(x => `${x.l} at y ${x.y.toFixed(2)}`).join(', ')}${seen.length > 5 ? ', …' : ''})${planted ? '' : '; not the planted levels'}${drawn ? '' : '; the liquid is not where the level says'}` : 'found no handle carrying dyeRoom among the App\'s hooks');
+      check(`${screen.name}, the bottle in hand: and the page commits for the App's clock and no more while it moves (0.6 to 1.5 a second)`,
+        patched && w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5),
+        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s`).join(', ') + whoFor(w));
+      await page.evaluate(() => clearInterval(window.__levelWatch));
       await ctx.close();
     }
     {

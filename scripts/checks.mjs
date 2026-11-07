@@ -485,8 +485,14 @@ const fmtSecs = (s) => (s >= 90 ? `${Math.floor(s / 60)} min ${String(Math.round
   none of the picked ones before it builds, the part builds once, first,
   and every check sees the site a full run would have shown it. Read from
   the commands (through their npm scripts), so a new check needs no field
-  to be safe, and a part whose picked checks build for themselves, or need
-  nothing built, pays nothing.
+  to be safe. It goes by order, not need: a picked check after a builder
+  pays one build whether it serves the site or not, about a minute, and a
+  part whose picked checks build for themselves, or come before every
+  builder, pays nothing. Not where `dist/` is already there: the Mac's job
+  builds before its shard (checks.yml), and a second build is a minute of
+  its queue. A builder inside a script (clicks, renders, inputpick and the
+  others that run `vite build` themselves) is not seen; none has a check
+  after it that needs the site and has no builder on its command before.
 */
 const buildsSite = (run, scripts) => [run, ...[...npmScriptsOf(run, scripts)].map((n) => scripts[n] ?? '')].some((r) => /\bvite(?:\.js)? build\b/.test(r));
 export function buildFirst(all, list, scripts) {
@@ -498,7 +504,7 @@ export function buildFirst(all, list, scripts) {
   }
   return false;
 }
-const SITE_BUILD = { name: 'The site, built first', run: 'node node_modules/vite/bin/vite.js build' };
+const SITE_BUILD = { name: 'The site, built first', run: 'node node_modules/vite/bin/vite.js build', timeout: 5 };
 
 // `only`: the names of the checks to run (reach.mjs's Measure selection,
 // CHECKS_ONLY in the job), or null for all of them. The rest are named in a
@@ -518,7 +524,7 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     console.log(`${shard}: none of its ${all.length} checks is reached by this change`);
     return 0;
   }
-  if (only && buildFirst(all, list, pkgScripts())) {
+  if (only && !fs.existsSync(path.join(ROOT, 'dist', 'index.html')) && buildFirst(all, list, pkgScripts())) {
     console.log(`${shard}: a check picked here leans on a build an unpicked one makes in a full run, so the site is built first (PLAN.md 19aa-15)`);
     console.log(`::group::Run ${SITE_BUILD.run}`);
     const b = await runOne(SITE_BUILD);
