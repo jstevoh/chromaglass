@@ -249,6 +249,7 @@
     "beams": "node scripts/beams.mjs",
     "wallpattern": "node --experimental-strip-types scripts/wallpattern.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
+    "timers": "node scripts/timers.mjs",
     "backplate": "node scripts/backplate.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",
     "phonelink": "npm run build && node --experimental-strip-types scripts/phonelink.mjs",
