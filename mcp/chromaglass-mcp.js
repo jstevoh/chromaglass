@@ -118,6 +118,7 @@ function link() {
       ws.onclose = () => {
         if (socket === ws) socket = null;
         mode = 'off';
+        lastState = null;   // a show that restarts is a new show
         for (const [id, p] of pending) { pending.delete(id); p({ ok: false, reason: 'the show closed the link (the assistant was switched off, or the show quit)' }); }
         done(new Error('the show closed the link'));
       };
@@ -142,7 +143,10 @@ async function ask(message) {
 async function freshState() {
   await link();
   if (lastState) return lastState;
-  await new Promise((resolve) => { stateWaiters.push(resolve); setTimeout(resolve, REPLY_MS).unref?.(); });
+  await new Promise((resolve) => {
+    stateWaiters.push(resolve);
+    setTimeout(() => { const i = stateWaiters.indexOf(resolve); if (i >= 0) stateWaiters.splice(i, 1); resolve(); }, REPLY_MS).unref?.();
+  });
   if (!lastState) throw new Error('the show has not reported its state: is the show window open?');
   return lastState;
 }
@@ -212,7 +216,10 @@ async function call(name, a = {}) {
     }
     case 'look_at_plate': {
       await link();
-      const picture = new Promise((resolve) => { pictureWaiters.push(resolve); setTimeout(() => resolve(null), PICTURE_MS).unref?.(); });
+      const picture = new Promise((resolve) => {
+        pictureWaiters.push(resolve);
+        setTimeout(() => { const i = pictureWaiters.indexOf(resolve); if (i >= 0) pictureWaiters.splice(i, 1); resolve(null); }, PICTURE_MS).unref?.();
+      });
       const r = await ask({ type: 'pad-picture', width: 480 });
       if (!r.ok) return fail(`Refused by the show: ${r.reason}`);
       const p = await picture;
@@ -240,6 +247,8 @@ async function call(name, a = {}) {
 // ── The protocol ───────────────────────────────────────────────────────
 
 const write = (m) => process.stdout.write(`${JSON.stringify(m)}\n`);
+// The client gone (its end of the pipe closed): nothing left to answer.
+process.stdout.on('error', () => process.exit(0));
 
 async function onRequest(m) {
   const { id, method, params } = m;

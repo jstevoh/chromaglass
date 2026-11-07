@@ -114,10 +114,12 @@ through cords and preset patches, and the plate shader is untouched.
   (`laterWrites` in `lib/lookFade.ts` already tracks desk writes). Pass: an
   `npm run assistant` line with the stand-in's sequencer moving a key the assistant
   may still set.
-- **44d-4. A glide fights a fader the desk moves mid-glide.** A phone's or OSC's patch
-  cancels the key's glide at once (`onPerformer`); a desk move is only seen in the next
-  snapshot, so up to a glide's remaining steps land over it. Glides default to 1 s.
-  Fix with 44d-3's marking. Pass: a desk move mid-glide stops the glide within 100 ms.
+- **44d-4. A desk move inside a glide's own path is missed.** A phone's or OSC's patch
+  cancels the key's glide at once (`onPerformer`), and a desk move to a value off the
+  glide's way stops it at the next snapshot (`echoOf`, `npm run assistant` holds it);
+  but a desk move that lands between where the glide began and where it is going reads
+  as the glide's own echo, and the glide rides over it. Fix with 44d-3's marking.
+  Pass: a desk move inside the path stops the glide within 100 ms.
 - **44c-2. Save a made look to the library.** `arm_new_look` arms a look for Go; saving
   it is the desk's own Save after Go. A `save-look` message needs the user-preset store,
   which lives in `App.tsx` (over 100 KB, so it cannot grow): split that piece out first

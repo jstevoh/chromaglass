@@ -11405,12 +11405,15 @@ else (the room's settings, blackout, clear, drain, recording, `startSavedLive`).
 every mode a numeric setting glides (smoothstep, 0.5 to 30 s, default 1), Undo walks
 back ten changes (a Go by the display's Back), and a key the performer moved in the
 last ten seconds (a phone's, OSC's or Art-Net's patch, or a change in the display's
-snapshot that is not the assistant's own echo) is refused; Suggest and Play cap a look
+snapshot that is not the assistant's own echo, which also stops the key's glide) is
+refused; Undo of a Go or a blackout is refused once the performer has changed it since,
+a Go with nothing armed is refused, and the switch changing stops every glide; Suggest and Play cap a look
 change at one per 4 s, four changes and ten gestures a second, Full at thirty messages
 a second. **44c**: `mcp/chromaglass-mcp.js`, no dependencies, 19 tools, a craft guide
 in its `instructions`, the owner's notes in a file outside the repo, and `look_at_plate`
 returning the remote's 480-px Draw picture as an image. **44g**: `npm run assistant`
-(Measure browser2), 38 lines and 15 mutants green twice on 2026-11-07, about 55 s; red
-on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
+(Measure browser2), 40 lines and 18 mutants green on 2026-11-07, about 65 s (three
+of the mutants added after a review pass found a desk move mid-glide overridden, Undo
+reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
 main's relay taking an `assistant` hello as a phone's, with the switch off and from
 another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).

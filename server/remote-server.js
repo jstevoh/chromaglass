@@ -424,7 +424,11 @@ const assistantWatch = setInterval(() => {
   assistantNow = mode;
   console.log(`  assistant switch: ${mode}`);
   broadcastTo('assistant', JSON.stringify({ type: 'assistant-mode', mode }));
-  if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.close();
+  // Whatever the assistant set gliding stops where it is: a glide begun in
+  // Full must not carry a room setting on into Suggest, or past Off.
+  guard.stop();
+  // Cut, not a closing handshake a stalled socket could sit in for half a minute.
+  if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();
 }, 1000);
 assistantWatch.unref?.();
 
@@ -527,7 +531,9 @@ wss.on('connection', (socket, req) => {
     // so any mode on may ask.
     if (from === 'assistant') {
       let reply;
-      if (message.type === 'pad-picture') {
+      if (assistantMode() === 'off') {
+        reply = { ok: false, reason: 'the assistant is switched off' };
+      } else if (message.type === 'pad-picture') {
         assistantWantsPicture = Date.now();
         broadcastTo('display', JSON.stringify({ type: 'pad-picture', width: Number(message.width) || 480 }));
         reply = { ok: true };
@@ -603,6 +609,8 @@ wss.on('connection', (socket, req) => {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
     }
+    // The last assistant gone: nothing it started keeps gliding.
+    if (role === 'assistant' && ![...wss.clients].some(c => c !== socket && roles.get(c) === 'assistant')) guard.stop();
   });
 });
 

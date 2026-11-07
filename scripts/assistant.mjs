@@ -97,10 +97,11 @@ async function startShow(serverDir, port, dir) {
 
 function standInDisplay(port, displayKey) {
   const settings = { ...SETTINGS };
+  const look = { on: 'calm', cued: null };
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: 'calm', isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: null, cuedName: null } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -112,12 +113,17 @@ function standInDisplay(port, displayKey) {
     // guard's telling its own echo from the performer's hand is measured.
     if (m.type === 'patch') { Object.assign(settings, m.settings); const snap = state(); setTimeout(() => { if (ws.readyState === 1) ws.send(JSON.stringify(snap)); }, 150); }
     if (m.type === 'request-state') sendState();
+    // Arm and Go, as the desk does them: Go puts the armed look on the plate.
+    if (m.type === 'cue') { look.cued = m.presetId; sendState(); }
+    if (m.type === 'cue-look') { look.cued = m.base ?? look.on; sendState(); }
+    if (m.type === 'action' && m.action === 'go' && look.cued) { look.on = look.cued; look.cued = null; sendState(); }
     if (m.type === 'pad-picture') ws.send(JSON.stringify({ type: 'picture', src: PICTURE, w: 1, h: 1, aspect: 1, seq: 1 }));
   });
   return {
     ready, settings, received,
     since: (t, type) => received.filter((r) => r.t >= t && (!type || r.m.type === type)).map((r) => r.m),
     desk(key, value) { settings[key] = value; sendState(); },
+    deskLook(id) { look.on = id; sendState(); },
     close: () => ws.close(),
   };
 }
@@ -261,12 +267,21 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const refusedFast = burst.filter((r) => !r.ok && /too fast/.test(r.text)).length;
     check('rate', 'the fifth change inside a second is refused', burst.filter((r) => r.ok).length === 4 && refusedFast === 1, burst.map((r) => (r.ok ? 'ok' : r.text.slice(17, 40))).join(' | '));
     await sleep(1100);
+    await mcp.call('arm_look', { look_id: 'acid' });
+    await sleep(100);
     t = Date.now();
     const go1 = await mcp.call('go');
     const go2 = await mcp.call('go');
     await sleep(150);
     check('lookgap', 'a second Go inside 4 s is refused', go1.ok && !go2.ok && display.since(t, 'action').filter((m) => m.action === 'go').length === 1, `${go1.text} | ${go2.text}`.slice(0, 120));
-    await sleep(2200);   // past the Go's fade and its echo, so the desk's move below is the desk's
+    await sleep(200);
+    display.deskLook('calm');
+    await sleep(200);
+    t = Date.now();
+    const undoGo = await mcp.call('undo');
+    await sleep(150);
+    check('undo-go', 'Undo of a Go is refused once the performer has changed the look', !undoGo.ok && /changed the look/.test(undoGo.text) && display.since(t, 'action').length === 0, undoGo.text.slice(0, 100));
+    await sleep(2000);   // past the Go's fade and its echo, so the desk's move below is the desk's
 
     // The hand.
     const phone = await hello(port, 'controller', SHOW_KEY);
@@ -284,6 +299,15 @@ async function scenario(serverDir, port, { full = true } = {}) {
     phone.ws.send(JSON.stringify({ type: 'cue-look', name: 'x', base: null, settings: {} }));
     await sleep(200);
     check('phone-live', 'a phone\'s assistant-live and cue-look never reach the display', display.since(t).every((m) => m.type !== 'assistant-live' && m.type !== 'cue-look'), display.since(t).map((m) => m.type).join(','));
+
+    // A desk move in the middle of a glide stops the glide there.
+    await sleep(1100);
+    const long = await mcp.call('set', { settings: { stockGrainSize: 0 }, glide_seconds: 3 });
+    await sleep(500);
+    display.desk('stockGrainSize', 4);
+    await sleep(700);
+    const midHand = await mcp.call('set', { settings: { stockGrainSize: 1 } });
+    check('glide-hand', 'a desk move mid-glide stops the glide, and the setting is the hand\'s', long.ok && display.settings.stockGrainSize === 4 && !midHand.ok && /hand wins/.test(midHand.text), `${long.text} | now ${display.settings.stockGrainSize} | ${midHand.text}`.slice(0, 140));
 
     // Gestures.
     await sleep(1100);
@@ -313,6 +337,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
       last = r.text;
       if (!r.ok) break;
       undos++;
+      await sleep(300);   // Undo is paced as a change is
     }
     check('depth', 'ten Undos, and no eleventh', undos === 10 && /nothing to undo/.test(last), `${undos} undos; then: ${last.slice(0, 60)}`);
     check('echo', 'the assistant\'s own glides are never read as the performer\'s hand', !lines.some((l) => l.rule === 'depth' && /hand wins/.test(l.detail)), '');
@@ -340,9 +365,14 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const hFull = await mcp.call('set', { settings: { stockWeave: 0.1 } });
     check('hand', 'in Full the hand still wins', !hFull.ok && /hand wins/.test(hFull.text), hFull.text.slice(0, 100));
 
-    // The switch turned off under it.
+    // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
+    await sleep(1100);
+    await mcp.call('set', { settings: { stock: 0.9 }, glide_seconds: 6 });
     await setMode('off');
+    const offT = Date.now();
+    await sleep(500);
+    check('stop', 'turning the switch off stops a glide where it is', display.since(offT, 'patch').length === 0, `${display.since(offT, 'patch').length} patches after off`);
     await sleep(300);
     const offAgain = await mcp.call('show_state');
     check('off-live', 'turning the switch off closes a linked assistant', linked.ws.readyState !== 1 && !offAgain.ok, `socket ${linked.ws.readyState}; ${offAgain.text.slice(0, 60)}`);
@@ -363,7 +393,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
 const MUTANTS = [
   { rule: 'off', file: 'remote-server.js', find: "role === 'assistant' && assistantMode() === 'off' ? 'off' : null", replace: 'null' },
   { rule: 'laptop', file: 'remote-server.js', find: "role === 'assistant' && !laptop ? 'not-laptop' :", replace: '' },
-  { rule: 'off-live', file: 'remote-server.js', find: "if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.close();", replace: '' },
+  { rule: 'off-live', file: 'remote-server.js', find: "if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();", replace: '' },
   { rule: 'phone-live', file: 'remote-server.js', find: 'if (ASSISTANT_ONLY.has(message.type)) return;', replace: '' },
   { rule: 'suggest', file: 'assistant.js', find: "needs(mode, 'play')", replace: 'null', all: true },
   { rule: 'fullonly', file: 'assistant.js', find: "needs(mode, 'full')", replace: 'null', all: true },
@@ -375,7 +405,10 @@ const MUTANTS = [
   { rule: 'glide', file: 'assistant.js', find: 'glideTo(target, message.glide, t);', replace: 'sendPatch(target, t);' },
   { rule: 'undo', file: 'assistant.js', find: 'if (Object.keys(back).length) glideTo(back, GLIDE_MIN_S, t);', replace: '' },
   { rule: 'depth', file: 'assistant.js', find: 'if (undo.length > UNDO_DEPTH) undo.shift();', replace: '' },
-  { rule: 'echo', file: 'assistant.js', find: 'if (!echo) handAt.set(k, t);', replace: 'handAt.set(k, t);' },
+  { rule: 'glide-hand', file: 'assistant.js', find: 'if (!echoOf(k, v, t)) { handAt.set(k, t); glides.delete(k); }', replace: 'if (!echoOf(k, v, t)) handAt.set(k, t);' },
+  { rule: 'undo-go', file: 'assistant.js', find: "if (entry.id && show.activePresetId !== entry.id) return refuse('the performer has changed the look since; Undo leaves theirs');", replace: '' },
+  { rule: 'stop', file: 'remote-server.js', find: 'guard.stop();', replace: 'void 0;', all: true },
+  { rule: 'echo', file: 'assistant.js', find: 'if (!echoOf(k, v, t))', replace: 'if (true)' },
 ];
 
 function mutantDir(m) {

@@ -17,7 +17,7 @@ import { sanitizePatch } from './sanitizeSettings';
  *
  * The armed look keeps its base's id, so Go takes the base's dyes and the
  * library still knows which look is on the plate; the name is the assistant's.
- * With no base found it falls back to the look on the plate now.
+ * A base not in the library, or none named, falls back to the look on the plate.
  */
 export interface AssistantLook {
   id: string;
@@ -32,8 +32,8 @@ export function assistantLook(
   presets: readonly { id: string; settings: Partial<VisualizerSettings> }[],
   onPlate: string | null,
 ): AssistantLook | null {
-  const baseId = typeof message.base === 'string' ? message.base : onPlate;
-  const base = baseId ? presets.find(p => p.id === baseId) : undefined;
+  const named = typeof message.base === 'string' ? presets.find(p => p.id === message.base) : undefined;
+  const base = named ?? (onPlate ? presets.find(p => p.id === onPlate) : undefined);
   const changes = sanitizePatch(message.settings) as Record<string, unknown>;
   for (const key of Object.keys(changes)) {
     if (RIG_KEYS.has(key as keyof VisualizerSettings) || SETUP_KEYS.has(key as keyof VisualizerSettings)) delete changes[key];
@@ -41,7 +41,7 @@ export function assistantLook(
   if (!base && Object.keys(changes).length === 0) return null;
   const raw = typeof message.name === 'string' ? message.name.trim().slice(0, NAME_MAX) : '';
   return {
-    id: base?.id ?? baseId ?? 'assistant',
+    id: base?.id ?? onPlate ?? 'assistant',
     name: raw || 'From the assistant',
     settings: { ...(base?.settings ?? {}), ...(changes as Partial<VisualizerSettings>) },
   };

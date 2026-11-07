@@ -122,12 +122,34 @@ export function createAssistantGuard(send, now = Date.now) {
   const sentValue = new Map();     // key -> what it sent
   const glides = new Map();        // key -> { from, to, start, ms }
   let glideTimer = null;
+  let show = {};                   // the rest of the display's snapshot: the look on the plate, the armed one, blackout
   let quietUntil = 0;              // a look fade the assistant started: its moves are not the hand's
   let lastLook = -Infinity;
   const recent = { patch: [], gesture: [], all: [] };
   const undo = [];
 
+  const sentLog = new Map();       // key -> [{ t, v }] of the last ECHO_MS, numeric
   const refuse = (reason) => ({ ok: false, reason });
+  /*
+    Whether a value the display reports is the assistant's own, come back.
+    The display's snapshot is throttled and runs behind, and it rounds a value
+    to its setting's step (`sanitizePatch`), so the echo of a glide is any
+    step on the way the assistant has sent lately, or on the way the glide
+    is going, give or take a little. A value off that way is a hand on the
+    fader, and the glide stops there rather than ride over it. A move that
+    lands inside the glide's own path is still missed (PLAN 44d-4).
+  */
+  const echoOf = (k, v, t) => {
+    if (t < quietUntil) return true;
+    if (!numeric(v)) return sentValue.has(k) && same(sentValue.get(k), v) && t - (sentAt.get(k) ?? -Infinity) < ECHO_MS;
+    let lo = Infinity, hi = -Infinity;
+    const g = glides.get(k);
+    if (g) { lo = Math.min(g.from, g.to); hi = Math.max(g.from, g.to); }
+    for (const e of sentLog.get(k) ?? []) if (t - e.t < ECHO_MS) { lo = Math.min(lo, e.v); hi = Math.max(hi, e.v); }
+    if (lo > hi) return false;
+    const slack = Math.max((hi - lo) * 0.05, Math.abs(hi) * 0.01, 1e-6);
+    return v >= lo - slack && v <= hi + slack;
+  };
   const within = (list, limit, t) => {
     while (list.length && t - list[0] >= 1000) list.shift();
     return list.length < limit;
@@ -135,7 +157,17 @@ export function createAssistantGuard(send, now = Date.now) {
   const stamp = (list, t) => { list.push(t); };
 
   const sendPatch = (patch, t) => {
-    for (const [k, v] of Object.entries(patch)) { sentAt.set(k, t); sentValue.set(k, v); if (settings) settings[k] = v; }
+    for (const [k, v] of Object.entries(patch)) {
+      sentAt.set(k, t);
+      sentValue.set(k, v);
+      if (settings) settings[k] = v;
+      if (numeric(v)) {
+        const log = sentLog.get(k) ?? [];
+        while (log.length && t - log[0].t >= ECHO_MS) log.shift();
+        log.push({ t, v });
+        sentLog.set(k, log);
+      }
+    }
     send({ type: 'patch', settings: patch });
   };
 
@@ -203,7 +235,12 @@ export function createAssistantGuard(send, now = Date.now) {
     if (mode !== 'full' && t - lastLook < LOOK_GAP_MS) return `a look change at most every ${LOOK_GAP_MS / 1000} s`;
     return null;
   };
-  const lookStarted = (t) => { lastLook = t; quietUntil = t + fadeSeconds * 1000 + ECHO_MS; remember({ kind: 'go' }); };
+  /*
+    A look the assistant put on the plate. Its Undo is the display's Back,
+    which goes back from whatever is on the plate, so the entry remembers which
+    look it put there and is refused once the performer has changed it.
+  */
+  const lookStarted = (t, id) => { lastLook = t; quietUntil = t + fadeSeconds * 1000 + ECHO_MS; remember({ kind: 'go', id }); };
 
   return {
     /** The display's snapshot: what the plate is set to, and what the performer moved since. */
@@ -215,11 +252,11 @@ export function createAssistantGuard(send, now = Date.now) {
       if (settings) {
         for (const [k, v] of Object.entries(next)) {
           if (same(settings[k], v)) continue;
-          const echo = glides.has(k) || (sentValue.has(k) && same(sentValue.get(k), v)) || t - (sentAt.get(k) ?? -Infinity) < ECHO_MS || t < quietUntil;
-          if (!echo) handAt.set(k, t);
+          if (!echoOf(k, v, t)) { handAt.set(k, t); glides.delete(k); }
         }
       }
       settings = { ...next };
+      show = { activePresetId: state.activePresetId ?? null, cuedPresetId: state.cuedPresetId ?? null, blackout: state.blackout === true };
     },
 
     /** A phone's, OSC's or Art-Net's message on its way to the display: a patch is the hand. */
@@ -269,24 +306,31 @@ export function createAssistantGuard(send, now = Date.now) {
       }
 
       if (type === 'assistant-undo') {
-        const why = needs(mode, 'play');
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
         if (why) return refuse(why);
         const entry = undo.pop();
         if (!entry) return refuse('nothing to undo');
+        count('patch', mode, t);
         if (entry.kind === 'go') {
+          if (entry.id && show.activePresetId !== entry.id) return refuse('the performer has changed the look since; Undo leaves theirs');
           // The display's own Back: the look before, over the desk's fade.
           send({ type: 'action', action: 'back' });
           quietUntil = t + fadeSeconds * 1000 + ECHO_MS;
           return { ok: true, undid: 'look' };
         }
         if (entry.kind === 'action') {
-          // A toggle undoes itself.
+          // A toggle undoes itself, unless the performer has toggled it back already.
+          if (show.blackout !== entry.after) return refuse('the performer has changed the blackout since');
           send({ type: 'action', action: entry.action });
           return { ok: true, undid: entry.action };
         }
         // A key the performer has moved since is theirs now, Undo included.
         const back = {};
-        for (const [k, v] of Object.entries(entry.before)) if (v !== undefined && t - (handAt.get(k) ?? -Infinity) >= HAND_MS) back[k] = v;
+        for (const [k, v] of Object.entries(entry.before)) {
+          if (v === undefined || t - (handAt.get(k) ?? -Infinity) < HAND_MS) continue;
+          if (mode !== 'full' && ROOM_KEYS.has(k)) continue;   // a room change made in Full stays until Full undoes it
+          back[k] = v;
+        }
         if (Object.keys(back).length) glideTo(back, GLIDE_MIN_S, t);
         return { ok: true, undid: Object.keys(back) };
       }
@@ -294,13 +338,17 @@ export function createAssistantGuard(send, now = Date.now) {
       if (type === 'action') {
         const action = message.action;
         if (PLAY_ACTIONS.has(action)) {
-          const why = needs(mode, 'play');
+          const why = needs(mode, 'play') ?? paced('patch', mode, t);
           if (why) return refuse(why);
-          if (action === 'go') {
+          // Next and previous in the sequencer change the look as Go does.
+          if (action === 'go' || action === 'seq-next' || action === 'seq-prev') {
             const gap = lookChange(mode, t);
             if (gap) return refuse(gap);
-            lookStarted(t);
+            if (action === 'go' && !show.cuedPresetId) return refuse('nothing is armed: arm a look first');
+            if (action === 'go') lookStarted(t, show.cuedPresetId);
+            else lastLook = t;
           }
+          count('patch', mode, t);
           send({ type: 'action', action });
           return { ok: true };
         }
@@ -310,7 +358,7 @@ export function createAssistantGuard(send, now = Date.now) {
           const pace = paced('patch', mode, t);
           if (pace) return refuse(pace);
           count('patch', mode, t);
-          if (action === 'blackout-toggle') remember({ kind: 'action', action });
+          if (action === 'blackout-toggle') remember({ kind: 'action', action, after: !show.blackout });
           // The stream has its own message, which the relay takes from no one
           // but this guard: a phone may end a stream and never start one.
           if (action === 'live-start' || action === 'live-test') send({ type: 'assistant-live', test: action === 'live-test' });
@@ -321,10 +369,11 @@ export function createAssistantGuard(send, now = Date.now) {
       }
 
       if (type === 'preset') {
-        const why = needs(mode, 'full');
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
         if (why) return refuse(why);
         if (typeof message.presetId !== 'string') return refuse('a look id is needed');
-        lookStarted(t);
+        count('patch', mode, t);
+        lookStarted(t, message.presetId);
         send({ type: 'preset', presetId: message.presetId });
         return { ok: true };
       }
