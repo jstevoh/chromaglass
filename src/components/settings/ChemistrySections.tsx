@@ -4,6 +4,7 @@ import { LIT } from '../ui';
 import { ViscosityDrip } from '../ui/Playful';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import { COVER_FULL_ML, COVER_GLASS_G } from '../../lib/cover';
 
 /*
   Chemistry: the liquid itself. The squish plate, oil and soap, the ferrofluid and
@@ -103,7 +104,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
         {/* The liquid under the cover and the glass on it (PLAN 38r-5): the gap is what they make. */}
         <Slider
           label="Liquid"
-          value={settings.liquidMl ?? 62.83}
+          value={settings.liquidMl ?? COVER_FULL_ML}
           min={9}
           max={150}
           step={1}
@@ -112,7 +113,7 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Cover Weight"
-          value={settings.coverWeight ?? 157}
+          value={settings.coverWeight ?? COVER_GLASS_G}
           min={0}
           max={1000}
           step={5}
