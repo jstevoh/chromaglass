@@ -669,8 +669,11 @@ export class FluidCore {
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
-    // The sim buffer only needs its grid sizes for a fill.
-    this.simF[0] = this.N; this.simF[1] = this.L;
+    // The sim buffer only needs its grid sizes for a fill, and the cover's gap
+    // for the gap's rest below (gapRest reads S.cover, PLAN 38r-5): a solver's
+    // first clear runs before any step has written it, and laid the gap at
+    // the floor, which npm run ferrorest read as the drop's Σc·h growing 650%.
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[51] = this.coverGap;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
