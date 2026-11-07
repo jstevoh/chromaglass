@@ -33,7 +33,7 @@ export const MOIRE_LOOKS: readonly {
     id: 'moire-ripple',
     name: 'Moiré Ripple',
     description: 'Two ring sheets slid a little apart: curved fringes like a pond, and every pool of dye bends them. The bass slides the top sheet.',
-    from: 'oil-and-water',
+    from: 'clock-glass',
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'rings', moireSheetB: 'rings', moireFlip: false,
       moireDensity: 44, moireAngle: 0, moireSlide: 0.035, moireGap: 5,
@@ -65,8 +65,10 @@ export const MOIRE_LOOKS: readonly {
     id: 'moire-groove',
     name: 'Song Groove',
     description: 'Two record grooves slid apart, their lines wiggled by the bass: the fringes breathe with the song.',
-    from: 'velvet-underground',
+    from: 'cell-bloom',
     settings: {
+      // Cell Bloom's dark violet LED ring off: the grooves want the white lamp under them.
+      ledPlatform: false,
       lampGround: 1, moireAmount: 1, moireSheetA: 'song', moireSheetB: 'song', moireFlip: false,
       moireDensity: 50, moireAngle: 0, moireSlide: 0.03, moireCurl: 0.15, moireGap: 3,
       sceneMappings: [{ source: 'bands', feature: 'bass', setting: 'moireCurl', depth: 0.5 }],

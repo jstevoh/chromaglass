@@ -21,10 +21,20 @@ export const MOIRE_WGSL = /* wgsl */ `
   tangent. An overhead's head lens works at about f/4 over a 330 mm throw to a
   stage 250 mm across; the cone a stage point sends into it is about 0.12.
   A sheet that sits a distance D off the plane the lens is focused on (the
-  liquid) is drawn through a disc of confusion of radius D * MOIRE_NA, which
-  is why a lower sheet's fine lines go soft on the wall while its moiré,
-  which is far coarser, stays crisp: the effect people see in every video
-  of the real thing.
+  liquid) is drawn through a disc of confusion of radius D * MOIRE_NA: at the
+  3 mm of a dish's glass, 0.36 mm, which leaves lines 5 mm apart sharp; at
+  15 mm, 1.8 mm, which greys lines 4 mm apart to a third of their contrast.
+
+  The two sheets are blurred each on its own and then multiplied, and that is
+  a shortcut (PLAN 42a-4). What the lens does is average the product over its
+  cone, and a ray of the cone crosses the lower sheet (D below the liquid) and
+  the upper (D above) displaced the opposite ways, so the fringe, the
+  difference of two gratings of frequencies kA and kB, is blurred as a
+  grating of kA + kB would be: more than the product of the two blurs says
+  (at the default 3 mm and 48 lines, to 0.91 of its contrast where this
+  draws 0.95). Two sheets laid together on one side would blur by kA - kB,
+  and their fringe would stay sharp while their lines went soft; these two
+  sit either side of the liquid, which is what lets the liquid bend only one.
 
   MOIRE_INK, MOIRE_FILM: what a good print passes. Opaque screen ink on clear
   polyester passes about 2% (the sellers' "blocks light much better than a

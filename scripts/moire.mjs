@@ -18,33 +18,48 @@
  *      2 L sin(a/2) fringes a frame, and two of the same angle at pitches L
  *      and 1.15 L beat at 0.15 L; read as the strongest frequency of the
  *      plate averaged along the fringes, within 6%;
- *   3. light through two sheets is the product: a sheet too fine to resolve
+ *   3. light through two sheets is the product: a resolved sheet (60 lines a
+ *      frame, its tent integral running, not the shortcut past a period)
  *      passes its mean, 92% of (half clear + half at 2%), and two crossed at
  *      45° pass that squared, within 5% each;
- *   4. no false moiré: a single sheet finer than the pixels (a period of 0.85
- *      and of 1.1 px, where a sampled grating aliases into a beat of 5.7 and
- *      11 px against the pixel grid) is a flat grey, under 1.5% row to row and
+ *   4. no false moiré: a single sheet finer than the pixels (a period of 1.02
+ *      and of 1.1 px, where a sampled grating aliases into a beat of 50 and
+ *      11 px against the pixel grid, both just inside the integral's reach) is a flat grey, under 1.5% row to row and
  *      column to column, measured against the lamp alone (the first runs read
  *      4.5% sheets or none: the lamp's own hot-spot toward the corners);
- *   5. the gap is the lens's defocus: at 15 mm, lines 4 mm apart lose over
- *      half the contrast they have at 0 mm, and the fringe of two coarser
- *      sheets keeps its frequency (the first run asked it of lines 10 mm apart,
- *      which a 1.8 mm disc should and did leave at 80%: the line asked the
- *      optics for the wrong thing);
+ *   5. the gap is the lens's defocus: at 15 mm, lines 4 mm apart keep the
+ *      share of their contrast at 0 mm that the disc of confusion predicts
+ *      (from MOIRE_NA and the stage's 250 mm, through the pixel's tent), within
+ *      15% (the first run asked it of lines 10 mm apart, which a 1.8 mm disc
+ *      should and did leave at 80%: the line asked the optics for the wrong
+ *      thing);
  *   6. the liquid bends the lower sheet and not the upper: over a pool of dye
  *      (the plate's surface is the dye's depth: its slope is the plate's own
  *      relief, normal0; the first run poured oil, whose phase the plate does
  *      not draw as relief, and read nothing anywhere), at the pool's sloping
- *      edge (the second run read its flat middle),
+ *      edge (the second run read its flat middle), and where: the lower
+ *      sheet's lines run up the frame, so a bend shows on the pool's left and
+ *      right and hardly at its top and bottom, also with the dish turned 45°
+ *      (the slope is turned back from the dish's frame to the screen's);
  *      what the two sheets pass changes inside the lens more than five times
  *      as much with the lower sheet in play as with the upper alone, the
  *      same at a gap of 0 mm (no depth, no bend) stays at the upper's level,
  *      and outside the lens nothing changes;
- *   7. the sheet's clock and its angle are one turn: a quarter turn of the
- *      spin's clock draws exactly what a Turn of 90° draws.
+ *   7. the sheet's clock and its angle are one turn: 15 rpm for one second of
+ *      the stage's clock (turnClocks) draws exactly what a Turn of 90° draws,
+ *      and not what a Turn of 0° draws;
+ *   8. every design is its own: each of the ten, alone on the lower sheet,
+ *      draws something no other design draws and not the bare lamp (a name the
+ *      shader's index does not know would draw no sheet at all).
  */
 import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
+import { stageClocks, turnClocks } from '../src/lib/stageClocks.ts';
+import { MOIRE_SHEETS } from '../src/lib/moire.ts';
+
+const clock = stageClocks();
+turnClocks(clock, 1, { moireSpin: 15 });
+const SHEETS = MOIRE_SHEETS.map(m => m.id).filter(id => id !== 'none');
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -89,7 +104,7 @@ const lab = await openLab({ software: true });
 let drew, looksNow, R;
 try {
   ({ drew, looks: looksNow } = await everyLook(lab));
-  R = await lab.page.evaluate(async ([S]) => {
+  R = await lab.page.evaluate(async ([S, turn, sheets]) => {
     const base = { lampGround: 1, moireAmount: 1, moireGap: 0, moireSlide: 0, moireRatio: 1, moireCurl: 0.3, moireFlip: false, moireSpin: 0 };
     const blank = async () => { await lab.create(128); lab.flush(); await lab.step(2); };
     const shot = (s, cam = {}) => lab.render(S, { ...base, ...s }, { zoom: 1, macroAmount: 0, cx: 0.5, cy: 0.5, bubbles: 0, ...cam });
@@ -98,29 +113,33 @@ try {
     r.lamp = await shot({ moireAmount: 0 });
     r.turned = await shot({ moireSheetA: 'lines', moireSheetB: 'lines', moireDensity: 24, moireAngle: 8 });
     r.scaled = await shot({ moireSheetA: 'lines', moireSheetB: 'lines', moireDensity: 24, moireAngle: 0, moireRatio: 1.15 });
-    r.fine1 = await shot({ moireSheetA: 'lines', moireSheetB: 'none', moireDensity: 300 });
-    r.fine2 = await shot({ moireSheetA: 'lines', moireSheetB: 'lines', moireDensity: 300, moireAngle: 45 });
+    r.fine1 = await shot({ moireSheetA: 'lines', moireSheetB: 'none', moireDensity: 60 });
+    r.fine2 = await shot({ moireSheetA: 'lines', moireSheetB: 'lines', moireDensity: 60, moireAngle: 45 });
+    r.alias1 = await shot({ moireSheetA: 'lines', moireSheetB: 'none', moireDensity: 250 });
     r.mid1 = await shot({ moireSheetA: 'lines', moireSheetB: 'none', moireDensity: 233 });
     r.sharp = await shot({ moireSheetA: 'lines', moireSheetB: 'none', moireDensity: 60, moireGap: 0 });
     r.soft = await shot({ moireSheetA: 'lines', moireSheetB: 'none', moireDensity: 60, moireGap: 15 });
-    r.softPair = await shot({ moireSheetA: 'lines', moireSheetB: 'lines', moireDensity: 24, moireAngle: 8, moireGap: 15 });
     r.angle90 = await shot({ moireSheetA: 'spokes', moireSheetB: 'zoom', moireAngle: 90 });
-    r.clock90 = await shot({ moireSheetA: 'spokes', moireSheetB: 'zoom', moireAngle: 0 }, { moireTurn: 0.25 });
+    r.clock90 = await shot({ moireSheetA: 'spokes', moireSheetB: 'zoom', moireAngle: 0 }, { moireTurn: turn });
+    r.angle0 = await shot({ moireSheetA: 'spokes', moireSheetB: 'zoom', moireAngle: 0 });
+    r.designs = [];
+    for (const id of sheets) r.designs.push([id, await shot({ moireSheetA: id, moireSheetB: 'none', moireDensity: 30 })]);
     // The liquid: one pool of dye in the middle, and the same plate without it.
     const lens = async () => { await lab.create(128); lab.dye(0.5, 0.5, 0.14, [0.5, 0.3, 0.4], 1.4); lab.flush(); await lab.step(10); };
     const pair = { moireDensity: 24, moireAngle: 6, moireGap: 6 };
-    for (const [tag, s] of [
+    for (const [tag, s, cam = {}] of [
       ['both', { moireSheetA: 'lines', moireSheetB: 'lines', ...pair }],
       ['upper', { moireSheetA: 'none', moireSheetB: 'lines', ...pair }],
       ['flat', { moireSheetA: 'lines', moireSheetB: 'lines', ...pair, moireGap: 0 }],
+      ['turned', { moireSheetA: 'lines', moireSheetB: 'lines', ...pair }, { rotation: Math.PI / 4 }],
     ]) {
       await blank();
-      r[`${tag}Clear`] = await shot(s); r[`${tag}ClearOff`] = await shot({ moireAmount: 0 });
+      r[`${tag}Clear`] = await shot(s, cam); r[`${tag}ClearOff`] = await shot({ moireAmount: 0 }, cam);
       await lens();
-      r[`${tag}Lens`] = await shot(s); r[`${tag}LensOff`] = await shot({ moireAmount: 0 });
+      r[`${tag}Lens`] = await shot(s, cam); r[`${tag}LensOff`] = await shot({ moireAmount: 0 }, cam);
     }
     return r;
-  }, [S]);
+  }, [S, clock.moire, SHEETS]);
 } finally { await lab.close(); }
 
 const who = (d) => d ? `${d.vendor} ${d.architecture}`.trim() : 'no adapter';
@@ -168,7 +187,7 @@ const lamp = mean(Array.from(lum(R.lamp)));
 const one = mean(Array.from(lum(R.fine1))) / lamp;
 const two = mean(Array.from(lum(R.fine2))) / lamp;
 const want1 = 0.92 * (0.5 + 0.5 * 0.02);
-check('a sheet too fine to resolve passes its mean, 92% of half clear and half at 2%', near(one, want1, 0.05), `${one.toFixed(3)} against ${want1.toFixed(3)} (lamp ${lamp.toFixed(1)})`);
+check('a resolved sheet passes its mean, 92% of half clear and half at 2%', near(one, want1, 0.05), `${one.toFixed(3)} against ${want1.toFixed(3)} (lamp ${lamp.toFixed(1)})`);
 check('two of them crossed pass the product', near(two, want1 * want1, 0.05), `${two.toFixed(3)} against ${(want1 * want1).toFixed(3)}`);
 
 // 4. No false moiré.
@@ -176,40 +195,61 @@ check('two of them crossed pass the product', near(two, want1 * want1, 0.05), `$
 // by 4 to 5% (the first two runs read exactly that, sheets or none).
 const lampL = lum(R.lamp);
 const flatness = (px) => { const l = lum(px).map((v, i) => v / Math.max(1, lampL[i])); const all = [...rowMeans(l), ...colMeans(l)]; const m = mean(all); return Math.max(...all.map(v => Math.abs(v - m))) / m; };
-const fl1 = flatness(R.fine1), fl2 = flatness(R.mid1);
+const fl1 = flatness(R.alias1), fl2 = flatness(R.mid1);
 check('a single sheet finer than the pixels is a flat grey, no beat against the pixel grid', fl1 < 0.015 && fl2 < 0.015,
-  `worst row or column ${(fl1 * 100).toFixed(2)}% at 0.85 px, ${(fl2 * 100).toFixed(2)}% at 1.1 px`);
+  `worst row or column ${(fl1 * 100).toFixed(2)}% at 1.02 px, ${(fl2 * 100).toFixed(2)}% at 1.1 px`);
 
 // 5. The gap is the lens's defocus.
 const contrast = (px) => { const c = colMeans(lum(px)); const m = mean(c); return Math.sqrt(mean(c.map(v => (v - m) ** 2))) / m; };
 const cSharp = contrast(R.sharp), cSoft = contrast(R.soft);
-const fSoft = peak(rowMeans(lum(R.softPair)));
-check('at a 15 mm gap lines 4 mm apart lose over half their contrast', cSoft < 0.5 * cSharp, `${cSoft.toFixed(3)} against ${cSharp.toFixed(3)} at 0 mm`);
-check('and the fringe of two sheets keeps its frequency', near(fSoft, wantTurn, 0.06), `${fSoft.toFixed(2)} against ${wantTurn.toFixed(2)}`);
+// The prediction: the fundamental through the tent whose variance is the
+// pixel's (w^2/6) plus the disc's (r^2/4), r = 15 mm / 250 mm x 0.12 (plateMoire.ts).
+const sinc2 = (x) => (x === 0 ? 1 : (Math.sin(Math.PI * x) / (Math.PI * x)) ** 2);
+const px1 = 1 / S, rDisc = 15 / 250 * 0.12;
+const predicted = sinc2(60 * Math.sqrt(px1 * px1 + 1.5 * rDisc * rDisc)) / sinc2(60 * px1);
+check('at a 15 mm gap lines 4 mm apart keep the share of their contrast the disc of confusion predicts', near(cSoft / cSharp, predicted, 0.15),
+  `${(cSoft / cSharp).toFixed(3)} against ${predicted.toFixed(3)} (${cSoft.toFixed(3)} and ${cSharp.toFixed(3)} at 0 mm)`);
 
 // 6. The liquid bends the lower sheet.
 const passed = (on, off) => { const a = lum(on), b = lum(off); return Float64Array.from(a, (v, i) => v / Math.max(1, b[i])); };
 const change = (tag) => {
   const clear = passed(R[`${tag}Clear`], R[`${tag}ClearOff`]);
   const lens = passed(R[`${tag}Lens`], R[`${tag}LensOff`]);
-  let inside = 0, ni = 0, outside = 0, no = 0;
+  let inside = 0, ni = 0, outside = 0, no = 0, side = 0, ns = 0, top = 0, nt = 0;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
     const d = Math.hypot(x / S - 0.5, y / S - 0.5);
     const v = Math.abs(lens[y * S + x] - clear[y * S + x]);
     // The pool's edge, where its surface slopes (its middle is flat and bends nothing).
-    if (d > 0.07 && d < 0.2) { inside += v; ni++; } else if (d > 0.3) { outside += v; no++; }
+    if (d > 0.07 && d < 0.2) {
+      inside += v; ni++;
+      if (Math.abs(x / S - 0.5) > 2 * Math.abs(y / S - 0.5)) { side += v; ns++; }
+      else if (Math.abs(y / S - 0.5) > 2 * Math.abs(x / S - 0.5)) { top += v; nt++; }
+    } else if (d > 0.3) { outside += v; no++; }
   }
-  return { inside: inside / ni, outside: outside / no };
+  return { inside: inside / ni, outside: outside / no, side: side / ns, top: top / nt };
 };
-const both = change('both'), upper = change('upper'), flat = change('flat');
+const both = change('both'), upper = change('upper'), flat = change('flat'), turned = change('turned');
 check('over a pool of dye the lower sheet is bent: five times the change of the upper alone', both.inside > 5 * Math.max(upper.inside, 0.002),
   `${both.inside.toFixed(4)} against ${upper.inside.toFixed(4)}`);
 check('at a gap of 0 mm there is no depth to bend through', flat.inside < 2 * Math.max(upper.inside, 0.002), `${flat.inside.toFixed(4)}`);
+check('the bend is across the lines: the pool\'s left and right change three times its top and bottom, the dish still or turned 45°',
+  both.side > 3 * both.top && turned.side > 3 * turned.top,
+  `${both.side.toFixed(4)} against ${both.top.toFixed(4)}; turned ${turned.side.toFixed(4)} against ${turned.top.toFixed(4)}`);
 check('and outside the lens nothing changes', Math.max(both.outside, upper.outside, flat.outside) < 0.01,
   `${both.outside.toFixed(4)}, ${upper.outside.toFixed(4)}, ${flat.outside.toFixed(4)}`);
 
 // 7. One turn.
-check('a quarter turn of the spin\'s clock draws what a Turn of 90° draws', same(R.angle90, R.clock90));
+check('15 rpm for a second of the stage\'s clock draws what a Turn of 90° draws, and not a Turn of 0°',
+  Math.abs(clock.moire - 0.25) < 1e-12 && same(R.angle90, R.clock90) && !same(R.angle0, R.angle90), `the clock read ${clock.moire} turns`);
+
+// 8. Every design is its own.
+const blankL = R.lamp;
+const alike = [];
+R.designs.forEach(([a, pa], i) => {
+  if (same(pa, blankL)) alike.push(`${a} = the bare lamp`);
+  R.designs.slice(i + 1).forEach(([b, pb]) => { if (same(pa, pb)) alike.push(`${a} = ${b}`); });
+});
+check(`every design draws something of its own (${R.designs.length})`, R.designs.length === 10 && !alike.length, alike.join(', ') || R.designs.map(d => d[0]).join(', '));
 
 const failed = checks.filter(c => !c.ok).length;
 console.log(`\n${checks.length - failed}/${checks.length} moire checks passed`);
