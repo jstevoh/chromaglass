@@ -9938,10 +9938,14 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   670 of 2026-11-07 were cancelled the same way: on 670 (1.39 ms a frame) `lab` reached
   holeline at 14:15, every check before it green, and was cancelled at 25:16 with holeline
   10:28 in; on 671 (1.06 ms) the same part ran 19:54, holeline 8:13. No part had ten minutes
-  to spare on the slow tier, so holeline moved, unchanged, to an eighth part `lab4`, which
-  installs Chromium like the others: `lab` is left at about 14:45 on the slow tier and `lab4`
-  about 11. The timeout stays 25 and no bar moves; the required names are unchanged, as in
-  19k-6. Still open: 19k-11b (the tier in the job summary, and every part read against it).
+  to spare on the slow tier, so holeline moved, unchanged, to an eighth part `lab4` (#690),
+  which installs Chromium like the others. #688 (19k-11a) had meanwhile moved `sloshgpu`,
+  `soapgpu --selftest` and `beadmask` from `lab` to `lab3`; with holeline gone from `lab`,
+  `sloshgpu` and `beadmask` went back, and `soapgpu` stays beside the soap checks it controls.
+  On the slow tier that leaves `lab` about 13:20, `lab3` about 15:20 and `lab4` about 11
+  (#690's own run, on faster runners: lab 12:01, lab4 5:28). The timeout stays 25 and no bar
+  moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
+  job summary, and every part read against it).
 
 ### 21. Looks after painters
 

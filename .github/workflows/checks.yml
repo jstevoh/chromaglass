@@ -187,7 +187,9 @@ jobs:
     # check before it green; on the middle tier (1.06 ms) it ran 19:54. No
     # other part had ten minutes to spare on that tier (lab3 ran 24:51 with it
     # on #655), so holeline went to a part of its own, `lab4` (PLAN 19k-11),
-    # leaving lab about 14:45 and lab4 about 11 on the slow tier.
+    # #688 had meanwhile moved sloshgpu, soapgpu and beadmask to lab3 (19k-11a);
+    # with holeline gone, sloshgpu and beadmask came back, leaving lab about
+    # 13:20, lab3 about 15:20 and lab4 about 11 on the slow tier.
     timeout-minutes: 25
     strategy:
       fail-fast: false
