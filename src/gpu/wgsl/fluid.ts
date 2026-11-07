@@ -116,10 +116,11 @@ function thinFaced(src: string, name: string): string {
   rim, and the bound below needs to know exactly what a face brings.
 
   A donor with air in it hands on its liquid mixed with what comes in. The
-  solve gives the air the liquid's mobility (PLAN 18i), so liquid runs
-  through a bubble: a whole bubble's middle leaves through the cells round
-  it, which are emptying too, and a moving bubble's front (a source) drains
-  through it to its back (a sink). In a substep more liquid then crosses a
+  liquid runs through cells the air is filling or leaving: a whole bubble's
+  middle leaves through the cells round it, which are emptying too, and a
+  popped one's hole fills from its rim inward. (It ran through a standing
+  bubble too, from a moving one's front to its back, until the solve gave
+  standing air no mobility: PLAN 15g-8d, hsPrep's standingLiquid.) In a substep more liquid then crosses a
   cell than it holds, and the plain donor, all it holds over its liquid,
   either hands on more than it has (the floor made 18% more colour than a
   pool had, under a bubble drifting across it, the lab) or, capped at what
@@ -139,8 +140,10 @@ function thinFaced(src: string, name: string): string {
   only adds. Two rings deep: the lab's whole bubble keeps 3.3% of the pool's
   colour under it, a moving one 4.8% and a growing one 1.0% (one ring kept
   6.5% and 7.4%), every total to the hundredth of a percent, where main
-  deleted 2.6–6.4% of the colour and painted a ring. The rest is the flow
-  through the air itself, which a two-phase solve takes away (PLAN 18i).
+  deleted 2.6–6.4% of the colour and painted a ring. The rest was the flow
+  through the air itself; with the solve's air shut (15g-8d) the lab at 128²
+  keeps 0.6% under a whole bubble (airShed hands its dry core's leftover
+  to the rim), nothing under a moving or a growing one.
   Counting what comes in at all it holds over its liquid instead kept 0.3%
   under a whole bubble but made 17% under a moving one, where the floor
   cells' concentrations run high. LIQUID_LEAST, the liquid a cell all air
@@ -267,6 +270,82 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(inflow, p, max(-o, vec4f(0.0)));
 }`;
 }
+/*
+  airShed: what a bubble's dry core still holds above its film, handed to the
+  liquid at its rim (PLAN 15g-8d). Once the air stands whole in a cell the
+  thin solve gives it no mobility (hsPrep), so nothing crosses its faces and
+  what it holds stays there until the air leaves. A bubble put down whole in
+  one step pushes the liquid of its middle out through cells that are
+  emptying too, and the donor rule above counts what comes in at the least it
+  can be, so the cells round the middle went dry with 4–6% of the pool's
+  colour (the lab, a bubble of radius 6 cells) that their liquid should have
+  taken out with it: a ring 15% bright where it popped, a streak behind it
+  where it moved off. That colour was on its way out to the rim, and the rim
+  is where it goes: a dry cell beside liquid keeps its film's share
+  (LIQUID_LEAST of the liquid beside it) and hands the rest in equal parts to
+  the cells beside it with liquid in them. A gather, each cell adding what its
+  dry neighbours shed by the same sums they take it off by, so nothing is made
+  or lost. A dry cell with no liquid beside it keeps what it has until the rim
+  reaches it. A.a.y is the air's room (bubbleClear), as the carries'.
+*/
+KERNELS.airShed = `${HEAD}
+@group(0) @binding(2) var src: texture_2d<f32>;
+@group(0) @binding(3) var airWas: texture_2d<f32>;
+@group(0) @binding(4) var airNow: texture_2d<f32>;
+@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+fn inside(q: vec2i, n: i32) -> bool { return q.x >= 0 && q.y >= 0 && q.x < n && q.y < n; }
+fn airOf(t: texture_2d<f32>, q: vec2i) -> f32 { return clamp(textureLoad(t, q, 0).r, 0.0, 1.0); }
+// Dry as the solve has it: the air standing through the step fills the cell (hsPrep's standingLiquid).
+fn dry(q: vec2i, n: i32) -> bool {
+  return inside(q, n) && 1.0 - A.a.y * min(airOf(airWas, q), airOf(airNow, q)) <= 0.0;
+}
+const SHED = array<vec2i, 4>(vec2i(1, 0), vec2i(-1, 0), vec2i(0, 1), vec2i(0, -1));
+fn wetBeside(q: vec2i, n: i32) -> f32 {
+  var w = 0.0;
+  for (var k = 0; k < 4; k++) { let r = q + SHED[k]; if (inside(r, n) && !dry(r, n)) { w += 1.0; } }
+  return w;
+}
+// Dry cells beside q that have liquid beside them: where a dry cell one further in sheds.
+fn relaysBeside(q: vec2i, n: i32) -> f32 {
+  var w = 0.0;
+  for (var k = 0; k < 4; k++) { let r = q + SHED[k]; if (dry(r, n) && wetBeside(r, n) > 0.0) { w += 1.0; } }
+  return w;
+}
+// What dry cell d sheds to each cell it sheds to: beside liquid, all but its
+// film's share, to each wet cell beside it; one further in, all it holds, to
+// each dry cell beside it that is beside liquid, which passes it on next step.
+fn shedOf(d: vec2i, n: i32) -> vec4f {
+  let wet = wetBeside(d, n);
+  if (wet == 0.0) {
+    let relays = relaysBeside(d, n);
+    return select(vec4f(0.0), textureLoad(src, d, 0) / relays, relays > 0.0);
+  }
+  var c = vec4f(0.0);
+  for (var k = 0; k < 4; k++) {
+    let q = d + SHED[k];
+    if (!inside(q, n) || dry(q, n)) { continue; }
+    c += textureLoad(src, q, 0) / max(1.0 - A.a.y * airOf(airNow, q), ${LIQUID_LEAST.toFixed(4)});
+  }
+  let keep = ${LIQUID_LEAST.toFixed(4)} * c / wet;
+  return max(textureLoad(src, d, 0) - keep, vec4f(0.0)) / wet;
+}
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let n = i32(S.n);
+  var v = textureLoad(src, p, 0);
+  if (dry(p, n)) {
+    let wet = wetBeside(p, n);
+    v -= shedOf(p, n) * select(relaysBeside(p, n), wet, wet > 0.0);
+    // What the dry cells one further in hand this one, beside the liquid.
+    if (wet > 0.0) {
+      for (var k = 0; k < 4; k++) { let q = p + SHED[k]; if (dry(q, n) && wetBeside(q, n) == 0.0) { v += shedOf(q, n); } }
+    }
+  } else {
+    for (var k = 0; k < 4; k++) { let q = p + SHED[k]; if (dry(q, n) && wetBeside(q, n) > 0.0) { v += shedOf(q, n); } }
+  }
+  textureStore(dst, p, v);
+}`;
 KERNELS.airGiveSub = airGiveKernel(true);
 KERNELS.airGiveThin = airGiveKernel(false);
 KERNELS.bodyAdvectSub = thinFaced(substepped('bodyAdvect'), 'bodyAdvectSub');
