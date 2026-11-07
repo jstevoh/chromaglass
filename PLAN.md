@@ -161,6 +161,7 @@ merge conflicts are the shared documents', which 0.6 ends.
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
+  H2c-9's owed line is in `npm run framereads` (2026-11-07): Antigravity-ready on its own.
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
   video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
@@ -168,9 +169,11 @@ merge conflicts are the shared documents', which 0.6 ends.
   -14.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
+  H2c-7 and H2c-6's owed lines are in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
 - **4.7** **14c-4k, 14c-governor, H2c-10, H2c-labels** (S each). Then **H2a**, **H1**, **H3a**.
+  H2c-labels' owed line is `npm run timelabels` (2026-11-07): Antigravity-ready.
 
 ### Wave 5. Playing it: the instrument
 

@@ -995,13 +995,30 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads",
+      "run": "npm run framereads -- --owed=h2c6,h2c7,h2c9",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
         "readback is handed out once (PLAN.md 14ab-3, scripts/framereads.mjs); thick",
         "liquid's share reads into one kept buffer to the same number (14ab-9). Logic",
-        "and counts, the same on any adapter that computes."
+        "and counts, the same on any adapter that computes. And three owed lines",
+        "(scripts/framereads-owed.mjs, 2026-11-07), each with controls that hold on",
+        "main: H2c-7's readback straight into its ring, H2c-6's one display target",
+        "with the camera off and H2c-9's pack only after a step, the last two on a",
+        "plate kept across frames (scripts/lab-plateframes.ts). About half a minute",
+        "more under SwiftShader, the kept plate drawn at 72²."
+      ]
+    },
+    {
+      "name": "GPU timings land on the pass that took them",
+      "shard": "logic",
+      "run": "npm run timelabels -- --owed=labels",
+      "why": [
+        "H2c-labels (scripts/timelabels.mjs): the real GpuProfiler on a stand-in GPU",
+        "whose mappings land two frames late, a constant time a pass, the camera",
+        "turned on at frame 100 and off at 110. The control (every label its own",
+        "time while the passes are unchanged) holds on main; the line that each time",
+        "lands on its own pass when they change is owed until the build."
       ]
     },
     {
