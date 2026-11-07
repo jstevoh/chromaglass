@@ -139,7 +139,7 @@ export function LiveShowPanel() {
               <span className="min-w-0 flex-1 truncate text-text">{d.name}</span>
               <span className="shrink-0 font-mono text-text-2">
                 {d.phase === 'live'
-                  ? `${mbps(d.kbps)} Mb/s · ${d.secondsBehind.toFixed(1)} s behind${d.dropping ? ' · dropping' : ''}`
+                  ? `${mbps(d.kbps)} Mb/s · ${d.secondsBehind.toFixed(1)} s behind${live.frames > 0 ? ` · ${(live.grabMs / live.frames).toFixed(1)} ms a frame` : ''}${d.dropping ? ' · dropping' : ''}`
                   : d.retryInMs != null ? `retrying in ${Math.ceil(d.retryInMs / 1000)} s` : d.error ? `ended: ${d.error}` : d.phase}
               </span>
             </li>
@@ -171,6 +171,20 @@ export function LiveShowPanel() {
         change([...list, d]);
         return true;
       }} />}
+
+      <label className="flex items-center gap-1.5">
+        <span className="text-text-2">Source</span>
+        <select
+          className={`${field} flex-1 disabled:opacity-40`}
+          value={format.source ?? 'plate'}
+          disabled={streaming}
+          onChange={e => changeFormat({ ...format, source: e.target.value === 'stack' ? 'stack' : 'plate' })}
+          data-testid="live-source"
+        >
+          <option value="plate">Plate</option>
+          <option value="stack">Mixer stack</option>
+        </select>
+      </label>
 
       <div className="flex items-center gap-1.5" data-testid="live-format">
         <span className="text-text-2">Stream</span>

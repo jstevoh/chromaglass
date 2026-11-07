@@ -18,7 +18,7 @@ import { UniformPack } from './uniforms';
 import { OUTPUT_LAYOUT } from './wgsl/outputFields';
 import { OUTPUT_WGSL } from './wgsl/output';
 import {
-  MAX_SURFACES, composeOntoPin, cornerPinMatrix,
+  DEFAULT_OUTPUT, MAX_SURFACES, composeOntoPin, cornerPinMatrix,
   type OutputConfig, type SurfaceBlend, type SurfaceShape, type SurfaceSource,
 } from '../lib/outputConfig';
 
@@ -29,6 +29,8 @@ export const SOURCE_INDEX: Record<SurfaceSource, number> = { wall: 0, front: 1, 
 export type PlateSource = Exclude<SurfaceSource, 'wall'>;
 /** As the shader counts them (`lay.x`). */
 export const BLEND_INDEX: Record<SurfaceBlend, number> = { over: 0, add: 1 };
+const WHOLE_SRC = [0, 0, 1, 1] as const;
+const QUAD_FIELDS = ['warpA', 'warpB', 'warpC', 'cornerAB', 'cornerCD', 'src', 'form', 'lay'] as const;
 
 /**
  * Every quad of a frame into the buffer at once, and how many there are.
@@ -38,8 +40,34 @@ export const BLEND_INDEX: Record<SurfaceBlend, number> = { over: 0, add: 1 };
  * about where a surface is: only the drawing of it is ported. A quad dragged
  * flat has no matrix and is skipped rather than divided by, which is why the
  * count comes back rather than being the number of surfaces.
+ *
+ * When `square` is true (37x-4d-1, the Mixer stack stream source), it writes
+ * one full-frame quad of the scene with identity warp, no corner pins and no
+ * masks, without allocating per frame.
  */
-export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: number, height: number, now = Date.now()): number {
+export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: number, height: number, now = Date.now(), square = false): number {
+  if (square) {
+    pack.set('mask', 0, 0, 0, 0);
+    pack.set('flip', 1, 1);
+    pack.set('resolution', width, height);
+    pack.set('feather', 0);
+    pack.set('gain', 1);
+    pack.set('gamma', 1);
+    pack.set('test', 0, 0, 0, 0);
+    pack.setAt('warpA', 0, 1, 0, 0, 0);
+    pack.setAt('warpB', 0, 0, 1, 0, 0);
+    pack.setAt('warpC', 0, 0, 0, 1, 0);
+    pack.setAt('cornerAB', 0, 0, 0, 1, 0);
+    pack.setAt('cornerCD', 0, 1, 1, 0, 1);
+    pack.setAt('src', 0, 0, 0, 1, 1);
+    pack.setAt('form', 0, SHAPE_INDEX.rect, 0, 1, SOURCE_INDEX.wall);
+    pack.setAt('lay', 0, BLEND_INDEX.over, width / Math.max(1e-6, height), 1, 0);
+    for (let i = 1; i < MAX_SURFACES; i++) {
+      for (const f of QUAD_FIELDS) pack.setAt(f, i, 0, 0, 0, 0);
+    }
+    pack.set('quads', 1);
+    return 1;
+  }
   pack.set('mask', cfg.maskTop, cfg.maskRight, cfg.maskBottom, cfg.maskLeft);
   pack.set('flip', cfg.flipX ? -1 : 1, cfg.flipY ? -1 : 1);
   pack.set('resolution', width, height);
@@ -93,7 +121,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
   if (surfaces.length === 0) {
     // No mapping at all: the picture lands on the pinned rectangle, exactly
     // as it did before any of this existed.
-    quad(cfg.corners, [0, 0, 1, 1], 'rect', 0, 1);
+    quad(cfg.corners, WHOLE_SRC, 'rect', 0, 1);
   } else {
     // Mapped, and possibly all of it switched off — which is a blackout, not
     // an absence of mapping.
@@ -109,7 +137,7 @@ export function fillOutputUniforms(pack: UniformPack, cfg: OutputConfig, width: 
   // buffer is read whole, and an unwritten slot is whatever the last frame
   // left there. They are never drawn, but they are never undefined either.
   for (let i = n; i < MAX_SURFACES; i++) {
-    for (const f of ['warpA', 'warpB', 'warpC', 'cornerAB', 'cornerCD', 'src', 'form', 'lay'] as const) {
+    for (const f of QUAD_FIELDS) {
       pack.setAt(f, i, 0, 0, 0, 0);
     }
   }
@@ -158,6 +186,23 @@ export class WebGPUOutput {
   private readonly sampler: GPUSampler;
   private readonly ubo: GPUBuffer;
   readonly pack: UniformPack;
+  readonly streamPack: UniformPack;
+  private readonly streamUbo: GPUBuffer;
+  private streamCanvasEl: HTMLCanvasElement | null = null;
+  private streamCtx: GPUCanvasContext | null = null;
+  private streamSize = [0, 0];
+  private streamReady = false;
+  private readonly streamBinding: [GPUBuffer, GPUSampler, GPUTexture, GPUTexture, GPUTexture, GPUTexture];
+  private readonly streamAttachment: GPURenderPassColorAttachment = {
+    view: null as unknown as GPUTextureView,
+    loadOp: 'clear', storeOp: 'store',
+    clearValue: { r: 0, g: 0, b: 0, a: 1 },
+  };
+  private readonly streamAttachments: GPURenderPassColorAttachment[] = [this.streamAttachment];
+  private readonly streamPassDesc: GPURenderPassDescriptor = {
+    label: 'output stream',
+    colorAttachments: this.streamAttachments,
+  };
 
   private scene: GPUTexture | null = null;
   private sceneSize = [0, 0];
@@ -182,6 +227,7 @@ export class WebGPUOutput {
   constructor(private readonly device: GPUDevice, private readonly format: GPUTextureFormat) {
     this.pipelines = PipelineCache.for(device, 'output');
     this.pack = new UniformPack(OUTPUT_LAYOUT);
+    this.streamPack = new UniformPack(OUTPUT_LAYOUT);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -190,6 +236,11 @@ export class WebGPUOutput {
       label: 'output uniforms', size: OUTPUT_LAYOUT.size,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
+    this.streamUbo = this.disposer.track(device.createBuffer({
+      label: 'output stream uniforms', size: OUTPUT_LAYOUT.size,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
+    this.streamBinding = [this.streamUbo, this.sampler, null as unknown as GPUTexture, null as unknown as GPUTexture, null as unknown as GPUTexture, null as unknown as GPUTexture];
   }
 
   /** Where the frame is drawn before this pass projects it. */
@@ -254,7 +305,9 @@ export class WebGPUOutput {
     target: GPUTextureView,
     quads: number,
     timestamps?: GPURenderPassTimestampWrites,
+    stream?: { width: number; height: number } | null,
   ): boolean {
+    this.streamReady = false;
     if (!this.scene) return false;
     this.device.queue.writeBuffer(this.ubo, 0, this.pack.bytes);
     // The format is in the name because the cache is the device's, not this
@@ -274,7 +327,68 @@ export class WebGPUOutput {
     }
     pass.end();
     this.drawn.clear();
+    if (stream) this.drawStream(encoder, stream.width, stream.height);
+    else this.dropStream();
     return true;
+  }
+
+  /**
+   * A second draw of the mixer's stack (`this.scene`) with identity warp, no
+   * corner pins and no masks into a canvas of the stream's size (37x-4d-1).
+   * Encoded only while a stream with the Mixer stack source is on air.
+   */
+  drawStream(
+    encoder: GPUCommandEncoder,
+    width: number,
+    height: number,
+    timestamps?: GPURenderPassTimestampWrites,
+  ): boolean {
+    this.streamReady = false;
+    if (!this.scene || typeof document === 'undefined') return false;
+    const pipeline = this.pipelines.renderPipeline(`output ${this.format}`, outputRecipe(this.device, this.format));
+    if (!pipeline) return false;
+    if (!this.streamCanvasEl) {
+      this.streamCanvasEl = document.createElement('canvas');
+      this.streamCtx = this.streamCanvasEl.getContext('webgpu');
+    }
+    if (!this.streamCtx) return false;
+    try {
+      if (this.streamSize[0] !== width || this.streamSize[1] !== height) {
+        this.streamCanvasEl.width = width;
+        this.streamCanvasEl.height = height;
+        this.streamCtx.configure({ device: this.device, format: this.format, alphaMode: 'opaque' });
+        this.streamSize[0] = width;
+        this.streamSize[1] = height;
+      }
+      fillOutputUniforms(this.streamPack, DEFAULT_OUTPUT, width, height, 0, true);
+      this.device.queue.writeBuffer(this.streamUbo, 0, this.streamPack.bytes);
+      this.streamAttachment.view = this.streamCtx.getCurrentTexture().createView();
+      this.streamPassDesc.timestampWrites = timestamps;
+      const pass = encoder.beginRenderPass(this.streamPassDesc);
+      this.streamBinding[2] = this.streamBinding[3] = this.streamBinding[4] = this.streamBinding[5] = this.scene;
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, groupOf(this.device, pipeline, this.streamBinding));
+      pass.draw(6, 1);
+      pass.end();
+      this.streamReady = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** The stream canvas when a square pass was drawn into it this frame, else null. */
+  get streamCanvas(): HTMLCanvasElement | null {
+    return this.streamReady ? this.streamCanvasEl : null;
+  }
+
+  /** Release the stream canvas's swapchain when no Mixer stack stream is on air. */
+  dropStream(): void {
+    this.streamReady = false;
+    if (this.streamSize[0] === 0 && this.streamSize[1] === 0) return;
+    this.streamSize[0] = 0;
+    this.streamSize[1] = 0;
+    try { this.streamCtx?.unconfigure(); } catch { /* already gone */ }
   }
 
   /** A source's picture if it was drawn this frame, else the scene (never sampled: no surface asks for it). */
@@ -284,6 +398,9 @@ export class WebGPUOutput {
   }
 
   dispose(): void {
+    this.dropStream();
+    this.streamCanvasEl = null;
+    this.streamCtx = null;
     this.disposer.dispose();
     this.sources.clear();
     this.scene = null;
