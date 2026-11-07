@@ -140,11 +140,12 @@ jobs:
   # ones that want Chromium, in two (`browser` and `browser2`, about
   # fourteen and eleven: the site's pages and desks, then the remote, the
   # show's wires and the sound in the app), and the lab on the CPU
-  # rasteriser, in three (`lab`, `lab2` and `lab3`: Chromium, then `holeline`
-  # building three labs on the first, `lampzero` drawing every look in two
-  # labs on the second, the soap's two checks on the third). Every
+  # rasteriser, in four (`lab`, `lab2`, `lab3` and `lab4`: Chromium, then the
+  # frame's passes and the GPU dishes on the first, `lampzero` drawing every
+  # look in two labs on the second, the soap's two checks on the third, and
+  # `holeline` building three labs on the fourth). Every
   # check runs whatever failed before it in its part. GitHub's ubuntu runners
-  # are not the queue the Mac's are, so seven at once cost the queue nothing.
+  # are not the queue the Mac's are, so eight at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -179,6 +180,14 @@ jobs:
     # Then widedials (#646, 3:40) joined lab after the soap left it, and lab was
     # cancelled at the limit twice on #658's run with main merged, in holeline
     # at 25:00 (it ran 23:23 before). widedials went to lab3, which ran 11:08.
+    # Then the runners: GitHub's ubuntu machines come in speed tiers about 2x
+    # apart (videoflow's CPU loop reads 0.70, 1.05 or 1.40 ms a frame), and on
+    # main's deploys 667 and 670 of 2026-11-07, on the slow one (1.39 ms), lab
+    # reached holeline at 14:15 and was cancelled in it at the limit, every
+    # check before it green; on the middle tier (1.06 ms) it ran 19:54. No
+    # other part had ten minutes to spare on that tier (lab3 ran 24:51 with it
+    # on #655), so holeline went to a part of its own, `lab4` (PLAN 19k-11),
+    # leaving lab about 14:45 and lab4 about 11 on the slow tier.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -262,7 +271,7 @@ jobs:
           path: ~/ffmpeg-debs
           key: ffmpeg-debs-${{ steps.image.outputs.os }}-${{ steps.image.outputs.version }}
 
-      # The browser, for the browser, browser2, lab, lab2 and lab3 parts' checks.
+      # The browser, for the browser, browser2, lab, lab2, lab3 and lab4 parts' checks.
       # The browser is fetched inside the same 25 minutes as the measuring, so a
       # cold download is a red with nothing wrong in the diff (PLAN 19ab). On
       # 2026-10-22 this step took 650 s on the browser shard and 683 s on the lab
@@ -280,10 +289,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -292,7 +301,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -310,7 +319,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0

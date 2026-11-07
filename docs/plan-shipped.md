@@ -9926,6 +9926,23 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
   moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
 
+#### 19k-11. holeline in a Measure part of its own
+
+- **19k-11** (E, S): **shipped** in part, `lab4`. GitHub's ubuntu runners come in speed tiers
+  about 2x apart (videoflow's printed CPU loop, plain JavaScript, reads 0.70, 1.05 or 1.40 ms a
+  frame across twenty branches' `lab` jobs, the same branch on different tiers from push to
+  push), and a part sized on the fast tier is cancelled on the slow one. #655 drew the slow tier
+  six times running: `lab` was cancelled in holeline before #658 moved `widedials` to `lab3`,
+  and with holeline moved to `lab3` too (#655's first fix, reverted) that part ran 24:51 of its
+  25 (holeline 10:23, soap 6:53, soapbreak 3:59, widedials 3:36). Then main's deploys 667 and
+  670 of 2026-11-07 were cancelled the same way: on 670 (1.39 ms a frame) `lab` reached
+  holeline at 14:15, every check before it green, and was cancelled at 25:16 with holeline
+  10:28 in; on 671 (1.06 ms) the same part ran 19:54, holeline 8:13. No part had ten minutes
+  to spare on the slow tier, so holeline moved, unchanged, to an eighth part `lab4`, which
+  installs Chromium like the others: `lab` is left at about 14:45 on the slow tier and `lab4`
+  about 11. The timeout stays 25 and no bar moves; the required names are unchanged, as in
+  19k-6. Still open: 19k-11b (the tier in the job summary, and every part read against it).
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
