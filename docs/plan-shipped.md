@@ -9697,6 +9697,27 @@ helpers that name none. `prepush-reviewer` and `check-skeptic` name opus (they j
   ladder and the real step-down are as they were. It touches no bar. `governor.ts` was not
   touched (#441, #474 and the #402 finish thread are in it).
 
+#### 19aa-13. `renders` and `squeeze` timed their windows and asked a rate no line claims
+
+- **19aa-13. A window held until it has the frames or steps its line asks (shipped
+  2026-11-07).** `renders` measured each window for a fixed 3 s, and the lines that read
+  frames ask 45 of them, so on the Mac every such line also asked fifteen frames a second.
+  GitHub's Macs draw that page at 11 to 19, and "the band: the ear is reading" with "the
+  plate hears a new reading" went red with their ratios green: 16 Mac reds in `npm run
+  flakes`, never on Linux; #435 (11-01), #546 (10-28, 10-29) and #645 (11-01) at 40 to 43
+  frames in one phone window with readings on 0.98 to 1.00 of the frames, and #656 twice
+  (laptop 18.3 readings a second for 11.3 frames a second). Now `heldOpen` keeps a window
+  open past its three seconds until the plate has drawn 45 frames, at most 10 s; the band,
+  fader, quiet-page and gamepad windows all take it. The counts with a ceiling (renders,
+  commits, what React is told, the desk's moves) are still read over the first three
+  seconds, so a burst is not spread over a longer window (check-skeptic). `squeeze`'s window was a fixed 12 s
+  against 200 steps (about seventeen a second); #656's fifth shard read 185 and 258, then
+  187 and 329, every other line green. It is now held, under its existing 45 s cap, until
+  200 steps as well as six kicks (with `SQUEEZE_GPU=1` only, where the line is asked). No
+  bar moved: the 45 frames and 200 steps are still asked, every ratio is over the window's
+  frames, squeeze's counts are rates over its own seconds; a plate under 4.5 frames or steps
+  a second still fills no window and is red. Each line prints how long its windows took.
+
 #### 19c. Checks that can pass without measuring, and checks nothing runs
 
 - ~~`wall`'s busy phase half a refresh behind cannot see the gate turning down the show's
@@ -11140,3 +11161,29 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
+
+
+## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
+
+Wave 7's next Claude item after OSC out. **37k**: `chromaglass.art/press`
+(`public/press.html`, a static page like `/pro`, routed in `firebase.json` before
+the app's catch-all): the two sentences with a copy button, the facts (prices from
+the landing page, what it runs on, the LLC, `support@`), six stills at 2560 × 1440
+and two 20-second 1080p60 clips with sound, the logo as SVG and large PNGs. The
+media are the owner's Mac recording the real app (the 34a-6 site films of 10-29,
+cut on the Mac: stills are the films' 30-second frame where no `still.png` was
+written, clips the 20 seconds with the most frame-to-frame movement, H.264 CRF 22
+capped at 4.3 Mb/s, +faststart), not the lab, because a press picture promises
+what the app looks like. Credits with ISRCs: `public/press/MEDIA.md`. The cards
+show the landing page's small webp of each look and link the full JPEG, so a phone
+loads about 120 KB of pictures. **12.6**: the privacy page's section for the phone
+apps (permissions asked on the phone, nothing more sent, no tracking or ad id),
+`docs/store-listings.md` (every field for both stores, the review note, category
+and rating, the App Privacy label and Data safety answers), and Play's 512 icon and
+1024 × 500 feature graphic from `scripts/brand/art.mjs` (`featureGraphic`).
+`npm run presskit` (Measure browser2), 46/46: the files exist, the stills' and
+clips' sizes and lengths read from the files themselves, the clips' index before
+their data, the prices against `Landing.tsx`, each listing field within its limit
+with no price or way to buy, the store pictures' sizes and alpha, and the page at
+360 and 1280 px with no sideways scroll and every picture loaded. Left open:
+12.6-shots (the phone's own screenshots) and 12.6-label.
