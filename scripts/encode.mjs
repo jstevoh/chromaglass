@@ -215,8 +215,9 @@ try {
   check('no args buffer is written with what it already holds', run.same === 0, `${run.same} of ${run.writes} writes (${perStep(run.writes).toFixed(1)} a step)`);
   check('no bind group is made on a step after the first ones', run.groups === 0, `${run.groups} made in ${run.steps} steps`);
 
-  await owedLines(page, check);
+  // The residual bars were read on the plate as encode leaves it: the owed lines' steps (one with a bubble) come after.
   await solveLines(page, run, check);
+  await owedLines(page, check);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

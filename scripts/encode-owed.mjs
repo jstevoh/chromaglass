@@ -44,15 +44,17 @@
   (SwiftShader). The open plate's step: 500 dispatches, of them four
   MacCormack corrections (the velocity, the dye, the two liquids: three
   `macCormack:rgba16float` and one `:rgba32float`, so the format cannot tell
-  the velocity's from a liquid's, which is why the line counts totals) and
-  nine semi-Lagrangian `advect`s (two for each of those four, one for the
-  grain). First-order velocity is one correction fewer and one carry fewer
-  (its two become one), the step two dispatches lighter. Air on a plate with
+  the velocity's from a liquid's, so each carry is told by whether its bind
+  group holds the velocity's own pair; the check-skeptic found a count of
+  totals passing a build that dropped the dye's correction) and nine
+  semi-Lagrangian `advect`s (two for each of those four, one for the grain).
+  First-order velocity is the velocity's 1 and 2 become 0 and 1, the others'
+  3 and 7 unchanged, the step two dispatches lighter. Air on a plate with
   no bubble: one pass a step and two textures alive.
 */
 const MAIN_OPEN = 500;
-const MAIN_CORRECTIONS = 4;
-const MAIN_CARRIES = 9;
+const MAIN_REST_CORRECTIONS = 3; // the dye's and the two liquids'
+const MAIN_REST_CARRIES = 7; // two for each of those, one for the grain
 
 export const ENCODE_OWED = ['h2c5', 'h2c8'];
 
@@ -76,6 +78,21 @@ export const installAirCounter = () => {
   GPUTexture.prototype.destroy = function () { live.delete(this); return destroy.call(this); };
   const view = GPUTexture.prototype.createView;
   GPUTexture.prototype.createView = function (...a) { const v = view.apply(this, a); viewOf.set(v, this); return v; };
+  /*
+    And for H2c-5: which textures each bind group binds, and the group a
+    compute pass last set, so a carry can be told by the field it moves
+    (the velocity's bind its own textures; the dye's and the liquids' carry
+    by the forced flow, never by the velocity's own pair).
+  */
+  const groupTex = (window.__groupTex = new WeakMap());
+  const group = GPUDevice.prototype.createBindGroup;
+  GPUDevice.prototype.createBindGroup = function (d) {
+    const g = group.call(this, d);
+    groupTex.set(g, new Set((d?.entries ?? []).map((e) => viewOf.get(e.resource)).filter(Boolean)));
+    return g;
+  };
+  const setGroup = GPUComputePassEncoder.prototype.setBindGroup;
+  GPUComputePassEncoder.prototype.setBindGroup = function (i, g, ...rest) { this.__tex = groupTex.get(g); return setGroup.call(this, i, g, ...rest); };
   const begin = GPUCommandEncoder.prototype.beginRenderPass;
   GPUCommandEncoder.prototype.beginRenderPass = function (d) {
     if (air.on && (isAir(d?.label) || (d?.colorAttachments ?? []).some((c) => c && live.has(viewOf.get(c.view))))) air.passes++;
@@ -102,11 +119,20 @@ export async function owedLines(page, check) {
     await lab.step(4, { thinGap: 1, immiscibility: 0.5 });
     air.on = false;
     const bare = { passes: air.passes / 4, live: air.live.size };
-    // The open plate's step by kernel, four of them.
+    // The open plate's step by kernel, four of them, each carry told by whether it binds the velocity's own pair.
+    const velPair = new Set([s.vel.read, s.vel.write]);
+    const tagged = { vel: { corrections: 0, carries: 0 }, rest: { corrections: 0, carries: 0 } };
+    const dispatch = GPUComputePassEncoder.prototype.dispatchWorkgroups;
+    GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) {
+      const k = this.__kernel ?? '';
+      const kind = /^macCormack/.test(k) ? 'corrections' : /^advect/.test(k) ? 'carries' : null;
+      if (counts.on && kind) tagged[[...(this.__tex ?? [])].some((t) => velPair.has(t)) ? 'vel' : 'rest'][kind]++;
+      return dispatch.apply(this, a);
+    };
     counts.dispatches = 0; counts.indirect = 0; counts.by = {}; counts.on = true;
-    await lab.step(4, { thinGap: 0, immiscibility: 0.5 });
-    counts.on = false;
-    const open = { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])) };
+    try { await lab.step(4, { thinGap: 0, immiscibility: 0.5 }); } finally { counts.on = false; GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch; }
+    for (const f of Object.values(tagged)) for (const k of Object.keys(f)) f[k] /= 4;
+    const open = { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])), tagged };
     // The control: one bubble on the same plate, stamped on each step.
     s.setBubbles(new Float32Array([0.5, 0.5, 0.06, 1]), 1, 0.05, new Float32Array(4));
     air.passes = 0; air.on = true;
@@ -118,18 +144,18 @@ export async function owedLines(page, check) {
     return { bare, open, bubble };
   });
 
-  const sum = (test) => Object.entries(r.open.by).reduce((a, [l, v]) => a + (test(l) ? v : 0), 0);
-  const corrections = sum((l) => l === 'macCormack' || l.startsWith('macCormack:'));
-  const carries = sum((l) => l.startsWith('advect'));
-  console.log(`  the open plate's step: ${r.open.dispatches.toFixed(0)} dispatches (main ${MAIN_OPEN}); MacCormack's corrections ${corrections} (main ${MAIN_CORRECTIONS}), semi-Lagrangian carries ${carries} (main ${MAIN_CARRIES}): ${JSON.stringify(Object.fromEntries(Object.entries(r.open.by).filter(([l]) => /^(advect|macCormack)/.test(l))))}`);
+  const { vel, rest } = r.open.tagged;
+  console.log(`  the open plate's step: ${r.open.dispatches.toFixed(0)} dispatches (main ${MAIN_OPEN}); the velocity's ${vel.corrections} MacCormack corrections and ${vel.carries} carries (main 1 and 2), the dye's, liquids' and grain's ${rest.corrections} and ${rest.carries} (main ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}): ${JSON.stringify(Object.fromEntries(Object.entries(r.open.by).filter(([l]) => /^(advect|macCormack)/.test(l))))}`);
   console.log(`  air: a plate never given a bubble makes ${r.bare.passes} air passes a step with ${r.bare.live} air textures alive; with one bubble ${r.bubble.passes} a step and ${r.bubble.live} alive`);
 
   check('control: a bubble on the plate is stamped, an air pass on every step and its texture alive', r.bubble.passes >= 1 && r.bubble.live >= 1,
     `${r.bubble.passes} passes a step, ${r.bubble.live} alive`);
-  line('h2c5', 'H2c-5: the open plate carries velocity first order (one MacCormack correction and one carry fewer, every dye field still corrected), the step two dispatches lighter',
-    corrections === MAIN_CORRECTIONS - 1 && carries <= MAIN_CARRIES - 1 && r.open.dispatches <= MAIN_OPEN - 2,
-    `${corrections} corrections (want ${MAIN_CORRECTIONS - 1}), ${carries} carries (at most ${MAIN_CARRIES - 1}), ${r.open.dispatches.toFixed(0)} dispatches (at most ${MAIN_OPEN - 2})`,
-    corrections === MAIN_CORRECTIONS && carries === MAIN_CARRIES);
+  check('control: the counting tells the velocity\'s carry from the others\'', vel.carries + vel.corrections >= 1 && rest.corrections >= 1,
+    `velocity ${vel.carries + vel.corrections}, the others ${rest.carries + rest.corrections}`);
+  line('h2c5', 'H2c-5: the open plate carries velocity first order (no MacCormack correction, one carry), every other field still corrected as on main, the step two dispatches lighter',
+    vel.corrections === 0 && vel.carries === 1 && rest.corrections === MAIN_REST_CORRECTIONS && rest.carries === MAIN_REST_CARRIES && r.open.dispatches <= MAIN_OPEN - 2,
+    `velocity ${vel.corrections} corrections and ${vel.carries} carries (want 0 and 1), the others ${rest.corrections} and ${rest.carries} (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.open.dispatches.toFixed(0)} dispatches (at most ${MAIN_OPEN - 2})`,
+    vel.corrections === 1 && vel.carries === 2);
   line('h2c8', 'H2c-8: a plate that never had a bubble makes no air pass a step and keeps no air texture',
     r.bare.passes === 0 && r.bare.live === 0,
     `${r.bare.passes} passes a step, ${r.bare.live} air textures alive (main 1 and 2)`,

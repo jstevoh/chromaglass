@@ -60,19 +60,26 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
   {
     const K4 = { width: 3840, height: 2160 };
     const opened = [];
-    let worst = 0;
+    let worst = 0, least = Infinity;
     for (const devicePx of [1, 2]) {
       for (const tier of ['hosted', 'local']) {
         for (const gpu of ['mid', 'strong']) {
           const { rungs, start } = ladderAt(tier, gpu, devicePx, K4);
           const px = canvasPixelsFor(rungs[start].dpr, K4, CAP, WINDOW);
           worst = Math.max(worst, mpx(px));
+          least = Math.min(least, mpx(px));
           opened.push(`${devicePx}x ${tier} ${gpu}: ${rungs[start].grid}² at ${px.width}x${px.height}`);
         }
       }
     }
-    line('4k', '14c-4k: a 3840×2160 stage opens at a share of at most 4.7 Mpx (the 0.75 share), and not below 4.0', worst <= 4.7 && worst >= 4.0,
-      `the most opened on: ${worst.toFixed(2)} Mpx; ${opened.join('  ·  ')}`, worst > 8);
+    /*
+      Every opening, not the largest alone: excused only while all eight open
+      on the whole wall, and each held between 4.0 and 4.7, so a build that
+      fixes seven tiers, or opens one far below, is red (the check-skeptic,
+      2026-11-07; the second clause below passes trivially for a low one).
+    */
+    line('4k', '14c-4k: a 3840×2160 stage opens at a share of at most 4.7 Mpx (the 0.75 share), and not below 4.0', worst <= 4.7 && least >= 4.0,
+      `opened on ${least.toFixed(2)} to ${worst.toFixed(2)} Mpx; ${opened.join('  ·  ')}`, least > 8);
 
     /*
       And its second clause (written 2026-11-07): no step down in the first
@@ -129,7 +136,7 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
     }
     const fell = downs.filter((d) => d.moves.length);
     line('4k', '14c-4k: and no opening on a 3840×2160 stage steps down in its first 10 s (a machine whose cost is the pixels)', fell.length === 0,
-      fell.length ? fell.map((d) => `${d.name}: ${d.moves.join(' → ')}`).join('  ·  ') : `none of ${downs.length} moved down`, worst > 8);
+      fell.length ? fell.map((d) => `${d.name}: ${d.moves.join(' → ')}`).join('  ·  ') : `none of ${downs.length} moved down`, least > 8);
   }
 
   // ── 14b-120: a 120 Hz desk with a 60 Hz projector, the wall the output ──
