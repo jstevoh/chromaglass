@@ -28,10 +28,10 @@
  *   3. and the picture turned with the liquid, not the glass: through the
  *      angle the liquid's speed integrates to, within 1.5× (about a twentieth
  *      of the glass's turn; rigid reads all of it);
- *   4. the solver was handed the dish's drag, Ω − ω_l, at least half the
- *      dish's speed, and no stir of its own: the flick's stir in the
- *      current went in 22h and the motor's in 22j, so the step has no
- *      `twist` at all;
+ *   4. the solver was handed the dish's drag, Ω − ω_l as the frame reads
+ *      them (within 1.5×: it asked for half of Ω while τ was 3 s, PLAN
+ *      38r), and no stir of its own: the flick's stir in the current went
+ *      in 22h and the motor's in 22j, so the step has no `twist` at all;
  *   5. two drag times later, the angle the picture has lost to the glass is
  *      the drag time's, to 15%: the speeds have nearly met by then and cannot
  *      tell τ apart, but the angle lost on the way is ∫(Ω − ω_l) and grows
@@ -184,9 +184,24 @@ try {
   const turned = (w.angle - f.angle) / liquidTurn(f.dish, t);
   check('and the picture turns with the liquid, not the glass', turned > 1 / 1.5 && turned < 1.5,
     `${(w.angle - f.angle).toFixed(4)} rad, the liquid's ${liquidTurn(f.dish, t).toFixed(4)}, the glass's ${glassTurn(f.dish, t).toFixed(3)}`);
-  check('the solver is handed the dish\'s drag on the liquid, and the flick stirs nothing of its own',
-    w.handed !== null && Math.abs(w.handed) > 0.5 * Math.abs(w.dish) && w.stir === false,
-    `Ω − ω_l ${w.handed?.toFixed(3)} rad/s, ${w.stir ? 'a twist in the step' : 'no twist in the step'}`);
+  /*
+    What the step was handed is the frame's own Ω − ω_l, read in the same
+    frame, within 1.5× either way (a frame's drift between the step and
+    the read is a twentieth of ω_l on water at the 2 mm gap). It used to
+    ask for at least half of Ω, which was the drag time's doing and not
+    the hand-off's: at the 6 mm gap water's τ was 3 s, so 0.3 s after the
+    flick the liquid had barely moved and Ω − ω_l was 0.9 Ω. At 2 mm τ is
+    a third of a second (PLAN 38r), the liquid is half-way to the glass by
+    the read, and Ω − ω_l is 0.4 Ω by the same law check 2 holds the
+    liquid to. Read as the difference itself the line still fails the two
+    mutants it is for: a step handed the glass's whole speed reads 2.5×,
+    one handed nothing reads 0.
+  */
+  const handedWant = w.dish - w.liquid;
+  const handedRatio = w.handed !== null && handedWant !== 0 ? w.handed / handedWant : 0;
+  check('the solver is handed the dish\'s drag on the liquid, Ω − ω_l as the frame reads them, and the flick stirs nothing of its own',
+    w.handed !== null && handedRatio > 1 / 1.5 && handedRatio < 1.5 && w.stir === false,
+    `handed ${w.handed?.toFixed(3)} rad/s against the frame's Ω − ω_l ${handedWant.toFixed(3)} (Ω ${w.dish.toFixed(3)}, ω_l ${w.liquid.toFixed(3)}), ${w.stir ? 'a twist in the step' : 'no twist in the step'}`);
 
   // ── 5: caught up ──
   await page.waitForTimeout(2 * TAU.thin * 1000);

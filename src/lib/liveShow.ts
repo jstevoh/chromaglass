@@ -296,6 +296,22 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
   return enc.state();
 }
 
+/**
+ * Go live (or test) to the destinations the panel has saved with a kept key,
+ * at the saved format: what the panel's own Go does, for the owner's assistant
+ * in Full mode (the relay's `assistant-live`, PLAN 44d). The panel's
+ * press-twice arming is the desk's guard against a slip of the hand; the
+ * assistant's is the owner's switch, which has to say Full.
+ */
+export async function startSavedLive(test: boolean): Promise<LiveState> {
+  const native = nativeLive();
+  if (!native) throw new Error('the live show streams from the Mac app');
+  const kept = new Set((await native.keys.list()).map((k) => k.name));
+  const to = chosenFor(loadDestinations(), test).filter((d) => kept.has(keyNameFor(d)));
+  if (to.length === 0) throw new Error(test ? 'no test destination with a kept key' : 'no live destination with a kept key');
+  return startLive({ ...liveOptionsFor(to, loadFormat()), test });
+}
+
 export async function stopLive(): Promise<LiveState | null> {
   if (!current) return null;
   const s = await current.stop();

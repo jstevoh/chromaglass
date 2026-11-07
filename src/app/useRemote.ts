@@ -19,7 +19,8 @@ import type { CastState } from '../lib/castProtocol';
 import type { MidiAction } from '../lib/midi';
 import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
-import { useLiveShow, onAir, stopLive } from '../lib/liveShow';
+import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
+import { assistantLook } from '../lib/assistantLook';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -221,6 +222,16 @@ export function useRemote({
           // Arm, do not apply: `preset` is the destructive one.
           if (message.presetId) cueLook(message.presetId); else setCued(null);
           break;
+        // The owner's assistant (PLAN 44c): a look it made, armed for Go, and
+        // in Full mode the live stream. Only the relay's guard sends these.
+        case 'cue-look': {
+          const look = assistantLook(message, allPresets, activePresetId);
+          if (look) setCued(look);
+          break;
+        }
+        case 'assistant-live':
+          void startSavedLive(message.test === true).catch(() => { /* the panel shows why */ });
+          break;
         case 'dye': {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {
@@ -364,6 +375,9 @@ export function useRemote({
         case 'lights':
         case 'cast':
         case 'picture':
+        case 'assistant-mode':
+        case 'assistant-reply':
+        case 'assistant-undo':
           break;
         default: unhandled('a message from the phone', message);
       }
