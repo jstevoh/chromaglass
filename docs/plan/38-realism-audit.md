@@ -525,12 +525,10 @@ written first. Line numbers are as read on main at d07ac31.
     change, for the check's author). At 2 mm the slump runs 1 substep, not 4, and the warm start's
     fit adds 3, so the total matches main's 365 by chance; any physics that moves an adaptive
     substep count reads as "H2c-1 built and misses". Count the multigrid's own kernels instead.
-  - **38r-15. A flushed glycerine dish keeps 0.9% too much at 2 mm, solved to convergence** (S–M;
-    found in #655's 38r-12). `npm run flush`'s line 3 asks 0.750 of the glycerine left to 1%. Ten
-    V-cycles a step read 0.757 (0.93%); two cycles from the old warm start read 0.754 and from the
-    fitted one 0.759, each the solve's own error either side of it. Find where the 0.7% stays (the
-    rim's lip, 18g-12, passes only a body cell's overflow; the held strip past the rim) and fix that,
-    so the line holds on any start; the bar is not moved.
+  - ~~**38r-15**~~ A flushed glycerine dish kept 0.9% too much at 2 mm: the grid's edge cells,
+    past the solve's open rim but inside its radius, held what the flow pushed out; the rim's
+    clearing now takes the solve's own set (`pastOpenRim`), `npm run flush` 0.759 → 0.751.
+    Shipped in #655; the story is in `docs/plan-shipped.md` §38r.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

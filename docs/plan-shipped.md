@@ -11249,3 +11249,16 @@ by the solve's own energy instead (the Ritz choice, G summed over faces): `encod
 1.072e-2, flush 0.759. A solve run to convergence (10 cycles) reads 0.757 on that line with or
 without the fit, so the old 0.754 was two cycles' error falling on the volume's side of the 1% bar
 (0.7575); see 38r-15.
+
+*38r-15:* where the 0.7% stayed. A probe in the lab, the flush's glycerine dish at 20 V-cycles a
+step: the carries' faces let out over the rim exactly the water poured (127.54 against 127.55 in
+the lab's units), and still the glycerine left read 0.757, and the last ring inside the rim read
+1.06 a cell. The piles were not in the ring but on the grid's own edge: hsPrep holds the air's
+pressure in the cells on the box's wall as well as past the rim's radius (PLAN 27a-1), and the
+species' rim (speciesSplat) and the colour's (decayDye) cleared by the radius alone. So four strips
+of sixteen cells, where the inscribed rim meets the wall, inside the radius and past the solve's
+rim, took what the flow pushed out and nothing took it off: 2.07 a cell at the +x edge, 0.99% of
+the dish's glycerine. Now one predicate, `pastOpenRim` in `wgsl/fluid/shared.ts`, is the solve's
+rim, the species' and the colour's, and the colour's spreading stops at the same edge
+(dyeDisperse). `PW_WEBGPU=1 npm run flush`: glycerine left 0.759 → 0.751 (the volume says 0.750),
+the colour 0.776 → 0.750, the full dish 1.002 → 0.997 of its area; 9/9, no bar moved.

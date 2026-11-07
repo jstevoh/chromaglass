@@ -682,8 +682,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     so they and not the film's drift set the carries' substeps (fluid.ts,
     driftCells; PLAN 27a-1).
   */
-  let d = uvOf(id) - vec2f(0.5);
-  if (length(d) >= ${OPEN_RIM.toFixed(2)} || q.x == 0 || q.y == 0 || q.x == n - 1 || q.y == n - 1) { mo = -mo; }
+  if (pastOpenRim(q)) { mo = -mo; }
   mob[q.x + q.y * n] = mo;
   /*
     Under a hand what is stored is u* + K·Δt·U, which the gradient takes
