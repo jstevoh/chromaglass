@@ -57,7 +57,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
 import { HitSource } from '../lib/hitSource';
 import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
-import { BarGrid, Accent } from '../lib/barGrid';
+import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
 import { ROOM_STALE_MS, RoomStir } from '../lib/roomStir';
@@ -72,7 +72,7 @@ import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '..
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
@@ -952,9 +952,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
   /*
-    The bar (lib/barGrid.ts): where the beats fall and which of them is the
-    one, heard from the same readings on the same clock as the song's shape,
-    so Accent the One can weigh each kick's press by its place in the bar.
+    The bar (lib/barGrid.ts): where the beats fall and which is the one,
+    heard on the song shape's clock (or told by Link), so Accent the One
+    weighs each kick's press by its place in the bar.
   */
   const barGridRef = useRef(new BarGrid());
   const accentRef = useRef(new Accent());
@@ -2604,10 +2604,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             heardAt = clockIsFixed() ? nowMs : Math.min(nowMs, kickAt * 1000);
           }
           const trust = isActiveRef.current && currentAudioData ? Math.max(0, Math.min(1, currentSettings.beatPrediction ?? 0)) : 0;
-          // A clock from the desk, a tapped tempo or a typed one, if there is
-          // one. Handed over every frame — the reading carries its own
-          // sequence number, so the clock can tell a new beat from a held one.
-          beatClockRef.current.setExternal(nowMs, clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null);
+          // Link, a desk's clock, taps or a typed bpm, every frame (its seq
+          // tells a new beat from a held one).
+          const tempoNow = clockIsFixed() ? null : tempoRef?.current?.read(nowMs) ?? null;
+          beatClockRef.current.setExternal(nowMs, tempoNow);
           kickRef.current = beatClockRef.current.update(nowMs, heardAt, trust, Math.max(0, currentSettings.beatLead ?? 0));
           if (kickRef.current.kick) kickCountRef.current++;
           /*
@@ -2628,6 +2628,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           songClockRef.current = heard ? heard.time : songClockRef.current + realDt;
           const songEvents = songShapeRef.current.update(heard, songClockRef.current);
           barGridRef.current.update(heard, songClockRef.current);
+          tellBar(barGridRef.current, tempoNow, nowMs, songClockRef.current);
           hitSourceRef.current.update(heard, songClockRef.current);
           /*
             The melody hears every reading whatever the setting, so turning
@@ -3612,7 +3613,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
           // ── Automation logic ───────────────────────────────────
           if (isAutomatedRef.current && isActiveRef.current && drainFrameRef.current === 0) {
-            const rate = Math.max(0, Math.min(1, currentSettings.automateRate ?? 0.12));
+            const rate = Math.max(0, Math.min(3, currentSettings.automateRate ?? 0.12));
             /*
               What the hands hear: the song over the last half minute, and its
               section. Not the frame's energy, treble and spectral centroid,
@@ -4226,7 +4227,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     its own and read as Beat Squeeze, which sits at 0 on every
                     look but Bass Drop.
                   */
-                  const bloomGain = Math.max(0, Math.min(1.5, currentSettings.kickBloom ?? 1));
+                  const bloomGain = Math.max(0, Math.min(4, currentSettings.kickBloom ?? 1));
                   if (kickRef.current.kick && simStep === 0 && bloomGain > 0) {
                     // Against its pool: the cycle half way round, so the ring is the other of the area's two dyes.
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
@@ -4403,7 +4404,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             if (melodyQueueRef.current.length > 0) {
               const drops = melodyQueueRef.current.splice(0);
               const mf = fluidsRef.current[activeLayerRef.current];
-              const gain = Math.max(0, Math.min(1, currentSettings.melodyWalk ?? 0));
+              const gain = Math.max(0, Math.min(2, currentSettings.melodyWalk ?? 0));
               if (mf && gain > 0 && isActiveRef.current && drainFrameRef.current === 0) {
                 const target = dyeLookTarget(mf.seedMean, currentSettings.dyeBudget ?? 0.85, mf.seedBudget);
                 const clearPhase = mf.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
@@ -4435,7 +4436,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           // leans a small sway keeps it alive.
           {
             const rock = rockRef.current;
-            const R = Math.max(0, Math.min(1, currentSettings.plateRock ?? 0));
+            const R = Math.max(0, Math.min(3, currentSettings.plateRock ?? 0));
             const bass01 = currentAudioData ? Math.min(1, currentAudioData.bass / 70) : 0;
             const kickStep = kickRef.current.kick && simStep === 0;
             /*
@@ -4677,11 +4678,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               // it. A standing squeeze on each footprint keeps pumping the
               // dye out to the rim, so the field flows round the bubbles
               // instead of sliding underneath them as if they were painted on.
+              // The bubble's press, not the hand's (lib/squish.ts Presser): a held Blow's straw bubble is one, and `npm run tools` counts the hand's alone.
               if (lead) {
                 for (const b of bubbles.bubbles) {
                   if (b.r < 1.2) continue;
                   const bx = Math.round(b.x), by = Math.round(b.y);
-                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035);
+                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
                 }
               }
               // A pop is an inward cavity collapse into the void left behind.
@@ -5220,7 +5222,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // Second-layer throw: zoom grows with the setting, drift is a slow
         // Lissajous so the two scales slide past each other.
         {
-          const variety = Math.max(0, Math.min(1, currentSettings.layerScaleVariety ?? 0));
+          const variety = Math.max(0, Math.min(2, currentSettings.layerScaleVariety ?? 0));
           const view = layer1ViewRef.current;
           view.zoom = 1 + variety * 1.6;
           view.dx = Math.sin(time * 0.05) * 0.07 * variety;
@@ -7209,41 +7211,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         picture on the wall without anything having been clicked.
       */
       if (!isMouseDownRef.current) return;
-      if (x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-        /*
-          Not under the Finger either: it carries the dye it touches
-          (carryDye) and does not press the glass. A press here is a squeeze-
-          film source, a flow that spreads out from under it, and dye
-          advected through a spreading flow is copied over more plate than it
-          came from: a stroke is thirty of these, and npm run tools measured
-          the Finger adding dye (512 -> 1484 against +216 left alone) after
-          its own carry had been made to conserve.
-        */
-        /*
-          Nor under the Drop: it puts paint down and that is all. Reported
-          twice as a "press or blow" going off with every drop; whatever else
-          is found, a drop that also squeezes the film and shoves it along the
-          stroke is not a drop.
-        */
-        if (activeToolRef.current === 'dropper') return;
-        /*
-          And the Finger neither presses nor stirs: its carry moves the dye.
-          With the stir's vertical sign put right it pushed along the stroke,
-          and a push through the film spreads the dye it carries over more
-          plate than it came from, the same copying the press did (npm run
-          tools: 310 -> 459 against +57 left alone).
-        */
-        if (activeToolRef.current === 'finger') return;
-        activeFluid.applySquish(x, y, 8, 0.005);
-        const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
-        const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
-        // The plate's uv counts up and CSS counts down (getTransformedMousePos):
-        // unflipped, a stroke up the screen shoved the liquid down it.
-        const sx = e.movementX, sy = -e.movementY;
-        const mx = (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale * 5;
-        const my = (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale * 5;
-        activeFluid.addVelocity(x, y, mx, my);
-      }
+      const angle = rotationAnglesRef.current[activeLayerRef.current] || 0;
+      const scale = Math.max(rect.width, rect.height) * 1.5 / GRID_SIZE * Math.max(0.0001, macroShotRef.current.zoom);
+      // The plate's uv counts up and CSS counts down (getTransformedMousePos):
+      // unflipped, a stroke up the screen shoved the liquid down it.
+      const sx = e.movementX, sy = -e.movementY;
+      stirAlongMove(activeFluid, activeToolRef.current, x, y, (sx * Math.cos(-angle) - sy * Math.sin(-angle)) / scale, (sx * Math.sin(-angle) + sy * Math.cos(-angle)) / scale);
     };
 
     const handleMouseDown = (e: MouseEvent) => {
@@ -7425,10 +7398,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           if (!h) continue;
           h.x = x; h.y = y;
         }
-        // Not under the magnet, the finger or the drop, as for the mouse above.
-        if (activeFluid && activeToolRef.current !== 'magnet' && activeToolRef.current !== 'finger' && activeToolRef.current !== 'dropper' && x > 0 && x < GRID_SIZE - 1 && y > 0 && y < GRID_SIZE - 1) {
-          activeFluid.applySquish(x, y, 8, 0.005);
-        }
+        // The press as for the mouse above, and no stir, which a touch never had (stirAlongMove: not under the finger, the drop or the blow).
+        if (activeFluid && activeToolRef.current !== 'magnet') stirAlongMove(activeFluid, activeToolRef.current, x, y, 0, 0);
       }
     };
 

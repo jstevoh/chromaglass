@@ -17,7 +17,7 @@ import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
 import { useDeskTabs } from './hooks/useDeskLayout';
 import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
-import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, type DeskSurface } from './lib/deskPins';
+import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, travelOfKey, valueOfKey, type DeskSurface } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette } from './components/desk/CommandPalette';
@@ -143,7 +143,8 @@ import { useCastFeed } from './app/useCastFeed';
 import { useRecording } from './app/useRecording';
 import { useGlides } from './app/useGlides';
 import { useRowFades } from './app/useRowFades';
-import { useRemote } from './app/useRemote';
+import { useRemote, type OscOutHear } from './app/useRemote';
+import { useShowFeed } from './app/useShowFeed';
 import { useSongScore } from './app/useSongScore';
 import { useSongRendering } from './app/useSongRendering';
 import { useControllers } from './app/useControllers';
@@ -221,7 +222,7 @@ export default function App() {
 
   const { output, setOutput, resetOutput, wallTest, setWallTest, shownOutput } = useOutput();
 
-  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, setLinkOn, tempoPanel } = useTempo();
+  const { tempoRef, tempoLabel, tapTempo, readTempo, clearTempo, linkProps, tempoPanel } = useTempo();
 
   const { ambientMode, setAmbientMode, setAmbientModeRef } = useAmbientMode();
 
@@ -1972,6 +1973,7 @@ export default function App() {
   };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
+  const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
     remoteLink,
   } = useRemote({
@@ -1982,7 +1984,7 @@ export default function App() {
     setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
     togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
-    runActionRef, runAction, tempoRef,
+    runActionRef, runAction, tempoRef, oscOutHearRef,
   });
 
   const {
@@ -2013,32 +2015,10 @@ export default function App() {
   ], [userPresets.presets]);
   relaySendRef.current = remoteLink.send;
 
-  /*
-    The plate's colour, out to the lighting rig.
-
-    The same `layerReport` the bench draws its tabs from, twenty times a second
-    to the show server, which turns it into Art-Net (see `server/artnet.js`).
-    The par cans wash the room in whatever the dye is doing instead of whatever
-    was set before the doors opened.
-
-    Faster than the bench's poll because a light that lags the screen by half a
-    second reads as broken, and it costs nothing when nothing is listening: no
-    relay, no socket, no send. It carries no React state, so the loop never
-    causes a render.
-  */
-  useEffect(() => {
-    if (remoteLink.status !== 'connected') return;
-    const id = setInterval(() => {
-      const layers = wallRef.current?.layerReport?.();
-      if (!layers?.length) return;
-      // The plate's own brightness, so the room dims when the glass thins
-      // rather than sitting at full on an empty plate. Blackout is black.
-      const fill = layers.reduce((a, l) => a + l.fill, 0) / layers.length;
-      const master = blackoutRef.current ? 0 : Math.min(1, fill * 1.6);
-      relaySendRef.current?.({ type: 'lights', layers: layers.map(l => ({ colour: l.colour, fill: l.fill })), master });
-    }, 50);
-    return () => clearInterval(id);
-  }, [remoteLink.status]);
+  // The plate's colour to the rig, and colour, sound and beat to a VJ app (OSC out).
+  const { oscOut, onOscOut } = useShowFeed({
+    connected: remoteLink.status === 'connected', relaySendRef, wallRef, blackoutRef, hear, tempoRef, oscOutHearRef,
+  });
 
   // ── MIDI controller and game controller ─────────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
@@ -2263,6 +2243,8 @@ export default function App() {
       wallTest={wallTest}
       onWallTest={setWallTest}
       {...tempoPanel}
+      oscOut={oscOut}
+      onOscOut={onOscOut}
       readTempo={readTempo}
       readEar={() => ear.live.current?.features ?? null}
       spinBpm={tempoLabel.source ? tempoLabel.bpm : heardBpm}
@@ -2310,6 +2292,7 @@ export default function App() {
   // A section as a panel; with Music & Drone out, Sound has no way there (35c-5).
   const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {}, ...(whereIs(deskLayout, 'player') && { onOpenSound: undefined }) });
 
+  const evolveAt = travelOfKey('automateRate', settings.automateRate);
   return (
     // On a phone the height is the dynamic viewport's: 100vh there is the
     // height with the browser's bars hidden, which put the dock under them.
@@ -2920,7 +2903,7 @@ export default function App() {
                       transition={{ type: "spring", stiffness: 500, damping: 30 }}
                     />
                   </button>
-                  {/* How fast it evolves: a drop or a blow every second or so at the left, a frenzy at the right */}
+                  {/* How busy Evolve is: a drop a second at left, a frenzy at right */}
                   <div className={`flex flex-col gap-1 w-full mt-1 transition-opacity ${isAutomated ? '' : 'opacity-40'}`}>
                     <div className="flex items-center justify-between w-full">
                       <span className="text-[11px] uppercase tracking-widest font-bold text-white/55">Evolve Speed</span>
@@ -2930,12 +2913,12 @@ export default function App() {
                       type="range"
                       min="0"
                       max="1"
-                      step="0.01"
-                      value={settings.automateRate ?? 0}
-                      onChange={e => updateSettings({ automateRate: parseFloat(e.target.value) })}
+                      step="0.001"
+                      value={evolveAt}
+                      onChange={e => updateSettings({ automateRate: valueOfKey('automateRate', +e.target.value) })}
                       className="w-full h-6 appearance-none rounded-full cursor-pointer accent-purple-400"
-                      style={{ background: `linear-gradient(to right, rgb(192,132,252) ${(settings.automateRate ?? 0) * 100}%, rgba(255,255,255,0.1) ${(settings.automateRate ?? 0) * 100}%)` }}
-                      title="How busy Random Evolve is: how often it pours, thins, strokes, and how far the dials wander"
+                      style={{ background: `linear-gradient(to right, rgb(192,132,252) ${evolveAt * 100}%, rgba(255,255,255,0.1) ${evolveAt * 100}%)` }}
+                      title="How busy Random Evolve is: how often it pours, thins and strokes"
                       data-testid="evolve-speed"
                     />
                   </div>
@@ -3283,7 +3266,9 @@ export default function App() {
             readLevel={readLevel}
             tempo={tempoLabel}
             onTap={tapTempo}
-            onLink={setLinkOn}
+            {...linkProps}
+            oscOut={oscOut}
+            onOscOut={onOscOut}
             readTempo={readTempo}
             show={{
               running: sequencer.status.running,

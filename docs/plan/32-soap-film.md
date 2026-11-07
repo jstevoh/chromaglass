@@ -47,7 +47,9 @@ can only be exchanged, not stretched. The reference model keeps that and drops t
   matching functions: the table's Airy with the path `4π n d cos θ_t / λ`, `cos θ_t` from
   Snell's law. The first reflectance maximum at 550 nm therefore sits at `d₀ / cos θ_t`.
 
-**Named shortcuts (the owner's rule: name them, give each a plan item).**
+**Named shortcuts (the owner's rule: name them, give each a plan item).** Numbered as items
+2026-10-30 (38o): (a) is 32h, (b) is 32i, (c) is 32f (shipped), (d) is 32g (shipped), (e) is 32j,
+(f) is 32b-1. What (c) and (d) said below is the prototype's, kept as the record.
 (a) *Gravity in the plane of a plate that lies flat.* The Hele-Shaw plate is horizontal; the
 film "hangs" because `g` is applied along the picture's y. It is a look of a vertical film,
 named so, and 32d keeps it a setting. (b) *ζ is tuned*, not derived: with `ρg = 9810` and
@@ -102,6 +104,47 @@ colleagues 2020.
   Chromium only on `Measure`'s `browser` and `lab` shards (`logic` has no Chromium), so
   `npm run soapgpu -- --selftest` sits in `Measure`'s `lab` shard beside `sloshgpu` until
   `soapgpu.mjs` steps the `--selftest` control in Node without a browser.
+
+## ~~32f. The frame drains the film (shortcut c)~~ — **Shipped** (`drainToBorder` in `src/lib/soapFilm.ts`, the border pass in `src/gpu/wgsl/soapFilm.ts`'s `soapTransport`; `npm run soapfilm` C8, five lines; `npm run soapgpu` 32f)
+
+**Shipped.** Story in `docs/plan-shipped.md` §32f (2026-10-30).
+
+- **32f-1. The border's exchange speed is the buoyant Darcy speed at the tuned ζ.** It inherits
+  32i's time compression: at a real ζ the fresh film would be thicker and slower. Re-measure C8
+  when 32i lands.
+- **32f-2. The bottom border is a fixed radius.** Real drainage fills the bottom border (r0 grows
+  with the liquid the borders take). `f.drained` is that liquid; r0 from it is the next step.
+
+## ~~32g. Black spots on Vrij's clock (shortcut d)~~ — **Shipped** (`blackSpots` in `src/lib/soapFilm.ts`, the same in `soapTransport`; `npm run soapfilm` C9, four lines; `npm run soapgpu` 32g, two)
+
+**Shipped.** Story in `docs/plan-shipped.md` §32g (2026-10-30).
+
+- **32g-1. The black front moves one cell a step.** Its speed is the grid's (2 cm/s at 1 mm and
+  dt 0.05), not the spot's. Real black spots grow at a speed set by the black film's lower
+  tension against the rim's drag (Mysels); that law is the next step.
+- **32g-2. Vrij's clock sits on the grid.** It does not travel with the film. It matters only
+  under about 60 nm, where the film barely moves, but advecting it with h is the honest form.
+- **32g-3. Only van der Waals.** The double-layer repulsion that sets a common black film's
+  thickness (DLVO) is left out: every spot goes straight to Newton black.
+
+## 32h. Gravity in the plane (shortcut a)
+
+The film hangs because g is applied along the picture's y on a plate that lies flat. The honest
+form is a tilt: in-plane gravity g sin θ for a film tilted θ from flat, θ a setting (90° a hanging
+film, 0 a level one with no sort), which is the real law at every angle. 32d's setting.
+
+## 32i. Real drag, and time as its own dial (shortcut b)
+
+ζ = 1.5 is fitted to make 30 s of show from minutes of drainage. Derive ζ from the film's own
+drag (air friction on both faces and the monolayers' surface shear viscosity), and make the
+compression a time-rate setting that runs the real physics faster, which may go past real (the
+owner, 2026-10-30), instead of a wrong constant. Re-measure C1–C9 at the real ζ under the rate.
+
+## 32j. The surfactant moves (shortcut e)
+
+Marangoni plug flow: transport the surfactant's surface concentration Γ and let its gradient
+push the film, which is what makes the film inextensible in the first place. Stiff (wave speed
+about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carries it.
 
 ## 32d. On the plate
 

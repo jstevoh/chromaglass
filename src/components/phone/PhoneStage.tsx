@@ -11,9 +11,11 @@ import {
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { PIN_RANGE } from '../../lib/deskPins';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PanelGuard } from '../PanelGuard';
@@ -21,6 +23,8 @@ import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
+import { OscOutRow } from '../ui/OscOutRow';
+import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -228,6 +232,11 @@ export interface PhoneStageProps {
   onTap: () => void;
   /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
   onLink?: (on: boolean) => void;
+  /** Live's play and stop move the Sequence (13.5-link-transport), as on the desk. */
+  onLinkTransport?: (on: boolean) => void;
+  /** OSC out at the show server (PLAN.md 13.5-osc), the desk's own row at a phone's size; null until a server is there. */
+  oscOut?: OscOutLabel | null;
+  onOscOut?: (on: boolean, target?: string) => boolean;
   readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
@@ -628,7 +637,7 @@ export function PhoneStage(p: PhoneStageProps) {
               label="Magnet · size"
               value={p.magnetSize}
               min={0}
-              max={1}
+              max={PIN_RANGE.get('magnetSize')?.max ?? 1}
               step={0.05}
               onChange={p.onMagnetSize}
               display={`${Math.round(p.magnetSize * 100)}%`}
@@ -701,7 +710,7 @@ export function PhoneStage(p: PhoneStageProps) {
             className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
             {/* The bottle in hand, filled to what is left of the Dye Budget (PLAN 35e); it leans while its sheet is open. */}
-            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} />
+            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} testId="phone-dye-bottle" />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
@@ -1053,7 +1062,20 @@ export function PhoneStage(p: PhoneStageProps) {
                 Link
               </button>
               <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
+              {p.tempo.link.on && p.onLinkTransport && (
+                <button
+                  onClick={() => p.onLinkTransport?.(!p.tempo.link?.follows)}
+                  aria-pressed={!!p.tempo.link.follows}
+                  data-testid="phone-tempo-link-transport"
+                  className={`ml-auto min-h-11 flex-none rounded-xl border px-4 text-[14px] font-medium ${p.tempo.link.follows ? LIT : 'border-white/10 bg-white/5'}`}
+                >
+                  Play/Stop
+                </button>
+              )}
             </div>
+          )}
+          {p.oscOut && p.onOscOut && (
+            <div className="mt-2"><OscOutRow oscOut={p.oscOut} onOscOut={p.onOscOut} touch testId="phone-osc-out" /></div>
           )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
@@ -1087,6 +1109,18 @@ export function PhoneStage(p: PhoneStageProps) {
               <SongScore {...p.score} touch />
             </>
           )}
+          {/*
+            The desk's Tip pad under a thumb (PLAN 18a-13j): for a phone on a stand,
+            an iPad, or a hand that would rather not tip the phone itself. Hidden
+            while Tilt is on, since the phone is then the dish and both would write
+            the same two settings.
+          */}
+          {!p.tilt.on && (
+            <div className="mt-3 flex items-center gap-4" data-testid="phone-tip">
+              <TipPad settings={p.mixer.settings} onSetting={p.mixer.onSetting} size={128} testId="phone-tip-pad" />
+              <p className="min-w-0 text-[13px] leading-snug text-muted">Drag the dot toward an edge and the liquid runs there. Let go and the dish lies flat, and the liquid sloshes back.</p>
+            </div>
+          )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
@@ -1095,7 +1129,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
-            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}
+            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={PIN_RANGE.get('automateRate')?.max ?? 1} step={0.01} onChange={p.onEvolveSpeed}
               display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
           </div>
           {/*

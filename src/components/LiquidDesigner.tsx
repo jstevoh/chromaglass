@@ -1,6 +1,12 @@
 /**
  * Your liquids: make one, load one from a file, save them to a file.
  *
+ * Making, changing and loading one is Pro (PLAN.md 23.19, the owner
+ * 2026-10-31): on Free and Home the Design and Load buttons and each bottle's
+ * Edit give way to the Pro note (ProMaker.tsx). What is already on the shelf
+ * stays open, so liquids made before, or left by a lapsed key, keep pouring,
+ * save to a file and come off the shelf.
+ *
  * The designer edits the same numbers the plate acts on (lib/liquidFile.ts),
  * and says underneath how the liquid will meet every other bottle on the
  * shelf, from the same rules, so what it promises is what the plate does.
@@ -12,6 +18,7 @@ import {
   BEHAVIOUR_PROPERTIES, DROP_RANGES, freshId, isCustomLiquid, meets, readLiquidFile, writeLiquidFile,
 } from '../lib/liquidFile';
 import { bottleSwatch } from '../lib/liquidColour';
+import { ProMakerUpsell, useCanMakeOwn } from './ProMaker';
 
 export interface LiquidDesignerProps {
   shelf: LiquidType[];
@@ -57,6 +64,9 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
   const [notice, setNotice] = useState<{ tone: 'ok' | 'warn' | 'error'; lines: string[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const custom = shelf.filter(isCustomLiquid);
+  // Design, Edit and Load are Pro's. Read on every render, so a key typed or
+  // removed while a draft is open opens or closes it (the draft is kept, not lost).
+  const canMake = useCanMakeOwn();
 
   const startFrom = (base?: LiquidType) => {
     setNotice(null);
@@ -81,7 +91,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
   const others = useMemo(() => (finished ? shelf.filter((l) => l.id !== finished.id) : []), [finished, shelf]);
 
   const save = () => {
-    if (!finished) return;
+    if (!finished || !canMake) return;
     onShelve([finished]);
     onPick?.(finished.id);
     setNotice({ tone: 'ok', lines: [`${finished.name} is on the shelf${onPick ? ' and in your hand' : ''}.`] });
@@ -89,7 +99,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
   };
 
   const importFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
+    if (!files?.length || !canMake) return;
     const made: LiquidType[] = [];
     const lines: string[] = [];
     let tone: 'ok' | 'warn' | 'error' = 'ok';
@@ -115,20 +125,37 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
   return (
     <div data-testid="liquid-designer">
       <p className="text-[12px] opacity-50 mb-3 leading-snug">
-        Make a liquid by what it is — how heavy, how oily, what it does to the surface — and the plate works out how it
-        meets every other bottle. Saved in this browser and on the shelf; a <code>.liquids.json</code> file takes them
-        to another machine or another person.
+        {canMake ? (
+          <>Make a liquid by what it is — how heavy, how oily, what it does to the surface — and the plate works out how it
+          meets every other bottle. Saved in this browser and on the shelf; a <code>.liquids.json</code> file takes them
+          to another machine or another person.</>
+        ) : (
+          <>Every bottle on the shelf pours on every tier, the ones you have already made included, and a
+          <code> .liquids.json</code> file takes yours to another machine.</>
+        )}
       </p>
 
+      <ProMakerUpsell id="liquids" what="Make your own liquids">
+        Design a liquid by what it is, how heavy, how oily, what it does to the surface, and the plate works out how it
+        meets every other bottle. Every built-in bottle stays yours to play.
+      </ProMakerUpsell>
+
       <div className="flex flex-wrap gap-2 mb-3">
-        <button type="button" onClick={() => startFrom()} className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
-          <Plus size={12} /> Design a liquid
-        </button>
-        <button type="button" onClick={() => fileRef.current?.click()} className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
-          <Upload size={12} /> Load a file…
-        </button>
-        <input ref={fileRef} type="file" accept=".json,application/json" multiple hidden
-          data-testid="liquid-file" onChange={(e) => { void importFiles(e.target.files); }} />
+        {canMake && (
+          <button type="button" onClick={() => startFrom()} data-testid="liquid-design"
+            className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
+            <Plus size={12} /> Design a liquid
+          </button>
+        )}
+        {canMake && (
+          <>
+            <button type="button" onClick={() => fileRef.current?.click()} data-testid="liquid-load" className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
+              <Upload size={12} /> Load a file…
+            </button>
+            <input ref={fileRef} type="file" accept=".json,application/json" multiple hidden
+              data-testid="liquid-file" onChange={(e) => { void importFiles(e.target.files); }} />
+          </>
+        )}
         {custom.length > 0 && (
           <button type="button" onClick={() => download('my.liquids.json', writeLiquidFile(custom))}
             className="px-3 py-1.5 rounded-md bg-white/10 hover:bg-white/15 text-[12px] flex items-center gap-1.5">
@@ -153,7 +180,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
                 <div className="text-[13px] truncate">{l.name}</div>
                 {l.description && <div className="text-[11px] opacity-40 truncate">{l.description}</div>}
               </button>
-              <button type="button" className="text-[11px] px-2 py-1 rounded bg-white/5 hover:bg-white/10" onClick={() => edit(l)}>Edit</button>
+              {canMake && <button type="button" data-testid="liquid-edit" className="text-[11px] px-2 py-1 rounded bg-white/5 hover:bg-white/10" onClick={() => edit(l)}>Edit</button>}
               <button type="button" aria-label={`Save ${l.name} to a file`} className="p-1.5 rounded bg-white/5 hover:bg-white/10"
                 onClick={() => download(fileName(l.name), writeLiquidFile([l]))}><Download size={12} /></button>
               <button type="button" aria-label={`Remove ${l.name}`} className="p-1.5 rounded bg-white/5 hover:bg-red-500/20"
@@ -165,7 +192,7 @@ export function LiquidDesigner({ shelf, onShelve, onRemove, onPick }: LiquidDesi
         <div className="text-[12px] opacity-35 mb-4">None yet.</div>
       )}
 
-      {draft && finished && (
+      {draft && finished && canMake && (
         <div className="rounded-lg border border-white/10 p-3 mb-2" data-testid="liquid-draft">
           <div className="flex items-center gap-2 mb-3">
             <FlaskConical size={14} className="opacity-50" />

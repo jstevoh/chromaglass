@@ -78,7 +78,12 @@ interface RemoteDeps {
   runAction: (a: MidiAction) => void;
   /** Where Ableton Link's readings go (PLAN.md 13.5-link): the show server sends them, the beat clock reads them. */
   tempoRef: RefObject<TempoSource | null>;
+  /** Where the server's OSC out state goes (PLAN.md 13.5-osc): `useShowFeed` holds the switch. */
+  oscOutHearRef: RefObject<OscOutHear | null>;
 }
+
+/** The server's word on OSC out, to whoever holds its switch. */
+export type OscOutHear = (m: Extract<RemoteMessage, { type: 'osc-out' }>) => void;
 
 export function useRemote({
   settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
@@ -88,7 +93,7 @@ export function useRemote({
   setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
-  tempoRef,
+  tempoRef, oscOutHearRef,
 }: RemoteDeps) {
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
@@ -179,6 +184,17 @@ export function useRemote({
   };
   const padPictureRef = useRef<PadPictureSender | null>(null);
   const linkAskedRef = useRef(-Infinity);
+  /*
+    Live's play and stop, when the operator asked for them (PLAN.md
+    13.5-link-transport): a stop pauses a running Sequence, and a start
+    resumes only a Sequence that Link paused, so Live never starts a show
+    nobody started. The newest sequencer is read through a ref, because a
+    reading twenty times a second is no reason to rebuild the handler.
+  */
+  const sequencerRef = useRef(sequencer);
+  sequencerRef.current = sequencer;
+  const linkPausedRef = useRef(false);
+  const linkPausedIdRef = useRef<string | null>(null);
   const remoteLinkRef = useRef<((m: RemoteMessage) => void) | null>(null);
 
   const remoteLink = useRemoteLink({
@@ -300,18 +316,31 @@ export function useRemote({
         case 'link': {
           const t = tempoRef.current;
           if (!t) break;
-          t.linkReading(performance.now(), message);
+          const edge = t.linkReading(performance.now(), message);
+          const seq = sequencerRef.current;
+          // A Sequence played, stopped or switched by hand since Link paused
+          // it is the operator's again: Live's next play must not start it.
+          if (linkPausedRef.current && (seq.status.running || seq.status.sequenceId !== linkPausedIdRef.current)) linkPausedRef.current = false;
+          if (edge && t.linkTransport) {
+            if (edge === 'stop' && seq.status.running) { linkPausedRef.current = true; linkPausedIdRef.current = seq.status.sequenceId; seq.pause(); }
+            else if (edge === 'start' && linkPausedRef.current) { linkPausedRef.current = false; seq.play(); }
+          }
+          if (edge === 'stop' && !t.linkTransport) linkPausedRef.current = false;
           // The operator wanted Link on and the server says it is off: a server
           // just started (the Mac app relaunches it) or this page just
           // connected. Asked again at most every two seconds, so a server that
           // will not switch it on is not asked twenty times a second.
           const at = performance.now();
-          if (t.linkWanted && !message.on && at - linkAskedRef.current > 2000) {
+          // Below Pro (`locked`) every ten seconds, so a key filed later still opens it.
+          if (t.linkWanted && !message.on && at - linkAskedRef.current > (message.locked ? 10000 : 2000)) {
             linkAskedRef.current = at;
             remoteLinkRef.current?.({ type: 'link-enable', on: true });
           }
           break;
         }
+        case 'osc-out':
+          oscOutHearRef.current?.(message);
+          break;
         /*
           Not this display's, and each for its own reason. Naming them is the
           point: without these four the switch below cannot ask the compiler
@@ -329,6 +358,8 @@ export function useRemote({
         case 'denied':
         case 'request-state':
         case 'link-enable':
+        case 'osc-out-enable':
+        case 'beat':
         case 'state':
         case 'lights':
         case 'cast':

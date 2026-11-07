@@ -162,6 +162,8 @@ Open, from building 9i:
   deep before domes came, with the balance of pull and lift left open. It belongs to
   the standing-domes plate PR that lab is for, not to a retune of the set-down
   strength here.
+  The liquid's onset is now worked out (38k, 4.0 mT, five times under the lab's), and
+  at it this magnet stands its pool up; it waits on 9t-2's pull, then 38k-7.
 - **9x. Picking the Magnet poured the hole itself; a magnet you size and play**
   (**shipped**). Story in `docs/plan-shipped.md` §9x (moved 2026-10-29, 19m).
   Open: on one Mac run (PR #230, after main came in) the pool's centre was 0.11 off

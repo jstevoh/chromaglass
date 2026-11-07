@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
+import { readFileSync } from 'fs';
 import path from 'path';
 import { defineConfig, loadEnv, type Plugin, type Rollup } from 'vite';
 import { APP_WORDS } from './src/lib/showPath';
@@ -75,9 +76,22 @@ function preloadApp(signIn: boolean): Plugin {
   };
 }
 
+/**
+ * The page's version (lib/appVersion.ts, PLAN 13-version): a Mac app release's
+ * own, from desktop.yml's `CHROMAGLASS_VERSION`, or package.json's. Written
+ * into the page as a meta tag too, so a check (and a cast, a phone, anything
+ * that fetches the page) can read which build it is without running it.
+ */
+const APP_VERSION = process.env.CHROMAGLASS_VERSION || JSON.parse(readFileSync(path.resolve(__dirname, 'package.json'), 'utf8')).version;
+const appVersion = (): Plugin => ({
+  name: 'chromaglass-version',
+  transformIndexHtml: () => [{ tag: 'meta', attrs: { name: 'chromaglass-version', content: APP_VERSION }, injectTo: 'head' }],
+});
+
 export default defineConfig(({ mode }) => ({
   // The webpage exists only in a build with a sign-in (main.tsx, LazySignIn).
-  plugins: [react(), tailwindcss(), preloadApp(Boolean(loadEnv(mode, process.cwd(), 'VITE_').VITE_FIREBASE_API_KEY))],
+  define: { __APP_VERSION__: JSON.stringify(APP_VERSION) },
+  plugins: [react(), tailwindcss(), appVersion(), preloadApp(Boolean(loadEnv(mode, process.cwd(), 'VITE_').VITE_FIREBASE_API_KEY))],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),

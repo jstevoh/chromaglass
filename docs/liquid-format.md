@@ -10,6 +10,11 @@ shelf, worked out with the same rules the plate uses (`meets` in
 Make one there, or write one by hand, and load it with **Load a file…**.
 `docs/liquids/examples.liquids.json` has three to start from.
 
+Designing, editing and loading a liquid in Settings → Liquids is Pro (PLAN.md
+23.19). On Free and Home every bottle already on the shelf still pours,
+including ones made before: saving to a file and taking a bottle off the shelf
+stay open on every tier.
+
 ```json
 {
   "format": "chromaglass.liquids",

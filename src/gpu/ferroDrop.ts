@@ -20,7 +20,8 @@
 import { Disposer, PipelineCache } from './kit';
 import { groupOf } from './groupCache';
 import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
-import { SPIKE_ONSET, SPIKE_PITCH } from './wgsl/spikes';
+import { SPIKE_PITCH } from './wgsl/spikes';
+import { LIFT_ONSET } from './wgsl/standing';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { CHI0, LANGEVIN } from './standing';
 
@@ -40,7 +41,7 @@ function langevin(x: number): number { return x < 1e-3 ? x / 3 : 1 / Math.tanh(M
   pressure, 0.50 per unit of ln(sinh ξ / ξ)). The film takes none of it on
   the plate; the picture's drop takes all of it.
 */
-const PULL = (2 / langevin(SPIKE_ONSET / LANGEVIN) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
+const PULL = (2 / langevin(LIFT_ONSET) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
 
 /** The drop's height on a wide flat top, in l_c, at Relief / 3D `relief`: a large sessile drop's 2 sin(θ/2). */
 export function dropPlateau(relief: number): number {

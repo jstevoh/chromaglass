@@ -72,10 +72,10 @@ export const CONTROL_HELP: Record<string, string> = {
   dishVignette: 'The round edge of a projected dish: dark beyond the rim and a thin bright ring at it.',
 
   // Lamp
-  lightPlay: 'How much the lamp\'s direction shows: bubbles shaded as lenses, dye rims lit on the lamp side.',
+  lightPlay: 'Up close, a softbox above the glass: its reflection in each bubble\'s curved wall, by Fresnel\'s law. 0 is the light box alone.',
   lampMotion: 'How far the light the gloss catches wanders, so highlights keep moving over the liquid. The projector\'s own light stays put.',
   lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
-  secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot, and two lights play across every bubble and edge.',
+  secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
   lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
@@ -114,7 +114,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
   macroDepth: 'Dome shading, contact shadow and a shallow depth of field in the close-up.',
   macroEdgeDetail: 'Breaks up smooth, blown-up edges with a fractal warp so a silhouette stays ragged and real.',
-  macroRelief: 'Surface relief up close: per-pixel bumps, wet highlights and shadowing.',
+  macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig
   kaleidoscope: 'Mirrors the plate into 2 to 8 folds. Zero is off.',
@@ -173,7 +173,7 @@ export const CONTROL_HELP: Record<string, string> = {
   rainDrip: 'Heavy drops run down the glass in streaks, as rain does on a window.',
   polarity: 'How polar the liquid is against water. Water is zero, oil is negative, and like dissolves like, so unlike liquids repel.',
   vorticityConfinement: 'Spins small eddies back up that a grid solver smooths away. Flair rather than physics.',
-  surfactantFlow: 'Soap lowers surface tension and the surface streams away from it, carrying the dye (Marangoni flow).',
+  surfactantFlow: 'Soap drops the tension and the surface streams away, carrying dye. It stays: on a plate soaped all over, more does nothing.',
   solutalBuoyancy: 'Dye makes the liquid heavier. Upright, it sinks in fingers; flat, it slumps out along the glass.',
   plateUpright: 'How far the plate stands up, from flat on the projector to upright on the wall, which sets what gravity can do.',
   tiltDirection: 'Which way the tilted plate runs downhill, as a compass on the screen. Zero is toward the top.',

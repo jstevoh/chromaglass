@@ -22,6 +22,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { TipPad } from '../ui/TipPad';
 import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
@@ -782,6 +783,26 @@ function ToolsBody({ p }: { p: DeskProps }) {
             </button>
           );
         })}
+        {/*
+          Tip the dish (PLAN 18a-13j, lib/tipPad.ts): the hand on the rim, beside
+          the hands on the liquid, in the two keycaps the last row leaves empty.
+          The owner never found a way to slosh the plate (2026-10-31): it was
+          three faders in a section no tab puts out. Here it is on every tab
+          that has the tools, with nothing to open and nothing to scroll to
+          (`npm run tippad`). It is not a tool: it needs no pointer on the
+          plate, so a pour and a tip can go together.
+        */}
+        <div
+          className="col-span-2 flex h-12 min-w-0 items-center gap-2 rounded-md border border-border bg-elevated px-1.5"
+          data-testid="tool-tip"
+          title="Tip the dish: drag the dot toward an edge and the liquid runs there; let go and it sloshes back. A first grab turns Slosh up to half if it was off."
+        >
+          <TipPad settings={p.settings} onSetting={p.onSetting} size={40} reach={72} testId="tip-pad" />
+          <span className="min-w-0 truncate text-[11px] font-medium leading-tight text-muted">
+            Tip
+            <span className="block font-mono text-[10px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
+          </span>
+        </div>
       </div>
       {p.onToolAmount && (
         <div className="flex items-center gap-2">

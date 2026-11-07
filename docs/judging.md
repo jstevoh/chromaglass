@@ -2167,6 +2167,14 @@ from the same reading of the protocol, so only Live can say the two agree.
 6. Bad: "looking for a session" for more than a few seconds with Live's Link on (a firewall
    prompt for the app, or the protocol), kicks a steady few milliseconds early or late (the
    clock offset), Live's tempo changing when the app joins.
+7. (13.5-link-one, 2026-11-01) A look with Accent the One up: the plate's heaviest kick lands on
+   Live's bar line from the first bar, not after a few bars of listening, also when the song's
+   own downbeat sounds weak.
+8. (13.5-link-transport) Start a Sequence, switch **Play/Stop** on beside Link, stop Live: the
+   Sequence pauses; play Live: it resumes. With Play/Stop off, Live's stop changes nothing.
+9. (13.5-link-menu) Show → **Ableton Link (Pro)** in the Mac app switches Link as the button does,
+   and its tick follows the button. (13.5-link-rescan) Switch Link on with the Wi-Fi off, then turn
+   the Wi-Fi on: Live on another machine is found within half a minute.
 
 ## 96. Colour that answers the music (PLAN 25i)
 
@@ -2256,3 +2264,113 @@ Lava Lamp) the pigment's grain in the body now reaches the lamp as dye (item 6).
 7. Bad: a look that went dull or flat where it had sparkle the owner liked (say which, and
    Glossiness can be turned up past where it was: it now steepens the real surface), black
    doughnut droplets that read as dirt, a caustic ring that looks drawn.
+
+## 100. Every dial from very gentle to very extreme (PLAN 27h-1)
+
+Twenty-five dials go further than they did (the list is in PLAN 27h-1). The looks have not
+moved: every look's own value is where it was, so a look should open exactly as before.
+
+1. Any look, each widened dial at its first step and at its top, with music. The first step
+   should be barely there; the top should be more than nature, never black, one flat colour or
+   frozen. Magnet Strength at 3 over ferrofluid should stand the spikes up full, which 1 never
+   did at the default height. Saturation at 0 is a grey plate.
+2. The curved dials (Gel Speed, Film Grain, Grain Size, Gate Weave, Grain Fineness, Shot Length,
+   Bass Boost, Evaporation, Flick Strength, Evolve Speed, Plate Rock, Kick Bloom, Hue Journey,
+   Macro Zoom): the look's own value should sit a third or so along the slider, not hard
+   against the left stop, on the panel, a pinned desk fader, the phone and a MIDI fader alike.
+3. Evolve on for five minutes: it should wander the widened dials no further than before.
+4. Bad: a dial whose top does nothing more than the old top did (a clamp left behind), or a
+   plate that blows up at a top.
+
+## 101. Film Physics: the rainbow or a real soap film's colours (PLAN 38m)
+
+`filmPhysics` mixes the thin-film colour from a plain rainbow (0, every look today) to Airy's
+colours of a real soap film (1). No look sets it. Six looks are photographed at 0 (left) and 1
+(right) in the project's shared files, `film-physics-38m/` (`contact.png` has all six).
+
+1. Open Soap Film, then turn Film Physics to 1 (Design desk, camera group). The thin dye's
+   fringes go from loud multi-hue rings to straw, gold, olive-grey and blue-grey: what a real
+   film shows, and quieter (saturation 0.137 to 0.116 on the lab's plate).
+2. Macro Bead, Lacing Run, Oil & Water: zoom to a bubble. Its film tint changes from lilac and
+   pink to the soap film's own colours; small on the projected plate, plain in the closeup.
+3. Pick per look: keep the rainbow, take the real colours, or something between. A look that
+   should be real by its name (Soap Film) is the first candidate for 1.
+
+## 102. Every edge lit from beneath (PLAN 38h-2)
+
+`npm run nolight` lines 9 to 12 show the light from above gone in the lab; only the Mac
+shows whether the closeup still reads. Most of it is the closeup (the macro camera): the
+projected plate changes only where a look has the Second Lamp (its glint on bubbles is gone)
+or dyed beads on the lamp ground (a filter now, darker).
+
+1. Zoom into any look with bubbles: each bubble is a dark ring round a clear middle, as a
+   bubble photographed over a light box is; no white dots, no lit crescent.
+2. The closeup with Macro Cells and Macro Relief up: every cell a dark ring, no white glints,
+   no lit side. Macro Relief turns the rings from nothing to bold.
+3. Lamp Motion and Light Play moving: no edge in the closeup follows the lamp any more.
+4. Bad: a closeup that went dull where its sparkle was liked, or cells that read as black
+   holes; Glossiness steepens the surface the relief reads.
+
+## 103. Depth in the closeup's bubbles (PLAN 38h-7)
+
+`npm run closeupdepth` checks the optics in the lab; only the Mac shows whether the closeup
+now reads in depth beside the photos (drops/references).
+
+1. Zoom into any look with bubbles: each bubble a bright clear middle, the colour round it
+   squeezed into its rim, a thin dark band, and light again at the very edge.
+2. Light Play from 0 to 1: a soft glint grows on each bubble's top-left side; the projected
+   plate does not change.
+3. Bad: bubbles that read as white holes, or a glint that looks pasted on.
+4. (Part 2) Zoom all the way in on a small bubble: its rim a clean circle at any zoom, no
+   square corners or steps; a small bubble's middle the liquid's colour, paler, with a
+   bright glint; a big one's middle the clear lamp.
+
+## 104. The dials held inside the solver go further (PLAN 27h-2)
+
+Swirl, Dye Weight and Heat Spread now run to 2, Pushes Dye to 1.2, Drop Height to 2, Background
+Loop to 1.4 and Glass Smear to 3; Momentum's lasting current keeps up to 0.999 of itself a step
+(its dial was already 0.8 to 1). Before, the solver held each at its old top, so the far end of
+these dials did nothing. Every look opens as it did: the fourteen looks whose Glass Smear sat
+under the old 0.2 gate (and so smeared nothing) now say 0.
+
+1. Each at its top, on a look that uses it, with music: Swirl at 2 should curl the flow into
+   more and tighter eddies than 1 and settle into that, never blow up; Dye Weight at 2 with
+   Gravity up should sink the colour in faster, heavier fingers; Heat Spread at 2 with Dye
+   Weight should make broader salt fingers; Pushes Dye at 1.2 should clear the colour from
+   under the ferrofluid a little more than 1; Drop Height at 2 should throw the splash further;
+   Background Loop at 1.4 (two layers) should all but still the plate behind the lead.
+2. Glass Smear on the old plate (Thin Gap off): its first steps should now smear a little, where
+   anything under 0.2 did nothing and 0.2 jumped straight to a fifth of full; 3 should drag the
+   colour hard along the glass.
+3. Bad: a dial whose top looks the same as its old top, a look that opens differently than it
+   did yesterday, or any plate that blows up at a top.
+
+## 105. The back plate's grain on the lamp (PLAN 38h-4)
+
+**What changed.** With two plates on a lamp look, the back plate's pools now carry the
+pigment's grain the way the front's do (more or less dye from place to place), where before
+they were nearly flat. The lab shows the back plate's grain at the front's strength in the
+log of the light, and no single-pixel flecks at its edges. What it cannot show is how the
+back plate's mottle reads at 60 fps: drawn alone it is brighter than the front (38h-12), so
+the same grain moves its bright edges more, in patches.
+
+1. Lava Lamp, Two Plates on, Front level at 0 so the back plate shows alone: the pools
+   should look like the front plate's grain, a soft mottle of more and less pigment.
+2. Poster 1969 and Milk Marble the same way: the pools' edges against the bright glass.
+3. Bad: edges that look dithered or "digital", or a mottle that crawls more than the front's.
+
+## 106. OSC out into Resolume (PLAN 13.5-osc)
+
+`npm run oscout` reads the show's OSC out with a decoder of its own and holds the numbers;
+only Resolume can say it reads them.
+
+1. Resolume and the Mac app on the same Mac, a Pro licence in. Resolume: Preferences → OSC →
+   OSC Input on, port 7000. App: Settings → Sound → **OSC out**; the line says "Sending colour,
+   sound and the beat to 127.0.0.1:7000".
+2. In Resolume's Edit OSC mode, give a layer's Hue Rotate the address
+   `/chromaglass/out/colour/hue` and a Strobe effect's trigger `/chromaglass/out/beat`. With
+   music playing, the hue should follow the plate's dye and the strobe land with the plate's
+   kicks, not a frame behind.
+3. Blackout: `/chromaglass/out/master` (on an opacity) goes to 0.
+4. Bad: Resolume's OSC monitor shows nothing (a firewall prompt, or the bundle), values stuck,
+   the strobe a steady beat late.
