@@ -41,10 +41,21 @@ export type PlateFrameOptions = {
   read?: boolean;
   /** Draw on a fresh plate made for this frame and disposed after it: the control. */
   fresh?: boolean;
+  /**
+   * Two layers: the copy `freeze` made as the first, its count of writes
+   * held, and the live solver as the second. A plate that keeps one count
+   * for all its layers, or reads the first layer's for every one, misses a
+   * write to the second.
+   */
+  two?: boolean;
 };
+
+/** The frozen layer's count of writes: it never changes, because nothing writes to the copy. */
+const FROZEN = -1;
 
 export function plateFrames(get: () => LabState) {
   let kept: WebGPUPlate | null = null;
+  let frozen: { dye: GPUTexture; velForced: GPUTexture; view: GPUTexture; species: GPUTexture } | null = null;
   const view = (l: LabState, settings: VisualizerSettings): PlateView => ({
     settings, time: l.time,
     shot: { cx: 0.5, cy: 0.5, zoom: 1 }, macroAmount: 0, isDarkBlend: false,
@@ -58,7 +69,7 @@ export function plateFrames(get: () => LabState) {
     const l = get();
     const device = l.solver['device'] as GPUDevice;
     fillPlateUniforms(plate.pack, {
-      view: view(l, { ...DEFAULT_SETTINGS } as VisualizerSettings), fluids: [{ gpu: l.solver as never }],
+      view: view(l, { ...DEFAULT_SETTINGS } as VisualizerSettings), fluids: o.two ? [{ gpu: l.solver as never }, { gpu: l.solver as never }] : [{ gpu: l.solver as never }],
       width: size, height: size, derived: true, grid: l.N, cameraOn: !!o.camera,
     });
     const s = l.solver as unknown as { fields: { dye: GPUTexture; view: GPUTexture; species: GPUTexture }; velForced: GPUTexture; fieldWrites?: number };
@@ -66,9 +77,11 @@ export function plateFrames(get: () => LabState) {
       dye: s.fields.dye, velForced: s.velForced, grain: null, particles: null, air: null, view: s.fields.view, species: s.fields.species,
       ...(o.writes ? { writes: s.fieldWrites } : {}),
     };
+    if (o.two && !frozen) throw new Error('lab.frames: two layers asked for before freeze()');
+    const layers = o.two ? [{ ...layer, ...frozen!, ...(o.writes ? { writes: FROZEN } : {}) }, layer] : [layer];
     const target = device.createTexture({ label: 'plateframes wall', size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder({ label: 'plateframes' });
-    plate.draw(enc, target.createView(), { width: size, height: size }, [layer]);
+    plate.draw(enc, target.createView(), { width: size, height: size }, layers);
     const row = Math.ceil(size * 4 / 256) * 256;
     const buf = o.read ? device.createBuffer({ size: row * size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ }) : null;
     if (buf) enc.copyTextureToBuffer({ texture: target }, { buffer: buf, bytesPerRow: row }, [size, size]);
@@ -102,9 +115,29 @@ export function plateFrames(get: () => LabState) {
       kept ??= await make();
       return draw(kept, size, o);
     },
+    /** Copy the solver's fields as they are now into the first of `two`'s layers, which nothing writes after. */
+    async freeze(): Promise<void> {
+      const l = get();
+      const device = l.solver['device'] as GPUDevice;
+      const s = l.solver as unknown as { fields: { dye: GPUTexture; view: GPUTexture; species: GPUTexture }; velForced: GPUTexture };
+      const enc = device.createCommandEncoder({ label: 'plateframes freeze' });
+      const copy = (t: GPUTexture) => {
+        const c = device.createTexture({ label: `frozen ${t.label}`, size: [t.width, t.height], format: t.format, usage: t.usage | GPUTextureUsage.COPY_DST });
+        enc.copyTextureToTexture({ texture: t }, { texture: c }, [t.width, t.height]);
+        return c;
+      };
+      if (frozen) for (const t of Object.values(frozen)) t.destroy();
+      frozen = { dye: copy(s.fields.dye), velForced: copy(s.velForced), view: copy(s.fields.view), species: copy(s.fields.species) };
+      device.queue.submit([enc.finish()]);
+      await device.queue.onSubmittedWorkDone();
+    },
     /** The kept plate, for what it says about itself (`auxTarget`). */
     get plate(): WebGPUPlate | null { return kept; },
     /** Let the kept plate go: the next draw makes a new one. */
-    dispose(): void { kept?.dispose(); kept = null; },
+    dispose(): void {
+      kept?.dispose(); kept = null;
+      if (frozen) for (const t of Object.values(frozen)) t.destroy();
+      frozen = null;
+    },
   };
 }

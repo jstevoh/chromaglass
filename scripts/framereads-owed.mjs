@@ -34,8 +34,10 @@
  * LiquidVisualizer's `cameraOn: !!cam`), so the build reads it there and
  * `draw`'s signature stays as it is. The line draws a plate kept across
  * frames (scripts/lab-plateframes.ts) with the camera off from its first
- * frame, and asks for the display pass to write one target and no texture at
- * the frame's size to be alive but the wall it draws into. The frame is
+ * frame, then on, then off again, and asks of both stretches off for the
+ * display pass to write one target and no texture at the frame's size to be
+ * alive but the wall it draws into (an aux made for the camera and kept
+ * after it, or a pipeline left at two targets, is the 16 MB still there). The frame is
  * drawn at 72² over a 128² grid so a texture at the frame's size can only
  * be a frame target. Its control holds on main and after: with the camera on,
  * two targets and `auxTarget` there for the camera pass.
@@ -48,19 +50,28 @@
  * ReadGate already keeps for the readbacks, PLAN 14ab-3), handed to `draw` on
  * each layer as `writes`, and a layer packed only when its `writes` differs
  * from the one it was last packed at, or is absent (a caller that does not
- * say, such as `lab.render`, packs every frame as today). The line draws 60
- * frames stepping on every other one, as a 120 Hz display at sixty steps does
- * for half a second, and asks for at most 31 of them to dispatch anything
- * (the 30 steps and the first frame). Its controls hold on main and after,
- * and are what keeps the skip honest: on a frame with no step the kept
- * plate's picture is the picture a fresh plate draws of the same fields, to
- * the byte, and so is the picture after a pour with no step after it (a
- * write that is not a step, which a skip keyed on steps alone would miss).
+ * say, such as `lab.render`, packs every frame as today). The plate has two
+ * layers, a frozen copy of the fields first (its count held, since nothing
+ * writes to it) and the live solver second, so a plate that keeps one count
+ * for all its layers, or reads the first layer's for every one, is seen. The
+ * line draws 60 frames with 30 steps on an irregular beat (gaps of one, two
+ * and three frames, so a plate that packs on a stride of its own cannot fall
+ * in step with them), as a 120 Hz display at sixty steps does for half a
+ * second, and asks for at most 31 of them to dispatch anything (the steps and
+ * the first frame). Its controls hold on main and after, and are what keeps
+ * the skip honest: the kept plate's picture is the picture a fresh plate
+ * draws of the same fields, to the byte, on the frame after a step (twice
+ * running, so both parities of the kept plate's draws are asked), on a frame
+ * with no step, and after a pour into the second layer alone with no step
+ * after it (twice running: a write that is not a step, which a skip keyed on
+ * steps alone would miss). The check-skeptic's pass found a plate packing on
+ * every other draw passing the first version of this, which stepped on every
+ * other frame.
  */
 
 export const FRAMEREADS_OWED = ['h2c6', 'h2c7', 'h2c9'];
 
-/** The frame a 120 Hz display draws in half a second, stepping on every other one. */
+/** The frames a 120 Hz display draws in half a second, with sixty steps a second among them. */
 const FRAMES = 60;
 const SIZE = 72;
 
@@ -171,34 +182,47 @@ export async function owedLines(page, check) {
       const aux = { off: off6, on: on6, auxOn, offAgain };
 
       // ── H2c-9: the pack ─────────────────────────────────────────
+      // Two layers: a frozen copy first, its count held, and the live solver second.
       const p = { thinGap: 1 };
       await lab.step(2, p);
-      await f.draw(size, { writes: true });
-      let packing = 0, packs = 0;
+      await f.freeze();
+      const o = { writes: true, two: true };
+      await f.draw(size, o);
+      // Steps on an irregular beat (gaps of one, two and three frames), so a
+      // plate that packs on a stride of its own cannot fall in step with them.
+      const stepsOn = (i) => [0, 1, 3].includes(i % 6);
+      let packing = 0, packs = 0, steps = 0;
       for (let i = 0; i < frames; i++) {
-        if (i % 2 === 0) await lab.step(1, p);
+        if (stepsOn(i)) { await lab.step(1, p); steps++; }
         zero(); c.on = true;
-        await f.draw(size, { writes: true });
+        await f.draw(size, o);
         c.on = false;
         if (c.dispatches) packing++;
         packs += c.dispatches;
       }
-      const same = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
-      // A frame with no step after one with a step, against a fresh plate.
-      await lab.step(1, p);
-      await f.draw(size, { writes: true });
-      const kept = await f.draw(size, { writes: true, read: true });
-      const fresh = await f.draw(size, { writes: true, read: true, fresh: true });
-      const stillOff = same(kept, fresh);
-      // A pour with no step after it.
-      lab.dye(0.62, 0.4, 0.14, [0.3, 0.6, 1.4], 3);
-      lab.flush();
-      const poured = await f.draw(size, { writes: true, read: true });
-      const pouredFresh = await f.draw(size, { writes: true, read: true, fresh: true });
-      const pourOff = same(poured, pouredFresh);
-      const pourMoved = same(kept, pouredFresh);
+      const same = (x, y) => { let n = 0; for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) n++; return n; };
+      // The kept plate's next frame against a fresh plate's of the same fields.
+      const compare = async () => {
+        const kept = await f.draw(size, { ...o, read: true });
+        const fresh = await f.draw(size, { ...o, read: true, fresh: true });
+        return { off: same(kept, fresh), kept, fresh };
+      };
+      // A step, drawn on the next frame, twice running: one on each parity of the kept plate's draws.
+      const stepped = [];
+      for (let k = 0; k < 2; k++) { await lab.step(1, p); stepped.push((await compare()).off); }
+      const still = await compare();
+      // A pour into the live layer alone with no step after it, twice running, the frozen layer's count unmoved.
+      const poured = [];
+      let firstPour = null;
+      for (let k = 0; k < 2; k++) {
+        lab.dye(0.62 - 0.2 * k, 0.4, 0.14, [0.3, 0.6, 1.4], 3);
+        lab.flush();
+        const x = await compare();
+        firstPour ??= x;
+        poured.push(x.off);
+      }
       f.dispose();
-      const pack = { packing, packs, stillOff, pourOff, pourMoved, pixels: kept.length / 4, writes: typeof s.fieldWrites };
+      const pack = { packing, packs, steps, stepped, stillOff: still.off, poured, pourMoved: same(still.kept, firstPour.fresh), pixels: still.kept.length / 4, writes: typeof s.fieldWrites };
       return { ring, aux, pack };
     } finally {
       for (const undo of hooks.reverse()) undo();
@@ -211,7 +235,7 @@ export async function owedLines(page, check) {
   console.log(`  the ring: one readback with its slots free copies ${ring.free.bytes} bytes in ${ring.free.copies} copies (${perField.toFixed(2)}x the two fields' ${2 * fieldBytes}) with ${ring.free.dispatches} dispatches; ` +
     `asked ${ring.busyCalls} more times once full, ${ring.busyDispatches} dispatches and ${ring.busyCopies} copies`);
   console.log(`  the aux: camera off ${aux.off.attachments} display targets, ${aux.off.alive} frame-size textures alive; on ${aux.on.attachments} and ${aux.on.alive} (auxTarget ${aux.auxOn ? 'there' : 'null'}); off again ${aux.offAgain.attachments} and ${aux.offAgain.alive}`);
-  console.log(`  the pack: ${FRAMES} frames, a step on every other one: ${pack.packing} frames dispatched ${pack.packs} pack dispatches (fieldWrites is ${pack.writes} on this solver)`);
+  console.log(`  the pack: two layers (one frozen), ${FRAMES} frames, ${pack.steps} steps on gaps of 1, 2 and 3: ${pack.packing} frames dispatched ${pack.packs} pack dispatches (fieldWrites is ${pack.writes} on this solver)`);
 
   check('control: the counting sees a readback\'s work (its downsample and its copies, slots free)', ring.free.took === 1 && ring.free.dispatches >= 2 && ring.free.bytes >= 2 * fieldBytes,
     `${ring.free.dispatches} dispatches, ${ring.free.bytes} bytes`);
@@ -225,16 +249,18 @@ export async function owedLines(page, check) {
 
   check('control: with the camera on the display writes its aux and the plate hands it to the camera pass', aux.on.attachments === 2 && aux.on.alive >= 1 && aux.auxOn,
     `${aux.on.attachments} targets, ${aux.on.alive} alive, auxTarget ${aux.auxOn ? 'there' : 'null'}`);
-  line('h2c6', 'H2c-6: with the camera off the display writes one target and no aux texture is alive',
-    aux.off.attachments === 1 && aux.off.alive === 0,
-    `${aux.off.attachments} targets (want 1, main 2), ${aux.off.alive} frame-size textures alive (want 0, main 1)`,
-    aux.off.attachments === 2 && aux.off.alive === 1);
+  line('h2c6', 'H2c-6: with the camera off, from the first frame and again after it was on, the display writes one target and no aux texture is alive',
+    aux.off.attachments === 1 && aux.off.alive === 0 && aux.offAgain.attachments === 1 && aux.offAgain.alive === 0,
+    `off from the first frame ${aux.off.attachments} targets and ${aux.off.alive} frame-size textures alive, off again after the camera ${aux.offAgain.attachments} and ${aux.offAgain.alive} (want 1 and 0, main 2 and 1)`,
+    aux.off.attachments === 2 && aux.off.alive === 1 && aux.offAgain.attachments === 2 && aux.offAgain.alive === 1);
 
-  check('control: on a frame with no step the kept plate draws what a fresh plate draws of the same fields', pack.stillOff === 0, `${pack.stillOff} of ${pack.pixels} pixels differ`);
-  check('control: a pour with no step after it is drawn, as a fresh plate draws it', pack.pourOff === 0 && pack.pourMoved > 0,
-    `${pack.pourOff} pixels differ from the fresh plate's; the pour moved ${pack.pourMoved}`);
-  line('h2c9', `H2c-9: at 120 Hz against sixty steps the plate packs only after a step (at most ${FRAMES / 2 + 1} of ${FRAMES} frames)`,
-    pack.packing <= FRAMES / 2 + 1 && pack.packs <= 2 * (FRAMES / 2 + 1),
-    `${pack.packing} frames packed with ${pack.packs} dispatches (at most ${FRAMES / 2 + 1} and ${FRAMES + 2}; main ${FRAMES} and ${2 * FRAMES})`,
-    pack.packing === FRAMES && pack.packs === 2 * FRAMES);
+  check('control: on the frame after a step, twice running, and on a frame with no step, the kept plate draws what a fresh plate draws of the same fields',
+    pack.stepped.every((n) => n === 0) && pack.stillOff === 0, `${pack.stepped.join(' and ')} pixels differ after the steps, ${pack.stillOff} with no step, of ${pack.pixels}`);
+  check('control: a pour into the second layer alone, with no step after it, is drawn as a fresh plate draws it, twice running', pack.poured.every((n) => n === 0) && pack.pourMoved > 0,
+    `${pack.poured.join(' and ')} pixels differ from the fresh plate's; the pour moved ${pack.pourMoved}`);
+  const most = pack.steps + 1;
+  line('h2c9', `H2c-9: at 120 Hz against sixty steps the plate packs only after a write (at most ${most} of ${FRAMES} frames, ${pack.steps} steps)`,
+    pack.packing <= most && pack.packs <= 2 * most + 2,
+    `${pack.packing} frames packed with ${pack.packs} dispatches (at most ${most} and ${2 * most + 2}; main ${FRAMES} and ${4 * FRAMES})`,
+    pack.packing === FRAMES && pack.packs === 4 * FRAMES);
 }
