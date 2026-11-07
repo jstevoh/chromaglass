@@ -11227,3 +11227,19 @@ lens 100.0%; rimhold's pour still crosses (weak/full 0.97/0.99 of what the volum
 
 *Judged:* the owner, from the 2 mm films (the sheet's dents, Plate Rock's slide), 2026-10-31
 16:39Z: "That looks fine".
+
+*38r-12:* main's #668 put the multigrid's residual into `npm run encode` with main's bars, read at
+6 mm: the thin gap's ‖r‖/‖b‖ after a step, 6.393e-2, held at 1.05×. At 2 mm it read 1.965e-1, and
+the same tree at 6 mm read main's to the digit. Not the operator: the check's plate has an even
+mobility at both gaps (0.4718 inside the rim at 2 mm, 0.8894 at 6 mm), and a V-cycle cuts the
+residual about as much at either (2.5× from the third to the fourth). The first guess: the solve
+starts from the last step's P, and with no cycle at all that left 2.6 of b at 2 mm (0.8 at 6 mm),
+worse than zero. The stir's flow dies on h²/12ν, under a step at 2 mm (kΔt 1.1 against 0.12), so last
+step's pressure was two to three times too big. Nearly all that is left sits in the cells just inside
+the open rim. Now the guess is a·P₁ + a′·P₂, the last two pressures fitted by least squares to this
+step's b through the solve's own operator (`wgsl/thinWarm.ts`, three dispatches), and the least
+residual of the warm start as it was, one pressure scaled and the pair is taken, so a steady flow
+keeps its start. `npm run encode -- --owed=h2c1,h2c3,h2c2`, cloud lab at 512²: thin residual
+1.965e-1 → 4.355e-2 (bar 6.713e-2; one pressure scaled alone read 7.551e-2), its half-strength
+control 0.548 → passes, open plate 2.079e-3 unchanged; dispatches 266 → 269 a step (the slump's
+substeps went 4 → 1 at 2 mm, its own physics, and the fit adds 3), 11/11.

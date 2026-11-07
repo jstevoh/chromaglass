@@ -508,6 +508,22 @@ written first. Line numbers are as read on main at d07ac31.
     disc's kink, where the glass does not fall off (4.5 against 4.2): its 0.6 now asks under 0.64,
     and a sheet with no lip (about 0.57) would pass it; the 25% half catches that sheet (1.0 against
     0.71). Ask the falloff against the stamp instead (the lip keeps some back).
+  - ~~**38r-12**~~ The thin solve's warm start fitted to the step: at 2 mm the flow dies inside a
+    step and last step's P alone was a worse guess than zero; now the last two pressures are fitted
+    to this step's b (`wgsl/thinWarm.ts`), `encode`'s thin residual 1.965e-1 → 4.355e-2 (#655).
+    Story in §38r.
+  - **38r-13. The open rim makes a source the solve then has to remove** (M; found in #655's
+    38r-12). A divergence-free flow dying under an even drag needs no pressure, yet on the check's
+    plate three quarters of b's square sits in the last 2% of the radius inside the rim (0.49 to
+    0.5). The likely cause, not yet measured apart: `hsDivergence` takes the cell-centred flux of the
+    cells past the rim, which `hsGradient` corrected by the compact face term (an approximate
+    projection), so each step the rim hands the next one a divergence its own flow did not make. Make the rim's faces in the divergence the projection's own faces (the
+    Rhie–Chow face flux the carries already take, `THIN_FACE`), so a dying flow reads b ≈ 0 there.
+    Re-read `rimhold`, `oillift` and `encode`'s residual (its bar is a ratio to b, which then falls).
+  - **38r-14. `encode`'s H2c-1 "still main's" test is the whole step's dispatch count** (S; check
+    change, for the check's author). At 2 mm the slump runs 1 substep, not 4, and the warm start's
+    fit adds 3, so the total matches main's 365 by chance; any physics that moves an adaptive
+    substep count reads as "H2c-1 built and misses". Count the multigrid's own kernels instead.
 
 - **38s. One number per liquid** (S each; Low). The oil is 0.15 lighter than water for
   buoyancy (`capillary.ts:354`) and 0.12 for the spin (`SPIN_OIL_LIGHT`, `constants.ts:371`);

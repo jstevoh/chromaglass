@@ -14,6 +14,7 @@ import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
 import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
 import { FluidFields } from './fields';
+import { WARM_GROUPS } from '../wgsl/thinWarm';
 
 /**
  * How much of the plate the air's cover has to change in a step (a bubble of
@@ -750,6 +751,15 @@ export class FluidPasses extends FluidFields {
       (`SQUEEZE_GPU=1` squeeze.mjs: 199 steps in 12 s against 200, where
       other PRs read 210 to 239).
     */
+    /*
+      The warm start fitted to this step (wgsl/thinWarm.ts, PLAN 38r-12):
+      at 2 mm the flow dies on the gap's viscous time, under a step, and the
+      last step's P alone was a worse first guess than zero.
+    */
+    const warm = this.hsWarm!;
+    this.hsRun(pass, 'hsWarmDot', 'hsWarmDot', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, this.hsP2!, warm], WARM_GROUPS * 64);
+    this.hsRun(pass, 'hsWarmFit', 'hsWarmFit', this.arg('none', [0, 0, 0, 0]), [warm], 64);
+    this.hsRun(pass, 'hsWarmScale', 'hsWarmScale', this.arg('none', [0, 0, 0, 0]), [this.hsP!, this.hsP2!, warm], this.N * this.N);
     if (Math.abs(this.airCover - this.airCoverPrev) > AIR_SETTLE_COVER) this.airSettle = 2;
     const settle = this.airSettle > 0 && this.airPush > 0;
     if (this.airSettle > 0) this.airSettle--;

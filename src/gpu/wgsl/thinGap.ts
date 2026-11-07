@@ -89,6 +89,7 @@
 import { HAND_GRIP } from '../../lib/handSolid';
 import { DISH_GAP_FIELD_METRES, OPEN_RIM } from '../../lib/turntable';
 import { WATER_NU } from '../../lib/liquidProps';
+import { thinWarmKernels } from './thinWarm';
 
 /**
  * The kernels, built on the solver's own head (the Sim and Args structs) and
@@ -205,6 +206,8 @@ fn hsSums0(x: i32, y: i32, n: i32, mi: f32) -> vec2f {
 `;
 
   return {
+    // The warm start fitted to this step (PLAN 38r-12): see wgsl/thinWarm.ts.
+    ...thinWarmKernels(HEAD, COMMON, ROWS0),
     /*
       Two of the look's own forces as the forces they are, on a thin gap
       only (PLAN 18a-2). The old plate keeps forcesB's versions, and every

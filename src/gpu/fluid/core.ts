@@ -204,6 +204,9 @@ export class FluidCore {
   protected hsLiftPsi: GPUBuffer | null = null;
   protected liftN = 2;
   protected hsP: GPUBuffer | null = null;
+  /** The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12). */
+  protected hsWarm: GPUBuffer | null = null;
+  protected hsP2: GPUBuffer | null = null;
   /** Whether the thin gap's pipelines are built (prepareThinGap), and the build under way. */
   protected hsReady = false;
   protected hsBuilding: Promise<void> | null = null;
