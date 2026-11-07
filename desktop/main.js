@@ -745,6 +745,7 @@ async function start() {
     email: initialStatus.email,
     id: initialStatus.id,
     exp: initialStatus.exp,
+    packs: initialStatus.packs ?? [],
     error: initialError,
     enforced: initialStatus.enforced,
   };

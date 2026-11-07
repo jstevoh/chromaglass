@@ -13,6 +13,15 @@ export interface LicensePayload {
   maxMachines: number;
   exp?: number;
   upgradeFrom?: string;
+  /** The art packs bought on top of the tier, e.g. `moire` (PLAN.md 42a-2); absent on a key with none. */
+  packs?: string[];
+}
+
+/** The pack names a payload may carry, as the signer keeps them (server/license-key.js `normalizePacks`). */
+export function normalizePacks(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const names = list.filter((p): p is string => typeof p === 'string' && /^[a-z0-9-]{1,24}$/.test(p));
+  return [...new Set(names)].sort().slice(0, 16);
 }
 
 export interface LicenseStatus {
@@ -123,6 +132,7 @@ export async function verifyLicenseKey(
       maxMachines: Number(payload.maxMachines) || 2,
       ...(typeof payload.exp === 'number' ? { exp: payload.exp } : {}),
       ...(typeof payload.upgradeFrom === 'string' ? { upgradeFrom: payload.upgradeFrom } : {}),
+      ...(normalizePacks(payload.packs).length ? { packs: normalizePacks(payload.packs) } : {}),
     },
   };
 }

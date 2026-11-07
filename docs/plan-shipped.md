@@ -11226,3 +11226,28 @@ their data, the prices against `Landing.tsx`, each listing field within its limi
 with no price or way to buy, the store pictures' sizes and alpha, and the page at
 360 and 1280 px with no sideways scroll and every picture loaded. Left open:
 12.6-shots (the phone's own screenshots) and 12.6-label.
+
+## 42a-2. Selling the moiré pack to Home (2026-11-07)
+
+The owner chose to sell the moiré pack as a $15 add-on to Home and to include it in Pro.
+A pack is not a tier, so it does not get a key of its own: a buyer would then hold two keys,
+and every place that holds one (the account sheet, the Mac's seats) would have to hold a set.
+The signed payload gained an optional `packs` list (`normalizePacks` in `server/license-key.js`
+and `src/lib/licenseKey.ts`: lower-case names, unique, sorted, at most 16), and a pack order
+signs the buyer's Home key again under the same id with the pack added
+(`server/license-packs.js`), as an upgrade signs it again as Pro. The record keeps which
+order bought which pack (`packOrders`), so a refund of the pack takes the pack off and
+leaves the Home, a refund of the Home takes the key, an upgrade carries the packs into Pro,
+and a refunded upgrade refiles the Home with them. A pack order is held for the owner when
+the email has no Home key, already has Pro (which includes it), or already has the pack.
+
+The device adopts the new token by itself: `accountLicense.ts`'s `pick()` takes a listed key
+with the held key's id whose packs differ and activates it, so a Home buyer signed in on the
+web or the Mac gets the pack without pasting anything. The Mac app passes the payload's packs
+through its bridge (`server-license.js` `currentStatus`, `desktop/main.js`). The gate is
+`canUseMoirePack` (Pro, or Home with `hasLicensePack('moire')`). The account sheet shows a
+Buy card to Home without the pack (`MoirePackBuy.tsx`), says where it comes from to Free, and
+says it is on the licence once bought; the Moiré Sheets section and the phone's Looks sheet
+have a Get it button beside Try. Checks: `npm run license-worker` 13g–13m (filed, refunded,
+upgraded, held; forcing the signed packs empty fails 13h and 13j), `npm run tiers` 14 (locked
+on Free and Home, the Buy link carries the email, open on a Home key that names the pack).

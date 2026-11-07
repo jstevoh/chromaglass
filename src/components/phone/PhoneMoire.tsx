@@ -1,6 +1,7 @@
 import { Slider } from '../ui';
 import { MOIRE_SHEETS } from '../../lib/moire';
 import { useMoirePreview } from '../../hooks/useMoirePreview';
+import { openAccountSheet } from '../../lib/tierGates';
 import type { VisualizerSettings } from '../../types';
 
 /**
@@ -46,6 +47,11 @@ export function PhoneMoire({ settings, onSetting }: {
           {pack.secondsLeft <= 0 && (
             <button type="button" onClick={pack.start} className="h-11 rounded-full bg-text px-4 text-[14px] font-medium text-bg" data-testid="phone-moire-try">
               Try it
+            </button>
+          )}
+          {pack.secondsLeft <= 0 && (
+            <button type="button" onClick={openAccountSheet} className="h-11 rounded-full border border-border-strong px-4 text-[14px] font-medium text-text" data-testid="phone-moire-get">
+              Get it
             </button>
           )}
         </div>

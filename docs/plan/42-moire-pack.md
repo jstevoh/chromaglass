@@ -31,10 +31,17 @@ own. Check: `npm run moire`.
   (`presetsMoire.ts`). Gate: `canUseMoirePack` in tierGates, open where tiers are not
   enforced, Pro where they are; a look of the pack opens the account sheet when locked.
   Found while building it, not done:
-  - **42a-2. Selling it to Home.** The licence names a tier only (`LicensePayload`); it
-    needs a `packs` list in the signed payload, the Worker a Lemon Squeezy product for the
-    pack (the owner makes it in the store) that adds `moire` to the buyer's key, and the
-    account sheet a Buy line. The Worker deploy waits for the owner's words.
+  - ~~**42a-2. Selling it to Home.**~~ **Shipped** (2026-11-07): a `packs` list in the signed
+    key, the store's Moiré Pack product ($15 once) re-signing the buyer's Home key, the account
+    sheet's Buy line and the section's Get it (`npm run license-worker` 13g–13m, `npm run tiers`
+    14); story in `docs/plan-shipped.md` §42a-2.
+  - **42a-5. The landing page sells the pack.** `Landing.tsx`'s price table names Home and Pro
+    only; a Home buyer meets the pack in the app. A line under Home ("Moiré pack, $15 once")
+    with the same checkout link, and `npm run press`'s price check reading it.
+  - **42a-6. A pack bought before Home is held, not refunded.** The Worker holds a pack order
+    with no Home key on file (`holdOrder`, reason `pack with no Home key`) for the owner to
+    refund by hand. If buyers do this, file the pack against the email and apply it when the
+    Home key is filed, rather than asking the owner to refund.
   - **42a-3. A hand on the sheet.** The real thing is played by turning the top sheet with a
     hand. A Turn Sheet tool (drag round the centre sets the turn, a flick spins it), on the
     desk, the phone's pad and the remote, as the Spin tool is built (`SpinHand`); the

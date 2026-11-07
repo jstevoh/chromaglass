@@ -8,7 +8,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `license-worker.js` (35 KB, grep it): the licence Worker: merchant webhooks, keys, machine seats, cloud sync.
 - `report-worker.js`: where the crash log's Send goes.
 - `feedback-worker.js`: where Settings → Feedback goes: one D1 table (`feedback-schema.sql`) and a mail to support@ (PLAN 39a).
-- `license-key.js`: `signLicenseKey`, `verifyLicenseKey` (Ed25519).
+- `license-key.js`: `signLicenseKey`, `verifyLicenseKey` (Ed25519), `normalizePacks` (the payload's optional `packs` list, PLAN 42a-2).
 
 ## Contracts
 
@@ -27,7 +27,8 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `fingerprint-worker.js`: song ID proxy.
 - `feedback-schema.sql`: the feedback table, run once against D1.
 - `firebase-token.js`: `verifyFirebaseToken` (the shows and feedback Workers): `{ uid, aud, email, emailVerified }`, `emailVerified` added for feedback.
-- `server-license.js`: local key storage for show server and Mac app.
+- `license-packs.js`: art packs sold on top of Home (`PACK_PRODUCTS`, `packForProduct`, `packFields`, `addPack`, `removePack`): a pack order signs the Home key again with the pack.
+- `server-license.js`: local key storage for show server and Mac app; `currentStatus()` carries the key's `packs`.
 - `license-key.js`, `license-worker.js`, `remote-server.js`, `report-worker.js`: above.
 
 ## Checks
