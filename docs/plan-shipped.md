@@ -5487,6 +5487,24 @@ its controls (the gate removed, the random walk restored, the snap removed) turn
 where there were 336). The desk and the phone share the camera, and Frame Sway is on
 both; the Guide's Music Sync line says what rides it.
 
+### 27d-cam. The closeup camera answers a hand (shipped 2026-11-07)
+
+The owner, 2026-10-22: "the camera controls don't really do much." Measured with the real
+`MacroCamera` at 1440 px and 60 fps (first built in #432, which closed unmerged; only Macro
+Zoom's squared curve reached main before it closed): Chase Speed in Hold took 0.37 s at 0
+and 0.18 s at 1 to cover nine tenths of an aim jump, a twofold throw; Music Sync did nothing
+in Hold and Follow at Frame Sway 0 and said nothing; the only pan was Alt-drag.
+
+- Chase Speed is Hold's weight (`holdRate`, lib/macroCamera.ts): 3.00 s at 0, 0.283 s at
+  the default 0.4 (unchanged), 0.18 s at 1, 0.05 s at the dial's top. The dial had since
+  been widened to 3, and #432's one exponential capped at 0.73, so three quarters of the
+  travel would have been dead: it bends at the default instead.
+- The arrow keys pan the aim by a share of the frame (`panAim`; Shift a frame, a held key
+  a slow drift), only with the closeup in.
+- Music Sync greys with "needs Frame Sway" in Hold and Follow at Frame Sway 0.
+- The phone's remote has Chase Speed beside Music Sync and Shot Length.
+- `npm run camerahand` 20/20 (red on main: neither `holdRate` nor `panAim` exists there).
+
 ### 27f-2. Plate Rock leans on the one and three (2026-10-22)
 
 The owner, 2026-10-21: Plate Rock and Beat Squeeze "feel the same", and on 10-22: "make sure

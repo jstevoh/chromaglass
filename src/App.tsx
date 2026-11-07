@@ -5,8 +5,8 @@ import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs, shotLabel } from './lib/macroCamera';
-import { closeupToggle } from './sim/constants';
+import { arrowAim, holdWhereItIs, shotLabel } from './lib/macroCamera';
+import { closeupToggle, macroZoomOf } from './sim/constants';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -1795,6 +1795,9 @@ export default function App() {
       if (e.key === '?') setShowHelp(h => !h);
       if (e.key === '+' || e.key === '=') zoomMacro(1);
       if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      // The arrows pan the closeup (lib/macroCamera.ts arrowAim), through the aim Alt-drag uses.
+      const to = arrowAim(e, settingsRef.current, visualizerRef.current?.macroCentre());
+      if (to) { e.preventDefault(); aimMacro(to.x, to.y); }
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
         const tool = activeToolRef.current;
@@ -1817,7 +1820,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro]);
+  }, [toggleBlackout, zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -2929,14 +2932,15 @@ export default function App() {
 
                 {/* Macro closeup */}
                 <button
-                  aria-pressed={!!settings.macroMode}
-                  onClick={() => updateSettings({ macroMode: !settings.macroMode })}
+                  aria-pressed={macroZoomOf(settings) > 1.05}
+                  // The same press as the desk's Close-up and M (closeupToggle, PLAN QA-32).
+                  onClick={() => updateSettings(closeupToggle(settings))}
                   className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    macroZoomOf(settings) > 1.05 ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
                   }`}
                   title="Macro closeup — magnify the plate and chase a single bead of liquid"
                 >
-                  <Microscope size={16} className={settings.macroMode ? '' : 'opacity-60 group-hover:opacity-100'} />
+                  <Microscope size={16} className={macroZoomOf(settings) > 1.05 ? '' : 'opacity-60 group-hover:opacity-100'} />
                   <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
                 </button>
 

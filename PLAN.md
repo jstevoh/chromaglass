@@ -393,7 +393,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 24 | Modular rigs: patch the rack into the liquid | [`24-modular-rigs.md`](docs/plan/24-modular-rigs.md) |  | 10 |
 | 25 | Areas of interest: several places on one plate | [`25-areas.md`](docs/plan/25-areas.md) |  | 11 |
 | 26 | A reaction that prints: Turing stripes in black and white (proposed 2026-10-05) | [`26-turing-print.md`](docs/plan/26-turing-print.md) |  | 10 |
-| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 17 |
+| 27 | Every control does something you can see | [`27-controls-you-see.md`](docs/plan/27-controls-you-see.md) |  | 22 |
 | 28 | Preset palettes: the looks refreshed for what the plate does now (2026-10-10) | [`28-preset-palettes.md`](docs/plan/28-preset-palettes.md) | 28a–28h | 19 |
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28k | 16 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 14 |

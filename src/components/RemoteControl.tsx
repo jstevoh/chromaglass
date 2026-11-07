@@ -13,6 +13,7 @@ import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture'
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
+import { closeupToggle, macroZoomOf } from '../sim/constants';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
 import { Slider } from './RemoteSlider';
@@ -126,6 +127,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   });
 
   const settings = state?.settings;
+  // In the closeup by the zoom the frame is drawn at, as the desk's button is lit (PLAN QA-32).
+  const closeupIn = !!settings && macroZoomOf(settings as VisualizerSettings) > 1.05;
   /*
     Ben-Day Dots is shown while the plate prints (the Roy look), and kept
     through a thumb taking it to 0, which would otherwise lose the slider it
@@ -814,13 +817,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
-          {/* Macro camera */}
+          {/*
+            Macro camera. The phone's switch is the desk's Close-up press and the
+            M key's (sim/constants.ts closeupToggle, PLAN QA-32): in by the zoom to
+            4x and out with both, lit by the zoom the frame is drawn at. It used to
+            flip macroMode alone, so the plate went to 4x while the Macro Zoom
+            slider under it read 1.0x, and a zoom set by the slider left it dark.
+          */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
             <button
               type="button"
               role="switch"
-              aria-checked={!!settings?.macroMode}
-              onClick={() => patch({ macroMode: !settings?.macroMode })}
+              aria-checked={closeupIn}
+              onClick={() => settings && patch(closeupToggle(settings as VisualizerSettings))}
               disabled={!connected}
               data-testid="remote-macro-toggle"
               className="flex w-full items-center justify-between disabled:opacity-30"
@@ -828,11 +837,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <SwitchPill on={!!settings?.macroMode} />
+              <SwitchPill on={closeupIn} />
             </button>
-            {settings?.macroMode && (
+            {closeupIn && (
               <div className="mt-4">
                 <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
               </div>

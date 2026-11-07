@@ -676,7 +676,20 @@
         "a plate whose middle is bare frame the nearest pool from the first frame",
         "(the control: the frame on the aim is bare); with liquid on the aim Hold",
         "does not move; a hand's aim is obeyed; an empty plate lands on the first",
-        "pour; and the Close-up press goes in by the zoom and out with both."
+        "pour; and the Close-up press goes in by the zoom and out with both, from",
+        "every hand (desk, M, the phone's switch, the side rail, the palette)."
+      ]
+    },
+    {
+      "name": "The closeup camera answers a hand",
+      "shard": "logic",
+      "run": "npm run camerahand",
+      "why": [
+        "The closeup's controls do something (PLAN.md 27d): Chase Speed's throw in",
+        "Hold runs from a 3 s glide to a snap across the whole dial, the default",
+        "still answers as it did; Macro Zoom's travel bends; the arrow keys pan by",
+        "the frame; Music Sync greys where the music cannot move the frame; and the",
+        "phone's remote has Chase Speed."
       ]
     },
     {

@@ -2410,3 +2410,15 @@ or blue look, Clear Film about 0.35 (tears over the dust in a second or two), Fi
 5. Bad: the holes tinted, the lace flat (one yellow regardless of thickness), or the plate
    changing when Film Dye is 0.
 
+## 110. The closeup lands on liquid, and answers your hand (PLAN QA-32, 27d-cam)
+
+1. Open a look that pours in pools (or drain, then pour one pool off to a side), and press
+   Close-up on the desk. Good: the closeup opens on the pool, never on black glass. Do the
+   same from the phone's Macro Closeup switch: same landing, and the Macro Zoom slider under
+   it reads 4.0x, not 1.0x.
+2. Set the camera to Hold and pan with the arrow keys: a tap moves a quarter of the frame,
+   Shift a whole frame, a held key a slow drift. It should feel like a heavy rig, never a lurch.
+3. Drag Chase Speed from 0 to the top while tapping an arrow: at 0 the frame glides over
+   about three seconds, at the default as it always did, at the top it snaps.
+4. Music Sync is greyed in Hold and Follow until Frame Sway is up; nothing the sound does
+   moves the frame meanwhile.

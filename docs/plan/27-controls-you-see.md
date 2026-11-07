@@ -95,6 +95,19 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - Heat is not carried on a thin gap (the velocity's self-advection is gone and vel.z
     rides with it), so Buoyancy, Heat Decay and Double Diffusion are weaker than their
     dials say.
+- ~~**27d-cam** "the camera controls don't really do much" (the owner, 2026-10-22).~~
+  **Shipped** 2026-11-07 with QA-32 (#575's fix carried onto main): Chase Speed is Hold's
+  weight across its whole 0..3 dial, the arrow keys pan the closeup, Music Sync says when it
+  cannot move the frame, the phone's remote has Chase Speed (`npm run camerahand`). Story in
+  `docs/plan-shipped.md` §27d-cam. Left from it:
+  - **27d-c1** The aim sliders' outer ends are clamped: at 4x about 8% of each end does
+    nothing, because the frame cannot leave the plate. Map the slider onto the reachable
+    range, or say so on it.
+  - **27d-c2** Follow's Chase has no visible effect (the lead, `leadTarget`, cancels the
+    lag it sets), so it wants a meaning of its own there (how far ahead it leads) or a fold
+    into Hold's weight.
+  - **27d-c3** The Lens section (Settings → Camera) moves only 1 to 5 px at 1440 wide by the
+    shader's arithmetic; 33i (#592) is the open rebuild, and it needs a Mac measurement.
 - **27e. The music should move the picture more (first part shipped, #307).** The owner,
   2026-10-05: "Generally I don't feel like music is having as much impact on the visuals
   as I would like." 27a-c make the kick's two rides and the stir answer harder. Read

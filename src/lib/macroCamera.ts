@@ -53,7 +53,8 @@
  * 3% from the middle of the frame, where it sat 27% off.
  */
 import { stream, type Rng } from './rng';
-import { MACRO_FULL_ZOOM } from '../sim/constants';
+import { MACRO_FULL_ZOOM, macroZoomOf } from '../sim/constants';
+import type { VisualizerSettings } from '../types';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -156,6 +157,36 @@ const LEAD_SECONDS = 0.6;
 const BARE_SHARE = 0.1;
 /** A plate whose average dye is under this has nothing to land on yet. */
 const EMPTY_PLATE = 1e-3;
+
+/**
+ * How fast Hold answers a hand on the aim, in eases a second: Chase Speed as
+ * a rig's weight. It was `6 + 6 × chase`, which took 0.37 s to cover nine
+ * tenths of an aim jump at 0 and 0.18 s at 1 (`npm run camerahand`): a dial
+ * with a twofold throw, and nothing at all once the aim stopped.
+ *
+ * Now it runs from a heavy glide (3 s at 0) to a snap (under a tenth of a
+ * second at the dial's top), and passes through 8.4 at the default 0.4,
+ * exactly what the old line gave there, so a look that left Chase alone moves
+ * as it did. It bends at the default rather than being one exponential: the
+ * dial runs to 3 since the dials were widened (midi.ts, `macroChase`), and a
+ * single curve through 0, 0.4 and the cap would have reached the cap by 0.73
+ * and left three quarters of the travel doing nothing. Below the default each
+ * step is a big change of weight; above it, the rate grows a fixed share per
+ * step until it is 60 a second (one frame's ease) at 3. Between 0.4 and 1
+ * that is 8.4 to 13 a second, close to the old line's 8.4 to 12 there.
+ */
+const HOLD_RATE_GLIDE = 0.77;   // at Chase 0: ln 10 / 0.77 = 3.0 s to nine tenths
+const HOLD_RATE_DEFAULT = 8.4;  // at Chase 0.4, the old 6 + 6 × 0.4
+const HOLD_RATE_SNAP = 60;      // at the dial's top: an ease a frame
+const CHASE_DEFAULT = 0.4;
+const CHASE_MAX = 3;
+
+export function holdRate(chase: number): number {
+  const c = clamp(Number.isFinite(chase) ? chase : CHASE_DEFAULT, 0, CHASE_MAX);
+  return c <= CHASE_DEFAULT
+    ? HOLD_RATE_DEFAULT * Math.pow(HOLD_RATE_GLIDE / HOLD_RATE_DEFAULT, (CHASE_DEFAULT - c) / CHASE_DEFAULT)
+    : HOLD_RATE_DEFAULT * Math.pow(HOLD_RATE_SNAP / HOLD_RATE_DEFAULT, (c - CHASE_DEFAULT) / (CHASE_MAX - CHASE_DEFAULT));
+}
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
@@ -491,7 +522,7 @@ export class MacroCamera {
     }
     if (first || landed) { this.camX = targetX; this.camY = targetY; }
     // A hand on the aim should be answered at once; a follow eases like a rig.
-    const rate = mode === 'hold' ? 6 + opts.chase * 6 : 1.0 + opts.chase * 5;
+    const rate = mode === 'hold' ? holdRate(opts.chase) : 1.0 + opts.chase * 5;
     const k = 1 - Math.exp(-rate * step);
     this.camX += (targetX - this.camX) * k;
     this.camY += (targetY - this.camY) * k;
@@ -878,4 +909,54 @@ export function holdWhereItIs<T extends { macroCamera?: CameraMode; macroAimX?: 
  */
 export function shotLabel(macroHold: number | undefined): string {
   return `${+Math.max(0.5, macroHold ?? 5).toFixed(1)}s`;
+}
+
+/**
+ * The frame's width as a share of the plate's, as MacroCamera keeps it in
+ * bounds: the longer side of the canvas over one and a half times itself
+ * (`spanX` in the frame loop) is two thirds, whatever the window's shape.
+ */
+const FRAME_SPAN = 2 / 3;
+
+/**
+ * The aim after an arrow key, in plate uv (the closeup's pan for a hand that
+ * has no Alt-drag, and a laptop's only way to move it without the Aim sliders).
+ *
+ * A tap moves a quarter of the frame, Shift a whole frame; a held key repeats
+ * at forty-fifth of a frame each, about three quarters of a frame a second at
+ * the keyboard's usual repeat, which is a slow pan, not a lurch. Sized by the
+ * frame, not the plate, so the same tap is the same distance on the screen at
+ * 2x and at 12x. Held on the plate: the aim never leaves 0..1.
+ */
+export function panAim(
+  from: { x: number; y: number }, dir: { dx: number; dy: number }, zoom: number,
+  how: { repeat?: boolean; big?: boolean } = {},
+): { x: number; y: number } {
+  const frame = FRAME_SPAN / Math.max(1, zoom);
+  const step = frame * (how.big ? 1 : how.repeat ? 1 / 45 : 0.25);
+  return { x: clamp(from.x + dir.dx * step, 0, 1), y: clamp(from.y + dir.dy * step, 0, 1) };
+}
+
+const ARROWS: Record<string, [number, number] | undefined> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+/**
+ * Where an arrow key moves the closeup's aim, or null when it is not an
+ * arrow or the closeup is out (the app's key handler then leaves the key
+ * alone). The same aim Alt-drag moves, panned from where the camera is
+ * looking now: Hold's own aim, or the frame's centre (`centre`, the
+ * visualizer's) in Follow and Auto, so they pan on from their own frame
+ * rather than jumping back to a stale aim. "In" is the zoom the frame is
+ * drawn at (`macroZoomOf`), so a look saved with the flag alone pans too.
+ * Here, not in App.tsx, because App is held at its size ceiling.
+ */
+export function arrowAim(
+  e: { key: string; repeat?: boolean; shiftKey?: boolean },
+  s: VisualizerSettings, centre: { x: number; y: number } | null | undefined,
+): { x: number; y: number } | null {
+  const arrow = ARROWS[e.key];
+  const zoom = macroZoomOf(s);
+  if (!arrow || zoom <= 1.05) return null;
+  const aim = { x: s.macroAimX ?? 0.5, y: s.macroAimY ?? 0.5 };
+  const here = (s.macroCamera ?? 'hold') === 'hold' ? aim : centre ?? aim;
+  return panAim(here, { dx: arrow[0], dy: arrow[1] }, zoom, { repeat: e.repeat, big: e.shiftKey });
 }

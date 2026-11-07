@@ -211,6 +211,40 @@ if (process.argv.includes('--node')) {
       && same(outOfZoom, { macroMode: false, macroZoom: 1 }) && same(outOfBoth, { macroMode: false, macroZoom: 1 }),
       `in ${JSON.stringify(inFromPlate)}; out of a flag-only look ${JSON.stringify(outOfFlag)}, of a zoom-only look ${JSON.stringify(outOfZoom)}`);
   }
+
+  // 9. Every hand's press is that press, lit by the zoom. The desk's button
+  // and M were the first; the phone's Macro Closeup switch, the side rail's
+  // microscope and the command palette still flipped macroMode alone when
+  // #575 was carried onto main (2026-11-07), so each was a 4x plate under a
+  // 1.0x Macro Zoom, and lit by the flag, so a zoom set by the slider left it
+  // dark. Asked of each hand where it stands (its lit state and its press
+  // together), not as a word anywhere in its file, since App.tsx holds two of
+  // them; and across src, nothing writes macroMode but true, false or the zoom.
+  {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    // esbuild runs this from node_modules/.cache, so the repo is npm's working directory.
+    const src = (f) => readFileSync(join(process.cwd(), f), 'utf8');
+    const hands = [
+      ['the desk\'s Close-up', 'src/components/desk/DeskPanels.tsx', /pressed=\{macroZoomOf\(p\.settings\) > 1\.05\}[\s\S]{0,200}onClick=\{\(\) => p\.onSetting\(closeupToggle\(p\.settings\)\)\}/],
+      ['M', 'src/App.tsx', /case 'macro-toggle':[\s\S]{0,300}updateSettings\(closeupToggle\(settingsRef\.current\)\)/],
+      ['the side rail', 'src/App.tsx', /aria-pressed=\{macroZoomOf\(settings\) > 1\.05\}[\s\S]{0,200}onClick=\{\(\) => updateSettings\(closeupToggle\(settings\)\)\}[\s\S]{0,200}macroZoomOf\(settings\) > 1\.05 \? LIT/],
+      ['the phone\'s switch', 'src/components/RemoteControl.tsx', /const closeupIn = !!settings && macroZoomOf\(settings as VisualizerSettings\) > 1\.05;[\s\S]*aria-checked=\{closeupIn\}\s*onClick=\{\(\) => settings && patch\(closeupToggle\(settings as VisualizerSettings\)\)\}[\s\S]{0,600}<SwitchPill on=\{closeupIn\} \/>/],
+      ['the palette', 'src/app/useCommandPalette.ts', /name: macroZoomOf\(settings\) > 1\.05 \? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: \(\) => updateSettings\(closeupToggle\(settings\)\)/],
+    ];
+    const off = hands.filter(([, f, re]) => !re.test(src(f))).map(([n]) => n);
+    const writes = [];
+    const walk = (d) => { for (const n of readdirSync(d)) { const f = join(d, n); if (statSync(f).isDirectory()) walk(f); else if (/\.tsx?$/.test(n)) {
+      for (const m of readFileSync(f, 'utf8').matchAll(/macroMode:\s*([^,}\n]+)/g)) {
+        const v = m[1].trim();
+        if (!/^(true|false|boolean;.*|\w+ > 1\.05)$/.test(v)) writes.push(`${f.slice(process.cwd().length + 1)}: ${v}`);
+      }
+    } } };
+    walk(join(process.cwd(), 'src'));
+    check('every way in (desk, M, the side rail, the phone\'s switch, the palette) is that press, lit by the zoom; nothing else writes macroMode',
+      off.length === 0 && writes.length === 0,
+      off.length || writes.length ? `not the press: ${off.join(', ') || 'none'}; other writes: ${writes.join('; ') || 'none'}` : `${hands.length} hands, every write true, false or the zoom`);
+  }
 } else {
   const { chromium } = await import('playwright');
   const { spawn } = await import('node:child_process');
