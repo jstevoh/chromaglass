@@ -4210,6 +4210,32 @@ The plan as written before it was built:
   punches a hole where it lands. Both are in the phone's bottle picker and on MIDI,
   like every other bottle.
 
+### 20b-13. The film's own dye
+
+**Shipped (this PR), behind Film Dye (`clearFilmDye`, 0 in every look) and its colour
+(`clearFilmDyeColor`, a warm yellow); judging §108.** Asked through the owner's lace still
+(yellow lacy veins and cells, fine spatter, over lavender, cobalt and coral). In the lab a
+yellow Oil Bodies sheet with water holes held lace for about a second and then Cahn–Hilliard
+pulled the veins to blobs by three seconds at any oil tension 0.08–0.9, so the still's lace
+is a dyed film dewetting, which Clear Film already does; it lacked a colour.
+
+- `src/gpu/wgsl/filmDye.ts`: `filmDyeThrough(h, gap)` is Beer–Lambert over the film's path
+  above its precursor, `lampThrough(colour, FILM_DYE_DEPTH × strength² × (h − h_p) × gap)`,
+  so Spectral Optics' dichromatism comes with it; `filmDyePaint` lays it on the black ground
+  (20b-14). Applied at the front plate's composite, after `throughScaled` (the dish edge and
+  grain scale the water's dye, not the film's). Exactly 1 at strength 0 or no film.
+- `FILM_PRECURSOR` (0.06) is now exported from `film.ts` (its `F_HP`, same text in the
+  shader): a hole on the precursor holds no dye, so the water's colour comes through clean
+  (with h read whole, a hole at full strength lost 82% of its blue; above h_p, 10%).
+- `plate.ts` shrank 123 bytes (its clear-film comment moved to the module).
+- `npm run lace` 8, on a thin dusty film torn into lace over clear water and a pool: at 0 the
+  picture is the undyed one byte for byte; the green absorbance is Beer–Lambert's at a
+  quarter, a half and all of the dial to within 15%, scales as the square, and as h − h_p
+  between thick and thin film; the red (all let through) does not move; the holes move under
+  a fifth of the film; on black the film is painted yellow.
+- Controls beside Clear Film, shown while there is a film: the desk (slider and swatch),
+  the phone's Dye sheet (slider and swatch), the remote, MIDI (`clearFilmDye`), help, pins.
+
 ### 18c. A pour adds liquid, not only colour
 
 **18c-1** (2026-10-05): a bottle's pour is volume, on a thin gap (`npm run flush`, judging

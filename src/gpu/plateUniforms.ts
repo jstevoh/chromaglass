@@ -333,6 +333,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('lampGround', !photo && Number.isFinite(s.lampGround) ? clamp01(s.lampGround as number) : 0);
     pack.set('paperA', pa.r, pa.g, pa.b);
     pack.set('paperB', pb.r, pb.g, pb.b);
+    // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.
+    const fd = hexToRgb(s.clearFilmDyeColor ?? '#ffd21a');
+    pack.set('filmDye', fd.r, fd.g, fd.b, Number.isFinite(s.clearFilmDye) ? clamp01(s.clearFilmDye as number) : 0);
     pack.set('droplets', clamp01(s.microDroplets ?? 0));
     pack.set('thinFilm', clamp01(s.thinFilm ?? 0));
     // Not clamp01 alone: it passes NaN, and ?set=filmPhysics=x is how the owner is asked to try it.
