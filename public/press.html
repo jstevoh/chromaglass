@@ -1,0 +1,207 @@
+<!doctype html>
+<!--
+  The press page (PLAN.md 37k).
+
+  Who it is for: a reviewer, a podcast or a newsletter that has written back
+  and needs, in one place and without asking, what ChromaGlass is in two
+  sentences, what it costs, pictures and clips they may run, the logo, and an
+  address to write to. Everything a journalist would otherwise email for.
+
+  Why a static file, as /pro and the Terms are, and not a route in the app:
+  nothing here needs the engine, sign-in or the intro; it must open at once
+  from a link in an email on a phone, and a link preview must read it whole.
+
+  Where the media come from, and why not the lab: the stills and clips are the
+  owner's Mac recording the real app at 60 fps (the 34a-6 site films, PLAN
+  §34), because a press picture is a promise of what the app looks like and
+  the lab's plate is a deterministic stand-in made for checks. The cards show
+  the landing page's small webp of the same look, and each links to the full
+  2560 × 1440 JPEG, so a phone opening this page loads about 120 KB of
+  pictures, not 6 MB. The logo files are written by `npm run brand` from
+  scripts/brand/art.mjs like every other icon, never drawn by hand.
+
+  Kept honest by `npm run presskit`: every file linked here exists in public/ and
+  is the size it says, the stills are at least 2400 pixels wide, the prices are
+  the landing page's (src/components/Landing.tsx), and the page fits a 360 px
+  phone without a sideways scroll. When a price or a tier line changes, this
+  page changes in the same PR. The look is /pro's: the landing page's tokens.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChromaGlass press kit</title>
+<meta name="description" content="ChromaGlass in two sentences, prices, stills and clips to download, the logo, and who to write to.">
+<meta property="og:title" content="ChromaGlass press kit">
+<meta property="og:description" content="A liquid light show you play to your music. Stills, clips, logo and facts for writing about it.">
+<meta property="og:image" content="https://chromaglass.art/og-card.png">
+<meta property="og:url" content="https://chromaglass.art/press">
+<meta name="theme-color" content="#0A0A0B">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0A0A0B; --surface: #111113; --elevated: #18181B;
+    --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.14);
+    --text: #FAFAFA; --text-2: #D4D4D8; --muted: #A1A1AA; --dim: #71717A;
+    --accent: #8B5CF6; --accent-text: #C4B5FD;
+    --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  a { color: inherit; }
+  a:focus-visible, .btn:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); border-radius: 8px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+  @media (min-width: 640px) { .wrap { padding: 0 32px; } }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: 8px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-size: 15px; font-weight: 600; letter-spacing: .02em; }
+  .brand img { width: 28px; height: 28px; }
+  .top nav { display: flex; gap: 4px; font-size: 14px; }
+  .top nav a { color: var(--text-2); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; padding: 0 10px; }
+  .top nav a:hover { color: var(--text); }
+
+  .intro { padding: 48px 0 40px; border-bottom: 1px solid var(--border); }
+  @media (min-width: 640px) { .intro { padding: 80px 0 56px; } }
+  .kicker { font: 500 12px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-text); margin: 0 0 14px; }
+  h1 { font-size: clamp(32px, 7vw, 52px); line-height: 1.06; letter-spacing: -.025em; font-weight: 600; margin: 0; max-width: 20ch; }
+  .blurb { margin: 20px 0 0; max-width: 42rem; font-size: 18px; line-height: 1.6; color: var(--text-2); }
+  .blurb-tools { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--dim); }
+  button.copy { font: 500 13px/1 var(--sans); color: var(--text-2); background: transparent; border: 1px solid var(--border-strong); border-radius: 8px; min-height: 40px; padding: 0 14px; cursor: pointer; }
+  button.copy:hover { background: rgba(255,255,255,.05); }
+
+  section.block { padding: 48px 0; border-bottom: 1px solid var(--border); }
+  @media (min-width: 640px) { section.block { padding: 64px 0; } }
+  h2 { font-size: clamp(22px, 4vw, 28px); line-height: 1.15; letter-spacing: -.015em; font-weight: 600; margin: 0; }
+  .sub { margin: 10px 0 0; max-width: 42rem; font-size: 15px; line-height: 1.65; color: var(--muted); }
+
+  /* The facts stack to one column under 560 px, as /pro's spec does, so a
+     phone reads them without a sideways scroll. */
+  table.facts { margin-top: 24px; width: 100%; border-collapse: collapse; font-size: 15px; }
+  .facts th, .facts td { text-align: left; vertical-align: top; padding: 12px 0; border-top: 1px solid var(--border); }
+  .facts th { width: 28%; font-weight: 500; color: var(--text-2); padding-right: 20px; }
+  .facts td { color: var(--muted); line-height: 1.55; }
+  .facts td strong { color: var(--text-2); font-weight: 500; }
+  @media (max-width: 559px) {
+    .facts th, .facts td { display: block; width: auto; padding: 0; border: none; }
+    .facts th { padding-top: 14px; border-top: 1px solid var(--border); }
+    .facts td { padding: 4px 0 14px; }
+  }
+
+  .grid { margin-top: 28px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 560px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 960px) { .grid.three { grid-template-columns: 1fr 1fr 1fr; } }
+  figure { margin: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); min-width: 0; }
+  figure img, figure video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
+  figcaption { padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; }
+  figcaption span { color: var(--text-2); min-width: 0; }
+  figcaption small { display: block; color: var(--dim); font: 400 12px/1.4 var(--mono); }
+  a.dl { flex: none; display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; font-size: 13px; text-decoration: none; color: var(--text-2); }
+  a.dl:hover { background: rgba(255,255,255,.05); }
+
+  .logos figure img { aspect-ratio: auto; height: 160px; object-fit: contain; padding: 24px; background: var(--elevated); }
+  .note { margin-top: 16px; font-size: 13px; line-height: 1.6; color: var(--dim); max-width: 46rem; }
+  .btn { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; border-radius: 8px; padding: 0 24px; font-size: 15px; font-weight: 500; text-decoration: none; background: var(--text); color: var(--bg); margin-top: 20px; }
+
+  footer { padding: 32px 0 max(32px, env(safe-area-inset-bottom)); font-size: 12px; line-height: 1.6; color: var(--dim); }
+  footer a { color: var(--dim); }
+  footer a:hover { color: var(--text-2); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="" aria-hidden="true">ChromaGlass</a>
+    <nav aria-label="Site">
+      <a href="/">Home</a>
+      <a href="/pro">For pros</a>
+      <a href="/show">Play</a>
+    </nav>
+  </header>
+</div>
+
+<main>
+<div class="wrap">
+  <section class="intro">
+    <p class="kicker">Press kit</p>
+    <h1>ChromaGlass, for writing about it.</h1>
+    <p class="blurb" id="blurb">ChromaGlass is a liquid light show you play to your music: oil, ink and ferrofluid on a glass plate, simulated drop by drop on the computer's graphics chip and thrown onto a wall or a projector. It listens to the room or follows MIDI clock and Ableton Link, so the colour moves with the song at a gig or in a living room, free in Chrome, with a Mac app for shows.</p>
+    <div class="blurb-tools">
+      <button class="copy" type="button" data-copy="blurb">Copy these two sentences</button>
+      <span>Free to quote as is.</span>
+    </div>
+  </section>
+
+  <section class="block" id="facts">
+    <h2>The facts</h2>
+    <table class="facts">
+      <tr><th scope="row">What</th><td>A real-time fluid simulation of a 1960s liquid light show (the overhead projector, the clock glass and the oil and water), played like an instrument with fingers, a mouse, MIDI controllers and sound.</td></tr>
+      <tr><th scope="row">Price</th><td><strong data-price="free">Free</strong> in the browser, with every look, tool and liquid. <strong data-price="home">Home $35</strong> adds full-length recording, 4K renders, the phone remote and the Mac app. <strong data-price="pro">Pro $199</strong> adds OSC, Art-Net / DMX, the finest grid and your own liquids. Pay once, no subscription.</td></tr>
+      <tr><th scope="row">Runs on</th><td>Current Chrome or Edge with WebGPU, and the Mac app on Apple silicon Macs (M1 and later). A phone or tablet plays it too, or drives a laptop's show as a remote.</td></tr>
+      <tr><th scope="row">Made by</th><td>Plum Tree Art LLC, California.</td></tr>
+      <tr><th scope="row">Links</th><td><a href="https://chromaglass.art">chromaglass.art</a> · <a href="/pro">the page for VJs and musicians</a> · <a href="/show">try it</a></td></tr>
+      <tr><th scope="row">Contact</th><td><a href="mailto:support@chromaglass.art">support@chromaglass.art</a>, for interviews, review licences and anything not on this page.</td></tr>
+    </table>
+  </section>
+
+  <section class="block" id="stills">
+    <h2>Stills</h2>
+    <p class="sub">Six looks, each a frame of the app recording itself on a Mac at 2560 × 1440, straight off the plate with nothing painted on afterwards. Tap one for the full-size JPEG.</p>
+    <div class="grid three">
+      <figure><img src="/landing/looks/neon-coral-reef.webp" alt="A reaction grows coral across the glass, branch by branch" loading="lazy" decoding="async"><figcaption><span>Neon Coral Reef<small>2560 × 1440 JPEG</small></span><a class="dl" href="/press/stills/neon-coral-reef.jpg" download>Download</a></figcaption></figure>
+      <figure><img src="/landing/looks/cell-bloom.webp" alt="Three pools of silicone and oil turning under a magnifier" loading="lazy" decoding="async"><figcaption><span>Lens Pools<small>2560 × 1440 JPEG</small></span><a class="dl" href="/press/stills/cell-bloom.jpg" download>Download</a></figcaption></figure>
+      <figure><img src="/landing/looks/ferro-paint.webp" alt="Black ferrofluid worked through amber, teal and coral" loading="lazy" decoding="async"><figcaption><span>Ferro Paint<small>2560 × 1440 JPEG</small></span><a class="dl" href="/press/stills/ferro-paint.jpg" download>Download</a></figcaption></figure>
+      <figure><img src="/landing/looks/lace-run.webp" alt="A tongue of amber dye dragging black lace behind it" loading="lazy" decoding="async"><figcaption><span>Lacing Run<small>2560 × 1440 JPEG</small></span><a class="dl" href="/press/stills/lace-run.jpg" download>Download</a></figcaption></figure>
+      <figure><img src="/landing/looks/aurora-borealis.webp" alt="Curtains of jade and lime rippling across a night sky" loading="lazy" decoding="async"><figcaption><span>Aurora Borealis<small>2560 × 1440 JPEG</small></span><a class="dl" href="/press/stills/aurora-borealis.jpg" download>Download</a></figcaption></figure>
+      <figure><img src="/landing/looks/macro-bead.webp" alt="One bead of oil close up: domed, wet, razor edges" loading="lazy" decoding="async"><figcaption><span>Macro Bead<small>2560 × 1440 JPEG</small></span><a class="dl" href="/press/stills/macro-bead.jpg" download>Download</a></figcaption></figure>
+    </div>
+  </section>
+
+  <section class="block" id="clips">
+    <h2>Clips</h2>
+    <p class="sub">Two 20-second clips of the app playing to music, 1920 × 1080 at 60 fps, H.264 with sound, recorded by the app itself on a Mac with nothing added afterwards.</p>
+    <div class="grid">
+      <figure><video src="/press/clips/neon-coral-reef.mp4" poster="/landing/looks/neon-coral-reef.webp" controls preload="none" playsinline></video><figcaption><span>Neon Coral Reef<small>20 s · 1080p MP4</small></span><a class="dl" href="/press/clips/neon-coral-reef.mp4" download>Download</a></figcaption></figure>
+      <figure><video src="/press/clips/ferro-paint.mp4" poster="/landing/looks/ferro-paint.webp" controls preload="none" playsinline></video><figcaption><span>Ferro Paint<small>20 s · 1080p MP4</small></span><a class="dl" href="/press/clips/ferro-paint.mp4" download>Download</a></figcaption></figure>
+    </div>
+    <p class="note" id="music">Music: "Newer Wave" (Neon Coral Reef) and "Ethernight Club" (Ferro Paint) by Kevin MacLeod (<a href="https://incompetech.com">incompetech.com</a>), licensed under <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0</a>. Keep that line with the clip, or run it silent. All the credits: <a href="/press/MEDIA.md">MEDIA.md</a>.</p>
+  </section>
+
+  <section class="block" id="logo">
+    <h2>Logo</h2>
+    <p class="sub">The mark alone and the mark with the name, as vectors and as large PNGs. Please don't recolour or stretch them.</p>
+    <div class="grid three logos">
+      <figure><img src="/press/logo/chromaglass-icon.svg" alt="The ChromaGlass icon" loading="lazy"><figcaption><span>Icon<small>SVG · PNG 1024</small></span><span><a class="dl" href="/press/logo/chromaglass-icon.svg" download>SVG</a> <a class="dl" href="/press/logo/chromaglass-icon-1024.png" download>PNG</a></span></figcaption></figure>
+      <figure><img src="/press/logo/chromaglass-lockup.svg" alt="The ChromaGlass mark with its name" loading="lazy"><figcaption><span>Mark and name<small>SVG · PNG 2400 wide, for dark grounds</small></span><span><a class="dl" href="/press/logo/chromaglass-lockup.svg" download>SVG</a> <a class="dl" href="/press/logo/chromaglass-lockup-2400.png" download>PNG</a></span></figcaption></figure>
+    </div>
+    <p class="note">The stills, clips and logo may be used in coverage of ChromaGlass. Cropping is fine; please don't paint over the stills.</p>
+  </section>
+</div>
+</main>
+
+<div class="wrap">
+  <footer>
+    ChromaGlass · Plum Tree Art LLC · <a href="mailto:support@chromaglass.art">support@chromaglass.art</a> ·
+    <a href="/terms.html">Terms</a> · <a href="/privacy.html">Privacy</a>
+  </footer>
+</div>
+
+<script>
+  // The one script on the page: copy the two sentences, and say so. A page
+  // with scripting off still shows the sentences to select by hand.
+  for (const b of document.querySelectorAll('button[data-copy]')) {
+    b.addEventListener('click', async () => {
+      const text = document.getElementById(b.dataset.copy).textContent.trim();
+      try { await navigator.clipboard.writeText(text); b.textContent = 'Copied'; }
+      catch { b.textContent = 'Select the text to copy'; }
+      setTimeout(() => { b.textContent = 'Copy these two sentences'; }, 2000);
+    });
+  }
+</script>
+</body>
+</html>
