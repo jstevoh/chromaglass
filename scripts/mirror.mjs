@@ -173,6 +173,15 @@ try {
       are then the plate's, which is what the derive pass's echo was (it lit
       each plate's relief from its mirror), whatever window the desk shows.
     */
+    /*
+      The pointer's mapping is the plate's to give (plateAt answers null until
+      the visualizer has laid its mapping down), so wait for it as for the
+      engine. Run first on a fresh Mac (PLAN 19k-12 moved this check to `show`,
+      and a PR that touches only it runs it alone) it answered null after the
+      settle and the line read "is not there"; last in `fifth` the shard's
+      earlier checks had warmed the runner. Up to 20 s, then the same line.
+    */
+    await page.waitForFunction(([x, y]) => !!window.chromaglassDebug?.().plateAt?.(x, y), [hx, hy], { timeout: 20000 }).catch(() => {});
     const cellPlate = await page.evaluate(({ hole, G }) => {
       const d = window.chromaglassDebug?.();
       if (typeof d?.plateAt !== 'function') return null;
