@@ -408,6 +408,21 @@
       ]
     },
     {
+      "name": "A Canvas loop with no seam",
+      "shard": "sound",
+      "run": "npm run loopseam -- --owed=picker",
+      "why": [
+        "A Spotify Canvas loop is an edit of the finished film, never of the",
+        "plate (PLAN 43b): the judge reads an MP4 (3 to 8 s, no audio track,",
+        "it moves, and the step from its last frame to its first is at most 3",
+        "times its median step) and is shown, on films it makes with ffmpeg",
+        "(installed above for the shelf), to fail a cut, a sound track, a",
+        "10 s loop and a still picture. --owed=picker: the seam picker's node",
+        "lines (src/lib/loopSeam.ts, on made-up frames) are written ahead of",
+        "43b and printed as owed; the PR that builds it takes the id out."
+      ]
+    },
+    {
       "name": "The ladder's shape",
       "shard": "logic",
       "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
@@ -2751,6 +2766,21 @@
       "name": "The show keeps moving",
       "shard": "tools",
       "run": "node scripts/moving.mjs"
+    },
+    {
+      "name": "The app renders a Canvas loop with no seam",
+      "shard": "tools",
+      "run": "npm run loopseam -- --app --owed=loop",
+      "why": [
+        "The app's own loop render (PLAN 43b), on a Mac because the app's",
+        "frames only read back on a GPU, and on this shard because it fetches",
+        "ffmpeg for npm run watch: a 4 s loop of a song the check makes,",
+        "rendered with and without the crossfade from one seed. The first",
+        "passes the judge of the entry above; the second fails its seam line,",
+        "so the check sees a seam in the app's own film; both are one pick.",
+        "--owed=loop until 43b's render ships; the PR that builds it takes the",
+        "id out. While owed it prints its lines and launches nothing."
+      ]
     }
   ]
 }
