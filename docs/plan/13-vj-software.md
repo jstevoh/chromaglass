@@ -150,7 +150,25 @@ picks it up in its next build. `detectTier()` already reads Electron as the
    owner's Mac, an automation lane playing a look change on the bar. The phone rule:
    the link's switch and its slot bindings are in the More sheet.
    Before any of it, the MIDI route in the table above, tried once in Logic and
-   Ableton and written up with step 4. *Not started.*
+   Ableton and written up with step 4. Cut 2026-11-01 into four PRs, the wire between
+   the halves written first so the two builders work apart:
+   - ~~**13.7-check**~~ (shipped 2026-11-07): the contract, `docs/dawbridge.md` (OSC
+     over UDP on `127.0.0.1:9024`, every address and argument, the page's messages and
+     the `CGPC` audio frame, the exports the check imports), and `npm run dawbridge`, a
+     fake plugin against the real show server and the built app, red on main with its
+     lines owed as `app` and `plugin`.
+   - **13.7a** (the app's half, Antigravity's lane): `server/dawBridge.js` beside
+     `abletonLink.js`, Pro only; `src/lib/dawBridge.ts`; slots in MIDI learn's map
+     (kind `'slot'`), the DAW as a tempo source ranked under Link, and the ear's source
+     "DAW". Done when it takes `app` out of `--owed` in `scripts/checks.json` and the
+     check is green in `browser2`. The phone rule: the bridge's state and its slot
+     bindings in the More sheet.
+   - **13.7b** (the plugin, Antigravity's lane, after 13.7a): `plugin/dawbridge/` in
+     JUCE, `BridgeProtocol.h` and the `DawBridgeSelfTest` target as the contract says;
+     its PR quotes `npm run dawbridge -- --plugin` and `auval` from the owner's Mac.
+   - **13.7c** (Claude: signing): the macOS runner builds the AU and VST3, signs and
+     notarises them with the Mac app's Developer ID, and a Mac shard runs the check
+     without `plugin` owed. Then the owner's sitting in Logic and Live.
    - **13.7-ipad** (later, from §30; after step 7 and §12's iPad app): the iPad sibling.
      An AUv3 that draws nothing, sits on an AUM (or Loopy Pro, Drambo) channel, and
      sends that channel's readings, its notes and the host's transport to the show over
