@@ -226,6 +226,33 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ clearFilm: v })}
           settingKey="clearFilm"
         />
+        {/*
+          The film's own dye (PLAN 20b-13): the lamp filtered over the film's
+          thickness, so the lace is a colour and the holes the water's. Shown
+          while there is a film to dye; the swatch is what one unit lets through.
+        */}
+        {(settings.clearFilm ?? 0) > 0.001 && (
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Slider
+                label="Film Dye"
+                value={settings.clearFilmDye ?? 0}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v: number) => onUpdate({ clearFilmDye: v })}
+                settingKey="clearFilmDye"
+              />
+            </div>
+            <input
+              type="color"
+              aria-label="Film dye colour"
+              value={settings.clearFilmDyeColor ?? '#ffd21a'}
+              onChange={(e) => onUpdate({ clearFilmDyeColor: e.target.value })}
+              className="mb-4 h-6 w-8 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+          </div>
+        )}
         <Slider
           label="Polarity (Repulsion)"
           value={settings.polarity}

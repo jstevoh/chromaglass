@@ -203,8 +203,25 @@ Open follow-ups:
 - **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
 - **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
 - ~~**18g-6**~~ An oil body touching the open rim no longer drains through it by its own surface tension: the rim is held at the oil's Laplace pressure, not the water's zero (CAPILLARY, rimLaplace; `npm run rimhold`, a lens at the rim 9.6% → 97.1% kept over six seconds). Story in `docs/plan-shipped.md` §18g.
-- **18g-7, open. A lens against the rim on the diagonal loses about 0.13% of its oil a second whatever its tension** (found building 18g-6: at a hundredth of Clock Glass's Oil Tension the lens laid against the rim at 45° kept 99.6% over the last three of six seconds, and over twelve seconds lost 1.8%; at the middle of the grid's edge it loses none). The oil past the rim grows by the same amount, so it is carried or relaxed across the rim's staircase cells, not pushed by a pressure: the mix's own Cahn–Hilliard relaxation (mixRelax/mixMu/mixUpdate read their neighbours past the rim with no rim condition) or the carry's faces there. Measure which first (oilBodies 0, the relaxation off), then give the mix the rim's zero-flux condition for its chemical potential, as dyeDisperse's diffusion has.
+- ~~**18g-7**~~ A lens against the rim on the diagonal lost about 0.13% of its oil a second whatever its tension: the mix's Cahn–Hilliard relaxation (mixRelax, mixMu, mixUpdate) and its overfull share read their neighbours past the open rim with no rim condition. They now take zero flux across it (`RIM_SIDE`, `wgsl/fluid/oil.ts`): the tilted lens's oil past the rim 1.71 → 0.03 at 27 s, `npm run oillift`'s rim lens 94.0% → 98.1% before mixRelax's share was added (#641, with 38r part 2). Story in `docs/plan-shipped.md` §38r.
 - **18g-8, open (a shortcut named). The gap's own curvature, 2σ/h across the gap, is not in the solve.** The thin gap's surface tension is the in-plane curvature alone; across an even gap the other curvature is the same everywhere and moves nothing, but where the gap changes (a press, a domed plate, and the cover glass's edge, where the gap opens into the reservoir) it pushes a non-wetting oil body toward the deeper liquid (Dangla, Kayi & Baroud 2013, drops moved by gradients of confinement). So whether a body at the rim is drawn out under the cover's edge into the reservoir, or held there by its in-plane interface as 18g-6 now has it, depends on a term the solve does not have. Add it as a force from the gap's gradient, σ·c̃·∇(2/h), and measure a lens in a wedge against the confinement speed before it is let near the rim. And the rim sets no contact angle: 18g-6's held pressure assumes the body's interface carries on past the rim, so the angle it meets the rim at is the grid's. At the middle of the grid's edge clampP mirrors the oil's blur (about 90°) and a lens there spreads along the rim (13.8 → 37.8 cells' worth of oil on the rim's cells over six seconds, review of #455); on the diagonal it draws itself off the rim (8.3 → 1.2), so part of what `npm run rimhold` reads as held there is a lens that has left the rim. A contact-line condition at the cover glass's edge (a pinned or angled interface, Gibbs' criterion at a sharp edge) belongs with the gap's curvature here, since both are what happens to the interface at the cover's edge.
+- ~~**18g-9**~~ The lip: across the open rim the oil goes only with an overflow (`lipHolds` in
+  `wgsl/fluid/carry.ts`, #650). At 2 mm a lens against the rim leaked its Cahn–Hilliard foot out
+  with the water (level, diagonal) and drifted through the rim into the held strip (tilted): rimhold's
+  diagonal 0.6% → 0.17% a reading in the probe, oillift's rim lens 98.1% → 100.0%. Story in §38r.
+- **18g-10, open. The oil's colour crosses the rim with the water while its oil is held** (S). `oilDye`
+  is carried by bodyAdvect, which has no lip: at the rim the colour can part from its oil. Read it with
+  `colourInWater`, then give bodyAdvect the same lip. And have rimhold's level lines and oillift's rim
+  line sum the oil's colour in the dish too, to the same bars: since the lip they read the oil (.r)
+  only, so a leak of the old kind (outward flow at p′ ≤ 0, or a p′ near zero whose sign differs on
+  Metal) or colour parting from its oil is blind to them (#655's review). Found building 18g-9.
+- **18g-11, open. Oil already past the rim stays there** (S). A splat's tail laid past the rim (0.39 of a
+  cell's worth in rimhold's probe) has no way back since 18g-7 and does not drain to the trough as the soap
+  does. Found building 18g-9.
+- ~~**18g-12**~~ An overflow takes the body, not the foot (`lipHolds`, #655): the lip let oil over
+  wherever p′ > 0, and a level lens at the grid's edge turns water out over the rim beside it, which
+  took the profile's foot (rimhold edge 98.5%, 0.9% in its last 3 s on the Mac). Only a cell of the
+  body (c ≥ ½) crosses now: edge 100.0%, diagonal 0.01% a reading. Story in §38r.
 
 - **Where:** the dye-budget regulator and "evaporation" (`LiquidVisualizer.tsx`,
   applied in `decayDye`), `capDye`, the `airExclude` multiply, a still bubble's

@@ -110,7 +110,7 @@ export interface LiquidType {
   color: string;
   /**
    * The liquid's own colour, with no dye in it: what a dish's depth of it
-   * (the 6 mm rest gap) lets through of the lamp's light, per channel.
+   * (6 mm, the rest gap before PLAN 38r; 38r-5) lets through of the lamp's light, per channel.
    * White is clear. A bottle without one is a dye (Ink, the owner's own),
    * and its colour is all it is. See lib/liquidColour.ts for how a dye
    * picked for it tints it.
@@ -496,6 +496,16 @@ export interface VisualizerSettings {
    * it. Moved while a film is on, the film is raised or lowered everywhere.
    */
   clearFilm?: number;
+  /**
+   * The clear film's own dye (PLAN 20b-13): an oil-soluble dye dissolved in
+   * it, how much (0 clear, as it was laid). The lamp is filtered by it over
+   * the film's own thickness (Beer–Lambert), so the lace takes the colour
+   * where the film is whole, deeper where it is thick, and the holes show the
+   * water's. On the black ground it is painted as the water's dye is.
+   */
+  clearFilmDye?: number;
+  /** What one unit of the film's dye lets through (hex): the colour the lace takes at the dial's middle on a film thin enough to tear. */
+  clearFilmDyeColor?: string;
   /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor); flat, a pool of it slumps out along the lower glass, further the heavier it is (PLAN 18m). */
   solutalBuoyancy: number;
   /** How far the plate stands up, from flat on the projector (0) to upright on the wall (1): what gravity can do in it. */
@@ -984,6 +994,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
+  clearFilmDye: 0,          // undyed: the film as every look has it, byte for byte (npm run lace, 8)
+  clearFilmDyeColor: '#ffd21a', // a warm yellow, the owner's lace still's
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,

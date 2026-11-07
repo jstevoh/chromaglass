@@ -194,6 +194,23 @@ Left from 20b, each its own item:
   into the film (`lab.addFilm`); the Dropper's path (`onDeposit`: Alcohol and Soap as
   the solvent, clear oil joining the film, the front plate only) is judged by eye
   (judging §34). A lab case that drives `onDeposit` as the app does would hold it.
+- ~~**20b-13. The film's own dye.**~~ Shipped (#684): Film Dye (`clearFilmDye`, with
+  `clearFilmDyeColor`), Beer–Lambert over the film's thickness above its precursor;
+  `npm run lace` 8. Story in [`docs/plan-shipped.md`](docs/plan-shipped.md) under 20b-13.
+- **20b-14. On the black ground the film's dye is painted, not lit.** A filter over black is
+  black, so on Lamp Ground 0 the dye is laid as the water's dye is there: its tint over
+  clear water, at the share of the lamp it takes, and a filter over the water's own painted
+  dye (`filmDyePaint`). It is the same convention
+  the water's dye has had since 18b, not the film's physics; it goes when the black ground
+  becomes a lamp seen from the side (scatter), if that is ever built. *A shortcut named.*
+- **20b-15. The film's dye is one concentration everywhere.** It is a dial, not a field: an
+  oil pour of another dye joins the film at the film's colour, and the dye does not
+  thin where the film is stretched (it moves with the oil, so c stays put, which is right
+  for a dye that stays in the oil, but a second dye would need its own c carried with h,
+  as the water's dye is carried with the water). A concentration carried on the film's grid
+  would let a pour of red oil streak a yellow lace.
+- **20b-16. The bubble lens and the edge decodes do not see the film's dye** (as 20b-11 for
+  the film itself): a bubble over dyed film shows the water's colour undyed.
 
 ## 20c. The lace stays lace: a viscous film
 

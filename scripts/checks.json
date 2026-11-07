@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -22,7 +22,7 @@
     {
       "name": "The scripts parse",
       "shard": "logic",
-      "run": "for f in scripts/*.mjs server/*.js; do node --check \"$f\" || exit 1; done",
+      "run": "for f in scripts/*.mjs server/*.js mcp/*.js; do node --check \"$f\" || exit 1; done",
       "always": true,
       "why": [
         "Every script parses (PLAN.md 19b). `tsc` reads only a handful of the",
@@ -408,6 +408,21 @@
       ]
     },
     {
+      "name": "A Canvas loop with no seam",
+      "shard": "sound",
+      "run": "npm run loopseam -- --owed=picker",
+      "why": [
+        "A Spotify Canvas loop is an edit of the finished film, never of the",
+        "plate (PLAN 43b): the judge reads an MP4 (3 to 8 s, no audio track,",
+        "it moves, and the step from its last frame to its first is at most 3",
+        "times its median step) and is shown, on films it makes with ffmpeg",
+        "(installed above for the shelf), to fail a cut, a sound track, a",
+        "10 s loop and a still picture. --owed=picker: the seam picker's node",
+        "lines (src/lib/loopSeam.ts, on made-up frames) are written ahead of",
+        "43b and printed as owed; the PR that builds it takes the id out."
+      ]
+    },
+    {
       "name": "The ladder's shape",
       "shard": "logic",
       "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
@@ -562,6 +577,19 @@
       "run": "npm run setlist",
       "why": [
         "The set list file: a show's running order reads back as it was written."
+      ]
+    },
+    {
+      "name": "The opening's wait for its frames",
+      "shard": "logic",
+      "run": "npm run stillwait",
+      "why": [
+        "The opening's wait for the page's frames before its first compile",
+        "(src/lib/stillWait.ts, PLAN.md 19aa-7), on made-up timelines: four",
+        "frames waited for whenever they come, half a second of the page free",
+        "with no frame ends it (the GPU process holding them, 43 of 116 Mac",
+        "openings), a busy or held page is never read as starved, and nothing",
+        "waits past the old 1.5 s cap."
       ]
     },
     {
@@ -1036,15 +1064,15 @@
     },
     {
       "name": "The draining soap film on the GPU (control)",
-      "shard": "lab",
+      "shard": "lab3",
       "run": "npm run soapgpu -- --selftest",
       "why": [
         "The draining soap film's GPU check against its CPU control (PLAN 32c,",
         "scripts/soapgpu.mjs --selftest, scripts/soapgpu-cpu.ts): the CPU reference",
         "in the GPU solver's contract through every scenario and bar of soapgpu.",
-        "In Measure's lab part rather than logic because soapgpu.mjs opens the lab",
+        "In Measure's lab3 part rather than logic because soapgpu.mjs opens the lab",
         "page in Chromium and requests a WebGPU adapter before running the solver,",
-        "and checks.yml installs Chromium only on the browser, lab and lab2 parts."
+        "and checks.yml installs Chromium only on the browser and lab parts."
       ]
     },
     {
@@ -1080,7 +1108,7 @@
     },
     {
       "name": "No line round a bubble's hole",
-      "shard": "lab",
+      "shard": "lab4",
       "run": "npm run holeline",
       "why": [
         "No line round a bubble's hole in one dye (PLAN.md 33a,",
@@ -1093,7 +1121,11 @@
         "holds PLAN.md 33b: the dye's relief is flat beside a hole (a third lab",
         "with airNear's mask taken off finds the glow again), and a pool's edge",
         "into clear liquid keeps its relief. It reads pictures from the lab, which SwiftShader renders as the shader's text,",
-        "so it sits here beside lampzero rather than in the Mac queue."
+        "so it sits here beside lampzero rather than in the Mac queue.",
+        "In a Measure part of its own, `lab4`, since main's deploys 667 and 670",
+        "(PLAN 19k-11): on GitHub's slow ubuntu tier (videoflow's CPU loop 1.39 ms",
+        "a frame) `lab` reached it at 14:15 and was cancelled at its 25 minutes",
+        "while it ran, every check before it green; it takes 8 to 10.5 minutes alone."
       ]
     },
     {
@@ -1128,6 +1160,27 @@
         "every look. --owed: each line is excused only in main's state and printed",
         "as owed until the PR that builds it takes its id out. The lab alone, about",
         "four minutes on SwiftShader, beside soap in `lab3` (PLAN 19k-8)."
+      ]
+    },
+    {
+      "name": "A song's title painted as ink, then swept away",
+      "shard": "lab3",
+      "run": "npm run inktitle -- --owed=cue,mask,lands,sweep,kept,setting,wired",
+      "timeout": 9,
+      "why": [
+        "The Live Show's ink titles (PLAN 37x-10, scripts/inktitle.mjs), written ahead",
+        "of their build: the cue (one title a song, the switch, 40 characters), the",
+        "ink (the palette's or a chosen colour), the mask (upright, on the wall, where",
+        "asked, small to the plate's width), and in the solver a title poured with",
+        "pourInk that reads at 0.8 or better half a second after it lands and adds",
+        "the dye it says, still reads at 0.7 at 3 s and at 0.3 or worse by 12 s at the",
+        "default sweep (by 2 s at the top, a drift at 0.01), with its dye still on the",
+        "plate: swept by the flow, never faded. Then the settings (off by default, no",
+        "look sets them) and the wiring (the app pours and washes, no shader draws a",
+        "title, the phone has the switch). --owed: each line is excused only in main's",
+        "state and printed as owed until the PR that builds it takes its id out. On",
+        "main it opens no browser; built, the lab steps 1,200 times, about six minutes",
+        "on SwiftShader, beside soapbreak in lab3."
       ]
     },
     {
@@ -1471,6 +1524,21 @@
         "over the cap are turned away; and the server restarted under a linked",
         "phone and laptop comes back without anyone touching either. No GPU;",
         "dist/ is the phone step's build."
+      ]
+    },
+    {
+      "name": "The owner's assistant link",
+      "shard": "browser2",
+      "run": "npm run assistant",
+      "why": [
+        "The assistant role and its guard (PLAN 44b-44d, 44g; scripts/assistant.mjs): the real",
+        "MCP server over stdio against the real show server, a stand-in display that echoes",
+        "its state late as the app's does, and a phone. The owner's switch (off, from this Mac",
+        "only, closed when turned off), Suggest, Play and Full, glides, Undo ten deep, the",
+        "pace, the hand winning, a phone never starting the stream, the plate's picture, the",
+        "notes; the room keys against lookFade.ts; nothing public naming it. Then eighteen",
+        "mutants, each a rule removed from a copy of server/, each of which must fail its",
+        "own line. No GPU, no build; about a minute."
       ]
     },
     {
@@ -1972,7 +2040,7 @@
       "run": "npm run sloshgpu",
       "why": [
         "The slosh dish's kernels against the TypeScript reference, on Metal",
-        "(the same check runs on SwiftShader in Measure's lab part)."
+        "(the same check runs on SwiftShader in Measure's lab3 part)."
       ]
     },
     {
@@ -2680,12 +2748,15 @@
     },
     {
       "name": "A drop lands only where it is dropped",
-      "shard": "fifth",
+      "shard": "show",
       "run": "node scripts/mirror.mjs",
       "why": [
         "A drop lands where it is dropped: on the Design desk, on either layer,",
         "the cell under the hand changes and its mirror image across the middle",
-        "does not (reported: an echo of the gesture \"in the mirrored section\")."
+        "does not (reported: an echo of the gesture \"in the mirrored section\").",
+        "In show since PLAN 19k-12: fifth ran 18:45 of its checks on #655's run",
+        "(this one last, 85 s) and its 20-minute job was cancelled on two deploys",
+        "running, every check green; show ran 15:56 and 16:23 on the same two."
       ]
     },
     {
@@ -2736,6 +2807,21 @@
       "name": "The show keeps moving",
       "shard": "tools",
       "run": "node scripts/moving.mjs"
+    },
+    {
+      "name": "The app renders a Canvas loop with no seam",
+      "shard": "tools",
+      "run": "npm run loopseam -- --app --owed=loop",
+      "why": [
+        "The app's own loop render (PLAN 43b), on a Mac because the app's",
+        "frames only read back on a GPU, and on this shard because it fetches",
+        "ffmpeg for npm run watch: a 4 s loop of a song the check makes,",
+        "rendered with and without the crossfade from one seed. The first",
+        "passes the judge of the entry above; the second fails its seam line,",
+        "so the check sees a seam in the app's own film; both are one pick.",
+        "--owed=loop until 43b's render ships; the PR that builds it takes the",
+        "id out. While owed it prints its lines and launches nothing."
+      ]
     }
   ]
 }

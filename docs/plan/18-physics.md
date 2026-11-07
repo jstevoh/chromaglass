@@ -59,7 +59,7 @@ its frame rate live. "Free" means no new passes or texture reads.
 | 18d | Each liquid has its real properties | Large: glycerine crawls, thin fingers into thick, alcohol punches holes | +0.5–0.7 ms, less CPU | 18a |
 | 18e | Edges come from refraction | Moderate to large: one mechanism for every edge, and a focus ring to play | <0.1 ms | None. **Partly shipped** (#355); 18e-1 to 18e-4 open |
 | 18f | Heat comes from the lamp | Moderate: dark regions warm and move; the lamp's own cells | Nearly free | **Shipped** (#352) |
-| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil); 18g-2..5, 18g-7, 18g-8 open |
+| 18g | Colour leaves by flushing, not fading | Moderate: the plate turns over like a real one; drying | ~0.3 ms | **18g-1 shipped** (#362), **18g-6 shipped** (the rim holds the oil), **18g-7 shipped** (#641, the oil's relaxation stops at the rim); 18g-2..5, 18g-8 open |
 | 18h | Dye diffuses physically; heat its own kappa | Moderate: holds sharp edges | About equal to today | **Partly shipped** (#357) |
 | 18i | Bubbles and beads live by physics, not timers | Moderate: less "sticker" behaviour | CPU only | **Shipped** (#358, then 38b with #603); Bretherton lubrication, Saffman-Taylor lobes, Reynolds film drainage merge, bead speed lag; no timers left, the rim drains |
 | 18j | Milky liquids scatter | Moderate for milk, paint and latex | Free to +0.4 ms | **Shipped** (#353) |
@@ -217,7 +217,7 @@ its frame rate live. "Free" means no new passes or texture reads.
     Thin Gap on. In a gap it is the Brinkman correction to the drag, of order h²/L²
     against it; measure whether any look shows it, and drop it for the time if not.
   - **18a-11, the cost measured (shipped).** Measured 2026-10-07 on the Mac with `npm run stages` (`docs/judging.md` §19): Thin Gap needs no look turned off (512², 33 ms/frame; H2b 52 fps), and the in-plane viscosity (18a-10) is 1.52 ms. Story in `docs/plan-shipped.md` §18a-11 (moved 2026-10-29, 19m-2).
-  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). Open: whether `hsCycles` from cold should converge on a grid that is not a power of two.
+  - **18a-12, the thin gap's pressure was never cleared: shipped, as a warm start.** The clear is gone and the warm start is the choice, said in `thinProject`. Story in `docs/plan-shipped.md` §18a-12 (moved 2026-10-29, 19m-2). The open question (whether `hsCycles` from cold should converge on a grid that is not a power of two) is answered by 38r part 2 (#650): it did not, because the multigrid's levels stopped at the first odd level (130² had one coarse level, 65²), and the 2 mm gap's stiffer mobility contrast made the stale pressure read as a ring that came back 18% past where it began (`npm run thingap` at 130²). The levels now halve rounding up down to under four cells (130 → 65, 33, 17, 9, 5; even ladders unchanged), and the thin solve's coarsening takes an odd level's missing face as two faces in series.
   - **18a-13, tilt sloshes the liquid: shipped** (the owner, 2026-10-20: tip it one way
     and then the other and the colour should slop and mix). A shallow-water dish on the
     CPU (`lib/slosh.ts`) fed by the owner's tilt alone, its flow added to the thin solve's

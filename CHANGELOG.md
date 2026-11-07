@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `1`). At `0` (`Off`), all soap is conserved on the plate; turning it up clears soap over the
   chosen half-life so a long show keeps bursting (`npm run soapbreak`).
 
+### Added — Film Dye: a colour for the clear film (PLAN 20b-13)
+
+- Beside Clear Film, while there is a film: **Film Dye** and a colour swatch, an
+  oil-soluble dye dissolved in the film. The lamp is filtered by it over the film's own
+  thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
+  and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
+  0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a
