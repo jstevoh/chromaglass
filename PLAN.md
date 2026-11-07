@@ -246,7 +246,8 @@ style (§31).
 - **7.2** VJ software (§13): ~~**13.4**~~ the OSC write-up (shipped 2026-10-31, with ~~**13-icon**~~ and ~~**13-version**~~), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), ~~**13.5**~~ OSC out (shipped 2026-11-01; Link 2026-10-30),
   **13-port**, **13-intel**, **13-exit**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
-  Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
+  Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (~~13.7-check~~ the contract and
+  its check shipped 2026-11-07; then 13.7a the app's half, 13.7b the plugin, 13.7c signing; its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
