@@ -710,7 +710,7 @@ export function PhoneStage(p: PhoneStageProps) {
             className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
             {/* The bottle in hand, filled to what is left of the Dye Budget (PLAN 35e); it leans while its sheet is open. */}
-            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} />
+            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} testId="phone-dye-bottle" />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
