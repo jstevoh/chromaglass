@@ -241,12 +241,13 @@ style (§31).
 
 ### Wave 7. Reach
 
-- **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, **12.6**, then
+- **7.1** The stores (§12), after the owner's accounts (2.x): **12.3**, **12.5**, ~~**12.6**~~ (the listings, Play's pictures and the apps' privacy lines, 2026-11-01; **12.6-shots** waits on step 7), then
   **12.7**, **12.8**; **12.4a**; later **12.9**. When the owner says go: **12-ship**, **12-play-org**; later **12-link**; **12-mas** not for now.
 - **7.2** VJ software (§13): ~~**13.4**~~ the OSC write-up (shipped 2026-10-31, with ~~**13-icon**~~ and ~~**13-version**~~), **13-win-app** then
   **13-win-sign** (after 13-win-smoke, which runs beside Wave 2), ~~**13.5**~~ OSC out (shipped 2026-11-01; Link 2026-10-30),
   **13-port**, **13-intel**, **13-exit**, ~~**13-update-signed**~~ (shipped, 1.3.692), then **13.2**
-  Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (its
+  Syphon, **13.3** NDI and Spout, **13.6** video in, **13.7** the DAW bridge plugin (~~13.7-check~~ the contract and
+  its check shipped 2026-11-07; then 13.7a the app's half, 13.7b the plugin, 13.7c signing; its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
 - **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
@@ -259,7 +260,7 @@ style (§31).
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
   13.1-sign), then **24.4**.
 - **7.7** Marketing (§37), tied to the store going live: before any link is posted, the share
-  card (34a-5) and the hero (34a-2); then **37a** *(owner)*, **37b**, **37c**, **37k**, the
+  card (34a-5) and the hero (34a-2); then **37a** *(owner)*, **37b**, **37c**, ~~**37k**~~ (`/press`, 2026-11-01), the
   launch **37f** (**37g**, **37h**, **37i**), **37l** from the first post, **37n**; **37m** and
   **37o** are the owner's calls; **37j** the cadence after. The week that runs itself,
   **37p** to **37s** (37s's API audit filed early: it takes weeks), then the album show:

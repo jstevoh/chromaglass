@@ -1407,6 +1407,20 @@
       ]
     },
     {
+      "name": "The press kit and store listings are what they say",
+      "shard": "browser2",
+      "run": "npm run presskit",
+      "why": [
+        "The press page (PLAN.md 37k) and the store listings (12.6): /press routed",
+        "before the app's catch-all, every file it links in public/, six stills at",
+        "least 2400 px wide and two faststart clips as long as their captions (read",
+        "from the files), the landing page's prices, each listing field within its",
+        "store's limit with no price or way to buy, the store pictures' sizes and",
+        "alpha, and the page at 360 px and 1280 px with no sideways scroll and every",
+        "picture loaded. No build: it serves public/ as Hosting does."
+      ]
+    },
+    {
       "name": "The Live Show panel",
       "shard": "browser2",
       "run": "npm run liveshow",
@@ -1512,6 +1526,24 @@
         "tempo moved by each. On the dist/ the phone's step built. The plate's colours on",
         "the fixture need a plate that reports its dye back, so those two lines skip here",
         "and are the owner's, run on the Mac (docs/judging.md §93 step 0), not a Mac shard's."
+      ]
+    },
+    {
+      "name": "The DAW bridge",
+      "shard": "browser2",
+      "run": "npm run dawbridge -- --owed=app",
+      "why": [
+        "The DAW bridge plugin's contract (PLAN 13.7, docs/dawbridge.md), written ahead",
+        "of both halves: a node stand-in for the plugin against the real show server",
+        "with a Pro key (hello, slots within a frame at full float, transport, CGPC audio",
+        "bit for bit within 5 ms, names back, one plugin at a time, bye and quiet, phones",
+        "kept out, localhost only, locked on Free), the page's libs (the frame decoded, a",
+        "slot through MIDI learn's map, transport as a tempo source under Link), then the",
+        "built app (a slot moves its setting, the DAW's tempo is the show's, the ear hears",
+        "it). Beside rig, on the dist/ the shard has built; run alone it builds (19k-10).",
+        "--owed: app is 13.7a's; the plugin's",
+        "lines run only with `-- --plugin` on a Mac with it built (13.7b, then 13.7c's",
+        "Mac shard entry)."
       ]
     },
     {

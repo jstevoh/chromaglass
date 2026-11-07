@@ -29,6 +29,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the Live Show (`src/lib/liveShow.ts`, `src/lib/liveStream.ts`, `LiveShowPanel.tsx`, `desktop/live*.js`) | `liveshow`, `livedrop`, `live` (`PW_WEBGPU=1`); what the stream carries: `liveshow -- --stack` (`PW_WEBGPU=1`, about 3.5 min, or the Mac's fifth shard) |
 | the iPhone app (`ios/`, `capacitor.config.json`, `src/lib/appLink.ts`, `LaptopLink.tsx`), the remote's link (`remoteProtocol.ts`, `RemoteControl.tsx`, `server/remote-server.js`), the Phone · iPad panel | `applink`, `remotemix`, `phonelink` (the panel's code, and the relay's count of phones); the app's Xcode build runs in `ios.yml`, and on a phone by hand (`docs/judging.md` §16) |
 | the Mac app (`desktop/`, `scripts/desktop.mjs`), and what it leans on: `useProjector`, `useCastSession`, `CastDisplay`, `server/remote-server.js` | `desktop` (`npm --prefix desktop install` once; `-- --packaged` after `npm --prefix desktop run pack`); `desktop.yml` checks the packed app on a Mac |
+| the DAW bridge (`docs/dawbridge.md`, `server/dawBridge.js`, `src/lib/dawBridge.ts`, `plugin/dawbridge/`), Ableton Link (`server/abletonLink.js`), the tempo sources (`src/lib/tempo.ts`) | `dawbridge` (`-- --node` without a build; `-- --plugin` on a Mac with the plugin built, for its self-test and `auval`), `link`, `rig` |
 | the governor (`src/lib/governor.ts`) or what the loop feeds it | `rungs` (the ladder, the policy, and Poster's measured costs replayed); `stutter` on the Mac (two-step frames per look) |
 | the show's timers (`src/lib/showClock.ts`) or the gamepad (`src/hooks/useGamepad.ts`) | `timers` (a look fade with the window covered, and the hook's timers with no pad; both owed until 14a-timers and 14j-gamepad) |
 | a new or changed setting | `panel`, `desk`, and the `setting-auditor` agent |
@@ -37,6 +38,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | `.github/workflows/checks.yml`, `scripts/reach.mjs`, `scripts/checks.mjs`, `scripts/checks.json` | `npm run checks`, `npm run reach`, `npm run closedruns`, `npm run cisecrets` (any workflow: keys only in main's environments, read-only tokens, pinned outside actions), `npm run actionlint` (a pinned release, fetched on first use); `npm run macqueue -- --hours 24` for the Mac time before and after |
 | a check's bar or input under `scripts/`, or a SHOUTING_CASE number in `src/gpu/` | name each under `Check changes:` in the PR body (`docs/handoff.md`); `npm run checkguard -- --base origin/main --body-file <body>` says what it wants |
 | `scripts/qa.mjs` | `node --check scripts/qa.mjs`; read every new `page.evaluate` for a missing `await` (`window.__cgFrame` returns a promise) |
+| the press page (`public/press.html`, `public/press/**`), `docs/store-listings.md`, `docs/brand/store/`, the tier prices in `src/components/Landing.tsx` | `presskit` |
 
 `npm run quick` is this table made executable (PLAN 19k): it reads
 `scripts/checks.json`, works out what each check reads (its scripts, the `src/` files
