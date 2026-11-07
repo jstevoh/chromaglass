@@ -4176,7 +4176,7 @@ of a third round, and one escape puts its class back on review before merge for 
 `AGENTS.md`, `CLAUDE.md` and `docs/ci.md` carry the short form. `scripts/reach.mjs` lists
 `ready.yml` with the workflows that never run a Mac shard.
 
-Measured: see the PR (#696 or the one that carries this), which quotes the stubbed-`gh`
+Measured: see #701, which quotes the stubbed-`gh`
 cases, `npm run actionlint` and `npm run reach`.
 
 ### 20b. A clear film that tears (the thin-film equation)
