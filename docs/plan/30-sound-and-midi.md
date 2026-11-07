@@ -110,6 +110,13 @@ LFO that restarts its cycle on a trigger (a note on a channel, the kick, a pad),
 sweep begins with the phrase rather than wherever the bar clock left it. The measure adds
 the smoothed random's slope bounded (no step larger than a frame's share of its range)
 and a restart landing within a frame of each kick on the recorded loop.
+*Check written first (2026-11-07):* `npm run soundowed`, id `lfo` (five lines, owed):
+`setLfo(id, { bars, shape, restart })`, `setEnvelope(id, { attack, decay, on })` and
+`trigger(source, velocity)` on `Modulators`, with `fire` kept for the envelopes left on
+'any'. A line that holds on main keeps today's rates and shapes the defaults, sample for
+sample. The drum loop is written out, not heard: the ear's kick and snare onsets calling
+`trigger` in the visualizer is the review's, and a recorded song's onsets driving it is
+**30b-loop**, a line to add once the build is in.
 
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
 plate is a simulated liquid, not a stack of shaders (the owner's rule to model the real
