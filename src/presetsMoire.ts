@@ -12,8 +12,15 @@ import type { VisualizerSettings } from './types';
  * the dye. On the real stage the lamp is always under the sheets.
  *
  * Sound reaches the sheets only through patch cords (fast readings, the
- * owner's rule): a kick nudges a turn, the bass slides a sheet or wiggles a
- * groove. Never the frame: the sheets move, the picture does not.
+ * owner's rule): a kick twists the spokes, the bass slides a sheet or wiggles
+ * a groove. Never the frame: the sheets move, the picture does not. A sheet's
+ * cord takes the last of its house look's cords (presets.ts), and moves its
+ * control by at least 3% of its travel, the least `npm run soundpatch` calls
+ * moving: a kick on the Turn would have to swing it 11 degrees, which sends
+ * line fringes from wide to fine on every beat, so the kick twists the Curl.
+ * Over a look with areas (Milk Marbling, Poster) a look adds no sheet cord;
+ * Song Groove is laid over Home Movie for that reason, and for its white lamp
+ * (Cell Bloom's dark violet LED ring drew the grooves near black).
  */
 export const MOIRE_LOOKS: readonly {
   id: string; name: string; description: string; from: string; settings: Partial<VisualizerSettings>;
@@ -21,12 +28,12 @@ export const MOIRE_LOOKS: readonly {
   {
     id: 'moire-star',
     name: 'Moiré Star',
-    description: 'Two swept spoke sheets, one face down, crossing into a field of diamonds that wheels as the top sheet turns. A kick nudges the turn.',
+    description: 'Two swept spoke sheets, one face down, crossing into a field of diamonds that wheels as the top sheet turns. A kick twists the spokes.',
     from: 'classic',
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'spokes', moireSheetB: 'spokes', moireFlip: true,
       moireDensity: 40, moireAngle: 3, moireSpin: 0.4, moireCurl: 0.35, moireGap: 3,
-      sceneMappings: [{ source: 'hits', feature: 'kickHit', setting: 'moireAngle', depth: 0.008 }],
+      sceneMappings: [{ source: 'hits', feature: 'kickHit', setting: 'moireCurl', depth: 0.06 }],
     },
   },
   {
@@ -37,7 +44,7 @@ export const MOIRE_LOOKS: readonly {
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'rings', moireSheetB: 'rings', moireFlip: false,
       moireDensity: 44, moireAngle: 0, moireSlide: 0.035, moireGap: 5,
-      sceneMappings: [{ source: 'bands', feature: 'bass', setting: 'moireSlide', depth: 0.03 }],
+      sceneMappings: [{ source: 'bands', feature: 'bass', setting: 'moireSlide', depth: 0.05 }],
     },
   },
   {
@@ -46,7 +53,7 @@ export const MOIRE_LOOKS: readonly {
     description: 'Two five-fold quasicrystal sheets turning slowly against each other: flowers bloom and fold back that no grid can make.',
     from: 'milk-marble',
     settings: {
-      lampGround: 1, moireAmount: 1, moireSheetA: 'quasi', moireSheetB: 'quasi', moireFlip: false,
+      lampGround: 1, moireAmount: 0.6, moireSheetA: 'quasi', moireSheetB: 'quasi', moireFlip: false,
       moireDensity: 26, moireAngle: 2, moireSpin: 0.15, moireGap: 2,
     },
   },
@@ -58,17 +65,14 @@ export const MOIRE_LOOKS: readonly {
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'inks', moireSheetB: 'inks', moireFlip: false,
       moireDensity: 36, moireAngle: 4, moireSpin: 0.2, moireGap: 2,
-      sceneMappings: [{ source: 'hits', feature: 'snareHit', setting: 'moireAngle', depth: 0.005 }],
     },
   },
   {
     id: 'moire-groove',
     name: 'Song Groove',
     description: 'Two record grooves slid apart, their lines wiggled by the bass: the fringes breathe with the song.',
-    from: 'cell-bloom',
+    from: 'home-movie',
     settings: {
-      // Cell Bloom's dark violet LED ring off: the grooves want the white lamp under them.
-      ledPlatform: false,
       lampGround: 1, moireAmount: 1, moireSheetA: 'song', moireSheetB: 'song', moireFlip: false,
       moireDensity: 50, moireAngle: 0, moireSlide: 0.03, moireCurl: 0.15, moireGap: 3,
       sceneMappings: [{ source: 'bands', feature: 'bass', setting: 'moireCurl', depth: 0.5 }],
@@ -80,7 +84,7 @@ export const MOIRE_LOOKS: readonly {
     description: 'Two log-polar grids, one a shade larger and turning: the fringes spiral inward for ever over the lava.',
     from: 'lava-lamp',
     settings: {
-      lampGround: 1, moireAmount: 1, moireSheetA: 'zoom', moireSheetB: 'zoom', moireFlip: false,
+      lampGround: 1, moireAmount: 0.6, moireSheetA: 'zoom', moireSheetB: 'zoom', moireFlip: false,
       moireDensity: 30, moireRatio: 1.03, moireAngle: 0, moireSpin: 0.5, moireCurl: 0.2, moireGap: 3,
     },
   },

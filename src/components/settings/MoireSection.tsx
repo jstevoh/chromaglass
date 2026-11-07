@@ -19,7 +19,6 @@ import type { SectionCtx } from './props';
 export const MoireSection = ({ c }: { c: SectionCtx }) => {
   const { settings, onUpdate, focusSection, keep, shown, CARD, GRID, TITLE } = c;
   const pack = useMoirePreview(onUpdate);
-  if (!keep('moire')) return null;
   const off = !pack.live && 'the moiré pack: try it, or Pro includes it';
   const sheetPicker = (side: 'moireSheetA' | 'moireSheetB', label: string, title: string, set: (v: string) => void) => (
     <label className="mb-3 flex items-center gap-2 text-[12px] text-white/60">
@@ -37,6 +36,8 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
     </label>
   );
   return (
+    <>
+    {keep('moire') && (
     <section id="settings-moire" className={`${CARD} ${shown('moire') ? GRID : 'hidden'} ${focusSection === 'moire' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('moire')} data-section="moire">
       <h3 className={TITLE}>
         <Grid3x3 size={12} /> Moiré Sheets
@@ -83,5 +84,7 @@ export const MoireSection = ({ c }: { c: SectionCtx }) => {
       <Slider label="Moiré Curl" disabled={off} value={settings.moireCurl ?? 0.3} min={0} max={1} step={0.01}
         onChange={(v: number) => onUpdate({ moireCurl: v })} settingKey="moireCurl" />
     </section>
+    )}
+    </>
   );
 };

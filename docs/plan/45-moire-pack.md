@@ -30,6 +30,13 @@ own. Check: `npm run moire`.
   for the ink, Turn and Spin. Six looks in the look menu's **Moiré pack** group
   (`presetsMoire.ts`). Gate: `canUseMoirePack` in tierGates, open where tiers are not
   enforced, Pro where they are; a look of the pack opens the account sheet when locked.
+  A pack look is its house look's plate under its own id (`plateLook`, presetPlate.ts:
+  dyes, pours, dish, areas and seed), and a sheet's cord takes the last of the house look's
+  cords, so every look keeps 28i-3b's two or three; Quasicrystal Garden and Zoom Tunnel print
+  their sheets at 0.6 ink, since at full ink their dense patterns left under a fifth of the
+  frame for the dye (`npm run litstage` c4) and the lamp under 6% of the picture
+  (`npm run lampzero`). `npm run grainedge` asks the grain under the sheets, as it asks it
+  under Roy's print.
   Found while building it, not done:
   - **45a-2. Selling it to Home.** The licence names a tier only (`LicensePayload`); it
     needs a `packs` list in the signed payload, the Worker a Lemon Squeezy product for the

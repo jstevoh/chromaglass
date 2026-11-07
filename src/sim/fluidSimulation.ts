@@ -21,7 +21,7 @@ import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
-import { PRESET_CONTRACTS } from '../presetPlate';
+import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
 import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
@@ -1318,12 +1318,6 @@ export class FluidSimulation {
   }
 
   /**
-   * A look's own seed laid at `w` of its strength (0..1): what `seedPreset`
-   * adds, scaled, on top of what is there. The four dye arrays are the
-   * state on the CPU path and the pending deltas on the GPU path, and a seed
-   * only adds to them, so the difference it made can be scaled either way.
-   */
-  /**
    * What `lay` would put on the plate, as a picture to add later rather than
    * dye added now: the dye it lays is taken back out and returned (its
    * velocity stays, laid once). A look change lays the incoming look a share
@@ -1356,6 +1350,11 @@ export class FluidSimulation {
     this.dirty = true;
   }
 
+  /**
+   * A look's own seed laid at `w` of its strength (0..1), on top of what is
+   * there. A seed only adds to the four dye arrays (the state on the CPU
+   * path, the deltas pending on the GPU), so what it added scales either way.
+   */
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
     const k = Math.max(0, Math.min(1, w));
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
@@ -1369,7 +1368,8 @@ export class FluidSimulation {
     return harmony;
   }
 
-  seedPreset(presetId: string, noise2D: (x: number, y: number) => number): number[] {
+  seedPreset(look: string, noise2D: (x: number, y: number) => number): number[] {
+    const presetId = plateLook(look);
     const S = this.size;
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
@@ -1428,7 +1428,7 @@ export class FluidSimulation {
         }
       }
       this.seedMean = Math.max(0, dishSum() - beforeMean);
-      this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
+      this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
       return harmony;
     }
 
@@ -2086,7 +2086,7 @@ export class FluidSimulation {
     }
 
     this.seedMean = Math.max(0, dishSum() - beforeMean);
-    this.seedBudget = findPreset(presetId)?.settings.dyeBudget ?? 0.85;
+    this.seedBudget = findPreset(look)?.settings.dyeBudget ?? 0.85;
     return harmony;
   }
 
