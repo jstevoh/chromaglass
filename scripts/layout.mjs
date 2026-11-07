@@ -206,16 +206,28 @@ try {
     const r = await page.evaluate(() => {
       const strip = document.querySelector('[data-testid="rides"]');
       if (!strip) return null;
+      const rows = [...strip.querySelectorAll('[data-testid^="ride-"]')].filter(e => e.getAttribute('data-testid') !== 'ride-pick');
+      if (!rows.length) return { rows: 0, seen: [] };
+      /*
+        From the rows' own box up, so the strip's scroller counts (the
+        Choose, Mixer and Drain row is pinned under it, inside the strip),
+        and every scroller is put back to its top first: what is asked is
+        what shows without anyone scrolling.
+      */
       let top = 0, bottom = innerHeight;
-      for (let e = strip.parentElement; e; e = e.parentElement) {
+      for (let e = rows[0].parentElement; e; e = e.parentElement) {
         if (getComputedStyle(e).overflowY === 'visible') continue;
         e.scrollTop = 0;
         const q = e.getBoundingClientRect();
         top = Math.max(top, q.top); bottom = Math.min(bottom, q.bottom);
       }
-      const rows = [...strip.querySelectorAll('[data-testid^="ride-"]')].filter(e => e.getAttribute('data-testid') !== 'ride-pick');
-      const seen = rows.filter(e => { const q = e.getBoundingClientRect(); return q.height > 0 && q.top >= top - 1 && q.bottom <= bottom + 1; })
-        .map(e => e.getAttribute('data-testid').slice('ride-'.length));
+      // And nothing lies over a row: the thing drawn at its middle is the row's own.
+      const seen = rows.filter(e => {
+        const q = e.getBoundingClientRect();
+        if (!(q.height > 0 && q.top >= top - 1 && q.bottom <= bottom + 1)) return false;
+        const at = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+        return !!at && e.contains(at);
+      }).map(e => e.getAttribute('data-testid').slice('ride-'.length));
       return { rows: rows.length, seen };
     });
     check(`at ${w}×${h} on Perform, every ride shows whole under the Bottles, Macro Zoom among them`,
