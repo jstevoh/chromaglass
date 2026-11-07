@@ -160,6 +160,7 @@ const SECTION_OF: Record<string, string> = {
   oilBodies: 'oil',
   filmHold: 'oil',
   clearFilm: 'oil',
+  clearFilmDye: 'oil',
   thinGap: 'squish',
   gapThickness: 'squish',
   liquidMl: 'squish', coverWeight: 'squish',

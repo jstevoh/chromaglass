@@ -157,6 +157,8 @@ const NOT_THE_LOOK = new Set([
   // The clear film (PLAN §20b): moving it pours clear oil over the dish or
   // draws it off, so a wander would fill the lace's holes back in by itself.
   'clearFilm',
+  // And its dye (PLAN 20b-13): a dye dissolved in the oil does not thin or deepen by itself.
+  'clearFilmDye',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

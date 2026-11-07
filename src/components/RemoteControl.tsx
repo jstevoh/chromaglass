@@ -804,6 +804,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             and thickening it is a pour, worth a thumb from across the room.
           */}
           <Slider label="Clear Film" field="clearFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
+          {/* Its dye (PLAN 20b-13), while there is a film to dye. */}
+          {(settings?.clearFilm ?? 0) > 0.001 && (
+            <Slider label="Film Dye" field="clearFilmDye" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilmDye') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />

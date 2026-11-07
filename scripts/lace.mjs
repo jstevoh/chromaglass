@@ -379,6 +379,136 @@ try {
   check('7. with Clear Film at 0 the picture is the plate\'s, byte for byte; with the film on it is not',
     same === never.length && on > 0.01 * never.length,
     `${never.length - same} of ${never.length} bytes differ off; ${on} with the film on`);
+
+  /*
+    8: the film's own dye (PLAN 20b-13). A thin film on the dusty dish, torn
+    by itself and by three drops of solvent into lace, over clear water and
+    one pool, drawn on the lamp with Film Dye at 0, a quarter, a half and
+    all of it, in the owner's yellow (#ffd21a: one unit lets through all the
+    red, 0.82 of the green, 0.10 of the blue). What is asked is the law, read
+    off the screen against the film's own thickness the solver left, not the
+    shader's arithmetic:
+
+      a. at 0 the picture is the undyed film's byte for byte (and is with
+         the colour set), where at a half it is not (the positive control);
+      b. Beer–Lambert over the film: the green the dye takes away, as an
+         absorbance ln(I0 / I) pixel by pixel, is the dye's (−ln 0.82) times
+         its depth, FILM_DYE_DEPTH × strength² × the film above its
+         precursor, to within 15% at each strength; going from a half to
+         all of it multiplies it by 4 (the square), and where the film is
+         thick it is deeper than where it is thin in proportion to h − h_p
+         (to within 20%), so the lace is darker in its thick veins, and
+         the straight line through the thin and the thick film's absorbance
+         meets zero at the precursor (0.06 ± 0.025), not at h = 0, which is
+         the hole holding no dye; the red, which the dye lets through whole,
+         is untouched. The bytes are linear in the lamp on the lamp ground
+         (onGround returns lampBg × through at 1; a tone curve put after it
+         would be what turned this red, not the dye);
+      b'. the swatch is what was promised, written here and not read from
+         the shader: at the dial's middle on a film 0.32–0.38 thick the
+         lace lets through 0.82 ± 0.03 of the green and 0.10 ± 0.03 of the
+         blue, one unit of the colour picked;
+      c. the holes keep the water's colour: in them the picture moves from
+         the undyed one by under a fifth of what it moves over whole film;
+      d. on the black ground (today's in most looks) a filter over black
+         would be black, so the dye is painted as the water's is: over
+         whole film the picture is brighter than the undyed film's by half
+         the scale at least, and yellow (its blue under a quarter of its red);
+         and painted by its depth, not as a flat tint where there is film:
+         the holes move under a fifth of what the film does, and the thick
+         film's tint is the deeper (its green to its red lower than the thin
+         film's: the dye's colour raised to a longer path, as on the lamp).
+
+    Not asked: the gap's own scale in the path (thicknessOptics is 0 here, so
+    the gap is the rest gap's; with it up the path grows with the gap).
+
+    The film is read before the renders and nothing steps between them, so
+    every render is the one plate.
+  */
+  {
+    await fresh();
+    const laid8 = { ...BASE, clearFilm: 0.35 / FILM_MAX, filmDust: 1 };
+    await page.evaluate(() => { lab.dye(0.72, 0.5, 0.22, [0.6, 0.9, 0.2], 1.0); lab.flush(); });
+    await page.evaluate((o) => lab.step(1, o), laid8);
+    await page.evaluate(() => { lab.addFilm(0.3, 0.35, 0.05, 0, 1); lab.addFilm(0.35, 0.7, 0.05, 0, 1); lab.addFilm(0.7, 0.5, 0.05, 0, 1); });
+    await page.evaluate((o) => lab.step(240, o), laid8);
+    const f8 = await film();
+    const YELLOW = '#ffd21a', G_UNIT = 0xd2 / 255;
+    const [FILM_DYE_DEPTH, HP] = await page.evaluate(() => [lab.filmDyeDepth, lab.filmPrecursor]);
+    const plain8 = { ...laid8, ...neutral, spectralOptics: 0, thicknessOptics: 0 };
+    const dyed = (k, ground = 1) => render({ ...plain8, lampGround: ground, clearFilmDye: k, clearFilmDyeColor: YELLOW });
+    const undyed = await render({ ...plain8, lampGround: 1 });
+    const zero8 = await dyed(0);
+    const shots8 = { 0.25: await dyed(0.25), 0.5: await dyed(0.5), 1: await dyed(1) };
+    const blackUndyed = await render({ ...plain8, lampGround: 0 });
+    const blackDyed = await dyed(0.5, 0);
+    let same8 = 0, on8 = 0;
+    for (let k = 0; k < undyed.length; k++) { if (undyed[k] === zero8[k]) same8++; if (undyed[k] !== shots8[0.5][k]) on8++; }
+    // Film cells whose four neighbours are in [lo, hi), as pixels (the mapping check 6 settles), with their h.
+    const cells8 = (lo, hi) => {
+      const out = [];
+      for (let y = 0; y < f8.n; y++) for (let x = 0; x < f8.n; x++) {
+        let inside = true;
+        for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const xx = Math.min(f8.n - 1, Math.max(0, x + dx)), yy = Math.min(f8.n - 1, Math.max(0, y + dy));
+          const h = f8.h[xx + yy * f8.n];
+          if (h < lo || h >= hi) inside = false;
+        }
+        if (!inside) continue;
+        const u = (x + 0.5) / f8.n - 0.5, v = (y + 0.5) / f8.n - 0.5;
+        const px = Math.floor((0.5 + 1.5 * u) * SIZE), row = Math.floor((0.5 - 1.5 * v) * SIZE);
+        if (px < 0 || row < 0 || px >= SIZE || row >= SIZE) continue;
+        out.push({ k: (px + row * SIZE) * 4, h: f8.h[x + y * f8.n] });
+      }
+      return out;
+    };
+    const film8 = cells8(0.25, 2), thin8 = cells8(0.25, 0.4), thick8 = cells8(0.5, 2), holes8 = cells8(0, 0.1);
+    // Measured and Beer–Lambert's green absorbance, summed over the pixels both are readable at (8-bit: I ≥ 12).
+    const absorb = (ks, k) => {
+      let got = 0, want = 0, hs = 0, n = 0;
+      for (const q of ks) {
+        const i0 = undyed[q.k + 1], i = shots8[k][q.k + 1];
+        if (i0 < 48 || i < 12) continue;
+        got += Math.log(i0 / i); want += FILM_DYE_DEPTH * k * k * (q.h - HP) * -Math.log(G_UNIT); hs += q.h; n++;
+      }
+      return { got: got / Math.max(1, n), want: want / Math.max(1, n), h: hs / Math.max(1, n), n };
+    };
+    const law = [0.25, 0.5, 1].map((k) => ({ k, ...absorb(film8, k) }));
+    const lawOk = law.every((r) => r.n > 100 && Math.abs(r.got / r.want - 1) < 0.15);
+    const square = law[2].got / law[1].got;
+    const meanH = (ks) => sum(ks.map((q) => q.h - HP)) / Math.max(1, ks.length);
+    const thinA = absorb(thin8, 0.5), thickA = absorb(thick8, 0.5);
+    const depthRatio = thickA.got / Math.max(1e-6, thinA.got), hRatio = meanH(thick8) / Math.max(1e-6, meanH(thin8));
+    // Where the line through the two meets zero absorbance: the precursor if the path is h − h_p, 0 if it is h.
+    const zeroAt = (thinA.h * thickA.got - thickA.h * thinA.got) / Math.max(1e-6, thickA.got - thinA.got);
+    // The swatch at the dial's middle on a film about 0.35 thick, in green and blue.
+    const swatch8 = cells8(0.32, 0.38);
+    const ratioIn = (c) => {
+      let t = 0, n = 0;
+      for (const q of swatch8) { if (undyed[q.k + c] < 48) continue; t += shots8[0.5][q.k + c] / undyed[q.k + c]; n++; }
+      return n > 20 ? t / n : NaN;
+    };
+    const swG = ratioIn(1), swB = ratioIn(2);
+    const swatchOk = Math.abs(swG - 0.82) < 0.03 && Math.abs(swB - 0.10) < 0.03;
+    let redMoved = 0;
+    for (const q of film8) redMoved = Math.max(redMoved, Math.abs(shots8[1][q.k] - undyed[q.k]));
+    const moved = (ks, a, b) => sum(ks.map((q) => [0, 1, 2].reduce((t, c) => t + Math.abs(a[q.k + c] - b[q.k + c]), 0) / 3)) / Math.max(1, ks.length);
+    const holeMove = moved(holes8, shots8[0.5], undyed), filmMove = moved(film8, shots8[0.5], undyed);
+    const meanC = (px, ks, c) => sum(ks.map((q) => px[q.k + c])) / Math.max(1, ks.length);
+    const bLumU = meanC(blackUndyed, film8, 0) + meanC(blackUndyed, film8, 1) + meanC(blackUndyed, film8, 2);
+    const bLumD = meanC(blackDyed, film8, 0) + meanC(blackDyed, film8, 1) + meanC(blackDyed, film8, 2);
+    const bYellow = meanC(blackDyed, film8, 2) < 0.25 * meanC(blackDyed, film8, 0);
+    const bHoleMove = moved(holes8, blackDyed, blackUndyed), bFilmMove = moved(film8, blackDyed, blackUndyed);
+    const bGR = (ks) => meanC(blackDyed, ks, 1) / Math.max(1, meanC(blackDyed, ks, 0));
+    const bDepth = bGR(thick8) < bGR(thin8) - 0.05;
+    check('8. the film\'s dye filters the lamp by Beer–Lambert over the film\'s own thickness, the holes keep the water, the black ground paints it, and at 0 nothing changes',
+      same8 === undyed.length && on8 > 0.01 * undyed.length && lawOk && Math.abs(square / 4 - 1) < 0.15
+        && Math.abs(depthRatio / hRatio - 1) < 0.2 && hRatio > 1.5 && Math.abs(zeroAt - HP) < 0.025 && swatchOk && redMoved <= 1
+        && holes8.length > 30 && holeMove < filmMove / 5 && bLumD - bLumU > 0.5 * 255 && bYellow && bHoleMove < bFilmMove / 5 && bDepth,
+      `at 0 ${undyed.length - same8} bytes differ, at a half ${on8}; green absorbance measured/Beer–Lambert ${law.map((r) => `${r.k}: ${r.got.toFixed(3)}/${r.want.toFixed(3)} (${r.n} px)`).join(', ')}; `
+        + `all/half ${square.toFixed(2)} (the square, 4); thick/thin ${depthRatio.toFixed(2)} against h − h_p ${hRatio.toFixed(2)} (${thin8.length} and ${thick8.length} px), zero at h ${zeroAt.toFixed(3)} (h_p ${HP}); swatch on h 0.32–0.38 green ${swG.toFixed(3)} blue ${swB.toFixed(3)} (${swatch8.length} px); red moved ${redMoved} levels at most; `
+        + `holes moved ${holeMove.toFixed(1)} levels in ${holes8.length} px, whole film ${filmMove.toFixed(1)}; black ground over film ${bLumU.toFixed(0)} undyed, ${bLumD.toFixed(0)} dyed, ${bYellow ? 'yellow' : 'NOT yellow'}, holes moved ${bHoleMove.toFixed(1)} against film ${bFilmMove.toFixed(1)}, green/red thick ${bGR(thick8).toFixed(3)}, thin ${bGR(thin8).toFixed(3)}`);
+  }
 } finally {
   await close();
 }

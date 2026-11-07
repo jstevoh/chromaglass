@@ -270,6 +270,20 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   about 22:50 and 14:30 on that tier, inside 25 but not by much. Size every
   Linux part to finish inside 21 minutes at 1.40 ms (printing the tier in the job summary, from
   videoflow's line), and split a part that does not. Found on #655 (PLAN 38r part 2).
+  - **19k-11a, shipped 2026-11-07 (#688).** `lab` was cancelled at 25:00 on both of #688's
+    attempts, on the slow tier: the first in holeline at ten minutes, the second with all 11
+    checks green in 24:34 (holeline 10:19), the job's own setup taking it past the limit;
+    `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
+    checks it controls) and `beadmask` (0:46) moved to `lab3`: `lab` about 20:20 at that rate,
+    `lab3` about 12:40. Only the shard moved; no command, bar or input. The part sized at 1.40 ms
+    and the tier printed in the summary are still open.
+- **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
+  whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
+  deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
+  cancelled open at 19:27, a slow runner; 669 also read reds in oscout, ears and startup 1b, 19aa-7,
+  each green on the runs either side). Before #655 fifth ran 17:14 and 17:48. `mirror` (85 s, the
+  shard's last) moved to `show`, which ran 15:56 and 16:23 on those deploys; no bound moves. The
+  same day deploy 667 was cancelled in `lab` at 24:30 of its 25, all eleven green: 19k-11 again.
 - **19k-10** (E, S): a check-only PR can run a `dist/`-leaning check with no `dist/`. Under
   `CHECKS_ONLY` (19k-4) a part runs only the checks the diff reaches, so a PR that changes
   only `scripts/followview.mjs` runs `followview` alone, and it (like `inputpick`,
