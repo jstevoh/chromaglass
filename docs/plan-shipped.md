@@ -11947,8 +11947,10 @@ through its bridge (`server-license.js` `currentStatus`, `desktop/main.js`). The
 `canUseMoirePack` (Pro, or Home with `hasLicensePack('moire')`). The account sheet shows a
 Buy card to Home without the pack (`MoirePackBuy.tsx`), says where it comes from to Free, and
 says it is on the licence once bought; the Moiré Sheets section and the phone's Looks sheet
-have a Get it button beside Try. Checks: `npm run license-worker` 13g–13m (filed, refunded,
-upgraded, held; forcing the signed packs empty fails 13h and 13j), `npm run tiers` 14 (locked
+have a Get it button beside Try. Checks: `npm run license-worker` 13g–13q (filed, refunded,
+upgraded, held; a pack order with no store product refused, 13o; a re-signed key under the
+held id taken on a device only for a pack change or a higher tier, 13p; the store's own pack
+ids filed with no Worker setting, 13q; forcing the signed packs empty fails 13h and 13j), `npm run tiers` 14 (locked
 on Free and Home, the Buy link carries the email, open on a Home key that names the pack).
 
 ## 45a-8. The website sells the moiré pack (2026-11-07)

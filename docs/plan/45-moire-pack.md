@@ -40,7 +40,7 @@ own. Check: `npm run moire`.
   Found while building it, not done:
   - ~~**45a-2. Selling it to Home.**~~ **Shipped** (2026-11-07): a `packs` list in the signed
     key, the store's Moiré Pack product ($15 once) re-signing the buyer's Home key, the account
-    sheet's Buy line and the section's Get it (`npm run license-worker` 13g–13p, `npm run tiers`
+    sheet's Buy line and the section's Get it (`npm run license-worker` 13g–13q, `npm run tiers`
     14); story in `docs/plan-shipped.md` §45a-2.
   - ~~**45a-8. The website sells the pack.**~~ **Shipped** (2026-11-07, with 45a-2): a card
     under the landing page's price cards with four frames of the pack drawn on the Mac's GPU
