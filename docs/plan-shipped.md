@@ -6846,7 +6846,7 @@ scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off th
 
 - The Recipe keeps the owner's eight and adds six look-building controls no ride and no panel on
   Perform's deck has: Oil Tension, Bubbles, Saturation, Iridescence, Lamp Warmth, Hue Journey
-  (`DEFAULT_RECIPE`, 14 = `MAX_PINS`). The old eight read as the default, so a strip saved as
+  (`DEFAULT_RECIPE`, 14; `MAX_PINS` 14 → 16 so the shipped strip still takes a pick). The old eight read as the default, so a strip saved as
   them gets the new one. `npm run desklayout`: the Recipe draws 8 of its own on Perform (2 before).
 - The owner chose denser faders (of: a zoom on the plate bar, Macro Zoom to the top of the Rides,
   denser faders). The Rides are one line each (`Slider dense`: name, travel, value; 24 px rows on

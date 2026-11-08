@@ -41,7 +41,7 @@ import {
   renameTab, sanitizeTabs, saveTabs, setTabLayout, storedForm, tabForStored,
 } from '../src/lib/deskTabs.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
-import { PINNABLE, PIN_RANGE, DEFAULT_RIDES, DEFAULT_RECIPE, loadPins } from '../src/lib/deskPins.ts';
+import { PINNABLE, PIN_RANGE, DEFAULT_RIDES, DEFAULT_RECIPE, MAX_PINS, loadPins } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
 import { settingsSource } from './settingsSource.mjs';
@@ -399,6 +399,9 @@ console.log('\n The operations');
   const recipeOwn = recipe.filter(k => PIN_RANGE.has(k) && n.get(k)?.join() === 'recipe');
   check('on Perform the Recipe draws at least eight controls of its own, not two and a list of where the rest went',
     recipeOwn.length >= 8, `the Recipe draws ${recipeOwn.length}: ${recipeOwn.join(', ')}`);
+  // A strip that ships full answers Choose with "take one off first": the Recipe at 14 of 14 did (qa's Refraction pick, 2026-11-07).
+  check('each strip that ships leaves room for a pick', DEFAULT_RECIPE.length < MAX_PINS && DEFAULT_RIDES.length < MAX_PINS,
+    `Recipe ${DEFAULT_RECIPE.length}, Rides ${DEFAULT_RIDES.length}, a strip holds ${MAX_PINS}`);
   // A Recipe stored as the old eight (the default before 2026-11-07) is read as the default, so the new strip reaches it.
   {
     const store = new Map();

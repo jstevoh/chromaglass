@@ -364,7 +364,8 @@ export type DeskSurface = 'perform' | 'design';
  * Perform's deck already has: the oil's tension, the bubbles, the colour's
  * saturation and sheen, the lamp's warmth and the hue's journey. On Perform
  * the Recipe draws eight of its own again, and on a tab without the Rides it
- * draws all fourteen (`MAX_PINS`). `npm run desklayout` counts them.
+ * draws all fourteen, two short of `MAX_PINS` so a pick still fits.
+ * `npm run desklayout` counts them.
  */
 export const DEFAULT_RECIPE: (keyof VisualizerSettings)[] = [
   // Granulation is off the strip: it made a few jagged cuts in the dye and
@@ -394,8 +395,18 @@ export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
   'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
 ];
 
-/** How many a strip will hold before it stops being a surface you can read. */
-export const MAX_PINS = 14;
+/**
+ * How many a strip will hold before it stops being a surface you can read.
+ *
+ * 14 until 2026-11-07, when the Recipe that ships grew to fourteen (35c-6) and
+ * so was full the day it shipped: Choose answered a pick with "A strip holds
+ * 14. Take one off first", which `npm run qa`'s recipe pick (Refraction onto
+ * the Recipe) caught on the Mac. Sixteen leaves the shipped Recipe room for two
+ * picks; on the Rides sixteen one-line rows are 400 px, still a strip read at
+ * a glance, and the Recipe's knobs are four rows of four.
+ * `npm run desklayout` asks that each strip that ships leaves room for a pick.
+ */
+export const MAX_PINS = 16;
 
 const KEYS: Record<DeskSurface, string> = {
   perform: 'chromaglass-ride-keys',
