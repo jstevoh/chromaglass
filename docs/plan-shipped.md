@@ -6642,6 +6642,55 @@ and its flat-window chroma bar compares the window with the plate's own chroma p
 (the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
 grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
 
+### 33f. Bubbles that know their liquid — motion (this PR)
+
+A pocket of air between the glasses read only the look's one plate-wide liquid
+(`BubbleField.liquid(settings)` in `src/lib/bubbles.ts`, 38n), so a pocket in a pool of
+glycerine, syrup or alcohol poured onto the default oil ran ahead of the flow, climbed a
+tilt, drained its contact film, rounded off, emptied at the rim and dissolved as if it
+were still in the oil.
+
+*Fix:* `src/lib/bubbleLiquid.ts` computes the liquid at any cell (`liquidAtCell(plate,
+snap, x, y, grid, poured, out)`) from the species field (`src/lib/liquidProps.ts`, 18d)
+using the thin gap's Arrhenius kinematic-viscosity mix `ν = ν_p · exp(g − r·ln(ν_p/ν_w))`,
+`σ = (1 − r)·σ_plate + r·σ_poured`, `ρ = (1 − r)·ρ_plate + r·ρ_poured` and `μ = ρ·ν` (no
+allocations; bit-identical to `plate` when `snap` is null or `r ≤ 1e-6`), and extracts a
+poured bottle's σ and ρ (`pouredOf(behaviour, plateSigma)`). `BubbleField.species(snap,
+poured)` attaches the downsampled snapshot, and in `step()` each pocket reads its own
+`μ, σ, ρ` on the same eight-point ring (`b.r + 1.5`) on which its drift samples the flow
+(remaining bit-identical to the plate's liquid when no ring point has poured share) for
+Bretherton's speed ratio and `filmAt`, the buoyancy tilt climb, dissolving `D` and the
+Laplace `Δp`, Paterson's `τ₂`, the rim's emptying, a touching pair's film drainage (from
+the harmonic mean of both pockets' liquid), and Durian's crowding (using the pair's own
+`μ` and `σ`, not whichever pocket the loop saw last). `WebGPUFluid.speciesSnapshot()`
+(`src/gpu/solverTypes.ts`, `src/gpu/fluid/reads.ts`, `src/gpu/rimRead.ts`) shares the
+once-a-second `speciesShare()` read on `RimRead`, recording `pouredOf()` where
+`speciesSplat` runs in `src/gpu/fluid/inputs.ts` and dropping any snapshot or in-flight
+read across a plate or chemistry clear. `src/sim/speciesPoll.ts` polls once every 60
+steps and hands the snapshot to `BubbleField` only on a thin gap (`null` otherwise),
+taking over `readPouredShare` from `src/sim/fluidSimulation.ts` and the bubble step block
+from `src/components/LiquidVisualizer.tsx` so both files shrink.
+
+*Measured* (`npm run bubbleliquid`, 9/9, `--owed` removed from `scripts/checks.json`):
+cell mix 1412 mPa·s pure glycerine, 167.9 mPa·s 50/50 Arrhenius (arithmetic 716), pool at
+(40, 140) 1412 vs (56, 140) 19.3 mPa·s; `default` 25,098 numbers over 900 steps
+bit-identical (`1 merge, 1 out at the rim, 4 pockets left`) across bare, `species(null)`
+and an empty snapshot; Bretherton lead 1.948× alcohol (law 1.948), 1.756× oil (law 1.756),
+0.807× glycerine (law 0.807); two pockets in one field climb at 0.0056 cells/s in
+glycerine (law 0.0056) and 0.28 in oil (law 0.28); touching-pair merge 14.45 s oil,
+1.23 s alcohol (μ/σ says 1.23), 43.53 s syrup (μ/σ says 43.55); Paterson τ₂ 0.247 s
+alcohol (law 0.247), 2.902 s oil (law 2.902), 8.745 s syrup (law 8.745); rim emptying
+1038.80 mm²/s oil (law 1038.80), 344.671 syrup (law 344.671); dissolving 0.3318 syrup/oil
+area loss ratio (law 0.3318); `wired` (`solverTypes=decl reads.ts=impl
+handover=src/sim/speciesPoll.ts`). `npm run bubblephysics` 24/24, `pops` 4/4, `bubblelook`
+19/19 unchanged.
+
+*Named shortcuts:* the species field holds no σ or ρ (channel b was traded from ρ to
+milk's scatter μs′ in 18d-4a), so `poured` carries the last-poured species bottle's σ and
+ρ (exact for one poured liquid; 33f-4 tracks per-cell σ and ρ when two miscible bottles
+are on the plate together); 33f-2 (per-liquid optics) and 33f-3 (Metal row direction)
+remain open in `docs/plan/33-bubbles-closeup.md`.
+
 ### 33g. The closeup: the liquid nearer and in relief, not cells (this PR)
 
 *Reported* (the owner, 2026-10-19): "Macro zoom is also still not great. Things look like

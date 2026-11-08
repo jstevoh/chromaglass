@@ -76,6 +76,7 @@ import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SEC
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
+import { stepPlateBubbles } from '../sim/speciesPoll';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
 interface LiquidVisualizerProps {
@@ -4666,36 +4667,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
                 bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + DICE.music.int(3), 3 * GRID_SCALE);
               }
-              const lead = fluidsRef.current[0];
-              const vx = lead?.readVx, vy = lead?.readVy;
-              const treble01 = currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0;
-              const qk = particleFlowScale(lead, currentSettings);
-              bubbles.liquid(currentSettings);
-              bubbles.step(simStepS, (bx, by) => {
-                if (!vx || !vy) return [0, 0];
-                const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
-                const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
-                return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-              }, tiltX, tiltY, treble01 * 0.6);
-              // A bubble is air between the plates: the dye cannot sit under
-              // it. A standing squeeze on each footprint keeps pumping the
-              // dye out to the rim, so the field flows round the bubbles
-              // instead of sliding underneath them as if they were painted on.
-              // The bubble's press, not the hand's (lib/squish.ts Presser): a held Blow's straw bubble is one, and `npm run tools` counts the hand's alone.
-              if (lead) {
-                for (const b of bubbles.bubbles) {
-                  if (b.r < 1.2) continue;
-                  const bx = Math.round(b.x), by = Math.round(b.y);
-                  if (bx > 2 && by > 2 && bx < GRID_SIZE - 3 && by < GRID_SIZE - 3) lead.applySquish(bx, by, Math.max(1, b.r * 0.85 / GRID_SCALE), 0.0035, 0, false, 'press', 'bubble');
-                }
-              }
-              // A pop is an inward cavity collapse into the void left behind.
-              for (const ev of bubbles.events) {
-                if (ev.kind === 'pop' && lead) {
-                  const px = Math.round(ev.x), py = Math.round(ev.y);
-                  if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.popBubble(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.04);
-                }
-              }
+              stepPlateBubbles(bubbles, fluidsRef.current[0], currentSettings, simStepS, tiltX, tiltY, currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0);
             }
             rock.lastBass = bass01;
           }

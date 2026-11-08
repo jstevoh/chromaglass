@@ -313,6 +313,12 @@ export class FluidCore {
   protected speciesLive = false;
   /** Pours since the last read of the plate's poured share, so a read made before a pour cannot drop the field it landed in. */
   protected speciesQuiet = 0;
+  /** Plate clears since the solver was made, so an in-flight species read started before a clear is dropped. */
+  protected speciesClears = 0;
+  /** The last poured species' surface tension and density (`pouredOf`, PLAN 33f), or null when cleared. */
+  protected speciesPoured: { sigma: number; rho: number } | null = null;
+  /** The last completed species snapshot (`speciesSnapshot`, PLAN 33f), or null when cleared or empty. */
+  protected speciesSnap: { L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null = null;
   /** The thin solve's volume source (PLAN 18c): the share of each column poured since the last step, which hsDivergence takes and empties. */
   protected hsPour: GPUBuffer | null = null;
   /** The last thin step's displacement scale, which the species' carry was given (benchSpecies repeats it). */
@@ -715,6 +721,9 @@ export class FluidCore {
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.speciesClears++;
+    this.speciesPoured = null;
+    this.speciesSnap = null;
     // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
     if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
     // The oil lift's Ψ is the last oil's shape; the next plate's starts from still.
