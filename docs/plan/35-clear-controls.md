@@ -19,7 +19,8 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - Touch targets under 44 px: the Play handle, the remote's layer dots, tool chips, dye
     swatches and cue strip, LaptopLink's button, Settings' rail on a phone, `Toggle`'s
     36 px row and `PanelFrame`'s 24 px icons.
-  - The remote's two Blackouts share the test id `remote-blackout` (one per layout).
+  - ~~The remote's two Blackouts share the test id `remote-blackout` (one per layout).~~ One
+    Blackout since 35f (the bar under the thumb), so one test id.
   - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
   - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
     rows): legible, but a third way of saying off; make them `disabled` with the reason.
@@ -34,6 +35,14 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
   panels and the phone's Settings strip (now with its headings drawn). Story in
   `docs/plan-shipped.md` §35.
+- **35-owed** *Checks written first* (2026-11-07) for the four of these that are a build with an
+  answer the source can show, `npm run clearleft -- --owed=pace,spin,tray,dimmed` (logic): `pace`
+  (35d-2, the remote's Speed and Evolve Speed draw `PaceTrack`), `spin` (35a-2 and 35f-2, Auto Spin and
+  Spin Direction picked from their named answers in Settings and on the remote, keeping `settingKey`),
+  `tray` (35g-2, a `SlideMount` on the remote's looks, its cue strip and the Sequencer's stages) and
+  `dimmed` (35a-2, the phone's Show, Evolve and Spin rows `disabled`, no group at half opacity). All
+  four read owed on main. 35a-2's touch targets under 44 px are not among them: only a page measures
+  a target, so they want a line in `npm run phone` first (open).
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
   - ~~Plates & LED holds the platform's spin, which is Motion's.~~ Moved to Plate Spin in 35c-2.
@@ -64,6 +73,22 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   in Sound… steps aside while Music & Drone is on the tab, the set's button says "Save set", and
   `npm run shelf` reaches the shelf through Setup and runs in the browser shard. Story in
   `docs/plan-shipped.md` §35c-5.
+- ~~**35c-6** The Recipe a strip of its own, and the Rides shown whole.~~ **Shipped** 2026-11-07:
+  the Recipe adds six controls no ride has (8 of its own on Perform, was 2), and the Rides are one
+  line each so all eight, Macro Zoom among them, show under the Bottles at 1440×900 and 1512×860
+  (was 3 and 2). Story in `docs/plan-shipped.md` §35c-6. Left from it:
+  - **35c-6a** At 1280×800 the Rides show 7 of 8 (Evolve Speed under the fold), and the right
+    column still scrolls with its scrollbar hidden, so a strip longer than the column says nothing
+    about what is below. A fade at the cut, or the Bottles folding to one row when the column is short.
+    Check written first (2026-11-08): `npm run deskreach` lines `rides1280` (every ride whole at
+    1280×800; main shows 7 of 8, Automate Rate under the fold) and `ridemark` (a `data-more-mark`
+    at the column's cut while more is below, gone at the end), owed in `scripts/checks.json`.
+  - **35c-6b** On Perform at 1440 the deck's Macro panel (and Squish, Lens) start off the right of
+    the screen, and the deck's sideways scroll has no mark either: the closeup's own dials (aim,
+    camera, depth) are as hard to find as its zoom was.
+    Check written first (2026-11-08): `npm run deskreach` lines `deckmark` (the deck's mark at its
+    right edge, 1280 px past it on main at 1440) and `macro` (the Macro panel wholly on the screen at
+    1440×900, unscrolled; main draws it at x 1874), owed.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

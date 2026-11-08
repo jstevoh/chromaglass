@@ -101,8 +101,36 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             desktop/package-lock.json
-      - run: npm ci
-      - run: npm ci --prefix desktop
+      # What the install and the build fetch from GitHub's release pages, kept
+      # between runs (19ak-7): canvas's prebuilt binary (prebuild-install, into
+      # ~/.npm/_prebuilds, which setup-node's npm cache does not keep once a key
+      # exists), Electron itself, and the tools electron-builder fetches for the
+      # .dmg. On 2026-11-08 those pages answered 504 for hours, and this job
+      # went red in `npm ci` (canvas) or in the build after "downloaded
+      # electron" with nothing wrong in the app. Keyed on both lockfiles, which
+      # pin every one of those versions; Electron and electron-builder check the
+      # checksums of what they fetch or find cached. A cold cache still needs
+      # the pages, so the install also retries. Pull requests only: a release
+      # is signed and shipped, so what goes into it is fetched fresh, never
+      # restored from a cache another run wrote.
+      - name: Release downloads, from the cache when they are there
+        if: github.event_name == 'pull_request'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm/_prebuilds
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: release-downloads-${{ runner.os }}-${{ hashFiles('package-lock.json', 'desktop/package-lock.json') }}
+          restore-keys: release-downloads-${{ runner.os }}-
+      - name: Install, three tries
+        run: |
+          for attempt in 1 2 3; do
+            npm ci && npm ci --prefix desktop && exit 0
+            echo "::warning::npm ci failed (attempt $attempt of 3)"
+            sleep $((attempt * 30))
+          done
+          exit 1
       # Only a release gets a version of its own; every other build keeps the
       # site's, so a pull request's app never looks newer than a release. Worked
       # out before the site is built, so the page inside a release calls itself

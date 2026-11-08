@@ -115,6 +115,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { findFfmpeg } from './watch.mjs';
+import { port } from './ports.mjs';
 
 const APP = process.argv.includes('--app');
 // --file=x.mp4: only the judge's five lines, on a film made anywhere (a kit's canvas file, 43c;
@@ -407,7 +408,7 @@ async function app() {
   const { chromium } = await import('playwright');
   const { launchChromium } = await import('./chromium.mjs');
   const { engineQuery, isGpuEngine } = await import('./frame.mjs');
-  const PORT = 4353, SEED = 7, SECONDS = 4, AFPS = 30, SONG_S = 14;
+  const PORT = port(4353), SEED = 7, SECONDS = 4, AFPS = 30, SONG_S = 14;
   const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
   const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
   process.on('exit', stop);

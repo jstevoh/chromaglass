@@ -15,7 +15,7 @@ import { WebGPUParticles } from '../particles';
 import { WebGPUAir } from '../air';
 import { StandingFilm } from '../standing';
 import { RowUploads } from '../../lib/deltaRows';
-import { MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
+import { REST_GAP, MG_CYCLES, DIV_GROUPS, LIES_B0, BZ_GRID, LIES_GRID, VEL, R32, RGBA32, SIM_FLOATS, type GroupNode, type FieldStats } from './constants';
 
 export class FluidCore {
   readonly N: number;
@@ -47,6 +47,8 @@ export class FluidCore {
   protected readonly squeeze: PingPong;
   /** The plate shape the gap was last laid at; a change re-seeds it. */
   protected lastCurve: number | null = null;
+  /** The cover glass's gap on its liquid, in gap units (0.03 is 2 mm): the uniform S.cover, stepped by fluid/cover.ts (PLAN 38r-5). */
+  protected coverGap = REST_GAP;
   protected readonly phase: PingPong;
   /**
    * The pressure, in a storage buffer rather than a texture (H2).
@@ -311,6 +313,12 @@ export class FluidCore {
   protected speciesLive = false;
   /** Pours since the last read of the plate's poured share, so a read made before a pour cannot drop the field it landed in. */
   protected speciesQuiet = 0;
+  /** Plate clears since the solver was made, so an in-flight species read started before a clear is dropped. */
+  protected speciesClears = 0;
+  /** The last poured species' surface tension and density (`pouredOf`, PLAN 33f), or null when cleared. */
+  protected speciesPoured: { sigma: number; rho: number } | null = null;
+  /** The last completed species snapshot (`speciesSnapshot`, PLAN 33f), or null when cleared or empty. */
+  protected speciesSnap: { L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null = null;
   /** The thin solve's volume source (PLAN 18c): the share of each column poured since the last step, which hsDivergence takes and empties. */
   protected hsPour: GPUBuffer | null = null;
   /** The last thin step's displacement scale, which the species' carry was given (benchSpecies repeats it). */
@@ -667,8 +675,11 @@ export class FluidCore {
     this.resetFilm();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
-    // The sim buffer only needs its grid sizes for a fill.
-    this.simF[0] = this.N; this.simF[1] = this.L;
+    // The sim buffer only needs its grid sizes for a fill, and the cover's gap
+    // for the gap's rest below (gapRest reads S.cover, PLAN 38r-5): a solver's
+    // first clear runs before any step has written it, and laid the gap at
+    // the floor, which npm run ferrorest read as the drop's Σc·h growing 650%.
+    this.simF[0] = this.N; this.simF[1] = this.L; this.simF[51] = this.coverGap;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
     for (const t of [this.dye.a, this.dye.b, this.scratchA, this.scratchB]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     for (const t of [this.vel.a, this.vel.b, this.velForced]) this.fill(pass, t, [0, 0, 0, 0], this.N);
@@ -710,6 +721,9 @@ export class FluidCore {
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.speciesClears++;
+    this.speciesPoured = null;
+    this.speciesSnap = null;
     // A pour laid since the last step is poured onto the plate that was cleared, not the new one.
     if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
     // The oil lift's Ψ is the last oil's shape; the next plate's starts from still.

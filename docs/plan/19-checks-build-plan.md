@@ -222,15 +222,17 @@ from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) 
 side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
 [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
-- **19k-7** (S): `npm run scene`'s two cost bars red on a PR that changed nothing it runs
-  (#540, 2026-10-28, twice on one head): the worst frame 22.5 ms against 20 (the still room's
-  cold first push; 18.7 on the run before, 13.7 on another PR's that day, 11 to 15 when the bar
-  was set), and once the strobe room's median 2.01 ms against 2. The cost is
-  `process.cpuUsage()`, the whole process's, so the optimiser compiling on V8's background
-  threads during the first push is counted as the analysis's own. Measure the push's thread
-  alone (a worker, or `performance.now()` with the first push timed separately), or warm one
-  push before the timed ones and keep the 20 ms bar for the warm stalls it was set for; and
-  print the reading on the FAIL line, which today says only that it failed.
+- **19k-7** (S): **shipped**, `npm run scene`'s cost bars time the main thread
+  (`process.threadCpuUsage()` after a `process.cpuUsage()` call), not the whole process, and the
+  worst-frame bar is 12 ms, not 20 (`--slow k` shows it red at 2 to 3x). Story in
+  `docs/plan-shipped.md` §19k-7 (closed draft #551, rebuilt on main 2026-11-07). Open:
+  - **19k-7a** (S): the worst frame is nearly always the still room's first optimised one, the
+    optimiser's main-thread work, and that is where what is left of the noise lives: in a cloud
+    session 1 run of about 120 read past 12 ms at 1x (14.6, with the VM's steal time climbing)
+    and 1 in 50 read a still-room median of 2.28 against 2. Measure's runner read 3.6 ms and
+    0.48. If either goes red on CI on a tree that did not change the sensor, time the first
+    room's cold frame as its own line and hold the warm rooms (0.5 to 2 ms peaks) to a bar of
+    their own, which would catch a stall in a warm room the 12 ms bar lets through.
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
   wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the
@@ -260,23 +262,42 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
 - **19k-9** (E, S): **shipped**, the browser part's last sixteen checks in a seventh Measure
   part `browser2`, cut at `applink`, which builds `dist/` for the ones after it. Story in
   `docs/plan-shipped.md` §19k-9.
-- **19k-11, open** (E, S). **Budget the Linux parts against GitHub's slow runners.** The ubuntu
-  runners come in speed tiers about 2x apart (videoflow's printed CPU loop, plain JavaScript, reads
-  0.70, 1.05 or 1.40 ms a frame across twenty branches' `lab` jobs, the same branch on different tiers
-  from push to push), and a part sized on the fast tier is cancelled on the slow one: #655 drew the slow
-  tier six times running: `lab` was cancelled in holeline before #658 moved `widedials` to `lab3`, and
-  with holeline moved there too (#655's first fix, reverted) `lab3` ran 24:51 of its 25 (holeline
-  10:23, soap 6:53, soapbreak 3:59, widedials 3:36) while `lab` ran 12:26. Main's split today is
-  about 22:50 and 14:30 on that tier, inside 25 but not by much. Size every
-  Linux part to finish inside 21 minutes at 1.40 ms (printing the tier in the job summary, from
-  videoflow's line), and split a part that does not. Found on #655 (PLAN 38r part 2).
+- **19k-11** (E, S): **shipped** in part, `holeline` in an eighth Measure part `lab4` (#690),
+  since `lab` was cancelled in it at 25 minutes on main's deploys 667 and 670 and on both of
+  #688's attempts, all on the slow runner tier. Story in `docs/plan-shipped.md` §19k-11. Open:
+  19k-11b.
   - **19k-11a, shipped 2026-11-07 (#688).** `lab` was cancelled at 25:00 on both of #688's
     attempts, on the slow tier: the first in holeline at ten minutes, the second with all 11
     checks green in 24:34 (holeline 10:19), the job's own setup taking it past the limit;
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
-    checks it controls) and `beadmask` (0:46) moved to `lab3`: `lab` about 20:20 at that rate,
-    `lab3` about 12:40. Only the shard moved; no command, bar or input. The part sized at 1.40 ms
-    and the tier printed in the summary are still open.
+    checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
+    #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
+  slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
+  0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
+  the tier in each part's job summary (from videoflow's line, or a few milliseconds of the same
+  loop in `checks.mjs` for the parts that do not run videoflow), and read every part's time at
+  1.40 ms over the next merges: split any that would pass 21 there. Each part draws its own
+  runner, so only `lab`, which runs videoflow, knows its tier today: on deploy 670 `lab2` and
+  `lab3` ran 11:38 and 11:49 as jobs on runners whose tier nothing printed.
+- **19k-13** (E, S): **shipped**, the Mac jobs' bound 20 → 25 minutes, and a shard's checks past
+  18 minutes (a Measure part's past 21) a warning on the run's page, the room line `ROOM` in
+  `scripts/checks.mjs`. Story in `docs/plan-shipped.md` §19k-13. Open: read the warnings over
+  the next deploys, and rebalance (or add a sixth shard) when one shard keeps warning. The
+  same day 18m-5a moved `npm run slump` (now about 2:00) from plate to tools; read both shards'
+  warnings before moving anything else.
+- **19k-14, open** (E, S). **`draftwall --frames` hangs on a Mac.** On #690's second run the
+  Mac's open shard ran `node scripts/draftwall.mjs --frames`, printed every line up to "and
+  the copy stays up for the next look" (17 s in), then nothing for 12:07, until the job was
+  cancelled at its bound with the five checks after it never run; green on the re-run, and
+  25 to 37 s on the other nine attempts of 2026-11-07. Since 19k-13 the entry has a 3-minute
+  timeout, so a hang is this check red by name and the shard goes on. What hung is not known:
+  the next calls are a `page.evaluate` of the settings and a `clear`, a 300 ms wait, another
+  `page.evaluate`, and a click on Live (`scripts/draftwall.mjs` after that line), and an
+  evaluate has no timeout of its own, so a page whose main thread stops would hold it. Next:
+  print a line before each of those calls under `CI`, so the next hang names its call, then
+  find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
+  19aa's and may share the cause).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

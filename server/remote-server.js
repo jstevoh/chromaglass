@@ -411,13 +411,14 @@ const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors'
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-undo']);
+const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-undo', 'assistant-still', 'song-action']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
 let assistantWantsPicture = -Infinity;
+let assistantWantsStill = -Infinity;
 const assistantWatch = setInterval(() => {
   const mode = readAssistantMode(process.env, ASSISTANT_FILE);
   if (mode === assistantNow) return;
@@ -537,6 +538,11 @@ wss.on('connection', (socket, req) => {
         assistantWantsPicture = Date.now();
         broadcastTo('display', JSON.stringify({ type: 'pad-picture', width: Number(message.width) || 480 }));
         reply = { ok: true };
+      } else if (message.type === 'assistant-still') {
+        // One frame up to 1280 wide (PLAN 44c-4): looking too, so any mode.
+        assistantWantsStill = Date.now();
+        broadcastTo('display', JSON.stringify({ type: 'assistant-still', width: Number(message.width) || 1280 }));
+        reply = { ok: true };
       } else {
         reply = guard.handle(message, assistantMode());
       }
@@ -549,6 +555,12 @@ wss.on('connection', (socket, req) => {
     if (from === 'display' && message.type === 'state') {
       guard.onDisplayState(message.state);
       broadcastTo('assistant', raw);
+    }
+    // A still is the assistant's alone: a pad on Draw paints the stream, and
+    // a 1280 picture a phone would drop unpainted is half a megabyte on its Wi-Fi.
+    if (from === 'display' && message.type === 'picture' && message.still === true) {
+      if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);
+      return;
     }
     if (from === 'display' && message.type === 'picture' && Date.now() - assistantWantsPicture < 3000) broadcastTo('assistant', raw);
     // The show itself — settings and audio bands, thirty times a second —

@@ -126,7 +126,9 @@ an item.
   Beer–Lambert (18b), so a red light under a blue dye goes dark as it does on glass, never a
   colour painted over the plate. *Check:* a breathing pattern's lamp brightness follows its
   period; with Spin at 0 the LED pattern turns and the dye does not.
-- **42g. Moiré transparencies on a turntable** (*proposed*, M). *The evidence:* the shop's
+- **42g. Moiré transparencies on a turntable** (*proposed*, M; **built as §45**, the moiré
+  pack: `45-moire-pack.md` has the sheets, the turn, the check and what is left, such as 45a-3
+  the hand on the sheet; this item stays for the turntable's own patterns). *The evidence:* the shop's
   moiré sets and lazy Susan; the gear tour's "Moiré Transparencies" chapter. *Today:* nothing.
   *The physics:* two transparencies in the beam multiply their transmissions; two line
   gratings of pitch d at an angle θ beat into fringes of spacing d / (2·sin(θ/2)), so a slow
