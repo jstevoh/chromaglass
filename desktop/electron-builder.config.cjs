@@ -49,13 +49,17 @@ module.exports = {
     'keys.js',
     'preload.cjs',
     'package.json',
+    'native/syphon/index.js',
+    'native/syphon/build/syphon.node',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
     { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'osc.js', 'abletonLink.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js', 'assistant.js', 'assistant-room-keys.json'] },
   ],
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --
-  // --packaged` is what says so.
+  // --packaged` is what says so. Native `.node` add-ons (Syphon, PLAN 13.2) are
+  // unpacked beside `app.asar` so `dlopen` can map them from disk.
   asar: true,
+  asarUnpack: ['native/syphon/build/*.node'],
   // Where the app looks for its next version (desktop/updates.js): this repo's
   // GitHub Releases, which desktop.yml publishes to when the owner asks for a
   // release. electron-builder writes this into the app as app-update.yml and

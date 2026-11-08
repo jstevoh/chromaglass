@@ -9,9 +9,10 @@
   "type": "module",
   "main": "main.js",
   "scripts": {
+    "postinstall": "node native/syphon/build.mjs",
     "start": "electron .",
-    "pack": "electron-builder --config electron-builder.config.cjs --dir --publish never",
-    "dist": "electron-builder --config electron-builder.config.cjs --publish never"
+    "pack": "node native/syphon/build.mjs && electron-builder --config electron-builder.config.cjs --dir --publish never",
+    "dist": "node native/syphon/build.mjs && electron-builder --config electron-builder.config.cjs --publish never"
   },
   "dependencies": {
     "electron-updater": "^6.8.10",

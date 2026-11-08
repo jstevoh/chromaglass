@@ -38,6 +38,156 @@ try {
 
 const requireSignIn = parseArg('--chromaglass-require-signin=') === '1';
 
+// Syphon output (PLAN.md 13.2): the show page checks `canUseProFeature()` in
+// `src/lib/syphonOut.ts` and hands GPU-backed `ImageBitmap` frames over a
+// `MessageChannelMain` port to the offscreen Syphon window, whose compositor
+// emits `paint` events carrying an `IOSurface` handle to `Syphon.framework`.
+let syphonPort = null;
+let syphonLastAsked = false;
+let syphonHasAsked = false;
+let syphonActive = false;
+const syphonAskListeners = new Set();
+let syphonCanvas = null;
+let syphonCtx = null;
+let syphonLatestBmp = null;
+let syphonRafId = 0;
+let syphonIntervalId = 0;
+let syphonFlip = 0;
+
+function isSyphonReceiverWindow() {
+  try {
+    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('syphon') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function drawSyphonLatest() {
+  if (!syphonActive || !syphonLatestBmp) return;
+  if (!syphonCanvas) {
+    syphonCanvas = document.createElement('canvas');
+    syphonCanvas.width = syphonLatestBmp.width;
+    syphonCanvas.height = syphonLatestBmp.height;
+    syphonCtx = syphonCanvas.getContext('2d', { alpha: false });
+  }
+  if (!syphonCanvas.isConnected && document.body) {
+    document.body.style.margin = '0';
+    document.body.style.overflow = 'hidden';
+    document.body.innerHTML = '';
+    document.body.appendChild(syphonCanvas);
+  }
+  if (syphonCanvas.width !== syphonLatestBmp.width || syphonCanvas.height !== syphonLatestBmp.height) {
+    syphonCanvas.width = syphonLatestBmp.width;
+    syphonCanvas.height = syphonLatestBmp.height;
+  }
+  if (syphonCtx) {
+    syphonCtx.drawImage(syphonLatestBmp, 0, 0);
+    // Toggle 1 LSB on a 1x1 pixel with opaque colour so the 8-bit offscreen
+    // compositor always records damage and emits a 60 Hz IOSurface paint event.
+    syphonFlip ^= 1;
+    syphonCtx.fillStyle = syphonFlip ? '#000000' : '#010101';
+    syphonCtx.fillRect(0, 0, 1, 1);
+  }
+}
+
+function stopSyphonTick() {
+  if (syphonRafId && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(syphonRafId);
+    syphonRafId = 0;
+  }
+  if (syphonIntervalId) {
+    clearInterval(syphonIntervalId);
+    syphonIntervalId = 0;
+  }
+}
+
+function syphonTick() {
+  if (!syphonActive || !syphonLatestBmp) {
+    syphonRafId = 0;
+    return;
+  }
+  drawSyphonLatest();
+  syphonRafId = requestAnimationFrame(syphonTick);
+}
+
+function ensureSyphonTick() {
+  if (!syphonActive || !syphonLatestBmp) return;
+  if (!syphonRafId && typeof requestAnimationFrame === 'function') {
+    syphonRafId = requestAnimationFrame(syphonTick);
+  }
+  if (!syphonIntervalId) {
+    syphonIntervalId = setInterval(() => {
+      if (!syphonActive || !syphonLatestBmp) {
+        stopSyphonTick();
+        return;
+      }
+      drawSyphonLatest();
+    }, 16);
+  }
+}
+
+ipcRenderer.on('chromaglass:syphon-port', (event) => {
+  const port = event.ports && event.ports[0];
+  if (!port) return;
+  if (syphonPort) {
+    try { syphonPort.close(); } catch { /* ignore */ }
+  }
+  syphonPort = port;
+  if (isSyphonReceiverWindow()) {
+    port.onmessage = (msg) => {
+      const bmp = msg.data;
+      if (!bmp || typeof bmp.close !== 'function') return;
+      if (!syphonActive) {
+        try { bmp.close(); } catch { /* ignore */ }
+        return;
+      }
+      const first = !syphonLatestBmp;
+      if (syphonLatestBmp && syphonLatestBmp !== bmp) {
+        try { syphonLatestBmp.close(); } catch { /* ignore */ }
+      }
+      syphonLatestBmp = bmp;
+      if (first) drawSyphonLatest();
+      ensureSyphonTick();
+    };
+    port.start();
+  }
+});
+
+ipcRenderer.on('chromaglass:syphon-ask', (_event, on) => {
+  const wanted = Boolean(on);
+  syphonLastAsked = wanted;
+  syphonHasAsked = true;
+  if (isSyphonReceiverWindow()) {
+    syphonActive = wanted;
+    if (!wanted) {
+      stopSyphonTick();
+      if (syphonLatestBmp) {
+        try { syphonLatestBmp.close(); } catch { /* ignore */ }
+        syphonLatestBmp = null;
+      }
+    } else {
+      ensureSyphonTick();
+    }
+    return;
+  }
+  for (const fn of syphonAskListeners) {
+    try { fn(wanted); } catch { /* ignore */ }
+  }
+});
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('message', (e) => {
+    if (e.source === window && e.data && e.data.__cgSyphonFrame && e.data.bmp) {
+      const bmp = e.data.bmp;
+      if (syphonPort) {
+        try { syphonPort.postMessage(bmp, [bmp]); } catch { try { bmp.close(); } catch { /* ignore */ } }
+      } else {
+        try { bmp.close(); } catch { /* ignore */ }
+      }
+    }
+  });
+}
+
 contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   shell: 'desktop',
   platform: process.platform,
@@ -106,6 +256,17 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
       const listener = (_e, state) => { try { fn(state); } catch { /* the page's own error */ } };
       ipcRenderer.on('chromaglass:update', listener);
       return () => ipcRenderer.removeListener('chromaglass:update', listener);
+    },
+  },
+  syphon: {
+    set: (on) => ipcRenderer.send('chromaglass:syphon-set', Boolean(on)),
+    onAsk: (fn) => {
+      if (typeof fn !== 'function') return () => {};
+      syphonAskListeners.add(fn);
+      if (syphonHasAsked) {
+        try { fn(syphonLastAsked); } catch { /* ignore */ }
+      }
+      return () => syphonAskListeners.delete(fn);
     },
   },
 });
