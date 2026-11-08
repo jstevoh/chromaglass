@@ -11261,6 +11261,23 @@ model cannot reach one, the PR says what it reached and asks.
     just inside the contact, was a black band (2 to 94 of 179). A pale fringe a cell past
     the rim on the lamp ground (119 against 105) is unchanged and stays 38h-9's. Found:
     38h-11.
+  - **38h-14 (shipped 2026-11-08).** The projector's bubble film still reflected at Film
+    Physics 0. Found writing 38h-6's check: the plate's own bubbles at Iridescence 1 read 51
+    to 54 levels brighter than at 0, because plate.ts's bubble block multiplied the lamp by
+    `0.45 + 1.25 × filmC` above Iridescence 0.25, a reflected rainbow added on top of the
+    light. A pocket between the glasses throws only what passes its film, T = 1 − R, the
+    pale complement, and a film splits light, never adds it. Film Physics 0 now treats the
+    stylised rainbow as R with a peak of FILM_R_RAINBOW = 0.55 and draws
+    cp·(1 − 0.55·clamp(0.6·irid)·filmC); Film Physics 1 still mixes in the measured table's
+    transmitted colour, unchanged. The code moved to `src/gpu/wgsl/bubbleFilm.ts`
+    (`projectorFilm`), plate.ts being at its size ceiling. Measured: `npm run nolight` line
+    16 (new), the plate's bubbles at Iridescence 1 against 0 at Film Physics 0 and 1, no
+    pixel brighter by over 1 and over 0.2% of the picture still moved: main 54 over (4.39%
+    moved), this 0 at both (4.34% and 3.12%). The lab's stills: 30 → 0 at Iridescence 0.6,
+    53 → 0 at 1; the plate's mean at Iridescence 1 160.0 → 158.4. Only looks with
+    Iridescence over 0.25 change (Soap Film, and what Lucky, drift or MIDI push there): a
+    cream glow becomes a pale cool tint. The owner judged it from before/after clips filmed
+    on the Mac (Soap Film, Acid Trip at 0.6 and 1, Crowd Plate at 1) and kept it.
   - **38h-4 (shipped 2026-10-31).** The back plate's lamp read the grain as its share of
     the opacity (`grained1 / film1`, grainedDepth's factor), which is 1 in a body near
     opaque, so on a lamp look with two plates the back plate's pools lost their grain. It

@@ -85,6 +85,10 @@
  *        Iridescence 1 nothing brighter than at 0, at Film Physics 0 and 1,
  *        and the film still drawn. Main multiplies by up to 1.7, a front-lit
  *        soap film's reflection: 22 levels over at Film Physics 0
+ *   16.  the projector's bubble film is light through it (38h-14): the
+ *        same at the plate's own bubbles, at Film Physics 0 and 1, and the
+ *        film still drawn. Main at Film Physics 0 multiplied by the
+ *        rainbow taken as reflected light: 54 levels over the lamp
  *
  * Every number asked is printed. Run against main before 38h it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
@@ -641,9 +645,8 @@ const oilThere = up8 > 20 && down8 > 20;
   already wears at Film Physics 1, so a grey stand-in or a second film of
   its own cannot pass. Not caught: a gain inside camFilm the same at both
   Iridescences cancels from the comparison (there is no film-free picture
-  of a bubble to hold it to); the review reads camFilm. The projector's own bubbles are printed beside it:
-  at Film Physics 0 they still wear the reflected film above Iridescence
-  0.25 (PLAN 38h-14). The owed state is main's: brighter by over 10 levels.
+  of a bubble to hold it to); the review reads camFilm. The projector's own
+  bubbles are line 16. The owed state is main's: brighter by over 10 levels.
 */
 {
   const f = r2.film;
@@ -652,12 +655,27 @@ const oilThere = up8 > 20 && down8 > 20;
   const cam = [0, 1].map((fp) => ({ fp, up: compare(f[`cam${fp}1`], f[`cam${fp}0`]), moved: moved(f[`cam${fp}1`], f[`cam${fp}0`], FILM_MOVE) }));
   // The camera wears the transmitted table at any Film Physics: the same picture at 0 and 1, at each Iridescence.
   const same = Math.max(...[0, 1].map((ir) => Math.max(compare(f[`cam0${ir}`], f[`cam1${ir}`]).over, compare(f[`cam1${ir}`], f[`cam0${ir}`]).over, 0)));
-  const plate = [0, 1].map((fp) => compare(f[`plate${fp}1`], f[`plate${fp}0`]).over);
   const over = Math.max(...cam.map((c) => c.up.over));
   line('film', `15. the camera's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, the film still drawn (over ${pct(DOES)} of the picture moved at each), and Film Physics 0 drawing the camera's bubbles as 1 does (by ${SLACK})`,
     over <= SLACK && cam.every((c) => c.moved > DOES) && same <= SLACK,
-    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; Film Physics 0 against 1 differs by ${same}; the projector's bubbles, printed only: brightest by ${plate.join(' and ')}`,
+    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; Film Physics 0 against 1 differs by ${same}`,
     over > 10);
+  /*
+    16 (PLAN 38h-14). The projector's own bubbles, on the same plate and the
+    same pockets, at Iridescence 1 against 0, at Film Physics 0 and 1. The
+    projector throws only the light through a pocket's film, T = 1 - R
+    (bubbleFilm.ts's projectorFilm): at Film Physics 1 soap's measured
+    table, at 0 the stylised rainbow taken as the reflected colour and
+    passed as its complement. So no pixel brighter (by over SLACK), and the
+    film still draws (over DOES of the picture moved by any level at each
+    Film Physics), so a film taken off altogether cannot pass. Main read
+    54 and 0: at Film Physics 0 it multiplied the plate by 0.45 + 1.25 x
+    the rainbow, a front-lit film's reflection, up to 1.7 times the lamp.
+  */
+  const plate = [0, 1].map((fp) => ({ fp, up: compare(f[`plate${fp}1`], f[`plate${fp}0`]).over, moved: moved(f[`plate${fp}1`], f[`plate${fp}0`], FILM_MOVE) }));
+  check(`16. the projector's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, the film still drawn (over ${pct(DOES)} of the picture moved at each)`,
+    plate.every((c) => c.up <= SLACK && c.moved > DOES),
+    plate.map((c) => `Film Physics ${c.fp}: brightest by ${c.up}, ${pct(c.moved)} moved`).join('; '));
 }
 
 const failed = checks.filter((c) => !c.ok).length;
