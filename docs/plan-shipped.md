@@ -2527,6 +2527,28 @@ pick asks for its own input by id, one track is live at the end, Input 2's (5/5)
 runs in Measure's browser part. Safari's second song and song ID's latch stay open in
 PLAN.md 14s.
 
+### 14t-pc. Program Change is dropped (shipped)
+
+`parseMidi` (`src/lib/midi.ts`) returned CC and note on/off and nothing else, so a `0xC0`
+message never reached learn. AUM's MIDI matrix, the Elektron boxes and most hardware
+sequencers send Program Change (and Bank Select, CC 0/32) when the pattern changes.
+
+*Shipped:* `MidiEvent.kind` and `MidiSource.kind` gain `'program'`, `parseMidi` reads
+`[0xC0 | ch, n]` as `{ kind: 'program', channel: ch, number: n, value: 0 }`, `eventSource`
+and `parseMidiMap` keep a program source, and `sourceLabel` prints `"Program n ch c"`.
+`MidiTarget` gains `{ kind: 'setlist'; index: number }` (0-based), formatted by `targetLabel`
+and preserved by `parseMidiMap` and `parseSoundBindings`. `useMidi`'s bank-resolution rule
+and button-press test live in `src/lib/midi.ts` as `liveBindings(map, source, bank)` (a
+bank's own binding wins over an always-live one) and `pressedBy(event)` (true for a
+program). `useMidi` calls both and handles `case 'setlist'` via `MidiHost.playSetItem`,
+which `App` wires to the set list's Go path (`sendLook` with `look.fade ?? fadeSeconds`).
+On the desk, `MidiPanel` shows `"Program n ch c"` bindings and offers set-list items under
+a `set list` tab; on the phone, the bindings are listed on its MIDI section (`#settings-midi`).
+Measured: `npm run soundowed -- --owed=voices,lfo` (`5/5 checks passed, 14 owed`: Bank Select
+CC 0/32 stays a CC, `parseMidi([0xC5, 7])` reads `{ kind: 'program', channel: 5, number: 7, value: 0 }`,
+2 of 2 bindings survive save and load, and a recorded run of 12 Program Changes with Bank
+Select and clock between lands all 12 with 0 doubled and 0 missed).
+
 ### 14x. The microphone hears the hand on the laptop (shipped)
 
 **Reported by the owner 2026-10-04:** pressing some controls (the Speed ride) or
@@ -4267,6 +4289,15 @@ the sessions' files or the native apps skips the Mac (19h).
   download, into a run-local SwiftPM cache under the name SwiftPM looks for, so SwiftPM
   copies them (checksum still checked) instead of downloading; the resolve retries git
   up to three times.
+- **19ak-7, the other release-page downloads** (2026-11-08). The same 504s turned
+  Measure · logic red (actionlint v1.7.7, three times on #720) and the Mac app job (canvas's
+  prebuilt in `npm ci`, then electron-builder's download after Electron's), while the same
+  URLs served a cloud session at times. `scripts/actionlint.mjs` now falls back to the
+  API's asset download (the route that carried #721's iPhone build through) and still
+  checks the sha256; `checks.yml` caches `scratch/actionlint` for the logic part, keyed on
+  the script. `desktop.yml` caches `~/.npm/_prebuilds` and Electron's and
+  electron-builder's caches on pull requests (a signed release fetches fresh), keyed on
+  both lockfiles, and retries the install three times.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
