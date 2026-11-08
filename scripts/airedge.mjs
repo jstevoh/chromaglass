@@ -57,20 +57,27 @@
  *      is A − wet to 5% (and 0.3% of A for the rim's rasterised circle) at
  *      every reading below, and at least 98% of the air is joined to the
  *      rim through air (what pinches off is bubbles, a little).
- *   4. fingers: on a full plate, bead empty, three pulls read where the
- *      ledger's wet first falls to 0.6 of the cover: Thickness 0.75 at hand
- *      −0.4 (n_max about 30) and at −0.15 (about 15), and Thickness 0.45 at
- *      −0.15 (the same n_max, eight times faster). Each front's dominant
- *      angular mode within 0.6 to 1.6 of its n_max, its roughness at least a
- *      cell; the hard pull's mode at least 1.5 times the gentle one's; and
- *      the two gentle pulls' modes, one over the other, within 35% of their
- *      n_max's ratio (the viscosity does not set the spacing).
+ *   4. fingers: on a full plate, bead empty, three pulls, each on four
+ *      seeds, read on the step the ledger's wet crosses 0.8 and then 0.6 of
+ *      the cover: Thickness 0.6 at hand −0.4 (n_max about 30) and at −0.15
+ *      (about 15), and Thickness 0.9 at −0.4 (the same n_max as the first,
+ *      eight times slower). The seeds' spectra averaged, each pull's
+ *      power-weighted mode over n_max/3 to 3·n_max within 0.75 to 1.35 of
+ *      n_max, half its power or more within n_max/2 to 2·n_max, that band's
+ *      power grown at least twofold from 0.8 to 0.6 of the cover (fingers
+ *      grow; a drawn rim does not), and two seeds' fronts correlating under
+ *      0.5 (a pattern at a fixed phase would); the hard pull's mode at least
+ *      1.5 times the gentle one's; and 0.6 against 0.9 at one pull within
+ *      20% of their n_max's ratio (the viscosity does not set the spacing).
+ *      Why 0.6 and 0.9 and not 0.45, and why four seeds: the comment above
+ *      the runs.
  *
  * What the build must give the lab: `WebGPUFluid.readWet()`, the wet
  * fraction on the solver's N×N grid, row by row from y = 0 (the layout of
- * `readField('vel')`), and the ledger's `wet` (lib/cover.ts). The front
- * needs a seed, as a real one has: the cover's ground edge is rough at the
- * grid's scale, so the air's inflow at the rim carries a white, seeded
+ * `readField('vel')`), the ledger's `wet` (lib/cover.ts), and the step's
+ * `airSeed` (a whole number seeding the rim's roughness). The front needs a
+ * seed, as a real one has: the cover's ground edge is rough at the grid's
+ * scale, so the air's inflow at the rim carries a white, seeded
  * perturbation with no wavelength of its own. Water's front at these pulls
  * runs ten to twenty cells a frame, so water is held by the ledger's rates
  * in `npm run gap` 21 and not here; the build substeps the front under a
@@ -219,7 +226,7 @@ try {
     const why = 'the solver has no readWet (the air edge is not built)';
     line('rim', 'the air comes in at the rim, and only once the bead is empty', false, why, true);
     line('front', 'the air under the glass is the ledger\'s (A − wet, to 5%) and joined to the rim', false, why, true);
-    line('fingers', 'a lift fingers as Saffman–Taylor in a lifted cell: n_max = √((1 + 4r|P̄|/σ)/3), finer for a harder pull, the same for a thicker liquid', false, why, true);
+    line('fingers', 'a lift fingers as Saffman–Taylor in a lifted cell: n_max = √((1 + 4r|P̄|/σ)/3) over four seeds, growing, not the same front twice, finer for a harder pull, the same for a thicker liquid', false, why, true);
   } else {
     const N = 192;
     const STILL = { thinGap: 1, gapSpring: 0 };
@@ -250,20 +257,57 @@ try {
     }
     line('rim', 'the air comes in at the rim, and only once the bead is empty', rimOk, rimDetail, false);
 
-    // 4's three pulls, each read where the ledger's wet first falls to 0.6 of the cover.
+    /*
+      4's pulls. A white seed's fingers differ seed to seed: one seed read
+      alone passes a right build on about 80% of seeds and a build fingering
+      at the marginal √3·n_max on 15% (the check-skeptic's model, 20k seeds),
+      and the seed is the build's to re-roll. So each pull runs on four seeds
+      (the step's `airSeed`), the spectra are averaged, and the mode is the
+      power-weighted one over n_max/3 to 3·n_max: modelled, a right build
+      passes always and the √3 one never. Each run is read on the step its
+      ledger's wet crosses 0.8 of the cover and on the step it crosses 0.6 (h
+      about 3.3 mm), never a step late (at Thickness 0.45 that was the
+      ceiling); a run that reaches 600 steps without crossing fails.
+      Thicknesses 0.6 and 0.9 (63 and 500 mm²/s), not 0.45: the thin solve
+      keeps the unsteady term (wgsl/thinGap.ts), and at 0.45 its drag time at
+      3.3 mm (41 ms) outlasts the fingers' growth (about 24 ms), so the
+      liquid is not yet Darcy's there and n_max is not its prediction.
+    */
+    const SEEDS = [1, 2, 3, 4];
     const pulls = [];
-    for (const [th, hand] of [[0.75, -0.4], [0.75, -0.15], [0.45, -0.15]]) {
-      const nu = C.thicknessViscosity(th);
-      await start(th, C.COVER_FULL_ML);
-      let r = null, k = 0;
-      for (; k < 600; k++) {
-        r = await stepRead({ ...STILL, gapThickness: th, liquidMl: C.COVER_FULL_ML, coverHand: hand });
-        if (r.s.wet <= 0.6 * A) break;
+    for (const [th, hand, name] of [[0.6, -0.4, 'hard'], [0.6, -0.15, 'gentle'], [0.9, -0.4, 'thicker']]) {
+      const nu = C.thicknessViscosity(th), runs = [];
+      for (const seed of SEEDS) {
+        const over = { ...STILL, gapThickness: th, liquidMl: C.COVER_FULL_ML, coverHand: hand, airSeed: seed };
+        await start(th, C.COVER_FULL_ML);
+        let early = null, late = null, k = 0;
+        for (; k < 600 && !late; k++) {
+          const r = await stepRead(over);
+          if (!early && r.s.wet <= 0.8 * A) early = { s: r.s, w: await page.evaluate(() => lab.wet()) };
+          if (r.s.wet <= 0.6 * A) late = { s: r.s, w: await page.evaluate(() => lab.wet()) };
+        }
+        if (!early || !late) { runs.push({ seed, capped: true, steps: k }); continue; }
+        const rf = frontOf(late.w, N);
+        runs.push({ seed, steps: k, rf, late: modes(rf).power, early: modes(frontOf(early.w, N)).power, s: late.s, want: nMax(late.s, nu, hand) });
+        if (seed === SEEDS[0]) fronts.push({ name: `Thickness ${th} at ${hand}`, s: late.s, w: late.w, nu });
       }
-      r = await stepRead({ ...STILL, gapThickness: th, liquidMl: C.COVER_FULL_ML, coverHand: hand }, 1, true);
-      const m = modes(frontOf(r.w, N)), dom = dominant(m.power), want = nMax(r.s, nu, hand);
-      pulls.push({ th, hand, nu, steps: k + 1, dom, want, std: m.std, s: r.s });
-      fronts.push({ name: `Thickness ${th} at ${hand}`, s: r.s, w: r.w, nu });
+      const ok = runs.filter((r) => !r.capped);
+      if (ok.length < SEEDS.length) { pulls.push({ name, th, hand, nu, capped: true, steps: runs.map((r) => r.steps) }); continue; }
+      const want = ok.reduce((t, r) => t + r.want, 0) / ok.length;
+      const mean = (key) => { const p = new Float64Array(122); for (const r of ok) for (let m = 0; m < p.length; m++) p[m] += (r[key][m] ?? 0) / ok.length; return p; };
+      const late = mean('late'), early = mean('early');
+      const sum = (p, lo, hi) => { let t = 0; for (let m = Math.max(2, Math.ceil(lo)); m <= Math.min(120, Math.floor(hi)); m++) t += p[m]; return t; };
+      let num = 0, den = 0;
+      for (let m = Math.max(2, Math.ceil(want / 3)); m <= Math.min(120, Math.floor(3 * want)); m++) { num += m * late[m]; den += late[m]; }
+      const mode = den > 0 ? num / den : 0;
+      const share = sum(late, want / 2, 2 * want) / Math.max(1e-30, sum(late, 2, 120));
+      const growth = sum(late, want / 2, 2 * want) / Math.max(1e-30, sum(early, want / 2, 2 * want));
+      // Two seeds' fronts at the same stage: a pattern drawn at a fixed phase would correlate.
+      const [a, b] = [ok[0].rf, ok[1].rf], ma = a.reduce((t, v) => t + v, 0) / a.length, mb = b.reduce((t, v) => t + v, 0) / b.length;
+      let ab = 0, aa = 0, bb = 0;
+      for (let k = 0; k < a.length; k++) { ab += (a[k] - ma) * (b[k] - mb); aa += (a[k] - ma) ** 2; bb += (b[k] - mb) ** 2; }
+      const corr = ab / Math.sqrt(Math.max(1e-30, aa * bb));
+      pulls.push({ name, th, hand, nu, want, mode, share, growth, corr, steps: ok.map((r) => r.steps), s: ok[0].s });
     }
 
     // 3: every reading's air against the ledger.
@@ -273,13 +317,15 @@ try {
     });
     line('front', 'the air under the glass is the ledger\'s (A − wet, to 5%) and joined to the rim', rows.every((x) => x.ok), rows.map((x) => x.text).join('; '), false);
 
-    const [hard, gentle, thin] = pulls;
-    const each = pulls.every((p) => p.dom >= 0.6 * p.want && p.dom <= 1.6 * p.want && p.std >= 1);
-    const finer = hard.dom >= 1.5 * gentle.dom;
-    const same = Math.abs(gentle.dom / thin.dom / (gentle.want / thin.want) - 1) <= 0.35;
-    line('fingers', 'a lift fingers as Saffman–Taylor in a lifted cell: n_max = √((1 + 4r|P̄|/σ)/3), finer for a harder pull, the same for a thicker liquid',
+    const [hard, gentle, thicker] = pulls;
+    const done = pulls.every((p) => !p.capped);
+    const each = done && pulls.every((p) => p.mode >= 0.75 * p.want && p.mode <= 1.35 * p.want && p.share >= 0.5 && p.growth >= 2 && p.corr < 0.5);
+    const finer = done && hard.mode >= 1.5 * gentle.mode;
+    const same = done && Math.abs(hard.mode / thicker.mode / (hard.want / thicker.want) - 1) <= 0.2;
+    line('fingers', 'a lift fingers as Saffman–Taylor in a lifted cell: n_max = √((1 + 4r|P̄|/σ)/3) over four seeds, growing, not the same front twice, finer for a harder pull, the same for a thicker liquid',
       each && finer && same,
-      `${pulls.map((p) => `Thickness ${p.th} (${(p.nu * 1e6).toFixed(0)} mm²/s) at ${p.hand}: ${p.steps} steps to wet ${(p.s.wet / A).toFixed(3)} A at ${(p.s.h * 1000).toFixed(3)} mm, mode ${p.dom} against n_max ${p.want.toFixed(1)}, roughness ${p.std.toFixed(2)} cells`).join('; ')}; hard over gentle ${(hard.dom / gentle.dom).toFixed(2)}, gentle thick over thinner ${(gentle.dom / thin.dom).toFixed(2)} (n_max's ${(gentle.want / thin.want).toFixed(2)})`,
+      `${pulls.map((p) => (p.capped ? `Thickness ${p.th} at ${p.hand}: never reached 0.6 of the cover (steps ${p.steps.join('/')})`
+        : `Thickness ${p.th} (${(p.nu * 1e6).toFixed(0)} mm²/s) at ${p.hand}: steps ${p.steps.join('/')}, wet ${(p.s.wet / A).toFixed(3)} A at ${(p.s.h * 1000).toFixed(3)} mm, mode ${p.mode.toFixed(1)} against n_max ${p.want.toFixed(1)}, band share ${p.share.toFixed(2)}, grew ×${p.growth.toFixed(1)} in power from 0.8 A, two seeds' fronts correlate ${p.corr.toFixed(2)}`)).join('; ')}${done ? `; hard over gentle ${(hard.mode / gentle.mode).toFixed(2)}, 0.6 over 0.9 at one pull ${(hard.mode / thicker.mode).toFixed(2)} (n_max's ${(hard.want / thicker.want).toFixed(2)})` : ''}`,
       false);
   }
 } finally {

@@ -530,22 +530,38 @@ written first. Line numbers are as read on main at d07ac31.
         phase of the thin solve, not the bubbles' drawn rims (`air.ts`'s `packedFinger` is a drawn
         pattern and is not used): a wet fraction w carried by the solve's flux, air cells at the
         air's pressure (μ_air is 1/55 of water's, 1/1250 of the thick carrier's: the Saffman–Taylor
-        limit), the front's liquid side at −σ(2cosθ/h + κ) with κ its in-plane curvature (without
-        κ every wavelength grows and the fingers run to the grid), the rim's inflow liquid while
-        the ledger's bead has any and air after, with a white seeded roughness (the cover's ground
-        edge), the front substepped under a cell a substep. The air is written into the air field
+        limit), the front's liquid side at p_air − 2σcosθ/h + σκ, κ = ∇·n̂ its in-plane curvature with
+        n̂ pointing out of the liquid (a convex liquid disc has κ > 0 and its liquid the higher;
+        the other sign makes the tension destabilise the front, and without κ every wavelength
+        grows: either way the fingers run to the grid), the rim's inflow liquid while
+        the ledger's bead has any and air after, with a white roughness seeded by the step's
+        `airSeed` (the cover's ground edge), the front substepped under a cell a substep. Named
+        shortcuts: at the hard pull's Ca = h²|P̄|/(3rσ) of about 0.4 the front leaves a wetting
+        film on the glasses that A − wet ignores (Park–Homsy), and water's rates are viscous-only
+        (38r-21). The air is written into the air field
         so the dye leaves it and the plate draws it as it draws a bubble's air; a finger that
         pinches off is a bubble (15g).
       - Checks: `gap` 19 the puddle's area V/h at the floor; 20 the dial down and the settle back
         (RK4, step-size free); 21 a lift past the bead and the suction, let go and back to V/A; 22
-        a wet glass sticks (on main too); 23 the pinch's hand and reading, and its wiring (reach
-        only: the feel is the Mac's film); lines 15 and 16 carry a branch for each ledger, exact in
+        a wet glass sticks at the weight and 0.9 suctions (on main too), with 21 asking 1.1 to
+        lift, so the gate is the suction and not the edge's hold; 23 the pinch's hand and reading,
+        and its wiring, comments stripped (reach only: a desk DOM line that sends a ctrl-wheel and
+        reads the hand back to 0 after 200 ms is a follow-up; the feel is the Mac's film); lines 15 and 16 carry a branch for each ledger, exact in
         both, the main one to go once this ships. `airedge`: the counter's control; the air comes
-        in at the rim only once the bead is empty; the field's air is A − wet; each pull's
-        dominant mode within 0.6–1.6 of n_max, the hard pull's at least 1.5 times the gentle's,
-        and Thickness 0.45 against 0.75 at one pull the same spacing to 35%. The bars are the
+        in at the rim only once the bead is empty; the field's air is A − wet; three pulls on
+        four seeds each, read as the ledger's wet crosses 0.8 and 0.6 of the cover: the averaged
+        spectra's power-weighted mode within 0.75–1.35 of n_max, half the power within n_max/2 to
+        2n_max, that band grown twofold, two seeds' fronts uncorrelated (under 0.5), the hard pull
+        at least 1.5 times the gentle, and Thickness 0.6 against 0.9 at one pull within 20%
+        (0.45 is not Darcy's at 3.3 mm: its drag time, 41 ms, outlasts the fingers' growth). The bars are the
         linear theory's: re-aimed by Claude with the measurement if the nonlinear stage moves
         them, never by the build.
+    - **38r-21. Water's glass is inertial, not Stefan's** (S-M; found in 38r-16's check review).
+      Water's settle (halfway in 6 ms) and a pull at hand −0.12 run the radial flow at Reynolds
+      numbers of thousands to 1.5e4; the flow's added mass ρπr⁴/(8h), about 2 kg against the
+      glass's 1.5 N, would put the half-settle at 40 ms or more. `lib/cover.ts` is viscous only
+      (Stefan, as `npm run gap` 14, 20 and 21 hold it); give the cover the unsteady squeeze
+      (ρ r² ḧ/h terms) and re-aim the water rows from it. The thick carrier is inside the theory.
     - **38r-17. The rest gap's other readers** (S-M). Still at the 2 mm constant: `FILM_TOP`
       (`wgsl/standing.ts`, compiled into phaseForces), `GAP_LC` (`wgsl/ferroDrop.ts`), the
       bubbles' `gapMetres` (`lib/bubbles.ts`, set by the visualizer), the rhythm sheet's h₀
