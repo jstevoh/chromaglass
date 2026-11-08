@@ -62,9 +62,11 @@
  *          the dye leaves at 2x and the line fails as surely as at 0. The
  *          ring's own drift before the steam (warm water expanding, about
  *          0.01 of dye a second) is taken off; at least a cell of steam; and
- *          the dye that left must arrive in the annulus out to a third of the
- *          plate (0.7x–1.3x), so steam that deleted the dye under it, with
- *          nothing flowing, does not pass.
+ *          the dye that left must arrive between the ring and the rim (out
+ *          to 0.45, past the dye's disc, 0.7x–1.3x), so steam that deleted
+ *          the dye under it, with nothing flowing, does not pass. Read where
+ *          the steam is at its most: a pocket can flash across the spot and
+ *          condense again within seconds.
  *   writes after the fan's run, 30 K poured out of the spot (lab.vel on vel.z)
  *          is still out ten 1/60 s steps later (0.8x–1.2x of the drop the
  *          pour asks for, the disc's mean over the hand's cells): a boil that keeps a private copy of the temperature and
@@ -168,8 +170,16 @@ const lineOf = (id, name, ok, detail) => {
 const T_SAT = 100;
 /** The hand's own radius (src/gpu/lampBoil.ts HAND_RADIUS, 1.5 cm) on the 20 cm dish (DISH_METRES), in plate units. */
 const HAND = 0.015 / 0.2;
-/** Where the dye the steam pushes out of the ring (2 × HAND) is looked for: out to a third of the plate, inside the dye's disc (0.35). */
-const OUTER = 0.33;
+/**
+ * Where the dye the steam pushes out of the ring (2 × HAND) is looked for:
+ * past the dye's disc (0.35) and inside the open rim (0.5). In a gap the
+ * liquid is incompressible, so steam in the middle of a uniform disc moves the
+ * whole disc out by the steam's area; what crosses any circle inside the disc
+ * is replaced from within, and the dye arrives at the disc's edge. (An outer
+ * edge at 0.33, inside the disc, read 0.08x on a fix whose ring lost 0.89x of
+ * the steam's room: the dye had gone where it should, past 0.33.)
+ */
+const OUTER = 0.45;
 const N = 48;
 
 // ── boil ─────────────────────────────────────────────────────────────────
@@ -299,15 +309,22 @@ async function boilPart() {
     from the ring, less what the ring was losing anyway (warm water expanding,
     the rate over the 10 s before b, carried over the same span), against the
     room the steam took (its coverage, cells, times the dye a ring cell held at
-    b, times 1 − ρv/ρl). And that dye has to arrive in the annulus beyond the
-    ring (0.7x–1.3x of what left): steam that took the dye away with nothing
+    b, times 1 − ρv/ρl). And that dye has to arrive between the ring and the
+    rim, out to OUTER (0.7x–1.3x of what left): steam that took the dye away with nothing
     flowing would pass the first half alone. At least one cell of steam, so a
     wrong-signed source cannot hide in the drift.
   */
   let detail = 'steam never showed under the hand', ok = false;
   if (H.steamAt !== null) {
+    /*
+      e is the read with the most steam, not the last: a pocket can flash
+      across the superheated spot inside one read and then condense as the
+      cooler liquid it pushed out flows back (a fix read 69 cells of steam
+      at its first read with steam and none ten seconds later).
+    */
     const i = H.reads.findIndex((r) => r.t === H.steamAt);
-    const b = H.reads[i - 1], e = H.reads.at(-1);
+    const b = H.reads[i - 1];
+    const e = H.reads.slice(i).reduce((m, r) => (r.steam > m.steam ? r : m), H.reads[i]);
     const back = H.reads.find((r) => r.t >= b.t - 10 && r.phase === 'fine') ?? b;
     const drift = b.t > back.t ? (back.dye - b.dye) / (b.t - back.t) : 0;
     const driftOut = b.t > back.t ? (b.beyond - back.beyond) / (b.t - back.t) : 0;
@@ -317,7 +334,7 @@ async function boilPart() {
     const want = (b.dye / b.ringCells) * e.steam * (1 - 0.598 / 958.4);
     const r = gone / want, carried = arrived / gone;
     ok = e.steam >= 1 && r >= 0.5 && r <= 1.5 && carried >= 0.7 && carried <= 1.3;
-    detail = `${fmt(e.steam, 2)} cells of steam in the ring (bar ≥ 1) after ${span} s should push out ${fmt(want, 3)} of dye; ${fmt(gone, 3)} left beyond the ring's own drift (${fmt(drift, 4)}/s): ${fmt(r)}x (bar 0.5–1.5); ${fmt(arrived, 3)} arrived beyond it: ${fmt(carried)}x of what left (bar 0.7–1.3)`;
+    detail = `${fmt(e.steam, 2)} cells of steam in the ring at its most (bar ≥ 1), ${span} s after the last read without, should push out ${fmt(want, 3)} of dye; ${fmt(gone, 3)} left beyond the ring's own drift (${fmt(drift, 4)}/s): ${fmt(r)}x (bar 0.5–1.5); ${fmt(arrived, 3)} arrived beyond it: ${fmt(carried)}x of what left (bar 0.7–1.3)`;
   }
   lineOf('steam', NAMES.steam, ok, detail);
 
