@@ -73,6 +73,19 @@
  *        main the pour drew its lens only where the wash happened to slope:
  *        301 px against the oil's 1944
  *
+ * And two written ahead of their builds (owed, see below):
+ *
+ *   14.  a clear rim in focus (PLAN 18e-2): at Focus 0.5 a clear pour of
+ *        glycerine, a clear oil drop and the pour on clear water with no
+ *        dye anywhere each draw a dark hairline on their edge, the light
+ *        bent by the path's slope past the projection lens, and nothing in
+ *        their middles or round them. On main nothing moves at all there:
+ *        the plate bends light by the dye's slope only
+ *   15.  the camera's bubble film is light through it (38h-6): at
+ *        Iridescence 1 nothing brighter than at 0, at Film Physics 0 and 1,
+ *        and the film still drawn. Main multiplies by up to 1.7, a front-lit
+ *        soap film's reflection: 22 levels over at Film Physics 0
+ *
  * Every number asked is printed. Run against main before 38h it
  * read 0/8: the droplets' dots, the oil's 8%, the gel's 1.5, Glossiness's
  * sheen, the dish's and the rims' glow and the grain each over the plate
@@ -87,7 +100,31 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  Two lines written ahead of their builds (14 for PLAN 18e-2, 15 for 38h-6),
+  each printed as owed while it fails and red the day it passes with its id
+  still listed (the convention of timers.mjs and wallflash.mjs); an owed line
+  is excused only while what it asks for is absent, and a build that is
+  there and misses is red.
+
+    npm run nolight -- --owed=rim,film
+*/
+const IDS = ['rim', 'film'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  checks.push({ name, ok: true });
+  console.log(` owed  ${name} — ${detail}`);
+};
+
 const N = 128, SIZE = 256, SLACK = 1, DARK = 8, DOES = 0.002;
+/** Line 15's "the film still draws": a transmitted soap film passes 92 to 100% of the light, so over most of a bubble its tint is a level or so, not DARK's 8: any level moved counts. */
+const FILM_MOVE = 0;
 /** Where the oil goes: the wash, away from the pools, so the plate under it is the lamp through the wash alone. */
 const OIL = { x: 0.72, y: 0.28, r: 0.09 };
 /** Where the clear pour goes (line 9): the wash's far corner from the oil and the pools. */
@@ -120,7 +157,7 @@ const LAMPS = [{ x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, { x: 0.1, y: 0.9, x2: 0.9, 
 const CAM_BEADS = [[0.3, 3], [0.55, 5], [0.75, 2.5]];
 /** A round drop's own brightening at 0.8 of its radius, to the camera (the beads' block, `focus`). */
 const FOCUS_EDGE = 0.3 * 0.2 * 0.2;
-let r, r2;
+let r, r2, r3;
 try {
   r = await page.evaluate(async ({ N, SIZE, OIL, POUR, DARK, NEAR }) => {
     await lab.create(N);
@@ -274,8 +311,35 @@ try {
     // That the closeup's relief and the camera's bubbles draw something at all.
     out.reliefOff = await shot({ ...lit, macroRelief: 0 }, { ...views.closeup, lamp: LAMPS[0] });
     out.bubblesOff = await shot(lit, { ...views.bubbles, bubbles: 0, lamp: LAMPS[0] });
+    /*
+      Line 15 (38h-6): the camera's bubbles with their film at Iridescence 0
+      and 1, at Film Physics 0 and 1, Light Play off (the softbox's glint is
+      its own and stays). And the projector's, printed only.
+    */
+    out.film = {};
+    for (const fp of [0, 1]) for (const ir of [0, 1]) {
+      const over = { filmPhysics: fp, iridescence: ir, lightPlay: 0 };
+      out.film[`cam${fp}${ir}`] = await shot(over, { ...views.bubbles, lamp: LAMPS[0] });
+      out.film[`plate${fp}${ir}`] = await shot(over, { macroAmount: 0, bubbles: 0.8, lamp: LAMPS[0] });
+    }
     return out;
   }, { N, SIZE, LAMPS, CAM_BEADS });
+  /*
+    Line 14's third leg: the same clear pour on a plate with no dye at all,
+    the lamp through clear water. The plate's rim term is gated on the dye
+    being there (fluid0.a > 0.03), and a clear pour into clear water has
+    none, so on main nothing can draw there even once the deflection reads
+    the path.
+  */
+  r3 = await page.evaluate(async ({ N, SIZE, POUR }) => {
+    await lab.create(N);
+    const base = { lampGround: 1, edgeRelief: 0.6, saturationBoost: 1, lampHotspot: 0, projectorFocus: 0.5 };
+    const shot = async () => Array.from(await lab.render(SIZE, base, { time: 3 }));
+    lab.flush(); await lab.step(2);
+    const off = await shot();
+    lab.addSpecies(POUR.x, POUR.y, POUR.r, 50, 'glycerine', false);
+    return { off, on: await shot() };
+  }, { N, SIZE, POUR });
 } finally {
   await close();
 }
@@ -368,14 +432,40 @@ for (const [i, key, name, off] of [
     lamp > 100 && lamp < 250 && spread <= lamp + SLACK && mid > DOES * P, `the lamp's brightest ${lamp}; spread apart ${spread}; ${pct(mid / P)} lit but darker`);
 }
 
-// The oil's disc and a ring of water round it, in the picture's rows (row 0 at the top, plate y up).
-const inOil = (u, v) => Math.hypot(u - OIL.x, (1 - v) - OIL.y) < OIL.r * 1.3;
+/*
+  Where a place on the plate is in the picture. The view shows the plate's
+  middle two thirds across the frame (uvToFluid's 1.5: a frame's width is
+  1/1.5 of the plate), so a point of the plate sits 1.5 times as far from the
+  picture's middle as from the plate's, and a disc is 1.5 times as wide. Lines
+  6, 7 and 13 read the plate's numbers as the picture's until 18e-2's line was
+  written (the oil's disc then read round (0.72, 0.28) of the picture, its
+  middle at (0.83, 0.17), so the ring of water each was read with cut through
+  the drop's own rim); the rings below are where the drops are drawn.
+  In the picture's rows: row 0 at the top, plate y up.
+*/
+const MAG = 1.5;
+const drawn = (o) => ({ x: 0.5 + (o.x - 0.5) * MAG, y: 0.5 + (o.y - 0.5) * MAG, r: o.r * MAG });
+/** How far a pixel is from a place on the plate, in that place's own radii as drawn. */
+const radii = (o) => { const s = drawn(o); return (u, v) => Math.hypot(u - s.x, (1 - v) - s.y) / s.r; };
+/*
+  What the lens alone does out of focus. With 18e-2 a clear edge loses light
+  past the pupil in focus as well (line 14), a hairline dark at Focus 0.5 that
+  is no lens and does not turn over, and on main there is none. So lines 7
+  and 13 ask of a picture out of focus against the plate without the drop at
+  that focus, times what the drop already does in focus: pic − base · picF /
+  baseF, in levels. On main picF is baseF where it matters (line 6), and this
+  is the difference it always read.
+*/
+const lensOnly = (pic, base, picF, baseF, i) => pic[i] - base[i] * (picF[i] + 0.5) / (baseF[i] + 0.5);
+// The oil's disc and a ring of water round it.
+const oilR = radii(OIL);
+const inOil = (u, v) => oilR(u, v) < 1.3;
 let up8 = 0, down8 = 0, flip = 0, both = 0;
 for (let i = 0; i < P; i++) {
   const x = i % SIZE, y = Math.floor(i / SIZE);
   if (!inOil(x / SIZE, y / SIZE)) continue;
-  const g8 = r.oil8[4 * i + 1] - r.water8[4 * i + 1];
-  const g2 = r.oil2[4 * i + 1] - r.water2[4 * i + 1];
+  const g8 = lensOnly(r.oil8, r.water8, r.oilFocus, r.waterFocus, 4 * i + 1);
+  const g2 = lensOnly(r.oil2, r.water2, r.oilFocus, r.waterFocus, 4 * i + 1);
   if (g8 > 2) up8++;
   if (g8 < -2) down8++;
   if (Math.abs(g8) > 2 && Math.abs(g2) > 2) { both++; if (Math.sign(g8) !== Math.sign(g2)) flip++; }
@@ -430,13 +520,14 @@ const oilThere = up8 > 20 && down8 > 20;
     `${moved.map(([k, m]) => `${k} ${m}`).join(', ')} levels; the relief moves ${pct(Math.max(relief, compare(r2.moved.closeup[0], r2.reliefOff).dark))}, the bubbles ${pct(bubblesDo)}`);
 }
 {
-  const inPour = (u, v) => Math.hypot(u - POUR.x, (1 - v) - POUR.y) < POUR.r * 1.3;
+  const pourR = radii(POUR);
+  const inPour = (u, v) => pourR(u, v) < 1.3;
   let up = 0, down = 0, turn = 0, seen = 0;
   for (let i = 0; i < P; i++) {
     const x = i % SIZE, y = Math.floor(i / SIZE);
     if (!inPour(x / SIZE, y / SIZE)) continue;
-    const g8 = r.pour8[4 * i + 1] - r.oil8[4 * i + 1];
-    const g2 = r.pour2[4 * i + 1] - r.oil2[4 * i + 1];
+    const g8 = lensOnly(r.pour8, r.oil8, r.pourFocus, r.oilFocus, 4 * i + 1);
+    const g2 = lensOnly(r.pour2, r.oil2, r.pourFocus, r.oilFocus, 4 * i + 1);
     if (g8 > 2) up++;
     if (g8 < -2) down++;
     if (Math.abs(g8) > 2 && Math.abs(g2) > 2) { seen++; if (Math.sign(g8) !== Math.sign(g2)) turn++; }
@@ -452,13 +543,15 @@ const oilThere = up8 > 20 && down8 > 20;
     disc's reach past it (0.07 of the plate covers R to Focus 0.8), against
     the oil's.
   */
-  const reach = (o) => (u, v) => Math.hypot(u - o.x, (1 - v) - o.y) < o.r * 1.3 + 0.07;
-  const strength = (pic, base, o) => {
+  const reach = (o) => { const s = drawn(o); return (u, v) => Math.hypot(u - s.x, (1 - v) - s.y) < s.r * 1.3 + 0.07 * MAG; };
+  // |ln(pic / base)| less what the drop does in focus (lensOnly's reason, in logs).
+  const strength = (pic, base, picF, baseF, o) => {
     const keep = reach(o); let sum = 0;
-    for (let i = 0; i < P; i++) if (keep((i % SIZE) / SIZE, Math.floor(i / SIZE) / SIZE)) sum += Math.abs(Math.log((pic[4 * i + 1] + 0.5) / (base[4 * i + 1] + 0.5)));
+    const ln = (a, b, i) => Math.log((a[i] + 0.5) / (b[i] + 0.5));
+    for (let i = 0; i < P; i++) if (keep((i % SIZE) / SIZE, Math.floor(i / SIZE) / SIZE)) sum += Math.abs(ln(pic, base, 4 * i + 1) - ln(picF, baseF, 4 * i + 1));
     return sum;
   };
-  const sPour = strength(r.pourNear, r.oilNear, POUR), sOil = strength(r.oilNear, r.waterNear, OIL);
+  const sPour = strength(r.pourNear, r.oilNear, r.pourFocus, r.oilFocus, POUR), sOil = strength(r.oilNear, r.waterNear, r.oilFocus, r.waterFocus, OIL);
   const d = compare(r.pourFocus, r.oilFocus, inPour);
   // What the optics predict: each lens as strong as its index step (glycerine 1.4746, the oil 0.8 of 1.47, over water's 1.333).
   const expect = (1.4746 - 1.333) / (0.8 * (1.47 - 1.333));
@@ -466,6 +559,74 @@ const oilThere = up8 > 20 && down8 > 20;
   check(`13. one shadowgraph for the whole column: a clear pour with no dye is a lens out of focus (brighter and darker at 0.8, the other way at 0.2, over 90%), as strong as the oil's for its index step (within a quarter), and in focus brightens nothing (by over ${SLACK})`,
     up > 20 && down > 20 && seen > 20 && turn / seen > 0.9 && ratio > 0.75 && ratio < 1 / 0.75 && d.over <= SLACK,
     `${up} px brighter, ${down} darker at 0.8 (the oil's ${up8 + down8}); summed |ln T| at ${NEAR} ${sPour.toFixed(1)} against the oil's ${sOil.toFixed(1)}, ${ratio.toFixed(2)} of the ${expect.toFixed(2)} the index steps predict; ${turn} of ${seen} turn over at 0.2; in focus brightest by ${d.over} levels`);
+}
+
+/*
+  14 (PLAN 18e-2, owed). A clear pour's rim in focus. At Focus's middle (Δz
+  0) the shadowgraph is 1, so what an edge draws there is the pupil's loss
+  alone: a ray bent at the edge by the slope of the optical path, ∇OPL, past
+  the projection lens's aperture, a dark hairline on the edge itself. The
+  plate works that bend out from the dye's slope (refractionOptics note 1),
+  so a pour with no dye across its edge, glycerine into water (Δn 0.14), or
+  a clear oil drop, draws no rim in focus: on main nothing at all moves
+  there. So, at Focus 0.5, against the same plate without it:
+    - the pour on the wash: over a quarter of its rim's ring (0.8 to 1.2 of
+      its radius) darker by DARK+, and none of it brighter (line 13 asks
+      that of the whole drop);
+    - only at the rim: its flat middle (inside 0.6 of the radius) and the
+      wash round it (1.4 to 2 radii) moved by no more than SLACK, so a line
+      painted wide, or a pour tinted, cannot pass;
+    - the clear oil drop on the wash, the same ring darker by DARK+ over a
+      quarter of it (Cahn-Hilliard's interface is softer than the pour's
+      step, so it draws a softer rim, but a rim);
+    - the pour on clear water, no dye anywhere: the same quarter of its
+      ring darker. The rim is the light lost from the lamp, and does not
+      need dye to have something to darken.
+  The owed state is main's: none of the three draws anything on its ring.
+*/
+{
+  const ringOf = (o, a, b) => { const d = radii(o); return (u, v) => { const k = d(u, v); return k >= a && k <= b; }; };
+  const ring = (pic, base, o) => compare(pic, base, ringOf(o, 0.8, 1.2));
+  const most = (pic, base, keep) => { const up = compare(pic, base, keep).over, down = compare(base, pic, keep).over; return Math.max(up, down, 0); };
+  const pour = ring(r.pourFocus, r.oilFocus, POUR), oil = ring(r.oilFocus, r.waterFocus, OIL), clear = ring(r3.on, r3.off, POUR);
+  const middle = most(r.pourFocus, r.oilFocus, ringOf(POUR, 0, 0.6)), round = most(r.pourFocus, r.oilFocus, ringOf(POUR, 1.4, 2));
+  const Q = 0.25;
+  line('rim', `14. a clear rim in focus (Focus 0.5): the clear pour, the clear oil drop and the pour on clear water each darken over ${pct(Q)} of their rim (0.8 to 1.2 radii) by ${DARK}+, the pour's rim no brighter (by ${SLACK}), its middle and the wash round it unmoved (by ${SLACK})`,
+    pour.dark > Q && oil.dark > Q && clear.dark > Q && pour.over <= SLACK && middle <= SLACK && round <= SLACK,
+    `rims darker: pour ${pct(pour.dark)}, oil ${pct(oil.dark)}, pour on clear water ${pct(clear.dark)}; the pour's rim brightest by ${pour.over}; its middle moved ${middle}, the wash round it ${round} levels`,
+    pour.dark < 0.01 && oil.dark < 0.01 && clear.dark < 0.01);
+}
+/*
+  15 (PLAN 38h-6, owed). The camera's bubble film by transmission. A pocket
+  of air between the glasses, lit from beneath, shows its wetting film by
+  the light through it: T = 1 - R, 92 to 100 per cent of the light in pale
+  complements of the reflected colours (filmTableAt(…, true)), which the
+  projector's bubble already wears at Film Physics. The camera's bubble
+  multiplies by 0.45 + 1.25 × the reflected film colour (camFilm), up to
+  1.7: a soap film lit from the front, as in the macro photographs it was
+  tuned against. So: the camera's bubbles at Iridescence 1 against the same
+  bubbles at Iridescence 0, at Film Physics 0 and at 1: no pixel brighter
+  (by over SLACK, a transmitted film only takes light away, and more film
+  colour takes more), and the film still draws (over DOES of the picture
+  moved at all, at either Film Physics: a transmitted film tints by a level
+  or so over most of a bubble, 8% at most, so DARK's 8 would ask more than
+  the physics gives; main at Film Physics 1, already transmitted, moves
+  0.00% of the picture by 8, 0.01% by over 2 and 10.83% by any level), so a
+  film taken off altogether cannot pass. The projector's own bubbles are printed beside it:
+  at Film Physics 0 they still wear the reflected film above Iridescence
+  0.25 (PLAN 38h-14). The owed state is main's: brighter by over 10 levels.
+*/
+{
+  const f = r2.film;
+  /* The share of the picture where any channel moved by more than t levels, either way. */
+  const moved = (a, b, t) => { let n = 0; for (let i = 0; i < P; i++) for (let c = 0; c < 3; c++) if (Math.abs(a[4 * i + c] - b[4 * i + c]) > t) { n++; break; } return n / P; };
+  const cam = [0, 1].map((fp) => ({ fp, up: compare(f[`cam${fp}1`], f[`cam${fp}0`]), moved: moved(f[`cam${fp}1`], f[`cam${fp}0`], FILM_MOVE) }));
+  const plate = [0, 1].map((fp) => compare(f[`plate${fp}1`], f[`plate${fp}0`]).over);
+  const over = Math.max(...cam.map((c) => c.up.over));
+  line('film', `15. the camera's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, and the film still draws (over ${pct(DOES)} of the picture moved at each)`,
+    over <= SLACK && cam.every((c) => c.moved > DOES),
+    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; the projector's bubbles, printed only: brightest by ${plate.join(' and ')}`,
+    over > 10);
 }
 
 const failed = checks.filter((c) => !c.ok).length;

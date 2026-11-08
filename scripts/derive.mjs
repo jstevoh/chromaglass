@@ -26,6 +26,27 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/*
+  A line written ahead of its build (PLAN 18e-2), printed as owed while it
+  fails and red the day it passes with its id still listed (the convention
+  of timers.mjs and wallflash.mjs): an owed line is excused only while what
+  it asks for is absent (here, while .z is still the signed Laplacian), and a
+  build that is there and misses is red.
+
+    npm run derive -- --owed=grad
+*/
+const IDS = ['grad'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
+
 const { page, close } = await openLab();
 try {
   const r = await page.evaluate(async () => {
@@ -64,11 +85,36 @@ try {
     const { w, h } = one;
     let sum = 0, sx = 0, sy = 0;
     let minLap = 1e9, maxLap = -1e9;
+    /*
+      The Laplacian of the path, worked out here from the path the pass
+      writes in .w, with the pass's own stencil: taps 3 cells of the logical
+      grid out (3 / 192 of the plate), the diagonals at half weight, times 25.
+      It used to be read from .z, which carried that Laplacian, but since
+      38h-3 nothing on the projected plate reads .z (the shadowgraph takes its
+      Laplacian from .w itself), and PLAN 18e-2 gives .z to |∇OPL|. Taken
+      from .w, the line asks the same of the path whatever .z carries; on
+      main the two agree (the PR that moved this line printed both).
+    */
+    const k = 3 * w / 192;
+    const wAt = (fx, fy) => {
+      const cx = Math.min(Math.max(fx, 0), w - 1), cy = Math.min(Math.max(fy, 0), h - 1);
+      const x0 = Math.min(Math.floor(cx), w - 2), y0 = Math.min(Math.floor(cy), h - 2), ax = cx - x0, ay = cy - y0;
+      return (one.at(x0, y0, 3) * (1 - ax) + one.at(x0 + 1, y0, 3) * ax) * (1 - ay)
+        + (one.at(x0, y0 + 1, 3) * (1 - ax) + one.at(x0 + 1, y0 + 1, 3) * ax) * ay;
+    };
+    let minZ = 1e9, maxZ = -1e9;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const g = Math.hypot(one.at(x, y, 0), one.at(x, y, 1));
-      const l = one.at(x, y, 2);
-      if (l < minLap) minLap = l;
-      if (l > maxLap) maxLap = l;
+      const z = one.at(x, y, 2);
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+      if (x >= k && y >= k && x < w - k && y < h - k) {
+        const c = one.at(x, y, 3);
+        const l = ((wAt(x - k, y) + wAt(x + k, y) + wAt(x, y - k) + wAt(x, y + k) - 4 * c)
+          + 0.5 * (wAt(x - k, y - k) + wAt(x + k, y - k) + wAt(x - k, y + k) + wAt(x + k, y + k) - 4 * c)) * 25;
+        if (l < minLap) minLap = l;
+        if (l > maxLap) maxLap = l;
+      }
       if (!(g > 0)) continue;
       sum += g; sx += g * (x + 0.5) / w; sy += g * (y + 0.5) / h;
     }
@@ -127,7 +173,60 @@ try {
       { id: 'water', n: N_WATER, read: pathAt(0.72, 0.72) },
     ].map((p) => ({ ...p, expected: p.n * thickness }));
 
-    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, paths, thickness };
+    /*
+      What .z carries (PLAN 18e-2, owed): |∇OPL|, the slope of the path that
+      deflects the light out of the projector's pupil at an edge, so a clear
+      pour's rim draws in focus. Read on the two clear pools, scale-free: it
+      is never negative (a magnitude), it peaks on each pool's rim (0.085 to
+      0.115 of the plate from its middle, the pools' radius 0.1), it is under
+      5% of that peak in each pool's flat middle (within 0.05) and in clear
+      water away from everything (round 0.72, 0.72), and the syrup's rim peak
+      stands to glycerine's as their index steps over water do. On main .z is
+      still the Laplacian: negative inside every rim.
+    */
+    const ringPeak = (cx, cy) => {
+      let m = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const d = Math.hypot((x + 0.5) / w - cx, (y + 0.5) / h - cy);
+        if (d >= 0.085 && d <= 0.115) m = Math.max(m, two.at(x, y, 2));
+      }
+      return m;
+    };
+    const flatMost = (cx, cy, r) => {
+      let m = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        if (Math.hypot((x + 0.5) / w - cx, (y + 0.5) / h - cy) <= r) m = Math.max(m, Math.abs(two.at(x, y, 2)));
+      }
+      return m;
+    };
+    /*
+      And where on the rim: a slope peaks at the step itself, where the path
+      is halfway between the pool's and the water's, while a Laplacian (or a
+      Laplacian with its negative lobe clamped away, which would pass the
+      lines above) peaks on the step's shoulders, where the path is nearly
+      the pool's or nearly the water's. So the path's place in the step, mean
+      over the rim's pixels within 80% of the peak, is asked between a
+      quarter and three quarters.
+    */
+    const midStep = (p, peak) => {
+      const inside = pathAt(p.x, p.y), outside = pathAt(0.72, 0.72);
+      let s = 0, k = 0;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const d = Math.hypot((x + 0.5) / w - p.x, (y + 0.5) / h - p.y);
+        if (d < 0.07 || d > 0.13 || two.at(x, y, 2) < 0.8 * peak) continue;
+        s += (two.at(x, y, 3) - outside) / (inside - outside); k++;
+      }
+      return k ? s / k : -1;
+    };
+    let zMin = 1e9;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) zMin = Math.min(zMin, two.at(x, y, 2));
+    const grad = {
+      zMin,
+      rims: pools.map((p) => { const peak = ringPeak(p.x, p.y); return { id: p.id, dn: indexOf(p.id) - N_WATER, peak, middle: flatMost(p.x, p.y, 0.05), at: midStep(p, peak) }; }),
+      water: flatMost(0.72, 0.72, 0.05),
+    };
+
+    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, paths, thickness, grad };
   });
   const at = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
   check('the derive pass finds slopes at all', r.sum > 0, `weight ${r.sum.toFixed(1)}`);
@@ -144,10 +243,21 @@ try {
     0 and this fails.
   */
   check('Becke line doublet present in Laplacian', r.minLap < -0.07 && r.maxLap > 0.18,
-    `Laplacian min ${r.minLap.toFixed(3)}, max ${r.maxLap.toFixed(3)}`);
+    `Laplacian of the path (.w) min ${r.minLap.toFixed(3)}, max ${r.maxLap.toFixed(3)}; .z min ${r.minZ.toFixed(3)}, max ${r.maxZ.toFixed(3)}`);
   const worst = Math.max(...r.paths.map((p) => Math.abs(p.read - p.expected)));
   check('optical path is each liquid\'s own index times its depth (glycerine, syrup, water)', worst < 0.005,
     `${r.paths.map((p) => `${p.id} ${p.read.toFixed(4)} against ${p.n} × ${r.thickness.toFixed(2)} = ${p.expected.toFixed(4)}`).join('; ')}`);
+  {
+    const g = r.grad, [gl, sy] = g.rims;
+    const peak = Math.min(gl.peak, sy.peak);
+    const ratio = (sy.peak / Math.max(1e-9, gl.peak)) / (sy.dn / gl.dn);
+    const flat = Math.max(gl.middle, sy.middle, g.water);
+    const atStep = g.rims.every((p) => p.at >= 0.25 && p.at <= 0.75);
+    line('grad', '18e-2: the pass writes |∇OPL| in .z: never negative, peaking on each clear pool\'s rim where the path is mid-step (0.25 to 0.75 of it), under 5% of that in their middles and in clear water, syrup\'s rim over glycerine\'s as their index steps (within 15%)',
+      g.zMin > -1e-3 && peak > 0 && atStep && flat < 0.05 * peak && ratio > 0.85 && ratio < 1 / 0.85,
+      `.z min ${g.zMin.toFixed(4)}; rim peaks ${g.rims.map((p) => `${p.id} ${p.peak.toFixed(4)} at ${p.at.toFixed(2)} of the step (Δn ${p.dn.toFixed(3)}, middle ${p.middle.toFixed(4)})`).join(', ')}; clear water ${g.water.toFixed(4)}; syrup over glycerine ${ratio.toFixed(2)} of the index steps' ratio`,
+      g.zMin < -1e-3);
+  }
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
