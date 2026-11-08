@@ -262,6 +262,7 @@
     "wallpattern": "node --experimental-strip-types scripts/wallpattern.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
     "timers": "node scripts/timers.mjs",
+    "hearahead": "node scripts/hearahead.mjs",
     "album": "node scripts/album.mjs",
     "albumplate": "npm run build && node scripts/album.mjs --app",
     "timelabels": "esbuild scripts/timelabels.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/timelabels.mjs && node node_modules/.cache/timelabels.mjs",

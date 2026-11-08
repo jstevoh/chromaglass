@@ -629,6 +629,20 @@
       ]
     },
     {
+      "name": "Hear the set ahead, from files, owed",
+      "shard": "logic",
+      "run": "npm run hearahead -- --owed=files,sections,ahead,loudness,clock,tags",
+      "why": [
+        "Written before the build (scripts/hearahead.mjs, PLAN §17, 2026-11-08): a",
+        "made-up 126 BPM record analysed ahead by the render's own ear, its beat grid",
+        "through a breakdown, its sections on the beat with the drop named, a song",
+        "show's lead in beats, BS.1770 loudness, the player's place in the set and",
+        "the file's tags. --owed: each line is excused only in main's state; the build",
+        "takes its id out and never edits a line. The ear's line and the late line",
+        "(nothing known ahead, a lead fires on the section) hold on main. Node, 4 s."
+      ]
+    },
+    {
       "name": "The album sheet, its checks written first",
       "shard": "logic",
       "run": "npm run album -- --owed=sheet,lineage,builds,seeds",
