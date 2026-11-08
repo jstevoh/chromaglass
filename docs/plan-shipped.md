@@ -9247,6 +9247,29 @@ for, and the GPU was asked for only after they had arrived and drawn.
   the hook and moves itself; the App renders 43 → 1.0 times a second with the ring up
   (`npm run renders`' gamepad phase), and the poll sets `connected` once.
 
+#### 14a-timers, 14j-gamepad. Covered-window fades on the ear worker's tick, and no gamepad timer without a pad
+
+- **14a-timers** (**shipped**): the look fade (`useLookFades`), the dimmer (`useBlackout`),
+  the row fades (`useRowFades`), the drift glides (`useGlides`), the sequencer, song
+  shows and the simulated band (`simulatedMusic.ts`) step on `showInterval`
+  (`src/lib/showClock.ts`), which live arms `setInterval`. Chrome holds a covered
+  window's own timers to about one a second, so a 4 s Go crossfade fired from a MIDI
+  pad with the show window behind the projector stepped 4 times instead of gliding.
+  `pumpShowIntervals(now)` in `src/lib/showClock.ts` is called from the ear worker's
+  unthrottled 16 ms tick in `src/hooks/useAudioAnalyzer.ts`. Each live `ShowTimer`
+  tracks its next `due` mark on `performance.now()` and whether its last fire came
+  from the pump (`pumped`), so on a visible page whichever of the browser timer and
+  the worker tick arrives first fires the period once and steps `due` past `now`, and
+  the other passes without doubling the writes. Measured by `npm run timers`: a 33 ms
+  look fade over 4 s steps 121 times hidden (was 4) and 121 visible (against 122 at
+  most, whether the tick lands before or after the timer); `npm run ears` unchanged.
+- **14j-gamepad** (**shipped**): `src/hooks/useGamepad.ts` used to arm a 16 ms
+  `setInterval` on mount whether or not a controller was plugged in. Now the poll is
+  armed on `gamepadconnected` (and on mount when `navigator.getGamepads()` already
+  reports a connected pad) and cleared on the last `gamepaddisconnected` (or unmount).
+  Measured by `npm run timers`: 0 timers with no pad (was 1), 1 with one plugged in,
+  0 once unplugged, 0 after unmount.
+
 #### 14z-1. On a New Song opens on Keep
 
 - **14z-1** (**shipped**): On a New Song opens on Keep. Nobody gets a look changed by
