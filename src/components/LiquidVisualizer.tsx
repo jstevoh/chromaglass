@@ -6217,7 +6217,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       ladderKey = key;
       const was = fresh ? null : governorRef.current?.rung;
       const keep = was ? ladder.rungs.findIndex((x) => x.grid === was.grid && x.dpr === was.dpr) : -1;
-      governorRef.current = new QualityGovernor(
+      governorRef.current = QualityGovernor.carry(
+        fresh ? null : governorRef.current,
         ladder.rungs,
         PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start),
         performance.now() * 0.001,

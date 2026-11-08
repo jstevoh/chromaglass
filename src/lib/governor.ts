@@ -146,6 +146,8 @@ export class QualityGovernor {
   private readonly failed = new Map<number, number>();
   /** How many times each rung, post level and step rate has failed with no tool held: the doubling's count. */
   private readonly failCounts = { rung: new Map<number, number>(), post: new Map<number, number>(), steps: new Map<number, number>() };
+  /** Rung failures remembered by grid and share across `carry` rebuilds when a wall comes and goes (14c-governor). */
+  private readonly carriedRungs = new Map<string, { failedAt?: number; count: number }>();
   private emaFrame = 16.7;
   private emaWork = 4;
   /**
@@ -207,6 +209,47 @@ export class QualityGovernor {
     this.settleUntil = now + SETTLE_S;
     this.costRung = this.rung;
     this.lastMoveAt = now;
+  }
+
+  /**
+   * Build a governor for a new ladder while keeping the step-rate give-up and
+   * failed-rung marks from `from` across a wall coming or going (PLAN 14c-governor).
+   */
+  static carry(from: QualityGovernor | null | undefined, rungs: QualityRung[], start: number, now: number, pin = false): QualityGovernor {
+    const next = new QualityGovernor(rungs, start, now, pin);
+    if (!from) return next;
+    const keyOf = (r: QualityRung) => `${r.grid}:${r.dpr.toFixed(3)}`;
+    for (const [k, v] of from.carriedRungs) next.carriedRungs.set(k, { ...v });
+    from.rungs.forEach((r, i) => {
+      const failedAt = from.failed.get(i);
+      const count = from.failCounts.rung.get(i) ?? 0;
+      if (failedAt !== undefined || count > 0) {
+        const prev = next.carriedRungs.get(keyOf(r));
+        next.carriedRungs.set(keyOf(r), {
+          failedAt: failedAt !== undefined ? Math.max(failedAt, prev?.failedAt ?? -Infinity) : prev?.failedAt,
+          count: Math.max(count, prev?.count ?? 0),
+        });
+      }
+    });
+    next.rungs.forEach((r, i) => {
+      const mem = next.carriedRungs.get(keyOf(r));
+      if (!mem) return;
+      if (mem.failedAt !== undefined) next.failed.set(i, mem.failedAt);
+      if (mem.count > 0) next.failCounts.rung.set(i, mem.count);
+    });
+    if (!pin) {
+      while (next.index < next.rungs.length - 1 && next.failed.get(next.index) === Number.POSITIVE_INFINITY) {
+        next.index += 1;
+        next.everSteppedDown = true;
+      }
+      next.costRung = next.rung;
+    }
+    next.steps = from.steps;
+    for (const [k, t] of from.stepsFailed) next.stepsFailed.set(k, Math.max(t, now));
+    for (const [k, c] of from.failCounts.steps) next.failCounts.steps.set(k, c);
+    next.heavyPost = from.heavyPost;
+    next.ambientOwn = from.ambientOwn;
+    return next;
   }
 
   get rung(): QualityRung {
@@ -547,7 +590,8 @@ export class QualityGovernor {
         */
         const faster = this.steps - 1;
         const stepsFailedAt = this.stepsFailed.get(faster);
-        const pictureWhole = this.index <= this.start && this.post === 0;
+        const rungWaiting = failedAt !== undefined && Number.isFinite(failedAt);
+        const pictureWhole = this.index <= this.start && !rungWaiting && this.post === 0;
         const fasterWork = faster >= 0 ? this.workAt(this.rung, STEP_RATES[faster]) : 0;
         if (faster >= 0 && pictureWhole && (stepsFailedAt === undefined || now - stepsFailedAt >= this.retryAfter('steps', faster))
           && fasterWork < WORK_BUDGET_MS) {
