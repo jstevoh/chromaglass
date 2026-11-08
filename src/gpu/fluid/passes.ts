@@ -385,15 +385,16 @@ export class FluidPasses extends FluidFields {
     }
   }
 
-  /** Red-black sweeps on level 0, the packed buffer. */
-  private smooth0(pass: GPUComputePassEncoder, sweeps: number): void {
+  /** Red-black sweeps on level 0, the packed buffer (`first` zeroes the guess on sweep 0, H2c-3). */
+  private smooth0(pass: GPUComputePassEncoder, sweeps: number, first = false): void {
     const pipe = this.pipelines.computePipeline('pressureRedBlack', kernel('pressureRedBlack', 'r32float'));
     if (!pipe) return;
     const half = Math.ceil((this.N * (this.N / 2)) / 64);
     for (let k = 0; k < sweeps; k++) {
+      const z = first && k === 0;
       for (let parity = 0; parity < 2; parity++) {
-        const args = this.arg4(this.nameOf('pressure ', parity), parity);
-        const key = `pressureRedBlack:${parity}`;
+        const args = this.arg4(this.nameOf(z ? 'pressure zero ' : 'pressure ', parity), parity, z ? 1 : 0);
+        const key = this.nameOf(z ? 'pressureRedBlack:0:' : 'pressureRedBlack:', parity);
         let group = this.groups.get(key);
         if (!group) {
           group = bindGroup(this.device, pipe, [this.sim, args, this.div, this.press]);
@@ -410,21 +411,26 @@ export class FluidPasses extends FluidFields {
    * One multigrid V-cycle from level `l` down (see `mgRestrict0` in
    * `wgsl/fluid.ts` for why). Smooth, hand the residual to the level below,
    * solve there, bring the correction back, smooth again; the coarsest level
-   * is small enough for sweeps alone to finish it.
+   * is small enough for sweeps alone to finish it. Each coarse level's first
+   * sweep reads zero instead of a prior `mgZero` dispatch (H2c-3), and level 0
+   * does the same on the first V-cycle of a cold projection (`first0`).
    */
-  private vcycle(pass: GPUComputePassEncoder, l: number): void {
-    const smooth = (level: number, sweeps: number) => {
-      if (level === 0) { this.smooth0(pass, sweeps); return; }
+  private vcycle(pass: GPUComputePassEncoder, l: number, first0 = false): void {
+    const smooth = (level: number, sweeps: number, first: boolean) => {
+      if (level === 0) { this.smooth0(pass, sweeps, first); return; }
       const lv = this.mg[level - 1];
       for (let k = 0; k < sweeps; k++) {
+        const z = first && k === 0;
         for (let parity = 0; parity < 2; parity++) {
-          this.dispatchBuf(pass, 'mgSmooth', this.nameOf('mgSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
+          this.dispatchBuf(pass, 'mgSmooth',
+            this.nameOf(z ? 'mgSmooth0:' : 'mgSmooth:', level, ':', parity),
+            this.arg4(this.nameOf(z ? 'mg smooth0 ' : 'mg smooth ', level, ' ', parity), lv.n, parity, z ? 1 : 0),
             [lv.b, lv.p], lv.n * Math.ceil(lv.n / 2));
         }
       }
     };
-    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS); return; }
-    smooth(l, MG_SWEEPS);
+    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS, true); return; }
+    smooth(l, MG_SWEEPS, l === 0 ? first0 : true);
     const below = this.mg[l];
     if (l === 0) {
       this.dispatchBuf(pass, 'mgRestrict0', 'mgRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.press, below.b], below.n * below.n);
@@ -432,7 +438,6 @@ export class FluidPasses extends FluidFields {
       const here = this.mg[l - 1];
       this.dispatchBuf(pass, 'mgRestrict', this.nameOf('mgRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, below.b], below.n * below.n);
     }
-    this.dispatchBuf(pass, 'mgZero', this.nameOf('mgZero:', l + 1), this.arg4(this.nameOf('mg zero ', l + 1), below.n * below.n), [below.p], below.n * below.n);
     this.vcycle(pass, l + 1);
     if (l === 0) {
       // Into level 0's packed buffer (A.a.y = 1): `mgProlong` in wgsl/fluid.ts.
@@ -441,7 +446,7 @@ export class FluidPasses extends FluidFields {
       const here = this.mg[l - 1];
       this.dispatchBuf(pass, 'mgProlong', this.nameOf('mgProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p], here.n * here.n);
     }
-    smooth(l, MG_SWEEPS);
+    smooth(l, MG_SWEEPS, false);
   }
 
   /**
@@ -475,12 +480,11 @@ export class FluidPasses extends FluidFields {
     this.dispatchBuf(pass, 'divTiles', 'divTiles', this.arg('none', [0, 0, 0, 0]), [this.divRaw, this.divPartials], DIV_GROUPS * 64);
     this.dispatchBuf(pass, 'divFold', 'divFold', this.arg('div fold', [DIV_GROUPS, 0, 0, 0]), [this.divPartials, this.divMean], 64);
     this.dispatchBuf2(pass, 'divCentre', 'divCentre', [this.divRaw, this.divMean, this.div]);
-    this.clearBuffer(pass, this.press, 'clear pressure');
 
     if (this.pressureSolver === 'multigrid' && this.mg.length > 0) {
-      for (let c = 0; c < MG_CYCLES; c++) this.vcycle(pass, 0);
+      for (let c = 0; c < MG_CYCLES; c++) this.vcycle(pass, 0, c === 0);
     } else {
-      this.smooth0(pass, PRESSURE_SWEEPS);
+      this.smooth0(pass, PRESSURE_SWEEPS, true);
     }
 
     const grad = this.pipelines.computePipeline('gradientSubtractBuf', kernel('gradientSubtractBuf', 'rgba16float'));
@@ -772,21 +776,24 @@ export class FluidPasses extends FluidFields {
   /** One V-cycle of the thin gap's variable-coefficient multigrid, as `vcycle` is for the old one. */
   private hsCycle(pass: GPUComputePassEncoder, l: number): void {
     const mob = this.hsMob!;
-    const smooth = (level: number, sweeps: number) => {
+    const smooth = (level: number, sweeps: number, first: boolean) => {
       for (let k = 0; k < sweeps; k++) {
         for (let parity = 0; parity < 2; parity++) {
           if (level === 0) {
             this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity), [this.div, this.hsP!, mob], this.N * (this.N / 2));
           } else {
             const lv = this.mg[level - 1];
-            this.hsRun(pass, 'hsSmooth', this.nameOf('hsSmooth:', level, ':', parity), this.arg4(this.nameOf('mg smooth ', level, ' ', parity), lv.n, parity),
+            const z = first && k === 0 && parity === 0;
+            this.hsRun(pass, 'hsSmooth',
+              this.nameOf(z ? 'hsSmooth:0:' : 'hsSmooth:', level, ':', parity),
+              this.arg4(this.nameOf(z ? 'mg smooth0 ' : 'mg smooth ', level, ' ', parity), lv.n, parity, z ? 1 : 0),
               [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], lv.n * Math.ceil(lv.n / 2));
           }
         }
       }
     };
-    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS); return; }
-    smooth(l, MG_SWEEPS);
+    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS, true); return; }
+    smooth(l, MG_SWEEPS, l > 0);
     const below = this.mg[l];
     if (l === 0) {
       this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
@@ -794,7 +801,6 @@ export class FluidPasses extends FluidFields {
       const here = this.mg[l - 1];
       this.hsRun(pass, 'hsRestrict', this.nameOf('hsRestrict:', l), this.arg4(this.nameOf('mg level ', l), here.n), [here.p, here.b, this.hsMobC[l - 1], this.hsFaceC[l - 1], below.b], below.n * below.n);
     }
-    this.dispatchBuf(pass, 'mgZero', this.nameOf('mgZero:', l + 1), this.arg4(this.nameOf('mg zero ', l + 1), below.n * below.n), [below.p], below.n * below.n);
     this.hsCycle(pass, l + 1);
     if (l === 0) {
       this.hsRun(pass, 'hsProlong0', 'hsProlong0', this.arg('none', [0, 0, 0, 0]), [below.p, this.hsP!, mob], this.N * this.N);
@@ -802,7 +808,7 @@ export class FluidPasses extends FluidFields {
       const here = this.mg[l - 1];
       this.hsRun(pass, 'hsProlong', this.nameOf('hsProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
     }
-    smooth(l, MG_SWEEPS);
+    smooth(l, MG_SWEEPS, false);
   }
 
   /** The lasting current: forces, then its own projection, on the M grid. */

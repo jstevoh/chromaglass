@@ -308,6 +308,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(2) var dv: texture_2d<f32>;
 @group(0) @binding(3) var<storage, read_write> pr: array<f32>;
 ${PACKED}
+fn at0(x: i32, y: i32, n: i32) -> f32 {
+  if (A.a.y > 0.5 && (A.a.x < 0.5 || x < 0 || y < 0 || x >= n || y >= n)) { return 0.0; }
+  return packedAt(x, y, n);
+}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(S.n);
@@ -319,7 +323,7 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   // The row's own colour decides which column this thread owns, so the two
   // sweeps together cover every cell exactly once.
   let x = 2 * (i % half) + ((y + parity) & 1);
-  let s = packedAt(x - 1, y, n) + packedAt(x + 1, y, n) + packedAt(x, y - 1, n) + packedAt(x, y + 1, n);
+  let s = at0(x - 1, y, n) + at0(x + 1, y, n) + at0(x, y - 1, n) + at0(x, y + 1, n);
   // y * half + (x >> 1) is i again, which is the whole point: thread i
   // writes word i of its plane, so a workgroup's 64 writes are 64 adjacent
   // words rather than 64 words spread across 128.
@@ -389,11 +393,19 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   bc[i] = res(x, y, n) + res(x + 1, y, n) + res(x, y + 1, n) + res(x + 1, y + 1, n);
 }`,
 
-  // Red-black Gauss-Seidel on a row-major level. A.a = (n, parity).
+  // Red-black Gauss-Seidel on a row-major level. A.a = (n, parity, first).
+  // When `first` is 1 (H2c-3), the sweep starts from a zero guess without a
+  // prior mgZero dispatch: the red half reads 0 for every black neighbour, and
+  // the black half reads the red cells just written and 0 for any neighbour
+  // clamped at the Neumann wall (which would otherwise read the black cell
+  // itself before it is overwritten).
   mgSmooth: `${HEAD}
 @group(0) @binding(2) var<storage, read> b: array<f32>;
 @group(0) @binding(3) var<storage, read_write> p: array<f32>;
-fn at(x: i32, y: i32, n: i32) -> f32 { return p[clamp(x, 0, n - 1) + clamp(y, 0, n - 1) * n]; }
+fn at(x: i32, y: i32, n: i32) -> f32 {
+  if (A.a.z > 0.5 && (A.a.y < 0.5 || x < 0 || y < 0 || x >= n || y >= n)) { return 0.0; }
+  return p[clamp(x, 0, n - 1) + clamp(y, 0, n - 1) * n];
+}
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let n = i32(A.a.x);
