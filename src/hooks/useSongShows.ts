@@ -137,8 +137,19 @@ export function useSongShows(a: Args): SongShowRuntime {
     which is a hit: it has to land on the frame the drop starts. A tick is a
     find, a filter and the scheduler over one song's actions, well under a
     tenth of a millisecond.
+
+    And only while a show runs. At ten a second an idle timer cost nothing
+    worth counting; at sixty, on every page whether or not any song has a
+    show, it is sixty tasks a second on the main thread that the frame loop,
+    the ear and the recorder share, for nothing. The Mac's checks that time
+    the page (the live stream's clicks, the ear behind the wall) went red on
+    the first run with the idle one, on a starved runner; that may not have
+    been this timer, but there is no reason to keep it, so the effect waits
+    for a show to begin and the timer goes when the show stops.
   */
+  const running = status.showId !== null;
   useEffect(() => {
+    if (!running) return;
     const timer = showInterval(() => {
       const run = runRef.current;
       const x = argsRef.current;
@@ -165,7 +176,7 @@ export function useSongShows(a: Args): SongShowRuntime {
         : { showId: current.id, song: songLabel(current.song), t, manual: run.manual, last: run.last }));
     }, SONG_SHOW_TICK_MS, 'song-show');
     return () => clearShowInterval(timer);
-  }, [stop]);
+  }, [stop, running]);
 
   return { status, start, stop, keepLook };
 }
