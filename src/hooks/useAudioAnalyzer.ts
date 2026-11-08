@@ -5,6 +5,7 @@ import {
   AudioFeatures, ANALYSER_FFT_SIZE, ANALYSER_SMOOTHING, type AudioReading,
 } from '../lib/audioFeatures';
 import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
+import { pumpShowIntervals } from '../lib/showClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
 import { installLiveConsole } from '../lib/liveShow';
 import { canUseProFeature } from '../lib/tierGates';
@@ -381,6 +382,11 @@ export function useAudioAnalyzer(
         ticker.onmessage = () => {
           if (earRef.current !== ear) return;
           const now = performance.now();
+          // Drive due show intervals on the worker's unthrottled tick as well
+          // (PLAN.md 14a-timers): Chrome holds a covered show window's own
+          // setInterval to about one a second, which would step a 4 s look
+          // fade four times instead of gliding.
+          pumpShowIntervals(now);
           if (ear.offer('tick', now, document.hidden)) update();
         };
         ticker.postMessage(TICK_MS);

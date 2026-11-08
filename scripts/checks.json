@@ -595,7 +595,7 @@
     {
       "name": "The show's timers when nobody is looking",
       "shard": "logic",
-      "run": "npm run timers -- --owed=hidden,gamepad",
+      "run": "npm run timers",
       "why": [
         "A look fade with the window covered, Chrome's one-a-second throttle",
         "modelled in node and the ear's worker tick driven by hand (PLAN 14a-timers),",

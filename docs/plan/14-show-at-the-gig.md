@@ -31,12 +31,9 @@ for thirty seconds and reading `chromaglassCastState().ear.reads` before and aft
 The worker's tick is chosen because a hidden page's own timers are held to about one
 a second; that is Chrome's documented behaviour and cannot be shown headless.
 
-*Found along the way, not done:* the look fade, the dimmer, the drift glides and the
+~~*Found along the way, not done:* the look fade, the dimmer, the drift glides and the
 simulated band run on the page's own timers (`showInterval`, `simulatedMusic.ts`),
-moved there so a covered window would not freeze them. A hidden page's timers are
-held to about one a second (much less after five minutes hidden), so a Go fired from
-a MIDI pad while the show window is covered steps through its crossfade a second at a
-time instead of gliding. The same worker tick could drive them.
+moved there so a covered window would not freeze them.~~ **Shipped as 14a-timers**: `pumpShowIntervals(now)` in `src/lib/showClock.ts` is driven from the ear worker's 16 ms tick and `simulatedMusic.ts` runs on `showInterval`, so a 4 s look fade steps 121 times hidden (was 4) and 121 visible (`npm run timers`; [`docs/plan-shipped.md`](../plan-shipped.md) §14).
 
 ## 14b. With the wall up, the plate may draw twice a refresh and the governor cannot see it
 
@@ -259,8 +256,8 @@ widest flat run); flat 0.85/0.95 and 0/0.3 frames through the probe and into
   dual-GPU laptops. Cap a phone's climb
   at its starting rung, and consider a "cool / battery" output setting (low-power
   adapter, 30 steps, a capped top rung) that ships with its phone control.
-- *The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
-  the timer on `gamepadconnected`.
+- ~~*The gamepad* is polled every 16 ms with no pad connected (`useGamepad.ts`); start
+  the timer on `gamepadconnected`.~~ **Shipped as 14j-gamepad**: `src/hooks/useGamepad.ts` arms its 16 ms poll on `gamepadconnected` (or at mount when `navigator.getGamepads()` already has a pad) and clears it on the last `gamepaddisconnected` (`npm run timers`: 0 timers with no pad, was 1; [`docs/plan-shipped.md`](../plan-shipped.md) §14).
 
 *Measure:* Chromium with `--disable-frame-rate-limit`, draws a second at 65 or fewer
 while steps hold; frozen, readbacks a second near 0; `npm run rungs` with a simulated
