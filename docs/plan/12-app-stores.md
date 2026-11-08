@@ -183,3 +183,62 @@ feature ships its phone version is what keeps them whole.
   $199 against Lemon Squeezy's about $10, and the tools VJs pay for (Resolume, VDMX,
   MadMapper, TouchDesigner) sell direct. Reopen only if Home's sales show buyers
   who would have found it in the store, and then as Home alone.
+
+**12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
+owner asked whether a Google TV / Android TV app should play the plate on a big
+screen at home, unlocked by Home and Pro. What decides it is the TV's GPU, not the
+store. The plate is WebGPU only (`src/gpu/device.ts` fails with `no-webgpu`, no
+WebGL path), and the boxes people own are phone chips from several years ago: the
+Google TV Streamer is a MediaTek MT8696 with a PowerVR GE9215 (the 2021 Fire TV Stick
+4K Max's chip), the old Chromecast with Google TV a Mali-G31, the Shield a Tegra X1
+stuck on Android 11. Chrome shipped WebGPU on Android 12+ for Adreno and Mali first;
+Android TV has no Chrome, and the WebView only gets a restricted compatibility-mode
+WebGPU (OpenGL ES 3.1) from Chrome 146 (blink-dev, January 2026). Samsung's and LG's
+TV browsers have none. Unmeasured, but scaled from the M4's 1024² step (25.2 ms) a
+GE9215 would hold a small grid at a few frames a second, if it starts at all. So the
+routes, cheapest first:
+
+1. **The computer draws, the TV shows (works today, free).** HDMI (Cast → Second
+   display), AirPlay from the Mac to an Apple TV or an AirPlay TV as a second
+   display, or Chrome's "Cast tab" to a Google TV. Tab casting is compressed video
+   with lag, fine for an evening, not for a gig. Nothing to build but a guide page.
+2. **A TV receiver app (recommended).** A thin Android TV app (a WebView shell,
+   since TWAs need Chrome, which Android TV lacks) that opens a `/tv` page: it finds
+   the Mac app on the same network, plays its plate as a low-latency WebRTC stream
+   (`canvas.captureStream()` in the Mac app, signalled through the same relay the
+   network display uses), and needs no WebGPU on the TV. Sound is heard and analysed
+   where it plays (the Mac's system audio, 23.8), so the TV needs no mic: the boxes
+   have none, only the remote's push-to-talk, and Android lets an app hear other
+   apps only through a screen-capture consent most TV builds do not offer. When no
+   Mac is on, the app plays a library of long rendered films (§6) so it is never a
+   blank screen. Unlock: the TV shows a code and a QR, the owner signs in on the
+   phone (device-code flow on Firebase Auth), and the TV asks `tierGates` /
+   the licence Worker for Home or Pro, the same check the Mac app makes. No price
+   and no buy button in the app, so Play Billing is not needed (the app only opens
+   what an account already owns). The phone stays the remote. Size: M, two PRs (the
+   Mac app's stream and the `/tv` page; the Android shell, D-pad focus and Play
+   listing under 12-play-org), and the Mac app's live encoder (`desktop/live.js`)
+   is the piece to reuse.
+3. **The plate itself on the TV.** The same shell with the solver in the WebView.
+   Only worth it if step 0 below shows a box that holds a usable grid; the cheap
+   boxes will not, so this would sell only to Shield-class owners. Size: L, mostly
+   a TV grid ladder and D-pad desks.
+4. **Apple TV, the plate itself.** tvOS has no WebView at all, so it means porting
+   the solver to Metal (the WGSL could be translated, the app around it could not).
+   The Apple TV 4K's A15 would run it well. Size: XL, and AirPlay from the Mac
+   (route 1) already gives Apple TV owners the picture. Not now.
+
+**12-tv-apple (the owner, 2026-11-08: "an Apple TV app as well").** Route 2's
+receiver, native on tvOS: a small Swift app (no WebView there) that plays the same
+Mac stream route 2 builds, with the same TV-code sign-in and Home/Pro check. It
+rides on route 2's stream and adds no work to the Mac side. The stream format is
+the trap: libwebrtc has no official tvOS build, so either the Mac app also offers
+low-latency HLS that `AVPlayer` plays natively (a second or two of lag, fine for an
+evening) or the app carries a community WebRTC build. Store rules: a free app that
+only opens what an account bought on the web, with no buy button or price, should
+fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs the
+App Store Connect record from 12-ship. Size: M, after route 2's first PR.
+
+**Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
+TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`
+exists and what grid it holds. If it holds nothing, route 3 closes for good.

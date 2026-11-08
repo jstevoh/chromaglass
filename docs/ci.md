@@ -66,6 +66,10 @@ deploy:
   GitHub's after 15 minutes (`Watchdog`); by hand, **Re-run all jobs**, never failed jobs.
   Setup, pausing it for a show, and what a job there can reach: `docs/mac-runner.md`
   (PLAN.md 19ah).
+- `ready.yml` labels an Antigravity PR (or one labelled `review-owed`)
+  `ready-for-review` and comments `READY #<n> <item> head <sha>` when `Checks` goes
+  green on its current head, and takes the label off on the next push or a red run
+  (`docs/handoff.md`, "Ready, review, merge"; PLAN.md 19al).
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every
