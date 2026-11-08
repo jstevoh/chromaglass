@@ -172,10 +172,12 @@ export const SongsPanel: React.FC<SongsPanelProps> = ({
             the column, because naming the song is where setting one up starts.
           */}
           {listen && (
-            <div className="mb-3 rounded-lg border border-white/10 bg-white/5 p-2.5" data-testid="songs-listen-box">
+            <div className="mb-3 rounded-lg border border-white/10 p-2.5" data-testid="songs-listen-box">
               <div className="flex gap-1.5">
                 <button onClick={listenBusy ? listen.cancel : listen.start} aria-pressed={listenBusy}
-                  className={`${smallBtn} flex-1 ${listenBusy ? LIT : ''}`} data-testid="songs-listen"
+                  // Lit while it listens, as the list's chosen song is: smallBtn's own
+                  // grey fill and border would win over LIT's if both were given.
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium ${listenBusy ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`} data-testid="songs-listen"
                   title="Name the song playing, add it here, and design its show once the show has heard it through">
                   <Ear size={12} className={listenPhase === 'listening' ? 'animate-pulse' : ''} /> {listenBusy ? 'Stop listening' : 'Listen'}
                 </button>
