@@ -247,6 +247,7 @@
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
     "lampzero": "node scripts/lampzero.mjs",
+    "moire": "node scripts/moire.mjs",
     "lampfield": "node scripts/lampfield.mjs",
     "litstage": "node scripts/litstage.mjs",
     "milk": "node scripts/milk.mjs",

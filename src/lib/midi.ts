@@ -557,6 +557,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turingInk',       label: 'Turing Print Ink', min: 0, max: 1 },
   { key: 'turingDrift',     label: 'Turing Print Drift', min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
+  // The moiré pack's sheets (PLAN 45a): the ink, and the upper sheet's turn
+  // and spin, the three a hand on the real stage plays.
+  { key: 'moireAmount',     label: 'Moiré Sheets',     min: 0, max: 1 },
+  { key: 'moireAngle',      label: 'Moiré Turn',       min: -180, max: 180 },
+  { key: 'moireSpin',       label: 'Moiré Spin (rpm)', min: -30, max: 30 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
   // Folds is a stepped choice and rides a fader as one: the sheet's five
   // buttons, Off, 2, 4, 6 and 8, each a fifth of the travel.

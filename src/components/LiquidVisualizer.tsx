@@ -40,6 +40,7 @@ import { DEFAULT_OUTPUT, outputIsIdentity, sourcesAskedFor, type OutputConfig } 
 import { sourceSettings } from '../lib/plateSources';
 import { BeatClock } from '../lib/beatClock';
 import { AutoSpin, GRIP_SECONDS, SpinHand, carrierViscosity, dishFollow, dishFrame, dragSeconds, lookMotor, lookMotorRate } from '../lib/turntable';
+import { stageClocks, turnClocks } from '../lib/stageClocks';
 import { MacroCamera, type MacroShot } from '../lib/macroCamera';
 import { CELL_TRAVEL } from '../lib/detailFlow';
 import { kickRock, stepRock, rockSwing, swayAt, restingHand, type RockHand, stepCover, coverDrag, coverRoom, frameSway, lampRock, plateSin, rockPast, HOLD_TILT, type CoverGlass } from '../lib/plateRock';
@@ -598,7 +599,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   /** Where they lay, one sink per plate, made once (lib/areaCords.ts fluidSink: the lab lays through it too). */
   const areaSinksRef = useRef(new WeakMap<FluidSimulation, AreaSink>());
   if (!patchRef.current) patchRef.current = new PatchBay(settings);
-  const gelAngleRef = useRef(0);
+  const [clocks] = useState(stageClocks);
   /** The mark: a still over the finished frame, uploaded once and then left alone. */
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
@@ -5218,8 +5219,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           lamp.y2 = 0.5 - (lamp.y - 0.5) * 0.7 + noise2D(29.3, time * 0.023) * 0.3 * motion;
         }
 
-        // The gel wheel turns on its own clock.
-        gelAngleRef.current = (gelAngleRef.current + realDt * (currentSettings.gelSpeed ?? 0.5) / 60) % 1;
+        turnClocks(clocks, realDt, currentSettings);
 
         // Second-layer throw: zoom grows with the setting, drift is a slow
         // Lissajous so the two scales slide past each other.
@@ -5313,7 +5313,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             rockY: rockRef.current.y,
             lampX: lampRef.current.x,
             lampY: lampRef.current.y,
-            gel: gelAngleRef.current,
+            gel: clocks.gel,
             kaleido: kaleidoPhaseRef.current,
             filmLevel: filmLevelRef.current,
             filmGain: filmGainRef.current,
@@ -5358,7 +5358,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           harmony: harmonyRef.current,
           lamp: lampRef.current,
           magnets: magnetsOnPlate(fluidsRef.current[0]?.lastStep ?? null),
-          gelAngle: gelAngleRef.current,
+          gelAngle: clocks.gel, moireTurn: clocks.moire,
           kaleidoPhase: kaleidoPhaseRef.current,
           layer1: layer1ViewRef.current,
           bubbles: bubbleDebugRef.current,
@@ -5594,7 +5594,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       */
       coverRef.current = { x: 0, y: 0, vx: 0, vy: 0 };
       lampRef.current = { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 };
-      gelAngleRef.current = 0;
+      clocks.gel = clocks.moire = 0;
       kaleidoPhaseRef.current = 0;
       filmLevelRef.current = 0.3;
       filmGainRef.current = 4.5;

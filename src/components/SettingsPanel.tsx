@@ -13,6 +13,7 @@ import { AudioInputSection } from './settings/SoundSection';
 import { LookSection, ShowSection, CameraSection, StockSection, LampSection, MacroSection } from './settings/LookSections';
 import { KaleidoscopeSection, TiltSection, SpinSection, PhysicsSection, AutomationSection } from './settings/MotionSections';
 import { RoomSection, FilmSection } from './settings/RoomFilmSections';
+import { MoireSection } from './settings/MoireSection';
 import { PatchesSection } from './settings/PatchesSection';
 import { MidiSection } from './settings/MidiSection';
 import { SquishSection, OilSection, FerroSection, ReactionsSection } from './settings/ChemistrySections';
@@ -250,6 +251,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onUpdate
       <StockSection c={c} />
       <KaleidoscopeSection c={c} />
       <LampSection c={c} />
+      <MoireSection c={c} />
       <RoomSection c={c} />
       <FilmSection c={c} />
       <PatchesSection c={c} />
