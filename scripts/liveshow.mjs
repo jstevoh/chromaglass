@@ -39,7 +39,7 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
 import { engineQuery, installFrameReader } from './frame.mjs';
-import { presentsInXvfb } from './chromium.mjs';
+import { presentsInXvfb, port } from './chromium.mjs';
 import { filmFile, stackJudge, gridOfPixels, barColumn, STACK_KEYSTONE } from './liveshowstack.mjs';
 import {
   cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS,
@@ -109,7 +109,7 @@ check('a server pasted as the key, or an empty key, is refused', keyProblem('rtm
 if (process.argv.includes('--node')) finish();
 
 // ── The panel ─────────────────────────────────────────────────────────
-const PORT = Number(process.env.LIVESHOW_PORT ?? 4196);
+const PORT = port(4196, 'LIVESHOW_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 

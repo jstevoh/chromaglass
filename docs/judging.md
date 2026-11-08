@@ -2431,3 +2431,38 @@ Refraction, Chromatic Aberration and Aperture where a look has them up (it never
 whether that is welcome as part of the dish evolving, or whether Evolve should leave the camera
 alone (PLAN 33i-9), and whether the frame hitches when a calm passage walks the Refraction down to
 0 and back up (33i-8).
+
+## 110. A tab made on the laptop is on the phone (PLAN 8-tabs-a)
+
+Signed in to the Pro account on two devices (the laptop and the Mac app, or the phone):
+
+1. On the laptop, press the pencil beside the tabs, rename Setup to the venue's name, move it first, and add a tab
+   with a panel or two on it.
+2. On the second device, press *Sync now* in Profile & Store (or wait a minute). The chips are the same, in the same
+   order, with the same panels. The tab that was up on each device is still the one that was up.
+3. On the phone: More › Tabs shows the same list.
+4. On the laptop, "Put the shipped tabs back": the other device is back to Perform, Sequence, Setup.
+5. Joining: on a device that has never synced and already has a renamed or added tab, sign in to an account whose
+   tabs were made on another. Both devices end with both sets of tabs; a tab renamed on both shows twice, one marked
+   "(here)", to delete.
+
+Bad: a tab that comes back after being deleted, the other device jumping to another tab while it is in use, or the
+plate stuttering when the list lands mid-show.
+
+## 111. The moiré pack's sheets on the wall (PLAN 45a)
+
+`npm run moire` holds the optics (the fringe's frequency, the product of two sheets, no false
+moiré, the gap's defocus, the liquid bending the lower sheet, off is off) on the lab plate;
+only the wall can say whether the six looks read as the real transparencies do.
+
+1. Load each look in the look menu's **Moiré pack** group: Moiré Star, Moiré Ripple,
+   Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel, with a song playing.
+2. Settings → **Moiré Sheets**: turn **Moiré Turn** slowly through 0. The fringes should
+   widen to nothing at 0 and sweep faster as it leaves; **Flip** on two Spokes should cross
+   into diamonds like the shop's video.
+3. Pour dye onto Moiré Ripple: each pool should drag the fringes round its edge, more with a
+   larger **Moiré Gap**, and the fine lines should go soft past about 10 mm while the
+   fringes stay.
+4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
+   not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
+   45a-5).

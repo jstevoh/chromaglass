@@ -149,6 +149,17 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
+  /* The moiré sheets on the stage (plateMoire.ts, lib/moire.ts; PLAN 45a). */
+  { name: 'moireAmount', type: 'f32', note: 'how dense the two sheets\' ink is: 0 takes them off the stage' },
+  { name: 'moireSheetA', type: 'f32', note: 'the lower sheet\'s design, an index into MOIRE_SHEETS (0 none)' },
+  { name: 'moireSheetB', type: 'f32', note: 'the upper sheet\'s design' },
+  { name: 'moireTurn', type: 'f32', note: 'the upper sheet\'s turn, radians: its angle and its spin\'s clock' },
+  { name: 'moireDensity', type: 'f32', note: 'the lower sheet\'s lines per frame height' },
+  { name: 'moireRatio', type: 'f32', note: 'the upper sheet\'s pitch against the lower\'s' },
+  { name: 'moireSlide', type: 'f32', note: 'the upper sheet slid sideways, frame heights' },
+  { name: 'moireGap', type: 'f32', note: 'each sheet\'s distance from the liquid, mm' },
+  { name: 'moireCurl', type: 'f32', note: 'the shape dial the designs share' },
+  { name: 'moireFlip', type: 'f32', note: '1 when the upper sheet is laid face down (mirrored)' },
   { name: 'projectorFocus', type: 'f32', note: 'projector lens focus plane (0..1, 0.5 = in-focus, defocus shifts Becke lines)' },
 ];
 

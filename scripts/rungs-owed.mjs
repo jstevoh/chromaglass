@@ -60,19 +60,83 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
   {
     const K4 = { width: 3840, height: 2160 };
     const opened = [];
-    let worst = 0;
+    let worst = 0, least = Infinity;
     for (const devicePx of [1, 2]) {
       for (const tier of ['hosted', 'local']) {
         for (const gpu of ['mid', 'strong']) {
           const { rungs, start } = ladderAt(tier, gpu, devicePx, K4);
           const px = canvasPixelsFor(rungs[start].dpr, K4, CAP, WINDOW);
           worst = Math.max(worst, mpx(px));
+          least = Math.min(least, mpx(px));
           opened.push(`${devicePx}x ${tier} ${gpu}: ${rungs[start].grid}² at ${px.width}x${px.height}`);
         }
       }
     }
-    line('4k', '14c-4k: a 3840×2160 stage opens at a share of at most 4.7 Mpx (the 0.75 share), and not below 4.0', worst <= 4.7 && worst >= 4.0,
-      `the most opened on: ${worst.toFixed(2)} Mpx; ${opened.join('  ·  ')}`, worst > 8);
+    /*
+      Every opening, not the largest alone: excused only while all eight open
+      on the whole wall, and each held between 4.0 and 4.7, so a build that
+      fixes seven tiers, or opens one far below, is red (the check-skeptic,
+      2026-11-07; the second clause below passes trivially for a low one).
+    */
+    line('4k', '14c-4k: a 3840×2160 stage opens at a share of at most 4.7 Mpx (the 0.75 share), and not below 4.0', worst <= 4.7 && least >= 4.0,
+      `opened on ${least.toFixed(2)} to ${worst.toFixed(2)} Mpx; ${opened.join('  ·  ')}`, least > 8);
+
+    /*
+      And its second clause (written 2026-11-07): no step down in the first
+      10 s. What was reported is a 4K wall opening on all its 8.3 Mpx and the
+      governor finding the 0.75 share only after seconds of slow frames; an
+      opening share that is right is one the governor does not have to leave.
+      So each of the eight openings above is replayed on a simulated machine
+      for ten seconds, the replay of `rungs`' Poster lines at its plainest:
+      frames at 60 Hz, a frame whose work runs over a refresh taking two, the
+      visualizer's accumulator and catch-up rule deciding the steps, and the
+      governor fed each frame as the visualizer feeds it.
+
+      The machine's cost is the pixels, because that is the whole of this
+      item: 2.2 ms of drawing a megapixel (the light plate of the lines above
+      at one device pixel on the 1280×800 window, about 1.5 ms a megapixel,
+      with the stage's warp and masks on top) and a step held at 2.5 ms
+      whatever the grid, so that a rung's grid, which this item does not
+      choose, cannot make a right share fail. On that machine all 8.29 Mpx is
+      18.2 ms of drawing, over a refresh: main's opening misses every frame
+      and gives something up inside ten seconds. The 0.75 share's 4.66 Mpx is
+      10.3 ms, 12.8 with the step, under the 13 ms a climb needs: a right
+      opening holds. A move down is a later rung or a lower step rate; a
+      climb is not counted.
+    */
+    const R = 1000 / 60;
+    const downs = [];
+    for (const devicePx of [1, 2]) {
+      for (const tier of ['hosted', 'local']) {
+        for (const gpu of ['mid', 'strong']) {
+          const { rungs, start } = ladderAt(tier, gpu, devicePx, K4);
+          const g = new QualityGovernor(rungs, start, 0);
+          let t = 0, last = 0, owedS = 0, idx = g.rungIndex, rate = g.stepRate;
+          const moves = [];
+          while (t < 10_000) {
+            const px = mpx(canvasPixelsFor(g.rung.dpr, K4, CAP, WINDOW));
+            const draw = 2.2 * px, step = 2.5;
+            const stepS = 1 / g.stepRate;
+            const catchUp = g.frameMs > 40 ? 1 : g.frameMs > 24 ? 2 : 4;
+            const due = Math.min(owedS + 1 / 60, stepS * catchUp + 1e-9);
+            const steps = Math.floor(due / stepS + 1e-9);
+            t += draw + step * steps > R ? 2 * R : R;
+            const dt = (t - last) / 1000;
+            last = t;
+            owedS = Math.min(owedS + dt, stepS * catchUp + 1e-9);
+            owedS -= Math.floor(owedS / stepS + 1e-9) * stepS;
+            if (g.sample(dt, 1, t / 1000, false, draw + step * steps, step, steps)) {
+              if (g.rungIndex > idx || g.stepRate < rate) moves.push(`${(t / 1000).toFixed(1)} s ${g.rung.grid}²@${g.rung.dpr.toFixed(2)} ${g.stepRate}/s`);
+              idx = g.rungIndex; rate = g.stepRate;
+            }
+          }
+          downs.push({ name: `${devicePx}x ${tier} ${gpu}`, moves });
+        }
+      }
+    }
+    const fell = downs.filter((d) => d.moves.length);
+    line('4k', '14c-4k: and no opening on a 3840×2160 stage steps down in its first 10 s (a machine whose cost is the pixels)', fell.length === 0,
+      fell.length ? fell.map((d) => `${d.name}: ${d.moves.join(' → ')}`).join('  ·  ') : `none of ${downs.length} moved down`, least > 8);
   }
 
   // ── 14b-120: a 120 Hz desk with a 60 Hz projector, the wall the output ──

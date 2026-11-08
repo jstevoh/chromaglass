@@ -16,12 +16,12 @@
  * how much — so the answer is read off rather than argued for.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { installFrameReader, frameOf } from './frame.mjs';
 
-const PORT = Number(process.env.KILLER_PORT ?? 4348);
+const PORT = port(4348, 'KILLER_PORT');
 const LOOK = process.env.KILLER_LOOK ?? 'soap-film';
 const RATE = Number(process.env.KILLER_RATE ?? 0.2);
 const MINUTES = Number(process.env.KILLER_MINUTES ?? 8);
@@ -39,7 +39,7 @@ const MINUTES = Number(process.env.KILLER_MINUTES ?? 8);
   guard's intent exactly — whatever it measures is a server this process
   started — while not being defeated by its own litter.
 */
-let server = null, port = PORT, leaving = false;
+let server = null, served = PORT, leaving = false;
 for (let tries = 0; tries < 6 && !server; tries++) {
   const candidate = PORT + tries;
   const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(candidate), '--strictPort'],
@@ -48,7 +48,7 @@ for (let tries = 0; tries < 6 && !server; tries++) {
   child.on('exit', () => { died = true; });
   await new Promise(r => setTimeout(r, 2500));
   if (died) { console.log(`  port ${candidate} was taken; trying the next`); continue; }
-  server = child; port = candidate;
+  server = child; served = candidate;
 }
 if (!server) { console.error(`no free port in ${PORT}..${PORT + 5}`); process.exit(2); }
 server.on('exit', (c) => {
@@ -95,7 +95,7 @@ try {
     try { sessionStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ }
   });
   await installFrameReader(page);
-  await page.goto(`http://localhost:${port}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${served}/?debug&gpu=mid&tier=local&look=${LOOK}`, { waitUntil: 'load' });
   await page.waitForTimeout(9000);
   await page.evaluate((r) => { window.chromaglassDebug().settings.automateRate = r; }, RATE);
   // The phrase is what the music does to the plate, so it is the honest

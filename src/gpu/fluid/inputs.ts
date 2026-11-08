@@ -11,6 +11,8 @@ import { SPLAT_FLOATS, type SplatList } from '../splats';
 import type { SolverCarry } from '../solverTypes';
 import { pressShare } from '../../lib/pressRing';
 import { dyeAbsorbances } from '../../lib/dye';
+import { pouredOf } from '../../lib/bubbleLiquid';
+import { LIQUID_SIGMA } from '../../lib/bubbles';
 import { LIES_B0, BZ_GRID, CHEM_REF, CHEM_STABLE, CHEM_MOST, LIES_GRID, R32, RGBA32, type FieldCarry } from './constants';
 import { FluidPasses } from './passes';
 
@@ -506,7 +508,7 @@ export class FluidInputs extends FluidPasses {
    * for a check that needs a pool in place (`npm run thick`). Only on a thin
    * gap; in plate units.
    */
-  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume = true): void {
+  pour(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number; weight?: number } | null, volume = true, what?: { tension?: number; density?: number; weight?: number }, plateSigma = LIQUID_SIGMA): void {
     if (!(radius > 0) || !(take > 0)) return;
     const enc = this.device.createCommandEncoder({ label: 'pour' });
     const pass = enc.beginComputePass({ label: 'pour' });
@@ -517,10 +519,11 @@ export class FluidInputs extends FluidPasses {
       if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
       const s = this.species;
       if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-      this.run(pass, 'speciesSplat', s.write, [s.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
+      this.run(pass, 'speciesSplat', s.write, [s.read, this.squeeze.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
+      this.speciesPoured = pouredOf(what ?? sp, plateSigma);
     }
     if (push) {
       this.hsRun(pass, 'pourVolume', 'pourVolume', this.arg('pour volume', [x, y, radius, take]), [this.hsPour!]);
@@ -705,6 +708,9 @@ export class FluidInputs extends FluidPasses {
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
+    this.speciesClears++;
+    this.speciesPoured = null;
+    this.speciesSnap = null;
     // With the oil gone its colour is the water's: the share is emptied, the dye kept.
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;

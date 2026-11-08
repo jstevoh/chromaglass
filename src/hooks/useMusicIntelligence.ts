@@ -132,6 +132,12 @@ export interface MusicIntelResult {
   nudgeToSection: (kind: NudgeKind) => void;
   /** Take the nudge back out: the position is the clock's own again. */
   resetNudge: () => void;
+  /**
+   * Where the song is this instant, read from the clock (or the follower's
+   * place) when called: `state.positionSec` is set twice a second, so a cue
+   * read from it lands up to half a second after its section starts.
+   */
+  positionNow: () => number;
 }
 
 export function useMusicIntelligence(
@@ -644,6 +650,24 @@ export function useMusicIntelligence(
     if (d !== null) seekBy(d);
   }, [seekBy]);
   const resetNudge = useCallback(() => seekBy(-posClockRef.current.nudge), [seekBy]);
+  /*
+    The song's position as the clock reads it now (PLAN 44f). The tick above
+    sets `positionSec` every 500 ms, which is plenty for the score's
+    playhead and the lyrics, and was the song show's clock too: a pour on the
+    drop fired up to half a second after the drop, a whole beat at 120. The
+    show's runtime calls this on its own tick instead. Same reading as the
+    tick's (the follower's place for the song it holds, else the clock), and
+    the last position set when there is no clock to read.
+  */
+  const positionSecRef = useRef(positionSec);
+  positionSecRef.current = positionSec;
+  const positionNow = useCallback((): number => {
+    const track = trackRef.current;
+    if (track?.identifiedAtMs == null) return positionSecRef.current;
+    const now = performance.now();
+    const held = placeRef.current;
+    return held && held.isrc === track.isrc ? held.place.at(now / 1000).positionSec : posClockRef.current.at(track, now) ?? 0;
+  }, []);
 
   const replayListenNumberRef = useRef<number | null>(null);
   useEffect(() => { replayListenNumberRef.current = replayListenNumber; }, [replayListenNumber]);
@@ -756,6 +780,6 @@ export function useMusicIntelligence(
     overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
     manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
-    nudgePosition, nudgeToSection, resetNudge,
+    nudgePosition, nudgeToSection, resetNudge, positionNow,
   };
 }

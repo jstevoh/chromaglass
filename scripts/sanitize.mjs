@@ -13,6 +13,7 @@ import {
   MACRO_CAMERA_MODES, MIX_BLENDS, AUDIO_FEATURES, RENDER_STYLES,
 } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
+import { MOIRE_SHEETS } from '../src/lib/moire.ts';
 import { sanitizePatch } from '../src/lib/sanitizeSettings.ts';
 import { parseRemoteGesture } from '../src/lib/remoteProtocol.ts';
 import { parseMidiMap } from '../src/lib/midi.ts';
@@ -104,6 +105,8 @@ const check = (name, ok, detail = '') => {
   const lists = [
     ['blendMode', BLEND_MODES], ['ledMode', LED_MODES], ['onNewSong', ON_NEW_SONG_MODES],
     ['viscosity', VISCOSITY_MODES], ['macroCamera', MACRO_CAMERA_MODES], ['renderStyle', RENDER_STYLES],
+    // The moiré pack's two sheets (PLAN 45a), every design either side.
+    ['moireSheetA', MOIRE_SHEETS.map(x => x.id)], ['moireSheetB', MOIRE_SHEETS.map(x => x.id)],
     // Every mixer row's blend, found by name, so a row added later is walked too.
     ...Object.keys(DEFAULT_SETTINGS).filter(k => k.endsWith('Blend')).map(k => [k, MIX_BLENDS]),
   ];

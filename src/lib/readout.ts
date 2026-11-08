@@ -48,6 +48,14 @@ const UNITS: Record<string, (v: number) => string> = {
   ])),
   // A row's fade time is bars of the song, and none at all is a cut.
   ...Object.fromEntries(MIX_FADE_KEYS.map(k => [String(k), fadeBarsLabel])),
+  // Soap Breakdown (0..1 → half-life ln(2)/k, 2 h at 0+ down to 10 s at 1; 0 is none).
+  soapBreakdown: v => {
+    if (!(v > 0)) return 'Off';
+    const hl = 7200 * (10 / 7200) ** Math.min(1, v);
+    if (hl >= 3600) return `${(hl / 3600).toFixed(1)}h`;
+    if (hl >= 120) return `${Math.round(hl / 60)}m`;
+    return `${Math.round(hl)}s`;
+  },
 };
 
 /**
