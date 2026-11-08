@@ -54,8 +54,44 @@ jobs:
           xcodebuild -version
       - name: Build the site into the app
         run: npm run build && npx cap sync ios
+      # Capacitor comes as Swift packages whose two binaries (Capacitor and
+      # Cordova .xcframework.zip) SwiftPM downloads from GitHub's releases into
+      # its shared cache, ~/Library/Caches/org.swift.swiftpm/artifacts. From
+      # about 08:45 UTC on 2026-11-08 every run failed there before compiling:
+      # "failed downloading … Capacitor.xcframework.zip … already exists in file
+      # system", on the same image and Xcode 26.3 that built green an hour
+      # earlier. That message is SwiftPM finding a file where it meant to put
+      # the download: one left in the shared cache (by the image, or by a
+      # download that failed part way, which SwiftPM does not clean up), and it
+      # refuses rather than overwrite. Nothing in this workflow restores a cache.
+      #
+      # So the packages resolve on their own, into a cache of this run's own
+      # (-packageCachePath) and a checkout folder of its own, both under the
+      # runner's temp folder, and the shared cache's artifacts are cleared too.
+      # If a download fails, both are emptied and the resolve tried again, up
+      # to three times, so a half-written zip from one attempt cannot fail the
+      # next the same way. The build then reads the same two folders and finds
+      # the packages already there. This proves the app compiles; it never needed the
+      # image's cache, only took it because it was there (19ak-6).
+      - name: Fetch the app's Swift packages
+        run: |
+          for attempt in 1 2 3; do
+            rm -rf "$RUNNER_TEMP/spm-cache" "$RUNNER_TEMP/spm-packages" \
+              "$HOME/Library/Caches/org.swift.swiftpm/artifacts"
+            if xcodebuild -project ios/App/App.xcodeproj -scheme App \
+                -packageCachePath "$RUNNER_TEMP/spm-cache" \
+                -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-packages" \
+                -resolvePackageDependencies; then
+              exit 0
+            fi
+            echo "::warning::Swift packages failed to resolve (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
       - name: Build the app
         run: >
           xcodebuild -project ios/App/App.xcodeproj -scheme App
           -configuration Debug -destination 'generic/platform=iOS Simulator'
+          -packageCachePath "$RUNNER_TEMP/spm-cache"
+          -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-packages"
           CODE_SIGNING_ALLOWED=NO build

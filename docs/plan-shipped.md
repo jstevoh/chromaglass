@@ -4256,6 +4256,15 @@ the sessions' files or the native apps skips the Mac (19h).
   children now run as attempt 1 of no run (`childEnv`); the skip keeps its own mocked
   cases. Measured with `npm run reach` as attempt 2 of a real green run (41350181902,
   Node's fetch through the proxy): 2 FAIL before, 97 ok and 0 FAIL after.
+- **19ak-6, the iPhone build fetches its own Swift packages** (2026-11-08). From about
+  08:45 UTC every `ios.yml` run (#707 twice, #720) failed before compiling: SwiftPM's
+  "failed downloading … Capacitor.xcframework.zip … already exists in file system" in
+  the runner's shared `~/Library/Caches/org.swift.swiftpm/artifacts`, on the same image
+  and Xcode 26.3 that built green an hour earlier, with no cache restored by the
+  workflow. A new step resolves the packages into a cache and checkout folder of the
+  run's own (`-packageCachePath`, `-clonedSourcePackagesDirPath` under `RUNNER_TEMP`),
+  clears the shared artifacts, and empties both and retries up to three times, so a
+  half-written zip cannot fail the next attempt; the build reads the same folders.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
