@@ -159,8 +159,8 @@ merge conflicts are the shared documents', which 0.6 ends.
   `docs/plan-shipped.md` §14aa.
 - **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
-- **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
-  after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
+- **4.3** **14j with H2c-9** and ~~**14b-120**~~ (M): a draw cap, readbacks only after a step, pack only
+  after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa; **14b-120** shipped, `npm run rungs`: 60.0 to 60.0/s over ten phases; story in `docs/plan-shipped.md`.)
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
   video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
@@ -171,8 +171,8 @@ merge conflicts are the shared documents', which 0.6 ends.
   H2c-5 and H2c-8's owed lines are in `npm run encode` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
-- **4.7** **14c-4k, 14c-governor, H2c-10, H2c-labels** (S each). Then **H2a**, **H1**, **H3a**.
-  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07: both Antigravity-ready.
+- **4.7** ~~**14c-4k, 14c-governor, H2c-10**~~ (shipped, `npm run rungs`; story in `docs/plan-shipped.md`), **H2c-labels** (S). Then **H2a**, **H1**, **H3a**.
+  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07 (#706) and green with the three shipped.
 
 ### Wave 5. Playing it: the instrument
 
@@ -195,7 +195,7 @@ with 30's envelope (M), **30b** LFOs and envelopes you set (S); from §31 (Conti
 
 Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back** (S);
 **16a-render, 16a-cast, 16a-remote, 16a-follow** (S each); **16b-logo** (S); **5-learncast**
-(S); **14a-timers** (S); **14c-readout** (S); **14k**'s remote lag and coalesced pointer
+(S); **14a-timers** (S); ~~**14c-readout**~~ (S, shipped, `npm run rungs`); **14k**'s remote lag and coalesced pointer
 (M); **5-actions** (S); **11-pinch** (S).
 
 Lane A: **14q** (S) then **R8** room lights as fixtures (M); **R4-card** the load-in card

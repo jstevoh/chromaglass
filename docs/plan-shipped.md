@@ -11566,3 +11566,26 @@ of the mutants added after a review pass found a desk move mid-glide overridden,
 reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
 main's relay taking an `assistant` hello as a phone's, with the switch off and from
 another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).
+
+## 14c-4k, 14c-governor, 14b-120, 14c-readout, H2c-10. Wave 4 ladder, wall pacing, readout and grid32 (2026-11-07)
+
+Five Wave 4 items checked by `scripts/rungs-owed.mjs` (`npm run rungs`). **14c-4k**
+(`src/lib/platform.ts`): `stageLadder` chooses the opening share from `STAGE_SHARES`
+whose pixel count `stagePx * dpr * dpr` is at most `STAGE_OPEN_MAX_PX` (`2880 * 1620`,
+4.67 Mpx), so a 3840×2160 stage opens on its 0.75 share (`2880×1620`, 4.67 Mpx) with
+0 of 8 openings stepping down in the first 10 s, while a 1920×1080 stage still opens on
+its 1.0 share (`1920×1080`, 2.07 Mpx). **14c-governor** (`src/lib/governor.ts`,
+`src/components/LiquidVisualizer.tsx`): `QualityGovernor.carry(from, rungs, start, now,
+pin?)` carries failed-rung timestamps and doubling counts by rung key across ladders
+even when the wall's ladder has a different set of rungs, carries the step-rate give-up
+and its retry counts, and holds step-rate climbs while the rung directly above is still
+waiting on its retry window (`2 changes after the wall` vs `2 with none`). **14b-120**
+(`src/lib/drawGate.ts`, `src/components/LiquidVisualizer.tsx`): `DrawGate.paceTo =
+'wall'` paces two-clock draws to the wall's (`ask`) refresh (`60.0 to 60.0 a second over
+ten phases` for a 120 Hz desk and 60 Hz wall) while keeping the desk's own refresh when
+no wall is asking. **14c-readout** (`src/sim/stepping.ts`,
+`src/components/LiquidVisualizer.tsx`): `engineLabel({ grid, dpr, post, stage })`
+formats `"WebGPU · 512² · 1.0x of the wall"` when a stage is attached and stays
+byte-for-byte identical without one. **H2c-10** (`src/sim/stepping.ts`):
+`resolveSimResolution` rounds a pinned grid to the nearest multiple of 32 (`514, 1000,
+777, 100 → 512, 992, 768, 96`). All five `--owed` ids removed from `scripts/checks.json`.
