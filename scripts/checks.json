@@ -1445,6 +1445,20 @@
       ]
     },
     {
+      "name": "What the desk has that nobody can see, owed",
+      "shard": "browser",
+      "run": "npm run deskreach -- --owed=rides1280,ridemark,deckmark,macro,remote",
+      "why": [
+        "Written before their builds (scripts/deskreach.mjs, 2026-11-08): every ride",
+        "whole at 1280x800 and a mark when the right column or the deck has more than",
+        "it shows (35c-6a, 35c-6b, the deck's Macro panel on the screen at 1440), and",
+        "Laptop remote on the iPad app's full layout (12 step 4a). --owed: each line is",
+        "excused only in main's state and printed as owed; the PR that builds it takes",
+        "its id out and never edits a line. The lines with no id hold on main: no mark",
+        "when nothing is below, no Laptop remote on the website. About a minute."
+      ]
+    },
+    {
       "name": "The cartoons",
       "shard": "browser",
       "run": "npm run cartoons",
