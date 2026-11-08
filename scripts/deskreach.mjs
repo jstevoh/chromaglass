@@ -27,7 +27,9 @@
  * 1512×860, but at 1280×800 Evolve Speed is still under the fold (7 of 8 on
  * main). Asked as in `layout`: every ride's row lies wholly inside what its
  * scrolling ancestors show, each put back to its top first, and what is drawn
- * at its middle is the row's own. How the build gets there (the Bottles
+ * at its middle is the row's own; each row at least 20 px tall (#699's dense
+ * rows are 24), and the Bottles above them still wholly on the screen, so
+ * rows squeezed flat or Bottles pushed out are no fix. How the build gets there (the Bottles
  * folding to one row when the column is short, or anything else) is its own.
  *
  * ## ridemark (35c-6a) and deckmark (35c-6b): a scroller that has more says so
@@ -44,8 +46,17 @@
  *     the scroller or its parent, its box overlapping the 48 px band inside
  *     that edge and the scroller's span across it, its computed opacity
  *     (through its ancestors) at least 0.3 and its visibility visible;
- *   - scrolled to the end in that direction, that mark is gone (no such
- *     element drawn there, or its opacity under 0.05);
+ *   - the mark is seen, not only boxed: the band shot as drawn and again with
+ *     every `data-more-mark` hidden differ in at least 1% of its pixels and
+ *     150 of them, so a 1 px or transparent mark, or one under the content,
+ *     does not count; the scroller's box is cut to the screen first, so a
+ *     mark at an edge that is itself off the screen does not count either;
+ *   - halfway along it is still seen, and scrolled to the end in that
+ *     direction it is gone (no such element drawn there, or its opacity
+ *     under 0.05, and it paints no pixel of the band);
+ *   - measured at every size listed where the scroller has more, and at least
+ *     one must (a line with no id), so a build that makes the column fit at
+ *     1440×900 leaves 1280×700 to measure;
  *   - with nothing past the edge, no mark (a line with no id: on main there
  *     is no mark anywhere, so it holds, and it keeps a build from drawing
  *     the mark always).
@@ -61,9 +72,13 @@
  * On Perform at 1440×900 the deck's panels run Dyes, Tools, Recipe, Physics,
  * Squish, Camera, Macro, Patches, and Macro (aim, camera, depth, the
  * closeup's dials) starts at x = 1874, off the screen, as hard to find as its
- * zoom was. Asked: with the deck scrolled to its start, the Macro panel's box
- * lies wholly inside the viewport at 1440×900. Squish and Camera are reached
- * through the deck's mark.
+ * zoom was. Asked: with the deck scrolled to its start, at 1440×900 every one
+ * of the Macro panel's dials (its inputs outside the panel's head, eleven on
+ * main) lies wholly on the screen and is what is drawn at its middle (or its
+ * knob is), so a folded body or a panel wrapped under the fold cannot pass;
+ * and Dyes, Tools and Recipe, wholly on the screen on main, stay so, so
+ * Macro is not brought in by pushing the playing panels out. Physics, Squish
+ * and Camera may move right, reached through the deck's mark.
  *
  * ## remote (12 step 4a): the iPad app's full layout can become the remote
  *
@@ -74,7 +89,8 @@
  * 1024×1366 and 1366×1024: a control `data-testid="desk-laptop-remote"` is
  * drawn without a tap and is not painted over, and pressing it with no
  * laptop remembered asks for one as the phone's does (`?remote=1` and the
- * `laptop-link` form). On the website it is absent (a line with no id). The
+ * `laptop-link` form, visible). On the website it is absent at 1440×900 and
+ * at both iPad sizes, with the desk drawn (a line with no id). The
  * rest of the remote (the relay, the remembered laptop) is `applink`'s, and
  * the QR code into the app (a `chromaglass://` link) needs Xcode's URL
  * scheme, so it is not asked here.
@@ -150,11 +166,15 @@ const ridesSeen = (page) => page.evaluate(() => {
   const ids = (l) => l.map((e) => e.getAttribute('data-testid').slice('ride-'.length));
   const seen = rows.filter((e) => {
     const q = e.getBoundingClientRect();
-    if (!(q.height > 0 && q.top >= top - 1 && q.bottom <= bottom + 1)) return false;
+    // A row squeezed under a finger's reach is not "shown": 20 px, where #699's dense rows are 24.
+    if (!(q.height >= 20 && q.top >= top - 1 && q.bottom <= bottom + 1)) return false;
     const at = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
     return !!at && e.contains(at);
   });
-  return { rows: rows.length, seen: ids(seen), hidden: ids(rows.filter((e) => !seen.includes(e))) };
+  // And the Bottles above them still whole: rides bought by pushing the Bottles out are no fix.
+  const b = document.querySelector('[data-testid="bench-left"]')?.getBoundingClientRect();
+  const bottles = !!b && b.height > 0 && b.top >= 0 && b.bottom <= innerHeight;
+  return { rows: rows.length, seen: ids(seen), hidden: ids(rows.filter((e) => !seen.includes(e))), bottles };
 });
 
 /**
@@ -163,15 +183,22 @@ const ridesSeen = (page) => page.evaluate(() => {
  * whether a `data-more-mark` for it is drawn at that edge (the contract in
  * the header).
  */
-const markState = (page, testId, dir, end) => page.evaluate(async ({ testId, dir, end }) => {
+const markState = (page, testId, dir, at) => page.evaluate(async ({ testId, dir, at }) => {
   const s = document.querySelector(`[data-testid="${testId}"]`);
   if (!s) return null;
   const y = dir === 'below';
-  if (y) s.scrollTop = end ? s.scrollHeight : 0; else s.scrollLeft = end ? s.scrollWidth : 0;
+  const max = y ? s.scrollHeight - s.clientHeight : s.scrollWidth - s.clientWidth;
+  const to = Math.round(max * at);
+  if (y) s.scrollTop = to; else s.scrollLeft = to;
   s.dispatchEvent(new Event('scroll'));
   await new Promise((r) => setTimeout(r, 700));
   const past = y ? s.scrollHeight - s.clientHeight - s.scrollTop : s.scrollWidth - s.clientWidth - s.scrollLeft;
-  const q = s.getBoundingClientRect();
+  /*
+    The scroller's box cut to the screen: a deck wider than the window has its
+    own right edge off the screen, and a mark drawn there is seen by no one.
+  */
+  const o = s.getBoundingClientRect();
+  const q = { left: Math.max(0, o.left), top: Math.max(0, o.top), right: Math.min(innerWidth, o.right), bottom: Math.min(innerHeight, o.bottom) };
   const opacity = (e) => { let o = 1; for (let a = e; a && a instanceof Element; a = a.parentElement) o *= parseFloat(getComputedStyle(a).opacity || '1'); return o; };
   const host = s.parentElement ?? s;
   const marks = [...host.querySelectorAll(`[data-more-mark="${dir}"]`)].map((m) => {
@@ -180,13 +207,46 @@ const markState = (page, testId, dir, end) => page.evaluate(async ({ testId, dir
       : r.right > q.right - 48 && r.left < q.right + 8 && r.bottom > q.top && r.top < q.bottom;
     return { drawn: r.width > 0 && r.height > 0 && band && getComputedStyle(m).visibility === 'visible', opacity: opacity(m) };
   });
+  const band = y ? { x: q.left, y: q.bottom - 48, width: q.right - q.left, height: 48 }
+    : { x: q.right - 48, y: q.top, width: 48, height: q.bottom - q.top };
   return {
     past: Math.round(past),
-    any: document.querySelectorAll('[data-more-mark]').length > 0,
+    band,
+    // This scroller's own marks, not another's: whichever ships first must not count for the other.
+    any: marks.length > 0,
     shown: marks.some((m) => m.drawn && m.opacity >= 0.3),
     faint: marks.every((m) => !m.drawn || m.opacity < 0.05),
   };
-}, { testId, dir, end });
+}, { testId, dir, at });
+
+/**
+ * How many pixels of `band` the marks paint: the band shot as drawn and again
+ * with every `data-more-mark` hidden, compared in the page. A mark with a box
+ * and an opacity that paints nothing (1 px, transparent, under the content)
+ * changes no pixel, so the box alone is never taken as the mark.
+ */
+async function markPixels(page, band) {
+  const vp = page.viewportSize();
+  const x = Math.max(0, Math.round(band.x)), y = Math.max(0, Math.round(band.y));
+  const clip = { x, y, width: Math.min(vp.width, Math.round(band.x + band.width)) - x, height: Math.min(vp.height, Math.round(band.y + band.height)) - y };
+  if (clip.width < 1 || clip.height < 1) return { changed: 0, of: 0 };
+  const drawn = (await page.screenshot({ clip })).toString('base64');
+  const style = await page.addStyleTag({ content: '[data-more-mark]{visibility:hidden !important}' });
+  await page.waitForTimeout(100);
+  const hidden = (await page.screenshot({ clip })).toString('base64');
+  await style.evaluate((n) => n.remove());
+  return page.evaluate(async ([a, b]) => {
+    const load = async (s) => { const i = new Image(); i.src = `data:image/png;base64,${s}`; await i.decode(); return i; };
+    const [ia, ib] = [await load(a), await load(b)];
+    const px = (i) => { const c = document.createElement('canvas'); c.width = i.width; c.height = i.height; const g = c.getContext('2d'); g.drawImage(i, 0, 0); return g.getImageData(0, 0, i.width, i.height).data; };
+    const [da, db] = [px(ia), px(ib)];
+    let n = 0;
+    for (let k = 0; k < da.length; k += 4) if (Math.max(Math.abs(da[k] - db[k]), Math.abs(da[k + 1] - db[k + 1]), Math.abs(da[k + 2] - db[k + 2])) > 24) n++;
+    return { changed: n, of: da.length / 4 };
+  }, [drawn, hidden]);
+}
+/** A mark that is seen: at least 1% of its band, and 150 pixels, painted by it. */
+const seenMark = (p) => p.changed >= Math.max(150, 0.01 * p.of);
 
 try {
   // ── rides1280 ──
@@ -195,8 +255,8 @@ try {
     const r = await ridesSeen(page);
     check('the desk draws the Rides at 1280×800 (what rides1280 measures is there)', !!r && r.rows >= 8, r ? `${r.rows} rows` : 'no Rides on Perform');
     if (r && r.rows >= 8) {
-      owedCheck('rides1280', 'at 1280×800 on Perform, every ride shows whole under the Bottles (35c-6a)',
-        r.seen.length === r.rows, `${r.seen.length} of ${r.rows} in view${r.hidden.length ? `; under the fold: ${r.hidden.join(', ')}` : ''}`);
+      owedCheck('rides1280', 'at 1280×800 on Perform, every ride shows whole (rows 20 px or more) under the Bottles, which stay whole (35c-6a)',
+        r.seen.length === r.rows && r.bottles, `${r.seen.length} of ${r.rows} in view${r.hidden.length ? `; under the fold: ${r.hidden.join(', ')}` : ''}; the Bottles ${r.bottles ? 'whole' : 'not whole on the screen'}`);
     }
     await ctx.close();
   }
@@ -206,25 +266,41 @@ try {
     ['ridemark', 'desk-right', 'below', [[1440, 900], [1280, 700]]],
     ['deckmark', 'desk-deck', 'right', [[1440, 900], [1280, 800]]],
   ]) {
+    /*
+      Measured at every size where the scroller has more than it shows, and
+      at least one must: a build that makes the column fit at 1440×900 (it
+      holds 33 px more on main) leaves 1280×700 to measure, rather than
+      turning this line red and asking for an edit.
+    */
+    let measured = 0;
+    const item = id === 'ridemark' ? '35c-6a' : '35c-6b';
     for (const [w, h] of sizes) {
       const { ctx, page } = await open(w, h);
-      const start = await markState(page, testId, dir, false);
-      check(`at ${w}×${h} the ${testId} scroller has more ${dir} than it shows (what ${id} measures is there)`, !!start && start.past > 8,
-        start ? `${start.past} px past its edge` : `no ${testId}`);
+      const start = await markState(page, testId, dir, 0);
       if (start && start.past > 8) {
-        const endState = await markState(page, testId, dir, true);
-        const ok = start.shown && endState.past <= 8 && endState.faint;
-        owedCheck(id, `at ${w}×${h}, ${testId} says there is more ${dir}, and says nothing once scrolled to its end (${id === 'ridemark' ? '35c-6a' : '35c-6b'})`,
-          ok, `${start.past} px past the edge: mark ${start.shown ? 'drawn' : 'not drawn'}; scrolled to the end (${endState.past} px left): mark ${endState.faint ? 'gone' : 'still drawn'}`,
-          !start.any && !endState.any);
+        measured++;
+        const p0 = await markPixels(page, start.band);
+        const half = await markState(page, testId, dir, 0.5);
+        const p5 = await markPixels(page, half.band);
+        const end = await markState(page, testId, dir, 1);
+        const p1 = await markPixels(page, end.band);
+        const at0 = start.shown && seenMark(p0);
+        const at5 = half.past <= 8 || (half.shown && seenMark(p5));
+        const at1 = end.past <= 8 && end.faint && !seenMark(p1);
+        owedCheck(id, `at ${w}×${h}, ${testId} says there is more ${dir}, still says so halfway, and says nothing at its end (${item})`,
+          at0 && at5 && at1,
+          `${start.past} px past the edge: mark ${at0 ? 'seen' : 'not seen'} (${p0.changed} of ${p0.of} band pixels its own); halfway (${half.past} px left) ${at5 ? 'seen' : 'not seen'}; at the end (${end.past} px left) ${at1 ? 'gone' : 'still seen'}`,
+          !start.any && !half.any && !end.any);
       }
       await ctx.close();
     }
+    check(`${testId} has more ${dir} than it shows at one size at least (what ${id} measures is there)`, measured > 0,
+      `${measured} of ${sizes.length} sizes (${sizes.map(([w, h]) => `${w}×${h}`).join(', ')})`);
   }
   // With nothing past the edge, no mark: holds on main (no marks at all) and after.
   {
     const { ctx, page } = await open(1440, 1400);
-    const s = await markState(page, 'desk-right', 'below', false);
+    const s = await markState(page, 'desk-right', 'below', 0);
     check('at 1440×1400, with the right column holding everything, it draws no "more below" mark',
       !!s && s.past <= 8 && !s.shown, s ? `${s.past} px past its edge, mark ${s.shown ? 'drawn' : 'not drawn'}` : 'no desk-right');
     await ctx.close();
@@ -233,19 +309,40 @@ try {
   // ── macro ──
   {
     const { ctx, page } = await open(1440, 900);
+    /*
+      The Macro panel's own dials, each wholly on the screen and drawn at its
+      middle (not a header with its body folded away, not a panel wrapped
+      under the fold), and the panels a player reaches first on main (Dyes,
+      Tools, Recipe) still wholly on the screen: Macro brought in by pushing
+      the playing panels out is no fix.
+    */
     const m = await page.evaluate(() => {
       const deck = document.querySelector('[data-testid="desk-deck"]');
       if (!deck) return null;
       deck.scrollLeft = 0;
+      const whole = (r) => r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight;
       const p = deck.querySelector('[data-panel="macro"]');
       if (!p) return { found: false };
       const r = p.getBoundingClientRect();
-      return { found: true, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth };
+      const dials = [...p.querySelectorAll('input, select')].filter((e) => !e.closest('[data-panel-head]'));
+      const seen = dials.filter((e) => {
+        const q = e.getBoundingClientRect();
+        if (!whole(q)) return false;
+        const at = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+        const row = e.closest('[data-knob]') ?? e.parentElement ?? e;
+        return !!at && (e.contains(at) || row.contains(at));
+      });
+      const first = ['dyes', 'tools', 'recipe'].filter((id) => {
+        const q = deck.querySelector(`[data-panel="${id}"]`)?.getBoundingClientRect();
+        return !q || !whole(q);
+      });
+      return { found: true, left: Math.round(r.left), right: Math.round(r.right), vw: innerWidth, dials: dials.length, seen: seen.length, pushed: first };
     });
-    check('Perform\'s deck has the Macro panel (what macro measures is there)', !!m && m.found, m ? '' : 'no desk-deck');
-    if (m && m.found) {
-      owedCheck('macro', 'at 1440×900 on Perform, the deck unscrolled, the Macro panel lies wholly on the screen (35c-6b)',
-        m.left >= 0 && m.right <= m.vw, `Macro at x ${m.left} to ${m.right} of ${m.vw}`);
+    check('Perform\'s deck has the Macro panel and its dials (what macro measures is there)', !!m && m.found && m.dials >= 3, m ? (m.found ? `${m.dials} dials` : 'no Macro panel') : 'no desk-deck');
+    if (m && m.found && m.dials >= 3) {
+      owedCheck('macro', 'at 1440×900 on Perform, the deck unscrolled, every Macro dial lies wholly on the screen, and Dyes, Tools and Recipe stay on it (35c-6b)',
+        m.seen === m.dials && m.pushed.length === 0,
+        `Macro at x ${m.left} to ${m.right} of ${m.vw}, ${m.seen} of ${m.dials} dials whole on the screen${m.pushed.length ? `; pushed off: ${m.pushed.join(', ')}` : ''}`);
     }
     await ctx.close();
   }
@@ -269,7 +366,7 @@ try {
       await page.waitForSelector('[data-testid="laptop-link"]', { timeout: 8000 }).catch(() => {});
       const u = new globalThis.URL(page.url());
       where = u.search;
-      asks = u.searchParams.get('remote') === '1' && !u.searchParams.has('relay') && (await page.getByTestId('laptop-link').count()) > 0;
+      asks = u.searchParams.get('remote') === '1' && !u.searchParams.has('relay') && (await page.getByTestId('laptop-link').first().isVisible());
     }
     owedCheck('remote', `in the app at ${w}×${h}, the full layout shows Laptop remote without a tap, and with no laptop remembered it asks for one (12 step 4a)`,
       b.found && b.drawn && b.own && asks,
@@ -277,11 +374,17 @@ try {
       !b.found);
     await ctx.close();
   }
-  // On the website there is no Laptop remote on the desk: a page cannot open ws:// to a laptop.
-  {
-    const { ctx, page } = await open(1440, 900);
+  /*
+    On the website there is no Laptop remote on the desk (a page cannot open
+    ws:// to a laptop), asked at the app's own sizes too, so a button keyed to
+    an iPad's width rather than to the app cannot pass the line above; and
+    with the desk drawn, so a page that never loaded cannot pass this one.
+  */
+  for (const [w, h] of [[1440, 900], [1024, 1366], [1366, 1024]]) {
+    const { ctx, page } = await open(w, h);
+    const desk = (await page.locator('[data-desk]').count()) > 0;
     const n = await page.getByTestId('desk-laptop-remote').count();
-    check('on the website the desk has no Laptop remote', n === 0, `${n} found`);
+    check(`on the website at ${w}×${h} the desk is drawn with no Laptop remote`, desk && n === 0, `${desk ? 'desk drawn' : 'no desk'}, ${n} found`);
     await ctx.close();
   }
 } finally {
