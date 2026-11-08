@@ -6871,6 +6871,23 @@ socket in the check) and Art-Net in, and count real packets for a second each: n
 then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
 Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.
 
+### 34a-6. The looks as films: six 1920s records, on the page (2026-11-08)
+
+*(M; the owner's Mac. The owner, 2026-10-29: films of the looks, each to a different kind of music, the cards to
+animate on hover, open larger and be heard, and the films on the channel. Then 2026-11-08, of
+the six 1920s films the app made once its ear heard a beat without a kick drum (14d-2): those,
+on the website and on the channel.)* **Shipped** the row: `src/lib/siteFilms.ts` lists six
+records from before 1926 (public domain in the US since 2026; `public/landing/films/SOURCES.md`
+records each Great 78 Project transfer, its checksum and the basis), each played whole by a
+look; the page's gallery of looks keeps its stills and the films are a row of their own under
+it, "Six records from the 1920s". `npm run sitefilms` takes the films the app recorded (or
+renders them on a Mac) and cuts each card's 6 s muted loop (MP4 and WebM, seam blended), its
+640 × 400 still, the channel's 1280 × 720 thumbnail and the description text.
+`LandingFilms.tsx`: a pointer (or focus) plays a card's loop, a phone plays the card in view,
+reduced motion keeps the stills, and a card whose film is on the channel opens it from
+youtube-nocookie.com with the credit under it. `npm run landingfilms` holds all of it. Not a
+GIF: 256 colours band a plate's gradients, and a GIF is ten to twenty times the bytes.
+
 ## 35. Clear controls: on reads on, one name for one thing
 
 ### 35a. One look for on, every name unique (2026-10-24)

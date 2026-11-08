@@ -1,16 +1,23 @@
 /**
- * The webpage's films: one look each, played to a piece of music that suits it
- * (PLAN.md 34a-6).
+ * The webpage's films: six records from before 1926, each played by one of
+ * the app's looks for the whole of the record (PLAN.md 34a-6).
  *
- * What was asked (the owner, 2026-10-29): re-record the looks on the webpage,
- * about a minute each, each look with a different kind of music, the cards to
- * animate when a pointer is over them, the films to open larger with their
- * sound, and the same films on the channel. So each look here has three
- * things made from one render: the minute itself, with its music (made by
- * `npm run sitefilms` on a Mac, uploaded to the channel, and played on the
- * page from there), a loop of a few seconds with no sound that the card plays
- * (public/landing/films/<id>.mp4 and .webm), and the loop's first frame as
- * the card's still (public/landing/looks/<id>.webp).
+ * What was asked (the owner, 2026-10-29): films of the looks on the webpage,
+ * each to a different kind of music, the cards to animate when a pointer is
+ * over them, the films to open larger with their sound, and the same films on
+ * the channel. Then (the owner, 2026-11-08), on seeing the films the app made
+ * of six 1920s records once its ear could hear a beat without a kick drum
+ * (PLAN.md 14d-2): those films, on the website and on the channel.
+ *
+ * So each film here is three things made from one render: the whole record
+ * with the plate playing it (the app's own Song film, made by `npm run
+ * sitefilms` on a Mac, uploaded to the channel by the owner, and played on
+ * the page from there), a loop of a few seconds with no sound that the card
+ * plays (public/landing/films/<id>.mp4 and .webm), and the loop's first frame
+ * as the card's still (public/landing/films/<id>.webp). They sit in a row of
+ * their own under the page's gallery of looks, which keeps its stills: the
+ * gallery shows the eight looks a visitor is sold on, and these show what the
+ * plate does with a song from start to finish.
  *
  * Why a short loop on the card and not an animated GIF, which was the first
  * ask: a GIF has 256 colours, and a plate is gradients, so its dye bands into
@@ -19,103 +26,149 @@
  * what every browser plays without a gesture, on a phone too, and the still
  * stands in until it plays.
  *
- * Why the minute is played from the channel and not from this site: it is
- * about 100 MB at the quality a plate needs, eight of them, and the channel
- * streams each at the size the visitor's screen and connection can take,
- * where a file from here would be one size for everyone. The page embeds the
- * player from youtube-nocookie.com, which sets no cookie until the visitor
- * presses play. `youtube` is null until the owner has uploaded the film; a
- * card with no film to open is a still that plays its loop, and nothing more.
+ * Why the film is played from the channel and not from this site: each is
+ * 100 to 160 MB at the quality a plate needs, and the channel streams each at
+ * the size the visitor's screen and connection can take, where a file from
+ * here would be one size for everyone. The page embeds the player from
+ * youtube-nocookie.com, which sets no cookie until the visitor presses play.
+ * `youtube` is null until the owner has uploaded the film; a card with no
+ * film to open is a still that plays its loop, and nothing more.
  *
- * The music. Every piece is Kevin MacLeod's, from incompetech.com, under
- * Creative Commons Attribution 4.0: free to use in a film, commercially and
- * on a channel that earns from it, credited. His terms put the credit in the
- * video's description; here it is also under the player. The track, its
- * file and its checksum are what `npm run sitefilms` fetches and checks,
- * and public/landing/films/SOURCES.md records why each is free to use. A
- * piece is chosen for its kind, so that the eight films show the plate under
- * eight kinds of music, and each film plays the piece from its start, as a
- * listener would hear it, with a fade at the minute.
+ * The music. Every record here was published in the United States before
+ * 1926, and so has been in the public domain there since 1 January 2026
+ * (17 U.S.C. § 1401(a)(2)(B)(i), the Music Modernization Act's schedule for
+ * recordings fixed before 1972): the recording, and the song under it, which
+ * is older still. The transfers are the Great 78 Project's, digitised from the
+ * original shellac and published by the Internet Archive; the archive item,
+ * the file and its checksum are what `npm run sitefilms` fetches and checks,
+ * and public/landing/films/SOURCES.md records why each is free to use and
+ * what was done to it (a trim of the run-in groove and run-out, a short fade
+ * at each end, nothing else). A label's later remaster of the same take may
+ * still be matched by the channel's claim system; SOURCES.md is the answer to
+ * such a claim. Why these six: one record for each kind of music a 1920s
+ * listener had (hot jazz, opera, solo piano, a dance band, New Orleans jazz,
+ * the blues), each given the look whose motion suits it.
  */
 
 export interface SiteFilm {
-  /** The look, a preset id (src/presets.ts), and the name of its files under public/landing. */
+  /** The film's name in the page and its files under public/landing/films. */
+  id: string;
+  /** The look that plays it, a preset id (src/presets.ts). */
   look: string;
-  /** The kind of music, as the film's title says it. */
-  genre: string;
-  track: {
+  /** The look's name as the app shows it (its preset's `name`; `npm run landingfilms` holds the two the same). Here so the page needn't load the presets. */
+  lookName: string;
+  /** The kind of music and its year, as the card's label says it. */
+  kind: string;
+  record: {
     title: string;
-    artist: string;
-    /** The recording's code, from incompetech.com's list: what answers a claim on the channel. */
-    isrc: string;
-    /**
-     * The file's name in the composer's library (`INCOMPETECH` in scripts/sitefilms.mjs, which
-     * fetches it on the Mac; the site itself never does, so no address of his is in the site).
-     */
+    performer: string;
+    composer: string;
+    /** The label, the catalogue number where it is known, and when it was published. */
+    published: string;
+    /** The Internet Archive item the transfer comes from (archive.org/details/<item>). */
+    item: string;
+    /** The file's name in that item: what `npm run sitefilms` fetches, on a Mac, never the site. */
     file: string;
     /** Of that file, so a changed file is noticed rather than filmed. */
     sha256: string;
-    /** Where the film's minute starts in the piece, in seconds. */
+    /** Where the music starts in the file, past the run-in groove, in seconds. */
     from: number;
+    /** How long the music is from there, to just past its last note, in seconds. */
+    seconds: number;
   };
   /** The plate's seed for the render (`?seed=`): the same seed draws the same film. */
   seed: number;
   /** Where in the film the card's loop is taken from, in seconds. */
   loopAt: number;
-  /** The film's id on the channel, once it is uploaded. */
+  /** The film's id on the channel, once the owner has uploaded it. */
   youtube: string | null;
 }
 
-const MACLEOD = 'Kevin MacLeod';
-
-export const FILM_SECONDS = 60;
 /** The card's loop: this many seconds, the last `LOOP_BLEND_S` of them blended into the first. */
 export const LOOP_SECONDS = 6;
 export const LOOP_BLEND_S = 1;
+/** The film's music: a short fade in past the groove, and a longer one out past the last note. */
+export const FADE_IN_S = 0.15;
+export const FADE_OUT_S = 1.2;
 
 export const SITE_FILMS: readonly SiteFilm[] = [
   {
-    look: 'ferro-paint', genre: 'dark electronic', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Ethernight Club', artist: MACLEOD, isrc: 'USUAN2100002', file: 'Ethernight Club.mp3', sha256: '40c13873da38bff6da4e1e8d7e2907e05d4c308d25707aa707f3032bffe74064', from: 0 },
+    id: 'wolverines', look: 'splodascope', lookName: 'Splodascope', kind: 'Hot jazz, 1924', seed: 1, loopAt: 70, youtube: null,
+    record: {
+      title: 'Riverboat Shuffle', performer: 'The Wolverine Orchestra, with Bix Beiderbecke',
+      composer: 'Hoagy Carmichael, Dick Voynow and Irving Mills', published: 'Gennett 5454, 1924',
+      item: '78_riverbeat-shuffle_wolverine-orchestra-carmichael_gbia0009181a',
+      file: 'Riverbeat Shuffle - Wolverine Orchestra - Carmichael.flac',
+      sha256: '6645df2fa4625ca5f2b716eaa0605e854d65534da05182cd2b1655bd428a98df', from: 0.4, seconds: 156.53,
+    },
   },
   {
-    look: 'aurora-borealis', genre: 'ambient', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Dreams Become Real', artist: MACLEOD, isrc: 'USUAN1500027', file: 'Dreams Become Real.mp3', sha256: 'a8ea5df5f969ed8d898af7fe07eb4712233f03e9d83f7ebcc88d1c851f3171b0', from: 0 },
+    id: 'caruso', look: 'solar-flare', lookName: 'Solar Flare', kind: 'Opera, 1907', seed: 1, loopAt: 100, youtube: null,
+    record: {
+      title: 'Vesti la giubba', performer: 'Enrico Caruso',
+      composer: 'Ruggero Leoncavallo, from Pagliacci (1892)', published: 'Victor 88061, 1907',
+      item: '78_pagliacci-vesti-la-giubba-on-with-the-play-act-1_enrico-caruso-ruggiero-leonc_gbia0276270a',
+      file: 'Pagliacci - Vesti la giubba (On With the P - Enrico Caruso.flac',
+      sha256: 'b2b2b9e970ba2513c86df1f4c95064124ac5f35d12ba67bd08b5600726b86c92', from: 4.3, seconds: 183.33,
+    },
   },
   {
-    look: 'cell-bloom', genre: 'chillwave', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Chill Wave', artist: MACLEOD, isrc: 'USUAN1600048', file: 'Chill Wave.mp3', sha256: '7f07fbf89860959ff527f7b74606146dd0b0de263739989a70ce712c7c361614', from: 0 },
+    id: 'rachmaninoff', look: 'galaxy', lookName: 'Galaxy', kind: 'Solo piano, 1921', seed: 1, loopAt: 110, youtube: null,
+    record: {
+      title: 'Prelude in C-sharp minor, Op. 3 No. 2', performer: 'Sergei Rachmaninoff',
+      composer: 'Sergei Rachmaninoff (1892)', published: 'Victor 66016, 1921',
+      item: '78_prelude-in-c-sharp-minor_sergei-rachmaninoff-rachmaninoff_gbia0170391a',
+      file: 'Prelude in C Sharp Minor - Sergei Rachmaninoff.flac',
+      sha256: 'c8dcaead7c958de71770815a6e276af042ffd38afb7bbafa0dc508def578826e', from: 0.9, seconds: 210.13,
+    },
   },
   {
-    look: 'poster-1969', genre: 'classic rock', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Twisted', artist: MACLEOD, isrc: 'USUAN1400046', file: 'Twisted.mp3', sha256: '56a2305a7b0356a9e0054fc4d8636a6d86f366578618f7271880136defe7ccda', from: 0 },
+    id: 'whiteman', look: 'aurora-borealis', lookName: 'Aurora Borealis', kind: 'Dance band, 1920', seed: 1, loopAt: 30, youtube: null,
+    record: {
+      title: 'Whispering', performer: 'Paul Whiteman and His Ambassador Orchestra',
+      composer: 'John Schonberger, Richard Coburn and Vincent Rose', published: 'Victor 18690, 1920',
+      item: '78_whispering_paul-whiteman-and-his-ambassador-orchestra-schonberger_gbia0120433a',
+      file: 'Whispering - Paul Whiteman and His Ambassador Orchestra.flac',
+      sha256: '92f1c2b8d5348cdad288644624e0ea7bf95df036b35e1feba86400720cf9be47', from: 5.3, seconds: 194.01,
+    },
   },
   {
-    look: 'macro-bead', genre: 'jazz', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Space Jazz', artist: MACLEOD, isrc: 'USUAN2100030', file: 'Space Jazz.mp3', sha256: '51924be4565a2f101f4daa45998aa4c3577dab05ba5d1067ffb7bc57583ad503', from: 0 },
+    id: 'oliver', look: 'neon-coral-reef', lookName: 'Neon Coral Reef', kind: 'New Orleans jazz, 1923', seed: 1, loopAt: 90, youtube: null,
+    record: {
+      title: 'Tears', performer: "King Oliver's Creole Jazz Band, with Louis Armstrong",
+      composer: 'Lil Hardin and Louis Armstrong', published: 'OKeh, 1923',
+      item: '78_tears_king-olivers-jazz-band-hardin-armstrong-joe-oliver-louis-armstrong-johnny-do_gbia0001053a',
+      file: "Tears - King Oliver's Jazz Band - Hardin.flac",
+      sha256: 'f6ee2e113db24fdba13a87fe2a3922d434c823fcb4cf88b46664e2fb10b52c65', from: 2.9, seconds: 194.78,
+    },
   },
   {
-    look: 'jellyfish-bloom', genre: 'dub', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Dub Feral', artist: MACLEOD, isrc: 'USUAN1200045', file: 'Dub Feral.mp3', sha256: '0b079ded2a2a9392729a8302cab6bc0d797e63690de60aa9ca6c5a8ae413e34c', from: 0 },
-  },
-  {
-    // Funkorama opens on ten quiet seconds of a lone drum kit; the minute starts where the band comes in.
-    look: 'lace-run', genre: 'funk', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Funkorama', artist: MACLEOD, isrc: 'USUAN1100474', file: 'Funkorama.mp3', sha256: '6be229815d85a0b99382b944d31098b882702c04ac7ad899e44ab7f8ba89b5ad', from: 8 },
-  },
-  {
-    look: 'neon-coral-reef', genre: '80s synth-pop', seed: 1, loopAt: 30, youtube: null,
-    track: { title: 'Newer Wave', artist: MACLEOD, isrc: 'USUAN2000024', file: 'Newer Wave.mp3', sha256: 'ef26589e066cc2f60f9523f8a3c17e543f57fc9e1145efc3bc46f7e5db92d0bc', from: 0 },
+    id: 'bessie', look: 'velvet-underground', lookName: 'Velvet Underground', kind: 'Blues, 1925', seed: 1, loopAt: 60, youtube: null,
+    record: {
+      title: 'Careless Love Blues', performer: 'Bessie Smith, with Louis Armstrong, Fletcher Henderson and Charlie Green',
+      composer: 'Traditional, arranged by W. C. Handy', published: 'Columbia 14083-D, 1925',
+      item: '78_careless-love-blues_bessie-smith-w-c-handy-fletcher-henderson-l-armstrong-c-green_gbia3043091a',
+      file: 'CARELESS LOVE BLUES - BESSIE SMITH - W. C. Handy.flac',
+      sha256: '8411eb9c3a059c73403e4b6033fc42837c7c47e58dfb4c0275644586ec68c931', from: 3.3, seconds: 205.55,
+    },
   },
 ];
 
-export const LICENCE = { name: 'CC BY 4.0', url: 'https://creativecommons.org/licenses/by/4.0/' };
+/** Why the music is free to use, in the words the credit under the player and the channel's description use. */
+export const PUBLIC_DOMAIN = {
+  name: 'public domain in the US',
+  why: 'Published in the United States before 1926, in the public domain there since 1 January 2026.',
+  transfer: 'Transfer from the original 78 by the Great 78 Project, via the Internet Archive.',
+};
 
-/** The credit the composer asks for, word for word (incompetech.com's "Attribution Code"). */
+export const archiveUrl = (f: SiteFilm): string => `https://archive.org/details/${f.record.item}`;
+
+/** The credit, a line each, as the channel's description and SOURCES.md give it. */
 export const creditLines = (f: SiteFilm): string[] => [
-  `"${f.track.title}" ${f.track.artist} (incompetech.com)`,
-  'Licensed under Creative Commons: By Attribution 4.0 License',
-  'http://creativecommons.org/licenses/by/4.0/',
+  `"${f.record.title}", ${f.record.performer}`,
+  `Composed by ${f.record.composer}. ${f.record.published}.`,
+  PUBLIC_DOMAIN.why,
+  `${PUBLIC_DOMAIN.transfer} ${archiveUrl(f)}`,
 ];
 
-export const filmOf = (look: string): SiteFilm | undefined => SITE_FILMS.find((f) => f.look === look);
+export const filmOf = (id: string): SiteFilm | undefined => SITE_FILMS.find((f) => f.id === id);

@@ -564,3 +564,13 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
   prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
   (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.
+- **19ak-8. Open, found 2026-11-08: `npm run widedials` is red on main.** "Heat Spread at 2
+  keeps the heat" reads ×0.9997, 0.9748 and 0.9657 where its bar wants the heat held. Not yet
+  run down: either Heat Spread at 2 now loses heat it kept (a real regression in the heat
+  field's diffusion) or the check reads a quantity that a later change made swing. Find which
+  before touching the bar.
+- **19ak-9. Open, found 2026-11-08: `oscout`'s `plate >= 10` is a fixed floor under a count
+  that swings with load.** A main deploy went red on 9 kicks in 15 s; on the Mac the same count
+  ran 10 to 24 before 14d-2. *Fix:* assert what the feature promises (each kick the ear hears
+  goes out as a message), by counting the ear's kicks over the same window and holding the OSC
+  count to them, not to a number. *Measure:* the ratio on a loaded and an idle run.

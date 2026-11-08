@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
-import { LookFilms, anyFilmOpens, type LookCard } from './LandingFilms';
+import { SiteFilms, anyFilmOpens } from './LandingFilms';
 import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /**
@@ -23,11 +23,10 @@ import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
  * on its own thread. What was tried first, a loop of the lab's plate as a
  * video, was set aside: the lab lays a few dye drops that barely move in the
  * seconds a hero has, and nothing in a cloud session can film the app itself
- * (PLAN.md 34a-2 asks for that film from a Mac). The looks below are each a
- * minute of the app's own Song film of the look, rendered to music on a Mac
- * (`LandingFilms.tsx`, PLAN.md 34a-6), shown as a still that plays a few
- * seconds when pointed at and opens the minute with its sound; nothing is
- * mocked up. The stills are 640 × 400, under a dark scrim in the hero.
+ * (PLAN.md 34a-2 asks for that film from a Mac). The looks below are frames
+ * from the app's own renders of its shipped looks, with each look's own name;
+ * nothing is mocked up. They are 480 × 300, so they are shown under a dark
+ * scrim in the hero and at their own size in the grid.
  *
  * "Play free" mounts the sign-in over this page rather than replacing it, so
  * the card sits on the hero and a visitor who backs out of it is still on the
@@ -47,10 +46,11 @@ interface LandingProps {
   covered: boolean;
 }
 
+interface LookCard { id: string; name: string; line: string }
 
 // The names are the shipped looks' own (src/presets.ts); the lines are theirs,
-// shortened. The pictures are the first frames of each look's loop, cut from
-// its minute rendered to music by `npm run sitefilms` (src/lib/siteFilms.ts).
+// shortened. The pictures are 480 × 300 frames from the app's render of each
+// look (PLAN.md 28i-1's contact sheets).
 const LOOKS: LookCard[] = [
   { id: 'ferro-paint', name: 'Ferro Paint', line: 'Black ferrofluid worked through amber, teal and coral under a wandering magnet.' },
   { id: 'aurora-borealis', name: 'Aurora Borealis', line: 'Curtains of jade and lime rippling across a night sky.' },
@@ -216,10 +216,38 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       <section id="looks" className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Real looks from the app</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
-          Every picture here is the app's own render: each look a different liquid with its own physics, played to its own
-          kind of music.{anyFilmOpens(LOOKS) ? ' Open one to watch a minute of it with the sound on.' : ''}
+          Every picture here is a frame the app drew. Each look is a different liquid with its own physics.
         </p>
-        <LookFilms looks={LOOKS} />
+        {/* On a phone the looks are a row to swipe, so eight of them are not four screens of scrolling. */}
+        <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
+          {LOOKS.map((l) => (
+            <li key={l.id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-xl border border-border bg-surface min-[560px]:w-auto">
+              <img
+                src={`/landing/looks/${l.id}.webp`}
+                alt={`${l.name}: ${l.line}`}
+                width={480}
+                height={300}
+                loading="lazy"
+                decoding="async"
+                className="block aspect-[8/5] w-full object-cover"
+              />
+              <div className="px-4 pb-4 pt-3">
+                <p className="text-[14px] font-medium">{l.name}</p>
+                <p className="mt-1 text-[13px] leading-snug text-muted">{l.line}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Films: six records from before 1926, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6). */}
+      <section id="films" className="mx-auto w-full max-w-[1120px] px-4 pb-16 sm:px-8 sm:pb-24">
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six records from the 1920s</h2>
+        <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
+          The app listening to six old 78s and playing each from the first note to the last, with nothing added afterwards.
+          The records are in the public domain.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
+        </p>
+        <SiteFilms />
       </section>
 
       {/* How it works */}
