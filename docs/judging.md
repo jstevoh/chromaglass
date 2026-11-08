@@ -2444,3 +2444,21 @@ only the wall can say whether the seven looks read as the real transparencies do
 4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
    not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
    45a-5).
+
+## 114. Song titles painted as ink, then swept away (PLAN 37x-10)
+
+The lab measures a still plate; how a look's own flow treats a title is taste, and only the
+Mac's film shows the letters at the solver's full grid.
+
+1. Settings → **Logo & Titles** → **Song titles as ink** on. Play a song the ear names (or
+   pour words from the phone remote's **Pour words**), on two or three looks: a calm one
+   (Classic), a busy one, and a dark one.
+2. The title should land as crisp ink in the look's first colour, readable for about three
+   seconds at the default **Title Sweep**, then drift and break up into the show's own
+   colour by about ten. **Title Sweep** at the top: gone in a second or two. Near the bottom:
+   it drifts, readable, for many seconds.
+3. **Title Size** small to the plate's width, a long title shrinking to fit; **Title Height**
+   moves it up and down; the phone's **Title** switch turns it on and off.
+4. Bad: soft or blocky letters (poured at the wrong grid), a title that fades rather than
+   moves, a wash that shakes the whole plate, a busy look that tears the title apart before
+   it can be read.
