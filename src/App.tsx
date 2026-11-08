@@ -43,7 +43,7 @@ import { RunLocallyCard } from './components/RunLocallyCard';
 import { ProjectorFillChip } from './components/ProjectorFillChip';
 import { PhoneStage, type PhoneLook } from './components/phone/PhoneStage';
 import { PhonePlay } from './components/phone/PhonePlay';
-import { PHONE_OFF_KEY } from './lib/phone';
+import { LiveRemoteChip } from './components/LiveRemoteChip';
 import { useDeviceTilt } from './hooks/useDeviceTilt';
 import { SequencerPanel } from './components/SequencerPanel';
 import { SongsPanel, type LookChoice } from './components/SongsPanel';
@@ -679,7 +679,6 @@ export default function App() {
   }, [settings, pinnedPresetId, userPresets.presets]);
   /** Network displays connected through the relay, and where they can reach it. */
   const [mirrorCount, setMirrorCount] = useState(0);
-  const [phoneCount, setPhoneCount] = useState(0);
   const [relay, setRelay] = useState<RelayInfo | null>(null);
   useEffect(() => { if (castMenu) void relayInfo().then(setRelay); }, [castMenu]);
   const [musicSettings, setMusicSettings] = useState<MusicSettings>(loadMusicSettings);
@@ -1353,7 +1352,7 @@ export default function App() {
   const previousLook = useRef<{ id: string | null; settings: VisualizerSettings } | null>(null);
 
   const {
-    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
+    phone, onFullLayout, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
   } = usePhoneLayout({
     deskLayout,
   });
@@ -1944,11 +1943,11 @@ export default function App() {
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
-    remoteLink,
+    remoteLink, livePhoneCount, live, onLiveAction,
   } = useRemote({
     settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
-    updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
+    updateSettings, wallRef, setMirrorCount, relaySendRef, castState, cuePreset,
     cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypesRef, setSelectedLiquidId,
     setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
@@ -1982,7 +1981,6 @@ export default function App() {
     ...PRESETS.map(p => ({ kind: 'preset' as const, id: p.id, name: p.name })),
     ...userPresets.presets.map(p => ({ kind: 'saved' as const, id: p.id, name: p.name })),
   ], [userPresets.presets]);
-  relaySendRef.current = remoteLink.send;
 
   // The plate's colour to the rig, and colour, sound and beat to a VJ app (OSC out).
   const { oscOut, onOscOut } = useShowFeed({
@@ -2023,11 +2021,6 @@ export default function App() {
    * The minimise chips live there too and have to give way to it.
    */
   const cueBarUp = overlayUp && !!(cued || fading > 0 || previousLook.current);
-
-  const livePhoneCount = remoteLink.status === 'connected' ? phoneCount : 0;
-  useEffect(() => {
-    if (remoteLink.status !== 'connected') setPhoneCount(0);
-  }, [remoteLink.status]);
 
   const deskDots = useMemo(() => ({
     sound: audioSource !== 'none',
@@ -3139,6 +3132,8 @@ export default function App() {
           onWander={setIsAutomated}
           onClear={() => setClearTrigger(n => n + 1)}
           recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, take: recorder.lastTake }}
+          live={live}
+          onLiveAction={onLiveAction}
           onAllControls={() => choosePhoneScreen('stage')}
           onOpenAccount={openAccount}
         />
@@ -3297,10 +3292,7 @@ export default function App() {
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
-            onFullLayout={() => {
-              try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
-              setPhone(false);
-            }}
+            onFullLayout={onFullLayout}
             onPlayScreen={() => choosePhoneScreen('play')}
             onOpenAccount={openAccount}
           />
@@ -3547,6 +3539,7 @@ export default function App() {
           )}
         </div>
 
+        <div className="flex flex-col items-end gap-2">
         <div className="flex gap-2 pointer-events-auto bg-black/50 backdrop-blur-xl border border-white/10 rounded-full p-1.5 shadow-2xl">
           <button
             onClick={() => { setShowTrackPanel(!showTrackPanel); setShowSequencer(false); }}
@@ -3683,6 +3676,8 @@ export default function App() {
           >
             ?
           </button>
+        </div>
+        <LiveRemoteChip live={live} action={onLiveAction} className="pointer-events-auto" />
         </div>
       </div>
       )}

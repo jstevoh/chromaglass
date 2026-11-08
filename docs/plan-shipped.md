@@ -11019,6 +11019,21 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-4. The Mac app's narrow window
+
+  - **37x-4d-4. The Mac app's narrow window (shipped 2026-11-08).** Narrowed under the
+    desks' width (1024) the app leaves the desks and the Live Show panel with them: a
+    stream running there kept running, unseen. It goes to the floating overlay
+    (`overlayUp` in `usePhoneLayout`), not the phone layout (`wantsPhoneLayout` wants a
+    coarse pointer and a short side under 600, which a Mac's window has not). Now while
+    `lib/liveShow.ts` says the show is on air, the floating overlay (`App.tsx` top bar)
+    and `PhonePlay` (`PhonePlay.tsx`, for an app opened at `/play`) draw the remote's
+    `LiveRemoteChip` (`data-testid="remote-live"`), fed from the `live` state and
+    `onLiveAction` returned by `useRemote` (`src/app/useRemote.ts`, which calls
+    `stopLive` on `'live-stop'`). The remote (`DrawScreen.tsx` and `RemoteControl.tsx`)
+    already carried `LiveRemoteChip`. Measured: `npm run liveshow` 35/35 (`--owed=narrow`
+    removed from `scripts/checks.json`).
+
 #### 37x-4d-6. The stream's frames were black
 
   - **37x-4d-6. The stream's frames were black (shipped 2026-10-31).** Found writing

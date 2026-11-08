@@ -1,5 +1,5 @@
-import { useMemo, useRef, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
-import { type RemoteState, parseRemoteGesture, type RemoteMessage } from '../lib/remoteProtocol';
+import { useState, useCallback, useMemo, useRef, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { type RemoteState, type RemoteAction, parseRemoteGesture, type RemoteMessage } from '../lib/remoteProtocol';
 import { isUserPresetId } from '../lib/userPresets';
 import type { VisualizerSettings, LiquidType } from '../types';
 import { sanitizePatch } from '../lib/sanitizeSettings';
@@ -49,7 +49,6 @@ interface RemoteDeps {
   updateSettings: (patch: Partial<VisualizerSettings>) => void;
   wallRef: RefObject<LiquidVisualizerHandle | null>;
   setMirrorCount: Dispatch<SetStateAction<number>>;
-  setPhoneCount: Dispatch<SetStateAction<number>>;
   relaySendRef: RefObject<((m: RemoteMessage) => void) | null>;
   castState: CastState;
   cuePreset: (presetId: string) => void;
@@ -91,13 +90,14 @@ export type OscOutHear = (m: Extract<RemoteMessage, { type: 'osc-out' }>) => voi
 export function useRemote({
   settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
   allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
-  updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
+  updateSettings, wallRef, setMirrorCount, relaySendRef, castState, cuePreset,
   cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypesRef, setSelectedLiquidId,
   setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
   tempoRef, oscOutHearRef,
 }: RemoteDeps) {
+  const [phoneCount, setPhoneCount] = useState(0);
   // ── Phone remote ────────────────────────────────────────────────
   // The laptop is authoritative: it publishes a snapshot of the show whenever
   // anything changes, and applies commands the phone sends back. When no relay
@@ -114,6 +114,9 @@ export function useRemote({
     ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
     : '';
   const live = useMemo<RemoteState['live']>(() => (liveKey ? JSON.parse(liveKey) : null), [liveKey]);
+  const onLiveAction = useCallback((action: RemoteAction) => {
+    if (action === 'live-stop') void stopLive().catch(() => { /* the panel shows why */ });
+  }, []);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -405,6 +408,12 @@ export function useRemote({
 
   runActionRef.current = runAction;
   remoteLinkRef.current = remoteLink.send;
+  relaySendRef.current = remoteLink.send;
+
+  const livePhoneCount = remoteLink.status === 'connected' ? phoneCount : 0;
+  useEffect(() => {
+    if (remoteLink.status !== 'connected') setPhoneCount(0);
+  }, [remoteLink.status]);
 
   // The wall for a remote's Draw: one sender while the link is up, fed by the frame task.
   const remoteSend = remoteLink.send;
@@ -424,5 +433,8 @@ export function useRemote({
 
   return {
     remoteLink,
+    livePhoneCount,
+    live,
+    onLiveAction,
   };
 }
