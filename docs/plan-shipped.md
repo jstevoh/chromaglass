@@ -575,8 +575,17 @@ dawbridge -- --plugin` against 13.7a's server and app: 36 of 36, the header at p
 packets with no gap; slot 3 moved 750 times from 0.000 to 1.000. Filmed on the owner's Mac
 in headed Metal Chromium against #694's show server: the self-test played three times, slot 4
 mapped to Plate Rock, and Plate Rock read 0.04, 0.31, 0.89, 1.00 through each 4 s run with the
-tempo source on `daw` (32 s film, shared with the owner). The film in Live is owed
-(13.7b-film): the Allow for Live was declined while the owner was away.
+tempo source on `daw` (32 s film, shared with the owner).
+
+**13.7b-film (2026-11-08).** Filmed inside Ableton Live on the owner's Mac. The owner put
+the VST3 on a track, and Live listed it only after the owner turned on Audio Units and VST3
+System Folders in Settings > Plug-Ins and rescanned (Live had 0 plug-ins in its database).
+The owner played Live and turned Slot 4 while the page filmed. The show server followed host
+"Ableton Live" at 48 kHz; the page got about 86 `daw-transport` messages a second (playing,
+120 bpm, 4/4) and its tempo source read `daw`; Plate Rock went from 0.01 to 0.54 over 144
+samples across 40 s, following the knob (40 s film, shared with the owner). An earlier take
+with only an automation lane moved nothing (no `daw-slot` arrived), so the lane was not on
+Slot 4 or its automation was off. That was the lane's setup, not the plugin.
 
 ### 13.5-link. Ableton Link in (2026-10-30)
 
