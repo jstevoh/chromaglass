@@ -33,7 +33,7 @@ import type { LiquidBehaviour } from '../types';
 import { DISH_METRES, DISH_GAP_METRES } from './turntable.ts';
 
 /** What speciesOf reads of a bottle: its behaviour, or the deposit made from it (lib/liquidPhase.ts). */
-type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index' | 'scatter'>;
+type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'tension' | 'index' | 'scatter'>;
 
 /** Water's kinematic viscosity, m²/s: Thickness 0 (thinGapViscosity). */
 export const WATER_NU = 1e-6;
@@ -68,6 +68,8 @@ export interface Species {
   index: number;
   /** Reduced scattering coefficient μs′, 1/mm. */
   scatter: number;
+  /** Surface tension against air, mN/m (when the bottle names one). */
+  tension?: number;
 }
 
 /**
@@ -94,7 +96,7 @@ export function speciesOf(what: Poured | undefined): Species | null {
     is thinner than water by more than alcohol's few percent, which on a
     plate whose clear liquid is water is no contrast at all.
   */
-  return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333, scatter };
+  return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333, scatter, ...(what.tension && what.tension > 0 ? { tension: what.tension } : {}) };
 }
 
 /*

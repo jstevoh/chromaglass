@@ -492,7 +492,7 @@
     {
       "name": "Bubbles know their liquid",
       "shard": "logic",
-      "run": "npm run bubbleliquid -- --owed=cell,default,bretherton,local,drain,shape,rim,dissolve,wired",
+      "run": "npm run bubbleliquid",
       "why": [
         "PLAN 33f (scripts/bubbleliquid.mjs), written ahead of its build: each pocket",
         "reads the poured liquid under it from the species field, so its Bretherton",

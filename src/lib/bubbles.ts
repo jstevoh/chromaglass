@@ -23,6 +23,7 @@
 import { stream, type Rng } from './rng';
 import { DISH_METRES, DISH_REST_GAP, DISH_GAP_METRES, OPEN_RIM, carrierViscosity, thicknessViscosity } from './turntable';
 import { plateSin } from './plateRock';
+import { liquidAtCell, type BubbleLiquid, type PouredLiquid, type SpeciesSnapshot } from './bubbleLiquid';
 
 export { DISH_METRES, DISH_REST_GAP };
 
@@ -191,6 +192,49 @@ export class BubbleField {
   private readonly touchingNow = new Set<number>();
   /** The bubbles on the end of the straw this step (kept, not made each step). */
   private readonly heldNow = new Set<Bubble>();
+  private snap: SpeciesSnapshot | null = null;
+  private poured: PouredLiquid | null = null;
+  private readonly plateL: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  private readonly sampleL: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  private readonly hereA: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+  private readonly hereC: BubbleLiquid = { mu: 0, sigma: 0, rho: 0 };
+
+  /**
+   * Hand the field a downsampled species snapshot and the last-poured
+   * bottle's `{sigma, rho}` in SI (`null` drops it, PLAN 33f).
+   */
+  species(snap: SpeciesSnapshot | null, poured: PouredLiquid | null = null): void {
+    this.snap = snap;
+    this.poured = snap ? poured : null;
+  }
+
+  /**
+   * Sample the liquid around pocket `b` on the same eight-point ring
+   * (`b.r + 1.5`) that `step()` samples the flow velocity on, into `out`.
+   * When no snapshot is set or none of the ring taps hits poured liquid,
+   * `out` holds the plate's own `{mu, sigma, rho}` to the bit.
+   */
+  private ringAt(b: Bubble, out: BubbleLiquid): BubbleLiquid {
+    const pMu = this.liquidMu, pSigma = this.liquidSigma, pRho = this.liquidRho;
+    out.mu = pMu; out.sigma = pSigma; out.rho = pRho;
+    if (!this.snap || !this.poured) return out;
+    const plate = this.plateL, sample = this.sampleL;
+    plate.mu = pMu; plate.sigma = pSigma; plate.rho = pRho;
+    const ring = b.r + 1.5;
+    let mu = 0, sigma = 0, rho = 0, any = false;
+    for (let k = 0; k < 8; k++) {
+      liquidAtCell(plate, this.snap, b.x + ring * RING_COS[k], b.y + ring * RING_SIN[k], this.grid, this.poured, sample);
+      if (sample.mu !== pMu || sample.sigma !== pSigma || sample.rho !== pRho) any = true;
+      mu += sample.mu;
+      sigma += sample.sigma;
+      rho += sample.rho;
+    }
+    if (!any) return out;
+    out.mu = mu * 0.125;
+    out.sigma = sigma * 0.125;
+    out.rho = rho * 0.125;
+    return out;
+  }
 
   /**
    * `rng` decides every size, scatter and finger: the show's
@@ -223,6 +267,8 @@ export class BubbleField {
     this.strawBubble = null;
     this.contactDrain.clear();
     this.touchingNow.clear();
+    this.snap = null;
+    this.poured = null;
     this.nextId = 1;
   }
 
@@ -240,8 +286,8 @@ export class BubbleField {
   get anyBlown(): boolean { return this.bubbles.some((b) => b.straw); }
 
   /** The film a front moving at `cellsPerSecond` lays on the glass, as a fraction of the gap. */
-  private filmAt(cellsPerSecond: number): number {
-    const Ca = (this.liquidMu * Math.abs(cellsPerSecond) * (DISH_METRES / this.grid)) / this.liquidSigma;
+  private filmAt(cellsPerSecond: number, mu = this.liquidMu, sigma = this.liquidSigma): number {
+    const Ca = (mu * Math.abs(cellsPerSecond) * (DISH_METRES / this.grid)) / sigma;
     return FILM_COEF * Math.cbrt(Ca * Ca);
   }
 
@@ -447,7 +493,6 @@ export class BubbleField {
     const bs = this.bubbles;
     const m = DISH_METRES / N;            // metres a cell
     const gap = this.gapMetres;
-    const mu = this.liquidMu, sigma = this.liquidSigma;
     this.events.length = 0;
 
     /*
@@ -456,11 +501,8 @@ export class BubbleField {
       Δρ·g·sinθ·b²/(12μ) (PLAN 38n), in the liquid's own viscosity and the
       real gap. It was −tilt·900 cells a second for every liquid and size.
     */
-    const climb = (this.liquidRho * G * gap * gap) / (12 * mu) / m;
     const sinX = plateSin(tiltX, 0), sinY = plateSin(tiltY, 0);
     const rimR = OPEN_RIM * N, cx0 = N / 2, cy0 = N / 2;
-    // Air's diffusivity in this liquid, and how far a pocket's depleted shell reaches (the plate).
-    const D = D_AIR_WATER * (MU_WATER / mu);
     const breath = this.breath;
 
     // The bubbles on the end of the straw this step: held where it is, so
@@ -479,6 +521,11 @@ export class BubbleField {
         b.inject -= add;
       }
       if (b.held) { b.held = false; continue; }
+      const lq = this.ringAt(b, this.hereA);
+      const mu = lq.mu, sigma = lq.sigma;
+      const climb = (lq.rho * G * gap * gap) / (12 * mu) / m;
+      // Air's diffusivity in this liquid, and how far a pocket's depleted shell reaches (the plate).
+      const D = D_AIR_WATER * (MU_WATER / mu);
       /*
         The liquid's own speed where the pocket is, read on a ring just
         outside its rim, not at its middle (PLAN 15g-8d). The thin solve
@@ -531,7 +578,7 @@ export class BubbleField {
         was last laid on. The plate draws the pocket's colour from this rather
         than from a random number and a clock (PLAN 38n).
       */
-      const filmT = this.filmAt(speed);
+      const filmT = this.filmAt(speed, mu, sigma);
       b.film += (filmT - b.film) * (1 - Math.exp(-dt * speed / Math.max(1, 2 * b.r)));
 
       /*
@@ -644,8 +691,10 @@ export class BubbleField {
         const key = Math.min(a.id, c.id) * (2 ** 26) + Math.max(a.id, c.id);
         this.touchingNow.add(key);
         const Re = (a.r * c.r) / (a.r + c.r);
+        const la = this.ringAt(a, this.hereA), lc = this.ringAt(c, this.hereC);
+        const vc = la.mu === lc.mu && la.sigma === lc.sigma ? la.mu / la.sigma : 0.5 * (la.mu / la.sigma + lc.mu / lc.sigma);
         // Stefan-Reynolds thin-film drainage: t_drain = DRAINAGE_FILM_FACTOR * (μ / σ) * Re_metres.
-        const tDrain = DRAINAGE_FILM_FACTOR * (mu / sigma) * Re * m;
+        const tDrain = DRAINAGE_FILM_FACTOR * vc * Re * m;
         const contact = (this.contactDrain.get(key) ?? 0) + dt;
         this.contactDrain.set(key, contact);
         if (contact < tDrain) continue;
@@ -695,10 +744,12 @@ export class BubbleField {
         const over = a.r + c.r - dist;
         if (over <= 0) continue;
         const Ra = Math.max(a.r, 0.3) * m, Rc = Math.max(c.r, 0.3) * m;
-        const k = (sigma * gap * (Ra + Rc)) / (Ra * Rc);
+        const la = this.ringAt(a, this.hereA), lc = this.ringAt(c, this.hereC);
+        const sigmaPair = la.sigma === lc.sigma ? la.sigma : 0.5 * (la.sigma + lc.sigma);
+        const k = (sigmaPair * gap * (Ra + Rc)) / (Ra * Rc);
         // A held bubble does not give: the other takes the whole of the move.
-        const ma = heldNow.has(a) ? 0 : gap / (6 * Math.PI * mu * Ra * Ra);
-        const mc = heldNow.has(c) ? 0 : gap / (6 * Math.PI * mu * Rc * Rc);
+        const ma = heldNow.has(a) ? 0 : gap / (6 * Math.PI * la.mu * Ra * Ra);
+        const mc = heldNow.has(c) ? 0 : gap / (6 * Math.PI * lc.mu * Rc * Rc);
         if (ma + mc <= 0) continue;
         const close = over * (1 - Math.exp(-dt * k * (ma + mc)));
         const pa = close * ma / (ma + mc), pc = close * mc / (ma + mc);

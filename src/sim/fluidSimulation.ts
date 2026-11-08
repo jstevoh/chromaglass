@@ -48,6 +48,7 @@ import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP } from './stepping';
+import { SpeciesPoller } from './speciesPoll';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 export class FluidSimulation {
@@ -445,18 +446,7 @@ export class FluidSimulation {
     share moves only as fast as pours and the rim change it, and a read is
     the species field downsampled to the CPU's grid, about 600 KB.
   */
-  private shareSteps = 0;
-  private shareReading = false;
-  private readPouredShare(): void {
-    const g = this.gpu;
-    if (!this.liquid.thickOnGpu || !g?.speciesShare) { this.liquid.gpuShare = null; return; }
-    if (this.shareReading || ++this.shareSteps < 60) return;
-    this.shareSteps = 0;
-    this.shareReading = true;
-    g.speciesShare()
-      .then((share) => { this.liquid.gpuShare = share; }, () => { /* a lost device: the next read tries again */ })
-      .finally(() => { this.shareReading = false; });
-  }
+  readonly speciesPoll = new SpeciesPoller();
   /** How much faster or slower the music wants this plate than its look (see `lib/tempoPace.ts`); set by the frame. */
   tempoMul = 1;
   /** A paced scene's activity (`lib/scenePacing.ts`): under 1 a rest, over it a swell; set by the frame. */
@@ -525,7 +515,7 @@ export class FluidSimulation {
       if (this.thinGap && g.pour) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
-        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
+        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what), true, what);
       }
       if (('active' in what) && (g as any).addActive) {
         (g as any).addActive(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.active as number) * amount);
@@ -1196,7 +1186,7 @@ export class FluidSimulation {
     this.liquid.setTilt(this.tiltX + this.rockX * 0.02, this.tiltY + this.rockY * 0.02);
     this.liquid.thickOnGpu = this.thinGap && !!this.gpu?.pour;
     this.liquid.gpuNative = !!this.gpu?.addLiquidDrop;
-    this.readPouredShare();
+    this.speciesPoll.poll(this.liquid.thickOnGpu, this.gpu, this.liquid);
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
     // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
     // the deltas and nothing else reads it. The CPU solver has no such step —
@@ -1246,6 +1236,7 @@ export class FluidSimulation {
 
   clearAll() {
     this.liquid.clear();
+    this.speciesPoll.clear();
     this.gpu?.clear();
     if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
