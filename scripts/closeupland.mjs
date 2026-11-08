@@ -262,9 +262,10 @@ if (process.argv.includes('--node')) {
 } else {
   const { chromium } = await import('playwright');
   const { spawn } = await import('node:child_process');
-  const { launchChromium, presentsInXvfb } = await import('./chromium.mjs');
+  const { launchChromium, presentsInXvfb, port } = await import('./chromium.mjs');
   const { engineQuery, installFrameReader, frameOf, waitForShow, waitForEngine, settlePlate } = await import('./frame.mjs');
-  const PORT = 4793;
+  // Asked of chromium.mjs, so two Mac runners' shards each get their own (19ah-7).
+  const PORT = port(4793);
   /** The app's pool, in plate uv (see layPool). */
   const POOL = [0.33, 0.5];
   const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'], { detached: true, stdio: 'ignore' });
