@@ -81,10 +81,18 @@
  * next one at once, and the projector asks on every refresh whatever became of
  * the last ask. So the gaps between one clock's own offers measure its display
  * whatever the other is doing. With `paceTo = 'wall'` (the show's setting), a
- * running wall clock (`ask`) sets the refresh the gate works to, so a 120 Hz
- * desk with a 60 Hz projector draws at the projector's 60 Hz and the desk's
- * preview takes those same frames, while with no wall running the desk draws
- * at its own rate (`'faster'` uses the shorter of the two clocks). The gaps
+ * running wall clock (`ask`) sets the refresh the gate works to when the desk's
+ * clock is faster than 60 Hz (`< AMBIENT_MIN_DRAW_MS`) and the wall's is not,
+ * so a 120 Hz desk with a 60 Hz projector draws at the projector's 60 Hz and
+ * the desk's preview takes those same frames, while with no wall running (or on
+ * a 60 Hz desk) the desk draws at its own rate (`'faster'` uses the shorter of
+ * the two clocks). Without the `frame < AMBIENT_MIN_DRAW_MS` guard, a 60 Hz
+ * wall missing refreshes on a busy runner (40.0 asks/s, median gap 33.3 ms of
+ * two refreshes) alongside a 60 Hz show window (53.0/s, median 16.7 ms) read as
+ * `frame < 0.8 * ask` with a 33.3 ms target refresh (0.6 of it 20.0 ms, over
+ * one 60 Hz refresh), turning down the show's own next frames where no ask drew
+ * (`npm run wall` on the Mac runner: 44.5 drawn/s against 47.7, and 27.5 show
+ * frames skipped/s against 19.0 asks drawn). The gaps
  * between *draws* would be the wrong measure: once doubled they are half a
  * refresh, the gate's threshold falls with them, and the doubled rate holds
  * itself up.
@@ -242,6 +250,7 @@ export class DrawGate {
   private readonly medians: Record<DrawSource, number> = { frame: Infinity, ask: Infinity };
   private readonly medianStamp: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
   private readonly scratch: number[] = [];
+  private askFast = false;
   /**
    * Whether each clock has offered since the last draw (or made it): its one
    * refresh that draw stands for is spent, so its next offer is a refresh of
@@ -276,10 +285,25 @@ export class DrawGate {
     return this.medians[source];
   }
 
-  /** The refresh the gate works to at `now` (ms): the faster running clock's median gap (or the wall's when `paceTo === 'wall'`), never under 240 Hz's. */
+  /**
+   * Whether the desk is a high-refresh display (> 60 Hz, `< AMBIENT_MIN_DRAW_MS`)
+   * pacing down to a slower running wall clock (PLAN 14b-120). A 60 Hz desk
+   * (`>= AMBIENT_MIN_DRAW_MS`) whose wall drops refreshes on a busy runner has
+   * `frame < 0.8 * ask` too (16.7 ms against a 33.3 ms two-refresh median),
+   * and must not mistake those dropped wall refreshes for a 30 Hz projector
+   * and skip its own 60 Hz frames.
+   */
+  private fasterDesk(now: number): boolean {
+    if (this.paceTo !== 'wall' || this.askFast) return false;
+    const frame = this.clockMs('frame', now);
+    const ask = this.clockMs('ask', now);
+    return frame < AMBIENT_MIN_DRAW_MS && ask >= AMBIENT_MIN_DRAW_MS && frame < 0.8 * ask;
+  }
+
+  /** The refresh the gate works to at `now` (ms): the faster running clock's median gap (or the wall's when `paceTo === 'wall'` on a faster desk), never under 240 Hz's. */
   refreshMs(now: number): number {
     const ask = this.clockMs('ask', now);
-    if (this.paceTo === 'wall' && Number.isFinite(ask)) return Math.max(REFRESH_MIN_MS, ask);
+    if (this.fasterDesk(now)) return Math.max(REFRESH_MIN_MS, Math.min(ask, REFRESH_DEFAULT_MS));
     const best = Math.min(this.clockMs('frame', now), ask);
     if (!Number.isFinite(best)) return REFRESH_DEFAULT_MS;
     return Math.max(REFRESH_MIN_MS, best);
@@ -299,10 +323,12 @@ export class DrawGate {
     if (gap > CLOCK_FRESH_MS) {
       g.length = 0;
       this.medians[source] = Infinity;
+      if (source === 'ask') this.askFast = false;
     } else if (gap > 0) {
       g.push(gap);
       if (g.length > GAPS) g.shift();
       this.updateMedian(source);
+      if (source === 'ask' && g.length >= 4 && this.medians.ask < AMBIENT_MIN_DRAW_MS) this.askFast = true;
     }
     this.lastOffer[source] = now;
     this.medianStamp[source] = now;
@@ -312,11 +338,9 @@ export class DrawGate {
     }
     // Gated only while the other clock is running too: one clock alone, the
     // show with no wall or the wall with the show covered, draws every tick.
-    // And never this clock's own next refresh (see above), unless pacing to a
-    // slower wall while the desk's preview clock runs faster (14b-120).
-    const fasterDesk = this.paceTo === 'wall' && source === 'frame'
-      && this.clockMs('frame', now) < 0.8 * this.clockMs('ask', now);
-    const ownNext = !fasterDesk && this.spent[source] && gap >= REFRESH_MIN_MS;
+    // And never this clock's own next refresh (see above), unless pacing a
+    // >60 Hz desk down to a slower wall clock (14b-120).
+    const ownNext = !(source === 'frame' && this.fasterDesk(now)) && this.spent[source] && gap >= REFRESH_MIN_MS;
     if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now) && !ownNext) {
       // An offer stamped behind the last draw (its callback ran late, after
       // the other clock's next refresh) is an earlier refresh, not the one

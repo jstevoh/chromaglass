@@ -11912,10 +11912,12 @@ and checks `now - failedAt < this.retryAfter('rung', above)` in `rungWaiting` so
 rate can climb back once a failed climb's retry window expires (`2 changes after the wall`
 vs `2 with none`). **14b-120** (`src/lib/drawGate.ts`,
 `src/components/LiquidVisualizer.tsx`): `new DrawGate('wall')` (`DrawGate.paceTo =
-'wall'`) paces two-clock draws to a running wall clock's (`ask`) refresh (`60.0 to 60.0 a
-second over ten phases` for a 120 Hz desk and 60 Hz wall) while keeping the desk's own
-refresh when no wall is asking, updating each clock's median gap in place via a reused
-scratch array with zero per-offer allocations. **14c-readout** (`src/sim/stepping.ts`,
+'wall'`) paces two-clock draws to a running wall clock's (`ask`) refresh when the desk's
+clock is faster than 60 Hz (`frame < AMBIENT_MIN_DRAW_MS && ask >= AMBIENT_MIN_DRAW_MS &&
+frame < 0.8 * ask`, `60.0 to 60.0 a second over ten phases` for a 120 Hz desk and 60 Hz
+wall) while keeping the desk's own refresh when no wall is asking or on a 60 Hz desk whose
+wall drops refreshes on a busy runner, updating each clock's median gap in place via a
+reused scratch array with zero per-offer allocations. **14c-readout** (`src/sim/stepping.ts`,
 `src/components/LiquidVisualizer.tsx`): `engineLabel({ grid, dpr, post, stage })`
 formats `"WebGPU · 512² · 1.0x of the wall"` when a stage is attached and stays
 byte-for-byte identical without one. **H2c-10** (`src/sim/stepping.ts`):
