@@ -179,8 +179,6 @@ export const SETUP_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof V
   // Where the logo sits and how big it is: placed once for the room, like a
   // projector, not ridden in a show.
   'markX', 'markY', 'markScale',
-  // And where the song's title lands, its size and its ink (PLAN 37x-10), set once for the show.
-  'inkTitleColor', 'inkTitleSize', 'inkTitleY',
   // Each row's take time: the desk's own setting, never seen on the wall.
   ...MIX_FADE_KEYS,
 ]);

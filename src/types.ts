@@ -981,7 +981,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     keeps the look unless someone asks for more. `npm run music` holds this.
   */
   onNewSong: 'off',
-  // Off: no look paints a title until the Live Show panel or the phone turns it on (PLAN 37x-10).
+  // Off: no song is titled until Settings > Logo & Titles or the phone's Title switch turns it on (PLAN 37x-10).
   inkTitle: false,
   inkTitleColor: '',
   inkTitleSize: 0.5,
