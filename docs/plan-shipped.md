@@ -11658,3 +11658,31 @@ of the mutants added after a review pass found a desk move mid-glide overridden,
 reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
 main's relay taking an `assistant` hello as a phone's, with the switch off and from
 another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).
+
+## 44c-4, 44f. A bigger picture, and a pour on the drop (2026-11-07)
+
+Asked with the test sweep and the album recording in mind (the owner, 2026-11-07:
+"let's do these now"). **44c-4**: `look_at_plate` was the remote's Draw picture, 480
+wide at most. `look_at_plate {size: "large"}` asks the display for one still
+(`assistant-still`, any mode on, relayed only from the guard): `PadPictureSender.wantStill`
+takes the next frame drawn up to 1280 wide through the same GPU grab and encoder, at
+quality 0.7, ahead of the pad's pace and whether or not a pad is asking, and sends it
+once as a `picture` with `still: true`, which the relay hands to the assistant alone.
+Bounded by the relay's half-megabyte frame (an oversized frame would close the
+display's own socket): a still over 480k characters is taken again at three quarters
+of the width. **44f**: `{ do: 'pour', color, amount, x?, y?, wall? }` is a song action,
+laid as a pad's Drop through `applyGesture` (`pourGesture`), its wall point turned onto
+the plate when it fires; `add_song_action` (Play; Full for drain, clear, lay again,
+black and the name and any look on the kicks; never a room setting outside Full, nor
+anything on every kick) sends a `song-action` the
+display adds to the playing song's show as a pinned cue is (`app/songCue.ts`, since
+App.tsx cannot grow). Found on the way: the song show's clock ticked ten times a second
+over a position set twice a second, so a section's action fired up to 558 ms late; it
+now ticks every frame and reads the position at the tick (`positionNow`), 16.7 ms at
+worst. The display clamps a song `set` as a patch and takes at most 24 actions from the
+assistant per song; a still is taken at one of four widths (1280, 960, 720, 540) so the
+GPU grab compiles at most four pipelines for it. Checks: `npm run assistant` 50 lines
+and 22 of 22 mutants (the large still read from its JPEG header, the still kept from
+phones, the song action's modes and kicks), the page's own still rule on the real
+`PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
+drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).

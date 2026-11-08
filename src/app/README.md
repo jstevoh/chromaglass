@@ -39,6 +39,7 @@ comments, which moved with it.
 | `useRemote` | the phone remote's link, both ways |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
 | `useSongScore` | a song's show while it plays, and its score |
+| `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `useSongRendering` | a song rendered to a film |
 | `useControllers` | MIDI, the gamepad, the projector window |
 | `useCommandPalette` | the palette's commands and the keyboard |
