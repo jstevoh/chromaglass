@@ -23,7 +23,7 @@
  */
 
 import inspector from 'node:inspector';
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, Notification, powerSaveBlocker, safeStorage, screen, session, shell, systemPreferences } from 'electron';
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, desktopCapturer, dialog, ipcMain, Menu, MessageChannelMain, Notification, powerSaveBlocker, safeStorage, screen, session, shell, systemPreferences } from 'electron';
 import electronUpdater from 'electron-updater';
 import { randomInt } from 'node:crypto';
 import { createSocket } from 'node:dgram';
@@ -35,6 +35,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
 import { wireLive } from './liveSession.js';
 import { makeKeyStore } from './keys.js';
+import { createSyphonController } from './native/syphon/index.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -137,6 +138,7 @@ const show = {
   oscMode: 'off',
   key: '',
   ambient: false,
+  syphon: false,
   requireSignIn: false,
   license: { valid: false, tier: 'free', email: null, id: null, exp: null, error: null, enforced: false },
 };
@@ -605,6 +607,18 @@ async function setOscMode(mode) {
   }
 }
 
+const syphon = createSyphonController({
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  MessageChannelMain,
+  show,
+  readShowFile,
+  writeShowFile,
+  getShowWindow: () => showWindow,
+  webPreferences: () => webPreferences(),
+});
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
   const template = [
@@ -625,6 +639,13 @@ function buildMenu() {
         },
         { type: 'separator' },
         { label: 'Show Server Details…', accelerator: 'CmdOrCtrl+Shift+K', click: showDetails },
+        {
+          id: 'syphon-out',
+          label: 'Syphon Out',
+          type: 'checkbox',
+          checked: show.syphon,
+          click: (item) => syphon.request(item ? item.checked : !show.syphon),
+        },
         {
           label: 'OSC input (Pro)',
           submenu: [
@@ -677,6 +698,7 @@ async function start() {
   const osc = oscSettings();
   show.osc = osc.port;
   show.oscMode = osc.mode;
+  show.syphon = syphon.readSetting();
   buildMenu();
   /*
     The app opens on a Home or Pro licence (PLAN.md 23.17d; the owner,
@@ -781,9 +803,7 @@ async function start() {
   // Closing the show closes the projector with it, and the app: the server has nothing to serve.
   showWindow.on('closed', () => {
     showWindow = null;
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w.isDestroyed()) w.destroy();
-    }
+    syphon.closeAll();
     app.quit();
     // And out, whatever holds the quit up. On CI's Mac a run whose projector
     // window had been in and out of the Mac's own full screen just before
@@ -793,8 +813,12 @@ async function start() {
     // when the quit goes through; this is only for when it does not.
     setTimeout(() => app.exit(0), 3000).unref?.();
   });
+  showWindow.webContents.on('did-finish-load', () => {
+    syphon.connectChannel();
+  });
   const query = process.env.CHROMAGLASS_QUERY ?? '';
   await showWindow.loadURL(`http://localhost:${show.port}/${query}`);
+  await syphon.openWindow();
 }
 
 function fail(title, err) {

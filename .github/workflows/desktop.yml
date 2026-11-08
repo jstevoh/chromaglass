@@ -237,7 +237,7 @@ jobs:
         env:
           # The Syphon line is written ahead of 13.2's add-on
           # (scripts/desktop-syphon.mjs); the PR that ships it takes the id out.
-          DESKTOP_OWED: syphon
+          DESKTOP_OWED: ''
           # The site above was built as the app ships it: the check's licence
           # lines ask a plain browser on the app's server for the door too.
           VITE_MAC_APP: '1'

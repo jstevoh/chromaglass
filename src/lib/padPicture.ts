@@ -33,6 +33,7 @@
  * 8-draw-a-2, a relay that routes them only to the askers).
  */
 import type { RemoteMessage } from './remoteProtocol';
+import { tapSyphonFrame } from './syphonOut';
 
 /** Frames a second at most. Enough to see where a drop landed while the finger is still down. */
 export const PAD_PICTURE_FPS = 15;
@@ -434,6 +435,7 @@ export function setPadPictureSender(s: PadPictureSender | null): void { current 
 export function padPictureSender(): PadPictureSender | null { return current; }
 /** Called by the frame task with the canvas it just drew. Never throws into it: a pad's picture is not worth a frame. */
 export function tapPadPicture(canvas: HTMLCanvasElement): void {
+  try { tapSyphonFrame(canvas); } catch { /* the next frame tries again */ }
   try { current?.tap(canvas); } catch { /* the next frame tries again */ }
 }
 /** Whether a remote wants pictures now: the WebGPU engine asks before it grabs. */

@@ -174,11 +174,15 @@ download, once more, and update in place from then on.
   desktop -- --packaged` checks the packed app against a feed of its own.
 - `preload.cjs`: tells the page it is in the app (`isDesktopApp()` in
   `src/lib/platform.ts`), which is what lets `useProjector` send the show to a
-  projector without waiting for a click.
+  projector without waiting for a click, and relays GPU-backed `ImageBitmap`
+  frames from the show page to the offscreen Syphon window.
+- `native/syphon/`: the macOS Objective-C++ N-API add-on (`syphon_addon.mm`,
+  `Syphon.framework` Metal server) and offscreen shared-texture controller that
+  publishes `"ChromaGlass"` when *Show → Syphon Out* is on (Pro, PLAN.md 13.2).
 - `electron-builder.config.cjs`: what goes in the app (this folder, `dist/`, the
-  server's two files), the Mac's Info.plist strings, and signing.
+  server's files, unpacked `*.node` add-ons), the Mac's Info.plist strings, and
+  signing.
 - `scripts/desktop.mjs` (`npm run desktop`): the check, run on the packed app by
   `.github/workflows/desktop.yml` on a Mac.
 
-Next in §13: Syphon out (step 2), a native add-on that publishes the plate from
-Electron's shared texture, so Resolume, VDMX or OBS take the plate as a layer.
+Next in §13: NDI out and Spout on Windows (step 3).
