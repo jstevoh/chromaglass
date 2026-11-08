@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SITE_FILMS, PUBLIC_DOMAIN, archiveUrl, type SiteFilm } from '../lib/siteFilms';
 
 /**
@@ -167,6 +167,7 @@ export function SiteFilms({ films = SITE_FILMS }: { films?: readonly SiteFilm[] 
   const [open, setOpen] = useState<string | null>(null);
   const row = useRef<HTMLUListElement>(null);
   const opener = useRef<HTMLElement | null>(null);
+  const restoring = useRef(false);
 
   // A phone: the card most in view plays, and none while the row is off screen.
   useEffect(() => {
@@ -192,7 +193,18 @@ export function SiteFilms({ films = SITE_FILMS }: { films?: readonly SiteFilm[] 
     return () => { if (scroller) scroller.style.overflowY = was; };
   }, [open]);
 
-  const shut = () => { setOpen(null); opener.current?.focus(); };
+  // One function for the life of the row, so the player's effect (which puts
+  // the focus on its close button) runs once when it opens, not again on every
+  // render of the page under it, which would pull the focus out of the film.
+  // Closing gives the focus back to the card, and a card plays its loop on
+  // focus; after a pointer opened it the loop would then run until the next
+  // click, so the focus goes back without starting it.
+  const shut = useCallback(() => {
+    setOpen(null);
+    restoring.current = true;
+    opener.current?.focus();
+    restoring.current = false;
+  }, []);
   const openFilm = films.find((f) => f.id === open);
 
   return (
@@ -204,7 +216,7 @@ export function SiteFilms({ films = SITE_FILMS }: { films?: readonly SiteFilm[] 
             key={f.id}
             film={f}
             playing={!still && playing === f.id}
-            onWant={(on) => { if (!touch) setPlaying((p) => (on ? f.id : p === f.id ? null : p)); }}
+            onWant={(on) => { if (!touch && !(on && restoring.current)) setPlaying((p) => (on ? f.id : p === f.id ? null : p)); }}
             onOpen={f.youtube ? () => { opener.current = document.activeElement as HTMLElement | null; setPlaying(null); setOpen(f.id); } : null}
           />
         ))}

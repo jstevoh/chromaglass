@@ -35,9 +35,11 @@
  * film to open is a still that plays its loop, and nothing more.
  *
  * The music. Every record here was published in the United States before
- * 1926, and so has been in the public domain there since 1 January 2026
- * (17 U.S.C. § 1401(a)(2)(B)(i), the Music Modernization Act's schedule for
- * recordings fixed before 1972): the recording, and the song under it, which
+ * 1926, and so is in the public domain there, the 1925 one since 1 January
+ * 2026 and the older ones before it (17 U.S.C. § 1401(a)(2)(B), the Music
+ * Modernization Act's schedule for recordings fixed before 1972: (i) for those
+ * published before 1923, (ii) for 1923 to 1946, each 100 years after it was
+ * published): the recording, and the song under it, which
  * is older still. The transfers are the Great 78 Project's, digitised from the
  * original shellac and published by the Internet Archive; the archive item,
  * the file and its checksum are what `npm run sitefilms` fetches and checks,
@@ -157,7 +159,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
 /** Why the music is free to use, in the words the credit under the player and the channel's description use. */
 export const PUBLIC_DOMAIN = {
   name: 'public domain in the US',
-  why: 'Published in the United States before 1926, in the public domain there since 1 January 2026.',
+  why: 'Published in the United States before 1926, and so in the public domain there.',
   transfer: 'Transfer from the original 78 by the Great 78 Project, via the Internet Archive.',
 };
 

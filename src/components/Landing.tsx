@@ -245,7 +245,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six records from the 1920s</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
           The app listening to six old 78s and playing each from the first note to the last, with nothing added afterwards.
-          The records are in the public domain.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
+          The records are in the public domain in the US.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
         </p>
         <SiteFilms />
       </section>
