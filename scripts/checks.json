@@ -718,6 +718,17 @@
       ]
     },
     {
+      "name": "Listen designs a song's show",
+      "shard": "logic",
+      "run": "npm run listen",
+      "why": [
+        "Listen (PLAN 28h-8): the show designed from a heard song's map plays on",
+        "the song (its cues through the real scheduler, its stages where startAt",
+        "lays them, louder sections fuller against the song's own range), and",
+        "the flow waits for the right map and says when nothing was named."
+      ]
+    },
+    {
       "name": "Settings survive the sanitiser",
       "shard": "logic",
       "run": "npm run sanitize",

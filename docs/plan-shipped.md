@@ -6083,6 +6083,30 @@ With the followed place (28g-2, #387): a nudge moves the place the follower hold
 the shows read that place. An identification while the follower is unsure resyncs to
 the fingerprint's offset plus the nudge, so a nudge survives a re-anchor.
 
+### 28h-8. Listen: the song named, added, and its show designed once heard (asked 2026-11-08)
+
+The owner, on the Sequence tab: the song recognition should be in the Songs panel, a
+button that listens, fills in the details, and designs a sequence around the song after
+it has heard it. All of it existed apart: the song ID (`useMusicIntelligence`), the map
+a first listen makes, the song shows and the stage sequences; a song was named by typing
+and its show built by hand. Nothing new recognises or maps: **Listen** asks the running
+song ID to try now (`listenNow`), turning on the microphone when nothing is chosen, the
+song ID and Follow songs, and `lib/songDesign.ts` does the rest. `listenStep` reads
+what the ear reports and says when to add the song (its show taking the look that is
+up, without a fade) and when to design; `designFromMap` writes one stage per section of
+the map, each its section's length so `startAt` joins a song halfway in the right stage,
+settings by the section's energy against the song's own range (a ballad's chorus opens
+as far as a rock song's), colours from two dyes to the whole palette and the bridge in
+close; and cues pinned to sections: the title, a burst each chorus, new dyes for the
+bridge and the last chorus, the drain 8 s before the end. The map a first listen made
+was forgotten in the same render it was made (the track ends with it), so it is kept as
+`state.heardMap`. App.tsx is over budget, so its run that starts a song's sequence moved
+whole to `app/useSongSequences.ts`, which Listen starts a designed sequence through.
+The phone has it, as the Songs tile opens the same panel. *Measure:* `npm run listen`,
+20 checks: the cues fire on the song through the real scheduler (0:40, 1:30, 2:14 for
+the bursts), every half-second of the song lands in its section's stage, the ballad, a
+song with no chorus, a map with one section, designing twice, and each step of the flow.
+
 ## 28i. Every look judged again, after the lamp, the soap film and the breakdown
 
 ### 28i-1. Nine looks retired (#408; Antigravity, batch 1 of the overhaul)

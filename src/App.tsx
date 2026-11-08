@@ -145,6 +145,8 @@ import { useRowFades } from './app/useRowFades';
 import { useRemote, type OscOutHear } from './app/useRemote';
 import { useShowFeed } from './app/useShowFeed';
 import { useSongScore } from './app/useSongScore';
+import { useSongSequences } from './app/useSongSequences';
+import { useListen } from './app/useListen';
 import { useSongRendering } from './app/useSongRendering';
 import { useControllers } from './app/useControllers';
 import { useCommandPalette } from './app/useCommandPalette';
@@ -1590,46 +1592,8 @@ export default function App() {
     },
   });
   sequencerRef.current = sequencer;
-  // ── Files made for a song ───────────────────────────────────────
-  // When a song is identified, a sequence made for it starts at the right
-  // point in it and a preset made for it is applied; when the song ends or
-  // another takes its place, a song-bound sequence stops.
-  const songBoundRef = useRef<string | null>(null);   // the sequence running for the current song
-  const lastSongKey = useRef<string | null>(null);
-  useEffect(() => {
-    const key = musicIntel.state.track ? `${musicIntel.state.track.isrc}|${musicIntel.state.track.title}|${musicIntel.state.track.artist}` : null;
-    if (key === lastSongKey.current) return;
-    lastSongKey.current = key;
-    const song = currentSong;
-    const running = sequencer.status.sequenceId;
-    if (songBoundRef.current && (running === songBoundRef.current) && !sameSong(sequencer.sequences.find(q => q.id === running)?.song, song)) {
-      sequencer.stop();
-      songBoundRef.current = null;
-    }
-    if (!song) return;
-    // A set item made for this song goes up on its own, at its own fade.
-    const setHit = setListRef.current.items.find(i => sameSong(i.song, song));
-    const setLook = setHit ? lookOfItem(setHit) : null;
-    if (setLook) { sendLook(setLook, setLook.fade ?? fadeSeconds); return; }
-    const seq = sequencer.sequences.find(q => sameSong(q.song, song));
-    if (seq) {
-      sequencer.startAt(seq.id, musicIntel.state.positionSec);
-      songBoundRef.current = seq.id;
-      return;
-    }
-    const up = userPresets.presets.find(p => sameSong(p.song, song));
-    if (up) applyUserPreset(up);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.state.track, currentSong]);
-  // The song ran out: stop its sequence rather than looping into the next song.
-  useEffect(() => {
-    const id = songBoundRef.current;
-    if (!id || sequencer.status.sequenceId !== id) return;
-    const seq = sequencer.sequences.find(q => q.id === id);
-    const dur = seq?.song?.durationSec;
-    if (dur && musicIntel.state.positionSec > dur + 2) { sequencer.stop(); songBoundRef.current = null; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.state.positionSec]);
+  // ── Files made for a song (app/useSongSequences.ts) ─────────────
+  const { startSongSequence } = useSongSequences({ musicIntel, currentSong, sequencer, setListRef, lookOfItem, sendLook, fadeSeconds, userPresets, applyUserPreset });
 
   const {
     addingToSet, setAddingToSet, addToSet, importToSet, onSetAction, onItemAction,
@@ -1963,6 +1927,10 @@ export default function App() {
     renderHold, musicIntel, isActive, currentSong, songShowsRef, setSongShows, activePresetId,
     pinnedPresetId, userPresets, tempoLabel,
   });
+  const listen = useListen({
+    musicIntel, audioSource, handleSourceChange, musicEnabled: musicSettings.enabled, updateMusicSettings, followSongs, setFollowSongs,
+    songShowsRef, setSongShows, songRuntimeRef, sequencer, startSongSequence, activePresetId, pinnedPresetId, userPresets,
+  });
 
   // ── Render this song (PLAN.md §6) ───────────────────────────────
   const showSequencerRef = useRef(sequencer);
@@ -2144,6 +2112,7 @@ export default function App() {
       currentSong={currentSong}
       follow={followSongs}
       onFollow={setFollowSongs}
+      listen={listen}
       status={songRuntime.status}
       onRun={songRuntime.start}
       onStop={songRuntime.stop}

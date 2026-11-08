@@ -82,6 +82,8 @@ export interface MusicIntelState {
   line: LyricLine | null;
   sectionSentimentValue: number;
   identifying: boolean;
+  /** The map the last first listen made, kept after its song ends (the track and its map are forgotten then): what Listen designs from (`lib/songDesign.ts`). */
+  heardMap: SongMap | null;
   recording: boolean;
   analyzing: boolean;
   fingerprintEnabled: boolean;
@@ -119,6 +121,8 @@ export interface MusicIntelResult {
   stopPerformanceReplay: () => void;
   deletePerformance: (id: string) => void;
   manualTag: (artist: string, title: string) => void;
+  /** Try to name the song now rather than on the next turn of the song ID (Listen, `lib/songDesign.ts`). */
+  listenNow: () => void;
   clearTrack: () => void;
   replayListen: (listenNumber: number) => void;
   stopReplay: () => void;
@@ -160,6 +164,7 @@ export function useMusicIntelligence(
   const [follow, setFollow] = useState<MusicIntelState['follow']>(null);
   const [identifying, setIdentifying] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [heardMap, setHeardMap] = useState<SongMap | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
   const [replayListenNumber, setReplayListenNumber] = useState<number | null>(null);
   const [allTracks, setAllTracks] = useState<TrackEvolutionState[]>([]);
@@ -357,6 +362,9 @@ export function useMusicIntelligence(
       const generated = await generateSongMap(currentTrack.isrc, recording, {
         title: currentTrack.title, artist: currentTrack.artist,
       }, trimToSec);
+      // Before the awaits below, in the same render as the analysis ending:
+      // Listen reads "analysis over and no map" as a song heard too short.
+      if (generated) setHeardMap(generated.map);
       setAnalyzing(false);
       if (generated) {
         const { map, fingerprint } = generated;
@@ -604,6 +612,7 @@ export function useMusicIntelligence(
   }, [adoptTrack, finalizeListen, stream]);
 
   const clearTrack = useCallback(() => { finalizeListen('manual'); }, [finalizeListen]);
+  const listenNow = useCallback(() => { lastIdentifyMsRef.current = -Infinity; lastLocalMatchMsRef.current = -Infinity; }, []);
 
   /*
     A nudge is a seek, not playback: what lies between the old position and
@@ -774,12 +783,12 @@ export function useMusicIntelligence(
   return {
     state: {
       track, songMap, lyrics, trackState, positionSec, nudgeSec, follow, section, line,
-      sectionSentimentValue, identifying, recording: recordingActive, analyzing,
+      sectionSentimentValue, identifying, heardMap, recording: recordingActive, analyzing,
       fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
     },
     overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
-    manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
+    manualTag, listenNow, clearTrack, replayListen, stopReplay, refreshTracks,
     nudgePosition, nudgeToSection, resetNudge, positionNow,
   };
 }

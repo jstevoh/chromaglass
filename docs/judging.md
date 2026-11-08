@@ -2444,3 +2444,21 @@ only the wall can say whether the seven looks read as the real transparencies do
 4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
    not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
    45a-5).
+
+## 112. Listen in the Songs panel (PLAN 28h-8)
+
+`npm run listen` holds the design (cues firing on each chorus through the real scheduler,
+stages where the sequencer lays them, louder sections fuller against the song's own range)
+and the flow on a known song; only a record playing in the room can say whether it names
+the song and whether the show it designs plays well.
+
+1. Sequence tab, Songs panel: with the Mac's speakers playing a record and nothing chosen as
+   the source, press **Listen**. The microphone comes on and, within a few tries, the song
+   is added and opened with its title, artist and length.
+2. Let the song play to its end (or the next song). The line should say what was designed;
+   the song's actions list the title, a burst on every chorus, new dyes for the bridge and
+   the last chorus, and the drain; Stage sequences lists "<title> (Listen)".
+3. Play the song again: the stages should open up on each chorus and settle in the verses,
+   the bridge go in close and come back out, the cues land on their sections.
+4. Bad: a burst a few seconds before its chorus on every play (the map's offset, 28h-9), a
+   look change when the song is added, the plate left in close after the bridge.
