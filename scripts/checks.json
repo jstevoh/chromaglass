@@ -125,12 +125,14 @@
     {
       "name": "The glass gap, one number",
       "shard": "logic",
-      "run": "npm run gap",
+      "run": "npm run gap -- --owed=puddle,settle,lift,pinch",
       "why": [
         "The glass sandwich's gap (PLAN 38r): one constant, 6 mm at rest, and every",
         "reader of it as a length (the drag, Darcy's speeds, the pour's dome, the",
         "cover's shear, the sheet's film, a finger's edge, the ferrofluid's room)",
-        "held to its physics worked out in SI from the millimetres alone."
+        "held to its physics worked out in SI from the millimetres alone. Lines",
+        "19-23 are PLAN 38r-16's pinch and air edge, written before the build:",
+        "each owed id comes out of --owed in the PR that builds it."
       ]
     },
     {
@@ -1266,6 +1268,20 @@
         "and emptying, and the hole filling back. Lab, so SwiftShader runs it,",
         "in lab2: under two minutes on a 128 grid (at 256 it ran nine and pushed",
         "lab2 past its 25-minute bound)."
+      ]
+    },
+    {
+      "name": "The air edge's fingers, owed until 38r-16 is built",
+      "shard": "lab3",
+      "run": "npm run airedge -- --owed=rim,front,fingers",
+      "why": [
+        "Written before the build (PLAN 38r-16; scripts/airedge.mjs): a lift past",
+        "the rim's bead draws air in at the rim only once the bead is empty, the",
+        "field's air is the ledger's A - wet, and the front fingers as",
+        "Saffman-Taylor in a lifted cell (n_max from the pull, not the viscosity).",
+        "Its finger counter's control runs on main; the GPU lines wait for",
+        "readWet, so on main it takes about two seconds. Lab, so SwiftShader",
+        "runs it once built (four runs at 192 squared, a few hundred steps)."
       ]
     },
     {

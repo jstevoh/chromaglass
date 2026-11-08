@@ -51,6 +51,19 @@
  * tilt's slosh (38r-1, a free surface the sandwich does not have), a drop's
  * pancake radius and the beads' merge time (38r-2), and the milk's
  * scattering depth (38i).
+ *
+ * Lines 19 to 23 are the pinch and the air edge (PLAN 38r-16), written
+ * before the build, and run until each is built as
+ *
+ *   npm run gap -- --owed=puddle,settle,lift,pinch
+ *
+ * Each line under an id is printed as owed while what it asks for is absent
+ * and is red the day it passes with its id still listed (the convention of
+ * `timers.mjs` and `bubbleair.mjs`): the PR that builds an item takes its id
+ * out of `--owed` in scripts/checks.json and never edits a line or a bar. A
+ * build that is there and misses is red, owed or not. Line 22 (a wet glass
+ * sticks) holds on main as well, so the build cannot lose it. The air's
+ * fingers themselves are measured on the GPU by `npm run airedge`.
  */
 import { build } from 'esbuild';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -62,6 +75,18 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 const near = (a, b, tol = 1e-9) => Number.isFinite(a) && Math.abs(a - b) <= tol * Math.abs(b);
+const IDS = ['puddle', 'settle', 'lift', 'pinch'];
+const flag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
+const unknown = [...owed].filter((id) => !IDS.includes(id));
+if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
+/** `mainState`: what the line is owed for is absent, which is the only state an owed line is excused in. */
+const line = (id, name, ok, detail, mainState) => {
+  if (!owed.has(id)) return check(name, ok, detail);
+  if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
+  if (!mainState) return check(name, false, `${detail}; owed, but what it is owed for has been built and misses`);
+  console.log(` owed  ${name} — ${detail}`);
+};
 
 const out = 'node_modules/.cache/gap-lib.mjs';
 await build({
@@ -81,6 +106,7 @@ await build({
       "export { FORCE_KERNELS } from './src/gpu/wgsl/fluid/forces.ts';",
       "export { FERRO_DROP_WGSL, GAP_LC } from './src/gpu/wgsl/ferroDrop.ts';",
       "export * as C from './src/lib/cover.ts';",
+      "export * as PG from './src/lib/playGesture.ts';",
       "export { DEFAULT_SETTINGS } from './src/types.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
@@ -228,6 +254,17 @@ const rk4 = (h0, P, sig, mu, t) => {
   for (let i = 0; i < n; i++) { const a = f(h), b = f(h + a * dt / 2), c = f(h + b * dt / 2), d = f(h + c * dt); h += (a + 2 * b + 2 * c + d) * dt / 6; }
   return h;
 };
+/*
+  Since PLAN 38r-16 the ledger may carry `wet`, the area under the glass the
+  liquid wets (all of it, A, on a full film). Two clauses of lines 15 and 16
+  are main's ledger, where the glass follows the liquid down at once and a
+  lift stops when the bead is empty; the air edge corrects both (the glass
+  cannot jump, so a dial taken down opens air at the rim, and a lift past
+  the bead draws the air in). Each clause is written for both ledgers, exact
+  in each, so neither is loosened and the build needs no edit here: the
+  main branch goes once 38r-16 has shipped (PLAN 38r-16).
+*/
+const airEdge = 'wet' in C.coverNew(C.COVER_FULL_ML);
 
 // 12
 {
@@ -284,10 +321,14 @@ const rk4 = (h0, P, sig, mu, t) => {
   // The dial down 10 mL: wicked off the bead first, the rest from under the glass; then down past everything, to the floor's full film.
   const before = { ...s };
   C.coverAdd(s, -10e-6);
-  const wick = s.bead === 0 && near(before.plate - s.plate, 10e-6 - before.bead, 1e-9) && near(s.added, before.added - 10e-6, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12) && near(s.h, s.plate / A, 1e-12);
+  // Main: the glass follows the liquid down at once. The air edge (38r-16): the glass stays where it was that instant and the liquid's edge leaves the rim, h·wet = V.
+  const glass = airEdge ? near(s.h, before.h, 1e-12) && near(s.wet, s.plate / s.h, 1e-12) && s.wet < A : near(s.h, s.plate / A, 1e-12);
+  const wick = s.bead === 0 && near(before.plate - s.plate, 10e-6 - before.bead, 1e-9) && near(s.added, before.added - 10e-6, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12) && glass;
   C.coverAdd(s, -1);
-  const floor = near(s.plate, A * C.COVER_FLOOR_M, 1e-12) && near(s.h, C.COVER_FLOOR_M, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12);
-  check(`a pour under the glass raises it by Q/A and spills nothing below h_hold; past it the glass settles to h_hold, the bead fills, the rest runs off; the dial down wicks the bead then the plate, never under the floor's film; plate + bead + off = everything put in`,
+  // Main: never under the floor's full film. The air edge: down to the dial's 1 mL, the rest a puddle.
+  const floor = (airEdge ? near(s.plate, C.LIQUID_ML_RANGE[0] * 1e-6, 1e-12) && near(s.wet, s.plate / s.h, 1e-12)
+    : near(s.plate, A * C.COVER_FLOOR_M, 1e-12) && near(s.h, C.COVER_FLOOR_M, 1e-12)) && near(s.plate + s.bead + s.off, s.added, 1e-12);
+  check(`a pour under the glass raises it by Q/A and spills nothing below h_hold; past it the glass settles to h_hold, the bead fills, the rest runs off; the dial down wicks the bead then the plate, ${airEdge ? 'the glass staying put as the liquid leaves the rim, down to the dial\'s 1 mL' : 'never under the floor\'s film'}; plate + bead + off = everything put in`,
     near(rise, 4e-6 / A, 1e-9) && Math.abs(before.h - hHold) < 1e-6 && near(before.bead, bead, 1e-9) && before.off > 0 && near(sum, before.added, 1e-12) && near(before.added, (C.COVER_FULL_ML + 24) * 1e-6, 1e-12) && wick && floor,
     `4 mL raised it ${(rise * 1e6).toFixed(1)} µm (Q/A ${(4e-6 / A * 1e6).toFixed(1)}); +20 mL settled at ${(before.h * 1000).toFixed(4)} mm (h_hold ${(hHold * 1000).toFixed(4)}), bead ${(before.bead * 1e6).toFixed(2)} mL, off ${(before.off * 1e6).toFixed(2)} mL; ledger ${(sum * 1e6).toFixed(4)} of ${(before.added * 1e6).toFixed(4)} mL; dial down ${wick}, floor ${floor}`);
 }
@@ -308,7 +349,7 @@ const rk4 = (h0, P, sig, mu, t) => {
   const want = 2 * WATER.sigma * SIN60 / (weight + 20);
   const lc = Math.sqrt(WATER.sigma / (1000 * G)), bead = 2 * Math.PI * R * (Math.PI / 4) * lc * lc;
   for (let i = 0; i < 60; i++) C.coverStep(s, 1 / 60, { nu: 1e-6, grams: glassG, hand: -0.3 });
-  const lifted = s.h;
+  const lifted = s.h, liftedWet = s.wet, liftedPlate = s.plate;
   for (let i = 0; i < 60; i++) C.coverStep(s, 1 / 60, { nu: 1e-6, grams: glassG, hand: 0 });
   // The lift's own rate, on the thick carrier where it is slow enough to see: press to fill the bead, then a gentle lift (about −1 Pa) for 0.2 s against an RK4 of dh/dt = −(2/3)h³P/(μR²).
   const g = C.coverNew(C.COVER_FULL_ML);
@@ -322,9 +363,13 @@ const rk4 = (h0, P, sig, mu, t) => {
     hr += (a + 2 * b + 2 * c + e) * dt / 6;
   }
   const liftRate = near(g.h - g0, hr - g0, 1e-3) && g.bead > 0;
-  check(`a light press settles the glass to 2σ sinθ/(w g + hand), filling the bead and running off past it; a lift past the glass's weight draws the bead back, bead/A higher, and stops; let go, the edge holds it there`,
+  // Main: the lift stops when the bead is in, and the edge holds it. The air edge (38r-16): past the bead the air comes in at the rim, the glass
+  // still rising with the liquid's volume kept (h·wet = V, V the pressed film and the bead), and let go, the puddle settles back to the rim at V/A.
+  const liftOk = airEdge ? lifted > want + bead / A && liftedWet < A && near(lifted * liftedWet, liftedPlate, 1e-9) && near(liftedPlate, want * A + bead, 1e-6) && near(s.wet, A, 1e-12)
+    : near(lifted, want + bead / A, 1e-6) && near(s.h, lifted, 1e-12);
+  check(`a light press settles the glass to 2σ sinθ/(w g + hand), filling the bead and running off past it; a lift past the glass's weight draws the bead back, bead/A higher, ${airEdge ? 'then the air in, and let go the puddle settles back to the rim there' : 'and stops; let go, the edge holds it there'}`,
     Math.abs(pressed - want) < 1e-6 && near(beadIn, bead, 1e-9) && near(off, (H0 - want) * A - bead, 1e-6)
-      && near(lifted, want + bead / A, 1e-6) && s.bead === 0 && near(s.h, lifted, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12) && liftRate,
+      && liftOk && s.bead === 0 && near(s.h, want + bead / A, 1e-6) && near(s.plate + s.bead + s.off, s.added, 1e-12) && liftRate,
     `pressed to ${(pressed * 1000).toFixed(4)} mm (want ${(want * 1000).toFixed(4)}), bead ${(beadIn * 1e6).toFixed(2)} mL, off ${(off * 1e6).toFixed(2)} mL; lifted to ${(lifted * 1000).toFixed(4)} mm (want ${((want + bead / A) * 1000).toFixed(4)}), held at ${(s.h * 1000).toFixed(4)}; a gentle lift rose ${((g.h - g0) * 1e9).toFixed(1)} nm in 0.2 s (RK4 ${((hr - g0) * 1e9).toFixed(1)})`);
 }
 
@@ -366,6 +411,201 @@ const rk4 = (h0, P, sig, mu, t) => {
     near(share, 0.5, 1e-12) && near(drag, 1, 1e-12) && near(heavy, 0.5, 1e-12) && solver.every(Boolean)
       && d.liquidMl === C.COVER_FULL_ML && d.coverWeight === C.COVER_GLASS_G,
     `share ×${share}, drag ×${drag.toFixed(6)} (heavy ×${heavy}), solver ${solver.map((b) => (b ? 1 : 0)).join('')}, defaults ${d.liquidMl} mL / ${d.coverWeight} g`);
+}
+
+/*
+  19–23: the pinch and the air edge (PLAN 38r-16).
+
+  The owner's pick (2026-10-31, "Build the air edge now"): below a full film
+  the liquid is a puddle under the glass with an air edge. Between two wetted
+  glasses that edge's meniscus is concave across the gap, so the liquid in
+  the puddle is below the air by 2σ cosθ/h and pulls the glasses together.
+  Over the wetted area `wet` the glass's load P (its weight and the hand,
+  over the whole cover A) and that suction make the puddle's mean pressure
+
+      P̄ = P·A/wet + 2σ cosθ/h,
+
+  and Stefan's squeeze of a disc of radius r = √(wet/π) moves the glass at
+
+      dh/dt = −(2/3) h³ P̄ / (μ r²),
+
+  with the volume kept, wet = V/h. A settle (P̄ > 0) spreads the puddle until
+  it meets the rim, where the edge pins (38r-5) and the glass stops at V/A;
+  under the gap's floor (a full film under 8.4 mL) it stops at the floor and
+  stays a puddle. A lift (P̄ < 0) shrinks it, the air coming in at the rim,
+  up to the gap's ceiling (4 mm, 38r-18's cap). On a full film with the bead
+  empty the same sum says when the air may come in at all: a lift weaker
+  than P_load + 2σ cosθ/h moves nothing, which is why a wet glass sticks.
+
+  Each line integrates that here by RK4 at a two-hundredth of its own time
+  scale and holds lib/cover.ts to it at 1e-4, so the lib must solve a step
+  exactly (or finely enough) whatever the frame's dt, as it does Stefan's
+  settle today (line 14).
+*/
+const COS60 = Math.cos(Math.PI / 3);
+const suck = (sig, h) => 2 * sig * COS60 / h;
+const puddleRate = (h, V, P, sig, mu) => { const wet = Math.min(A, V / h); return -(2 / 3) * h ** 3 * (P * A / wet + suck(sig, h)) / (mu * wet / Math.PI); };
+/** The glass over a puddle of V from h0 under load P, t seconds: stops at the rim (V/A) settling, at the ceiling lifting, never under the floor. */
+const puddleRk4 = (h0, V, P, sig, mu, t) => {
+  const rim = V / A, top = C.COVER_TOP_M, fl = C.COVER_FLOOR_M;
+  const clampH = (h, down) => (down ? Math.max(h, Math.max(rim, fl)) : Math.min(h, top));
+  const down = puddleRate(h0, V, P, sig, mu) < 0;
+  const n = Math.max(4000, Math.ceil(t / ((h0 / Math.abs(puddleRate(h0, V, P, sig, mu))) / 200)));
+  const dt = t / n;
+  let h = h0;
+  for (let i = 0; i < n; i++) {
+    const f = (x) => puddleRate(clampH(x, down), V, P, sig, mu);
+    const a = f(h), b = f(h + a * dt / 2), c = f(h + b * dt / 2), d = f(h + c * dt);
+    h = clampH(h + (a + 2 * b + 2 * c + d) * dt / 6, down);
+    if (h === (down ? Math.max(rim, fl) : top)) break;
+  }
+  return h;
+};
+/** The lib's glass after t seconds in steps of dt, under a constant hand. */
+const libRun = (s, t, dt, k) => { for (let i = 0, n = Math.round(t / dt); i < n; i++) C.coverStep(s, dt, k); return s; };
+const wetOf = (s) => (airEdge ? `wet ${(s.wet / A).toFixed(4)} A` : 'no wet in the ledger');
+
+// 19
+{
+  const fl = C.COVER_FLOOR_M, k = { nu: 1e-6, grams: glassG, hand: 0 };
+  const s5 = libRun(C.coverNew(5), 2, 1 / 60, k), s1 = libRun(C.coverNew(1), 2, 1 / 60, k), sf = libRun(C.coverNew(C.COVER_FULL_ML), 2, 1 / 60, k);
+  const ok = airEdge && C.LIQUID_ML_RANGE[0] === 1 && near(s5.h, fl, 1e-12) && near(s5.wet, 5e-6 / fl, 1e-9) && near(s1.h, fl, 1e-12) && near(s1.wet, 1e-6 / fl, 1e-9)
+    && near(sf.wet, A, 1e-12) && near(sf.h, H0, 1e-12) && [s5, s1, sf].every((s) => near(s.plate, s.h * s.wet, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12));
+  line('puddle', `under a full film (${(A * fl * 1e6).toFixed(2)} mL at the ${(fl * 1000).toFixed(3)} mm floor) the liquid is a puddle at the floor, its area V/h; the default fills the cover; the Liquid dial runs from 1 mL`, ok,
+    `5 mL: h ${(s5.h * 1000).toFixed(4)} mm, ${wetOf(s5)} (V/h ${(5e-6 / fl / A).toFixed(4)} A); 1 mL: ${wetOf(s1)} (${(1e-6 / fl / A).toFixed(4)} A); default: ${wetOf(sf)}; dial from ${C.LIQUID_ML_RANGE[0]} mL`, !airEdge);
+}
+
+// 20
+{
+  /*
+    The dial taken from the default down to 20 mL at once: the glass cannot
+    jump, so the liquid's edge leaves the rim (wet = V/h₀, a third of the
+    cover), and the puddle settles back out to the rim, the glass coming down
+    to V/A = 0.64 mm: halfway in about 6 ms for water and 0.13 s for the
+    thick carrier (22 mm²/s), the ratio of their μ. Held to the RK4 at half, one and two of its own
+    half-times, stepped at a tenth of the half-time and in one step of twice
+    it (the same answer: a step's size must not matter), and the end exactly
+    V/A with the cover wet.
+  */
+  const rows = []; let ok = airEdge;
+  const V = 20e-6, rim = V / A;
+  for (const [name, nu] of [['water', 1e-6], ['thick', 2.2e-5]]) {
+    const sig = C.carrierTension(nu), mu = 1000 * nu, k = { nu, grams: glassG, hand: 0 };
+    let lo = 0, hi = 60;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (puddleRk4(H0, V, weight, sig, mu, m) > (H0 + rim) / 2) lo = m; else hi = m; }
+    const half = lo;
+    const start = () => { const s = C.coverNew(C.COVER_FULL_ML); C.coverAdd(s, V - s.plate); return s; };
+    const s0 = start();
+    ok &&= near(s0.h, H0, 1e-12) && near(s0.wet, V / H0, 1e-9);
+    for (const f of [0.5, 1, 2]) {
+      const want = puddleRk4(H0, V, weight, sig, mu, f * half), got = libRun(start(), f * half, half / 10, k).h;
+      ok &&= Math.abs(got - want) <= 1e-4 * want && got >= rim * (1 - 1e-12);
+      if (f === 1) rows.push(`${name} half-settled in ${(half * 1000).toFixed(1)} ms, at it ${(got * 1000).toFixed(4)} mm (RK4 ${(want * 1000).toFixed(4)})`);
+    }
+    const one = libRun(start(), 2 * half, 2 * half, k).h, many = libRun(start(), 2 * half, half / 10, k).h;
+    const end = libRun(start(), 60 * half + 1, 1 / 60, k);
+    ok &&= Math.abs(one - many) <= 1e-4 * many && near(end.h, rim, 1e-9) && near(end.wet, A, 1e-12) && near(end.plate + end.bead + end.off, end.added, 1e-12);
+    rows.push(`${name} one step of 2 half-times ${(one * 1000).toFixed(4)} against twenty ${(many * 1000).toFixed(4)}; ends ${(end.h * 1000).toFixed(4)} mm (V/A ${(rim * 1000).toFixed(4)}), ${wetOf(end)}`);
+    ok &&= name === 'water' ? half > 0.001 && half < 0.03 : half > 0.05 && half < 0.5;
+  }
+  line('settle', 'the dial taken down faster than the glass settles opens air at the rim, and the puddle settles back out by Stefan under its weight and its edge\'s suction 2σcosθ/h, to V/A: halfway in milliseconds for water, a tenth of a second or so thick', ok, rows.join('; '), !airEdge);
+}
+
+// 21
+{
+  /*
+    A lift past the bead (it is empty on a fresh plate) and past the edge's
+    suction: hand −0.12, a pull of 120 Pa against the glass's 49 and the
+    edge's 34–36. The air comes in at the rim and the glass rises, faster as
+    the puddle shrinks (P·A/wet grows): thick in frames, asked against the
+    RK4 where it has the glass at 3 mm (about 0.4 s); water, 22 times
+    quicker, at the gap's ceiling inside half a second. Then let
+    go: the puddle settles back to the rim and the glass to V/A, the default
+    2 mm, the cover wet again (the air pushed out; what the GPU traps as
+    bubbles is `npm run airedge`'s, not the ledger's).
+  */
+  const rows = []; let ok = airEdge;
+  const V = C.COVER_FULL_ML * 1e-6, P = weight - 0.12 * C.HAND_PA;
+  for (const [name, nu] of [['water', 1e-6], ['thick', 2.2e-5]]) {
+    const sig = C.carrierTension(nu), mu = 1000 * nu;
+    // Water is at the ceiling by half a second; thick is asked where the RK4 has it at 3 mm, halfway up, in frames.
+    let T = 0.5;
+    if (name === 'thick') { let lo = 0, hi = 0.5; for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (puddleRk4(H0, V, P, sig, mu, m) < 0.003) lo = m; else hi = m; } T = Math.round(lo * 60) / 60; }
+    const s = libRun(C.coverNew(C.COVER_FULL_ML), T, 1 / 60, { nu, grams: glassG, hand: -0.12 });
+    const want = puddleRk4(H0, V, P, sig, mu, T);
+    const up = s.h, upWet = s.wet;
+    ok &&= Math.abs(up - want) <= 1e-4 * want && s.bead === 0 && near(s.plate, up * upWet, 1e-12) && upWet < A;
+    ok &&= name === 'water' ? near(up, C.COVER_TOP_M, 1e-12) : up < C.COVER_TOP_M && up > H0 * 1.25 && T > 0.2;
+    libRun(s, 5, 1 / 60, { nu, grams: glassG, hand: 0 });
+    ok &&= near(s.h, H0, 1e-9) && near(s.wet, A, 1e-12) && near(s.plate + s.bead + s.off, s.added, 1e-12);
+    rows.push(`${name} lifted to ${(up * 1000).toFixed(4)} mm in ${T.toFixed(3)} s (RK4 ${(want * 1000).toFixed(4)}), ${airEdge ? `wet ${(upWet / A).toFixed(3)} A` : 'no wet'}; let go, ${(s.h * 1000).toFixed(4)} mm, ${wetOf(s)}`);
+  }
+  line('lift', 'a lift past the bead and the edge\'s suction draws air in at the rim, the glass rising by Stefan with the volume kept (h·wet = V) up to the ceiling; let go, it settles back to V/A', ok, rows.join('; '), !airEdge);
+}
+
+// 22
+{
+  // A wet glass sticks: with the bead empty, a lift weaker than the glass's weight and the edge's suction moves nothing, now and after the build.
+  const rows = []; let ok = true;
+  for (const [name, nu] of [['water', 1e-6], ['thick', 2.2e-5]]) {
+    const sig = C.carrierTension(nu), hand = -(weight + 0.5 * suck(sig, H0)) / C.HAND_PA;
+    const s = libRun(C.coverNew(C.COVER_FULL_ML), 2, 1 / 60, { nu, grams: glassG, hand });
+    ok &&= s.h === H0 && s.bead === 0 && near(s.plate, A * H0, 1e-12) && (!airEdge || s.wet === A);
+    rows.push(`${name}: a pull of ${(-hand * C.HAND_PA).toFixed(1)} Pa held the glass at ${(s.h * 1000).toFixed(4)} mm`);
+  }
+  check('a wet glass sticks: with the bead empty, a lift weaker than the glass\'s weight and the edge\'s suction 2σcosθ/h moves nothing', ok, rows.join('; '));
+}
+
+// 23
+{
+  /*
+    The pinch's hand (lib/playGesture.ts, the contract the build exports):
+    `pinchHand(scale)` turns a pinch's span, now over where it started, into
+    FluidSimulation.coverHand: fingers together press (+), apart lift (−),
+    zero at the start, odd in the span's log, a full hand at half or twice
+    the span and no more past it, and a gentle bottom (a pinch just told
+    from a breath, at PINCH_SPAN, under a tenth: about 100 Pa, the owner's
+    gentle-to-extreme rule). And `playHand`'s fifth argument, the pair's span
+    over its landing span: a pair whose span changes past PINCH_SPAN is a
+    pinch, a pair moving together a breath, as before; once a pinch, a pinch
+    until every finger is off; the closeup's pair stays the camera; a tool
+    picked on the tray is that hand. Then the wiring, which only reaches:
+    something under src/ hands pinchHand's answer to coverHand, from the
+    trackpad's ctrl-wheel and from the touch path. How it feels is the
+    Mac's film, not a line.
+  */
+  const PG = L.PG;
+  const has = typeof PG.pinchHand === 'function' && typeof PG.PINCH_SPAN === 'number';
+  let ok = false, detail = 'no pinchHand or PINCH_SPAN in lib/playGesture.ts';
+  if (has) {
+    const f = (travel, ms) => ({ travel, ms });
+    const spans = [1 / 4, 1 / 2, 1 / 1.5, 1 / 1.2, 1, 1.2, 1.5, 2, 4], hands = spans.map(PG.pinchHand);
+    const mono = hands.every((v, i) => i === 0 || v < hands[i - 1] || (Math.abs(v) === 1 && v === hands[i - 1]));
+    const odd = [1.1, 1.5, 2, 3].every((x) => near(PG.pinchHand(1 / x), -PG.pinchHand(x), 1e-9));
+    const ends = PG.pinchHand(1) === 0 && PG.pinchHand(0.5) === 1 && PG.pinchHand(2) === -1 && PG.pinchHand(0.25) === 1 && PG.pinchHand(4) === -1;
+    const g = PG.pinchHand(1 / PG.PINCH_SPAN), gentle = g > 0 && g <= 0.1 && PG.PINCH_SPAN >= 1.1 && PG.PINCH_SPAN <= 1.3;
+    const pair = [f(30, 300), f(30, 300)];
+    const reads = [
+      PG.playHand('dropper', 'blow', pair, false, 1.4) === 'pinch',
+      PG.playHand('dropper', 'blow', pair, false, 0.7) === 'pinch',
+      PG.playHand('dropper', 'blow', [f(90, 300), f(90, 300)], false, 1.05) === 'blow',
+      PG.playHand('dropper', 'dropper', [f(0, 30), f(0, 0)], false, 1) === 'blow',
+      PG.playHand('dropper', 'pinch', [f(90, 600), f(90, 600)], false, 1) === 'pinch',
+      PG.playHand('dropper', 'pinch', [f(90, 600)], false) === 'pinch',
+      PG.playHand('dropper', 'pinch', [], false) === 'dropper',
+      PG.playHand('dropper', 'dropper', pair, true, 1.5) === 'dropper',
+      PG.playHand('blow', 'dropper', pair, false, 1.5) === 'blow',
+    ];
+    const files = [];
+    const walk = (d) => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else if (/\.(ts|tsx)$/.test(n) && !p.endsWith('playGesture.ts')) files.push(p); } };
+    walk('src');
+    const calls = files.map((p) => [p, readFileSync(p, 'utf8')]).filter(([, t]) => /pinchHand\(/.test(t));
+    const sites = calls.reduce((n, [, t]) => n + (t.match(/pinchHand\(/g) ?? []).length, 0);
+    const wired = sites >= 2 && calls.some(([, t]) => /ctrlKey/.test(t) && /coverHand/.test(t));
+    ok = mono && odd && ends && gentle && reads.every(Boolean) && wired;
+    detail = `hands ${hands.map((v) => v.toFixed(3)).join(' ')} over spans ${spans.map((x) => x.toFixed(2)).join(' ')}; monotone ${mono}, odd ${odd}, ends ${ends}, at PINCH_SPAN ${PG.PINCH_SPAN} ${g.toFixed(3)}; reads ${reads.map((b) => (b ? 1 : 0)).join('')}; pinchHand called ${sites} times in ${calls.map(([p]) => p).join(', ') || 'no file'}, wired ${wired}`;
+  }
+  line('pinch', 'a pinch on the trackpad (ctrl-wheel) or two fingers whose span changes sets the glass\'s hand: together presses, apart lifts, gentle at first and full at half or twice the span; a pair moving together still blows', ok, detail, !has);
 }
 
 console.log(bad ? `\n${bad} FAILED` : '\nall ok');
