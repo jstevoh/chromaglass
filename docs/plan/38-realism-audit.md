@@ -261,6 +261,23 @@ written first. Line numbers are as read on main at d07ac31.
     ferrofluid's glint is a fixed key light (with **38j**). The photo style's softbox is a
     print lit from the front and stays. And the lab draws only the derived path, so the
     plain path's rims are checked through the camera's, which shares `meniscus`.
+    *The film's check, written first (2026-11-08):* `npm run nolight -- --owed=film` line
+    15, the camera's bubbles at Iridescence 1 against 0, at Film Physics 0 and 1: no pixel
+    brighter (by over 1), over 0.2% of the picture still moved, and Film Physics 0 the same
+    picture as 1 (one transmitted film; main differs by 31). Main: 22 levels over at
+    Film Physics 0 (`camFilm`'s `0.45 + 1.25 × filmC`), 0 at 1, where it already
+    transmits. A throwaway `camFilm` that returns `mix(1, filmTableAt(filmP, true), irid)`
+    at any Film Physics passed it (10.83% moved at each).
+  - **38h-14. The projector's bubble film still reflects at Film Physics 0** (S, nil; a
+    look change on the looks that set Iridescence over 0.25). Found writing 38h-6's
+    check: the plate's own bubbles at Iridescence 1 against 0 read 51 levels brighter at
+    Film Physics 0 (`cp * (0.45 + 1.25 * filmC)` above Iridescence 0.25, plate.ts's bubble
+    block), 0 at Film Physics 1. A pocket between the glasses throws only the light
+    through its film, so at Film Physics 0 the rainbow wants a transmitted form too (the
+    pale complement, 1 − k·R, never over 1), or Film Physics 0 is kept as the deliberate
+    look it was written as and named so. Owner's call on the looks. *Measure:* `npm run
+    nolight` line 15 prints the projector's number beside the camera's; ask it under
+    line 15's bar when this ships.
   - ~~**38h-4**~~ *shipped 2026-10-31.* The back plate's lamp takes the pigment's grain as
     dye, T^grain (`lampGrain1`), as the front's does. `npm run grainedge` line 4. Story in
     `docs/plan-shipped.md` §38.
