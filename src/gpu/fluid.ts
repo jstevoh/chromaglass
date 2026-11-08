@@ -1225,8 +1225,8 @@ export class WebGPUFluid extends FluidReads {
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Previously, isotropic Jacobi diffusion
-      removed about 8a/(1+8a) of it a step. Now with physical molecular diffusion
+      GRID_DAMP a step in every look. Isotropic Jacobi diffusion used to take
+      about 8a/(1+8a) of it a step. With physical molecular diffusion
       Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
       nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
       elevated diffusion, keeping high-frequency grid modes smoothly damped.
