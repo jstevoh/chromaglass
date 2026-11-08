@@ -189,7 +189,7 @@ export class WebGPUAir {
   /** Whether anything would be drawn — the caller skips the exclusion without it. */
   get any(): boolean { return this.live > 0 || this.boilTex !== null; }
 
-  /** Attach or clear the plate's boiling vapour fraction texture (`r32float`, PLAN §36e-2). */
+  /** Attach or clear the plate's boiling vapour fraction texture (`rg32float`, PLAN §36e-2). */
   setBoilAlpha(tex: GPUTexture | null): void {
     this.boilTex = tex;
   }

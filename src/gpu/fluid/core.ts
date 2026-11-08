@@ -101,11 +101,15 @@ export class FluidCore {
   /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
   protected sloshLevel = true;
   protected sloshTex: GPUTexture | null = null;
-  /** The plate's boiling vapour fraction field (`r32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
+  /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;
   protected boilUni: GPUBuffer | null = null;
+  protected readonly boilUniData = new ArrayBuffer(112);
+  protected readonly boilUniF = new Float32Array(this.boilUniData);
+  protected readonly boilUniU = new Uint32Array(this.boilUniData);
   protected boilLive = false;
+  protected boilFresh = false;
   protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   protected readonly velRide: GPUTexture;
@@ -716,6 +720,7 @@ export class FluidCore {
     this.swirlTail = 0;
     if (this.boilAlpha) for (const t of [this.boilAlpha.a, this.boilAlpha.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.boilLive = false;
+    this.boilFresh = true;
     this.boilTail = 0;
     this.air?.setBoilAlpha(null);
     if (this.grain) {

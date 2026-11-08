@@ -260,25 +260,29 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let q = vec2i(id.xy);
   let uv = (vec2f(id.xy) + 0.5) / m;
   var c = textureLoad(cur, q, 0).xy;
-  let temp = bilerpN(vel, uv, S.n).z;
-  /*
-    Buoyancy from water's real density (Kell 1975, PLAN §18f and §36e-2), with the
-    clamp(temp, 0, 50) removed and maxCur kept off the thermal buoyancy so plumes
-    have the strength of their real density deficit right up to boiling. S.up is
-    gated on upright, so a level plate has no in-plane buoyancy.
-  */
+  let rawTemp = bilerpN(vel, uv, S.n).z;
+  let boiling = A.a.z > 0.0;
+  let temp = select(clamp(rawTemp, 0.0, 50.0), 0.0, boiling);
+  var f = S.up * (S.curBuoy * temp);
   let dd = tanh(clamp(bilerpN(dye, uv, S.n).a - S.meanD, -10.0, 10.0));
-  var f = S.rock * dd;
+  f += S.rock * dd;
   let toC = vec2f(0.5) - uv;
   let r = length(toC);
   if (r > 1e-4) { f += (toC / r) * (S.curGrav * dd); }
   c = c * S.curDamp + f * (1.0 - S.curDamp);
-  if (S.curBuoy <= 0.0 || temp <= 0.0) {
-    let s = length(c);
-    if (s > S.maxCur) { c *= S.maxCur / s; }
-  } else {
-    let dRho = max(0.0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + temp));
-    c += S.up * (S.curBuoy * dRho * (1.0 - S.curDamp));
+  let s = length(c);
+  if (s > S.maxCur) { c *= S.maxCur / s; }
+  /*
+    While the boil model runs (A.a.z > 0), buoyancy comes from water's real
+    density deficit Δρ = ρ(T_ambient) − ρ(T) (Kell 1975, PLAN §18f and §36e-2),
+    converted from kg/m³ to the current's per-kelvin Darcy rise units via
+    BOIL_BUOY_PER_KG_M3 = 1 / |dρ/dT(T_ambient)| and added uncapped by maxCur
+    after the non-thermal current is capped. At Heat = 0, today's exact lines
+    above run byte for byte.
+  */
+  if (boiling && S.curBuoy > 0.0 && rawTemp > 0.0) {
+    let dRho = max(0.0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + rawTemp));
+    c += S.up * (S.curBuoy * (dRho * BOIL_BUOY_PER_KG_M3) * (1.0 - S.curDamp));
   }
   textureStore(dst, q, select(vec4f(0.0), vec4f(c, 0.0, 0.0), finite2(c)));
 }`,

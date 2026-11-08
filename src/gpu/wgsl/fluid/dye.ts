@@ -216,7 +216,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  if (S.heatDecay >= 0.0) {
+  if (A.a.x <= 0.0) {
     // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
     let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
     var temp = v.z * cool;

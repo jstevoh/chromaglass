@@ -14,7 +14,7 @@ import { SimResolution } from '../types';
 import { PipelineCache } from '../gpu/kit';
 import { QualityGovernor } from '../lib/governor';
 import type { GpuStepParams } from '../gpu/solverTypes';
-import { T_AMBIENT, waterDensity } from '../gpu/lampBoil';
+import { BOIL_BUOY_PER_KG_M3, T_AMBIENT, waterDensity } from '../gpu/lampBoil';
 
 /**
  * The largest grid a pinned `?sim=` may ask for.
@@ -243,27 +243,26 @@ export function stepCurrentCpu(
   vyOut: Float32Array,
   p: GpuStepParams,
 ): void {
+  const boiling = (p.heat ?? 0) > 1e-4;
   for (let j = 1; j < M - 1; j++) {
     for (let i = 1; i < M - 1; i++) {
       const k = i + j * M;
       const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
+      const t = boiling ? 0 : Math.max(0, Math.min(50, temp[q]));
       const dd = Math.tanh(density[q] - p.meanDensity);
       const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
       let fx = p.rockX * dd;
-      let fy = p.rockY * dd;
+      let fy = p.rockY * dd + upright * p.currentBuoy * t;
       const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
       const r = Math.sqrt(tx * tx + ty * ty);
       if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
       let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
       let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
-      const t = temp[q];
-      if (upright <= 0 || p.currentBuoy <= 0 || t <= 0) {
-        const s = Math.sqrt(vx * vx + vy * vy);
-        if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
-      } else {
-        const dRho = Math.max(0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + t));
-        fy = upright * p.currentBuoy * dRho;
-        vy += fy * (1 - p.currentDamp);
+      const s = Math.sqrt(vx * vx + vy * vy);
+      if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
+      if (boiling && upright > 0 && p.currentBuoy > 0 && temp[q] > 0) {
+        const dRho = Math.max(0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + temp[q]));
+        vy += upright * p.currentBuoy * (dRho * BOIL_BUOY_PER_KG_M3) * (1 - p.currentDamp);
       }
       cvx[k] = vx; cvy[k] = vy;
     }

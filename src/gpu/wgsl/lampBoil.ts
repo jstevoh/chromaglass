@@ -33,6 +33,16 @@ export const ALPHA_MAX = 0.95;
 export const SIGMA_SB = 5.670374e-8;
 export const T_AMBIENT = 20.0;
 export const HAND_RADIUS = 0.015;
+/**
+ * Physical scale from Kell density deficit Δρ = ρ(T_ambient) − ρ(T) (kg/m³) to
+ * the current's per-kelvin buoyancy (`curBuoy`). In Darcy flow through the gap h₀,
+ * u_Darcy = (HEAT_RISE / ρ₀) Δρ with HEAT_RISE = g h₀² / (12 ν_ref); since `curBuoy`
+ * is calibrated per kelvin at T_AMBIENT (20 °C), where |dρ/dT| = ρ₀ β₀ = 0.2068227 kg/(m³·K),
+ * the ratio (HEAT_RISE / ρ₀) / (β₀ HEAT_RISE) = 1 / (ρ₀ β₀) = 4.8350587 K/(kg/m³)
+ * converts Δρ (kg/m³) into kelvin-equivalent Darcy rise, matching the linear Boussinesq
+ * slope near 20 °C and rising 3.4× steeper at 90 °C (Kell 1975).
+ */
+export const BOIL_BUOY_PER_KG_M3 = 4.8350587;
 
 /** Shared physical property functions in WGSL (`waterDensity`, `waterDensityDeriv`, `waterViscosity`, `minmodBoil`). */
 export const BOIL_PROPERTIES_WGSL = /* wgsl */ `
@@ -61,6 +71,9 @@ const VIS_FRACTION: f32 = 0.12;
 const EPS_GLASS: f32 = 0.9;
 const H_INTER: f32 = 1e4;
 const PI_BOIL: f32 = 3.141592653589793;
+// Physical Darcy buoyancy scale 1 / |dρ/dT(T_AMBIENT)| = 1 / 0.2068227 K/(kg/m³),
+// converting Kell density deficit Δρ (kg/m³) into the current's per-kelvin buoyancy units.
+const BOIL_BUOY_PER_KG_M3: f32 = 4.8350587;
 
 // Kell (1975) liquid water density (kg/m³), 0–150 °C at 1 atm.
 fn waterDensity(T: f32) -> f32 {
@@ -716,7 +729,7 @@ struct PlateBoilU {
 @group(0) @binding(5) var alphaIn: texture_2d<f32>;
 @group(0) @binding(6) var<storage, read> dTnuc: array<f32>;
 @group(0) @binding(7) var velOut: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(8) var alphaOut: texture_storage_2d<r32float, write>;
+@group(0) @binding(8) var alphaOut: texture_storage_2d<rg32float, write>;
 @group(0) @binding(9) var<storage, read_write> poured: array<f32>;
 
 fn insideRim(q: vec2i, n: i32) -> bool {
@@ -731,9 +744,16 @@ fn gapMetresAt(q: vec2i, n: i32) -> f32 {
   return max(1e-4, (g / max(P.h0, 1e-4)) * P.gapMetres);
 }
 
+// Reads the boil's float32 temperature from alphaIn.g unless an external pass
+// (splat, pour, or initial state on bit 1 of P.thin) wrote velIn.z further than
+// one half-float ULP from alphaIn.g (PLAN §36e-4).
 fn tempAt(q: vec2i, n: i32) -> f32 {
   if (!insideRim(q, n)) { return T_AMBIENT; }
-  return max(0.0, T_AMBIENT + textureLoad(velIn, q, 0).z);
+  let half = textureLoad(velIn, q, 0).z;
+  if ((P.thin & 2u) != 0u) { return max(0.0, T_AMBIENT + half); }
+  let own = textureLoad(alphaIn, q, 0).g;
+  let ulp = exp2(floor(log2(max(abs(own), 6.1e-5))) - 10.0);
+  return max(0.0, T_AMBIENT + select(half, own, abs(half - own) <= ulp));
 }
 
 fn alphaAt(q: vec2i, n: i32) -> f32 {
@@ -909,16 +929,16 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   a1 = clamp(a1, 0.0, ALPHA_MAX);
   let rho1 = waterDensity(T1);
 
-  // Warming water's expansion and the vapour's volume as sources in the thin gap's projection (hsPour).
-  if (P.thin != 0u) {
+  // Warming water's thermal expansion as a source in the thin gap's projection (hsPour).
+  // Steam's displaced volume is counted once through the air field's rate (now - was in hsDivergence).
+  if ((P.thin & 1u) != 0u) {
     let expansionShare = -(1.0 - a1) * ((rho1 - rho0) / rho0);
-    let vapourShare = -(RHO_V / rho1) * (a1 - a_adv);
-    poured[k] = poured[k] + clamp(expansionShare + vapourShare, -0.5, 0.5);
+    poured[k] = poured[k] + clamp(expansionShare, -0.5, 0.5);
   }
 
   let newTemp = clamp(T1 - T_AMBIENT, -T_AMBIENT, 250.0);
   textureStore(velOut, p, vec4f(v0.xy, newTemp, v0.w));
-  textureStore(alphaOut, p, vec4f(a1, 0.0, 0.0, 0.0));
+  textureStore(alphaOut, p, vec4f(a1, newTemp, 0.0, 0.0));
 }
 `;
 

@@ -505,6 +505,7 @@ export class WebGPUFluid extends FluidCover {
       under a bubble that had already popped.
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.stepPlateBoil(enc, p);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     /*
       And on the step after the last bubble goes: its hole is a sink in the
@@ -1659,7 +1660,7 @@ export class WebGPUFluid extends FluidCover {
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], none);
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], this.boilLive ? this.arg('decay boil', [1, 0, 0, 0]) : none);
       this.vel.swap();
     });
 

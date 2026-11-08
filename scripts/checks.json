@@ -1897,7 +1897,7 @@
     {
       "name": "The plate boils under a held hand at 60 fps, not under the fan (36e-2b)",
       "shard": "plate",
-      "run": "npm run plateboil -- --part=boil --owed=rate,hold,fan,steam,writes",
+      "run": "npm run plateboil -- --part=boil",
       "timeout": 15,
       "why": [
         "The live plate's own boil (PLAN 36e-2b), which boilgpu's dishes do not reach:",

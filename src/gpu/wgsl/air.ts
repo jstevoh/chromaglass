@@ -146,7 +146,7 @@ fn fs(in: VOut) -> @location(0) vec4f {
 
 /**
  * Full-screen pass that merges the plate's boiling vapour fraction field
- * (`boilAlpha`, r32float, PLAN §36e-2) into the `rgba16float` air field (`H6`),
+ * (`boilAlpha`, rg32float, PLAN §36e-2) into the `rgba16float` air field (`H6`),
  * reconstructing each steam pocket's outward radial coordinate `q` from the
  * coverage gradient so `plate.ts` shades boiling steam pockets with the same
  * refractive meniscus and wetting-film optics as blown bubbles.

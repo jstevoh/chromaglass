@@ -268,6 +268,26 @@ export function recordRemoteHold(map: RemoteHoldMap, layer: number, id: number |
   });
 }
 
+const BOIL_HOLD_POOL: { x: number; y: number }[][] = [];
+
+function writeBoilHold(
+  holds: { x: number; y: number }[],
+  pool: { x: number; y: number }[],
+  idx: number,
+  x: number,
+  y: number,
+): void {
+  let slot = pool[idx];
+  if (!slot) {
+    slot = { x, y };
+    pool[idx] = slot;
+  } else {
+    slot.x = x;
+    slot.y = y;
+  }
+  holds[idx] = slot;
+}
+
 export function syncBoilHolds(
   fluids: (FluidSimulation | undefined)[],
   activeLayer: number,
@@ -279,19 +299,25 @@ export function syncBoilHolds(
   for (let li = 0; li < fluids.length; li++) {
     const fl = fluids[li];
     if (!fl) continue;
-    const holds: { x: number; y: number }[] = [];
+    let pool = BOIL_HOLD_POOL[li];
+    if (!pool) {
+      pool = [];
+      BOIL_HOLD_POOL[li] = pool;
+    }
+    const holds = fl.boilHolds;
+    let count = 0;
     if (li === activeLayer && drainFrame === 0) {
       for (const { hand } of hands) {
         if (hand.x > 0 && hand.x < GRID_SIZE - 1 && hand.y > 0 && hand.y < GRID_SIZE - 1) {
-          holds.push({ x: (hand.x + 0.5) / GRID_SIZE, y: (hand.y + 0.5) / GRID_SIZE });
+          writeBoilHold(holds, pool, count++, (hand.x + 0.5) / GRID_SIZE, (hand.y + 0.5) / GRID_SIZE);
         }
       }
     }
     for (const [hid, h] of remoteHolds) {
       if (holdNow - h.at >= 250) { remoteHolds.delete(hid); continue; }
-      if (h.layer === li && drainFrame === 0) holds.push({ x: h.x, y: h.y });
+      if (h.layer === li && drainFrame === 0) writeBoilHold(holds, pool, count++, h.x, h.y);
     }
-    fl.boilHolds = holds;
+    holds.length = count;
   }
 }
 

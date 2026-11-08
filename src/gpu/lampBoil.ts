@@ -11,6 +11,7 @@
  */
 import {
   ALPHA_MAX,
+  BOIL_BUOY_PER_KG_M3,
   BOIL_DISH_WGSL,
   HAND_RADIUS,
   K_GLASS,
@@ -28,6 +29,7 @@ import {
 
 export {
   ALPHA_MAX,
+  BOIL_BUOY_PER_KG_M3,
   HAND_RADIUS,
   K_GLASS,
   K_WATER,
