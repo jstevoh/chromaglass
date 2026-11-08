@@ -258,6 +258,25 @@ The steps, most visible first. Each is one PR with its own check, and every step
        11 s is 10 to 22 steps. Judge on the Mac whether a fast colour move looks stepped;
        if so, step short glides faster (not the whole interval: `npm run renders`
        counts App's renders).
+       *2026-11-08, with 33i:* the speed itself is now kept, not just measured. A move at
+       the top of the dial could cross two fifths of a dial's travel in a glide under four
+       seconds, about 16 % of the travel a second; the check's seed had never drawn one until
+       the camera's dials defaulted to 0 and sent it down another path (5.84 %/s, magnet
+       height). The planner now shortens the step to 5 % a second at the glide's steepest
+       (`DIAL_RATE_MAX` in `src/lib/slowEvolve.ts`, by the dial's `wanderSpan` where it has
+       one), never the glide; it binds only in the upper half of the dial (from 52 % on
+       Classic) and never at a look's own speed. `npm run slowevolve` reads 4.99 %/s at full.
+     - **8d-3** (open, found by reading 2026-11-08, not yet measured): a Go or Back with a
+       fade restarts Evolve (`evolveLetsGo` in `fadeSettingsTo`, `src/app/useLookFades.ts`)
+       but neither re-anchors it nor holds it for the fade. A fresh planner plans on its
+       first tick at full speed (four seconds in at the default), its glide writes between
+       the fade's 33 ms steps, and its windows still sit round the old look, since
+       `driftAnchor` was last set by the preset, a hand or a ride. So across a Go it can pull
+       the new look's dials back toward the old one, and switch on a dial the new look has at
+       0 (`dialWindow` reads the anchor). Fix: set `driftAnchor.current` to the fade's target
+       in `fadeSettingsTo`, and plan nothing while `lookFadeRef.current` is set (or
+       re-anchor at the fade's end); a check in `npm run slowevolve` or a fade harness that
+       Goes mid-Evolve and reads every key against the new look.
 
 Small things that ride along with the steps: drops with a coloured rim lined up in
 chains along the flow (with batch 3), letting the dish rim show now and then as a phrase

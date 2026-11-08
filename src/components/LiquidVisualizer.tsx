@@ -6617,7 +6617,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
               width: canvas.width, height: canvas.height,
               derived: true,
               grid: fields[0].dye.width,
-              // The plate leaves the grain to the camera when Lens is up, and
+              // The plate leaves the grain to the camera with Lens up, and
               // still dithers into its 8-bit texture, or a dark ramp bands
               // before the camera ever sees it.
               cameraOn: !!cam,

@@ -1,6 +1,7 @@
 import type { VisualizerSettings } from '../types';
 import type { SongSection } from './songShape';
 import { THEMES, moveTargets } from './drift';
+import { PIN_RANGE } from './deskPins';
 import { stream } from './rng';
 
 /**
@@ -123,6 +124,37 @@ const DEAF_AFTER = 12;
 
 /** How far the closeup's aim may wander in one move, each way, as a share of the plate. */
 export const AIM_STEP = 0.08;
+
+/*
+  The fastest any dial may move, as a share of its travel a second, however
+  fast the Evolve Speed: App writes a glide twice a second, so this is two and
+  a half percent of a dial's travel a write (PLAN 10-8d-2), the most the owner
+  had seen it move when the top of the dial was first played.
+
+  Until now that was a number the check happened to read and not a thing the
+  planner kept. A move may take a dial anywhere in its window, two fifths of
+  its travel from one side to the other, and at the top of the dial a glide
+  can be as short as GLIDE_MIN over PACE_FASTEST, under four seconds; with
+  the glide's ease peaking at one and a half times its mean speed, that is
+  sixteen percent of the travel a second, more than three times this. The
+  seed `npm run slowevolve` plays happened never to draw such a move until
+  the camera's dials went to zero by default (33i): Evolve leaves a dial the
+  look has at zero alone, so Classic's glass theme lost three of its dials,
+  the same seed took another path, and a ferrofluid move sent the magnet's
+  height three tenths of its travel in under eight seconds, 5.84 % a second.
+
+  So the step is shortened, never the glide lengthened: the same rule as the
+  closeup's aim below, a quick move is a shorter step over a shorter glide,
+  and the moves a minute the dial promises stay what they were. The travel is
+  the one the dial wanders by (`wanderSpan` for a dial whose range was
+  widened, as `dialWindow` reads it), so a widened dial is held to the pace
+  of its old width like every other. It binds only where a glide can run
+  under twelve seconds, about halfway up the dial or more (52 % on Classic),
+  and never at a look's own Evolve Speed, where no glide is under thirty.
+*/
+const DIAL_RATE_MAX = 0.05;
+/** The glide's ease, a·a·(3 − 2a), at its steepest runs one and a half times its mean. */
+const EASE_PEAK = 1.5;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -338,6 +370,12 @@ export class SlowEvolve {
         }
         seconds *= (1.15 - 0.3 * PACE_PIVOT) * (0.88 + 0.24 * this.rand());
         const move: EvolveMove = { theme: t.name, to, seconds: pace * clamp(seconds, GLIDE_MIN, GLIDE_MAX), lean: this.lean, cue };
+        for (const k of Object.keys(to)) {
+          const spec = PIN_RANGE.get(k), now = current[k as keyof VisualizerSettings];
+          if (!spec || typeof now !== 'number') continue;
+          const most = DIAL_RATE_MAX * (spec.wanderSpan ?? spec.max - spec.min) * move.seconds / EASE_PEAK;
+          to[k] = clamp(to[k], now - most, now + most);
+        }
         if ((current.macroZoom ?? 1) > 1.05 && (current.macroCamera ?? 'hold') !== 'auto') {
           /*
             The camera never goes faster than at the default, however fast the
