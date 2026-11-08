@@ -1255,6 +1255,21 @@
       ]
     },
     {
+      "name": "The rest of a bubble's air, owed until its builds",
+      "shard": "lab4",
+      "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
+      "why": [
+        "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
+        "scripts/bubbleair.mjs): on bubbledye's plate, the old plate's bubbles",
+        "keep the colour and fill their holes, the species carried alone, the",
+        "oil's mix and the maze's path take the air, the carry empties a bubble",
+        "and fills its hole evenly without airShed, and the app lays no press",
+        "under a bubble while the flow round it stays the same. Each owed id",
+        "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
+        "it: about three and a half minutes, in lab4, which has the room."
+      ]
+    },
+    {
       "name": "No line round a bubble's hole",
       "shard": "lab4",
       "run": "npm run holeline",
