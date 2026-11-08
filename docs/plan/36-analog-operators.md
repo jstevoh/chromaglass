@@ -143,8 +143,13 @@ button, making it look good. Every item here is held to those.
     89 872 on the CPU; the level plate is the same (S.curBuoy is already upright ×
     Buoyancy, so #718's uncapped branch never runs there). A throwaway fix of #718 (its
     temperature kept in a float32 channel of the boil field, the reference's vapour source,
-    the Kell branch only while the boil runs) reads 6/6 on *zero*. One check-skeptic pass;
-    its six findings are in the check.
+    the Kell branch only while the boil runs, a write to vel.z taken when it is more than a
+    half-float step from the boil's own; /mnt/project-files/antigravity/36e-2b-proof-throwaway.diff)
+    reads 6/6 on *zero* and 6/6 on *boil* (rate 0.84x, steam at 112 s peaking 108.7 °C, fan
+    89.5 °C, the steam's dye 0.89x of its room and 1.00x arriving past the disc, writes 1.00).
+    Its pocket flashes across the spot in one read and condenses within 10 s as the cooler
+    liquid it pushed out flows back: one pocket, as 36e-3 says. One check-skeptic pass; its
+    six findings are in the check.
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
     rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,
