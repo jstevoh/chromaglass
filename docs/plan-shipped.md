@@ -3814,6 +3814,37 @@ the cores and is not known; it was not reproduced in this run or in the eight-lo
 goes red beside others again, `quick` writes its log to `scratch/quick/` and 19k-5 is reopened
 with that log.
 
+*19k-7 (2026-10-28; closed draft #551, rebuilt on main 2026-11-07).* `scene`'s two cost bars went red twice on one head of #540, a PR that
+changed nothing the check runs: the costliest frame 22.5 ms against 20 (the still room's first
+optimised frame; 18.7 on the run before), and once the strobe room's median 2.01 ms against 2.
+19k-5 had moved the reading from the sensor's wall clock to `process.cpuUsage()`, which sums every
+thread, and V8 compiles a hot function on background threads, so the frame on which the analysis
+was first optimised was charged for the compiler's work on another core too. Reproduced in a
+4-core cloud session, twenty runs each: the process's worst frame 9.6 to 13.8 ms alone and 8.6 to
+24.7 beside twelve busy loops (22.1 and 24.7 among them, red), its worst median 2.29 alone (red).
+
+The push is now timed with the main thread's own CPU time, `process.threadCpuUsage()`. On Linux
+that alone steps at the scheduler's tick (4 ms, so a 0.5 ms frame read 0); a `process.cpuUsage()`
+call first brings the calling thread's time up to date in the kernel, and the thread reading is
+then exact (steps of 1 to 50 microseconds; a 1 ms busy wait reads 1.01). The check asserts the
+clock's step is under 0.1 ms, so a kernel that does not do that is red, not a cost of zero. Read
+the same way: worst frame 4.5 to 7.1 ms alone and 4.6 to 7.3 loaded, worst median 1.14; with the
+final script, ten runs beside twelve busy loops, 4.7 to 6.0 ms and 0.53. Both bars unchanged, and
+each FAIL line now prints its reading and its room.
+
+Still red on a real slowdown: `npm run scene -- --slow k` runs the analysis k times a frame inside
+the timed push. Against the old 20 ms the worst-frame bar would have gone red only at 4 to 5x
+(18.5 to 25.7 ms at 4x, red in 3 of 5), where on the process's reading it went red from 2x, half
+of that reading being the compiler; keeping the number would have loosened the bar in effect, so
+it is 12 ms. In the cloud session: about 120 runs at 1x read 4.5 to 10.4 ms but one 14.6 (the
+VM's steal time climbing through that batch); fifteen at 2x 9.0 to 16.5 (red in 9); fifteen at
+3x 13.4 to 26.8 (red in all). Measure's runner read 3.6 ms at 1x on #551, so there it goes red
+from a little over 3x. The median bar went red at 5 to 6x on either reading (1.6 to 3.0 ms at 5x
+and 6x), so it stays at 2 ms; one run in fifty here read 2.28 at 1x, the still room's median
+carrying the optimiser's main-thread work (19k-7a). The review (one, as for every check change)
+found the thread reading exact against busy waits of 0.1 to 2 ms and asked for `--slow`'s typos
+to be refused rather than run at 1x, which they are.
+
 *The two nits on #504.* `checks.mjs`'s walk detector (which makes a Measure check that walks
 `scripts/` an `always` entry) knew `walk('scripts')` and `walk(join(root, 'scripts'))` only; a
 `walk(\`${ROOT}/scripts\`)` or `readdirSync(ROOT + '/scripts/')` slipped past, so it now takes any
@@ -9926,6 +9957,27 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   `browser2`, which installs Chromium like the others. The timeout stays 25 and no bar
   moves; the required names are unchanged, as in 19k-6. Found along the way: 19k-10.
 
+#### 19k-11. holeline in a Measure part of its own
+
+- **19k-11** (E, S): **shipped** in part, `lab4`. GitHub's ubuntu runners come in speed tiers
+  about 2x apart (videoflow's printed CPU loop, plain JavaScript, reads 0.70, 1.05 or 1.40 ms a
+  frame across twenty branches' `lab` jobs, the same branch on different tiers from push to
+  push), and a part sized on the fast tier is cancelled on the slow one. #655 drew the slow tier
+  six times running: `lab` was cancelled in holeline before #658 moved `widedials` to `lab3`,
+  and with holeline moved to `lab3` too (#655's first fix, reverted) that part ran 24:51 of its
+  25 (holeline 10:23, soap 6:53, soapbreak 3:59, widedials 3:36). Then main's deploys 667 and
+  670 of 2026-11-07 were cancelled the same way: on 670 (1.39 ms a frame) `lab` reached
+  holeline at 14:15, every check before it green, and was cancelled at 25:16 with holeline
+  10:28 in; on 671 (1.06 ms) the same part ran 19:54, holeline 8:13. No part had ten minutes
+  to spare on the slow tier, so holeline moved, unchanged, to an eighth part `lab4` (#690),
+  which installs Chromium like the others. #688 (19k-11a) had meanwhile moved `sloshgpu`,
+  `soapgpu --selftest` and `beadmask` from `lab` to `lab3`; with holeline gone from `lab`,
+  `sloshgpu` and `beadmask` went back, and `soapgpu` stays beside the soap checks it controls.
+  On the slow tier that leaves `lab` about 13:20, `lab3` about 15:20 and `lab4` about 11
+  (#690's own run, on faster runners: lab 12:01, lab4 5:28). The timeout stays 25 and no bar
+  moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
+  job summary, and every part read against it).
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
@@ -10628,6 +10680,39 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-6. The stream's frames were black
+
+  - **37x-4d-6. The stream's frames were black (shipped 2026-10-31).** Found writing
+    37x-4d-1's check (#619).
+      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
+      and a presented WebGPU canvas read outside the frame task that drew it answers black
+      (why the projector window and the pad's picture are copied inside that task:
+      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
+      plate read in its frame was the film with the keystone; the Plate source's decoded
+      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
+      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
+      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
+      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
+      --stack`, red on main. Metal answers the same: CI's fifth Mac shard on #619 decoded
+      (0, 0, 0) in every cell from 50 packets, against the plate's own (30, 104, 251) |
+      (240, 139, 1).
+    The fix: `LiquidVisualizer`'s frame task, where the projector's mirror and the pad's
+    picture are copied, now calls `tapFrameCopies(canvas)` (`lib/frameTaps.ts`), which
+    hands the canvas to the pad and to the Live Show (`lib/liveFrame.ts`). While a stream
+    is on air (`LiveEncoder` with `frames: 'plate'`, as `lib/liveShow.ts` starts it) the
+    encoder copies the picture onto each output's 2D staging canvas there, once for each
+    frame its clock has sent since, and encodes the stage on its own clock: the stream
+    keeps its rate and repeats its last picture when the plate is slower. `start` waits
+    for the first picture before its clock starts (a frame at sixty; CI's Mac decoded a
+    black first keyframe when it did not, and the moving line found no film in it), and
+    a page with no plate, as the panel's check on a machine with no WebGPU, starts black
+    after half a second and still streams. Measured
+    with `PW_WEBGPU=1 npm run liveshow -- --stack` in a cloud session: the Plate source's
+    decoded 1920x1080 frame went from (0, 0, 0) in every cell to the film with the
+    keystone, middle (3, 106, 250) | (243, 139, 1) against the plate's own (3, 105, 251)
+    | (242, 139, 1), black in the two keystoned corners as the plate is. `npm run
+    liveshow` 33/33 as before. The `plate` id left `--owed` in `scripts/checks.json`.
+
 #### 37x-4d. The Live Show panel and the Pro gate
 
   - **37x-4d. The Live Show panel and the Pro gate (shipped 2026-10-30).** The owner asked
@@ -11226,6 +11311,44 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
+## 38c-3. Soap Breakdown: a first-order surfactant loss in real seconds (2026-11-01)
+
+`src/gpu/fluid/soap.ts`, `src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/oil.ts`,
+`src/gpu/solverTypes.ts`, `src/sim/fluidSimulation.ts`, `src/types.ts`,
+`src/lib/readout.ts`, `src/components/settings/ChemistrySections.tsx`,
+`src/components/phone/PhoneStage.tsx`, `src/components/RemoteControl.tsx`,
+`src/lib/deskPins.ts`, `src/lib/midi.ts`, `src/lib/sceneMap.ts`,
+`src/lib/controlHelp.ts`, `src/lib/drift.ts`
+
+Since 38c (#609) conserved soap on the plate, the Soap Bursts dropper (`LiquidVisualizer`)
+soaps the whole dish in a few minutes of a show and later drops do nothing, as a real
+closed dish does. The owner chose (2026-10-31) a setting for a real loss — soap taken up
+by the oil's interface or washed through the trough — at `0` (none, the real closed-dish
+value) by default on every look, and free to ramp up so a long show keeps bursting.
+
+- **The rate law** (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`): maps the dial
+  `0..1` to $k$ in $\text{s}^{-1}$ in $d\Gamma/dt = -k\Gamma$. At `0` it returns `0`
+  exactly; above `0`, the half-life $\ln 2 / k = 7200 \cdot (10 / 7200)^d\text{ s}$ steps
+  logarithmically from $1.87\text{ h}$ at `0.01` ($4.5\text{ min}$ at `0.5`) down to
+  $10.00\text{ s}$ at `1`.
+- **Per real second, once per step** (`soapPlan` in `src/gpu/fluid/soap.ts`, `mixUpdate`
+  in `src/gpu/wgsl/fluid/oil.ts`, `src/gpu/fluid.ts`): `soapPlan` writes the step's
+  retention factor $\exp(-k \cdot s)$ into `out[5]` from `magnetSeconds` (never frames or
+  the look's `dt`), and `fluid.ts` passes it as `A.b.x` to `mixUpdate` on the first
+  substep only (`k === 0`, and `1` on the remaining Cahn–Hilliard oil substeps).
+- **The control** (`soapBreakdown`, default `0` in `DEFAULT_SETTINGS`, untouched by all 33
+  presets and excluded from Evolve's drift in `NOT_THE_LOOK`): in Settings → Oil & Soap
+  under Soap Bursts, MIDI-learnable, pinnable on both desks, on the phone's Dye sheet when
+  Soap is in hand (and on the remote while Soap Bursts is on), displaying `'Off'` at `0`
+  and the half-life (`1.9h`, `4m`, `20s`, `10s`) via `readSetting` in `src/lib/readout.ts`.
+- **Measured:** `npm run soapbreak`, 4/4 (`law`, `decay`, `show`, `default`, all removed
+  from `--owed` in `scripts/checks.json`): $k(0) = 0$, half-life $1.87\text{ h}$ at
+  `0.01` and $10.00\text{ s}$ at `1`; after $30\text{ s}$ at dial `0.895` (half-life
+  $20.00\text{ s}$), kept `0.3536`, `0.3535`, `0.3536`, `0.3536` across $0.1\text{ s}$
+  steps, $0.05\text{ s}$ steps, $3\times\text{ dt}$ and an oil look against
+  $\exp(-kt) = 0.3536$, and `1.000003` at `0`; in the tenth minute of a kick track, a drop
+  clears `73.8%` of the dye in its radius in $2\text{ s}$ at `1` (`0.0%` at `0`, `99.5%`
+  on clean water), with bursts returning from dial `0.87` ($25\text{ s}$ half-life).
 
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 

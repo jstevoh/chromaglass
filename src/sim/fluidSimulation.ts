@@ -3382,6 +3382,7 @@ export class FluidSimulation {
       oilBodies: c01(settings.oilBodies),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),
+      soapBreakdown: c01(settings.soapBreakdown),
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).

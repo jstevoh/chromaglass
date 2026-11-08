@@ -426,20 +426,14 @@ rest is routine and the owner's calls.
       film of two known halves alone in the mixer, a keystone on the wall, the Mixer stack
       source's frames decoded: 1920x1080, the film the right way up and round, the mixer's
       grade on it, every edge cell the film's, square, and on a Mac moving), with the panel's Source as `data-testid="live-source"` (values `plate`,
-      `stack`); CI's fifth Mac shard runs it with `--owed=plate,stack` until the builds land.
-    - *37x-4d-6. The stream's frames are black.* (Open; found writing 37x-4d-1's check.)
-      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
-      and a presented WebGPU canvas read outside the frame task that drew it answers black
-      (why the projector window and the pad's picture are copied inside that task:
-      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
-      plate read in its frame was the film with the keystone; the Plate source's decoded
-      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
-      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
-      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
-      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
-      --stack`, red on main. Metal answers the same: CI's fifth Mac shard on #619 decoded
-      (0, 0, 0) in every cell from 50 packets, against the plate's own (30, 104, 251) |
-      (240, 139, 1).
+      `stack`); CI's fifth Mac shard runs it with `--owed=stack` until the build lands (the
+      `plate` line went green with 37x-4d-6). Its frames come the way the plate's now do:
+      see 37x-4d-6.
+    - *37x-4d-6. The stream's frames are black.* *(shipped 2026-10-31.)* The frame task
+      hands the encoder each picture it draws (`lib/liveFrame.ts`, `lib/frameTaps.ts`);
+      story in `docs/plan-shipped.md` §37x-4d-6. The Mixer stack's draw (37x-4d-1) calls
+      `tapLiveFrame('stack', canvas)` from the same task and the panel starts the encoder
+      with `frames: 'stack'`; it can skip its draw unless `liveFrameWanted('stack')`.
     - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
       account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
       new desk; and it would sit on the website's Perform too, where it cannot stream. It
@@ -510,6 +504,44 @@ rest is routine and the owner's calls.
   song's chapter is a link in the cuts' captions; the albums are one playlist ("Albums")
   beside 37b's three. The 60-second look videos (37b) continue less often, as the site's
   library.
+- **37x-10. The song's title painted as ink, then swept away.** *(build, M; Antigravity
+  from the brief; its check shipped 2026-11-07, `npm run inktitle`, red on main and owed.)*
+  A stream's viewer needs to know what is playing, and the 1920s legends their credit. The
+  first idea, a lower third drawn over the picture's corner for eight seconds, the owner
+  replaced on 2026-11-07: "let titles get painted on as ink and then swept away". When a
+  song starts and the switch is on, its artist and title (two lines, each clipped at 40
+  characters) are rasterised once into a mask and poured into the dye field as ink, at
+  the solver's own grid (`pourInk`, sampled from the mask as the video pour samples its
+  frame, 14ab-2); then a wash, a real flow added to the step's velocity, drifts and stirs
+  it until the letters break up. Nothing in the plate's shaders knows about titles
+  (physics writes, rendering reads), so the title is on the wall, in the stream and in
+  every recording at once, and the dye it leaves behind stays in the show as colour.
+  - *The dials.* `inkTitle` (the switch, off by default; the Live Show panel and the phone
+    turn it on), `inkTitleColor` ('' is the look's palette, its first colour, or a chosen
+    colour), `inkTitleSize` (small to the plate's width, never off the wall: a long title
+    shrinks to fit), `inkTitleY` (where it lands, up the plate) and `inkTitleSweep` (a
+    slow drift at 0.01 that still reads after 6 s, gone by 12 s at the default, by 2 s at
+    the top). No look sets any of them.
+  - *When.* The identified song (`TrackIdentity` from the song ID, 14z) changes while the
+    switch is on: `inkTitleCue` gives one title a song, keyed by its isrc, else artist
+    and title, and none for a song with no title. The album show's queue (37x-7) knows its
+    track list ahead; feeding the cue from it instead of the ear, so a title lands on the
+    song's first beat rather than when the ear recognises it, is 37x-10b.
+  - *The check.* `npm run inktitle` (scripts/inktitle.mjs): readable means the dye in the
+    title's box follows the letters, the correlation of the dye's density with the mask
+    at its best shift (a title that slid away intact still counts as readable). 0.8 or
+    better half a second after it lands, strokes four times the dye of their gaps, the
+    dye added as poured within 10%; 0.7 or better at 3 s; 0.3 or worse by 12 s; 90% of
+    its dye still on the plate when it is gone (swept, not faded). A throwaway reference
+    build passed every lab line (0.922 at landing, gone by 8 s at the dial's middle,
+    2 s at the top) before the check was committed.
+  - *Phone version.* A "Title" switch in Live Show on the phone (the remote's Live Show
+    chip, `LiveRemoteChip.tsx`, or the phone's own Live Show sheet), same setting.
+  - *Owed after the build.* The owner judges it on the Mac's film on two or three looks
+    (the lab measures a still plate; a busy look's own flow may break a title up before
+    3 s, and how a look's flow treats it is taste): docs/judging.md takes a section then.
+  - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the
+    show's own track list and its clock, so the title lands on the song's first beat.
 
 ## Who does what
 

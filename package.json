@@ -211,6 +211,7 @@
     "videoflow": "node scripts/videoflow.mjs",
     "straw": "node scripts/straw.mjs",
     "bubblephysics": "node scripts/bubblephysics.mjs",
+    "bubbleliquid": "node scripts/bubbleliquid.mjs",
     "lift": "node scripts/lift.mjs",
     "heldpress": "node scripts/heldpress.mjs",
     "pressoil": "node scripts/pressoil.mjs",
@@ -298,6 +299,7 @@
     "bubblelook": "node scripts/bubblelook.mjs",
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
+    "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
     "presskit": "node scripts/presskit.mjs",
     "loopseam": "node --experimental-strip-types scripts/loopseam.mjs"
   },
