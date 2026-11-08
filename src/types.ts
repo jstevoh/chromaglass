@@ -419,6 +419,21 @@ export interface VisualizerSettings {
   thinGap: number;
   gapThickness: number;
   /*
+    The liquid on the plate and the glass on it (PLAN 38r-5, lib/cover.ts).
+    `liquidMl` is how much liquid is under the cover, in mL: 62.83 fills the
+    0.1 m cover at today's 2 mm. A turn of it is liquid added (poured at the
+    rim, drawn in under the glass) or wicked off there; the solver keeps the
+    running total, which pours add to and a press past what the edge's
+    meniscus holds spills from, so the dial is what you put in, not a
+    reading of what is left. `coverWeight` is the cover glass in grams:
+    157 is a 2 mm float glass (5 kg/m²). The gap is a result of the two,
+    never set: the edge holds the glass up to 2σ sinθ/h, past that it sinks
+    by Stefan's law and the liquid goes over the rim. The defaults are
+    today's plate to the digit, so every look keeps its 2 mm.
+  */
+  liquidMl: number;
+  coverWeight: number;
+  /*
     The second phase, and the magnet under the glass (H7,
     docs/bubbles-plan.md B).
 
@@ -479,6 +494,13 @@ export interface VisualizerSettings {
   filmHold: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
+  /**
+   * Soap Breakdown (PLAN 38c-3): first-order loss of soap on the plate
+   * (dΓ/dt = −k Γ in real seconds, shown as the half-life ln(2)/k), for soap
+   * taken up by the oil's interface or washed through the trough. 0 is none
+   * (all soap kept), the real dish and the default on every look.
+   */
+  soapBreakdown: number;
   /**
    * A clear film against the glass (PLAN §20b): 0 none; up, a clear oil film
    * that thick (1 is 0.86 of the gap) laid over the plate, which tears open
@@ -986,6 +1008,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   depthDrag: 0,
   thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
+  liquidMl: 62.83185307179587,     // A·2 mm under the 0.1 m cover (lib/cover.ts COVER_FULL_ML): today's gap
+  coverWeight: 157.07963267948966, // a 2 mm float glass, 5 kg/m² (COVER_GLASS_G)
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,
@@ -1001,6 +1025,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
   surfactantFlow: 0,
+  soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
   clearFilmDye: 0,          // undyed: the film as every look has it, byte for byte (npm run lace, 8)
   clearFilmDyeColor: '#ffd21a', // a warm yellow, the owner's lace still's

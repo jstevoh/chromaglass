@@ -110,7 +110,7 @@
  * VITE_FIREBASE_AUTH_EMULATOR (the emulator's URL).
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { createServer } from 'node:http';
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, statSync, writeFileSync, mkdtempSync } from 'node:fs';
@@ -125,9 +125,9 @@ const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok
 
 const FIREBASE_TOOLS = 'firebase-tools@15.33.0';
 const PROJECT = 'demo-chromaglass'; // a "demo-" project: the emulator needs no real one
-const EMU_PORT = 9199;
+const EMU_PORT = port(9199);
 const EMU = `http://127.0.0.1:${EMU_PORT}`;
-const ON_PORT = 5281, OFF_PORT = 5282;
+const ON_PORT = port(5281), OFF_PORT = port(5282);
 const ON_DIST = resolve(process.env.SIGNIN_DIST ?? 'dist-signin');
 const OFF_DIST = resolve(process.env.SIGNIN_OFF_DIST ?? 'dist-signin-off');
 /** The sign-in's whole cost to a returning visit's first paint: a lazy import and a check of the cached user. */
@@ -138,7 +138,7 @@ const HOLD_MS = 10_000;
 const BOOT_MS = 90_000;
 const EMAIL = 'check@example.com';
 
-const LIC_PORT = 5283;
+const LIC_PORT = port(5283);
 const FIREBASE_ENV = {
   VITE_FIREBASE_API_KEY: 'demo-key',
   VITE_FIREBASE_AUTH_DOMAIN: `${PROJECT}.firebaseapp.com`,

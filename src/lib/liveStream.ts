@@ -59,6 +59,7 @@
  * key's name and the main process looks it up (desktop/keys.js).
  */
 import { avcCodec, videoBitrate as bitrateFor } from './render';
+import { listenLiveFrames, type LiveFrameKind } from './liveFrame';
 
 export interface LivePacket { kind: 'video' | 'audio'; timestampMs: number; key?: boolean; data: Uint8Array; /** A video packet's encode (an output's id); audio goes to every destination. */ output?: string }
 export interface LiveAudioMeta { codec: 'aac' | 'opus'; sampleRate: number; channels: number; bitrate: number }
@@ -117,6 +118,14 @@ export interface LiveOptions {
   audioCodec?: 'aac' | 'opus';
   /** The encoder hint; unset, `start` probes and chooses (see `probeVideoEncoder`). */
   acceleration?: LiveAcceleration;
+  /**
+   * Where the frames come from. Unset, `canvas` is read when each frame is
+   * due, which a 2D canvas allows (the lab's). Set, the frame task hands
+   * over that kind of picture as it draws it (lib/liveFrame.ts), and
+   * `canvas` gives only its first size: the app's plate is a presented
+   * WebGPU canvas, black when read on the stream's own clock (37x-4d-6).
+   */
+  frames?: LiveFrameKind;
 }
 
 export type LiveAcceleration = 'no-preference' | 'prefer-hardware' | 'prefer-software';
@@ -322,6 +331,9 @@ export function liveCrop(cw: number, ch: number, w: number, h: number, fit: 'cov
   return { sx: (cw - sw) / 2, sy: (ch - sh) / 2, sw, sh, dx: 0, dy: 0, dw: w, dh: h };
 }
 
+/** How long `start` waits for the frame task's first picture before it starts the clock anyway (see `start`). */
+const FIRST_PICTURE_WAIT_MS = 500;
+
 export class LiveEncoder {
   readonly opts: LiveOptions;
   private outs: VideoOut[] = [];
@@ -345,6 +357,22 @@ export class LiveEncoder {
   private phase: LiveState['phase'] = 'idle';
   private error: string | null = null;
   private stopping = false;
+  /**
+   * With `frames`: the frame task copies the next picture only when a frame
+   * has gone out since the last. `start` waits for the first copy before the
+   * clock starts; a page whose plate never draws (the panel's check, on a
+   * machine with no WebGPU) starts after half a second with the stage black
+   * and still makes a stream, its first frame a keyframe, as it always has.
+   * Black then is the truth about the plate, not the bug: once a picture has
+   * come, the stage keeps it until the next copy, and a plate slower than
+   * the stream is repeated, never blacked out. The copy is the first plate
+   * frame after a stream frame went out, not the last before the next: at
+   * sixty and thirty that is up to one plate frame (17 ms) older than the
+   * stream frame's stamp, well inside what a viewer's player smooths over,
+   * for half the copies a copy on every frame would cost.
+   */
+  private want = true;
+  private unlisten: (() => void) | null = null;
 
   constructor(opts: LiveOptions) {
     this.opts = opts;
@@ -426,6 +454,23 @@ export class LiveEncoder {
       this.transportState = started.state ?? null;
       if (!started.ok) throw new Error(started.error ?? 'the server refused the stream');
 
+      /*
+        The first picture before the clock starts. Started at once, the
+        first frame, a keyframe at t = 0, went out of a stage the frame task
+        had not drawn yet: black, and on CI's Mac the moving line of
+        `npm run liveshow -- --stack` decoded from that keyframe and found
+        no film in its first frame. At sixty a second the wait is a frame;
+        a page whose plate never draws (no WebGPU) gives up after half a
+        second and starts black, as before.
+      */
+      if (this.opts.frames) {
+        let first: () => void = () => {};
+        const came = new Promise<void>((res) => { first = res; });
+        this.unlisten = listenLiveFrames(this.opts.frames, (c) => { if (this.take(c)) first(); });
+        await Promise.race([came, new Promise<void>((res) => setTimeout(res, FIRST_PICTURE_WAIT_MS))]);
+      }
+      // Stopped while it waited: `stop` has torn down what there was.
+      if (this.phase !== 'starting') return;
       this.t0 = performance.now();
       for (const o of this.outs) {
         o.encoder = new VideoEncoder({
@@ -453,7 +498,7 @@ export class LiveEncoder {
   /** The frame timer: the next frame at t0 + n/fps, for every output; late ones skipped, never queued. */
   private tick(n: number): void {
     if (this.phase !== 'live') return;
-    const { fps, canvas, keySeconds = 2 } = this.opts;
+    const { fps, canvas, keySeconds = 2, frames } = this.opts;
     const frameMs = 1000 / fps;
     const now = performance.now() - this.t0;
     // n is the frame due now; if more than one is due, the ones between are skipped.
@@ -468,7 +513,7 @@ export class LiveEncoder {
       let frame: VideoFrame | null = null;
       try {
         const t = performance.now();
-        frame = new VideoFrame(this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
+        frame = new VideoFrame(frames ? this.stageOf(o) : this.staged(canvas, o), { timestamp: Math.round(now * 1000), duration: Math.round(frameMs * 1000) });
         if (i === 0 && o.counts.frames === 0) this.timing.firstEncodeAt = t;
         o.encoder.encode(frame, { keyFrame });
         if (i === 0) this.timing.grabMs += performance.now() - t;
@@ -481,25 +526,55 @@ export class LiveEncoder {
         frame?.close();
       }
     }
+    this.want = true;
     const next = this.t0 + (due + 1) * frameMs;
     this.timer = setTimeout(() => this.tick(due + 1), Math.max(0, next - performance.now()));
   }
 
+  /**
+   * The frame task's picture, copied onto every output's stage while it can
+   * still be read (lib/liveFrame.ts), once for each frame the clock has sent
+   * since: the plate draws at the display's rate and the stream takes 30.
+   * Copied even at the output's own size, unlike `staged`: the canvas
+   * itself is unreadable by the time the frame is due.
+   */
+  private take(canvas: HTMLCanvasElement | OffscreenCanvas): boolean {
+    if (!this.want || (this.phase !== 'live' && this.phase !== 'starting')) return false;
+    const t = performance.now();
+    for (const o of this.outs) this.stage(canvas, o);
+    this.timing.grabMs += performance.now() - t;
+    this.want = false;
+    return true;
+  }
+
   /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
   private staged(canvas: HTMLCanvasElement, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
-    const { width, height, fit } = o.spec;
+    const { width, height } = o.spec;
     if (canvas.width === width && canvas.height === height) return canvas;
+    return this.stage(canvas, o);
+  }
+
+  /** The output's staging canvas, made black at its size the first time. */
+  private stageOf(o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height } = o.spec;
     if (!o.stage) {
       o.stage = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), { width, height });
       o.stageCtx = o.stage.getContext('2d') as OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null;
+      if (o.stageCtx) { o.stageCtx.fillStyle = '#000'; o.stageCtx.fillRect(0, 0, width, height); }
     }
+    return o.stage;
+  }
+
+  private stage(canvas: HTMLCanvasElement | OffscreenCanvas, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
+    const { width, height, fit } = o.spec;
+    const stage = this.stageOf(o);
     const ctx = o.stageCtx;
     if (!ctx) throw new Error('no 2D context to stage the stream\'s frames on');
     // Cropped, never stretched: a round dish drawn into another shape would be an oval (37x-4b stretched the window's canvas to 16:9).
     const c = liveCrop(canvas.width, canvas.height, width, height, fit);
     if (fit === 'contain') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); }
     ctx.drawImage(canvas, c.sx, c.sy, c.sw, c.sh, c.dx, c.dy, c.dw, c.dh);
-    return o.stage;
+    return stage;
   }
 
   private onVideo(o: VideoOut, chunk: EncodedVideoChunk, m?: EncodedVideoChunkMetadata): void {
@@ -606,6 +681,7 @@ export class LiveEncoder {
     if (this.stopping) return;
     this.stopping = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    this.unlisten?.(); this.unlisten = null;
     for (const o of this.outs) { try { if (o.encoder && o.encoder.state === 'configured') await o.encoder.flush(); } catch { /* failed already */ } }
     try { if (this.audio && this.audio.state === 'configured') await this.audio.flush(); } catch { /* failed already */ }
     for (const o of this.outs) { try { o.encoder?.close(); } catch { /* closed */ } }

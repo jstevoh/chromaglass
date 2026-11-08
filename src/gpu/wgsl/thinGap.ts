@@ -639,7 +639,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let tempVisc = exp(-0.02 * clamp(uf.z, 0.0, 50.0));
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag * tempVisc;
-  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
+  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (S.cover * S.cover) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
     layer, and the liquid it touches moves with it. Brinkman's penalised

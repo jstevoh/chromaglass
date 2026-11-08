@@ -50,16 +50,22 @@ import WebSocket from 'ws';
 import { signLicenseKey } from '../server/license-key.js';
 import { TempoSource } from '../src/lib/tempo.ts';
 import { curveOf, valueAt } from '../src/lib/midi.ts';
+import { port } from './ports.mjs';
 
 const NODE_ONLY = process.argv.includes('--node');
 const PLUGIN = process.argv.includes('--plugin');
-const PORT = Number(process.env.DAWBRIDGE_PORT ?? 5311);
+const PORT = port(5311, 'DAWBRIDGE_PORT');
 // Not 9024: a real plugin and app on this machine keep theirs.
 const BRIDGE = PORT + 3713;
 const FREE_PORT = PORT + 1;
 const FREE_BRIDGE = BRIDGE + 1;
 // The contract's numbers (docs/dawbridge.md), written here, not read from either half.
-const SLOTS = 32, CONTRACT_PORT = 9024, PROTOCOL = 1;
+const SLOTS = 32, PROTOCOL = 1;
+// The port the contract names for a DAW's plugin to find the bridge on: a
+// number this harness compares with src/lib/dawBridge.ts and the plugin's
+// header, never one it serves (its bridge listens on BRIDGE, which moves
+// with the runner's block), so it is not asked of ports.mjs.
+const contractPort = 9024;
 const A = (s) => `/chromaglass/bridge/${s}`;
 const ADDRESSES = ['hello', 'slot', 'transport', 'pcm', 'bye', 'names'].map(A);
 
@@ -428,7 +434,7 @@ const heartA = setInterval(() => { pa.hello('inst-a'); }, 1000);
 {
   const lib = await import('../src/lib/dawBridge.ts').catch((e) => ({ missing: e.message.split('\n')[0] }));
   const has = (k) => k in lib;
-  line('app', 'src/lib/dawBridge.ts says the contract\'s numbers', lib.DAW_SLOTS === SLOTS && lib.DAW_PORT === CONTRACT_PORT && lib.DAW_PROTOCOL === PROTOCOL,
+  line('app', 'src/lib/dawBridge.ts says the contract\'s numbers', lib.DAW_SLOTS === SLOTS && lib.DAW_PORT === contractPort && lib.DAW_PROTOCOL === PROTOCOL,
     lib.missing ?? `slots ${lib.DAW_SLOTS}, port ${lib.DAW_PORT}, protocol ${lib.DAW_PROTOCOL}`);
 
   let pcmOk = false, pcmDetail = 'no decodeDawPcm';
@@ -626,7 +632,7 @@ else {
   const num = (name) => Number(text.match(new RegExp(`\\b${name}\\s*(?:=\\s*|\\{\\s*)(\\d+)`))?.[1]);
   const missing = ADDRESSES.filter((a) => !text.includes(`"${a}"`));
   line('plugin', 'the plugin\'s protocol header says what the contract says',
-    text && num('kProtocol') === PROTOCOL && num('kSlots') === SLOTS && num('kPort') === CONTRACT_PORT && missing.length === 0,
+    text && num('kProtocol') === PROTOCOL && num('kSlots') === SLOTS && num('kPort') === contractPort && missing.length === 0,
     text ? `protocol ${num('kProtocol')}, slots ${num('kSlots')}, port ${num('kPort')}${missing.length ? `; missing ${missing.join(' ')}` : ''}` : `no ${header}`);
   const bin = ['plugin/dawbridge/build/DawBridgeSelfTest_artefacts/Release/DawBridgeSelfTest', 'plugin/dawbridge/build/DawBridgeSelfTest_artefacts/DawBridgeSelfTest'].find(existsSync);
   if (!bin) line('plugin', 'the plugin\'s self-test is built', false, 'no DawBridgeSelfTest under plugin/dawbridge/build');

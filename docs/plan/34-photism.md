@@ -140,6 +140,21 @@ a grid of generic stock thumbnails: ours are the plate itself.
   the frame budget (Wave 4) is not touched. Phone: the Looks sheet gets the same grid.
   Line 1211 above already asks for a still saved in each preset file; that is the
   cheap first step, and the live preview follows.
+  *Briefed for the build lane* (2026-11-07): stills first (34b-1, a picture per look from the
+  gallery's own renders, the grid on the desk's preset menu and the phone's Looks sheet), then one
+  live preview at a time (34b-2). Its check is Claude's and lands before the build: the grid draws
+  every shipped look's still, only the hovered card runs, and the plate's step rate with the grid
+  open is its rate with it shut (the frame budget untouched).
+  *Check written* (2026-11-08): `npm run looksgrid -- --owed=stills,preview` (browser shard,
+  headless, about 20 s) and `npm run looksgrid -- --budget --owed=budget` (tools shard, Metal);
+  the header of `scripts/looksgrid.mjs` is the contract. Found on the way: the Perform desk has no
+  look menu (`PresetMenu` is only the narrow window's, under 1024 wide), so the contract asks for a
+  grid opened from the desk itself (`looks-grid-open`) beside the narrow menu and the phone sheet.
+  A throwaway build passed both cloud lines and failed them with one file for every look, a hidden
+  still and a preview left mounted. The Mac line asks the preview to report its own solver
+  (`chromaglassDebug().preview`, `{ id, stepCount }`), so a picture that only moves cannot pass it. Not in the check: no preview while a show is live on the wall (needs a cast
+  or mirror open; the reviewer reads it), and `BUDGET_SHARE` (0.95) is unmeasured on the Mac until
+  a preview exists.
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the
