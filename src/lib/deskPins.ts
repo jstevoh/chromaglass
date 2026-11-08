@@ -164,6 +164,7 @@ const SECTION_OF: Record<string, string> = {
   clearFilmDye: 'oil',
   thinGap: 'squish',
   gapThickness: 'squish',
+  liquidMl: 'squish', coverWeight: 'squish',
   pacing: 'automation',
   songFollow: 'automation',
   spinRpm: 'spin',

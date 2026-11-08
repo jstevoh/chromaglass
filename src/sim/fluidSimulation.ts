@@ -50,6 +50,9 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP } from './stepping';
 import { rimCount, rimMask } from '../lib/rimMask';
 
+/** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
+const c01 = (v: number | undefined) => Math.max(0, Math.min(1, v ?? 0));
+
 export class FluidSimulation {
   size: number;
   dt: number;
@@ -102,6 +105,8 @@ export class FluidSimulation {
    * solver with the first finger's magnet (GpuStepParams.extraMagnets).
    */
   extraMagnets: readonly { x: number; y: number }[] = [];
+  /** A two-finger pinch's hand on the cover glass, −1 lifting to 1 pressing (lib/playGesture.ts, PLAN 38r-5). */
+  coverHand = 0;
   /** The magnet's radius, Magnet Size's (magnetFor; gpu/wgsl/magnetDisc.ts). */
   magnetRadius = MAGNET_RADIUS;
   /** Half the screen's width and height, in plate widths (the plate is drawn 1.5× the long side). */
@@ -525,7 +530,7 @@ export class FluidSimulation {
       if (this.thinGap && g.pour) {
         const L = this.size;
         const r = Math.max(1.5, radius) / L;
-        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds), speciesOf(what));
+        g.pour(cx / L, cy / L, r, pourShare(r, amount, seconds, g.coverMetres), speciesOf(what));
       }
       if (('active' in what) && (g as any).addActive) {
         (g as any).addActive(cx / this.size, cy / this.size, Math.max(1.5, radius) / this.size, (what.active as number) * amount);
@@ -881,7 +886,7 @@ export class FluidSimulation {
   thinPatch(cx: number, cy: number, radius: number, keep: number): void {
     const N = this.size;
     const R = Math.max(2, radius);
-    const k = Math.max(0, Math.min(1, keep));
+    const k = c01(keep);
     const yl = Math.max(0, Math.floor(cy - R)), yh = Math.min(N - 1, Math.ceil(cy + R));
     const xl = Math.max(0, Math.floor(cx - R)), xh = Math.min(N - 1, Math.ceil(cx + R));
     for (let y = yl; y <= yh; y++) {
@@ -944,7 +949,7 @@ export class FluidSimulation {
       // mirror and the deltas are both on, so nothing is mapped.
       const R = b.r;
       if (!(R > 0.7) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
-      const clear = Math.max(0, Math.min(1, b.opacity));
+      const clear = c01(b.opacity);
       if (clear < 0.02) continue;
       /*
         Only cells it did not already cover at the last deposit.
@@ -1223,7 +1228,7 @@ export class FluidSimulation {
    * of sitting under them for minutes.
    */
   thinDye(factor: number) {
-    const f = Math.max(0, Math.min(1, factor));
+    const f = c01(factor);
     if (f >= 1) return;
     if (this.gpu) {
       for (let i = 0; i < GRID_AREA; i++) this.mul[i] *= f;
@@ -1357,7 +1362,7 @@ export class FluidSimulation {
   }
 
   seedPresetScaled(presetId: string, noise2D: (x: number, y: number) => number, w: number): number[] {
-    const k = Math.max(0, Math.min(1, w));
+    const k = c01(w);
     const before = [this.density.slice(), this.densityR.slice(), this.densityG.slice(), this.densityB.slice()];
     const harmony = this.seedPreset(presetId, noise2D);
     const now = [this.density, this.densityR, this.densityG, this.densityB];
@@ -3141,7 +3146,7 @@ export class FluidSimulation {
       number (both solvers halve it).
     */
     {
-      const vf = Math.max(0, Math.min(1, settings.vibrationFrequency ?? 0));
+      const vf = c01(settings.vibrationFrequency);
       if (vf > 0.005) {
         const energy = audioData ? Math.min(1, audioData.energy) : 0;
         vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
@@ -3153,7 +3158,7 @@ export class FluidSimulation {
     // (immiscibility, below). It also set a fingering push, a noise pushing
     // the dye along its own gradient, which grew a grating in every pool
     // and is gone (forcesB in wgsl/fluid.ts, and why).
-    const tension = Math.max(0, Math.min(1, settings.blobSurfaceTension ?? 0.5));
+    const tension = c01(settings.blobSurfaceTension ?? 0.5);
     const polarity = settings.polarity || 0;
 /*
       Named `immiscibility` and not `surfaceTension`, which is what it was
@@ -3300,7 +3305,6 @@ export class FluidSimulation {
       insurance against something that does not happen.
     */
     const evapFactor = Math.pow(Math.max(0.0001, perStep), Math.max(0, this.dt) / DT_FULL);
-    const c01 = (v = 0) => Math.max(0, Math.min(1, v));
 
     return {
       dt, visc, nu,
@@ -3327,7 +3331,7 @@ export class FluidSimulation {
       // is the strength that measured well on the projector, and at 1.0 it stops
       // three-quarters of the way up, short of where a bright rim appears along
       // boundaries and thin dye goes blocky.
-      sharpness: (s => s * (0.225 - 0.09 * s))(Math.max(0, Math.min(1, settings.sharpness ?? 0))),
+      sharpness: (s => s * (0.225 - 0.09 * s))(c01(settings.sharpness)),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
       turbScale, turbDetail, spin, immiscibility,
@@ -3353,9 +3357,9 @@ export class FluidSimulation {
         to move it, and a bead needs neither. One control, because the two are
         never independently interesting.
       */
-      phaseSharp: Math.max(0, Math.min(1, settings.phaseSharp ?? 0.35)),
+      phaseSharp: c01(settings.phaseSharp ?? 0.35),
       phaseTension: Math.max(0, Math.min(1, (settings.phaseScale ?? 0.4) * 0.45)),
-      magnetX: Math.max(0, Math.min(1, settings.magnetX ?? 0.5)),
+      magnetX: c01(settings.magnetX ?? 0.5),
       /*
         Not flipped, and it was for a while on the strength of a bad reading.
 
@@ -3366,7 +3370,7 @@ export class FluidSimulation {
         magnet was asked for and 0.350 from the mirror of it. The instrument
         was wrong, not the axis.
       */
-      magnetY: Math.max(0, Math.min(1, settings.magnetY ?? 0.5)),
+      magnetY: c01(settings.magnetY ?? 0.5),
       // Held further away for a bigger look, which is what spreads the pull.
       magnetHeight: magnetDepth(settings.magnetHeight, settings.phaseScale),
       magnetStrength: Math.max(0, settings.magnetStrength ?? 0),
@@ -3382,21 +3386,22 @@ export class FluidSimulation {
       // The front plate only: the display reads the film from the front
       // plate's packed view alone, so a film on the back plate would be
       // computed and never seen (PLAN 20b-5).
-      clearFilm: this.layerIndex === 0 ? Math.max(0, Math.min(1, settings.clearFilm ?? 0)) : 0,
+      clearFilm: this.layerIndex === 0 ? c01(settings.clearFilm) : 0,
       solutalBuoyancy: Math.max(0, Math.min(2, settings.solutalBuoyancy ?? 0)),
       plateUpright: c01(settings.plateUpright),
       ...this.downhill(settings.tiltDirection ?? 180),
       doubleDiffusion: Math.max(0, Math.min(2, settings.doubleDiffusion ?? 0)),
-      ferroLabyrinth: Math.max(0, Math.min(1, settings.ferroLabyrinth ?? 0)),
-      mazeDetail: Math.max(0, Math.min(1, settings.mazeDetail ?? 0)),
+      ferroLabyrinth: c01(settings.ferroLabyrinth),
+      mazeDetail: c01(settings.mazeDetail),
       phaseDisplace: Math.max(0, Math.min(2, settings.phaseDisplace ?? 0)),
-      bzReaction: Math.max(0, Math.min(1, settings.bzReaction ?? 0)),
-      liesegang: Math.max(0, Math.min(1, settings.liesegang ?? 0)),
+      bzReaction: c01(settings.bzReaction),
+      liesegang: c01(settings.liesegang),
       plateCurve: Math.max(-1, Math.min(1, settings.plateCurve ?? 0)),
       depthDrag: Math.max(0, Math.min(3, settings.depthDrag ?? 0)),
       // The plate as a Hele-Shaw cell (PLAN §18a): a switch, and the liquid's thickness for it.
       thinGap: (settings.thinGap ?? 1) > 0.5 ? 1 : 0,
-      gapThickness: Math.max(0, Math.min(1, settings.gapThickness ?? THIN_GAP_THICKNESS)),
+      gapThickness: c01(settings.gapThickness ?? THIN_GAP_THICKNESS),
+      liquidMl: settings.liquidMl, coverGrams: settings.coverWeight, coverHand: this.coverHand,
       /*
         The half-life the comment above means is in seconds, and `this.dt`
         is not one: it is the look's step, Speed × 0.2, so on Classic
@@ -3415,7 +3420,7 @@ export class FluidSimulation {
       */
       gapSpring: glassSpring(settings.plateSpring ?? 0.35, this.thinGap ? this.dtSeconds : this.dt),
       gapMemory: Math.pow(0.5, this.dt / 0.22),
-      platePressure: Math.max(0, Math.min(1, settings.platePressure ?? 0.4)),
+      platePressure: c01(settings.platePressure ?? 0.4),
       vibIntensity, vibFrequency,
       drip: settings.rainDrip > 0.01 ? settings.rainDrip : 0,
       smearX, smearY,
@@ -3457,7 +3462,7 @@ export class FluidSimulation {
       */
       spinDish: this.dishSpin - this.liquidSpin,
       spinLiquid: this.liquidSpin,
-      spinTau: dragSeconds(carrierViscosity(settings.viscosity)),
+      spinTau: dragSeconds(carrierViscosity(settings.viscosity), this.gpu?.coverUnits),
       spinNu: carrierViscosity(settings.viscosity),
       spinDyeWeight: dyeDensityContrast(settings.solutalBuoyancy),
       particles: settings.particles ?? 0,
@@ -3482,7 +3487,7 @@ export class FluidSimulation {
         const k = i + j * M;
         const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
         const dd = Math.tanh(this.density[q] - p.meanDensity);   // saturated (see the GPU twin)
-        const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
+        const upright = c01(p.plateUpright ?? 0);
         let fx = p.rockX * dd;
         let fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd;   // Boussinesq linear in temperature, gated on upright (see the GPU twin)
         const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
@@ -3516,9 +3521,9 @@ export class FluidSimulation {
     }
     // Into the velocity the dye is carried by, sampled up to the logical grid.
     for (let j = 1; j < S - 1; j++) {
-      const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = Math.max(0, Math.min(1, y - j0));
+      const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = c01(y - j0);
       for (let i = 1; i < S - 1; i++) {
-        const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = Math.max(0, Math.min(1, x - i0));
+        const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = c01(x - i0);
         const k = i0 + j0 * M;
         const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
         const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;

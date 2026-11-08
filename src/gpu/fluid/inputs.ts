@@ -517,7 +517,7 @@ export class FluidInputs extends FluidPasses {
       if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
       const s = this.species;
       if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
-      this.run(pass, 'speciesSplat', s.write, [s.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
+      this.run(pass, 'speciesSplat', s.write, [s.read, this.squeeze.read], this.arg('species splat', [x, y, radius, take, sp.lnNu, sp.scatter ?? 0, sp.index, push ? 1 : 0]));
       s.swap();
       this.speciesLive = true;
       this.speciesQuiet++;
