@@ -19,7 +19,7 @@ Open from it:
 - ~~**8-tabs-a** The tabs live in the browser's storage, so a phone and a laptop each
   have their own~~ (shipped: `deskTabs`, a synced store in `src/lib/cloudSync.ts`, read
   again in `useDeskTabs`; which tab is up stays the machine's; `npm run cloudsync` 14;
-  judging §111; story in `docs/plan-shipped.md` §8). Tabs reach other devices once the
+  judging §110; story in `docs/plan-shipped.md` §8). Tabs reach other devices once the
   licence Worker is redeployed with `deskTabs` in its stores (the owner's go); until
   then the old Worker ignores the store and the manifest sends it again after.
   - **8-tabs-a-1** (S) The list syncs as one value, newest edit wins, and every touch of
