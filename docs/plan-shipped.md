@@ -4267,6 +4267,15 @@ the sessions' files or the native apps skips the Mac (19h).
   download, into a run-local SwiftPM cache under the name SwiftPM looks for, so SwiftPM
   copies them (checksum still checked) instead of downloading; the resolve retries git
   up to three times.
+- **19ak-7, the other release-page downloads** (2026-11-08). The same 504s turned
+  Measure · logic red (actionlint v1.7.7, three times on #720) and the Mac app job (canvas's
+  prebuilt in `npm ci`, then electron-builder's download after Electron's), while the same
+  URLs served a cloud session at times. `scripts/actionlint.mjs` now falls back to the
+  API's asset download (the route that carried #721's iPhone build through) and still
+  checks the sha256; `checks.yml` caches `scratch/actionlint` for the logic part, keyed on
+  the script. `desktop.yml` caches `~/.npm/_prebuilds` and Electron's and
+  electron-builder's caches on pull requests (a signed release fetches fresh), keyed on
+  both lockfiles, and retries the install three times.
 
 ### 20b. A clear film that tears (the thin-film equation)
 

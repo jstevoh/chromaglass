@@ -330,6 +330,20 @@ jobs:
           npx playwright install-deps chromium || { echo "::error title=Chromium's system libraries::a library is missing (listed above) and apt could not install Playwright's packages"; exit 1; }
           node scripts/chromiumlibs.mjs || { echo "::error title=Chromium's system libraries::still missing after apt (listed above); every browser check after this fails on it"; exit 1; }
 
+      # actionlint's pinned binary (19ak-7), kept between runs so the lint
+      # needs no download at all once a run has fetched it. On 2026-11-08
+      # GitHub's release pages answered 504 for hours and the logic part went
+      # red on a lint with nothing to say. The key is scripts/actionlint.mjs,
+      # which holds the version and each platform's sha256, so a moved pin is a
+      # new key. On a miss the check fetches it as before (the release page,
+      # then the API's asset download) and still holds it to the sha256.
+      - name: actionlint's binary, from the cache when it is there
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        uses: actions/cache@v4
+        with:
+          path: scratch/actionlint
+          key: actionlint-${{ runner.os }}-${{ hashFiles('scripts/actionlint.mjs') }}
+
       # Every check in this part, from scripts/checks.json, in the manifest's
       # order (PLAN.md 19k). Each opens a `Run <command>` group as its own step
       # did, a red one is an error annotation with its name and its FAIL lines,
