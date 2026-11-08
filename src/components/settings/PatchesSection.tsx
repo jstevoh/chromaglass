@@ -7,7 +7,7 @@ import { isClassFeature } from '../../lib/hitSource';
 import { AreaPicker } from '../phone/AreaPicker';
 import { BandStrip } from '../phone/BandStrip';
 import { groupOf } from '../../lib/settingsMap';
-import { ENVELOPE_TRIGGERS, formatLfoBars, LFO_BARS, LFO_SHAPES, LFO_TRIGGERS, nearestLfoBars, syncModulatorLabels } from '../../lib/modulators';
+import { ENVELOPE_TRIGGERS, formatLfoBars, LFO_BARS, LFO_SHAPES, LFO_TRIGGERS, nearestLfoBars } from '../../lib/modulators';
 import { Info } from '../Info';
 import { LIT } from '../ui';
 import { Slider, PinChips } from './controls';
@@ -54,7 +54,6 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
     settings, onUpdate, readEar, focusSection, lookAreas, areaColours, pins, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
-  syncModulatorLabels(settings);
   return (
     <>
 
@@ -118,7 +117,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       aria-label="Source"
                       onChange={(e) => {
                         const source = e.target.value as PatchSource;
-                        const options = featuresFor(source);
+                        const options = featuresFor(source, settings);
                         const keep = options.some(([v]) => v === m.feature);
                         const next = [...(settings.sceneMappings ?? [])];
                         const { band: _dropBand, ...rest } = m;
@@ -148,7 +147,7 @@ export const PatchesSection = ({ c }: { c: SectionCtx }) => {
                       className="min-h-6 flex-1 min-w-0 bg-black/40 border border-white/10 rounded px-1 py-1 text-[12px] outline-none"
                       data-testid={`patch-feature-${i}`}
                     >
-                      {featuresFor(m.source ?? 'room').map(([value, label]) => (
+                      {featuresFor(m.source ?? 'room', settings).map(([value, label]) => (
                         <option key={value} value={value}>{label}</option>
                       ))}
                     </select>
