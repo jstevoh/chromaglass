@@ -263,7 +263,8 @@ written first. Line numbers are as read on main at d07ac31.
     plain path's rims are checked through the camera's, which shares `meniscus`.
     *The film's check, written first (2026-11-08):* `npm run nolight -- --owed=film` line
     15, the camera's bubbles at Iridescence 1 against 0, at Film Physics 0 and 1: no pixel
-    brighter (by over 1), and over 0.2% of the picture still moved. Main: 22 levels over at
+    brighter (by over 1), over 0.2% of the picture still moved, and Film Physics 0 the same
+    picture as 1 (one transmitted film; main differs by 31). Main: 22 levels over at
     Film Physics 0 (`camFilm`'s `0.45 + 1.25 × filmC`), 0 at 1, where it already
     transmits. A throwaway `camFilm` that returns `mix(1, filmTableAt(filmP, true), irid)`
     at any Film Physics passed it (10.83% moved at each).
