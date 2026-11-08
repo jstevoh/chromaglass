@@ -73,7 +73,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
-import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
+import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
@@ -2191,8 +2191,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       asked, and turns down any offer that comes within 0.6 of a refresh of
       the last one: one draw a refresh, not one per clock.
     */
-    const drawGate = new DrawGate();
-    drawGate.paceTo = 'wall';
+    const drawGate = new DrawGate('wall');
     /*
       The loop, guarded.
 
@@ -3033,9 +3032,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const lead = fluidsRef.current[0];
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
           const status: EngineStatus = {
-            label: lead?.gpu
-              ? `WebGPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
-              : `WebGPU · ${gpuUnavailable ? 'unavailable' : 'starting'}`,
+            label: lead?.gpu ? engineLabel({ grid: lead.gpu.N, dpr: dprRef.current, post: governorRef.current, stage: stageRef.current }) : `WebGPU · ${gpuUnavailable ? 'unavailable' : 'starting'}`,
             engine: lead?.gpu ? 'webgpu' : 'none',
             grid: lead?.gpu ? lead.gpu.N : 0,
             dpr: dprRef.current,
@@ -6218,13 +6215,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       ladderKey = key;
       const was = fresh ? null : governorRef.current?.rung;
       const keep = was ? ladder.rungs.findIndex((x) => x.grid === was.grid && x.dpr === was.dpr) : -1;
-      governorRef.current = QualityGovernor.carry(
-        fresh ? null : governorRef.current,
-        ladder.rungs,
-        PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start),
-        performance.now() * 0.001,
-        PINNED_RUNG !== null,
-      );
+      governorRef.current = QualityGovernor.carry(fresh ? null : governorRef.current, ladder.rungs, PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start), performance.now() * 0.001, PINNED_RUNG !== null);
       // Below whatever ran out of memory before.
       const g = governorRef.current;
       while (g.rung.grid > gridCapRef.current && g.failRung(performance.now() * 0.001)) { /* down a rung */ }

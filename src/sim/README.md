@@ -34,7 +34,7 @@ the component.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
-  `resolveSimResolution`.
+  `resolveSimResolution`, `engineLabel`.
 - `tools.ts`: the hands' settle and hold, Blow's straw, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`).
 
 ## Checks

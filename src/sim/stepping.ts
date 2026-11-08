@@ -96,6 +96,12 @@ export function postLevelLabel(governor: QualityGovernor | null | undefined): st
   return level === 1 ? ' · effects ½' : level === 2 ? ' · effects off' : '';
 }
 
+/** The engine readout's label; with a stage it names the share as "of the wall" (PLAN 14c-readout). */
+export function engineLabel({ grid, dpr, post, stage }: { grid: number; dpr: number; post?: string | QualityGovernor | null; stage: unknown }): string {
+  const suffix = typeof post === 'string' ? post : postLevelLabel(post);
+  return `WebGPU · ${grid}² · ${dpr.toFixed(1)}x${stage ? ' of the wall' : ''}${suffix}`;
+}
+
 /**
  * The stage draws the show (docs/webgpu-plan.md): there is one engine.
  */

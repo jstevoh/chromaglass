@@ -232,6 +232,10 @@ export class DrawGate {
   /** Whether two clocks pace to the faster display or to the wall's refresh (14b-120). */
   paceTo: DrawPace = 'faster';
   private readonly lastOffer: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
+
+  constructor(paceTo: DrawPace = 'faster') {
+    this.paceTo = paceTo;
+  }
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
   /**
    * Whether each clock has offered since the last draw (or made it): its one

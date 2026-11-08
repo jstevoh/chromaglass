@@ -425,7 +425,7 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs -- --owed=readout,grid32",
+      "run": "npm run rungs -- --owed=grid32",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
