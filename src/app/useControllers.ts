@@ -70,7 +70,7 @@ export function useControllers({
       applyPreset: cuePreset,
       selectDye,
       // Every note plays the envelopes, whatever else that pad is for.
-      noteStruck: (velocity) => wallRef.current?.fireEnvelopes?.(velocity),
+      noteStruck: (velocity, source) => wallRef.current?.fireEnvelopes?.(velocity, source),
     },
     {
       activePresetId,
