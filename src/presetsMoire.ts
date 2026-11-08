@@ -1,7 +1,7 @@
 import type { VisualizerSettings } from './types';
 
 /**
- * The moiré pack's looks (PLAN 45a): six of the house looks with a pair of
+ * The moiré pack's looks (PLAN 45a): seven of the house looks with a pair of
  * the pack's sheets on the stage. Each starts from a look that already
  * ships, so the liquid is one people know, and sets only what the sheets
  * need: which two, how they sit, and the lamp.
@@ -33,6 +33,29 @@ export const MOIRE_LOOKS: readonly {
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'spokes', moireSheetB: 'spokes', moireFlip: true,
       moireDensity: 40, moireAngle: 3, moireSpin: 0.4, moireCurl: 0.35, moireGap: 3,
+      sceneMappings: [{ source: 'hits', feature: 'kickHit', setting: 'moireCurl', depth: 0.06 }],
+    },
+  },
+  {
+    /*
+      PLAN 45a-11. The owner picked this one off the moiré reel of 2026-11-08
+      ("I like the waves one"): the clip was Moiré Star's stage with the spoke
+      sheets swapped for Waves, laid the same way up. Face down, two wave
+      sheets cross their crests and troughs into a lattice of eyes; face up
+      the crests stay in step and beat into broad swells that roll across the
+      plate as the top sheet turns, which is what the clip showed. The turn is
+      Star's less one degree and its spin half, so the swells are wide and
+      slow, and Curl (the waves' height) at 0.4 is the clip's. The kick cord
+      is Star's: on Waves the Curl is the height of the waves, so a kick
+      lifts them and the swells jump with it.
+    */
+    id: 'moire-waves',
+    name: 'Moiré Waves',
+    description: 'Two wave sheets turning slowly against each other: their crests beat into broad swells that roll across the dye. A kick lifts the waves.',
+    from: 'classic',
+    settings: {
+      lampGround: 1, moireAmount: 1, moireSheetA: 'waves', moireSheetB: 'waves', moireFlip: false,
+      moireDensity: 40, moireAngle: 2, moireSpin: 0.2, moireCurl: 0.4, moireGap: 3,
       sceneMappings: [{ source: 'hits', feature: 'kickHit', setting: 'moireCurl', depth: 0.06 }],
     },
   },

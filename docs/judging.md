@@ -2453,10 +2453,10 @@ plate stuttering when the list lands mid-show.
 
 `npm run moire` holds the optics (the fringe's frequency, the product of two sheets, no false
 moiré, the gap's defocus, the liquid bending the lower sheet, off is off) on the lab plate;
-only the wall can say whether the six looks read as the real transparencies do.
+only the wall can say whether the seven looks read as the real transparencies do.
 
-1. Load each look in the look menu's **Moiré pack** group: Moiré Star, Moiré Ripple,
-   Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel, with a song playing.
+1. Load each look in the look menu's **Moiré pack** group: Moiré Star, Moiré Waves (45a-11),
+   Moiré Ripple, Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel, with a song playing.
 2. Settings → **Moiré Sheets**: turn **Moiré Turn** slowly through 0. The fringes should
    widen to nothing at 0 and sweep faster as it leaves; **Flip** on two Spokes should cross
    into diamonds like the shop's video.
