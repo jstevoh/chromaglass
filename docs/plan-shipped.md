@@ -6879,9 +6879,12 @@ the busier frames dropped the headline to 2.6:1 on a phone on its side.
 
 Check 11c measured cover from `naturalWidth`, which under a `w` srcset is divided by the chosen density, so it read 0.41
 on frames that were sharp. It now reads each file's real pixels from a fresh `Image`, multiplies in the largest scale in
-the `cg-hero-slide` keyframes, and holds the drift still while it measures. After: cover 1.00 / 1.03 / 0.99 (laptop,
+each frame's live `cg-hero-slide` animation, paused and stepped through its cycle (reading the keyframes' text gave ×1
+when the rule was renamed or written another way, a pass 4% easier), refuses a frame with no chosen source, and holds
+the drift still while it measures. It also runs on a 1440 × 900 Retina laptop, the screen the cuts were sized for: at
+1024 × 768 the old ×1.07 still cleared the bar (0.97), at 1440 it reads 0.93 and fails, the control run. After: cover 1.00 / 1.03 / 0.99 (laptop,
 phone upright, phone on its side; bar 0.95), headline 6.4 / 6.0 / 4.7:1, line 5.9 / 5.4 / 5.0:1, first frame 168 / 74 /
-125 KB; `npm run signin` 29/29. Re-filming with bubbles on stays open in §34a-8.
+125 KB, and 0.96 with 7.0 / 6.5:1 on the 1440 laptop; `npm run signin` 29/29. Re-filming with bubbles on stays open in §34a-8.
 
 ### 34a-5. The page's words, rewritten (2026-10-28)
 

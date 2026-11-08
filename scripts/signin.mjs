@@ -50,7 +50,8 @@
  *  10. the remote (?remote) and a cast (?cast) never ask, nor fetch Firebase
  *  11. the sign-in fits a laptop (1024×768) and a phone, upright and on its
  *      side: nothing wider than the screen, every button a thumb's height
- *  11c. the landing page's hero on the same screens (PLAN.md 34a-8): every
+ *  11c. the landing page's hero on the same screens and a 1440×900 Retina
+ *      laptop (PLAN.md 34a-8): every
  *      one of its frames has at least HERO_COVER_MIN of a device pixel for
  *      each screen pixel it covers (the old frames had a fifth: 480 × 300
  *      cards drawn across a Retina laptop), the headline and its line keep
@@ -381,17 +382,29 @@ async function heroLook(page) {
   if (!all) return null;
   const sized = await page.evaluate(async () => {
     const dpr = devicePixelRatio;
-    // The slide's slow zoom is held off while the box is read, and its
-    // largest scale is read from the page's own keyframes and multiplied in,
-    // so a frame is judged at its most enlarged, not at whichever moment of
-    // the zoom the page happened to be in (and a deeper zoom fails here).
-    let zoom = 1;
-    for (const sh of document.styleSheets) {
-      let rules; try { rules = sh.cssRules; } catch { continue; }
-      for (const r of rules) if (r.type === CSSRule.KEYFRAMES_RULE && r.name === 'cg-hero-slide') {
-        for (const k of r.cssRules) { const m = /scale\(([\d.]+)\)/.exec(k.style.transform || ''); if (m) zoom = Math.max(zoom, Number(m[1])); }
+    // The slide's slow zoom is read from the page's own running animation,
+    // not from its stylesheet's text: each frame's `cg-hero-slide` animation
+    // is paused and stepped through its whole cycle, and the zoom is the
+    // largest drawn width over the laid-out width. Reading the keyframes'
+    // text (the first version of this) quietly gave ×1, a pass 4% easier,
+    // when the rule was renamed, written as scale(a, b), scale3d, a matrix or
+    // the `scale:` property, or moved to a sheet whose rules cannot be read;
+    // stepping the live animation reads any of those, and a frame with no
+    // such animation fails rather than counting as unzoomed. The animation is
+    // then held off while the box is read, so the zoom is counted once.
+    let zoom = 0;
+    for (const im of document.querySelectorAll('img[data-cg-hero]')) {
+      const a = im.getAnimations().find((x) => x.animationName === 'cg-hero-slide');
+      if (!a) return null;
+      const was = a.currentTime, T = Number(a.effect.getComputedTiming().duration);
+      a.pause();
+      for (let k = 0; k <= 200; k++) {
+        a.currentTime = (T * k) / 200;
+        zoom = Math.max(zoom, im.getBoundingClientRect().width / im.offsetWidth);
       }
+      a.currentTime = was; a.play();
     }
+    zoom = Math.round(zoom * 1000) / 1000;
     const hold = document.createElement('style');
     hold.textContent = '.cg-hero-slide{animation:none!important;transform:none!important}';
     document.head.append(hold);
@@ -400,7 +413,10 @@ async function heroLook(page) {
     // file's own pixels are read from a fresh Image with no srcset.
     const own = (src) => new Promise((ok) => { const im = new Image(); im.onload = () => ok([im.naturalWidth, im.naturalHeight]); im.onerror = () => ok([0, 0]); im.src = src; });
     const frames = await Promise.all([...document.querySelectorAll('img[data-cg-hero]')].map(async (im) => {
-      const src = im.currentSrc || im.src;
+      // No chosen source means the srcset chose nothing: measuring `src`
+      // (the 1920 fallback) instead would judge a frame that is not shown.
+      const src = im.currentSrc;
+      if (!src) return { src: '(none chosen)', cover: 0, zoom };
       const [nw, nh] = await own(src);
       const b = im.getBoundingClientRect();
       const scale = Math.max(b.width / nw, b.height / nh) * zoom;
@@ -419,6 +435,7 @@ async function heroLook(page) {
     h1.style.color = 'transparent'; line.style.color = 'transparent';
     return out;
   });
+  if (!sized) return null;
   const rect = (sel) => page.evaluate((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }, sel);
   const h1Box = await rect('[data-cg-landing] h1');
   const lineBox = await page.evaluate(() => { const r = document.querySelector('[data-cg-landing] h1').nextElementSibling.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; });
@@ -730,11 +747,26 @@ try {
     await c.close();
   }
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
+  // 11c also on a 1440 × 900 Retina laptop, the screen the hero's cuts and
+  // zoom were sized for: at 1024 × 768 the old ×1.07 zoom still cleared the
+  // bar (0.974), so only here does the check tell the zoom that blurs from
+  // the one that does not (×1.07 reads 0.935, ×1.04 0.962). The default
+  // screens of 1470- and 1512-wide laptops want more than the 2880 cut has
+  // (0.905 and 0.881) and wait for the re-filming in PLAN 34a-8.
+  const heroScreens = [...sizes, { name: 'laptop 1440×900', viewport: { width: 1440, height: 900 }, touch: false }];
+  {
+    const s = heroScreens[heroScreens.length - 1];
+    const c = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: 2 });
+    const p = await c.newPage();
+    await p.goto(ON);
+    s.hero = (await waitFor(() => landingShown(p), 30_000)) ? await heroLook(p) : null;
+    await c.close();
+  }
   const heroOk = (h) => !!h && h.frames.length >= 5 && h.frames.every((fr) => fr.cover >= HERO_COVER_MIN && fr.h1 >= HERO_H1_CONTRAST_MIN && fr.line >= HERO_LINE_CONTRAST_MIN)
     && h.firstBytes > 0 && h.firstBytes <= HERO_FIRST_BYTES_MAX;
   check(`11c. the landing page's hero is sharp on a laptop and a phone (every frame ≥ ${HERO_COVER_MIN} device px a screen px), its headline ≥ ${HERO_H1_CONTRAST_MIN}:1 and line ≥ ${HERO_LINE_CONTRAST_MIN}:1 over every frame, the first frame ≤ ${HERO_FIRST_BYTES_MAX / 1000} KB`,
-    sizes.every((s) => heroOk(s.hero)),
-    sizes.map((s) => `${s.name}: ${s.hero ? `${s.hero.frames.length} frames, cover ${Math.min(...s.hero.frames.map((fr) => fr.cover)).toFixed(2)} at least at the zoom's ×${s.hero.frames[0]?.zoom} (${s.hero.frames.map((fr) => fr.src).join(' ')}), headline ${Math.min(...s.hero.frames.map((fr) => fr.h1)).toFixed(1)}:1 and line ${Math.min(...s.hero.frames.map((fr) => fr.line)).toFixed(1)}:1 at worst, first frame ${Math.round(s.hero.firstBytes / 1000)} KB, all ${Math.round(s.hero.allBytes / 1000)} KB` : 'no hero read'}`).join('; '));
+    heroScreens.every((s) => heroOk(s.hero)),
+    heroScreens.map((s) => `${s.name}: ${s.hero ? `${s.hero.frames.length} frames, cover ${Math.min(...s.hero.frames.map((fr) => fr.cover)).toFixed(2)} at least at the zoom's ×${s.hero.frames[0]?.zoom} (${s.hero.frames.map((fr) => fr.src).join(' ')}), headline ${Math.min(...s.hero.frames.map((fr) => fr.h1)).toFixed(1)}:1 and line ${Math.min(...s.hero.frames.map((fr) => fr.line)).toFixed(1)}:1 at worst, first frame ${Math.round(s.hero.firstBytes / 1000)} KB, all ${Math.round(s.hero.allBytes / 1000)} KB` : 'no hero read'}`).join('; '));
 
   const sheet = {};
   const lit = {};
