@@ -656,7 +656,7 @@
     {
       "name": "Three sound builds, their checks written first",
       "shard": "logic",
-      "run": "npm run soundowed -- --owed=voices,lfo",
+      "run": "npm run soundowed -- --owed=voices",
       "why": [
         "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
         "notes as voices placed by Melody Walk's scale with an attack, a release",
@@ -1774,6 +1774,21 @@
         "notes; the room keys against lookFade.ts; nothing public naming it. Then eighteen",
         "mutants, each a rule removed from a copy of server/, each of which must fail its",
         "own line. No GPU, no build; about a minute."
+      ]
+    },
+    {
+      "name": "The owner's YouTube connector",
+      "shard": "browser2",
+      "run": "npm run youtube",
+      "why": [
+        "The YouTube MCP server (PLAN 44i; scripts/youtube.mjs): mcp/youtube-mcp.js over stdio",
+        "against a stand-in Google on loopback. The sign-in (state refused, PKCE S256, the key",
+        "file 600 in a 700 folder), a refused access key refreshed, an upload killed mid-file",
+        "and resumed by a second server in the same session, a dropped chunk and a 503 resumed",
+        "from Google's count, the bytes exact, private when no privacy is named (Google's default",
+        "is public since 2026-11-02), the same file twice refused, an update keeping what it did",
+        "not name, no secret in any reply or log. Then fourteen mutants, each of which must fail",
+        "its own line. No GPU, no build, no network; about half a minute."
       ]
     },
     {
