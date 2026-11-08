@@ -39,6 +39,26 @@ const paperPair = (rand: () => number): { paperA: string; paperB: string } => {
 };
 
 /**
+ * The camera's lens, rolled as a whole. Its dials each act on their own (a
+ * lens at 0 with the bloom up still blooms), so a roll that left Lens at 0
+ * and drew the rest at random would put glass in front of every look, where
+ * the roll used to give it to two in five. Two in five get it, and the rest
+ * carry all of it at 0.
+ */
+const lensRoll = (rand: () => number) => {
+  const on = rand() < 0.4;
+  const dial = (lo: number, span: number) => (on ? lo + rand() * span : 0);
+  return {
+    camera: dial(0.5, 0.5),
+    focus: rand(),
+    aperture: dial(0, 0.8),
+    bloom: dial(0, 0.7),
+    chromaticAberration: dial(0, 0.6),
+    refraction: dial(0.3, 0.7),
+  };
+};
+
+/**
  * One roll of the dice: a complete look, made up on the spot.
  *
  * "Randomise the look", and what `onNewSong: 'random'` reaches for. It lived
@@ -219,12 +239,7 @@ export function luckyLook(
     iridescence: rand() * 0.6,
     renderStyle: rand() < 0.25 ? 'photo' : 'show',
     ...paperPair(rand),
-    camera: rand() < 0.4 ? 0.5 + rand() * 0.5 : 0,
-    focus: rand(),
-    aperture: rand() * 0.8,
-    bloom: rand() * 0.7,
-    chromaticAberration: rand() * 0.6,
-    refraction: 0.3 + rand() * 0.7,
+    ...lensRoll(rand),
     microDroplets: rand() < 0.4 ? rand() : 0,
     thinFilm: rand() < 0.4 ? rand() : 0,
     // The other projectors come out one roll in five, one at a time

@@ -433,24 +433,27 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
         {/*
           "Lens", not "Camera": the section is called Camera, the room has a
           camera and the film has one too, and this is none of them — it is
-          how much of the photograph's lens is over the picture.
+          how much of the photograph's sensor look (roll-off, vignette, grain) is
+          over the picture. The dials under it act on their own, so none waits
+          for it (a greyed dial is one nobody finds does anything). Focus waits
+          for Aperture: a focal plane with nothing to blur shows nothing.
         */}
         <Slider label="Lens" value={settings.camera ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ camera: v })}
           settingKey="camera"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })}
+        <Slider disabled={(settings.aperture ?? 0) <= 0.001 && 'needs Aperture above 0'} label="Focus" value={settings.focus ?? 0.5} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ focus: v })}
           settingKey="focus"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })}
+        <Slider label="Aperture" value={settings.aperture ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ aperture: v })}
           settingKey="aperture"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })}
+        <Slider label="Bloom" value={settings.bloom ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ bloom: v })}
           settingKey="bloom"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })}
+        <Slider label="Chromatic Aberration" value={settings.chromaticAberration ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ chromaticAberration: v })}
           settingKey="chromaticAberration"
         />
-        <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })}
+        <Slider label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })}
           settingKey="refraction"
         />
         <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })}
