@@ -43,9 +43,11 @@ import { X509Certificate } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.NETDISPLAY_PORT ?? 4297);
+// The http port moves with its runner (scripts/ports.mjs); the https port is
+// the server's own default, PORT + 443, so it moves with it.
+const PORT = port(4297, 'NETDISPLAY_PORT');
 const HTTPS_PORT = PORT + 443;
 const KEY = '24681357';
 const TLS_DIR = mkdtempSync(join(tmpdir(), 'cg-tls-'));
