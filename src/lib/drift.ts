@@ -127,6 +127,10 @@ const NOT_THE_LOOK = new Set([
   // tear a look's crowd of drops into a few blobs for good, and up adds
   // nothing to a look without one. The look's own number, held.
   'filmHold',
+  // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
+  // soap clear off the plate at a chosen half-life; Evolve must not start a
+  // loss by itself.
+  'soapBreakdown',
   // How much of a burst each kick throws (Kick Bloom): the owner's hand, as
   // Frame Sway is. It is 1 on every look so none changes, and a wander would
   // walk a look off the amount it ships with and into the dye-free calm of 0
