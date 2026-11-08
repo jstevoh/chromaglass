@@ -137,6 +137,9 @@ Left, each its own plan item:
     back as a ring from the readback mirror, frames behind on a slow machine. Every look runs a
     thin gap, so this is the plate switched off it; the fix is the same accounting in the old
     carries (a source where the air arrives, colour per unit of liquid), then the CPU's half goes.
+    Check written first: `npm run bubbleair` id `oldplate` (Thin Gap off: a whole, drifting and
+    popped bubble keep the colour to 0.1%, main −2.6%, −6.6%, −2.6%; the hole fills to 0.5, main
+    0.000; no `depositBubbleRims` left in src/).
   - ~~**15g-8d Liquid runs through a bubble in the thin solve.**~~ **Shipped**: standing air has
     no mobility in the thin solve, so the liquid goes round a bubble; its drift reads the flow on a
     ring past its rim. Lab: nothing left under a moving or growing bubble (was 6.6%, 1.0%). Story in
@@ -147,6 +150,10 @@ Left, each its own plan item:
     path and the oil's mix (`mixAdvectSub`) do not. So under a bubble with Oil Bodies a body's
     colour and its edge can part, and two setups `npm run thick` holds equal differ under air.
     Give each the same accounting (airLiquid takes any amount carry), with a lab case per carry.
+    Check written first: `npm run bubbleair` ids `species`, `mix`, `maze` (no more left in a whole
+    bubble's middle than the colour's own carry leaves there, 0.005 over it at most, today a bar of
+    0.011; main 0.343 for the species alone, 0.203 for the oil's mix, 0.031 on the maze's path,
+    which takes the air but has no airShed after it).
   - **15g-8f A popped bubble's hole fills unevenly.** The donor rule counts what comes into a cell
     with air at the least it can be (two rings deep), so where liquid runs through cells the air is
     leaving, a pop's hole fills to 0.6 of the pool in its middle and 1.09 a few cells out
@@ -154,12 +161,19 @@ Left, each its own plan item:
     its middle, which `airShed` now hands to the rim, a correction rather than the carry getting it
     right. The fix is a donor that mixes what comes in at what it is: the cell's own same-substep
     balance solved across the ring, not bounded from below.
+    Check written first: `npm run bubbleair` id `donor`, in a lab with airShed's call off: under
+    0.02 left in a whole bubble of radius 0.05 and 0.08 (main 0.026, 0.040; with airShed 0.006,
+    0.033), every cell within three radii 0.95–1.05 of the pool thirty steps after the pop (main
+    0.68–1.08, 0.58–1.07; with airShed 0.60–1.09), and the airShed kernel gone.
   - **15g-8g The app still presses the glass under every bubble.** `LiquidVisualizer` lays a
     standing 'press' squish on each bubble's footprint "so the field flows round the bubbles". With
     the solve's air shut (15g-8d) the liquid goes round them by itself; the press is a shortcut that
     dents the gap under the air, a source the solve then has to answer. Measure the plate with and
     without it (`npm run holeline`, `bubbles`, the Mac's `tools`), and take it out if the flow round
-    a bubble is the same.
+    a bubble is the same. Measured (`npm run bubbleair`): in the lab the flow round a drifting
+    bubble is the same with the app's press and without it to 0.09%, nothing runs through it
+    either way, and the press dents the gap under it 0.0300 → 0.0273, so it goes; owed id `press`
+    (no applySquish with the presser 'bubble' left in src/). Still the Mac's `bubbles`/`tools`.
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event

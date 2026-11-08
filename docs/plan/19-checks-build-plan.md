@@ -298,6 +298,18 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   print a line before each of those calls under `CI`, so the next hang names its call, then
   find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
   19aa's and may share the cause).
+- **19k-15** (E, S): **shipped**, `ears`'s covered line holds each tick to the wall's ask
+  before it (more than 250 ms after, EAR_ASK_HOLD_MS) rather than wanting none; red on GitHub's
+  Macs on #718 and #734 at one tick each. Story in `docs/plan-shipped.md` §19k-15.
+- **19k-16, open** (E, S). **`draftwall --frames` reads 0 painted frames on a GitHub Mac.** On
+  #734's run (2026-11-08) "the projector window is painted from the wall's canvas" counted 0
+  frames from either canvas over 8.2 s while the wall's engine drew 334; #718's the same day
+  counted 26 against 121 and passed. Once, on a PR that does not touch the wall. Not known
+  whether the show stopped handing frames over, the window dropped them (a size of 0 returns
+  early in `CastDisplay`'s `paint`) or the patched drawImage missed them; since 19k-15's PR the
+  line prints what the window says of itself (mirror hooked, its own `paints` over the window,
+  stage and source sizes, dark). Next: read that on the next red, then fix the side it names.
+  The bar stays.
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

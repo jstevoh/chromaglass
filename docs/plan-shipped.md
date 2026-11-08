@@ -552,6 +552,41 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
 
+### 13.7b. The DAW bridge plugin (2026-11-07)
+
+**What was built.** `plugin/dawbridge/`, a JUCE 8 effect in AU and VST3 (universal, macOS
+11 and up) that passes its audio through untouched and sends the running app what MIDI
+carries badly: 32 automation slots at full float resolution, the host's transport with
+the bar's phase exact, and the track's audio as PCM, all as OSC over UDP to
+`127.0.0.1:9024` per `docs/dawbridge.md`. The audio thread never waits: it writes what it
+saw into two lock-free FIFOs and a sender thread of the plugin's own does all the talking
+(the hello once a second, the stopped transport's 250 ms heartbeat, the bye on release).
+The app's names come back on the same socket, so a lane reads `Slot 4 · Swirl` in a host
+that follows parameter names, and the window lists every slot's binding for the hosts
+that do not. `DawBridgeSelfTest` is the real processor played as a host plays it, in real
+time, so the FIFOs and the sender are what is measured.
+
+**Built on the owner's Mac, not in Antigravity's lane,** because it needs cmake, the JUCE
+download, `auval` in a GUI session and a DAW to film in, none of which a headless run has.
+
+**What it measured.** `auval -v aufx Pltr Cgbr`: AU VALIDATION SUCCEEDED. `npm run
+dawbridge -- --plugin` against 13.7a's server and app: 36 of 36, the header at protocol 1,
+32 slots, port 9024; 375 transports to beat 7.98 over the 4 s run; 4.000 s of audio in 750
+packets with no gap; slot 3 moved 750 times from 0.000 to 1.000. Filmed on the owner's Mac
+in headed Metal Chromium against #694's show server: the self-test played three times, slot 4
+mapped to Plate Rock, and Plate Rock read 0.04, 0.31, 0.89, 1.00 through each 4 s run with the
+tempo source on `daw` (32 s film, shared with the owner).
+
+**13.7b-film (2026-11-08).** Filmed inside Ableton Live on the owner's Mac. The owner put
+the VST3 on a track, and Live listed it only after the owner turned on Audio Units and VST3
+System Folders in Settings > Plug-Ins and rescanned (Live had 0 plug-ins in its database).
+The owner played Live and turned Slot 4 while the page filmed. The show server followed host
+"Ableton Live" at 48 kHz; the page got about 86 `daw-transport` messages a second (playing,
+120 bpm, 4/4) and its tempo source read `daw`; Plate Rock went from 0.01 to 0.54 over 144
+samples across 40 s, following the knob (40 s film, shared with the owner). An earlier take
+with only an automation lane moved nothing (no `daw-slot` arrived), so the lane was not on
+Slot 4 or its automation was off. That was the lane's setup, not the plugin.
+
 ### 13.5-link. Ableton Link in (2026-10-30)
 
 The owner OK'd one simple piece of the DAW work on 2026-10-30, while the in-flight work
@@ -2527,6 +2562,28 @@ pick asks for its own input by id, one track is live at the end, Input 2's (5/5)
 runs in Measure's browser part. Safari's second song and song ID's latch stay open in
 PLAN.md 14s.
 
+### 14t-pc. Program Change is dropped (shipped)
+
+`parseMidi` (`src/lib/midi.ts`) returned CC and note on/off and nothing else, so a `0xC0`
+message never reached learn. AUM's MIDI matrix, the Elektron boxes and most hardware
+sequencers send Program Change (and Bank Select, CC 0/32) when the pattern changes.
+
+*Shipped:* `MidiEvent.kind` and `MidiSource.kind` gain `'program'`, `parseMidi` reads
+`[0xC0 | ch, n]` as `{ kind: 'program', channel: ch, number: n, value: 0 }`, `eventSource`
+and `parseMidiMap` keep a program source, and `sourceLabel` prints `"Program n ch c"`.
+`MidiTarget` gains `{ kind: 'setlist'; index: number }` (0-based), formatted by `targetLabel`
+and preserved by `parseMidiMap` and `parseSoundBindings`. `useMidi`'s bank-resolution rule
+and button-press test live in `src/lib/midi.ts` as `liveBindings(map, source, bank)` (a
+bank's own binding wins over an always-live one) and `pressedBy(event)` (true for a
+program). `useMidi` calls both and handles `case 'setlist'` via `MidiHost.playSetItem`,
+which `App` wires to the set list's Go path (`sendLook` with `look.fade ?? fadeSeconds`).
+On the desk, `MidiPanel` shows `"Program n ch c"` bindings and offers set-list items under
+a `set list` tab; on the phone, the bindings are listed on its MIDI section (`#settings-midi`).
+Measured: `npm run soundowed -- --owed=voices,lfo` (`5/5 checks passed, 14 owed`: Bank Select
+CC 0/32 stays a CC, `parseMidi([0xC5, 7])` reads `{ kind: 'program', channel: 5, number: 7, value: 0 }`,
+2 of 2 bindings survive save and load, and a recorded run of 12 Program Changes with Bank
+Select and clock between lands all 12 with 0 doubled and 0 missed).
+
 ### 14x. The microphone hears the hand on the laptop (shipped)
 
 **Reported by the owner 2026-10-04:** pressing some controls (the Speed ride) or
@@ -4267,6 +4324,15 @@ the sessions' files or the native apps skips the Mac (19h).
   download, into a run-local SwiftPM cache under the name SwiftPM looks for, so SwiftPM
   copies them (checksum still checked) instead of downloading; the resolve retries git
   up to three times.
+- **19ak-7, the other release-page downloads** (2026-11-08). The same 504s turned
+  Measure · logic red (actionlint v1.7.7, three times on #720) and the Mac app job (canvas's
+  prebuilt in `npm ci`, then electron-builder's download after Electron's), while the same
+  URLs served a cloud session at times. `scripts/actionlint.mjs` now falls back to the
+  API's asset download (the route that carried #721's iPhone build through) and still
+  checks the sha256; `checks.yml` caches `scratch/actionlint` for the logic part, keyed on
+  the script. `desktop.yml` caches `~/.npm/_prebuilds` and Electron's and
+  electron-builder's caches on pull requests (a signed release fetches fresh), keyed on
+  both lockfiles, and retries the install three times.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -8451,6 +8517,10 @@ and `AutoRange` (6 dB minimum, 30 dB cap) as `band1`..`band8`, and `PatchBay.fol
 and the live log-frequency spectrum strip on both the desk and the phone. Story in
 `docs/plan-shipped.md` §30a.
 
+#### ~~30b. The LFOs and envelopes are fixed~~ (shipped 2026-11-08)
+
+Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` removed from `--owed` in `scripts/checks.json`; `npm run shapes` 15/15). `Modulators` (`src/lib/modulators.ts`) adds `setLfo(id, { bars, shape, restart })` (bars in `¼..16`, shapes `'sine' | 'triangle' | 'ramp' | 'stepped' | 'smooth'` with a cosine glide per period for `'smooth'`, and restart trigger `'none' | 'kick' | 'snare' | 'note' | 'pad'`), `setEnvelope(id, { attack, decay, on })` (`'any' | 'kick' | 'snare' | 'note' | 'pad'`), `trigger(source, velocity)` and `strike(velocity, source)`, while keeping `fire(velocity)` (and `'any'` envelopes) for notes, pads and taps only so ear kicks and snares fire only envelopes set to them, and preserving today's rates and shapes as defaults sample for sample (`DEFAULT_SETTINGS` in `src/types.ts`). `modulatorLabel` computes dynamic labels purely from settings in the panel while `MODULATOR_LABELS` stays constant, `Modulators.step` syncs settings without frame-loop allocations and triggers `'kick'` and `'snare'` from the ear's onsets, and `PatchesSection.tsx` draws the LFO rate, shape and restart controls and envelope trigger, attack and decay controls with MIDI pin chips on the desk and phone. `30b-loop` remains open in `docs/plan/30-sound-and-midi.md`.
+
 ### 32. The soap film: a draining film seen in reflection (asked 2026-10-18)
 
 #### ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` reflected view in `src/lib/soapFilm.ts` with Snell path factor `d_eff = h cos θ_t`, 4-point path spread `spread = 0.025`, dark ground `ground = 0.0004`, and colour grade `notchFloor = 0.0725`, `chromaRetention = 0.67` named under shortcut (f) in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; control with the grade off (`notchFloor = 0`, `chromaRetention = 1`) is 77% saturated, 22.7% dark, 9/12 hues at t=120 s, and with the grade on is 13% saturated, 19.4% dark, 8/12 hues at t=120 s (14.8% saturated, 12/12 hues at t=110 s) against the photograph's 15% saturated and 9/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; replacing the grade with the real solid-angle integral and camera gamut mapping is 32b-1 below)
@@ -10231,6 +10301,24 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
 
 ### 21. Looks after painters
 
+#### 19k-15. The ear behind the wall: a tick in the wall's stall
+
+- **19k-15** (E, S): **shipped** (2026-11-08). `npm run ears`'s line "and it hears on the
+  wall's asks, one a frame, not on its own frames or the tick" went red on GitHub's Macs on two
+  unrelated PRs the same morning: #718 `44 ask, 0 frame, 1 tick, over 45 frames asked for`, #734
+  `65 ask, 0 frame, 1 tick, over 66`. Both runs were hosted Macs (MacCloud, westus), not the
+  owner's; the wall's popup drew 22 and 33 frames a second there. The clock lets the tick read
+  once the wall's asks have stopped for EAR_ASK_HOLD_MS (250 ms, `src/lib/earClock.ts`), and a
+  window drawing 22 a second has such gaps; asks plus ticks matched the frames drawn both times,
+  so nothing read twice. The line wanted no tick at all, which measured the runner. Now each tick
+  in the window is held to the last ask before it, each on its own, and must land more than
+  250 ms after it (the visible lines' `placed` rule, the 250 written in the check, not
+  imported), the clock's record has to agree with its tick count, and asks plus ticks must match
+  the frames drawn within 2. A tick running beside the asks lands within 16 ms of one and fails as
+  before. Cloud run: `26/26 checks passed` (121 ask, 0 frame, 0 tick, over 121). Found along the
+  way: 19k-16 (`draftwall --frames` painted 0 on #734's run), with the line printing what the
+  projector window says of itself.
+
 #### 21. Looks after painters (found along the way, for §14b)
 
 *Found along the way (for §14b's owner, not this section's):* on this PR's two Mac
@@ -11923,3 +12011,30 @@ formats `"WebGPU · 512² · 1.0x of the wall"` when a stage is attached and sta
 byte-for-byte identical without one. **H2c-10** (`src/sim/stepping.ts`):
 `resolveSimResolution` rounds a pinned grid to the nearest multiple of 32 (`514, 1000,
 777, 100 → 512, 992, 768, 96`). All five `--owed` ids removed from `scripts/checks.json`.
+
+## 44i. The owner's YouTube channel from the assistant (2026-11-08)
+
+Asked by the owner while the six music films were going up by hand, a session driving
+a browser through YouTube Studio field by field: "can we create a connector ourselves
+for the future?" No connector in Claude's directory uploads to YouTube. Built as a
+second local MCP server, `mcp/youtube-mcp.js`, beside the show's, not as more tools on
+it: the show's server is a live link behind the owner's switch whose every rule is the
+show server's guard, and none of that concerns a channel; this one needs no show
+running, has its own sign-in, and fails on its own. No packages, like the show's.
+The YouTube Data API v3 signed in as a desktop app (loopback redirect, PKCE S256,
+`state`), the refresh key kept in `~/.chromaglass/youtube/` at 600 in a 700 folder,
+never in a reply or the log. Nine tools: `channel`, `list_videos`, `upload_video`,
+`upload_status`, `update_video`, `set_thumbnail`, `list_playlists`, `create_playlist`,
+`add_to_playlist`; no delete, on purpose. Uploads are the resumable protocol in 8 MiB
+chunks and resume across a dropped connection or a 5xx (back off, ask Google where it
+stopped), an expired access key (refreshed), and the assistant's app closing (the
+session saved in `uploads.json`; asking again for the same file and title carries on
+and never makes a second copy unless `again`). Read on the API's pages the same day:
+since 2026-11-02 an upload from an unverified project is no longer locked private, and
+one that names no privacy goes up public, so this server always names one, private
+unless the assistant passes another; an upload costs 1 unit of its own bucket (100 a
+day). Check: `npm run youtube`, 19 lines against a stand-in Google on loopback
+(an upload killed mid-file and resumed by a second server in one session; a dropped
+chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte file;
+the bytes exact; private by default; an update naming only the title keeping the rest)
+and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).

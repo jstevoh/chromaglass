@@ -16,7 +16,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
-import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
+import { forgetReadbacks, readbacksLanded, trackReadbacks, PipelineCache } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
@@ -24,13 +24,11 @@ import { WebGPUCamera, fillCameraUniforms } from '../gpu/camera';
 import { WebGPUOutput, fillOutputUniforms } from '../gpu/output';
 import { WebGPUFrameProbe } from '../gpu/probe';
 import { WebGPUPadGrab } from '../gpu/padGrab';
-import { WebGPUPostChain } from '../gpu/post';
+import { WebGPUPostChain, type PostTest } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
 import { prepareLog, prepareShow } from '../gpu/prepare';
 import { openingOf } from '../gpu/opening';
-import { PipelineCache } from '../gpu/kit';
-import type { PostTest } from '../gpu/post';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
 import { FlashGuard } from '../lib/flashGuard';
@@ -1958,7 +1956,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       markRef.current = { source, aspect: width > 0 && height > 0 ? width / height : 1, dirty: true };
     },
     clearMark: () => { markRef.current = null; },
-    fireEnvelopes: (velocity = 1) => modRef.current.fire(velocity),
+    fireEnvelopes: (velocity = 1, source) => modRef.current.strike(velocity, source),
     filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
@@ -2731,20 +2729,18 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           about how far the liquid has been pushed. Paused, it holds where it
           is instead of running on in the dark and coming back somewhere else.
         */
-        // The LFOs, on the bar rather than on the second: see `modulators.ts`.
-        if (isActiveRef.current) modRef.current.step(realDt, clockIsFixed() ? 0 : tempoRef?.current?.bpm ?? 0);
-
         // Followed while paused too, so a sequence stopped in the dark still
         // brings the light back up on a paused plate.
         paceNowRef.current = approachPace(paceNowRef.current, paceTargetRef.current, realDt);
         frameBubblesRef.current = currentSettings.bubbles ?? 0;
         if (isActiveRef.current) {
-          const phrased = phrasingRef.current.step(
+          // The LFOs, on the bar rather than on the second: see `modulators.ts`.
+          modRef.current.step(realDt, clockIsFixed() ? 0 : tempoRef?.current?.bpm ?? 0, currentSettings, currentAudioData?.features);
+          phraseRef.current = phrasingRef.current.step(
             realDt,
             currentSettings.surge ?? 0,
             currentAudioData ? Math.min(1, currentAudioData.energy) : 0,
           );
-          phraseRef.current = phrased;
           for (const f of fluidsRef.current) if (f) {
             f.phrase = phraseRef.current; f.dtSeconds = simStepS;
             f.sparseDarkLook = isSparseDark(currentSettings.lampGround, dyeLookTarget(f.seedMean, currentSettings.dyeBudget ?? 0.85, f.seedBudget));

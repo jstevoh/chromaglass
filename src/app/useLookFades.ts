@@ -7,6 +7,7 @@ import { isUserPresetId, type UserPreset } from '../lib/userPresets';
 import { findPreset } from '../presets';
 import { FADE_LEVEL_KEYS, type RowFades, type FadeWay } from '../lib/mixFade';
 import type { ArmedLook } from './shared';
+import type { SetItem, SetList } from '../lib/setList';
 import type { ShowSequence } from '../lib/sequencer';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { MixSource } from '../lib/mixer';
@@ -45,13 +46,14 @@ interface LookFadesDeps {
   setBackLook: Dispatch<SetStateAction<{ id: string; name: string; leaving?: boolean | undefined; } | null>>;
   setRowFading: Dispatch<SetStateAction<Partial<Record<MixSource, FadeWay>>>>;
   blackoutRef: RefObject<boolean>;
+  setListRef: RefObject<SetList>;
 }
 
 export function useLookFades({
   lookFadeRef, lookTakesLevels, flushRide, evolveLetsGo, ride, settingsRef, setSettings, setFading,
   rowFades, laterWrites, setLiveItemId, setRideKeys, setCued, sequencerRef, previousLook,
   pinnedPresetId, adoptPreset, visualizerRef, lookPhase, cued, fadeSeconds, userPresetsRef,
-  setBackLook, setRowFading, blackoutRef,
+  setBackLook, setRowFading, blackoutRef, setListRef,
 }: LookFadesDeps) {
   /**
    * Send a look to the stage, over `seconds`. With no fade this is still not
@@ -149,6 +151,43 @@ export function useLookFades({
     if (cued) sendLook(cued, seconds ?? cued.fade ?? fadeSeconds);
   }, [cued, fadeSeconds, sendLook]);
 
+  const cueLook = useCallback((presetId: string) => {
+    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
+    const built = up ? undefined : findPreset(presetId);
+    const settings = up ? up.settings : built?.settings;
+    const name = up?.name ?? built?.name ?? presetId;
+    if (settings) setCued({ id: built?.id ?? presetId, name, settings });
+  }, []);
+
+  /** What a set item will send: its look with its own controls on top, or its sequence. */
+  const lookOfItem = useCallback((item: SetItem): ArmedLook | null => {
+    const extra = { item: item.id, fade: item.fade, rides: item.rides };
+    if (item.kind === 'sequence') {
+      const seq = sequencerRef.current?.sequences.find(q => q.id === item.ref);
+      return seq ? { id: `sequence:${seq.id}`, name: item.name ?? seq.name, settings: {}, sequence: seq.id, ...extra } : null;
+    }
+    const up = isUserPresetId(item.ref) ? userPresetsRef.current.find(p => p.id === item.ref) : null;
+    const built = up ? undefined : findPreset(item.ref);
+    const base = up ? up.settings : built?.settings;
+    if (!base) return null;
+    return { id: built?.id ?? item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
+  }, []);
+  const cueItem = useCallback((itemId: string) => {
+    const item = setListRef.current.items.find(i => i.id === itemId);
+    const look = item ? lookOfItem(item) : null;
+    if (look) setCued(look);
+  }, [lookOfItem]);
+  /** Arm a row of the desk's list, whichever list it is showing. */
+  const cueAny = useCallback((id: string) => {
+    if (setListRef.current.items.length > 0) cueItem(id); else cueLook(id);
+  }, [cueItem, cueLook]);
+  /** Play set-list item `index` (0-based) with its own fade, the way Go does. */
+  const playSetItem = useCallback((index: number) => {
+    const item = setListRef.current.items[index];
+    const look = item ? lookOfItem(item) : null;
+    if (look) sendLook(look, look.fade ?? fadeSeconds);
+  }, [lookOfItem, sendLook, fadeSeconds]);
+
   /** For the debug hook (`useCheckHooks`), which is installed once and calls through this. */
   const goLookNowRef = useRef<((presetId: string, seconds?: number) => void) | null>(null);
   /** The same, for a look that was never armed — the palette's ⇧⏎. */
@@ -233,7 +272,7 @@ export function useLookFades({
   useEffect(() => () => { if (lookFadeRef.current) clearShowInterval(lookFadeRef.current); }, []);
 
   return {
-    fadeSettingsTo, sendLook, goLook, goLookNowRef, goLookNow, goBackPlate, backLookNow,
-    backFollowsFront, backLookCleared, revertLook,
+    fadeSettingsTo, sendLook, goLook, cueLook, lookOfItem, cueItem, cueAny, playSetItem,
+    goLookNowRef, goLookNow, goBackPlate, backLookNow, backFollowsFront, backLookCleared, revertLook,
   };
 }
