@@ -257,6 +257,7 @@
     "wallpattern": "node --experimental-strip-types scripts/wallpattern.mjs",
     "rowfade": "node --experimental-strip-types scripts/rowfade.mjs",
     "timers": "node scripts/timers.mjs",
+    "timelabels": "esbuild scripts/timelabels.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/timelabels.mjs && node node_modules/.cache/timelabels.mjs",
     "soundowed": "node scripts/soundowed.mjs",
     "backplate": "node scripts/backplate.mjs",
     "remotemix": "npm run build && node --experimental-strip-types scripts/remotemix.mjs",
