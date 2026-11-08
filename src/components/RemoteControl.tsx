@@ -11,7 +11,6 @@ import { LensCap } from './ui/Playful';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
-import { closeupToggled, macroZoomOf } from '../lib/macroCamera';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { readSetting } from '../lib/readout';
@@ -825,8 +824,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <button
               type="button"
               role="switch"
-              aria-checked={macroZoomOf(settings ?? {}) > 1.05}
-              onClick={() => patch(closeupToggled(settings ?? {}))}
+              aria-checked={!!settings?.macroMode}
+              onClick={() => patch({ macroMode: !settings?.macroMode })}
               disabled={!connected}
               data-testid="remote-macro-toggle"
               className="flex w-full items-center justify-between disabled:opacity-30"
@@ -834,9 +833,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <SwitchPill on={macroZoomOf(settings ?? {}) > 1.05} />
+              <SwitchPill on={!!settings?.macroMode} />
             </button>
-            {macroZoomOf(settings ?? {}) > 1.05 && (
+            {settings?.macroMode && (
               <div className="mt-4">
                 <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />

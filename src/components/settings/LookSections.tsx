@@ -1,6 +1,5 @@
 import { Palette, Microscope, Film, Clapperboard, Lightbulb, Aperture } from 'lucide-react';
 import { VisualizerSettings } from '../../types';
-import { macroZoomOf } from '../../lib/macroCamera';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { Segmented, LIT } from '../ui';
@@ -748,21 +747,21 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
         */}
         <Slider
           label="Macro Zoom"
-          value={macroZoomOf(settings)}
+          value={settings.macroZoom ?? 1}
           min={1}
           max={16}
           step={0.1}
           onChange={(v: number) => onUpdate({ macroZoom: v, macroMode: v > 1.05 })}
           settingKey="macroZoom"
         />
-        {macroZoomOf(settings) <= 1.05 && (
+        {(settings.macroZoom ?? 1) <= 1.05 && (
           <Info>
             At 1× this is the whole plate. Push the zoom in and the camera goes where it is aimed — the exposure,
             the depth of field and the surface under the dye all arrive with the magnification rather than switching on
             at a threshold. Everything below shapes that closeup and takes effect as you come in.
           </Info>
         )}
-        {macroZoomOf(settings) > 1.05 && (
+        {(settings.macroZoom ?? 1) > 1.05 && (
           <>
             {/*
               Who moves the camera. It used to be the camera alone: it picked a

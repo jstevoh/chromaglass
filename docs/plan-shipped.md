@@ -11052,8 +11052,8 @@ model cannot reach one, the PR says what it reached and asks.
     look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
   - **38h-13 (shipped 2026-11-07).** The closeup's bubbles drawn from their circles. The
-    owner, on the live site: "close up has really pixelated bubble edges ... where is the
-    macro zoom control? ... the recipe box only has two controls?" Photographed in the lab on
+    owner, on the live site: "close up has really pixelated bubble edges" (the zoom control
+    and the recipe box in the same message went to #707 and #699). Photographed in the lab on
     Classic at the Close-up button's 4x on a 256 grid (a cell 25 screen pixels), three faults
     a cell wide: square chunks between two bubbles sitting close, flat cuts off a rim, a
     blocky polygon in the window. Causes: (1) the air splat blended by max channel by
@@ -11072,14 +11072,7 @@ model cannot reach one, the PR says what it reached and asks.
     liquid two cells out. `npm run bubbleedge` (new): the same bubbles laid half a cell apart
     on the grid draw the same picture: one bubble 2.01 -> 0.74 levels, a pressed pair 4.59 ->
     1.18 (99th percentile 82 -> 8), on black 2.39 -> 0.07 over the corners' floor; the field
-    0 texels out of place. 0/4 before, 4/4 after. The zoom: every Close-up button flipped
-    `macroMode` alone, so the frame went to the look's 4x with the slider at 1 and the desk's
-    chip (drawn past 1) never came; out, a look with its own zoom stayed zoomed. One
-    `closeupToggled` (lib/macroCamera.ts, with `macroZoomOf` moved beside it) for the recipe,
-    the rail, the palette, the pads and the phone remote; the chip, the slider and the wheel
-    read `macroZoomOf`. The recipe: six of its eight defaults were rides, drawn once on a tab
-    and kept by the Rides (`drawnElsewhere`), so Perform drew Swirl and Gravity; its defaults
-    are now eight of its own (`npm run desklayout`: 2 of 8 drawn before, 8 of 8 after, and a desk that stored the old eight opens on the new; `npm run holdjump`: the toggle in and out, and no control flipping the flag alone).
+    0 texels out of place. 0/4 before, 4/4 after.
     `npm run airlens` line 9 asked the camera's ring through a small ball for the liquid
     itself (0.85 to 1.05 of it), which main met only on the lab's half-cleared hole (two
     solver steps; 1.54 at fourteen, as clear as the live plate keeps it). It now asks for

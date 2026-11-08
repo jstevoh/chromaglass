@@ -53,7 +53,6 @@
  * 3% from the middle of the frame, where it sat 27% off.
  */
 import { stream, type Rng } from './rng';
-import type { VisualizerSettings } from '../types';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -707,35 +706,4 @@ export function holdWhereItIs<T extends { macroCamera?: CameraMode; macroAimX?: 
  */
 export function shotLabel(macroHold: number | undefined): string {
   return `${+Math.max(0.5, macroHold ?? 5).toFixed(1)}s`;
-}
-
-// ── The zoom, and the Close-up control ───────────────────────────────
-
-/** A preset or a saved show that sets `macroMode` with no zoom of its own. */
-export const MACRO_PRESET_ZOOM = 4.0;
-
-/** The zoom the frame is asked for: the slider's, or a macro look's own. */
-export function macroZoomOf(s: Partial<Pick<VisualizerSettings, 'macroZoom' | 'macroMode'>>): number {
-  const setZoom = s.macroZoom ?? 1;
-  return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
-}
-
-/**
- * What a Close-up control writes: in at the closeup look's zoom from the
- * plate, out to the whole plate from any zoom (PLAN 38h-13).
- *
- * The owner, 2026-11-07: "where is the macro zoom control?" Every Close-up
- * button flipped the flag alone (the recipe's, the old rail's, the
- * palette's, the phone remote's), and the zoom is the control (macroZoomOf),
- * so the flag on its own did two wrong things. In, the slider stayed at 1
- * while the frame went to 4x, and the desk's zoom chip, drawn only when the
- * slider was past 1, never came: a closeup with nothing to zoom it by
- * (seen on the Mac: Classic, Close-up on, no chip). Out, on a look with a
- * zoom of its own (Lens Pools, 3.5x) the flag went off and the frame stayed
- * at 3.5x. And the pads' toggle asked the slider whether it was in, so on a
- * closeup look it pressed in again rather than out. One answer for every
- * hand, from the zoom the frame is drawn at.
- */
-export function closeupToggled(s: Partial<Pick<VisualizerSettings, 'macroZoom' | 'macroMode'>>): Pick<VisualizerSettings, 'macroZoom' | 'macroMode'> {
-  return macroZoomOf(s) > 1.05 ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: MACRO_PRESET_ZOOM };
 }
