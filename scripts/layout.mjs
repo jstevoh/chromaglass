@@ -20,10 +20,10 @@
 import { chromium } from 'playwright';
 import { TIP_DELAY_MS } from '../src/lib/tipDelay.ts';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { clickAt, modeSwitchX, legibility, coveredControls, statusDots, COVER_WIDTHS } from './layoutProbe.mjs';
 
-const PORT = Number(process.env.LAYOUT_PORT ?? 4179);
+const PORT = port(4179, 'LAYOUT_PORT');
 // The plate's resolution does not change a layout, and every millisecond the
 // software renderer spends on it is a millisecond the page is not answering.
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;

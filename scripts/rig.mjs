@@ -57,9 +57,10 @@ import { join, resolve } from 'node:path';
 import WebSocket from 'ws';
 import { ARTNET_PORT, decodeArtDmx, encodeArtDmx } from '../server/artnet.js';
 import { signLicenseKey } from '../server/license-key.js';
+import { port } from './ports.mjs';
 
 const NODE_ONLY = process.argv.includes('--node');
-const PORT = Number(process.env.RIG_PORT ?? 5297);
+const PORT = port(5297, 'RIG_PORT');
 // Not 9000, 6454 out or 6460: a real rig on this machine, or `npm run lights`,
 // keeps its ports. Art-Net in has no choice: the server listens on 6454.
 const OSC_PORT = PORT + 4020;

@@ -85,7 +85,7 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
@@ -102,7 +102,7 @@ if (!existsSync('dist/index.html')) {
   execFileSync(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], { stdio: 'inherit' });
 }
 
-const PORT = Number(process.env.RENDERS_PORT ?? 4333);
+const PORT = port(4333, 'RENDERS_PORT');
 // Where a plate draws: the Mac, or a machine that says it has one.
 const PLATE = process.platform === 'darwin' || !!process.env.RENDERS_PLATE;
 const skip = (name, why) => console.log(`skip  ${name} — ${why}`);

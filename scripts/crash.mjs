@@ -27,9 +27,9 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.CRASH_PORT ?? 4331);
+const PORT = port(4331, 'CRASH_PORT');
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
