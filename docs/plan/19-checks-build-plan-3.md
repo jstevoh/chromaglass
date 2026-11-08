@@ -408,6 +408,27 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   harnesses still sleep a fixed time, and with two shards on one Mac (19ah-6) the start is
   slower. Move them to `untilServing`, and read the printed times on the Mac first to see
   how slow a start gets.
+- **19ah-9. Built: a Mac busy with other work hands the deploy back.** Deploys 679 and 682
+  (2026-11-08, runs 42427960522 and 42436205976) went red on the owner's Mac and passed
+  the same shards on GitHub's: `startup`'s "built ahead ... nothing built behind it" twice,
+  "no pipeline was built on a frame" (particles) once, `phone` on a taken port, and every
+  other shard into its 20-minute timeout. The open shard's own lines: the opening's 65
+  builds 11.86 and 17.99 s (median 0.554 s, the display 6.77 s) against 3.43 s for 56
+  (median 0.186 s) on the same Mac's first deploy of 10-29, so the half behind the show
+  outran startup's 45 s wait for it; setup-node alone two to five minutes; and the port
+  step found another checkout serving `signin` and `tiers`. The Mac now hosts sessions and
+  Antigravity's queue running the same harnesses. Built: each Mac shard's first step
+  (`scripts/macbusy.sh`) looks for a test browser or the ChromaGlass app at work (5% of a
+  core or more, so a cancelled job's idle leftover does not count) that is not a deploy's
+  own (no runner worker among its ancestors), waits two minutes, then
+  fails listing it; the watchdog reads that step's failure and moves the deploy to
+  GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
+  with `hosted`. Open: **19ah-9a**, work begun mid-shard still shares the GPU (a shard
+  could look again before its timing checks); **19ah-9b**, `startup` prints "nothing built
+  behind it" when its 45 s wait for the half behind the show ran out with it still
+  building, which read as the show asking for nothing (the script is over 100 KB, so the
+  wording waits for its split); and the 45 s wait has 7 s to spare on GitHub's Macs
+  (38.45 s behind on deploy 671).
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
@@ -536,3 +557,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   `here`, once a session has timed the lab checks on software WebGPU.
 - **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
   children run as a first attempt (docs/plan-shipped.md, 19ak).
+- **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
+  retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
+  GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).

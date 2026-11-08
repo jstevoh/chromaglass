@@ -88,7 +88,48 @@ button, making it look good. Every item here is held to those.
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
   - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the reference the GPU build (36e-2) is held to and `npm run boil` its judge (#352 took the buoyancy tanh out). Story in `docs/plan-shipped.md` §36e-1 (moved 2026-10-29, 19m-2). *Owed with 36e-4:* `boil`'s dry-out look-alike passes today (it throws away 1.7% of the lamp's heat, moving the ledger 0.16%, under its 3% bar); once the glass absorbs the infrared, that build adds a tighter dry-out ledger line.
-  - **36e-2. The GPU build (shipped).** `src/gpu/lampBoil.ts` (`createBoilPlateGpu`), `src/gpu/wgsl/lampBoil.ts` (`BOIL_DISH_WGSL`, `PLATE_BOIL_WGSL`), the plate's `stepPlateBoil` pass in `src/gpu/fluid/passes.ts` feeding `vel.z` (°C above `T_AMBIENT`), `hsPour` (thermal expansion + vapour volume in the thin gap's projection) and `air.field` (the vapour fraction shaded as H6's air), Kell buoyancy in `currentForces` (`src/gpu/wgsl/fluid/forces.ts` and `src/sim/fluidSimulation.ts`) with `clamp(temp, 0, 50)` and `maxCurrent` out of the heat's way, the **Heat** dial (`heat`, default 0, excluded from Evolve in `NOT_THE_LOOK`, on Settings → Lamp & Light, Perform desk, MIDI, remote and phone) and the held-hand air block (`boilHolds` on desk, iPad and phone). `npm run boilgpu` 54/54 on `apple metal-3` (`cost: 4.40 ms a step at 768 × 768 on apple metal-3, lamp on`). Story in `docs/plan-shipped.md` §36e-2; judging notes in `docs/judging.md` §109.
+  - **36e-2. The GPU build (shipped).** `src/gpu/lampBoil.ts` (`createBoilPlateGpu`), `src/gpu/wgsl/lampBoil.ts` (`BOIL_DISH_WGSL`, `PLATE_BOIL_WGSL`), the plate's `stepPlateBoil` pass in `src/gpu/fluid/passes.ts` feeding `vel.z` (°C above `T_AMBIENT`), `hsPour` (thermal expansion in the thin gap's projection) and `air.field` (the vapour fraction shaded as H6's air, whose own change in `thinGap.ts` displaces the liquid by the steam's volume), Kell buoyancy in `currentForces` (`src/gpu/wgsl/fluid/forces.ts` and `src/sim/stepping.ts`) while the boil runs with `clamp(temp, 0, 50)` and `maxCurrent` out of the heat's way (and today's current byte-for-byte at Heat 0), the **Heat** dial (`heat`, default 0, excluded from Evolve in `NOT_THE_LOOK`, on Settings → Lamp & Light, Perform desk, MIDI, remote and phone) and the held-hand air block (`boilHolds` on desk, iPad and phone). `npm run boilgpu` 54/54 on `apple metal-3` (`cost: 4.40 ms a step at 768 × 768 on apple metal-3, lamp on`). Story in `docs/plan-shipped.md` §36e-2.
+  - **36e-2b. The live plate's boil, its check** (*check written 2026-11-08, owed until
+    36e-2*). `boilgpu` holds the dish solver; the boil the app steps on the plate every frame
+    (#718's `stepPlateBoil`, `PLATE_BOIL_WGSL`, the current beside it) had no line, and the
+    review of #718 found three faults there. `npm run plateboil` (scripts/plateboil.mjs):
+    *boil* (the Mac's plate shard, `--owed=rate,hold,fan,steam,writes`, printed owed while
+    neither src/gpu/lampBoil.ts nor `GpuStepParams.boilHolds` exists): a level dish of dark
+    dye at Heat 1, Heat Decay at the app's 0.98, warmed at the app's longest frame (0.1 s,
+    FluidSimulation's clamp) and then stepped at 1/60 s. `rate` the 1/60 s approach heats
+    as the warm-up did (the hand's mean, 0.6x–1.4x, still climbing); `hold` under a held
+    hand the spot reaches 100 °C and steam shows in the air field within 150 s (a site's
+    superheat, about 4.3 K at the lowest under the hand, comes on top); `fan` under the fan,
+    after 15 minutes, over 80 °C and under 100 °C at every read, no steam; `steam` the dye
+    that leaves a ring twice the hand's size, less the ring's own drift, is what the steam's
+    volume displaced (0.5x–1.5x) and arrives in the annulus beyond (0.7x–1.3x); `writes`
+    30 K poured out of the fan plate's spot stays out ten 1/60 s steps later (a boil that
+    keeps a private copy and writes it back passes the rest on a still level plate). An f64
+    port of #718's own heat balance reads 100 °C at 258 s under the hand and 94 °C after 15
+    minutes under the fan. #718's head (cc0f6523) reads 0/4 on the first four: its hand's
+    plate climbs in half-float quanta to 84.8 °C at 0.1 s steps and then cools at 1/60 s
+    (vel.z is a half float: once 64 K over the room a step is 1/16 K and a frame's 0.007 K
+    rounds away), its fan's stops at 67.7 °C, and no steam. *zero* (Measure's lab2, holds on
+    main): Heat 0 keeps today's current byte for byte, the tree's `currentForces` against
+    today's (scripts/plateboil-today.mjs, generated from main at 50159cb) in a second lab on
+    SwiftShader, three plates with a spot over the clamp's 50 K, the fluid.ts lines that
+    pack its uniforms held to today's text, and FluidSimulation's `stepCurrent` against
+    today's body. #718 reads 20 084 and 20 889 values different on the upright plates and
+    89 872 on the CPU; the level plate is the same (S.curBuoy is already upright ×
+    Buoyancy, so #718's uncapped branch never runs there). A throwaway fix of #718 (its
+    temperature kept in a float32 channel of the boil field, the reference's vapour source,
+    the Kell branch only while the boil runs, a write to vel.z taken when it is more than a
+    half-float step from the boil's own; /mnt/project-files/antigravity/36e-2b-proof-throwaway.diff)
+    reads 6/6 on *zero* and 6/6 on *boil* (rate 0.84x, steam at 112 s peaking 108.7 °C, fan
+    89.5 °C, the steam's dye 0.89x of its room and 1.00x arriving past the disc, writes 1.00).
+    Its pocket flashes across the spot in one read and condenses within 10 s as the cooler
+    liquid it pushed out flows back: one pocket, as 36e-3 says. The same fix with the
+    vapour term in `poured` zeroed still reads `steam` 1.01x: the air field's own change
+    (thinGap.ts reads its rate) already displaces the liquid by the steam's volume, so #718's
+    review point 5 is answered by measurement: the vapour's volume is counted there, and a
+    second term in `poured` is not needed (with the reference's term as well it read 0.89x,
+    a different pocket, not a doubled push). One check-skeptic pass; its
+    six findings are in the check.
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
     rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,

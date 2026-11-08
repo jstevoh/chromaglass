@@ -978,6 +978,47 @@ pull was tried at 0.3 and did no better on this band (spread 18 ms against 13 at
 20 fps), so `hear()` still snaps: with the onset's own time the snap's jitter is
 the onset's, a few ms, not the smoothed level's 30–55.
 
+### 14d-2. No kick drum, no beat: the 1920s records (shipped)
+
+The owner loved the six 1920s song films (acoustic 78s: the Wolverines, Caruso,
+Rachmaninoff, Whiteman, King Oliver, Bessie Smith) and asked for them to react to the
+music more. Every beat answer on the plate (Kick hit patches, the beat clock's kicks,
+Beat Squeeze) waited for the ear's kick, energy arriving at 30–120 Hz, and on those
+records it fired 3 to 6 times a minute (the Wolverines 22, mostly low notes leaking
+into the band). There is no kick drum on an acoustic record: the horn could not take
+one, so the bands kept time on banjo, tuba, piano and woodblock.
+
+**Shipped.** `pulseEar.ts` hears an onset over 60 Hz–4 kHz by SuperFlux (each bin's rise
+against the loudest of its neighbours a frame before, so a sung note's vibrato is not an
+onset), with the ear's own median-and-MAD threshold and a 0.2 dB floor. It becomes the
+reading's `beat` only while the kick is not keeping time (no kick for 1.5 s, or a run of
+steady kicks shorter than 3 s); a steady kick is the beat to the frame, as before. Its
+beats come no closer than 0.25 s, and a kick always counts unless it is the same attack
+within 0.1 s. `HitSource`'s Kick hit and the beat clock read `beat ?? onsets.kick`
+(`beatAt`). Beats a minute at 30 fps (the films' rate), kick before and beat after:
+Wolverines 22 → 107, Caruso 4 → 45, Rachmaninoff 6 → 106, Whiteman 3 → 114, Oliver 4 → 111,
+Bessie 5 → 83; modern tracks with a kick barely move (werq 85 → 108, thatched-villagers
+133 → 134), pink noise 8 → 8, a held chord 0 → 0. `npm run pulse` plays a horned 1920s band
+with no kick (the beat catches at least 90% of its notes within 70 ms, the kick alone under
+20%), the same band unhorned, a loop with a kick once a bar and sixteenth hats, a drummed
+band (every beat is a kick, to the frame) and noise, chord and silence. Two count rules for
+"the kick keeps time" were tried first and failed on the band's own leaking low chord
+(71% and 66% caught); the reasons are in the module's comment.
+
+A check-skeptic pass then gave the band a soft cornet note on every off-beat: 35% of the
+beats were the cornet at 30 fps (20% at 60) and the clock fired 96 times for 65 beats, and
+no gate on an attack's size alone separated a weak real beat (split across two frames)
+from the cornet. So the ear entrains: it keeps the band's period (the median of its last
+eight beat gaps, locked after three) and takes an attack on that grid (within a fifth of a
+period) as the beat, one off it only when it is as hard as the band's usual attack, and
+lets the period go after three off-grid beats in a row or a four-second stop. With the
+cornet: all 65 beats heard, none of the cornet's, the clock 67 times. Over the six songs
+the beat now comes Wolverines 90, Caruso 37, Rachmaninoff 93, Whiteman 109, Oliver 99,
+Bessie 67 a minute (the first version 107, 45, 106, 114, 111, 83), each median gap on the
+song's tempo. `npm run pulse` adds the cornet, a breakdown (kick out 12–24 s and back),
+stray and count limits on the clock and Kick hit. `npm run eargc` 7.98 KB an update (bar
+8; 6.33 before the pulse). Open: 14d-3 to 14d-9.
+
 ### 15a. Only the Dropper lays the bottle's liquid (shipped)
 
 Pour, Spray, Splat and Streak laid the colour and nothing else. With Ferrofluid in
@@ -4215,6 +4256,17 @@ the sessions' files or the native apps skips the Mac (19h).
   children now run as attempt 1 of no run (`childEnv`); the skip keeps its own mocked
   cases. Measured with `npm run reach` as attempt 2 of a real green run (41350181902,
   Node's fetch through the proxy): 2 FAIL before, 97 ok and 0 FAIL after.
+- **19ak-6, the iPhone build fetches Capacitor's binaries itself** (2026-11-08). From
+  about 08:45 UTC every `ios.yml` run (#707 twice, #720) failed before compiling with
+  SwiftPM's "failed downloading … Capacitor.xcframework.zip … already exists in file
+  system". The message misleads: given an empty cache folder of its own, SwiftPM failed
+  the same way. GitHub's release page answered `504 Gateway Time-out` for that zip (and
+  for others, the gh CLI's among them) while other files on the same release still
+  redirected; SwiftPM retries the 504, trips on its own first try's file, and reports
+  that. A step now fetches both zips with curl's retries, falling back to the API's asset
+  download, into a run-local SwiftPM cache under the name SwiftPM looks for, so SwiftPM
+  copies them (checksum still checked) instead of downloading; the resolve retries git
+  up to three times.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -5519,7 +5571,7 @@ setting itself still moves as it did) and the print that is off starts the next 
 Not a control, so no phone change.
 
 Named shortcuts: plane waves, not a true noise field; the cap is a straight line through
-a sweep, not Pearson's full regime boundaries; k ignores the look's own k while the drift
+a sweep (a tent since 2026-11-07, below), not Pearson's full regime boundaries; k ignores the look's own k while the drift
 is on; the clock is fixed-rate and follows no music; every number is the lab's (SwiftShader),
 none yet Metal's.
 
@@ -5552,6 +5604,24 @@ The app counts the slew in solver iterations (`TURING_ITERATIONS_PER_SECOND`, 18
 as the lab does, and the check reads both numbers and refuses a rate outside (0, 1]. The bars for stripe width and the Drift 0 clock are
 unchanged. Not tested: where a grey patch sits (a speckle of dead cells would still show in
 the width line, not the tile line).
+
+**26d-6a. The tent cap: the corners of the drift hold their spots (shipped 2026-11-07).**
+A review held each corner of the drift's feed range (F 0.04 plus or minus `DRIFT_FEED`,
+0.02 to 0.06) at the spots end for 9000 units and found the straight cap `0.0105 - 0.15 F`
+too generous below F 0.035: it went on rising to 0.0075 at F 0.02, from no measured point,
+and a plate held there at nine tenths of it kept only 0.313 of its cells alive (0.42 at
+F 0.03), against 0.483 for the spots held at F 0.04 and a floor of 0.433. Spots that
+survive a 6000-unit sweep are not spots that survive a minute, and Pearson's dead zone lies
+below. The cap is now a tent, `max(0.15 min(F, 0.07 - F), 0.0008)`: the old line from
+F 0.035 up, falling below it (0.003 at F 0.02). `npm run turing` gained the held-corner
+line, which settles at the look's feed and kill, slews to each corner over 3000 units as
+the app slews, holds 9000 and reads the live share every third of the hold; the cap, its
+share and `DRIFT_FEED` are read from `src/gpu/wgsl/fluid/reactions.ts`, so moving them
+moves the check, and an instrument line pushes F 0.02 to twice the cap and must read it
+emptied. Built in PR #421 in October and carried onto main's split shader 2026-11-07;
+#421's clear Turing Print contract (Pure White) and its "paper stays clean" line were
+dropped, because #523 (28i-2) gave the look colour pools on purpose. Measured numbers are
+in the PR that shipped it.
 
 
 ## 27. Every control does something you can see
@@ -6582,6 +6652,55 @@ of the plate shows through the band and the band read 25–28 % where it is draw
 and its flat-window chroma bar compares the window with the plate's own chroma plus 4
 (the lamp's warm white is 8.8 levels apart by itself; the bar was 4 when the ground was
 grey). Every other `airlens` line and its numbers are unchanged: 10 of 10.
+
+### 33f. Bubbles that know their liquid — motion (this PR)
+
+A pocket of air between the glasses read only the look's one plate-wide liquid
+(`BubbleField.liquid(settings)` in `src/lib/bubbles.ts`, 38n), so a pocket in a pool of
+glycerine, syrup or alcohol poured onto the default oil ran ahead of the flow, climbed a
+tilt, drained its contact film, rounded off, emptied at the rim and dissolved as if it
+were still in the oil.
+
+*Fix:* `src/lib/bubbleLiquid.ts` computes the liquid at any cell (`liquidAtCell(plate,
+snap, x, y, grid, poured, out)`) from the species field (`src/lib/liquidProps.ts`, 18d)
+using the thin gap's Arrhenius kinematic-viscosity mix `ν = ν_p · exp(g − r·ln(ν_p/ν_w))`,
+`σ = (1 − r)·σ_plate + r·σ_poured`, `ρ = (1 − r)·ρ_plate + r·ρ_poured` and `μ = ρ·ν` (no
+allocations; bit-identical to `plate` when `snap` is null or `r ≤ 1e-6`), and extracts a
+poured bottle's σ and ρ (`pouredOf(behaviour, plateSigma)`). `BubbleField.species(snap,
+poured)` attaches the downsampled snapshot, and in `step()` each pocket reads its own
+`μ, σ, ρ` on the same eight-point ring (`b.r + 1.5`) on which its drift samples the flow
+(remaining bit-identical to the plate's liquid when no ring point has poured share) for
+Bretherton's speed ratio and `filmAt`, the buoyancy tilt climb, dissolving `D` and the
+Laplace `Δp`, Paterson's `τ₂`, the rim's emptying, a touching pair's film drainage (from
+the harmonic mean of both pockets' liquid), and Durian's crowding (using the pair's own
+`μ` and `σ`, not whichever pocket the loop saw last). `WebGPUFluid.speciesSnapshot()`
+(`src/gpu/solverTypes.ts`, `src/gpu/fluid/reads.ts`, `src/gpu/rimRead.ts`) shares the
+once-a-second `speciesShare()` read on `RimRead`, recording `pouredOf()` where
+`speciesSplat` runs in `src/gpu/fluid/inputs.ts` and dropping any snapshot or in-flight
+read across a plate or chemistry clear. `src/sim/speciesPoll.ts` polls once every 60
+steps and hands the snapshot to `BubbleField` only on a thin gap (`null` otherwise),
+taking over `readPouredShare` from `src/sim/fluidSimulation.ts` and the bubble step block
+from `src/components/LiquidVisualizer.tsx` so both files shrink.
+
+*Measured* (`npm run bubbleliquid`, 9/9, `--owed` removed from `scripts/checks.json`):
+cell mix 1412 mPa·s pure glycerine, 167.9 mPa·s 50/50 Arrhenius (arithmetic 716), pool at
+(40, 140) 1412 vs (56, 140) 19.3 mPa·s; `default` 25,098 numbers over 900 steps
+bit-identical (`1 merge, 1 out at the rim, 4 pockets left`) across bare, `species(null)`
+and an empty snapshot; Bretherton lead 1.948× alcohol (law 1.948), 1.756× oil (law 1.756),
+0.807× glycerine (law 0.807); two pockets in one field climb at 0.0056 cells/s in
+glycerine (law 0.0056) and 0.28 in oil (law 0.28); touching-pair merge 14.45 s oil,
+1.23 s alcohol (μ/σ says 1.23), 43.53 s syrup (μ/σ says 43.55); Paterson τ₂ 0.247 s
+alcohol (law 0.247), 2.902 s oil (law 2.902), 8.745 s syrup (law 8.745); rim emptying
+1038.80 mm²/s oil (law 1038.80), 344.671 syrup (law 344.671); dissolving 0.3318 syrup/oil
+area loss ratio (law 0.3318); `wired` (`solverTypes=decl reads.ts=impl
+handover=src/sim/speciesPoll.ts`). `npm run bubblephysics` 24/24, `pops` 4/4, `bubblelook`
+19/19 unchanged.
+
+*Named shortcuts:* the species field holds no σ or ρ (channel b was traded from ρ to
+milk's scatter μs′ in 18d-4a), so `poured` carries the last-poured species bottle's σ and
+ρ (exact for one poured liquid; 33f-4 tracks per-cell σ and ρ when two miscible bottles
+are on the plate together); 33f-2 (per-liquid optics) and 33f-3 (Metal row direction)
+remain open in `docs/plan/33-bubbles-closeup.md`.
 
 ### 33g. The closeup: the liquid nearer and in relief, not cells (this PR)
 
@@ -10090,6 +10209,25 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   (#690's own run, on faster runners: lab 12:01, lab4 5:28). The timeout stays 25 and no bar
   moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
   job summary, and every part read against it).
+
+#### 19k-13. Room in the Mac jobs' bound, and a line where slowness is read
+
+- **19k-13** (E, S): **shipped**. On GitHub's Macs on 2026-11-07 (main's deploys 668 to 673
+  and #690's two runs, eleven attempts) every Mac shard ran 14:51 to 20:21 a job, 0:39 to 3:07
+  of it before the first check (tools' includes the ffmpeg install), so all five sat within
+  three minutes of the 20-minute bound, and three were cancelled with every check they reached
+  green: plate on #690's first run a minute after its 41 checks had finished (19:51 of 20:01;
+  Areas that listen 1:12 to 1:45, A drop slumps 0:46 to 1:05), open on deploy 668 in its last
+  check, fifth on 668 and both of 669's attempts in `mirror` (19k-12). Moving a check out of
+  plate would have put the next shard there, since the others ran 15:49 to 18:41, and a sixth
+  shard asks the Mac queue for one more runner on every run. So the bound went to 25, as
+  Measure's is, and slowness is read apart from it: `runShard` warns (`::warning`, and a mark
+  on the job summary's heading) when a Mac shard's checks pass 18 minutes, where the old bound
+  began cancelling, or a Measure part's pass 21 (19k-11b's line), and the shard stays green.
+  `npm run checks` holds both: a shard over its line warns, one under does not, a Measure part
+  is held to its own line, and each job's bound in `checks.yml` is at least three minutes past
+  its line (the old 20 is the control that would fail). Found along the way: `draftwall
+  --frames` hung 12 minutes on #690's second run (19k-14); its entry got a 3-minute timeout.
 
 ### 21. Looks after painters
 

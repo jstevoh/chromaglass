@@ -315,9 +315,16 @@ export interface PlateSolver {
   readonly coverMetres?: number;
   /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
   readonly coverUnits?: number;
-  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume?: boolean): void;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
+  /**
+   * The species field downsampled to the logical grid (L × L × 4, rgba32float)
+   * and the surface tension and density of the last poured species (PLAN 33f),
+   * read back on the same one-second read as `speciesShare`. Null when no
+   * species is live or after a clear.
+   */
+  speciesSnapshot?(): Promise<{ L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null>;
   /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
   addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */
