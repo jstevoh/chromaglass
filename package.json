@@ -184,6 +184,7 @@
     "widedials": "node scripts/widedials.mjs",
     "shaderdials": "node scripts/shaderdials.mjs",
     "clearleft": "node scripts/clearleft.mjs",
+    "looksgrid": "esbuild scripts/looksgrid.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --outfile=node_modules/.cache/looksgrid.mjs && node node_modules/.cache/looksgrid.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferrodrop": "node scripts/ferrodrop.mjs",
     "ferrorest": "node scripts/ferrorest.mjs",
