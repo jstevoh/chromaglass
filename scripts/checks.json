@@ -1395,6 +1395,20 @@
       ]
     },
     {
+      "name": "Heat 0 keeps today's current (the plate's boil, 36e-2b)",
+      "shard": "lab2",
+      "run": "npm run plateboil -- --part=zero",
+      "timeout": 6,
+      "why": [
+        "The Heat dial's default, 0, must leave every look as it is today, and the",
+        "first boil build (#718) changed the lasting current at every Heat. The tree's",
+        "currentForces against today's, frozen in scripts/plateboil-today.mjs, in a",
+        "second lab on SwiftShader (lampzero's reason: two compiled programs compared",
+        "byte for byte), and FluidSimulation's stepCurrent against today's body in",
+        "node. Holds on main. About 90 s in a cloud session."
+      ]
+    },
+    {
       "name": "The layout",
       "shard": "browser",
       "run": "npm run layout",
@@ -1854,6 +1868,21 @@
         "The solver's physics on its own: the projection is incompressible",
         "(multigrid against the sweeps), and the magnet draws ferrofluid in",
         "without making, losing or over-packing any."
+      ]
+    },
+    {
+      "name": "The plate boils under a held hand at 60 fps, not under the fan (36e-2b)",
+      "shard": "plate",
+      "run": "npm run plateboil -- --part=boil --owed=rate,hold,fan,steam",
+      "timeout": 15,
+      "why": [
+        "The live plate's own boil (PLAN 36e-2b), which boilgpu's dishes do not reach:",
+        "a dark dish at Heat 1 warmed at the app's longest frame (0.1 s), then stepped",
+        "at 1/60 s, where a half-float temperature loses each step's heat. Under a",
+        "held hand it reaches 100 °C and steams; under the fan it settles over 80 °C",
+        "and under 100; the steam pushes out the liquid its volume displaces. On Metal",
+        "because it is some 20 000 solver steps (half an hour on SwiftShader). Owed",
+        "until 36e-2: the build takes the ids out of --owed and never edits a line."
       ]
     },
     {
