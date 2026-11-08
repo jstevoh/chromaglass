@@ -424,7 +424,7 @@ try {
     const lv = await levels(ms);
     const b = await snap();
     const d = delta(a.ear, b.ear);
-    return { lv, d, drawn: b.frames - a.frames, ear: b.ear, at: await placed(a.now, b.now, d) };
+    return { lv, d, drawn: b.frames - a.frames, ear: b.ear, at: await placed(a.now, b.now, d), t0: a.now, t1: b.now };
   };
   const inStalls = (v) => v.at.honest && v.at.misplaced === 0;
   /*
@@ -500,9 +500,40 @@ try {
     match both ways: more readings than asks answered is a second clock, fewer
     is an ask the ear missed.
   */
-  check('and it hears on the wall\'s asks, one a frame, not on its own frames or the tick',
-    v3.d.ask > 20 && v3.d.frame === 0 && v3.d.tick === 0 && Math.abs(v3.d.ask - v3.drawn) <= 2,
-    `readings ${v3.d.ask} ask, ${v3.d.frame} frame, ${v3.d.tick} tick, over ${v3.drawn} frames asked for`);
+  /*
+    "Not the tick" as the clock is written, not as the runner's frame rate.
+    This wanted no tick at all, and on GitHub's Macs it went red twice on
+    2026-11-08 (#718: 44 asks, 1 tick, over 45 frames asked for; #734: 65 and
+    1 over 66): the wall there drew 22 and 33 frames a second, and the tick is
+    written to take over once the wall's asks have stopped for
+    EAR_ASK_HOLD_MS (250 ms, lib/earClock.ts), which is what it did, once,
+    in a gap of the wall's. The ask-and-tick count matched the frames drawn
+    both times, so nothing read twice. The visible lines above went the same
+    way and were mended the same way (`placed`): every tick held to the ask
+    before it, each on its own, more than 250 ms after it or it is a second
+    clock beside the wall. The 250 is written here, not imported, for the
+    reason given there. A build whose tick runs beside the asks reads it
+    within 16 ms of one, and fails here as it did before.
+  */
+  const v3t = await page.evaluate(([t0, t1]) => {
+    const recent = window.chromaglassCastState().ear.recent;
+    let misplaced = 0, closest = Infinity, n = 0;
+    for (const r of recent) {
+      if (r.driver !== 'tick' || r.at <= t0 || r.at > t1) continue;
+      n++;
+      let last = -Infinity;
+      for (const q of recent) { if (q.driver === 'ask' && q.at < r.at) last = q.at; }
+      const gap = r.at - last;
+      closest = Math.min(closest, gap);
+      if (gap <= 250) misplaced++;
+    }
+    return { n, misplaced, closest };
+  }, [v3.t0, v3.t1]);
+  check('and it hears on the wall\'s asks, one a frame, not on its own frames, nor the tick but where the asks stopped past 250 ms',
+    v3.d.ask > 20 && v3.d.frame === 0 && v3t.n === v3.d.tick && v3t.misplaced === 0 && Math.abs(v3.d.ask + v3.d.tick - v3.drawn) <= 2,
+    `readings ${v3.d.ask} ask, ${v3.d.frame} frame, ${v3.d.tick} tick, over ${v3.drawn} frames asked for` +
+    `${v3t.n ? `; ${v3t.misplaced} of ${v3t.n} ticks within 250 ms of an ask (closest ${v3t.closest.toFixed(0)} ms)` : ''}` +
+    `${v3t.n === v3.d.tick ? '' : `; the record does not agree (${v3t.n} ticks recorded)`}`);
   await wall.close();
 
   // No wall: the worker's tick.
