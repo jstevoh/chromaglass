@@ -2609,9 +2609,15 @@
       "name": "Preview's copy, with frames",
       "shard": "open",
       "run": "node scripts/draftwall.mjs --frames",
+      "timeout": 3,
       "why": [
         "Preview's copy again (see Measure's), here with frames: the projector",
-        "window is painted from the wall's canvas and never the copy's."
+        "window is painted from the wall's canvas and never the copy's.",
+        "Three minutes (PLAN 19k-14): it runs 25 to 37 s on GitHub's Macs, and",
+        "on #690's second run it hung after 'and the copy stays up for the next",
+        "look' for 12:07, until the job was cancelled and the five checks after",
+        "it never ran. Bounded, a hang is this check red by name and the rest",
+        "of the shard still runs; why it hung is 19k-14's."
       ]
     },
     {

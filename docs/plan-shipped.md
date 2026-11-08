@@ -10109,6 +10109,25 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
   job summary, and every part read against it).
 
+#### 19k-13. Room in the Mac jobs' bound, and a line where slowness is read
+
+- **19k-13** (E, S): **shipped**. On GitHub's Macs on 2026-11-07 (main's deploys 668 to 673
+  and #690's two runs, eleven attempts) every Mac shard ran 14:51 to 20:21 a job, 0:39 to 3:07
+  of it before the first check (tools' includes the ffmpeg install), so all five sat within
+  three minutes of the 20-minute bound, and three were cancelled with every check they reached
+  green: plate on #690's first run a minute after its 41 checks had finished (19:51 of 20:01;
+  Areas that listen 1:12 to 1:45, A drop slumps 0:46 to 1:05), open on deploy 668 in its last
+  check, fifth on 668 and both of 669's attempts in `mirror` (19k-12). Moving a check out of
+  plate would have put the next shard there, since the others ran 15:49 to 18:41, and a sixth
+  shard asks the Mac queue for one more runner on every run. So the bound went to 25, as
+  Measure's is, and slowness is read apart from it: `runShard` warns (`::warning`, and a mark
+  on the job summary's heading) when a Mac shard's checks pass 18 minutes, where the old bound
+  began cancelling, or a Measure part's pass 21 (19k-11b's line), and the shard stays green.
+  `npm run checks` holds both: a shard over its line warns, one under does not, a Measure part
+  is held to its own line, and each job's bound in `checks.yml` is at least three minutes past
+  its line (the old 20 is the control that would fail). Found along the way: `draftwall
+  --frames` hung 12 minutes on #690's second run (19k-14); its entry got a 3-minute timeout.
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
