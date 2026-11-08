@@ -23,6 +23,7 @@ import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
+import { parsePourText, POUR_TEXT_GAP_MS } from '../lib/pourText';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -199,6 +200,7 @@ export function useRemote({
   const linkPausedRef = useRef(false);
   const linkPausedIdRef = useRef<string | null>(null);
   const remoteLinkRef = useRef<((m: RemoteMessage) => void) | null>(null);
+  const lastPourTextRef = useRef(-Infinity);
 
   const remoteLink = useRemoteLink({
     role: 'display',
@@ -248,6 +250,21 @@ export function useRemote({
           }
           const why = a ? addSongCue(a.when, a.what) : 'not a song action this build knows';
           if (why) console.info(`[assistant] song action not added: ${why}`);
+          break;
+        }
+        /*
+          Words poured as ink (PLAN 37x-10c): a song's name at the top of a
+          track, from the phone's text box or the relay's guard. Read as
+          untrusted whoever sent it (lib/pourText.ts), and one pour per
+          POUR_TEXT_GAP_MS at most, since a pour adds dye and a double tap
+          would stack the same words into a blot.
+        */
+        case 'pour-text': {
+          const t = performance.now();
+          const pour = parsePourText(message);
+          if (!pour || t - lastPourTextRef.current < POUR_TEXT_GAP_MS) break;
+          lastPourTextRef.current = t;
+          wallRef.current?.pourText(pour.rows, { colour: pour.colour });
           break;
         }
         case 'dye': {

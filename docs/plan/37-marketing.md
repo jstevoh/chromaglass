@@ -563,6 +563,19 @@ rest is routine and the owner's calls.
     3 s, and how a look's flow treats it is taste): docs/judging.md takes a section then.
   - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the
     show's own track list and its clock, so the title lands on the song's first beat.
+  - **37x-10c. Words poured from the phone, the show server and the assistant.**
+    *(shipped 2026-11-08.)* A `pour-text` message (`src/lib/pourText.ts`) that pours any
+    words onto the plate through today's title pour, from the phone remote's "Pour words"
+    box, the relay, and the owner's assistant (`pour_text`), so a set played from files,
+    which the ear names nothing in, still gets its titles; `npm run assistant` and
+    `npm run remotemix`; story in `docs/plan-shipped.md` §37x-10c. Found building it:
+    - **37x-10d. Send `pour-text` into 37x-10's ink.** *(S, after 37x-10.)* Today the
+      words go through `pourText`, which adds them to the dye in one pour and leaves
+      the look's own flow to carry them off: real dye, really advected, but with no wash,
+      so on a still look the letters stay readable longer than 37x-10's sweep allows.
+      When 37x-10's `pourInk` and wash land, a `pour-text` message goes through them
+      (rows as its two lines, the colour as `inkTitleColor`), and the live conductor's
+      cue at 0 s of each track gets the sweep the owner asked for.
 
 ## Who does what
 

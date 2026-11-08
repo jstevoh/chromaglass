@@ -220,6 +220,14 @@ export type RemoteMessage =
   | { type: 'song-action'; when: unknown; what: unknown }
   | { type: 'preset'; presetId: string }
   /**
+   * Words poured onto the plate as dye, which the flow then carries off
+   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
+   * of each track in a live set. From the phone remote's text box, or
+   * through the relay's guard; the display reads it with `parsePourText`
+   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   */
+  | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
+  /**
    * Arm a look without sending it. `null` disarms.
    *
    * Separate from `preset` on purpose: `preset` applies, which cuts the plate

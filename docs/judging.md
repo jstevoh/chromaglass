@@ -2444,3 +2444,19 @@ only the wall can say whether the seven looks read as the real transparencies do
 4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
    not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
    45a-5).
+
+## 113. Song titles poured as ink from the phone (PLAN 37x-10c)
+
+`npm run assistant` and `npm run remotemix` hold the message: what the phone's box and the
+assistant send, what the guard lets through, and how the rows are laid out. Only the wall
+can say whether the words read when they land and how a look's own flow carries them off.
+
+1. Open the show on the Mac with the phone remote linked, and play a song from a file.
+2. On the phone, Controls → **Pour words**: type `Song name - Artist` and press **Pour**.
+   The name should land in capitals across the middle of the plate with the artist under
+   it, dark on a bright plate and the look's brightest dye on a dark one.
+3. Watch it on three looks: a still one (Classic), a busy one, and the look the live set
+   uses. The words should read for a few seconds, then smear and drift into the colour.
+4. Bad: letters too small to read from across a room, words that never break up on a still
+   look (37x-10d's wash is the fix, not a fade), a pour that clears or dims the plate around
+   the words, a second pour inside 1.5 s landing on top of the first.
