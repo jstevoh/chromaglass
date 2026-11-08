@@ -49,9 +49,10 @@ import { join, resolve } from 'node:path';
 import WebSocket from 'ws';
 import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, readOsc, SOUND_OUT } from '../server/osc.js';
 import { signLicenseKey } from '../server/license-key.js';
+import { port } from './ports.mjs';
 
 const NODE_ONLY = process.argv.includes('--node');
-const PORT = Number(process.env.OSCOUT_PORT ?? 5331);
+const PORT = port(5331, 'OSCOUT_PORT');
 
 const checks = [];
 const check = (name, ok, detail = '') => {

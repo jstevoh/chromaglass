@@ -52,12 +52,13 @@ import { createInterface } from 'node:readline';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import WebSocket from 'ws';
+import { port } from './ports.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
 const WRITE = args.includes('--write');
 const MUTANTS_ON = !args.includes('--no-mutants');
-const BASE_PORT = Number(process.env.ASSISTANT_PORT ?? 5371);
+const BASE_PORT = port(5371, 'ASSISTANT_PORT');
 const SHOW_KEY = '24681357';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

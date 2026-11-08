@@ -37,9 +37,19 @@ Mac is free, and on GitHub's machines as before when it is not.
 - **How many shards** the Mac takes is the repository variable `OWNER_MAC_SHARDS` (a
   count, from the first; unset is all five). Set it lower to keep the Mac's share short
   and leave the rest to GitHub's queue.
-- **Ports.** The harnesses listen on fixed ports. On the Mac, the shard's first step
-  (`scripts/macports.sh`) waits up to ten minutes for those ports to be free of another
-  session's run and then fails with the process that holds them.
+- **More than one at a time** (PLAN.md 19ah-6). Each runner takes one job, so the Mac
+  runs as many shards at once as it has runners: `--runners 2` below puts `owner-mac-2`
+  beside `owner-mac`, on the same label, and GitHub hands the deploy's shards to whichever
+  is free.
+- **Ports.** Every harness serves the app on its own port with `--strictPort`, and many
+  share one (4351 is `bottles`, `mirror`, `moving` and `render-app`). Each runner on the
+  Mac has a block of ports of its own: its `.env` sets `HARNESS_PORT_SHIFT` (10000 for the
+  first, 20000 for the second), and every harness serves on its port plus that
+  (`scripts/ports.mjs`; unset, as on GitHub's machines and for a session by hand, the
+  ports are what they always were). So two shards never meet on a port, and neither meets
+  a harness the owner or a session runs by hand. The shard's first step
+  (`scripts/macports.sh`) still waits up to ten minutes for its own block to be free, of
+  a cancelled job's server, and then fails with the process that holds it.
 - **A watchdog, for a Mac that sleeps after the probe said free.** The shards would wait for
   it, and every deploy behind them. `deploy.yml`'s `Watchdog` job (`scripts/macwatch.mjs`)
   reads the run's jobs; when a shard has been queued for the owner's Mac for 15 minutes with
@@ -60,6 +70,14 @@ it as a LaunchAgent (as the owner, not root, so Chromium has the GPU), makes the
 `mac-runner` environment and asks for the probe's token at a hidden prompt. Each step is
 skipped when already done. The last line is what a deploy would do now.
 
+```bash
+bash scripts/macrunner-setup.sh --runners 2
+```
+
+does the same for a second runner in `~/actions-runner-2` (and gives the first its block of
+ports, which restarts it: run it when no deploy is on the Mac). Up to three. The second
+keeps its own npm cache, so two jobs never restore one into the same folder at once.
+
 Keep the Mac awake on power (System Settings → Energy: "Prevent automatic sleeping when
 the display is off"). A Mac that sleeps after the probe said free costs the watchdog's 15
 minutes and then a GitHub queue. To move a stalled deploy sooner by hand: Cancel workflow,
@@ -70,12 +88,13 @@ sleeping Mac again.
 ## For a show, or anything else that wants the GPU
 
 ```bash
-~/actions-runner/svc.sh stop
+for d in ~/actions-runner ~/actions-runner-[23]; do [ -d "$d" ] && (cd "$d" && ./svc.sh stop); done
 ```
 
-and `~/actions-runner/svc.sh start` afterwards. A stopped runner is offline to the probe,
-so deploys go to GitHub. To remove it for good: `svc.sh uninstall`, then
-`./config.sh remove --token <token>` from the repository's Settings → Actions → Runners.
+and the same with `start` afterwards. A stopped runner is offline to the probe, so deploys
+go to GitHub. To go back to one runner, stop just `~/actions-runner-2`. To remove one for
+good: in its folder `./svc.sh uninstall`, then `./config.sh remove --token <token>` with
+the token from the repository's Settings → Actions → Runners.
 
 ## What a job on the Mac can reach
 
