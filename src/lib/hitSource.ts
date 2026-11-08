@@ -15,7 +15,9 @@
  *
  *   - **kickHit**, **snareHit**, **hatsHit**: how hard that drum's last hit
  *     was, against its own hardest of late (the analyser's onset strength),
- *     falling away over a quarter of a second, half a beat at 120;
+ *     falling away over a quarter of a second, half a beat at 120. Kick hit
+ *     is the beat (`reading.beat`, `pulseEar.ts`): the kick's own where a
+ *     kick keeps time, the band's attack where none does;
  *   - **anyHit**: the kick's or the snare's, whichever is up;
  *   - **pitch**: the note the analyser hears, low to high over five octaves
  *     (C1 to C6), glided between notes so a frame of a wrong octave is not
@@ -47,6 +49,17 @@
  */
 
 import type { AudioReading } from './audioFeatures.ts';
+
+/**
+ * When the reading's last beat began, seconds on the readings' clock: the
+ * beat whatever plays it (the kick where a kick keeps time, the band's attack
+ * where none does, `pulseEar.ts`), or the kick on a reading without one. The
+ * beat clock's ear and Kick hit both read this, so a 1920s record, with no
+ * bass drum on it at all, drives the clock and the patches from its banjo.
+ */
+export function beatAt(reading: AudioReading | null | undefined): number | null {
+  return (reading?.beat ?? reading?.onsets?.kick)?.at ?? null;
+}
 
 export const HIT_FEATURES = ['anyHit', 'kickHit', 'snareHit', 'hatsHit', 'pitch', 'noteClass'] as const;
 export type HitFeature = typeof HIT_FEATURES[number];
@@ -137,7 +150,9 @@ export class HitSource {
     for (const [, key] of DRUMS) v[key] *= fall;
     if (reading?.onsets) {
       for (const [name, key] of DRUMS) {
-        const o = reading.onsets[name];
+        // Kick hit is the beat, whatever plays it (`pulseEar.ts`): on a record
+        // with no kick drum the band's attack carries it, as the beat clock's.
+        const o = name === 'kick' ? reading.beat ?? reading.onsets.kick : reading.onsets[name]; // see beatAt
         if (!o || o.at === null || o.at === this.hitAt[name]) continue;
         // An onset from long before this source began listening is history, not a hit.
         const stale = this.hitAt[name] === null && o.at < time - HIT_FALL * 4;

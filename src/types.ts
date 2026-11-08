@@ -419,6 +419,21 @@ export interface VisualizerSettings {
   thinGap: number;
   gapThickness: number;
   /*
+    The liquid on the plate and the glass on it (PLAN 38r-5, lib/cover.ts).
+    `liquidMl` is how much liquid is under the cover, in mL: 62.83 fills the
+    0.1 m cover at today's 2 mm. A turn of it is liquid added (poured at the
+    rim, drawn in under the glass) or wicked off there; the solver keeps the
+    running total, which pours add to and a press past what the edge's
+    meniscus holds spills from, so the dial is what you put in, not a
+    reading of what is left. `coverWeight` is the cover glass in grams:
+    157 is a 2 mm float glass (5 kg/m²). The gap is a result of the two,
+    never set: the edge holds the glass up to 2σ sinθ/h, past that it sinks
+    by Stefan's law and the liquid goes over the rim. The defaults are
+    today's plate to the digit, so every look keeps its 2 mm.
+  */
+  liquidMl: number;
+  coverWeight: number;
+  /*
     The second phase, and the magnet under the glass (H7,
     docs/bubbles-plan.md B).
 
@@ -479,6 +494,13 @@ export interface VisualizerSettings {
   filmHold: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
+  /**
+   * Soap Breakdown (PLAN 38c-3): first-order loss of soap on the plate
+   * (dΓ/dt = −k Γ in real seconds, shown as the half-life ln(2)/k), for soap
+   * taken up by the oil's interface or washed through the trough. 0 is none
+   * (all soap kept), the real dish and the default on every look.
+   */
+  soapBreakdown: number;
   /**
    * A clear film against the glass (PLAN §20b): 0 none; up, a clear oil film
    * that thick (1 is 0.86 of the gap) laid over the plate, which tears open
@@ -723,6 +745,22 @@ export interface VisualizerSettings {
   turingDrift: number;        // how far the print's feed and kill wander across the plate over 30 to 90 s, so the pattern keeps changing once it has grown (26d-6); 0 is the constant map
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
+  /*
+    The moiré pack (PLAN 45a; lib/moire.ts, gpu/wgsl/plateMoire.ts): two
+    printed transparencies on the stage, A under the glass (seen through the
+    liquid) and B on the cover, B turned, slid and scaled against A.
+  */
+  moireAmount: number;        // how dense the sheets' ink is: 0 takes them off, 1 is a good print (2% through the ink)
+  moireSheetA: string;        // the lower sheet's design (MOIRE_SHEETS)
+  moireSheetB: string;        // the upper sheet's design
+  moireAngle: number;         // the upper sheet's turn, degrees
+  moireSpin: number;          // the upper sheet's spin, turns a minute (negative turns it back)
+  moireSlide: number;         // the upper sheet slid sideways, in frame heights
+  moireRatio: number;         // the upper sheet's line pitch against the lower's (1 the same print)
+  moireDensity: number;       // lines per frame height on the lower sheet
+  moireGap: number;           // each sheet's distance from the liquid, mm: the lens's defocus and the liquid's bend
+  moireCurl: number;          // the one shape dial the designs share (sweep, starts, wave height, wiggle, twist)
+  moireFlip: boolean;         // the upper sheet laid face down, mirrored: two spoke or spiral sheets cross into flowers
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
@@ -896,6 +934,14 @@ export interface VisualizerSettings {
   soundImpact: number;        // master depth over every patch whose source is the sound
   /** Master depth over every patch driven by an LFO or an envelope. */
   shapeImpact: number;
+  /** Cycle length in bars (0.25..16), shape index (`LFO_SHAPES`) and restart trigger (`LFO_TRIGGERS`) per LFO. */
+  lfo1Bars: number; lfo1Shape: number; lfo1Restart: number;
+  lfo2Bars: number; lfo2Shape: number; lfo2Restart: number;
+  lfo3Bars: number; lfo3Shape: number; lfo3Restart: number;
+  lfo4Bars: number; lfo4Shape: number; lfo4Restart: number;
+  /** Attack and decay in seconds, and trigger source index (`ENVELOPE_TRIGGERS`) per envelope. */
+  env1Attack: number; env1Decay: number; env1On: number;
+  env2Attack: number; env2Decay: number; env2On: number;
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -970,6 +1016,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   depthDrag: 0,
   thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
+  liquidMl: 62.83185307179587,     // A·2 mm under the 0.1 m cover (lib/cover.ts COVER_FULL_ML): today's gap
+  coverWeight: 157.07963267948966, // a 2 mm float glass, 5 kg/m² (COVER_GLASS_G)
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,
@@ -985,6 +1033,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
   surfactantFlow: 0,
+  soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
   clearFilmDye: 0,          // undyed: the film as every look has it, byte for byte (npm run lace, 8)
   clearFilmDyeColor: '#ffd21a', // a warm yellow, the owner's lace still's
@@ -1118,6 +1167,17 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turingDrift: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
+  moireAmount: 0,
+  moireSheetA: 'spokes',
+  moireSheetB: 'spokes',
+  moireAngle: 4,
+  moireSpin: 0,
+  moireSlide: 0,
+  moireRatio: 1,
+  moireDensity: 48,
+  moireGap: 3,
+  moireCurl: 0.3,
+  moireFlip: true,
   filmMix: 0.7,
   filmKey: 0.18,
   // A film is a slide until it is asked to be a force: a look saved before
@@ -1190,6 +1250,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // source whose master starts at zero makes a patch you just made look broken.
   soundImpact: 1,
   shapeImpact: 1,
+  lfo1Bars: 8, lfo1Shape: 0, lfo1Restart: 0,
+  lfo2Bars: 2, lfo2Shape: 0, lfo2Restart: 0,
+  lfo3Bars: 1, lfo3Shape: 1, lfo3Restart: 0,
+  lfo4Bars: 0.25, lfo4Shape: 3, lfo4Restart: 0,
+  env1Attack: 0.012, env1Decay: 0.28, env1On: 0,
+  env2Attack: 0.09, env2Decay: 1.6, env2On: 0,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

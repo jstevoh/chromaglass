@@ -39,6 +39,17 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     `18.7 fps`), clearing `30 steps/s` with +17% margin; `governor.ts` needs a step-rate /
     `simMs` downshift rule (or a `256²` start when `simMs > 16 ms`) so single-plate thin-gap
     looks reach `PINNED_STEP_RATE = 30`.
+    *Read again 2026-11-07, before writing its check:* the governor's own rules already do this on the
+    costs above. Fed Poster's single-plate readings (a 12 ms step and 56 ms of drawing at 384², 6 ms and
+    42 ms at 256², the frame its steps plus its drawing, four steps at most), a `QualityGovernor` on a
+    512/384/256 ladder gives up sixty steps at 4.3 s and 384² at 8.4 s, and steps 37 times a second in
+    the 12 s after 8 s; one started at 256² steps 37. So "stays on 384²" is what the app did on that
+    run, not what `governor.ts` decides, and a downshift rule written into the governor would be fixing
+    a rule that is not broken. What holds the app there is a root cause to find on the Mac (the
+    governor's moves logged during `squeeze`'s Poster window, and whether that run had pinned the rung
+    or the step rate: `PINNED_STEP_RATE` reads `?steps=`); until then 28i-2a has no check to build to,
+    and it stays out of the build lane. Poster to one plate (`layerCount: 1`, +56% measured) is a look
+    change on its own, for the owner's eye.
   - **28i-2b, open. The projector check cannot see a left/right shift of 0.2 or less.**
     `scripts/webgpu-smoke.mjs`'s "the projector places the picture on the wall" probes only the
     top rows and the middle, so a sideways shift of the picture by 0.2 of the frame or less
@@ -200,7 +211,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   - ~~**28l-1. The look**~~ (**shipped**, this PR): `saffron-lace`, the film at 0.3 of the
     gap dyed yellow at 0.35, on the lamp, with three thin pools (lib/plateAreas.ts): a wide
     lavender wash, cobalt with icy blue where the bass pours soap, coral where the treble
-    pours oil. Lab render beside the still in the PR. Judging §109.
+    pours oil. Lab render beside the still in the PR. Judging §112.
   - **28l-2. The lavender cannot be the ground.** Yellow over lavender is amber by
     subtraction, so the look lays its lavender as a thin pool on the lamp's white, and its
     holes elsewhere show white where the still shows lilac everywhere. The still's veins

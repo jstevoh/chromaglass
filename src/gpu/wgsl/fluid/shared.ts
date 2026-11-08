@@ -75,6 +75,8 @@ struct Sim {
   surfaceClear: f32,
   // Lamp intensity scaled by heating rate (PLAN 18f).
   lampHeat: f32,
+  // The cover glass's gap on its liquid, in gap units, 0.03 at 2 mm (PLAN 38r-5, lib/cover.ts): the dome's mean.
+  cover: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
