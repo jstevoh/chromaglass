@@ -55,11 +55,11 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { EarClock } from '../src/lib/earClock.ts';
 
-const PORT = Number(process.env.EARS_PORT ?? 4331);
+const PORT = port(4331, 'EARS_PORT');
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });

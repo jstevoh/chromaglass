@@ -35,9 +35,9 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.DRAFTWALL_PORT ?? 4183);
+const PORT = port(4183, 'DRAFTWALL_PORT');
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;
 /** On the Mac, where the app draws: the painted line must see frames rather than say it measured nothing. */
 const FRAMES = process.argv.includes('--frames');

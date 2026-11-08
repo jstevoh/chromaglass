@@ -116,6 +116,8 @@ export interface GpuStepParams {
   filmDust?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
+  /** First-order surfactant loss dial (0..1, 0 = none; soapBreakdownRate in soap.ts). */
+  soapBreakdown?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */
   solutalBuoyancy?: number;
   /** How far the plate stands up (0 flat on the projector, 1 upright). */
@@ -146,6 +148,16 @@ export interface GpuStepParams {
   thinGap?: number;
   /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
   gapThickness?: number;
+  /**
+   * The liquid on the plate and the cover glass on it (PLAN 38r-5,
+   * lib/cover.ts): Liquid in mL (a change is liquid added or wicked off at the
+   * rim), Cover weight in grams, and a two-finger pinch's hand on the glass,
+   * −1 lifting to 1 pressing. Absent, the plate holds today's 62.8 mL under a
+   * 157 g glass, which is today's 2 mm.
+   */
+  liquidMl?: number;
+  coverGrams?: number;
+  coverHand?: number;
   /**
    * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
    * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the
@@ -295,9 +307,20 @@ export interface PlateSolver {
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
    * its share into the species field. Plate units.
    */
-  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume?: boolean): void;
+  /** The cover glass's gap on its liquid, metres (PLAN 38r-5): what a pour's share and the cover's drag are taken at. */
+  readonly coverMetres?: number;
+  /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
+  readonly coverUnits?: number;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
+  /**
+   * The species field downsampled to the logical grid (L × L × 4, rgba32float)
+   * and the surface tension and density of the last poured species (PLAN 33f),
+   * read back on the same one-second read as `speciesShare`. Null when no
+   * species is live or after a clear.
+   */
+  speciesSnapshot?(): Promise<{ L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null>;
   /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
   addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */

@@ -381,6 +381,54 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   `scripts/macrunner-hook.sh` from the checkout it runs in; a change to the hook on `main`
   reaches the Mac only when the owner runs setup again. A check that the installed copy
   matches `main`'s (the probe could read a hash the hook prints) would say when it is stale.
+- **19ah-6. Built: two shards at once on the owner's Mac.** Asked 2026-10-29 (the first
+  deploy on the Mac, run 40929715769, ran its five shards one after another in 51.5
+  minutes). Each runner takes one job, so a second runner on the same Mac is the whole of
+  it, but the harnesses served on fixed ports, many shared (4351: `bottles`, `mirror`,
+  `moving`, `render-app`), and `macports.sh` made a second shard wait. Closed unmerged as
+  #570 and rebuilt on main 2026-11-07, with the nine harnesses written since converted too
+  (`assistant`, `dawbridge`, `feedbackpane`, `liveshow`, `loopseam`, `openingtime`, `oscout`,
+  `rig`, `tippad`): 86 scripts on 60 ports. The open #595 (our own pull requests' Mac
+  shards on the Mac) wrote the same id; it takes 19ah-8 when it is carried onto main. Now every harness
+  asks `scripts/ports.mjs` for its port, which adds `HARNESS_PORT_SHIFT` (a block of
+  10000; unset everywhere but a runner's `.env`, so GitHub's machines and sessions keep
+  their ports); `macrunner-setup.sh --runners 2` adds `owner-mac-2` in
+  `~/actions-runner-2` with block 20000 and its own npm cache, and gives the first 10000;
+  `npm run ports` (Measure, every diff) fails a harness with a bare port and proves two
+  blocks serve one harness side by side while one block still collides. Open: the A/B on
+  the M4 (wall time against 51.5 minutes; `startup`, `squeeze`, `drawwall`'s rate and
+  `mirror` green with their bars as they are), and if a timing-heavy shard cannot share
+  the GPU, a label that keeps it alone. Found along the way: `quick.mjs` keeps checks
+  that share a port apart; giving each of its workers a block would let them run side
+  by side (they still share `dist/`).
+- **19ah-7. Open: every harness waits for its preview to answer.** Deploy 580 (2026-10-29)
+  lost `tools` to `ERR_CONNECTION_REFUSED` on localhost:4346 9.4 s after `vite preview` was
+  spawned, ports free and vite silent: the harness had slept a fixed 2.5 s. `tools.mjs` now
+  asks `untilServing` (scripts/ports.mjs) and prints how long the server took; sixty other
+  harnesses still sleep a fixed time, and with two shards on one Mac (19ah-6) the start is
+  slower. Move them to `untilServing`, and read the printed times on the Mac first to see
+  how slow a start gets.
+- **19ah-9. Built: a Mac busy with other work hands the deploy back.** Deploys 679 and 682
+  (2026-11-08, runs 42427960522 and 42436205976) went red on the owner's Mac and passed
+  the same shards on GitHub's: `startup`'s "built ahead ... nothing built behind it" twice,
+  "no pipeline was built on a frame" (particles) once, `phone` on a taken port, and every
+  other shard into its 20-minute timeout. The open shard's own lines: the opening's 65
+  builds 11.86 and 17.99 s (median 0.554 s, the display 6.77 s) against 3.43 s for 56
+  (median 0.186 s) on the same Mac's first deploy of 10-29, so the half behind the show
+  outran startup's 45 s wait for it; setup-node alone two to five minutes; and the port
+  step found another checkout serving `signin` and `tiers`. The Mac now hosts sessions and
+  Antigravity's queue running the same harnesses. Built: each Mac shard's first step
+  (`scripts/macbusy.sh`) looks for a test browser or the ChromaGlass app at work (5% of a
+  core or more, so a cancelled job's idle leftover does not count) that is not a deploy's
+  own (no runner worker among its ancestors), waits two minutes, then
+  fails listing it; the watchdog reads that step's failure and moves the deploy to
+  GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
+  with `hosted`. Open: **19ah-9a**, work begun mid-shard still shares the GPU (a shard
+  could look again before its timing checks); **19ah-9b**, `startup` prints "nothing built
+  behind it" when its 45 s wait for the half behind the show ran out with it still
+  building, which read as the show asking for nothing (the script is over 100 KB, so the
+  wording waits for its split); and the 45 s wait has 7 s to spare on GitHub's Macs
+  (38.45 s behind on deploy 671).
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
@@ -509,3 +557,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   `here`, once a session has timed the lab checks on software WebGPU.
 - **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
   children run as a first attempt (docs/plan-shipped.md, 19ak).
+- **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
+  retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
+  GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).

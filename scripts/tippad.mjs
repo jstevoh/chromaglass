@@ -37,11 +37,11 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { padTilt, padDot, tipGrab, tipLetGo, tipMoved, keysTilt, TIP_SLOSH } from '../src/lib/tipPad.ts';
 import { tiltReading } from '../src/lib/phone.ts';
 
-const PORT = Number(process.env.TIPPAD_PORT ?? 4191);
+const PORT = port(4191, 'TIPPAD_PORT');
 /** The desk pad's travel for the plate stood fully up (its `reach`, components/desk/DeskPanels.tsx). */
 const DESK_REACH = 72;
 const URL = `http://localhost:${PORT}/?debug&dpr=0.35&play=0`;

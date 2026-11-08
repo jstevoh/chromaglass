@@ -21,6 +21,8 @@ import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
 import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { assistantLook } from '../lib/assistantLook';
+import { parseSongAction } from '../lib/songShows';
+import { addSongCue } from './songCue';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -232,6 +234,22 @@ export function useRemote({
         case 'assistant-live':
           void startSavedLive(message.test === true).catch(() => { /* the panel shows why */ });
           break;
+        // A still for the assistant to judge detail by (PLAN 44c-4), and a
+        // song action it programmed, fired by the show's own clock (44f).
+        case 'assistant-still':
+          padPictureRef.current?.wantStill(message.width);
+          break;
+        case 'song-action': {
+          let a = parseSongAction(message);
+          // A set is clamped as a patch is, and dropped if it names no setting.
+          if (a?.what.do === 'set') {
+            const v = sanitizePatch({ [a.what.key]: a.what.value })[a.what.key];
+            a = typeof v === 'number' ? { ...a, what: { ...a.what, value: v } } : null;
+          }
+          const why = a ? addSongCue(a.when, a.what) : 'not a song action this build knows';
+          if (why) console.info(`[assistant] song action not added: ${why}`);
+          break;
+        }
         case 'dye': {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {

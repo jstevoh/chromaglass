@@ -557,6 +557,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turingInk',       label: 'Turing Print Ink', min: 0, max: 1 },
   { key: 'turingDrift',     label: 'Turing Print Drift', min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
+  // The moiré pack's sheets (PLAN 45a): the ink, and the upper sheet's turn
+  // and spin, the three a hand on the real stage plays.
+  { key: 'moireAmount',     label: 'Moiré Sheets',     min: 0, max: 1 },
+  { key: 'moireAngle',      label: 'Moiré Turn',       min: -180, max: 180 },
+  { key: 'moireSpin',       label: 'Moiré Spin (rpm)', min: -30, max: 30 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
   // Folds is a stepped choice and rides a fader as one: the sheet's five
   // buttons, Off, 2, 4, 6 and 8, each a fifth of the travel.
@@ -599,6 +604,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
   { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
+  { key: 'soapBreakdown',   label: 'Soap Breakdown',   min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.
   { key: 'clearFilm',       label: 'Clear Film',       min: 0, max: 1 },
@@ -610,6 +616,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // to coast and the plate loosens.
   { key: 'thinGap',         label: 'Thin Gap',         min: 0, max: 1, step: 1 },
   { key: 'gapThickness',    label: 'Thickness',        min: 0, max: 1 },
+  // The liquid under the cover and the glass's weight (PLAN 38r-5). A fader
+  // up pours liquid in at the rim and the glass rises; down wicks it off.
+  // The weight on a squared curve, so the default 157 g sits two fifths up
+  // and the bottom of the travel is a whisper of a glass.
+  { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
+  { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.

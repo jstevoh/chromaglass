@@ -94,6 +94,13 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   way) so a pad held on ten fingers does not flood the plate, and a channel can be sent to
   an area (25h). The measure adds a three-note chord: three drops in one frame, ordered
   across the plate by pitch, and a fifth held note releasing the first.
+  *Check written first (2026-11-07):* `npm run soundowed`, id `voices` (nine lines,
+  owed): a new `src/lib/noteVoices.ts` (`makeNoteVoices`, `voiceOn`, `voiceOff`,
+  `voicePour`, `noteSource`, `VOICE_DEFAULTS`), Melody Walk's placement taken out as
+  `melodyPlace(pitch, line)` so a sequencer's note lands where the heard note does
+  (24.3-place-1), and a `{ kind: 'voices' }` target that `liveBindings` answers for
+  every note on its channel. Each measure above is a line; the hook laying the drop
+  through `layMelodyDrop` and the phone's list are the review's.
   ~~*The melody walks across the plate (24.3-place, direction B of the owner's 2026-10-24
   exploration; after 25h).*~~ (shipped: each note the microphone hears lets go of one drop,
   low notes on one side of the plate and high on the other, a harder note a bigger drop; a
