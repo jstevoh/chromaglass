@@ -978,6 +978,47 @@ pull was tried at 0.3 and did no better on this band (spread 18 ms against 13 at
 20 fps), so `hear()` still snaps: with the onset's own time the snap's jitter is
 the onset's, a few ms, not the smoothed level's 30–55.
 
+### 14d-2. No kick drum, no beat: the 1920s records (shipped)
+
+The owner loved the six 1920s song films (acoustic 78s: the Wolverines, Caruso,
+Rachmaninoff, Whiteman, King Oliver, Bessie Smith) and asked for them to react to the
+music more. Every beat answer on the plate (Kick hit patches, the beat clock's kicks,
+Beat Squeeze) waited for the ear's kick, energy arriving at 30–120 Hz, and on those
+records it fired 3 to 6 times a minute (the Wolverines 22, mostly low notes leaking
+into the band). There is no kick drum on an acoustic record: the horn could not take
+one, so the bands kept time on banjo, tuba, piano and woodblock.
+
+**Shipped.** `pulseEar.ts` hears an onset over 60 Hz–4 kHz by SuperFlux (each bin's rise
+against the loudest of its neighbours a frame before, so a sung note's vibrato is not an
+onset), with the ear's own median-and-MAD threshold and a 0.2 dB floor. It becomes the
+reading's `beat` only while the kick is not keeping time (no kick for 1.5 s, or a run of
+steady kicks shorter than 3 s); a steady kick is the beat to the frame, as before. Its
+beats come no closer than 0.25 s, and a kick always counts unless it is the same attack
+within 0.1 s. `HitSource`'s Kick hit and the beat clock read `beat ?? onsets.kick`
+(`beatAt`). Beats a minute at 30 fps (the films' rate), kick before and beat after:
+Wolverines 22 → 107, Caruso 4 → 45, Rachmaninoff 6 → 106, Whiteman 3 → 114, Oliver 4 → 111,
+Bessie 5 → 83; modern tracks with a kick barely move (werq 85 → 108, thatched-villagers
+133 → 134), pink noise 8 → 8, a held chord 0 → 0. `npm run pulse` plays a horned 1920s band
+with no kick (the beat catches at least 90% of its notes within 70 ms, the kick alone under
+20%), the same band unhorned, a loop with a kick once a bar and sixteenth hats, a drummed
+band (every beat is a kick, to the frame) and noise, chord and silence. Two count rules for
+"the kick keeps time" were tried first and failed on the band's own leaking low chord
+(71% and 66% caught); the reasons are in the module's comment.
+
+A check-skeptic pass then gave the band a soft cornet note on every off-beat: 35% of the
+beats were the cornet at 30 fps (20% at 60) and the clock fired 96 times for 65 beats, and
+no gate on an attack's size alone separated a weak real beat (split across two frames)
+from the cornet. So the ear entrains: it keeps the band's period (the median of its last
+eight beat gaps, locked after three) and takes an attack on that grid (within a fifth of a
+period) as the beat, one off it only when it is as hard as the band's usual attack, and
+lets the period go after three off-grid beats in a row or a four-second stop. With the
+cornet: all 65 beats heard, none of the cornet's, the clock 67 times. Over the six songs
+the beat now comes Wolverines 90, Caruso 37, Rachmaninoff 93, Whiteman 109, Oliver 99,
+Bessie 67 a minute (the first version 107, 45, 106, 114, 111, 83), each median gap on the
+song's tempo. `npm run pulse` adds the cornet, a breakdown (kick out 12–24 s and back),
+stray and count limits on the clock and Kick hit. `npm run eargc` 7.98 KB an update (bar
+8; 6.33 before the pulse). Open: 14d-3 to 14d-9.
+
 ### 15a. Only the Dropper lays the bottle's liquid (shipped)
 
 Pour, Spray, Splat and Streak laid the colour and nothing else. With Ferrofluid in

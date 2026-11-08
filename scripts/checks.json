@@ -353,6 +353,25 @@
       ]
     },
     {
+      "name": "The beat without a kick drum",
+      "shard": "sound",
+      "run": "npm run pulse",
+      "why": [
+        "The beat (src/lib/pulseEar.ts, PLAN.md 30-pulse): a synthetic 78 (banjo,",
+        "tuba, voice and hiss through a recording horn's 170 Hz high-pass, no kick",
+        "drum) at 30 and 60 fps, where the kick alone hears almost none of the",
+        "band's beats and the beat, the beat clock and Kick hit hear 90% or more;",
+        "the same band without the horn, whose low chord fires the kick in runs",
+        "that must not take the beat away; a loop of sixteenth hats under a sparse",
+        "kick, whose beat must not strobe faster than 240 a minute and must stay",
+        "on the quarters; a drummed band, where every beat is a kick to the frame;",
+        "a soft cornet on every off-beat, which must not be taken for the beat (the",
+        "ear entrains to the band's period); a breakdown where the kick lays out and",
+        "comes back; and noise, a held chord and silence, which give no beat.",
+        "About 18 s."
+      ]
+    },
+    {
       "name": "The breakdown",
       "shard": "sound",
       "run": "npm run breakdown",

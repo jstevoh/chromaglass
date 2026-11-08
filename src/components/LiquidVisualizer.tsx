@@ -56,7 +56,7 @@ import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
-import { HitSource } from '../lib/hitSource';
+import { HitSource, beatAt } from '../lib/hitSource';
 import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
@@ -2600,7 +2600,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             heard.
           */
           const earReading = currentAudioData?.features ?? null;
-          const kickAt = earReading?.onsets?.kick?.at ?? null;
+          const kickAt = beatAt(earReading);
           let heardAt: number | null = null;
           if (kickAt !== null && kickAt !== heardKicksRef.current.lastAt) {
             heardKicksRef.current.lastAt = kickAt;
@@ -5537,7 +5537,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         difference read as a kick, and the fresh clock pressed the plate
         once on the hand-back with nothing playing.
       */
-      heardKicksRef.current.lastAt = audioDataRef.current?.features?.onsets?.kick?.at ?? null;
+      heardKicksRef.current.lastAt = beatAt(audioDataRef.current?.features);
       soundLearnRef.current.reset();
       // The song's shape is timed on the readings' clock, which a render
       // starts again at zero: its history and references belong to the song
