@@ -1777,6 +1777,21 @@
       ]
     },
     {
+      "name": "The owner's YouTube connector",
+      "shard": "browser2",
+      "run": "npm run youtube",
+      "why": [
+        "The YouTube MCP server (PLAN 44i; scripts/youtube.mjs): mcp/youtube-mcp.js over stdio",
+        "against a stand-in Google on loopback. The sign-in (state refused, PKCE S256, the key",
+        "file 600 in a 700 folder), a refused access key refreshed, an upload killed mid-file",
+        "and resumed by a second server in the same session, a dropped chunk and a 503 resumed",
+        "from Google's count, the bytes exact, private when no privacy is named (Google's default",
+        "is public since 2026-11-02), the same file twice refused, an update keeping what it did",
+        "not name, no secret in any reply or log. Then fourteen mutants, each of which must fail",
+        "its own line. No GPU, no build, no network; about half a minute."
+      ]
+    },
+    {
       "name": "The remote's Draw screen",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/draw.mjs",
