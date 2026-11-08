@@ -307,6 +307,8 @@ export class WebGPUFluid extends FluidCover {
     // opening's first twenty seconds on the Mac: built behind, and `npm run
     // startup` gives each look's opening seconds as well as steps to say so.
     for (const name of ['splatDeltas', 'pourImage']) add(`${name}:${RGBA32}`, splatKernel(name, RGBA32), false);
+    // A song's title poured as ink (PLAN 37x-10), only for a show with titles on.
+    add(`pourInk:${RGBA32}`, splatKernel('pourInk', RGBA32), false);
     // The video pour's (PLAN 14ab-2), only for a show that pours a video.
     add('videoSample:rgba8unorm', splatKernel('videoSample', 'rgba8unorm'), false);
     add(`videoFlow:${RGBA32}`, splatKernel('videoFlow', RGBA32), false);

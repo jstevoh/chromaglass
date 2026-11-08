@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — song titles painted as ink, then swept away (PLAN 37x-10)
+
+- **Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone): when a new
+  song is named, its title and artist are poured into the liquid as ink at the plate's full
+  resolution, then a wash (a drift and eddies, a real flow) breaks the letters up. Title ink,
+  Size, Height and Sweep set it. Song-show title cards and words poured from the phone, the
+  show server or the assistant go through the same ink and wash.
+
 ### Added — the liquid's amount sets the gap: Liquid and Cover Weight (PLAN 38r-5)
 
 - The plate now knows how much liquid is under its cover glass. Two dials, Liquid (mL) and

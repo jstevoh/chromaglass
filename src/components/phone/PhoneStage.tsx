@@ -20,6 +20,7 @@ import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PhoneMoire } from './PhoneMoire';
+import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
@@ -1302,6 +1303,8 @@ export function PhoneStage(p: PhoneStageProps) {
             />
             <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
           </div>
+          {/* Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch, on the phone. */}
+          {p.mixer && <div className="mt-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
               <SectionLabel>Running shows on your account</SectionLabel>

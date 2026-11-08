@@ -37,6 +37,7 @@ comments, which moved with it.
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
 | `useRemote` | the phone remote's link, both ways |
+| `useInkTitle` | the identified song's title poured as ink when it changes and the Title switch is on (PLAN 37x-10), called by `useRemote` |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
 | `useSongScore` | a song's show while it plays, and its score |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |

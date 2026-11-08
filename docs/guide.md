@@ -187,6 +187,27 @@ Resolume's OSC output speaks Resolume's own addresses (`/composition/layers/1/vi
 
 Send a number from 0 to 1: the server hands the number to the setting as it is. The settings that already run 0 to 1 take a Resolume slider one to one: Sound Drive (`audioImpact`), Dimmer (`dimmer`), Bloom (`bloom`) and Turbulence (`turbulenceScale`). Plate Rock (`plateRock`) and Evolve Speed (`automateRate`) run on to 3 now, so a Resolume slider rides them one to one up to their old top of 1 and never reaches the extreme third. A setting with another range gets the 0 to 1 number unscaled and clamped to its own range: Speed (`globalSpeed`, 0 to 0.3) reaches its top 30% of the way along the slider, and Macro Zoom (`macroZoom`, 1 to 16) stays at 1. Put those on MIDI learn until the server can scale another program's ranges (PLAN 34a-7i). None of this has been tried in Resolume itself yet: `docs/judging.md` §93 is the owner's sitting with it.
 
+## Song titles painted as ink
+
+**Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone, in
+the More sheet and on the remote's Controls) pours each new song's title and artist
+onto the plate as ink when the song is named, then washes it away. The ink is dye
+in the liquid itself, poured at the plate's full resolution, so it is on the wall,
+in a live stream and in every recording at once; nothing is drawn over the picture.
+What takes it away is a real flow: a drift across the plate and eddies a sixth of
+the plate wide that break the letters up, after a moment to read them. The dye
+stays on the plate afterwards as colour.
+
+- **Title ink**: the look's own first colour, or one you pick.
+- **Title Size**: from a small credit to the width of the plate. A long title shrinks to fit.
+- **Title Height**: where it lands, bottom to top.
+- **Title Sweep**: how hard the wash is. At the default the title reads for about
+  three seconds and is gone before twelve; at the top it is gone in two; near the
+  bottom it drifts, readable, for many seconds. Sweep, Size and Height are on MIDI.
+
+A song show's title card and sign-off, and words poured from the phone remote, the
+show server or the assistant in a live set, go through the same ink and wash.
+
 ## A logo that survives the plate
 
 Dropping an image into the liquid is the lovely thing to do with it — the dye

@@ -101,7 +101,7 @@ declare global {
     /** Stop the song's show. */
     chromaglassSongStop?: () => void;
     /** Pour rows of text onto the plate. */
-    chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string; columns?: [number, number] }) => unknown;
+    chromaglassPourText?: (rows: { text: string; weight?: number }[], opts?: { colour?: string }) => unknown;
     /** Start the bench (`npm run bench`). */
     chromaglassBench?: (opts?: BenchOptions) => void;
     /** The cast session as the show sees it. */
