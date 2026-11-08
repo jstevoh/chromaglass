@@ -410,7 +410,7 @@
     {
       "name": "A Canvas loop with no seam",
       "shard": "sound",
-      "run": "npm run loopseam -- --owed=picker",
+      "run": "npm run loopseam",
       "why": [
         "A Spotify Canvas loop is an edit of the finished film, never of the",
         "plate (PLAN 43b): the judge reads an MP4 (3 to 8 s, no audio track,",
@@ -2786,7 +2786,7 @@
     {
       "name": "The app renders a Canvas loop with no seam",
       "shard": "tools",
-      "run": "npm run loopseam -- --app --owed=loop",
+      "run": "npm run loopseam -- --app",
       "why": [
         "The app's own loop render (PLAN 43b), on a Mac because the app's",
         "frames only read back on a GPU, and on this shard because it fetches",

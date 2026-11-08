@@ -11443,3 +11443,44 @@ of the mutants added after a review pass found a desk move mid-glide overridden,
 reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
 main's relay taking an `assistant` hello as a phone's, with the switch off and from
 another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).
+
+## 43b. A seamless loop, for a Canvas (#693, 2026-11-07)
+
+A seamless loop for a Spotify Canvas, built as an edit of the finished film's frames with
+the plate shader and the solver untouched:
+
+- **Seam picker and crossfade weights (`src/lib/loopSeam.ts`).** Plain functions over small
+  grey frames (`Uint8Array`): `frameDistance(a, b)` returns the mean per-element `|a - b|`
+  (`0..255`) and throws on a length mismatch; `pickSeam(thumbs, loopFrames, fadeFrames)`
+  picks the earliest start `s` (`0 <= s <= n - loopFrames - fadeFrames`) with the least
+  `frameDistance(thumbs[s], thumbs[s + loopFrames])`, never picking a start whose fade runs
+  past the last frame and throwing when `n < loopFrames + fadeFrames`; `fadeWeight(t, fadeFrames)`
+  is `0` at `t = 0`, rises linearly (`t / fadeFrames`) to `1` at `t = fadeFrames`, stays `1`
+  past the fade, and returns `1` throughout when `fadeFrames === 0`. Helpers `rgbaToGrey`,
+  `blendRgba` and `pickLoudestWindow` support the two-pass render.
+- **Two-pass loop render (`src/app/loopRender.ts`, wired in `src/app/useSongRendering.ts` and `src/lib/checkHooks.ts`).**
+  Decodes the song and locates the loudest contiguous search window (`loopFrames` plus 2 s)
+  from the offline `SongEar` bands (§6) unless `startSec` is typed. Pass 1 lays the look on
+  `seed` on the fixed clock and steps the search window, keeping only a 64×64 grey thumbnail
+  (4 KB) per frame so `pickSeam` chooses `start`. Pass 2 resets the clock, seed, plate and
+  app state to the exact starting state of Pass 1, holds only the half-second fade's early
+  frames (`s .. s + fadeFrames - 1`), streams the middle frames (`s + fadeFrames .. s + loopFrames - 1`)
+  straight to the H.264 MP4 encoder with `audio: null`, and blends the held early frames with
+  the late frames (`s + loopFrames .. s + loopFrames + fadeFrames - 1`) at the end of the file.
+  `window.chromaglassRender` (`?debug`) accepts `loop: { seconds, crossfade, startSec }` and
+  returns `bytes` and `loop: { startFrame, seconds, distance }`; `crossfade: false` renders the
+  same pick and frames with no blend.
+- **Render panel (`src/components/RenderPanel.tsx`).** Adds a "Full song" / "Loop for a Canvas"
+  segmented choice, a 3 to 8 s loop length selector (default 8 s) and an optional start-time
+  field; the free site keeps its 720p cap and watermark.
+
+Measured: `npm run loopseam` 14/14 (`pickSeam` and `fadeWeight` on made-up frames, and the 6 s
+joined loop with seam 1.72 at 1.4x vs 50.87 at 41.7x without weights); `npm run loopseam -- --app`
+on the Mac (`apple metal-3`): 4 s loop renders 120 frames, 4.000 s, 0 audio tracks; seam 0.34
+against a median step of 0.41 (0.8x, bar 3x), first-to-middle 15.72 (38.3x, bar 4x); without
+crossfade fails the seam line at 22.11 against a median step of 0.36 (60.9x); both renders pick
+startFrame 225 and stay within 0.08 in the middle half against the 0.41 median step. The
+cut-inside line (`CUT_OVER_MEDIAN = 8`) reads 3.95 (9.6x of 0.41) on the unedited film's own
+kick beat at frame 90→91 (inside the crossfade the steps are 1.39..1.97, 3.4x..4.8x of the
+median; between kicks 80% of the frames drift at 0.26..0.41 while `BassPress` lurches 3.14..3.95
+on each 120 bpm kick of `songWav(14)`). Left open: 43b-2, 43b-3.

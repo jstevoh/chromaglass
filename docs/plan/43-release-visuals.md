@@ -69,29 +69,9 @@ nothing. A loop that needs less of a crossfade (a periodic stir locked to the ba
   *Measure:* a new check renders two seconds at 1080x1920 and reads back an MP4 of
   exactly that size whose plate reaches all four edges (no letterbox rows of black), on
   the Mac shard; `panel` for the new choice.
-- **43b. A seamless loop, for a Canvas.** *(M, in flight.)* A Loop length (3 to 8 s, default 8) in
-  Render: it renders the loop plus a search window, picks the pair of frames one loop
-  apart with the least difference, crossfades the film's last half second into its first,
-  and writes H.264 MP4 with no audio track, from the song's loudest stretch by the offline
-  bands (§6) unless a start is typed. In a module beside `useSongRendering.ts`, not in it.
-  *Measure:* `npm run loopseam`, **written 2026-11-07, owed until 43b ships**. Its judge
-  reads the finished MP4: 3 to 8 s, no audio track, it moves (first frame to the middle
-  more than 4 times the median step), and the seam (last frame to first) at most **3**
-  times the median frame-to-frame step, and no cut inside (no step over 8 times the
-  median, which a "crossfade" that switches at once fails), on frames shrunk to 16x16 grey. 3 and not the 1.5
-  first written here, measured on the check's made-up film: a loop whose seam is exactly
-  one step before encoding reads 1.7 to 2.0 times the median after H.264 at crf 18 and
-  2.6 at crf 23, because the codec's error is carried from frame to frame but not from
-  the last frame back to the first; a cut reads about 50 times. The judge is shown, on
-  films it makes with ffmpeg, to fail a cut, a hidden cut, a sound track, a 10 s loop and
-  a still picture, and runs now on ubuntu; `-- --file=x.mp4` judges any film (43c, 43f). Owed: `picker`, the node lines of
-  `src/lib/loopSeam.ts` (`frameDistance`, `pickSeam(thumbs, loopFrames, fadeFrames)`,
-  `fadeWeight(t, fadeFrames)`; the contract is the check's header) on made-up frames,
-  on ubuntu; and `loop`, on the Mac's `tools` shard, `window.chromaglassRender` with
-  `loop: { seconds, crossfade }` handing back the loop and its `startFrame`: a 4 s loop
-  with the crossfade passes the judge and lasts 4 s to a frame, the same pick without it
-  fails the seam line, and past the fade the two are one film. The PR that builds each
-  takes its id out of `--owed` in `scripts/checks.json`.
+- ~~**43b. A seamless loop, for a Canvas.**~~ **Shipped 2026-11-07** (`src/lib/loopSeam.ts`,
+  `src/app/loopRender.ts`, `RenderPanel.tsx`; `npm run loopseam` 14/14, `npm run loopseam -- --app`
+  3/4 on the Mac; story in [`docs/plan-shipped.md`](../plan-shipped.md) §43b).
   - **43b-3.** The crossfade's own frames step about 3.4 times the median on the made-up
     film (the fade carries the whole distance between the two picked frames across half
     a second), which the seam line does not see and the cut-inside line allows up to 8. If the picked pair on a real plate is far
