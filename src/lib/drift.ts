@@ -101,6 +101,9 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
   'plateRock', 'frameSway', 'beatSqueeze', 'beatAccent', 'kaleidoSpin', 'kaleidoZoom',
   'spinRpm', 'rotationSpeed', 'spinImpulse', 'spinWander', 'spinAudioDepth', 'spinDrag',
   'plateSpring', 'lampMotion', 'stockWeave',
+  // The liquid under the cover and the cover's weight (PLAN 38r-5) set the whole dish's gap as one,
+  // and a wander down either spills liquid over the rim for good: a hand's, never Evolve's.
+  'liquidMl', 'coverWeight',
 ]);
 /*
   And what Evolve does itself, so it does not also wander: the palette moves at

@@ -203,18 +203,21 @@ function hear(every = 1, silentAfter = Infinity) {
 const frames = hear();
 
 // On the frame: every kick the analyser heard is in Kick hit on its own frame, at its strength.
-const onTime = frames.filter((f) => f.r?.onsets.kick.hit);
-const late = onTime.filter((f) => f.kickHit + 1e-9 < f.r.onsets.kick.strength);
+// Kick hit follows the beat (the kick, or the band where no kick keeps time:
+// lib/pulseEar.ts), so "the kick" here is the reading's beat.
+const beatOf = (r) => r?.beat ?? r?.onsets.kick;
+const onTime = frames.filter((f) => beatOf(f.r)?.hit);
+const late = onTime.filter((f) => f.kickHit + 1e-9 < beatOf(f.r).strength);
 check('a kick is in Kick hit on the frame it is heard, at the strength the analyser gave it',
   onTime.length > 50 && late.length === 0, `${onTime.length} kicks, ${late.length} under their strength on their frame`);
 
 // And gone: 0.6 s after each kick with none in between, under a tenth of where it was.
 const lens = [];
 for (let i = 0; i < frames.length; i++) {
-  if (!frames[i].r?.onsets.kick.hit) continue;
+  if (!beatOf(frames[i].r)?.hit) continue;
   const at = frames[i].t, peak = frames[i].kickHit;
   const later = frames.find((f) => f.t >= at + 0.6);
-  const between = frames.filter((f) => f.t > at && f.t < at + 0.6).some((f) => f.r?.onsets.kick.hit);
+  const between = frames.filter((f) => f.t > at && f.t < at + 0.6).some((f) => beatOf(f.r)?.hit);
   if (later && !between && peak > 0.2) lens.push(later.kickHit / peak);
 }
 const drop = song.truth.sections.filter((s) => s.kind === 'drop');

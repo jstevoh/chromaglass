@@ -353,6 +353,25 @@
       ]
     },
     {
+      "name": "The beat without a kick drum",
+      "shard": "sound",
+      "run": "npm run pulse",
+      "why": [
+        "The beat (src/lib/pulseEar.ts, PLAN.md 30-pulse): a synthetic 78 (banjo,",
+        "tuba, voice and hiss through a recording horn's 170 Hz high-pass, no kick",
+        "drum) at 30 and 60 fps, where the kick alone hears almost none of the",
+        "band's beats and the beat, the beat clock and Kick hit hear 90% or more;",
+        "the same band without the horn, whose low chord fires the kick in runs",
+        "that must not take the beat away; a loop of sixteenth hats under a sparse",
+        "kick, whose beat must not strobe faster than 240 a minute and must stay",
+        "on the quarters; a drummed band, where every beat is a kick to the frame;",
+        "a soft cornet on every off-beat, which must not be taken for the beat (the",
+        "ear entrains to the band's period); a breakdown where the kick lays out and",
+        "comes back; and noise, a held chord and silence, which give no beat.",
+        "About 18 s."
+      ]
+    },
+    {
       "name": "The breakdown",
       "shard": "sound",
       "run": "npm run breakdown",
@@ -938,6 +957,22 @@
       ]
     },
     {
+      "name": "The moiré sheets are optics, and off is off",
+      "shard": "lab2",
+      "run": "npm run moire",
+      "why": [
+        "The moiré pack's two printed sheets (PLAN 45a), on the real plate",
+        "shader: every look without them draws byte for byte as a lab built",
+        "with their call taken out; two gratings beat at the difference of",
+        "their frequencies; two sheets pass the product of their",
+        "transmissions; a sheet finer than the pixels is flat grey, no false",
+        "moiré; the gap defocuses the lines and keeps the fringe; the liquid",
+        "bends the lower sheet and not the upper; the spin's clock and the",
+        "Turn are one angle. On SwiftShader beside lampzero, which compares two",
+        "compiled programs the same way and for the same reason."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",
@@ -1070,13 +1105,30 @@
     {
       "name": "The frame reads back what the solver wrote, once",
       "shard": "lab",
-      "run": "npm run framereads",
+      "run": "npm run framereads -- --owed=h2c6,h2c7,h2c9",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "The fields are read back only after a submit that may have written them, and a",
         "readback is handed out once (PLAN.md 14ab-3, scripts/framereads.mjs); thick",
         "liquid's share reads into one kept buffer to the same number (14ab-9). Logic",
-        "and counts, the same on any adapter that computes."
+        "and counts, the same on any adapter that computes. And three owed lines",
+        "(scripts/framereads-owed.mjs, 2026-11-07), each with controls that hold on",
+        "main: H2c-7's readback straight into its ring, H2c-6's one display target",
+        "with the camera off and H2c-9's pack only after a step, the last two on a",
+        "plate kept across frames (scripts/lab-plateframes.ts). About half a minute",
+        "more under SwiftShader, the kept plate drawn at 72²."
+      ]
+    },
+    {
+      "name": "GPU timings land on the pass that took them",
+      "shard": "logic",
+      "run": "npm run timelabels -- --owed=labels",
+      "why": [
+        "H2c-labels (scripts/timelabels.mjs): the real GpuProfiler on a stand-in GPU",
+        "whose mappings land 0 to 3 frames late, and once with the ring full, a",
+        "constant time a pass, the camera on at frame 100 and off at 110. The control (every label its own",
+        "time while the passes are unchanged) holds on main; the line that each time",
+        "lands on its own pass when they change is owed until the build."
       ]
     },
     {
@@ -1420,6 +1472,21 @@
         "on a phone in portrait and two landscapes, More → Feedback fits with",
         "nothing covered, 16 px type (13 px was found in every landscape) and",
         "48 px topics; and the phone's Settings strip ends in it too."
+      ]
+    },
+    {
+      "name": "The looks browser: stills and one preview, owed",
+      "shard": "browser",
+      "run": "npm run looksgrid -- --owed=stills,preview",
+      "why": [
+        "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
+        "look's card on the Perform desk's grid, the narrow window's look menu and the",
+        "phone's Looks sheet draws one lazy still of its own, a small WebP from the",
+        "built site, the same file on all three, none flat and no two alike (34b-1);",
+        "and only the hovered or held card holds a preview canvas, one at a time,",
+        "gone once it is left (34b-2). Headless with no WebGPU, so the page answers",
+        "at once; the site \"The load\" just built. --owed: each line is excused only",
+        "in main's state; the PR that builds it takes its id out. About 20 s."
       ]
     },
     {
@@ -2478,6 +2545,19 @@
       ]
     },
     {
+      "name": "The looks browser leaves the plate its steps, owed",
+      "shard": "tools",
+      "run": "npm run looksgrid -- --budget --owed=budget",
+      "why": [
+        "PLAN 34b-2 on Metal (scripts/looksgrid.mjs --budget): a hovered card's",
+        "preview plays, and the show's plate steps meanwhile at 0.95 or more of its",
+        "rate with the grid shut. A real GPU's line: SwiftShader gives the page",
+        "a frame every few seconds, so neither half can be read in Measure.",
+        "--owed=budget is excused only while no card holds a preview; the PR that",
+        "builds it takes the id out. About 40 s."
+      ]
+    },
+    {
       "name": "Roy opens as a panel",
       "shard": "open",
       "run": "npm run royopen",
@@ -2548,9 +2628,15 @@
       "name": "Preview's copy, with frames",
       "shard": "open",
       "run": "node scripts/draftwall.mjs --frames",
+      "timeout": 3,
       "why": [
         "Preview's copy again (see Measure's), here with frames: the projector",
-        "window is painted from the wall's canvas and never the copy's."
+        "window is painted from the wall's canvas and never the copy's.",
+        "Three minutes (PLAN 19k-14): it runs 25 to 37 s on GitHub's Macs, and",
+        "on #690's second run it hung after 'and the copy stays up for the next",
+        "look' for 12:07, until the job was cancelled and the five checks after",
+        "it never ran. Bounded, a hang is this check red by name and the rest",
+        "of the shard still runs; why it hung is 19k-14's."
       ]
     },
     {
@@ -2668,8 +2754,9 @@
         "The Turing pattern (PLAN 26): one stripe width on every rung, carried",
         "with the colour and healed after a stir, grown only where it is fed,",
         "and Turing Print black on white where the reaction is, not piling up.",
-        "The lab only; five or six minutes on SwiftShader, so on a Mac rather",
-        "than in Measure, and on the fifth shard (PLAN.md 19w; it went to show",
+        "The lab only; about fifteen minutes on SwiftShader (the held-corner",
+        "lines, PLAN 26d-6a), so on a Mac rather than in Measure, and on the",
+        "fifth shard (PLAN.md 19w; it went to show",
         "first, which had the most room then, 13.2 against open's 16.8 on #331's run)."
       ]
     },
