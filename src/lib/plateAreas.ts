@@ -44,6 +44,7 @@
  * in the same order.
  */
 import type { Rng } from './rng';
+import { MOIRE_LOOKS } from '../presetsMoire';
 
 /** Which of the music's hands land in an area. `any` takes whatever no area claims. */
 export type AreaBand = 'bass' | 'mid' | 'treble' | 'any';
@@ -216,6 +217,10 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.5, y: 0.7, r: 0.12, liquid: 'activator', dye: 2, dyes: [2], band: 'bass' },
   ],
 };
+
+// A look of the moiré pack has its house look's areas, as it has its dyes
+// and its dish (presetPlate.ts, PLAN 45a): its cords are the house look's.
+for (const m of MOIRE_LOOKS) if (PRESET_AREAS[m.from]) PRESET_AREAS[m.id] = PRESET_AREAS[m.from];
 
 /**
  * Looks whose areas take the music and the area cords but whose plate is laid

@@ -7005,6 +7005,27 @@ Checks. `panel` asks each pair from both ends (the home there, the copy gone), i
 main's components, 264/264 after (two more for the leftovers); the no-controller check that asked for the Rides' button now asks
 for the MIDI light's words and no second route.
 
+### 35c-6. The Recipe a strip of its own, and the Rides shown whole (shipped 2026-11-07)
+
+The owner, 2026-11-07: "where is the macro zoom control? and the recipe box only has two
+controls? lets fix that." Neither had been deleted. 35c-4's rule (one control, one place on a
+tab, the Rides keep theirs) was right, but six of the Recipe's eight (Speed, Turbulence, Soap
+Bursts, Beat Squeeze, Macro Zoom, Evolve Speed) were rides too, so on the Perform tab that ships
+the Recipe drew Swirl and Gravity and a line saying where the rest were. Macro Zoom's one copy
+was the seventh of the Rides, which on Perform sit under the Bottles: at 1440×900 the right
+column left them room for three of their 88 px two-line rows, and the strip scrolled with its
+scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off the right of the deck.
+
+- The Recipe keeps the owner's eight and adds six look-building controls no ride and no panel on
+  Perform's deck has: Oil Tension, Bubbles, Saturation, Iridescence, Lamp Warmth, Hue Journey
+  (`DEFAULT_RECIPE`, 14; `MAX_PINS` 14 → 16 so the shipped strip still takes a pick). The old eight read as the default, so a strip saved as
+  them gets the new one. `npm run desklayout`: the Recipe draws 8 of its own on Perform (2 before).
+- The owner chose denser faders (of: a zoom on the plate bar, Macro Zoom to the top of the Rides,
+  denser faders). The Rides are one line each (`Slider dense`: name, travel, value; 24 px rows on
+  an 18 px handle; full rows still on touch), and Choose shares the bottom row with Mixer and
+  Drain. `npm run layout`: every ride shows whole, Macro Zoom among them, at 1440×900 (3 of 8
+  before) and 1512×860 (2 of 8 before).
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
@@ -11646,6 +11667,55 @@ the dish's glycerine. Now one predicate, `pastOpenRim` in `wgsl/fluid/shared.ts`
 rim, the species' and the colour's, and the colour's spreading stops at the same edge
 (dyeDisperse). `PW_WEBGPU=1 npm run flush`: glycerine left 0.759 → 0.751 (the volume says 0.750),
 the colour 0.776 → 0.750, the full dish 1.002 → 0.997 of its area; 9/9, no bar moved.
+
+## 38r-5. The liquid's amount sets the gap, part 1 (2026-11-07)
+
+Asked by the owner on 2026-10-31: "Should the plate gap be more related to liquid content? Do
+we ever really figure out how much liquid is on the plate?" We did not: the gap was a constant
+2 mm, a pour was a source that left over the open rim, and nothing totalled the liquid.
+
+The physics, worked out in the design thread and checked here. A flat glass on liquid has no
+height of its own: its weight (5 kg/m², 49 Pa) would squeeze any film to nothing by Stefan's
+law. What holds it is the meniscus pinned at its square edge, which by Gibbs's inequality can
+bulge until its angle passes θ + 90°, so it holds up to 2σ sinθ/h: 62 Pa at 2 mm for water on
+an oiled glass (θ 60°), enough for the default glass, so the default plate keeps its 2 mm.
+Past h_hold = 2σ sinθ/(w g) (2.54 mm of water) the glass sinks at
+dh/dt = −(2/3)h³(P − P_hold)/(μR²). The first brief guessed seconds to minutes; it is 26 ms
+to half-settled for water and half a second for the thick carrier.
+
+What changed. `lib/cover.ts`: the ledger and the glass, with the settle solved exactly
+(separated, F(h) = 1/(ch) + (P/c²) ln(P − c/h) falls by kt, bisected) so no step size can
+overshoot h_hold. `gpu/fluid/cover.ts`: a solver layer (the gap's shape moved out of
+`fluid.ts`'s squeeze stage first, a pure move) that steps it before `writeSim`, packs
+`S.cover` into the uniform's padding slot 51, and shifts the gap field when the cover moves,
+with the solve left primed, so `hsDivergence` turns a rising glass into liquid drawn in at the
+rim and a settling one into liquid pushed out over it. The dome is now added to the cover's
+height rather than scaled by the rest number (the same at the default). Pours add their volume
+at the live gap. The readers that were worked out at 2 mm take the cover: the Darcy speeds
+(colour's fall, oil's lift, oil's pull) by (h/h₀)², the breath, the glass's drag, the slump,
+hsPrep's hand forcing, a pour's share, the plate rock's cover drag (with the Cover Weight's own
+mass) and the spin's drag time. Two dials, Liquid 9–150 mL (62.83 default) and Cover Weight
+0–1000 g (157.08 default), on the sheet, the desks, MIDI and the phone's remote.
+
+Measured: `npm run gap` 11 → 18 lines, all ok; the settle against an RK4 of the ODE to 1e-4
+at five times for water and thick; a 4 mL pour raises the glass 127.3 µm (Q/A) and spills
+nothing; 20 mL more settles it to h_hold with the bead full and 3.34 mL run off, the ledger
+to 1e-12. Left: 38r-16 (the pinch and the air edge), 38r-17, 38r-18, 38r-19, 38r-20.
+
+The floating glass broke two things `npm run flush` caught. Its lines assume the gap is
+h₀ everywhere, and a pour now lifts the glass by Q/A: the ring at r was pushed by
+Q(1 − r²/R²) (0.856 of V/π) and a quarter of the dish of water flushed 1.4% of the
+glycerine, not 25%. Its glass is now the one the edge holds at exactly 2 mm (189 g at
+Thickness 0.45), it waits out the Stefan settle (435 steps, from the lib's own
+`stefanSettle`), and it counts each pour at the gap the glass stood at
+(`lab.coverMetres`). That found the second: the species' splat added a share f of a
+rest-gap column where the column is as tall as the glass stands, so glycerine poured
+under a lifted glass was 3.4% short (0.9675); it adds f·g/h₀ now, as the thin solve's
+source and the ledger do (`wgsl/fluid/splats.ts`), 0.9991. The glycerine flush is a
+fifth of the dish, not a quarter: water fingering into glycerine (Saffman–Taylor) ran
+on through the seven-second settle and reached 0.8–0.9 of the radius, so water left
+with the glycerine (0.739 against 0.724); the line now also checks no water got there
+(0.974 of the column at the least). No bar moved.
 
 ## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 

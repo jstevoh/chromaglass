@@ -126,10 +126,11 @@ export const HELD_POUR = 0.5e-6;
  * disc's area times the rest gap (lib/turntable.ts DISH_GAP_METRES). Without, a one-shot dose (a drop
  * that falls, the automation's): `amount` is the share, as the body's is.
  */
-export function pourShare(radius: number, amount: number, seconds?: number): number {
+export function pourShare(radius: number, amount: number, seconds?: number, gap = DISH_GAP_METRES): number {
   if (!(amount > 0)) return 0;
   if (seconds === undefined) return Math.min(1, amount);
   const r = radius * DISH_METRES;
-  const dome = (Math.PI * r * r) / 2 * DISH_GAP_METRES;
+  // At the cover's live gap (PLAN 38r-5): the same mL is less of a deep column.
+  const dome = (Math.PI * r * r) / 2 * gap;
   return Math.min(1, (amount * HELD_POUR * Math.max(0, seconds)) / dome);
 }

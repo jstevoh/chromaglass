@@ -11,6 +11,7 @@
  */
 import { DEFAULT_LIQUID_TYPES } from './types';
 import type { PhasePourShape } from './lib/phasePour';
+import { MOIRE_LOOKS } from './presetsMoire';
 
 // ─── Palette contracts ───────────────────────────────────────────────
 // Each preset names the palette indices it may use; seeding, automation,
@@ -270,3 +271,27 @@ export const LIQUIDS_BY_ID = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l]));
  * of a real one and is scaled again by whatever headroom the plate has left.
  */
 export const AUTO_DOSE = 0.35;
+
+/*
+  A look of the moiré pack (presetsMoire.ts, PLAN 45a) is a house look with
+  two printed sheets on the stage: the sheets are on the lamp's side of the
+  glass, and the plate under them is the house look's, poured the same way.
+  So its dyes, its pours, its dish and its ferrofluid's pour are its house
+  look's, entered here under its own id, because every reader (the seed, the
+  automation, the bottles, `npm run plate`) looks a look up by the id it has.
+  Copied rather than written out again so the two cannot drift: retune Clock
+  Glass's oils and Moiré Ripple's follow.
+*/
+const MOIRE_BASE: ReadonlyMap<string, string> = new Map(MOIRE_LOOKS.map(m => [m.id, m.from]));
+for (const [id, from] of MOIRE_BASE) {
+  for (const table of [PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR] as Record<string, unknown>[]) {
+    if (table[from] !== undefined) table[id] = table[from];
+  }
+}
+
+/**
+ * The look whose plate a look lays: its house look for one of the moiré pack,
+ * otherwise itself. The dye's seed (seedPreset) is written per house look, a
+ * case for each, so a pack's look seeds as its house look does.
+ */
+export const plateLook = (id: string): string => MOIRE_BASE.get(id) ?? id;
