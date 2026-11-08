@@ -167,6 +167,21 @@
       ]
     },
     {
+      "name": "What the clear controls left, owed",
+      "shard": "logic",
+      "run": "npm run clearleft -- --owed=pace,spin,tray,dimmed",
+      "why": [
+        "PLAN 35a-2, 35d-2, 35f-2, 35g-2 written ahead of their build (scripts/clearleft.mjs):",
+        "the remote's Speed and Evolve Speed draw the snail and hare, Auto Spin and",
+        "Spin Direction are picked from their named answers and not a stepped slider",
+        "(Settings and the remote), the remote's looks and cue strip and the Sequencer's",
+        "stages draw a look's slide mount, and the phone's Show, Evolve and Spin rows",
+        "say off by disabled rather than half opacity. Read from the source, as states",
+        "is. --owed: each line is excused only in main's state; the PR that builds it",
+        "takes its id out. A second, no browser."
+      ]
+    },
+    {
       "name": "The check-change guard",
       "shard": "logic",
       "run": "npm run checkguard",
@@ -230,6 +245,19 @@
         "request, pull_request_target, workflow_run, a schedule, another workflow",
         "on main and another repository refused. And the watchdog's stall rule",
         "(scripts/macwatch.mjs) against made-up runs, between two shards included."
+      ]
+    },
+    {
+      "name": "Two runners on one Mac never share a harness port",
+      "shard": "logic",
+      "run": "npm run ports",
+      "always": true,
+      "why": [
+        "Every harness asks scripts/ports.mjs for its port (PLAN.md 19ah-6), which moves it by its runner's",
+        "block (HARNESS_PORT_SHIFT), so two shards on the owner's Mac at once never meet on one. Reads every",
+        "script, so it runs on every diff: a new harness with a bare port fails it. Holds that the blocks cannot",
+        "overlap or reach macOS's own ports, refuses a mistyped shift, and listens twice on one harness's port",
+        "from two blocks (both serve) and from one (the second is refused, the control)."
       ]
     },
     {
@@ -574,6 +602,19 @@
         "and useGamepad's timers with no pad, the real hook on a stand-in React",
         "(14j-gamepad). Both owed until their builds; the visible fade's line holds",
         "on main and keeps a pump from doubling a fade's writes."
+      ]
+    },
+    {
+      "name": "Three sound builds, their checks written first",
+      "shard": "logic",
+      "run": "npm run soundowed -- --owed=pc,voices,lfo",
+      "why": [
+        "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
+        "notes as voices placed by Melody Walk's scale with an attack, a release",
+        "and a voice cap (24.3), and LFOs and envelopes you set (30b), each a",
+        "library contract named in the script's header. Owed until each build;",
+        "the PR that builds one takes its id out. Two lines hold on main: Bank",
+        "Select stays a CC, and today's LFOs and envelopes stay the defaults."
       ]
     },
     {
@@ -1122,6 +1163,22 @@
         "WebGPU (cloud, 2026-10-31), so on Linux's lab shards rather than a Mac's.",
         "In lab3 since #658: its 3:40 in lab put that part past its 25 minutes on",
         "main's merge of #646 (cancelled twice in holeline, after it); lab3 ran 11."
+      ]
+    },
+    {
+      "name": "The dials held in the plate shader reach their tops, owed",
+      "shard": "lab4",
+      "run": "npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-3 written ahead of its build (scripts/shaderdials.mjs): Micro-Droplets,",
+        "Plate Cells, Glossiness, Boundary Glow and Gate Edge each run to their new top",
+        "(2, 1.4, 2, 2, 2) in the one range, the uniform does not clamp them to the old",
+        "one, no look moves, and in the lab the last quarter of each range still changes",
+        "the picture by a quarter of what the first does (Gate Edge, in the post chain the",
+        "lab does not draw, by its shader's mix held at 1 and its width growing). --owed:",
+        "each line is excused only in main's state; the PR that builds it takes its id",
+        "out. About a minute on SwiftShader (cloud, 2026-11-07), in lab4 beside holeline."
       ]
     },
     {
@@ -1777,11 +1834,17 @@
     },
     {
       "name": "A drop slumps under its own weight",
-      "shard": "plate",
-      "run": "npm run slump",
+      "shard": "tools",
+      "run": "npm run slump -- --owed=front",
       "why": [
         "A drop of ink on a level plate slumps out along the lower glass as a",
-        "viscous gravity current, its front where Huppert's law puts it (PLAN 18m)."
+        "viscous gravity current, its front where Huppert's law puts it (PLAN 18m).",
+        "On tools since 18m-5a, which runs it with the grid filter on and adds a",
+        "glycerine run without it (55 s on Metal): on #498 plate was killed at its",
+        "20 minutes twice, in ferro.mjs, with every check before it passed, where",
+        "tools ran in 14. 14b (the filter does not move the front) is owed to",
+        "PLAN 18m-5c: in the 2 mm gap main's filter moves the glycerine drop's 2%",
+        "front 0.36 mm in 20 s."
       ]
     },
     {
@@ -2402,13 +2465,16 @@
     {
       "name": "The Ben-Day print",
       "shard": "tools",
-      "run": "npm run benday",
+      "run": "npm run benday -- --owed=back",
       "why": [
         "Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to",
         "the screen, a pool one flat ink outlined in black, and only Roy prints.",
         "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
         "2026-10-26 against its 20, and #502's was stopped there with one check left;",
-        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
+        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14.",
+        "--owed=back: a second plate's pool outlined as the front's is (PLAN 21b),",
+        "excused only in main's state (the back printed, not outlined); the PR that",
+        "builds it takes the id out"
       ]
     },
     {

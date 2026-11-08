@@ -2410,3 +2410,19 @@ or blue look, Clear Film about 0.35 (tears over the dust in a second or two), Fi
 5. Bad: the holes tinted, the lace flat (one yellow regardless of thickness), or the plate
    changing when Film Dye is 0.
 
+## 110. A tab made on the laptop is on the phone (PLAN 8-tabs-a)
+
+Signed in to the Pro account on two devices (the laptop and the Mac app, or the phone):
+
+1. On the laptop, press the pencil beside the tabs, rename Setup to the venue's name, move it first, and add a tab
+   with a panel or two on it.
+2. On the second device, press *Sync now* in Profile & Store (or wait a minute). The chips are the same, in the same
+   order, with the same panels. The tab that was up on each device is still the one that was up.
+3. On the phone: More › Tabs shows the same list.
+4. On the laptop, "Put the shipped tabs back": the other device is back to Perform, Sequence, Setup.
+5. Joining: on a device that has never synced and already has a renamed or added tab, sign in to an account whose
+   tabs were made on another. Both devices end with both sets of tabs; a tab renamed on both shows twice, one marked
+   "(here)", to delete.
+
+Bad: a tab that comes back after being deleted, the other device jumping to another tab while it is in use, or the
+plate stuttering when the list lands mid-show.

@@ -18,7 +18,7 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { execSync, spawn } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -35,7 +35,7 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const PORT = 5294;
+const PORT = port(5294);
 const DIST = resolve(process.env.TIERS_DIST ?? 'dist-tiers');
 const tempDir = mkdtempSync(join(tmpdir(), 'cg-tiers-'));
 const licenseFile = join(tempDir, 'license.json');
