@@ -218,8 +218,8 @@ if (process.argv.includes('--node')) {
   // #575 was carried onto main (2026-11-07), so each was a 4x plate under a
   // 1.0x Macro Zoom, and lit by the flag, so a zoom set by the slider left it
   // dark. Asked of each hand where it stands (its lit state and its press
-  // together), not as a word anywhere in its file, since App.tsx holds two of
-  // them; and across src, nothing writes macroMode but true, false or the zoom.
+  // together), not as a word anywhere in its file, since App.tsx holds M and
+  // places the rail's; and across src, nothing writes macroMode but true, false or the zoom.
   {
     const { readdirSync, readFileSync, statSync } = await import('node:fs');
     const { join } = await import('node:path');
@@ -228,7 +228,8 @@ if (process.argv.includes('--node')) {
     const hands = [
       ['the desk\'s Close-up', 'src/components/desk/DeskPanels.tsx', /pressed=\{macroZoomOf\(p\.settings\) > 1\.05\}[\s\S]{0,200}onClick=\{\(\) => p\.onSetting\(closeupToggle\(p\.settings\)\)\}/],
       ['M', 'src/App.tsx', /case 'macro-toggle':[\s\S]{0,300}updateSettings\(closeupToggle\(settingsRef\.current\)\)/],
-      ['the side rail', 'src/App.tsx', /aria-pressed=\{macroZoomOf\(settings\) > 1\.05\}[\s\S]{0,200}onClick=\{\(\) => updateSettings\(closeupToggle\(settings\)\)\}[\s\S]{0,200}macroZoomOf\(settings\) > 1\.05 \? LIT/],
+      ['the side rail', 'src/components/CloseupRailButton.tsx', /const on = macroZoomOf\(settings\) > 1\.05;[\s\S]{0,60}aria-pressed=\{on\}\s*onClick=\{\(\) => onSetting\(closeupToggle\(settings\)\)\}[\s\S]{0,200}on \? LIT/],
+      ['the side rail, on the rail', 'src/App.tsx', /<CloseupRailButton settings=\{settings\} onSetting=\{updateSettings\} \/>/],
       ['the phone\'s switch', 'src/components/RemoteControl.tsx', /const closeupIn = !!settings && macroZoomOf\(settings as VisualizerSettings\) > 1\.05;[\s\S]*aria-checked=\{closeupIn\}\s*onClick=\{\(\) => settings && patch\(closeupToggle\(settings as VisualizerSettings\)\)\}[\s\S]{0,600}<SwitchPill on=\{closeupIn\} \/>/],
       ['the palette', 'src/app/useCommandPalette.ts', /name: macroZoomOf\(settings\) > 1\.05 \? 'Leave the closeup' : 'Macro closeup', kind: 'Actions', run: \(\) => updateSettings\(closeupToggle\(settings\)\)/],
     ];

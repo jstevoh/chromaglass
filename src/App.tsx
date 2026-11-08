@@ -6,7 +6,8 @@ import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVis
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
 import { arrowAim, holdWhereItIs, shotLabel } from './lib/macroCamera';
-import { closeupToggle, macroZoomOf } from './sim/constants';
+import { closeupToggle } from './sim/constants';
+import { CloseupRailButton } from './components/CloseupRailButton';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -2930,19 +2931,7 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Macro closeup */}
-                <button
-                  aria-pressed={macroZoomOf(settings) > 1.05}
-                  // The same press as the desk's Close-up and M (closeupToggle, PLAN QA-32).
-                  onClick={() => updateSettings(closeupToggle(settings))}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    macroZoomOf(settings) > 1.05 ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Macro closeup — magnify the plate and chase a single bead of liquid"
-                >
-                  <Microscope size={16} className={macroZoomOf(settings) > 1.05 ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
-                </button>
+                <CloseupRailButton settings={settings} onSetting={updateSettings} />
 
                 {/* Settings */}
                 <button
