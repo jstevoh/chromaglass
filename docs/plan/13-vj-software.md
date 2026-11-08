@@ -155,11 +155,15 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      `plugin/dawbridge/` in JUCE 8, an AU and VST3 effect with `DawBridgeSelfTest`;
      `auval` passes and `npm run dawbridge -- --plugin` is 36 of 36 there. Story in
      `docs/plan-shipped.md` §13.7b.
-   - **13.7b-film** (owed): film an automation lane in Live driving the plate through
-     the plugin, beside the plate. The Allow for Live was declined on 2026-11-07 while
-     the owner was away, so the plugin's own self-test host was filmed instead (the plugin
-     driving Plate Rock 0 to 1 three times); the owner's Mac has no Logic, so Logic waits
-     for 13.7c's sitting.
+   - ~~**13.7b-film**~~ (shipped 2026-11-08): filmed in Ableton Live on the owner's Mac,
+     Slot 4 driving Plate Rock with the tempo locked to Live. Story in
+     `docs/plan-shipped.md` §13.7b. Logic waits for 13.7c's sitting (no Logic on that Mac).
+   - **13.7b-hostfirst** (found filming 13.7b-film, in 13.7a's server on #694): the show
+     server follows the first bridge instance that says hello and ignores every other
+     until that one says bye or goes quiet. A playing Live never goes quiet (hello once a
+     second), so a second instance (the self-test host, a second DAW, a second track) is
+     dropped without a word. Show which instance is followed in the More sheet's bridge
+     row and give a way to switch to another one, on the desk and the phone.
    - **13.7b-ahead** (found building 13.7b): the transport's `ahead` comes from the host's
      own host-time stamp, which Live and Logic fill but other hosts may not (it is then
      0 and the app's clock carries the latency alone). Measure `ahead` and the host's

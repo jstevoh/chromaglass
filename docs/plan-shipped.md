@@ -575,8 +575,17 @@ dawbridge -- --plugin` against 13.7a's server and app: 36 of 36, the header at p
 packets with no gap; slot 3 moved 750 times from 0.000 to 1.000. Filmed on the owner's Mac
 in headed Metal Chromium against #694's show server: the self-test played three times, slot 4
 mapped to Plate Rock, and Plate Rock read 0.04, 0.31, 0.89, 1.00 through each 4 s run with the
-tempo source on `daw` (32 s film, shared with the owner). The film in Live is owed
-(13.7b-film): the Allow for Live was declined while the owner was away.
+tempo source on `daw` (32 s film, shared with the owner).
+
+**13.7b-film (2026-11-08).** Filmed inside Ableton Live on the owner's Mac. The owner put
+the VST3 on a track, and Live listed it only after the owner turned on Audio Units and VST3
+System Folders in Settings > Plug-Ins and rescanned (Live had 0 plug-ins in its database).
+The owner played Live and turned Slot 4 while the page filmed. The show server followed host
+"Ableton Live" at 48 kHz; the page got about 86 `daw-transport` messages a second (playing,
+120 bpm, 4/4) and its tempo source read `daw`; Plate Rock went from 0.01 to 0.54 over 144
+samples across 40 s, following the knob (40 s film, shared with the owner). An earlier take
+with only an automation lane moved nothing (no `daw-slot` arrived), so the lane was not on
+Slot 4 or its automation was off. That was the lane's setup, not the plugin.
 
 ### 13.5-link. Ableton Link in (2026-10-30)
 
@@ -10287,6 +10296,24 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   --frames` hung 12 minutes on #690's second run (19k-14); its entry got a 3-minute timeout.
 
 ### 21. Looks after painters
+
+#### 19k-15. The ear behind the wall: a tick in the wall's stall
+
+- **19k-15** (E, S): **shipped** (2026-11-08). `npm run ears`'s line "and it hears on the
+  wall's asks, one a frame, not on its own frames or the tick" went red on GitHub's Macs on two
+  unrelated PRs the same morning: #718 `44 ask, 0 frame, 1 tick, over 45 frames asked for`, #734
+  `65 ask, 0 frame, 1 tick, over 66`. Both runs were hosted Macs (MacCloud, westus), not the
+  owner's; the wall's popup drew 22 and 33 frames a second there. The clock lets the tick read
+  once the wall's asks have stopped for EAR_ASK_HOLD_MS (250 ms, `src/lib/earClock.ts`), and a
+  window drawing 22 a second has such gaps; asks plus ticks matched the frames drawn both times,
+  so nothing read twice. The line wanted no tick at all, which measured the runner. Now each tick
+  in the window is held to the last ask before it, each on its own, and must land more than
+  250 ms after it (the visible lines' `placed` rule, the 250 written in the check, not
+  imported), the clock's record has to agree with its tick count, and asks plus ticks must match
+  the frames drawn within 2. A tick running beside the asks lands within 16 ms of one and fails as
+  before. Cloud run: `26/26 checks passed` (121 ask, 0 frame, 0 tick, over 121). Found along the
+  way: 19k-16 (`draftwall --frames` painted 0 on #734's run), with the line printing what the
+  projector window says of itself.
 
 #### 21. Looks after painters (found along the way, for §14b)
 

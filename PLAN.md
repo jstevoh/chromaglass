@@ -259,7 +259,7 @@ style (§31).
   its check shipped 2026-11-07; then 13.7a the app's half, ~~13.7b~~ the plugin (shipped 2026-11-07), 13.7c signing; its
   MIDI route written up with 13.4); **13.8** the native renderer core only when the owner asks.
 - **7.3** Many plates (§16): **16d** (after 2.3), **16e**, then **R2**, **R5**, **R4**.
-- **7.4** **§17** hear the set ahead (after 1.7). **R6** watching a real rig. **H4**, **H5**.
+- **7.4** **§17** hear the set ahead (after 1.7): the spec and its owed check `hearahead` written 2026-11-08; **17a–17f** one Antigravity brief, then **17g** (its desk and phone check first), **17h**. **R6** watching a real rig. **H4**, **H5**.
 - **7.5** Accounts first (the owner, 2026-10-11, ahead of Wave 1): **23.9** and **23.13**
   *(owner)*, **23.10**, then **23.14** (after #380), **23.12**, **23.11**, **23.15**.
   Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
@@ -386,11 +386,11 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 15 | Every tool on every liquid | [`15-tools-on-liquids.md`](docs/plan/15-tools-on-liquids.md) | 15a–15h | 23 |
 |  | (continued) | [`15-tools-on-liquids-2.md`](docs/plan/15-tools-on-liquids-2.md) | 15k | 2 |
 | 16 | Many plates: each projector its own source (rig-plan R1) | [`16-many-plates.md`](docs/plan/16-many-plates.md) |  | 6 |
-| 17 | Hear the set ahead, from files | [`17-hear-ahead.md`](docs/plan/17-hear-ahead.md) |  | 3 |
+| 17 | Hear the set ahead, from files | [`17-hear-ahead.md`](docs/plan/17-hear-ahead.md) | 17a–17h | 13 |
 | 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 24 |
 |  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 28 |
 |  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
-| 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-14 | 19 |
+| 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-16 | 19 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
 |  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-7 | 22 |
 | 20 | Lace and holes: a pale film torn open over colour | [`20-lace-and-holes.md`](docs/plan/20-lace-and-holes.md) |  | 18 |
