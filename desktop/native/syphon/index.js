@@ -120,6 +120,7 @@ export function createSyphonController({ BrowserWindow, ipcMain, Menu, MessageCh
       if (syphonWindow && !syphonWindow.isDestroyed()) {
         try {
           syphonWindow.webContents.send('chromaglass:syphon-ask', true);
+          syphonWindow.webContents.invalidate();
         } catch { /* ignore */ }
       }
     } else {

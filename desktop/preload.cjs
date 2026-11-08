@@ -91,6 +91,8 @@ function drawSyphonLatest() {
   if (syphonCtx) {
     if (syphonLatestBmp && syphonNeedsBlit) {
       syphonCtx.drawImage(syphonLatestBmp, 0, 0);
+      try { syphonLatestBmp.close(); } catch { /* ignore */ }
+      syphonLatestBmp = null;
       syphonNeedsBlit = false;
     }
     // Toggle 1 LSB on a 1x1 pixel with opaque colour so the 8-bit offscreen
