@@ -557,3 +557,6 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   `here`, once a session has timed the lab checks on software WebGPU.
 - **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
   children run as a first attempt (docs/plan-shipped.md, 19ak).
+- **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
+  retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
+  GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).
