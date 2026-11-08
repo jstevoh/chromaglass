@@ -188,6 +188,53 @@ try {
     inPerform !== null && inDesign !== null && back !== null && drift <= 1,
     `perform ${inPerform}, setup ${inDesign}, back ${back} — ${drift}px`);
 
+  // ── The Rides show whole under the Bottles ─────────────────────
+  /*
+    The owner (2026-11-07): "where is the macro zoom control?" It was the
+    seventh of the Rides, which on the Perform tab sit under the Bottles; at
+    1440×900 the right column left them room for three of their two-line rows
+    and the strip scrolled with its scrollbar hidden, so Macro Zoom was on the
+    page and nowhere anyone could see it. The owner chose denser faders. What
+    is asked is the feature, not a pixel: at a laptop's 1440×900 and a smaller
+    1512×860, every ride's row lies wholly inside what its scrolling ancestors
+    show, unscrolled, and Macro Zoom is one of them. The build before the fix
+    showed 3 of 8 and 2 of 8.
+  */
+  for (const [w, h] of [[1440, 900], [1512, 860]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await settle(800);
+    const r = await page.evaluate(() => {
+      const strip = document.querySelector('[data-testid="rides"]');
+      if (!strip) return null;
+      const rows = [...strip.querySelectorAll('[data-testid^="ride-"]')].filter(e => e.getAttribute('data-testid') !== 'ride-pick');
+      if (!rows.length) return { rows: 0, seen: [] };
+      /*
+        From the rows' own box up, so the strip's scroller counts (the
+        Choose, Mixer and Drain row is pinned under it, inside the strip),
+        and every scroller is put back to its top first: what is asked is
+        what shows without anyone scrolling.
+      */
+      let top = 0, bottom = innerHeight;
+      for (let e = rows[0].parentElement; e; e = e.parentElement) {
+        if (getComputedStyle(e).overflowY === 'visible') continue;
+        e.scrollTop = 0;
+        const q = e.getBoundingClientRect();
+        top = Math.max(top, q.top); bottom = Math.min(bottom, q.bottom);
+      }
+      // And nothing lies over a row: the thing drawn at its middle is the row's own.
+      const seen = rows.filter(e => {
+        const q = e.getBoundingClientRect();
+        if (!(q.height > 0 && q.top >= top - 1 && q.bottom <= bottom + 1)) return false;
+        const at = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+        return !!at && e.contains(at);
+      }).map(e => e.getAttribute('data-testid').slice('ride-'.length));
+      return { rows: rows.length, seen };
+    });
+    check(`at ${w}×${h} on Perform, every ride shows whole under the Bottles, Macro Zoom among them`,
+      !!r && r.rows >= 8 && r.seen.length === r.rows && r.seen.includes('macroZoom'),
+      r ? `${r.seen.length} of ${r.rows} in view: ${r.seen.join(', ')}` : 'no Rides on Perform');
+  }
+
   // ── Readable in a dark room, on both desks and inside the panels ─
   await page.setViewportSize({ width: 1600, height: 900 });
   // The three tabs that ship (lib/deskTabs.ts), each held to the same rules:

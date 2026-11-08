@@ -367,9 +367,15 @@ export interface SliderProps extends Keyed {
   resetTo?: number;
   /** What it does, one line. A setting's own line is found by `midiKey`. */
   help?: string;
+  /**
+   * The name, the travel and the value on one line, for a strip that has to
+   * show all of itself in a short column (the desk's Rides). Ignored on touch,
+   * where the 48 px rule needs the full row.
+   */
+  dense?: boolean;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -420,6 +426,50 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     name: label, help: line, value: display,
     hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
+  const track = (
+    <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
+      <input
+        type="range"
+        min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
+        step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+        value={curve === 1 ? value : at}
+        onChange={e => {
+          const raw = Number(e.target.value);
+          if (curve === 1) { onChange(raw); return; }
+          onChange(handValueAt(raw, min, max, curve));
+        }}
+        aria-label={label}
+        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
+        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''}`}
+        style={{ '--fill': `${pct}%` } as CSSProperties}
+      />
+    </PaceTrack>
+  );
+  /*
+    One line, for the Rides (the owner, 2026-11-07: "where is the macro zoom
+    control?"). On the Perform tab the Rides sit under the Bottles, and at
+    1440×900 the column left them room for three of their eight 88 px rows:
+    Macro Zoom, the seventh, was below the fold with the scrollbar hidden. The
+    owner chose denser faders over moving it. The name keeps the left, the
+    travel takes the middle and the value the right, so a row is 25 px and the
+    strip shows whole (`npm run layout`). The hand still gets the full width of
+    travel left after the name, the same curve, the CC chip and the card.
+  */
+  if (dense && !touch) {
+    return (
+      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+        {tip.card}
+        <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
+        <div className="min-w-0 flex-1">{track}</div>
+        {cc != null && (
+          <span className={`shrink-0 rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
+            hit ? 'bg-text text-bg' : 'text-faint'
+          }`}>{cc}</span>
+        )}
+        <span className="w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
+      </div>
+    );
+  }
   return (
     <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
@@ -447,23 +497,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
         </span>
       </div>
-      <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
-        <input
-          type="range"
-          min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
-          step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
-          value={curve === 1 ? value : at}
-          onChange={e => {
-            const raw = Number(e.target.value);
-            if (curve === 1) { onChange(raw); return; }
-            onChange(handValueAt(raw, min, max, curve));
-          }}
-          aria-label={label}
-          onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-          className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
-          style={{ '--fill': `${pct}%` } as CSSProperties}
-        />
-      </PaceTrack>
+      {track}
     </div>
   );
 }
