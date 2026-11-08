@@ -140,6 +140,11 @@ a grid of generic stock thumbnails: ours are the plate itself.
   the frame budget (Wave 4) is not touched. Phone: the Looks sheet gets the same grid.
   Line 1211 above already asks for a still saved in each preset file; that is the
   cheap first step, and the live preview follows.
+  *Briefed for the build lane* (2026-11-07): stills first (34b-1, a picture per look from the
+  gallery's own renders, the grid on the desk's preset menu and the phone's Looks sheet), then one
+  live preview at a time (34b-2). Its check is Claude's and lands before the build: the grid draws
+  every shipped look's still, only the hovered card runs, and the plate's step rate with the grid
+  open is its rate with it shut (the frame budget untouched).
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the

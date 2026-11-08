@@ -66,12 +66,12 @@
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import { launchChromium, presentsInXvfb } from './chromium.mjs';
+import { launchChromium, presentsInXvfb, port } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { lookTarget } from '../src/lib/dyeTarget.ts';
 import { engineQuery, installFrameReader, frameOf, waitForShow, settlePlate } from './frame.mjs';
 
-const PORT = Number(process.env.HANDPOUR_PORT ?? 4346);
+const PORT = port(4346, 'HANDPOUR_PORT');
 const ONLY = process.env.HANDPOUR_ONLY ? process.env.HANDPOUR_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : null;
 const SERIES = process.env.HANDPOUR_SKIP_SERIES !== '1';
 const OUT = process.env.HANDPOUR_OUT ?? 'handpour.json';

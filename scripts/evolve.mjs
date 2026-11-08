@@ -12,7 +12,7 @@
  * A look that is 90% one colour is not a look.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { luckyLook } from '../src/lib/lucky.ts';
@@ -21,7 +21,7 @@ import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 
-const PORT = 4336;
+const PORT = port(4336);
 // Four is a smoke test. The flat-backdrop roll was 1 in 63, so hunting for
 // another cause of it wants a number like 20 and the patience to match.
 const ROLLS_EACH = Number(process.env.EVOLVE_ROLLS ?? 4);
