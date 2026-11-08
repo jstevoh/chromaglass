@@ -265,7 +265,7 @@ style (§31).
   Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
   **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
   **23.7**.
-  Art packs (§45): ~~**45a**~~ the moiré pack's sheets (2026-11-07), then **45a-2** selling it to Home
+  Art packs (§45): ~~**45a**~~ the moiré pack's sheets (2026-11-07), ~~**45a-11**~~ Moiré Waves (2026-11-08), then **45a-2** selling it to Home
   (the owner makes the store product; the Worker deploy on the owner's word), **45a-3** a hand on the sheet.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
@@ -352,7 +352,7 @@ Where each batch stands, as of 2026-09-27:
 | 42 | What Liquid Light Lab's tutorials and gear showed | Asked 2026-11-07 from a working show's tutorials and shop: the glass pair as the instrument (Fast and Slow glass from real radii, 42a), the top glass turned by hand (42b), a triple plate (42c), an open dish for blow plates (42d), the classic mixture's numbers (42e), the RGB turntable's patterns (42f), moiré (42g), diffraction (42h), a ripple wheel (42i, the owner's call), all proposed; the videos themselves wait on the owner's Mac (42m) |
 | 43 | Visuals for a musician's release | Asked 2026-11-07 after the revenue research: a Spotify Canvas loop, a YouTube visualizer and vertical cuts from one render, self-serve in the app or done for the musician; the owner picked the Release kit in Home, then a done-for-you test (43-0, 2026-11-07); portrait renders (43a), a seamless loop (43b, its check `loopseam` written and owed) and the release kit (43c) next; nothing built yet |
 | 44 | A person's AI assistant plays the show | Asked 2026-11-07; the owner's answer: **for the owner's own use, not sold or promoted**. **44b, 44c, 44d, 44g shipped** (`npm run assistant`): the show server's `assistant` role behind a switch only the owner sets, Suggest / Play / Full (Full: everything, the live stream included), glides, Undo ten deep, the hand winning; a local MCP server (`mcp/`) with a show guide, the owner's notes and a picture of the plate. **44c-4** (a 1280 still for the assistant) and **44f** (a pour as a song action, `add_song_action`, the song show's clock read every frame) **shipped** (`npm run assistant`, `npm run songs`). 44h, control over the internet, next; 44a and the menu parked while private; 44c-2, 44c-3, 44d-2 to 44d-4, 44f-2 to 44f-4 open |
-| 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), six looks; **42a shipped** (`npm run moire`), selling it to Home is 42a-2. |
+| 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), seven looks; **45a shipped** (`npm run moire`), **45a-11** Moiré Waves shipped, selling it to Home is 45a-2, the Waves clip on the site 45a-12. |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
