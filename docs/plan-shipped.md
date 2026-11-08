@@ -4591,7 +4591,9 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   the glycerine drop of check 7 twice, with the filter and without. It holds the dye to 0.01%
   of the bare run's and the 2% front within 0.05 mm of it, at 2 s and 20 s. It also asks that
   the filter changed some cell of the field at 20 s, so that it is not comparing two bare runs
-  (two runs of one program agree to the bit). It does not ask for a moment such as Σa²: the
+  (two runs of one program agree to the bit). On today's main (the 2 mm gap of #655) the
+  front half of 14 is red on the filter as main already has it, +0.36 mm at 20 s, so it ships
+  as its own line, 14b, owed to 18m-5c. It does not ask for a moment such as Σa²: the
   filter before 18m-5, which certainly ran, moved Σa² by only 0.048%. Checks 12 and 13 keep the filter off: they look for a
   checkerboard growing out of the slump's own step, and the filter takes 5% of one out each
   step.

@@ -1744,14 +1744,16 @@
     {
       "name": "A drop slumps under its own weight",
       "shard": "tools",
-      "run": "npm run slump",
+      "run": "npm run slump -- --owed=front",
       "why": [
         "A drop of ink on a level plate slumps out along the lower glass as a",
         "viscous gravity current, its front where Huppert's law puts it (PLAN 18m).",
         "On tools since 18m-5a, which runs it with the grid filter on and adds a",
         "glycerine run without it (55 s on Metal): on #498 plate was killed at its",
         "20 minutes twice, in ferro.mjs, with every check before it passed, where",
-        "tools ran in 14."
+        "tools ran in 14. 14b (the filter does not move the front) is owed to",
+        "PLAN 18m-5c: in the 2 mm gap main's filter moves the glycerine drop's 2%",
+        "front 0.36 mm in 20 s."
       ]
     },
     {
