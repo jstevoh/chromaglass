@@ -36,7 +36,7 @@
  * and taking over again is one button.
  */
 
-export type TempoSourceKind = 'clock' | 'tap' | 'manual' | 'link';
+export type TempoSourceKind = 'clock' | 'tap' | 'manual' | 'link' | 'daw';
 
 /** Ableton Link as the page knows it: whether the show server offers it, whether it is on, and how many others are in the session. */
 export interface LinkStatus {
@@ -71,6 +71,18 @@ export interface LinkMessage {
 
 /** A change in the Link session's transport, as `TempoSource.linkReading` hands it back. */
 export type LinkTransportEdge = 'start' | 'stop' | null;
+
+/** The show server's DAW bridge transport message (`server/dawBridge.js`, `docs/dawbridge.md`). */
+export interface DawTransportMessage {
+  type?: 'daw-transport';
+  playing: boolean;
+  bpm: number;
+  beat: number;
+  barBeat?: number;
+  num?: number;
+  den?: number;
+  ahead?: number;
+}
 
 export interface TempoReading {
   /** Milliseconds per beat. */
@@ -121,6 +133,12 @@ const DOUBLE_TAP_MS = 25;
  */
 const LINK_HOLD = 1000;
 /**
+ * How long a DAW bridge transport reading is believed after the last one. The
+ * plugin sends up to one every 10 ms while playing; half a second quiet hands
+ * back to whatever was driving before (`docs/dawbridge.md`).
+ */
+const DAW_HOLD = 500;
+/**
  * How far the beat's anchor may creep later per reading, ms.
  *
  * Each reading is stamped when it arrives, and one that sat behind a frame
@@ -157,7 +175,7 @@ const fold = (ms: number): number => {
 
 /** The source's name on the desk and the phone. */
 export const tempoSourceName = (source: string | null): string =>
-  source === 'clock' ? 'midi clock' : source === 'tap' ? 'tapped' : source === 'link' ? 'Link' : 'set';
+  source === 'clock' ? 'midi clock' : source === 'tap' ? 'tapped' : source === 'link' ? 'Link' : source === 'daw' ? 'DAW' : 'set';
 
 /** What Link is doing, in a few words beside its switch. */
 export function linkLine(link: LinkStatus): string {
@@ -206,14 +224,19 @@ export class TempoSource {
   /** Set by the remote link: asks the show server to switch Link on or off. */
   onLinkSwitch: ((on: boolean) => void) | null = null;
 
+  // DAW bridge transport, ranked under Link and over MIDI clock, tap and manual.
+  private daw: { origin: number; period: number; whole: number; until: number; barOffset: number; barLen: number } | null = null;
+  private dawFresh = false;
+
   /** What is driving the tempo right now, or null when nothing is. */
   get active(): TempoSourceKind | null {
-    return this.linkFresh ? 'link' : this.kind;
+    return this.linkFresh ? 'link' : this.dawFresh ? 'daw' : this.kind;
   }
 
   /** Beats per minute of whatever is driving, or 0. */
   get bpm(): number {
     if (this.linkFresh && this.link) return bpmOf(this.link.period);
+    if (this.dawFresh && this.daw) return bpmOf(this.daw.period);
     return this.kind ? bpmOf(this.period) : 0;
   }
 
@@ -259,6 +282,41 @@ export class TempoSource {
     return edge;
   }
 
+  /**
+   * A DAW bridge transport message from the show server, stamped `now` on arrival.
+   *
+   * `m.beat` is the song's quarter-note beat heard `m.ahead` seconds after the
+   * packet left the plugin (`now + m.ahead * 1000`), and `m.barBeat` is the
+   * beat's place from the DAW's bar start (which differs from `beat % 4` after
+   * a pickup bar or a meter change). Ranked under Link and over MIDI clock, tap
+   * and a typed number; stopping the DAW or 500 ms of silence hands back.
+   */
+  dawReading(now: number, m: DawTransportMessage): void {
+    if (!m || !m.playing || !(m.bpm > 0) || !Number.isFinite(m.beat)) {
+      this.daw = null;
+      this.dawFresh = false;
+      return;
+    }
+    const period = periodOf(m.bpm);
+    const aheadMs = (typeof m.ahead === 'number' && Number.isFinite(m.ahead) ? m.ahead : 0) * 1000;
+    const origin = now + aheadMs - m.beat * period;
+    const num = typeof m.num === 'number' && m.num > 0 ? m.num : 4;
+    const den = typeof m.den === 'number' && m.den > 0 ? m.den : 4;
+    const barLen = Math.max(1, Math.round(num * (4 / den)));
+    const barBeat = typeof m.barBeat === 'number' && Number.isFinite(m.barBeat) ? m.barBeat : ((m.beat % barLen) + barLen) % barLen;
+    const barOffset = barBeat - m.beat;
+    const d = this.daw;
+    if (d && Math.abs(d.period - period) < 1e-6 * period && Math.abs(origin - d.origin) < period / 4) {
+      d.origin = Math.min(d.origin + LINK_CREEP, origin);
+      d.until = now + DAW_HOLD;
+      d.barOffset = barOffset;
+      d.barLen = barLen;
+    } else {
+      this.daw = { origin, period, whole: d?.whole ?? Number.NaN, until: now + DAW_HOLD, barOffset, barLen };
+    }
+    this.dawFresh = true;
+  }
+
   /** How many taps are in the current attempt, for a button that counts them in. */
   get tapCount(): number {
     return this.taps.length;
@@ -279,12 +337,22 @@ export class TempoSource {
     // gear, and a tap or a typed number under it waits for it to end.
     const l = this.link;
     this.linkFresh = !!l && now < l.until;
+    const d = this.daw;
+    this.dawFresh = !!d && now < d.until;
     if (l && this.linkFresh) {
       const beats = (now - l.origin) / l.period;
       const whole = Math.floor(beats);
       if (whole !== l.whole) { l.whole = whole; this.seq++; }
       // Not folded: Link means the tempo it says, as a MIDI clock does.
       return { period: clampPeriod(l.period), beatAt: l.origin + whole * l.period, source: 'link', seq: this.seq, bar: ((whole % 4) + 4) % 4 };
+    }
+    if (d && this.dawFresh) {
+      const beats = (now - d.origin) / d.period;
+      const whole = Math.floor(beats);
+      if (whole !== d.whole) { d.whole = whole; this.seq++; }
+      const barLen = d.barLen || 4;
+      const bar = ((Math.round(whole + d.barOffset) % barLen) + barLen) % barLen;
+      return { period: clampPeriod(d.period), beatAt: d.origin + whole * d.period, source: 'daw', seq: this.seq, bar };
     }
     if (!this.kind || this.period <= 0) return null;
     return { period: this.period, beatAt: this.beatAt, source: this.kind, seq: this.seq };

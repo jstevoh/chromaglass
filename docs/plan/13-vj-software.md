@@ -145,12 +145,11 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      the `CGPC` audio frame, the exports the check imports), and `npm run dawbridge`, a
      fake plugin against the real show server and the built app, red on main with its
      lines owed as `app` and `plugin`.
-   - **13.7a** (the app's half, Antigravity's lane, in flight): `server/dawBridge.js` beside
-     `abletonLink.js`, Pro only; `src/lib/dawBridge.ts`; slots in MIDI learn's map
-     (kind `'slot'`), the DAW as a tempo source ranked under Link, and the ear's source
-     "DAW". Done when it takes `app` out of `--owed` in `scripts/checks.json` and the
-     check is green in `browser2`. The phone rule: the bridge's state and its slot
-     bindings in the More sheet.
+   - ~~**13.7a**~~ (shipped 2026-11-07, #694; story in `docs/plan-shipped.md` §13.7a):
+     `server/dawBridge.js`, `src/lib/dawBridge.ts`, `'slot'` bindings in `src/lib/midi.ts`,
+     the `'daw'` tempo source ranked under Link, the ear's `'daw'` source, and the phone's
+     More sheet switch and slot bindings (`npm run dawbridge` 30/30 app lines green, `app`
+     removed from `--owed` in `scripts/checks.json`).
    - **13.7b** (the plugin, Antigravity's lane, after 13.7a): `plugin/dawbridge/` in
      JUCE, `BridgeProtocol.h` and the `DawBridgeSelfTest` target as the contract says;
      its PR quotes `npm run dawbridge -- --plugin` and `auval` from the owner's Mac.

@@ -2,8 +2,8 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { TempoSource, type TempoLabel } from '../lib/tempo';
 
 /**
- * Where the beat clock's tempo comes from: Ableton Link, a MIDI clock, taps, a
- * number off the set list, else the microphone (`lib/tempo.ts`).
+ * Where the beat clock's tempo comes from: Ableton Link, the DAW bridge, a MIDI
+ * clock, taps, a number off the set list, else the microphone (`lib/tempo.ts`).
  *
  * The source is a ref the render loop reads once a frame; the label the desk
  * shows is sampled from it four times a second rather than watched, so a tempo

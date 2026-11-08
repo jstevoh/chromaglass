@@ -1,7 +1,8 @@
 import { HIT_FEATURES } from '../lib/hitSource';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Sheet, LIT } from './ui';
 import { Sliders, Download, FolderOpen, Trash2, Radio, Zap, LayoutGrid, Music } from 'lucide-react';
+import { getDawBridgeStatus, subscribeDawBridge } from '../lib/dawBridge';
 import {
   ACTION_LABELS, LEARNABLE_SETTINGS, sourceLabel, targetLabel,
   MAPPABLE_SOURCES, MUSIC_SOURCES, MUSIC_SOURCE_LABELS, isMapping, triggerable, soundMappable,
@@ -140,6 +141,8 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
 export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClose }: MidiPanelProps) {
   const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
   const lastEvent = useMidiLastEvent(midi);
+  const dawStatus = useSyncExternalStore(subscribeDawBridge, getDawBridgeStatus);
+  const canLearn = midi.enabled || dawStatus.on;
   /*
     The activity light goes out 400 ms after the last message, and the panel
     has to render then to show it: the App used to render it there, many
@@ -180,7 +183,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
           <button
             aria-pressed={!!isLearning}
             onClick={() => (isLearning ? midi.cancelLearn() : midi.learn(target, encoder && target.kind === 'setting' ? 'relative' : 'absolute'))}
-            disabled={!midi.enabled}
+            disabled={!canLearn}
             className={`px-2 py-1 rounded-md border text-[12px] font-medium disabled:opacity-30 ${isLearning ? `${LIT} animate-pulse` : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
             data-testid={`midi-learn-${key}`}
           >
@@ -247,14 +250,18 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
       */}
       <div className="flex items-center gap-2 mb-3">
         <div
-          className={`flex-1 flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium ${midi.enabled ? LIT : 'border-white/10 bg-white/5 text-white/60'}`}
+          className={`flex-1 flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium ${canLearn ? LIT : 'border-white/10 bg-white/5 text-white/60'}`}
           role="status"
           data-testid="midi-state"
-          data-on={midi.enabled ? 'true' : 'false'}
+          data-on={canLearn ? 'true' : 'false'}
         >
           <Radio size={14} />
           <span className="truncate">
-            {!midi.supported ? 'No Web MIDI here' : midi.enabled ? `MIDI is on · ${midi.activeInputName ?? 'no device'}` : 'MIDI is off'}
+            {midi.enabled
+              ? `MIDI is on · ${midi.activeInputName ?? 'no device'}${dawStatus.on ? ` · DAW (${dawStatus.host ?? 'bridge'})` : ''}`
+              : dawStatus.on
+                ? `DAW bridge is on · ${dawStatus.host ?? 'plugin'}`
+                : !midi.supported ? 'No Web MIDI here' : 'MIDI is off'}
           </span>
         </div>
         <button
@@ -265,10 +272,10 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
         >
           Set up…
         </button>
-        <span className={`h-2.5 w-2.5 rounded-full ${lastEvent && performance.now() - lastEvent.at < 400 ? 'bg-emerald-400' : midi.enabled ? 'bg-white/20' : 'bg-white/5'}`} title="Activity" data-testid="midi-activity" />
+        <span className={`h-2.5 w-2.5 rounded-full ${lastEvent && performance.now() - lastEvent.at < 400 ? 'bg-emerald-400' : canLearn ? 'bg-white/20' : 'bg-white/5'}`} title="Activity" data-testid="midi-activity" />
       </div>
       {midi.error && <p className="text-[12px] text-red-300 mb-3" data-testid="midi-error">{midi.error}</p>}
-      {midi.enabled && lastEvent && (
+      {canLearn && lastEvent && (
         <p className="mb-3 text-[11px] font-mono text-white/40" data-testid="midi-last">Last: {sourceLabel(lastEvent.source)} = {lastEvent.value}</p>
       )}
 

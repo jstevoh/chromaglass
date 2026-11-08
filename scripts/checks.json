@@ -1574,7 +1574,7 @@
     {
       "name": "The DAW bridge",
       "shard": "browser2",
-      "run": "npm run dawbridge -- --owed=app",
+      "run": "npm run dawbridge",
       "why": [
         "The DAW bridge plugin's contract (PLAN 13.7, docs/dawbridge.md), written ahead",
         "of both halves: a node stand-in for the plugin against the real show server",

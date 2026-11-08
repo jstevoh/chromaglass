@@ -23,7 +23,8 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `account-shows.js`: an account's running shows (served by the show server).
 - `assistant.js`: the guard for the owner's AI assistant (PLAN 44b–44d): `readAssistantMode(env, file)` (the switch: `CHROMAGLASS_ASSISTANT`, or one word in `CHROMAGLASS_ASSISTANT_FILE`, default `server/.assistant`; off, suggest, play or full), `createAssistantGuard(send)`, `ROOM_KEYS` (from `assistant-room-keys.json`, the page's `RIG_KEYS` and `SETUP_KEYS`, rewritten by `node scripts/assistant.mjs --write`). `remote-server.js` admits the `assistant` role only from the laptop, with the show key, while the switch is on, and passes its every message through the guard. `mcp/` imports `ROOM_KEYS`; nothing here imports `mcp/`.
 - `artnet.js`: Art-Net in and out.
-- `osc.js`: OSC both ways: the reader and the address space the show takes in (`readOsc`, `oscToMessage`), the writer and the feed it sends out (`encodeOsc`, `encodeBundle`, `feedMessages`, `oscOutTarget`; PLAN 13.5-osc).
+- `dawBridge.js`: re-exports the localhost UDP bridge for the DAW plugin (`DAW_BRIDGE_PORT`, `DAW_PROTOCOL`, `DAW_SLOTS`, `encodeDawNames`, `startDawBridge`, default `9024` on `127.0.0.1` alone; PLAN 13.7a, `docs/dawbridge.md`) from `osc.js`.
+- `osc.js`: OSC both ways and the DAW bridge: the reader and the address space the show takes in (`readOsc`, `oscToMessage`), the writer and the feed it sends out (`encodeOsc`, `encodeBundle`, `feedMessages`, `oscOutTarget`; PLAN 13.5-osc), and the localhost DAW bridge (`startDawBridge`, `encodeDawNames`; PLAN 13.7a, placed here so `desktop/electron-builder.config.cjs` packs it without touching `desktop/`).
 - `cloud-sync.js`: Pro cloud sync store.
 - `fingerprint-worker.js`: song ID proxy.
 - `feedback-schema.sql`: the feedback table, run once against D1.

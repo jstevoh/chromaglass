@@ -19,9 +19,9 @@ import { HIT_FEATURES, HIT_FEATURE_LABELS, isClassFeature, type HitFeature } fro
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
-/** Where a message comes from: a controller or a note, on a channel (0–15). */
+/** Where a message comes from: a controller, a note, or a DAW bridge slot (0–31). */
 export interface MidiSource {
-  kind: 'cc' | 'note';
+  kind: 'cc' | 'note' | 'slot';
   channel: number;
   number: number;
 }
@@ -433,7 +433,7 @@ export const travelOf = (value: number, min: number, max: number, curve = 1): nu
   const at = clamp01((value - min) / (max - min || 1));
   return curve === 1 ? at : Math.pow(at, 1 / curve);
 };
-export const sourceLabel = (s: MidiSource): string => `${s.kind === 'cc' ? 'CC' : 'Note'} ${s.number} ch ${s.channel + 1}`;
+export const sourceLabel = (s: MidiSource): string => s.kind === 'slot' ? `Slot ${s.number + 1}` : `${s.kind === 'cc' ? 'CC' : 'Note'} ${s.number} ch ${s.channel + 1}`;
 
 export function targetLabel(t: MidiTarget, presetName?: (id: string) => string | undefined): string {
   switch (t.kind) {
@@ -800,10 +800,12 @@ export function parseMidiMap(text: string): MidiMap {
   if (!Array.isArray(o.bindings)) throw new Error('The MIDI map has no bindings.');
   const bindings = o.bindings.filter((b): b is MidiBinding =>
     !!b && typeof b === 'object' && !!b.source && !!b.target &&
-    (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
+    (b.source.kind === 'cc' || b.source.kind === 'note' || b.source.kind === 'slot') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
     .map(b => ({
       ...b,
-      target: onTodaysTravel(b.target),
+      target: b.source.kind === 'slot' && b.target.kind === 'setting' && Number.isFinite(b.target.min) && Number.isFinite(b.target.max)
+        ? b.target
+        : onTodaysTravel(b.target),
       id: typeof b.id === 'string' ? b.id : fallbackId('b'),
       mode: (b.mode === 'relative' ? 'relative' : 'absolute') as MidiBinding['mode'],
       // A map written before banks existed has none, and every binding in it
@@ -815,8 +817,10 @@ export function parseMidiMap(text: string): MidiMap {
       if (b.target.kind === 'setting') {
         const spec = LEARNABLE_BY_KEY.get(b.target.key);
         if (!spec) return false;
-        b.target.min = spec.min;
-        b.target.max = spec.max;
+        if (b.source.kind !== 'slot' || !Number.isFinite(b.target.min) || !Number.isFinite(b.target.max)) {
+          b.target.min = spec.min;
+          b.target.max = spec.max;
+        }
         return true;
       }
       return true;

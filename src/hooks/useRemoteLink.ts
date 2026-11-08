@@ -19,6 +19,8 @@ interface UseRemoteLinkOptions {
   role: 'display' | 'controller' | 'mirror';
   /** Called for every message addressed to this role. */
   onMessage?: (message: RemoteMessage) => void;
+  /** Display only: called for binary frames (`CGPC` DAW bridge audio). */
+  onBinary?: (data: ArrayBuffer) => void;
   /**
    * Display only: the current state, sent on connect, on request, and whenever
    * it changes. Controllers pass nothing.
@@ -44,7 +46,7 @@ const PROBE_INTERVAL = 30000;
  * sleeping shouldn't need anyone to reload anything — and stays completely
  * silent when there's no relay to talk to.
  */
-export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRemoteLinkOptions) {
+export function useRemoteLink({ role, onMessage, onBinary, state, enabled = true }: UseRemoteLinkOptions) {
   const [status, setStatus] = useState<RemoteStatus>(enabled ? 'connecting' : 'offline');
   const socketRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(RETRY_MIN);
@@ -61,6 +63,8 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
   // socket down and reconnects.
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
+  const onBinaryRef = useRef(onBinary);
+  onBinaryRef.current = onBinary;
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -140,6 +144,7 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       let socket: WebSocket;
       try {
         socket = new WebSocket(remoteSocketUrl(role));
+        socket.binaryType = 'arraybuffer';
       } catch {
         scheduleRetry();
         return;
@@ -156,6 +161,10 @@ export function useRemoteLink({ role, onMessage, state, enabled = true }: UseRem
       };
 
       socket.onmessage = (event) => {
+        if (event.data instanceof ArrayBuffer) {
+          onBinaryRef.current?.(event.data);
+          return;
+        }
         let message: RemoteMessage;
         try {
           message = JSON.parse(String(event.data));

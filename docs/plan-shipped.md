@@ -552,6 +552,59 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
 
+### 13.7a. The DAW bridge in the show server and the app (2026-11-07)
+
+`server/dawBridge.js` (new), `server/remote-server.js`, `src/lib/dawBridge.ts` (new),
+`src/lib/midi.ts`, `src/lib/tempo.ts`, `src/lib/remoteProtocol.ts`,
+`src/app/useTempo.ts`, `src/app/useRemote.ts`, `src/app/useSoundSource.ts`,
+`src/hooks/useRemoteLink.ts`, `src/hooks/useMidi.ts`, `src/components/SoundPanel.tsx`,
+`src/components/MidiPanel.tsx`, `src/components/settings/SoundSection.tsx`,
+`src/components/phone/PhoneStage.tsx`, `scripts/checks.json`
+
+**What was built.** `server/dawBridge.js` binds UDP `127.0.0.1:9024` (loopback only,
+Pro only through `proLinks()` per packet and per `daw-enable` command, as Link and OSC
+in are) and reads the contract's five OSC addresses (`/chromaglass/bridge/hello`, `bye`,
+`slot`, `transport`, `pcm`) from one followed plugin instance at a time, releasing on
+`bye` or 3 s of silence (`QUIET_MS`), relaying `{ type: 'daw' }`, `{ type: 'daw-slot' }`
+and `{ type: 'daw-transport' }` JSON messages and binary `CGPC` frames to the display's
+WebSocket alone (phones never receive DAW frames or messages), and sending
+`/chromaglass/bridge/names` (32 strings) back to the followed plugin's UDP port whenever
+the page updates its slot names (`daw-names`).
+
+In the app:
+- `src/lib/dawBridge.ts` holds the protocol constants (`DAW_BRIDGE_PORT = 9024`,
+  `DAW_SLOT_COUNT = 32`, `DAW_PROTOCOL_VERSION = 1`), `decodePcmFrame` for the 20-byte
+  `CGPC` header + float32 PCM payload, `dawSlotNames` and `dawSlotSettings` for the
+  page's 32 automation slots, and `DawPcmTap` (a Web Audio `ScriptProcessorNode` ring
+  buffer that feeds incoming stereo/mono PCM at the plugin's sample rate into the ear's
+  `AudioContext`).
+- `src/lib/midi.ts` adds `{ kind: 'slot', channel: 0, number: 0..31 }` to `MidiSource`:
+  `midiValue` maps a slot's `0..1` float at full float resolution (`valueAt` directly,
+  with no `/ 127` quantisation) and `parseMidiMap` keeps a slot binding's saved `min`
+  and `max` range while Rejecting out-of-range slots (`< 0` or `>= 32`).
+- `src/lib/tempo.ts` and `src/app/useTempo.ts` add `dawReading` and the `'daw'` tempo
+  source, ranked under `'link'` and over `'midi'` / `'tap'`: each playing transport
+  packet projects the song beat (`beatHi + beatLo + ahead * bpm / 60`) and `barBeat` onto
+  the beat clock (`setExternal`) and `barGrid.tell`, and hands back after 500 ms of
+  silence or when `playing` is false.
+- `src/app/useSoundSource.ts`, `src/components/SoundPanel.tsx` and
+  `src/components/settings/SoundSection.tsx` add the `'daw'` sound source (`DAW` pill in
+  the Sound sheet, status and switch in Settings → Sound, and `slot` bindings in the
+  MIDI panel and the phone's More sheet). `app` is removed from `--owed` in
+  `scripts/checks.json`.
+
+**Measured** (`npm run dawbridge`, 30/30 app checks; `plugin` still owed for 13.7b/c):
+hello in 3.7 ms, 32 slot names to the plugin, 20 slot moves within 1.2 ms at exact
+float32 resolution, transport song position reconstructed whole (`2000.3`), 188/188
+`CGPC` audio packets bit-for-bit with p95 3.53 ms, 0 frames and 0 DAW messages to a
+phone client, second plugin ignored while the first speaks, bye and 3.07 s timeout hand
+over, LAN address refused and port bound to loopback alone, Free tier locked, full-float
+slot resolution (`0.20762081538246763` vs CC's `0.207936`), transport beat within 1.06 ms
+over 703 readings, tempo change in 0 ms, priority under Link and over tap, and in the
+built app: slot 4 named `"Plate Rock"`, slot moves setting at full float resolution,
+132.000 BPM from `daw`, and ear energy `0.000` in silence → `0.116` with kicks on source
+`DAW`.
+
 ### 13.5-link. Ableton Link in (2026-10-30)
 
 The owner OK'd one simple piece of the DAW work on 2026-10-30, while the in-flight work

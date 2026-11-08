@@ -151,6 +151,14 @@ export type RemoteMessage =
   | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean; locked?: boolean }
   /** Display → relay: switch Link on or off. The relay takes it from the laptop's own page only. */
   | { type: 'link-enable'; on: boolean }
+  /** Relay → display: the DAW bridge plugin's status (`server/dawBridge.js`, `docs/dawbridge.md`). */
+  | { type: 'daw'; on: boolean; instance?: string; host?: string; sampleRate?: number; latency?: number; locked?: boolean }
+  /** Relay → display: a DAW bridge automation slot (0..31) at full float32 resolution (0..1). */
+  | { type: 'daw-slot'; slot: number; value: number }
+  /** Relay → display: the DAW's transport, with beat position rebuilt in double precision. */
+  | { type: 'daw-transport'; playing: boolean; bpm: number; beat: number; barBeat: number; num: number; den: number; ahead: number }
+  /** Display → relay: what each of the 32 DAW bridge slots is bound to (`""` when unbound). */
+  | { type: 'daw-names'; names: string[] }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**

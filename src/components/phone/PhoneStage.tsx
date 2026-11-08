@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
 import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
@@ -6,9 +6,16 @@ import {
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
   Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
-  Laptop, Save, Video, User, LogIn,
+  Laptop, Save, Video, User, LogIn, Radio,
   Crosshair, LayoutGrid, Plus,
 } from 'lucide-react';
+import {
+  LEARNABLE_SETTINGS, sourceLabel, targetLabel, type MidiTarget,
+} from '../../lib/midi';
+import {
+  DAW_SLOTS, getDawBridgeStatus, getDawSlotController,
+  subscribeDawBridge, subscribeDawSlotController,
+} from '../../lib/dawBridge';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
 import { TipPad } from '../ui/TipPad';
@@ -114,7 +121,7 @@ const OWN_SHEET: Record<string, Exclude<SheetName, 'tabs' | 'more'>> = {
   bottles: 'dye', dyes: 'dye', tools: 'dye', cues: 'looks', recipe: 'play', rides: 'play', score: 'play', mixer: 'mix',
 };
 const SHEET_NAME: Record<string, string> = { dye: 'Dye', looks: 'Looks', play: 'Motion', mix: 'Mix', sound: 'Sound' };
-type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
+type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone' | 'daw';
 
 export interface PhoneStageProps {
   // The look
@@ -1286,6 +1293,7 @@ export function PhoneStage(p: PhoneStageProps) {
             />
             <p className="text-[12px] text-dim">Plate video is a clip of the plate. A Take keeps your strokes to replay with the song.</p>
           </div>
+          <PhoneDawBridge audioSource={p.audioSource} onAudioSource={p.onAudioSource} />
           {accountShows.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5" data-testid="account-shows">
               <SectionLabel>Running shows on your account</SectionLabel>
@@ -1314,6 +1322,122 @@ export function PhoneStage(p: PhoneStageProps) {
           </p>
           </PanelGuard>
         </PhoneSheet>
+      )}
+    </div>
+  );
+}
+
+/** The More sheet's DAW bridge switch and slot bindings (PLAN.md 13.7a). */
+function PhoneDawBridge({ audioSource, onAudioSource }: { audioSource: AudioSource; onAudioSource: (s: AudioSource) => void }) {
+  const dawStatus = useSyncExternalStore(subscribeDawBridge, getDawBridgeStatus);
+  const slotCtrl = useSyncExternalStore(subscribeDawSlotController, getDawSlotController);
+  const [slotIdx, setSlotIdx] = useState(0);
+  const [settingKey, setSettingKey] = useState<string>(String(LEARNABLE_SETTINGS[0]?.key ?? 'audioImpact'));
+  const slotBindings = (slotCtrl?.bindings ?? []).filter(b => b.source.kind === 'slot');
+  const chosenSetting = LEARNABLE_SETTINGS.find(s => String(s.key) === settingKey) ?? LEARNABLE_SETTINGS[0];
+  const chosenTarget: MidiTarget | null = chosenSetting
+    ? { kind: 'setting', key: chosenSetting.key, min: chosenSetting.min, max: chosenSetting.max }
+    : null;
+  const isLearning = !!(slotCtrl?.learning && chosenTarget && JSON.stringify(slotCtrl.learning.target) === JSON.stringify(chosenTarget));
+  const dawOn = audioSource === 'daw';
+
+  return (
+    <div className="mt-3 flex flex-col gap-2" data-testid="phone-daw-bridge">
+      <SectionLabel>DAW bridge</SectionLabel>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onAudioSource(dawOn ? 'none' : 'daw')}
+          aria-pressed={dawOn}
+          data-testid="phone-daw-switch"
+          className={`flex h-12 shrink-0 items-center gap-2 rounded-lg border px-4 text-[14px] font-medium ${dawOn ? LIT : 'border-border bg-elevated text-text-2 active:bg-active'}`}
+        >
+          <Radio size={16} />
+          <span>{dawOn ? 'DAW on' : 'DAW'}</span>
+        </button>
+        <span className="min-w-0 flex-1 truncate text-[13px] text-muted" data-testid="phone-daw-status">
+          {dawStatus.locked
+            ? 'Part of Pro'
+            : dawStatus.on
+              ? `${dawStatus.host ?? 'Plugin'}${dawStatus.sampleRate ? ` · ${dawStatus.sampleRate} Hz` : ''}`
+              : dawOn
+                ? 'Listening on 127.0.0.1:9024'
+                : 'Audio, transport and 32 slots from Logic or Live'}
+        </span>
+      </div>
+      {slotCtrl && (
+        <div className="flex flex-col gap-1.5" data-testid="phone-daw-slots">
+          <div className="grid grid-cols-2 gap-1.5">
+            <select
+              value={slotIdx}
+              onChange={e => setSlotIdx(Number(e.target.value))}
+              aria-label="DAW bridge slot"
+              data-testid="phone-daw-slot-select"
+              className="h-12 min-w-0 rounded-lg border border-border bg-elevated px-3 text-[14px] text-text outline-none"
+            >
+              {Array.from({ length: DAW_SLOTS }, (_, i) => (
+                <option key={i} value={i}>{`Slot ${i + 1}`}</option>
+              ))}
+            </select>
+            <select
+              value={settingKey}
+              onChange={e => setSettingKey(e.target.value)}
+              aria-label="Setting for DAW bridge slot"
+              data-testid="phone-daw-target-select"
+              className="h-12 min-w-0 rounded-lg border border-border bg-elevated px-3 text-[14px] text-text outline-none"
+            >
+              {LEARNABLE_SETTINGS.map(s => (
+                <option key={String(s.key)} value={String(s.key)}>{s.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              type="button"
+              onClick={() => { if (chosenTarget) slotCtrl.bindSlot(slotIdx, chosenTarget); }}
+              data-testid="phone-daw-bind"
+              className="flex h-12 items-center justify-center rounded-lg border border-border-strong bg-elevated px-3 text-[14px] font-medium text-text active:bg-active"
+            >
+              {`Bind Slot ${slotIdx + 1}`}
+            </button>
+            <button
+              type="button"
+              aria-pressed={isLearning}
+              onClick={() => {
+                if (!chosenTarget) return;
+                if (isLearning) slotCtrl.cancelLearn();
+                else slotCtrl.learn(chosenTarget);
+              }}
+              data-testid="phone-daw-learn"
+              className={`flex h-12 items-center justify-center rounded-lg border px-3 text-[14px] font-medium ${isLearning ? LIT : 'border-border bg-elevated text-text-2 active:bg-active'}`}
+            >
+              {isLearning ? 'Move a slot…' : 'Learn from DAW'}
+            </button>
+          </div>
+          {slotBindings.length > 0 && (
+            <div className="flex flex-col gap-1" data-testid="phone-daw-binding-list">
+              {slotBindings.map(b => (
+                <div
+                  key={b.id}
+                  data-testid={`phone-daw-binding-${b.source.number}`}
+                  className="flex min-h-[48px] items-center justify-between gap-2 rounded-lg border border-border bg-elevated pl-3 pr-1 text-[13px]"
+                >
+                  <span className="shrink-0 font-mono text-muted">{sourceLabel(b.source)}</span>
+                  <span className="min-w-0 flex-1 truncate text-text">{targetLabel(b.target, slotCtrl.presetName)}</span>
+                  <button
+                    type="button"
+                    onClick={() => slotCtrl.removeBinding(b.id)}
+                    aria-label={`Remove ${sourceLabel(b.source)} binding`}
+                    data-testid={`phone-daw-slot-remove-${b.source.number}`}
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-muted active:bg-active"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

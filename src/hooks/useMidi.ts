@@ -15,7 +15,11 @@ import { PALETTE } from '../constants';
 import { touch, touchKey } from '../lib/midiTouch';
 import { downloadText } from '../lib/userPresets';
 import type { VisualizerSettings } from '../types';
-import { livePresetId } from '../presets';
+import { PRESETS, livePresetId } from '../presets';
+import {
+  dawSlotNames, dawSlotSettings, dawSlotSource, publishDawSlotNames,
+  setDawSlotController, setDawSlotListener,
+} from '../lib/dawBridge';
 
 /**
  * The MIDI controller on the desk.
@@ -517,6 +521,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     // and each control is written exactly once.
     const byControl = new Map<string, MidiBinding[]>();
     for (const b of mapRef.current.bindings) {
+      if (b.source.kind === 'slot') continue;
       const k = sourceKey(b.source);
       const list = byControl.get(k);
       if (list) list.push(b); else byControl.set(k, [b]);
@@ -687,6 +692,86 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const removeSound = useCallback((id: string) => setMap(prev => ({ ...prev, sound: (prev.sound ?? []).filter(b => b.id !== id) })), [setMap]);
   /** A binding written by hand (the panel's "add" without touching the controller). */
   const addBinding = useCallback((b: Omit<MidiBinding, 'id'>) => setMap(prev => ({ ...prev, bindings: [...prev.bindings.filter(x => sourceKey(x.source) !== sourceKey(b.source)), { ...b, id: newId() }] })), [setMap]);
+  /** Bind a DAW bridge slot (`0..31`) to a target on the current bank. */
+  const bindSlot = useCallback((slot: number, target: MidiTarget) => {
+    const src = dawSlotSource(slot);
+    const key = sourceKey(src);
+    const onto = bankRef.current === 0 ? undefined : bankRef.current;
+    setMap(prev => ({
+      ...prev,
+      bindings: [
+        ...prev.bindings.filter(b => sourceKey(b.source) !== key || b.bank !== onto),
+        { id: newId(), source: src, target, mode: 'absolute', bank: onto },
+      ],
+    }));
+  }, [setMap]);
+
+  // Publish the 32 slot names to the DAW bridge whenever the map changes, and
+  // expose the slot controller for the phone's More sheet (PLAN 13.7a).
+  useEffect(() => {
+    const presetName = (id: string) => PRESETS.find(p => p.id === livePresetId(id))?.name;
+    publishDawSlotNames(dawSlotNames(map, presetName));
+    setDawSlotController({
+      bindings: map.bindings,
+      learning,
+      presetName,
+      learn: (target) => setLearning({ target, mode: 'absolute' }),
+      cancelLearn: () => setLearning(null),
+      removeBinding: (id) => setMap(prev => ({ ...prev, bindings: prev.bindings.filter(b => b.id !== id) })),
+      bindSlot,
+    });
+  }, [map, learning, setMap, bindSlot]);
+
+  // DAW bridge slot moves (PLAN 13.7a, docs/dawbridge.md): learned like knobs,
+  // and applied at full float resolution without soft takeover.
+  const slotValueRef = useRef(new Map<number, number>());
+  useEffect(() => {
+    setDawSlotListener((slot, value) => {
+      const src = dawSlotSource(slot);
+      const now = performance.now();
+      const prevVal = slotValueRef.current.get(slot) ?? 0;
+      slotValueRef.current.set(slot, value);
+      if (now - eventTick.current > 80) {
+        eventTick.current = now;
+        lastEvent.set({ source: src, value: Math.round(value * 1000) / 1000, at: now });
+      }
+      if (watchRef.current) return;
+      const learnTarget = learningRef.current;
+      if (learnTarget) {
+        const key = sourceKey(src);
+        const onto = bankRef.current === 0 ? undefined : bankRef.current;
+        setMap(prev => ({
+          ...prev,
+          bindings: [
+            ...prev.bindings.filter(b => sourceKey(b.source) !== key || b.bank !== onto),
+            { id: newId(), source: src, target: learnTarget.target, mode: 'absolute', bank: onto },
+          ],
+        }));
+        setLearning(null);
+        return;
+      }
+      const h = hostRef.current;
+      const patch = dawSlotSettings(mapRef.current, slot, value, bankRef.current);
+      for (const [k, v] of Object.entries(patch)) {
+        const sk = k as keyof VisualizerSettings;
+        h.setSetting(sk, v as number);
+        touch(`setting:${String(sk)}`, v as number);
+      }
+      const key = sourceKey(src);
+      const matching = mapRef.current.bindings.filter(b => sourceKey(b.source) === key);
+      const onThisBank = matching.filter(b => b.bank === bankRef.current);
+      const live = onThisBank.length ? onThisBank : matching.filter(b => b.bank === undefined);
+      if (prevVal <= 0.5 && value > 0.5) {
+        for (const b of live) {
+          const t: MidiTarget = b.target;
+          if (t.kind === 'action') { h.action(t.action); touch(touchKey(t)); }
+          else if (t.kind === 'preset') { h.applyPreset(t.presetId); touch(touchKey(t)); }
+          else if (t.kind === 'dye') { h.selectDye(t.paletteIndex); touch(touchKey(t)); }
+        }
+      }
+    });
+    return () => { setDawSlotListener(null); };
+  }, [setMap, lastEvent]);
 
   const activeInputName = useMemo(() => {
     if (!enabled || inputs.length === 0) return null;
@@ -698,7 +783,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     supported, enabled, enable, disable, error,
     inputs, outputs, ports, choosePorts, activeInputName,
     map, setMap, rename, clearMap, loadFactory, exportMap, importFile,
-    learning, learn, cancelLearn, removeBinding, setBindingMode, setBindingBank, addBinding,
+    learning, learn, cancelLearn, removeBinding, setBindingMode, setBindingBank, addBinding, bindSlot,
     learnSound, removeSound,
     softTakeover, setSoftTakeover: setSoftTakeoverOn,
     lastEvent,

@@ -18,7 +18,7 @@ export function loadMusicSettings(): MusicSettings {
   return { ...DEFAULT_MUSIC_SETTINGS };
 }
 
-export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
+export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone' | 'daw';
 
 export const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 
