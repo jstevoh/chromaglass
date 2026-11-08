@@ -31,6 +31,7 @@ import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { BUBBLE_FILM_WGSL } from './bubbleFilm';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 
@@ -530,6 +531,7 @@ ${filmTableWgsl()}
 ${LAMP_FIELD_WGSL}
 ${EDGE_LIGHT_WGSL}
 ${CLOSEUP_DEPTH_WGSL}
+${BUBBLE_FILM_WGSL}
 
 // Read one of the two tables at t rainbow periods, one period being one
 // interference order of soap (FILM_NM_PER_T nm), linearly between entries.
@@ -1688,8 +1690,6 @@ const AIR_X: f32 = DROP_NA / (2.0 * N_WATER * (N_WATER / N_AIR - 1.0));
 const AIR_CORE: f32 = AIR_X / sqrt(1.0 + AIR_X * AIR_X);
 /** How much of the plate's light the band takes: it leaves a tenth, less than a drop's 0.15, the bend being three times as hard. */
 const AIR_DARK: f32 = 0.9;
-/** The share of the lamp the rainbow film reflects back toward the lamp at full Iridescence, Film Physics 0 (38h-14): a setting past soap's 8%, its depth the old reflected film's on its dark side. */
-const FILM_R_RAINBOW: f32 = 0.55;
 /** The upright magnification a projected ball gives the dye just under it, M = f/(f - d) at d = R, f = 5.4R. */
 const DROP_MAG: f32 = 1.23;
 /*
@@ -3365,12 +3365,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
           a quarter, is what every look has always had, and the camera's
           bubble still wears it; the plate takes only what is asked above
           that, as a performer turning a soap film up (the looks that set
-          0.6 and 0.9 get most of it; a look at 0.3, a trace). And it is the
-          film's transmitted colour, never its reflected one (38h-14): see
-          the note at the film below.
-        - **No light added.** A film is lossless: what it does not pass it
-          reflects, back up toward the lamp, never to the screen, so the
-          light through it is T = 1 - R of the lamp and never more.
+          0.6 and 0.9 get most of it; a look at 0.3, a trace), as the
+          light through it, never more than the lamp (bubbleFilm.ts).
         - **No highlight**, the second lamp's included: its glint was a
           reflection toward the screen, which the lamp beneath never makes.
 
@@ -3381,42 +3377,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       if (dropCam < 0.999) {
         let blackB = smoothstep(AIR_CORE - softB, AIR_CORE + softB, tB);
         cp = outColor * mix(vec3f(1.0), tint, 0.1 * k1);
-        let cp0 = cp;
         let iridP = clamp((U.iridescence - 0.25) / 0.75, 0.0, 1.0) * (0.4 + 0.6 * k3);
-        /*
-          The film as the projector throws it: the light through it, which is
-          the lamp less what the film reflects, T = 1 - R, in the pale
-          complement of the reflected colour (38h-14). It was the camera's
-          reflected film, cp * (0.45 + 1.25 * filmC), which multiplies the
-          plate by up to 1.7 where the rainbow is bright: at Iridescence 1
-          against 0 the plate's bubbles read 51 levels brighter at Film
-          Physics 0 (\`npm run nolight\` line 15), light out of a pocket of
-          air that has nothing to give it. A film between the glasses is
-          lossless, so whatever colour it reflects up toward the lamp is the
-          colour missing from what reaches the screen: magenta where the
-          reflection is green, straw where it is blue.
-
-          At Film Physics 0 the reflected colour is the look's rainbow,
-          filmC, standing in for R at FILM_R_RAINBOW of the lamp at full
-          strength. A real soap film reflects at most about 8 per cent (the
-          research, item 8), so that is a setting ramped past what soap
-          does, the way Iridescence always was; but its form is the real
-          one, a share of the lamp taken away, so no pixel is brighter than
-          the plate with no film (and no bubble) under it. Its depth is the
-          old one's on its dark side, 1 - 0.6 * 0.55 = 0.67 at the
-          rainbow's peak, so the film is as strong a mark as it was, drawn
-          by what it takes instead of what it added.
-        */
-        cp = cp * (1.0 - FILM_R_RAINBOW * clamp(iridP * 0.6, 0.0, 1.0) * filmC);
-        // With Film Physics up, the projector's film is the measured one:
-        // the light through soap, 1 - R, 92 to 100 per cent of the lamp in
-        // pale complements of the reflected colours (the research, item 8).
-        // So the ramped rainbow above gives way to that as the setting
-        // rises; a real soap film on a projected plate is a faint tint.
-        if (U.filmPhysics > 0.0) {
-          let cpT = cp0 * filmTableAt(filmP, true);
-          cp = mix(cp, mix(cp0, cpT, clamp(iridP, 0.0, 1.0)), U.filmPhysics);
-        }
+        cp = projectorFilm(cp, filmC, filmP, iridP);
         cp = cp * (1.0 - AIR_DARK * blackB);
       }
       let fm = camFilm(filmC, filmP, irid, F);

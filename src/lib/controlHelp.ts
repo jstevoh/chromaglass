@@ -77,7 +77,7 @@ export const CONTROL_HELP: Record<string, string> = {
   lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
   secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
-  iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
+  iridescence: 'Thin-film colour round bubbles: the camera sees the film\'s reflected rainbow, the projected plate the paler colours it lets through.',
   lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
   transmission: 'How light passes through the dye: thin pale, thick deep. Zero is a flat glow.',
   exposure: 'Plate-wide exposure. Dye thinner than the plate\'s own floor reads as bare glass.',
