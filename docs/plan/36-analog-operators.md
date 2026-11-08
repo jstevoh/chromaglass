@@ -88,32 +88,7 @@ button, making it look good. Every item here is held to those.
   heat where it is hottest, buoyant convection and a nucleation threshold boiling vapour
   bubbles while it is held and calming when released. Not a bubble sprite.
   - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the reference the GPU build (36e-2) is held to and `npm run boil` its judge (#352 took the buoyancy tanh out). Story in `docs/plan-shipped.md` §36e-1 (moved 2026-10-29, 19m-2). *Owed with 36e-4:* `boil`'s dry-out look-alike passes today (it throws away 1.7% of the lamp's heat, moving the ledger 0.16%, under its 3% bar); once the glass absorbs the infrared, that build adds a tighter dry-out ledger line.
-  - **36e-2. The GPU build** (*open*, Antigravity's brief in the project's shared files).
-    The model as passes on the plate's grid: the temperature in kelvin, the lamp in watts,
-    the Heat dial, the hand's held air, the threshold and the vapour as a field the bubbles'
-    shading reads (H6's air), the volume sources in the thin gap's projection (as 18c-1's
-    pours), and the `clamp(temp, 0, 50)` and the current's cap out of the heat's way. The
-    phone gets the dial and the gesture in the same PR.
-    *Its check is written* (2026-10-27), red on main until the build, as `soapgpu` was
-    before 32c: `npm run boilgpu` (scripts/boilgpu.mjs, its dishes in
-    scripts/boilgpu-scenes.ts) asks the solver `src/gpu/lampBoil.ts`, in the contract
-    written in scripts/boilgpu-cpu.ts, for boil.mjs's lines on its own fields with boil.mjs's
-    bars, five moved to what float32 can read (each says why: H1 and H2 over 10 ms, the
-    dye's ratio 1e-2, the rim's heat over 1 ms at ±10 K, a site 1e-4 K over its superheat,
-    the volume's divergence 1e-3), plus a nucleus alone (gap-wide, paying its latent heat);
-    and holds its fields to the reference, stepped beside it in node, cell by cell: the
-    lamp's first step and second, a warm patch's upright second, a steam pocket's, a boiling
-    second with no sites, the dish after five minutes, and the hand's boil's start, cell,
-    peak and size at the lift. Every step must submit GPU work, every read map a buffer, and
-    the solver may not carry the reference. The control (`-- --selftest`, Measure's lab2
-    part) reads 54 of 54. Of ten look-alikes of the reference, the dry-out discard, a
-    first-order carry and an explicit rim pass boil.mjs and fail here on the model's lines;
-    a nucleus with no latent heat and one a tenth of a cell pass everything else and fail
-    the nucleus lines; a shortened pressure solve, a weaker rim, a non-conservative steam
-    carry and no vapour volume fail both. One passes: dropping the heat of a bubble's last
-    vapour when it vanishes (under a hundredth of a nucleus, about 0.05 mK), named in 36e-4.
-    `npm run boilgpu` itself joins the Mac's plate shard with the build, which prints its
-    cost a step at 768².
+  - **36e-2. The GPU build (shipped).** `src/gpu/lampBoil.ts` (`createBoilPlateGpu`), `src/gpu/wgsl/lampBoil.ts` (`BOIL_DISH_WGSL`, `PLATE_BOIL_WGSL`), the plate's `stepPlateBoil` pass in `src/gpu/fluid/passes.ts` feeding `vel.z` (°C above `T_AMBIENT`), `hsPour` (thermal expansion + vapour volume in the thin gap's projection) and `air.field` (the vapour fraction shaded as H6's air), Kell buoyancy in `currentForces` (`src/gpu/wgsl/fluid/forces.ts` and `src/sim/fluidSimulation.ts`) with `clamp(temp, 0, 50)` and `maxCurrent` out of the heat's way, the **Heat** dial (`heat`, default 0, excluded from Evolve in `NOT_THE_LOOK`, on Settings → Lamp & Light, Perform desk, MIDI, remote and phone) and the held-hand air block (`boilHolds` on desk, iPad and phone). `npm run boilgpu` 54/54 on `apple metal-3` (`cost: 4.40 ms a step at 768 × 768 on apple metal-3, lamp on`). Story in `docs/plan-shipped.md` §36e-2; judging notes in `docs/judging.md` §109.
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
     rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,
@@ -133,8 +108,13 @@ button, making it look good. Every item here is held to those.
     dissolved air); one broadband infrared coefficient and one visible share; a nucleus
     born whole in one step; the heat of a bubble's last vapour (under 1% of a nucleus)
     given back when it vanishes, which no check can read in float32 and a solver could
-    drop unseen; and an upright dish warmer than its reservoir turns over
-    through the open rim (a slide is closed at its edges; S1 wants a closed rim).
+    drop unseen; an upright dish warmer than its reservoir turns over
+    through the open rim (a slide is closed at its edges; S1 wants a closed rim); and on the
+    live plate's `stepPlateBoil` pass (unlike the standalone `createBoilPlateGpu` dish solver,
+    which runs the full substepped minmod face-flux carry and Jacobi conduction in `r32float`),
+    the plate's temperature and vapour ride the thin gap's velocity by single-step first-order
+    semi-Lagrangian sampling with explicit 5-point conduction, and `vel.z` is stored in the
+    plate's `rgba16float` velocity texture.
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest

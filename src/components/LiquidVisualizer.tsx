@@ -71,7 +71,7 @@ import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '..
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, pourTextOnFluid } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
@@ -1151,6 +1151,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
     if (!af || drainFrameRef.current > 0) return;
+    recordRemoteHold(remoteHoldsRef.current, layer, g.id, g.x, g.y);
     const S = GRID_SIZE;
     const kToolRaw = toolAmountRef.current;
     const kTool = kToolRaw * kToolRaw;
@@ -1328,6 +1329,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * solver steps read it, and keep the magnet there after the hand lets go.
    */
   const magnetHandRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  const remoteHoldsRef = useRef<RemoteHoldMap>(new Map());
   /** Where the lead plate's look put its magnet last frame, to see it moved (see magnetFor). */
   const magnetLookRef = useRef<{ x: number; y: number } | null>(null);
   /** The magnet's own slow walk when nobody is holding it: where along its path. */
@@ -1584,55 +1586,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {
-      const fluid = fluidsRef.current[0];
-      if (!fluid || rows.length === 0) return;
-      // The box injectImage pours into, on the logical grid.
-      const S = fluid.size;
-      const w = Math.round(S * 0.81) - Math.round(S * 0.19);
-      const h = Math.round(S * 0.69) - Math.round(S * 0.31);
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      const g = c.getContext('2d');
-      if (!g) return;
-      const lum = (r: number, gg: number, b: number) => 0.2126 * r + 0.7152 * gg + 0.0722 * b;
-      const brightest = (): string => {
-        const idx = presetContractRef.current ?? harmonyRef.current;
-        let best = { r: 1, g: 1, b: 1 }, bl = -1;
-        for (const i of idx) { const p = PALETTE_RGB[i]; if (p && lum(p.r, p.g, p.b) > bl) { bl = lum(p.r, p.g, p.b); best = p; } }
-        return `rgb(${Math.round(best.r * 255)}, ${Math.round(best.g * 255)}, ${Math.round(best.b * 255)})`;
-      };
-      let colour = opts.colour ?? brightest();
-      if (colour === 'contrast') {
-        // Dark letters on a bright plate, the look's brightest dye on a dark one.
-        const m = fluid.meanColor, d = Math.min(1, fluid.meanDensity);
-        colour = m && d > 0.25 && lum(m[0], m[1], m[2]) > 0.3 ? 'rgb(14, 14, 18)' : brightest();
-      }
-      const [c0, c1] = opts.columns ?? [0, 1];
-      const x0 = Math.round(c0 * w), x1 = Math.round(c1 * w);
-      const room = (x1 - x0) - 6;
-      const face = (px: number) => `900 ${px}px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`;
-      const share = rows.reduce((a, r) => a + (r.weight ?? 1), 0);
-      const usable = h - 6;
-      g.fillStyle = colour;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      // Turned against the plate's own angle so the words read level on the frame.
-      const angle = rotationAnglesRef.current[0] ?? 0;
-      if (angle) { g.translate(w / 2, h / 2); g.rotate(angle); g.translate(-w / 2, -h / 2); }
-      let y = 3;
-      for (const r of rows) {
-        const band = usable * (r.weight ?? 1) / share;
-        let px = Math.floor(band * 0.95);
-        g.font = face(px);
-        while (px > 6 && g.measureText(r.text).width > room) { px -= 1; g.font = face(px); }
-        g.fillText(r.text, (x0 + x1) / 2, y + band / 2);
-        y += band;
-      }
-      // The plate's rows run from the bottom of the frame up; a canvas's run down.
-      const img = g.getImageData(0, 0, w, h);
-      const flipped = g.createImageData(w, h);
-      for (let yy = 0; yy < h; yy++) flipped.data.set(img.data.subarray((h - 1 - yy) * w * 4, (h - yy) * w * 4), yy * w * 4);
-      fluid.injectImage(flipped);
+      pourTextOnFluid(fluidsRef.current[0], rows, opts, presetContractRef.current ?? harmonyRef.current, rotationAnglesRef.current[0] ?? 0);
     },
     kicks: () => kickCountRef.current,
     songShape: () => ({ now: { ...songShapeRef.current.now }, bar: { ...barGridRef.current.now }, events: songEventsRef.current.slice() }),
@@ -3265,6 +3219,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const hands: { hand: Hand; primary: boolean }[] = [];
           if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, laid: dropLaidRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
+          syncBoilHolds(fluidsRef.current, activeLayerRef.current, drainFrameRef.current, hands, remoteHoldsRef.current);
           for (const f of fluidsRef.current) f?.markHand();
           for (const { hand, primary } of hands) {
             /*
@@ -5492,6 +5447,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       mazeKickRef.current = { env: 0, at: 0 };
       magnetWalkAtRef.current = 0;
       magnetHandRef.current = null;
+      remoteHoldsRef.current.clear();
       handoffRef.current = null;
       /*
         The back plate's own look (§16a), let go of. A render lays its look on

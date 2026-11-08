@@ -18,7 +18,7 @@
  * the way the thing it describes does.
  */
 
-import { AIR_SPLAT_WGSL } from './wgsl/air';
+import { AIR_BOIL_WGSL, AIR_SPLAT_WGSL } from './wgsl/air';
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
 import { groupOf, viewOf } from './groupCache';
 
@@ -63,6 +63,32 @@ function splatRecipe(device: GPUDevice): RenderRecipe {
   });
 }
 
+function boilRecipe(device: GPUDevice): RenderRecipe {
+  return (module) => ({
+    label: 'air boil',
+    layout: device.createPipelineLayout({
+      label: 'air boil',
+      bindGroupLayouts: [device.createBindGroupLayout({
+        label: 'air boil',
+        entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } }],
+      })],
+    }),
+    vertex: { module: module(AIR_BOIL_WGSL), entryPoint: 'vs' },
+    fragment: {
+      module: module(AIR_BOIL_WGSL),
+      entryPoint: 'fs',
+      targets: [{
+        format: 'rgba16float' as GPUTextureFormat,
+        blend: {
+          color: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+          alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'max' },
+        },
+      }],
+    },
+    primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
+  });
+}
+
 export class WebGPUAir {
   private readonly disposer = new Disposer();
   private readonly pipelines: PipelineCache;
@@ -83,6 +109,7 @@ export class WebGPUAir {
   private readonly fields: [GPUTexture, GPUTexture];
   private which = 0;
   private live = 0;
+  private boilTex: GPUTexture | null = null;
   /** The list as last handed over, for the coverage the source needs. */
   private packed = new Float32Array(0);
   private disposed = false;
@@ -160,7 +187,12 @@ export class WebGPUAir {
   }
 
   /** Whether anything would be drawn — the caller skips the exclusion without it. */
-  get any(): boolean { return this.live > 0; }
+  get any(): boolean { return this.live > 0 || this.boilTex !== null; }
+
+  /** Attach or clear the plate's boiling vapour fraction texture (`r32float`, PLAN §36e-2). */
+  setBoilAlpha(tex: GPUTexture | null): void {
+    this.boilTex = tex;
+  }
 
   /**
    * What fraction of the plate is air, from the list rather than the field.
@@ -207,6 +239,14 @@ export class WebGPUAir {
       pass.setPipeline(pipeline);
       pass.setBindGroup(0, groupOf(this.device, pipeline, [this.uniform, this.buffer, this.fingers]));
       pass.draw(4, this.live);
+    }
+    if (this.boilTex) {
+      const boilPipe = this.pipelines.renderPipeline('air boil', boilRecipe(this.device));
+      if (boilPipe) {
+        pass.setPipeline(boilPipe);
+        pass.setBindGroup(0, groupOf(this.device, boilPipe, [this.boilTex]));
+        pass.draw(3);
+      }
     }
     pass.end();
   }

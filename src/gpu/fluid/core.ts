@@ -99,6 +99,12 @@ export class FluidCore {
   /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
   protected sloshLevel = true;
   protected sloshTex: GPUTexture | null = null;
+  /** The plate's boiling vapour fraction field (`r32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
+  protected boilAlpha: PingPong | null = null;
+  protected boilSites: GPUBuffer | null = null;
+  protected boilUni: GPUBuffer | null = null;
+  protected boilLive = false;
+  protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   protected readonly velRide: GPUTexture;
   protected readonly scratchA: GPUTexture;
@@ -697,6 +703,10 @@ export class FluidCore {
     for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b, this.swirlDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     this.swirlLive = false;
     this.swirlTail = 0;
+    if (this.boilAlpha) for (const t of [this.boilAlpha.a, this.boilAlpha.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.boilLive = false;
+    this.boilTail = 0;
+    this.air?.setBoilAlpha(null);
     if (this.grain) {
       // Identity coordinates: seedGrain with both phases reseeded. It reads the
       // other texture of the pair — a dispatch may not sample what it writes.

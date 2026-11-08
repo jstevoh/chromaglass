@@ -533,6 +533,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The ground the dye is seen on (PLAN 18b): a fader fades a look from dye
   // as light on black to the lamp shining through it.
   { key: 'lampGround',      label: 'Lamp Ground',      min: 0, max: 1 },
+  { key: 'heat',            label: 'Heat',             min: 0, max: 1 },
   { key: 'iridescence',     label: 'Iridescence',      min: 0, max: 1 },
   { key: 'camera',          label: 'Lens',             min: 0, max: 1 },
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },

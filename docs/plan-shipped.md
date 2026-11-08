@@ -10626,6 +10626,48 @@ model cannot reach one, the PR says what it reached and asks.
     infrared (36e-4), and that build adds a tighter dry-out ledger line. `boilgpu`'s
     boiling second (36e-2) already fails it, by 13% and 16% of the reference's change.
 
+#### 36e-2. The GPU build
+
+  - **36e-2. The GPU build (shipped, 2026-11-07).** `src/gpu/lampBoil.ts` (`createBoilPlateGpu`,
+    `seedBoilSites`, `waterDensity`, `waterViscosity`, `nucleationSuperheat`) and
+    `src/gpu/wgsl/lampBoil.ts` (`BOIL_PROPERTIES_WGSL`, `BOIL_DISH_WGSL`, `PLATE_BOIL_WGSL`)
+    build the 36e-1 model on the GPU, pass for pass, without importing `src/lib/lampBoil.ts`:
+    - *Standalone dish solver (`createBoilPlateGpu`):* `boilThermal` (two-band Beer–Lambert
+      lamp heating $0.12(1 - e^{-A_{\text{dye}}(1-\alpha)}) + 0.88(1 - e^{-\kappa_{\text{IR}}d(1-\alpha)})$,
+      forced/natural air cooling $h_{\text{Forced}} = 50$ or $h_{\text{Natural}} = 10\,\text{W/(m}^2\text{K)}$
+      inside `HAND_RADIUS` of a held hand, and two-face radiation $2\epsilon\sigma(T^4 - T_a^4)$),
+      40-iteration Jacobi sideways conduction (`boilConductionJacobi`) with implicit open-rim
+      clamping to `T_AMBIENT`, cavity nucleation at each cell's largest cavity superheat
+      $\Delta T_{\text{nuc}} = 2\sigma T_{\text{sat}}/(\rho_v L r_c)$ with gap-wide nucleus floor
+      $\alpha_{\text{min}} = \min(0.25, \pi(d/2)^2/\text{d}x^2)$ and two-way rim heat exchange
+      $A_{\text{int}} = 2\sqrt{\pi\alpha}\,d/\text{d}x$ (`boilPhaseChange`), Hele-Shaw Kell buoyancy
+      $(\rho(T_a) - \rho(T))g\,\text{up}$ and Vogel viscosity with 160-iteration red-black SOR
+      pressure projection (`boilPressureSetup`, `boilSorRed`, `boilSorBlack`, `boilVelocity`)
+      sourced by thermal expansion + phase change $\nabla\cdot\mathbf{u} = \beta\dot{T}(1-\alpha) + \dot{\alpha}(1 - \rho_v/\rho_l)$,
+      and CFL-substepped (`dtSub <= 0.45 * dx / vmax`) minmod-limited face-flux advection of
+      liquid temperature (scaled by `C_LIQUID / C_TOTAL` while the glass stays put), vapour
+      $\alpha$ and dye (`boilMaxSpeed`, `boilAdvectFlux`, `boilAdvectApply`).
+    - *Live plate integration:* `stepPlateBoil` (`src/gpu/fluid/passes.ts`) decodes `A_dye`
+      from the plate's dye texture (`0.60 * max(r,g,b) + 0.32 * mean(r,g,b)`), runs the same
+      two-band lamp + air + radiation + conduction + nucleation/condensation step on the
+      plate's grid, writes °C above `T_AMBIENT` to `vel.z`, adds $\nabla\cdot\mathbf{u}$ to
+      `this.hsPour` for the thin gap's pressure projection (`hsDivergence` in
+      `src/gpu/wgsl/thinGap.ts`), and merges `boilAlpha` into `this.air.field` (`setBoilAlpha`
+      in `src/gpu/air.ts`) so the bubbles' shading reads the vapour pocket as H6's air. In
+      `currentForces` (`src/gpu/wgsl/fluid/forces.ts` and `src/sim/fluidSimulation.ts`),
+      `clamp(temp, 0, 50)` is removed, buoyancy uses Kell's `waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + temp)`
+      gated on `S.up` (zero on a level plate), and `maxCurrent` clamps only the non-buoyant
+      current before adding thermal buoyancy.
+    - *Controls:* **Heat** (`heat`, 0..1, default 0 so every look opens byte-for-byte as
+      today, held by `npm run lampzero` and `npm run boilgpu` check 6) in Settings → Lamp &
+      Light, Perform desk (`SECTION_OF` in `src/lib/deskPins.ts`), MIDI (`LEARNABLE_SETTINGS`
+      in `src/lib/midi.ts`), `PER_LAYER` (`src/lib/sceneMap.ts`), excluded from Evolve
+      (`NOT_THE_LOOK` in `src/lib/drift.ts`) and Lucky (`heat: 0`), remote
+      (`src/components/RemoteControl.tsx`) and phone (`src/components/phone/PhoneStage.tsx`);
+      and a pointer hold on the pad (`boilHolds`, desk, iPad and phone) that blocks the fan's
+      air under the finger while held.
+    - *Measured:* `PW_WEBGPU=1 npm run boilgpu` 54/54 on `apple metal-3` (`cost: 4.40 ms a step at 768 × 768 on apple metal-3, lamp on`), `npm run boilgpu -- --selftest` 54/54, `npm run boil` 38/38, `PW_WEBGPU=1 npm run heat` 10/10, `npm run wgsl` 162 shaders, `npm run panel` 263/263, `npm run desk` 48/48.
+
 ### 37. Marketing and social media (asked 2026-10-29)
 
 #### 37x-4d. The Live Show panel and the Pro gate

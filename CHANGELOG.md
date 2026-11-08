@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Heat from the lamp, and boiling under a held hand (PLAN 36e-2)
+
+- **Heat** (`heat`, Settings → Lamp & Light, Perform desk, MIDI, the remote and the phone's Looks
+  sheet; 0 by default and held out of Evolve and Lucky): the projector lamp's thermal flux on the
+  dish in $\text{W/m}^2$ across its visible (dye-absorbed) and infrared (water-absorbed) bands,
+  with two-face radiation, sideways conduction, Kell water-density buoyancy without the old
+  `clamp(temp, 0, 50)` ceiling, thermal expansion and vapour volume sources in the thin gap's
+  projection, and cavity nucleation into vapour pockets shaded as air (`src/gpu/lampBoil.ts`,
+  `src/gpu/wgsl/lampBoil.ts`, `npm run boilgpu`). Holding a pointer or finger on the dish blocks
+  the cooling fan's air under the hand ($h = 50 \to 10\,\text{W/(m}^2\text{K)}$) so the spot boils
+  while held and condenses when released.
+
 ### Added — Film Dye: a colour for the clear film (PLAN 20b-13)
 
 - Beside Clear Film, while there is a film: **Film Dye** and a colour swatch, an

@@ -10,10 +10,12 @@
  */
 import { LiquidType } from '../types';
 import { LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
+import { PALETTE_RGB } from '../constants';
 import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
 import { fluidSink, type AreaSink } from '../lib/areaCords';
+import { showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 export const HAND_SETTLE = 0.25;
@@ -250,4 +252,96 @@ export function stirAlongMove(fluid: Pick<FluidSimulation, 'applySquish' | 'addV
   fluid.applySquish(x, y, 8, 0.005);
   // A touch passes no move (its handler never stirred): no stir, and no row marked for nothing.
   if (dx || dy) fluid.addVelocity(x, y, dx * 5, dy * 5);
+}
+
+/** Remote pad hands held on the glass (0–1), blocking the projector's air while held (PLAN 36e-2). */
+export type RemoteHoldMap = Map<string, { layer: number; x: number; y: number; at: number }>;
+
+export function recordRemoteHold(map: RemoteHoldMap, layer: number, id: number | undefined, x: number | undefined, y: number | undefined): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const holdId = `${layer}:${Number.isFinite(id) ? id : 0}`;
+  map.set(holdId, {
+    layer,
+    x: Math.max(0, Math.min(1, x as number)),
+    y: Math.max(0, Math.min(1, y as number)),
+    at: showNow(),
+  });
+}
+
+export function syncBoilHolds(
+  fluids: (FluidSimulation | undefined)[],
+  activeLayer: number,
+  drainFrame: number,
+  hands: { hand: { x: number; y: number } }[],
+  remoteHolds: RemoteHoldMap,
+): void {
+  const holdNow = showNow();
+  for (let li = 0; li < fluids.length; li++) {
+    const fl = fluids[li];
+    if (!fl) continue;
+    const holds: { x: number; y: number }[] = [];
+    if (li === activeLayer && drainFrame === 0) {
+      for (const { hand } of hands) {
+        if (hand.x > 0 && hand.x < GRID_SIZE - 1 && hand.y > 0 && hand.y < GRID_SIZE - 1) {
+          holds.push({ x: (hand.x + 0.5) / GRID_SIZE, y: (hand.y + 0.5) / GRID_SIZE });
+        }
+      }
+    }
+    for (const [hid, h] of remoteHolds) {
+      if (holdNow - h.at >= 250) { remoteHolds.delete(hid); continue; }
+      if (h.layer === li && drainFrame === 0) holds.push({ x: h.x, y: h.y });
+    }
+    fl.boilHolds = holds;
+  }
+}
+
+export function pourTextOnFluid(
+  fluid: FluidSimulation | undefined,
+  rows: { text: string; weight?: number }[],
+  opts: { colour?: string; columns?: [number, number] },
+  idx: number[],
+  angle: number,
+): void {
+  if (!fluid || rows.length === 0) return;
+  const S = fluid.size;
+  const w = Math.round(S * 0.81) - Math.round(S * 0.19);
+  const h = Math.round(S * 0.69) - Math.round(S * 0.31);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  if (!g) return;
+  const lum = (r: number, gg: number, b: number) => 0.2126 * r + 0.7152 * gg + 0.0722 * b;
+  const brightest = (): string => {
+    let best = { r: 1, g: 1, b: 1 }, bl = -1;
+    for (const i of idx) { const p = PALETTE_RGB[i]; if (p && lum(p.r, p.g, p.b) > bl) { bl = lum(p.r, p.g, p.b); best = p; } }
+    return `rgb(${Math.round(best.r * 255)}, ${Math.round(best.g * 255)}, ${Math.round(best.b * 255)})`;
+  };
+  let colour = opts.colour ?? brightest();
+  if (colour === 'contrast') {
+    const m = fluid.meanColor, d = Math.min(1, fluid.meanDensity);
+    colour = m && d > 0.25 && lum(m[0], m[1], m[2]) > 0.3 ? 'rgb(14, 14, 18)' : brightest();
+  }
+  const [c0, c1] = opts.columns ?? [0, 1];
+  const x0 = Math.round(c0 * w), x1 = Math.round(c1 * w);
+  const room = (x1 - x0) - 6;
+  const face = (px: number) => `900 ${px}px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`;
+  const share = rows.reduce((a, r) => a + (r.weight ?? 1), 0);
+  const usable = h - 6;
+  g.fillStyle = colour;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  if (angle) { g.translate(w / 2, h / 2); g.rotate(angle); g.translate(-w / 2, -h / 2); }
+  let y = 3;
+  for (const r of rows) {
+    const band = usable * (r.weight ?? 1) / share;
+    let px = Math.floor(band * 0.95);
+    g.font = face(px);
+    while (px > 6 && g.measureText(r.text).width > room) { px -= 1; g.font = face(px); }
+    g.fillText(r.text, (x0 + x1) / 2, y + band / 2);
+    y += band;
+  }
+  const img = g.getImageData(0, 0, w, h);
+  const flipped = g.createImageData(w, h);
+  for (let yy = 0; yy < h; yy++) flipped.data.set(img.data.subarray((h - 1 - yy) * w * 4, (h - yy) * w * 4), yy * w * 4);
+  fluid.injectImage(flipped);
 }

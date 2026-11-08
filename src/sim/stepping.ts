@@ -13,6 +13,8 @@
 import { SimResolution } from '../types';
 import { PipelineCache } from '../gpu/kit';
 import { QualityGovernor } from '../lib/governor';
+import type { GpuStepParams } from '../gpu/solverTypes';
+import { T_AMBIENT, waterDensity } from '../gpu/lampBoil';
 
 /**
  * The largest grid a pinned `?sim=` may ask for.
@@ -222,3 +224,76 @@ export const LOCKSTEP = (() => {
   if (typeof window === 'undefined') return false;
   return new URLSearchParams(window.location.search).get('lockstep') === '1';
 })();
+
+/**
+ * The lasting current on the CPU half-grid (M = S/2): buoyancy from water's
+ * real density (Kell 1975, PLAN §36e-2), warm Gauss-Seidel projection, and
+ * bilinear upsampling into the logical velocity grid.
+ */
+export function stepCurrentCpu(
+  M: number,
+  S: number,
+  cvx: Float32Array,
+  cvy: Float32Array,
+  cpr: Float32Array,
+  cdv: Float32Array,
+  density: Float32Array,
+  temp: Float32Array,
+  vxOut: Float32Array,
+  vyOut: Float32Array,
+  p: GpuStepParams,
+): void {
+  for (let j = 1; j < M - 1; j++) {
+    for (let i = 1; i < M - 1; i++) {
+      const k = i + j * M;
+      const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
+      const dd = Math.tanh(density[q] - p.meanDensity);
+      const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
+      let fx = p.rockX * dd;
+      let fy = p.rockY * dd;
+      const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
+      const r = Math.sqrt(tx * tx + ty * ty);
+      if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
+      let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
+      let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
+      const t = temp[q];
+      if (upright <= 0 || p.currentBuoy <= 0 || t <= 0) {
+        const s = Math.sqrt(vx * vx + vy * vy);
+        if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
+      } else {
+        const dRho = Math.max(0, waterDensity(T_AMBIENT) - waterDensity(T_AMBIENT + t));
+        fy = upright * p.currentBuoy * dRho;
+        vy += fy * (1 - p.currentDamp);
+      }
+      cvx[k] = vx; cvy[k] = vy;
+    }
+  }
+  for (let i = 0; i < M; i++) { cvx[i] = cvy[i] = cvx[i + (M - 1) * M] = cvy[i + (M - 1) * M] = 0; cvx[i * M] = cvy[i * M] = cvx[M - 1 + i * M] = cvy[M - 1 + i * M] = 0; }
+  for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+    const k = i + j * M;
+    cdv[k] = -0.5 * (cvx[k + 1] - cvx[k - 1] + cvy[k + M] - cvy[k - M]) / M;
+  }
+  for (let it = 0; it < 10; it++) {
+    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+      const k = i + j * M;
+      cpr[k] = (cdv[k] + cpr[k - 1] + cpr[k + 1] + cpr[k - M] + cpr[k + M]) * 0.25;
+    }
+    for (let i = 0; i < M; i++) { cpr[i] = cpr[i + M]; cpr[i + (M - 1) * M] = cpr[i + (M - 2) * M]; cpr[i * M] = cpr[1 + i * M]; cpr[M - 1 + i * M] = cpr[M - 2 + i * M]; }
+  }
+  for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
+    const k = i + j * M;
+    cvx[k] -= 0.5 * (cpr[k + 1] - cpr[k - 1]) * M;
+    cvy[k] -= 0.5 * (cpr[k + M] - cpr[k - M]) * M;
+  }
+  for (let j = 1; j < S - 1; j++) {
+    const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = Math.max(0, Math.min(1, y - j0));
+    for (let i = 1; i < S - 1; i++) {
+      const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = Math.max(0, Math.min(1, x - i0));
+      const k = i0 + j0 * M;
+      const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
+      const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;
+      vxOut[i + j * S] += ux;
+      vyOut[i + j * S] += uy;
+    }
+  }
+}
