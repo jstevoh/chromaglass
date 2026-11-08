@@ -51,6 +51,7 @@
     "downbeat": "esbuild scripts/downbeat.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/downbeat.mjs && node node_modules/.cache/downbeat.mjs",
     "breakdown": "esbuild scripts/breakdown.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/breakdown.mjs && node node_modules/.cache/breakdown.mjs",
     "kicks": "esbuild scripts/kicks.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/kicks.mjs && node node_modules/.cache/kicks.mjs",
+    "pulse": "node --experimental-strip-types scripts/pulse.mjs",
     "learn": "esbuild scripts/learn.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/learn.mjs && node node_modules/.cache/learn.mjs",
     "render": "node --experimental-strip-types scripts/render.mjs",
     "render-lab": "node scripts/render-lab.mjs",
