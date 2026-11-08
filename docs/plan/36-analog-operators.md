@@ -118,26 +118,33 @@ button, making it look good. Every item here is held to those.
     36e-2*). `boilgpu` holds the dish solver; the boil the app steps on the plate every frame
     (#718's `stepPlateBoil`, `PLATE_BOIL_WGSL`, the current beside it) had no line, and the
     review of #718 found three faults there. `npm run plateboil` (scripts/plateboil.mjs):
-    *boil* (the Mac's plate shard, `--owed=rate,hold,fan,steam`, printed owed while
-    src/gpu/lampBoil.ts is absent): a level dish of dark dye at Heat 1, warmed at the app's
-    longest frame (0.1 s, FluidSimulation's clamp) and then stepped at 1/60 s. `rate` the
-    1/60 s approach heats as the warm-up did (0.6x–1.4x, still climbing); `hold` under a
-    held hand the spot reaches 100 °C and steam shows in the air field within 90 s; `fan`
-    under the fan, after 15 minutes, over 80 °C and under 100 °C at every read, no steam;
-    `steam` the dye that leaves a ring twice the hand's size is what the steam's volume
-    displaced (0.5x–1.5x). An f64 port of #718's own heat balance reads 100 °C at 258 s
-    under the hand and 94 °C after 15 minutes under the fan. #718's head (cc0f6523) at 1/60 s
-    stalls at 84.0 °C under the hand (vel.z is a half float: once 64 K over the room its step
-    is 1/16 K and a step's 0.007 K rounds away) and at 64 °C under the fan, at 0.1 s steps
-    climbs in half-float quanta (3.0 K each 10 s). *zero* (Measure's lab2, holds on main):
-    Heat 0 keeps today's current byte for byte, the tree's `currentForces` against today's
-    (scripts/plateboil-today.mjs, generated from main at 50159cb) in a second lab on
-    SwiftShader, three plates with a spot over the clamp's 50 K, and FluidSimulation's
-    `stepCurrent` against today's body. #718 reads 20 084 and 20 889 values different on the
-    upright plates and 89 872 on the CPU; the level plate is the same (S.curBuoy is already
-    upright × Buoyancy, so #718's uncapped branch never runs there). A throwaway fix of
-    #718 (its temperature kept in a float32 channel of the boil field, the reference's
-    vapour source, the Kell branch only while the boil runs) reads 6/6 on *zero*.
+    *boil* (the Mac's plate shard, `--owed=rate,hold,fan,steam,writes`, printed owed while
+    neither src/gpu/lampBoil.ts nor `GpuStepParams.boilHolds` exists): a level dish of dark
+    dye at Heat 1, Heat Decay at the app's 0.98, warmed at the app's longest frame (0.1 s,
+    FluidSimulation's clamp) and then stepped at 1/60 s. `rate` the 1/60 s approach heats
+    as the warm-up did (the hand's mean, 0.6x–1.4x, still climbing); `hold` under a held
+    hand the spot reaches 100 °C and steam shows in the air field within 150 s (a site's
+    superheat, about 4.3 K at the lowest under the hand, comes on top); `fan` under the fan,
+    after 15 minutes, over 80 °C and under 100 °C at every read, no steam; `steam` the dye
+    that leaves a ring twice the hand's size, less the ring's own drift, is what the steam's
+    volume displaced (0.5x–1.5x) and arrives in the annulus beyond (0.7x–1.3x); `writes`
+    30 K poured out of the fan plate's spot stays out ten 1/60 s steps later (a boil that
+    keeps a private copy and writes it back passes the rest on a still level plate). An f64
+    port of #718's own heat balance reads 100 °C at 258 s under the hand and 94 °C after 15
+    minutes under the fan. #718's head (cc0f6523) reads 0/4 on the first four: its hand's
+    plate climbs in half-float quanta to 84.8 °C at 0.1 s steps and then cools at 1/60 s
+    (vel.z is a half float: once 64 K over the room a step is 1/16 K and a frame's 0.007 K
+    rounds away), its fan's stops at 67.7 °C, and no steam. *zero* (Measure's lab2, holds on
+    main): Heat 0 keeps today's current byte for byte, the tree's `currentForces` against
+    today's (scripts/plateboil-today.mjs, generated from main at 50159cb) in a second lab on
+    SwiftShader, three plates with a spot over the clamp's 50 K, the fluid.ts lines that
+    pack its uniforms held to today's text, and FluidSimulation's `stepCurrent` against
+    today's body. #718 reads 20 084 and 20 889 values different on the upright plates and
+    89 872 on the CPU; the level plate is the same (S.curBuoy is already upright ×
+    Buoyancy, so #718's uncapped branch never runs there). A throwaway fix of #718 (its
+    temperature kept in a float32 channel of the boil field, the reference's vapour source,
+    the Kell branch only while the boil runs) reads 6/6 on *zero*. One check-skeptic pass;
+    its six findings are in the check.
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
     rim moves at about h_i·ΔT/(ρ_v·L), 4 cm/s) before the next site warms to its threshold,

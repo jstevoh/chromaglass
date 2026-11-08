@@ -66,8 +66,8 @@
  *          plate (0.7x–1.3x), so steam that deleted the dye under it, with
  *          nothing flowing, does not pass.
  *   writes after the fan's run, 30 K poured out of the spot (lab.vel on vel.z)
- *          is still out ten 1/60 s steps later (0.8x–1.2x of the drop read at
- *          once): a boil that keeps a private copy of the temperature and
+ *          is still out ten 1/60 s steps later (0.8x–1.2x of the drop the
+ *          pour asks for, the disc's mean over the hand's cells): a boil that keeps a private copy of the temperature and
  *          writes it back each step undoes every other pass that writes heat,
  *          and on a still level plate nothing else would show it.
  *
@@ -241,10 +241,9 @@ async function plate(page, { hold, warmTo, warmMax, fineMax, afterSteam }) {
   */
   const before = await read(t, 'pour');
   await page.evaluate((hand) => { lab.vel(0.5, 0.5, hand, [0, 0, -30, 0]); lab.flush(); }, HAND);
-  const written = await read(t, 'poured');
   await page.evaluate((o) => lab.step(10, { ...o, magnetSeconds: 1 / 60 }), over);
   const kept = await read(t + 10 / 60, 'kept');
-  return { reads, warmEnd, steamAt, pour: { before, written, kept } };
+  return { reads, warmEnd, steamAt, pour: { before, kept } };
 }
 
 const NAMES = {
@@ -322,10 +321,22 @@ async function boilPart() {
   }
   lineOf('steam', NAMES.steam, ok, detail);
 
-  const { before, written, kept } = F.pour;
-  const wrote = before.mean - written.mean, stays = (before.mean - kept.mean) / wrote;
-  lineOf('writes', NAMES.writes, wrote > 10 && stays >= 0.8 && stays <= 1.2,
-    `30 K poured out under the fan's spot took the hand's mean from ${fmt(before.mean, 1)} to ${fmt(written.mean, 1)} °C (bar a drop over 10 K); ten 1/60 s steps later ${fmt(kept.mean, 1)} °C: ${fmt(stays)} of the drop kept (bar 0.8–1.2)`);
+  /*
+    The pour is lab.vel's soft disc, 30 K × (1 − r²/HAND²) on the L × L grid
+    (L = N here), which the solver adds to vel.z in the next step's deltaVel;
+    so the drop it asks for, over the hand's cells, is that disc's mean there,
+    and a read straight after the flush would see nothing yet.
+  */
+  const { before, kept } = F.pour;
+  let asked = 0, cells = 0;
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const dx = (i + 0.5) / N - 0.5, dy = (j + 0.5) / N - 0.5, q = dx * dx + dy * dy;
+    if (q <= HAND * HAND) { asked += 30 * Math.max(0, 1 - q / (HAND * HAND)); cells++; }
+  }
+  asked /= cells;
+  const stays = (before.mean - kept.mean) / asked;
+  lineOf('writes', NAMES.writes, stays >= 0.8 && stays <= 1.2,
+    `30 K poured out under the fan's spot asks the hand's mean to drop ${fmt(asked, 1)} K; ten 1/60 s steps later it went from ${fmt(before.mean, 1)} to ${fmt(kept.mean, 1)} °C: ${fmt(stays)} of the drop kept (bar 0.8–1.2)`);
 }
 
 // ── zero ─────────────────────────────────────────────────────────────────
