@@ -244,7 +244,12 @@
         "a job can arrive: main's push and run by hand taken; a branch, a pull",
         "request, pull_request_target, workflow_run, a schedule, another workflow",
         "on main and another repository refused. And the watchdog's stall rule",
-        "(scripts/macwatch.mjs) against made-up runs, between two shards included."
+        "(scripts/macwatch.mjs) against made-up runs, between two shards included,",
+        "and its busy rule (19ah-9): a shard whose first step found other work on",
+        "the Mac moves the deploy to GitHub's Macs; and that step's own rule",
+        "(scripts/macbusy.sh) against made-up process lists and this machine's own:",
+        "another session's working browser or the app counted; a deploy's own, an",
+        "idle leftover and a vite server alone not."
       ]
     },
     {

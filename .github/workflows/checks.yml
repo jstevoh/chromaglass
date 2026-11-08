@@ -458,6 +458,18 @@ jobs:
         shard: ${{ fromJSON(needs.reach.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
+      # First on the owner's Mac, before setup-node: is anything else drawing
+      # with its GPU (another session's harness, a build queue's checks, the
+      # ChromaGlass app: a test browser or the app at 5% of a core or more)? Two deploys of 2026-11-08 ran beside them three
+      # times slower than the same Mac alone and went red on timing lines and
+      # timeouts. It waits up to two minutes, then fails, and deploy.yml's
+      # watchdog moves the deploy to GitHub's Macs (scripts/macbusy.sh,
+      # PLAN.md 19ah-9). Its name is what the watchdog reads: keep the two
+      # the same (FREE_STEP in scripts/macwatch.mjs).
+      - name: The owner's Mac is free of other work
+        if: ${{ runner.environment == 'self-hosted' }}
+        timeout-minutes: 4
+        run: bash scripts/macbusy.sh 120
       - uses: actions/setup-node@v5
         with:
           node-version: 22
