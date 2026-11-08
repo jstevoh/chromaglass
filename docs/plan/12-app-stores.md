@@ -184,7 +184,7 @@ feature ships its phone version is what keeps them whole.
   MadMapper, TouchDesigner) sell direct. Reopen only if Home's sales show buyers
   who would have found it in the store, and then as Home alone.
 
-**12-tv: the plate on a living-room TV (asked 2026-11-08, route not chosen).** The
+**12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
 owner asked whether a Google TV / Android TV app should play the plate on a big
 screen at home, unlocked by Home and Pro. What decides it is the TV's GPU, not the
 store. The plate is WebGPU only (`src/gpu/device.ts` fails with `no-webgpu`, no
