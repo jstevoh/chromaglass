@@ -1397,6 +1397,21 @@
       ]
     },
     {
+      "name": "The looks browser: stills and one preview, owed",
+      "shard": "browser",
+      "run": "npm run looksgrid -- --owed=stills,preview",
+      "why": [
+        "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
+        "look's card on the Perform desk's grid, the narrow window's look menu and the",
+        "phone's Looks sheet draws one lazy still of its own, a small WebP from the",
+        "built site, the same file on all three, none flat and no two alike (34b-1);",
+        "and only the hovered or held card holds a preview canvas, one at a time,",
+        "gone once it is left (34b-2). Headless with no WebGPU, so the page answers",
+        "at once; the site \"The load\" just built. --owed: each line is excused only",
+        "in main's state; the PR that builds it takes its id out. About 20 s."
+      ]
+    },
+    {
       "name": "The Tip pad on the desk and the phone",
       "shard": "browser",
       "run": "npm run tippad",
@@ -2443,6 +2458,19 @@
         "--owed=back: a second plate's pool outlined as the front's is (PLAN 21b),",
         "excused only in main's state (the back printed, not outlined); the PR that",
         "builds it takes the id out"
+      ]
+    },
+    {
+      "name": "The looks browser leaves the plate its steps, owed",
+      "shard": "tools",
+      "run": "npm run looksgrid -- --budget --owed=budget",
+      "why": [
+        "PLAN 34b-2 on Metal (scripts/looksgrid.mjs --budget): a hovered card's",
+        "preview plays, and the show's plate steps meanwhile at 0.95 or more of its",
+        "rate with the grid shut. A real GPU's line: SwiftShader gives the page",
+        "a frame every few seconds, so neither half can be read in Measure.",
+        "--owed=budget is excused only while no card holds a preview; the PR that",
+        "builds it takes the id out. About 40 s."
       ]
     },
     {
