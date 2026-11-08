@@ -287,8 +287,11 @@ rest is routine and the owner's calls.
   stays and what grows across the album. Each song still gets its own look, applied whole
   (looks never inherit, `lookFade.ts`), but the sheet derives them from one place:
   - *One palette lineage.* An album palette of four or five dyes (five is the plate's most,
-    25h); each song takes it a step around the wheel or swaps one dye, never all five, so
-    track 7 is recognisably the same record as track 1. The changes land on song
+    25h); each song swaps a dye or two, never all five, so track 7 is recognisably the
+    same record as track 1. (It said "a step around the wheel or" too: on the 24-colour
+    palette every dye moved one hue along reads 0.125 to 0.207 in OKLab, more than half
+    as far as two different shipped looks, so the check's bar holds a song to a swap's
+    scale; 2026-11-08.) The changes land on song
     boundaries, faded, as Evolve already does at a section (`slowEvolve.ts`).
   - *One liquid, one motif.* The album picks its liquid (oil over ink, ferrofluid, soap
     film) and a motif that returns (the title poured at each song's start, a ferrofluid
@@ -316,6 +319,18 @@ rest is routine and the owner's calls.
   neighbouring songs stays under a bar while track 1 and track 3 differ, that the building
   quantity rises monotonically across the album, and that the plate's dye at a song's
   first frame is the previous song's last.
+  *Check written first (2026-11-08), red on main:* `npm run album` (`scripts/album.mjs`,
+  node, the Measure lane's logic part, `--owed=sheet,lineage,builds,seeds`) holds the
+  contract, `src/lib/albumSheet.ts` (`readAlbumFile`, `trackPalette`, `trackStart`,
+  `buildAt`, `trackSeed`, `albumSetList`); its palette bars are read from the shipped
+  looks' palettes (neighbours within half their median OKLab distance, 0.079 today; track
+  1 and 3 at least 0.03 apart; track 7 nearer track 1 than the median). `npm run
+  albumplate -- --owed=carry` (the fifth Mac shard) is the plate's line through a new
+  `window.chromaglassAlbum` hook, with two controls that hold on main (Go keeps the plate,
+  Clear does not); it reads the picture's pattern and the settings, the mean dye only printed. A node line rather than the lab for all but `carry`, since the sheet is
+  data; `carry` is the app's, since only the app's song change can clear the plate.
+  Not measured: the motif, the Design desk's editor, and whether the plate draws the
+  track's palette (the owner judges the record).
 - **37x-4. Go live to YouTube from the Mac app.** *(build, M; its own thread.)* The owner
   chose 2026-10-29 to play the album from a streaming app and capture it live: "I would
   rather play off of youtube music/qobuz and capture the audio live as the video plays in
@@ -426,20 +441,14 @@ rest is routine and the owner's calls.
       film of two known halves alone in the mixer, a keystone on the wall, the Mixer stack
       source's frames decoded: 1920x1080, the film the right way up and round, the mixer's
       grade on it, every edge cell the film's, square, and on a Mac moving), with the panel's Source as `data-testid="live-source"` (values `plate`,
-      `stack`); CI's fifth Mac shard runs it with `--owed=plate,stack` until the builds land.
-    - *37x-4d-6. The stream's frames are black.* (Open; found writing 37x-4d-1's check.)
-      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
-      and a presented WebGPU canvas read outside the frame task that drew it answers black
-      (why the projector window and the pad's picture are copied inside that task:
-      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
-      plate read in its frame was the film with the keystone; the Plate source's decoded
-      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
-      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
-      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
-      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
-      --stack`, red on main. Metal answers the same: CI's fifth Mac shard on #619 decoded
-      (0, 0, 0) in every cell from 50 packets, against the plate's own (30, 104, 251) |
-      (240, 139, 1).
+      `stack`); CI's fifth Mac shard runs it with `--owed=stack` until the build lands (the
+      `plate` line went green with 37x-4d-6). Its frames come the way the plate's now do:
+      see 37x-4d-6.
+    - *37x-4d-6. The stream's frames are black.* *(shipped 2026-10-31.)* The frame task
+      hands the encoder each picture it draws (`lib/liveFrame.ts`, `lib/frameTaps.ts`);
+      story in `docs/plan-shipped.md` §37x-4d-6. The Mixer stack's draw (37x-4d-1) calls
+      `tapLiveFrame('stack', canvas)` from the same task and the panel starts the encoder
+      with `frames: 'stack'`; it can skip its draw unless `liveFrameWanted('stack')`.
     - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
       account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
       new desk; and it would sit on the website's Perform too, where it cannot stream. It
@@ -452,10 +461,16 @@ rest is routine and the owner's calls.
       carries). A Test to one unlisted destination proves only its own rate: the advice
       says "never filled the link" rather than guess. A destination that does not
       acknowledge (37x-4c's item) cannot fill the measure either.
-    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width the app
-      goes to the phone layout (`usePhoneLayout`), which has no Live Show and no live chip:
-      a stream running there keeps running, unseen. Small, since the Mac app is the
-      laptop at the desk; the fix is the remote's `LiveRemoteChip` on `PhonePlay`.
+    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width (1024) the
+      app leaves the desks and the Live Show panel with them: a stream running there keeps
+      running, unseen. It goes to the floating overlay (`overlayUp` in `usePhoneLayout`),
+      not the phone layout as this item first said: `wantsPhoneLayout` wants a coarse
+      pointer and a short side under 600, which a Mac's window has not (found writing the
+      check, 2026-11-08). The fix is the remote's `LiveRemoteChip` on that overlay, and on
+      `PhonePlay` too should the app ever be opened at `/play`. Check written first, red
+      on main: `npm run liveshow -- --owed=narrow` (`scripts/liveshownarrow.mjs`): at
+      900x800 the chip on screen saying Live with its clock, its first tap only asking;
+      and, holding on main, the stream still live back at full width.
     - *37x-4d-5. Instagram's and TikTok's keys are per stream.* The panel keeps a key until
       it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
       change it each stream, the row could clear the key when a stream ends and say so,

@@ -290,7 +290,7 @@ export class FluidPasses extends FluidFields {
   protected stepSpecies(pass: GPUComputePassEncoder, carry = true): void {
     const sp = this.species!;
     if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
-    this.run(pass, 'speciesSplat', sp.write, [sp.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
+    this.run(pass, 'speciesSplat', sp.write, [sp.read, this.squeeze.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
   }
 
@@ -337,7 +337,7 @@ export class FluidPasses extends FluidFields {
     const perStep = gPrime * seconds / (3 * nu * dx * dx);
     if (!(perStep > 0) || !Number.isFinite(perStep)) return null;
     const eta = DYE_CAP * DYE_LAYER;
-    const b = REST_GAP_METRES;
+    const b = this.coverGap * GAP_METRES;
     // η³(1 − η/b)³ rises to its peak at half the gap.
     const e = Math.min(eta, b / 2);
     const open = 1 - e / b;
@@ -688,9 +688,10 @@ export class FluidPasses extends FluidFields {
     /*
       And how far that pull carries the film this step, for the carries to
       take out (driftCells, and why): hsPrep's drag, u = (u + kΔt·glass) /
-      (1 + kΔt), at the rest gap, in whole cells a step.
+      (1 + kΔt), at the cover's gap (38r-5), in whole cells a step.
     */
-    const kdt = 12 * nu / (REST_GAP_METRES * REST_GAP_METRES) * seconds;
+    const hc = this.coverGap * GAP_METRES;
+    const kdt = 12 * nu / (hc * hc) * seconds;
     this.glassFlow = [(this.glassFlow[0] + kdt * glassX) / (1 + kdt), (this.glassFlow[1] + kdt * glassY) / (1 + kdt)];
     this.glassCells = [this.glassFlow[0] * disp * this.N, this.glassFlow[1] * disp * this.N];
     const whole = (c: number) => Math.max(-DRIFT_MOST, Math.min(DRIFT_MOST, Math.round(c)));

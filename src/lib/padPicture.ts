@@ -48,6 +48,30 @@ export const PAD_PICTURE_RENEW_MS = 1000;
 const QUALITY = 0.6;
 /** The largest picture a remote will paint, as a data URL. A 480-wide JPEG is about 40k of it. */
 export const PAD_PICTURE_MAX_CHARS = 400_000;
+/*
+  The owner's assistant's one-off still (PLAN 44c-4). Its `look_at_plate` rode
+  the pad's picture, 480 wide at most: enough to tell mud from balance, not
+  enough to judge a fine edge, a thin film's rings or the grain of a stock.
+  So it may ask for one frame up to 1280 wide, through the same grab and the
+  same encoder, answered once and never streamed: fifteen 1280 JPEGs a second
+  would be several megabytes a second on a show's Wi-Fi for a picture a model
+  reads once every few seconds.
+
+  Its size on the wire is what bounds it. The relay closes a socket whose
+  frame is over half a megabyte (`MAX_FRAME` in server/remote-server.js), and
+  that socket is the display's own: an oversized still would drop the whole
+  show's link. A 1280 by 720 frame of a busy plate encoded at 0.7 measured
+  about 150 to 250 kB, a third more as base64; a still over
+  `PAD_STILL_MAX_CHARS` is not sent, and the next frame is taken again at
+  next step down (three quarters of the width), so a plate busy enough to
+  overflow still answers, a little smaller.
+*/
+export const PAD_STILL_MAX_WIDTH = 1280;
+export const PAD_STILL_MAX_CHARS = 480_000;
+/** A still is sharper than the pad's stream: it is read for detail, once. */
+const STILL_QUALITY = 0.7;
+/** A still asked for and not taken in this long (no frame drawn: the show window shut) is let go. */
+export const PAD_STILL_WAIT_MS = 3000;
 
 export type PadPictureMessage = Extract<RemoteMessage, { type: 'picture' }>;
 
@@ -63,6 +87,19 @@ type Done = (src: string | null, size: number) => void;
 export function padPictureWidth(asked: unknown): number {
   const w = typeof asked === 'number' && Number.isFinite(asked) ? Math.round(asked) : PAD_PICTURE_MIN_WIDTH;
   return Math.max(PAD_PICTURE_MIN_WIDTH, Math.min(PAD_PICTURE_MAX_WIDTH, w));
+}
+
+/**
+ * The width a still is taken at: the widest of a few steps not over what was
+ * asked. Steps, not any width, because the GPU grab compiles a pipeline per
+ * size (gpu/padGrab.ts): any width from 160 to 1280 could be a shader
+ * compile in the middle of a show every time the assistant asked (found in
+ * review). These are the widths an oversized still steps down through too.
+ */
+export const PAD_STILL_WIDTHS = [1280, 960, 720, 540] as const;
+export function padStillWidth(asked: unknown): number {
+  const w = typeof asked === 'number' && Number.isFinite(asked) ? asked : PAD_STILL_MAX_WIDTH;
+  return PAD_STILL_WIDTHS.find(s => s <= w) ?? PAD_STILL_WIDTHS[PAD_STILL_WIDTHS.length - 1];
 }
 
 /** Whether a `picture` from the wire is one a remote should paint. */
@@ -100,10 +137,27 @@ export class PadPictureSender {
     if (this.leases.length > 16) this.leases.splice(0, this.leases.length - 16);
   }
 
-  /** Whether any remote wants pictures now. */
+  /**
+   * The owner's assistant asked for one still this wide (PLAN 44c-4). Taken
+   * from the next frame drawn, whether or not a pad is asking, and sent once
+   * with `still: true`. A second ask before it is taken only widens it.
+   */
+  wantStill(width: unknown): void {
+    const w = padStillWidth(width);
+    const t = this.now();
+    const live = this.still && this.still.until > t ? this.still.width : 0;
+    this.still = { width: Math.max(w, live), until: t + PAD_STILL_WAIT_MS };
+  }
+  private still: { width: number; until: number } | null = null;
+  /** The pictures in flight that are stills, by seq. */
+  private stills = new Set<number>();
+  /** Stills sent, for the debug readout. */
+  stillsSent = 0;
+
+  /** Whether any remote wants pictures now, or the assistant a still. */
   get wanted(): boolean {
     const t = this.now();
-    return this.leases.some(l => l.until > t);
+    return this.leases.some(l => l.until > t) || (this.still !== null && this.still.until > t);
   }
 
   /**
@@ -194,12 +248,13 @@ export class PadPictureSender {
       // `toBlob` can throw (an encoder that fails, a canvas that is not
       // origin-clean): then nothing is in flight, and a place held would
       // narrow the pictures until the watchdog freed it.
+      const quality = this.stills.has(seq) ? STILL_QUALITY : QUALITY;
       try { small.toBlob((blob) => {
         if (!blob) { done(null, 0); return; }
         const reader = new FileReader();
         reader.onloadend = () => done(typeof reader.result === 'string' ? reader.result : null, blob.size);
         reader.readAsDataURL(blob);
-      }, 'image/jpeg', QUALITY); } catch { done(null, 0); }
+      }, 'image/jpeg', quality); } catch { done(null, 0); }
       return true;
     });
   }
@@ -213,22 +268,28 @@ export class PadPictureSender {
     const t = this.now();
     // An encode that never answered in two seconds is given up on, so it
     // cannot hold a place in flight until a reload.
-    for (const [s, at] of this.inflight) if (t - at > 2000) { this.inflight.delete(s); this.waiting.delete(s); this.readAt.delete(s); this.encodeMs.delete(s); }
+    for (const [s, at] of this.inflight) if (t - at > 2000) { this.inflight.delete(s); this.stills.delete(s); this.waiting.delete(s); this.readAt.delete(s); this.encodeMs.delete(s); }
+    if (this.still && this.still.until <= t) this.still = null;
     const live = this.leases.filter(l => l.until > t);
-    if (live.length === 0 || frameWidth === 0 || frameHeight === 0) return;
+    const still = this.still;
+    if ((live.length === 0 && !still) || frameWidth === 0 || frameHeight === 0) return;
     this.trace.frames++;
-    if (t < this.due - 8) return;
+    // A still is taken from the first frame it can be: it is one picture,
+    // not a stream, so the stream's pace does not hold it back.
+    if (!still && t < this.due - 8) return;
     if (this.inflight.size >= PAD_PICTURE_IN_FLIGHT) { this.trace.full++; return; }
     // The widest frame asking: the iPad's, when a phone and an iPad both are.
-    const width = Math.max(...live.map(l => l.width));
+    const width = still ? still.width : Math.max(...live.map(l => l.width));
     const aspect = frameWidth / frameHeight;
     const w = Math.min(width, frameWidth);
     const h = Math.max(1, Math.round(w / aspect));
     const seq = ++this.seq;
     this.inflight.set(seq, t);
+    if (still) this.stills.add(seq);
     const done: Done = (src, size) => {
       const taken = this.inflight.get(seq);
       if (taken === undefined || !this.inflight.delete(seq)) return;   // answered after the watchdog gave up on it
+      const isStill = this.stills.delete(seq);
       this.waiting.delete(seq);
       const read = this.readAt.get(seq), enc = this.encodeMs.get(seq);
       this.readAt.delete(seq);
@@ -237,13 +298,29 @@ export class PadPictureSender {
       const trips = this.trace.trips;
       trips.push([read === undefined ? -1 : Math.round(read - taken), enc === undefined ? -1 : Math.round(enc), Math.round(this.now() - taken)]);
       if (trips.length > 60) trips.shift();
+      if (isStill) {
+        // Too big for the relay's frame: take the next one a step smaller,
+        // unless it is at the last step (then the assistant is told nothing
+        // came, by its own wait running out).
+        if (src && src.length > PAD_STILL_MAX_CHARS) {
+          const next = PAD_STILL_WIDTHS.find(s => s < w);
+          if (next) this.wantStill(next);
+          return;
+        }
+        if (!src) return;   // an encode that failed: the assistant's wait runs out, and it asks again
+        this.stillsSent++;
+        this.bytes += size;
+        this.send({ type: 'picture', src, w, h, aspect, seq, still: true });
+        return;
+      }
       if (!src || seq < this.last) return;
       this.last = seq;
       this.sent++;
       this.bytes += size;
       this.send({ type: 'picture', src, w, h, aspect, seq });
     };
-    if (!start(w, h, seq, done)) { this.inflight.delete(seq); this.trace.refused++; return; }
+    if (!start(w, h, seq, done)) { this.inflight.delete(seq); this.stills.delete(seq); this.trace.refused++; return; }
+    if (still) { this.still = null; return; }
     this.due = Math.max(this.due + 1000 / PAD_PICTURE_FPS, t);
   }
 
@@ -251,7 +328,7 @@ export class PadPictureSender {
   private post(worker: Worker, seq: number, job: { bmp: ImageBitmap } | { pixels: Uint8ClampedArray; w: number; h: number }, transfer: Transferable[], done: Done): void {
     if (!this.inflight.has(seq)) { done(null, 0); return; }   // the watchdog gave up on it while it was read
     this.waiting.set(seq, done);
-    worker.postMessage({ ...job, quality: QUALITY, seq }, transfer);
+    worker.postMessage({ ...job, quality: this.stills.has(seq) ? STILL_QUALITY : QUALITY, seq }, transfer);
   }
 
   /** When each picture in flight came back from the GPU (`tapGrab`), and how long the worker's own encode of it took. */
@@ -275,7 +352,7 @@ export class PadPictureSender {
   private waiting = new Map<number, Done>();
 
   /** What `chromaglassDebug().padPicture` says: the counts, the ways, and the trace. */
-  get debug() { return { sent: this.sent, bytes: this.bytes, wanted: this.wanted, via: this.via, from: this.from, trace: this.trace }; }
+  get debug() { return { sent: this.sent, stills: this.stillsSent, bytes: this.bytes, wanted: this.wanted, via: this.via, from: this.from, trace: this.trace }; }
 
   /** Where the frames are read: on the GPU by the WebGPU engine, or from the canvas (for the checks). */
   get from(): 'gpu' | 'canvas' { return this.now() - this.grabbedAt < 1000 ? 'gpu' : 'canvas'; }

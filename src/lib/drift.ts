@@ -76,6 +76,9 @@ const CALIBRATION = new Set([
   'beatLead', 'filmDrive', 'filmImpact', 'filmMix', 'filmKey', 'soundImpact',
   'shapeImpact', 'sceneDrive', 'sceneHands', 'sceneImpact', 'sceneDeadzone',
   'sceneSmooth', 'camera',
+  'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
+  'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
+  'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // How the show follows the music, not what the look is (lib/tempoPace.ts).
   'tempoSync',
   // The set's shape, not the look's (lib/scenePacing.ts): a nudge across its
@@ -101,6 +104,9 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
   'plateRock', 'frameSway', 'beatSqueeze', 'beatAccent', 'kaleidoSpin', 'kaleidoZoom',
   'spinRpm', 'rotationSpeed', 'spinImpulse', 'spinWander', 'spinAudioDepth', 'spinDrag',
   'plateSpring', 'lampMotion', 'stockWeave',
+  // The liquid under the cover and the cover's weight (PLAN 38r-5) set the whole dish's gap as one,
+  // and a wander down either spills liquid over the rim for good: a hand's, never Evolve's.
+  'liquidMl', 'coverWeight',
 ]);
 /*
   And what Evolve does itself, so it does not also wander: the palette moves at
@@ -127,6 +133,10 @@ const NOT_THE_LOOK = new Set([
   // tear a look's crowd of drops into a few blobs for good, and up adds
   // nothing to a look without one. The look's own number, held.
   'filmHold',
+  // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
+  // soap clear off the plate at a chosen half-life; Evolve must not start a
+  // loss by itself.
+  'soapBreakdown',
   // How much of a burst each kick throws (Kick Bloom): the owner's hand, as
   // Frame Sway is. It is 1 on every look so none changes, and a wander would
   // walk a look off the amount it ships with and into the dye-free calm of 0

@@ -13,6 +13,7 @@ import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture'
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
+import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
 import { Slider } from './RemoteSlider';
@@ -796,6 +797,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.thinGap ?? 1) > 0.5 && (
             <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* The liquid under the cover and the glass on it (PLAN 38r-5), as on the desk. */}
+          <Slider label="Liquid" field="liquidMl" step={1} format={(v) => `${Math.round(v)} mL`} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Cover Weight" field="coverWeight" step={5} format={(v) => `${Math.round(v)} g`} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The clear film that tears into lace (PLAN §20b), always: laying it
             and thickening it is a pour, worth a thumb from across the room.
@@ -812,6 +816,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* And Film Hold, which keeps the drops of that oil apart, likewise. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
+          {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
+            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
           {/* Macro camera */}

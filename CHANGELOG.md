@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — LFOs and envelopes you set (PLAN 30b)
+
+- In **Settings → Patches** (on the desk and the phone, and learnable over MIDI), each of the four LFOs (`lfo1`..`lfo4`) now sets its bar rate (`¼` to `16` bars), waveform shape (`sine`, `triangle`, `ramp`, `stepped`, or `smoothed random` gliding by cosine each period) and optional restart trigger (`free`, `kick`, `snare`, `note`, `pad`); each of the two envelopes (`env1`, `env2`) sets its attack (`1 ms`–`1 s`), decay (`20 ms`–`4 s`) and trigger source (`any`, `kick`, `snare`, `note`, `pad`). Today's fixed rates and shapes remain the defaults sample for sample (`npm run soundowed`, `npm run shapes`).
+
+### Added — the liquid's amount sets the gap: Liquid and Cover Weight (PLAN 38r-5)
+
+- The plate now knows how much liquid is under its cover glass. Two dials, Liquid (mL) and
+  Cover Weight (g), set the gap between the glasses through the real physics: the glass
+  floats on the liquid while the meniscus at its edge holds it, and squeezes the extra out
+  over the rim, by Stefan's law, when it cannot. Pours lift the glass. The defaults are
+  today's 2 mm plate.
+
+### Added — Soap Breakdown (PLAN 38c-3)
+
+- A new **Soap Breakdown** control (`soapBreakdown`, Settings → Oil & Soap under Soap Bursts,
+  MIDI, both desks, the remote while Soap Bursts is on, and the phone's Dye sheet with Soap
+  in hand; `0` by default on every look): a first-order surfactant loss $d\Gamma/dt = -k\Gamma$
+  on the mix's `.g` channel in `mixUpdate` (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`),
+  scaled by the step's real seconds (`magnetSeconds`), never by frames or the look's Speed,
+  and shown on the desk as its half-life ($\ln 2 / k$, from `1.9h` at `0.01` down to `10s` at
+  `1`). At `0` (`Off`), all soap is conserved on the plate; turning it up clears soap over the
+  chosen half-life so a long show keeps bursting (`npm run soapbreak`).
+
 ### Added — Film Dye: a colour for the clear film (PLAN 20b-13)
 
 - Beside Clear Film, while there is a film: **Film Dye** and a colour swatch, an

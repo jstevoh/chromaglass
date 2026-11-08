@@ -1,5 +1,6 @@
 import { Sliders } from 'lucide-react';
-import { FACTORY_MAPS, type FactoryMapId } from '../../lib/midi';
+import { FACTORY_MAPS, sourceLabel, targetLabel, type FactoryMapId } from '../../lib/midi';
+import { PRESETS, livePresetId } from '../../presets';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { LIT } from '../ui';
@@ -173,6 +174,17 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                   {midi.clocked ? ' · clock arriving' : ''}
                 </p>
               </>
+            )}
+
+            {midi.map.bindings.length > 0 && (
+              <div className="mb-3 max-h-36 overflow-y-auto rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px]" data-testid="settings-midi-bindings">
+                {midi.map.bindings.map(b => (
+                  <div key={b.id} className="flex items-center justify-between gap-2 py-0.5 border-b border-white/5 last:border-b-0" data-testid="settings-midi-binding">
+                    <span className="font-mono text-white/60 shrink-0">{sourceLabel(b.source)}</span>
+                    <span className="truncate text-white/80">{targetLabel(b.target, (id) => PRESETS.find(p => p.id === livePresetId(id))?.name)}</span>
+                  </div>
+                ))}
+              </div>
             )}
 
             {onOpenMidi && (

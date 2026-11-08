@@ -165,7 +165,7 @@ export interface LiquidVisualizerHandle {
    * and because the thing firing it should not have to know what an envelope
    * is. `velocity` scales how far they swing, so a hard note hits harder.
    */
-  fireEnvelopes: (velocity?: number) => void;
+  fireEnvelopes: (velocity?: number, source?: 'note' | 'pad') => void;
   /**
    * The element the film is playing in, so it can be read back as a sensor
    * as well as shown through the dye. Null when nothing is loaded.
