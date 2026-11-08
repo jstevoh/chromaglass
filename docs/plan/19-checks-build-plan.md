@@ -280,12 +280,24 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   1.40 ms over the next merges: split any that would pass 21 there. Each part draws its own
   runner, so only `lab`, which runs videoflow, knows its tier today: on deploy 670 `lab2` and
   `lab3` ran 11:38 and 11:49 as jobs on runners whose tier nothing printed.
-- **19k-13, open** (E, S). **The Mac's plate shard at its 20 minutes.** On #690's run the
-  plate shard's 41 checks took 19:08 after 46 s of setup on a GitHub Mac, and the job was
-  cancelled about a second past its bound, every check green (green on re-run); on main's
-  deploy 671 it ran 18:07. The slowest: Areas that listen 1:42, A drop slumps 1:05, the
-  Finger drags 0:58, the physics 0:56. Every other Mac shard ran 15:49 to 16:49 on that run,
-  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way.
+- **19k-13** (E, S): **shipped**, the Mac jobs' bound 20 → 25 minutes, and a shard's checks past
+  18 minutes (a Measure part's past 21) a warning on the run's page, the room line `ROOM` in
+  `scripts/checks.mjs`. Story in `docs/plan-shipped.md` §19k-13. Open: read the warnings over
+  the next deploys, and rebalance (or add a sixth shard) when one shard keeps warning. The
+  same day 18m-5a moved `npm run slump` (now about 2:00) from plate to tools; read both shards'
+  warnings before moving anything else.
+- **19k-14, open** (E, S). **`draftwall --frames` hangs on a Mac.** On #690's second run the
+  Mac's open shard ran `node scripts/draftwall.mjs --frames`, printed every line up to "and
+  the copy stays up for the next look" (17 s in), then nothing for 12:07, until the job was
+  cancelled at its bound with the five checks after it never run; green on the re-run, and
+  25 to 37 s on the other nine attempts of 2026-11-07. Since 19k-13 the entry has a 3-minute
+  timeout, so a hang is this check red by name and the shard goes on. What hung is not known:
+  the next calls are a `page.evaluate` of the settings and a `clear`, a 300 ms wait, another
+  `page.evaluate`, and a click on Live (`scripts/draftwall.mjs` after that line), and an
+  evaluate has no timeout of its own, so a page whose main thread stops would hold it. Next:
+  print a line before each of those calls under `CI`, so the next hang names its call, then
+  find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
+  19aa's and may share the cause).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

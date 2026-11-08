@@ -1,5 +1,6 @@
-import { useCallback, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
-import { type SongAction, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId } from '../lib/songShows';
+import { useCallback, useEffect, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { type SongAction, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId, pourGesture } from '../lib/songShows';
+import { setSongCueSink } from './songCue';
 import { unhandled } from '../lib/unhandled';
 import { useSongShows } from '../hooks/useSongShows';
 import { PRESETS } from '../presets';
@@ -38,6 +39,9 @@ interface SongScoreDeps {
   tempoLabel: { source: string | null; bpm: number; taps: number; };
 }
 
+/** How many actions the owner's assistant may add to one song's show (PLAN 44f). */
+const ASSISTANT_SONG_ACTIONS = 24;
+
 export function useSongScore({
   wallRef, goLookNow, runActionRef, setSettings, glideSetting, songShows, followSongs, designing,
   renderHold, musicIntel, isActive, currentSong, songShowsRef, setSongShows, activePresetId,
@@ -67,6 +71,8 @@ export function useSongScore({
       // full, bright plate in the look's own dye does not show.
       case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
       case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
+      // A drop of this dye, as a pad's Drop lays it (lib/songShows.ts pourGesture).
+      case 'pour': v?.applyGesture(pourGesture(a, (x, y) => v.wallToPlate(x, y, 0, true))); break;
       // A show that names something this build cannot do says so, rather
       // than running the stage and appearing to have done it.
       default: unhandled("a song show's action", a);
@@ -80,6 +86,7 @@ export function useSongScore({
     follow: followSongs && !designing && !renderHold,
     track: musicIntel.state.track,
     positionSec: musicIntel.state.positionSec,
+    positionNow: musicIntel.positionNow,
     songMap: musicIntel.state.songMap,
     isActive,
     kicks: () => wallRef.current?.kicks() ?? 0,
@@ -101,9 +108,9 @@ export function useSongScore({
     slider moved, a fader ridden), which a fade would take back.
   */
   const currentShow = useMemo(() => showFor(songShows, currentSong), [songShows, currentSong]);
-  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat) => {
+  const pinScoreCue = useCallback((when: ActionWhen, what: ActionWhat, idPrefix = 'act') => {
     if (!currentSong) return;
-    const action: SongAction = { id: newId('act'), when, what };
+    const action: SongAction = { id: newId(idPrefix), when, what };
     const shows = songShowsRef.current;
     const existing = showFor(shows, currentSong);
     if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
@@ -115,6 +122,29 @@ export function useSongScore({
     songRuntimeRef.current.keepLook(id);
     setSongShows([...shows, { id, song: currentSong, look, actions: [action] }]);
   }, [currentSong, setSongShows, activePresetId, pinnedPresetId, userPresets.presets]);
+  /*
+    The owner's assistant's song actions (PLAN 44f, app/songCue.ts) land as a
+    pinned cue does. With no song playing there is no show to put it in, and
+    the assistant is told so rather than the action being kept for a song
+    nobody named. Its actions carry ids of their own (`asst-`), and it adds
+    no more than ASSISTANT_SONG_ACTIONS to one song's show: one in a loop must
+    not grow the saved shows without end, nor stack a hundred pours on one
+    second of the song (the guard paces the adding, not the firing).
+  */
+  const pinRef = useRef(pinScoreCue);
+  pinRef.current = pinScoreCue;
+  const songRef = useRef(currentSong);
+  songRef.current = currentSong;
+  useEffect(() => {
+    setSongCueSink((when, what) => {
+      if (!songRef.current) return 'no song is playing: the action goes into the show of the song playing now';
+      const mine = showFor(songShowsRef.current, songRef.current)?.actions.filter(x => x.id.startsWith('asst-')).length ?? 0;
+      if (mine >= ASSISTANT_SONG_ACTIONS) return `the assistant has already added ${ASSISTANT_SONG_ACTIONS} actions to this song's show`;
+      pinRef.current(when, what, 'asst');
+      return null;
+    });
+    return () => setSongCueSink(null);
+  }, [songShowsRef]);
   const removeScoreCue = useCallback((actionId: string) => {
     setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
   }, [setSongShows]);

@@ -36,8 +36,15 @@
  *     holds the empty plate (the counting sees a write that is not a step);
  *   - the counting sees a readback asked for (the first frame asks: twice,
  *     since until a ring has landed something it is asked again).
+ *
+ * And three lines owed until their builds, with their own controls
+ * (scripts/framereads-owed.mjs, 2026-11-07): H2c-7's readback straight into
+ * its ring, H2c-6's display with no aux target while the camera is off, and
+ * H2c-9's pack only after a step, the last two on a plate kept across frames
+ * (scripts/lab-plateframes.ts, loaded by scripts/framereads-entry.ts).
  */
 import { openLab } from './lab.mjs';
+import { owedLines } from './framereads-owed.mjs';
 
 const N = Number(process.env.FRAMEREADS_GRID ?? 128);
 const FRAMES = 30;
@@ -48,7 +55,7 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const { page, close } = await openLab();
+const { page, close } = await openLab({ entry: 'scripts/framereads-entry.ts' });
 try {
   const r = await page.evaluate(async ({ n, frames }) => {
     const p = { thinGap: 1 };
@@ -151,6 +158,9 @@ try {
   check('settled, the mirror is the field read straight out', r.dyeOff === 0 && r.velOff === 0, `dye off by ${r.dyeOff}, flow by ${r.velOff}`);
   check('thick liquid\'s share is the share it was, to the bit', r.shares[0] > 0 && r.shares.every((v) => v === r.was), `${r.shares.join(', ')} against ${r.was}`);
   check('a share read after the first makes no buffer', r.madeAfter === 0, `${r.madeAfter} made`);
+
+  // H2c-6, H2c-7 and H2c-9, owed until each ships (framereads-owed.mjs).
+  await owedLines(page, check);
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
