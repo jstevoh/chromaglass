@@ -158,6 +158,7 @@ export async function owedLines(page, check) {
     vel.corrections === 1 && vel.carries === 2);
   line('h2c8', 'H2c-8: a plate that never had a bubble makes no air pass a step and keeps no air texture',
     r.bare.passes === 0 && r.bare.live === 0,
-    `${r.bare.passes} passes a step, ${r.bare.live} air textures alive (main 1 and 2)`,
-    r.bare.passes === 1 && r.bare.live === 2);
+    `${r.bare.passes} passes a step, ${r.bare.live} air textures alive (main 1 and 3)`,
+    // Main's state: one pass, the air pair and, since 38h-13, the splat's depth (which disc wins a texel, gpu/air.ts).
+    r.bare.passes === 1 && r.bare.live === 3);
 }
