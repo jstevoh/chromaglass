@@ -2192,6 +2192,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       the last one: one draw a refresh, not one per clock.
     */
     const drawGate = new DrawGate();
+    drawGate.paceTo = 'wall';
     /*
       The loop, guarded.
 

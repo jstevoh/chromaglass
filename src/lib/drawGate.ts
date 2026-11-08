@@ -136,6 +136,7 @@
 import { isGlobalAmbientMode } from './ambient.ts';
 
 export type DrawSource = 'frame' | 'ask';
+export type DrawPace = 'faster' | 'wall';
 
 /** An offer this soon after the last draw, as a fraction of a refresh, is turned down. */
 export const DRAW_SKIP_FRACTION = 0.6;
@@ -228,6 +229,8 @@ export class DrawGate {
   lastDraw = -Infinity;
   /** Optional explicit per-gate ambient cap (defaults to global ambient mode). */
   ambient = false;
+  /** Whether two clocks pace to the faster display or to the wall's refresh (14b-120). */
+  paceTo: DrawPace = 'faster';
   private readonly lastOffer: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
   /**
@@ -240,20 +243,27 @@ export class DrawGate {
   readonly drawn: Record<DrawSource, number> = { frame: 0, ask: 0 };
   readonly skipped: Record<DrawSource, number> = { frame: 0, ask: 0 };
 
+  setPaceTo(mode: DrawPace): void {
+    this.paceTo = mode;
+  }
+
   /** Whether both clocks have offered within the last `CLOCK_FRESH_MS` at `now`: the only time anything is gated. */
   twoClocks(now: number): boolean {
     return now - this.lastOffer.ask <= CLOCK_FRESH_MS && now - this.lastOffer.frame <= CLOCK_FRESH_MS;
   }
 
-  /** The refresh the gate works to at `now` (ms): the faster running clock's median gap, never under 240 Hz's. */
+  private clockMs(source: DrawSource, now: number): number {
+    const g = this.gaps[source];
+    if (g.length === 0 || now - this.lastOffer[source] > CLOCK_FRESH_MS) return Infinity;
+    const sorted = [...g].sort((a, b) => a - b);
+    return sorted[sorted.length >> 1];
+  }
+
+  /** The refresh the gate works to at `now` (ms): the faster running clock's median gap (or the wall's when `paceTo === 'wall'`), never under 240 Hz's. */
   refreshMs(now: number): number {
-    let best = Infinity;
-    for (const source of ['frame', 'ask'] as const) {
-      const g = this.gaps[source];
-      if (g.length === 0 || now - this.lastOffer[source] > CLOCK_FRESH_MS) continue;
-      const sorted = [...g].sort((a, b) => a - b);
-      best = Math.min(best, sorted[sorted.length >> 1]);
-    }
+    const ask = this.clockMs('ask', now);
+    if (this.paceTo === 'wall' && Number.isFinite(ask)) return Math.max(REFRESH_MIN_MS, ask);
+    const best = Math.min(this.clockMs('frame', now), ask);
     if (!Number.isFinite(best)) return REFRESH_DEFAULT_MS;
     return Math.max(REFRESH_MIN_MS, best);
   }
@@ -278,8 +288,11 @@ export class DrawGate {
     }
     // Gated only while the other clock is running too: one clock alone, the
     // show with no wall or the wall with the show covered, draws every tick.
-    // And never this clock's own next refresh (see above).
-    const ownNext = this.spent[source] && gap >= REFRESH_MIN_MS;
+    // And never this clock's own next refresh (see above), unless pacing to a
+    // slower wall while the desk's preview clock runs faster (14b-120).
+    const fasterDesk = this.paceTo === 'wall' && source === 'frame'
+      && this.clockMs('frame', now) < 0.8 * this.clockMs('ask', now);
+    const ownNext = !fasterDesk && this.spent[source] && gap >= REFRESH_MIN_MS;
     if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now) && !ownNext) {
       // An offer stamped behind the last draw (its callback ran late, after
       // the other clock's next refresh) is an earlier refresh, not the one
