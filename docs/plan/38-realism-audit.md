@@ -255,19 +255,14 @@ written first. Line numbers are as read on main at d07ac31.
     bulb's lost share.
   - **38h-6. Light still made at an edge, found doing 38h-2** (S each, nil). The back
     plate's derived boundary adds `edge1 · edgeK · 0.25` of white and 1.6 of the dye (the
-    31a shortcut, left to **31a**); the camera's bubble's film colour multiplies by up to
-    1.7 (a front-lit soap film's reflection, where a backlit pocket's film transmits:
-    `filmTableAt(…, true)`, as the projected bubble already uses at Film Physics); the
-    ferrofluid's glint is a fixed key light (with **38j**). The photo style's softbox is a
-    print lit from the front and stays. And the lab draws only the derived path, so the
-    plain path's rims are checked through the camera's, which shares `meniscus`.
-    *The film's check, written first (2026-11-08):* `npm run nolight -- --owed=film` line
-    15, the camera's bubbles at Iridescence 1 against 0, at Film Physics 0 and 1: no pixel
-    brighter (by over 1), over 0.2% of the picture still moved, and Film Physics 0 the same
-    picture as 1 (one transmitted film; main differs by 31). Main: 22 levels over at
-    Film Physics 0 (`camFilm`'s `0.45 + 1.25 × filmC`), 0 at 1, where it already
-    transmits. A throwaway `camFilm` that returns `mix(1, filmTableAt(filmP, true), irid)`
-    at any Film Physics passed it (10.83% moved at each).
+    31a shortcut, left to **31a**); the ferrofluid's glint is a fixed key light (with
+    **38j**). The photo style's softbox is a print lit from the front and stays. And the lab
+    draws only the derived path, so the plain path's rims are checked through the camera's,
+    which shares `meniscus`. ~~*The camera bubble's film*~~ *shipped 2026-11-08:* `camFilm`
+    (`src/gpu/wgsl/closeupDepth.ts`) returns the transmitted film `mix(1, filmTableAt(filmP,
+    true), clamp(irid, 0, 1))` at every Film Physics (22 levels over to 0, 10.75% moved at
+    each, 0 levels between Film Physics 0 and 1); `npm run nolight` line 15 (`film` taken out
+    of `--owed`). Story in `docs/plan-shipped.md` §38.
   - **38h-14. The projector's bubble film still reflects at Film Physics 0** (S, nil; a
     look change on the looks that set Iridescence over 0.25). Found writing 38h-6's
     check: the plate's own bubbles at Iridescence 1 against 0 read 51 levels brighter at
