@@ -157,7 +157,7 @@ merge conflicts are the shared documents', which 0.6 ends.
   Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
   249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
   `docs/plan-shipped.md` §14aa.
-- **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
+- **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S; H2c-3 and H2c-1 in progress): the coarse multigrid levels in one workgroup,
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
