@@ -29,7 +29,7 @@ import {
   designFromMap, listenStep, startListening, withDesign, listenLine, LISTEN_IDLE, LISTEN_GIVE_UP_MS, DESIGNED_CUE,
 } from '../src/lib/songDesign.ts';
 import { scoreOf } from '../src/lib/songScore.ts';
-import { GLIDES } from '../src/lib/sequencer.ts';
+import { GLIDES, stageAtOffset } from '../src/lib/sequencer.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -51,12 +51,8 @@ const ROCK = mapOf([
 const show = (actions) => ({ id: 's', song: { title: 'T', artist: 'A' }, look: { kind: 'preset', id: 'classic' }, actions });
 /** Where each designed cue fires, through the real scheduler, as `what@seconds`. */
 const fires = (map, design) => scoreOf(map, show(design.actions)).cues.map((c) => `${c.what}@${c.at}`);
-/** The stage `startAt` would enter at t: stages end to end by their seconds. */
-function stageAt(stages, t) {
-  let off = t, i = 0;
-  for (; i < stages.length - 1; i++) { const len = Math.max(1, stages[i].seconds); if (off < len) break; off -= len; }
-  return stages[i];
-}
+/** The stage the transport's `startAt` enters at t, through its own walk (`stageAtOffset`). */
+const stageAt = (stages, t) => stages[stageAtOffset(stages, t, false).index];
 
 // ── The design, on a rock song ───────────────────────────────────────
 const rock = designFromMap(ROCK);
@@ -70,16 +66,21 @@ for (let t = 0; t < 180; t += 0.5) {
   const st = stageAt(rock.stages, t);
   if (!st.name.toLowerCase().startsWith(sec.label)) wrongStage.push(`${t}s ${st.name}/${sec.label}`);
 }
-check('a song joined at any moment starts in the stage of the section playing then', wrongStage.length === 0,
+check('a song joined at any moment starts in the stage of the section playing then, and every stage hands over on its clock',
+  wrongStage.length === 0 && rock.stages.every((st) => st.advance === 'time'),
   wrongStage.length ? wrongStage.slice(0, 4).join(', ') : '360 half-seconds, all in their section\'s stage');
 const s = rock.stages, by = (n) => s.find((st) => st.name === n);
-const louder = ['dyeBudget', 'turbulenceScale', 'audioImpact', 'beatSqueeze'].every((k) => by('Chorus 1').settings[k] > by('Verse 1').settings[k] && by('Verse 1').settings[k] > by('Intro').settings[k]);
-check('the chorus is fuller, more stirred and pressed harder than the verse, and the verse than the intro', louder,
+// Every setting a stage moves, not a chosen few: one that fell as the song
+// got louder, or sat still, would read as the show not hearing the chorus.
+const rideKeys = Object.keys(by('Intro').settings);
+const louder = rideKeys.length === 6 && rideKeys.every((k) => by('Chorus 1').settings[k] > by('Verse 1').settings[k] && by('Verse 1').settings[k] > by('Intro').settings[k]);
+check('the chorus is fuller, more stirred, rocked and pressed harder, with more bubbles, than the verse, and the verse than the intro (all six)', louder,
   `dye ${by('Intro').settings.dyeBudget} → ${by('Verse 1').settings.dyeBudget} → ${by('Chorus 1').settings.dyeBudget}`);
 check('every designed setting is one a stage glides (GLIDES), so it moves rather than jumps',
   s.every((st) => Object.keys(st.settings).every((k) => GLIDES.some(([g]) => g === k))));
 check('colours open from two dyes in the intro to the whole palette in the chorus; each verse turns one',
-  by('Intro').paletteSize === 2 && by('Chorus 1').paletteSize === undefined && by('Verse 1').paletteLead === 0 && by('Verse 2').paletteLead === 1);
+  by('Intro').paletteSize === 2 && by('Outro').paletteSize === 2 && by('Chorus 1').paletteSize === undefined
+  && by('Verse 1').paletteLead === 0 && by('Verse 2').paletteLead === 1 && by('Bridge').paletteSize === 3 && by('Bridge').paletteLead === 2);
 check('the bridge goes in close and the stage after it comes back out',
   by('Bridge').macro === true && by('Chorus 3').macro === false && by('Chorus 1').macro === undefined);
 check('no glide is longer than half its stage, and up into a louder section is quicker than down',
@@ -121,10 +122,11 @@ check('designing again replaces the designed cues and keeps the person\'s own',
 const track = (isrc = 'SONG-A') => ({ isrc, title: 'Tiger Rag', artist: 'The Band', source: 'fingerprint', durationSec: 180 });
 const ear = (o) => ({ now: 0, track: null, songMap: null, heardMap: null, analyzing: false, ...o });
 const t0 = startListening(1000);
-let r = listenStep(t0, ear({ now: 1000 + 10_000 }));
+// In seconds, not the constant: what the panel promises is forty-five.
+let r = listenStep(t0, ear({ now: 1000 + 44_000 }));
 const stillListening = r.state.phase === 'listening';
-r = listenStep(t0, ear({ now: 1000 + LISTEN_GIVE_UP_MS + 1 }));
-check('nothing named for 45 s says so, and not before', stillListening && r.state.phase === 'missed', listenLine(r.state, true));
+r = listenStep(t0, ear({ now: 1000 + 45_001 }));
+check('nothing named for 45 s says so, and not before', LISTEN_GIVE_UP_MS === 45_000 && stillListening && r.state.phase === 'missed', listenLine(r.state, true));
 r = listenStep(t0, ear({ now: 2000, track: track() }));
 check('a song named with no map yet goes into the list and waits to be heard through',
   r.state.phase === 'learning' && r.heard?.title === 'Tiger Rag' && r.heard?.artist === 'The Band' && r.heard?.durationSec === 180 && r.design === null,
@@ -137,6 +139,13 @@ const analysisRunning = r.state.phase === 'learning';
 r = listenStep(learning, ear({ track: null, heardMap: { ...ROCK, isrc: 'OTHER' }, analyzing: false }));
 check('another song\'s map is not this song\'s; a song gone while its analysis runs is not "too short"; gone with no map is',
   notOther && analysisRunning && r.state.phase === 'short', listenLine(r.state, true));
+// The next song starting is the other way a song goes (no silence between).
+const nextSongAnalysing = listenStep(learning, ear({ track: track('OTHER'), analyzing: true })).state.phase;
+const nextSongNoMap = listenStep(learning, ear({ track: track('OTHER'), analyzing: false })).state.phase;
+check('a song cut off by the next one: waits while its analysis runs, then says it was too short',
+  nextSongAnalysing === 'learning' && nextSongNoMap === 'short', `${nextSongAnalysing}, then ${nextSongNoMap}`);
+r = listenStep(learning, ear({ track: track('OTHER'), heardMap: ROCK }));
+check('a song cut off by the next one, long enough to map, is designed from its own map', r.design === ROCK);
 r = listenStep(learning, ear({ track: null, heardMap: ROCK }));
 check('the map its first listen made, kept after the song ended, is what it designs from', r.design === ROCK);
 r = listenStep(t0, ear({ now: 1500, track: track(), songMap: ROCK }));
