@@ -74,7 +74,7 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
       <div className={section} data-cg-cloud-sync="upsell">
         <div className={label}>Cloud sync · Pro</div>
         <p className="mt-1 text-[12px] leading-snug text-text-2">
-          Pro keeps your saved looks, sequences, set lists, song shows, MIDI map and settings the same in every
+          Pro keeps your saved looks, sequences, set lists, song shows, MIDI map, desk tabs and settings the same in every
           browser and Mac app you sign in to.
         </p>
         <a
@@ -123,7 +123,7 @@ export const CloudSyncCard: React.FC<{ tier: 'free' | 'home' | 'pro'; email: str
         {note ?? line(status, email)}
       </p>
       <p className="mt-1 text-[12px] leading-snug text-muted">
-        Saved looks, sequences, set lists, song shows, liquids, the MIDI map and settings. The projector layout,
+        Saved looks, sequences, set lists, song shows, liquids, the MIDI map, the desk's tabs and settings. The projector layout,
         audio input and MIDI ports stay with each computer.
       </p>
       <div className="mt-2 flex flex-wrap gap-2">

@@ -1250,6 +1250,49 @@ follows a source at a depth through the patch bay (`sceneMap.ts`), and an action
 on a source's onset, on the predicted beat once the clock is locked (64 ms ahead of the
 heard kick on the test song; `npm run learn`, 30/30). A beat cannot press a toggle.
 
+#### 8-tabs-a. The tabs go with the account (2026-11-07, rebuilt from the closed #531)
+
+The desk's tab list (`chromaglass-desk-tabs`) is a synced store, `deskTabs`, in
+`src/lib/cloudSync.ts` and `server/cloud-sync.js`, so a Setup tab made for a venue on
+the laptop is the phone's and the Mac app's. Nothing in the desk learned about the
+cloud: the sync scan stamps the key like any other and `useDeskTabs` reads it again
+when the cloud writes it (`useCloudSyncReload`), because a list held in state and
+saved over the new one would read, to the next scan, as this device overruling it.
+It is kept whole, as one value, not a list by tab id: the order of the chips is part
+of it, and a list by id would lose the order. The price is that two tab lists edited
+on two devices before either syncs leave the later one (8-tabs-a-1). The tab that is
+up (`chromaglass-desk-mode`) stays each machine's own: the phone is on Perform while
+the laptop is on Setup. The shipped three are stored as nothing, so "Put the shipped
+tabs back" removes the key and that is a deletion the cloud takes and the other
+devices follow. `npm run cloudsync` 14a to 14c: renamed, moved and added tabs arrive
+on a second device in order and with the same panels, which tab is up does not
+travel, the reset travels, and a value that is not tabs loads as the shipped three.
+The first time a device meets the account's list it joins it, not loses to it
+(`mergeFirst` on the store, `mergeStoredTabs` in `src/lib/deskTabs.ts`): a device that
+held its own tabs before it ever synced is stamped the oldest there is, and with the
+tabs kept whole the cloud's list won that tie and took every tab the device had made;
+the review of #531 measured it with the laptop and the Mac app each renaming a different
+tab, and on an account whose list had once been put back to shipped (the cloud then holds
+a deletion with a real time). The cloud's list is the base and its order stands; a tab
+only this device has is added, a shipped tab arranged here that the cloud holds as
+shipped takes the cloud's place for it, a tab arranged on both is the cloud's with this
+device's kept beside it as "(here)", and a shipped tab never touched and absent from the
+cloud is not brought back. `npm run cloudsync` 14d to 14g (the first three fail without it). The rollout order is
+covered too (14h): the site updates before the Mac app, so a device on the build before
+`deskTabs` syncs after another pushed its tabs, its `rev` moves past that record, and
+when it updates its seeding tied with the cloud and the answer held nothing to merge;
+the next edit there then wiped the other's tabs. A store seeded on a device that has
+synced before sets `refetch` in its meta, and the next answer is asked for from `since
+0` (one full download, kept until an answer arrives, so offline does not lose it).
+The review of #697 found the first meeting could still be missed: a device that edits its
+tabs again before its first answer (offline at the venue, or while the live Worker does not
+yet take the store) stamped the edit with the clock, so its whole list beat the account's
+on the server and the merge never ran. A stamp still waiting for that meeting now keeps
+its mark and its oldest time through such an edit (14i). It also found a "(here)" tab could
+take the id of one an earlier meeting had kept, and a full strip of nine dropped this
+device's arrangement of a shipped tab though that adds no tab (14j). Both fail without
+the fix. Judging §110.
+
 #### 8-v2. Desk v2: one desk, three layouts (2026-10-10)
 
 `src/components/desk/Desk.tsx`, `DeskPanels.tsx`, `PanelBrowser.tsx` (new),
@@ -10680,6 +10723,39 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4d-6. The stream's frames were black
+
+  - **37x-4d-6. The stream's frames were black (shipped 2026-10-31).** Found writing
+    37x-4d-1's check (#619).
+      `lib/liveStream.ts` draws `#liquid-canvas` onto its staging canvas on its own clock,
+      and a presented WebGPU canvas read outside the frame task that drew it answers black
+      (why the projector window and the pad's picture are copied inside that task:
+      `CastDisplay.tsx`, `LiquidVisualizer.tsx`). Measured on SwiftShader 2026-10-31: the
+      plate read in its frame was the film with the keystone; the Plate source's decoded
+      frame was (0, 0, 0) in every cell. `npm run liveshow` and `npm run desktop` count
+      packets, and `npm run live` streams the lab's canvas, so none saw it. Fix: hand the
+      encoder each frame from inside the frame task (a tap beside `tapPadPicture`), which
+      the Mixer stack source needs too. Measure: the `plate` line of `npm run liveshow --
+      --stack`, red on main. Metal answers the same: CI's fifth Mac shard on #619 decoded
+      (0, 0, 0) in every cell from 50 packets, against the plate's own (30, 104, 251) |
+      (240, 139, 1).
+    The fix: `LiquidVisualizer`'s frame task, where the projector's mirror and the pad's
+    picture are copied, now calls `tapFrameCopies(canvas)` (`lib/frameTaps.ts`), which
+    hands the canvas to the pad and to the Live Show (`lib/liveFrame.ts`). While a stream
+    is on air (`LiveEncoder` with `frames: 'plate'`, as `lib/liveShow.ts` starts it) the
+    encoder copies the picture onto each output's 2D staging canvas there, once for each
+    frame its clock has sent since, and encodes the stage on its own clock: the stream
+    keeps its rate and repeats its last picture when the plate is slower. `start` waits
+    for the first picture before its clock starts (a frame at sixty; CI's Mac decoded a
+    black first keyframe when it did not, and the moving line found no film in it), and
+    a page with no plate, as the panel's check on a machine with no WebGPU, starts black
+    after half a second and still streams. Measured
+    with `PW_WEBGPU=1 npm run liveshow -- --stack` in a cloud session: the Plate source's
+    decoded 1920x1080 frame went from (0, 0, 0) in every cell to the film with the
+    keystone, middle (3, 106, 250) | (243, 139, 1) against the plate's own (3, 105, 251)
+    | (242, 139, 1), black in the two keystoned corners as the plate is. `npm run
+    liveshow` 33/33 as before. The `plate` id left `--owed` in `scripts/checks.json`.
+
 #### 37x-4d. The Live Show panel and the Pro gate
 
   - **37x-4d. The Live Show panel and the Pro gate (shipped 2026-10-30).** The owner asked
@@ -11278,6 +11354,44 @@ the plate keeps the lab's onset until the standing film has its pull (38k-7).
   (and it prints the lab's 22.1 mT beside it); two magnets' |ΣB| against Biot–Savart's
   vector sum, 0.00% at 8 points, where the energies' sum was 27% off. No bar moved.
 
+## 38c-3. Soap Breakdown: a first-order surfactant loss in real seconds (2026-11-01)
+
+`src/gpu/fluid/soap.ts`, `src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/oil.ts`,
+`src/gpu/solverTypes.ts`, `src/sim/fluidSimulation.ts`, `src/types.ts`,
+`src/lib/readout.ts`, `src/components/settings/ChemistrySections.tsx`,
+`src/components/phone/PhoneStage.tsx`, `src/components/RemoteControl.tsx`,
+`src/lib/deskPins.ts`, `src/lib/midi.ts`, `src/lib/sceneMap.ts`,
+`src/lib/controlHelp.ts`, `src/lib/drift.ts`
+
+Since 38c (#609) conserved soap on the plate, the Soap Bursts dropper (`LiquidVisualizer`)
+soaps the whole dish in a few minutes of a show and later drops do nothing, as a real
+closed dish does. The owner chose (2026-10-31) a setting for a real loss — soap taken up
+by the oil's interface or washed through the trough — at `0` (none, the real closed-dish
+value) by default on every look, and free to ramp up so a long show keeps bursting.
+
+- **The rate law** (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`): maps the dial
+  `0..1` to $k$ in $\text{s}^{-1}$ in $d\Gamma/dt = -k\Gamma$. At `0` it returns `0`
+  exactly; above `0`, the half-life $\ln 2 / k = 7200 \cdot (10 / 7200)^d\text{ s}$ steps
+  logarithmically from $1.87\text{ h}$ at `0.01` ($4.5\text{ min}$ at `0.5`) down to
+  $10.00\text{ s}$ at `1`.
+- **Per real second, once per step** (`soapPlan` in `src/gpu/fluid/soap.ts`, `mixUpdate`
+  in `src/gpu/wgsl/fluid/oil.ts`, `src/gpu/fluid.ts`): `soapPlan` writes the step's
+  retention factor $\exp(-k \cdot s)$ into `out[5]` from `magnetSeconds` (never frames or
+  the look's `dt`), and `fluid.ts` passes it as `A.b.x` to `mixUpdate` on the first
+  substep only (`k === 0`, and `1` on the remaining Cahn–Hilliard oil substeps).
+- **The control** (`soapBreakdown`, default `0` in `DEFAULT_SETTINGS`, untouched by all 33
+  presets and excluded from Evolve's drift in `NOT_THE_LOOK`): in Settings → Oil & Soap
+  under Soap Bursts, MIDI-learnable, pinnable on both desks, on the phone's Dye sheet when
+  Soap is in hand (and on the remote while Soap Bursts is on), displaying `'Off'` at `0`
+  and the half-life (`1.9h`, `4m`, `20s`, `10s`) via `readSetting` in `src/lib/readout.ts`.
+- **Measured:** `npm run soapbreak`, 4/4 (`law`, `decay`, `show`, `default`, all removed
+  from `--owed` in `scripts/checks.json`): $k(0) = 0$, half-life $1.87\text{ h}$ at
+  `0.01` and $10.00\text{ s}$ at `1`; after $30\text{ s}$ at dial `0.895` (half-life
+  $20.00\text{ s}$), kept `0.3536`, `0.3535`, `0.3536`, `0.3536` across $0.1\text{ s}$
+  steps, $0.05\text{ s}$ steps, $3\times\text{ dt}$ and an oil look against
+  $\exp(-kt) = 0.3536$, and `1.000003` at `0`; in the tenth minute of a kick track, a drop
+  clears `73.8%` of the dye in its radius in $2\text{ s}$ at `1` (`0.0%` at `0`, `99.5%`
+  on clean water), with bursts returning from dial `0.87` ($25\text{ s}$ half-life).
 
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 
