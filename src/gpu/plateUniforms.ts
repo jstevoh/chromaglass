@@ -21,6 +21,7 @@ import type { GpuStepParams } from './solverTypes';
 import { PER_CELL, SPLAT_SCALE } from './particles';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
+import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
@@ -63,6 +64,8 @@ export interface PlateView {
    */
   magnets?: readonly { x: number; y: number; height: number; strength: number; radius?: number }[];
   gelAngle: number;
+  /** The upper moiré sheet's spin, in turns (lib/stageClocks.ts); 0 where nothing turns it. */
+  moireTurn?: number;
   /** Where the mirror rig has turned to, accumulated on the CPU. */
   kaleidoPhase: number;
   /** The second plate's throw: how magnified, and how far it has drifted. */
@@ -357,6 +360,23 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('gel1', b.r, b.g, b.b);
     pack.set('gel2', c2.r, c2.g, c2.b);
     pack.set('gel3', d.r, d.g, d.b);
+    /*
+      The moiré sheets (plateMoire.ts). Every number is clamped to its
+      control's range here too: a look file or ?set= can carry anything, and
+      a density of 0 or a NaN turn would be a sheet of one grey or none.
+    */
+    const fin = (v: unknown, d: number, lo: number, hi: number) =>
+      (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+    pack.set('moireAmount', fin(s.moireAmount, 0, 0, 1));
+    pack.set('moireSheetA', moireSheetIndex(s.moireSheetA));
+    pack.set('moireSheetB', moireSheetIndex(s.moireSheetB));
+    pack.set('moireTurn', 2 * Math.PI * (fin(view.moireTurn, 0, -1, 1) + fin(s.moireAngle, 0, -180, 180) / 360));
+    pack.set('moireDensity', fin(s.moireDensity, 48, 4, 400));
+    pack.set('moireRatio', fin(s.moireRatio, 1, 0.5, 2));
+    pack.set('moireSlide', fin(s.moireSlide, 0, -0.5, 0.5));
+    pack.set('moireGap', fin(s.moireGap, 3, 0, 20));
+    pack.set('moireCurl', fin(s.moireCurl, 0.3, 0, 1));
+    pack.set('moireFlip', s.moireFlip ? 1 : 0);
     pack.set('beads', clamp01(s.beads ?? 0));
     // Not clamp01 alone: it passes NaN, and ?set=beadDrops=x is how the owner is asked to try it.
     pack.set('beadDrops', Number.isFinite(s.beadDrops) ? clamp01(s.beadDrops) : 0);

@@ -25,11 +25,11 @@
  * asks (SQUEEZE_GPU=1 there, as `npm run phone` has PHONE_GPU).
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { kickDepth } from '../src/lib/squish.ts';
 
-const PORT = Number(process.env.SQUEEZE_PORT ?? 4371);
+const PORT = port(4371, 'SQUEEZE_PORT');
 const NEED_GPU = process.env.SQUEEZE_GPU === '1';
 const checks = [];
 const check = (name, ok, detail = '') => {

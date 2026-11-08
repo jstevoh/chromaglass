@@ -4658,6 +4658,55 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   (`3.8%` / `3.5%` of L1) on `main` to `3.41 ms` / `3.76 ms` (`7.1%` / `7.5%` of L0) and
   `1.99 ms` / `2.33 ms` (`8.5%` / `9.5%` of L1) on this branch.
 
+#### 18m-5a. `npm run slump` with the grid filter on (built 2026-10-26 on #498, which closed unmerged; rebuilt on the split shaders and shipped 2026-11-07)
+
+- `scripts/slump.mjs` ran every drop with `gridDamp: 0`, because until 18m-5 the filter made
+  dye at a drop's rim. Checks 1 to 11 now run with it on, as every look has it. Check 14 runs
+  the glycerine drop of check 7 twice, with the filter and without. It holds the dye to 0.01%
+  of the bare run's and the 2% front within 0.05 mm of it, at 2 s and 20 s. It also asks that
+  the filter changed some cell of the field at 20 s, so that it is not comparing two bare runs
+  (two runs of one program agree to the bit). On today's main (the 2 mm gap of #655) the
+  front half of 14 is red on the filter as main already has it, +0.36 mm at 20 s, so it ships
+  as its own line, 14b, owed to 18m-5c. It does not ask for a moment such as Σa²: the
+  filter before 18m-5, which certainly ran, moved Σa² by only 0.048%. Checks 12 and 13 keep the filter off: they look for a
+  checkerboard growing out of the slump's own step, and the filter takes 5% of one out each
+  step.
+- **Measured:** on Metal (CI plate shard, `b8cd33b`) all 14 pass with the filter on.
+  Check 14 read dye −0.0000% and +0.0001%, front +0.000 mm at both times, and Σa² 0.50% off.
+  The red control used a lab built from `7d77141`'s fluid sources (the filter before 18m-5),
+  on software WebGPU: dye +0.926% and +3.202%, front +0.192 and +0.170 mm, so it fails on all
+  four. The same measure found what 18m-5c is now: the 5% contour moves out 0.18 mm in 20 s
+  (before 18m-5, 0.35 mm), the same at Grid Damp 0.05 and 0.5. Σa² goes down 0.48% at 0.05
+  and up 3.3% at 0.5, which is another reason the guard counts cells instead.
+
+#### 18m-5b. The grid filter's three passes each worked out the stencil again (built 2026-10-26 on #498, which closed unmerged; rebuilt on the split shaders and shipped 2026-11-07)
+
+- **Measured after 18m-5** (#485, `npm run stages`, 768² + 512², Metal): `dye grid` took
+  7.1–9.5% of a layer's step, against 1.4–3.8% for the one-pass filter before it. All three
+  passes evaluated the 25-tap stencil and the 3×3 bounds for every cell, and the last one
+  also summed a 7×7 of β from the texture wherever a cell had room.
+- **What changed:** `dampGridCurv` writes the clamped c into the field's write side as well as
+  the room. `dampGrid` returns at once where the room is zero or no β comes back, which is
+  everywhere except within three cells of a clamp, and leaves c standing. Where β does come
+  back it works c, lo and hi out again in f32, so that a half-float dye adds to the same
+  unrounded number as before. It reads its 14×14 of β once per 8×8 workgroup into shared
+  memory and sums them in the same order. The 7×7 sums test only the grid's bounds, because
+  the passes before them already write 0 past the rim.
+- **Same to the bit** (a scratch lab with main's two fluid sources swapped in through an
+  esbuild plugin, on software WebGPU at 256²): 40 drops, some hard-edged, a stirred open
+  plate, a hard-edged plate with its rim, and the glycerine drop. After 1, 31 and 121 steps,
+  0 of 262,144 numbers differ. Control: with `dampGrid` stopped before its correction,
+  21,104 to 173,518 of them differ (worst 3.42 units).
+- **Measured on Metal** (`npm run stages`, the owner's Mac, 768² + 512², 2 layers, 20 s, branch
+  `75e1dce` and main `6cf1ab1` run alternately). The two pairs ran at different loads (the whole
+  step 113–121 ms in the first, 76–77 ms in the second), so read each within its pair. `dye
+  grid` went from 10.08 ms (11.8% of L0's step) and 5.00 ms (13.0% of L1's) to 6.54 ms (6.8%)
+  and 2.59 ms (6.2%) in the first pair. In the second it went from 5.24 ms (8.9%) and 3.35 ms
+  (12.7%) to 3.43 ms (6.3%) and 2.60 ms (9.9%). That is a third to a half of the stage's time.
+  It is still above the one-pass filter's 1.4–3.8% from before 18m-5: the first pass's 25-tap
+  stencil and 3×3 bounds remain, now done once rather than three times.
+  `npm run slump` (14/14) and `npm run grating` (24/24) passed on the same Mac.
+
 ### 19aa-3. The API scripts never print the token
 
 **Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on
@@ -5470,7 +5519,7 @@ setting itself still moves as it did) and the print that is off starts the next 
 Not a control, so no phone change.
 
 Named shortcuts: plane waves, not a true noise field; the cap is a straight line through
-a sweep, not Pearson's full regime boundaries; k ignores the look's own k while the drift
+a sweep (a tent since 2026-11-07, below), not Pearson's full regime boundaries; k ignores the look's own k while the drift
 is on; the clock is fixed-rate and follows no music; every number is the lab's (SwiftShader),
 none yet Metal's.
 
@@ -5503,6 +5552,24 @@ The app counts the slew in solver iterations (`TURING_ITERATIONS_PER_SECOND`, 18
 as the lab does, and the check reads both numbers and refuses a rate outside (0, 1]. The bars for stripe width and the Drift 0 clock are
 unchanged. Not tested: where a grey patch sits (a speckle of dead cells would still show in
 the width line, not the tile line).
+
+**26d-6a. The tent cap: the corners of the drift hold their spots (shipped 2026-11-07).**
+A review held each corner of the drift's feed range (F 0.04 plus or minus `DRIFT_FEED`,
+0.02 to 0.06) at the spots end for 9000 units and found the straight cap `0.0105 - 0.15 F`
+too generous below F 0.035: it went on rising to 0.0075 at F 0.02, from no measured point,
+and a plate held there at nine tenths of it kept only 0.313 of its cells alive (0.42 at
+F 0.03), against 0.483 for the spots held at F 0.04 and a floor of 0.433. Spots that
+survive a 6000-unit sweep are not spots that survive a minute, and Pearson's dead zone lies
+below. The cap is now a tent, `max(0.15 min(F, 0.07 - F), 0.0008)`: the old line from
+F 0.035 up, falling below it (0.003 at F 0.02). `npm run turing` gained the held-corner
+line, which settles at the look's feed and kill, slews to each corner over 3000 units as
+the app slews, holds 9000 and reads the live share every third of the hold; the cap, its
+share and `DRIFT_FEED` are read from `src/gpu/wgsl/fluid/reactions.ts`, so moving them
+moves the check, and an instrument line pushes F 0.02 to twice the cap and must read it
+emptied. Built in PR #421 in October and carried onto main's split shader 2026-11-07;
+#421's clear Turing Print contract (Pure White) and its "paper stays clean" line were
+dropped, because #523 (28i-2) gave the look colour pools on purpose. Measured numbers are
+in the PR that shipped it.
 
 
 ## 27. Every control does something you can see
@@ -6924,6 +6991,27 @@ Checks. `panel` asks each pair from both ends (the home there, the copy gone), i
 `scripts/panelOneHome.mjs` beside it since `panel.mjs` is at its size ceiling: 256/262 against
 main's components, 264/264 after (two more for the leftovers); the no-controller check that asked for the Rides' button now asks
 for the MIDI light's words and no second route.
+
+### 35c-6. The Recipe a strip of its own, and the Rides shown whole (shipped 2026-11-07)
+
+The owner, 2026-11-07: "where is the macro zoom control? and the recipe box only has two
+controls? lets fix that." Neither had been deleted. 35c-4's rule (one control, one place on a
+tab, the Rides keep theirs) was right, but six of the Recipe's eight (Speed, Turbulence, Soap
+Bursts, Beat Squeeze, Macro Zoom, Evolve Speed) were rides too, so on the Perform tab that ships
+the Recipe drew Swirl and Gravity and a line saying where the rest were. Macro Zoom's one copy
+was the seventh of the Rides, which on Perform sit under the Bottles: at 1440×900 the right
+column left them room for three of their 88 px two-line rows, and the strip scrolled with its
+scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off the right of the deck.
+
+- The Recipe keeps the owner's eight and adds six look-building controls no ride and no panel on
+  Perform's deck has: Oil Tension, Bubbles, Saturation, Iridescence, Lamp Warmth, Hue Journey
+  (`DEFAULT_RECIPE`, 14; `MAX_PINS` 14 → 16 so the shipped strip still takes a pick). The old eight read as the default, so a strip saved as
+  them gets the new one. `npm run desklayout`: the Recipe draws 8 of its own on Perform (2 before).
+- The owner chose denser faders (of: a zoom on the plate bar, Macro Zoom to the top of the Rides,
+  denser faders). The Rides are one line each (`Slider dense`: name, travel, value; 24 px rows on
+  an 18 px handle; full rows still on touch), and Choose shares the bottom row with Mixer and
+  Drain. `npm run layout`: every ride shows whole, Macro Zoom among them, at 1440×900 (3 of 8
+  before) and 1512×860 (2 of 8 before).
 
 ### 35d. Colour and keys (shipped 2026-10-25)
 
@@ -11586,6 +11674,55 @@ rim, the species' and the colour's, and the colour's spreading stops at the same
 (dyeDisperse). `PW_WEBGPU=1 npm run flush`: glycerine left 0.759 → 0.751 (the volume says 0.750),
 the colour 0.776 → 0.750, the full dish 1.002 → 0.997 of its area; 9/9, no bar moved.
 
+## 38r-5. The liquid's amount sets the gap, part 1 (2026-11-07)
+
+Asked by the owner on 2026-10-31: "Should the plate gap be more related to liquid content? Do
+we ever really figure out how much liquid is on the plate?" We did not: the gap was a constant
+2 mm, a pour was a source that left over the open rim, and nothing totalled the liquid.
+
+The physics, worked out in the design thread and checked here. A flat glass on liquid has no
+height of its own: its weight (5 kg/m², 49 Pa) would squeeze any film to nothing by Stefan's
+law. What holds it is the meniscus pinned at its square edge, which by Gibbs's inequality can
+bulge until its angle passes θ + 90°, so it holds up to 2σ sinθ/h: 62 Pa at 2 mm for water on
+an oiled glass (θ 60°), enough for the default glass, so the default plate keeps its 2 mm.
+Past h_hold = 2σ sinθ/(w g) (2.54 mm of water) the glass sinks at
+dh/dt = −(2/3)h³(P − P_hold)/(μR²). The first brief guessed seconds to minutes; it is 26 ms
+to half-settled for water and half a second for the thick carrier.
+
+What changed. `lib/cover.ts`: the ledger and the glass, with the settle solved exactly
+(separated, F(h) = 1/(ch) + (P/c²) ln(P − c/h) falls by kt, bisected) so no step size can
+overshoot h_hold. `gpu/fluid/cover.ts`: a solver layer (the gap's shape moved out of
+`fluid.ts`'s squeeze stage first, a pure move) that steps it before `writeSim`, packs
+`S.cover` into the uniform's padding slot 51, and shifts the gap field when the cover moves,
+with the solve left primed, so `hsDivergence` turns a rising glass into liquid drawn in at the
+rim and a settling one into liquid pushed out over it. The dome is now added to the cover's
+height rather than scaled by the rest number (the same at the default). Pours add their volume
+at the live gap. The readers that were worked out at 2 mm take the cover: the Darcy speeds
+(colour's fall, oil's lift, oil's pull) by (h/h₀)², the breath, the glass's drag, the slump,
+hsPrep's hand forcing, a pour's share, the plate rock's cover drag (with the Cover Weight's own
+mass) and the spin's drag time. Two dials, Liquid 9–150 mL (62.83 default) and Cover Weight
+0–1000 g (157.08 default), on the sheet, the desks, MIDI and the phone's remote.
+
+Measured: `npm run gap` 11 → 18 lines, all ok; the settle against an RK4 of the ODE to 1e-4
+at five times for water and thick; a 4 mL pour raises the glass 127.3 µm (Q/A) and spills
+nothing; 20 mL more settles it to h_hold with the bead full and 3.34 mL run off, the ledger
+to 1e-12. Left: 38r-16 (the pinch and the air edge), 38r-17, 38r-18, 38r-19, 38r-20.
+
+The floating glass broke two things `npm run flush` caught. Its lines assume the gap is
+h₀ everywhere, and a pour now lifts the glass by Q/A: the ring at r was pushed by
+Q(1 − r²/R²) (0.856 of V/π) and a quarter of the dish of water flushed 1.4% of the
+glycerine, not 25%. Its glass is now the one the edge holds at exactly 2 mm (189 g at
+Thickness 0.45), it waits out the Stefan settle (435 steps, from the lib's own
+`stefanSettle`), and it counts each pour at the gap the glass stood at
+(`lab.coverMetres`). That found the second: the species' splat added a share f of a
+rest-gap column where the column is as tall as the glass stands, so glycerine poured
+under a lifted glass was 3.4% short (0.9675); it adds f·g/h₀ now, as the thin solve's
+source and the ledger do (`wgsl/fluid/splats.ts`), 0.9991. The glycerine flush is a
+fifth of the dish, not a quarter: water fingering into glycerine (Saffman–Taylor) ran
+on through the seven-second settle and reached 0.8–0.9 of the radius, so water left
+with the glycerine (0.739 against 0.724); the line now also checks no water got there
+(0.974 of the column at the least). No bar moved.
+
 ## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 
 Wave 7's next Claude item after OSC out. **37k**: `chromaglass.art/press`
@@ -11646,3 +11783,31 @@ of the mutants added after a review pass found a desk move mid-glide overridden,
 reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
 main's relay taking an `assistant` hello as a phone's, with the switch off and from
 another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).
+
+## 44c-4, 44f. A bigger picture, and a pour on the drop (2026-11-07)
+
+Asked with the test sweep and the album recording in mind (the owner, 2026-11-07:
+"let's do these now"). **44c-4**: `look_at_plate` was the remote's Draw picture, 480
+wide at most. `look_at_plate {size: "large"}` asks the display for one still
+(`assistant-still`, any mode on, relayed only from the guard): `PadPictureSender.wantStill`
+takes the next frame drawn up to 1280 wide through the same GPU grab and encoder, at
+quality 0.7, ahead of the pad's pace and whether or not a pad is asking, and sends it
+once as a `picture` with `still: true`, which the relay hands to the assistant alone.
+Bounded by the relay's half-megabyte frame (an oversized frame would close the
+display's own socket): a still over 480k characters is taken again at three quarters
+of the width. **44f**: `{ do: 'pour', color, amount, x?, y?, wall? }` is a song action,
+laid as a pad's Drop through `applyGesture` (`pourGesture`), its wall point turned onto
+the plate when it fires; `add_song_action` (Play; Full for drain, clear, lay again,
+black and the name and any look on the kicks; never a room setting outside Full, nor
+anything on every kick) sends a `song-action` the
+display adds to the playing song's show as a pinned cue is (`app/songCue.ts`, since
+App.tsx cannot grow). Found on the way: the song show's clock ticked ten times a second
+over a position set twice a second, so a section's action fired up to 558 ms late; it
+now ticks every frame and reads the position at the tick (`positionNow`), 16.7 ms at
+worst. The display clamps a song `set` as a patch and takes at most 24 actions from the
+assistant per song; a still is taken at one of four widths (1280, 960, 720, 540) so the
+GPU grab compiles at most four pipelines for it. Checks: `npm run assistant` 50 lines
+and 22 of 22 mutants (the large still read from its JPEG header, the still kept from
+phones, the song action's modes and kicks), the page's own still rule on the real
+`PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
+drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).

@@ -41,7 +41,7 @@ import {
   renameTab, sanitizeTabs, saveTabs, setTabLayout, storedForm, tabForStored,
 } from '../src/lib/deskTabs.ts';
 import { SETTINGS_SECTIONS, SETTINGS_CATEGORIES, groupOf } from '../src/lib/settingsMap.ts';
-import { PINNABLE, DEFAULT_RIDES, DEFAULT_RECIPE } from '../src/lib/deskPins.ts';
+import { PINNABLE, PIN_RANGE, DEFAULT_RIDES, DEFAULT_RECIPE, MAX_PINS, loadPins } from '../src/lib/deskPins.ts';
 const PIN_SECTION = (key) => PINNABLE.find(s => s.key === key)?.section;
 import { readFileSync } from 'node:fs';
 import { settingsSource } from './settingsSource.mjs';
@@ -388,6 +388,32 @@ console.log('\n The operations');
     rides.every(k => n.get(k)?.join() === 'rides') && recipe.filter(k => !rides.includes(k)).every(k => n.get(k)?.join() === 'recipe')
     && left.get('physics:vorticityConfinement') === 'recipe' && left.get('macro:macroZoom') === 'rides' && left.get('recipe:globalSpeed') === 'rides',
     `Swirl on ${n.get('vorticityConfinement')?.join()}; Zoom on ${n.get('macroZoom')?.join()}; Speed on ${n.get('globalSpeed')?.join()}`);
+  /*
+    The owner (2026-11-07): "the recipe box only has two controls?" The rule
+    above was right and the Recipe still came out as Swirl and Gravity, because
+    six of its eight were rides too. What is drawn on the Recipe on the tab
+    that ships has to be a strip in its own right: at least eight of its own,
+    two full rows of its four-wide knobs. Two (the build before the fix) fails.
+  */
+  // Only keys the desk can draw (a key with no spec counts in the strip and draws nothing).
+  const recipeOwn = recipe.filter(k => PIN_RANGE.has(k) && n.get(k)?.join() === 'recipe');
+  check('on Perform the Recipe draws at least eight controls of its own, not two and a list of where the rest went',
+    recipeOwn.length >= 8, `the Recipe draws ${recipeOwn.length}: ${recipeOwn.join(', ')}`);
+  // A strip that ships full answers Choose with "take one off first": the Recipe at 14 of 14 did (qa's Refraction pick, 2026-11-07).
+  check('each strip that ships leaves room for a pick', DEFAULT_RECIPE.length < MAX_PINS && DEFAULT_RIDES.length < MAX_PINS,
+    `Recipe ${DEFAULT_RECIPE.length}, Rides ${DEFAULT_RIDES.length}, a strip holds ${MAX_PINS}`);
+  // A Recipe stored as the old eight (the default before 2026-11-07) is read as the default, so the new strip reaches it.
+  {
+    const store = new Map();
+    globalThis.localStorage = { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k) };
+    store.set('chromaglass-recipe-keys', JSON.stringify(['globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate']));
+    const oldEight = loadPins('design', DEFAULT_RECIPE).map(String);
+    store.set('chromaglass-recipe-keys', JSON.stringify(['globalSpeed', 'bloom']));
+    const chosen = loadPins('design', DEFAULT_RECIPE).map(String);
+    delete globalThis.localStorage;
+    check('and a Recipe saved as the old eight comes up as the new strip, while one somebody chose is kept',
+      oldEight.join() === recipe.join() && chosen.join() === 'globalSpeed,bloom', `old eight → ${oldEight.length}; chosen → ${chosen.join(', ')}`);
+  }
   // Closing the Rides gives the Recipe its whole strip back: nothing was taken off it, only not drawn twice.
   const back = drawn(closePanel(perform, 'rides'));
   check('and with the Rides closed the Recipe draws all of its own again',

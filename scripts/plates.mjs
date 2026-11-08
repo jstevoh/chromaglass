@@ -28,11 +28,11 @@
  *   Stage 1 item 4.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader } from './frame.mjs';
 
-const PORT = 4334;
+const PORT = port(4334);
 const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
 const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };

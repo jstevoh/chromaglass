@@ -800,6 +800,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.thinGap ?? 1) > 0.5 && (
             <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* The liquid under the cover and the glass on it (PLAN 38r-5), as on the desk. */}
+          <Slider label="Liquid" field="liquidMl" step={1} format={(v) => `${Math.round(v)} mL`} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Cover Weight" field="coverWeight" step={5} format={(v) => `${Math.round(v)} g`} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The clear film that tears into lace (PLAN §20b), always: laying it
             and thickening it is a pour, worth a thumb from across the room.

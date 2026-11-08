@@ -161,6 +161,7 @@ merge conflicts are the shared documents', which 0.6 ends.
   `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
+  H2c-9's owed line is in `npm run framereads` (2026-11-07): Antigravity-ready on its own.
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the
   video pour's pause and play every frame, shipped with 14ac; 14ab-7, -8 with #533; 14ab-3,
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
@@ -168,11 +169,11 @@ merge conflicts are the shared documents', which 0.6 ends.
   -14.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
-  H2c-5 and H2c-8's owed lines are in `npm run encode` (2026-11-07): Antigravity-ready.
+  H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-7 and H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
 - **4.7** **14c-4k, 14c-governor, H2c-10, H2c-labels** (S each). Then **H2a**, **H1**, **H3a**.
-  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07: both Antigravity-ready.
+  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07, H2c-labels' owed line is `npm run timelabels`: all Antigravity-ready.
 
 ### Wave 5. Playing it: the instrument
 
@@ -223,7 +224,7 @@ style (§31).
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
   (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
-- **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, **18m-5a** slump check with grid filter on), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
+- **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, ~~**18m-5a**~~ slump check with grid filter on, ~~**18m-5b**~~ its cost, **18m-5c** the filter's edge reshaping), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12, 20b-14 to 20b-16; ~~20b-13~~ the film's dye).
 - **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
@@ -239,7 +240,8 @@ style (§31).
 - **6.10** The realism audit's top picks (§38), each its own thread, in its order: ~~**38a** the lamp
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), ~~**38c**~~ soap conserved (and ~~**38c-3**~~ Soap Breakdown), **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), ~~**38h**~~
   nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; ~~38h-4~~ the back plate's grain and ~~38h-3~~ one shadowgraph for the whole column shipped; 38h-5, 38h-6, 38h-8, 38h-9, 38h-11 and 38h-12 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f**, **38g-2**, **38i**, **38j**; **38r** (the rest
-  gap, shipped: one number, #613, then a real 2 mm, #655) is read before 38d and 38i.
+  gap, shipped: one number, #613, then a real 2 mm, #655; **38r-5** the liquid's amount sets it, Liquid
+  and Cover Weight, part 1 shipped, then **38r-16** the pinch and the air edge) is read before 38d and 38i.
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own
   thread: **42m** the tutorials watched on the owner's Mac first, then **42a** the glass pair
   (Fast and Slow glass from real radii; after #655), **42e** the classic mixture's numbers (with
@@ -263,6 +265,8 @@ style (§31).
   Selling it (§23), after Wave 1, a judging pass, **13.1-sign** and a free beta:
   **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
   **23.7**.
+  Art packs (§45): ~~**45a**~~ the moiré pack's sheets (2026-11-07), then **45a-2** selling it to Home
+  (the owner makes the store product; the Worker deploy on the owner's word), **45a-3** a hand on the sheet.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
   13.1-sign), then **24.4**.
@@ -346,7 +350,8 @@ Where each batch stands, as of 2026-09-27:
 | 38 | Realism audit, after §18 | Audited 2026-10-30 across the fluid, the bubbles and films, the ferrofluid and the optics: twenty shortcuts not already open elsewhere, ranked (38a–38j the top picks: the lamp as a condenser, bubbles without clocks, soap conserved, the labyrinth from the Bond number, oil's σ in N/m, heat as a force, bubbles merging and crowding as pockets, nothing on the plate makes light, milk's scatter conserved, the ferrofluid black by its thickness); **38b, 38g, 38n shipped** (bubbles as pockets in a gap: no clocks, the round rim, Paterson, Durian, the look's own liquid; `npm run bubblephysics`), **38a shipped** (the lamp lever and the aperture, #604; 38a-2 and 38a-3 open), **38h, 38h-2, 38h-7 shipped** (nothing on the plate makes light, every edge lit from beneath, `npm run nolight`; the closeup's bubbles traced and Light Play a softbox, `npm run closeupdepth`; ~~38h-4~~ the back plate's grain and ~~38h-3~~ one shadowgraph for the whole column shipped; 38h-5, 38h-6, 38h-8, 38h-9, 38h-11 and 38h-12 open), **38k part shipped** (magnets add as fields, the liquid's onset worked out at 4 mT, #630; the plate on it is 38k-7, after 9t-2), **38l, 38l-2 and 38l-4 shipped** (the glass peels back against the film's suction, Beat Squeeze's sheet with it, a hard press holding a second before it lets go, `npm run stefan`, `npm run sheet`), ~~**38c**~~ soap conserved shipped 2026-10-31 (`npm run soap`) and ~~**38c-3**~~ Soap Breakdown shipped 2026-11-01 (`npm run soapbreak`), leaving 38c-1, 38c-2 and 38c-4; **38r shipped** (the real 2 mm gap, #655; 38r-1..4 open), the rest open; 38m pictured for the owner, 38o numbered as 32f–32j with 32f and 32g shipped |
 | 42 | What Liquid Light Lab's tutorials and gear showed | Asked 2026-11-07 from a working show's tutorials and shop: the glass pair as the instrument (Fast and Slow glass from real radii, 42a), the top glass turned by hand (42b), a triple plate (42c), an open dish for blow plates (42d), the classic mixture's numbers (42e), the RGB turntable's patterns (42f), moiré (42g), diffraction (42h), a ripple wheel (42i, the owner's call), all proposed; the videos themselves wait on the owner's Mac (42m) |
 | 43 | Visuals for a musician's release | Asked 2026-11-07 after the revenue research: a Spotify Canvas loop, a YouTube visualizer and vertical cuts from one render, self-serve in the app or done for the musician; the owner picked the Release kit in Home, then a done-for-you test (43-0, 2026-11-07); portrait renders (43a), a seamless loop (43b, its check `loopseam` written and owed) and the release kit (43c) next; nothing built yet |
-| 44 | A person's AI assistant plays the show | Asked 2026-11-07; the owner's answer: **for the owner's own use, not sold or promoted**. **44b, 44c, 44d, 44g shipped** (`npm run assistant`): the show server's `assistant` role behind a switch only the owner sets, Suggest / Play / Full (Full: everything, the live stream included), glides, Undo ten deep, the hand winning; a local MCP server (`mcp/`) with a show guide, the owner's notes and a picture of the plate. 44h, control over the internet, next; 44a and the menu parked while private; 44c-2 to 44c-4, 44d-2 to 44d-4, 44f open |
+| 44 | A person's AI assistant plays the show | Asked 2026-11-07; the owner's answer: **for the owner's own use, not sold or promoted**. **44b, 44c, 44d, 44g shipped** (`npm run assistant`): the show server's `assistant` role behind a switch only the owner sets, Suggest / Play / Full (Full: everything, the live stream included), glides, Undo ten deep, the hand winning; a local MCP server (`mcp/`) with a show guide, the owner's notes and a picture of the plate. **44c-4** (a 1280 still for the assistant) and **44f** (a pour as a song action, `add_song_action`, the song show's clock read every frame) **shipped** (`npm run assistant`, `npm run songs`). 44h, control over the internet, next; 44a and the menu parked while private; 44c-2, 44c-3, 44d-2 to 44d-4, 44f-2 to 44f-4 open |
+| 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), six looks; **42a shipped** (`npm run moire`), selling it to Home is 42a-2. |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -383,7 +388,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 17 | Hear the set ahead, from files | [`17-hear-ahead.md`](docs/plan/17-hear-ahead.md) |  | 3 |
 | 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 24 |
 |  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 28 |
-|  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5a | 8 |
+|  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-12 | 19 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
 |  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-5 | 22 |
@@ -414,6 +419,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 42 | What Liquid Light Lab's tutorials and gear showed (asked 2026-11-07) | [`42-liquid-light-lab.md`](docs/plan/42-liquid-light-lab.md) |  | 10 |
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 9 |
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 13 |
+| 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 4 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing

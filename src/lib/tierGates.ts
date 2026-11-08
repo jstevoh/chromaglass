@@ -244,6 +244,22 @@ export function canUseProFeature(): boolean {
 }
 
 /**
+ * Whether this copy may put the moiré pack's sheets on the stage (PLAN 45a).
+ * Everything is open where tiers are not enforced (a self-run copy, the
+ * checks, development); where they are, Pro includes every art pack
+ * (PLAN 23) and Home buys this one as an add-on, which the licence names
+ * once the store sells it (PLAN 45a-2). Like every site gate, a nudge.
+ */
+export function canUseMoirePack(): boolean {
+  return !isTierGatingEnforced() || canUseProFeature();
+}
+
+/** Whether a look of this art pack (a `Preset.pack`) is locked here: the pack is not on this copy. */
+export function isPackLocked(pack: string | undefined): boolean {
+  return pack === 'moire' && !canUseMoirePack();
+}
+
+/**
  * Whether the desktop sign-in gate should appear (PLAN 23.11):
  * Only when `requireSignIn` is enabled on the native app, no valid license key
  * is present, and the user has not signed in. A valid license key NEVER hits

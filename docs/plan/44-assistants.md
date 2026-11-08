@@ -131,16 +131,33 @@ through cords and preset patches, and the plate shader is untouched.
   `LEARNABLE_SETTINGS` (`lib/midi.ts`) and `lib/controlHelp.ts` at build time into a
   JSON the MCP server reads (it cannot read TypeScript). Pass: the table's keys match
   the code's, checked in `npm run assistant`.
-- **44c-4. A bigger picture.** `look_at_plate` rides the remote's Draw picture, at most
-  480 px wide (`PAD_PICTURE_MAX_WIDTH`), enough to judge mud and balance, not fine
-  detail. A one-off still at 1024 px for the assistant, through the same grab
-  (`gpu/padGrab.ts`). Pass: the image's width read from its JPEG header.
-- **44f. A pour as a song action.** *(S.)* `songShows.ts` has no *what* that drops a
-  colour: `dyes` takes the look's next palette, and `burst` presses. Add `{ do: 'pour';
-  color; amount }` so "blue on the next drop" is a song action and not a timed call,
-  and a `make_song_show` / `on_next` tool so the assistant can program it. The check is
-  `npm run songs`, extended: a pour at the second drop fires on the frame the section
-  starts and not before.
+- **44c-4.** A bigger picture, `look_at_plate {size: large}`, one 1280 still: **shipped** (`npm run assistant`; story in `docs/plan-shipped.md` §44). Owed: a real 1280 still from the Mac's GPU (judging, with the test sweep).
+- **44f.** A pour as a song action, programmed with `add_song_action`, and the song show's clock read every frame: **shipped** (`npm run songs`, `npm run assistant`).
+- **44f-2. Pour in the Songs panel's menu.** *(S, AG lane, if the owner wants it for
+  people.)* A pour arrives today only from the assistant or a file, and its row shows
+  as its own sentence (as `set` does). A menu entry with a colour swatch and an amount,
+  on the desk's Songs panel and the phone's Play sheet. Pass: `panel`, `desk`, `phone`.
+- **44f-3. Other readers of the late position.** The song show's clock now reads the
+  song's position at its own tick (`positionNow`), where it read `state.positionSec`,
+  which the music hook sets every 500 ms (an action fired up to 558 ms after its
+  section began, `npm run songs`). Other code still reads `state.positionSec`: the
+  score's playhead and the hooks that start a sequence at the song's place
+  (`useSetActions`, `useLookFades`); not yet audited for which of them fire something
+  on a section edge. And read sixty times a second, a position that steps back across
+  a section edge (a follower's resync, a nudge) refires an action on `any` section or
+  on two neighbouring sections of one kind (`dueActions` keys a section action by the
+  section's index); it could at two readings a second too, now more often. Pass: each
+  reader that fires on an edge reads `positionNow`, with a line in `score`, and a
+  `songs` line where a position jittering across an edge fires its action once.
+- **44f-4. The display does not answer a song action.** The guard's yes means it
+  passed the guard; the display can still drop it (no song playing by the time it
+  lands, 24 actions from the assistant already in that song's show, a *what* it does
+  not know, a `set` that names no setting), and says so only in its console. The MCP
+  checks the track first, which covers the usual case. A `song-action-reply` from the
+  display through the relay would close it, and with it a check of the page's own half
+  (`parseSongAction` to `addSongCue` to the pinned cue), which `npm run assistant`
+  stops short of at its stand-in display. Pass: an `npm run assistant` line where the
+  display refuses and the tool says why.
 - **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
   lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
   ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
@@ -157,5 +174,5 @@ through cords and preset patches, and the plate shader is untouched.
 
 ## Order
 
-44h next, in its own PR; then 44c-3 and 44f; 44d-2 to 44d-4, 44c-2 and 44c-4 as they
+44h next, in its own PR; then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
 are wanted.

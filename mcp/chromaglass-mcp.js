@@ -36,6 +36,8 @@ const NOTES = process.env.CHROMAGLASS_ASSISTANT_NOTES ?? join(homedir(), '.chrom
 const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const REPLY_MS = 4_000;
 const PICTURE_MS = 5_000;
+/** look_at_plate's large picture: one still this wide (PLAN 44c-4; the display's cap is PAD_STILL_MAX_WIDTH). */
+const STILL_WIDTH = 1280;
 
 const log = (...a) => process.stderr.write(`chromaglass-mcp: ${a.join(' ')}\n`);
 const Socket = globalThis.WebSocket ?? (await import('ws')).default;
@@ -55,7 +57,7 @@ Start every session with read_notes: the owner's own notes on what worked and wh
 What works on a wall:
 - Slow is beautiful. People watch a light show for minutes. Keep motion gentle and let a look develop for 20 to 60 seconds before judging it. Save fast motion for a peak.
 - Few colours. Two or three related dyes read as a look; five read as mud. Contrast comes from dark areas, not from more colours.
-- Change on the music's sections (verse, chorus, drop), not on every beat. You answer in seconds and cannot hit a beat; the app plays to the beat on its own.
+- Change on the music's sections (verse, chorus, drop), not on every beat. You answer in seconds and cannot hit a beat; the app plays to the beat on its own. To land a move on a drop or a kick, program it with add_song_action and the app fires it on time.
 - Build and release. Follow the song's energy up, give the biggest move (a pour, a burst, a new look) to the drop, then leave space.
 - Dark is part of the picture. Never fill the whole plate all the time.
 - Small steps. Change one to three settings at a time. Glide mood changes over 2 to 8 seconds. Then look_at_plate and judge: if it went muddy, washed out or busy, undo.
@@ -109,7 +111,13 @@ function link() {
         }
         if (m.type === 'assistant-mode') { mode = m.mode; socket = ws; done(); return; }
         if (m.type === 'state') { lastState = m.state; while (stateWaiters.length) stateWaiters.shift()(); return; }
-        if (m.type === 'picture') { while (pictureWaiters.length) pictureWaiters.shift()(m); return; }
+        // A still answers only the waiters that asked for one, and the pad's
+        // stream only the rest: a large look must not settle for a 480.
+        if (m.type === 'picture') {
+          const still = m.still === true;
+          for (const w of pictureWaiters.filter((x) => x.still === still)) { pictureWaiters.splice(pictureWaiters.indexOf(w), 1); w.resolve(m); }
+          return;
+        }
         if (m.type === 'assistant-reply') {
           const p = pending.get(m.id);
           if (p) { pending.delete(m.id); p(m); }
@@ -159,7 +167,7 @@ const TOOLS = [
   { name: 'show_state', mode: 'any', description: 'What is on the plate now: the look, the armed look, the track, the sequencer, blackout, recording, the live stream, and the assistant mode the owner has set.', inputSchema: { type: 'object', properties: {} } },
   { name: 'list_looks', mode: 'any', description: 'Every look in the library (built-in and the owner\'s own), by id and name.', inputSchema: { type: 'object', properties: {} } },
   { name: 'get_settings', mode: 'any', description: 'The plate\'s settings now. Look settings move with a look; room settings (the projector, the mixer, the microphone) need Full mode to change.', inputSchema: { type: 'object', properties: { keys: { type: 'array', items: { type: 'string' }, description: 'Only these settings; omit for all.' } } } },
-  { name: 'look_at_plate', mode: 'any', description: 'A picture of the wall as the show draws it now (a small JPEG). Look after a change to judge it.', inputSchema: { type: 'object', properties: {} } },
+  { name: 'look_at_plate', mode: 'any', description: 'A picture of the wall as the show draws it now. Small (480 wide, the default) is enough to judge balance, mud and brightness after a change; large (1280 wide) shows fine detail (edges, thin-film rings, grain) and costs more to read, so use it when the detail is the question.', inputSchema: { type: 'object', properties: { size: { type: 'string', enum: ['small', 'large'] } } } },
   { name: 'read_notes', mode: 'any', description: 'The owner\'s notes on what works and what does not. Read them first.', inputSchema: { type: 'object', properties: {} } },
   { name: 'add_note', mode: 'any', description: 'Save a note about the owner\'s taste: what worked, what looked bad, what never to do.', inputSchema: { type: 'object', properties: { note: { type: 'string' } }, required: ['note'] } },
   { name: 'arm_look', mode: 'suggest', description: 'Arm a look from the library for the performer\'s Go. The plate is untouched.', inputSchema: { type: 'object', properties: { look_id: { type: 'string' } }, required: ['look_id'] } },
@@ -171,6 +179,7 @@ const TOOLS = [
   { name: 'press', mode: 'play', description: 'Press the glass at a point.', inputSchema: { type: 'object', properties: { ...xy, amount: num }, required: ['x', 'y'] } },
   { name: 'tilt', mode: 'play', description: 'Tilt the plate: x and y from -1 to 1, 0 is level.', inputSchema: { type: 'object', properties: { x: num, y: num }, required: ['x', 'y'] } },
   { name: 'dye', mode: 'play', description: 'Change the colour of the bottle in hand.', inputSchema: { type: 'object', properties: { color: { type: 'string', description: '#rrggbb' } }, required: ['color'] } },
+  { name: 'add_song_action', mode: 'play', description: 'Program something into the show of the song playing now, for the app to fire on the song\'s own clock: the way to land a move on a beat or a section, which a live call cannot. when: {at:"section", section:"drop", nth:2} (sections: intro, verse, chorus, bridge, drop, outro, any; omit nth for every one), {at:"kick", every:8}, {at:"time", sec:60}, {at:"before-end", sec:8} or {at:"start"}. what: {do:"pour", color:"#rrggbb", amount:0.05..1, x, y} (x, y as look_at_plate shows them; omit for the middle), {do:"burst"}, {do:"dyes"}, {do:"zoom", zoom:1..16, over:seconds}, {do:"kaleidoscope", folds:0..12}, {do:"look", look:{kind:"preset", id}, fade:seconds}, {do:"set", key, value, over:seconds}, {do:"title"}; Full adds drain, clear, seed, blackout, lights-up, signoff. It appears in the performer\'s Songs panel, where they can take it out.', inputSchema: { type: 'object', properties: { when: { type: 'object' }, what: { type: 'object' } }, required: ['when', 'what'] } },
   { name: 'sequencer', mode: 'play', description: 'The show sequencer\'s transport.', inputSchema: { type: 'object', properties: { command: { type: 'string', enum: ['play', 'pause', 'next', 'prev', 'stop'] } }, required: ['command'] } },
   { name: 'undo', mode: 'play', description: 'Take back your last change (up to ten).', inputSchema: { type: 'object', properties: {} } },
   { name: 'show_action', mode: 'full', description: 'Anything else at the desk: blackout, clear, drain, recording, the live stream (live-start goes live to the saved destinations, live-test to the test ones), and the rest.', inputSchema: { type: 'object', properties: { action: { type: 'string', enum: ['blackout-toggle', 'clear', 'drain', 'seed', 'lucky', 'record-toggle', 'live-start', 'live-test', 'live-stop', 'overlays-off', 'overlays-on', 'play', 'pause', 'automate-on', 'automate-off', 'back', 'preset-next', 'preset-prev', 'performance-toggle'] } }, required: ['action'] } },
@@ -216,11 +225,13 @@ async function call(name, a = {}) {
     }
     case 'look_at_plate': {
       await link();
+      const still = a.size === 'large';
       const picture = new Promise((resolve) => {
-        pictureWaiters.push(resolve);
-        setTimeout(() => { const i = pictureWaiters.indexOf(resolve); if (i >= 0) pictureWaiters.splice(i, 1); resolve(null); }, PICTURE_MS).unref?.();
+        const w = { still, resolve };
+        pictureWaiters.push(w);
+        setTimeout(() => { const i = pictureWaiters.indexOf(w); if (i >= 0) pictureWaiters.splice(i, 1); resolve(null); }, PICTURE_MS).unref?.();
       });
-      const r = await ask({ type: 'pad-picture', width: 480 });
+      const r = await ask(still ? { type: 'assistant-still', width: STILL_WIDTH } : { type: 'pad-picture', width: 480 });
       if (!r.ok) return fail(`Refused by the show: ${r.reason}`);
       const p = await picture;
       const m = p && /^data:(image\/[a-z]+);base64,(.+)$/.exec(String(p.src));
@@ -238,6 +249,14 @@ async function call(name, a = {}) {
     case 'dye': return answered(await ask({ type: 'dye', color: a.color }), 'Bottle changed.');
     case 'sequencer': return answered(await ask({ type: 'action', action: `seq-${a.command}` }), 'Done.');
     case 'undo': return answered(await ask({ type: 'assistant-undo' }), 'Undone');
+    case 'add_song_action': {
+      // A song action goes into the show of the song playing now: with none,
+      // say so here rather than send one the display has nowhere to put.
+      const s = await freshState();
+      if (!s.trackName) return fail('No song is playing: a song action goes into the show of the song playing now. Start the song first.');
+      const what = a.what && typeof a.what === 'object' && a.what.do === 'pour' && typeof a.what.x === 'number' ? { ...a.what, wall: true } : a.what;
+      return answered(await ask({ type: 'song-action', when: a.when, what }), 'Added to this song\'s show: the app fires it on the song\'s clock.');
+    }
     case 'show_action': return answered(await ask({ type: 'action', action: a.action }), `Done: ${a.action}.`);
     case 'play_look_now': return answered(await ask({ type: 'preset', presetId: String(a.look_id ?? '') }), 'On the plate.');
     default: return fail(`No such tool: ${name}`);
