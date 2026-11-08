@@ -3,7 +3,7 @@
  * The plate's own boil, on the live path the app steps (PLAN 36e-2b).
  *
  *   npm run plateboil -- --part=zero                       (Measure's lab2: SwiftShader, about a minute)
- *   npm run plateboil -- --part=boil --owed=rate,hold,fan,steam   (the Mac's plate shard)
+ *   npm run plateboil -- --part=boil --owed=rate,hold,fan,steam,writes   (the Mac's plate shard)
  *
  * `npm run boilgpu` holds 36e-2's dish solver (src/gpu/lampBoil.ts) to the
  * CPU reference, dish by dish, and the first build (#718) passes it. What it
@@ -43,7 +43,10 @@
  *          did, within 0.6x–1.4x, with the plate still climbing (> 0.05 K/s):
  *          a stored temperature that loses a step's increment reads 0.
  *   hold   under the hand, the hot spot reaches T_SAT (100 °C) and steam shows
- *          in the plate's air field within 90 s of 1/60 s steps.
+ *          in the plate's air field within 150 s of 1/60 s steps. Steam needs
+ *          a site's superheat over T_SAT as well (the lowest under the hand
+ *          is about 4.3 K at this grid, seedBoilSites), so from the warm-up's
+ *          95 °C it is about 10 K at under 0.2 K/s: the window is twice that.
  *   fan    under the fan, after 15 minutes of warm-up and a minute at 1/60 s,
  *          the hot spot is over 80 °C (the lamp did heat it) and under 100 °C
  *          at every read, with no steam.
@@ -56,7 +59,17 @@
  *          (src/lib/lampBoil.ts). #718 wrote −(ρv/ρl)(an − a): the wrong
  *          sign, 1/1600 of it. The air field's own change may also carry a
  *          source into the thin gap (thinGap.ts reads its rate); counted twice,
- *          the dye leaves at 2x and the line fails as surely as at 0.
+ *          the dye leaves at 2x and the line fails as surely as at 0. The
+ *          ring's own drift before the steam (warm water expanding, about
+ *          0.01 of dye a second) is taken off; at least a cell of steam; and
+ *          the dye that left must arrive in the annulus out to a third of the
+ *          plate (0.7x–1.3x), so steam that deleted the dye under it, with
+ *          nothing flowing, does not pass.
+ *   writes after the fan's run, 30 K poured out of the spot (lab.vel on vel.z)
+ *          is still out ten 1/60 s steps later (0.8x–1.2x of the drop read at
+ *          once): a boil that keeps a private copy of the temperature and
+ *          writes it back each step undoes every other pass that writes heat,
+ *          and on a still level plate nothing else would show it.
  *
  * The contract the build keeps, which #718 already has: GpuStepParams.heat
  * (0..1) and GpuStepParams.boilHolds ({x, y} in plate units, the hand's own
@@ -64,10 +77,16 @@
  * every other pass reads it, and the steam drawn into the air field (the
  * solver's readAir, the bubbles' coverage the plate shades), which is the
  * steam a performer sees. Where the build keeps its own higher-precision
- * temperature is its business; what vel.z says is what the plate does.
+ * temperature is its business, so long as vel.z is what the plate does and a
+ * write to vel.z is the plate's (`writes`). Heat Decay is left at the app's
+ * default, 0.98: at Heat > 0 the plate's cooling is the boil's (the fan, the
+ * hand, radiation), and #718 already turns the old per-step decay off while
+ * the boil runs. A build that let both cool the plate would read low here,
+ * which is the plate the app would show.
  *
- * Each of these lines is printed as owed while src/gpu/lampBoil.ts is absent
- * (main before 36e-2), and is red the day it passes with its id still listed
+ * Each of these lines is printed as owed while the boil is absent (main before
+ * 36e-2: neither src/gpu/lampBoil.ts nor GpuStepParams.boilHolds; one without
+ * the other is red), and is red the day it passes with its id still listed
  * (soundowed.mjs's convention): the PR that builds 36e-2 takes the ids out of
  * `--owed` in scripts/checks.json and never edits a line or a bar.
  *
@@ -90,7 +109,10 @@
  * the velocity and dye fields after 30 steps at Heat 0 compared bit for bit.
  * On the CPU: FluidSimulation's own stepCurrent (the solver without WebGPU)
  * against today's body, five steps, upright and level. These hold on main and
- * are not owed. Their guards: both labs drew on SwiftShader; the control's
+ * are not owed. Their guards: both labs drew on SwiftShader with no GPU error
+ * (a control kernel that failed to compile would read as values differing);
+ * the lines of src/gpu/fluid.ts that pack the current's uniforms are today's
+ * text (both labs share them, so the comparison cannot see them); the control's
  * bundle carries today's kernel (its marker) and the plain one's does not;
  * the scenes reach the current (Buoyancy 0.45 against 0 reads differently)
  * and today's clamp and cap (cells over 50 K, cells at the cap).
@@ -98,17 +120,19 @@
  * What the zero lines ask of the build: at Heat 0 the current runs today's
  * arithmetic, and the kernel keeps today's inputs (cur, vel, dye: a build that
  * needs the boil's own field in the current reads it through vel.z, as the
- * review's fix asks), so today's kernel still binds in its place.
+ * review's fix asks), so today's kernel still binds in its place. What the
+ * zero lines do not see: a change at Heat 0 outside the current (the boil's
+ * own pass, the decay); that is boil's and lampzero's ground.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { openLab } from './lab.mjs';
-import { TODAY_MARK, TODAY_PLUGIN, todayCpuCurrent } from './plateboil-today.mjs';
+import { TODAY_MARK, TODAY_PACK, TODAY_PLUGIN, todayCpuCurrent } from './plateboil-today.mjs';
 
 const root = process.cwd();
-const IDS = ['rate', 'hold', 'fan', 'steam'];
+const IDS = ['rate', 'hold', 'fan', 'steam', 'writes'];
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const part = arg('part') ?? 'all';
 const verbose = process.argv.includes('--verbose');   // every read of the boil plates, as it is taken
@@ -123,39 +147,42 @@ const unknown = [...owed].filter((id) => !IDS.includes(id));
 if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${IDS.join(', ')})`);
 if (!['all', 'zero', 'boil'].includes(part)) check('--part is zero, boil or all', false, `asked for ${part}`);
 
-/** The build is absent (main before 36e-2): the only state an owed line is excused in. */
-const absent = !existsSync(join(root, 'src/gpu/lampBoil.ts'));
+/**
+ * The build is absent (main before 36e-2): the only state an owed line is
+ * excused in. Two marks, so a build that moves the solver's file is not taken
+ * for main: the solver's module and the hand's parameter. One without the
+ * other is half a build, and red.
+ */
+const hasSolver = existsSync(join(root, 'src/gpu/lampBoil.ts'));
+const hasHolds = readFileSync(join(root, 'src/gpu/solverTypes.ts'), 'utf8').includes('boilHolds');
+const absent = !hasSolver && !hasHolds;
+if (hasSolver !== hasHolds) check('the build is whole or absent: src/gpu/lampBoil.ts and GpuStepParams.boilHolds together', false, `lampBoil.ts ${hasSolver}, boilHolds ${hasHolds}`);
 const lineOf = (id, name, ok, detail) => {
   if (!owed.has(id)) return check(name, ok, detail);
   if (ok) return check(name, false, `${detail}; it passes, so it is no longer owed: take "${id}" out of --owed`);
-  if (!absent) return check(name, false, `${detail}; owed, but src/gpu/lampBoil.ts is built and the line misses`);
+  if (!absent) return check(name, false, `${detail}; owed, but the boil is built and the line misses`);
   owedLines++;
   console.log(` owed  ${name} — ${detail}`);
 };
 
-const T_SAT = 100, T_ROOM = 20;
+const T_SAT = 100;
 /** The hand's own radius (src/gpu/lampBoil.ts HAND_RADIUS, 1.5 cm) on the 20 cm dish (DISH_METRES), in plate units. */
 const HAND = 0.015 / 0.2;
+/** Where the dye the steam pushes out of the ring (2 × HAND) is looked for: out to a third of the plate, inside the dye's disc (0.35). */
+const OUTER = 0.33;
 const N = 48;
 
 // ── boil ─────────────────────────────────────────────────────────────────
-
-/** Cell centres of an N × N field within r of the plate's centre (the lamp's hot spot, where the hand is held). */
-const within = (n, r) => {
-  const out = [];
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const dx = (i + 0.5) / n - 0.5, dy = (j + 0.5) / n - 0.5;
-    if (dx * dx + dy * dy <= r * r) out.push(i + j * n);
-  }
-  return out;
-};
 
 /**
  * One plate under the lamp at Heat 1: a level dish of dark dye (absorbance 3,
  * nine tenths of the visible taken), the hand over the hot spot or not.
  * Warm-up at 0.1 s steps, read every 10 s, until the spot is at `warmTo` °C or
  * `warmMax` s; then 1/60 s steps, read every 2 s, for `fineMax` s, or until
- * steam has shown for `afterSteam` s.
+ * steam has shown for `afterSteam` s. Heat Decay is the app's default (0.98)
+ * on purpose: the app runs it, and at Heat > 0 the boil's own cooling (the
+ * fan, the hand, radiation) is the plate's, so the build decides what the old
+ * per-step decay does then, and these lines read the plate it leaves.
  */
 async function plate(page, { hold, warmTo, warmMax, fineMax, afterSteam }) {
   await page.evaluate(async (N) => {
@@ -163,103 +190,142 @@ async function plate(page, { hold, warmTo, warmMax, fineMax, afterSteam }) {
     lab.dyeDisc(0.5, 0.5, 0.35, [3, 3, 3], 1);
     lab.flush();
   }, N);
-  const over = { thinGap: 1, heat: 1, dimmer: 1, boilHolds: hold ? [{ x: 0.5, y: 0.5 }] : [] };
-  const read = (t, phase) => page.evaluate(async ([t, phase, hand, ring]) => {
+  const over = { thinGap: 1, heat: 1, dimmer: 1, heatDecay: 0.98, boilHolds: hold ? [{ x: 0.5, y: 0.5 }] : [] };
+  /*
+    A read: under the hand the hottest cell (`hot`, for boiling, which starts
+    at the hottest site) and the mean (`mean`, for rates: a build that rounds
+    its stored temperature stochastically is noisy cell by cell and right on
+    average); the steam's coverage in the ring of twice the hand's radius; the
+    dye in that ring and in the annulus beyond it, and the ring's cells, all
+    counted on the dye's own grid.
+  */
+  const read = (t, phase) => page.evaluate(async ([t, phase, hand, ring, outer]) => {
     const v = await lab.field('vel');
     const d = await lab.field('dye');
     const air = await lab.solver().readAir();
     const n = Math.round(Math.sqrt(v.length / 4)), L = Math.round(Math.sqrt(d.length / 4));
-    const near = (k, m, r) => { const i = k % m, j = Math.floor(k / m), dx = (i + 0.5) / m - 0.5, dy = (j + 0.5) / m - 0.5; return dx * dx + dy * dy <= r * r; };
-    let hot = -Infinity, steam = 0, dye = 0;
-    for (let k = 0; k < n * n; k++) if (near(k, n, hand)) hot = Math.max(hot, v[k * 4 + 2]);
-    if (air) for (let k = 0; k < air.n * air.n; k++) if (near(k, air.n, ring)) steam += Math.max(0, air.data[k]);
-    for (let k = 0; k < L * L; k++) if (near(k, L, ring)) dye += d[k * 4 + 3];
-    return { t, phase, hot: 20 + hot, steam, dye, air: !!air };
-  }, [t, phase, HAND, 2 * HAND]);
+    const r2 = (k, m) => { const i = k % m, j = Math.floor(k / m), dx = (i + 0.5) / m - 0.5, dy = (j + 0.5) / m - 0.5; return dx * dx + dy * dy; };
+    let hot = -Infinity, sum = 0, cells = 0, steam = 0, dye = 0, beyond = 0, ringCells = 0;
+    for (let k = 0; k < n * n; k++) if (r2(k, n) <= hand * hand) { hot = Math.max(hot, v[k * 4 + 2]); sum += v[k * 4 + 2]; cells++; }
+    if (air) for (let k = 0; k < air.n * air.n; k++) if (r2(k, air.n) <= ring * ring) steam += Math.max(0, air.data[k]);
+    for (let k = 0; k < L * L; k++) {
+      const q = r2(k, L);
+      if (q <= ring * ring) { dye += d[k * 4 + 3]; ringCells++; } else if (q <= outer * outer) beyond += d[k * 4 + 3];
+    }
+    return { t, phase, hot: 20 + hot, mean: 20 + sum / cells, steam, dye, beyond, ringCells, air: !!air };
+  }, [t, phase, HAND, 2 * HAND, OUTER]);
   const reads = [];
+  const note = (r) => { reads.push(r); if (verbose) console.log(`  ${hold ? 'hand' : 'fan '} ${JSON.stringify(r)}`); return r; };
   let t = 0;
   for (; t < warmMax;) {
     await page.evaluate((o) => lab.step(100, { ...o, magnetSeconds: 0.1 }), over);
     t += 10;
-    reads.push(await read(t, 'warm'));
-    if (verbose) console.log(`  ${hold ? 'hand' : 'fan '} ${JSON.stringify(reads.at(-1))}`);
-    if (reads.at(-1).hot >= warmTo) break;
+    if (note(await read(t, 'warm')).hot >= warmTo) break;
   }
   const warmEnd = t;
   let steamAt = null;
   for (; t < warmEnd + fineMax;) {
     await page.evaluate((o) => lab.step(120, { ...o, magnetSeconds: 1 / 60 }), over);
     t += 2;
-    const r = await read(t, 'fine');
-    reads.push(r);
-    if (verbose) console.log(`  ${hold ? 'hand' : 'fan '} ${JSON.stringify(r)}`);
+    const r = note(await read(t, 'fine'));
     if (steamAt === null && r.steam > 0) steamAt = t;
     if (steamAt !== null && t >= steamAt + afterSteam) break;
   }
-  return { reads, warmEnd, steamAt };
+  /*
+    And a write to the temperature, after it all: 30 K taken out under the
+    hand's spot (a cooler pour), read at once and again after ten 1/60 s
+    steps. vel.z is the plate's temperature for every pass that reads it, and
+    one that writes it is the plate's too: a boil that keeps its own copy and
+    writes it back each step would undo the pour, and nothing on a still
+    level plate shows that otherwise.
+  */
+  const before = await read(t, 'pour');
+  await page.evaluate((hand) => { lab.vel(0.5, 0.5, hand, [0, 0, -30, 0]); lab.flush(); }, HAND);
+  const written = await read(t, 'poured');
+  await page.evaluate((o) => lab.step(10, { ...o, magnetSeconds: 1 / 60 }), over);
+  const kept = await read(t + 10 / 60, 'kept');
+  return { reads, warmEnd, steamAt, pour: { before, written, kept } };
 }
+
+const NAMES = {
+  rate: 'a 1/60 s step heats the plate as a 0.1 s step does (the stored temperature keeps every increment)',
+  hold: 'under a held hand the plate reaches T_SAT and steams within 150 s at 1/60 s steps',
+  fan: 'under the fan the plate settles hot and under T_SAT, with no steam',
+  steam: 'the steam pushes out the liquid its volume displaces (0.5x–1.5x), and its dye arrives beyond the ring',
+  writes: "a write to the plate's temperature stays written (the boil keeps no copy of its own over it)",
+};
 
 async function boilPart() {
   if (absent) {
-    for (const [id, name] of [
-      ['rate', 'a 1/60 s step heats the plate as a 0.1 s step does (the stored temperature keeps every increment)'],
-      ['hold', 'under a held hand the plate reaches T_SAT and steams within 90 s at 1/60 s steps'],
-      ['fan', 'under the fan the plate settles hot and under T_SAT, with no steam'],
-      ['steam', "the steam pushes out the liquid its volume displaces (0.5x–1.5x)"],
-    ]) lineOf(id, name, false, 'src/gpu/lampBoil.ts is absent');
+    for (const id of IDS) lineOf(id, NAMES[id], false, 'the boil is absent (src/gpu/lampBoil.ts, GpuStepParams.boilHolds)');
     return;
   }
   const { page, close } = await openLab();
+  const gpuErrors = [];
+  page.on('console', (m) => { if (/gpu error|validation|device lost/i.test(m.text())) gpuErrors.push(m.text().slice(0, 160)); });
   let H, F, drew;
   const t0 = Date.now();
   try {
-    H = await plate(page, { hold: true, warmTo: T_SAT - 5, warmMax: 600, fineMax: 90, afterSteam: 20 });
+    H = await plate(page, { hold: true, warmTo: T_SAT - 5, warmMax: 600, fineMax: 150, afterSteam: 20 });
     F = await plate(page, { hold: false, warmTo: Infinity, warmMax: 900, fineMax: 60, afterSteam: 0 });
     drew = await page.evaluate(() => lab.adapter());
   } finally { await close(); }
   console.log(`  ${drew?.vendor ?? ''} ${drew?.architecture ?? ''}: both plates in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  check('the boil plates ran without a GPU error', !gpuErrors.length, gpuErrors.length ? gpuErrors.slice(0, 2).join(' | ') : 'none');
   const fmt = (x, k = 2) => (Number.isFinite(x) ? x.toFixed(k) : String(x));
   const show = (P) => P.reads.filter((r, i, a) => r.phase === 'fine' || i % 6 === 5 || a[i + 1]?.phase === 'fine')
-    .map((r) => `${r.t}s ${fmt(r.hot, 1)}°C${r.steam > 0 ? ` steam ${fmt(r.steam, 3)}` : ''}`).join(', ');
+    .map((r) => `${r.t}s ${fmt(r.hot, 1)}°C${r.steam > 0 ? ` steam ${fmt(r.steam, 2)}` : ''}`).join(', ');
   console.log(`  hand: ${show(H)}`);
   console.log(`  fan:  ${show(F)}`);
 
-  // rate: the last 10 s of warm-up against the first 6 s at 1/60 s.
+  // rate: the hand's mean over the last 10 s of warm-up against its first 6 s at 1/60 s.
   const warm = H.reads.filter((r) => r.phase === 'warm'), fine = H.reads.filter((r) => r.phase === 'fine');
-  const wa = warm.at(-2), wb = warm.at(-1);
-  const rateW = wa && wb ? (wb.hot - wa.hot) / (wb.t - wa.t) : NaN;
-  const fb = fine[2];
-  const rateF = wb && fb ? (fb.hot - wb.hot) / (fb.t - wb.t) : NaN;
+  const wa = warm.at(-2), wb = warm.at(-1), fb = fine[2];
+  const rateW = wa && wb ? (wb.mean - wa.mean) / (wb.t - wa.t) : NaN;
+  const rateF = wb && fb ? (fb.mean - wb.mean) / (fb.t - wb.t) : NaN;
   const ratio = rateF / rateW;
-  lineOf('rate', 'a 1/60 s step heats the plate as a 0.1 s step does (the stored temperature keeps every increment)',
-    rateW > 0.05 && ratio >= 0.6 && ratio <= 1.4,
-    `${fmt(rateW, 3)} K/s at 0.1 s steps to ${fmt(wb?.hot, 1)} °C, then ${fmt(rateF, 3)} K/s at 1/60 s: ${fmt(ratio)}x (bar 0.6–1.4, still climbing > 0.05 K/s)`);
+  lineOf('rate', NAMES.rate, rateW > 0.05 && ratio >= 0.6 && ratio <= 1.4,
+    `the hand's mean ${fmt(rateW, 3)} K/s at 0.1 s steps to ${fmt(wb?.mean, 1)} °C, then ${fmt(rateF, 3)} K/s at 1/60 s: ${fmt(ratio)}x (bar 0.6–1.4, still climbing > 0.05 K/s)`);
 
   const top = Math.max(...fine.map((r) => r.hot));
-  lineOf('hold', 'under a held hand the plate reaches T_SAT and steams within 90 s at 1/60 s steps',
-    top >= T_SAT && H.steamAt !== null,
-    `warm-up to ${fmt(wb?.hot, 1)} °C in ${H.warmEnd} s, then at 1/60 s the spot peaks at ${fmt(top, 1)} °C; steam ${H.steamAt === null ? 'never shows' : `shows at ${H.steamAt - H.warmEnd} s`}${fine[0]?.air === false ? ' (no air field)' : ''}`);
+  lineOf('hold', NAMES.hold, top >= T_SAT && H.steamAt !== null && fine.every((r) => r.air),
+    `warm-up to ${fmt(wb?.hot, 1)} °C in ${H.warmEnd} s, then at 1/60 s the spot peaks at ${fmt(top, 1)} °C; steam ${H.steamAt === null ? 'never shows' : `shows at ${H.steamAt - H.warmEnd} s`}${fine.some((r) => !r.air) ? ' (no air field)' : ''}`);
 
   const fanTop = Math.max(...F.reads.map((r) => r.hot)), fanEnd = F.reads.at(-1)?.hot, fanSteam = Math.max(...F.reads.map((r) => r.steam));
-  lineOf('fan', 'under the fan the plate settles hot and under T_SAT, with no steam',
-    fanEnd >= 80 && fanTop < T_SAT && fanSteam === 0,
-    `${fmt(fanEnd, 1)} °C after ${F.reads.at(-1)?.t} s (bar over 80), peak ${fmt(fanTop, 1)} °C (bar under ${T_SAT}), steam ${fmt(fanSteam, 3)}`);
+  lineOf('fan', NAMES.fan, fanEnd >= 80 && fanTop < T_SAT && fanSteam === 0 && F.reads.every((r) => r.air),
+    `${fmt(fanEnd, 1)} °C after ${F.reads.at(-1)?.t} s (bar over 80), peak ${fmt(fanTop, 1)} °C (bar under ${T_SAT}), steam ${fmt(fanSteam, 3)}${F.reads.some((r) => !r.air) ? ', no air field' : ''}`);
 
-  // steam: dye gone from the ring against the steam's room, from the last read before steam.
-  let detail = 'steam never showed under the hand';
-  let ok = false;
+  /*
+    steam. From the last read before steam (b) to the end (e): the dye gone
+    from the ring, less what the ring was losing anyway (warm water expanding,
+    the rate over the 10 s before b, carried over the same span), against the
+    room the steam took (its coverage, cells, times the dye a ring cell held at
+    b, times 1 − ρv/ρl). And that dye has to arrive in the annulus beyond the
+    ring (0.7x–1.3x of what left): steam that took the dye away with nothing
+    flowing would pass the first half alone. At least one cell of steam, so a
+    wrong-signed source cannot hide in the drift.
+  */
+  let detail = 'steam never showed under the hand', ok = false;
   if (H.steamAt !== null) {
     const i = H.reads.findIndex((r) => r.t === H.steamAt);
-    const before = H.reads[i - 1], end = H.reads.at(-1);
-    const cells = within(N, 2 * HAND).length;
-    const perCell = before.dye / cells;
-    const want = perCell * end.steam * (1 - 0.598 / 958.4);
-    const gone = before.dye - end.dye;
-    const r = gone / want;
-    ok = r >= 0.5 && r <= 1.5;
-    detail = `${fmt(end.steam, 3)} cells of steam in the ring after ${end.t - H.steamAt} s should displace ${fmt(want, 3)} of dye; ${fmt(gone, 3)} left: ${fmt(r)}x (bar 0.5–1.5)`;
+    const b = H.reads[i - 1], e = H.reads.at(-1);
+    const back = H.reads.find((r) => r.t >= b.t - 10 && r.phase === 'fine') ?? b;
+    const drift = b.t > back.t ? (back.dye - b.dye) / (b.t - back.t) : 0;
+    const driftOut = b.t > back.t ? (b.beyond - back.beyond) / (b.t - back.t) : 0;
+    const span = e.t - b.t;
+    const gone = b.dye - e.dye - drift * span;
+    const arrived = e.beyond - b.beyond - driftOut * span;
+    const want = (b.dye / b.ringCells) * e.steam * (1 - 0.598 / 958.4);
+    const r = gone / want, carried = arrived / gone;
+    ok = e.steam >= 1 && r >= 0.5 && r <= 1.5 && carried >= 0.7 && carried <= 1.3;
+    detail = `${fmt(e.steam, 2)} cells of steam in the ring (bar ≥ 1) after ${span} s should push out ${fmt(want, 3)} of dye; ${fmt(gone, 3)} left beyond the ring's own drift (${fmt(drift, 4)}/s): ${fmt(r)}x (bar 0.5–1.5); ${fmt(arrived, 3)} arrived beyond it: ${fmt(carried)}x of what left (bar 0.7–1.3)`;
   }
-  lineOf('steam', 'the steam pushes out the liquid its volume displaces (0.5x–1.5x)', ok, detail);
+  lineOf('steam', NAMES.steam, ok, detail);
+
+  const { before, written, kept } = F.pour;
+  const wrote = before.mean - written.mean, stays = (before.mean - kept.mean) / wrote;
+  lineOf('writes', NAMES.writes, wrote > 10 && stays >= 0.8 && stays <= 1.2,
+    `30 K poured out under the fan's spot took the hand's mean from ${fmt(before.mean, 1)} to ${fmt(written.mean, 1)} °C (bar a drop over 10 K); ten 1/60 s steps later ${fmt(kept.mean, 1)} °C: ${fmt(stays)} of the drop kept (bar 0.8–1.2)`);
 }
 
 // ── zero ─────────────────────────────────────────────────────────────────
@@ -295,13 +361,17 @@ const bitsDiffer = (a, b) => {
 };
 
 async function zeroPart() {
+  const gpuErrors = [];
+  const listen = (lab, who) => lab.page.on('console', (m) => { if (/gpu error|validation|device lost/i.test(m.text())) gpuErrors.push(`${who}: ${m.text().slice(0, 160)}`); });
   const plain = await openLab({ software: true });
+  listen(plain, 'plain');
   let now, still;
   try {
     now = await zeroRun({ page: plain.page });
     still = await zeroRun({ page: plain.page }, 0);
   } finally { await plain.close(); }
   const control = await openLab({ software: true, plugins: [TODAY_PLUGIN], tag: 'today-current' });
+  listen(control, 'control');
   let then;
   try { then = await zeroRun({ page: control.page }); } finally { await control.close(); }
 
@@ -311,6 +381,18 @@ async function zeroPart() {
   check("the control is today's current: its bundle carries today's kernel and the plain lab's does not",
     control.js.includes(TODAY_MARK) && !plain.js.includes(TODAY_MARK) && control.js !== plain.js,
     `marker in control ${control.js.includes(TODAY_MARK)}, in plain ${plain.js.includes(TODAY_MARK)}`);
+  // A control kernel that did not compile (a renamed field of S) would read as "values differ"; say so instead.
+  check('both labs ran without a GPU error', !gpuErrors.length, gpuErrors.length ? gpuErrors.slice(0, 2).join(' | ') : 'none');
+  /*
+    The control freezes the kernel; the uniforms it reads are packed by the
+    tree's fluid.ts in both labs. So those lines are held to today's text: a
+    build that moved the current's Buoyancy, cap or damping at every Heat
+    there would be the same in both labs and pass the comparison.
+  */
+  const fluidSrc = readFileSync(join(root, 'src/gpu/fluid.ts'), 'utf8');
+  const lost = TODAY_PACK.filter((l) => !fluidSrc.includes(l));
+  check("the current's uniforms are packed as today (src/gpu/fluid.ts, S.curDamp to S.rock)", !lost.length,
+    lost.length ? `not found: ${lost.map((l) => l.trim().slice(0, 60)).join(' | ')}` : `${TODAY_PACK.length} lines as today`);
   const reach = SCENES.map(([, over], i) => ({ name: SCENES[i][0], upright: over.plateUpright, d: bitsDiffer(now.out[i][0], still.out[i][0]).n }));
   check('the plates reach the current: Buoyancy 0.45 moves the upright plates against Buoyancy 0',
     reach.filter((r) => r.upright).every((r) => r.d > 0), reach.map((r) => `${r.name} ${r.d} values`).join(', '));

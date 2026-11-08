@@ -43,6 +43,18 @@ export const TODAY_PLUGIN = {
   },
 };
 
+/**
+ * The lines of src/gpu/fluid.ts that pack the uniforms today's current reads
+ * (S.curDamp, S.curBuoy as upright × Buoyancy, S.curGrav, S.meanD, S.maxCur,
+ * S.rock), as main had them: the control lab shares the tree's fluid.ts, so
+ * the check holds these to today's text.
+ */
+export const TODAY_PACK = [
+  "    f[22] = fin(p.currentDamp, 0.98); f[23] = upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);",
+  "    f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);",
+  "    f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);"
+];
+
 const c01 = (v) => Math.max(0, Math.min(1, v ?? 0));
 
 /** FluidSimulation.stepCurrent as main had it: M the current's grid (S / 2), S the plate's. */
