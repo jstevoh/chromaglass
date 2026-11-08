@@ -223,10 +223,21 @@ routes, cheapest first:
    Only worth it if step 0 below shows a box that holds a usable grid; the cheap
    boxes will not, so this would sell only to Shield-class owners. Size: L, mostly
    a TV grid ladder and D-pad desks.
-4. **Apple TV.** tvOS has no WebView at all, so it means porting the solver to
-   Metal (the WGSL could be translated, the app around it could not). The Apple TV
-   4K's A15 would run it well. Size: XL, and AirPlay from the Mac (route 1) already
-   gives Apple TV owners the picture. Not now.
+4. **Apple TV, the plate itself.** tvOS has no WebView at all, so it means porting
+   the solver to Metal (the WGSL could be translated, the app around it could not).
+   The Apple TV 4K's A15 would run it well. Size: XL, and AirPlay from the Mac
+   (route 1) already gives Apple TV owners the picture. Not now.
+
+**12-tv-apple (the owner, 2026-11-08: "an Apple TV app as well").** Route 2's
+receiver, native on tvOS: a small Swift app (no WebView there) that plays the same
+Mac stream route 2 builds, with the same TV-code sign-in and Home/Pro check. It
+rides on route 2's stream and adds no work to the Mac side. The stream format is
+the trap: libwebrtc has no official tvOS build, so either the Mac app also offers
+low-latency HLS that `AVPlayer` plays natively (a second or two of lag, fine for an
+evening) or the app carries a community WebRTC build. Store rules: a free app that
+only opens what an account bought on the web, with no buy button or price, should
+fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs the
+App Store Connect record from 12-ship. Size: M, after route 2's first PR.
 
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`
