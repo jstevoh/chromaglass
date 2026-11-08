@@ -3,6 +3,7 @@ import type { AudioData } from '../hooks/useAudioAnalyzer';
 import { clearShowInterval, type ShowIntervalHandle } from '../lib/showClock';
 import { flushSync } from 'react-dom';
 import { useSongRender } from '../hooks/useSongRender';
+import { useLoopRender } from './loopRender';
 import { parseSeed, showSeed } from '../lib/rng';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { ShowSequence, SequencerStatus } from '../lib/sequencer';
@@ -125,22 +126,43 @@ export function useSongRendering({
       };
     },
   }), []);
-  const songRender = useSongRender(renderHost);
+  const fullRender = useSongRender(renderHost);
+  const loopRender = useLoopRender(renderHost);
+  const [lastKind, setLastKind] = useState<'song' | 'loop'>('song');
+  const activeRender = loopRender.running ? loopRender : fullRender.running ? fullRender : lastKind === 'loop' ? loopRender : fullRender;
+  const songRender = useMemo(() => ({
+    state: activeRender.state,
+    running: fullRender.running || loopRender.running,
+    support: fullRender.support,
+    start: fullRender.start,
+    cancel: () => { fullRender.cancel(); loopRender.cancel(); },
+    reset: () => { fullRender.reset(); loopRender.reset(); },
+  }), [activeRender.state, fullRender, loopRender]);
   const [renderOpen, setRenderOpen] = useState(false);
-  const startRender = useCallback((choice: { width: number; height: number; fps: number; seed: string }) => {
+  const startRender = useCallback((choice: { width: number; height: number; fps: number; seed: string; loop?: { seconds: number; startSec?: number } }) => {
     if (!musicFile) return;
     const s = settingsRef.current;
-    void songRender.start({
+    const seed = parseSeed(choice.seed) ?? showSeed();
+    const levels = { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false };
+    if (choice.loop) {
+      setLastKind('loop');
+      void loopRender.start({
+        song: musicFile.url, name: musicFile.name,
+        width: choice.width, height: choice.height, fps: choice.fps, seed, levels,
+        loop: { seconds: choice.loop.seconds, startSec: choice.loop.startSec },
+      });
+      return;
+    }
+    setLastKind('song');
+    void fullRender.start({
       song: musicFile.url, name: musicFile.name,
-      width: choice.width, height: choice.height, fps: choice.fps,
-      seed: parseSeed(choice.seed) ?? showSeed(),
-      levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
+      width: choice.width, height: choice.height, fps: choice.fps, seed, levels,
     });
-  }, [musicFile, songRender.start]);
+  }, [musicFile, fullRender.start, loopRender.start]);
   /*
-    For `npm run render-app` only (`?debug`): render the loaded song, or a
-    song handed over as bytes, small and kept in memory, and hand back the
-    file and a hash of every frame, so the check can render twice and compare.
+    For `npm run render-app` and `npm run loopseam` only (`?debug`): render the
+    loaded song, or a song handed over as bytes, small and kept in memory, and
+    hand back the file and a hash of every frame (or the loop's picked start).
   */
   const musicFileRef = useRef(musicFile);
   musicFileRef.current = musicFile;
@@ -153,13 +175,27 @@ export function useSongRendering({
     });
     window.chromaglassRender = async (o: {
       song?: ArrayBuffer; width: number; height: number; fps: number; seed: number; maxFrames?: number;
+      loop?: { seconds: number; crossfade?: boolean; startSec?: number };
     }) => {
       const s = settingsRef.current;
       const song = o.song ? new Blob([o.song]) : musicFileRef.current?.url;
       if (!song) throw new Error('no song: load one or pass its bytes');
-      const r = await songRender.start({
-        song, name: 'check', width: o.width, height: o.height, fps: o.fps, seed: o.seed,
-        levels: { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false },
+      const levels = { sensitivity: s.sensitivity, bassBoost: s.bassBoost, autoCalibrate: s.autoCalibrate !== false };
+      if (o.loop) {
+        const r = await loopRender.start({
+          song, name: 'check', width: o.width, height: o.height, fps: o.fps, seed: o.seed, levels,
+          loop: o.loop, test: { keepInMemory: true },
+        });
+        let b64: string | null = null;
+        if (r.bytes) {
+          let bin = '';
+          for (let i = 0; i < r.bytes.length; i += 0x8000) bin += String.fromCharCode(...r.bytes.subarray(i, i + 0x8000));
+          b64 = btoa(bin);
+        }
+        return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, bytes: b64, loop: r.loop };
+      }
+      const r = await fullRender.start({
+        song, name: 'check', width: o.width, height: o.height, fps: o.fps, seed: o.seed, levels,
         test: { keepInMemory: true, hashFrames: true, maxFrames: o.maxFrames },
       });
       let b64: string | null = null;
@@ -170,7 +206,7 @@ export function useSongRendering({
       }
       return { phase: r.phase, message: r.message, format: r.format, summary: r.summary, frameHashes: r.frameHashes, frameDigests: r.frameDigests, bytes: b64 };
     };
-  }, [songRender.start]);
+  }, [fullRender.start, loopRender.start]);
 
   return {
     songRender, renderOpen, setRenderOpen, startRender,
