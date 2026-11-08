@@ -490,6 +490,21 @@
       ]
     },
     {
+      "name": "Bubbles know their liquid",
+      "shard": "logic",
+      "run": "npm run bubbleliquid -- --owed=cell,default,bretherton,local,drain,shape,rim,dissolve,wired",
+      "why": [
+        "PLAN 33f (scripts/bubbleliquid.mjs), written ahead of its build: each pocket",
+        "reads the poured liquid under it from the species field, so its Bretherton",
+        "lead, tilt climb, film drainage, Paterson relaxation, rim emptying and",
+        "dissolving follow its own cell's mu, sigma and rho (alcohol, oil, syrup,",
+        "glycerine, each within 1-5% of the law), two pockets in one field each at",
+        "their own, and nothing poured moves nothing to the bit. --owed: each line",
+        "is excused only in main's state and printed as owed until the PR that",
+        "builds it takes its id out. Node only, a few seconds."
+      ]
+    },
+    {
       "name": "Blow's range",
       "shard": "logic",
       "run": "npm run blowrange",
@@ -966,7 +981,7 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2,h2c5,h2c8",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
@@ -976,7 +991,26 @@
         "sits here rather than in the Mac queue. And the multigrid's own lines",
         "(scripts/encode-solve.mjs): the residual a step leaves, read through the",
         "solver's restriction kernel against main's, which holds on main; and the",
-        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships."
+        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships.",
+        "And two more owed lines (scripts/encode-owed.mjs, 2026-11-07): H2c-5's",
+        "first-order velocity on the open plate (one MacCormack correction and one",
+        "carry fewer) and H2c-8's air only where there are bubbles (no air pass and",
+        "no air texture on a plate that never had one), with a bubble as the control."
+      ]
+    },
+    {
+      "name": "A pinned grid solves as well as the ladder's",
+      "shard": "lab4",
+      "run": "npm run encode -- --grids",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "H2c-10's residual clause (scripts/encode-solve.mjs gridLines): ?sim=514,",
+        "1000, 777 and 100 at the grid the real resolveSimResolution gives, each a",
+        "fresh solver read after four thin steps like the 512² plate it is held",
+        "to within twice of. It holds on main (worst 1.43x, 2026-11-07) and is the",
+        "guard that the multiple-of-32 rounding (the owed line in rungs) solves no",
+        "worse. Five solvers, one 1000², about two minutes under SwiftShader: in",
+        "lab4, the part with the most room, not with encode in lab."
       ]
     },
     {
@@ -1148,7 +1182,7 @@
     {
       "name": "Soap Breakdown keeps a long show bursting",
       "shard": "lab3",
-      "run": "npm run soapbreak -- --owed=law,decay,show,default",
+      "run": "npm run soapbreak",
       "timeout": 8,
       "why": [
         "The Soap Breakdown dial (PLAN 38c-3, scripts/soapbreak.mjs), written ahead of",
@@ -2731,14 +2765,14 @@
     {
       "name": "The Live Show streams the picture",
       "shard": "fifth",
-      "run": "npm run liveshow -- --stack --owed=plate,stack",
+      "run": "npm run liveshow -- --stack --owed=stack",
       "why": [
         "What the Live Show panel's stream carries (PLAN.md 37x-4d-1, 37x-4d-6;",
         "scripts/liveshow.mjs, --stack): a film of two known halves alone in the",
         "mixer and a keystone on the wall, streamed and decoded, against the",
         "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
-        "the Plate source's frames are black today and the Mixer stack source is",
-        "not built; printed as owed until the PR that fixes each takes its id out."
+        "the Mixer stack source is not built; printed as owed until the PR that",
+        "builds it takes its id out (the Plate source's black frames, 37x-4d-6, are fixed)."
       ]
     },
     {
