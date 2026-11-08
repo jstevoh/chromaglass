@@ -155,6 +155,11 @@ a grid of generic stock thumbnails: ours are the plate itself.
   (`chromaglassDebug().preview`, `{ id, stepCount }`), so a picture that only moves cannot pass it. Not in the check: no preview while a show is live on the wall (needs a cast
   or mirror open; the reviewer reads it), and `BUDGET_SHARE` (0.95) is unmeasured on the Mac until
   a preview exists.
+  *34b-1 shipped* (2026-11-08): a 240×150 WebP still per shipped look under `public/looks/<id>.webp`
+  (2.9–16.8 KB, rendered from the plate shader), shared through `src/lib/lookStills.ts` across the
+  Perform desk's new Looks grid (`LooksGrid`, opened from `looks-grid-open` in the desk breadcrumb),
+  the narrow window's `PresetMenu` (`preset-menu-<id>`) and the phone's Looks sheet (`phone-look-<id>`),
+  with `<img loading="lazy">` inside `SlideMount` on the narrow menu and phone cards; `npm run looksgrid -- --owed=preview` green (39 looks on 3 surfaces, 240 px, 2936–16754 bytes, closest pair 26.9 apart). Left: 34b-2 (live preview on hover/hold).
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the

@@ -21,6 +21,7 @@ The desk: the laptop's control surface around the plate. Perform and Design are 
 
 - `AddToSetSheet.tsx`: add a look to a set list.
 - `CommandPalette.tsx`: the Cmd-K box (`Command`).
+- `LooksGrid.tsx`: the desk's Looks grid (`LooksGrid`, `looks-grid-open`, `looks-grid-<id>`, PLAN 34b-1).
 - `PanelBrowser.tsx`: every panel, Cmd-P.
 - `PanelWindow.tsx`: a panel in its own window (`openPanelWindow`).
 - `PickList.tsx`: what rides on a strip.
