@@ -79,6 +79,18 @@ export function parsePourText(raw: unknown): PourTextMessage | null {
 }
 
 /**
+ * The display's whole rule for one `pour-text` message arriving at `now`
+ * (ms), the last pour taken at `last`: the pour to make, or null for a
+ * message with no words or one inside POUR_TEXT_GAP_MS of the last. A pure
+ * function so the gap is measured in node (`npm run assistant`), not only
+ * on a plate.
+ */
+export function takePourText(raw: unknown, now: number, last: number): PourTextMessage | null {
+  if (now - last < POUR_TEXT_GAP_MS) return null;
+  return parsePourText(raw);
+}
+
+/**
  * What a person typed or pasted, as rows laid out as a song's title card is
  * (`titleRows`): the first line is the name, in capitals on one or two
  * lines; each line after it is a credit, smaller. One line holding a dash

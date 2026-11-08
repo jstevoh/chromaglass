@@ -245,6 +245,7 @@ try {
     const label = await remote.getByTestId('remote-pour-text-go').innerText();
     await press(remote.getByTestId('remote-pour-text-go'));
     for (let i = 0; i < 20 && heard.length === 0; i++) await remote.waitForTimeout(100);
+    await remote.waitForTimeout(300);   // a second pour from one press would land in this
     const rows = heard[0]?.rows?.map(r => `${r.text}@${r.weight}`).join('|');
     check('words typed in the phone\'s box and poured reach the display as one pour, the name in capitals over the credit',
       heard.length === 1 && rows === 'SUNSHINE OF@1.25|YOUR LOVE@1.25|Cream@0.75' && heard[0].colour === 'contrast', `${heard.length} pours: ${rows} (button "${label}")`);
