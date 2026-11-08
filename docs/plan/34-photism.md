@@ -75,9 +75,15 @@ a grid of generic stock thumbnails: ours are the plate itself.
 - **34a-6. The looks as films, each to its own kind of music, and on the channel.** *The row
   shipped (2026-11-08): six 1920s records, each played whole by a look, under the gallery; story
   in `docs/plan-shipped.md` §34a-6.*
-  - **34a-6a. Open: the channel's ids.** The owner uploads the six films (the package and the
-    steps are in the project's files); each film's `youtube` id then goes into
-    `siteFilms.ts`, which turns its card into one that opens the film with its sound.
+  - **34a-6a. The channel's ids.** *Shipped (2026-11-08): all six on the channel, Public, ids
+    in `siteFilms.ts`; story in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6c. Open: the channel's content claims.** Five of the six carry a claim from the
+    channel's matching of a label's remaster: Rachmaninoff and Tears are blocked in some
+    countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
+    is a Great 78 transfer of the original disc, published in the US before 1926, so each is
+    disputed as public domain with the credit lines and `public/landing/films/SOURCES.md`;
+    the owner files the disputes. Until one is won, a visitor in a blocked country who opens
+    that card gets YouTube's own notice in the player, not the film.
   - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
     as each year's recordings enter the public domain (1926's on 1 January 2027).
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,

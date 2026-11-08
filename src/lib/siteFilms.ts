@@ -95,7 +95,7 @@ export const FADE_OUT_S = 1.2;
 
 export const SITE_FILMS: readonly SiteFilm[] = [
   {
-    id: 'wolverines', look: 'splodascope', lookName: 'Splodascope', kind: 'Hot jazz, 1924', seed: 1, loopAt: 70, youtube: null,
+    id: 'wolverines', look: 'splodascope', lookName: 'Splodascope', kind: 'Hot jazz, 1924', seed: 1, loopAt: 70, youtube: 'j7afUdmWi2c',
     record: {
       title: 'Riverboat Shuffle', performer: 'The Wolverine Orchestra, with Bix Beiderbecke',
       composer: 'Hoagy Carmichael, Dick Voynow and Irving Mills', published: 'Gennett 5454, 1924',
@@ -105,7 +105,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'caruso', look: 'solar-flare', lookName: 'Solar Flare', kind: 'Opera, 1907', seed: 1, loopAt: 100, youtube: null,
+    id: 'caruso', look: 'solar-flare', lookName: 'Solar Flare', kind: 'Opera, 1907', seed: 1, loopAt: 100, youtube: '9N4GEV-z2KE',
     record: {
       title: 'Vesti la giubba', performer: 'Enrico Caruso',
       composer: 'Ruggero Leoncavallo, from Pagliacci (1892)', published: 'Victor 88061, 1907',
@@ -115,7 +115,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'rachmaninoff', look: 'galaxy', lookName: 'Galaxy', kind: 'Solo piano, 1921', seed: 1, loopAt: 110, youtube: null,
+    id: 'rachmaninoff', look: 'galaxy', lookName: 'Galaxy', kind: 'Solo piano, 1921', seed: 1, loopAt: 110, youtube: '6SIl6gNhcpE',
     record: {
       title: 'Prelude in C-sharp minor, Op. 3 No. 2', performer: 'Sergei Rachmaninoff',
       composer: 'Sergei Rachmaninoff (1892)', published: 'Victor 66016, 1921',
@@ -125,7 +125,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'whiteman', look: 'aurora-borealis', lookName: 'Aurora Borealis', kind: 'Dance band, 1920', seed: 1, loopAt: 30, youtube: null,
+    id: 'whiteman', look: 'aurora-borealis', lookName: 'Aurora Borealis', kind: 'Dance band, 1920', seed: 1, loopAt: 30, youtube: 'WbqOB_OeEoM',
     record: {
       title: 'Whispering', performer: 'Paul Whiteman and His Ambassador Orchestra',
       composer: 'John Schonberger, Richard Coburn and Vincent Rose', published: 'Victor 18690, 1920',
@@ -135,7 +135,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'oliver', look: 'neon-coral-reef', lookName: 'Neon Coral Reef', kind: 'New Orleans jazz, 1923', seed: 1, loopAt: 90, youtube: null,
+    id: 'oliver', look: 'neon-coral-reef', lookName: 'Neon Coral Reef', kind: 'New Orleans jazz, 1923', seed: 1, loopAt: 90, youtube: 'nIzxLuUu8tk',
     record: {
       title: 'Tears', performer: "King Oliver's Creole Jazz Band, with Louis Armstrong",
       composer: 'Lil Hardin and Louis Armstrong', published: 'OKeh, 1923',
@@ -145,7 +145,7 @@ export const SITE_FILMS: readonly SiteFilm[] = [
     },
   },
   {
-    id: 'bessie', look: 'velvet-underground', lookName: 'Velvet Underground', kind: 'Blues, 1925', seed: 1, loopAt: 60, youtube: null,
+    id: 'bessie', look: 'velvet-underground', lookName: 'Velvet Underground', kind: 'Blues, 1925', seed: 1, loopAt: 60, youtube: 'ij4wuO7HQH8',
     record: {
       title: 'Careless Love Blues', performer: 'Bessie Smith, with Louis Armstrong, Fletcher Henderson and Charlie Green',
       composer: 'Traditional, arranged by W. C. Handy', published: 'Columbia 14083-D, 1925',

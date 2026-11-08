@@ -6890,6 +6890,13 @@ GIF: 256 colours band a plate's gradients, and a GIF is ten to twenty times the 
 
 ## 35. Clear controls: on reads on, one name for one thing
 
+**34a-6a, the channel's ids (2026-11-08).** The owner had the six films uploaded to the channel
+from the package `npm run sitefilms` writes, each with its own title, description, credit and
+thumbnail, and made Public. Their ids went into `siteFilms.ts`: Wolverines `j7afUdmWi2c`,
+Caruso `9N4GEV-z2KE`, Rachmaninoff `6SIl6gNhcpE`, Whiteman `WbqOB_OeEoM`, Oliver
+`nIzxLuUu8tk`, Bessie `ij4wuO7HQH8`. Every card now opens its film; `npm run landingfilms`
+uses the real ids instead of its stand-ins, since it only stubs the ids that are null.
+
 ### 35a. One look for on, every name unique (2026-10-24)
 
 Reported: the owner, with the Video panel open and a loop playing, could not tell which of
