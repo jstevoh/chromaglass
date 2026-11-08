@@ -629,6 +629,17 @@
       ]
     },
     {
+      "name": "The album sheet, its checks written first",
+      "shard": "logic",
+      "run": "npm run album -- --owed=sheet,lineage,builds,seeds",
+      "why": [
+        "PLAN 37x-3's album sheet in node (scripts/album.mjs): the file read on the",
+        "album's clock and as a set list, one palette lineage with bars read from",
+        "the shipped looks' palettes, a quantity that builds at Evolve's pace, and",
+        "track seeds drawn from the album's. All owed until src/lib/albumSheet.ts."
+      ]
+    },
+    {
       "name": "Three sound builds, their checks written first",
       "shard": "logic",
       "run": "npm run soundowed -- --owed=voices,lfo",
@@ -1682,7 +1693,7 @@
     {
       "name": "The Live Show panel",
       "shard": "browser2",
-      "run": "npm run liveshow",
+      "run": "npm run liveshow -- --owed=narrow",
       "why": [
         "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
         "its sums in node against numbers worked by hand, then the built app",
@@ -1691,7 +1702,8 @@
         "the public, the upload warning, and the phone's Stop. No GPU: the",
         "encoder is WebCodecs' software H.264. Through npm run, which builds",
         "dist/ first and puts esbuild on the PATH (a bare esbuild in the",
-        "shard's shell is not found: exit 127 on the first CI run)."
+        "shard's shell is not found: exit 127 on the first CI run). The narrow",
+        "window's chip (37x-4d-4, scripts/liveshownarrow.mjs) is owed until built."
       ]
     },
     {
@@ -2984,6 +2996,19 @@
         "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
         "the Mixer stack source is not built; printed as owed until the PR that",
         "builds it takes its id out (the Plate source's black frames, 37x-4d-6, are fixed)."
+      ]
+    },
+    {
+      "name": "The album's plate carries from song to song",
+      "shard": "fifth",
+      "run": "npm run albumplate -- --owed=carry",
+      "why": [
+        "PLAN 37x-3 (scripts/album.mjs --app): song 2's first half second keeps song",
+        "1's dye (the picture's luma correlated, its spread held) while track 2's",
+        "settings move, and a track marked opensOnBlack opens on black, through the",
+        "window.chromaglassAlbum hook; owed until built. Two control lines hold on",
+        "main: a look taken with Go keeps the plate by the same bars and Clear does",
+        "not. On a Mac because the plate needs WebGPU."
       ]
     },
     {
