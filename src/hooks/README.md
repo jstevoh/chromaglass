@@ -5,8 +5,8 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 ## Start here
 
 - `useAudioAnalyzer.ts`: `useAudioAnalyzer`, `AudioData`, `Ear`: the show's ear.
-- `useMidi.ts` (37 KB, grep it): `useMidi`, `MidiHost`, `MidiDevice`, controller maps, clock and timecode.
-- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances.
+- `useMidi.ts` (37 KB, grep it): `useMidi`, `MidiHost` (`playSetItem`), `MidiDevice`, controller maps, clock and timecode.
+- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms).
 - `useShowSequencer.ts`: transport over a `ShowSequence`'s stages.
 - `useProjector.ts`: `useProjector`, `pickProjector`, `ProjectorMode`.
 
@@ -23,6 +23,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useDeskLayout.ts`: `useDeskTabs`, `TabEdit`, the desk's tabs.
 - `useDeviceTilt.ts`: phone tilt as Gravity.
 - `useEscape.ts`: Esc closes.
+- `useMoirePreview.ts`: whether the moiré pack's controls move here, and a copy without it a minute's try (the desk's Moiré Sheets section and the phone's Looks sheet both call it; PLAN 45a).
 - `useFilmSense.ts`: the film, read back.
 - `useGamepad.ts`: game controller as a hand.
 - `useMidiTouch.ts`: flash on a controller touch.
@@ -32,7 +33,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useSceneCamera.ts`: the room camera.
 - `useSongChange.ts`: a new song, on a beat.
 - `useSongRender.ts`: render a song.
-- `useSongShows.ts`: a song's show.
+- `useSongShows.ts`: a song's show, ticking every frame (`SONG_SHOW_TICK_MS`) on `positionNow` when given.
 - `useUserPresets.ts`: own presets.
 - `useWakeLock.ts`: screen stays on.
 

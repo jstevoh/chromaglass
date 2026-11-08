@@ -128,14 +128,14 @@ export interface RemoteState {
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror'; key?: string }
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant'; key?: string }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
    * minutes, `retryMs` from now. A locked phone waits that long rather than
    * knocking again, since every knock while locked is refused unread.
    */
-  | { type: 'denied'; reason: 'key' | 'locked'; retryMs?: number }
+  | { type: 'denied'; reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop'; retryMs?: number }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -190,6 +190,34 @@ export type RemoteMessage =
   | { type: 'state'; state: RemoteState }
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
+  /**
+   * The owner's assistant (PLAN 44b–44d; the relay's guard is
+   * `server/assistant.js`, the program the assistant talks to
+   * `mcp/chromaglass-mcp.js`). Only the relay's guard sends the first two to
+   * the display, and the relay drops either from anyone else, so a phone can
+   * still end a stream and never start one.
+   *
+   * `cue-look`: arm a look the assistant made, a base from the library with
+   * its own settings over it (`lib/assistantLook.ts`), for the performer's Go.
+   * `assistant-live`: start the live stream to the saved destinations, or the
+   * test ones; Full mode only. The rest pass between the relay and the
+   * assistant and never reach the display: the switch's mode, the guard's
+   * answer to a numbered message, and Undo.
+   */
+  | { type: 'cue-look'; name: string; base: string | null; settings: Partial<VisualizerSettings> }
+  | { type: 'assistant-live'; test: boolean }
+  | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
+  | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
+  | { type: 'assistant-undo' }
+  /**
+   * The owner's assistant (PLAN 44c-4, 44f), relayed only from the guard. A
+   * still: one frame up to 1280 wide, answered as a `picture` with
+   * `still: true` (lib/padPicture.ts). A song action: a *when* and a *what*
+   * added to the show of the song playing now, as a cue pinned on the score
+   * is (lib/songShows.ts `parseSongAction`, app/songCue.ts).
+   */
+  | { type: 'assistant-still'; width: number }
+  | { type: 'song-action'; when: unknown; what: unknown }
   | { type: 'preset'; presetId: string }
   /**
    * Arm a look without sending it. `null` disarms.
@@ -255,7 +283,7 @@ export type RemoteMessage =
    * URL. `aspect` is the canvas's own (width over height), so the remote's
    * frame takes the wall's shape rather than a 16:9 it assumed.
    */
-  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number };
+  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number; still?: true };
 
 /**
  * Build the ws:// URL for the relay: the page's own origin, which is the show

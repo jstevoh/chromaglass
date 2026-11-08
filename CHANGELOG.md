@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the liquid's amount sets the gap: Liquid and Cover Weight (PLAN 38r-5)
+
+- The plate now knows how much liquid is under its cover glass. Two dials, Liquid (mL) and
+  Cover Weight (g), set the gap between the glasses through the real physics: the glass
+  floats on the liquid while the meniscus at its edge holds it, and squeezes the extra out
+  over the rim, by Stefan's law, when it cannot. Pours lift the glass. The defaults are
+  today's 2 mm plate.
+
+### Added — Soap Breakdown (PLAN 38c-3)
+
+- A new **Soap Breakdown** control (`soapBreakdown`, Settings → Oil & Soap under Soap Bursts,
+  MIDI, both desks, the remote while Soap Bursts is on, and the phone's Dye sheet with Soap
+  in hand; `0` by default on every look): a first-order surfactant loss $d\Gamma/dt = -k\Gamma$
+  on the mix's `.g` channel in `mixUpdate` (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`),
+  scaled by the step's real seconds (`magnetSeconds`), never by frames or the look's Speed,
+  and shown on the desk as its half-life ($\ln 2 / k$, from `1.9h` at `0.01` down to `10s` at
+  `1`). At `0` (`Off`), all soap is conserved on the plate; turning it up clears soap over the
+  chosen half-life so a long show keeps bursting (`npm run soapbreak`).
+
+### Added — Film Dye: a colour for the clear film (PLAN 20b-13)
+
+- Beside Clear Film, while there is a film: **Film Dye** and a colour swatch, an
+  oil-soluble dye dissolved in the film. The lamp is filtered by it over the film's own
+  thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
+  and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
+  0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+
 ### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
 
 - The oil beads are laid larger in the macro view (twice the size scale), where each is a

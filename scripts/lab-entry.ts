@@ -2,6 +2,8 @@
 // canvas, driven step by step so a physics change can be measured on any
 // adapter that computes (a Linux box's software one included).
 import { WebGPUFluid, DISPLACE_PUSH, DISPLACE_INSIDE, CARRY_SUBSTEPS, thinGapViscosity, FERRO_NU, FILM_MAX, DYE_LAYER, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, NU_REF, LIQUID_DENSITY, REST_GAP, REST_GAP_METRES, GAP_METRES, PLATE_METRES, STEFAN_FILM } from '../src/gpu/fluid';
+import { FILM_DYE_DEPTH } from '../src/gpu/wgsl/filmDye';
+import { FILM_PRECURSOR } from '../src/gpu/wgsl/film';
 import { WebGPUPlate } from '../src/gpu/plate';
 import { SPIKES_WGSL, fieldOnAxis, SPIKE_ONSET, SPIKE_ONSET_REAL, SPIKE_FULL, SPIKE_B_REF, MAGNET_E, MAGNET_BS } from '../src/gpu/wgsl/spikes';
 import { magnetReach, magnetDepth } from '../src/lib/magnetSize';
@@ -325,6 +327,8 @@ const api = {
     return sp;
   },
   async speciesShare() { return lab!.solver.speciesShare(); },
+  /** The floating glass's gap, metres, as the last step left it (lib/cover.ts; `npm run flush` waits on it). */
+  coverMetres() { return lab!.solver.coverMetres; },
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
@@ -426,6 +430,9 @@ const api = {
   },
   /** The thickest film Clear Film lays, as a share of the gap (FILM_MAX in src/gpu/fluid.ts). */
   filmMax: FILM_MAX,
+  // The clear film's dye and the precursor its path is read above (PLAN 20b-13, `npm run lace` 8).
+  filmDyeDepth: FILM_DYE_DEPTH,
+  filmPrecursor: FILM_PRECURSOR,
   async phase() {
     const f = await lab!.solver.readPhase();
     if (!f) return null;
@@ -659,6 +666,8 @@ const api = {
         (PLAN 38h).
       */
       gelAngle?: number;
+      /** The upper moiré sheet's spin, turns (PLAN 45a). */
+      moireTurn?: number;
       /*
         Projectors' own sources (PLAN.md §16b). Each is the plate's display
         drawn again with that source's uniforms, after the wall's draw and in
@@ -707,7 +716,7 @@ const api = {
         macroAmount: cam.macroAmount ?? Math.max(0, Math.min(1, zoom - 1)), isDarkBlend: false,
         // As the app has them: the cells slide on the lab plate's own travel.
         flowRate: CELL_TRAVEL, cellClock: l.cellClock,
-        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0,
+        rotations: [cam.rotation ?? 0, cam.backRotation ?? 0], harmony: [0, 1, 2, 3], lamp: cam.lamp ?? { x: 0.5, y: 0.5, x2: 0.5, y2: 0.5 }, magnets: cam.magnets ?? l.magnets, gelAngle: cam.gelAngle ?? 0, moireTurn: cam.moireTurn ?? 0,
         kaleidoPhase: 0, layer1: { zoom: 1, dx: 0, dy: 0 }, bubbles: { count: 0, strength: cam.bubbles ?? 0 },
         bubblePack: { packed: new Float32Array(160), shape: new Float32Array(160) }, dimmerGain: 1,
         filmLevel: cam.filmLevel ?? 0.05, filmGain: cam.filmGain ?? 3,

@@ -75,6 +75,8 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   a patch or LFO must not flip it mid-song.
 */
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+  // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
+  'clearFilmDye',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
   // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
@@ -125,8 +127,10 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   'plateCurve', 'plateSpring', 'depthDrag',
   // Whether the plate is a thin gap, and its liquid's thickness (PLAN §18a).
   'thinGap', 'gapThickness',
+  // The liquid under this plate's cover and the cover's weight (PLAN 38r-5).
+  'liquidMl', 'coverWeight',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
-  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'surfactantFlow', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
+  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'surfactantFlow', 'soapBreakdown', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   // The clear film (PLAN §20b): the front plate's solver lays it; a back
   // plate is handed 0 until the display can draw one there (20b-5).
   'clearFilm',

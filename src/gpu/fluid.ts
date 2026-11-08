@@ -30,6 +30,7 @@
  *   fluid/passes.ts     FluidPasses: the passes a step runs (projection, thin gap, carries)
  *   fluid/inputs.ts     FluidInputs: deltas, splats, pours, chemistry, hand-over
  *   fluid/reads.ts      FluidReads: readbacks, the stats, the checks' reads
+ *   fluid/cover.ts      FluidCover: the cover glass on its liquid, the gap's shape (38r-5)
  *   gpu/fluid.ts        WebGPUFluid: `step`, the pipelines built ahead and the statics
  *
  * The members were moved, not written again; one another file reaches is `protected` where
@@ -49,8 +50,8 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
-import { FluidReads } from './fluid/reads';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { FluidCover } from './fluid/cover';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
 
@@ -58,7 +59,7 @@ import { OPEN_RIM } from '../lib/turntable';
 export { THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, FILM_GRID, FILM_MAX, FILM_RATE, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, STEFAN_FILM, NU_REF, ROCK_FALL, OIL_LIFT, DYE_LAYER, LIQUID_DENSITY, thinGapViscosity, thinGapDragSeconds, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, DISPLACE_INSIDE } from './fluid/constants';
 export type { FieldStats } from './fluid/constants';
 
-export class WebGPUFluid extends FluidReads {
+export class WebGPUFluid extends FluidCover {
   /**
    * For `npm run swirlcost` (PLAN 22k): the same plate with the swirl held
    * off, to read what it costs, and how many steps ran it of how many were
@@ -67,7 +68,7 @@ export class WebGPUFluid extends FluidReads {
    */
   static swirlHeldOff = false;
   /** The step's soap numbers (soapPlan), kept so a frame makes none. */
-  private readonly soapNums = new Float64Array(5);
+  private readonly soapNums = new Float64Array(6);
 
   /**
    * The kernels a step runs, on any look a show can open on, built before
@@ -405,6 +406,7 @@ export class WebGPUFluid extends FluidReads {
     f[48] = fin(p.magnetRadius, MAGNET_RADIUS);
     f[49] = p.surfaceClear ? 1 : 0;
     f[50] = fin(p.dimmer, 1) * LAMP_HEATING;
+    f[51] = this.coverGap;
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -483,6 +485,7 @@ export class WebGPUFluid extends FluidReads {
     if (!thin) this.hsPrimed = false;
     if (!this.phaseLive) this.phaseGapPrimed = false;
     this.thinLive = thin;
+    this.coverAdvance(p);
     this.writeSim(p, disp);
     if (p.rawSim) {
       p.rawSim(this.simF);
@@ -561,50 +564,7 @@ export class WebGPUFluid extends FluidReads {
 
     // 1. Hele-Shaw squeeze-film flow
     stage('squeeze', (pass) => {
-      /*
-        A new plate shape is a new pair of glasses, not a press.
-
-        The gap springs toward its rest dome at `gapSpring`, which is tuned
-        for a press lifting — about a second — and measures as a time constant
-        near half a minute on a slow plate. That is right for a press and
-        wrong for the dome itself: turning Plate Shape up is swapping the
-        glasses, and the answer should be the shape they are, not a shape they
-        reach ninety seconds later. Measured before this: eight seconds after
-        setting the curve to 1, the gap had moved a sixth of the way.
-
-        So the gap is *shifted* by the change, in `gapReshape`, which leaves a
-        press's own dent in place and does not touch the rate. Re-laying it
-        outright was the first version and it is a trap: the plate shape is a
-        per-plate patch target, so a sound or camera mapping can drive it every
-        frame, and a reset would wipe a live press sixty times a second.
-      */
-      if (this.lastCurve === null) {
-        /*
-          A plate that has just appeared is laid at the shape it is meant to
-          have, absolutely.
-
-          This branch is not a formality. The ladder builds a new solver a few
-          seconds into a show, and the clear that comes with it lays the gap
-          flat — so a plate whose shape was already set came back flat and
-          then crept toward its dome at the spring's rate. Measured: the dome
-          held for six seconds, snapped to 0.03 everywhere, and started over.
-          Adopting the current shape without laying it is what caused that.
-        */
-        for (const t of [this.squeeze.a, this.squeeze.b]) {
-          this.run(pass, 'gapRest', t, [], this.arg('gap rest', [0, 0, 0, 0]));
-        }
-        this.lastCurve = p.plateCurve;
-        this.hsPrimed = false;
-        this.phaseGapPrimed = false;
-      } else if (this.lastCurve !== p.plateCurve) {
-        this.run(pass, 'gapReshape', this.squeeze.write, [this.squeeze.read],
-          this.arg('gap reshape', [this.lastCurve, p.plateCurve, 0, 0]));
-        this.squeeze.swap();
-        this.lastCurve = p.plateCurve;
-        // New glasses, not a press: a thin gap takes the new shape as it is.
-        this.hsPrimed = false;
-        this.phaseGapPrimed = false;
-      }
+      this.gapShape(pass, p);
       if (!deltasApplied) {
         // A.a.y the thin gap, for the glass's suction on its way up (PLAN 38l), as the delta's update has it.
         this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze no delta', [0, this.thinLive ? 1 : 0, 0, 0]));
@@ -781,6 +741,7 @@ export class WebGPUFluid extends FluidReads {
     if (bodiesOn) this.oilDyeStale = false;
     else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
+    const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 : OIL_TENSION) * perSecond * N * N, cells = OIL_CELLS / Math.max(disp * N, 1e-9);
     stage('mix force', (pass) => {
       /*
         Gravity in the plate: how far it stands up, toward the bottom of the
@@ -800,7 +761,7 @@ export class WebGPUFluid extends FluidReads {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      const args = this.arg('mix force', [oil * OIL_TENSION * perSecond * N * N, OIL_CELLS / Math.max(disp * N, 1e-9), lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
+      const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
         gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
@@ -817,7 +778,7 @@ export class WebGPUFluid extends FluidReads {
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {
         this.run(pass, 'mixFilm', this.vel.write, [this.vel.read, mix!.read, smooth],
-          this.arg('mix film', [oil * OIL_TENSION * perSecond * N * N * FILM_PUSH * hold, OIL_CELLS / Math.max(disp * N, 1e-9), 0, 0]));
+          this.arg('mix film', [pull * FILM_PUSH * hold, cells, 0, 0]));
         this.vel.swap();
       }
     }, !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001));
@@ -832,6 +793,7 @@ export class WebGPUFluid extends FluidReads {
     */
     const mixOn = !!mix && ((this.mixLive && oil > 0.001) || buoy > 0.001);
     const rockOn = thin && Math.hypot(p.rockX, p.rockY) > 1e-5;
+    const rockGain = p.rockGain ?? 1;
     const thinBody = thin && (p.drip > 0.01 || p.air > 0.1 || !!breath || rockOn);
     if (thinBody) {
       /*
@@ -841,7 +803,7 @@ export class WebGPUFluid extends FluidReads {
         flow's units, plate widths a step over the step's displacement
         (real seconds over the plate's width and disp, as hsPrep's hand).
       */
-      const h0 = REST_GAP_METRES;
+      const h0 = this.coverGap * GAP_METRES;
       const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
       const breathScale = breath ? (h0 / (2 * LIQUID_DENSITY * NU_REF)) * seconds / (PLATE_METRES * Math.max(disp, 1e-9)) : 0;
       const breathTex = breath ?? this.blank('rgba');
@@ -875,12 +837,12 @@ export class WebGPUFluid extends FluidReads {
           }
           const built = (name: string) => this.pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
           if (built('hsOilMean') && built('hsLiftSource') && built('hsLiftRelax')) {
-            lift = -OIL_LIFT * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
+            lift = -OIL_LIFT * this.coverH2 * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
           }
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
           this.arg('thin body', [p.drip > 0.01 ? DRIP_WEIGHT * p.drip : 0, AIR_SHEAR, REST_GAP, breathScale,
-            rockOn ? ROCK_FALL * p.rockX : 0, rockOn ? ROCK_FALL * p.rockY : 0, lift * p.rockX, lift * p.rockY]),
+            rockOn ? ROCK_FALL * this.coverH2 * rockGain * p.rockX : 0, rockOn ? ROCK_FALL * this.coverH2 * rockGain * p.rockY : 0, lift * rockGain * p.rockX, lift * rockGain * p.rockY]),
           [this.vel.read, this.dye.read, this.squeeze.read, this.vel.write, breathTex, mixTex, this.hsOilMean!, this.hsLiftPsi!, oilDyeTex]);
         this.vel.swap();
       });
@@ -926,7 +888,7 @@ export class WebGPUFluid extends FluidReads {
       for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     }, swirlOn || this.swirlLive);
     this.swirlLive = swirlOn;
-    const swirlScale = swirlOn ? (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7) : 0;
+    const swirlScale = swirlOn ? perSecond : 0;
 
     /*
       A thin gap takes the stirring in with the other forces, before the
@@ -961,7 +923,7 @@ export class WebGPUFluid extends FluidReads {
         // What the dye rides is the flow itself: the current is in it now.
         if (this.sloshTex && this.pipeline('addSlosh', VEL)) {
           // And the dish's own flow over it, when the dial is up (setSlosh): the unit is the swirl's, plate widths a second to this solver's.
-          const sloshScale = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
+          const sloshScale = perSecond;
           // Each layer's own: the oil's share of the cell (the mix's red) rides the oil's flow, the rest the water's (lib/slosh.ts).
           const sloshOil = !!this.mix && (p.oilTension ?? 0) > 0;
           this.run(pass, 'addSlosh', this.velForced, [this.vel.read, this.sloshTex, sloshOil ? this.mix!.read : this.sloshTex], this.arg('add slosh', [0, sloshOil ? 1 : 0, SLOSH_N, sloshScale]));
@@ -1004,8 +966,8 @@ export class WebGPUFluid extends FluidReads {
       on show timescales, holding crisp edges across streamlines. Along the flow,
       the Poiseuille parabolic velocity profile across the gap (u(z) = 1.5 ū (1 - 4z²/h²))
       shears dye columns into parabolic sheets with variance σ² ≈ 0.2 |ū|² (Δt)².
-      On show timescales (t ≪ h²/Dm ≈ 25 hours), diffusion has not homogenized
-      across the 6 mm gap, so the flow is in the pre-asymptotic, unsteady shear
+      On show timescales (t ≪ h²/Dm ≈ 3 hours at 2 mm), diffusion has not homogenized
+      across the gap, so the flow is in the pre-asymptotic, unsteady shear
       dispersion regime rather than the asymptotic Taylor–Aris limit.
 
       In that pre-asymptotic regime, the parabolic shear is kinematically
@@ -1223,8 +1185,8 @@ export class WebGPUFluid extends FluidReads {
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Previously, isotropic Jacobi diffusion
-      removed about 8a/(1+8a) of it a step. Now with physical molecular diffusion
+      GRID_DAMP a step in every look. Isotropic Jacobi diffusion used to take
+      about 8a/(1+8a) of it a step. With physical molecular diffusion
       Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
       nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
       elevated diffusion, keeping high-frequency grid modes smoothly damped.
@@ -1234,7 +1196,7 @@ export class WebGPUFluid extends FluidReads {
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
       const damp = (field: PingPong) => {
-        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
         this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
         this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
         field.swap();
@@ -1249,7 +1211,7 @@ export class WebGPUFluid extends FluidReads {
       reading the same soap the dye was moved by. In metres and seconds, in
       as many substeps as the grid and the step need (soapPlan, PLAN 38c).
     */
-    const sp = soapPlan(soap, p.magnetSeconds ?? 1 / 60, N, this.soapNums);
+    const sp = soapPlan(soap, p.magnetSeconds, N, this.soapNums, p.soapBreakdown);
     const soapRim = thin ? OPEN_RIM : 0;
     stage('marangoni', (pass) => {
       const k = this.arg('marangoni', [sp[1], 0, sp[2], sp[3], soapRim, 0, 0, 0]);
@@ -1503,8 +1465,8 @@ export class WebGPUFluid extends FluidReads {
           this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
-            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04])
-            : this.arg('mix update oil', [0.012, 0, 0, 0]));
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5]])
+            : this.arg('mix update oil', [0.012, 0, 0, 0, 1]));
           m.swap();
         }
       }

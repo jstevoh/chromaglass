@@ -21,7 +21,7 @@
  * Each look gets its own page load, because that is how a person opens one.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
@@ -29,7 +29,7 @@ import { engineQuery, installFrameReader, frameOf } from './frame.mjs';
 // Overridable so a second sweep can run beside one already going — the guard
 // below is right to refuse a port it did not open, but that should not mean
 // waiting half an hour to check something unrelated.
-const PORT = Number(process.env.LOOKS_PORT ?? 4342);
+const PORT = port(4342, 'LOOKS_PORT');
 const ONLY = process.env.LOOKS_ONLY ? process.env.LOOKS_ONLY.split(',') : null;
 const SETTLE = Number(process.env.LOOKS_SETTLE ?? 11000);
 const LATE = Number(process.env.LOOKS_LATE ?? 14000);

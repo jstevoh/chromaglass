@@ -84,35 +84,30 @@ Steps:
     - **Light as the kill** (CIMA is photosensitive; the lamp's level would move k).
     - **A slow ink-hue glide** (26d-3).
     - **Periodic reseeds**.
-    - **Metal's numbers** for the regime glide: the cap line (`0.0105 - 0.15 F`) was fitted on
+    - **Metal's numbers** for the regime glide: the cap (the tent, `0.15 min(F, 0.07 - F)`) was fitted on
       SwiftShader, and Metal rounds half floats toward zero; read `npm run turing` line 9
       off the `fifth` shard, and ask the watcher for a look if the pieces count differs.
-    - **The cap line is a straight line, and it is too generous at the corners**: the
-      review held each corner of the drift range for 9000 units (stripes settled at F 0.04,
-      k 0.06, 60 seeds, k = curve(F) + share x cap(F), alive share = cells with v over 0.1).
-      F 0.02 collapses to 6–7 % alive at share 0.25 and 0.9 (flat); F 0.05 at share 0.9
-      starts at 0.079 and recovers to 0.228; F 0.06 at share 0.25 recovers 0.089 to 0.392;
-      F 0.06 at share 0.9 stays at 0.061, flat. At F 0.06 and share 0.9 the margin is 0.00135
-      against about 0.001 measured as the limit, and below F 0.03 the cap is extrapolated
-      from no measured point. A corner that collapses leaves a frozen sparse residue that does
-      not regrow while held. The plate reaches those corners only where both waves saturate at
-      once (|w|, |wr| over 2) at Drift 1, a small share of the plate for a few seconds at a time.
-      Two steps: fit the cap through measured points (or Pearson's boundaries) including F
-      below 0.03; and give `npm run turing` a held-corner line, F 0.06 at share 0.9 and
-      F 0.02 for 9000 units, that has to stay over the alive band's floor. Measure the corners
-      on Metal too.
-    - **Grey smears in the app that the lab's grey-patch line cannot see**: on Metal
-      (Apple M4, head dfec25f) `npm run turing` passes all 31 lines twice and the lab plate
-      reads tile contrast 0.93 of the control at Drift 0.7 and 0.78 at Drift 1. But in the
-      app (Turing Print preset, 60 s settle, frames at 0, 30, 60 and 90 s) the watcher saw
-      soft blue-grey smears where the stripes lose contrast, 10–20 % of the plate in places,
-      drifting about (upper-middle at Drift 1 at 60 s; centre-right at Drift 0.7 at 60 and
-      90 s). The glide itself is clearly visible within a minute. Not known yet whether the
-      smears are the look's poured dye showing under the print or the reaction going flat.
-      The gap in the check: the line runs on the lab's plain plate (activator only), never
-      on the app's poured look. Next step: in the app, read the chemistry field itself off the
-      GPU at those frames and the same cells' contrast, to say which; then make the check
-      read the app's plate, or the field in the app, so it can see this. Start here.
+    - ~~**The cap line was too generous at the corners**~~ (**shipped**, the tent cap; story
+      in `docs/plan-shipped.md` §26): the cap is now `max(0.15 min(F, 0.07 - F), 0.0008)`,
+      and `npm run turing` holds F 0.02, 0.03 and 0.06 at the spots end for 9000 units over
+      the spots' floor, with an instrument line that goes red at twice the cap. Still open
+      from it: **the margin at F 0.02 is thin** (about 0.03 over the floor in the lab), and
+      the cap is still a tent, not Pearson's boundaries; a Metal read under the floor means
+      refitting the cap, not lowering the bar. The review of the carried line left two
+      more: the corners start from a maze settled at KILL 0.06 and slewed, while the spots
+      they are judged against are grown at the spots' kill from seeds, so a history
+      difference can move the 0.03 margin (a held F 0.04 run made the corners' way would be
+      the fair reference); and each corner is one seed, so two seeds both over the floor
+      would tell a bad cap from a different engine.
+    - **Grey smears in the app that the lab's grey-patch line cannot see**: on Metal the
+      lab passed while the app showed soft blue-grey smears at Drift 0.7 and 1. The cause
+      found (PR #421, never merged): the reaction was healthy; the smears were the look's own
+      dark contract dye (then Graphite and Midnight), laid by Evolve's drops under the
+      multiply-blended print, which is clear wherever the reaction is low. #523 (28i-2) has
+      since given the look colour pools on purpose (`src/presetPlate.ts`), so #421's clear
+      contract and its "paper stays clean" line were dropped. Open: does a grey smear still
+      show with the pools? Film it on the owner's Mac (Turing Print, 60 s settle, Drift 0.7
+      and 1); if the pools read as the intended colour and nothing grey, close this.
     - **The Pattern knob does not steer the drifting regime**: while the drift is on k is
       the curve plus the margin and ignores the look's own k, so only its feed counts. A
       look that wants more spots than stripes needs a "spots share" input, not a k.

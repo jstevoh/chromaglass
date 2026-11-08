@@ -9,6 +9,7 @@
  */
 
 import { HEAD, W } from './shared';
+import { DISH_GAP_RANGE, DISH_REST_GAP } from '../../../lib/turntable';
 
 export const SPLAT_KERNELS: Record<string, string> = {
   // dye = max(dye * mul + add, 0), from the full-resolution delta fields.
@@ -114,11 +115,24 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     here, and its flow dilutes what it lands in by pushing it aside. A.b.w
     0 lays the liquid as though poured long ago, with no volume: f of the
     column replaced (a check's pool in place, \`npm run thick\`). A.a.z of 0
-    is the rim instead: what the flow has carried past A.b.w from the
-    middle has gone over the dish's open rim and is taken off.
+    is the rim instead: what the flow has carried past the dish's open rim
+    (pastOpenRim: its radius, and the grid's edge where the rim meets the wall)
+    has gone over it and is taken off.
 
     A.a = (x, y, radius, the share at the middle), A.b = (ln(ν/ν_water),
-    scatter, index, the mode; the rim's radius for the rim).
+    scatter, index, the mode; the rim's radius for the rim, which pastOpenRim
+    now holds itself).
+
+    The share f is of the column the pour lands in, and since the glass
+    floats (PLAN 38r-5, gpu/fluid/cover.ts) that column is as tall as the
+    glass stands, lifted by the pours before it. The field is a sum in
+    rest-gap columns (the carry's fluxes are in the rest gap's units), so a
+    pour adds f · g/h₀, the same factor the thin solve's source takes
+    (pourVolume times hsGap in hsDivergence) and the cover's ledger takes
+    (FluidCover.pour). Without it a pour under a lifted glass brought more
+    liquid than glycerine: \`npm run flush\`, under the glass its edge holds
+    at 2 mm, read 0.9675 of the glycerine poured, the 3.4% the glass had
+    risen by at the pours.
   */
   liquidSplat0: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -156,18 +170,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 
   speciesSplat: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(3) var sq: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let was = textureLoad(src, p, 0);
   if (A.a.z <= 0.0) {
-    textureStore(dst, p, select(was, vec4f(0.0), length(uvOf(id) - vec2f(0.5)) >= A.b.w));
+    // Taken off where the thin solve's open rim is (pastOpenRim), its edge cells with it.
+    textureStore(dst, p, select(was, vec4f(0.0), pastOpenRim(p)));
     return;
   }
   let d = length(uvOf(id) - A.a.xy) / A.a.z;
   let f = select(0.0, clamp((1.0 - d * d) * A.a.w, 0.0, 1.0), d < 1.0);
   let poured = vec4f(1.0, A.b.xyz);
-  textureStore(dst, p, select(mix(was, poured, f), was + f * poured, A.b.w > 0.5));
+  let tall = max(textureLoad(sq, p, 0).r, ${DISH_GAP_RANGE[0]}) / ${DISH_REST_GAP};
+  textureStore(dst, p, select(mix(was, poured, f), was + f * tall * poured, A.b.w > 0.5));
 }`,
 };

@@ -19,7 +19,10 @@ import type { CastState } from '../lib/castProtocol';
 import type { MidiAction } from '../lib/midi';
 import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
-import { useLiveShow, onAir, stopLive } from '../lib/liveShow';
+import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
+import { assistantLook } from '../lib/assistantLook';
+import { parseSongAction } from '../lib/songShows';
+import { addSongCue } from './songCue';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -221,6 +224,32 @@ export function useRemote({
           // Arm, do not apply: `preset` is the destructive one.
           if (message.presetId) cueLook(message.presetId); else setCued(null);
           break;
+        // The owner's assistant (PLAN 44c): a look it made, armed for Go, and
+        // in Full mode the live stream. Only the relay's guard sends these.
+        case 'cue-look': {
+          const look = assistantLook(message, allPresets, activePresetId);
+          if (look) setCued(look);
+          break;
+        }
+        case 'assistant-live':
+          void startSavedLive(message.test === true).catch(() => { /* the panel shows why */ });
+          break;
+        // A still for the assistant to judge detail by (PLAN 44c-4), and a
+        // song action it programmed, fired by the show's own clock (44f).
+        case 'assistant-still':
+          padPictureRef.current?.wantStill(message.width);
+          break;
+        case 'song-action': {
+          let a = parseSongAction(message);
+          // A set is clamped as a patch is, and dropped if it names no setting.
+          if (a?.what.do === 'set') {
+            const v = sanitizePatch({ [a.what.key]: a.what.value })[a.what.key];
+            a = typeof v === 'number' ? { ...a, what: { ...a.what, value: v } } : null;
+          }
+          const why = a ? addSongCue(a.when, a.what) : 'not a song action this build knows';
+          if (why) console.info(`[assistant] song action not added: ${why}`);
+          break;
+        }
         case 'dye': {
           const color = typeof message.color === 'string' && message.color.length <= 9 ? message.color : undefined;
           if (color) {
@@ -364,6 +393,9 @@ export function useRemote({
         case 'lights':
         case 'cast':
         case 'picture':
+        case 'assistant-mode':
+        case 'assistant-reply':
+        case 'assistant-undo':
           break;
         default: unhandled('a message from the phone', message);
       }

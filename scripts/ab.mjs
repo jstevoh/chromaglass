@@ -29,7 +29,7 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 import net from 'node:net';
@@ -37,7 +37,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { installFrameReader, isGpuEngine } from './frame.mjs';
 
-const PORT = 4332;
+const PORT = port(4332);
 const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
   return i > 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;

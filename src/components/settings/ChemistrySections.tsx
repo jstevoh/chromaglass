@@ -4,6 +4,7 @@ import { LIT } from '../ui';
 import { ViscosityDrip } from '../ui/Playful';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
+import { COVER_FULL_ML, COVER_GLASS_G } from '../../lib/cover';
 
 /*
   Chemistry: the liquid itself. The squish plate, oil and soap, the ferrofluid and
@@ -100,6 +101,25 @@ export const SquishSection = ({ c }: { c: SectionCtx }) => {
             settingKey="gapThickness"
           />
         )}
+        {/* The liquid under the cover and the glass on it (PLAN 38r-5): the gap is what they make. */}
+        <Slider
+          label="Liquid"
+          value={settings.liquidMl ?? COVER_FULL_ML}
+          min={9}
+          max={150}
+          step={1}
+          onChange={(v: number) => onUpdate({ liquidMl: v })}
+          settingKey="liquidMl"
+        />
+        <Slider
+          label="Cover Weight"
+          value={settings.coverWeight ?? COVER_GLASS_G}
+          min={0}
+          max={1000}
+          step={5}
+          onChange={(v: number) => onUpdate({ coverWeight: v })}
+          settingKey="coverWeight"
+        />
         <Slider
           label="Press Lift"
           value={settings.plateSpring ?? 0.35}
@@ -203,6 +223,15 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ surfactantFlow: v })}
           settingKey="surfactantFlow"
         />
+        <Slider
+          label="Soap Breakdown"
+          value={settings.soapBreakdown ?? 0}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ soapBreakdown: v })}
+          settingKey="soapBreakdown"
+        />
         {/*
           A clear oil film against the glass that tears into lace (PLAN §20b):
           how thick it is laid. Thin tears at once over the dish's dust, thick
@@ -217,6 +246,33 @@ export const OilSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ clearFilm: v })}
           settingKey="clearFilm"
         />
+        {/*
+          The film's own dye (PLAN 20b-13): the lamp filtered over the film's
+          thickness, so the lace is a colour and the holes the water's. Shown
+          while there is a film to dye; the swatch is what one unit lets through.
+        */}
+        {(settings.clearFilm ?? 0) > 0.001 && (
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <Slider
+                label="Film Dye"
+                value={settings.clearFilmDye ?? 0}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v: number) => onUpdate({ clearFilmDye: v })}
+                settingKey="clearFilmDye"
+              />
+            </div>
+            <input
+              type="color"
+              aria-label="Film dye colour"
+              value={settings.clearFilmDyeColor ?? '#ffd21a'}
+              onChange={(e) => onUpdate({ clearFilmDyeColor: e.target.value })}
+              className="mb-4 h-6 w-8 cursor-pointer rounded border-0 bg-transparent p-0"
+            />
+          </div>
+        )}
         <Slider
           label="Polarity (Repulsion)"
           value={settings.polarity}

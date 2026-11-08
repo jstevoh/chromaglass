@@ -5,6 +5,7 @@
  */
 
 import { SPIKES_WGSL } from '../spikes';
+import { OPEN_RIM } from '../../../lib/turntable';
 
 /**
  * What every pass gets: the grid, the step, and the forces. One buffer,
@@ -74,6 +75,8 @@ struct Sim {
   surfaceClear: f32,
   // Lamp intensity scaled by heating rate (PLAN 18f).
   lampHeat: f32,
+  // The cover glass's gap on its liquid, in gap units, 0.03 at 2 mm (PLAN 38r-5, lib/cover.ts): the dome's mean.
+  cover: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -87,6 +90,28 @@ struct Args {
 fn uvOf(id: vec3u) -> vec2f { return (vec2f(id.xy) + 0.5) / S.n; }
 fn inGrid(id: vec3u) -> bool { return id.x < u32(S.n) && id.y < u32(S.n); }
 fn clampP(p: vec2i, n: f32) -> vec2i { return clamp(p, vec2i(0), vec2i(i32(n) - 1)); }
+/*
+  Past a thin gap's open rim: out at the rim's radius, or on the grid's own
+  edge, where the inscribed rim meets the box's wall. The thin solve holds
+  the air's pressure in both (hsPrep, PLAN 27a-1), so liquid that reaches
+  either has left the dish, and whatever leaves with it is taken off the
+  plate in the same cells: the species' rim (speciesSplat) and the colour's
+  (decayDye), and the colour's spreading stops at the same edge (dyeDisperse).
+
+  They took the radius alone, and so missed the edge: four strips of
+  sixteen cells on a 128² plate, each a few cells either side of a point
+  where the rim touches the wall, inside the radius but past the solve's
+  rim, where the flow carried what it pushed out and nothing took it off.
+  Flushing a dish of glycerine, a converged solve let out exactly the water
+  poured (127.54 against 127.55, the lab's units, at 20 V-cycles a step), and
+  still the glycerine left read 0.757 of the dish against the volume's
+  0.750: the strips held 2.07 a cell, 0.99% of the dish's glycerine piled
+  where it could not be seen and would never leave (PLAN 38r-15).
+*/
+fn pastOpenRim(p: vec2i) -> bool {
+  let n = i32(S.n);
+  return length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)} || p.x == 0 || p.y == 0 || p.x == n - 1 || p.y == n - 1;
+}
 /*
   Whether all four numbers are finite, read off the exponent bits.
 

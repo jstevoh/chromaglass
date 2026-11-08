@@ -32,6 +32,7 @@ import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { THIN_FILM_WGSL } from './plateThinFilm';
+import { FILM_DYE_WGSL } from './filmDye';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -1736,6 +1737,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
   return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
 ${TRANSMIT_WGSL}
+${FILM_DYE_WGSL}
 ${DROP_LENS_WGSL}
 ${THIN_FILM_WGSL}
 
@@ -2425,13 +2427,10 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let phasePx = max(length(dpdx(fuvBase)), length(dpdy(fuvBase)));
   gapScale = mix(1.0, clamp(view.gap / 0.03, 0.3, 3.0), clamp(U.thickOptics, 0.0, 1.0));
   /*
-    The clear film (PLAN §20b; 18b-6): where it lies against the glass the
-    dyed water is only the gap less the film, so the dye's path is that much
-    shorter. Under a whole film (0.86 of the gap) the lamp comes through the
-    seventh of the gap that is water, white with a faint tint of the dye;
-    where it has torn, the water spans the gap and the colour is at full
-    strength. With no film this is 1, exactly, and nothing changes.
+    The clear film (§20b, 18b-6): the water's dye has the gap less the film,
+    and the film's own dye (20b-13) the film's path. 1 with no film.
   */
+  let ft0 = filmDyeThrough(view.film, gapScale);
   gapScale *= 1.0 - view.film;
   let layerGap0 = gapScale;
   filmWater = 1.0 - view.film;
@@ -2647,8 +2646,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let t0 = milkTransmission(through0, vel0, fuv0, layerGap0);
     milkScatter = sc0;
     milkGap = layerGap0;
-    outColor = onGround(outColor, fluid0,
-      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4) * lampGrain0, film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0));
+    outColor = onGround(filmDyePaint(outColor, ft0, 1.0), vec4f(filmDyePaint(fluid0.rgb, ft0, 0.0), fluid0.a),
+      throughScaled(t0, select(more0, dish0.x * select(1.0, fluid0.a / max(film0, 1e-4) * lampGrain0, film0 > 0.004), U.lampGround > 0.001)) * reliefOf(fluid0.rgb, tint0, alpha0) * ft0);
     milkScatter = 0.0;
 
     /*
@@ -3026,8 +3025,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // focuses on, what these say is on the glass, and a plate faded out is not.
   auxN *= U.mixLevel.y;
   auxH *= U.mixLevel.y;
-  // Whatever the operator put below the back plate, in order.
-  outColor = mixSourcesAt(outColor, U.mixPos2.z + 1.0, U.mixPos.y, uv, uvScreen, fluid0, normal0);
+  // The moiré sheets, then what the operator put below the back plate (plateMoire.ts).
+  outColor = mixBelowBack(outColor, uv, uvScreen, fluid0, normal0);
 
   // ── Layer 1 (if present) ──────────────────────────────────────────
   if (U.layerCount > 1) {
