@@ -222,15 +222,17 @@ from a pinned release), **19k-4** (Measure runs only the checks a diff reaches) 
 side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories are in
 [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same numbers). Open:
 
-- **19k-7** (S): `npm run scene`'s two cost bars red on a PR that changed nothing it runs
-  (#540, 2026-10-28, twice on one head): the worst frame 22.5 ms against 20 (the still room's
-  cold first push; 18.7 on the run before, 13.7 on another PR's that day, 11 to 15 when the bar
-  was set), and once the strobe room's median 2.01 ms against 2. The cost is
-  `process.cpuUsage()`, the whole process's, so the optimiser compiling on V8's background
-  threads during the first push is counted as the analysis's own. Measure the push's thread
-  alone (a worker, or `performance.now()` with the first push timed separately), or warm one
-  push before the timed ones and keep the 20 ms bar for the warm stalls it was set for; and
-  print the reading on the FAIL line, which today says only that it failed.
+- **19k-7** (S): **shipped**, `npm run scene`'s cost bars time the main thread
+  (`process.threadCpuUsage()` after a `process.cpuUsage()` call), not the whole process, and the
+  worst-frame bar is 12 ms, not 20 (`--slow k` shows it red at 2 to 3x). Story in
+  `docs/plan-shipped.md` §19k-7 (closed draft #551, rebuilt on main 2026-11-07). Open:
+  - **19k-7a** (S): the worst frame is nearly always the still room's first optimised one, the
+    optimiser's main-thread work, and that is where what is left of the noise lives: in a cloud
+    session 1 run of about 120 read past 12 ms at 1x (14.6, with the VM's steal time climbing)
+    and 1 in 50 read a still-room median of 2.28 against 2. Measure's runner read 3.6 ms and
+    0.48. If either goes red on CI on a tree that did not change the sensor, time the first
+    room's cold frame as its own line and hold the warm rooms (0.5 to 2 ms peaks) to a bar of
+    their own, which would catch a stall in a warm room the 12 ms bar lets through.
 - **19k-2** (E, S): measure what 19k claimed, over the next 25 merged PRs after #502: Mac minutes
   on check-only PRs (the replay over #433 to #497 said 1,325 then, 275 under the rule), Measure
   wall time on the check-only and document-only ones (19k-4: before it, every PR waited for the
@@ -283,7 +285,10 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   cancelled about a second past its bound, every check green (green on re-run); on main's
   deploy 671 it ran 18:07. The slowest: Areas that listen 1:42, A drop slumps 1:05, the
   Finger drags 0:58, the physics 0:56. Every other Mac shard ran 15:49 to 16:49 on that run,
-  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way.
+  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way. On
+  2026-11-07 18m-5a moved `npm run slump` (now about 2:00, with its added filter-off run)
+  from plate to tools, which held it at 15.7 minutes on #498's runs; read both shards'
+  times on the next deploys before moving anything else.
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

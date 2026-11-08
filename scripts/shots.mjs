@@ -24,14 +24,14 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { engineQuery, installFrameReader, isGpuEngine } from './frame.mjs';
 
-const PORT = 4326;
+const PORT = port(4326);
 
 const argOf = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);

@@ -41,7 +41,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { engineQuery } from './frame.mjs';
 
 const arg = (name, fallback) => {
@@ -51,7 +51,7 @@ const arg = (name, fallback) => {
 const RUNS = Number(arg('runs', '3'));
 const VARIANTS = arg('variants', ',lanes=2,lanes=6').split(',');
 const COLD = process.argv.includes('--cold') || !!process.env.CI;
-const PORT = 4363;
+const PORT = port(4363);
 
 function coldCache() {
   if (!COLD || process.platform !== 'darwin') return 'left as it was (--cold empties it)';

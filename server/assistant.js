@@ -81,6 +81,26 @@ export const ROOM_KEYS = new Set(JSON.parse(readFileSync(join(HERE, 'assistant-r
 
 const GESTURES = new Set(['drop', 'blow', 'press', 'finger', 'spin', 'tilt', 'dye', 'liquid']);
 const PLAY_ACTIONS = new Set(['go', 'seq-play', 'seq-pause', 'seq-next', 'seq-prev', 'seq-stop']);
+/*
+  What a song action may do in Play (PLAN 44f): what a hand at the plate or a
+  Go could, scheduled. The rest (drain, clear, lay again, black, the name)
+  are what Full's own actions are, so a song action that does them needs Full
+  too: scheduling a clear does not make it less of one. A setting a song
+  action glides is held to the patch's rules (a setting of this show, not
+  the room's, not one the performer holds), and the display clamps its value
+  as it clamps a patch (useRemote, `sanitizePatch`).
+
+  The pace counts a song action when it is added, not when it fires, so in
+  Play what it may fire on is held too (found in review): a look on every
+  kick would be a look change twice a second, past Go's 4 s, so a look never
+  rides the kicks; anything else rides every second kick at most, under the
+  gestures' own pace at any tempo a show plays. How many the assistant may
+  add to one song is the display's cap (app/useSongScore.ts).
+*/
+const SONG_PLAY = new Set(['pour', 'burst', 'dyes', 'zoom', 'kaleidoscope', 'look', 'title', 'set']);
+/** In Play, the fewest kicks between two firings of a song action on the kicks. */
+const SONG_KICKS_MIN = 2;
+const SONG_WHEN = new Set(['start', 'time', 'section', 'kick', 'before-end']);
 /** Full only: what a person at the desk can do that a Play assistant cannot. */
 const FULL_ACTIONS = new Set([
   'play', 'pause', 'seed', 'clear', 'drain', 'lucky', 'automate-on', 'automate-off',
@@ -375,6 +395,25 @@ export function createAssistantGuard(send, now = Date.now) {
         count('patch', mode, t);
         lookStarted(t, message.presetId);
         send({ type: 'preset', presetId: message.presetId });
+        return { ok: true };
+      }
+
+      if (type === 'song-action') {
+        const when = message.when && typeof message.when === 'object' ? message.when : null;
+        const what = message.what && typeof message.what === 'object' ? message.what : null;
+        if (!when || !SONG_WHEN.has(when.at)) return refuse('a song action needs a when: start, time, section, kick or before-end');
+        if (!what || typeof what.do !== 'string') return refuse('a song action needs a what');
+        const why = needs(mode, SONG_PLAY.has(what.do) ? 'play' : 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (what.do === 'set') {
+          const no = typeof what.value === 'number' && Number.isFinite(what.value) ? blocked([String(what.key)], mode, t) : 'a song action\'s set needs a number';
+          if (no) return refuse(no);
+        }
+        if (mode !== 'full' && when.at === 'kick' && (what.do === 'look' || !(Number(when.every) >= SONG_KICKS_MIN))) {
+          return refuse(what.do === 'look' ? 'in Play a look never changes on the kicks: put it on a section' : `in Play a song action fires at most every ${SONG_KICKS_MIN} kicks`);
+        }
+        count('patch', mode, t);
+        send({ type: 'song-action', when, what });
         return { ok: true };
       }
 

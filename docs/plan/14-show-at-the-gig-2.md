@@ -70,7 +70,13 @@ is live after the third track); `npm run music` with a `finalizeListen` that thr
   to a named preset, played with the item's own fade. On the phone, the bindings are
   listed on its MIDI page. *Measure:* beside `npm run desk`'s MIDI lines, a recorded
   run of Program Change messages lands on the bound look every time, none doubled,
-  with the item's fade.
+  with the item's fade. *Check written first (2026-11-07):* `npm run soundowed`, id `pc` (three lines,
+  owed): `parseMidi` reads 0xC0 as `{ kind: 'program' }`, a map keeps a program bound to
+  a look and to a `{ kind: 'setlist', index }` item, and a recorded run of twelve Program
+  Changes with Bank Select and clock between lands each on its one binding through
+  `liveBindings(map, source, bank)` and `pressedBy(event)`, both moved out of `useMidi`'s
+  handler into midi.ts. The hook's `setlist` case playing the item's own fade is the
+  review's. Brief: `/mnt/project-files/antigravity/` (shared files).
 - *The decks already know the bar* (*proposed*). Pioneer's Pro DJ Link (a CDJ's beat
   packets carry the beat within the bar and the tempo) and Denon's StageLinQ are on the
   network the show server already listens on for OSC and Art-Net. They give the true

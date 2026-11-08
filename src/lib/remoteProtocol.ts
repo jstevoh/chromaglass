@@ -209,6 +209,15 @@ export type RemoteMessage =
   | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
   | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
   | { type: 'assistant-undo' }
+  /**
+   * The owner's assistant (PLAN 44c-4, 44f), relayed only from the guard. A
+   * still: one frame up to 1280 wide, answered as a `picture` with
+   * `still: true` (lib/padPicture.ts). A song action: a *when* and a *what*
+   * added to the show of the song playing now, as a cue pinned on the score
+   * is (lib/songShows.ts `parseSongAction`, app/songCue.ts).
+   */
+  | { type: 'assistant-still'; width: number }
+  | { type: 'song-action'; when: unknown; what: unknown }
   | { type: 'preset'; presetId: string }
   /**
    * Arm a look without sending it. `null` disarms.
@@ -274,7 +283,7 @@ export type RemoteMessage =
    * URL. `aspect` is the canvas's own (width over height), so the remote's
    * frame takes the wall's shape rather than a 16:9 it assumed.
    */
-  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number };
+  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number; still?: true };
 
 /**
  * Build the ws:// URL for the relay: the page's own origin, which is the show
