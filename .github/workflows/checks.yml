@@ -480,9 +480,14 @@ jobs:
       # watchdog moves the deploy to GitHub's Macs (scripts/macbusy.sh,
       # PLAN.md 19ah-9). Its name is what the watchdog reads: keep the two
       # the same (FREE_STEP in scripts/macwatch.mjs).
+      # From its first line it also marks the Mac held for this shard
+      # (~/.chromaglass-runner/deploy-<runner>.json), and harnesses a session
+      # or a build queue starts meanwhile wait for it (PLAN.md 19ah-9a).
       - name: The owner's Mac is free of other work
         if: ${{ runner.environment == 'self-hosted' }}
         timeout-minutes: 4
+        env:
+          SHARD: ${{ matrix.shard }}
         run: bash scripts/macbusy.sh 120
       - uses: actions/setup-node@v5
         with:
@@ -529,6 +534,18 @@ jobs:
         env:
           CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
+      # Last on the owner's Mac, whatever happened above, a cancel included:
+      # marks this shard's hold on the Mac ended (harnesses wait two minutes
+      # more, for the next shard), and fails if a look between the checks
+      # found other work drawing with the GPU (scripts/checks.mjs stopped the
+      # shard), which the watchdog reads as it reads the first step's failure
+      # (STAYED_STEP in scripts/macwatch.mjs; keep the names the same).
+      - name: The owner's Mac stayed free of other work
+        if: ${{ always() && runner.environment == 'self-hosted' }}
+        timeout-minutes: 1
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bash scripts/macbusy.sh --end
 
   # The one name the rest of the repository knows this stage by.
   # Green when every shard is, or when the change reached no Mac shard and
