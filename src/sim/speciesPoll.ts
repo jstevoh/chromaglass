@@ -26,6 +26,16 @@ export class SpeciesPoller {
   private clears = 0;
   private snap: SolverSpeciesSnap | null = null;
 
+  /**
+   * The snapshot the last read brought back, without polling. The bubbles take
+   * it from here rather than calling `poll` themselves: the solver's step
+   * already polls once a step, and a second caller in the frame advanced the
+   * same 60-step counter twice, so the "once a second" read ran twice as often
+   * (and a caller passing its own thin-gap test could null what the step's
+   * caller had just read). One owner of the counter, any number of readers.
+   */
+  get latest(): SolverSpeciesSnap | null { return this.snap; }
+
   /** Drop any cached snapshot and ignore any read started before this clear. */
   clear(): void {
     this.clears++;
@@ -79,7 +89,7 @@ export function stepPlateBubbles(
   const qk = particleFlowScale(lead, currentSettings);
   bubbles.liquid(currentSettings);
   const thinGap = (currentSettings.thinGap ?? 1) > 0 && !!lead?.thinGap;
-  const snap = thinGap && lead ? lead.speciesPoll.poll(true, lead.gpu, lead.liquid) : null;
+  const snap = thinGap && lead ? lead.speciesPoll.latest : null;
   bubbles.species(snap, snap ? snap.poured : null);
   bubbles.step(simStepS, (bx, by) => {
     if (!vx || !vy) return [0, 0];

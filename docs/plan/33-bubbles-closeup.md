@@ -100,6 +100,12 @@ Left from it, so none of it is lost:
   poured liquid; when two miscible bottles sit on the plate together, the earlier pool's
   viscosity ν stays its own in channel g while its σ and ρ read the newer bottle's).
   Carry Σ share·ρ and Σ share·σ per cell once 18d-4a gives scatter its own home.
+- **33f-5. A bottle the owner made with no tension, on a water plate.** `pour` in
+  `src/gpu/fluid/inputs.ts` hands `pouredOf` the oil's σ (`LIQUID_SIGMA`, 30 mN/m) as
+  the plate's, since the solver does not know the look's carrier: on a water look
+  (72 mN/m) such a bottle's pool reads 30, not the plate's 72. Every shelf bottle that
+  lays a species names its tension, so only Liquid Designer bottles meet it. Fix: the
+  app passes the BubbleField's `liquidSigma` into `pour` (found in review of #715).
 *Check (for 33f-2):* `npm run bubblephysics` or `bubblelook` extended: the band width oil
 against water follows u* from the cell's index within 15 %, ferrofluid draws a bright
 window and milk a bright middle.
