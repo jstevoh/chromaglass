@@ -11015,6 +11015,21 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4c-2. YouTube's acknowledgements are too coarse to judge by
+
+  - **37x-4c-2. YouTube's acknowledgements are too coarse to judge by (shipped
+    2026-11-08).** The answer to 37x-4c's "whether the platforms acknowledge", found on the first live album show: the
+    owner's fast connection read "trouble" and the stream dropped video. YouTube's ingest,
+    probed from the cloud, sends Window Acknowledgement Size 2,500,000 and Set Peer
+    Bandwidth 59,768,832, and the client echoes the second as its window, so YouTube's
+    acknowledgements come at least 2.5 MB apart (3.2 s of a 1080p stream): the readout
+    climbed past the 2 s bound between every two of them and dropped video to the next
+    keyframe. Now a server whose acknowledgements are more than a second of the stream
+    apart (`ACK_COARSE_SHARE`) is read on the socket's word. `npm run livedrop`'s new
+    YouTube-like listener: 247 of 570 frames dropped and 4.9 s behind before, none and
+    0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
+    link for seconds (37x-4c's item).
+
 #### 37x-4d-6. The stream's frames were black
 
   - **37x-4d-6. The stream's frames were black (shipped 2026-10-31).** Found writing
