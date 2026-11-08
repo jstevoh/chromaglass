@@ -684,10 +684,18 @@ What to try, largest saving first:
 1. **The coarse levels in one workgroup.** Every level of 32² or less (b and p together
    are 8 KB of workgroup memory) solved in one single-workgroup dispatch, with
    `workgroupBarrier` between sweeps: about 256 fewer dispatches at 512² (172 to 216
-   counting 16² and less only).
+   counting 16² and less only). *Shipped 2026-11-07 (PLAN H2c-1, #711, `npm run encode`):
+   `mgSmoothCoarse` and `hsSmoothCoarse` smooth every level of 32² or less in one
+   256-thread workgroup with `wb` and `wp` in workgroup memory; with H2c-3, thin-gap
+   direct dispatches a step went 269 → 157 (365 → 253 with the 96 indirect) and open
+   plate 500 → 274 at 512², residuals unchanged (`1.149e-2` and `2.091e-3`).*
 2. **A warm start and one V-cycle** (the warm start is `evaluation-2026-09.md`'s):
    about 218 fewer, judged by `pressureSelfTest`'s residual, not by eye.
 3. **`mgZero` folded into the first sweep** of a level, as a zero guess: 28 fewer.
+   *Shipped 2026-11-07 (PLAN H2c-3, #711, `npm run encode`): `first` flag on the
+   smoother kernels reads 0 instead of a zeroed buffer on the first sweep, dropping
+   `mgZero` (44 → 0 dispatches a step across the two plates, 14 on the thin gap and 30
+   on the open plate), residuals unchanged to the printed digit.*
 4. **Constant arguments written once**, when they are made, and `kernel(name, format)`
    cached with its pipeline: about 440 fewer `writeBuffer` calls and 880 fewer
    allocations a step. *Shipped 2026-10-24 (PLAN 14aa, `npm run encode`):

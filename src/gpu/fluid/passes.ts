@@ -415,22 +415,30 @@ export class FluidPasses extends FluidFields {
    * sweep reads zero instead of a prior `mgZero` dispatch (H2c-3), and level 0
    * does the same on the first V-cycle of a cold projection (`first0`).
    */
-  private vcycle(pass: GPUComputePassEncoder, l: number, first0 = false): void {
-    const smooth = (level: number, sweeps: number, first: boolean) => {
-      if (level === 0) { this.smooth0(pass, sweeps, first); return; }
-      const lv = this.mg[level - 1];
-      for (let k = 0; k < sweeps; k++) {
-        const z = first && k === 0;
-        for (let parity = 0; parity < 2; parity++) {
-          this.dispatchBuf(pass, 'mgSmooth',
-            this.nameOf(z ? 'mgSmooth0:' : 'mgSmooth:', level, ':', parity),
-            this.arg4(this.nameOf(z ? 'mg smooth0 ' : 'mg smooth ', level, ' ', parity), lv.n, parity, z ? 1 : 0),
-            [lv.b, lv.p], lv.n * Math.ceil(lv.n / 2));
-        }
+  private mgSmoothLevel(pass: GPUComputePassEncoder, level: number, sweeps: number, first: boolean): void {
+    if (level === 0) { this.smooth0(pass, sweeps, first); return; }
+    const lv = this.mg[level - 1];
+    if (lv.n <= 32) {
+      this.dispatchBuf(pass, 'mgSmoothCoarse',
+        this.nameOf(first ? 'mgSmoothCoarse0:' : 'mgSmoothCoarse:', level, ':', sweeps),
+        this.arg4(this.nameOf(first ? 'mg coarse0 ' : 'mg coarse ', level, ' ', sweeps), lv.n, sweeps, first ? 1 : 0),
+        [lv.b, lv.p], 64);
+      return;
+    }
+    for (let k = 0; k < sweeps; k++) {
+      const z = first && k === 0;
+      for (let parity = 0; parity < 2; parity++) {
+        this.dispatchBuf(pass, 'mgSmooth',
+          this.nameOf(z ? 'mgSmooth0:' : 'mgSmooth:', level, ':', parity),
+          this.arg4(this.nameOf(z ? 'mg smooth0 ' : 'mg smooth ', level, ' ', parity), lv.n, parity, z ? 1 : 0),
+          [lv.b, lv.p], lv.n * Math.ceil(lv.n / 2));
       }
-    };
-    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS, true); return; }
-    smooth(l, MG_SWEEPS, l === 0 ? first0 : true);
+    }
+  }
+
+  private vcycle(pass: GPUComputePassEncoder, l: number, first0 = false): void {
+    if (l === this.mg.length) { this.mgSmoothLevel(pass, l, MG_COARSE_SWEEPS, true); return; }
+    this.mgSmoothLevel(pass, l, MG_SWEEPS, l === 0 ? first0 : true);
     const below = this.mg[l];
     if (l === 0) {
       this.dispatchBuf(pass, 'mgRestrict0', 'mgRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.press, below.b], below.n * below.n);
@@ -446,7 +454,7 @@ export class FluidPasses extends FluidFields {
       const here = this.mg[l - 1];
       this.dispatchBuf(pass, 'mgProlong', this.nameOf('mgProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p], here.n * here.n);
     }
-    smooth(l, MG_SWEEPS, false);
+    this.mgSmoothLevel(pass, l, MG_SWEEPS, false);
   }
 
   /**
@@ -773,27 +781,40 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
   }
 
+  private hsSmoothLevel(pass: GPUComputePassEncoder, level: number, sweeps: number, first: boolean): void {
+    const mob = this.hsMob!;
+    if (level === 0) {
+      for (let k = 0; k < sweeps; k++) {
+        for (let parity = 0; parity < 2; parity++) {
+          this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity), [this.div, this.hsP!, mob], this.N * (this.N / 2));
+        }
+      }
+      return;
+    }
+    const lv = this.mg[level - 1];
+    if (lv.n <= 32) {
+      this.hsRun(pass, 'hsSmoothCoarse',
+        this.nameOf(first ? 'hsSmoothCoarse:0:' : 'hsSmoothCoarse:', level, ':', sweeps),
+        this.arg4(this.nameOf(first ? 'mg coarse0 ' : 'mg coarse ', level, ' ', sweeps), lv.n, sweeps, first ? 1 : 0),
+        [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], 64);
+      return;
+    }
+    for (let k = 0; k < sweeps; k++) {
+      for (let parity = 0; parity < 2; parity++) {
+        const z = first && k === 0 && parity === 0;
+        this.hsRun(pass, 'hsSmooth',
+          this.nameOf(z ? 'hsSmooth:0:' : 'hsSmooth:', level, ':', parity),
+          this.arg4(this.nameOf(z ? 'mg smooth0 ' : 'mg smooth ', level, ' ', parity), lv.n, parity, z ? 1 : 0),
+          [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], lv.n * Math.ceil(lv.n / 2));
+      }
+    }
+  }
+
   /** One V-cycle of the thin gap's variable-coefficient multigrid, as `vcycle` is for the old one. */
   private hsCycle(pass: GPUComputePassEncoder, l: number): void {
     const mob = this.hsMob!;
-    const smooth = (level: number, sweeps: number, first: boolean) => {
-      for (let k = 0; k < sweeps; k++) {
-        for (let parity = 0; parity < 2; parity++) {
-          if (level === 0) {
-            this.hsRun(pass, 'hsSmooth0', this.nameOf('hsSmooth0:', parity), this.arg4(this.nameOf('pressure ', parity), parity), [this.div, this.hsP!, mob], this.N * (this.N / 2));
-          } else {
-            const lv = this.mg[level - 1];
-            const z = first && k === 0 && parity === 0;
-            this.hsRun(pass, 'hsSmooth',
-              this.nameOf(z ? 'hsSmooth:0:' : 'hsSmooth:', level, ':', parity),
-              this.arg4(this.nameOf(z ? 'mg smooth0 ' : 'mg smooth ', level, ' ', parity), lv.n, parity, z ? 1 : 0),
-              [lv.b, lv.p, this.hsMobC[level - 1], this.hsFaceC[level - 1]], lv.n * Math.ceil(lv.n / 2));
-          }
-        }
-      }
-    };
-    if (l === this.mg.length) { smooth(l, MG_COARSE_SWEEPS, true); return; }
-    smooth(l, MG_SWEEPS, l > 0);
+    if (l === this.mg.length) { this.hsSmoothLevel(pass, l, MG_COARSE_SWEEPS, true); return; }
+    this.hsSmoothLevel(pass, l, MG_SWEEPS, l > 0);
     const below = this.mg[l];
     if (l === 0) {
       this.hsRun(pass, 'hsRestrict0', 'hsRestrict0', this.arg('none', [0, 0, 0, 0]), [this.div, this.hsP!, mob, below.b], below.n * below.n);
@@ -808,7 +829,7 @@ export class FluidPasses extends FluidFields {
       const here = this.mg[l - 1];
       this.hsRun(pass, 'hsProlong', this.nameOf('hsProlong:', l), this.arg4(this.nameOf('mg level ', l), here.n), [below.p, here.p, this.hsMobC[l - 1]], here.n * here.n);
     }
-    smooth(l, MG_SWEEPS, false);
+    this.hsSmoothLevel(pass, l, MG_SWEEPS, false);
   }
 
   /** The lasting current: forces, then its own projection, on the M grid. */

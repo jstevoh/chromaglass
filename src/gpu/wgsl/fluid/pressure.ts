@@ -420,6 +420,132 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Coarse multigrid levels of 32×32 or smaller solved in one single-workgroup
+    dispatch (H2c-1, docs/webgpu-plan.md).
+
+    At 512² a V-cycle's levels from 32² down to 4² took 56 smoothing dispatches
+    each cycle (four sweeps of two parities each way on 32², 16² and 8², and
+    thirty-two half-sweeps at 4²), where a 4² or 8² dispatch is almost all
+    command overhead. For n <= 32, b and p together are at most 2 × 1024 floats
+    (8 KB), which fits in workgroup memory: one 256-thread workgroup loads b
+    and p (or zeroes wp when `first` is 1, H2c-3), runs all `sweeps` red-black
+    Gauss-Seidel sweeps in place with a `workgroupBarrier()` between parities,
+    and writes p back once. Same cells, same order, same arithmetic as mgSmooth
+    and hsSmooth, so the pressure and residual after a step are bit-for-bit
+    identical. A.a = (n, sweeps, first).
+  */
+  mgSmoothCoarse: `${HEAD}
+@group(0) @binding(2) var<storage, read> b: array<f32>;
+@group(0) @binding(3) var<storage, read_write> p: array<f32>;
+var<workgroup> wb: array<f32, 1024>;
+var<workgroup> wp: array<f32, 1024>;
+fn at(x: i32, y: i32, n: i32) -> f32 {
+  return wp[clamp(x, 0, n - 1) + clamp(y, 0, n - 1) * n];
+}
+@compute @workgroup_size(256)
+fn main(@builtin(local_invocation_index) t: u32) {
+  let n = i32(A.a.x);
+  let sweeps = i32(A.a.y);
+  let first = A.a.z > 0.5;
+  let nn = n * n;
+  let half = (n + 1) / 2;
+  let nh = n * half;
+  var idx = i32(t);
+  loop {
+    if (idx >= nn) { break; }
+    wb[idx] = b[idx];
+    if (first) { wp[idx] = 0.0; } else { wp[idx] = p[idx]; }
+    idx += 256;
+  }
+  workgroupBarrier();
+  for (var k = 0; k < sweeps; k++) {
+    for (var parity = 0; parity < 2; parity++) {
+      var i = i32(t);
+      loop {
+        if (i >= nh) { break; }
+        let y = i / half;
+        let x = 2 * (i % half) + ((y + parity) & 1);
+        if (x < n) {
+          let s = at(x - 1, y, n) + at(x + 1, y, n) + at(x, y - 1, n) + at(x, y + 1, n);
+          wp[x + y * n] = (wb[x + y * n] + s) * 0.25;
+        }
+        i += 256;
+      }
+      workgroupBarrier();
+    }
+  }
+  idx = i32(t);
+  loop {
+    if (idx >= nn) { break; }
+    p[idx] = wp[idx];
+    idx += 256;
+  }
+}`,
+
+  // The same single-workgroup coarse smoother for the thin gap's variable-coefficient multigrid (H2c-1). A.a = (n, sweeps, first).
+  hsSmoothCoarse: `${HEAD}
+@group(0) @binding(2) var<storage, read> b: array<f32>;
+@group(0) @binding(3) var<storage, read_write> p: array<f32>;
+@group(0) @binding(4) var<storage, read> cell: array<f32>;
+@group(0) @binding(5) var<storage, read> fc: array<f32>;
+var<workgroup> wb: array<f32, 1024>;
+var<workgroup> wp: array<f32, 1024>;
+@compute @workgroup_size(256)
+fn main(@builtin(local_invocation_index) t: u32) {
+  let n = i32(A.a.x);
+  let sweeps = i32(A.a.y);
+  let first = A.a.z > 0.5;
+  let nn = n * n;
+  let half = (n + 1) / 2;
+  let nh = n * half;
+  var idx = i32(t);
+  loop {
+    if (idx >= nn) { break; }
+    wb[idx] = b[idx];
+    if (first) { wp[idx] = 0.0; } else { wp[idx] = p[idx]; }
+    idx += 256;
+  }
+  workgroupBarrier();
+  for (var k = 0; k < sweeps; k++) {
+    for (var parity = 0; parity < 2; parity++) {
+      var i = i32(t);
+      loop {
+        if (i >= nh) { break; }
+        let y = i / half;
+        let x = 2 * (i % half) + ((y + parity) & 1);
+        if (x < n) {
+          let c = x + y * n;
+          if (cell[c] < 0.0) {
+            wp[c] = 0.0;
+          } else {
+            var f = array<f32, 4>(fc[c], 0.0, fc[nn + c], 0.0);
+            var q = array<i32, 4>(c + 1, c - 1, c + n, c - n);
+            if (x > 0) { f[1] = fc[c - 1]; }
+            if (y > 0) { f[3] = fc[nn + c - n]; }
+            var den = 0.0;
+            var num = 0.0;
+            for (var d = 0; d < 4; d++) {
+              if (f[d] <= 0.0) { continue; }
+              den += f[d];
+              if (cell[q[d]] >= 0.0) { num += f[d] * wp[q[d]]; }
+            }
+            wp[c] = select(0.0, (wb[c] + num) / den, den > 0.0);
+          }
+        }
+        i += 256;
+      }
+      workgroupBarrier();
+    }
+  }
+  idx = i32(t);
+  loop {
+    if (idx >= nn) { break; }
+    p[idx] = wp[idx];
+    idx += 256;
+  }
+}`,
+
+  /*
     A.a.x = cells to zero. Level 0's packed pressure too, between
     projections (`clearBuffer`), with A.a.x its n²: that had a kernel of its
     own, `pressureClear`, the same zeroing with the count read off the
