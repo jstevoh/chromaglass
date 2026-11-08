@@ -67,7 +67,7 @@ export class WebGPUFluid extends FluidReads {
    */
   static swirlHeldOff = false;
   /** The step's soap numbers (soapPlan), kept so a frame makes none. */
-  private readonly soapNums = new Float64Array(5);
+  private readonly soapNums = new Float64Array(6);
 
   /**
    * The kernels a step runs, on any look a show can open on, built before
@@ -1225,8 +1225,8 @@ export class WebGPUFluid extends FluidReads {
     });
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Previously, isotropic Jacobi diffusion
-      removed about 8a/(1+8a) of it a step. Now with physical molecular diffusion
+      GRID_DAMP a step in every look. Isotropic Jacobi diffusion used to take
+      about 8a/(1+8a) of it a step. With physical molecular diffusion
       Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
       nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
       elevated diffusion, keeping high-frequency grid modes smoothly damped.
@@ -1236,7 +1236,7 @@ export class WebGPUFluid extends FluidReads {
     stage('dye grid', (pass) => {
       const k = this.arg('dye grid', [gridTop, 0, 0, 0]);
       const damp = (field: PingPong) => {
-        this.run(pass, 'dampGridCurv', this.scratchA, [field.read], k);
+        this.run(pass, 'dampGridCurv', this.scratchA, [field.read, field.write], k);
         this.run(pass, 'dampGridLimit', this.scratchB, [field.read, this.scratchA], k);
         this.run(pass, 'dampGrid', field.write, [field.read, this.scratchA, this.scratchB], k);
         field.swap();
@@ -1251,7 +1251,7 @@ export class WebGPUFluid extends FluidReads {
       reading the same soap the dye was moved by. In metres and seconds, in
       as many substeps as the grid and the step need (soapPlan, PLAN 38c).
     */
-    const sp = soapPlan(soap, p.magnetSeconds ?? 1 / 60, N, this.soapNums);
+    const sp = soapPlan(soap, p.magnetSeconds, N, this.soapNums, p.soapBreakdown);
     const soapRim = thin ? OPEN_RIM : 0;
     stage('marangoni', (pass) => {
       const k = this.arg('marangoni', [sp[1], 0, sp[2], sp[3], soapRim, 0, 0, 0]);
@@ -1505,8 +1505,8 @@ export class WebGPUFluid extends FluidReads {
           this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
-            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04])
-            : this.arg('mix update oil', [0.012, 0, 0, 0]));
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5]])
+            : this.arg('mix update oil', [0.012, 0, 0, 0, 1]));
           m.swap();
         }
       }

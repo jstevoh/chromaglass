@@ -25,14 +25,14 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { installFrameReader, isGpuEngine, lastFrameRead } from './frame.mjs';
 import { clickAt, modeSwitchX, legibility, coveredControls, statusDots, COVER_WIDTHS } from './layoutProbe.mjs';
 import { spawn } from 'node:child_process';
 
 // Overridable so two runs can share a machine — measuring a change to this
 // suite means running it twice, and a hard-coded port makes that serial.
-const PORT = Number(process.env.QA_PORT ?? 4178);
+const PORT = port(4178, 'QA_PORT');
 /*
   The whole suite, on the GPU solver:  QA_GPU=mid npm run qa
 
