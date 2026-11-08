@@ -11969,3 +11969,30 @@ and 22 of 22 mutants (the large still read from its JPEG header, the still kept 
 phones, the song action's modes and kicks), the page's own still rule on the real
 `PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
 drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).
+
+## 44i. The owner's YouTube channel from the assistant (2026-11-08)
+
+Asked by the owner while the six music films were going up by hand, a session driving
+a browser through YouTube Studio field by field: "can we create a connector ourselves
+for the future?" No connector in Claude's directory uploads to YouTube. Built as a
+second local MCP server, `mcp/youtube-mcp.js`, beside the show's, not as more tools on
+it: the show's server is a live link behind the owner's switch whose every rule is the
+show server's guard, and none of that concerns a channel; this one needs no show
+running, has its own sign-in, and fails on its own. No packages, like the show's.
+The YouTube Data API v3 signed in as a desktop app (loopback redirect, PKCE S256,
+`state`), the refresh key kept in `~/.chromaglass/youtube/` at 600 in a 700 folder,
+never in a reply or the log. Nine tools: `channel`, `list_videos`, `upload_video`,
+`upload_status`, `update_video`, `set_thumbnail`, `list_playlists`, `create_playlist`,
+`add_to_playlist`; no delete, on purpose. Uploads are the resumable protocol in 8 MiB
+chunks and resume across a dropped connection or a 5xx (back off, ask Google where it
+stopped), an expired access key (refreshed), and the assistant's app closing (the
+session saved in `uploads.json`; asking again for the same file and title carries on
+and never makes a second copy unless `again`). Read on the API's pages the same day:
+since 2026-11-02 an upload from an unverified project is no longer locked private, and
+one that names no privacy goes up public, so this server always names one, private
+unless the assistant passes another; an upload costs 1 unit of its own bucket (100 a
+day). Check: `npm run youtube`, 19 lines against a stand-in Google on loopback
+(an upload killed mid-file and resumed by a second server in one session; a dropped
+chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte file;
+the bytes exact; private by default; an update naming only the title keeping the rest)
+and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
