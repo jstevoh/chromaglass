@@ -181,6 +181,8 @@
     "disc": "node scripts/disc.mjs",
     "standing": "node scripts/standing.mjs",
     "widedials": "node scripts/widedials.mjs",
+    "shaderdials": "node scripts/shaderdials.mjs",
+    "clearleft": "node scripts/clearleft.mjs",
     "ferrodye": "node scripts/ferrodye.mjs",
     "ferrodrop": "node scripts/ferrodrop.mjs",
     "ferrorest": "node scripts/ferrorest.mjs",

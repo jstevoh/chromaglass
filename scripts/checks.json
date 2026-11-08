@@ -167,6 +167,21 @@
       ]
     },
     {
+      "name": "What the clear controls left, owed",
+      "shard": "logic",
+      "run": "npm run clearleft -- --owed=pace,spin,tray,dimmed",
+      "why": [
+        "PLAN 35a-2, 35d-2, 35f-2, 35g-2 written ahead of their build (scripts/clearleft.mjs):",
+        "the remote's Speed and Evolve Speed draw the snail and hare, Auto Spin and",
+        "Spin Direction are picked from their named answers and not a stepped slider",
+        "(Settings and the remote), the remote's looks and cue strip and the Sequencer's",
+        "stages draw a look's slide mount, and the phone's Show, Evolve and Spin rows",
+        "say off by disabled rather than half opacity. Read from the source, as states",
+        "is. --owed: each line is excused only in main's state; the PR that builds it",
+        "takes its id out. A second, no browser."
+      ]
+    },
+    {
       "name": "The check-change guard",
       "shard": "logic",
       "run": "npm run checkguard",
@@ -1088,6 +1103,22 @@
         "WebGPU (cloud, 2026-10-31), so on Linux's lab shards rather than a Mac's.",
         "In lab3 since #658: its 3:40 in lab put that part past its 25 minutes on",
         "main's merge of #646 (cancelled twice in holeline, after it); lab3 ran 11."
+      ]
+    },
+    {
+      "name": "The dials held in the plate shader reach their tops, owed",
+      "shard": "lab4",
+      "run": "npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate",
+      "timeout": 6,
+      "why": [
+        "PLAN 27h-3 written ahead of its build (scripts/shaderdials.mjs): Micro-Droplets,",
+        "Plate Cells, Glossiness, Boundary Glow and Gate Edge each run to their new top",
+        "(2, 1.4, 2, 2, 2) in the one range, the uniform does not clamp them to the old",
+        "one, no look moves, and in the lab the last quarter of each range still changes",
+        "the picture by a quarter of what the first does (Gate Edge, in the post chain the",
+        "lab does not draw, by its shader's mix held at 1 and its width growing). --owed:",
+        "each line is excused only in main's state; the PR that builds it takes its id",
+        "out. About a minute on SwiftShader (cloud, 2026-11-07), in lab4 beside holeline."
       ]
     },
     {
@@ -2368,13 +2399,16 @@
     {
       "name": "The Ben-Day print",
       "shard": "tools",
-      "run": "npm run benday",
+      "run": "npm run benday -- --owed=back",
       "why": [
         "Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to",
         "the screen, a pool one flat ink outlined in black, and only Roy prints.",
         "On tools since PLAN 19k: plate ran 19.1 to 20.4 minutes on the PR runs of",
         "2026-10-26 against its 20, and #502's was stopped there with one check left;",
-        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14."
+        "this and the rides (or the Ben-Day print), 3.3 minutes, went to tools, at 14.",
+        "--owed=back: a second plate's pool outlined as the front's is (PLAN 21b),",
+        "excused only in main's state (the back printed, not outlined); the PR that",
+        "builds it takes the id out"
       ]
     },
     {
