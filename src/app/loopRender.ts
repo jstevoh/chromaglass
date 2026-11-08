@@ -153,6 +153,69 @@ async function pickLoopFormat(width: number, height: number, fps: number): Promi
 }
 
 /**
+ * Smooth the per-frame audio readings for a silent Canvas loop so the plate is
+ * driven by a continuous bass wave rather than single-frame kick impulses that
+ * stamp a sudden droplet burst (`Kick Bloom`) or lurch the glass press in one
+ * frame (`largest step inside <= 8x median`).
+ */
+function shapeLoopAudio(frames: AudioData[], fps: number): AudioData[] {
+  const n = frames.length;
+  if (n === 0) return frames;
+  const radius = Math.max(2, Math.round(fps * 0.12));
+  const weights = new Float32Array(radius * 2 + 1);
+  let wSum = 0;
+  for (let k = -radius; k <= radius; k++) {
+    const w = 0.5 * (1 + Math.cos((Math.PI * k) / (radius + 1)));
+    weights[k + radius] = w;
+    wSum += w;
+  }
+  for (let i = 0; i < weights.length; i++) weights[i] /= wSum;
+
+  const smoothBass = new Float32Array(n);
+  let minB = Infinity;
+  let maxB = -Infinity;
+  for (let i = 0; i < n; i++) {
+    let acc = 0;
+    for (let k = -radius; k <= radius; k++) {
+      const idx = Math.max(0, Math.min(n - 1, i + k));
+      acc += frames[idx].bass * weights[k + radius];
+    }
+    smoothBass[i] = acc;
+    if (acc < minB) minB = acc;
+    if (acc > maxB) maxB = acc;
+  }
+  const spanB = maxB - minB;
+  if (spanB > 5) {
+    const lo = Math.max(18, minB);
+    const hi = Math.min(82, Math.max(60, maxB));
+    for (let i = 0; i < n; i++) {
+      const t = (smoothBass[i] - minB) / spanB;
+      smoothBass[i] = lo + t * (hi - lo);
+    }
+  }
+
+  return frames.map((a, i) => {
+    const feat = a.features
+      ? {
+          ...a.features,
+          beat: undefined,
+          onsets: a.features.onsets
+            ? {
+                ...a.features.onsets,
+                kick: { ...a.features.onsets.kick, hit: false, strength: 0, at: 0 },
+              }
+            : a.features.onsets,
+        }
+      : a.features;
+    return {
+      ...a,
+      bass: smoothBass[i],
+      features: feat,
+    };
+  });
+}
+
+/**
  * Extract the `windowFrames` of offline audio readings for the search window.
  * When `startSec` is not given, scans the song's offline bands (`SongEar`) to
  * locate the loudest contiguous stretch of `windowFrames` first.
@@ -172,7 +235,7 @@ function buildWindowAudio(
     for (let i = 0; i < windowStart; i++) firstEar.next();
     const windowAudio: AudioData[] = [];
     for (let i = 0; i < windowFrames; i++) windowAudio.push(firstEar.next());
-    return { windowStart, windowAudio };
+    return { windowStart, windowAudio: shapeLoopAudio(windowAudio, fps) };
   }
 
   // For songs up to a minute, keep the readings from the single scan pass; for
@@ -192,13 +255,16 @@ function buildWindowAudio(
   }
   const windowStart = pickLoudestWindow(energy, windowFrames);
   if (allAudio) {
-    return { windowStart, windowAudio: allAudio.slice(windowStart, windowStart + windowFrames) };
+    return {
+      windowStart,
+      windowAudio: shapeLoopAudio(allAudio.slice(windowStart, windowStart + windowFrames), fps),
+    };
   }
   const secondEar = new SongEar(mono, sampleRate, fps, levels);
   for (let i = 0; i < windowStart; i++) secondEar.next();
   const windowAudio: AudioData[] = [];
   for (let i = 0; i < windowFrames; i++) windowAudio.push(secondEar.next());
-  return { windowStart, windowAudio };
+  return { windowStart, windowAudio: shapeLoopAudio(windowAudio, fps) };
 }
 
 export function useLoopRender(host: SongRenderHost) {
