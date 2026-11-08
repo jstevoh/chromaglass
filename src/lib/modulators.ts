@@ -149,8 +149,8 @@ export interface ModulatorReadingSlice {
   };
 }
 
-/** Bars per cycle for each LFO at default settings. */
-const BARS = { lfo1: 8, lfo2: 2, lfo3: 1, lfo4: 0.25 } as const;
+/** Bars per cycle for each LFO; lfo4 steps once a beat instead. */
+const BARS = { lfo1: 8, lfo2: 2, lfo3: 1 } as const;
 /** Attack and decay in seconds at default settings. */
 const ENVS = { env1: { a: 0.012, d: 0.28 }, env2: { a: 0.09, d: 1.6 } } as const;
 /** With no tempo to hold onto, this is the one assumed. */
@@ -166,7 +166,7 @@ export class Modulators {
     lfo1: { bars: BARS.lfo1, shape: 'sine', restart: null },
     lfo2: { bars: BARS.lfo2, shape: 'sine', restart: null },
     lfo3: { bars: BARS.lfo3, shape: 'triangle', restart: null },
-    lfo4: { bars: BARS.lfo4, shape: 'stepped', restart: null },
+    lfo4: { bars: 0.25, shape: 'stepped', restart: null },
   };
   private rnd: Record<LfoId, { from: number; to: number; held: number; seeded: boolean }> = {
     lfo1: { from: 0.5, to: 0.5, held: 0.5, seeded: false },
