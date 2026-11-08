@@ -936,6 +936,14 @@ export interface VisualizerSettings {
   soundImpact: number;        // master depth over every patch whose source is the sound
   /** Master depth over every patch driven by an LFO or an envelope. */
   shapeImpact: number;
+  /** Cycle length in bars (0.25..16), shape index (`LFO_SHAPES`) and restart trigger (`LFO_TRIGGERS`) per LFO. */
+  lfo1Bars: number; lfo1Shape: number; lfo1Restart: number;
+  lfo2Bars: number; lfo2Shape: number; lfo2Restart: number;
+  lfo3Bars: number; lfo3Shape: number; lfo3Restart: number;
+  lfo4Bars: number; lfo4Shape: number; lfo4Restart: number;
+  /** Attack and decay in seconds, and trigger source index (`ENVELOPE_TRIGGERS`) per envelope. */
+  env1Attack: number; env1Decay: number; env1On: number;
+  env2Attack: number; env2Decay: number; env2On: number;
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -1245,6 +1253,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // source whose master starts at zero makes a patch you just made look broken.
   soundImpact: 1,
   shapeImpact: 1,
+  lfo1Bars: 8, lfo1Shape: 0, lfo1Restart: 0,
+  lfo2Bars: 2, lfo2Shape: 0, lfo2Restart: 0,
+  lfo3Bars: 1, lfo3Shape: 1, lfo3Restart: 0,
+  lfo4Bars: 0.25, lfo4Shape: 3, lfo4Restart: 0,
+  env1Attack: 0.012, env1Decay: 0.28, env1On: 0,
+  env2Attack: 0.09, env2Decay: 1.6, env2On: 0,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

@@ -87,6 +87,7 @@
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
 import { _electron as electron } from 'playwright';
+import { untilMacDeployDone } from './macdeploy.mjs';
 import { spawn as launchProcess, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -258,6 +259,9 @@ const env = {
 };
 delete env.SHOW_KEY;   // the app's own key, the one it keeps, is what is checked
 
+// The app draws the plate on the Mac's GPU as a harness's browser does: a
+// deploy's shard holding the owner's Mac goes first (PLAN.md 19ah-9a).
+await untilMacDeployDone('npm run desktop');
 const electronApp = await electron.launch({
   executablePath: app.executablePath,
   args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])],

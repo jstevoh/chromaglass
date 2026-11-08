@@ -75,6 +75,9 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   a patch or LFO must not flip it mid-song.
 */
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+  'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
+  'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
+  'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
   'clearFilmDye',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.

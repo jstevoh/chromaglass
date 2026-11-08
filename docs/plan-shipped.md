@@ -8517,6 +8517,10 @@ and `AutoRange` (6 dB minimum, 30 dB cap) as `band1`..`band8`, and `PatchBay.fol
 and the live log-frequency spectrum strip on both the desk and the phone. Story in
 `docs/plan-shipped.md` §30a.
 
+#### ~~30b. The LFOs and envelopes are fixed~~ (shipped 2026-11-08)
+
+Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` removed from `--owed` in `scripts/checks.json`; `npm run shapes` 15/15). `Modulators` (`src/lib/modulators.ts`) adds `setLfo(id, { bars, shape, restart })` (bars in `¼..16`, shapes `'sine' | 'triangle' | 'ramp' | 'stepped' | 'smooth'` with a cosine glide per period for `'smooth'`, and restart trigger `'none' | 'kick' | 'snare' | 'note' | 'pad'`), `setEnvelope(id, { attack, decay, on })` (`'any' | 'kick' | 'snare' | 'note' | 'pad'`), `trigger(source, velocity)` and `strike(velocity, source)`, while keeping `fire(velocity)` (and `'any'` envelopes) for notes, pads and taps only so ear kicks and snares fire only envelopes set to them, and preserving today's rates and shapes as defaults sample for sample (`DEFAULT_SETTINGS` in `src/types.ts`). `modulatorLabel` computes dynamic labels purely from settings in the panel while `MODULATOR_LABELS` stays constant, `Modulators.step` syncs settings without frame-loop allocations and triggers `'kick'` and `'snare'` from the ear's onsets, and `PatchesSection.tsx` draws the LFO rate, shape and restart controls and envelope trigger, attack and decay controls with MIDI pin chips on the desk and phone. `30b-loop` remains open in `docs/plan/30-sound-and-midi.md`.
+
 ### 32. The soap film: a draining film seen in reflection (asked 2026-10-18)
 
 #### ~~32b. The reflected view~~ — **Shipped, this PR (#469)** (`soapFilmRgb` reflected view in `src/lib/soapFilm.ts` with Snell path factor `d_eff = h cos θ_t`, 4-point path spread `spread = 0.025`, dark ground `ground = 0.0004`, and colour grade `notchFloor = 0.0725`, `chromaRetention = 0.67` named under shortcut (f) in `PLAN.md` §32 and `src/lib/soapFilm.ts`; `npm run soapfilm` 23/23 with C7 saturation bar unchanged, `npm run filmtable` 8/8; control with the grade off (`notchFloor = 0`, `chromaRetention = 1`) is 77% saturated, 22.7% dark, 9/12 hues at t=120 s, and with the grade on is 13% saturated, 19.4% dark, 8/12 hues at t=120 s (14.8% saturated, 12/12 hues at t=110 s) against the photograph's 15% saturated and 9/12 hues; 3-angle render at 0°/30°/50° shows bands shift down by 13–18 rows while Newton-black lace stays at row 1.00–1.09; story in `docs/plan-shipped.md` §32b; replacing the grade with the real solid-angle integral and camera gamut mapping is 32b-1 below)
@@ -12024,3 +12028,30 @@ and 22 of 22 mutants (the large still read from its JPEG header, the still kept 
 phones, the song action's modes and kicks), the page's own still rule on the real
 `PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
 drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).
+
+## 44i. The owner's YouTube channel from the assistant (2026-11-08)
+
+Asked by the owner while the six music films were going up by hand, a session driving
+a browser through YouTube Studio field by field: "can we create a connector ourselves
+for the future?" No connector in Claude's directory uploads to YouTube. Built as a
+second local MCP server, `mcp/youtube-mcp.js`, beside the show's, not as more tools on
+it: the show's server is a live link behind the owner's switch whose every rule is the
+show server's guard, and none of that concerns a channel; this one needs no show
+running, has its own sign-in, and fails on its own. No packages, like the show's.
+The YouTube Data API v3 signed in as a desktop app (loopback redirect, PKCE S256,
+`state`), the refresh key kept in `~/.chromaglass/youtube/` at 600 in a 700 folder,
+never in a reply or the log. Nine tools: `channel`, `list_videos`, `upload_video`,
+`upload_status`, `update_video`, `set_thumbnail`, `list_playlists`, `create_playlist`,
+`add_to_playlist`; no delete, on purpose. Uploads are the resumable protocol in 8 MiB
+chunks and resume across a dropped connection or a 5xx (back off, ask Google where it
+stopped), an expired access key (refreshed), and the assistant's app closing (the
+session saved in `uploads.json`; asking again for the same file and title carries on
+and never makes a second copy unless `again`). Read on the API's pages the same day:
+since 2026-11-02 an upload from an unverified project is no longer locked private, and
+one that names no privacy goes up public, so this server always names one, private
+unless the assistant passes another; an upload costs 1 unit of its own bucket (100 a
+day). Check: `npm run youtube`, 19 lines against a stand-in Google on loopback
+(an upload killed mid-file and resumed by a second server in one session; a dropped
+chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte file;
+the bytes exact; private by default; an update naming only the title keeping the rest)
+and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).

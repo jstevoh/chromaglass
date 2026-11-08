@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the cooling fan's air under the hand ($h = 50 \to 10\,\text{W/(m}^2\text{K)}$) so the spot boils
   while held and condenses when released.
 
+### Added — LFOs and envelopes you set (PLAN 30b)
+
+- In **Settings → Patches** (on the desk and the phone, and learnable over MIDI), each of the four LFOs (`lfo1`..`lfo4`) now sets its bar rate (`¼` to `16` bars), waveform shape (`sine`, `triangle`, `ramp`, `stepped`, or `smoothed random` gliding by cosine each period) and optional restart trigger (`free`, `kick`, `snare`, `note`, `pad`); each of the two envelopes (`env1`, `env2`) sets its attack (`1 ms`–`1 s`), decay (`20 ms`–`4 s`) and trigger source (`any`, `kick`, `snare`, `note`, `pad`). Today's fixed rates and shapes remain the defaults sample for sample (`npm run soundowed`, `npm run shapes`).
+
 ### Added — the liquid's amount sets the gap: Liquid and Cover Weight (PLAN 38r-5)
 
 - The plate now knows how much liquid is under its cover glass. Two dials, Liquid (mL) and

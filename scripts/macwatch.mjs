@@ -22,10 +22,10 @@
 // never happens; the Mac waking up ends it as well.
 //
 // Its job is done, and it stops, once every one of the owner's Mac's jobs has
-// started and got past its first step (a job that has started cannot stall in
-// the queue; one whose Mac sleeps under it fails within `timeout-minutes`), or
-// once the checks' summary job `WebGPU (macOS)` has finished, which waits for
-// every shard, or for none when `reach` skipped them.
+// finished (a job that has started cannot stall in the queue, but it can
+// still find the Mac busy between its checks, PLAN.md 19ah-9a), or once the
+// checks' summary job `WebGPU (macOS)` has finished, which waits for every
+// shard, or for none when `reach` skipped them.
 //
 // A Mac that is awake but busy (PLAN.md 19ah-9) gets the same move: each of
 // its shards first looks for other work drawing with the Mac's GPU
@@ -71,14 +71,24 @@ export const SUMMARY = 'Checks / WebGPU (macOS)';
   find the Mac busy.
 */
 export const FREE_STEP = "The owner's Mac is free of other work";
-const freeStep = (j) => (j.steps || []).find((s) => s.name === FREE_STEP);
+/*
+  And its last step (PLAN.md 19ah-9a): a shard on the owner's Mac looks for
+  other work again before each check, and when work begun mid-shard stays
+  (or is there right after a red check) it stops and this step fails. Busy
+  the same. So `done` waits for each of ours to finish, not only to pass its
+  first step: deploy 18:16Z of 2026-11-08 had passed every first step it
+  began when sessions started filming beside it, and a watchdog already gone
+  could not have moved it.
+*/
+export const STAYED_STEP = "The owner's Mac stayed free of other work";
+const step = (j, name) => (j.steps || []).find((s) => s.name === name);
+const freeStep = (j) => step(j, FREE_STEP);
 export function verdict(jobs, shards) {
   const ours = jobs.filter((j) => (j.labels || []).includes(LABEL));
-  if (ours.some((j) => freeStep(j)?.conclusion === 'failure')) return 'busy';
+  if (ours.some((j) => freeStep(j)?.conclusion === 'failure' || step(j, STAYED_STEP)?.conclusion === 'failure')) return 'busy';
   if (jobs.some((j) => j.name === SUMMARY && j.status === 'completed')) return 'done';
   const waiting = ours.filter((j) => j.status === 'queued' || j.status === 'waiting' || j.status === 'pending');
-  const past = (j) => j.status === 'completed' || ['success', 'skipped'].includes(freeStep(j)?.conclusion);
-  if (ours.length >= shards.length && !waiting.length && ours.every(past)) return 'done';
+  if (ours.length >= shards.length && !waiting.length && ours.every((j) => j.status === 'completed')) return 'done';
   if (waiting.length && !ours.some((j) => j.status === 'in_progress')) return 'stalled';
   return 'wait';
 }
@@ -143,9 +153,9 @@ function selftest() {
   // A job's steps as the jobs API lists them: the free step's conclusion
   // (null while it runs, undefined for a job too new to list steps) and a
   // later step's, for a check that fails after the Mac was found free.
-  const mac = (name, status, free, later) => ({
+  const mac = (name, status, free, later, stayed) => ({
     name: `Checks / WebGPU (macOS) · ${name}`, status, labels: ['self-hosted', LABEL],
-    steps: [{ name: 'Set up job', conclusion: 'success' }, ...(free === undefined ? [] : [{ name: FREE_STEP, conclusion: free }]), ...(later ? [{ name: 'The checks', conclusion: later }] : [])],
+    steps: [{ name: 'Set up job', conclusion: 'success' }, ...(free === undefined ? [] : [{ name: FREE_STEP, conclusion: free }]), ...(later ? [{ name: 'The checks', conclusion: later }] : []), ...(stayed ? [{ name: STAYED_STEP, conclusion: stayed }] : [])],
   });
   const job = (name, status) => ({ name, status, labels: ['ubuntu-latest'] });
   const cases = [
@@ -154,7 +164,8 @@ function selftest() {
     ['the Mac on its first shard', [job('Checks / reach', 'completed'), mac('lab', 'in_progress'), mac('app1', 'queued'), mac('app2', 'queued')], 'wait'],
     ['between two shards', [mac('lab', 'completed'), mac('app1', 'queued'), mac('app2', 'queued'), job('Checks / Measure', 'in_progress')], 'stalled'],
     ['asleep from the first', [mac('lab', 'queued'), mac('app1', 'queued'), mac('app2', 'queued')], 'stalled'],
-    ['every shard started (and past its free step, 19ah-9)', [mac('lab', 'completed'), mac('app1', 'completed'), mac('app2', 'in_progress', 'success'), job('Checks / Measure', 'in_progress')], 'done'],
+    ['every shard started and past its free step, one still running (19ah-9a: it can still find the Mac busy)', [mac('lab', 'completed'), mac('app1', 'completed'), mac('app2', 'in_progress', 'success'), job('Checks / Measure', 'in_progress')], 'wait'],
+    ['every shard finished', [mac('lab', 'completed'), mac('app1', 'completed'), mac('app2', 'completed', 'success'), job('Checks / Measure', 'in_progress')], 'done'],
     ['only some made yet, all started', [mac('lab', 'in_progress'), job('Checks / Measure', 'in_progress')], 'wait'],
     ['after reach, before the shards exist', [job('Watchdog', 'in_progress'), job('Checks / reach', 'completed'), job('Checks / Measure', 'completed')], 'wait'],
     ['the summary waiting on the shards', [job('Checks / reach', 'completed'), job(SUMMARY, 'queued'), mac('lab', 'queued')], 'stalled'],
@@ -165,22 +176,27 @@ function selftest() {
     ['the last shard finds it busy, all started', [mac('lab', 'completed', 'success'), mac('app1', 'completed', 'success'), mac('app2', 'in_progress', 'failure')], 'busy'],
     ['busy, though the summary has finished', [mac('lab', 'completed', 'success'), mac('app1', 'completed', 'success'), mac('app2', 'completed', 'failure'), job(SUMMARY, 'completed')], 'busy'],
     ['all started, the last not yet past its free step', [mac('lab', 'completed', 'success'), mac('app1', 'completed', 'success'), mac('app2', 'in_progress', null)], 'wait'],
-    ['all started and past it', [mac('lab', 'completed', 'success'), mac('app1', 'in_progress', 'success'), mac('app2', 'in_progress', 'success')], 'done'],
-    ['a red check later in a shard is not busy', [mac('lab', 'completed', 'success', 'failure'), mac('app1', 'in_progress', 'success'), mac('app2', 'queued')], 'wait'],
+    ['all started and past it, two still running', [mac('lab', 'completed', 'success'), mac('app1', 'in_progress', 'success'), mac('app2', 'in_progress', 'success')], 'wait'],
+    ['a red check later in a shard is not busy', [mac('lab', 'completed', 'success', 'failure', 'success'), mac('app1', 'in_progress', 'success'), mac('app2', 'queued')], 'wait'],
+    // 19ah-9a: busy found between the checks, read from the last step.
+    ['a shard stopped mid-way, the Mac busy', [mac('lab', 'completed', 'success', 'failure', 'failure'), mac('app1', 'queued'), mac('app2', 'queued')], 'busy'],
+    ['the last shard stopped mid-way, the summary finished', [mac('lab', 'completed', 'success', 'success', 'success'), mac('app1', 'completed', 'success', 'success', 'success'), mac('app2', 'completed', 'success', 'failure', 'failure'), job(SUMMARY, 'completed')], 'busy'],
   ];
   let fail = 0;
   // The step the rule reads is named in checks.yml, not here: reworded there
   // alone, the busy rule would never fire and every case above stay green.
   const wf = readFileSync(new URL('../.github/workflows/checks.yml', import.meta.url), 'utf8');
-  const named = wf.includes(`- name: ${FREE_STEP}\n`);
-  if (!named) fail++;
-  console.log(`${named ? ' ok  ' : ' FAIL'} checks.yml names the step "${FREE_STEP}"`);
+  for (const name of [FREE_STEP, STAYED_STEP]) {
+    const named = wf.includes(`- name: ${name}\n`);
+    if (!named) fail++;
+    console.log(`${named ? ' ok  ' : ' FAIL'} checks.yml names the step "${name}"`);
+  }
   for (const [what, js, want] of cases) {
     const got = verdict(js, S);
     if (got !== want) fail++;
     console.log(`${got === want ? ' ok  ' : ' FAIL'} ${what}: ${got}${got === want ? '' : ` (wanted ${want})`}`);
   }
-  console.log(`${cases.length + 1 - fail} passed, ${fail} failed`);
+  console.log(`${cases.length + 2 - fail} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 }
 
