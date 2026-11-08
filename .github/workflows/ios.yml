@@ -54,8 +54,73 @@ jobs:
           xcodebuild -version
       - name: Build the site into the app
         run: npm run build && npx cap sync ios
+      # Capacitor comes as Swift packages with two binaries, Capacitor's and
+      # Cordova's .xcframework.zip, that SwiftPM downloads from GitHub's release
+      # pages. From about 08:45 UTC on 2026-11-08 every run failed there before
+      # compiling: "failed downloading … Capacitor.xcframework.zip … already
+      # exists in file system". That message is wrong about the cause. A first
+      # try of this step gave SwiftPM a cache folder of its own, empty, and it
+      # still failed the same way, about twelve seconds in. The release page
+      # itself answers "504 Gateway Time-out" from GitHub's edge for that file
+      # (and for others, even the gh CLI's), while some files on the same page
+      # still redirect to their download. SwiftPM retries the 504, finds the
+      # file its first try left behind, and reports that instead.
+      #
+      # So the two zips are fetched here, before xcodebuild, with curl's own
+      # retries; if the release page still fails, the same file comes through
+      # the API's asset download, a different route to the same bytes. Each is
+      # put where SwiftPM keeps its cache, under the name it would give it (the
+      # URL with every other character as "_"), in a cache folder of this run's
+      # own (-packageCachePath). SwiftPM copies a cached zip rather than
+      # download it, and still checks it against the checksum in
+      # capacitor-swift-pm's Package.swift, so a wrong file fails the build
+      # rather than slip in. The version is read from the Package.swift that
+      # `npx cap sync` writes, so a Capacitor update needs no edit here (19ak-6).
+      - name: Fetch Capacitor's binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ver=$(sed -n 's/.*capacitor-swift-pm\.git", exact: "\([^"]*\)".*/\1/p' ios/App/CapApp-SPM/Package.swift)
+          if [ -z "$ver" ]; then echo "No capacitor-swift-pm version in ios/App/CapApp-SPM/Package.swift"; exit 1; fi
+          dir="$RUNNER_TEMP/spm-cache/artifacts"
+          mkdir -p "$dir"
+          for name in Capacitor Cordova; do
+            url="https://github.com/ionic-team/capacitor-swift-pm/releases/download/$ver/$name.xcframework.zip"
+            out="$dir/$(printf %s "$url" | sed 's/[^A-Za-z0-9]/_/g')"
+            if curl -fsSL --retry 4 --retry-all-errors --retry-delay 5 -o "$out" "$url"; then
+              echo "$name $ver from the release page: $(wc -c < "$out") bytes"
+              continue
+            fi
+            echo "::warning::$url failed; fetching it through the API's asset download"
+            id=$(gh api "repos/ionic-team/capacitor-swift-pm/releases/tags/$ver" \
+              --jq ".assets[] | select(.name == \"$name.xcframework.zip\") | .id")
+            if [ -z "$id" ]; then echo "No $name.xcframework.zip on release $ver"; exit 1; fi
+            curl -fsSL --retry 4 --retry-all-errors --retry-delay 5 \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
+              -o "$out" "https://api.github.com/repos/ionic-team/capacitor-swift-pm/releases/assets/$id"
+            echo "$name $ver through the API: $(wc -c < "$out") bytes"
+          done
+      # The packages' own source still comes by git, which can fail on its own;
+      # the resolve is tried up to three times from an empty checkout folder.
+      # The cache folder above is kept between tries: it holds only the zips.
+      - name: Resolve the app's Swift packages
+        run: |
+          for attempt in 1 2 3; do
+            rm -rf "$RUNNER_TEMP/spm-packages"
+            if xcodebuild -project ios/App/App.xcodeproj -scheme App \
+                -packageCachePath "$RUNNER_TEMP/spm-cache" \
+                -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-packages" \
+                -resolvePackageDependencies; then
+              exit 0
+            fi
+            echo "::warning::Swift packages failed to resolve (attempt $attempt of 3)"
+            sleep $((attempt * 20))
+          done
+          exit 1
       - name: Build the app
         run: >
           xcodebuild -project ios/App/App.xcodeproj -scheme App
           -configuration Debug -destination 'generic/platform=iOS Simulator'
+          -packageCachePath "$RUNNER_TEMP/spm-cache"
+          -clonedSourcePackagesDirPath "$RUNNER_TEMP/spm-packages"
           CODE_SIGNING_ALLOWED=NO build
