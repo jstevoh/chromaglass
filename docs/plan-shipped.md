@@ -619,6 +619,32 @@ follow-ups 13.5-link wrote down when it shipped, done as one PR.
 **Owed:** the owner's Live sitting (`docs/judging.md` §95) now also covers Live's
 downbeat on the plate's one, Play/Stop on a running Sequence, and the menu item.
 
+### 13.2. Syphon out (2026-11-08)
+
+**What was built.** The Mac app publishes the plate as a Metal Syphon server named
+`"ChromaGlass"` with no CPU readback (`desktop/native/syphon/`, `src/lib/syphonOut.ts`).
+`desktop/native/syphon/build.mjs` compiles `Syphon.framework`'s Metal server classes and
+`syphon_addon.mm` into `desktop/native/syphon/build/syphon.node` (unpacked into
+`app.asar.unpacked` by `desktop/electron-builder.config.cjs`). In the main process,
+`desktop/native/syphon/index.js` opens a hidden offscreen `BrowserWindow` with
+`webPreferences: { offscreen: { useSharedTexture: true } }` (filtered out of
+`BrowserWindow.getAllWindows()` so window-count checks see only the visible windows) and
+wires `Show → Syphon Out` (`id: 'syphon-out'`, persisted in `show.json`, off at start).
+When ticked, the show page checks `canUseProFeature()` (`src/lib/tierGates.ts`; Pro only,
+never reading the licence directly) and hands GPU-backed `ImageBitmap` frames
+(`AcceleratedStaticBitmapImage`, a `gpu::SharedImage` mailbox) from `tapPadPicture` over a
+`MessageChannelMain` port to the offscreen window, whose `paint` listener binds each
+`event.texture.textureInfo.handle.ioSurface` via `CVMetalTextureCacheCreateTextureFromImage`,
+publishes it to `SyphonMetalServer`, and calls `event.texture.release()` in the same turn.
+`syphon` is removed from `DESKTOP_OWED` in `.github/workflows/desktop.yml`.
+
+**Measured:** `npm run desktop` 25/25 (and `--packaged` 28/28), with `Syphon out` loading
+the native add-on, starting off, serving `"ChromaGlass"` when ticked with >= 30 frames/s
+published and every paint texture released, and stopping cleanly when unticked.
+
+**Owed:** the plate as a layer in Resolume or VDMX on the owner's Mac (`docs/judging.md`),
+and 13.2-1 (tapping the pre-geometry texture when wall geometry is active).
+
 ### 13.5-osc. OSC out to a VJ app (2026-11-01)
 
 Wave 7's second Claude item, after 13.4. **What was built.** The page's twenty-a-second

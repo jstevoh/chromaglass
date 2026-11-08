@@ -58,7 +58,6 @@ export const syphonAddon = {
 export function createSyphonController({ BrowserWindow, ipcMain, Menu, MessageChannelMain, show, readShowFile, writeShowFile, getShowWindow, webPreferences }) {
   let syphonWindow = null;
   let syphonWanted = false;
-  let invalidateTimer = null;
   const origGetAllWindows = BrowserWindow.getAllWindows.bind(BrowserWindow);
   BrowserWindow.getAllWindows = () => origGetAllWindows().filter((w) => w !== syphonWindow);
 
@@ -76,28 +75,8 @@ export function createSyphonController({ BrowserWindow, ipcMain, Menu, MessageCh
     if (item && item.checked !== checked) item.checked = checked;
   }
 
-  function stopInvalidateTimer() {
-    if (invalidateTimer) {
-      clearInterval(invalidateTimer);
-      invalidateTimer = null;
-    }
-  }
-
-  function startInvalidateTimer() {
-    if (invalidateTimer) return;
-    invalidateTimer = setInterval(() => {
-      if (!syphonWanted || !syphonWindow || syphonWindow.isDestroyed()) {
-        stopInvalidateTimer();
-        return;
-      }
-      try { syphonWindow.webContents.invalidate(); } catch { /* ignore */ }
-    }, 16);
-    invalidateTimer.unref?.();
-  }
-
   function stopServer() {
     syphonWanted = false;
-    stopInvalidateTimer();
     syphonAddon.stop();
     syphonState.serving = false;
     syphonState.name = null;
@@ -138,11 +117,9 @@ export function createSyphonController({ BrowserWindow, ipcMain, Menu, MessageCh
     }
     if (syphonAddon.start('ChromaGlass')) {
       syphonWanted = true;
-      startInvalidateTimer();
       if (syphonWindow && !syphonWindow.isDestroyed()) {
         try {
           syphonWindow.webContents.send('chromaglass:syphon-ask', true);
-          syphonWindow.webContents.invalidate();
         } catch { /* ignore */ }
       }
     } else {
@@ -163,8 +140,8 @@ export function createSyphonController({ BrowserWindow, ipcMain, Menu, MessageCh
   async function openWindow() {
     if (process.platform !== 'darwin') return;
     syphonWindow = new BrowserWindow({
-      width: 1280,
-      height: 720,
+      width: 640,
+      height: 360,
       show: false,
       backgroundColor: '#000000',
       webPreferences: {

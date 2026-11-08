@@ -84,12 +84,12 @@ export function tapSyphonFrame(canvas: HTMLCanvasElement): void {
     bridge.set(false);
     return;
   }
-  if (inFlight >= 8 || canvas.width === 0 || canvas.height === 0) return;
+  if (inFlight >= 1 || canvas.width === 0 || canvas.height === 0) return;
   if (typeof createImageBitmap !== 'function') return;
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  if (now - lastTapMs < 14) return;
+  if (now - lastTapMs < 30) return;
   lastTapMs = now;
-  const scale = Math.min(1, 1280 / canvas.width, 720 / canvas.height);
+  const scale = Math.min(1, 640 / canvas.width, 360 / canvas.height);
   const w = Math.max(2, Math.round(canvas.width * scale));
   const h = Math.max(2, Math.round(canvas.height * scale));
   if (!stageCanvas && typeof document !== 'undefined') {

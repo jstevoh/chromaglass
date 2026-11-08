@@ -51,15 +51,8 @@ picks it up in its next build. `detectTier()` already reads Electron as the
 **Running order.** Steps marked *(owner)* need the owner's Mac and a VJ app on it.
 
 1. ~~**The wrapper**~~ **Shipped** (2026-09-27, #207): `desktop/`, checked by `npm run desktop` on the packed app in `desktop.yml`. Story in `docs/plan-shipped.md` §13.1 (moved 2026-10-29, 19m-2). **Owed:** the Mac look (`docs/judging.md` §26); signing landed with 13-update-signed.
-2. **Syphon out** (one PR): a native add-on that publishes the plate as a Syphon
-   server from Electron's offscreen shared texture, with no readback. Then *(owner)*:
-   the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured
-   against the plate's own frame. *Not started.* **Check written** (2026-11-01,
-   `scripts/desktop-syphon.mjs`, run by desktop.yml with `DESKTOP_OWED: syphon`):
-   the add-on loads, a Show-menu checkbox `syphon-out` (off at start) serves "ChromaGlass"
-   with at least 30 frames a second published and each released, through
-   `globalThis.__chromaglassSyphon` in the main process; skipped off a Mac. The build
-   takes `syphon` out of `DESKTOP_OWED`.
+2. ~~**Syphon out**~~ **Shipped** (2026-11-08, #723): `desktop/native/syphon/`, `src/lib/syphonOut.ts`, Show → Syphon Out (Pro), checked by `scripts/desktop-syphon.mjs` in `npm run desktop` and `desktop.yml`. Story in `docs/plan-shipped.md` §13.2. **Owed:** the plate as a layer in Resolume or VDMX on the owner's Mac, with the delay measured against the plate's own frame (`docs/judging.md`).
+   - **13.2-1.** When wall geometry (keystone / surfaces) is active, the pre-geometry scene lives in an internal `GPUTexture` inside `src/gpu/output.ts` rather than on a separate canvas; switch `tapSyphonFrame` to tap that pre-geometry texture when wall geometry is in use.
 3. **NDI out, then Spout on Windows** (one PR each): the same add-on sends NDI over
    the network, and Spout on a Windows build. *Not started.*
 4. ~~**Control, written up**~~ **Shipped** (2026-10-31): `docs/osc.md`, every address with a starter Resolume map and a TouchDesigner script (`docs/osc/chromaglass_touchdesigner.py`), held to the code by `npm run rig`. Story in `docs/plan-shipped.md` §13.4. **Owed:** the maps tried in Resolume and TouchDesigner, the owner's sitting in `docs/judging.md` §93.
