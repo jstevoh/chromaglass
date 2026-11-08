@@ -148,7 +148,12 @@ button, making it look good. Every item here is held to those.
     reads 6/6 on *zero* and 6/6 on *boil* (rate 0.84x, steam at 112 s peaking 108.7 °C, fan
     89.5 °C, the steam's dye 0.89x of its room and 1.00x arriving past the disc, writes 1.00).
     Its pocket flashes across the spot in one read and condenses within 10 s as the cooler
-    liquid it pushed out flows back: one pocket, as 36e-3 says. One check-skeptic pass; its
+    liquid it pushed out flows back: one pocket, as 36e-3 says. The same fix with the
+    vapour term in `poured` zeroed still reads `steam` 1.01x: the air field's own change
+    (thinGap.ts reads its rate) already displaces the liquid by the steam's volume, so #718's
+    review point 5 is answered by measurement: the vapour's volume is counted there, and a
+    second term in `poured` is not needed (with the reference's term as well it read 0.89x,
+    a different pocket, not a doubled push). One check-skeptic pass; its
     six findings are in the check.
   - **36e-3. One pocket, not many bubbles, on a level dish** (*open*, found building 36e-1).
     On the check's dish the first site's bubble grows across the superheated hot spot (its
