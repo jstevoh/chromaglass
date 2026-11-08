@@ -552,6 +552,32 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
 
+### 13.7b. The DAW bridge plugin (2026-11-07)
+
+**What was built.** `plugin/dawbridge/`, a JUCE 8 effect in AU and VST3 (universal, macOS
+11 and up) that passes its audio through untouched and sends the running app what MIDI
+carries badly: 32 automation slots at full float resolution, the host's transport with
+the bar's phase exact, and the track's audio as PCM, all as OSC over UDP to
+`127.0.0.1:9024` per `docs/dawbridge.md`. The audio thread never waits: it writes what it
+saw into two lock-free FIFOs and a sender thread of the plugin's own does all the talking
+(the hello once a second, the stopped transport's 250 ms heartbeat, the bye on release).
+The app's names come back on the same socket, so a lane reads `Slot 4 · Swirl` in a host
+that follows parameter names, and the window lists every slot's binding for the hosts
+that do not. `DawBridgeSelfTest` is the real processor played as a host plays it, in real
+time, so the FIFOs and the sender are what is measured.
+
+**Built on the owner's Mac, not in Antigravity's lane,** because it needs cmake, the JUCE
+download, `auval` in a GUI session and a DAW to film in, none of which a headless run has.
+
+**What it measured.** `auval -v aufx Pltr Cgbr`: AU VALIDATION SUCCEEDED. `npm run
+dawbridge -- --plugin` against 13.7a's server and app: 36 of 36, the header at protocol 1,
+32 slots, port 9024; 375 transports to beat 7.98 over the 4 s run; 4.000 s of audio in 750
+packets with no gap; slot 3 moved 750 times from 0.000 to 1.000. Filmed on the owner's Mac
+in headed Metal Chromium against #694's show server: the self-test played three times, slot 4
+mapped to Plate Rock, and Plate Rock read 0.04, 0.31, 0.89, 1.00 through each 4 s run with the
+tempo source on `daw` (32 s film, shared with the owner). The film in Live is owed
+(13.7b-film): the Allow for Live was declined while the owner was away.
+
 ### 13.5-link. Ableton Link in (2026-10-30)
 
 The owner OK'd one simple piece of the DAW work on 2026-10-30, while the in-flight work
