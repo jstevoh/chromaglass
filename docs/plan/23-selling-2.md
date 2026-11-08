@@ -2,13 +2,46 @@
 
 Part 2 of 2 of §23; it begins at 23.15. The section starts in `23-selling.md`.
 
-- **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
-  app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
-  Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
-  and key in the Firebase console) and native in the iPhone app, and
-  deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
-  laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
-  `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
+- **23.15** (**shipped**, this PR): Sign in with Apple on the site, the Mac app and the phone
+  (the owner, 2026-11-08: "should we add the apple login option as well, now that we have a
+  developer ID?"). `APPLE_SIGN_IN` is on in `SignInScreen.tsx`; the button sits under Google's
+  in the one shared form (the first-visit screen, the profile sheet, the Mac app's licence
+  gate, every phone and tablet layout). Apple asks for the email scope, because the licence is
+  kept under the account's email. In the Mac app the button sends Apple to the browser, as
+  Google's does (the app opens outside addresses in the real browser, so a popup never comes
+  back). An email that already has an account made another way keeps Apple's (or Google's)
+  credential with the email it was refused for and attaches it on the next sign-in of that
+  same address only (closes 23.10e-5). The account sheet lists Apple among the ways in and
+  says when the address is Apple's Hide My Email relay. The owner's half (App ID
+  `app.chromaglass`, Services ID `app.chromaglass.signin`, the key, the provider in Firebase,
+  the relay email source) is in the project's shared files, never the repo. *Measure:*
+  `npm run signin` line 4 (Apple offered, reaches Apple's provider, asks for the email) and
+  11/15 (three buttons fit every screen); judging §112 on the live site.
+  - **23.15a** (open, with §12's iPhone app): native Sign in with Apple in the iPhone app
+    (the `AuthenticationServices` sheet, not the web popup; the App ID already carries the
+    capability) and deleting the account inside the app (App Store guideline 5.1.1(v)). The
+    app as the laptop's remote still never asks; 23.14 is how it finds the laptop.
+    *Measure:* `ios.yml`'s build, and on a phone by hand.
+  - **23.15b** (open): the Mac app could sign in with Apple in its own window through a
+    native `ASAuthorizationController` call in the shell, with Firebase's `signInWithCredential`
+    from the identity token; today it finishes in the browser like Google's.
+  - **23.15c** (open): a buyer who signs in with Apple and hides their email gets a relay
+    address (`…@privaterelay.appleid.com`), and the licence Worker keeps a licence under the
+    address it was bought with, so that account reads Free until they sign in with their own
+    email. The sheet says so (`isApplePrivateRelay`); a fix lets the owner of both addresses
+    join them (the Worker moving `keys:<bought>` to the relay after a confirmed link from the
+    bought address). Apple's relay passes on mail only from senders registered in the owner's
+    Apple account: Firebase's `noreply@chromaglass.firebaseapp.com` is registered with this
+    PR's setup; Lemon Squeezy's receipt and key mail (its sending domain) is not yet, so a
+    buyer who checks out with a relay address may not get the receipt.
+  - **23.15d** (open, from this PR's review): no emulator line drives the linking itself (an
+    Apple sign-in refused because the email has an account, then a sign-in of that address
+    and confirmed email links it, a different address or an unconfirmed one does not). The
+    emulator's fake provider page can do it; `linkWithCredential`'s errors are swallowed, so a
+    broken link (Apple's nonce through `credentialFromError`) would go unseen until then.
+    Also: an account made with only the emailed link cannot pick up the kept credential (the
+    link opens a new page); an "Add Apple / Add Google" button on the account sheet
+    (`linkWithPopup`) would cover it.
 - **23.16** (**shipped**, this PR): one address. Story in `docs/plan-shipped.md` §23.16
   (moved 2026-10-29, 19m).
   - **23.16a** (open): what the forward cannot carry. IndexedDB (`chromaglass-music`: song maps,
