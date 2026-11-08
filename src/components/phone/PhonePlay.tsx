@@ -15,6 +15,8 @@ const EVOLVE_MAX = PIN_RANGE.get('automateRate')?.max ?? 1;
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { LIT, LIVE } from '../ui';
 import { SlideMount, SlideTray, TapeReels } from '../ui/Playful';
+import { LiveRemoteChip } from '../LiveRemoteChip';
+import type { RemoteAction, RemoteState } from '../../lib/remoteProtocol';
 
 /**
  * Play: ChromaGlass on a phone for someone listening, not performing.
@@ -107,6 +109,8 @@ export interface PhonePlayProps {
   onWander: (on: boolean) => void;
   onClear: () => void;
   recording: { supported: boolean; on: boolean; seconds: number; onToggle: () => void; take: { blob: Blob; filename: string; url: string } | null };
+  live?: RemoteState['live'];
+  onLiveAction?: (action: RemoteAction) => void;
   onAllControls: () => void;
   onOpenAccount?: () => void;
 }
@@ -313,7 +317,8 @@ export function PhonePlay(p: PhonePlayProps) {
   return (
     <div className="pointer-events-none fixed inset-0 z-30 flex flex-col justify-between" data-testid="play-screen">
       {/* ── The top: the look, and Shuffle and Record (Save while the sheet is up) ── */}
-      <div className="pointer-events-none flex items-start justify-between gap-2 px-3" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}>
+      <div className="pointer-events-none flex flex-col gap-1.5 px-3" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}>
+      <div className="pointer-events-none flex items-start justify-between gap-2">
         <button
           onClick={() => setSheet(true)}
           aria-label="Choose a look"
@@ -373,6 +378,8 @@ export function PhonePlay(p: PhonePlayProps) {
             </>
           )}
         </div>
+      </div>
+      <LiveRemoteChip live={p.live} action={p.onLiveAction ?? (() => {})} className="pointer-events-auto self-start" />
       </div>
 
       {/* ── The bottom: the hint, then the tray or the sheet ── */}

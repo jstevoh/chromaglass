@@ -53,6 +53,10 @@ export function usePhoneLayout({
     try { localStorage.setItem(PHONE_SCREEN_KEY, to); } catch { /* private: this visit only */ }
     setPhoneScreenUp(to);
   };
+  const onFullLayout = () => {
+    try { sessionStorage.setItem(PHONE_OFF_KEY, '1'); } catch { /* private: this render only */ }
+    setPhone(false);
+  };
   useEffect(() => {
     const onResize = () => setPhone(readPhone());
     window.addEventListener('resize', onResize);
@@ -109,6 +113,6 @@ export function usePhoneLayout({
   const overlayUp = !deskUp && !phone;
 
   return {
-    phone, setPhone, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
+    phone, setPhone, onFullLayout, phoneScreenUp, choosePhoneScreen, performing, designing, deskUp, overlayUp,
   };
 }

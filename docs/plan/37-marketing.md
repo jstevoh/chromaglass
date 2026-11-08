@@ -461,16 +461,9 @@ rest is routine and the owner's calls.
       carries). A Test to one unlisted destination proves only its own rate: the advice
       says "never filled the link" rather than guess. A destination that does not
       acknowledge (37x-4c's item) cannot fill the measure either.
-    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width (1024) the
-      app leaves the desks and the Live Show panel with them: a stream running there keeps
-      running, unseen. It goes to the floating overlay (`overlayUp` in `usePhoneLayout`),
-      not the phone layout as this item first said: `wantsPhoneLayout` wants a coarse
-      pointer and a short side under 600, which a Mac's window has not (found writing the
-      check, 2026-11-08). The fix is the remote's `LiveRemoteChip` on that overlay, and on
-      `PhonePlay` too should the app ever be opened at `/play`. Check written first, red
-      on main: `npm run liveshow -- --owed=narrow` (`scripts/liveshownarrow.mjs`): at
-      900x800 the chip on screen saying Live with its clock, its first tap only asking;
-      and, holding on main, the stream still live back at full width.
+    - *37x-4d-4. The Mac app's narrow window.* *(shipped 2026-11-08.)* `LiveRemoteChip` is
+      drawn on the floating overlay and on `PhonePlay`, fed from `useRemote`'s `live`
+      state (`npm run liveshow` 35/35); full story in `docs/plan-shipped.md` §37x-4d-4.
     - *37x-4d-5. Instagram's and TikTok's keys are per stream.* The panel keeps a key until
       it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
       change it each stream, the row could clear the key when a stream ends and say so,

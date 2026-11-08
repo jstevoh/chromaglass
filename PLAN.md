@@ -277,7 +277,7 @@ style (§31).
   **37p** to **37s** (37s's API audit filed early: it takes weeks), then the album show:
   **37x-1** and **37x-2** (the music) from now, the builds **37x-4** (go live from the
   Mac app; OBS until then) and **37x-3** (the album sheet; its checks shipped 2026-11-08,
-  `npm run album` and `albumplate`; Antigravity builds, with 37x-4d-4's chip, `liveshow --owed=narrow`), each its own thread, then
+  `npm run album` and `albumplate`; Antigravity builds; ~~**37x-4d-4**~~'s narrow-window chip shipped 2026-11-08, `npm run liveshow` 35/35), each its own thread, then
   **37x-7**'s routine. **37x-10**, the song's title painted as ink (its check shipped
   2026-11-07, `npm run inktitle`; Antigravity builds), then **37x-10b**.
 
