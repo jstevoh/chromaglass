@@ -223,7 +223,7 @@ style (§31).
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
   (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
-- **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, **18m-5a** slump check with grid filter on), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
+- **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, ~~**18m-5a**~~ slump check with grid filter on, ~~**18m-5b**~~ its cost, **18m-5c** the filter's edge reshaping), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
 - **6.7** §20 after its prerequisites: ~~**20b**~~ #259, **20c, 20e, 20f** (and 20b's own leftovers, 20b-1 to 20b-12, 20b-14 to 20b-16; ~~20b-13~~ the film's dye).
 - **6.8** The ferrofluid: **9t** (**shipped**; then **9u**, **9k**, and 9t's own items), **9h**, **9o**, **9d**, ~~**9v**~~, ~~**9w**~~ #266, **9z**, **9aa** (with **9d**), **9m**,
@@ -383,7 +383,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 17 | Hear the set ahead, from files | [`17-hear-ahead.md`](docs/plan/17-hear-ahead.md) |  | 3 |
 | 18 | The physics under the look: where the plate imitates a result instead of simulating it | [`18-physics.md`](docs/plan/18-physics.md) | 18a–18b-8 | 24 |
 |  | (continued) | [`18-physics-2.md`](docs/plan/18-physics-2.md) | 18b-9–18l-6 | 28 |
-|  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5a | 8 |
+|  | (continued) | [`18-physics-3.md`](docs/plan/18-physics-3.md) | 18l-7–18m-5c | 8 |
 | 19 | The checks, the build and the plan itself | [`19-checks-build-plan.md`](docs/plan/19-checks-build-plan.md) | 19a–19k-12 | 19 |
 |  | (continued) | [`19-checks-build-plan-2.md`](docs/plan/19-checks-build-plan-2.md) | 19l–19aa-8 | 22 |
 |  | (continued) | [`19-checks-build-plan-3.md`](docs/plan/19-checks-build-plan-3.md) | 19aa-9–19ak-5 | 22 |
