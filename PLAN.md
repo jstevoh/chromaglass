@@ -157,8 +157,7 @@ merge conflicts are the shared documents', which 0.6 ends.
   Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
   249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
   `docs/plan-shipped.md` §14aa.
-- **4.2** **H2c-1, H2c-3, then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup,
-  `mgZero` folded in, then a warm start and one V-cycle: about 250 dispatches a step.
+- **4.2** ~~**H2c-1, H2c-3**~~ (#711), **then H2c-2** (M, S, S): the coarse multigrid levels in one workgroup and `mgZero` folded in (**shipped**, `npm run encode -- --owed=h2c2` at 512² on a thin gap: `mgZero` dispatches 44 → 0 across the two plates, thin-gap direct dispatches 269 → 157 and total 365 → 253, open plate 500 → 274, residuals unchanged at `1.149e-2` and `2.091e-3`; story in `docs/plan-shipped.md` §H2c-3, H2c-1), then a warm start and one V-cycle (H2c-2, open).
 - **4.3** **14j with H2c-9 and 14b-120** (M): a draw cap, readbacks only after a step, pack only
   after a step, a heat-aware governor. (The governor's doubling retry shipped with 14aa.)
 - **4.3b** **14ab** (M): the rest of the per-frame CPU work found with 14aa (14ab-1, the

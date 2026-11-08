@@ -732,9 +732,10 @@ export class FluidCore {
   protected shareRead: RimRead | null = null;
 
   /**
-   * Zero one of the packed pressure buffers, as the Jacobi's `fill` did, with
-   * the multigrid's own zeroing (`mgZero` in `wgsl/fluid.ts` on why not a
-   * kernel of its own).
+   * Zero one of the packed pressure buffers on `clear()`, as the Jacobi's `fill`
+   * did (within a step, each level's first sweep reads zero instead of a
+   * dispatch, H2c-3; `mgZero` in `wgsl/fluid/pressure.ts` on why not a kernel
+   * of its own).
    */
   protected clearBuffer(pass: GPUComputePassEncoder, buf: GPUBuffer, key: string): void {
     const pipe = this.pipelines.computePipeline('mgZero', kernel('mgZero', 'r32float'));

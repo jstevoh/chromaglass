@@ -968,7 +968,10 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   mc[i] = select(1.0, -1.0, nOpen >= 1);
 }`,
 
-    // Red-black on a row-major coarse level. A.a = (n, parity).
+    // Red-black on a row-major coarse level. A.a = (n, parity, first).
+    // When `first` is 1 on the red half of a level's first sweep (H2c-3), the
+    // black neighbours are read as 0 rather than from `p`, folding `mgZero`
+    // into the sweep; the black half then reads only the red cells just written.
     hsSmooth: `${HEAD}${COMMON}
 @group(0) @binding(2) var<storage, read> b: array<f32>;
 @group(0) @binding(3) var<storage, read_write> p: array<f32>;
@@ -986,7 +989,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   if (x >= n) { return; }
   if (cell[x + y * n] < 0.0) { p[x + y * n] = 0.0; return; }
   let s = hsRowSums(x, y, n);
-  p[x + y * n] = select(0.0, (b[x + y * n] + s.y) / s.x, s.x > 0.0);
+  let num = select(s.y, 0.0, A.a.z > 0.5);
+  p[x + y * n] = select(0.0, (b[x + y * n] + num) / s.x, s.x > 0.0);
 }`,
 
     // A coarse level's residual, summed down to the next. A.a.x = n.
