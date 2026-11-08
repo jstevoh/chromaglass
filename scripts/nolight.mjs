@@ -131,6 +131,8 @@ const OIL = { x: 0.72, y: 0.28, r: 0.09 };
 const POUR = { x: 0.72, y: 0.72, r: 0.09 };
 /** Line 9's strength is read just off Focus's middle, where the transport is still linear in the path and nothing clips. */
 const NEAR = 0.56;
+/** Line 14's index-matched pour, on the clear plate: the corner away from the glycerine. */
+const MATCH = { x: 0.28, y: 0.72, r: 0.09 };
 
 const { page, close } = await openLab();
 /** Where the lamps stand for line 12: the middle, and opposite corners. */
@@ -331,15 +333,24 @@ try {
     none, so on main nothing can draw there even once the deflection reads
     the path.
   */
-  r3 = await page.evaluate(async ({ N, SIZE, POUR }) => {
+  r3 = await page.evaluate(async ({ N, SIZE, POUR, MATCH }) => {
     await lab.create(N);
     const base = { lampGround: 1, edgeRelief: 0.6, saturationBoost: 1, lampHotspot: 0, projectorFocus: 0.5 };
     const shot = async () => Array.from(await lab.render(SIZE, base, { time: 3 }));
     lab.flush(); await lab.step(2);
     const off = await shot();
-    lab.addSpecies(POUR.x, POUR.y, POUR.r, 50, 'glycerine', false);
-    return { off, on: await shot() };
-  }, { N, SIZE, POUR });
+    const gly = lab.addSpecies(POUR.x, POUR.y, POUR.r, 50, 'glycerine', false);
+    const on = await shot();
+    /*
+      And the same glycerine with its index matched to water's: the same
+      field, the same footprint, the same viscosity, no step in the path. An
+      edge matched in index is invisible (why a glass rod vanishes in oil of
+      its own index), so it draws nothing; a rim drawn from where the poured
+      liquid is, and not from the light, draws one here.
+    */
+    lab.solver().pour(MATCH.x, MATCH.y, MATCH.r, 50, { ...gly, index: 1.333 }, false);
+    return { off, on, matched: await shot() };
+  }, { N, SIZE, POUR, MATCH });
 } finally {
   await close();
 }
@@ -581,20 +592,32 @@ const oilThere = up8 > 20 && down8 > 20;
       step, so it draws a softer rim, but a rim);
     - the pour on clear water, no dye anywhere: the same quarter of its
       ring darker. The rim is the light lost from the lamp, and does not
-      need dye to have something to darken.
-  The owed state is main's: none of the three draws anything on its ring.
+      need dye to have something to darken;
+    - each of the three with the pour's guards: nothing on its rim brighter,
+      its middle and the ground round it unmoved;
+    - and the same glycerine poured with its index matched to water's (the
+      same field and footprint, no step in the path) draws nothing, so a rim
+      drawn from where a liquid was poured, not from the light, cannot pass.
+  The owed state is main's: nothing moves at all on any of the three rims.
 */
 {
   const ringOf = (o, a, b) => { const d = radii(o); return (u, v) => { const k = d(u, v); return k >= a && k <= b; }; };
-  const ring = (pic, base, o) => compare(pic, base, ringOf(o, 0.8, 1.2));
   const most = (pic, base, keep) => { const up = compare(pic, base, keep).over, down = compare(base, pic, keep).over; return Math.max(up, down, 0); };
-  const pour = ring(r.pourFocus, r.oilFocus, POUR), oil = ring(r.oilFocus, r.waterFocus, OIL), clear = ring(r3.on, r3.off, POUR);
-  const middle = most(r.pourFocus, r.oilFocus, ringOf(POUR, 0, 0.6)), round = most(r.pourFocus, r.oilFocus, ringOf(POUR, 1.4, 2));
+  /*
+    Each leg: its rim darker over Q, no pixel of the rim brighter, and its
+    middle and the ground round it unmoved, so a darkened disc or a wide
+    painted band cannot pass any of them. And "owed" means nothing moved at
+    all on any of the three rims (by over SLACK): a rim built too weak to
+    reach DARK is red, not owed.
+  */
+  const leg = (pic, base, o) => ({ ...compare(pic, base, ringOf(o, 0.8, 1.2)), moved: most(pic, base, ringOf(o, 0.8, 1.2)), middle: most(pic, base, ringOf(o, 0, 0.6)), round: most(pic, base, ringOf(o, 1.4, 2)) });
+  const legs = [['pour', leg(r.pourFocus, r.oilFocus, POUR)], ['oil', leg(r.oilFocus, r.waterFocus, OIL)], ['pour on clear water', leg(r3.on, r3.off, POUR)]];
+  const matched = most(r3.matched, r3.on, ringOf(MATCH, 0, 2));
   const Q = 0.25;
-  line('rim', `14. a clear rim in focus (Focus 0.5): the clear pour, the clear oil drop and the pour on clear water each darken over ${pct(Q)} of their rim (0.8 to 1.2 radii) by ${DARK}+, the pour's rim no brighter (by ${SLACK}), its middle and the wash round it unmoved (by ${SLACK})`,
-    pour.dark > Q && oil.dark > Q && clear.dark > Q && pour.over <= SLACK && middle <= SLACK && round <= SLACK,
-    `rims darker: pour ${pct(pour.dark)}, oil ${pct(oil.dark)}, pour on clear water ${pct(clear.dark)}; the pour's rim brightest by ${pour.over}; its middle moved ${middle}, the wash round it ${round} levels`,
-    pour.dark < 0.01 && oil.dark < 0.01 && clear.dark < 0.01);
+  line('rim', `14. a clear rim in focus (Focus 0.5): the clear pour, the clear oil drop and the pour on clear water each darken over ${pct(Q)} of their rim (0.8 to 1.2 radii) by ${DARK}+, no pixel of it brighter (by ${SLACK}), each middle and the ground round it unmoved (by ${SLACK}); the same pour matched to water's index draws nothing (by ${SLACK})`,
+    legs.every(([, l]) => l.dark > Q && l.over <= SLACK && l.middle <= SLACK && l.round <= SLACK) && matched <= SLACK,
+    `${legs.map(([k, l]) => `${k}: ${pct(l.dark)} of its rim darker, brightest by ${l.over}, middle moved ${l.middle}, round it ${l.round}`).join('; ')}; the matched pour moved ${matched} levels`,
+    legs.every(([, l]) => l.moved <= SLACK));
 }
 /*
   15 (PLAN 38h-6, owed). The camera's bubble film by transmission. A pocket
@@ -612,7 +635,13 @@ const oilThere = up8 > 20 && down8 > 20;
   or so over most of a bubble, 8% at most, so DARK's 8 would ask more than
   the physics gives; main at Film Physics 1, already transmitted, moves
   0.00% of the picture by 8, 0.01% by over 2 and 10.83% by any level), so a
-  film taken off altogether cannot pass. The projector's own bubbles are printed beside it:
+  film taken off altogether cannot pass. And the camera's bubbles at Film
+  Physics 0 are the same picture as at 1 (by SLACK, at each Iridescence):
+  a pocket lit from beneath has one film, the transmitted one the projector
+  already wears at Film Physics 1, so a grey stand-in or a second film of
+  its own cannot pass. Not caught: a gain inside camFilm the same at both
+  Iridescences cancels from the comparison (there is no film-free picture
+  of a bubble to hold it to); the review reads camFilm. The projector's own bubbles are printed beside it:
   at Film Physics 0 they still wear the reflected film above Iridescence
   0.25 (PLAN 38h-14). The owed state is main's: brighter by over 10 levels.
 */
@@ -621,11 +650,13 @@ const oilThere = up8 > 20 && down8 > 20;
   /* The share of the picture where any channel moved by more than t levels, either way. */
   const moved = (a, b, t) => { let n = 0; for (let i = 0; i < P; i++) for (let c = 0; c < 3; c++) if (Math.abs(a[4 * i + c] - b[4 * i + c]) > t) { n++; break; } return n / P; };
   const cam = [0, 1].map((fp) => ({ fp, up: compare(f[`cam${fp}1`], f[`cam${fp}0`]), moved: moved(f[`cam${fp}1`], f[`cam${fp}0`], FILM_MOVE) }));
+  // The camera wears the transmitted table at any Film Physics: the same picture at 0 and 1, at each Iridescence.
+  const same = Math.max(...[0, 1].map((ir) => Math.max(compare(f[`cam0${ir}`], f[`cam1${ir}`]).over, compare(f[`cam1${ir}`], f[`cam0${ir}`]).over, 0)));
   const plate = [0, 1].map((fp) => compare(f[`plate${fp}1`], f[`plate${fp}0`]).over);
   const over = Math.max(...cam.map((c) => c.up.over));
-  line('film', `15. the camera's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, and the film still draws (over ${pct(DOES)} of the picture moved at each)`,
-    over <= SLACK && cam.every((c) => c.moved > DOES),
-    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; the projector's bubbles, printed only: brightest by ${plate.join(' and ')}`,
+  line('film', `15. the camera's bubble film is light through it: at Iridescence 1 no pixel brighter than at 0 (by over ${SLACK}), at Film Physics 0 and 1, the film still drawn (over ${pct(DOES)} of the picture moved at each), and Film Physics 0 drawing the camera's bubbles as 1 does (by ${SLACK})`,
+    over <= SLACK && cam.every((c) => c.moved > DOES) && same <= SLACK,
+    `${cam.map((c) => `Film Physics ${c.fp}: brightest by ${c.up.over}, ${pct(c.moved)} moved`).join('; ')}; Film Physics 0 against 1 differs by ${same}; the projector's bubbles, printed only: brightest by ${plate.join(' and ')}`,
     over > 10);
 }
 

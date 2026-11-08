@@ -103,6 +103,8 @@ try {
         + (one.at(x0, y0 + 1, 3) * (1 - ax) + one.at(x0 + 1, y0 + 1, 3) * ax) * ay;
     };
     let minZ = 1e9, maxZ = -1e9;
+    // How closely .z follows that Laplacian (Pearson's r): main's .z is it, so the grad line is owed only while r stays high.
+    let cn = 0, cz = 0, cl = 0, czz = 0, cll = 0, czl = 0;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const g = Math.hypot(one.at(x, y, 0), one.at(x, y, 1));
       const z = one.at(x, y, 2);
@@ -114,6 +116,7 @@ try {
           + 0.5 * (wAt(x - k, y - k) + wAt(x + k, y - k) + wAt(x - k, y + k) + wAt(x + k, y + k) - 4 * c)) * 25;
         if (l < minLap) minLap = l;
         if (l > maxLap) maxLap = l;
+        cn++; cz += z; cl += l; czz += z * z; cll += l * l; czl += z * l;
       }
       if (!(g > 0)) continue;
       sum += g; sx += g * (x + 0.5) / w; sy += g * (y + 0.5) / h;
@@ -182,7 +185,10 @@ try {
       5% of that peak in each pool's flat middle (within 0.05) and in clear
       water away from everything (round 0.72, 0.72), and the syrup's rim peak
       stands to glycerine's as their index steps over water do. On main .z is
-      still the Laplacian: negative inside every rim.
+      still the Laplacian: negative inside every rim. Owed only while it is:
+      while .z follows the Laplacian of .w worked out above (Pearson's r over
+      0.9 on the first plate), so a .z rebuilt as anything else and missing is
+      red, not owed (a signed ∂x would keep the sign test's excuse).
     */
     const ringPeak = (cx, cy) => {
       let m = 0;
@@ -200,33 +206,41 @@ try {
       return m;
     };
     /*
-      And where on the rim: a slope peaks at the step itself, where the path
-      is halfway between the pool's and the water's, while a Laplacian (or a
-      Laplacian with its negative lobe clamped away, which would pass the
-      lines above) peaks on the step's shoulders, where the path is nearly
-      the pool's or nearly the water's. So the path's place in the step, mean
-      over the rim's pixels within 80% of the peak, is asked between a
-      quarter and three quarters.
+      And where on the rim: a slope is largest on the step itself, where the
+      path is halfway between the pool's and the water's, while a Laplacian
+      crosses zero there and peaks on the step's shoulders. So on the step's
+      own pixels (the path 0.35 to 0.65 of the way from the water's to the
+      pool's, at least 8 of them) .z is asked at 0.6 of its rim peak or more.
+      A Laplacian with its negative lobe clamped away, or its absolute value,
+      would pass the lines above and reads near nothing here. (A first try
+      asked where the pixels near the peak sat in the step, as a mean and
+      then pixel by pixel: the mean let |Laplacian|'s two lobes average to a
+      half, the check-skeptic's review; pixel by pixel failed a true slope,
+      whose stencil spreads one sharp step's peak over pixels wholly in or
+      out of it, 3% of them mid-step in the throwaway build.)
     */
     const midStep = (p, peak) => {
       const inside = pathAt(p.x, p.y), outside = pathAt(0.72, 0.72);
-      let s = 0, k = 0;
+      let sum = 0, k = 0;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
         const d = Math.hypot((x + 0.5) / w - p.x, (y + 0.5) / h - p.y);
-        if (d < 0.07 || d > 0.13 || two.at(x, y, 2) < 0.8 * peak) continue;
-        s += (two.at(x, y, 3) - outside) / (inside - outside); k++;
+        if (d < 0.07 || d > 0.13) continue;
+        const f = (two.at(x, y, 3) - outside) / (inside - outside);
+        if (f < 0.35 || f > 0.65) continue;
+        sum += two.at(x, y, 2); k++;
       }
-      return k ? s / k : -1;
+      return { n: k, at: k && peak > 0 ? sum / k / peak : 0 };
     };
     let zMin = 1e9;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) zMin = Math.min(zMin, two.at(x, y, 2));
     const grad = {
       zMin,
-      rims: pools.map((p) => { const peak = ringPeak(p.x, p.y); return { id: p.id, dn: indexOf(p.id) - N_WATER, peak, middle: flatMost(p.x, p.y, 0.05), at: midStep(p, peak) }; }),
+      rims: pools.map((p) => { const peak = ringPeak(p.x, p.y); return { id: p.id, dn: indexOf(p.id) - N_WATER, peak, middle: flatMost(p.x, p.y, 0.05), ...midStep(p, peak) }; }),
       water: flatMost(0.72, 0.72, 0.05),
     };
 
-    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, paths, thickness, grad };
+    const corr = (cn * czl - cz * cl) / Math.sqrt(Math.max(1e-12, (cn * czz - cz * cz) * (cn * cll - cl * cl)));
+    return { sum, px: sx / sum, py: sy / sum, dx: dx / dsum, dy: dy / dsum, minLap, maxLap, minZ, maxZ, corr, paths, thickness, grad };
   });
   const at = (x, y) => `${x.toFixed(2)},${y.toFixed(2)}`;
   check('the derive pass finds slopes at all', r.sum > 0, `weight ${r.sum.toFixed(1)}`);
@@ -252,11 +266,11 @@ try {
     const peak = Math.min(gl.peak, sy.peak);
     const ratio = (sy.peak / Math.max(1e-9, gl.peak)) / (sy.dn / gl.dn);
     const flat = Math.max(gl.middle, sy.middle, g.water);
-    const atStep = g.rims.every((p) => p.at >= 0.25 && p.at <= 0.75);
-    line('grad', '18e-2: the pass writes |∇OPL| in .z: never negative, peaking on each clear pool\'s rim where the path is mid-step (0.25 to 0.75 of it), under 5% of that in their middles and in clear water, syrup\'s rim over glycerine\'s as their index steps (within 15%)',
+    const atStep = g.rims.every((p) => p.n >= 8 && p.at >= 0.6);
+    line('grad', '18e-2: the pass writes |∇OPL| in .z: never negative, peaking on each clear pool\'s rim and on the step itself (0.6 of the peak or more where the path is 0.35 to 0.65 of the step), under 5% of that in their middles and in clear water, syrup\'s rim over glycerine\'s as their index steps (within 15%)',
       g.zMin > -1e-3 && peak > 0 && atStep && flat < 0.05 * peak && ratio > 0.85 && ratio < 1 / 0.85,
-      `.z min ${g.zMin.toFixed(4)}; rim peaks ${g.rims.map((p) => `${p.id} ${p.peak.toFixed(4)} at ${p.at.toFixed(2)} of the step (Δn ${p.dn.toFixed(3)}, middle ${p.middle.toFixed(4)})`).join(', ')}; clear water ${g.water.toFixed(4)}; syrup over glycerine ${ratio.toFixed(2)} of the index steps' ratio`,
-      g.zMin < -1e-3);
+      `.z min ${g.zMin.toFixed(4)}; rim peaks ${g.rims.map((p) => `${p.id} ${p.peak.toFixed(4)}, ${p.at.toFixed(2)} of it on the step (${p.n} px) (Δn ${p.dn.toFixed(3)}, middle ${p.middle.toFixed(4)})`).join(', ')}; clear water ${g.water.toFixed(4)}; syrup over glycerine ${ratio.toFixed(2)} of the index steps' ratio; .z against the path's Laplacian r = ${r.corr.toFixed(3)}`,
+      r.corr > 0.9);
   }
 } finally { await close(); }
 const failed = checks.filter((c) => !c.ok);
