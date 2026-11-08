@@ -245,6 +245,19 @@ if (process.argv.includes('--node')) {
     check('every way in (desk, M, the side rail, the phone\'s switch, the palette) is that press, lit by the zoom; nothing else writes macroMode',
       off.length === 0 && writes.length === 0,
       off.length || writes.length ? `not the press: ${off.join(', ') || 'none'}; other writes: ${writes.join('; ') || 'none'}` : `${hands.length} hands, every write true, false or the zoom`);
+    // And every reader of the zoom reads the zoom the frame is drawn at. A look
+    // that turns the closeup on with macroMode and no macroZoom of its own is
+    // drawn at 4x, but the zoom chip, the Settings slider, the wheel's guard and
+    // the desk's zoom read `macroZoom ?? 1` and said 1x, or showed nothing
+    // (found from the bubble-edges thread, 2026-11-08). macroZoomOf is the one
+    // reading; `macroZoom ?? 1` anywhere else is the second opinion coming back.
+    const raw = [];
+    const scan = (d) => { for (const n of readdirSync(d)) { const f = join(d, n); if (statSync(f).isDirectory()) scan(f); else if (/\.tsx?$/.test(n) && !f.endsWith(join('sim', 'constants.ts'))) {
+      readFileSync(f, 'utf8').split('\n').forEach((l, i) => { if (/macroZoom \?\? 1\b/.test(l)) raw.push(`${f.slice(process.cwd().length + 1)}:${i + 1}`); });
+    } } };
+    scan(join(process.cwd(), 'src'));
+    check('every reader of the zoom (chip, slider, wheel, desk, phone, pace, evolve) reads the zoom the frame is drawn at, not macroZoom alone',
+      raw.length === 0, raw.length ? `reads macroZoom ?? 1: ${raw.join(', ')}` : 'none read macroZoom alone');
   }
 } else {
   const { chromium } = await import('playwright');
