@@ -2189,12 +2189,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     /*
       Which offers of a frame are drawn, from either window (PLAN.md §14b,
-      lib/drawGate.ts). The projector window asks for a frame on every one of
-      its refreshes (see __chromaglassFrame below) and this window's own
-      animation frames keep coming while it is visible, so with the wall up
-      there are two clocks. The gate stamps every draw, whichever of them
-      asked, and turns down any offer that comes within 0.6 of a refresh of
-      the last one: one draw a refresh, not one per clock.
+      lib/drawGate.ts). The projector window asks on every one of its refreshes
+      (see __chromaglassFrame below) and this window's animation frames keep
+      coming while visible: a running wall clock paces the draws, and with no
+      wall up this window draws at its own rate.
     */
     const drawGate = new DrawGate('wall');
     /*

@@ -74,18 +74,20 @@
  * 0.6 is past the half with room for a millisecond or two of jitter either
  * way, and short of the next refresh by the same.
  *
- * Why the refresh is the faster clock's. Each clock's own interval is its
- * display's refresh (or what a busy machine manages of it), and neither is
+ * Why a running wall clock paces the draws when `paceTo` is `'wall'` (PLAN.md
+ * 14b-120), and the faster clock in `'faster'`. Each clock's own interval is
+ * its display's refresh (or what a busy machine manages of it), and neither is
  * changed by what the gate turns down: a turned-down show frame asks for the
  * next one at once, and the projector asks on every refresh whatever became of
  * the last ask. So the gaps between one clock's own offers measure its display
- * whatever the other is doing. The shorter of the two is used, so neither
- * window ever gets fewer frames than its own display would give it alone: a
- * 120 Hz laptop keeps its 120 with a 60 Hz projector beside it (the draw
- * rate is then the laptop's, not the sum of both), and a covered show draws
- * every frame the projector asks for. The gaps between *draws* would be the
- * wrong measure: once doubled they are half a refresh, the gate's threshold
- * falls with them, and the doubled rate holds itself up.
+ * whatever the other is doing. With `paceTo = 'wall'` (the show's setting), a
+ * running wall clock (`ask`) sets the refresh the gate works to, so a 120 Hz
+ * desk with a 60 Hz projector draws at the projector's 60 Hz and the desk's
+ * preview takes those same frames, while with no wall running the desk draws
+ * at its own rate (`'faster'` uses the shorter of the two clocks). The gaps
+ * between *draws* would be the wrong measure: once doubled they are half a
+ * refresh, the gate's threshold falls with them, and the doubled rate holds
+ * itself up.
  *
  * Why a median of the last few gaps, and bounds. One late frame (a long task,
  * a collection) is a single long gap, and a mean would carry it into the next
@@ -237,6 +239,9 @@ export class DrawGate {
     this.paceTo = paceTo;
   }
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
+  private readonly medians: Record<DrawSource, number> = { frame: Infinity, ask: Infinity };
+  private readonly medianStamp: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
+  private readonly scratch: number[] = [];
   /**
    * Whether each clock has offered since the last draw (or made it): its one
    * refresh that draw stands for is spent, so its next offer is a refresh of
@@ -247,20 +252,28 @@ export class DrawGate {
   readonly drawn: Record<DrawSource, number> = { frame: 0, ask: 0 };
   readonly skipped: Record<DrawSource, number> = { frame: 0, ask: 0 };
 
-  setPaceTo(mode: DrawPace): void {
-    this.paceTo = mode;
-  }
-
   /** Whether both clocks have offered within the last `CLOCK_FRESH_MS` at `now`: the only time anything is gated. */
   twoClocks(now: number): boolean {
     return now - this.lastOffer.ask <= CLOCK_FRESH_MS && now - this.lastOffer.frame <= CLOCK_FRESH_MS;
   }
 
-  private clockMs(source: DrawSource, now: number): number {
+  private updateMedian(source: DrawSource): number {
     const g = this.gaps[source];
-    if (g.length === 0 || now - this.lastOffer[source] > CLOCK_FRESH_MS) return Infinity;
-    const sorted = [...g].sort((a, b) => a - b);
-    return sorted[sorted.length >> 1];
+    if (g.length === 0) return (this.medians[source] = Infinity);
+    const s = this.scratch;
+    s.length = g.length;
+    for (let i = 0; i < g.length; i++) s[i] = g[i];
+    s.sort((a, b) => a - b);
+    return (this.medians[source] = s[s.length >> 1]);
+  }
+
+  private clockMs(source: DrawSource, now: number): number {
+    if (now - this.lastOffer[source] > CLOCK_FRESH_MS) return Infinity;
+    if (this.medianStamp[source] !== this.lastOffer[source]) {
+      this.medianStamp[source] = this.lastOffer[source];
+      return this.updateMedian(source);
+    }
+    return this.medians[source];
   }
 
   /** The refresh the gate works to at `now` (ms): the faster running clock's median gap (or the wall's when `paceTo === 'wall'`), never under 240 Hz's. */
@@ -283,9 +296,16 @@ export class DrawGate {
   offer(source: DrawSource, now: number): boolean {
     const gap = now - this.lastOffer[source];
     const g = this.gaps[source];
-    if (gap > CLOCK_FRESH_MS) g.length = 0;
-    else if (gap > 0) { g.push(gap); if (g.length > GAPS) g.shift(); }
+    if (gap > CLOCK_FRESH_MS) {
+      g.length = 0;
+      this.medians[source] = Infinity;
+    } else if (gap > 0) {
+      g.push(gap);
+      if (g.length > GAPS) g.shift();
+      this.updateMedian(source);
+    }
     this.lastOffer[source] = now;
+    this.medianStamp[source] = now;
     if ((this.ambient || isGlobalAmbientMode()) && now - this.lastDraw < AMBIENT_MIN_DRAW_MS) {
       this.skipped[source]++;
       return false;

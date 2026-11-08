@@ -11904,14 +11904,18 @@ whose pixel count `stagePx * dpr * dpr` is at most `STAGE_OPEN_MAX_PX` (`2880 * 
 0 of 8 openings stepping down in the first 10 s, while a 1920×1080 stage still opens on
 its 1.0 share (`1920×1080`, 2.07 Mpx). **14c-governor** (`src/lib/governor.ts`,
 `src/components/LiquidVisualizer.tsx`): `QualityGovernor.carry(from, rungs, start, now,
-pin?)` carries failed-rung timestamps and doubling counts by rung key across ladders
-even when the wall's ladder has a different set of rungs, carries the step-rate give-up
-and its retry counts, and holds step-rate climbs while the rung directly above is still
-waiting on its retry window (`2 changes after the wall` vs `2 with none`). **14b-120**
-(`src/lib/drawGate.ts`, `src/components/LiquidVisualizer.tsx`): `DrawGate.paceTo =
-'wall'` paces two-clock draws to the wall's (`ask`) refresh (`60.0 to 60.0 a second over
-ten phases` for a 120 Hz desk and 60 Hz wall) while keeping the desk's own refresh when
-no wall is asking. **14c-readout** (`src/sim/stepping.ts`,
+pin?)` carries timed rung failures (`failed` and `failCounts.rung`) per ladder key
+(`rungs.map((x) => `${x.grid}@${x.dpr}`).join(' ')`) so laptop and wall ladders do not
+mix their `dpr` marks, carries `Infinity` (`failRung`) marks by `grid` across ladders,
+carries `steps`, `stepsFailed` (keeping each timestamp `t` as-is) and `failCounts.steps`,
+and checks `now - failedAt < this.retryAfter('rung', above)` in `rungWaiting` so the step
+rate can climb back once a failed climb's retry window expires (`2 changes after the wall`
+vs `2 with none`). **14b-120** (`src/lib/drawGate.ts`,
+`src/components/LiquidVisualizer.tsx`): `new DrawGate('wall')` (`DrawGate.paceTo =
+'wall'`) paces two-clock draws to a running wall clock's (`ask`) refresh (`60.0 to 60.0 a
+second over ten phases` for a 120 Hz desk and 60 Hz wall) while keeping the desk's own
+refresh when no wall is asking, updating each clock's median gap in place via a reused
+scratch array with zero per-offer allocations. **14c-readout** (`src/sim/stepping.ts`,
 `src/components/LiquidVisualizer.tsx`): `engineLabel({ grid, dpr, post, stage })`
 formats `"WebGPU · 512² · 1.0x of the wall"` when a stage is attached and stays
 byte-for-byte identical without one. **H2c-10** (`src/sim/stepping.ts`):
