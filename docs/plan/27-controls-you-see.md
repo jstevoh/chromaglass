@@ -236,6 +236,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
     the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate
     Boundary Glow near 0.45), Gate Edge (clamp the mix, let the width grow).
+    *Check written first* (2026-11-07): `npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate`
+    (lab4), each dial to its new top (2, 1.4, 2, 2, 2) in `PIN_RANGE`, its uniform not clamped to the
+    old top, no look moved, and in the lab the last quarter of the range changing the picture by a
+    quarter of what the first does (Gate Edge from its post shader's mix, which the lab does not draw).
+    Read on main: Micro-Droplets moves 6 px in its first half and none past 1, Plate Cells 3.64 levels
+    in 0 to 0.35 and none in 1.05 to 1.4, Glossiness 5.05 then 0.76 (15%). Two readings move the item:
+    Boundary Glow is alive past 1 on the lab's plate (0.34 in 0 to 0.5, 0.18 in 1.5 to 2), so its hold is
+    the range's 1, not a knee near 0.45; and Projector Focus changes the picture by 0.30 to 0.68 a step
+    across all of 0 to 1 (a focus plane, in focus at 0.5), so it has no dead travel and is not owed.
+    The build is Antigravity's, from a brief; each look's picture at its own values is the reviewer's.
   - **27h-4, open. Dead bottoms that need a re-map, not a range** (each must give today's value
     at today's default): Iridescence never reaches off (a 0.25 floor), Beat Prediction's lower
     half never locks (the lock asks trust × confidence ≥ 0.5), Sensitivity's trim never goes

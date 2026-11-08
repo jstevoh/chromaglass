@@ -14,6 +14,7 @@ import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { closeupToggle, macroZoomOf } from '../sim/constants';
+import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
 import { Slider } from './RemoteSlider';
@@ -815,6 +816,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {/* And Film Hold, which keeps the drops of that oil apart, likewise. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
+          {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
+            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
           {/*
