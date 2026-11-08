@@ -46,6 +46,11 @@ a grid of generic stock thumbnails: ours are the plate itself.
   contact sheets (28i-1) and are soft where a Retina screen draws them at 2x. `pixels.yml` renders
   every look one to one at a laptop's size: take the eight from it and keep the file sizes under
   60 KB each.
+- **34a-8. Sharp hero frames.** *Shipped (2026-11-08)*: five 2880 × 1800 stills filmed from the app (Acid Trip twice, Stardust Collapse,
+  Cyberpunk, Ferro Paint) cut at 1280/1920/2560/2880 and an upright 1012 × 1800, replacing the 480 × 300 cards the hero
+  stretched to a screen; `npm run signin` 11c now holds cover at least 0.95 at the slow zoom's widest. Story in
+  `docs/plan-shipped.md` §34a-8. *Open:* the frames were filmed with bubbles and droplets set to none because of the
+  ring around bubbles; film them again with bubbles on once that ring is fixed, and keep 11c green.
 - **34a-4. Buy buttons on the landing page.** *(S; built, held for the go-live order.)* The Home
   and Pro cards carry a Buy button to the live Lemon Squeezy checkout (new tab) and the Free card
   Play free; "Buying opens soon" is gone. The links live in `lib/checkoutLinks.ts` (the landing

@@ -6863,6 +6863,26 @@ Measured (`npm run signin` 16/16; `layout` 74/74; `panel` 192/192): Play free is
 comes up in 0.9 s against 1.1 s for a build with no sign-in; the landing is never drawn for a
 returning visit nor for `?remote` and `?cast`.
 
+### 34a-8. Sharp hero frames (2026-11-08)
+
+The owner sent a screenshot of the landing page: the hero was soft and pixelated, and plain (two blobs of green). The
+hero cross-faded five 480 × 300 cards from the preset contact sheets, stretched to the whole screen and zoomed a further
+1.07 by the slow drift, so on a 1024 × 768 laptop at 2x each image pixel covered about five and a half device pixels
+(cover 0.18). The new frames are filmed from the app at `?debug&look=<id>&rung=0` in a 1440 × 900 window at 2x, so
+2880 × 1800, with bubbles and micro-droplets set to none (the ring around bubbles is another thread's bug, and the
+droplets' lenses read as rings too): Acid Trip at 40 and 70 seconds, Stardust Collapse, Cyberpunk and Ferro Paint,
+chosen from contact sheets of about twenty looks for many colours and fine dye and oil edges. Each is cut at 1280,
+1920, 2560 and 2880 wide as WebP (67 to 290 KB) plus an upright 1012 × 1800 crop for phones held upright, served
+through `srcset`. The drift's zoom fell from 1.07 to 1.04, because at 1.07 even the 2880 cut fell under one image
+pixel per device pixel on a 1440-wide Retina laptop, and the scrim darkened in its middle (0.2 to 0.45 at 40%) because
+the busier frames dropped the headline to 2.6:1 on a phone on its side.
+
+Check 11c measured cover from `naturalWidth`, which under a `w` srcset is divided by the chosen density, so it read 0.41
+on frames that were sharp. It now reads each file's real pixels from a fresh `Image`, multiplies in the largest scale in
+the `cg-hero-slide` keyframes, and holds the drift still while it measures. After: cover 1.00 / 1.03 / 0.99 (laptop,
+phone upright, phone on its side; bar 0.95), headline 6.4 / 6.0 / 4.7:1, line 5.9 / 5.4 / 5.0:1, first frame 168 / 74 /
+125 KB; `npm run signin` 29/29. Re-filming with bubbles on stays open in §34a-8.
+
 ### 34a-5. The page's words, rewritten (2026-10-28)
 
 Asked: the owner wanted the landing page's words looked at again, and decided there is no free

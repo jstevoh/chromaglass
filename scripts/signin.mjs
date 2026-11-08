@@ -50,6 +50,12 @@
  *  10. the remote (?remote) and a cast (?cast) never ask, nor fetch Firebase
  *  11. the sign-in fits a laptop (1024×768) and a phone, upright and on its
  *      side: nothing wider than the screen, every button a thumb's height
+ *  11c. the landing page's hero on the same screens (PLAN.md 34a-8): every
+ *      one of its frames has at least HERO_COVER_MIN of a device pixel for
+ *      each screen pixel it covers (the old frames had a fifth: 480 × 300
+ *      cards drawn across a Retina laptop), the headline and its line keep
+ *      their contrast over every frame, and the first frame is light enough
+ *      that the headline does not wait on it
  *  12. the account sheet opens from the desk and from the phone, and names
  *      the account
  *  13. deleting the account from the sheet removes it from the auth server
@@ -132,6 +138,24 @@ const ON_DIST = resolve(process.env.SIGNIN_DIST ?? 'dist-signin');
 const OFF_DIST = resolve(process.env.SIGNIN_OFF_DIST ?? 'dist-signin-off');
 /** The sign-in's whole cost to a returning visit's first paint: a lazy import and a check of the cached user. */
 const ENTRY_GROWTH_MAX = 6000;
+/**
+ * The hero's frames, 11c. Device pixels of a frame per screen pixel it covers
+ * (object-cover's scale and the screen's DPR undone): 1 is one to one. The
+ * reported softness was 0.2 on a laptop (a 480 × 300 card under a 2x 1024 ×
+ * 768 cover); 0.95 lets a frame be drawn 5% up and no more.
+ */
+const HERO_COVER_MIN = 0.95;
+/**
+ * Contrast (WCAG's ratio) of the headline's and its line's own colour against
+ * the 95th percentile of the brightest backing behind each, over every frame
+ * with the scrim on: a frame's brightest spot under the words is what makes
+ * them hard to read, not its average. 3 is WCAG AA for large text, the
+ * headline's 38 to 72 px; 4.5 is AA for body text, the line's 17 to 18 px.
+ */
+const HERO_H1_CONTRAST_MIN = 3;
+const HERO_LINE_CONTRAST_MIN = 4.5;
+/** The first frame's bytes: the one that paints with the page. The other four load after it. */
+const HERO_FIRST_BYTES_MAX = 800_000;
 /** How long the plate must stay up after the account goes away under it. */
 const HOLD_MS = 10_000;
 /** A first boot on SwiftShader is slow; this is a ceiling, never what is judged. */
@@ -341,6 +365,92 @@ const landingShown = (page) => page.evaluate(() => {
   const r = el.getBoundingClientRect(), s = getComputedStyle(el);
   return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0;
 }).catch(() => false);
+/**
+ * The landing page's hero, measured for 11c: each frame's device pixels per
+ * screen pixel, and the contrast of the headline (h1) and its line (the p
+ * under it) over each frame, read from the screen itself with the words made
+ * transparent and that one frame held still and opaque under the scrim.
+ * Waits for all the frames: only the first loads with the page, the rest once
+ * it has drawn, so a read too soon would see one frame and pass on it alone.
+ */
+async function heroLook(page) {
+  const all = await waitFor(() => page.evaluate(() => {
+    const imgs = [...document.querySelectorAll('img[data-cg-hero]')];
+    return imgs.length >= 5 && imgs.every((im) => im.complete && im.naturalWidth > 0);
+  }).catch(() => false), 30_000);
+  if (!all) return null;
+  const sized = await page.evaluate(async () => {
+    const dpr = devicePixelRatio;
+    // The slide's slow zoom is held off while the box is read, and its
+    // largest scale is read from the page's own keyframes and multiplied in,
+    // so a frame is judged at its most enlarged, not at whichever moment of
+    // the zoom the page happened to be in (and a deeper zoom fails here).
+    let zoom = 1;
+    for (const sh of document.styleSheets) {
+      let rules; try { rules = sh.cssRules; } catch { continue; }
+      for (const r of rules) if (r.type === CSSRule.KEYFRAMES_RULE && r.name === 'cg-hero-slide') {
+        for (const k of r.cssRules) { const m = /scale\(([\d.]+)\)/.exec(k.style.transform || ''); if (m) zoom = Math.max(zoom, Number(m[1])); }
+      }
+    }
+    const hold = document.createElement('style');
+    hold.textContent = '.cg-hero-slide{animation:none!important;transform:none!important}';
+    document.head.append(hold);
+    // A picture chosen from a `w` srcset reports a naturalWidth divided by
+    // its density (2560 px chosen for a 1024 px slot reads as 1024), so the
+    // file's own pixels are read from a fresh Image with no srcset.
+    const own = (src) => new Promise((ok) => { const im = new Image(); im.onload = () => ok([im.naturalWidth, im.naturalHeight]); im.onerror = () => ok([0, 0]); im.src = src; });
+    const frames = await Promise.all([...document.querySelectorAll('img[data-cg-hero]')].map(async (im) => {
+      const src = im.currentSrc || im.src;
+      const [nw, nh] = await own(src);
+      const b = im.getBoundingClientRect();
+      const scale = Math.max(b.width / nw, b.height / nh) * zoom;
+      return { src: src.split('/').pop(), cover: nw ? 1 / (scale * dpr) : 0, zoom };
+    }));
+    hold.remove();
+    const bytes = performance.getEntriesByType('resource').filter((e) => e.name.includes('/landing/hero/'));
+    const first = (document.querySelector('img[data-cg-hero]').currentSrc || '');
+    const h1 = document.querySelector('[data-cg-landing] h1'), line = h1?.nextElementSibling;
+    const colour = (el) => getComputedStyle(el).color;
+    const out = { frames, firstBytes: bytes.find((e) => e.name === first)?.encodedBodySize ?? 0, allBytes: bytes.reduce((a, e) => a + e.encodedBodySize, 0), h1c: colour(h1), linec: colour(line) };
+    const st = document.createElement('style');
+    st.id = 'cg-hero-hold';
+    st.textContent = '.cg-hero-slide{animation:none!important;transform:none!important}';
+    document.head.append(st);
+    h1.style.color = 'transparent'; line.style.color = 'transparent';
+    return out;
+  });
+  const rect = (sel) => page.evaluate((q) => { const r = document.querySelector(q).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }, sel);
+  const h1Box = await rect('[data-cg-landing] h1');
+  const lineBox = await page.evaluate(() => { const r = document.querySelector('[data-cg-landing] h1').nextElementSibling.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; });
+  for (let i = 0; i < sized.frames.length; i++) {
+    await page.evaluate((k) => { [...document.querySelectorAll('img[data-cg-hero]')].forEach((im, j) => { im.style.opacity = j === k ? '1' : '0'; }); }, i);
+    await page.waitForTimeout(150);
+    for (const [key, box, colour] of [['h1', h1Box, sized.h1c], ['line', lineBox, sized.linec]]) {
+      const png = await page.screenshot({ clip: box });
+      sized.frames[i][key] = await page.evaluate(async ({ b64, colour }) => {
+        const bmp = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+        const c = new OffscreenCanvas(bmp.width, bmp.height); const g = c.getContext('2d'); g.drawImage(bmp, 0, 0);
+        const d = g.getImageData(0, 0, bmp.width, bmp.height).data;
+        const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        const lum = (r, gg, b) => 0.2126 * lin(r) + 0.7152 * lin(gg) + 0.0722 * lin(b);
+        const n = d.length / 4, L = new Float32Array(n), order = new Uint32Array(n);
+        for (let k = 0; k < n; k++) { L[k] = lum(d[4 * k], d[4 * k + 1], d[4 * k + 2]); order[k] = k; }
+        order.sort((a, z) => L[a] - L[z]);
+        const at = order[Math.floor(n * 0.95)], back = L[at];
+        // The text's colour as the screen would draw it over that pixel:
+        // painted, so any CSS colour form reads, and laid over the backing
+        // by its own alpha, so a translucent grey is judged as it shows.
+        const one = new OffscreenCanvas(1, 1).getContext('2d');
+        one.fillStyle = `rgb(${d[4 * at]},${d[4 * at + 1]},${d[4 * at + 2]})`; one.fillRect(0, 0, 1, 1);
+        one.fillStyle = colour; one.fillRect(0, 0, 1, 1);
+        const t = one.getImageData(0, 0, 1, 1).data;
+        const text = lum(t[0], t[1], t[2]);
+        return (Math.max(text, back) + 0.05) / (Math.min(text, back) + 0.05);
+      }, { b64: png.toString('base64'), colour });
+    }
+  }
+  return sized;
+}
 /**
  * Watch a page from before its first script for the sign-in ever being drawn:
  * a MutationObserver and a per-frame look, so a sign-in shown for one frame
@@ -615,10 +725,16 @@ try {
       return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad };
     }) : null;
     s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0;
+    s.hero = up ? await heroLook(p) : null;
     landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong` : 'landing page not drawn'}`);
     await c.close();
   }
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
+  const heroOk = (h) => !!h && h.frames.length >= 5 && h.frames.every((fr) => fr.cover >= HERO_COVER_MIN && fr.h1 >= HERO_H1_CONTRAST_MIN && fr.line >= HERO_LINE_CONTRAST_MIN)
+    && h.firstBytes > 0 && h.firstBytes <= HERO_FIRST_BYTES_MAX;
+  check(`11c. the landing page's hero is sharp on a laptop and a phone (every frame ≥ ${HERO_COVER_MIN} device px a screen px), its headline ≥ ${HERO_H1_CONTRAST_MIN}:1 and line ≥ ${HERO_LINE_CONTRAST_MIN}:1 over every frame, the first frame ≤ ${HERO_FIRST_BYTES_MAX / 1000} KB`,
+    sizes.every((s) => heroOk(s.hero)),
+    sizes.map((s) => `${s.name}: ${s.hero ? `${s.hero.frames.length} frames, cover ${Math.min(...s.hero.frames.map((fr) => fr.cover)).toFixed(2)} at least at the zoom's ×${s.hero.frames[0]?.zoom} (${s.hero.frames.map((fr) => fr.src).join(' ')}), headline ${Math.min(...s.hero.frames.map((fr) => fr.h1)).toFixed(1)}:1 and line ${Math.min(...s.hero.frames.map((fr) => fr.line)).toFixed(1)}:1 at worst, first frame ${Math.round(s.hero.firstBytes / 1000)} KB, all ${Math.round(s.hero.allBytes / 1000)} KB` : 'no hero read'}`).join('; '));
 
   const sheet = {};
   const lit = {};

@@ -24,8 +24,31 @@ import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
  * seconds a hero has, and nothing in a cloud session can film the app itself
  * (PLAN.md 34a-2 asks for that film from a Mac). The looks below are frames
  * from the app's own renders of its shipped looks, with each look's own name;
- * nothing is mocked up. They are 480 × 300, so they are shown under a dark
- * scrim in the hero and at their own size in the grid.
+ * nothing is mocked up.
+ *
+ * The hero's frames are not the grid's. What was reported (2026-11-08): the
+ * hero looked upscaled, soft and pixelated, and plain, "two blobs of green".
+ * It was: it drew the grid's 480 × 300 cards across the whole screen, five
+ * device pixels for every one of theirs on a Retina laptop, and two of the
+ * five were the quiet green looks. The hero now has its own frames, filmed
+ * from the app on a Mac at 1440 × 900 at 2x (2880 × 1800 canvas pixels, the
+ * plate on its 768² rung) and chosen for detail: many dyes, ferrofluid and oil
+ * edges: Acid Trip twice (40 and 70 s in), Stardust Collapse, Cyberpunk and
+ * Ferro Paint. They were filmed with the looks' bubbles and droplets on the
+ * glass set to none, because a bubble's rim drew a faint ring of small
+ * bubbles at the time (an open bug in its own thread), and the droplets'
+ * lenses read as the same rings at this size; PLAN.md 34a-8 says to film them
+ * again once the ring is fixed.
+ * Each is cut five ways (public/landing/hero/): 2880 wide (the frame as
+ * filmed, for a 1440-wide Retina laptop), 2560, 1920 and 1280 for a
+ * landscape screen, picked by the browser from `srcset` for the screen's
+ * own pixels, and an upright 1012 × 1800 crop for a phone held upright, which
+ * `object-cover` would otherwise draw from a sliver of the landscape frame
+ * blown up. Only the first frame loads with the page; the other four mount
+ * once it has drawn, so the headline is not waiting on four megabytes.
+ * `npm run signin` 11c measures both halves of the ask on a laptop and a
+ * phone: every frame has at least a device pixel for each screen pixel it
+ * covers, and the headline and its line keep their contrast over every frame.
  *
  * "Play free" mounts the sign-in over this page rather than replacing it, so
  * the card sits on the hero and a visitor who backs out of it is still on the
@@ -61,10 +84,16 @@ const LOOKS: LookCard[] = [
   { id: 'neon-coral-reef', name: 'Neon Coral Reef', line: 'A reaction grows coral across the glass, branch by branch.' },
 ];
 
-// Five of the looks above, in the order the hero shows them; each stays about
-// HERO_SLIDE_S seconds, the last quarter of it crossing into the next.
-const HERO = ['ferro-paint', 'aurora-borealis', 'jellyfish-bloom', 'neon-coral-reef', 'cell-bloom'];
+// The hero's five frames (public/landing/hero/<id>-<w>.webp, see the note at
+// the top), named by the look each was filmed from (`-late` the same look
+// thirty seconds on), in the order shown; each
+// stays about HERO_SLIDE_S seconds, the last quarter of it crossing into the
+// next. `npm run signin` 11c reads this list from the page, not from here.
+const HERO = ['acid-trip', 'stardust-collapse', 'cyberpunk', 'ferro-paint', 'acid-trip-late'];
 const HERO_SLIDE_S = 7;
+/** The landscape cuts, by width; the upright cut is `-tall` (1012 × 1800). */
+const HERO_WIDTHS = [1280, 1920, 2560, 2880];
+const heroSrcSet = (id: string) => HERO_WIDTHS.map((w) => `/landing/hero/${id}-${w}.webp ${w}w`).join(', ');
 
 const STEPS: { n: string; title: string; body: string }[] = [
   { n: '1', title: 'Play something', body: 'The plate listens to your music through the browser and answers each kick and note.' },
@@ -123,6 +152,14 @@ const btnGhost =
 
 export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
   const [still] = useState(wantsStill);
+  // The hero's first frame has drawn (or failed): the other four may load now.
+  // When, in seconds after the first, they mount: a CSS animation's clock
+  // starts when its element goes in, so each of the four is set back by this
+  // much to keep its place in the first frame's cycle.
+  const born = useRef(performance.now());
+  const [restAt, setRestAt] = useState<number | null>(null);
+  const rest = restAt !== null;
+  const setRest = () => setRestAt((t) => t ?? (performance.now() - born.current) / 1000);
   const [mac] = useState(() => onMacComputer());
   const root = useRef<HTMLDivElement>(null);
 
@@ -147,29 +184,40 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           0% { opacity: 0; transform: scale(1); }
           5% { opacity: 1; }
           22% { opacity: 1; }
-          28% { opacity: 0; transform: scale(1.07); }
-          100% { opacity: 0; transform: scale(1.07); }
+          /* 1.04 (it was 1.07): the zoom enlarges the frame past its own
+             pixels, and at 1.07 even the 2880 cut fell under one device
+             pixel a screen pixel on a 1440-wide Retina laptop. */
+          28% { opacity: 0; transform: scale(1.04); }
+          100% { opacity: 0; transform: scale(1.04); }
         }
         .cg-hero-slide { animation: cg-hero-slide ${HERO.length * HERO_SLIDE_S}s linear infinite; will-change: opacity, transform; }
       `}</style>
       {/* Hero */}
       <section className="relative isolate flex min-h-[100svh] flex-col overflow-hidden">
         <div aria-hidden="true" className="absolute inset-0 -z-20 overflow-hidden bg-bg">
-          {HERO.map((id, i) => (
-            <img
-              key={id}
-              src={`/landing/looks/${id}.webp`}
-              alt=""
-              decoding="async"
-              style={still ? { opacity: i === 0 ? 1 : 0 } : { animationDelay: `${i * HERO_SLIDE_S - HERO_SLIDE_S / 4}s` }}
-              className={`absolute inset-0 h-full w-full object-cover opacity-0 ${still ? '' : 'cg-hero-slide'}`}
-            />
+          {HERO.map((id, i) => (i === 0 || (rest && !still)) && (
+            <picture key={id}>
+              <source media="(orientation: portrait) and (max-width: 900px)" srcSet={`/landing/hero/${id}-tall.webp`} />
+              <img
+                src={`/landing/hero/${id}-1920.webp`}
+                srcSet={heroSrcSet(id)}
+                sizes="100vw"
+                alt=""
+                data-cg-hero=""
+                decoding="async"
+                fetchPriority={i === 0 ? 'high' : 'low'}
+                onLoad={i === 0 ? setRest : undefined}
+                onError={i === 0 ? setRest : undefined}
+                style={still ? { opacity: i === 0 ? 1 : 0 } : { animationDelay: `${i * HERO_SLIDE_S - HERO_SLIDE_S / 4 - (i === 0 ? 0 : restAt ?? 0)}s` }}
+                className={`absolute inset-0 h-full w-full object-cover opacity-0 ${still ? '' : 'cg-hero-slide'}`}
+              />
+            </picture>
           ))}
         </div>
         <div
           aria-hidden="true"
           className="absolute inset-0 -z-10"
-          style={{ background: 'linear-gradient(to bottom, rgba(10,10,11,0.55) 0%, rgba(10,10,11,0.2) 35%, rgba(10,10,11,0.75) 80%, #0a0a0b 100%)' }}
+          style={{ background: 'linear-gradient(to bottom, rgba(10,10,11,0.6) 0%, rgba(10,10,11,0.45) 40%, rgba(10,10,11,0.75) 80%, #0a0a0b 100%)' }}
         />
 
         <header className="mx-auto flex w-full max-w-[1120px] items-center justify-between px-4 pb-2 pt-[max(16px,env(safe-area-inset-top))] sm:px-8">
