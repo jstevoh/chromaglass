@@ -29,6 +29,7 @@ const KIND_COLOUR: Record<MidiTarget['kind'], string> = {
   setting: '#38bdf8',
   action: '#fbbf24',
   preset: '#a78bfa',
+  setlist: '#34d399',
   dye: '#ffffff',
 };
 
@@ -56,6 +57,7 @@ function shortLabel(t: MidiTarget, presetName: (id: string) => string | undefine
     case 'setting': return LEARNABLE_SETTINGS.find(s => s.key === t.key)?.label ?? String(t.key);
     case 'action': return ACTION_LABELS[t.action];
     case 'preset': return presetName(t.presetId) ?? t.presetId;
+    case 'setlist': return `Set #${t.index + 1}`;
     case 'dye': return PALETTE[t.paletteIndex]?.name ?? `Dye ${t.paletteIndex + 1}`;
   }
 }
