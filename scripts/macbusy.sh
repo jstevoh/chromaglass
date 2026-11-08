@@ -75,17 +75,22 @@ others() {
     if (c ~ /desktop\/node_modules\/electron\/dist\/Electron\.app\//) return "the desktop app by hand"
     return ""
   }
+  # Every walk asks `in cmd` before it reads a parent: a parent that has
+  # already exited (a browser reparented, a session closed) is in no list,
+  # and gawk 5.2, Measure'"'"'s awk, dies with "Op_illegal" when a function is
+  # handed an array element that was never set (macOS'"'"'s awk and mawk read
+  # it as ""). Reading it also would add it, so the walks never do.
   function ours(p,   q, hops) {
     q = p
-    for (hops = 0; q != "" && q != "0" && hops < 64; hops++) {
+    for (hops = 0; (q in cmd) && hops < 64; hops++) {
       if (q == self || cmd[q] ~ /Runner\.Worker/) return 1
-      if (q == "1") return 0
+      if (q == "1" || q == "0") return 0
       q = par[q]
     }
     return 0
   }
   function top(p,   hops) {
-    for (hops = 0; hops < 64 && par[p] != "" && kind(cmd[par[p]]) != "" && par[p] != p; hops++) p = par[p]
+    for (hops = 0; hops < 64 && (par[p] in cmd) && par[p] != p && kind(cmd[par[p]]) != ""; hops++) p = par[p]
     return p
   }
   END {
