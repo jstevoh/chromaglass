@@ -11289,6 +11289,19 @@ model cannot reach one, the PR says what it reached and asks.
     Focus 0.56, 1.04 of the 1.29 predicted; a doubled index reads 1.75, red; main turns only
     0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
     look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
+  - **38h-6 (camera bubble film, shipped 2026-11-08).** At Film Physics 0 `camFilm`
+    (`src/gpu/wgsl/closeupDepth.ts`) multiplied the camera's bubble by `0.45 + 1.25 × filmC`,
+    up to 1.7: a soap film lit from the front, as in the macro photographs it was tuned
+    against. A pocket of air between the glasses, lit from beneath, shows its wetting film
+    only by the light through it, T = 1 − R (`filmTableAt(filmP, true)`), which the
+    projector's bubble already wore at Film Physics 1. `camFilm` now returns
+    `mix(vec3f(1.0), filmTableAt(filmP, true), clamp(irid, 0.0, 1.0))` at every Film Physics,
+    keeping Iridescence as how much film colour shows with no gain on it. `npm run nolight`
+    line 15 (`film` taken out of `--owed` in `scripts/checks.json`): at Iridescence 1 against
+    0, brightest pixel over goes from 22 levels at Film Physics 0 (14.74% moved) to 0 at both
+    Film Physics 0 and 1 (10.75% moved at each), and Film Physics 0 against 1 goes from 31
+    levels apart to 0. The back plate's 31a boundary line and the ferrofluid glint stay open
+    in 38h-6.
 
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
