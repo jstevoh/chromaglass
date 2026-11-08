@@ -457,11 +457,63 @@ written first. Line numbers are as read on main at d07ac31.
     a push fades nine times sooner. If a look wants the old glide, the honest dial is the
     gap itself, not a stand-in for inertia.
     (2026-10-31: the owner chose Liquid amount and Cover weight over a bare Gap dial, so the
-    gap is a result of the plate's volume, 38r-5, written in by its own thread.)
+    gap is a result of the plate's volume: taken over by 38r-5.)
   - **38r-4. Frame Sway on the default oil** (S). On a 2 mm film the cover's shear drag is
     three times the 6 mm one's, and #605 measured full Plate Rock leaving the glass inside
     half its room on the default oil (0.489% against 0.487% a frame): Frame Sway 0.5 and 1
     would slide the picture the same.
+  - **38r-5. The liquid's amount sets the gap** (M-L; Medium on every look's pace). The
+    owner, 2026-10-31: "Do we ever really figure out how much liquid is on the plate?", then
+    "make sure the liquid amounts also adjust physics appropriately". Takes over 38r-3 with two
+    physical dials, **Liquid** (mL) and **Cover Weight** (g). *Part 1 shipped* (this PR, story
+    in `docs/plan-shipped.md` §38r-5): `lib/cover.ts` keeps the ledger (under the glass, the
+    rim's bead, run off) and works out the glass: h = V/A while the liquid fills the cover; the
+    meniscus pinned at its edge holds 2σ sinθ/h (θ 60°); past that Stefan's settle, solved
+    exactly, into a bead of 2πR·(π/4)·l_c² (3.6 mL) and off the dish; a lift past the glass's
+    weight draws the bead back. The solver steps it, packs `S.cover`, lays the dome about it,
+    and turns a moving cover into flow at the rim; pours add to it; the main readers of the rest
+    gap follow it; the dials are on the sheet, the desks, MIDI and the phone's remote. Open:
+    - **38r-16. The pinch and the air edge** (M-L; part 2, its own thread). A two-finger pinch
+      on the desk (trackpad: wheel + ctrlKey over the plate, outside the closeup) and the phone
+      (two fingers whose span changes, told from Blow's two fingers moving together in
+      `lib/playGesture.ts`, and the visualizer's hands let go as the closeup's pinch does) sets
+      `FluidSimulation.coverHand` (−1 lift to 1 press; the solver and `npm run gap` 16 already
+      take it). And the owner's pick (2026-10-31 20:08Z, "Build the air edge now", over a floor
+      at a full film): below a full film (V < A·h_floor, 9 mL at the 0.27 mm floor) the liquid
+      is a puddle under the glass with an air edge, whose meniscus between two wetted glasses
+      pulls, −2σ cosθ/h, so the glass sinks and the puddle spreads (A_wet = V/h) until it meets
+      the rim; a lift faster than the bead can feed, or the dial taken down faster than the
+      glass settles, draws air in from the rim, Saffman–Taylor unstable in the Hele-Shaw gap,
+      fingers at λ_c = πh√(σ/(μU)) (fastest √3 λ_c). The air is the bubbles' air (15g) entering
+      at the rim, never a drawn finger pattern. Liquid's dial then runs from 1 mL. Checks: the
+      puddle's area V/h; its settle; a lift's finger spacing against λ, water and thick.
+    - **38r-17. The rest gap's other readers** (S-M). Still at the 2 mm constant: `FILM_TOP`
+      (`wgsl/standing.ts`, compiled into phaseForces), `GAP_LC` (`wgsl/ferroDrop.ts`), the
+      bubbles' `gapMetres` (`lib/bubbles.ts`, set by the visualizer), the rhythm sheet's h₀
+      (`lib/sheet.ts`), the kick's `dentRadius` (`lib/squish.ts`), `handEdge`
+      (`lib/handSolid.ts`), the opening's drag time (`gpu/opening.ts`). Each to the solver's
+      `coverMetres`/`coverUnits`. `forces.ts`'s `nominal` stays the 2 mm on purpose: it is the
+      old plate's absolute depth drag, so a thinner cover already slows it.
+    - **38r-18. The gap field's ceiling is a cap a floating glass does not have** (S). Past
+      4 mm (`DISH_GAP_RANGE[1]`, a weightless glass on more than 125 mL) the ledger overflows
+      over the rim (`lib/cover.ts` coverSettleTop), because raising the ceiling moves the spun
+      dish's swirl tail (`fields.ts` swirlTail). Raise it with that re-measured.
+    - **38r-19. A press spills, and the bead is a capillary ring** (S to decide). A light press
+      (20 Pa) on the default plate pushes 6 mL out, past the 3.6 mL bead, and it does not come
+      back: the physics of a flat glass on a flat plate. A watch-glass pair's bowl keeps the
+      squeezed liquid up its sides and gravity returns it; if the owner's glasses are a bowl,
+      the bead is the bowl's annulus (ρ g Δz back-pressure), not l_c.
+    - **38r-20. The glass settles at the Thickness dial's pace, not the liquid's under it**
+      (S-M). `coverStep` is told `thinGapViscosity(gapThickness)`, so a dish of poured
+      glycerine (about 1000 mm²/s, against 22 at Thickness 0.45) lets the glass down in
+      1.4 s where Stefan's τ ∝ μ says about a minute. Give the cover the plate's
+      h³-weighted mean of the species' ν (what the thin solve's mobility already reads).
+      Found by `npm run flush` (38r-5), whose glycerine settles at the dial's pace. Two
+      consequences for that check when this lands: its SETTLE is computed from the dial's ν
+      and must take the glycerine's, or its glycerine lines go red; and the glycerine flush
+      went from a quarter of the dish to a fifth because water fingered to 0.8 of the
+      radius through the too-fast settle (mean front about 0.52), so re-run the quarter
+      then and go back to it if the fingers stay inside.
   - ~~**38r-6**~~ `thingap` 5 read the Spin's one-cell mask edge, not the solve's residual:
     Spin's stir mask is blurred [1 4 1] over a cell's neighbours (#641). Story in §38r.
   - ~~**38r-7**~~ The rhythm sheet at 2 mm: its waits are on the film's own clock (#641).

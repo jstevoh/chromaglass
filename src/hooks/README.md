@@ -23,6 +23,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useDeskLayout.ts`: `useDeskTabs`, `TabEdit`, the desk's tabs.
 - `useDeviceTilt.ts`: phone tilt as Gravity.
 - `useEscape.ts`: Esc closes.
+- `useMoirePreview.ts`: whether the moiré pack's controls move here, and a copy without it a minute's try (the desk's Moiré Sheets section and the phone's Looks sheet both call it; PLAN 45a).
 - `useFilmSense.ts`: the film, read back.
 - `useGamepad.ts`: game controller as a hand.
 - `useMidiTouch.ts`: flash on a controller touch.

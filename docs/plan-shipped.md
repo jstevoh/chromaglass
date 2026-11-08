@@ -978,6 +978,47 @@ pull was tried at 0.3 and did no better on this band (spread 18 ms against 13 at
 20 fps), so `hear()` still snaps: with the onset's own time the snap's jitter is
 the onset's, a few ms, not the smoothed level's 30–55.
 
+### 14d-2. No kick drum, no beat: the 1920s records (shipped)
+
+The owner loved the six 1920s song films (acoustic 78s: the Wolverines, Caruso,
+Rachmaninoff, Whiteman, King Oliver, Bessie Smith) and asked for them to react to the
+music more. Every beat answer on the plate (Kick hit patches, the beat clock's kicks,
+Beat Squeeze) waited for the ear's kick, energy arriving at 30–120 Hz, and on those
+records it fired 3 to 6 times a minute (the Wolverines 22, mostly low notes leaking
+into the band). There is no kick drum on an acoustic record: the horn could not take
+one, so the bands kept time on banjo, tuba, piano and woodblock.
+
+**Shipped.** `pulseEar.ts` hears an onset over 60 Hz–4 kHz by SuperFlux (each bin's rise
+against the loudest of its neighbours a frame before, so a sung note's vibrato is not an
+onset), with the ear's own median-and-MAD threshold and a 0.2 dB floor. It becomes the
+reading's `beat` only while the kick is not keeping time (no kick for 1.5 s, or a run of
+steady kicks shorter than 3 s); a steady kick is the beat to the frame, as before. Its
+beats come no closer than 0.25 s, and a kick always counts unless it is the same attack
+within 0.1 s. `HitSource`'s Kick hit and the beat clock read `beat ?? onsets.kick`
+(`beatAt`). Beats a minute at 30 fps (the films' rate), kick before and beat after:
+Wolverines 22 → 107, Caruso 4 → 45, Rachmaninoff 6 → 106, Whiteman 3 → 114, Oliver 4 → 111,
+Bessie 5 → 83; modern tracks with a kick barely move (werq 85 → 108, thatched-villagers
+133 → 134), pink noise 8 → 8, a held chord 0 → 0. `npm run pulse` plays a horned 1920s band
+with no kick (the beat catches at least 90% of its notes within 70 ms, the kick alone under
+20%), the same band unhorned, a loop with a kick once a bar and sixteenth hats, a drummed
+band (every beat is a kick, to the frame) and noise, chord and silence. Two count rules for
+"the kick keeps time" were tried first and failed on the band's own leaking low chord
+(71% and 66% caught); the reasons are in the module's comment.
+
+A check-skeptic pass then gave the band a soft cornet note on every off-beat: 35% of the
+beats were the cornet at 30 fps (20% at 60) and the clock fired 96 times for 65 beats, and
+no gate on an attack's size alone separated a weak real beat (split across two frames)
+from the cornet. So the ear entrains: it keeps the band's period (the median of its last
+eight beat gaps, locked after three) and takes an attack on that grid (within a fifth of a
+period) as the beat, one off it only when it is as hard as the band's usual attack, and
+lets the period go after three off-grid beats in a row or a four-second stop. With the
+cornet: all 65 beats heard, none of the cornet's, the clock 67 times. Over the six songs
+the beat now comes Wolverines 90, Caruso 37, Rachmaninoff 93, Whiteman 109, Oliver 99,
+Bessie 67 a minute (the first version 107, 45, 106, 114, 111, 83), each median gap on the
+song's tempo. `npm run pulse` adds the cornet, a breakdown (kick out 12–24 s and back),
+stray and count limits on the clock and Kick hit. `npm run eargc` 7.98 KB an update (bar
+8; 6.33 before the pulse). Open: 14d-3 to 14d-9.
+
 ### 15a. Only the Dropper lays the bottle's liquid (shipped)
 
 Pour, Spray, Splat and Streak laid the colour and nothing else. With Ferrofluid in
@@ -5544,7 +5585,7 @@ setting itself still moves as it did) and the print that is off starts the next 
 Not a control, so no phone change.
 
 Named shortcuts: plane waves, not a true noise field; the cap is a straight line through
-a sweep, not Pearson's full regime boundaries; k ignores the look's own k while the drift
+a sweep (a tent since 2026-11-07, below), not Pearson's full regime boundaries; k ignores the look's own k while the drift
 is on; the clock is fixed-rate and follows no music; every number is the lab's (SwiftShader),
 none yet Metal's.
 
@@ -5577,6 +5618,24 @@ The app counts the slew in solver iterations (`TURING_ITERATIONS_PER_SECOND`, 18
 as the lab does, and the check reads both numbers and refuses a rate outside (0, 1]. The bars for stripe width and the Drift 0 clock are
 unchanged. Not tested: where a grey patch sits (a speckle of dead cells would still show in
 the width line, not the tile line).
+
+**26d-6a. The tent cap: the corners of the drift hold their spots (shipped 2026-11-07).**
+A review held each corner of the drift's feed range (F 0.04 plus or minus `DRIFT_FEED`,
+0.02 to 0.06) at the spots end for 9000 units and found the straight cap `0.0105 - 0.15 F`
+too generous below F 0.035: it went on rising to 0.0075 at F 0.02, from no measured point,
+and a plate held there at nine tenths of it kept only 0.313 of its cells alive (0.42 at
+F 0.03), against 0.483 for the spots held at F 0.04 and a floor of 0.433. Spots that
+survive a 6000-unit sweep are not spots that survive a minute, and Pearson's dead zone lies
+below. The cap is now a tent, `max(0.15 min(F, 0.07 - F), 0.0008)`: the old line from
+F 0.035 up, falling below it (0.003 at F 0.02). `npm run turing` gained the held-corner
+line, which settles at the look's feed and kill, slews to each corner over 3000 units as
+the app slews, holds 9000 and reads the live share every third of the hold; the cap, its
+share and `DRIFT_FEED` are read from `src/gpu/wgsl/fluid/reactions.ts`, so moving them
+moves the check, and an instrument line pushes F 0.02 to twice the cap and must read it
+emptied. Built in PR #421 in October and carried onto main's split shader 2026-11-07;
+#421's clear Turing Print contract (Pure White) and its "paper stays clean" line were
+dropped, because #523 (28i-2) gave the look colour pools on purpose. Measured numbers are
+in the PR that shipped it.
 
 
 ## 27. Every control does something you can see
@@ -10116,6 +10175,25 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   moves; the required names are unchanged, as in 19k-6. Still open: 19k-11b (the tier in the
   job summary, and every part read against it).
 
+#### 19k-13. Room in the Mac jobs' bound, and a line where slowness is read
+
+- **19k-13** (E, S): **shipped**. On GitHub's Macs on 2026-11-07 (main's deploys 668 to 673
+  and #690's two runs, eleven attempts) every Mac shard ran 14:51 to 20:21 a job, 0:39 to 3:07
+  of it before the first check (tools' includes the ffmpeg install), so all five sat within
+  three minutes of the 20-minute bound, and three were cancelled with every check they reached
+  green: plate on #690's first run a minute after its 41 checks had finished (19:51 of 20:01;
+  Areas that listen 1:12 to 1:45, A drop slumps 0:46 to 1:05), open on deploy 668 in its last
+  check, fifth on 668 and both of 669's attempts in `mirror` (19k-12). Moving a check out of
+  plate would have put the next shard there, since the others ran 15:49 to 18:41, and a sixth
+  shard asks the Mac queue for one more runner on every run. So the bound went to 25, as
+  Measure's is, and slowness is read apart from it: `runShard` warns (`::warning`, and a mark
+  on the job summary's heading) when a Mac shard's checks pass 18 minutes, where the old bound
+  began cancelling, or a Measure part's pass 21 (19k-11b's line), and the shard stays green.
+  `npm run checks` holds both: a shard over its line warns, one under does not, a Measure part
+  is held to its own line, and each job's bound in `checks.yml` is at least three minutes past
+  its line (the old 20 is the control that would fail). Found along the way: `draftwall
+  --frames` hung 12 minutes on #690's second run (19k-14); its entry got a 3-minute timeout.
+
 ### 21. Looks after painters
 
 #### 21. Looks after painters (found along the way, for §14b)
@@ -11643,6 +11721,55 @@ the dish's glycerine. Now one predicate, `pastOpenRim` in `wgsl/fluid/shared.ts`
 rim, the species' and the colour's, and the colour's spreading stops at the same edge
 (dyeDisperse). `PW_WEBGPU=1 npm run flush`: glycerine left 0.759 → 0.751 (the volume says 0.750),
 the colour 0.776 → 0.750, the full dish 1.002 → 0.997 of its area; 9/9, no bar moved.
+
+## 38r-5. The liquid's amount sets the gap, part 1 (2026-11-07)
+
+Asked by the owner on 2026-10-31: "Should the plate gap be more related to liquid content? Do
+we ever really figure out how much liquid is on the plate?" We did not: the gap was a constant
+2 mm, a pour was a source that left over the open rim, and nothing totalled the liquid.
+
+The physics, worked out in the design thread and checked here. A flat glass on liquid has no
+height of its own: its weight (5 kg/m², 49 Pa) would squeeze any film to nothing by Stefan's
+law. What holds it is the meniscus pinned at its square edge, which by Gibbs's inequality can
+bulge until its angle passes θ + 90°, so it holds up to 2σ sinθ/h: 62 Pa at 2 mm for water on
+an oiled glass (θ 60°), enough for the default glass, so the default plate keeps its 2 mm.
+Past h_hold = 2σ sinθ/(w g) (2.54 mm of water) the glass sinks at
+dh/dt = −(2/3)h³(P − P_hold)/(μR²). The first brief guessed seconds to minutes; it is 26 ms
+to half-settled for water and half a second for the thick carrier.
+
+What changed. `lib/cover.ts`: the ledger and the glass, with the settle solved exactly
+(separated, F(h) = 1/(ch) + (P/c²) ln(P − c/h) falls by kt, bisected) so no step size can
+overshoot h_hold. `gpu/fluid/cover.ts`: a solver layer (the gap's shape moved out of
+`fluid.ts`'s squeeze stage first, a pure move) that steps it before `writeSim`, packs
+`S.cover` into the uniform's padding slot 51, and shifts the gap field when the cover moves,
+with the solve left primed, so `hsDivergence` turns a rising glass into liquid drawn in at the
+rim and a settling one into liquid pushed out over it. The dome is now added to the cover's
+height rather than scaled by the rest number (the same at the default). Pours add their volume
+at the live gap. The readers that were worked out at 2 mm take the cover: the Darcy speeds
+(colour's fall, oil's lift, oil's pull) by (h/h₀)², the breath, the glass's drag, the slump,
+hsPrep's hand forcing, a pour's share, the plate rock's cover drag (with the Cover Weight's own
+mass) and the spin's drag time. Two dials, Liquid 9–150 mL (62.83 default) and Cover Weight
+0–1000 g (157.08 default), on the sheet, the desks, MIDI and the phone's remote.
+
+Measured: `npm run gap` 11 → 18 lines, all ok; the settle against an RK4 of the ODE to 1e-4
+at five times for water and thick; a 4 mL pour raises the glass 127.3 µm (Q/A) and spills
+nothing; 20 mL more settles it to h_hold with the bead full and 3.34 mL run off, the ledger
+to 1e-12. Left: 38r-16 (the pinch and the air edge), 38r-17, 38r-18, 38r-19, 38r-20.
+
+The floating glass broke two things `npm run flush` caught. Its lines assume the gap is
+h₀ everywhere, and a pour now lifts the glass by Q/A: the ring at r was pushed by
+Q(1 − r²/R²) (0.856 of V/π) and a quarter of the dish of water flushed 1.4% of the
+glycerine, not 25%. Its glass is now the one the edge holds at exactly 2 mm (189 g at
+Thickness 0.45), it waits out the Stefan settle (435 steps, from the lib's own
+`stefanSettle`), and it counts each pour at the gap the glass stood at
+(`lab.coverMetres`). That found the second: the species' splat added a share f of a
+rest-gap column where the column is as tall as the glass stands, so glycerine poured
+under a lifted glass was 3.4% short (0.9675); it adds f·g/h₀ now, as the thin solve's
+source and the ledger do (`wgsl/fluid/splats.ts`), 0.9991. The glycerine flush is a
+fifth of the dish, not a quarter: water fingering into glycerine (Saffman–Taylor) ran
+on through the seven-second settle and reached 0.8–0.9 of the radius, so water left
+with the glycerine (0.739 against 0.724); the line now also checks no water got there
+(0.974 of the column at the least). No bar moved.
 
 ## 37k. A press page, and 12.6 the store listings (#666, 2026-11-01)
 

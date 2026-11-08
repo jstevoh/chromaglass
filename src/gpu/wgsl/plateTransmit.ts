@@ -1,4 +1,5 @@
 import { BULB_FILL } from './lampField';
+import { MOIRE_WGSL } from './plateMoire';
 /**
  * What the plate does with the lamp's light where it once painted light of
  * its own (PLAN 38h): a plate lit from beneath shows transmitted light only,
@@ -192,6 +193,7 @@ fn camBubble(fuv: vec2f, p: vec2f, R: f32) -> vec3f {
   }
   return vec3f((sx - Rf * sq) / sn, Rf);
 }
+${MOIRE_WGSL}
 `;
 
 /**
