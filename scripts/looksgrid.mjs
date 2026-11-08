@@ -329,7 +329,21 @@ try {
       check('the budget line has a real GPU to measure on', false, 'software or no WebGPU: run it on the Mac (tools shard), not here');
     } else {
       await waitForEngine(page);
-      for (let i = 0; i < 60 && (await stepsNow(page)) === null; i++) await page.waitForTimeout(500);
+      /*
+        Stepping before the first window, and settled. The first run on a
+        GitHub Mac (PR #713, main's state) read "steps shut 0.0/s, with the
+        preview 28.5/s, shut again 27.8/s": `waitForEngine` waits only in
+        software, the plate had not taken a step in its first six seconds,
+        and the lower shut window, 0, would have failed a correct build. So:
+        two seconds in a row with steps, then three more to settle.
+      */
+      for (let i = 0, run = 0; i < 120 && run < 2; i++) {
+        const a = await stepsNow(page);
+        await page.waitForTimeout(1_000);
+        const b = await stepsNow(page);
+        run = a !== null && b !== null && b > a ? run + 1 : 0;
+      }
+      await page.waitForTimeout(3_000);
       const rate = async () => { const a = await stepsNow(page); await page.waitForTimeout(BUDGET_WINDOW_MS); const b = await stepsNow(page); return a === null || b === null ? null : (b - a) / (BUDGET_WINDOW_MS / 1000); };
       const before = await rate();
       await page.getByTestId(sf.opener).first().click({ timeout: 5_000 }).catch(() => {});
