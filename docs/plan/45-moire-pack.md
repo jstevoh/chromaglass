@@ -27,7 +27,7 @@ own. Check: `npm run moire`.
   Spin (on the stage's clock, `lib/stageClocks.ts`), Slide, Scale, Lines, Gap (mm), Curl and
   Flip (the upper sheet face down, which is what crosses two spoke sheets into diamonds). The
   desk's **Moiré Sheets** section, the phone's Looks sheet (`phone/PhoneMoire.tsx`), MIDI
-  for the ink, Turn and Spin. Six looks in the look menu's **Moiré pack** group
+  for the ink, Turn and Spin. Six looks (seven since 45a-11) in the look menu's **Moiré pack** group
   (`presetsMoire.ts`). Gate: `canUseMoirePack` in tierGates, open where tiers are not
   enforced, Pro where they are; a look of the pack opens the account sheet when locked.
   A pack look is its house look's plate under its own id (`plateLook`, presetPlate.ts:
@@ -72,7 +72,18 @@ own. Check: `npm run moire`.
     draws no sheets; a closeup of a moiré look shows the liquid alone. Draw the sheets in
     plate coordinates at the closeup's zoom.
   - **45a-6. The phone's look list.** The phone groups looks in `App.tsx`'s `phoneLooks`, so
-    the pack's six sit in Light show there rather than in their own group; the desk's menu
+    the pack's seven sit in Light show there rather than in their own group; the desk's menu
     groups them. Needs room in `App.tsx` (over budget) or the grouping moved to a lib.
-  - **45a-7. Judging on the wall.** How the six looks and the defocus read at 60 fps on a real
+  - **45a-7. Judging on the wall.** How the seven looks and the defocus read at 60 fps on a real
     projector (`docs/judging.md`).
+  - **45a-11. Moiré Waves, the seventh look** (**shipped**, this PR). The owner picked the
+    Waves clip off the moiré reel of 2026-11-08 ("I like the waves one"), and no look had
+    the Waves sheet. Moiré Star's stage (Classic underneath, the kick on the Curl) with two
+    Waves sheets face up, Turn 2, Spin 0.2, Curl 0.4: the clip's settings. On Waves the
+    Curl is the waves' height, so the kick lifts them. The phone lists it with the other
+    pack looks (`phoneLooks` reads the presets), and the pack's lock covers it.
+  - **45a-12. The Waves clip on the website.** The owner liked it in motion, so the
+    landing page's moiré card (45a-8, PR #691) should play it as a short loop beside the
+    stills: a few seconds off the Mac's take (the film script and takes are on the owner's
+    Mac), as a muted, looping, `playsinline` video under 1 MB with a still as its poster.
+    Needs #691 merged and a Mac session for the file.

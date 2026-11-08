@@ -19,7 +19,7 @@ export function MoirePackBuy({ tier, email }: { tier: 'free' | 'home' | 'pro'; e
   if (tier === 'free') {
     return (
       <p data-cg-moire-pack="free" className="mt-2 text-[12px] leading-snug text-muted">
-        The moiré pack, ten printed sheets for the stage and six looks, is $15 on top of Home, and in Pro.
+        The moiré pack, ten printed sheets for the stage and seven looks, is $15 on top of Home, and in Pro.
       </p>
     );
   }
@@ -44,7 +44,7 @@ export function MoirePackBuy({ tier, email }: { tier: 'free' | 'home' | 'pro'; e
         <span className="text-[12px] text-muted"><span className="font-mono font-medium text-text-2">$15</span> once</span>
       </div>
       <p className="mt-1 text-[12px] leading-snug text-muted">
-        Ten printed sheets for the stage and six looks: turn one over the other and the liquid draws itself into the fringes.
+        Ten printed sheets for the stage and seven looks: turn one over the other and the liquid draws itself into the fringes.
       </p>
     </a>
   );

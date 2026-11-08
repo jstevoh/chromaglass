@@ -74,7 +74,7 @@ const STEPS: { n: string; title: string; body: string }[] = [
 ];
 
 /*
-  The moiré pack (PLAN.md 45a-2), $15 on Home and in Pro: four of its six looks, each a frame
+  The moiré pack (PLAN.md 45a-2), $15 on Home and in Pro: four of its seven looks, each a frame
   the app drew on this Mac's GPU two dozen seconds after the look was opened (a still a page
   load away, like LOOKS above). Kept at 960x600 for a 480x300 box: a pattern of fine lines
   scaled down in the browser beats against the screen's own pixels, so these are the one set
@@ -315,7 +315,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             <span className="font-mono text-[13px] text-text-2">$15 on Home · in Pro</span>
           </div>
           <p className="mt-2 max-w-[44rem] text-[14px] leading-snug text-muted">
-            Six looks with two printed transparencies on the light, stacked the way a light show crew stacks them on the overhead:
+            Seven looks with two printed transparencies on the light, stacked the way a light show crew stacks them on the overhead:
             their lines cross into fringes that turn, slide and breathe with the song, and every drop of liquid under them bends the pattern.
             Buy it with the email your Home key is under and it joins that key; Pro has it already. Anyone can try it for a minute in the app.
           </p>
