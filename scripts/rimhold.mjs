@@ -50,7 +50,8 @@
  * Linux box's software WebGPU anywhere else (PW_WEBGPU=1).
  */
 import { openLab } from './lab.mjs';
-import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
+import { DISH_GAP_METRES, thicknessViscosity } from '../src/lib/turntable.ts';
+import { build } from 'esbuild';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -73,14 +74,50 @@ const R = 0.06;   // the lens's radius, in plates (oillift's)
 */
 const SECOND = Math.round(60 * (0.006 / DISH_GAP_METRES) ** 2);
 
+/*
+  Check 3's glass. Since PLAN 38r-5 the cover floats: a pour lifts it by
+  V/A, and under the default 157 g glass the edge holds it up to 2.41 mm,
+  so the twelve pours raised the glass and pushed almost nothing over the
+  rim (the meter read 0.04 and the looks' tension 0.01 on the Mac). The
+  meter's premise is the volume crossing the rim, so, as \`npm run flush\`
+  does, the pours go under the glass the edge holds at exactly 2 mm (w = 2σ
+  sinθ/h₀ · A/g at this Thickness, 189 g), and what crosses the rim is
+  counted as it crosses: each interval's pours, at the gap the glass stood
+  at, less what the glass rose by, times the oil's share of the rim then,
+  through the Stefan settle that follows. Counted as it crosses, the reading
+  need not wait for the glass to come all the way down, and it should not:
+  the lens loses a slow seventh of a percent a second at the rim whatever
+  is poured (18g-7), and over the whole settle (seven seconds) that loss,
+  taken off as the unpoured lens's, outweighed the pour's at the looks'
+  tension (the line read −0.12). So the window ends when three quarters of
+  the twelve pours' lift has gone (SETTLE, from the lib's own exact
+  settle): the meter read 0.92 and the looks' tension 0.55 (SwiftShader;
+  0.81 and 0.44 on the rigid glass). The bars are as they were.
+*/
+const THICK = 0.45;
+const coverLib = 'node_modules/.cache/rimhold-cover.mjs';
+await build({
+  stdin: { contents: "export * from './src/lib/cover.ts';", resolveDir: '.', loader: 'ts' },
+  bundle: true, format: 'esm', platform: 'node', outfile: coverLib, logLevel: 'warning',
+});
+const C = await import(`../${coverLib}`);
+const SIGMA = C.carrierTension(thicknessViscosity(THICK));
+const HOLD_P = C.holdPressure(SIGMA, DISH_GAP_METRES);
+const HOLD_G = HOLD_P * C.COVER_AREA / C.GRAVITY * 1000;
+const RP = 0.05, POURS = 12;
+let SETTLE = 0;
+for (let h = DISH_GAP_METRES * (1 + POURS * Math.PI * RP * RP / 2 / (Math.PI / 4)); h - DISH_GAP_METRES > 0.25 * (POURS * Math.PI * RP * RP / 2 / (Math.PI / 4)) * DISH_GAP_METRES && SETTLE < 6000; SETTLE++) {
+  h = C.stefanSettle(h, HOLD_P, SIGMA, 1000 * thicknessViscosity(THICK), 1 / 60);
+}
+
 const { page, close } = await openLab();
 const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|device lost|validation/i.test(m.text())) gpuErrors.push(m.text().slice(0, 200)); });
 let r;
 try {
-  r = await page.evaluate(async ({ R, SECOND }) => {
+  r = await page.evaluate(async ({ R, SECOND, THICK, HOLD_G, SETTLE, RP, POURS, H0 }) => {
     const N = 128, out = {};
-    const T = { thinGap: 1, gapThickness: 0.45, gapSpring: 0, oilTension: 0.9, oilBodies: 1, diff: 0 };
+    const T = { thinGap: 1, gapThickness: THICK, gapSpring: 0, oilTension: 0.9, oilBodies: 1, diff: 0 };
     /*
       The oil inside the dish, its centroid, and its share of the rim's own
       cells, the last ring inside it (what a pour's flow carries across).
@@ -118,39 +155,48 @@ try {
       it, so the rim's cells stay in its oil while the pour pushes it),
       settled three seconds, then water poured at the middle, a dome a step
       for POURS steps (flush.mjs's pour), the oil's share of the rim's cells
-      read before each, so what crosses the rim is summed step by step; and
-      a few steps after for the flow to finish.
+      read before each, so what crosses the rim is summed step by step; then
+      the glass's settle, read every ten steps, what it pushes out weighted
+      the same way. All under the glass the edge holds at 2 mm.
     */
-    const pour = async (T) => {
+    const pour = async (T0) => {
+      const T = { ...T0, coverGrams: HOLD_G };
+      const dish = Math.PI / 4;
       const at = [0.5 + (0.5 - R / 2) * Math.SQRT1_2, 0.5 + (0.5 - R / 2) * Math.SQRT1_2];
       await lab.create(N, N);
       lab.solver().addMix(at[0], at[1], R, { oil: 1 });
       await lab.step(180, T);
       const before = await oil();
-      // A dome of share 1 over radius RP is π RP²/2 of the plate's area (flush.mjs's domeOf).
-      const RP = 0.05, POURS = 12, dome = Math.PI * RP * RP / 2;
-      let want = 0, shares = [];
+      // A dome of share 1 over radius RP is π RP²/2 of the plate's area (flush.mjs's domeOf), at the gap the glass stands at.
+      const dome = Math.PI * RP * RP / 2;
+      let want = 0, V = 0, shares = [];
       for (let k = 0; k < POURS; k++) {
         const now = k === 0 ? before : await oil();
-        want += dome * now.rim; shares.push(now.rim);
+        const h = lab.coverMetres(), v = dome * h / H0;
         lab.addSpecies(0.5, 0.5, RP, 1, 'water', true);
         await lab.step(1, T);
+        // What crossed the rim this step: the pour, less what the glass rose by over the dish.
+        want += (v - dish * (lab.coverMetres() - h) / H0) * now.rim; V += v; shares.push(now.rim);
       }
-      await lab.step(5, T);
+      for (let k = 0; k < SETTLE; k += 10) {
+        const now = await oil(), h = lab.coverMetres();
+        await lab.step(Math.min(10, SETTLE - k), T);
+        want += dish * (h - lab.coverMetres()) / H0 * now.rim; shares.push(now.rim);
+      }
       const after = await oil();
       // The same lens left alone over the same steps, for what it loses with no pour.
       await lab.create(N, N);
       lab.solver().addMix(at[0], at[1], R, { oil: 1 });
       await lab.step(180, T);
       const still0 = await oil();
-      await lab.step(POURS + 5, T);
+      await lab.step(POURS + SETTLE, T);
       const still1 = await oil();
-      return { before, after, want, V: POURS * dome, shares, still: still0.amount - still1.amount };
+      return { before, after, want, V, shares, still: still0.amount - still1.amount };
     };
     out.pour = await pour(T);
     out.pourWeak = await pour({ ...T, oilTension: 0.009 });
     return out;
-  }, { R, SECOND });
+  }, { R, SECOND, THICK, HOLD_G, SETTLE, RP, POURS, H0: DISH_GAP_METRES });
 } finally {
   await close();
 }

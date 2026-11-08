@@ -14,6 +14,7 @@ import {
 import { PIN_RANGE, onStep } from './deskPins.ts';
 import { SETTING_TRAVEL } from './sceneMap.ts';
 import { isAreaTarget } from './areaCords.ts';
+import { VALID_MOIRE_SHEETS } from './moire.ts';
 
 const VALID_VISCOSITY = new Set<string>(VISCOSITY_MODES);
 const VALID_BLEND_MODE = new Set<string>(BLEND_MODES);
@@ -95,6 +96,8 @@ export function sanitizePatch(raw: unknown): Partial<VisualizerSettings> {
         if (VALID_BLEND_MODE.has(value)) out.blendMode = value as VisualizerSettings['blendMode'];
       } else if (key === 'ledMode') {
         if (VALID_LED_MODE.has(value)) out.ledMode = value as VisualizerSettings['ledMode'];
+      } else if (key === 'moireSheetA' || key === 'moireSheetB') {
+        if (VALID_MOIRE_SHEETS.has(value)) (out as Record<string, unknown>)[key] = value;
       } else if (key === 'macroCamera') {
         if (VALID_MACRO_CAMERA.has(value)) out.macroCamera = value as VisualizerSettings['macroCamera'];
       } else if (key === 'onNewSong') {

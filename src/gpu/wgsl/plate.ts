@@ -3025,8 +3025,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // focuses on, what these say is on the glass, and a plate faded out is not.
   auxN *= U.mixLevel.y;
   auxH *= U.mixLevel.y;
-  // Whatever the operator put below the back plate, in order.
-  outColor = mixSourcesAt(outColor, U.mixPos2.z + 1.0, U.mixPos.y, uv, uvScreen, fluid0, normal0);
+  // The moiré sheets, then what the operator put below the back plate (plateMoire.ts).
+  outColor = mixBelowBack(outColor, uv, uvScreen, fluid0, normal0);
 
   // ── Layer 1 (if present) ──────────────────────────────────────────
   if (U.layerCount > 1) {

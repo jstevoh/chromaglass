@@ -49,12 +49,12 @@
  */
 
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { isGpuEngine } from './frame.mjs';
 
-const PORT = 4322;
+const PORT = port(4322);
 const LOOK = process.env.LOOK || 'cosmos';
 const checks = [];
 const check = (name, ok, detail = '') => {
