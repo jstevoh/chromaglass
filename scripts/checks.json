@@ -966,7 +966,7 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2,h2c5,h2c8",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",
@@ -976,7 +976,26 @@
         "sits here rather than in the Mac queue. And the multigrid's own lines",
         "(scripts/encode-solve.mjs): the residual a step leaves, read through the",
         "solver's restriction kernel against main's, which holds on main; and the",
-        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships."
+        "dispatch counts H2c-1, H2c-3 and H2c-2 must reach, owed until each ships.",
+        "And two more owed lines (scripts/encode-owed.mjs, 2026-11-07): H2c-5's",
+        "first-order velocity on the open plate (one MacCormack correction and one",
+        "carry fewer) and H2c-8's air only where there are bubbles (no air pass and",
+        "no air texture on a plate that never had one), with a bubble as the control."
+      ]
+    },
+    {
+      "name": "A pinned grid solves as well as the ladder's",
+      "shard": "lab4",
+      "run": "npm run encode -- --grids",
+      "env": {"PW_WEBGPU":"1"},
+      "why": [
+        "H2c-10's residual clause (scripts/encode-solve.mjs gridLines): ?sim=514,",
+        "1000, 777 and 100 at the grid the real resolveSimResolution gives, each a",
+        "fresh solver read after four thin steps like the 512² plate it is held",
+        "to within twice of. It holds on main (worst 1.43x, 2026-11-07) and is the",
+        "guard that the multiple-of-32 rounding (the owed line in rungs) solves no",
+        "worse. Five solvers, one 1000², about two minutes under SwiftShader: in",
+        "lab4, the part with the most room, not with encode in lab."
       ]
     },
     {

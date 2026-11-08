@@ -168,9 +168,11 @@ merge conflicts are the shared documents', which 0.6 ends.
   -14.
 - **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
   target without the camera, air only where there are bubbles, first-order velocity.
+  H2c-5 and H2c-8's owed lines are in `npm run encode` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
 - **4.7** **14c-4k, 14c-governor, H2c-10, H2c-labels** (S each). Then **H2a**, **H1**, **H3a**.
+  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07: both Antigravity-ready.
 
 ### Wave 5. Playing it: the instrument
 

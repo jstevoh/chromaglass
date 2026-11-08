@@ -41,6 +41,10 @@
  * judged by this number, not by eye), so the builder never moves a bar.
  */
 
+import { pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+import { ENCODE_OWED } from './encode-owed.mjs';
+
 /*
   Main's numbers, read by this file on 2026-11-01 at 512² under the lab
   (SwiftShader, the lab shard's adapter), the base the bars are fractions of.
@@ -63,13 +67,78 @@ const MAIN_TOTAL = 365;
 const MAIN_RESIDUAL_THIN = 6.393e-2;
 const MAIN_RESIDUAL_OPEN = 2.071e-3;
 
+const residualsOf = async (page, thin, samples, gap) => page.evaluate(async ({ thin, samples, gap }) => {
+  const s = lab.solver();
+  const d = s.device;
+  const n = s.N, nc = s.mg[0].n;
+  /*
+    Two buffers of this check's own, kept for the run (the solver's level
+    buffers are STORAGE alone, never copied out): what the kernel writes, and
+    a pressure of zero. With a pressure of zero the kernel's residual is the
+    right-hand side itself, masked by the rim as the solve masks it, so both
+    numbers of the ratio come from the solver's operator.
+  */
+  const keep = (window.__solve ??= {});
+  const bufOf = (name, size, usage) => (keep[name] ??= d.createBuffer({ label: `encode ${name}`, size, usage }));
+  const outB = bufOf(`out ${nc}`, nc * nc * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
+  const zero = bufOf(`zero ${n}`, n * n * 4, GPUBufferUsage.STORAGE);
+  const restrict = (pass, p, key) => {
+    if (thin) s.hsRun(pass, 'hsRestrict0', `encode ${key} thin`, s.arg('none', [0, 0, 0, 0]), [s.div, p, s.hsMob, outB], nc * nc);
+    else s.dispatchBuf(pass, 'mgRestrict0', `encode ${key} open`, s.arg('none', [0, 0, 0, 0]), [s.div, p, outB], nc * nc);
+  };
+  const read = async (p, key) => {
+    const enc = d.createCommandEncoder();
+    const pass = enc.beginComputePass();
+    restrict(pass, p, key);
+    pass.end();
+    const rb = d.createBuffer({ size: nc * nc * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    enc.copyBufferToBuffer(outB, 0, rb, 0, nc * nc * 4);
+    d.queue.submit([enc.finish()]);
+    await rb.mapAsync(GPUMapMode.READ);
+    let sum = 0;
+    for (const v of new Float32Array(rb.getMappedRange())) sum += v * v;
+    rb.unmap(); rb.destroy();
+    return Math.sqrt(sum);
+  };
+  const out = [];
+  for (let k = 0; k < samples; k++) {
+    lab.vel(0.35 + 0.05 * k, 0.5, 0.12, [2, 1, 0, 0]);
+    lab.flush();
+    await lab.step(gap, { thinGap: thin ? 1 : 0, immiscibility: 0.5 });
+    const solved = thin ? s.hsP : s.press;
+    const r = await read(solved, 'solved');
+    const b = await read(zero, 'zero');
+    out.push({ rel: r / Math.max(b, 1e-30), b });
+    if (k === samples - 1) {
+      /*
+        The control: the same solve's pressure at half strength, which leaves
+        about half the right-hand side unsolved. A measure that read the
+        kernel's output wrong (a buffer never written, the wrong binding)
+        would read the two the same.
+      */
+      const half = bufOf(`half ${n}`, n * n * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+      const pr = d.createBuffer({ size: n * n * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+      const enc = d.createCommandEncoder();
+      enc.copyBufferToBuffer(solved, 0, pr, 0, n * n * 4);
+      d.queue.submit([enc.finish()]);
+      await pr.mapAsync(GPUMapMode.READ);
+      const halved = new Float32Array(pr.getMappedRange()).map((v) => v * 0.5);
+      pr.unmap(); pr.destroy();
+      d.queue.writeBuffer(half, 0, halved);
+      out.control = (await read(half, 'half')) / Math.max(b, 1e-30);
+    }
+  }
+  return { reads: out, control: out.control };
+}, { thin, samples, gap });
+
 export const SOLVE_OWED = ['h2c1', 'h2c3', 'h2c2'];
 
 export async function solveLines(page, run, check) {
   const flag = process.argv.find((a) => a.startsWith('--owed='));
   const owed = new Set(flag ? flag.slice('--owed='.length).split(',').filter(Boolean) : []);
-  const unknown = [...owed].filter((id) => !SOLVE_OWED.includes(id));
-  if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${SOLVE_OWED.join(', ')})`);
+  const known = [...SOLVE_OWED, ...ENCODE_OWED];
+  const unknown = [...owed].filter((id) => !known.includes(id));
+  if (unknown.length) check('every id in --owed is a line of this check', false, `unknown: ${unknown.join(', ')} (known: ${known.join(', ')})`);
   // `mainState`: the step still as main's, the only state an owed line is excused in.
   const line = (id, name, ok, detail, mainState) => {
     if (!owed.has(id)) return check(name, ok, detail);
@@ -78,72 +147,10 @@ export async function solveLines(page, run, check) {
     console.log(` owed  ${name} — ${detail}`);
   };
 
-  const residuals = async (thin, samples, gap) => page.evaluate(async ({ thin, samples, gap }) => {
-    const s = lab.solver();
-    const d = s.device;
-    const n = s.N, nc = s.mg[0].n;
-    /*
-      Two buffers of this check's own, kept for the run (the solver's level
-      buffers are STORAGE alone, never copied out): what the kernel writes, and
-      a pressure of zero. With a pressure of zero the kernel's residual is the
-      right-hand side itself, masked by the rim as the solve masks it, so both
-      numbers of the ratio come from the solver's operator.
-    */
-    const keep = (window.__solve ??= {});
-    const bufOf = (name, size, usage) => (keep[name] ??= d.createBuffer({ label: `encode ${name}`, size, usage }));
-    const outB = bufOf(`out ${nc}`, nc * nc * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC);
-    const zero = bufOf(`zero ${n}`, n * n * 4, GPUBufferUsage.STORAGE);
-    const restrict = (pass, p, key) => {
-      if (thin) s.hsRun(pass, 'hsRestrict0', `encode ${key} thin`, s.arg('none', [0, 0, 0, 0]), [s.div, p, s.hsMob, outB], nc * nc);
-      else s.dispatchBuf(pass, 'mgRestrict0', `encode ${key} open`, s.arg('none', [0, 0, 0, 0]), [s.div, p, outB], nc * nc);
-    };
-    const read = async (p, key) => {
-      const enc = d.createCommandEncoder();
-      const pass = enc.beginComputePass();
-      restrict(pass, p, key);
-      pass.end();
-      const rb = d.createBuffer({ size: nc * nc * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-      enc.copyBufferToBuffer(outB, 0, rb, 0, nc * nc * 4);
-      d.queue.submit([enc.finish()]);
-      await rb.mapAsync(GPUMapMode.READ);
-      let sum = 0;
-      for (const v of new Float32Array(rb.getMappedRange())) sum += v * v;
-      rb.unmap(); rb.destroy();
-      return Math.sqrt(sum);
-    };
-    const out = [];
-    for (let k = 0; k < samples; k++) {
-      lab.vel(0.35 + 0.05 * k, 0.5, 0.12, [2, 1, 0, 0]);
-      lab.flush();
-      await lab.step(gap, { thinGap: thin ? 1 : 0, immiscibility: 0.5 });
-      const solved = thin ? s.hsP : s.press;
-      const r = await read(solved, 'solved');
-      const b = await read(zero, 'zero');
-      out.push({ rel: r / Math.max(b, 1e-30), b });
-      if (k === samples - 1) {
-        /*
-          The control: the same solve's pressure at half strength, which leaves
-          about half the right-hand side unsolved. A measure that read the
-          kernel's output wrong (a buffer never written, the wrong binding)
-          would read the two the same.
-        */
-        const half = bufOf(`half ${n}`, n * n * 4, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
-        const pr = d.createBuffer({ size: n * n * 4, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
-        const enc = d.createCommandEncoder();
-        enc.copyBufferToBuffer(solved, 0, pr, 0, n * n * 4);
-        d.queue.submit([enc.finish()]);
-        await pr.mapAsync(GPUMapMode.READ);
-        const halved = new Float32Array(pr.getMappedRange()).map((v) => v * 0.5);
-        pr.unmap(); pr.destroy();
-        d.queue.writeBuffer(half, 0, halved);
-        out.control = (await read(half, 'half')) / Math.max(b, 1e-30);
-      }
-    }
-    return { reads: out, control: out.control };
-  }, { thin, samples, gap });
   const median = (xs) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
   // The open plate's step, counted the way `encode`'s thin one was.
+  const residuals = (thin, samples, gap) => residualsOf(page, thin, samples, gap);
   const thinAll = await residuals(true, 6, 4);
   const thinRes = thinAll.reads;
   const open = await page.evaluate(async () => {
@@ -190,4 +197,59 @@ export async function solveLines(page, run, check) {
     `${mgZero.toFixed(0)} mgZero a step on the two plates, ${thinTotal.toFixed(0)} dispatches a thin step against at most ${MAIN_TOTAL - MAIN_THIN_ZEROS}`, zeroThin === MAIN_THIN_ZEROS);
   line('h2c2', 'H2c-2: one V-cycle a projection, and a step at least 150 fewer dispatches than main', cyclesThin === 1 && cyclesOpen === 1 && thinTotal <= MAIN_TOTAL - 150,
     `${cyclesThin} and ${cyclesOpen} cycles, ${thinTotal.toFixed(0)} dispatches against at most ${MAIN_TOTAL - 150}`, cyclesThin === 2 && cyclesOpen === 2);
+  return { owed, line, rt };
+}
+
+
+/*
+  H2c-10's second clause: a pinned grid solves as well as the ladder's own.
+  `resolveSimResolution` rounds `?sim=N` (or a saved look's grid) to even
+  only, so 514 keeps a coarsest multigrid level of 257 and 1000 one of 125:
+  the V-cycle halves while it can and stops there, and the sweeps at the
+  coarsest level cannot carry a smooth error across a grid that size, so the
+  cycle is little better than sweeping. The rounding line is in `npm run
+  rungs` (id `grid32`); this is the residual it is for, at the grid the
+  rounding gives, after the same thin-gap stir as the 512² plate above, held
+  to within twice that plate's (the plan's bar). The grid comes from the
+  real `resolveSimResolution` (src/sim/stepping.ts), bundled here as
+  `rungs` bundles it, with the auto rung passed so no governor is consulted:
+  a build that rounds well passes by the rounding, not by a list written
+  here. Same id as rungs' line: the H2c-10 build takes `grid32` out of both.
+*/
+const ASKED = [514, 1000, 777, 100];
+
+export async function gridLines(page, check) {
+  const out = 'node_modules/.cache/encode-stepping.mjs';
+  await build({ entryPoints: ['src/sim/stepping.ts'], bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'warning' });
+  for (const k of ['GPUTextureUsage', 'GPUBufferUsage', 'GPUShaderStage', 'GPUMapMode', 'GPUColorWrite']) globalThis[k] ??= {};
+  const { resolveSimResolution } = await import(pathToFileURL(out).href);
+  const grids = ASKED.map((n) => resolveSimResolution(n, null, 8192, 512));
+  /*
+    Every grid read the same way, the 512² plate first as the reference: a
+    fresh solver, the dye drop, four thin steps, then three reads a step
+    apart, the middle one kept. The protocol matters more than it looks: the
+    thin gap's solve is warm-started from the last step's pressure, so its
+    residual falls for the first dozen steps of a plate, and a pinned grid read
+    after four steps against the 512² plate read after thirty-odd (the lines
+    above) came out at 3.1 times on main where the same grids read after
+    twenty steps came out at 0.7 (2026-11-07). Like against like.
+  */
+  const at = async (g) => {
+    await page.evaluate(async (n) => {
+      await lab.create(n);
+      window.__solve = {}; // its buffers belonged to the last solver's device
+      lab.dye(0.5, 0.5, 0.2, [1, 0.6, 0.3], 3);
+      lab.flush();
+      await lab.step(4, { thinGap: 1, immiscibility: 0.5 });
+    }, g);
+    const { reads } = await residualsOf(page, true, 3, 1);
+    return reads.map((x) => x.rel).sort((a, b) => a - b)[1];
+  };
+  const ref = await at(512);
+  const reads = [];
+  for (const g of grids) reads.push(await at(g));
+  const worst = Math.max(...reads.map((r) => r / ref));
+  console.log(`  pinned grids, each fresh and read after four steps: 512² ${ref.toExponential(3)}; ${ASKED.map((n, i) => `${n} → ${grids[i]}² ${reads[i].toExponential(3)} (${(reads[i] / ref).toFixed(2)}x)`).join(', ')}`);
+  check('every pinned grid\'s residual is read from a solve (under 1, a pressure of zero reads 1)', ref > 0 && reads.every((r) => r > 0 && r < 1), [ref, ...reads].map((r) => r.toExponential(2)).join(' '));
+  return { worst, grids };
 }
