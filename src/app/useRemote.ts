@@ -21,6 +21,7 @@ import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
 import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { assistantLook } from '../lib/assistantLook';
+import { emitDawSlot, feedDawPcm, getDawSlotNames, setDawBridgeStatus, setDawNamesSender } from '../lib/dawBridge';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -201,6 +202,9 @@ export function useRemote({
   const remoteLink = useRemoteLink({
     role: 'display',
     state: remoteState,
+    onBinary: (data) => {
+      feedDawPcm(data);
+    },
     onMessage: (message) => {
       switch (message.type) {
         case 'mirrors':
@@ -352,6 +356,25 @@ export function useRemote({
         case 'osc-out':
           oscOutHearRef.current?.(message);
           break;
+        case 'daw':
+          setDawBridgeStatus({
+            on: message.on,
+            locked: message.locked,
+            instance: message.instance,
+            host: message.host,
+            sampleRate: message.sampleRate,
+            latency: message.latency,
+          });
+          if (message.on) {
+            remoteLinkRef.current?.({ type: 'daw-names', names: getDawSlotNames() });
+          }
+          break;
+        case 'daw-slot':
+          emitDawSlot(message.slot, message.value);
+          break;
+        case 'daw-transport':
+          tempoRef.current?.dawReading(performance.now(), message);
+          break;
         /*
           Not this display's, and each for its own reason. Naming them is the
           point: without these four the switch below cannot ask the compiler
@@ -370,6 +393,7 @@ export function useRemote({
         case 'request-state':
         case 'link-enable':
         case 'osc-out-enable':
+        case 'daw-names':
         case 'beat':
         case 'state':
         case 'lights':
@@ -403,6 +427,20 @@ export function useRemote({
     t.onLinkSwitch = (on) => remoteSend({ type: 'link-enable', on });
     return () => { t.onLinkSwitch = null; };
   }, [tempoRef, remoteSend]);
+  // The DAW bridge's slot names go back to the show server whenever a binding changes.
+  useEffect(() => {
+    if (remoteLink.status !== 'connected') {
+      setDawNamesSender(null);
+      setDawBridgeStatus({ on: false });
+      return;
+    }
+    setDawNamesSender((names) => remoteSend({ type: 'daw-names', names }));
+    remoteSend({ type: 'daw-names', names: getDawSlotNames() });
+    return () => {
+      setDawNamesSender(null);
+      setDawBridgeStatus({ on: false });
+    };
+  }, [remoteLink.status, remoteSend]);
 
   return {
     remoteLink,

@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
 import { startLink } from './abletonLink.js';
-import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, readOsc } from './osc.js';
+import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, readOsc, startDawBridge } from './osc.js';
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
@@ -138,6 +138,7 @@ const WS_PATH = '/remote-ws';
  */
 const OSC_PORT = Number(process.env.OSC_PORT ?? 9000);
 const OSC_BIND = process.env.OSC_BIND ?? '0.0.0.0';
+const DAW_BRIDGE_PORT = Number(process.env.DAW_BRIDGE_PORT ?? 9024);
 const INFO_PATH = '/remote-info.json';
 
 const MIME = {
@@ -200,6 +201,7 @@ const refreshTier = async () => {
   // A key taken out, or a Pro key swapped for a Home one, closes Link as it
   // closes OSC and Art-Net: the session is left, not kept on (13.5-link-gate).
   if (link && !proLinks()) setLink(false);
+  dawBridge?.onTierChange();
   return showTier;
 };
 const proLinks = () => showTier === 'pro';
@@ -402,7 +404,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'daw', 'daw-slot', 'daw-transport', 'assistant-mode', 'assistant-reply']);
 
 // ── The assistant (PLAN 44b) ───────────────────────────────────────────
 // The owner's own AI assistant, joined from this Mac (`mcp/chromaglass-mcp.js`).
@@ -518,6 +520,7 @@ wss.on('connection', (socket, req) => {
           socket.send(linkMessage());
           // And OSC out's state, which offers its switch the same way.
           socket.send(oscOutMessage());
+          if (dawBridge?.state().on) socket.send(JSON.stringify(dawBridge.state()));
         }
       }
       return;
@@ -588,6 +591,10 @@ wss.on('connection', (socket, req) => {
     // room's clock source is not a remote's job.
     if (message.type === 'link-enable') {
       if (from === 'display') setLink(message.on === true);
+      return;
+    }
+    if (message.type === 'daw-names') {
+      if (from === 'display') dawBridge.setNames(message.names);
       return;
     }
     if (from === 'mirror') return;   // a display only listens
@@ -763,6 +770,19 @@ function setLink(on) {
   tellLink();
 }
 
+const dawBridge = startDawBridge({
+  port: DAW_BRIDGE_PORT,
+  proLinks,
+  onMessage: (m) => broadcastTo('display', JSON.stringify(m)),
+  onBinary: (frame) => {
+    for (const c of wss.clients) {
+      if (c.readyState === 1 && roles.get(c) === 'display' && c.bufferedAmount <= 1_000_000) {
+        c.send(frame, { binary: true });
+      }
+    }
+  },
+});
+
 // ── OSC out (PLAN.md 13.5-osc) ─────────────────────────────────────────
 //
 // The plate's colour, the ear's readings and the beat, out to a VJ app, the
@@ -872,6 +892,7 @@ server.listen(PORT, '0.0.0.0', () => {
   if (artnet) console.log(`  Art-Net out:        ${artnetStatus}  (${artnet.count} x ${artnet.order} from channel ${artnet.start}, ${artnet.rate} fps)`);
   if (ARTNET_IN.size > 0) console.log(`  Art-Net in:         udp port ${ARTNET_PORT}${ARTNET_IN_UNIVERSE === null ? '' : ` universe ${ARTNET_IN_UNIVERSE}`}  (${[...ARTNET_IN].map(([c, m]) => `${c}->${m.key}`).join(', ')})`);
   if (OSC_PORT > 0) console.log(`  OSC in:             udp port ${OSC_PORT}${OSC_BIND === '0.0.0.0' ? '' : ` on ${OSC_BIND}`}  (/chromaglass/setting/<key> <n>, /chromaglass/action/<name>, /chromaglass/preset <id>, /blow /drop /press /tilt /dye; every address: docs/osc.md)`);
+  if (DAW_BRIDGE_PORT > 0) console.log(`  DAW bridge:         udp 127.0.0.1:${DAW_BRIDGE_PORT}  (/chromaglass/bridge/hello, /slot, /transport, /pcm, /bye; docs/dawbridge.md)`);
   if (hosts.length === 0) {
     console.log('  No LAN address found — is this machine on a network?');
   } else {

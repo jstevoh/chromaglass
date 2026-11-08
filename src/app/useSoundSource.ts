@@ -4,6 +4,7 @@ import { startSimulatedMusic, type SimulatedMusic } from '../lib/simulatedMusic'
 import type { Track } from '../lib/musicLibrary';
 import { isDesktopApp } from '../lib/platform';
 import { startSystemTap, type SystemTap } from '../lib/systemTap';
+import { startDawTap, type DawAudioTap } from '../lib/dawBridge';
 import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY } from './shared';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
@@ -11,7 +12,7 @@ function rememberedSource(): AudioSource {
   try {
     const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
     // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
-    if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
+    if (raw === 'microphone' || raw === 'simulated' || raw === 'daw' || (raw === 'system' && isDesktopApp())) return raw;
   } catch { /* private */ }
   return 'none';
 }
@@ -71,6 +72,8 @@ export function useSoundSource({
 }: SoundSourceDeps) {
   /** The Mac app's system-audio loopback tap (PLAN.md 23.8): the one source this hook starts and stops itself. */
   const systemTapRef = useRef<SystemTap | null>(null);
+  /** The DAW bridge's PCM tap (PLAN.md 13.7a, docs/dawbridge.md). */
+  const dawTapRef = useRef<DawAudioTap | null>(null);
   /*
     The context the ear analyses in when the source owns one. The System audio
     source plays the Mac's sound into a context of its own, and on GitHub's
@@ -109,6 +112,7 @@ export function useSoundSource({
     }
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
     if (systemTapRef.current) { systemTapRef.current.stop(); systemTapRef.current = null; }
+    if (dawTapRef.current) { dawTapRef.current.stop(); dawTapRef.current = null; }
     setEarContext(null);
     // The drone owns an AudioContext and four running oscillators; leaving it
     // behind would keep them sounding under whatever replaced it.
@@ -120,6 +124,14 @@ export function useSoundSource({
     if (source === 'none') return;
     if (source === 'file') {
       // The stream comes from the element once it is ready; see playMusicFile.
+      return;
+    }
+    if (source === 'daw') {
+      const tap = startDawTap();
+      dawTapRef.current = tap;
+      setEarContext(tap.context);
+      audioStreamRef.current = tap.stream;
+      setAudioStream(tap.stream);
       return;
     }
     if (source === 'drone') {
@@ -310,6 +322,7 @@ export function useSoundSource({
     // Music takes over: the plate's instrument and the band in a box stop.
     stopDrone();
     if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+    if (dawTapRef.current) { dawTapRef.current.stop(); dawTapRef.current = null; setEarContext(null); }
     sourceAskRef.current++;   // a microphone still being asked for is not heard over the music
     if (audioStream) { audioStream.getTracks().forEach(t => t.stop()); setAudioStream(null); }
     el.src = url;
@@ -335,6 +348,7 @@ export function useSoundSource({
       sourceAskRef.current++;   // as startMusic
       stopDrone();
       if (simulatedRef.current) { simulatedRef.current.stop(); simulatedRef.current = null; }
+      if (dawTapRef.current) { dawTapRef.current.stop(); dawTapRef.current = null; setEarContext(null); }
       if (audioStream) audioStream.getTracks().forEach(t => t.stop());
       setAudioSource('file');
       setAudioStream(musicStream(el));

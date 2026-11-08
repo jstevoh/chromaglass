@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
+import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square, Radio } from 'lucide-react';
 import { Sheet, LIT } from './ui';
 import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
@@ -20,7 +20,7 @@ import { isDesktopApp } from '../lib/platform';
  * is — one of the things you set up before a room fills.
  */
 
-export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
+export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone' | 'daw';
 
 const SOURCES: ReadonlyArray<{
   id: AudioSource; label: string; icon: typeof Mic; blurb: string;
@@ -31,6 +31,8 @@ const SOURCES: ReadonlyArray<{
     blurb: 'The room, taken raw: no echo cancellation, no noise suppression, no auto gain. Those are tuned for speech on a call and treat a steady groove as noise to duck.' },
   { id: 'system', label: 'Another tab', icon: Monitor,
     blurb: 'Share a tab that is playing music and the show listens to it in stereo. The sound stays in that tab, so a video call sharing *this* tab will not carry it.' },
+  { id: 'daw', label: 'DAW', icon: Radio,
+    blurb: 'Direct 32-bit float audio from the ChromaGlass Bridge plugin on a track in Logic or Ableton Live, over localhost with no loopback device.' },
   { id: 'file', label: 'Your file', icon: FileAudio,
     blurb: 'Play a track from this machine. It plays out of this tab, so a shared tab carries the music too.' },
   { id: 'drone', label: 'The plate', icon: Waves,

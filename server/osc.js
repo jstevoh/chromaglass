@@ -10,6 +10,8 @@
  * sockets stay in the server.
  */
 
+import { createSocket } from 'node:dgram';
+
 // ── In ─────────────────────────────────────────────────────────────────
 // A small OSC 1.0 reader: address, type tags, int/float/string/blob/bool
 // arguments, and bundles. Addresses (all under /chromaglass):
@@ -221,4 +223,258 @@ export function feedMessages(feed) {
   const bpm = typeof feed?.bpm === 'number' && Number.isFinite(feed.bpm) ? Math.max(0, Math.min(400, feed.bpm)) : 0;
   out.push(['/chromaglass/out/bpm', [bpm]]);
   return out;
+}
+
+// ── DAW bridge (PLAN.md 13.7a, docs/dawbridge.md) ──────────────────────
+//
+// Sits here so the packed Mac app (desktop/electron-builder.config.cjs), which
+// lists `osc.js`, carries the bridge without touching `desktop/`; `dawBridge.js`
+// re-exports these symbols for callers and checks that read it directly.
+
+export const DAW_BRIDGE_PORT = 9024;
+export const DAW_PROTOCOL = 1;
+export const DAW_SLOTS = 32;
+const DAW_QUIET_MS = 3000;
+
+function readBridgeString(buf, offset) {
+  const end = buf.indexOf(0, offset);
+  if (end < 0) return null;
+  return { value: buf.toString('utf8', offset, end), next: ((end + 4) & ~3) };
+}
+
+function readBridgeMessage(buf) {
+  if (buf.length < 4 || buf[0] !== 0x2f) return null;
+  const addr = readBridgeString(buf, 0);
+  if (!addr) return null;
+  const tags = readBridgeString(buf, addr.next);
+  if (!tags || tags.value[0] !== ',') return null;
+  let at = tags.next;
+  const args = [];
+  for (let i = 1; i < tags.value.length; i++) {
+    const t = tags.value[i];
+    if (t === 'i') {
+      if (at + 4 > buf.length) return null;
+      args.push(buf.readInt32BE(at));
+      at += 4;
+    } else if (t === 'f') {
+      if (at + 4 > buf.length) return null;
+      args.push(buf.readFloatBE(at));
+      at += 4;
+    } else if (t === 's') {
+      const s = readBridgeString(buf, at);
+      if (!s) return null;
+      args.push(s.value);
+      at = s.next;
+    } else if (t === 'b') {
+      if (at + 4 > buf.length) return null;
+      const len = buf.readInt32BE(at);
+      at += 4;
+      if (len < 0 || at + len > buf.length) return null;
+      args.push(buf.subarray(at, at + len));
+      at += (len + 3) & ~3;
+    } else {
+      return null;
+    }
+  }
+  return { address: addr.value, args };
+}
+
+function readBridgePacket(buf) {
+  if (buf.length >= 16 && buf.toString('ascii', 0, 8) === '#bundle\0') {
+    const out = [];
+    let at = 16;
+    while (at + 4 <= buf.length) {
+      const size = buf.readInt32BE(at);
+      at += 4;
+      if (size <= 0 || at + size > buf.length) break;
+      out.push(...readBridgePacket(buf.subarray(at, at + size)));
+      at += size;
+    }
+    return out;
+  }
+  const msg = readBridgeMessage(buf);
+  return msg ? [msg] : [];
+}
+
+export function encodeDawNames(names) {
+  return encodeOsc('/chromaglass/bridge/names', Array.from({ length: DAW_SLOTS }, (_, i) => String(names?.[i] ?? '')));
+}
+
+export function startDawBridge({
+  port = DAW_BRIDGE_PORT,
+  proLinks = () => true,
+  onMessage = () => {},
+  onBinary = () => {},
+} = {}) {
+  let followed = null;
+  let names = Array(DAW_SLOTS).fill('');
+  let socket = null;
+
+  const sendNames = () => {
+    if (!followed || !socket) return;
+    const pkt = encodeDawNames(names);
+    socket.send(pkt, followed.port, followed.address, () => {});
+  };
+
+  const state = () => (followed
+    ? {
+        type: 'daw',
+        on: true,
+        instance: followed.instance,
+        host: followed.host,
+        sampleRate: followed.sampleRate,
+        latency: followed.latency,
+      }
+    : { type: 'daw', on: false, ...(proLinks() ? {} : { locked: true }) });
+
+  const setNames = (next) => {
+    if (!Array.isArray(next)) return;
+    names = Array.from({ length: DAW_SLOTS }, (_, i) => (typeof next[i] === 'string' ? next[i] : ''));
+    sendNames();
+  };
+
+  const onTierChange = () => {
+    if (!proLinks() && followed) {
+      followed = null;
+      onMessage({ type: 'daw', on: false, locked: true });
+    }
+  };
+
+  if (!(port > 0)) {
+    return { port: 0, state, setNames, onTierChange, close: () => {} };
+  }
+
+  socket = createSocket({ type: 'udp4', reuseAddr: true });
+  socket.on('error', () => {
+    try { socket.close(); } catch { /* already closed */ }
+    socket = null;
+  });
+
+  socket.on('message', (buf, rinfo) => {
+    if (rinfo.address !== '127.0.0.1') return;
+    let msgs;
+    try { msgs = readBridgePacket(buf); } catch { return; }
+    for (const { address, args } of msgs) {
+      if (!address.startsWith('/chromaglass/bridge/')) continue;
+      if (!proLinks()) {
+        if (followed) followed = null;
+        if (address === '/chromaglass/bridge/hello') {
+          onMessage({ type: 'daw', on: false, locked: true });
+        }
+        continue;
+      }
+
+      if (address === '/chromaglass/bridge/hello') {
+        const [version, instance, host, sampleRate, latency] = args;
+        if (
+          version !== DAW_PROTOCOL ||
+          typeof instance !== 'string' || !instance ||
+          typeof host !== 'string' ||
+          typeof sampleRate !== 'number' || !(sampleRate > 0) ||
+          typeof latency !== 'number' || !(latency >= 0)
+        ) continue;
+
+        if (followed && (followed.address !== rinfo.address || followed.port !== rinfo.port || followed.instance !== instance)) {
+          continue;
+        }
+        const changed = !followed ||
+          followed.instance !== instance ||
+          followed.host !== host ||
+          followed.sampleRate !== sampleRate ||
+          followed.latency !== latency;
+        followed = {
+          address: rinfo.address,
+          port: rinfo.port,
+          instance,
+          host,
+          sampleRate,
+          latency,
+          lastSeen: Date.now(),
+        };
+        if (changed) onMessage(state());
+        sendNames();
+        continue;
+      }
+
+      if (!followed || rinfo.address !== followed.address || rinfo.port !== followed.port) continue;
+      followed.lastSeen = Date.now();
+
+      if (address === '/chromaglass/bridge/bye') {
+        const [instance] = args;
+        if (typeof instance === 'string' && instance !== followed.instance) continue;
+        followed = null;
+        onMessage({ type: 'daw', on: false });
+      } else if (address === '/chromaglass/bridge/slot') {
+        const [slot, value] = args;
+        if (!Number.isInteger(slot) || slot < 0 || slot >= DAW_SLOTS || typeof value !== 'number' || !Number.isFinite(value)) continue;
+        onMessage({ type: 'daw-slot', slot, value: Math.max(0, Math.min(1, value)) });
+      } else if (address === '/chromaglass/bridge/transport') {
+        const [playing, bpm, whole, frac, barBeat, num, den, ahead] = args;
+        if (
+          typeof playing !== 'number' ||
+          typeof bpm !== 'number' || !(bpm > 0) ||
+          typeof whole !== 'number' ||
+          typeof frac !== 'number' ||
+          typeof barBeat !== 'number' ||
+          typeof num !== 'number' ||
+          typeof den !== 'number' ||
+          typeof ahead !== 'number'
+        ) continue;
+        onMessage({
+          type: 'daw-transport',
+          playing: playing !== 0,
+          bpm,
+          beat: whole + frac,
+          barBeat,
+          num,
+          den,
+          ahead,
+        });
+      } else if (address === '/chromaglass/bridge/pcm') {
+        const [channels, sampleRate, seq, blob] = args;
+        if (
+          (channels !== 1 && channels !== 2) ||
+          typeof sampleRate !== 'number' || !(sampleRate > 0) ||
+          typeof seq !== 'number' ||
+          !Buffer.isBuffer(blob) || blob.length === 0 || blob.length % (4 * channels) !== 0
+        ) continue;
+        const frame = Buffer.allocUnsafe(16 + blob.length);
+        frame[0] = 0x43;
+        frame[1] = 0x47;
+        frame[2] = 0x50;
+        frame[3] = 0x43;
+        frame[4] = channels & 0xff;
+        frame[5] = 0;
+        frame[6] = 0;
+        frame[7] = 0;
+        frame.writeUInt32LE(sampleRate >>> 0, 8);
+        frame.writeUInt32LE(seq >>> 0, 12);
+        blob.copy(frame, 16);
+        onBinary(frame);
+      }
+    }
+  });
+
+  socket.bind(port, '127.0.0.1');
+
+  const timer = setInterval(() => {
+    if (followed && Date.now() - followed.lastSeen >= DAW_QUIET_MS) {
+      followed = null;
+      onMessage({ type: 'daw', on: false });
+    }
+  }, 200);
+  timer.unref?.();
+
+  return {
+    port,
+    state,
+    setNames,
+    onTierChange,
+    close: () => {
+      clearInterval(timer);
+      followed = null;
+      try { socket?.close(); } catch { /* already closed */ }
+      socket = null;
+    },
+  };
 }

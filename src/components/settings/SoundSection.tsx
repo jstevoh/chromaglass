@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { Activity } from 'lucide-react';
 import { isMapping } from '../../lib/midi';
 import { groupOf } from '../../lib/settingsMap';
@@ -6,6 +7,7 @@ import { SwitchPill, Toggle, LIT } from '../ui';
 import { TapPad } from '../ui/Playful';
 import { OscOutRow } from '../ui/OscOutRow';
 import { linkLine, tempoSourceName } from '../../lib/tempo';
+import { getDawBridgeStatus, subscribeDawBridge } from '../../lib/dawBridge';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 
@@ -27,6 +29,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
     onTempoBpm, onLink, oscOut, onOscOut, onLinkTransport, midiClocked, timecode, focusSection, midi, onOpenSound, keep, shown, goTo, listens,
     CARD, GRID, TITLE,
   } = c;
+  const dawStatus = useSyncExternalStore(subscribeDawBridge, getDawBridgeStatus);
   return (
     <>
 
@@ -105,13 +108,13 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                 data-testid="audio-source-state"
                 data-source={audioSource}
               >
-                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument' } as const)[audioSource]}
+                {({ none: 'Off', microphone: 'Mic', system: 'System', file: 'File', simulated: 'Band', drone: 'Instrument', daw: 'DAW' } as const)[audioSource]}
               </div>
               {onOpenSound && (
                 <button
                   onClick={onOpenSound}
                   className="h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[12px] font-medium transition-colors hover:bg-white/10"
-                  title="Choose what the plate listens to: the mic, a tab, a file, the band or the plate as an instrument"
+                  title="Choose what the plate listens to: the mic, a tab, a file, the band, the DAW bridge or the plate as an instrument"
                   data-testid="audio-source-open"
                 >
                   Change in Sound…
@@ -119,7 +122,7 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
               )}
             </div>
             <Info>
-              <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
+              <b>Mic</b> hears the room. <b>System</b> captures a tab or the whole machine, so a stream drives the plate with no microphone in the loop. <b>DAW</b> hears a track straight from the ChromaGlass Bridge plugin in Logic or Live. <b>File</b> plays a track here and is the straightest signal there is. <b>Band</b> is a synthesised group played silently into the analyser — no device, no permission, and every mapping runs exactly as it does on a real input.
             </Info>
           </div>
         )}
@@ -250,6 +253,27 @@ export const AudioInputSection = ({ c }: { c: SectionCtx }) => {
                     Play/Stop
                   </button>
                 )}
+              </div>
+            )}
+            {/* DAW bridge (PLAN.md 13.7a): the plugin's status and its ear switch when a show server or plugin is present. */}
+            {(tempo?.link?.available || dawStatus.on || dawStatus.locked || audioSource === 'daw') && onAudioSource && (
+              <div className="flex items-center gap-2" data-testid="daw-bridge-row">
+                <button
+                  onClick={() => onAudioSource(audioSource === 'daw' ? 'none' : 'daw')}
+                  aria-pressed={audioSource === 'daw'}
+                  data-testid="daw-bridge-source"
+                  title="Listen to the ChromaGlass Bridge plugin on a track in Logic or Ableton Live"
+                  className={`min-h-9 flex-none rounded-lg border px-3 text-[13px] font-medium transition-all ${audioSource === 'daw' ? LIT : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                >
+                  DAW
+                </button>
+                <span className="text-[12px] opacity-50" data-testid="daw-bridge-says">
+                  {dawStatus.locked
+                    ? 'part of Pro'
+                    : dawStatus.on
+                      ? `${dawStatus.host ?? 'plugin'}${dawStatus.sampleRate ? ` · ${dawStatus.sampleRate} Hz` : ''}`
+                      : 'waiting for the plugin on 127.0.0.1:9024'}
+                </span>
               </div>
             )}
             {/* OSC out (PLAN.md 13.5-osc): offered, like Link, only where a show server is there to send it. */}
