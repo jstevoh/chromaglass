@@ -55,8 +55,11 @@ import { port } from './ports.mjs';
 const NODE_ONLY = process.argv.includes('--node');
 const PLUGIN = process.argv.includes('--plugin');
 const PORT = port(5311, 'DAWBRIDGE_PORT');
-// Not 9024: a real plugin and app on this machine keep theirs.
-const BRIDGE = PORT + 3713;
+// Not 9024: a real plugin and app on this machine keep theirs. It was PORT + 3713,
+// which is 9024 exactly: with a show server already running here, that server answered
+// the fake plugin and the check read its names (13.7b found it). 9124 is clear of both,
+// and a harness port shift only moves it further from 9024.
+const BRIDGE = PORT + 3813;
 const FREE_PORT = PORT + 1;
 const FREE_BRIDGE = BRIDGE + 1;
 // The contract's numbers (docs/dawbridge.md), written here, not read from either half.

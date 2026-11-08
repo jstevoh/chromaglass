@@ -560,3 +560,7 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
 - **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
   retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
   GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).
+- **19ak-7. Shipped:** the other release-page downloads survive a 504 too: actionlint falls
+  back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
+  prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
+  (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.

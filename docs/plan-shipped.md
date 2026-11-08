@@ -552,6 +552,32 @@ receiver once rather than in every cast state (the lesson of S0's logo, in
 *Measure:* `npm run desk` and `npm run phone` find a picture on every built-in look's
 row; the cast state's size is unchanged.
 
+### 13.7b. The DAW bridge plugin (2026-11-07)
+
+**What was built.** `plugin/dawbridge/`, a JUCE 8 effect in AU and VST3 (universal, macOS
+11 and up) that passes its audio through untouched and sends the running app what MIDI
+carries badly: 32 automation slots at full float resolution, the host's transport with
+the bar's phase exact, and the track's audio as PCM, all as OSC over UDP to
+`127.0.0.1:9024` per `docs/dawbridge.md`. The audio thread never waits: it writes what it
+saw into two lock-free FIFOs and a sender thread of the plugin's own does all the talking
+(the hello once a second, the stopped transport's 250 ms heartbeat, the bye on release).
+The app's names come back on the same socket, so a lane reads `Slot 4 · Swirl` in a host
+that follows parameter names, and the window lists every slot's binding for the hosts
+that do not. `DawBridgeSelfTest` is the real processor played as a host plays it, in real
+time, so the FIFOs and the sender are what is measured.
+
+**Built on the owner's Mac, not in Antigravity's lane,** because it needs cmake, the JUCE
+download, `auval` in a GUI session and a DAW to film in, none of which a headless run has.
+
+**What it measured.** `auval -v aufx Pltr Cgbr`: AU VALIDATION SUCCEEDED. `npm run
+dawbridge -- --plugin` against 13.7a's server and app: 36 of 36, the header at protocol 1,
+32 slots, port 9024; 375 transports to beat 7.98 over the 4 s run; 4.000 s of audio in 750
+packets with no gap; slot 3 moved 750 times from 0.000 to 1.000. Filmed on the owner's Mac
+in headed Metal Chromium against #694's show server: the self-test played three times, slot 4
+mapped to Plate Rock, and Plate Rock read 0.04, 0.31, 0.89, 1.00 through each 4 s run with the
+tempo source on `daw` (32 s film, shared with the owner). The film in Live is owed
+(13.7b-film): the Allow for Live was declined while the owner was away.
+
 ### 13.5-link. Ableton Link in (2026-10-30)
 
 The owner OK'd one simple piece of the DAW work on 2026-10-30, while the in-flight work
@@ -2527,6 +2553,28 @@ pick asks for its own input by id, one track is live at the end, Input 2's (5/5)
 runs in Measure's browser part. Safari's second song and song ID's latch stay open in
 PLAN.md 14s.
 
+### 14t-pc. Program Change is dropped (shipped)
+
+`parseMidi` (`src/lib/midi.ts`) returned CC and note on/off and nothing else, so a `0xC0`
+message never reached learn. AUM's MIDI matrix, the Elektron boxes and most hardware
+sequencers send Program Change (and Bank Select, CC 0/32) when the pattern changes.
+
+*Shipped:* `MidiEvent.kind` and `MidiSource.kind` gain `'program'`, `parseMidi` reads
+`[0xC0 | ch, n]` as `{ kind: 'program', channel: ch, number: n, value: 0 }`, `eventSource`
+and `parseMidiMap` keep a program source, and `sourceLabel` prints `"Program n ch c"`.
+`MidiTarget` gains `{ kind: 'setlist'; index: number }` (0-based), formatted by `targetLabel`
+and preserved by `parseMidiMap` and `parseSoundBindings`. `useMidi`'s bank-resolution rule
+and button-press test live in `src/lib/midi.ts` as `liveBindings(map, source, bank)` (a
+bank's own binding wins over an always-live one) and `pressedBy(event)` (true for a
+program). `useMidi` calls both and handles `case 'setlist'` via `MidiHost.playSetItem`,
+which `App` wires to the set list's Go path (`sendLook` with `look.fade ?? fadeSeconds`).
+On the desk, `MidiPanel` shows `"Program n ch c"` bindings and offers set-list items under
+a `set list` tab; on the phone, the bindings are listed on its MIDI section (`#settings-midi`).
+Measured: `npm run soundowed -- --owed=voices,lfo` (`5/5 checks passed, 14 owed`: Bank Select
+CC 0/32 stays a CC, `parseMidi([0xC5, 7])` reads `{ kind: 'program', channel: 5, number: 7, value: 0 }`,
+2 of 2 bindings survive save and load, and a recorded run of 12 Program Changes with Bank
+Select and clock between lands all 12 with 0 doubled and 0 missed).
+
 ### 14x. The microphone hears the hand on the laptop (shipped)
 
 **Reported by the owner 2026-10-04:** pressing some controls (the Speed ride) or
@@ -4267,6 +4315,15 @@ the sessions' files or the native apps skips the Mac (19h).
   download, into a run-local SwiftPM cache under the name SwiftPM looks for, so SwiftPM
   copies them (checksum still checked) instead of downloading; the resolve retries git
   up to three times.
+- **19ak-7, the other release-page downloads** (2026-11-08). The same 504s turned
+  Measure · logic red (actionlint v1.7.7, three times on #720) and the Mac app job (canvas's
+  prebuilt in `npm ci`, then electron-builder's download after Electron's), while the same
+  URLs served a cloud session at times. `scripts/actionlint.mjs` now falls back to the
+  API's asset download (the route that carried #721's iPhone build through) and still
+  checks the sha256; `checks.yml` caches `scratch/actionlint` for the logic part, keyed on
+  the script. `desktop.yml` caches `~/.npm/_prebuilds` and Electron's and
+  electron-builder's caches on pull requests (a signed release fetches fresh), keyed on
+  both lockfiles, and retries the install three times.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
