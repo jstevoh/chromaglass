@@ -1553,7 +1553,7 @@
     {
       "name": "The looks browser: stills and one preview, owed",
       "shard": "browser",
-      "run": "npm run looksgrid -- --owed=stills,preview",
+      "run": "npm run looksgrid -- --owed=preview",
       "why": [
         "PLAN 34b written ahead of its build (scripts/looksgrid.mjs): every shipped",
         "look's card on the Perform desk's grid, the narrow window's look menu and the",

@@ -6,6 +6,7 @@ import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
 import { RecordControls } from './RecordControls';
 import { DeskHeader } from './DeskHeader';
+import { LooksGrid } from './LooksGrid';
 import { LEFT_WIDTH, PanelBody, RIDES_WIDTH, panelMeta } from './DeskPanels';
 import { PanelBrowser } from './PanelBrowser';
 import { PanelWindow, openPanelWindow } from './PanelWindow';
@@ -817,7 +818,7 @@ function DocMenu({ p, crumb }: { p: DeskProps; crumb: string }) {
   };
   return (
     <>
-      <span className="text-muted">{crumb}</span>
+      <LooksGrid label={crumb} activeLookId={p.liveLookId} onSelectLook={p.onSendSaved} />
       <span className="text-faint">/</span>
       <div className="relative flex min-w-0 items-center gap-2">
         <button
