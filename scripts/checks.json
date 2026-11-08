@@ -592,6 +592,19 @@
       ]
     },
     {
+      "name": "Three sound builds, their checks written first",
+      "shard": "logic",
+      "run": "npm run soundowed -- --owed=pc,voices,lfo",
+      "why": [
+        "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
+        "notes as voices placed by Melody Walk's scale with an attack, a release",
+        "and a voice cap (24.3), and LFOs and envelopes you set (30b), each a",
+        "library contract named in the script's header. Owed until each build;",
+        "the PR that builds one takes its id out. Two lines hold on main: Bank",
+        "Select stays a CC, and today's LFOs and envelopes stay the defaults."
+      ]
+    },
+    {
       "name": "The back plate's own look",
       "shard": "logic",
       "run": "npm run backplate",
