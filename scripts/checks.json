@@ -249,7 +249,11 @@
         "the Mac moves the deploy to GitHub's Macs; and that step's own rule",
         "(scripts/macbusy.sh) against made-up process lists and this machine's own:",
         "another session's working browser or the app counted; a deploy's own, an",
-        "idle leftover and a vite server alone not."
+        "idle leftover and a vite server alone not. And 19ah-9a (scripts/macdeploy.mjs):",
+        "the mark a shard writes holds a harness's launch while its worker lives and",
+        "for a grace after it ends, never for a shard that gave up or died; macbusy.sh's",
+        "own marks read back; the last step fails when a look between the checks found",
+        "the Mac busy, and the watchdog reads that failure as busy too."
       ]
     },
     {
@@ -477,7 +481,7 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
+      "run": "npm run rungs",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
@@ -629,9 +633,34 @@
       ]
     },
     {
+      "name": "Hear the set ahead, from files, owed",
+      "shard": "logic",
+      "run": "npm run hearahead -- --owed=files,sections,ahead,loudness,clock,tags",
+      "why": [
+        "Written before the build (scripts/hearahead.mjs, PLAN §17, 2026-11-08): a",
+        "made-up 126 BPM record analysed ahead by the render's own ear, its beat grid",
+        "through a breakdown, its sections on the beat with the drop named, a song",
+        "show's lead in beats, BS.1770 loudness, the player's place in the set and",
+        "the file's tags. --owed: each line is excused only in main's state; the build",
+        "takes its id out and never edits a line. The ear's line and the late line",
+        "(nothing known ahead, a lead fires on the section) hold on main. Node, 4 s."
+      ]
+    },
+    {
+      "name": "The album sheet, its checks written first",
+      "shard": "logic",
+      "run": "npm run album -- --owed=sheet,lineage,builds,seeds",
+      "why": [
+        "PLAN 37x-3's album sheet in node (scripts/album.mjs): the file read on the",
+        "album's clock and as a set list, one palette lineage with bars read from",
+        "the shipped looks' palettes, a quantity that builds at Evolve's pace, and",
+        "track seeds drawn from the album's. All owed until src/lib/albumSheet.ts."
+      ]
+    },
+    {
       "name": "Three sound builds, their checks written first",
       "shard": "logic",
-      "run": "npm run soundowed -- --owed=voices,lfo",
+      "run": "npm run soundowed -- --owed=voices",
       "why": [
         "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
         "notes as voices placed by Melody Walk's scale with an attack, a release",
@@ -994,7 +1023,7 @@
     {
       "name": "Nothing on the plate makes light",
       "shard": "lab",
-      "run": "npm run nolight",
+      "run": "npm run nolight -- --owed=rim,film",
       "why": [
         "A plate lit from beneath shows transmitted light only (PLAN 38h): the",
         "satellite droplets, Glossiness, the gel and the dish's wall each leave",
@@ -1004,7 +1033,10 @@
         "Focus passes the middle; and two times of the clock draw the same",
         "plate (no grain). The lab on SwiftShader, beside lampzero, about two",
         "minutes: the real plate shader on a lab plate, any adapter that",
-        "computes, so it has no need of the Mac."
+        "computes, so it has no need of the Mac. --owed=rim,film: a clear pour's",
+        "and a clear oil drop's rim in focus (PLAN 18e-2) and the camera's bubble",
+        "film by transmission (38h-6), written ahead of their builds; the build",
+        "takes its id out."
       ]
     },
     {
@@ -1255,6 +1287,21 @@
       ]
     },
     {
+      "name": "The rest of a bubble's air, owed until its builds",
+      "shard": "lab4",
+      "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
+      "why": [
+        "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
+        "scripts/bubbleair.mjs): on bubbledye's plate, the old plate's bubbles",
+        "keep the colour and fill their holes, the species carried alone, the",
+        "oil's mix and the maze's path take the air, the carry empties a bubble",
+        "and fills its hole evenly without airShed, and the app lays no press",
+        "under a bubble while the flow round it stays the same. Each owed id",
+        "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
+        "it: about three and a half minutes, in lab4, which has the room."
+      ]
+    },
+    {
       "name": "No line round a bubble's hole",
       "shard": "lab4",
       "run": "npm run holeline",
@@ -1445,6 +1492,20 @@
       ]
     },
     {
+      "name": "What the desk has that nobody can see, owed",
+      "shard": "browser",
+      "run": "npm run deskreach -- --owed=rides1280,ridemark,deckmark,macro,remote",
+      "why": [
+        "Written before their builds (scripts/deskreach.mjs, 2026-11-08): every ride",
+        "whole at 1280x800 and a mark when the right column or the deck has more than",
+        "it shows (35c-6a, 35c-6b, the deck's Macro panel on the screen at 1440), and",
+        "Laptop remote on the iPad app's full layout (12 step 4a). --owed: each line is",
+        "excused only in main's state and printed as owed; the PR that builds it takes",
+        "its id out and never edits a line. The lines with no id hold on main: no mark",
+        "when nothing is below, no Laptop remote on the website. About a minute."
+      ]
+    },
+    {
       "name": "The cartoons",
       "shard": "browser",
       "run": "npm run cartoons",
@@ -1622,6 +1683,23 @@
       ]
     },
     {
+      "name": "The phone controller apps, owed",
+      "shard": "browser2",
+      "run": "npm run controller -- --owed=setlist,songs,display,scan,android,nogpu",
+      "why": [
+        "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
+        "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
+        "song shows on the phone's remote, and the laptop's half that sends them and",
+        "acts on a tap (12-ctl-1); Scan the Phone panel's QR code instead of typing",
+        "(12-ctl-2); the Android app as a Capacitor project that may open ws:// to the",
+        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). --owed: each",
+        "line is excused only in main's state and printed as owed; the PR that builds",
+        "it takes its id out and never edits a line. The lines with no id hold on main:",
+        "the looks stay on Controls, the laptop answers a controller, no Scan on the",
+        "website, no Open in Chrome on the iPhone. No plate needed; about a minute."
+      ]
+    },
+    {
       "name": "OSC out reaches a VJ app",
       "shard": "browser2",
       "run": "npm run oscout",
@@ -1653,7 +1731,7 @@
     {
       "name": "The Live Show panel",
       "shard": "browser2",
-      "run": "npm run liveshow",
+      "run": "npm run liveshow -- --owed=narrow",
       "why": [
         "The Mac app's Live Show panel (PLAN.md 37x-4d; scripts/liveshow.mjs):",
         "its sums in node against numbers worked by hand, then the built app",
@@ -1662,7 +1740,8 @@
         "the public, the upload warning, and the phone's Stop. No GPU: the",
         "encoder is WebCodecs' software H.264. Through npm run, which builds",
         "dist/ first and puts esbuild on the PATH (a bare esbuild in the",
-        "shard's shell is not found: exit 127 on the first CI run)."
+        "shard's shell is not found: exit 127 on the first CI run). The narrow",
+        "window's chip (37x-4d-4, scripts/liveshownarrow.mjs) is owed until built."
       ]
     },
     {
@@ -1716,6 +1795,21 @@
         "notes; the room keys against lookFade.ts; nothing public naming it. Then eighteen",
         "mutants, each a rule removed from a copy of server/, each of which must fail its",
         "own line. No GPU, no build; about a minute."
+      ]
+    },
+    {
+      "name": "The owner's YouTube connector",
+      "shard": "browser2",
+      "run": "npm run youtube",
+      "why": [
+        "The YouTube MCP server (PLAN 44i; scripts/youtube.mjs): mcp/youtube-mcp.js over stdio",
+        "against a stand-in Google on loopback. The sign-in (state refused, PKCE S256, the key",
+        "file 600 in a 700 folder), a refused access key refreshed, an upload killed mid-file",
+        "and resumed by a second server in the same session, a dropped chunk and a 503 resumed",
+        "from Google's count, the bytes exact, private when no privacy is named (Google's default",
+        "is public since 2026-11-02), the same file twice refused, an update keeping what it did",
+        "not name, no secret in any reply or log. Then fourteen mutants, each of which must fail",
+        "its own line. No GPU, no build, no network; about half a minute."
       ]
     },
     {
@@ -1921,9 +2015,10 @@
     {
       "name": "The relief",
       "shard": "plate",
-      "run": "npm run derive",
+      "run": "npm run derive -- --owed=grad",
       "why": [
-        "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror."
+        "The plate's relief (slopes, edges) is worked out where the dye is, not at its mirror.",
+        "--owed=grad: the derive pass writes |∇OPL| in .z (PLAN 18e-2), written ahead of its build."
       ]
     },
     {
@@ -2955,6 +3050,19 @@
         "plate read in its own frame. On a Mac because it needs WebGPU. --owed:",
         "the Mixer stack source is not built; printed as owed until the PR that",
         "builds it takes its id out (the Plate source's black frames, 37x-4d-6, are fixed)."
+      ]
+    },
+    {
+      "name": "The album's plate carries from song to song",
+      "shard": "fifth",
+      "run": "npm run albumplate -- --owed=carry",
+      "why": [
+        "PLAN 37x-3 (scripts/album.mjs --app): song 2's first half second keeps song",
+        "1's dye (the picture's luma correlated, its spread held) while track 2's",
+        "settings move, and a track marked opensOnBlack opens on black, through the",
+        "window.chromaglassAlbum hook; owed until built. Two control lines hold on",
+        "main: a look taken with Go keeps the plate by the same bars and Clear does",
+        "not. On a Mac because the plate needs WebGPU."
       ]
     },
     {
