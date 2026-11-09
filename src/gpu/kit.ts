@@ -800,18 +800,32 @@ export class ReadbackRing {
   /** The newest copy asked for: a reading is of the GPU as of its copy (see `landed`). */
   get issued(): number { return this.seq; }
 
-  /** Copy `src` into a free slot as part of `encoder`; false when every slot is still in flight (skip this frame). */
-  copyFrom(encoder: GPUCommandEncoder, src: GPUBuffer, offset = 0): GPUBuffer | null {
+  /** Whether a slot is free to be copied into. */
+  get hasFree(): boolean { return this.slots.some((s) => !s.busy); }
+
+  /**
+   * Reserve a free slot and hand back its buffer to copy into (H2c-7: a
+   * `copyTextureToBuffer` straight into the ring rather than through a
+   * staging buffer); null when every slot is still in flight (skip this frame).
+   */
+  reserve(): GPUBuffer | null {
     const slot = this.slots.find((s) => !s.busy);
     if (!slot) return null;
-    encoder.copyBufferToBuffer(src, offset, slot.buf, 0, this.bytes);
     slot.busy = true;
     slot.seq = ++this.seq;
     slot.epoch = epoch;
     return slot.buf;
   }
 
-  /** After the submit: map the slot `copyFrom` returned, keeping its data if it is the newest to land. */
+  /** Copy `src` into a free slot as part of `encoder`; null when every slot is still in flight (skip this frame). */
+  copyFrom(encoder: GPUCommandEncoder, src: GPUBuffer, offset = 0): GPUBuffer | null {
+    const buf = this.reserve();
+    if (!buf) return null;
+    encoder.copyBufferToBuffer(src, offset, buf, 0, this.bytes);
+    return buf;
+  }
+
+  /** After the submit: map the slot `reserve` or `copyFrom` returned, keeping its data if it is the newest to land. */
   collect(buf: GPUBuffer): void {
     const slot = this.slots.find((s) => s.buf === buf);
     if (!slot) return;

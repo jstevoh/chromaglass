@@ -12165,3 +12165,19 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+## 40. H2c-7 · Readback straight into its ring (2026-11-08)
+
+`WebGPUFluid.readbackAsync` (`src/gpu/fluid/reads.ts`) downsampled each field into
+`readTarget`, copied that into `rbStaging`, and only then asked `ReadbackRing`
+(`src/gpu/kit.ts`) for a free slot and copied staging into it: two copies a field
+(2.36 MB across four copies at 384²), and when both slots were still in flight it still
+downsampled and copied into staging before throwing the work away. `ReadbackRing` now
+exposes `hasFree` and `reserve()` beside `copyFrom`; `ReadGate.wants` and `readbackAsync`
+check that both rings have a free slot before encoding anything (leaving `askedNow`
+uncalled when full so the next frame asks again), and `readbackAsync` copies `readTarget`
+straight into the reserved slot buffer with `copyTextureToBuffer`. `rbStaging` is dropped
+from `FluidCore`. `h2c7` is taken out of `--owed` in `scripts/checks.json`; `npm run
+framereads` 16/16 (`1179648` bytes in 2 copies, `1.00x` a field's bytes, down from
+`2359296` in 4 copies, `2.00x`; 0 dispatches and 0 copies across 6 full asks, down from
+12 and 12; the frame after the full asks reads the plate back with 0 error).

@@ -167,9 +167,9 @@ merge conflicts are the shared documents', which 0.6 ends.
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
   14ab-13 with #591, finished in #596; 14ab-6 the beads' mask on the GPU). Left: 14ab-10, -11,
   -14.
-- **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
+- **4.4** ~~**H2c-7**~~, **H2c-6, H2c-8, H2c-5** (S each): ~~the readback straight into its ring~~ (shipped), no aux
   target without the camera, air only where there are bubbles, first-order velocity.
-  H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-7 and H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
+  H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
 - **4.7** ~~**14c-4k, 14c-governor, H2c-10**~~ (shipped, `npm run rungs`; story in `docs/plan-shipped.md`), **H2c-labels** (S). Then **H2a**, **H1**, **H3a**.
@@ -416,7 +416,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 37 | Marketing and social media, and the weekly album show (asked 2026-10-29) | [`37-marketing.md`](docs/plan/37-marketing.md) |  | 30 |
 | 38 | Realism audit: what still imitates, after §18 (asked 2026-10-30) | [`38-realism-audit.md`](docs/plan/38-realism-audit.md) |  | 23 |
 | 39 | Feedback from inside the app (asked 2026-10-30) | [`39-feedback.md`](docs/plan/39-feedback.md) |  | 5 |
-| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) |  | 27 |
+| 40 | Specs for the thin items, part 1: the frame budget, the gig and the desk (written 2026-11-01) | [`40-specs-frame-gig-desk.md`](docs/plan/40-specs-frame-gig-desk.md) | H2c-7 shipped | 26 |
 | 41 | Specs for the thin items, part 2: sound and beat, many plates, the fluids (written 2026-11-01) | [`41-specs-sound-plates-fluids.md`](docs/plan/41-specs-sound-plates-fluids.md) |  | 28 |
 | 42 | What Liquid Light Lab's tutorials and gear showed (asked 2026-11-07) | [`42-liquid-light-lab.md`](docs/plan/42-liquid-light-lab.md) |  | 10 |
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 9 |

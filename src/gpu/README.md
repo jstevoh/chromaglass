@@ -8,7 +8,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead. The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
 - `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms.
 - `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (including `speciesShare` and `speciesSnapshot`).
-- `kit.ts` (47 KB, grep it): `PipelineCache`, `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing`, `GpuProfiler`.
+- `kit.ts` (47 KB, grep it): `PipelineCache`, `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing` (`hasFree`, `reserve`, `copyFrom`, `collect`), `GpuProfiler`.
 
 ## Contracts
 
