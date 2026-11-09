@@ -360,12 +360,14 @@ try {
     the order a set naturally runs in (the app opens at None; the owner
     presses Go, then starts the music). Before the fix the encoder took its
     sound once, at Go, and this stream was silence to the end. Now the tone
-    must be heard from the moment it was handed over, at its own pitch
-    (opened at 44.1 kHz against the silent track's 48, so a stream that
-    forgot to resample it reads 239.5 Hz, not 220), placed on the stream's
-    clock where it was opened (within 100 ms: placed late, a switched source
-    would drift out of sync with the picture by however late), and the
-    track still whole across the change.
+    must be heard, at its own pitch (opened at 44.1 kHz against the silent
+    track's 48, so a stream that forgot to resample it reads 239.5 Hz, not
+    220); the step it makes a second after the hand-over must land on the
+    stream's clock where the page made it, within the click line's 30 ms (a
+    hole or a cut at the switch moves all the sound after it against the
+    picture, since the encoder stamps by sample count); and the track must
+    run to the stream's last frame, not short of it by whatever went
+    missing.
   */
   for (const kind of ['no source', 'source off on air', 'source opened on air']) {
     const key = { 'no source': 'check-stream-key-silent', 'source off on air': 'check-stream-key-ended', 'source opened on air': 'check-stream-key-opened' }[kind];
@@ -406,18 +408,23 @@ try {
     if (opens) {
       // Before the hand-over, silence; from 300 ms after it, the tone, at 220 Hz; and where it starts on the stream's clock, the decoder's priming set back.
       const om = opened?.openedMs ?? NaN;
-      const pre = lv.filter((l) => l.ts > 300 && l.ts < om - 100), post = lv.filter((l) => l.ts > om + 300);
+      const sm = opened?.stepMs ?? NaN;
+      const pre = lv.filter((l) => l.ts > 300 && l.ts < sm - 100), post = lv.filter((l) => l.ts > sm + 300);
       const prime = dec.primingMs ?? 0;
       const onset = lv.find((l) => l.ts > om - 1000 && loud(l));
       const onsetMs = onset ? onset.ts - prime : NaN;
-      const hz = median((dec.pitch ?? []).filter((p) => p.ts > om + 300).map((p) => p.hz));
-      check(`${kind}: the audio track decodes, silence until the source was opened and the tone from then on, at its own pitch`,
+      const hz = median((dec.pitch ?? []).filter((p) => p.ts > sm + 300).map((p) => p.hz));
+      check(`${kind}: the audio track decodes, silence until the source's tone and the tone from then on, at its own pitch`,
         whole && pre.length > 0 && pre.every(quiet) && post.length > 0 && post.filter(loud).length >= 0.95 * post.length && Math.abs(hz - 220) <= 3,
         dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; before ${pre.filter(quiet).length}/${pre.length} quiet, after ${post.filter(loud).length}/${post.length} loud; pitch ${fmt(hz, 1)} Hz (220 sent from ${opened?.rate} Hz into a ${rate} Hz track)`);
-      check(`${kind}: the tone starts on the stream's clock where it was opened, within 100 ms`, Number.isFinite(onsetMs) && Math.abs(onsetMs - om) <= 100,
-        `opened at ${fmt(om, 0)} ms, heard from ${fmt(onsetMs, 0)} ms (priming ${fmt(prime, 1)} ms set back)`);
-      check(`${kind}: the encoder says it moved to the new source once, resampling it`, st?.audioSwitches === 1 && st?.audioResampled === (opened?.rate !== rate),
-        `${st?.audioSwitches} switches, resampled ${st?.audioResampled}`);
+      check(`${kind}: the tone's step lands on the stream's clock where the page made it, within an audio block and a codec frame (±30 ms)`, Number.isFinite(onsetMs) && Math.abs(onsetMs - sm) <= 30,
+        `handed over at ${fmt(om, 0)} ms, stepped at ${fmt(sm, 0)} ms, heard from ${fmt(onsetMs, 0)} ms (${fmt(onsetMs - sm, 0)} ms; priming ${fmt(prime, 1)} ms set back)`);
+      // Packets are stamped by sample count, so a missing stretch shows as a track that ends early, not as a gap.
+      const audioEnd = at[at.length - 1].timestamp, videoEnd = vt[vt.length - 1].timestamp;
+      check(`${kind}: the audio runs to the stream's last frame, nothing lost at the switch`, audioEnd >= videoEnd - 25,
+        `last audio packet at ${audioEnd} ms, last frame at ${videoEnd} ms`);
+      check(`${kind}: the encoder says it moved to the new source once, resampling it from another rate`, st?.audioSwitches === 1 && opened?.rate !== rate && st?.audioResampled === true,
+        `${st?.audioSwitches} switches, resampled ${st?.audioResampled}, ${opened?.rate} Hz into ${rate} Hz`);
       continue;
     }
     const heard = kind === 'no source'

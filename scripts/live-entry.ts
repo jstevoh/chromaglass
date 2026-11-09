@@ -186,20 +186,35 @@ const api = {
    * A sound source opened on air (37x-4f-2): a fresh tone, in a context of
    * its own at `rate` (44.1 kHz, against the silent track's 48, so the
    * encoder has to resample it), handed to the running stream as
-   * useAudioAnalyzer hands the app's (`setLiveAudio` → `setAudio`).
-   * Returns when it was handed over, on the stream's clock, and the rate.
+   * useAudioAnalyzer hands the app's (`setLiveAudio` → `setAudio`). The tone
+   * is silent for its first `stepInMs` and then steps up: a mark at a known
+   * instant, so the check can find where the source's sound landed on the
+   * stream's clock. Its onset alone could not tell: the track is read from
+   * whenever the hand-over happens, and a hole or a cut at the switch moves
+   * everything after it (Chromium's AudioEncoder stamps its packets by
+   * sample count, so a gap in the input is not a gap in the output, it is
+   * the rest of the sound arriving early; the check-skeptic's control put
+   * 100 ms of hole at the switch and an onset line still read 8 ms). The
+   * step's stream time is its render time, worked out as `event()` does.
    */
-  async openTone(rate = 44100): Promise<{ openedMs: number; rate: number }> {
+  async openTone(rate = 44100, stepInMs = 1000): Promise<{ openedMs: number; stepMs: number; rate: number }> {
     if (!encoder) throw new Error('start first');
     const c = new AudioContext({ sampleRate: rate });
     await c.resume();
     const dest = c.createMediaStreamDestination();
     const tone = c.createOscillator(); tone.frequency.value = 220;
-    const g = c.createGain(); g.gain.value = 0.05;
+    const g = c.createGain();
+    const t0 = encoder['t0'] as number;
+    // A context just resumed reports no output timestamp yet (0 and 0, which read as a step a minute in the past): wait for its first.
+    let pair = c.getOutputTimestamp();
+    for (let i = 0; i < 50 && !(pair.performanceTime && pair.contextTime); i++) { await new Promise((r) => setTimeout(r, 10)); pair = c.getOutputTimestamp(); }
+    const ctxNow = pair.contextTime ?? c.currentTime, perfNow = pair.performanceTime ?? performance.now();
+    const renderAheadMs = Math.max(0, c.currentTime - ctxNow) * 1000;
+    g.gain.setValueAtTime(0, 0); g.gain.setValueAtTime(0.05, ctxNow + stepInMs / 1000);
     tone.connect(g).connect(dest); tone.start();
-    const openedMs = performance.now() - (encoder['t0'] as number);
+    const openedMs = performance.now() - t0;
     encoder.setAudio(dest.stream);
-    return { openedMs, rate: c.sampleRate };
+    return { openedMs, stepMs: perfNow + stepInMs - renderAheadMs - t0, rate: c.sampleRate };
   },
   state: async () => encoder ? encoder.refresh() : null,
   async stop(): Promise<unknown> {
