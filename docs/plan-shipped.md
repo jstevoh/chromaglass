@@ -11093,6 +11093,11 @@ model cannot reach one, the PR says what it reached and asks.
     every 0.9 s one; and 3182 of the moving ones (9%) were read as still by first against
     last. Each of the four conditions taken out turns the proof red. Left: a stream that
     froze in the second half of its span can pass.
+    Its first Mac run was red on a stream that really did not move: 61 frames over 2.24 s,
+    the bar in column 7 on every one (first against last would have been red on it too).
+    So the line now also prints what drew while the stream was live (the plate's frames,
+    the film's clock and frames) and the strip's read of the last frame against the whole
+    frame's, so the next red says whether the stream, the plate or the film stood still.
 
 #### 37x-4d-6. The stream's frames were black
 

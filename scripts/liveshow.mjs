@@ -507,8 +507,14 @@ async function stackLines() {
   }
   const moving = (which, f, id) => {
     if (presentsInXvfb()) { console.log(` skip  the ${which} stream moves with the film: software WebGPU draws a few frames a minute`); return true; }
-    const m = barMoves((f?.trail ?? []).map(t => ({ ms: t.ms, col: barColumnOfRow(t.row) })));
-    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, m.ok, m.detail, m.ok === false && f?.blackStream === true);
+    const trail = (f?.trail ?? []).map(t => ({ ms: t.ms, col: barColumnOfRow(t.row) }));
+    const m = barMoves(trail);
+    // The strip's read of the last frame against the whole frame's, so a red
+    // says whether the strip reader itself is wrong on this machine.
+    const whole = f?.grid ? barColumnOfRow(f.grid.slice(7 * f.cols, 8 * f.cols)) : null;
+    const strip = trail.length ? trail[trail.length - 1].col : null;
+    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, m.ok,
+      `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? ''}`, m.ok === false && f?.blackStream === true);
     return m.ok;
   };
   const STACK_LINE = 'with a film in the mixer and a keystone on the wall, the Mixer stack source\'s frames carry the film and are square';
@@ -558,8 +564,18 @@ async function stackLines() {
   await page.getByTestId('live-add-key').fill(SECRET);
   await page.getByTestId('live-add-save').click();
   await page.waitForTimeout(250);
+  // What drew while the stream ran, for the moving line's detail: the
+  // plate's frames and the film's own clock. A frozen stream on a Mac (red on
+  // this PR's first run, 61 frames all with the bar in column 7) says by
+  // these whether the stream stopped taking pictures or the film or the plate
+  // stopped making new ones.
+  const clocks = () => page.evaluate(() => {
+    const v = window.chromaglassDebug?.().film?.video;
+    return { plate: window.chromaglassDebug?.()?.webgpu?.frames ?? null, film: v ? v.currentTime : null, filmFrames: v?.getVideoPlaybackQuality?.().totalVideoFrames ?? null, paused: v ? v.paused : null };
+  });
   const stream = async () => {
     await page.evaluate(() => { const c = window.__liveStub.calls; c.keep = true; c.video = []; });
+    const before = await clocks();
     // Go live asks once more (the panel's lines above) and forgets the ask
     // after five seconds, which a software plate's page, a few frames a
     // minute, can spend between two of Playwright's presses: so both presses
@@ -579,9 +595,12 @@ async function stackLines() {
     // Two keyframes in: the stream asks for one every two seconds, and the
     // frames after the second are of a canvas drawn since Go live.
     await until(page, () => window.__liveStub.calls.video.filter(v => v.key).length >= 2, undefined, 60_000);
+    const after = await clocks();
     await page.getByTestId('live-stop').click();
     await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
-    return page.evaluate(async () => {
+    const d = (k) => (before[k] === null || after[k] === null ? '?' : after[k] - before[k]);
+    const during = `while it was live the plate drew ${d('plate')} frames and the film's clock went ${typeof d('film') === 'number' ? d('film').toFixed(2) : '?'} s, ${d('filmFrames')} of its frames${after.paused ? ', paused' : ''}`;
+    return { during, ...(await page.evaluate(async () => {
       const { video, desc } = window.__liveStub.calls;
       window.__liveStub.calls.keep = false;
       const pk = video.filter(v => v.output === 'landscape');
@@ -649,7 +668,7 @@ async function stackLines() {
       first?.close();
       out.trail = trail;
       return out;
-    });
+    })) };
   };
 
   // The plate itself, read in the frame task that drew it (`grabFrame`, the
