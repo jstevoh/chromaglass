@@ -139,8 +139,7 @@ numbers, merged the day it is green so no other branch has to chase it. The poin
 session has to read to make a change, and the faults that come from scattered state; the
 merge conflicts are the shared documents', which 0.6 ends.
 
-- **3.1** **P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines (2.6 decided: delete). Next in
-  lane G once #307 has merged.
+- **3.1** ~~**P7-cpu** (G): delete the CPU solver's stepping, about 1,000 lines (2.6 decided: delete).~~ **Shipped** (`docs/plan-shipped.md` §P7-cpu).
 - **3.2** **14l** (G, L): `FluidSimulation` out of `LiquidVisualizer.tsx`; then device recovery as
   `useGpuStage` (which S16's fault came from); then the pointer and touch handlers as
   `usePlateInput`; then the frame loop as a module; then the imperative handle.
