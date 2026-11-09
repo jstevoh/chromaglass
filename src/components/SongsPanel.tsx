@@ -372,6 +372,7 @@ function ActionRow({ action, looks, index, count, onChange, onRemove, onMove, lo
       <select className={inputCls} value={a.do} onChange={(e) => onChange({ what: defaultWhat(e.target.value as ActionWhat['do'], looks) })} data-testid={`songs-action-${index}-what`}>
         {WHAT_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         {a.do === 'set' && <option value="set">{describeWhat(a)}</option>}
+        {a.do === 'pour' && <option value="pour">{describeWhat(a)}</option>}
       </select>
       {a.do === 'look' && (
         <>

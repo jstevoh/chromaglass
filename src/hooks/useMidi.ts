@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { unhandled } from '../lib/unhandled';
 import {
-  apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, relativeDelta,
+  apcMiniMk2Map, apc40Mk2Map, launchpadMap, launchControlXlMap, eventSource, liveBindings, loadMidiMap, nanoKontrol2Map, padVelocityFor, parseMidi, parseMidiMap, pressedBy, relativeDelta,
   parseMidiRealtime, saveMidiMap, serializeMidiMap, sourceKey, SoftTakeover, sameSoundBinding, withLoadedMap,
   MIDI_BANKS, MIDI_FILE_EXT, MIDI_FORMAT, MIDI_MAP_KEY, settingLed, curveOf, valueAt, travelOf,
   type FactoryMapId,
@@ -34,6 +34,8 @@ export interface MidiHost {
   setSetting: (key: keyof VisualizerSettings, value: number) => void;
   action: (action: MidiAction) => void;
   applyPreset: (presetId: string) => void;
+  /** Play set-list item `index` (0-based) with the item's own fade, the way Go does. */
+  playSetItem?: (index: number) => void;
   selectDye: (paletteIndex: number) => void;
   /**
    * A note was struck, with its velocity.
@@ -44,7 +46,7 @@ export interface MidiHost {
    * preset pads therefore also plays the envelopes, which is the behaviour a
    * synth has and the reason the envelopes are worth having at all.
    */
-  noteStruck?: (velocity: number) => void;
+  noteStruck?: (velocity: number, source?: 'note' | 'pad') => void;
 }
 
 /** What the LEDs should show. Changes here are pushed to the controller. */
@@ -193,7 +195,11 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     const now = performance.now();
     heardRef.current.set(sourceKey(src), now);
     // Ahead of the bindings, and regardless of them: see `noteStruck`.
-    if (e.kind === 'noteon') hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)));
+    if (e.kind === 'noteon') {
+      const k = sourceKey(src);
+      const isPad = e.channel === 9 || mapRef.current.bindings.some(b => sourceKey(b.source) === k && b.target.kind !== 'setting');
+      hostRef.current.noteStruck?.(Math.max(0, Math.min(1, e.value / 127)), isPad ? 'pad' : 'note');
+    }
     if (now - eventTick.current > 80) { eventTick.current = now; lastEvent.set({ source: src, value: e.value, at: now }); }
 
     /*
@@ -237,8 +243,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     }
 
     const h = hostRef.current;
-    const key = sourceKey(src);
-    // What this control does *on this layer*.
+    // What this control does *on this layer* (`liveBindings` in `midi.ts`).
     //
     // A binding that names a bank answers only on that one; a binding that
     // names none is always live. Where a control has both — which is exactly
@@ -247,16 +252,14 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
     // always-live one stays out of the way. Firing both meant one fader
     // driving two settings at once, which on a stage reads as the app having
     // a mind of its own.
-    const matching = mapRef.current.bindings.filter(b => sourceKey(b.source) === key);
-    const onThisBank = matching.filter(b => b.bank === bankRef.current);
-    const live = onThisBank.length ? onThisBank : matching.filter(b => b.bank === undefined);
+    const live = liveBindings(mapRef.current, src, bankRef.current);
     for (const b of live) {
       // Annotated, and that is not decoration: without it `t` is `any` here,
       // so nothing in the switch below was checked at all — not the property
       // names it reads off each kind, not a misspelt case, not a missing one.
       const t: MidiTarget = b.target;
 
-      const pressed = e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
+      const pressed = pressedBy(e);
       /**
        * Set when soft takeover held this fader back, so the report below does
        * not go on to claim it moved. `break` inside the switch leaves the
@@ -296,7 +299,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
             break;
           }
           let in01 = e.value / 127;
-          if (e.kind === 'noteon') in01 = 1;
+          if (e.kind === 'noteon' || e.kind === 'program') in01 = 1;
           // Onto the nearest detent before soft takeover sees it, so the
           // position it compares against the setting is one the setting can
           // actually hold. Snapped afterwards instead, a fader resting between
@@ -323,9 +326,10 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
           h.setSetting(t.key, onStep(stepped, valueAt(in01, t.min, t.max, curve)));
           break;
         }
-        case 'action': if (pressed) h.action(t.action); break;
-        case 'preset': if (pressed) h.applyPreset(t.presetId); break;
-        case 'dye':    if (pressed) h.selectDye(t.paletteIndex); break;
+        case 'action':  if (pressed) h.action(t.action); break;
+        case 'preset':  if (pressed) h.applyPreset(t.presetId); break;
+        case 'setlist': if (pressed) h.playSetItem?.(t.index); break;
+        case 'dye':     if (pressed) h.selectDye(t.paletteIndex); break;
         // A binding whose kind has no case here is a control that does
         // nothing when it is touched, and says nothing about why.
         default: unhandled('a MIDI binding', t);
@@ -498,6 +502,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
       */
       const heard = heardRef.current.get(k);
       if (heard !== undefined && performance.now() - heard < HANDS_OFF_MS) { sent.delete(k); return; }
+      if (src.kind === 'program') return;
       if (sent.get(k) === level) return;
       sent.set(k, level);
       try {
@@ -536,6 +541,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         // A pad saved before its look was retired lights for the look it now plays (PLAN.md 28a).
         const live = livePresetId(t.presetId);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.activePresetId !== live) : (f.activePresetId === live ? 3 : 1);
+      } else if (t.kind === 'setlist') {
+        level = b.source.kind === 'cc' ? 127 : 1;
       } else if (t.kind === 'dye') {
         const c = f.paletteColor(t.paletteIndex);
         level = c ? padVelocityFor(c.r, c.g, c.b, f.dyeIndex !== t.paletteIndex) : 0;

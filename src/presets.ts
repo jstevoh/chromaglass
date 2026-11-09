@@ -1,10 +1,13 @@
 import { VisualizerSettings } from './types';
+import { MOIRE_LOOKS } from './presetsMoire';
 
 export interface Preset {
   id: string;
   name: string;
   description: string;
   settings: Partial<VisualizerSettings>;
+  /** The art pack a look sells in, when it needs one beyond the app (PLAN 23, 45a). */
+  pack?: 'moire';
 }
 
 /*
@@ -2221,7 +2224,111 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
+  {
+    id: 'saffron-lace',
+    name: 'Saffron Lace',
+    description: 'A film of yellow oil on pale water tears itself into lace and beads into spatter, lit from below: lavender shows through its holes, and cobalt and coral pools lie under it.',
+    settings: {
+      /*
+        After the owner's still of a liquid light show (2026-11-07): yellow
+        veins and cells of lace with fine spatter between them, over a
+        lavender wash, with cobalt and coral. The lace is not drawn: it is
+        Clear Film (PLAN §20b, wgsl/film.ts), a thin layer of oil against the
+        glass that dewets by itself on the dish's dust, opens into holes, and
+        beads its ligaments into rows of drops, dyed yellow by Film Dye
+        (20b-13, Beer–Lambert through the film's own thickness). Oil Bodies
+        laid as lace was tried first and rejected: Cahn–Hilliard pulls its
+        veins into blobs within three seconds at any Oil Tension.
+
+        The water under it is pale on purpose. A yellow film over lavender
+        water is two filters stacked, and yellow times lavender is amber
+        (0.71 × 1, 0.55 × 0.82, 1 × 0.1 in three bands): Film Dye's own lab
+        picture (#684) drew its lace amber over a lavender ground. So the lamp's white is
+        the ground, the film reads yellow over it, and the colour is laid as
+        pools (lib/plateAreas.ts): a wide pale lavender wash, a cobalt pool,
+        a coral one. Where the film is whole over a pool its colour darkens
+        toward amber or olive, as a real dyed film over dyed water would;
+        where it has torn the pool's own colour shows through the hole. The
+        film's thickness also takes its share out of the water's path
+        (plate.ts: gapScale × (1 − film)), so a fat bead pushes the water's
+        dye out from under it and reads closer to its own yellow.
+      */
+      lampGround: 1,
+      clearFilm: 0.35,           // 0.3 of the gap: it tears on the dish's dust in a few seconds, a third torn by five (lab)
+      clearFilmDye: 0.35,        // at 0.6 its beads, which thicken toward the whole gap, read orange (lab)
+      clearFilmDyeColor: '#ffd21a',
+      globalSpeed: 0.0126,
+      surge: 0.35,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.3,
+      rotationSpeed: 0.03,       // the dish's motor, slow: the lace turns and shears without being wound up
+      centerGravity: 0.0,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.1,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.06,        // a few pours a minute: oil re-thickens the film where it lands, soap opens it again
+      platePressure: 0.3,
+      glassSmear: 0,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      evaporationRate: 0.002,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.05,
+      audioImpact: 0.5,
+      blobSurfaceTension: 0.4,
+      boundaryContrast: 0.3,
+      saturationBoost: 1.2,
+      dyeBudget: 0.7,
+      glossiness: 0.2,
+      postBlurRadius: 0.05,
+      plateCurve: 0.2,
+      transmission: 0.5,
+      dishVignette: 0.5,
+      lampHotspot: 0.35,
+      bubbles: 0,
+      /*
+        Fast readings only (the owner's rule). A kick presses the top glass,
+        and the press thins the film under it, so the lace opens on the beat;
+        a snare lifts the press into fingers, which tear the film along their
+        edges; and the cobalt pool's soap takes the bass (its area), so each
+        kick there opens a fresh hole.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'fingering', depth: 0.2 },
+      ],
+      audioMappings: { velocity: 'bass', density: 'none', color: 'none', rotation: 'none' },
+    }
+  },
 ];
+
+/*
+  The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
+  it starts from. Its cords are that look's, and a sheet's cord takes the
+  place of the last of them: a look carries two or three fast cords
+  (PLAN 28i-3b, `npm run soundpatch`), and the first version, which added the
+  sheet's to the house look's three, made four, too many for a hand to read
+  on the wall. A pack look laid over a look with areas adds none: its areas'
+  cords are the music there, and a plate-wide one beside them is the
+  redundancy 28i-3b turns away. The plate itself (dyes, pours, dish, areas)
+  is the house look's under the pack look's id (presetPlate.ts).
+*/
+for (const m of MOIRE_LOOKS) {
+  const from = PRESETS.find(p => p.id === m.from);
+  if (!from) continue;
+  const own = m.settings.sceneMappings ?? [];
+  const house = from.settings.sceneMappings ?? [];
+  const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
+  PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
+}
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).

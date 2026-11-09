@@ -29,6 +29,7 @@ interface ControllersDeps {
   rideSetting: (key: keyof VisualizerSettings, value: number) => void;
   runAction: (a: MidiAction) => void;
   cuePreset: (presetId: string) => void;
+  playSetItem?: (index: number) => void;
   selectDye: (paletteIndex: number) => void;
   wallRef: RefObject<LiquidVisualizerHandle | null>;
   activePresetId: string | null;
@@ -57,7 +58,7 @@ interface ControllersDeps {
 }
 
 export function useControllers({
-  ride, settingsRef, rideSetting, runAction, cuePreset, selectDye, wallRef, activePresetId,
+  ride, settingsRef, rideSetting, runAction, cuePreset, playSetItem, selectDye, wallRef, activePresetId,
   selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
   blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
   visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
@@ -68,9 +69,10 @@ export function useControllers({
       setSetting: rideSetting,
       action: runAction,
       applyPreset: cuePreset,
+      playSetItem,
       selectDye,
       // Every note plays the envelopes, whatever else that pad is for.
-      noteStruck: (velocity) => wallRef.current?.fireEnvelopes?.(velocity),
+      noteStruck: (velocity, source) => wallRef.current?.fireEnvelopes?.(velocity, source),
     },
     {
       activePresetId,
@@ -111,7 +113,7 @@ export function useControllers({
     action a beat must not press, the last door before the show.
   */
   const runSoundTrigger = (b: SoundBinding) => {
-    runTrigger(b, { action: runAction, preset: cuePreset, dye: colourDye });
+    runTrigger(b, { action: runAction, preset: cuePreset, setlist: playSetItem, dye: colourDye });
   };
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, ...(tool === 'drop' ? laidColour(selectedLiquid) : {}) }),

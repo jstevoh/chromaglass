@@ -12,7 +12,7 @@
 // and it was found by pushing.
 //
 // What this does. Fetches the release below once, from GitHub's release page
-// for this platform, holds it to the sha256 written here (copied from the
+// for this platform (or, when that page fails, the API's asset download), holds it to the sha256 written here (copied from the
 // release's own `checksums.txt`, so a changed asset, or a changed address, is
 // red and not run), keeps it in `scratch/actionlint/<version>/`, and runs it
 // over the workflows. Pinned, so the lint is the same in a session, on the
@@ -54,13 +54,31 @@ if (!SHA256[plat]) {
 const dir = path.join(ROOT, 'scratch', 'actionlint', VERSION);
 const bin = path.join(dir, 'actionlint');
 
+// The release page first, then the API's asset download: the same bytes by
+// another route. On 2026-11-08 from about 08:50 UTC GitHub's edge answered
+// "504 Gateway Time-out" for many release-page downloads (this one, the
+// Capacitor zips the iPhone build needs, the gh CLI's own checksums) while
+// the API's asset route served them; Measure · logic went red three times on
+// #720 with nothing wrong in the workflows (19ak-7). The sha256 check below
+// holds either route to the pinned bytes. GH_TOKEN, where one is set, only
+// lifts the API's rate limit; CI keeps the binary in its cache (checks.yml).
+const curl = (args) => spawnSync('curl', ['-fsSL', '--retry', '4', '--retry-all-errors', '--retry-delay', '3', '--max-time', '120', ...args], { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' });
 function fetchBinary() {
   fs.mkdirSync(dir, { recursive: true });
+  const name = `actionlint_${VERSION}_${plat}.tar.gz`;
   const tgz = path.join(dir, `${plat}.tar.gz`);
   // curl, not Node's fetch: it takes the proxy a cloud session sets up, and
   // retries a dropped connection.
-  execFileSync('curl', ['-fsSL', '--retry', '4', '--retry-delay', '3', '--max-time', '120', '-o', tgz,
-    `https://github.com/rhysd/actionlint/releases/download/v${VERSION}/actionlint_${VERSION}_${plat}.tar.gz`], { stdio: 'inherit' });
+  if (curl(['-o', tgz, `https://github.com/rhysd/actionlint/releases/download/v${VERSION}/${name}`]).status !== 0) {
+    console.log(`warn the release page refused ${name}; asking the API for it`);
+    const auth = process.env.GH_TOKEN ? ['-H', `Authorization: Bearer ${process.env.GH_TOKEN}`] : [];
+    const rel = curl([...auth, `https://api.github.com/repos/rhysd/actionlint/releases/tags/v${VERSION}`]);
+    const asset = rel.status === 0 ? JSON.parse(rel.stdout).assets?.find((a) => a.name === name) : null;
+    if (!asset || curl([...auth, '-H', 'Accept: application/octet-stream', '-o', tgz, asset.url]).status !== 0) {
+      console.log(`FAIL could not fetch ${name} from the release page or the API`);
+      process.exit(1);
+    }
+  }
   const got = crypto.createHash('sha256').update(fs.readFileSync(tgz)).digest('hex');
   if (got !== SHA256[plat]) {
     fs.rmSync(tgz);

@@ -35,9 +35,9 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 
-const PORT = Number(process.env.DRAFTWALL_PORT ?? 4183);
+const PORT = port(4183, 'DRAFTWALL_PORT');
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;
 /** On the Mac, where the app draws: the painted line must see frames rather than say it measured nothing. */
 const FRAMES = process.argv.includes('--frames');
@@ -172,6 +172,7 @@ try {
   */
   const drawnFrom = await page.evaluate(() => window.chromaglassDebug().frames);
   await wall.evaluate(() => { window.__painted = {}; });
+  const paintsFrom = await wall.evaluate(() => window.chromaglassCast?.().paints ?? null).catch(() => null);
   const started = Date.now();
   let painted = {};
   do {
@@ -183,7 +184,23 @@ try {
   const wallSize = await wall.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, canvases: document.querySelectorAll('canvas').length }));
   const fromWall = painted['liquid-canvas'] ?? 0, fromCopy = painted['liquid-canvas-draft'] ?? 0;
   const anyPainted = fromWall + fromCopy > 0;
-  console.log(`  (in ${seconds.toFixed(1)} s the wall's engine drew ${drawn} frames; the projector window is ${wallSize.w}x${wallSize.h} with ${wallSize.canvases} canvas(es))`);
+  /*
+    What the projector window says of itself, beside the count. On #734's
+    run (GitHub's Mac, 2026-11-08) this line read 0 frames from either
+    canvas while the wall's engine drew 334 in 8.2 s, and on #718's the same
+    day 26 against 121: the count alone cannot say whether the show stopped
+    handing frames over (no mirror hook on the show's window), the window
+    dropped them (a size of 0, so `paint` returns early), or the patched
+    drawImage missed them. PLAN.md 19k-15.
+  */
+  const castSays = await wall.evaluate(() => {
+    let hooked = null;
+    try { hooked = typeof window.opener?.__chromaglassMirror === 'function'; } catch { /* gone */ }
+    const c = window.chromaglassCast?.();
+    return { hooked, ...(c ? { paints: c.paints, stage: c.stage, source: c.source, dark: c.dark, linked: c.linked } : {}) };
+  }).catch(() => null);
+  if (castSays && paintsFrom !== null && typeof castSays.paints === 'number') castSays.paints -= paintsFrom;
+  console.log(`  (in ${seconds.toFixed(1)} s the wall's engine drew ${drawn} frames; the projector window is ${wallSize.w}x${wallSize.h} with ${wallSize.canvases} canvas(es); it says ${JSON.stringify(castSays)})`);
   check(anyPainted ? 'the projector window is painted from the wall\'s canvas, never the copy\'s'
     : `the projector window is painted from the wall's canvas (measured nothing: no frames ran here${FRAMES ? '' : '; on the Mac, --frames requires them'})`,
     FRAMES ? fromWall > 0 && fromCopy === 0 : !anyPainted || (fromWall > 0 && fromCopy === 0),

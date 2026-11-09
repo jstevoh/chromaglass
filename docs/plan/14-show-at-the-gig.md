@@ -59,12 +59,7 @@ and nobody has seen it happen on the Mac.
   brings it to 0.90 to 0.95 in the arithmetic, at the cost of up to a quarter more draws on a
   machine already short of time; whether the wall's smoothness is worth that is the
   owner's call. Measure: the busy phase's draws against its slots.
-- *A 120 Hz laptop with a 60 Hz projector draws 120 a second.* The gate works to the
-  faster display so that neither window gets fewer frames than it would alone, which
-  keeps the desk at 120 on a ProMotion screen; but every draw carries the mirror
-  copy, and the wall shows only every other one. Pacing to the projector while the
-  show window is not what the audience is watching would halve that work. Measure:
-  the arithmetic case 120/60 with the draws counted against the wall's refresh.
+- ~~*A 120 Hz laptop with a 60 Hz projector draws 120 a second.*~~ **Shipped** (14b-120, `DrawGate.paceTo = 'wall'` in `src/lib/drawGate.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
 - *The wall's older "asking for one draws one" line cannot fail on the ask.* It asks
   thirty times with the show's own frames running and counts every frame drawn, so
   the show's own clock alone passes it (and did before this: 60 a second is over its
@@ -92,15 +87,9 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
   from it would share that page's device scale factor, so a Retina laptop driving a
   1x projector cannot be staged in one browser context. A `?stage=1920x1080`
   diagnostic knob, like `?dpr=`, calling `setStage` would let it measure the wall.
-- A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before. The start
-  rule weighs the GPU class and not the stage's pixels; the governor finds the 0.75
-  rung within seconds, but a wall above 1920×1200 could open there.
-- The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall
-  rather than a pixel ratio, and the bench's `dpr` reads the same number. On a stage it
-  should say so ("of the wall").
-- A wall coming or going builds a new governor, which forgets a step rate it had given
-  up and waits out its settling period again, and forgets rungs a solver that would not
-  start had marked failed (only running out of memory sets the cap it keeps).
+- ~~A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before.~~ **Shipped** (14c-4k, `stageLadder` in `src/lib/platform.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+- ~~The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall rather than a pixel ratio.~~ **Shipped** (14c-readout, `engineLabel` in `src/sim/stepping.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+- ~~A wall coming or going builds a new governor, which forgets a step rate it had given up and waits out its settling period again, and forgets rungs a solver that would not start had marked failed.~~ **Shipped** (14c-governor, `QualityGovernor.carry` in `src/lib/governor.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
 - `PW_WEBGPU=1 npm run phone` went red once in two runs on "spreading them zooms in by
   as much as they spread" (3.00 times of 3.40): the zoom was read before the pinch's
   last move landed, on a software plate a few frames a second. Green on the rerun; the
@@ -109,6 +98,84 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
 ## 14d. The beat clock hears a smoothed bass level, not the kick
 
 **Shipped** (#199): the clock hears the kick's onset, by its time (`npm run kicks`); counting heard kicks in the app on the Mac is 10.4's. How it was found, built and measured is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+## 14d-2. No kick drum, no beat: the 1920s records (shipped)
+
+**Shipped**: the ear's `beat` is the kick where a kick keeps time and the band's whole-range attack (SuperFlux, 60 Hz–4 kHz) where none does, entrained to the band's period; Kick hit and the beat clock follow it (`npm run pulse`). The six 1920s song films went from 3–22 beats a minute to 37–109. The story is in [`docs/plan-shipped.md`](docs/plan-shipped.md), under the same number.
+
+## 14d-3. The smoothed levels sit at 1 on a loud record
+
+**Measured 2026-11-07** on the six 1920s films (scratch beat statistics, frame by frame as
+the render hears them): `bass01` and its neighbours stay pinned at 1 for most of a song
+once the record is loud, so a patch that Follows a level moves for the first seconds and
+then not at all. The level's ceiling is a fixed dB, not the song's own range. *Fix:* scale
+each smoothed level against its own running range (a slow max and floor, as the ear's
+reference already falls), so a level keeps moving inside a loud song. *Measure:* a
+`bands` case on a loud fixture: the fraction of frames a level sits within 2% of 1, today
+and after.
+
+## 14d-4. A low chord fires the kick
+
+**Measured 2026-11-07** in `npm run pulse`'s band: an F chord (175 Hz fundamental) fires the
+kick (30–120 Hz) three times in a row every 8.6 s, through the analysis window's leakage;
+on the Wolverines the kick fires 22 times a minute, in runs on the low notes, with no
+kick drum on the record. 14d-2 made the beat robust to it (a run on one chord is never three
+steady seconds of kick), but the kick itself, and anything reading `onsets.kick` directly,
+still fires. *Fix:* hear a kick only where the rise below 120 Hz is not the skirt of a
+peak above it (compare the band's rise with its neighbours', or require the region's own
+spectral peak to sit inside it). *Measure:* `pulse`'s kick-only control, kicks a minute on
+the horned band, today about 7.
+
+## 14d-5. Onsets land on the frame grid
+
+**Measured 2026-11-07**: 30 ms hats at 30 fps drop out of `pulse`'s loop for a bar every
+7.5 s: a hat that starts and ends between two analysis frames is never seen rising. The ear
+takes one spectrum a frame, so an onset's time is quantised to the frame and a short one can
+fall through. The check's hats are 60 ms. *Fix:* the render's ear (`songTrack.ts`) can take
+spectra at a fixed rate independent of the film's (say 200 a second) and hand the frame the
+onsets that landed since the last one, with their own times; the live ear the same off the
+analyser's own buffer. *Measure:* `pulse`'s loop with 30 ms hats at 30 fps, quarters caught.
+
+## 14d-6. Surface hiss sets the threshold of the ear's wide onsets
+
+**Measured 2026-11-07**: the ear's whole-spectrum onset (`level`, 30 Hz–16 kHz, plain flux)
+fires 4 to 45 times a minute on the six 1920s films, against 45 to 135 for SuperFlux over
+60 Hz–4 kHz (the table in `pulseEar.ts`): half its bins are hiss churning a few dB a frame,
+and the churn sets the median its threshold stands on. 14d-2 built its own onset for the beat
+and left the other regions as they were. *Fix:* the same maximum filter and a band edge at
+the record's hiss for `level` and the snare and hat regions where a reading is old or noisy.
+*Measure:* hits a minute on the six films and the pulse fixtures' noise line.
+
+## 14d-7. Where the kick comes and goes, the beat flips between kick and band
+
+**Measured 2026-11-07** (scratch beat statistics): on funkorama, a funk track whose kick
+skips bars, the beat is the kick for three steady seconds and then the band's pulse until the
+kick is steady again, 122 beats a minute where the song is 107 bpm. The pulse is held to a
+quarter second, so the extra beats are eighths, not a strobe, but Kick hit lands on some
+off-beats there. *Fix:* hand back to the pulse only when the beat clock, locked to the
+kick, misses more than a bar of predicted beats, so a skipped kick is filled by the clock's
+own prediction and not by the band. *Measure:* a `pulse` case with a kick that skips one bar
+in four: beats a minute against the tempo, and the fraction off the quarter grid.
+
+## 14d-8. The pulse's 0.2 dB floor is not held by a check
+
+**Found 2026-11-07** (check-skeptic on `npm run pulse`): the floor under the pulse's threshold
+(`PULSE_MIN_DB`, 0.2 dB) was chosen on the six 1920s songs (the table in `pulseEar.ts`), but
+`npm run pulse`'s synthetic band passes at 0.5 and 1.0 too, so a change that raised it back
+to where Caruso loses a third of his beats would stay green. *Fix:* a fixture whose attacks
+sit where the songs' quiet ones do (a soft banjo under a loud held voice), so 1.0 dB drops
+them and 0.2 keeps them. *Measure:* `pulse` with the floor at 0.2, 0.5 and 1.0: the beat's
+catch on that fixture.
+
+## 14d-9. SuperFlux's vibrato suppression is not tested on its own
+
+**Found 2026-11-07** (check-skeptic): `pulseEar.ts` measures each bin's rise against the
+loudest of its neighbours a frame before (Böck and Widmer's maximum filter) so a sung note's
+vibrato is not an onset, but the pulse check's held chord with vibrato makes no pulse with
+the filter removed either: the median-and-MAD threshold already eats a steady vibrato.
+*Fix:* a voice whose vibrato deepens and quickens through a phrase (as a 1920s tenor's
+does), where plain flux fires and the maximum filter does not. *Measure:* pulses a minute on
+that voice, with and without the filter.
 
 ## 14e. The picture and the room disagree about when the kick is
 
