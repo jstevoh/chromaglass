@@ -1,9 +1,23 @@
 // The remote's slider and action tile, moved out of RemoteControl.tsx (PLAN 19ai, the size ratchet).
-import type { ComponentType } from 'react';
+import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import type { VisualizerSettings } from '../types';
 import { PIN_RANGE } from '../lib/deskPins';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
 import { PaceTrack } from './ui/Pace';
+
+/** How hard a pointer presses, 0..1. Fingers on most screens report 0 or 1: treat them as a mouse. */
+export function pressureOf(e: ReactPointerEvent): number {
+  if (e.pointerType === 'pen') return Math.max(0.05, Math.min(1, e.pressure || 0.5));
+  if (e.pointerType === 'touch' && e.pressure > 0 && e.pressure < 1) return Math.max(0.05, e.pressure);  // Sensel, 3D Touch
+  return 0.5;
+}
+/** Which way a pen leans, as a plate direction (y up); zero for anything without tilt. */
+export function tiltOf(e: ReactPointerEvent): { dx: number; dy: number } | null {
+  if (e.pointerType !== 'pen') return null;
+  const tx = e.tiltX ?? 0, ty = e.tiltY ?? 0;
+  if (Math.abs(tx) < 8 && Math.abs(ty) < 8) return null;
+  return { dx: tx / 90, dy: -ty / 90 };
+}
 
 export function ActionButton({ label, icon: Icon, onPress, connected, tone = 'default' }: {
   label: string;

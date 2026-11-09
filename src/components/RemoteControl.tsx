@@ -16,7 +16,7 @@ import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
-import { ActionButton, Slider } from './RemoteSlider';
+import { ActionButton, Slider, pressureOf, tiltOf } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
@@ -37,20 +37,6 @@ import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './Dr
  * screen, which is what most hands pick a phone up to do. This page is its
  * Controls.
  */
-
-/** How hard a pointer presses, 0..1. Fingers on most screens report 0 or 1: treat them as a mouse. */
-function pressureOf(e: ReactPointerEvent): number {
-  if (e.pointerType === 'pen') return Math.max(0.05, Math.min(1, e.pressure || 0.5));
-  if (e.pointerType === 'touch' && e.pressure > 0 && e.pressure < 1) return Math.max(0.05, e.pressure);  // Sensel, 3D Touch
-  return 0.5;
-}
-/** Which way a pen leans, as a plate direction (y up); zero for anything without tilt. */
-function tiltOf(e: ReactPointerEvent): { dx: number; dy: number } | null {
-  if (e.pointerType !== 'pen') return null;
-  const tx = e.tiltX ?? 0, ty = e.tiltY ?? 0;
-  if (Math.abs(tx) < 8 && Math.abs(ty) < 8) return null;
-  return { dx: tx / 90, dy: -ty / 90 };
-}
 
 /**
  * In the iPhone app with no laptop chosen yet, ask for one first: the app's

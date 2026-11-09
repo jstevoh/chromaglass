@@ -13,36 +13,40 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   3:1 bar in `npm run switches`. Story in `docs/plan-shipped.md` §35.
 - **35a-2** What phase 1 left, each because it moves a check's input or a layout:
   - Sliders standing in for switches: the phone's Press · thin gap and Two Projectors
-    (`phone.mjs` drives the first as a range by keyboard), the remote's three (788, 822,
-    848 as of 4397c83), Settings' Auto Spin and Spin Direction (stepped sliders with three
-    named stops, which want a Segmented that keeps MIDI learn and the pins).
+    (`phone.mjs` drives the first as a range by keyboard), the remote's two remaining (788,
+    822 as of 4397c83); ~~Settings' Auto Spin and Spin Direction (stepped sliders with three
+    named stops, which want a Segmented that keeps MIDI learn and the pins)~~ and the remote's
+    Auto Spin shipped in 35-owed (`Segmented` with `settingKey` and `PinChips`).
   - Touch targets under 44 px: the Play handle, the remote's layer dots, tool chips, dye
     swatches and cue strip, LaptopLink's button, Settings' rail on a phone, `Toggle`'s
     36 px row and `PanelFrame`'s 24 px icons.
   - ~~The remote's two Blackouts share the test id `remote-blackout` (one per layout).~~ One
     Blackout since 35f (the bar under the thumb), so one test id.
   - The phone dock's Motion dot stands for two states (Evolve or Tilt) at once.
-  - Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
-    rows): legible, but a third way of saying off; make them `disabled` with the reason.
+  - ~~Groups dimmed to 50% while their parent is off (the phone's Show, Evolve and Spin
+    rows): legible, but a third way of saying off; make them `disabled` with the reason.~~
+    Shipped in 35-owed (`PhoneStage.tsx`, `disabled=` with reason text beside them).
   - ~~"All settings…" twice on the desk (DeskPanels' rides and recipe) beside "+ Panel".~~ The
     status bar's alone since 35c-5.
   - ~~"Sound" in the layout switch next to the Sound dot that opens the same panel.~~ Gone with the
     layout switch: the tabs are Perform, Sequence and Setup (found in 35c-5's sweep).
   - The hand-built pick-one grids in Settings (On a New Song, Render Style, Film Stock,
-    folds, Second Screen, Viscosity) are lit and stated now; the shared `Segmented` would
-    draw them once, once it takes a title per option and a number id.
+    folds, Second Screen, Viscosity) are lit and stated now; `Segmented` now takes a number
+    id and a title per option (shipped in 35-owed), so the remaining hand-built grids can fold
+    into it.
 - ~~**35b** Regroup the panels into seven.~~ Shipped: Play, Pour, Feed, Motion, Chemistry, Look,
   Stage, one vocabulary for the rail, the panel browser, the sections' `data-group`, the desk's own
   panels and the phone's Settings strip (now with its headings drawn). Story in
   `docs/plan-shipped.md` §35.
-- **35-owed** *Checks written first* (2026-11-07) for the four of these that are a build with an
-  answer the source can show, `npm run clearleft -- --owed=pace,spin,tray,dimmed` (logic): `pace`
-  (35d-2, the remote's Speed and Evolve Speed draw `PaceTrack`), `spin` (35a-2 and 35f-2, Auto Spin and
-  Spin Direction picked from their named answers in Settings and on the remote, keeping `settingKey`),
-  `tray` (35g-2, a `SlideMount` on the remote's looks, its cue strip and the Sequencer's stages) and
-  `dimmed` (35a-2, the phone's Show, Evolve and Spin rows `disabled`, no group at half opacity). All
-  four read owed on main. 35a-2's touch targets under 44 px are not among them: only a page measures
-  a target, so they want a line in `npm run phone` first (open).
+- ~~**35-owed** *Checks written first* (2026-11-07) for the four of these that are a build with an
+  answer the source can show, `npm run clearleft` (logic): `pace` (35d-2, the remote's Speed and
+  Evolve Speed draw `PaceTrack`), `spin` (35a-2 and 35f-2, Auto Spin and Spin Direction picked from
+  their named answers in Settings and on the remote, keeping `settingKey`), `tray` (35g-2, a
+  `SlideMount` on the remote's looks, its cue strip and the Sequencer's stages) and `dimmed` (35a-2,
+  the phone's Show, Evolve and Spin rows `disabled`, no group at half opacity).~~ **Shipped**
+  2026-11-08 (`npm run clearleft` 4/4, `--owed` removed from `scripts/checks.json`). Story in
+  `docs/plan-shipped.md` §35-owed. 35a-2's touch targets under 44 px are not among them: only a page
+  measures a target, so they want a line in `npm run phone` first (open).
 - **35b-2** What regrouping showed, none of it moved in 35b because each is a change inside a
   section (35c's work) or a different surface:
   - ~~Plates & LED holds the platform's spin, which is Motion's.~~ Moved to Plate Spin in 35c-2.
@@ -128,8 +132,9 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
     drawing 36 degrees, not 4.5. Named shortcut of the picture; nothing about any look.
   - **The tray does not know about the phone's cue.** It clicks when the stage's look changes (the tray is
     the stage, not the cue); a cued look on the desk shows only its mount behind the arrow.
-  - **The remote and the Sequencer's stage list still show flat swatches** (`RemoteControl`, `SequencerPanel`,
-    the command palette and Add to Set sheet); the film could go there too.
+  - ~~**The remote and the Sequencer's stage list still show flat swatches** (`RemoteControl`, `SequencerPanel`)~~
+    Shipped in 35-owed (`SlideMount` on `remote-preset-*`, `remote-cue-*` and `seq-stage-*`); the command
+    palette and Add to Set sheet still show flat swatches.
   - **The film is two colours.** The mount shows the first two palette colours of a look's contract, as the
     cue rows always did, not a render of the look; a photograph of each look (the gallery's) would be a
     truer slide.
@@ -144,10 +149,10 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   - **The mic-heard tempo lights the ring but not the tap pad's beat light.** The pad polls the tempo source
     (tap, MIDI clock, typed), which a heard beat does not set; the ring takes the beat grid's tempo when
     nothing was tapped. Lighting the pad from the grid is a follow-up if the owner wants it.
-  - The remote's Record, Auto Spin and tempo are still plain buttons and sliders (35d-2's remote list grows
-    by these), and the Settings Source row has no meter (the needle is in the Sound sheet).
-- **35d-2** What batch A left: the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
-  no snail and hare, and the remote has no group colours; the phone's Settings sheet takes the cap colours
+  - The remote's Record and tempo are still plain buttons (`Auto Spin` is now `Segmented`, shipped in 35-owed),
+    and the Settings Source row has no meter (the needle is in the Sound sheet).
+- **35d-2** What batch A left: ~~the remote's own sliders (Speed and Evolve Speed in `RemoteControl.tsx`) have
+  no snail and hare~~ (shipped in 35-owed, `RemoteSlider.tsx` draws `PaceTrack`), and the remote has no group colours; the phone's Settings sheet takes the cap colours
   only on its rail headings, since its sliders are the white-thumbed `set-range`; Kaleido Spin on a knob has
   its hare at both ends but no snail at the stop in the middle (the slider has one under the track). Batches B
   (liquid in the controls) and C (show hardware) have shipped (35e, 35f), and item 12 (35g), the last.
