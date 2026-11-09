@@ -12,7 +12,7 @@ Mac app, and not named on any page a visitor or customer reads.
   (initialize, tools/list, tools/call, ping), Node's own WebSocket (the repo's `ws` on
   Node 20). Finds the show on `127.0.0.1` (`CHROMAGLASS_PORT`, default 3000), takes the
   key from `/remote-info.json`, says hello as `assistant`. Its tools, and the mode each
-  needs, are the `TOOLS` table (`look_at_plate {size: large}` is one 1280 still, PLAN 44c-4; `add_song_action` programs the playing song's show, 44f); its guide for the assistant is `GUIDE`. The owner's
+  needs, are the `TOOLS` table (`look_at_plate {size: large}` is one 1280 still, PLAN 44c-4; `add_song_action` programs the playing song's show, 44f; `pour_text` pours a song's name as ink, PLAN 37x-10c); its guide for the assistant is `GUIDE`. The owner's
   notes are a file outside the repo (`CHROMAGLASS_ASSISTANT_NOTES`, default
   `~/.chromaglass/assistant-notes.md`).
 
