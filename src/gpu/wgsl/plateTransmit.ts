@@ -28,6 +28,15 @@ fn reliefGain(n: vec3f) -> vec3f {
 }
 
 /*
+  Past 1 (PLAN 27h-3), Glossiness also deepens the meniscus rim's share of
+  the aperture loss toward the projector's 0.85 extinction ceiling, while
+  0..1 stays U.edgeRelief * amt so every shipped look draws as it did.
+*/
+fn reliefWeight(amt: f32) -> f32 {
+  return U.edgeRelief * (1.0 + 0.5 * max(0.0, U.glossiness - 1.0)) * amt;
+}
+
+/*
   A gel is a filter: it passes at most all of each band and makes none
   (PLAN 38h). It multiplied the lamp by its colour times 1.5, over a floor
   of 0.10 under it, so a gel brightened a white lamp by half and lit a black
@@ -279,7 +288,7 @@ fn airBend(s: f32) -> f32 { return 2.0 * N_WATER * (N_WATER / N_AIR - 1.0) * s /
 */
 fn meniscus(color: vec3f, n: vec3f, a: f32, isCamera: bool) -> vec3f {
   let keep = edgePass(dyeBend(n), select(0.0, 1.0, isCamera));
-  return color * mix(1.0, keep, U.edgeRelief * smoothstep(0.02, 0.2, a));
+  return color * mix(1.0, keep, reliefWeight(smoothstep(0.02, 0.2, a)));
 }
 
 /*

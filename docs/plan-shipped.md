@@ -8167,6 +8167,34 @@ Not a gate and no bar: a rate depends on what was pushed.
   its dye at Pushes Dye 1 and 1.2, now 0.763 at 1.2, the plate's total ×1.0000 either way.
   Each widened dial carries `wanderSpan` 1, so Evolve wanders it no further than before.
 
+- **27h-3. The dials held in the plate shader (shipped, 2026-11-08).** Five dials whose top was
+  held in the plate shader, its uniform packing or the post chain, widened in `PIN_RANGE`
+  (`src/lib/deskPins.ts`), `src/lib/midi.ts` (Plate Cells) and the settings sliders
+  (`src/components/settings/LookSections.tsx`), each with `wanderSpan: 1` so Evolve wanders it no
+  further than before, and with `0..1` drawing bit-for-bit identically to before so every look
+  opens as it did:
+  Micro-Droplets (`microDroplets`, uniform `droplets`) to 2 (`clamp(…, 0, 2)` in
+  `src/gpu/plateUniforms.ts`; `min(1, droplets × 1.5)` in `src/gpu/wgsl/plate.ts` caps the mix
+  weight at 1 while `keep` grows across `1..2`, keeping more satellite drops without a brighter
+  mix);
+  Plate Cells (`cells`) to 1.4 (`clamp(…, 0, 1.4)` in `src/gpu/plateUniforms.ts`, deepening the
+  cell contrast past 1);
+  Glossiness (`glossiness`) to 2 (`reliefWeight` in `src/gpu/wgsl/plateTransmit.ts` scales the
+  meniscus rim's share of the aperture loss by `1 + 0.5 × max(0, glossiness - 1)` above 1 while
+  `0..1` is unchanged and `npm run nolight` holds: no pixel is made brighter than without it);
+  Boundary Glow (`boundaryContrast`) to 2 (already unclamped in `plateUniforms.ts` and alive past
+  1 in the Becke chain);
+  Gate Edge (`stockGate`) to 2 (`saturate(U.stockGate)` holds the mix weight at 1 in
+  `src/gpu/wgsl/post.ts` while `0.05 * U.stockGate` continues to widen the gate edge across
+  `1..2`).
+  Projector Focus (`projectorFocus`) was read on main across 0 to 1 and moved the picture 0.30 to
+  0.68 levels per step at both ends (a focus plane, in focus at 0.5), so it has no dead travel.
+  `npm run shaderdials` (5/5 green, `--owed` removed in `scripts/checks.json`): in the lab on
+  256², Micro-Droplets moves 6 px in `0→0.5` and 68 px in `1.5→2` (1133%), Plate Cells 3.64
+  levels in `0→0.35` and 3.22 in `1.05→1.4` (89%), Glossiness 5.05 levels in `0→0.5` and 4.09 in
+  `1.5→2` (81%, up from 0.76 / 15% on main), Boundary Glow 0.34 levels in `0→0.5` and 0.18 in
+  `1.5→2` (54%).
+
 ### 28. Preset palettes: the looks refreshed for what the plate does now (2026-10-10)
 
 - **28b. Colour palettes for the lamp** (**shipped**, #330). Pastel Glow and Galaxy each

@@ -292,7 +292,7 @@ fn curve(x: f32, toe: f32, shoulder: f32) -> f32 {
     let r = 0.12;
     let corner = length(max(d - (1.0 - r), vec2f(0.0))) / r;
     let edge = max(max(d.x, d.y), corner);
-    c = c * mix(1.0, smoothstep(1.0, 1.0 - 0.06 - 0.05 * U.stockGate, edge), U.stockGate);
+    c = c * mix(1.0, smoothstep(1.0, 1.0 - 0.06 - 0.05 * U.stockGate, edge), saturate(U.stockGate));
   }
 
   return vec4f(mix(tex2(picture, in.uv).rgb, max(c, vec3f(0.0)), amt), 1.0);

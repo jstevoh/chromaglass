@@ -2549,7 +2549,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let g0 = -normal0.xy / (0.9 * max(normal0.z, 1e-4));
       var bEdge0 = 0.0;
       if (U.boundaryContrast > 0.005) { bEdge0 = boundaryEdge(layer0, fuv0); }
-      let reliefK0 = select(0.0, U.edgeRelief * plateAmt, plateOn && U.edgeRelief > 0.005);
+      let reliefK0 = select(0.0, reliefWeight(plateAmt), plateOn && U.edgeRelief > 0.005);
       fluid0 = vec4f(fluid0.rgb * refractionOptics(g0, bEdge0, reliefK0, edgeK), fluid0.a);
     } else if (U.boundaryContrast > 0.005) {
       var edge0 = boundaryLine(near0.z);

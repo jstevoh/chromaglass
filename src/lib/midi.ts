@@ -518,7 +518,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'beads',           label: 'Oil Beads',        min: 0, max: 1 },
   { key: 'beadDrops',       label: 'Bead Drops',       min: 0, max: 1 },
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
-  { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
+  { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1.4, wanderSpan: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
   { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },

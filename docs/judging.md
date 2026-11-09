@@ -2410,3 +2410,20 @@ or blue look, Clear Film about 0.35 (tears over the dust in a second or two), Fi
 5. Bad: the holes tinted, the lace flat (one yellow regardless of thickness), or the plate
    changing when Film Dye is 0.
 
+## 109. The dials held in the plate shader go further (PLAN 27h-3)
+
+Micro-Droplets, Glossiness, Boundary Glow and Gate Edge now run to 2, and Plate Cells to 1.4.
+Before, their uniform clamp, shader mix or range held them at 1 (or let Glossiness fade to
+15% in its top quarter). From 0 to 1 every dial draws the exact same picture as before, so
+every look opens unchanged.
+
+1. Each at its top on a look that uses it: Micro-Droplets at 2 keeps a denser field of small
+   satellite drops around the pools without turning their mix brighter than 1; Plate Cells at
+   1.4 carves deeper Rayleigh-Bénard cell rims; Glossiness at 2 deepens the dark meniscus rim
+   on sloped dye edges without adding artificial white highlights; Boundary Glow at 2 extends
+   the Becke interface line further around meeting pools; Gate Edge at 2 widens the projector
+   gate's dark frame without over-multiplying past black.
+2. Bad: any look opening differently at its preset value (0 to 1), Glossiness making a pixel
+   brighter than 0, or Gate Edge inverting colours past 1.
+
+
