@@ -108,11 +108,12 @@ const api = {
    * what `__cgLive.start({ destinations })` would. The plate steps on and is
    * redrawn every `plateMs`.
    */
-  async start(url: string, keys: { key: string; orientation?: 'landscape' | 'portrait' }[], fps: number, audioCodec?: 'aac' | 'opus', plateMs = 700): Promise<unknown> {
+  async start(url: string, keys: { key: string; orientation?: 'landscape' | 'portrait' }[], fps: number, audioCodec?: 'aac' | 'opus', plateMs = 700, silent = false): Promise<unknown> {
     if (!canvas || !stream) throw new Error('setup first');
     const plan = liveConsolePlan({ destinations: keys.map((k) => ({ name: k.key, url, key: k.key, orientation: k.orientation })), width: W, height: H, portrait: { width: H, height: W }, videoBitrate: 1500000 });
     const destinations: LiveDestinationSpec[] = plan.destinations;
-    encoder = new LiveEncoder({ canvas, audio: stream, transport, outputs: plan.outputs, destinations, fps, audioBitrate: 96000, audioCodec });
+    // `silent`: the app with its sound source at None, which hands the encoder no stream at all (37x-4f).
+    encoder = new LiveEncoder({ canvas, audio: silent ? null : stream, transport, outputs: plan.outputs, destinations, fps, audioBitrate: 96000, audioCodec });
     await encoder.start();
     let busy = false;
     plateTimer = setInterval(() => {
@@ -166,6 +167,21 @@ const api = {
   /** The crop the portrait encode takes of the canvas, for the check to print and test. */
   crop: (cw: number, ch: number, w: number, h: number, fit: 'cover' | 'contain') => liveCrop(cw, ch, w, h, fit),
   plate: () => ({ redraws, errors: plateErrors.slice(0, 3) }),
+  /**
+   * The sound source switched off on air: the tone's track is stopped, which
+   * ends the encoder's reader as a source the owner turns off would, and a
+   * fresh tone is made for any stream started after (37x-4f).
+   */
+  endTone(): void {
+    if (!ac || !stream) throw new Error('setup first');
+    for (const t of stream.getAudioTracks()) t.stop();
+    const dest = ac.createMediaStreamDestination();
+    const tone = ac.createOscillator(); tone.frequency.value = 220;
+    const g = ac.createGain(); g.gain.value = 0.05;
+    tone.connect(g).connect(dest); tone.start();
+    stream = dest.stream;
+    (window as unknown as { __liveDest: MediaStreamAudioDestinationNode }).__liveDest = dest;
+  },
   state: async () => encoder ? encoder.refresh() : null,
   async stop(): Promise<unknown> {
     if (plateTimer) clearInterval(plateTimer);

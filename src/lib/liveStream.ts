@@ -59,6 +59,7 @@
  * key's name and the main process looks it up (desktop/keys.js).
  */
 import { avcCodec, videoBitrate as bitrateFor } from './render';
+import { silenceChunk, SILENCE_CHANNELS, SILENCE_RATE, SILENCE_STEP_MS } from './liveSilence';
 import { listenLiveFrames, type LiveFrameKind } from './liveFrame';
 
 export interface LivePacket { kind: 'video' | 'audio'; timestampMs: number; key?: boolean; data: Uint8Array; /** A video packet's encode (an output's id); audio goes to every destination. */ output?: string }
@@ -348,6 +349,11 @@ export class LiveEncoder {
   private audioBaseMs = 0;
   private audioCodec: 'aac' | 'opus' | null = null;
   private audioDescribed = false;
+  /** Where the encoded audio ends, on the AudioData clock, and its rate and channels: what silence continues from (lib/liveSilence.ts). */
+  private audioEndUs = 0;
+  private audioRate = 0;
+  private audioChannels = 0;
+  private silenceTimer: ReturnType<typeof setInterval> | null = null;
   private transportState: LiveTransportState | null = null;
   private audioPackets = 0;
   /** For the checks: the first output's ms spent making frames, ms from its first encode to its first packet out, packets out. */
@@ -438,7 +444,14 @@ export class LiveEncoder {
         if (!codec) throw new Error(`no audio encoder for ${channels} channels at ${first.sampleRate} Hz`);
         this.audioCodec = codec;
         audioMeta = { codec, sampleRate: first.sampleRate, channels, bitrate: audioBitrate };
+      } else {
+        // No sound source: the stream still carries an audio track, of silence, since YouTube shows nothing of a stream without one (lib/liveSilence.ts).
+        const codec = await liveAudioCodec(SILENCE_RATE, SILENCE_CHANNELS, audioBitrate, this.opts.audioCodec);
+        if (!codec) throw new Error(`no audio encoder for the silent track (${SILENCE_CHANNELS} channels at ${SILENCE_RATE} Hz)`);
+        this.audioCodec = codec;
+        audioMeta = { codec, sampleRate: SILENCE_RATE, channels: SILENCE_CHANNELS, bitrate: audioBitrate };
       }
+      if (audioMeta) { this.audioRate = audioMeta.sampleRate; this.audioChannels = audioMeta.channels; }
       // The hint is chosen on the first output's size (the largest, in the usual show) and used for all of them.
       const lead = this.outs[0].spec;
       if (this.opts.acceleration) this.acceleration = this.opts.acceleration;
@@ -479,7 +492,7 @@ export class LiveEncoder {
         });
         o.encoder.configure(o.cfg);
       }
-      if (first && audioMeta) {
+      if (audioMeta) {
         this.audio = new AudioEncoder({
           output: (chunk, m) => this.onAudio(chunk, m),
           error: (e) => this.fail(e),
@@ -488,6 +501,13 @@ export class LiveEncoder {
       }
       this.phase = 'live';
       if (first) { this.takeAudio(first, firstReadAt); void this.pumpAudio(); }
+      else if (audioMeta) {
+        this.audioClock = 'track';
+        this.audioOriginUs = this.t0 * 1000;
+        this.audioBaseMs = 0;
+        this.audioEndUs = this.audioOriginUs;
+        this.startSilence();
+      }
       this.tick(0);
     } catch (e) {
       this.fail(e);
@@ -593,7 +613,8 @@ export class LiveEncoder {
     while (this.reader && this.phase === 'live') {
       let r: ReadableStreamReadResult<AudioData>;
       try { r = await this.reader.read(); } catch (e) { if (this.phase === 'live') this.fail(e); return; }
-      if (r.done) return;
+      // The source's track ended on air (switched off mid-set): silence carries the track on from its last sample.
+      if (r.done) { if (this.phase === 'live') this.startSilence(); return; }
       if (this.phase !== 'live') { r.value.close(); return; }
       this.takeAudio(r.value);
     }
@@ -636,11 +657,31 @@ export class LiveEncoder {
         } else {
           this.audio.encode(ad);
         }
+        this.audioEndUs = ad.timestamp + (ad.numberOfFrames / ad.sampleRate) * 1e6;
       }
     } catch (e) {
       this.fail(e);
     } finally {
       ad.close();
+    }
+  }
+
+  /** Silence from where the audio ends, topped up every SILENCE_STEP_MS until the stream stops. */
+  private startSilence(): void {
+    if (this.silenceTimer || !this.audioRate) return;
+    if (!this.audioEndUs) this.audioEndUs = this.audioOriginUs + ((performance.now() - this.t0) - this.audioBaseMs) * 1000;
+    this.silenceTimer = setInterval(() => this.fillSilence(), SILENCE_STEP_MS);
+  }
+
+  private fillSilence(): void {
+    if (this.phase !== 'live') return;
+    // Now, on the AudioData clock the audio is stamped in ('track': performance.now()'s; 'arrival': the track's own, offset by the base).
+    const toUs = this.audioOriginUs + ((performance.now() - this.t0) - this.audioBaseMs) * 1000;
+    for (let c = silenceChunk(this.audioEndUs, toUs, this.audioRate, this.audioChannels); c; c = silenceChunk(this.audioEndUs, toUs, this.audioRate, this.audioChannels)) {
+      const end = c.timestamp + (c.numberOfFrames / c.sampleRate) * 1e6;
+      this.takeAudio(c);
+      // Set here as well as in takeAudio, so a chunk it declined cannot hold the loop.
+      this.audioEndUs = end;
     }
   }
 
@@ -681,6 +722,7 @@ export class LiveEncoder {
     if (this.stopping) return;
     this.stopping = true;
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    if (this.silenceTimer) { clearInterval(this.silenceTimer); this.silenceTimer = null; }
     this.unlisten?.(); this.unlisten = null;
     for (const o of this.outs) { try { if (o.encoder && o.encoder.state === 'configured') await o.encoder.flush(); } catch { /* failed already */ } }
     try { if (this.audio && this.audio.state === 'configured') await this.audio.flush(); } catch { /* failed already */ }

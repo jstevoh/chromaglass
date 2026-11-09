@@ -343,6 +343,57 @@ try {
   check('the client answered the server\'s ping', (first(stopped?.transport)?.pings ?? 0) >= 1 && s.pongs >= 1, `${first(stopped?.transport)?.pings} answered, ${s.pongs} heard`);
   check('the client acknowledged the server\'s bytes when asked', (first(stopped?.transport)?.acks ?? 0) >= 1 && s.acks === first(stopped?.transport)?.acks, `${first(stopped?.transport)?.acks} sent, ${s.acks} heard, window ${256} bytes`);
 
+  /*
+    Always an audio track (37x-4f). The Mac app streamed to YouTube for
+    minutes with no error and Studio showed "No data": with the sound source
+    at None the encoder had no track and the stream went out as video alone,
+    which YouTube's ingest is known not to start a broadcast from (ffmpeg's
+    test pattern, with a tone, showed at once on the same key). Our listener and
+    ffmpeg's both took the video-only stream happily, which is why no line
+    here saw it. So two short streams: one with no source at all, as the app
+    opens, and one whose source is switched off on air. Each must carry an
+    audio track from its first frame to its last with no hole a server could
+    read as the audio ending, and the track must decode: silence where there
+    is no sound, the tone where there was.
+  */
+  for (const kind of ['no source', 'source off on air']) {
+    const key = kind === 'no source' ? 'check-stream-key-silent' : 'check-stream-key-ended';
+    const RUN_MS = 6000, END_MS = 2500;
+    await page.evaluate(([url, k, fps, c, silent]) => window.liveLab.start(url, [{ key: k }], fps, c ?? undefined, 700, silent), [listener.url, key, FPS, CODEC, kind === 'no source']);
+    if (kind !== 'no source') { await page.waitForTimeout(END_MS); await page.evaluate(() => window.liveLab.endTone()); await page.waitForTimeout(RUN_MS - END_MS); } else await page.waitForTimeout(RUN_MS);
+    const st = await page.evaluate(() => window.liveLab.stop());
+    await new Promise((r) => setTimeout(r, 500));
+    const conn = byKey.get(key);
+    const tg = (conn?.tags ?? []).map((t) => ({ ...t, d: describeTag(t.type, t.body) }));
+    const vt = tg.filter((t) => t.d.kind === 'video' && !t.d.header), at = tg.filter((t) => t.d.kind === 'audio' && !t.d.header);
+    const aHead = tg.findIndex((t) => t.d.kind === 'audio' && t.d.header), vHead = tg.findIndex((t) => t.d.kind === 'video' && t.d.header);
+    const aFirst = tg.findIndex((t) => t.d.kind === 'audio' && !t.d.header);
+    const gaps = at.slice(1).map((t, i) => t.timestamp - at[i].timestamp);
+    const maxGap = gaps.length ? Math.max(...gaps) : Infinity;
+    const meta = conn?.meta ?? {};
+    const span = vt.length > 1 ? `${vt[0].timestamp}..${vt[vt.length - 1].timestamp}` : 'none';
+    const aspan = at.length > 1 ? `${at[0].timestamp}..${at[at.length - 1].timestamp}` : 'none';
+    const covers = vt.length > FPS && at.length > 0 && at[0].timestamp <= vt[0].timestamp + 200 && at[at.length - 1].timestamp >= vt[vt.length - 1].timestamp - 300;
+    check(`${kind}: the stream still carries an audio track, named in onMetaData, from the first frame to the last with no hole`, !!conn && meta.audiocodecid !== undefined && aHead >= 0 && aHead < aFirst && vHead >= 0 && covers && maxGap <= 100 && st?.audioCodec,
+      `${st?.audioCodec ?? 'no'} audio, onMetaData audiocodecid ${meta.audiocodecid ?? 'none'}; video ${span} ms, audio ${aspan} ms in ${at.length} packets, widest gap ${Number.isFinite(maxGap) ? maxGap : '-'} ms`);
+    if (!conn || vHead < 0 || aHead < 0 || !at.length) continue;
+    const rate = Number(meta.audiosamplerate) || setup.sampleRate;
+    const dec = await page.evaluate(([v, a]) => window.liveLab.decode(v, a), [
+      { description: tg[vHead].d.payload.toString('base64'), frames: vt.map((t) => ({ ts: t.timestamp, key: t.d.key, data: t.d.payload.toString('base64') })) },
+      { codec: tg[aHead].d.codec, description: tg[aHead].d.payload.toString('base64'), sampleRate: rate, channels: meta.stereo ? 2 : 1, packets: at.map((t) => ({ ts: t.timestamp, data: t.d.payload.toString('base64') })) },
+    ]);
+    // The tone is 0.05 of full scale (RMS 0.035); silence is zeros, which an AAC or Opus round trip leaves under a thousandth.
+    const loud = (l) => l.rms > 0.01, quiet = (l) => l.rms < 0.001;
+    const lv = dec.levels ?? [];
+    const before = lv.filter((l) => l.ts > 300 && l.ts < END_MS - 300), after = lv.filter((l) => l.ts > END_MS + 700);
+    const heard = kind === 'no source'
+      ? lv.length > 0 && lv.every(quiet)
+      : before.length > 0 && after.length > 0 && before.filter(loud).length >= 0.9 * before.length && after.every(quiet);
+    const audioSpan = (at[at.length - 1].timestamp - at[0].timestamp) / 1000;
+    check(`${kind}: the audio track decodes, ${kind === 'no source' ? 'silence throughout' : 'the tone until it was switched off, silence after'}`, !dec.audioError && Math.abs(dec.audioSeconds - audioSpan) <= 0.15 && heard,
+      dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; ${kind === 'no source' ? `loudest ${fmt(Math.max(...lv.map((l) => l.rms)), 4)}` : `before ${before.filter(loud).length}/${before.length} loud, after ${after.filter(quiet).length}/${after.length} quiet`}`);
+  }
+
   // A bad key.
   const bad = new LiveClient({ url: listener.url, key: 'wrong-key', meta: {} });
   let badErr = null;

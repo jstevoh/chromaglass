@@ -438,7 +438,7 @@ try {
     with. The key store is Electron's safeStorage: on a Mac it encrypts
     through the login Keychain; on a Linux box with no keyring it refuses,
     and the repo's app (never the packed one) takes the key itself, as the
-    check does here. With no sound source open the stream is video only.
+    check does here. With no sound source open the stream carries a silent audio track (37x-4f).
     Since 37x-4c the page streams to two destinations at once, a landscape
     and a portrait one, which is two encodes and two sockets through the
     same IPC: both must arrive, each at its own size.
