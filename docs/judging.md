@@ -2431,10 +2431,10 @@ plate stuttering when the list lands mid-show.
 
 `npm run moire` holds the optics (the fringe's frequency, the product of two sheets, no false
 moiré, the gap's defocus, the liquid bending the lower sheet, off is off) on the lab plate;
-only the wall can say whether the six looks read as the real transparencies do.
+only the wall can say whether the seven looks read as the real transparencies do.
 
-1. Load each look in the look menu's **Moiré pack** group: Moiré Star, Moiré Ripple,
-   Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel, with a song playing.
+1. Load each look in the look menu's **Moiré pack** group: Moiré Star, Moiré Waves (45a-11),
+   Moiré Ripple, Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel, with a song playing.
 2. Settings → **Moiré Sheets**: turn **Moiré Turn** slowly through 0. The fringes should
    widen to nothing at 0 and sweep faster as it leaves; **Flip** on two Spokes should cross
    into diamonds like the shop's video.
@@ -2444,3 +2444,36 @@ only the wall can say whether the six looks read as the real transparencies do.
 4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
    not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
    45a-5).
+
+## 112. Saffron Lace beside the owner's lace still (PLAN 28l)
+
+The look menu (or the phone's Looks sheet) → **Saffron Lace**. Beside the still the owner
+sent on 2026-11-07 (yellow lace, lavender, cobalt, coral):
+
+1. Within a few seconds the yellow film tears into lace by itself, and keeps breaking: veins
+   bead into rows of drops (the spatter).
+2. The lace reads yellow, not amber or brown, over the white and over the lavender wash.
+3. The holes show the pools' colours: lilac on the right, cobalt and icy blue on the left,
+   coral low in the middle.
+4. A kick opens the lace a little (the press); the cobalt pool's soap opens fresh holes on
+   the bass; the coral pool's oil thickens the film where it lands.
+5. Bad: a flat yellow sheet that never tears, lace that is all rings (28l-3), or the pools
+   so deep under the film that they read navy, red or brown.
+
+## 113. Sign in with Apple (PLAN 23.15)
+
+On the live site, signed out, in a private window:
+
+1. Play free. Three buttons: Continue with Google, Continue with Apple, Continue with email.
+2. Continue with Apple: Apple's sheet opens, asks for your name and email (try *Hide My Email* once), and the
+   plate starts. Profile & Store says "Signs in with Apple", and with the hidden address it adds the note that a
+   licence bought under your own email shows up when you sign in with that email.
+3. Sign out, then Continue with Apple again: straight in, no second account in Firebase's Users list.
+4. An address that already has a Google account, shared with your Apple ID: Apple says the email already has an
+   account; sign in with Google and Firebase's Users list shows that one account with both Google and Apple.
+5. The Mac app signed out: Continue with Apple in your browser opens the browser's sign-in, and the app opens the
+   show by itself once you finish there.
+6. A phone: the same three buttons fit, and Apple's sheet comes back to the show.
+
+Bad: a second account for the same person, an error saying the provider is not enabled, or the Mac app's window
+stuck on "Finish in your browser" after the browser signed in.

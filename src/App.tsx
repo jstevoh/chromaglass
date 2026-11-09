@@ -61,7 +61,6 @@ import { useUserPresets, asPreset } from './hooks/useUserPresets';
 import { downloadText, parsePresetFile, sequenceFileName, serializeSequence, isUserPresetId, type UserPreset } from './lib/userPresets';
 import type { ShowSequence } from './lib/sequencer';
 import { sameSong, songRefFromTrack, songLabel, type SongRef } from './lib/songRef';
-import { type SetItem } from './lib/setList';
 import { useShowSequencer } from './hooks/useShowSequencer';
 import { useMusicIntelligence } from './hooks/useMusicIntelligence';
 import { clockText } from './lib/performanceTake';
@@ -1519,36 +1518,6 @@ export default function App() {
     () => allPresets.find(p => p.id === activePresetId)?.name ?? null,
     [allPresets, activePresetId]);
 
-  const cueLook = useCallback((presetId: string) => {
-    const up = isUserPresetId(presetId) ? userPresetsRef.current.find(p => p.id === presetId) : null;
-    const built = up ? undefined : findPreset(presetId);
-    const settings = up ? up.settings : built?.settings;
-    const name = up?.name ?? built?.name ?? presetId;
-    if (settings) setCued({ id: built?.id ?? presetId, name, settings });
-  }, []);
-
-  /** What a set item will send: its look with its own controls on top, or its sequence. */
-  const lookOfItem = useCallback((item: SetItem): ArmedLook | null => {
-    const extra = { item: item.id, fade: item.fade, rides: item.rides };
-    if (item.kind === 'sequence') {
-      const seq = sequencerRef.current?.sequences.find(q => q.id === item.ref);
-      return seq ? { id: `sequence:${seq.id}`, name: item.name ?? seq.name, settings: {}, sequence: seq.id, ...extra } : null;
-    }
-    const up = isUserPresetId(item.ref) ? userPresetsRef.current.find(p => p.id === item.ref) : null;
-    const built = up ? undefined : findPreset(item.ref);
-    const base = up ? up.settings : built?.settings;
-    if (!base) return null;
-    return { id: built?.id ?? item.ref, name: item.name ?? up?.name ?? built?.name ?? item.ref, settings: { ...base, ...((item.controls ?? {}) as Partial<VisualizerSettings>) }, ...extra };
-  }, []);
-  const cueItem = useCallback((itemId: string) => {
-    const item = setListRef.current.items.find(i => i.id === itemId);
-    const look = item ? lookOfItem(item) : null;
-    if (look) setCued(look);
-  }, [lookOfItem]);
-  /** Arm a row of the desk's list, whichever list it is showing. */
-  const cueAny = useCallback((id: string) => {
-    if (setListRef.current.items.length > 0) cueItem(id); else cueLook(id);
-  }, [cueItem, cueLook]);
   const liveItemIdRef = useRef<string | null>(null);
   liveItemIdRef.current = liveItemId;
 
@@ -1559,13 +1528,13 @@ export default function App() {
   });
 
   const {
-    fadeSettingsTo, sendLook, goLook, goLookNowRef, goLookNow, goBackPlate, backLookNow,
-    backFollowsFront, backLookCleared, revertLook,
+    fadeSettingsTo, sendLook, goLook, cueLook, lookOfItem, cueAny, playSetItem,
+    goLookNowRef, goLookNow, goBackPlate, backLookNow, backFollowsFront, backLookCleared, revertLook,
   } = useLookFades({
     lookFadeRef, lookTakesLevels, flushRide, evolveLetsGo, ride, settingsRef, setSettings,
     setFading, rowFades, laterWrites, setLiveItemId, setRideKeys, setCued, sequencerRef,
     previousLook, pinnedPresetId, adoptPreset, visualizerRef, lookPhase, cued, fadeSeconds,
-    userPresetsRef, setBackLook, setRowFading, blackoutRef,
+    userPresetsRef, setBackLook, setRowFading, blackoutRef, setListRef,
   });
 
   const { timecodeRef, timecode } = useTimecode();
@@ -2026,7 +1995,7 @@ export default function App() {
   const {
     midi, runSoundTrigger, gamepad, projector, gamepadRingRect,
   } = useControllers({
-    ride, settingsRef, rideSetting, runAction, cuePreset, selectDye, wallRef, activePresetId,
+    ride, settingsRef, rideSetting, runAction, cuePreset, playSetItem, selectDye, wallRef, activePresetId,
     selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
     blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
     visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
@@ -3424,6 +3393,7 @@ export default function App() {
           <MidiPanel
             midi={midi}
             presets={allPresets.map(p => ({ id: p.id, name: p.name }))}
+            setItems={cues.map((c, index) => ({ index, name: c.name }))}
             activity={showActivity}
             onActivity={setShowActivity}
             onSetup={() => openSettingsAt('midi')}

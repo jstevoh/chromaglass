@@ -7,7 +7,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `stage.ts`: `WebGPUStage`: canvas, device, frame.
 - `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead. The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
 - `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms.
-- `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver`.
+- `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (including `speciesShare` and `speciesSnapshot`).
 - `kit.ts` (47 KB, grep it): `PipelineCache`, `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing` (`hasFree`, `reserve`, `copyFrom`, `collect`), `GpuProfiler`.
 
 ## Contracts
@@ -34,7 +34,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `prepare.ts`: `prepareShow`, pipelines built before opening.
 - `probe.ts`: delivered brightness for the flash guard.
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
-- `rimRead.ts`: `RimRead`, the mean inside the dish's rim.
+- `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.
 - `selftest.ts`: kit tests, `?debug`.
 - `slosh.ts`, `soapFilm.ts`, `standing.ts`: slosh dish, soap film, ferrofluid domes.
 - `splats.ts`: a frame's pours as GPU records.

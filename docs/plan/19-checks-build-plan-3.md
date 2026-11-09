@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself (continued)
 
-Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
+Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
 
 - **19aa-9. Bottles' Splat with the Ferrofluid bottle, "not at its mirror" (read 2026-10-25).**
   3 reds of 183 Mac runs in the week, all on the Splat and on no other tool or the replays
@@ -408,6 +408,50 @@ ran. How it works and how to pause it: `docs/mac-runner.md`.
   harnesses still sleep a fixed time, and with two shards on one Mac (19ah-6) the start is
   slower. Move them to `untilServing`, and read the printed times on the Mac first to see
   how slow a start gets.
+- **19ah-9. Built: a Mac busy with other work hands the deploy back.** Deploys 679 and 682
+  (2026-11-08, runs 42427960522 and 42436205976) went red on the owner's Mac and passed
+  the same shards on GitHub's: `startup`'s "built ahead ... nothing built behind it" twice,
+  "no pipeline was built on a frame" (particles) once, `phone` on a taken port, and every
+  other shard into its 20-minute timeout. The open shard's own lines: the opening's 65
+  builds 11.86 and 17.99 s (median 0.554 s, the display 6.77 s) against 3.43 s for 56
+  (median 0.186 s) on the same Mac's first deploy of 10-29, so the half behind the show
+  outran startup's 45 s wait for it; setup-node alone two to five minutes; and the port
+  step found another checkout serving `signin` and `tiers`. The Mac now hosts sessions and
+  Antigravity's queue running the same harnesses. Built: each Mac shard's first step
+  (`scripts/macbusy.sh`) looks for a test browser or the ChromaGlass app at work (5% of a
+  core or more, so a cancelled job's idle leftover does not count) that is not a deploy's
+  own (no runner worker among its ancestors), waits two minutes, then
+  fails listing it; the watchdog reads that step's failure and moves the deploy to
+  GitHub's Macs at once (`npm run macguard`). Recovery that night: the deploy run by hand
+  with `hosted`. **19ah-9a** built below; open: **19ah-9b**, `startup` prints "nothing built
+  behind it" when its 45 s wait for the half behind the show ran out with it still
+  building, which read as the show asking for nothing (the script is over 100 KB, so the
+  wording waits for its split); and the 45 s wait has 7 s to spare on GitHub's Macs
+  (38.45 s behind on deploy 671).
+- **19ah-9a. Built: work begun mid-shard waits for the deploy, or hands it back.** Main's
+  deploy of 2026-11-08 began its Mac shards at 18:16Z, each past its first look, and then
+  sessions began GPU work on the Mac: filming the hero, `lampzero.mjs`, `renders.mjs` in
+  Antigravity's clone, a driver of the app. `startup` went red on the Mac ("no pipeline was
+  built on a frame"), the tools shard's first look refused the Mac, and the deploy went to
+  GitHub's Macs to queue behind pull requests. Built, both sides: the first step now marks
+  the Mac held from its first line (`~/.chromaglass-runner/deploy-<runner>.json`) and a new
+  last step, "The owner's Mac stayed free of other work" (`always()`), marks it ended;
+  `launchChromium` and `npm run desktop` wait while a shard holds the Mac and for 120 s after
+  one ends, for the next shard (`scripts/macdeploy.mjs`; a mark whose runner worker exited,
+  older than 30 minutes, or from a shard that gave up holds nothing; only on a Mac, never in
+  a job). What does not read the mark, `scripts/checks.mjs` looks for before each check and
+  after the last (`macbusy.sh --again`): still there after two minutes, or there at all right
+  after a red check, the shard stops and its last step fails, which the watchdog reads as
+  busy; so the watchdog now watches until every Mac shard has finished, not until each is
+  past its first step. Checked by `npm run macguard` (the hold rule, `macbusy.sh`'s marks
+  read back, the last step's failure, the watchdog's new cases) and by hand in a session: a
+  red check beside a busy fake headless shell stopped its shard and failed the last step,
+  and a launch held by a mark ended 112 s ago went on 10 s later. Open: the first deploy on
+  the Mac with a session working beside it (read the harness's "a deploy holds the owner's
+  Mac" line and the shard's checks green). Found along the way, **19ah-9c**: a session's
+  script that launches Playwright itself (`detail.mjs`, `webgpu-smoke.mjs`, and scratch
+  drivers) skips the mark and is caught only by the look between checks; and a deploy handed
+  back queues behind pull requests' Mac runs, which a hosted deploy could jump.
 
 ## 19ai. Smaller sessions: the separation plan (2026-10-28)
 
@@ -536,3 +580,10 @@ the docs PR numbers the series 19ai-1..10). Written here so far: 19ai-1 and 19ai
   `here`, once a session has timed the lab checks on software WebGPU.
 - **19ak-5. Shipped:** a re-run no longer turns the logic shard red; `reach.mjs`'s selftest
   children run as a first attempt (docs/plan-shipped.md, 19ak).
+- **19ak-6. Shipped:** the iPhone build fetches Capacitor's two binaries itself (curl
+  retries, then the API's asset download) into a SwiftPM cache of its own, so a 504 from
+  GitHub's release page no longer fails it (docs/plan-shipped.md, 19ak).
+- **19ak-7. Shipped:** the other release-page downloads survive a 504 too: actionlint falls
+  back to the API's asset download and CI caches its binary; the Mac app job caches canvas's
+  prebuilt, Electron and electron-builder's tools on pull requests and retries `npm ci`
+  (docs/plan-shipped.md, 19ak). A cold cache on the Mac app job still needs the pages.

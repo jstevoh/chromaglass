@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself
 
-This section is in 3 files, cut between items: `19-checks-build-plan.md`, `19-checks-build-plan-2.md`, `19-checks-build-plan-3.md`.
+This section is in 4 files, cut between items: `19-checks-build-plan.md`, `19-checks-build-plan-2.md`, `19-checks-build-plan-3.md`, `19-checks-build-plan-4.md`.
 
 Found 2026-09-28 by reading `.github/workflows/`, `scripts/` and the build, and by
 reading 14 recent `Checks` runs and 96 `gallery.yml` runs through the Actions API.
@@ -280,15 +280,36 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   1.40 ms over the next merges: split any that would pass 21 there. Each part draws its own
   runner, so only `lab`, which runs videoflow, knows its tier today: on deploy 670 `lab2` and
   `lab3` ran 11:38 and 11:49 as jobs on runners whose tier nothing printed.
-- **19k-13, open** (E, S). **The Mac's plate shard at its 20 minutes.** On #690's run the
-  plate shard's 41 checks took 19:08 after 46 s of setup on a GitHub Mac, and the job was
-  cancelled about a second past its bound, every check green (green on re-run); on main's
-  deploy 671 it ran 18:07. The slowest: Areas that listen 1:42, A drop slumps 1:05, the
-  Finger drags 0:58, the physics 0:56. Every other Mac shard ran 15:49 to 16:49 on that run,
-  so a move needs room found first; 19k-12 moved `mirror` out of fifth the same way. On
-  2026-11-07 18m-5a moved `npm run slump` (now about 2:00, with its added filter-off run)
-  from plate to tools, which held it at 15.7 minutes on #498's runs; read both shards'
-  times on the next deploys before moving anything else.
+- **19k-13** (E, S): **shipped**, the Mac jobs' bound 20 → 25 minutes, and a shard's checks past
+  18 minutes (a Measure part's past 21) a warning on the run's page, the room line `ROOM` in
+  `scripts/checks.mjs`. Story in `docs/plan-shipped.md` §19k-13. Open: read the warnings over
+  the next deploys, and rebalance (or add a sixth shard) when one shard keeps warning. The
+  same day 18m-5a moved `npm run slump` (now about 2:00) from plate to tools; read both shards'
+  warnings before moving anything else.
+- **19k-14, open** (E, S). **`draftwall --frames` hangs on a Mac.** On #690's second run the
+  Mac's open shard ran `node scripts/draftwall.mjs --frames`, printed every line up to "and
+  the copy stays up for the next look" (17 s in), then nothing for 12:07, until the job was
+  cancelled at its bound with the five checks after it never run; green on the re-run, and
+  25 to 37 s on the other nine attempts of 2026-11-07. Since 19k-13 the entry has a 3-minute
+  timeout, so a hang is this check red by name and the shard goes on. What hung is not known:
+  the next calls are a `page.evaluate` of the settings and a `clear`, a 300 ms wait, another
+  `page.evaluate`, and a click on Live (`scripts/draftwall.mjs` after that line), and an
+  evaluate has no timeout of its own, so a page whose main thread stops would hold it. Next:
+  print a line before each of those calls under `CI`, so the next hang names its call, then
+  find why that call can stop (D671's same-check red, "the dimmer still reaches the wall", is
+  19aa's and may share the cause).
+- **19k-15** (E, S): **shipped**, `ears`'s covered line holds each tick to the wall's ask
+  before it (more than 250 ms after, EAR_ASK_HOLD_MS) rather than wanting none; red on GitHub's
+  Macs on #718 and #734 at one tick each. Story in `docs/plan-shipped.md` §19k-15.
+- **19k-16, open** (E, S). **`draftwall --frames` reads 0 painted frames on a GitHub Mac.** On
+  #734's run (2026-11-08) "the projector window is painted from the wall's canvas" counted 0
+  frames from either canvas over 8.2 s while the wall's engine drew 334; #718's the same day
+  counted 26 against 121 and passed. Once, on a PR that does not touch the wall. Not known
+  whether the show stopped handing frames over, the window dropped them (a size of 0 returns
+  early in `CastDisplay`'s `paint`) or the patched drawImage missed them; since 19k-15's PR the
+  line prints what the window says of itself (mirror hooked, its own `paints` over the window,
+  stage and source sizes, dark). Next: read that on the next red, then fix the side it names.
+  The bar stays.
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
