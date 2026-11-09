@@ -540,42 +540,26 @@ rest is routine and the owner's calls.
   song's chapter is a link in the cuts' captions; the albums are one playlist ("Albums")
   beside 37b's three. The 60-second look videos (37b) continue less often, as the site's
   library.
-- **37x-10. The song's title painted as ink, then swept away.** *(build, M; Antigravity
-  from the brief; its check shipped 2026-11-07, `npm run inktitle`, red on main and owed.)*
-  A stream's viewer needs to know what is playing, and the 1920s legends their credit. The
-  first idea, a lower third drawn over the picture's corner for eight seconds, the owner
-  replaced on 2026-11-07: "let titles get painted on as ink and then swept away". When a
-  song starts and the switch is on, its artist and title (two lines, each clipped at 40
-  characters) are rasterised once into a mask and poured into the dye field as ink, at
-  the solver's own grid (`pourInk`, sampled from the mask as the video pour samples its
-  frame, 14ab-2); then a wash, a real flow added to the step's velocity, drifts and stirs
-  it until the letters break up. Nothing in the plate's shaders knows about titles
-  (physics writes, rendering reads), so the title is on the wall, in the stream and in
-  every recording at once, and the dye it leaves behind stays in the show as colour.
-  - *The dials.* `inkTitle` (the switch, off by default; the Live Show panel and the phone
-    turn it on), `inkTitleColor` ('' is the look's palette, its first colour, or a chosen
-    colour), `inkTitleSize` (small to the plate's width, never off the wall: a long title
-    shrinks to fit), `inkTitleY` (where it lands, up the plate) and `inkTitleSweep` (a
-    slow drift at 0.01 that still reads after 6 s, gone by 12 s at the default, by 2 s at
-    the top). No look sets any of them.
-  - *When.* The identified song (`TrackIdentity` from the song ID, 14z) changes while the
-    switch is on: `inkTitleCue` gives one title a song, keyed by its isrc, else artist
-    and title, and none for a song with no title. The album show's queue (37x-7) knows its
-    track list ahead; feeding the cue from it instead of the ear, so a title lands on the
-    song's first beat rather than when the ear recognises it, is 37x-10b.
-  - *The check.* `npm run inktitle` (scripts/inktitle.mjs): readable means the dye in the
-    title's box follows the letters, the correlation of the dye's density with the mask
-    at its best shift (a title that slid away intact still counts as readable). 0.8 or
-    better half a second after it lands, strokes four times the dye of their gaps, the
-    dye added as poured within 10%; 0.7 or better at 3 s; 0.3 or worse by 12 s; 90% of
-    its dye still on the plate when it is gone (swept, not faded). A throwaway reference
-    build passed every lab line (0.922 at landing, gone by 8 s at the dial's middle,
-    2 s at the top) before the check was committed.
-  - *Phone version.* A "Title" switch in Live Show on the phone (the remote's Live Show
-    chip, `LiveRemoteChip.tsx`, or the phone's own Live Show sheet), same setting.
-  - *Owed after the build.* The owner judges it on the Mac's film on two or three looks
-    (the lab measures a still plate; a busy look's own flow may break a title up before
-    3 s, and how a look's flow treats it is taste): docs/judging.md takes a section then.
+- **37x-10. The song's title painted as ink, then swept away.** *(shipped 2026-11-08.)*
+  The identified song's title and artist poured into the dye as ink at the solver's own
+  grid (`pourInk`), then a wash (a drift and eddies added to the step's velocity) breaks
+  the letters up; Settings → Logo & Titles and the phone's Title switch; every title pour
+  (song-show title cards, 37x-10c's `pour-text` words) goes through it, which was
+  37x-10d. `npm run inktitle`; story in `docs/plan-shipped.md` §37x-10. Found building it:
+  - **37x-10e. The check's arms on the thin gap too.** *(S, Claude: a check change.)*
+    `npm run inktitle` steps the old plate (the lab's default), but every look opens on
+    the thin gap, where a push in the deltas is a solid bringing the liquid up to its
+    speed and no faster (Brinkman, PLAN 15b), so the same wash is weaker there. The
+    build was tuned on both by a side run (thin: 0.949 landing, 0.915 at 3 s, gone at
+    8.5 s at the default, 1 s at the top, all its dye kept), but only the old plate is
+    held by the check. Add the three arms on the thin gap, same bars.
+  - **37x-10f. The dead GPU picture pour.** *(S.)* `WebGPUFluid.pourImage` (gpu/fluid/
+    inputs.ts) has no caller (the app's `injectImage` lays a picture through the CPU's
+    arrays), and its fold binds three textures to `deltaDye`, which reads four since
+    the soap's breakdown: it would fail validation if called. Fold it through
+    `foldDye` and pour pictures at the solver's grid, or delete it.
+  - *Owed:* the owner judges it on the Mac's film on two or three looks
+    (docs/judging.md).
   - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the
     show's own track list and its clock, so the title lands on the song's first beat.
 

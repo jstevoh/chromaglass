@@ -139,7 +139,7 @@ const check = (name, ok, detail = '') => {
     a new choice setting added to the types without a line above fails here
     instead of passing unwalked.
   */
-  const FREE_FORM = new Set(['paperA', 'paperB', 'ledColor', 'clearFilmDyeColor', 'mixOrder', 'simResolution']);
+  const FREE_FORM = new Set(['paperA', 'paperB', 'ledColor', 'clearFilmDyeColor', 'inkTitleColor', 'mixOrder', 'simResolution']);
   const walked = new Set(lists.map(([k]) => k));
   const unwalked = Object.entries(DEFAULT_SETTINGS)
     .filter(([k, v]) => typeof v === 'string' && !walked.has(k) && !FREE_FORM.has(k)).map(([k]) => k);
