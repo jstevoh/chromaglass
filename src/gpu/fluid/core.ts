@@ -130,7 +130,6 @@ export class FluidCore {
   protected readonly sampler: GPUSampler;
 
   protected readonly rbRow: number;
-  protected readonly rbStaging: { dye: GPUBuffer; vel: GPUBuffer };
   protected readonly rbRings: { dye: ReadbackRing; vel: ReadbackRing };
   protected readonly rbDye: Float32Array;
   /** The reading `rbDye` holds: the ring's sequence when it was copied in, not when the next one landed. */
@@ -545,8 +544,6 @@ export class FluidCore {
     this.rbVel = new Float32Array(this.L * this.L * 4);
     this.rbRow = Math.ceil((this.L * 16) / 256) * 256;
     const bytes = this.rbRow * this.L;
-    const staging = (label: string) => this.disposer.track(device.createBuffer({ label, size: bytes, usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST }));
-    this.rbStaging = { dye: staging('readback dye'), vel: staging('readback vel') };
     this.rbRings = { dye: new ReadbackRing(device, this.disposer, bytes, 2, 'dye readback'), vel: new ReadbackRing(device, this.disposer, bytes, 2, 'vel readback') };
 
     this.clear();
