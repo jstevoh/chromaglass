@@ -1383,7 +1383,7 @@
     {
       "name": "A song's title painted as ink, then swept away",
       "shard": "lab3",
-      "run": "npm run inktitle -- --owed=cue,mask,lands,sweep,kept,setting,wired",
+      "run": "npm run inktitle",
       "timeout": 9,
       "why": [
         "The Live Show's ink titles (PLAN 37x-10, scripts/inktitle.mjs), written ahead",

@@ -23,6 +23,7 @@ import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
+import { useInkTitle } from './useInkTitle';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -110,6 +111,14 @@ export function useRemote({
     state between those seconds.
   */
   const liveShow = useLiveShow();
+  /*
+    The Live Show's titles (PLAN 37x-10): when the identified song changes
+    and the Title switch is on (the phone's, beside the controls below, or
+    the desk's Logo & Titles), its name is poured as ink and the wash takes
+    it. Here beside the remote's `pour-text` message, the other way a title
+    reaches the plate in a set, so the two are read in one place.
+  */
+  useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
   const liveKey = onAir(liveShow)
     ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
     : '';

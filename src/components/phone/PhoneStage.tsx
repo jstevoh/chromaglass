@@ -20,6 +20,7 @@ import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
 import { PhoneMoire } from './PhoneMoire';
+import { PhoneInkTitle } from './PhoneInkTitle';
 import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
@@ -1266,6 +1267,16 @@ export function PhoneStage(p: PhoneStageProps) {
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
+          {/*
+            Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch,
+            on the phone. Above the tiles, not after Record makes where it
+            first went: Songs, Settings, Guide and the rest close this sheet
+            to open their own, so anything below them is a sheet the hand (and
+            `npm run switches`, which walks the sheet in order and found the
+            switch gone by the time it reached it) has to open again. The
+            switch is the one thing here changed mid-set; the tiles lead away.
+          */}
+          {p.mixer && <div className="mb-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
