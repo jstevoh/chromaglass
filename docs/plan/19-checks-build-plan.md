@@ -310,6 +310,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   line prints what the window says of itself (mirror hooked, its own `paints` over the window,
   stage and source sizes, dark). Next: read that on the next red, then fix the side it names.
   The bar stays.
+- **19k-17** (E, S): **shipped**, `ears`'s windows last until the runner has offered enough
+  (30 frames drawn, asks, page turns or level samples; at least 2 s, at most 15 s) rather than
+  a fixed 2 s, bars unchanged, and the covered line counts asks against frames drawn without
+  the ticks (which draw nothing), each passed-over ask found by its time; the tick line is held
+  to half the page's turns and "uncovered" to every frame. Red three times on 2026-11-09 on GitHub's Macs, a different
+  line each time. `--slow=N` and `--busy=MS` put a cloud session where those runners are.
+  Story in `docs/plan-shipped.md` §19k-17.
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also
