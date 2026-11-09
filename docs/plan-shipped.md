@@ -12273,7 +12273,7 @@ the show.
   URL is dropped and the page pairs again. App.tsx carries the card in no more
   bytes than before (its file is over the size limit).
 
-Measured: `npm run tvpair` 51/51 (the advert asked both ways, pairing, kept
+Measured: `npm run tvpair` 52/52 (the advert asked both ways, pairing, kept
 keys across a restart, unknown keys, Forget, No and the lockout, the built page,
 the card laid out with the built stylesheet at laptop and phone width, the
 digits on a phone); `npm run tv` 33/33 unchanged; `./gradlew assembleDebug

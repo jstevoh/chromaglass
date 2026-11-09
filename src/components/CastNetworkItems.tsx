@@ -1,5 +1,5 @@
 import { Info } from './Info';
-import type { RelayInfo } from '../lib/remoteProtocol';
+import type { RelayInfo, RemoteMessage } from '../lib/remoteProtocol';
 
 /**
  * The cast menu's two network entries: a network display, which runs its own
@@ -24,6 +24,21 @@ export interface TvAtHome {
   allow: (id: string) => void;
   refuse: (id: string) => void;
   forget: () => void;
+}
+
+/**
+ * The laptop's three answers as the relay's messages (PLAN 12-tv-2), out of
+ * the hook so the check can hold the exact messages a press sends.
+ */
+export function tvAtHome(count: number, pairing: { asks: { id: string; code: string }[]; paired: number }, send: (m: RemoteMessage) => void): TvAtHome {
+  return {
+    count,
+    asks: pairing.asks,
+    paired: pairing.paired,
+    allow: (id) => send({ type: 'tv-allow', id }),
+    refuse: (id) => send({ type: 'tv-refuse', id }),
+    forget: () => send({ type: 'tv-forget' }),
+  };
 }
 
 const BUTTON = 'rounded-full px-3 py-1 text-[11px] font-semibold';

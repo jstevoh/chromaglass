@@ -291,9 +291,11 @@ export function advertise({ port, id, name, txt = {}, addresses = lanAddresses4,
  * Ask the network once who offers `_chromaglass._tcp`, the way a TV does, and
  * gather what comes back for `ms`. For the check (`npm run tvpair`), and for a
  * person wondering whether their Mac is visible: `node server/bonjour.js`.
- * `to` sends a legacy unicast question to one address instead of the group.
+ * `to` sends a legacy unicast question to one address instead of the group;
+ * `ask: false` only listens, which is how the check knows that what it heard
+ * after asking was an answer and not an announcement passing by.
  */
-export function browse({ ms = 1500, to = null } = {}) {
+export function browse({ ms = 1500, to = null, ask = true } = {}) {
   return new Promise((done) => {
     const found = new Map();
     const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
@@ -319,7 +321,7 @@ export function browse({ ms = 1500, to = null } = {}) {
     } else {
       sock.bind(MDNS_PORT, () => {
         for (const ip of lanAddresses4()) { try { sock.addMembership(MDNS_ADDRESS, ip); } catch { /* skip */ } }
-        sock.send(q, MDNS_PORT, MDNS_ADDRESS, () => {});
+        if (ask) sock.send(q, MDNS_PORT, MDNS_ADDRESS, () => {});
         setTimeout(finish, ms);
       });
     }

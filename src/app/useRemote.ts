@@ -26,7 +26,7 @@ import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
 import { useInkTitle } from './useInkTitle';
-import type { TvAtHome } from '../components/CastNetworkItems';
+import { tvAtHome } from '../components/CastNetworkItems';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -477,14 +477,7 @@ export function useRemote({
 
   // What the cast menu and the pairing card hold: the TVs watching, asking
   // and paired, and the laptop's three answers to them.
-  const tv = useMemo<TvAtHome>(() => ({
-    count: tvCount,
-    asks: tvPairing.asks,
-    paired: tvPairing.paired,
-    allow: (id) => remoteSend({ type: 'tv-allow', id }),
-    refuse: (id) => remoteSend({ type: 'tv-refuse', id }),
-    forget: () => remoteSend({ type: 'tv-forget' }),
-  }), [tvCount, tvPairing, remoteSend]);
+  const tv = useMemo(() => tvAtHome(tvCount, tvPairing, remoteSend), [tvCount, tvPairing, remoteSend]);
 
   return {
     remoteLink,

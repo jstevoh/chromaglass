@@ -96,6 +96,7 @@ const wait = (ms) => new Promise(r => setTimeout(r, ms));
 // ── The show server ────────────────────────────────────────────────────
 let server = null;
 let serverSaid = '';
+let startedAt = 0;
 async function startServer() {
   serverSaid = '';
   server = spawn(process.execPath, ['server/remote-server.js'], {
@@ -108,6 +109,7 @@ async function startServer() {
     server.stderr.on('data', d => { serverSaid += String(d); });
     server.on('exit', c => { clearTimeout(bail); reject(new Error(`the show server exited ${c}: ${serverSaid.slice(0, 300)}`)); });
   });
+  startedAt = Date.now();
   await wait(300);
 }
 const stopServer = async () => {
@@ -143,6 +145,13 @@ if (!LAN) { console.log(`\n${total - failed}/${total} passed`); process.exit(1);
     one?.port === PORT && one?.txt?.path === '/tv' && /^ChromaGlass on /.test(one?.instance ?? ''), JSON.stringify(one ?? null));
   check('advert: its id is the show\'s random id from the TV file', one?.txt?.id === kept.id && /^[0-9a-f]{16}$/.test(kept.id), `${one?.txt?.id} vs ${kept.id}`);
   check('advert: the address it gives is the one a TV reaches', (one?.addresses ?? []).includes(LAN), (one?.addresses ?? []).join(', '));
+  // The advert announces itself at 0, 1 and 3 seconds after the start; an
+  // announcement heard while asking would pass for an answer (found in
+  // review: with group questions ignored this still passed). So past them,
+  // a quiet listen first must hear nothing, and then the question an answer.
+  await wait(Math.max(0, startedAt + 4000 - Date.now()));
+  const quiet = ours(await browse({ ms: 1200, ask: false }));
+  check('advert: (unasked, past its announcements, it says nothing)', quiet === undefined, JSON.stringify(quiet ?? null));
   const group = ours(await browse({ ms: 1500 }));
   check('advert: asked as NsdManager asks (to the multicast group), it answers the same', group?.port === PORT && group?.txt?.id === kept.id && (group?.addresses ?? []).includes(LAN), JSON.stringify(group ?? null));
   await tap('127.0.0.1');
@@ -209,10 +218,11 @@ let tvKey = null;
     laptop.heard.slice(before).map(m => m.type).join(',') || 'nothing');
   const phone = client(LAN, { type: 'hello', role: 'controller', key: KEY });
   await phone.open;
-  await wait(200);
+  // In first, or a phone turned away would "fail to allow" for the wrong reason (found in review).
+  const phoneIn = await laptop.next((m) => m.type === 'controllers' && m.count >= 1);
   phone.send({ type: 'tv-allow', id: seen?.id });
   await wait(400);
-  check('pairing: a phone remote cannot allow it', !tv.heard.some(isType('tv-key')) && asksNow(laptop)?.asks?.length === 1);
+  check('pairing: a phone remote, let in, cannot allow it', !!phoneIn && !tv.heard.some(isType('tv-key')) && asksNow(laptop)?.asks?.length === 1, phoneIn ? 'the phone was in' : 'the phone never got in');
   phone.close();
   laptop.send({ type: 'tv-allow', id: seen?.id });
   const key = await tv.next(isType('tv-key'));
@@ -373,10 +383,10 @@ const errors = [];
   const entry = `
     import { createRoot } from 'react-dom/client';
     import { createElement as h } from 'react';
-    import { CastNetworkItems, TvAsks } from './src/components/CastNetworkItems.tsx';
+    import { CastNetworkItems, TvAsks, tvAtHome } from './src/components/CastNetworkItems.tsx';
     window.__calls = [];
-    const tv = (paired) => ({ count: 1, paired, asks: [{ id: 'ask7', code: '4821' }],
-      allow: (id) => window.__calls.push('allow ' + id), refuse: (id) => window.__calls.push('refuse ' + id), forget: () => window.__calls.push('forget') });
+    // The app's own builder (what useRemote hands the card), with a send that records.
+    const tv = (paired) => tvAtHome(1, { paired, asks: [{ id: 'ask7', code: '4821' }] }, (m) => window.__calls.push(JSON.stringify(m)));
     const relay = { chromaglass: 'relay', path: '/remote-ws', port: 3000, hosts: ['192.168.1.20'], key: null, displayKey: null };
     window.__render = (paired) => createRoot(document.getElementById('root')).render(h('div', null, h(TvAsks, { tv: tv(paired) }), h('div', { id: 'menu' }, h(CastNetworkItems, { relay, mirrorCount: 0, tv: tv(paired) }))));
   `;
@@ -402,7 +412,8 @@ const errors = [];
       await page.click('[data-testid="tv-forget"]');
       const calls = await page.evaluate(() => window.__calls);
       const forgetSays = await page.textContent('[data-testid="tv-forget"]');
-      check('the card: Allow and No answer that ask; Forget says how many and forgets', calls.join('|') === 'allow ask7|refuse ask7|forget' && /2 paired TVs/.test(forgetSays ?? ''), `${calls.join('|')} · ${forgetSays}`);
+      const want = ['{"type":"tv-allow","id":"ask7"}', '{"type":"tv-refuse","id":"ask7"}', '{"type":"tv-forget"}'];
+      check('the card: Allow and No send the relay that ask\'s answer; Forget says how many and sends Forget', calls.join('|') === want.join('|') && /2 paired TVs/.test(forgetSays ?? ''), `${calls.join('|')} · ${forgetSays}`);
     } else {
       const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
       const card = await page.$eval('[data-testid="tv-asks"]', (e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right }; }).catch(() => null);
@@ -414,11 +425,17 @@ const errors = [];
 }
 
 // ── No: three of them lock the address out (last, since it locks the LAN address) ──
-// The page's No above was the first since the restart (which cleared the
-// count, and the wrong show key's with it), so two more make three.
+// A fresh server first, so the count of wrong keys starts at none whatever
+// the sections above did, and all three Nos are here.
+laptop.close();
+await stopServer();
+await startServer();
+laptop = client('127.0.0.1', { type: 'hello', role: 'display', key: (await (await fetch(`http://127.0.0.1:${PORT}/remote-info.json`)).json()).displayKey });
+await laptop.open;
+await laptop.next(isType('tv-pairing'));
 {
   const reasons = [];
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     const tv = client(LAN, { type: 'hello', role: 'tv', pair: true });
     const c = await tv.next(isType('tv-code'));
     const ask = await until(() => asksNow(laptop)?.asks?.find(a => a.code === c?.code));
