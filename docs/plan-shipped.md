@@ -4829,6 +4829,15 @@ three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots,
 3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
 0.115. The phone lays the same seed (it is the plate, not a control).
 
+**Shipped (21b): the back plate is outlined from its own dye.** The Ben-Day print's pen
+line (`benDayEdge`, moved to `src/gpu/wgsl/plateBenDay.ts` beside `plate.ts`) was called
+on `layer0` only, so a second plate's pools printed in flat inks and dots without a black
+outline. It now runs on `layer1` at `fuv1` with `layer1`'s own screen-pixel step, dish
+mask and mixer level (`U.mixLevel.z`), combined with the front plate's line by `max`.
+`npm run benday` line 8 (`--owed=back` removed from `scripts/checks.json`): on main the
+front pool was ringed in black on 180 of 180 rays and the back plate's rotated pool on 0;
+now both are ringed on 180 of 180 rays, and lines 1 to 7 on a single plate are unchanged.
+
 ### 19ai-8. App() into its domains' hooks
 
 Shipped 2026-10-29, with 19ai-4a for App's setters. `App.tsx` was 372,525 bytes and

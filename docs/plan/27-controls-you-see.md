@@ -219,6 +219,10 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     stable, the front a little under its Froude speed. 38r part 2's 2 mm gap takes this back
     under 20 (about 16); if it does not land, raise the cap (a SHOUTING_CASE number: name it
     under Check changes).
+  - **27h-2d, open. `widedials` Heat Spread total on Metal.** Written on SwiftShader (`Measure`
+    `lab3`), where Heat Spread at 0, 1, 2 keeps the heat within 1%; on a Mac's Metal (`rgba16float`
+    over 60 steps of Jacobi diffusion into the Gaussian tail) `npm run widedials` reads totals
+    `×0.9997, 0.9748, 0.9657`.
   - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
     `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
     the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate

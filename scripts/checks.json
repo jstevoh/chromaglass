@@ -2433,7 +2433,7 @@
     {
       "name": "The Ben-Day print",
       "shard": "tools",
-      "run": "npm run benday -- --owed=back",
+      "run": "npm run benday",
       "why": [
         "Ben-Day Dots, the Roy look's print: a pale wash is even dots fixed to",
         "the screen, a pool one flat ink outlined in black, and only Roy prints.",
