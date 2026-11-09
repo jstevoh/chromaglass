@@ -5,7 +5,9 @@
  *
  *   npm run openingtime -- --cold --runs 3 --variants ",lanes=2,lanes=6"
  *
- * Not a check: it judges nothing and is in no shard. It is the instrument
+ * Not a check, but for one line: with `--bar` it judges the opening's count
+ * (below, PLAN.md 46a) and sits in Measure's browser2 part: a count is the
+ * same on software WebGPU (main: 66 asked of WebGPU, the ledger's 65). It is the instrument
  * for choosing how the opening builds its pipelines, which `npm run startup`
  * cannot be: startup opens the show once as it ships (and once the old way,
  * as its control), on whatever the runner gives it that minute, and a cold
@@ -49,7 +51,34 @@ const arg = (name, fallback) => {
   return i > 0 && i + 1 < process.argv.length ? process.argv[i + 1] : fallback;
 };
 const RUNS = Number(arg('runs', '3'));
-const VARIANTS = arg('variants', ',lanes=2,lanes=6').split(',');
+const BAR = process.argv.includes('--bar');
+const VARIANTS = BAR ? [''] : arg('variants', ',lanes=2,lanes=6').split(',');
+/*
+  `--bar` (PLAN.md 46a): the one line this instrument judges, on the opening
+  as it ships, and the only reason it is in a shard. The opening Classic waits
+  for before its first step, counted, at most OPENING_MOST pipelines.
+
+  Why a count and not the seconds. The seconds are what the owner feels, and
+  they are printed on every run, but a cold Mac's opening varies by seconds
+  from one opening to the next on the same commit (10.04 to 14.60 s over eight
+  of CI's runs on 2026-10-28, above), so a bar in seconds on one CI opening
+  would be a coin toss, and three openings would add a minute to a shard. The
+  count does not vary, and the seconds follow it: 14v-10 measured that the
+  Mac's compiler sets the pace (more lanes built no faster), so an opening is
+  its compiles over three lanes, about 0.2 s each in all, plus Chromium's GPU
+  start. The opening was forty-three shared pipelines and a look's own few
+  when it was written (gpu/opening.ts); on the owner's Mac on 2026-11-08
+  (main 06add19, `npm run startup` in the deploy's open shard) Classic waited
+  for 65, built in 13.51 s, first step 15.48 s from load, and the looks waited
+  for 65 to 85. OPENING_MOST is a fifth fewer than that 65: the fused kernels
+  and the opening's own reach (docs/plan/46-quality-efficiency-hunt.md) are
+  where they come from. The owner's to move, never the builder's.
+
+  `--owed=count` excuses the line while main waits for more, and is red the
+  day it passes with the id still listed (the convention of rungs-owed.mjs).
+*/
+const OPENING_MOST = 52;
+const OWED = (process.argv.find((a) => a.startsWith('--owed='))?.slice(7) ?? arg('owed', '')).split(',').filter(Boolean);
 const COLD = process.argv.includes('--cold') || !!process.env.CI;
 const PORT = port(4363);
 
@@ -93,7 +122,18 @@ function instruments() {
       const adapter = await ra(...a);
       if (adapter) {
         const rd = adapter.requestDevice.bind(adapter);
-        adapter.requestDevice = async (...b) => { const d = await rd(...b); window.__otDevice = performance.now(); return d; };
+        adapter.requestDevice = async (...b) => {
+          const d = await rd(...b);
+          window.__otDevice = performance.now();
+          // Every pipeline the page asks WebGPU for, by when: what a count
+          // read from the app's own ledger could leave out (PLAN.md 46a).
+          const pipes = (window.__otPipes ??= []);
+          for (const m of ['createComputePipeline', 'createComputePipelineAsync', 'createRenderPipeline', 'createRenderPipelineAsync']) {
+            const f = d[m]?.bind(d);
+            if (f) d[m] = (...c) => { pipes.push(performance.now()); return f(...c); };
+          }
+          return d;
+        };
       }
       return adapter;
     };
@@ -113,9 +153,11 @@ async function openOnce(variant) {
       let first = null;
       // Kept as it is seen: on software WebGPU the device is lost every few
       // seconds, and with it, for a moment, the debug hooks that hold the log.
-      let p = null;
+      let p = null, openings = [];
       while (performance.now() - t0 < 90000) {
-        p ??= window.chromaglassDebug?.()?.pipelines?.()?.prepares?.find((x) => x.stage === 'opening') ?? null;
+        const all = window.chromaglassDebug?.()?.pipelines?.()?.prepares?.filter((x) => x.stage === 'opening') ?? [];
+        if (all.length >= openings.length) openings = all.map((x) => ({ asked: x.asked }));
+        p ??= all[0] ?? null;
         if (first === null && step() > 0) first = performance.now();
         if (first !== null && performance.now() > first + 2000) break;
         await new Promise((r) => setTimeout(r, 50));
@@ -134,6 +176,10 @@ async function openOnce(variant) {
         gap, gapAt,
         still: still.map(([a, b]) => [a, b]),
         asked: p?.asked ?? 0,
+        // Every 'opening' entry the ledger holds, not only the first, and
+        // WebGPU's own count of pipelines asked for before the first step.
+        ledger: openings.reduce((n, x) => n + (x.asked ?? 0), 0),
+        created: first == null ? null : (window.__otPipes ?? []).filter((t) => t <= first).length,
         raw: (p?.raw ?? []).map(([k, at, c]) => [k, at, c]),
       };
     }, cache);
@@ -170,5 +216,29 @@ for (const v of VARIANTS) {
   const build = rs.map((r) => (r.to != null && r.from != null ? r.to - r.from : null));
   const afterDevice = rs.map((r) => (r.first != null && r.device != null ? r.first - r.device : null));
   console.log(`  ${(v || 'as shipped').padEnd(32)} first step ${s(median(rs.map((r) => r.first)))}, from the device ${s(median(afterDevice))}, building ${s(median(build))}, longest frame wait ${s(median(rs.map((r) => r.gap)))} (worst ${s(Math.max(...rs.map((r) => r.gap)))})`);
+}
+if (BAR) {
+  const rs = results[''];
+  const seen = rs.filter((r) => r.asked > 0 && r.first != null);
+  let failed = 0;
+  const line = (id, name, ok, detail) => {
+    const owed = id && OWED.includes(id);
+    const word = ok ? (owed ? 'FAIL' : 'ok  ') : owed ? 'owed' : 'FAIL';
+    if (word === 'FAIL') failed++;
+    console.log(`${word} ${name} — ${detail}${ok && owed ? ` (passes with '${id}' still in --owed: take it out)` : ''}`);
+  };
+  line(null, 'control: every opening was seen building ahead and stepping', seen.length === rs.length && rs.length > 0,
+    `${seen.length} of ${rs.length} openings with a build list and a first step`);
+  /*
+    The count judged is WebGPU's own: every pipeline the page asked for before
+    the first step, wherever it was asked (the ledger's opening entries, the
+    boot, anything else). A build moved out of the ledger's list, or the
+    opening split into two lists, counts the same here. The ledger's own sum
+    is printed beside it.
+  */
+  const created = Math.max(...rs.map((r) => r.created ?? Infinity));
+  line('count', `Classic's opening asks WebGPU for at most ${OPENING_MOST} pipelines before its first step`, seen.length > 0 && created <= OPENING_MOST,
+    `${created} (the ledger's opening lists ${Math.max(...rs.map((r) => r.ledger))}; first step ${s(median(rs.map((r) => r.first)))}, building ${s(median(rs.map((r) => (r.to != null && r.from != null ? r.to - r.from : null))))})`);
+  process.exit(failed ? 1 : 0);
 }
 process.exit(0);

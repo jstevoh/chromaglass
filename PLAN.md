@@ -153,6 +153,9 @@ merge conflicts are the shared documents', which 0.6 ends.
 
 ### Wave 4. The frame budget (lane C, measured with `npm run stages` and `npm run renders`)
 
+The owner's hunt (2026-11-09) takes this wave's written items to Antigravity under §46
+(`docs/plan/46-quality-efficiency-hunt.md`), each held to `npm run samelook`: the look kept.
+
 - ~~**4.1** **H2c-4** constant arguments written once and `kernel()` cached (S): CPU, every step.~~
   Shipped with 14aa (`npm run encode`, 512², thin gap: 506 KB allocated a step → 31 KB,
   249 writes for 267 dispatches → 2, the main thread in `step()` 3.4 ms → 0.4). Story in
@@ -422,6 +425,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 9 |
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 13 |
 | 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 4 |
+| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46a-46d to Antigravity after its queue, 46e Claude's | 7 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing
