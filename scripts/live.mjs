@@ -355,12 +355,27 @@ try {
     audio track from its first frame to its last with no hole a server could
     read as the audio ending, and the track must decode: silence where there
     is no sound, the tone where there was.
+
+    And a third (37x-4f-2): no source at Go, then a source opened on air,
+    the order a set naturally runs in (the app opens at None; the owner
+    presses Go, then starts the music). Before the fix the encoder took its
+    sound once, at Go, and this stream was silence to the end. Now the tone
+    must be heard from the moment it was handed over, at its own pitch
+    (opened at 44.1 kHz against the silent track's 48, so a stream that
+    forgot to resample it reads 239.5 Hz, not 220), placed on the stream's
+    clock where it was opened (within 100 ms: placed late, a switched source
+    would drift out of sync with the picture by however late), and the
+    track still whole across the change.
   */
-  for (const kind of ['no source', 'source off on air']) {
-    const key = kind === 'no source' ? 'check-stream-key-silent' : 'check-stream-key-ended';
+  for (const kind of ['no source', 'source off on air', 'source opened on air']) {
+    const key = { 'no source': 'check-stream-key-silent', 'source off on air': 'check-stream-key-ended', 'source opened on air': 'check-stream-key-opened' }[kind];
+    const opens = kind === 'source opened on air';
     const RUN_MS = 6000, END_MS = 2500;
-    await page.evaluate(([url, k, fps, c, silent]) => window.liveLab.start(url, [{ key: k }], fps, c ?? undefined, 700, silent), [listener.url, key, FPS, CODEC, kind === 'no source']);
-    if (kind !== 'no source') { await page.waitForTimeout(END_MS); await page.evaluate(() => window.liveLab.endTone()); await page.waitForTimeout(RUN_MS - END_MS); } else await page.waitForTimeout(RUN_MS);
+    let opened = null;
+    await page.evaluate(([url, k, fps, c, silent]) => window.liveLab.start(url, [{ key: k }], fps, c ?? undefined, 700, silent), [listener.url, key, FPS, CODEC, kind !== 'source off on air']);
+    if (kind === 'source off on air') { await page.waitForTimeout(END_MS); await page.evaluate(() => window.liveLab.endTone()); await page.waitForTimeout(RUN_MS - END_MS); }
+    else if (opens) { await page.waitForTimeout(END_MS); opened = await page.evaluate(() => window.liveLab.openTone(44100)); await page.waitForTimeout(RUN_MS - END_MS); }
+    else await page.waitForTimeout(RUN_MS);
     const st = await page.evaluate(() => window.liveLab.stop());
     await new Promise((r) => setTimeout(r, 500));
     const conn = byKey.get(key);
@@ -386,11 +401,29 @@ try {
     const loud = (l) => l.rms > 0.01, quiet = (l) => l.rms < 0.001;
     const lv = dec.levels ?? [];
     const before = lv.filter((l) => l.ts > 300 && l.ts < END_MS - 300), after = lv.filter((l) => l.ts > END_MS + 700);
+    const audioSpan = (at[at.length - 1].timestamp - at[0].timestamp) / 1000;
+    const whole = !dec.audioError && Math.abs(dec.audioSeconds - audioSpan) <= 0.15;
+    if (opens) {
+      // Before the hand-over, silence; from 300 ms after it, the tone, at 220 Hz; and where it starts on the stream's clock, the decoder's priming set back.
+      const om = opened?.openedMs ?? NaN;
+      const pre = lv.filter((l) => l.ts > 300 && l.ts < om - 100), post = lv.filter((l) => l.ts > om + 300);
+      const prime = dec.primingMs ?? 0;
+      const onset = lv.find((l) => l.ts > om - 1000 && loud(l));
+      const onsetMs = onset ? onset.ts - prime : NaN;
+      const hz = median((dec.pitch ?? []).filter((p) => p.ts > om + 300).map((p) => p.hz));
+      check(`${kind}: the audio track decodes, silence until the source was opened and the tone from then on, at its own pitch`,
+        whole && pre.length > 0 && pre.every(quiet) && post.length > 0 && post.filter(loud).length >= 0.95 * post.length && Math.abs(hz - 220) <= 3,
+        dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; before ${pre.filter(quiet).length}/${pre.length} quiet, after ${post.filter(loud).length}/${post.length} loud; pitch ${fmt(hz, 1)} Hz (220 sent from ${opened?.rate} Hz into a ${rate} Hz track)`);
+      check(`${kind}: the tone starts on the stream's clock where it was opened, within 100 ms`, Number.isFinite(onsetMs) && Math.abs(onsetMs - om) <= 100,
+        `opened at ${fmt(om, 0)} ms, heard from ${fmt(onsetMs, 0)} ms (priming ${fmt(prime, 1)} ms set back)`);
+      check(`${kind}: the encoder says it moved to the new source once, resampling it`, st?.audioSwitches === 1 && st?.audioResampled === (opened?.rate !== rate),
+        `${st?.audioSwitches} switches, resampled ${st?.audioResampled}`);
+      continue;
+    }
     const heard = kind === 'no source'
       ? lv.length > 0 && lv.every(quiet)
       : before.length > 0 && after.length > 0 && before.filter(loud).length >= 0.9 * before.length && after.every(quiet);
-    const audioSpan = (at[at.length - 1].timestamp - at[0].timestamp) / 1000;
-    check(`${kind}: the audio track decodes, ${kind === 'no source' ? 'silence throughout' : 'the tone until it was switched off, silence after'}`, !dec.audioError && Math.abs(dec.audioSeconds - audioSpan) <= 0.15 && heard,
+    check(`${kind}: the audio track decodes, ${kind === 'no source' ? 'silence throughout' : 'the tone until it was switched off, silence after'}`, whole && heard,
       dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; ${kind === 'no source' ? `loudest ${fmt(Math.max(...lv.map((l) => l.rms)), 4)}` : `before ${before.filter(loud).length}/${before.length} loud, after ${after.filter(quiet).length}/${after.length} quiet`}`);
   }
 

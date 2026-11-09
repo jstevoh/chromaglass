@@ -505,10 +505,23 @@ rest is routine and the owner's calls.
     - *37x-4f-1. Seen on YouTube.* The cloud cannot reach YouTube's ingest (its proxy drops
       RTMPS), and the Mac's guard would not let a session read the key, so the proof is
       the private rehearsal on the next Mac build: Studio shows the picture.
-    - *37x-4f-2. A source opened on air is not heard.* The encoder takes its track at the
-      start; a song started after Go streams as silence until the next start. The fix is
-      an audio bus the encoder reads (the current source mixed into one track, silence
-      its floor), so the source can change under a running stream.
+    - *37x-4f-2. A source opened on air is heard at once.* *(built 2026-11-09.)* The
+      encoder took its track at Go, so a song started after Go streamed as silence until
+      the next start. Now useAudioAnalyzer hands every change of source to the stream on
+      air (`setLiveAudio` → `LiveEncoder.setAudio`): the old track's reader is let go,
+      silence carries the track until the new source's first chunk, which is placed where
+      it was made on the stream's clock; the source is fitted to the encoder's rate and
+      channels (a 44.1 kHz source into the 48 kHz silent track is resampled, or it plays
+      a semitone and a half sharp), and silence stays under it as a floor 150 ms behind
+      now if it stalls (`src/lib/liveAudioSwitch.ts`). Not an AudioContext bus, as first
+      planned: a context the stream makes can start suspended and make no samples, the
+      hole 37x-4f closed. `npm run live`'s three new lines: silence then the tone at
+      220.0 Hz, its onset within 100 ms of the hand-over (measured 7 ms), one switch.
+      Red without the fix (0/641 loud) and red without the resampling (239.5 Hz).
+      - *37x-4f-3. A cubic, not a polyphase filter.* The resampler is Catmull-Rom: fine
+        for a 160 kbit stream, but a proper band-limited resampler (or one shared with
+        Record's) would keep the top octave whole. Only met when the source's rate is not
+        the encoder's (most Macs run 48 kHz throughout).
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.
