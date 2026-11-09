@@ -2460,7 +2460,7 @@ sent on 2026-11-07 (yellow lace, lavender, cobalt, coral):
 5. Bad: a flat yellow sheet that never tears, lace that is all rings (28l-3), or the pools
    so deep under the film that they read navy, red or brown.
 
-## 114. Heat from the lamp, and blocking the fan's air by hand (PLAN 36e-2)
+## 115. Heat from the lamp, and blocking the fan's air by hand (PLAN 36e-2)
 
 `npm run boilgpu` (54/54 on Metal) holds the GPU dish solver to the CPU reference (`npm run boil`,
 38/38), and `npm run plateboil` (8/8 on `zero`, 6/6 on `boil`) holds the live plate's boil at

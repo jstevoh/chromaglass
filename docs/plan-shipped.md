@@ -11097,7 +11097,7 @@ model cannot reach one, the PR says what it reached and asks.
       excluded from Evolve (`NOT_THE_LOOK` in `src/lib/drift.ts`) and Lucky (`heat: 0`), remote
       (`src/components/RemoteControl.tsx`) and phone (`src/components/phone/PhoneStage.tsx`);
       and a pointer hold on the pad (`boilHolds`, desk, iPad and phone) that blocks the fan's
-      air under the finger while held (`docs/judging.md` §114).
+      air under the finger while held (`docs/judging.md` §115).
     - *Measured:* `PW_WEBGPU=1 npm run boilgpu` 54/54 on `apple metal-3` (`cost: 4.40 ms a step at 768 × 768 on apple metal-3, lamp on`), `npm run boilgpu -- --selftest` 54/54, `npm run plateboil -- --part=zero` 8/8, `PW_WEBGPU=1 npm run plateboil -- --part=boil` 6/6 on `apple metal-3` (`rate` 0.98x, `hold` 108.7 °C peak and steam at 142 s, `fan` 85.8 °C and 0.000 steam, `steam` 1.01x displaced and 1.00x arriving beyond the ring, `writes` 1.00 kept; `rate,hold,fan,steam,writes` removed from `--owed` in `scripts/checks.json`), `npm run boil` 38/38, `PW_WEBGPU=1 npm run heat` 10/10, `npm run wgsl` 162 shaders, `npm run panel` 263/263, `npm run desk` 48/48.
 
 ### 37. Marketing and social media (asked 2026-10-29)
