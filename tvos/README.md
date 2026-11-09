@@ -30,8 +30,29 @@ answering the same offer the `/tv` page answers. Nothing is sold on the TV.
 - `Sources/cgtv-probe/`: what `npm run tvswift` runs against the Worker's real handler
   and a stand-in for the Mac's relay.
 
-The app target (SwiftUI screens, the video view over LiveKit's tvOS WebRTC build)
-goes in `App/` and links the core; it needs Xcode with the tvOS SDK.
+- `Video/`: the video link, a package of its own because it links LiveKit's
+  `webrtc-xcframework` (a binary of Google's libwebrtc with a tvOS slice), which only a
+  Mac can link. `LiveKitPeer` is the core's `PeerLink` over it: no ICE servers, receive
+  only, "connected" reported apart from the first frame. `cgtv-video-probe` is what
+  `npm run tvvideo` runs: the receiver against a Chromium page sending real WebRTC.
+  It builds with the Command Line Tools on macOS (the macOS slice), no Xcode needed.
+- `App/`: the tvOS app, an XcodeGen spec (`project.yml`) over SwiftUI screens:
+  - `AppModel.swift`: sign in by code, keep the pass fresh, take the show's address;
+  - `ChromaGlassTVApp.swift`: the code screen (the code, a QR of the phone's link
+    page) and the address screen;
+  - `ShowView.swift`: the plate in `LKRTCMTLVideoView`, with the /tv page's words over
+    it while it is not live;
+  - `PassStore.swift`: the pass and the address in the keychain, this device only.
+
+  The licence Worker's address and the signing team go in a git-ignored
+  `App/Local.xcconfig` (copy `Local.xcconfig.example`). To build:
+
+  ```bash
+  brew install xcodegen
+  cd tvos/App && cp Local.xcconfig.example Local.xcconfig && xcodegen generate
+  ```
+
+  then open `ChromaGlassTV.xcodeproj` in Xcode and run on the tvOS simulator.
 
 ## Edges
 
@@ -44,3 +65,11 @@ side's messages is a change to `npm run tvswift`, which proves both together.
 ```bash
 npm run tvswift
 ```
+
+```bash
+npm run tvvideo
+```
+
+`tvswift` runs anywhere with Swift (Measure's logic shard); `tvvideo` only on a Mac, and
+`.github/workflows/tvos.yml` runs it with the app's simulator build when a PR touches
+`tvos/`.

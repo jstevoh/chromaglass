@@ -342,7 +342,8 @@
     "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
     "logomelt": "PW_WEBGPU=1 node scripts/logomelt.mjs",
     "presskit": "node scripts/presskit.mjs",
-    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs"
+    "loopseam": "node --experimental-strip-types scripts/loopseam.mjs",
+    "tvvideo": "node scripts/tvvideo.mjs"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",

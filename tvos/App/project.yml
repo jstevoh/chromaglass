@@ -1,0 +1,51 @@
+# The Apple TV app's Xcode project, written as an XcodeGen spec so the project file is
+# made, not hand-edited and merged (PLAN.md 12-tv-apple). Make it with:
+#
+#   brew install xcodegen
+#   cp Local.xcconfig.example Local.xcconfig   # then fill in the licence Worker's address
+#   xcodegen generate                          # writes ChromaGlassTV.xcodeproj, git-ignored
+#
+# The app links the core (tvos/Package.swift, checked by `npm run tvswift`) and the video
+# link (tvos/Video, LiveKit's WebRTC), both as local packages.
+name: ChromaGlassTV
+options:
+  bundleIdPrefix: app.chromaglass
+  deploymentTarget:
+    tvOS: "16.0"
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+packages:
+  ChromaGlassTV:
+    path: ..
+  ChromaGlassTVVideo:
+    path: ../Video
+targets:
+  ChromaGlassTV:
+    type: application
+    platform: tvOS
+    sources: [Sources]
+    dependencies:
+      - package: ChromaGlassTV
+        product: ChromaGlassTVCore
+      - package: ChromaGlassTVVideo
+        product: ChromaGlassTVVideo
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: ChromaGlass
+        CGLicenceURL: $(CG_LICENCE_URL)
+        UILaunchScreen: {}
+        # The Mac's show server is on the house's network, by address, over plain ws://:
+        # local networking is allowed without opening the app to arbitrary HTTP.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: ChromaGlass connects to the Mac running your show on this network.
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.chromaglass
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        DEVELOPMENT_TEAM: $(CG_TEAM)
+        CODE_SIGN_STYLE: Automatic

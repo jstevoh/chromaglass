@@ -387,7 +387,20 @@ and runs it against the Worker's own `/tv/` handler (link, a code running out, t
 pass verified, renewed to the next generation, a spent pass unlinking). Left: the
 app target in `tvos/App` (the code screen with its QR, the video view answering the
 Mac's offer through LiveKitWebRTC, the pass in the keychain), which waits on Xcode
-with the tvOS SDK on the owner's Mac. Open from it:
+with the tvOS SDK on the owner's Mac.
+
+Progress (2026-11-08, evening): the receiver and the app are written. The /tv page's
+connection rules are one Swift value, `ReceiverMachine`, driven over URLSession's
+WebSocket by `ReceiverDriver`; `npm run tvswift` now also runs it against a stand-in
+relay (live, a wrong key, a lockout, a show going off, a stuck picture). The peer
+connection over LiveKit's WebRTC is `tvos/Video` (`LiveKitPeer`), and `npm run tvvideo`
+proves it on a Mac with no Xcode: a Chromium page sends a canvas over WebRTC through a
+stand-in relay, and the receiver goes live in 0.4 s and decodes 30 frames a second at
+640x360, dark and light as sent (two mutations, a grey page and a receiver that never
+reports a frame, each turn it red). The app (`tvos/App`, an XcodeGen spec) has the code
+screen with its QR, the address screen, the show view over `LKRTCMTLVideoView`, and the
+pass in the keychain; `.github/workflows/tvos.yml` builds it for the tvOS simulator and
+runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
 
 - **12-tv-apple-1, finding the Mac.** Today the TV reads the Mac's "TV at home"
   address (`RelayAddress`), typed with the remote. Bonjour (`_chromaglass._tcp`)
@@ -397,6 +410,20 @@ with the tvOS SDK on the owner's Mac. Open from it:
   `logic` part, so a cold runner compiles swift-crypto's BoringSSL (about a minute)
   each time it runs. If that shows in the shard's time, cache `tvos/.build` or move
   the check to a Mac shard, where CryptoKit needs no build.
+- **12-tv-apple-3, films while the show is off.** The /tv page plays films until the
+  show starts (its `films` state); the app shows "Looking for the show…" on black. Play
+  the same films (an `AVPlayer` over the site's film list) under the waiting screen.
+- **12-tv-apple-4, the 50 ms jitter buffer.** The page sets `TV_JITTER_MS = 50` on its
+  receiver (`jitterBufferTarget`); LiveKit's Objective-C API may not expose the
+  receiver's jitter target. Find whether it does (`LKRTCRtpReceiver`), and if not,
+  measure the TV's delay against the page's on one Mac (a flash on both screens filmed
+  together) before deciding it matters.
+- **12-tv-apple-5, a shorter link for the phone.** The code screen shows
+  `chromaglass.art/?tvlink` to type on a phone; a path such as `chromaglass.art/tv-link`
+  (a Firebase rewrite to the same page) reads better aloud and from across a room.
+- **12-tv-apple-6, the app on a TV, judged.** Run it in the tvOS simulator against the
+  Mac's real show, then on an Apple TV (judging), and sign it with the owner's team for
+  TestFlight once the App Store Connect record exists (12-ship).
 
 **~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
 `/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
