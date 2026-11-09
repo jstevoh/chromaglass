@@ -4334,6 +4334,43 @@ the sessions' files or the native apps skips the Mac (19h).
   electron-builder's caches on pull requests (a signed release fetches fresh), keyed on
   both lockfiles, and retries the install three times.
 
+### 19al. The handoff between the two tools waits on whoever notices (2026-11-07)
+
+**19al-1, 19al-2, 19al-3 shipped** 2026-11-07, rebuilt on that day's `main` from #450
+(written 2026-10-24 as 19ae, closed unmerged by an idle-draft sweep; 19ae has since gone
+to the phone check). What went wrong on 2026-10-24: the Mac watcher's wait for
+Antigravity's CI died, and two PRs that had gone green sat for two hours before anyone
+looked; all five open Antigravity PRs had fallen behind `main` and conflicted, and #355
+(13 days old) broke when `main` was merged in; five sat as review-owed at once. The Mac
+queue was not the hold-up: `npm run macqueue -- --hours 48` read a PR shard's mean wait
+at 7 minutes, and no Mac job running for 2,274 of the 2,880 minutes. The time went in the
+hops between tools, each waiting on a process or a person to notice. In the two weeks #450
+sat as a draft, the same thing kept happening by hand (#485 sat green 2.5 hours on
+2026-10-25), and Antigravity was told to post its own `READY` line in the meantime.
+
+Changed (19al-1): `.github/workflows/ready.yml` runs when `Checks` finishes. If the run
+tested the PR's current head and it is green, it labels the PR `ready-for-review` and
+comments `READY #<n> <item> head <sha>`; a push or a red run of the head takes the label
+off. Only `antigravity/` branches and PRs labelled `review-owed`. It never checks out the
+PR's code, and the PR's own text reaches the shell only through environment variables.
+Its push job is skipped on a PR with no label to take off, so it adds nothing to the
+checks of every other PR. `docs/handoff.md` gains "Small and short-lived" (one plan item,
+about 400 lines, a day; `main` merged in once, just before review) and "Ready, review,
+merge" (which PRs owe a review before merge; verdicts `PASS`/`CHANGES #<n> head <sha>`; a
+re-review reads only the commits since; merge pinned with `--match-head-commit`). The
+owner chose (19al-2) that the reviewing Claude session merges on its own `PASS` rather
+than waiting for Antigravity's next run, which can be a day or more off when it is out of
+credit. And (19al-3) "Who takes what", last written 2026-10-06 around lane numbers since
+shipped, now carries the owner's 2026-11-01 split: Antigravity builds everything with a
+number to hit, Claude Code keeps briefs and checks, root causes, sign-in, payments,
+Workers and CI, and reviews by risk; a PR with two `CHANGES` comes to Claude Code instead
+of a third round, and one escape puts its class back on review before merge for a week.
+`AGENTS.md`, `CLAUDE.md` and `docs/ci.md` carry the short form. `scripts/reach.mjs` lists
+`ready.yml` with the workflows that never run a Mac shard.
+
+Measured: see #701, which quotes the stubbed-`gh`
+cases, `npm run actionlint` and `npm run reach`.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
@@ -11019,6 +11056,21 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-4c-2. YouTube's acknowledgements are too coarse to judge by
+
+  - **37x-4c-2. YouTube's acknowledgements are too coarse to judge by (shipped
+    2026-11-08).** The answer to 37x-4c's "whether the platforms acknowledge", found on the first live album show: the
+    owner's fast connection read "trouble" and the stream dropped video. YouTube's ingest,
+    probed from the cloud, sends Window Acknowledgement Size 2,500,000 and Set Peer
+    Bandwidth 59,768,832, and the client echoes the second as its window, so YouTube's
+    acknowledgements come at least 2.5 MB apart (3.2 s of a 1080p stream): the readout
+    climbed past the 2 s bound between every two of them and dropped video to the next
+    keyframe. Now a server whose acknowledgements are more than a second of the stream
+    apart (`ACK_COARSE_SHARE`) is read on the socket's word. `npm run livedrop`'s new
+    YouTube-like listener: 247 of 570 frames dropped and 4.9 s behind before, none and
+    0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
+    link for seconds (37x-4c's item).
+
 #### 37x-4d-6. The stream's frames were black
 
   - **37x-4d-6. The stream's frames were black (shipped 2026-10-31).** Found writing
@@ -12009,3 +12061,50 @@ day). Check: `npm run youtube`, 19 lines against a stand-in Google on loopback
 chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte file;
 the bytes exact; private by default; an update naming only the title keeping the rest)
 and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
+
+## 45a-2. Selling the moiré pack to Home (2026-11-07)
+
+The owner chose to sell the moiré pack as a $15 add-on to Home and to include it in Pro.
+A pack is not a tier, so it does not get a key of its own: a buyer would then hold two keys,
+and every place that holds one (the account sheet, the Mac's seats) would have to hold a set.
+The signed payload gained an optional `packs` list (`normalizePacks` in `server/license-key.js`
+and `src/lib/licenseKey.ts`: lower-case names, unique, sorted, at most 16), and a pack order
+signs the buyer's Home key again under the same id with the pack added
+(`server/license-packs.js`), as an upgrade signs it again as Pro. The record keeps which
+order bought which pack (`packOrders`), so a refund of the pack takes the pack off and
+leaves the Home, a refund of the Home takes the key, an upgrade carries the packs into Pro,
+and a refunded upgrade refiles the Home with them. A pack order is held for the owner when
+the email has no Home key, already has Pro (which includes it), or already has the pack.
+
+The device adopts the new token by itself: `accountLicense.ts`'s `pick()` takes a listed key
+with the held key's id whose packs differ and activates it, so a Home buyer signed in on the
+web or the Mac gets the pack without pasting anything. The Mac app passes the payload's packs
+through its bridge (`server-license.js` `currentStatus`, `desktop/main.js`). The gate is
+`canUseMoirePack` (Pro, or Home with `hasLicensePack('moire')`). The account sheet shows a
+Buy card to Home without the pack (`MoirePackBuy.tsx`), says where it comes from to Free, and
+says it is on the licence once bought; the Moiré Sheets section and the phone's Looks sheet
+have a Get it button beside Try. Checks: `npm run license-worker` 13g–13q (filed, refunded,
+upgraded, held; a pack order with no store product refused, 13o; a re-signed key under the
+held id taken on a device only for a pack change or a higher tier, 13p; the store's own pack
+ids filed with no Worker setting, 13q; forcing the signed packs empty fails 13h and 13j), `npm run tiers` 14 (locked
+on Free and Home, the Buy link carries the email, open on a Home key that names the pack).
+
+## 45a-8. The website sells the moiré pack (2026-11-07)
+
+The owner asked for the pack on the website with demo pictures once the store product existed.
+The landing page now has a card under its three price cards: what the pack is, $15 on Home and
+in Pro, four of its looks as pictures, and a Buy that opens the store's live checkout in a
+new tab (its own `data-cg-landing-pack`, so the Home and Pro count of `data-cg-landing-buy` is
+unchanged). The pack is an add-on, not a tier, which is why it sits under the cards rather than
+as a fourth beside them. `pro.html`'s tier table gains a row for it.
+
+The pictures are frames the app drew on the Mac's GPU, about 22 s after each look opened from
+`/show?debug&look=<id>`, cropped to 8:5 from the plate's own read-back (`grabFrame`). They are
+960x600 for a 480x300 box, unlike the other landing looks: a pattern of fine lines scaled down
+by the browser beats against the screen's pixels and draws a moiré of its own that is not the
+app's. Song Groove came out with no fringes at all and is left off (45a-10); Quasicrystal
+Garden read as scattered specks at this size and is left off too.
+
+`npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
+card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
+four pictures load at 960 px wide.

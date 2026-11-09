@@ -249,7 +249,11 @@
         "the Mac moves the deploy to GitHub's Macs; and that step's own rule",
         "(scripts/macbusy.sh) against made-up process lists and this machine's own:",
         "another session's working browser or the app counted; a deploy's own, an",
-        "idle leftover and a vite server alone not."
+        "idle leftover and a vite server alone not. And 19ah-9a (scripts/macdeploy.mjs):",
+        "the mark a shard writes holds a harness's launch while its worker lives and",
+        "for a grace after it ends, never for a shard that gave up or died; macbusy.sh's",
+        "own marks read back; the last step fails when a look between the checks found",
+        "the Mac busy, and the watchdog reads that failure as busy too."
       ]
     },
     {

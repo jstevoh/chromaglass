@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
 import CloudSyncCard from './CloudSyncCard';
 import { MacAppCard } from './MacAppCard';
+import { MoirePackBuy } from './MoirePackBuy';
 import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
 import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
@@ -410,6 +411,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                   </a>
                 </div>
               )}
+              <MoirePackBuy tier={currentTier} email={checkoutEmail} />
             </div>
           )}
 
