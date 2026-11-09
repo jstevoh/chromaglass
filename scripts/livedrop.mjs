@@ -23,6 +23,10 @@
  *   tall     the vertical output; its connection is dropped at 6 s
  *   refused  landscape, with a key its listener refuses
  *   quiet    landscape, on a listener that never acknowledges
+ *   youtube  landscape, on a listener that answers as YouTube's ingest did
+ *            when probed (2026-11-08): Window Acknowledgement Size 2,500,000,
+ *            Set Peer Bandwidth 59,768,832, and acknowledgements on its own
+ *            2.5 MB window whatever the client asks (3.9 s of this stream)
  *
  * Each line is one thing the session promises:
  *
@@ -61,6 +65,18 @@
  *                 the kernel's buffers are full (the check-skeptic throttled
  *                 this one: 1.29 s read while 7 s were queued; PLAN 37x-4c's
  *                 found item), so this line claims only the fallback
+ *   youtube, keeps up
+ *                 on a server whose acknowledgements come 2.5 MB apart (3.9 s
+ *                 of this stream), a link that keeps up drops no frame and
+ *                 the readout never passes the bound: before the fix it read
+ *                 4.9 s and dropped 247 of 570 frames (the first live album
+ *                 show's "trouble" on the owner's fast connection)
+ *   youtube, coarse
+ *                 such a server is read on the socket's word at every
+ *                 reading, and the readout says so
+ *   cutoff        a scripted client: acknowledgements 5% under a share of
+ *                 the bound apart (ACK_COARSE_SHARE) are the server's word,
+ *                 5% over are the socket's
  *   resume        the drop resumes at the first keyframe once the readout is
  *                 under half the bound, not at the bound: a client fed a
  *                 scripted readout
@@ -70,7 +86,7 @@
  */
 import { startRtmpListener, summarize } from './rtmpListener.mjs';
 import { LiveSession } from '../desktop/liveSession.js';
-import { BEHIND_LIMIT_SECONDS, WINDOW_ACK, LiveClient } from '../desktop/live.js';
+import { BEHIND_LIMIT_SECONDS, WINDOW_ACK, ACK_COARSE_SHARE, LiveClient } from '../desktop/live.js';
 import { describeTag } from '../desktop/rtmp.js';
 
 const FPS = 30;
@@ -99,10 +115,13 @@ const numberOf = (payload) => payload.readUInt32BE(4);
 
 const listener = await startRtmpListener({ refuse: 'refused-key', pingAfterMs: 0 });
 const quietListener = await startRtmpListener({ acknowledge: false, pingAfterMs: 0 });
+const YT_WINDOW = 2500000, YT_PEER_BANDWIDTH = 59768832;
+const ytListener = await startRtmpListener({ ackWindow: YT_WINDOW, peerBandwidth: YT_PEER_BANDWIDTH, ownWindow: YT_WINDOW, pingAfterMs: 0 });
 const byKey = new Map();
 const onPublish = (s) => { if (!byKey.has(s.key)) byKey.set(s.key, []); byKey.get(s.key).push(s); };
 listener.on('publish', onPublish);
 quietListener.on('publish', onPublish);
+ytListener.on('publish', onPublish);
 
 const meta = (width, height) => ({ width, height, fps: FPS, videoBitrate: STREAM_BPS * 8, audio: { codec: 'aac', sampleRate: 48000, channels: 2, bitrate: 128000 } });
 const session = new LiveSession({
@@ -113,13 +132,14 @@ const session = new LiveSession({
     { name: 'tall', url: listener.url, key: 'tall-key', output: 'tall' },
     { name: 'refused', url: listener.url, key: 'refused-key', output: 'wide' },
     { name: 'quiet', url: quietListener.url, key: 'quiet-key', output: 'wide' },
+    { name: 'youtube', url: ytListener.url, key: 'youtube-key', output: 'wide' },
   ],
   reconnectDelaysMs: [500, 1000],
 });
 
 const started = await session.start();
 const health = (name) => session.state().destinations.find((d) => d.name === name);
-check('the show went live with one destination refused, not the whole start failed', started.ok && health('refused').phase === 'refused' && ['slow', 'steady', 'tall', 'quiet'].every((n) => health(n).phase === 'live'), `${started.ok ? 'live' : started.error}; ${session.state().destinations.map((d) => `${d.name} ${d.phase}`).join(', ')}`);
+check('the show went live with one destination refused, not the whole start failed', started.ok && health('refused').phase === 'refused' && ['slow', 'steady', 'tall', 'quiet', 'youtube'].every((n) => health(n).phase === 'live'), `${started.ok ? 'live' : started.error}; ${session.state().destinations.map((d) => `${d.name} ${d.phase}`).join(', ')}`);
 
 // The sequence headers, as the page sends them with its first frame and packet.
 session.videoConfig('wide', Uint8Array.from([1, 0x64, 0, 0x28, 0xff]));
@@ -152,7 +172,8 @@ while (Date.now() - t0 < END_AT) {
     const tags = slowConn?.tags ?? [];
     const lastRead = tags.length ? tags[tags.length - 1].timestamp : 0;
     const lastWritten = Math.round((frames - 1) * 1000 / FPS);
-    samples.push({ at: now, behind: h.secondsBehind, by: h.measuredAt, kbps: h.kbps, dropping: h.dropping, truth: Math.max(0, (lastWritten - lastRead) / 1000) });
+    const y = health('youtube');
+    samples.push({ at: now, behind: h.secondsBehind, by: h.measuredAt, kbps: h.kbps, dropping: h.dropping, truth: Math.max(0, (lastWritten - lastRead) / 1000), yt: y.secondsBehind, ytBy: y.measuredAt, ytDropping: y.dropping });
   }
   await sleep(5);
 }
@@ -226,6 +247,33 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
   check('a server that never acknowledges is judged on the socket, says so, and drops nothing when it keeps up (not that it sees a slow one: PLAN 37x-4c)', q.measuredAt === 'socket' && q.serverAcks === 0 && q.videoDropped === 0 && complete(nums(framesOf(conn, 'video')), frames), `measured at the ${q.measuredAt}, ${q.serverAcks} acknowledgements, ${q.videoDropped} dropped`);
 }
 
+// youtube: a server whose acknowledgements are megabytes apart, on a link that keeps up.
+{
+  const conn = byKey.get('youtube-key')[0];
+  const v = nums(framesOf(conn, 'video'));
+  const h = endHealth.youtube;
+  const ytMax = Math.max(...samples.map((s) => s.yt));
+  const step = YT_WINDOW / STREAM_BPS;
+  console.log(`  youtube: ${conn.acksSent} acknowledgements sent, ${fmt(step, 1)} s of stream apart; the client asked for a ${conn.ackSize}-byte window; readout at most ${fmt(ytMax, 2)} s behind`);
+  check(`a YouTube-like server (acknowledging every ${YT_WINDOW} bytes, ${fmt(step, 1)} s of stream) on a link that keeps up: no frame dropped, every frame arrived, never past the ${BEHIND_LIMIT_SECONDS} s bound`, conn.acksSent >= 2 && h.videoDropped === 0 && h.dropRuns === 0 && complete(v, frames) && ytMax <= BEHIND_LIMIT_SECONDS && samples.every((s) => !s.ytDropping), `${h.videoDropped} dropped in ${h.dropRuns} run(s), ${v.length} of ${frames} frames, ${fmt(ytMax, 2)} s at most, ${conn.acksSent} acknowledgements`);
+  // Every reading, not the last: by the end an acknowledgement can simply be stale (ACK_STALE_MS), which reads 'socket' on the old code too (the check-skeptic's control).
+  const byServer = samples.filter((s) => s.ytBy === 'server').length;
+  check(`a server whose acknowledgements are more than ${BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE} s of stream apart is read on the socket's word at every reading, and says so`, byServer === 0 && h.serverAcks >= 2 && step > BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE, `${byServer} of ${samples.length} readings on the server's word, ${h.serverAcks} acknowledgements heard`);
+}
+
+// The cutoff itself: a scripted client whose acknowledgements are just under and just over a share of the bound apart.
+{
+  const meta = { videoBitrate: 6_000_000, audio: { bitrate: 128_000 } };
+  const cutoff = ((meta.videoBitrate + meta.audio.bitrate) / 8) * BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE;
+  const byAt = (step) => {
+    const c = new LiveClient({ url: 'rtmp://127.0.0.1:1/live', key: 'k', meta });
+    Object.assign(c.delivery, { flushed: 10_000_000, serverAck: 9_000_000, serverAckAt: Date.now(), ackStep: step });
+    return c.behind().by;
+  };
+  const under = byAt(Math.floor(cutoff * 0.95)), over = byAt(Math.ceil(cutoff * 1.05));
+  check(`the cutoff is ${ACK_COARSE_SHARE} of the ${BEHIND_LIMIT_SECONDS} s bound in stream bytes (${Math.round(cutoff)} at 6.1 Mbps): acknowledgements 5% under it are the server's word, 5% over the socket's`, under === 'server' && over === 'socket', `under: ${under}, over: ${over}`);
+}
+
 // Resume at half the bound: a client with a scripted readout and a socket that takes everything.
 {
   const c = new LiveClient({ url: 'rtmp://127.0.0.1:1/live', key: 'k', meta: {} });
@@ -255,5 +303,6 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
 
 await listener.close();
 await quietListener.close();
+await ytListener.close();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

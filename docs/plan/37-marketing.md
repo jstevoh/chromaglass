@@ -425,6 +425,17 @@ rest is routine and the owner's calls.
       the fix is a second measure for it: the socket's bytes not yet sent against the
       upload rate the client has seen, or the kernel's own queue (`TCP_NOTSENT_LOWAT` on
       macOS, which node does not expose; a small native module would).
+    - **37x-4c-2. YouTube's acknowledgements are too coarse to judge by.** *(shipped
+      2026-11-08; story in `docs/plan-shipped.md` §37x-4c-2.)*
+    - **37x-4c-3. The client gives up its own 256 KB window.** *(open, S.)* On Set Peer
+      Bandwidth the client echoes the server's figure as the window it asks
+      acknowledgements on (`desktop/live.js`, as the RTMP spec has it), which undoes
+      `WINDOW_ACK`'s 256 KB against any real server (YouTube's is 59,768,832). Answering
+      with 256 KB instead was tried on 2026-11-08: `livedrop`'s throttled listener then
+      never recovered (dropping to the end, 0 of the last 90 frames). The existing lines
+      had only ever met 256-byte acknowledgements (the listener's own window echoed back).
+      Find why the drop never ends at a 256 KB window before asking for one, and add a
+      line that runs the slow case at it.
   - **37x-4d. The Live Show panel and the Pro gate.** *(shipped 2026-10-30.)* The Live
     Show panel in the Mac app (`src/components/LiveShowPanel.tsx`, one controller for it,
     the console and the phone in `src/lib/liveShow.ts`), the phone remote's live chip and
