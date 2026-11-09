@@ -515,9 +515,12 @@ rest is routine and the owner's calls.
       a semitone and a half sharp), and silence stays under it as a floor 150 ms behind
       now if it stalls (`src/lib/liveAudioSwitch.ts`). Not an AudioContext bus, as first
       planned: a context the stream makes can start suspended and make no samples, the
-      hole 37x-4f closed. `npm run live`'s three new lines: silence then the tone at
-      220.0 Hz, its onset within 100 ms of the hand-over (measured 7 ms), one switch.
-      Red without the fix (0/641 loud) and red without the resampling (239.5 Hz).
+      hole 37x-4f closed. `npm run live`'s four new lines: silence then the tone at
+      220.0 Hz; a step in the tone lands where the page made it within 30 ms (measured
+      +2 ms); the track runs to the last frame; one switch, resampled. Red without the
+      fix (0/641 loud), without the resampling (239.5 Hz), and with a 100 ms hole at the
+      switch (the step 93 ms early: the encoder stamps by sample count, so a hole is the
+      rest of the sound arriving early, not a gap).
       - *37x-4f-3. A cubic, not a polyphase filter.* The resampler is Catmull-Rom: fine
         for a 160 kbit stream, but a proper band-limited resampler (or one shared with
         Record's) would keep the top octave whole. Only met when the source's rate is not
