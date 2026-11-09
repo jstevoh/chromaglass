@@ -1440,7 +1440,7 @@
     },
     {
       "name": "A song's title stays readable on a busy look's thin gap, then is rinsed away",
-      "shard": "lab4",
+      "shard": "lab5",
       "run": "npm run inktitle -- --thin",
       "timeout": 16,
       "why": [
@@ -1452,7 +1452,9 @@
         "the title in thin ink, reads under 0.6 at 1 s) it reads 0.7 at 2.5 s and 0.3 or",
         "worse by 12 s; it lands at 0.8; the rinse takes it by 2 s at the top and leaves",
         "it at 0.7 at 6 s at 0.01; every arm keeps 90% of its dye; the pad is there. About",
-        "21 s of plate, ten minutes on SwiftShader, in its own entry so lab3 keeps its pace."
+        "21 s of plate, seven minutes on SwiftShader's fast runner tier and about fourteen on",
+        "the slow one: in lab5, whose samelook says \"not asked\" off the speed hunt's PRs,",
+        "since lab4 with it was cancelled at the 25-minute limit on the slow tier (#778)."
       ]
     },
     {

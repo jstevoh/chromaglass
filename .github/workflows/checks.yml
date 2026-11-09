@@ -145,7 +145,8 @@ jobs:
   # look in two labs on the second, the soap's two checks on the third,
   # `holeline` building three labs on the fourth, and on the fifth `samelook`,
   # two trees' labs side by side, which runs only on a pull request of the
-  # speed hunt's and says "not asked" on any other, PLAN.md 46-0). Every
+  # speed hunt's and says "not asked" on any other, PLAN.md 46-0, and the ink
+  # title's thin-gap arms, about fourteen minutes on the slow tier, PLAN 37x-10g). Every
   # check runs whatever failed before it in its part. GitHub's ubuntu runners
   # are not the queue the Mac's are, so nine at once cost the queue nothing.
   #
