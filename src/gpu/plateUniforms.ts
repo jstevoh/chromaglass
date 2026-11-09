@@ -397,7 +397,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.setAll('bubbles', view.bubblePack.packed.length > 160 ? view.bubblePack.packed.subarray(0, 160) : view.bubblePack.packed);
     pack.setAll('bubbleShape', view.bubblePack.shape.length > 160 ? view.bubblePack.shape.subarray(0, 160) : view.bubblePack.shape);
     pack.set('bubbleCount', Math.min(40, bubbles.count));
-    pack.set('bubbleStrength', bubbles.strength);
+    pack.set('bubbleStrength', (s.heat ?? 0) > 0 ? Math.max(bubbles.strength, 1) : bubbles.strength);
   }
   pack.set('postBlur', s.postBlurRadius ?? 0.35);
   // Sampling math follows the texture actually bound; the tuned look

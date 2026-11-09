@@ -592,6 +592,8 @@ export interface VisualizerSettings {
     exists is reachable through Buoyancy, and boiling is unbuilt.
   */
   evaporationRate: number;
+  /** The projector lamp's thermal power (PLAN 36e-2): 0 is off (every look opens as today); up to 1 heats the dish under the lamp so a held finger blocking the fan's air boils the spot. */
+  heat?: number;
   
   // Manual/Interaction
   airVelocity: number;
@@ -1128,6 +1130,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  heat: 0,                  // off: every look opens as today, byte for byte (PLAN 36e-2)
   cometSpeed: 0.0,
   cometAngle: 0.0,
   // Enough to be felt without the plate ever looking like it is pulsing to a

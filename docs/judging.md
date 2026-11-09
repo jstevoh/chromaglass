@@ -2496,7 +2496,44 @@ Mac's film shows the letters at the solver's full grid.
    moves, a wash that shakes the whole plate, a busy look that tears the title apart before
    it can be read.
 
-## 115. The Android TV app finds the Mac and pairs by four digits (PLAN 12-tv-2)
+## 115. Heat from the lamp, and blocking the fan's air by hand (PLAN 36e-2)
+
+`npm run boilgpu` (54/54 on Metal) holds the GPU dish solver to the CPU reference (`npm run boil`,
+38/38), and `npm run plateboil` (8/8 on `zero`, 6/6 on `boil`) holds the live plate's boil at
+1/60 s steps; only the Mac and phone at 60 fps show how the **Heat** dial and a held finger feel
+on a live look.
+
+1. Settings → Lamp & Light → **Heat** (also Perform desk, MIDI, the remote and the phone's Looks
+   sheet). Default is 0, so every look opens as before.
+2. On a look with dye over the lamp (Fillmore East, 1969 or Lava Lamp), raise **Heat** to 0.7:
+   where the lamp's hot spot and dark dye sit, the dish warms; with Gravity up (a tilted plate),
+   warm plumes rise by Kell buoyancy without hitting the old 50-unit ceiling.
+3. Press and hold a finger or pointer still on the dish over the warm spot (on the desk pad, iPad
+   or phone): blocking the cooling air drops $h$ from $50$ to $10\,\text{W/(m}^2\text{K)}$ under
+   the hand, nucleating a vapour pocket that pushes the surrounding liquid out and shades as an
+   air pocket; lift the hand and the fan's air condenses the vapour back down.
+4. Bad: any look changing with **Heat** at 0, Evolve turning **Heat** on by itself, or vapour
+   failing to condense after the hand lifts or **Heat** returns to 0.
+
+## 116. Listen in the Songs panel (PLAN 28h-8)
+
+`npm run listen` holds the design (cues firing on each chorus through the real scheduler,
+stages where the sequencer lays them, louder sections fuller against the song's own range)
+and the flow on a known song; only a record playing in the room can say whether it names
+the song and whether the show it designs plays well.
+
+1. Sequence tab, Songs panel: with the Mac's speakers playing a record and nothing chosen as
+   the source, press **Listen**. The microphone comes on and, within a few tries, the song
+   is added and opened with its title, artist and length.
+2. Let the song play to its end (or the next song). The line should say what was designed;
+   the song's actions list the title, a burst on every chorus, new dyes for the bridge and
+   the last chorus, and the drain; Stage sequences lists "<title> (Listen)".
+3. Play the song again: the stages should open up on each chorus and settle in the verses,
+   the bridge go in close and come back out, the cues land on their sections.
+4. Bad: a burst a few seconds before its chorus on every play (the map's offset, 28h-9), a
+   look change when the song is added, the plate left in close after the bridge.
+
+## 117. The Android TV app finds the Mac and pairs by four digits (PLAN 12-tv-2)
 
 The check (`npm run tvpair`) asks the advert and pairs on Linux; a real Google TV, the Mac's
 own mDNSResponder beside the advert, and the WebView's video decode are only seen here.

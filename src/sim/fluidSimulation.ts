@@ -47,7 +47,7 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP } from './stepping';
+import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { rimCount, rimMask } from '../lib/rimMask';
 
@@ -253,10 +253,12 @@ export class FluidSimulation {
   private sheetLaid = false;
   /** Sound Drive's bass, as a hand on the glass (lib/squish.ts `BassPress`, PLAN 27e). */
   readonly bassPress = new BassPress();
+  /** Hands held on the glass this step (0..1 plate coords), blocking the fan's air over the spot (PLAN 36e-2). */
+  boilHolds: { x: number; y: number; radius?: number }[] = [];
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.boilHolds = []; this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -3460,6 +3462,8 @@ export class FluidSimulation {
       particleLife: 4,
       meanDensity: this.meanDensity,
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
+      heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
+      boilHolds: this.boilHolds,
     };
   }
 
@@ -3471,57 +3475,7 @@ export class FluidSimulation {
    * itself lives in cvx/cvy.
    */
   private stepCurrent(p: GpuStepParams) {
-    const M = this.CM, S = this.size;
-    const cvx = this.cvx, cvy = this.cvy, cpr = this.cpr, cdv = this.cdv;
-    for (let j = 1; j < M - 1; j++) {
-      for (let i = 1; i < M - 1; i++) {
-        const k = i + j * M;
-        const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
-        const dd = Math.tanh(this.density[q] - p.meanDensity);   // saturated (see the GPU twin)
-        const upright = c01(p.plateUpright ?? 0);
-        let fx = p.rockX * dd;
-        let fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd;   // Boussinesq linear in temperature, gated on upright (see the GPU twin)
-        const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
-        const r = Math.sqrt(tx * tx + ty * ty);
-        if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
-        // Relax toward the flow the forces ask for (see the GPU twin).
-        let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
-        let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
-        const s = Math.sqrt(vx * vx + vy * vy);
-        if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
-        cvx[k] = vx; cvy[k] = vy;
-      }
-    }
-    // Walls: no flow through them.
-    for (let i = 0; i < M; i++) { cvx[i] = cvy[i] = cvx[i + (M - 1) * M] = cvy[i + (M - 1) * M] = 0; cvx[i * M] = cvy[i * M] = cvx[M - 1 + i * M] = cvy[M - 1 + i * M] = 0; }
-    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-      const k = i + j * M;
-      cdv[k] = -0.5 * (cvx[k + 1] - cvx[k - 1] + cvy[k + M] - cvy[k - M]) / M;
-    }
-    for (let it = 0; it < 10; it++) {
-      for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-        const k = i + j * M;
-        cpr[k] = (cdv[k] + cpr[k - 1] + cpr[k + 1] + cpr[k - M] + cpr[k + M]) * 0.25;
-      }
-      for (let i = 0; i < M; i++) { cpr[i] = cpr[i + M]; cpr[i + (M - 1) * M] = cpr[i + (M - 2) * M]; cpr[i * M] = cpr[1 + i * M]; cpr[M - 1 + i * M] = cpr[M - 2 + i * M]; }
-    }
-    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-      const k = i + j * M;
-      cvx[k] -= 0.5 * (cpr[k + 1] - cpr[k - 1]) * M;
-      cvy[k] -= 0.5 * (cpr[k + M] - cpr[k - M]) * M;
-    }
-    // Into the velocity the dye is carried by, sampled up to the logical grid.
-    for (let j = 1; j < S - 1; j++) {
-      const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = c01(y - j0);
-      for (let i = 1; i < S - 1; i++) {
-        const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = c01(x - i0);
-        const k = i0 + j0 * M;
-        const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
-        const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;
-        this.vx[i + j * S] += ux;
-        this.vy[i + j * S] += uy;
-      }
-    }
+    stepCurrentCpu(this.CM, this.size, this.cvx, this.cvy, this.cpr, this.cdv, this.density, this.temp, this.vx, this.vy, p);
   }
 
   // ── Private simulation methods ─────────────────────────────────────

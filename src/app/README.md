@@ -39,7 +39,9 @@ comments, which moved with it.
 | `useRemote` | the phone remote's link, both ways; and the TVs at home, `tv` (a `TvAtHome`: watching, asking to pair, paired, and Allow, No, Forget; PLAN 12-tv, 12-tv-2, `lib/tvFeed.ts`) |
 | `useInkTitle` | the identified song's title poured as ink when it changes and the Title switch is on (PLAN 37x-10), called by `useRemote` |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
-| `useSongScore` | a song's show while it plays, and its score |
+| `useSongSequences` | the set item, sequence or preset made for a song, up when it is identified; a song's sequence stopped at its end (moved out of App for 28h-8) |
+| `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it) |
+| `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `useSongRendering` | a song rendered to a film |
 | `useControllers` | MIDI, the gamepad, the projector window |
