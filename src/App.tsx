@@ -5,7 +5,7 @@ import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs, shotLabel } from './lib/macroCamera';
+import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
@@ -1726,8 +1726,7 @@ export default function App() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'b' || e.key === 'B') toggleBlackout();
       if (e.key === '?') setShowHelp(h => !h);
-      if (e.key === '+' || e.key === '=') zoomMacro(1);
-      if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      macroKey(e, settingsRef.current, visualizerRef.current, zoomMacro, aimMacro);
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
         const tool = activeToolRef.current;
@@ -1750,7 +1749,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro]);
+  }, [toggleBlackout, zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.

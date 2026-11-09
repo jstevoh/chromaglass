@@ -181,7 +181,16 @@ The owner's hunt (2026-11-09) takes this wave's written items to Antigravity und
 ### Wave 5. Playing it: the instrument
 
 **§27, every control does something you can see** (the owner, 2026-10-05): ~~27a-c Plate
-Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G);
+Rock, Beat Squeeze, Turbulence~~ (#305); **27d** the rest of the sweep (M, lanes B and G; its camera controls are shipped,
+`npm run camerahand`: Chase Speed is Hold's weight, 3 s at 0 to a snap at 3, 0.27 s at the
+default 0.4 as before; the arrow keys pan the closeup; Music Sync greys with "needs Frame
+Sway" in Hold and Follow. Open: **27d-c1** the aim sliders' outer ends are clamp, at 4x 8%
+each side does nothing; **27d-c2** Follow's Chase has no visible effect, the lead cancels
+the lag, so it wants a meaning or a fold into Hold's; **27d-c3** the Lens section, Settings →
+Camera: Lens, Focus, Aperture, Bloom, Chromatic Aberration, Refraction, off by default and
+gated on Lens, each moving only 1 to 5 px at 1440 wide by the shader's arithmetic, so it
+needs a Mac measurement before a fix; see 31f's Lens Type, which may already cover part
+and handoff `camera-controls.md`);
 ~~27e Sound Drive's bass as the glass~~ (#307), then **27e-1** the kick's drop, **27e-2** the
 film's measure.
 

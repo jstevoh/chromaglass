@@ -826,6 +826,15 @@
       ]
     },
     {
+      "name": "The closeup camera answers a hand",
+      "shard": "logic",
+      "run": "npm run camerahand",
+      "why": [
+        "The closeup camera answers a hand (PLAN.md 27d): Chase Speed's throw in",
+        "Hold, the arrow-key pan, and Music Sync's label, on the real closeup camera."
+      ]
+    },
+    {
       "name": "The seed",
       "shard": "logic",
       "run": "npm run seed",
