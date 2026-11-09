@@ -75,7 +75,14 @@ export const GAP_KERNELS: Record<string, string> = {
     touched, because changing which glasses are on the desk is not a squeeze
     and should not pump the liquid.
 
-    A.a.x is the shape it was laid at, A.a.y the shape it is going to.
+    A.a.x is the shape it was laid at, A.a.y the shape it is going to; A.a.z
+    and A.a.w the cover's gap before and after (PLAN 38r-5).
+
+    The dome is added to the cover's height, not scaled by it: the glasses'
+    shape is a matter of metres (how far their curves part), and a glass
+    floating higher on more liquid parts from the other by the same shape
+    shifted up, not by a deeper one. At the default cover, 0.03, the two are
+    the same number.
   */
   gapReshape: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
@@ -85,8 +92,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   let k = (r2 - 0.5) * 2.0;
-  let was = clamp(${GAP_REST} * (1.0 - A.a.x * k), ${GAP_FLOOR}, ${GAP_TOP});
-  let now = clamp(${GAP_REST} * (1.0 - A.a.y * k), ${GAP_FLOOR}, ${GAP_TOP});
+  let was = clamp(A.a.z - ${GAP_REST} * A.a.x * k, ${GAP_FLOOR}, ${GAP_TOP});
+  let now = clamp(A.a.w - ${GAP_REST} * A.a.y * k, ${GAP_FLOOR}, ${GAP_TOP});
   let s = textureLoad(src, vec2i(id.xy), 0);
   textureStore(dst, vec2i(id.xy), vec4f(clamp(s.r + (now - was), ${GAP_FLOOR}, ${GAP_TOP}), s.g, s.b, s.a));
 }`,
@@ -105,7 +112,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // the squeeze film and no look sets it, and depth did not reach the flow
   // until depth became a mobility on the transport, so the shape has
   // never been visible.
-  let rest = clamp(${GAP_REST} * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), ${GAP_FLOOR}, ${GAP_TOP});
+  let rest = clamp(S.cover - ${GAP_REST} * S.plateCurve * (r2 - 0.5) * 2.0, ${GAP_FLOOR}, ${GAP_TOP});
   textureStore(dst, vec2i(id.xy), vec4f(rest, 0.0, 0.0, 0.0));
 }`,
 
@@ -121,7 +128,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let d = uvOf(id) - vec2f(0.5);
   let r2 = clamp(dot(d, d) * 4.0, 0.0, 1.0);
   // The dome the two glasses leave when nothing is pressing on them.
-  let rest = clamp(${GAP_REST} * (1.0 - S.plateCurve * (r2 - 0.5) * 2.0), ${GAP_FLOOR}, ${GAP_TOP});
+  let rest = clamp(S.cover - ${GAP_REST} * S.plateCurve * (r2 - 0.5) * 2.0, ${GAP_FLOOR}, ${GAP_TOP});
   var gap = s.r;
   var dhdt = 0.0;
   var pressed = false;

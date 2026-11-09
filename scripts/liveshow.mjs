@@ -39,8 +39,9 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
 import { engineQuery, installFrameReader } from './frame.mjs';
-import { presentsInXvfb } from './chromium.mjs';
+import { presentsInXvfb, port } from './chromium.mjs';
 import { filmFile, stackJudge, gridOfPixels, barColumn, STACK_KEYSTONE } from './liveshowstack.mjs';
+import { narrowLines } from './liveshownarrow.mjs';
 import {
   cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS,
 } from '../src/lib/liveShow.ts';
@@ -109,7 +110,7 @@ check('a server pasted as the key, or an empty key, is refused', keyProblem('rtm
 if (process.argv.includes('--node')) finish();
 
 // ── The panel ─────────────────────────────────────────────────────────
-const PORT = Number(process.env.LIVESHOW_PORT ?? 4196);
+const PORT = port(4196, 'LIVESHOW_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 
@@ -319,6 +320,9 @@ try {
   const packets = await until(page, () => window.__liveStub.calls.packets > 30 && window.__liveStub.calls, undefined, 20_000);
   check('the page\'s encoder is handing the bridge real packets, the first frame a keyframe', packets?.packets > 30 && packets.empty === 0 && packets.firstVideo === true,
     packets ? `${packets.packets} packets, ${packets.empty} empty, first frame a keyframe ${packets.firstVideo}` : 'none');
+
+  // ── The Mac app's narrow window (37x-4d-4; scripts/liveshownarrow.mjs) ──
+  await narrowLines({ page, until, check });
 
   // ── The phone ───────────────────────────────────────────────────
   const remote = await (await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })).newPage();

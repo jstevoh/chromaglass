@@ -29,7 +29,9 @@
     "chromaglass",
     "node_modules",
     "dist",
-    "desktop"
+    "desktop",
+    "plugin"
   ],
+  "//plugin": "The DAW bridge plugin is C++ (PLAN 13.7b). Its CMake build directory writes files named compiler_depend.ts, which are make rules, not TypeScript: with the plugin built, `npm run lint` read them and printed hundreds of syntax errors.",
   "//strict": "Measured, not aspirational: with @types/react installed this costs zero errors. Without those types it looked like 3774, and 3133 of them were 'no JSX.IntrinsicElements' - the missing declarations, not the code. With strict off, every React API and every JSX element was `any`: useState<VisualizerSettings> handed back an `any` setter, which is why a settings object missing 33 required keys typechecked and shipped, and useRef(map) left the whole MIDI dispatch switch unchecked. One line to dial back if it ever gets in the way."
 }

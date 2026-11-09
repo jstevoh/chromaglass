@@ -10,7 +10,8 @@ The WebGPU solver's class, split by what its members do (PLAN 19ai-7). Each file
 - `fields.ts`: `FluidFields`. The fields a look makes on first use (the mix, the film, the reaction's grids, the thin gap's), the getters the frame loop reads, `dispose`.
 - `inputs.ts`: `FluidInputs`. What is put in from outside a step: `applyDeltas`, `applySplats`, the poured image and video, chemistry, phase, film and liquids, `handOver` and `takeOver`.
 - `passes.ts`: `FluidPasses`. What a step runs: the projection (Jacobi and multigrid), the thin gap's solve and its substepped carries, the swirl, the phase passes, the species, the particles.
-- `reads.ts`: `FluidReads`. What comes back: `readbackAsync`, `measure`, `readField` and the checks' single-field reads.
+- `reads.ts`: `FluidReads`. What comes back: `readbackAsync`, `measure`, `speciesShare`, `speciesSnapshot`, `readField` and the checks' single-field reads.
+- `cover.ts`: `FluidCover`. The cover glass on its liquid (PLAN 38r-5): `gapShape` lays the gap's dome on a new plate and shifts it on a new curve or a new cover height.
 
 `../fluid.ts` holds `WebGPUFluid`: `step` itself, which calls the passes in order, the pipelines built ahead (`prepare`) and the thin-gap and old-plate builds.
 

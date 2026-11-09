@@ -62,15 +62,7 @@ is live after the third track); `npm run music` with a `finalizeListen` that thr
   three quarters of a beat off. (Start and a clock dropout are 14e's.) 14-bit pairs and
   NRPN (CC 99/98/6/38) are not decoded either, so learn and auto-map bind the coarse
   byte or the parameter number.
-- *Program Change is dropped* (**14t-pc**, from §30). `parseMidi` (`midi.ts`) returns
-  CC and note on/off and nothing else, so a 0xC0 message never reaches learn. AUM's
-  MIDI matrix, the Elektron boxes and most hardware sequencers send Program Change (and
-  Bank Select, CC 0/32) when the pattern changes, and Imaginando's VS switches patches
-  on it. A `program` binding kind in `MidiTarget`, bound either to set-list item n or
-  to a named preset, played with the item's own fade. On the phone, the bindings are
-  listed on its MIDI page. *Measure:* beside `npm run desk`'s MIDI lines, a recorded
-  run of Program Change messages lands on the bound look every time, none doubled,
-  with the item's fade.
+- ~~*Program Change is dropped* (**14t-pc**, from §30).~~ **Shipped** (`npm run soundowed`, id `pc` out of `--owed`; story in `docs/plan-shipped.md` §14t-pc).
 - *The decks already know the bar* (*proposed*). Pioneer's Pro DJ Link (a CDJ's beat
   packets carry the beat within the bar and the tempo) and Denon's StageLinQ are on the
   network the show server already listens on for OSC and Art-Net. They give the true

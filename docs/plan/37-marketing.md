@@ -287,8 +287,11 @@ rest is routine and the owner's calls.
   stays and what grows across the album. Each song still gets its own look, applied whole
   (looks never inherit, `lookFade.ts`), but the sheet derives them from one place:
   - *One palette lineage.* An album palette of four or five dyes (five is the plate's most,
-    25h); each song takes it a step around the wheel or swaps one dye, never all five, so
-    track 7 is recognisably the same record as track 1. The changes land on song
+    25h); each song swaps a dye or two, never all five, so track 7 is recognisably the
+    same record as track 1. (It said "a step around the wheel or" too: on the 24-colour
+    palette every dye moved one hue along reads 0.125 to 0.207 in OKLab, more than half
+    as far as two different shipped looks, so the check's bar holds a song to a swap's
+    scale; 2026-11-08.) The changes land on song
     boundaries, faded, as Evolve already does at a section (`slowEvolve.ts`).
   - *One liquid, one motif.* The album picks its liquid (oil over ink, ferrofluid, soap
     film) and a motif that returns (the title poured at each song's start, a ferrofluid
@@ -316,6 +319,18 @@ rest is routine and the owner's calls.
   neighbouring songs stays under a bar while track 1 and track 3 differ, that the building
   quantity rises monotonically across the album, and that the plate's dye at a song's
   first frame is the previous song's last.
+  *Check written first (2026-11-08), red on main:* `npm run album` (`scripts/album.mjs`,
+  node, the Measure lane's logic part, `--owed=sheet,lineage,builds,seeds`) holds the
+  contract, `src/lib/albumSheet.ts` (`readAlbumFile`, `trackPalette`, `trackStart`,
+  `buildAt`, `trackSeed`, `albumSetList`); its palette bars are read from the shipped
+  looks' palettes (neighbours within half their median OKLab distance, 0.079 today; track
+  1 and 3 at least 0.03 apart; track 7 nearer track 1 than the median). `npm run
+  albumplate -- --owed=carry` (the fifth Mac shard) is the plate's line through a new
+  `window.chromaglassAlbum` hook, with two controls that hold on main (Go keeps the plate,
+  Clear does not); it reads the picture's pattern and the settings, the mean dye only printed. A node line rather than the lab for all but `carry`, since the sheet is
+  data; `carry` is the app's, since only the app's song change can clear the plate.
+  Not measured: the motif, the Design desk's editor, and whether the plate draws the
+  track's palette (the owner judges the record).
 - **37x-4. Go live to YouTube from the Mac app.** *(build, M; its own thread.)* The owner
   chose 2026-10-29 to play the album from a streaming app and capture it live: "I would
   rather play off of youtube music/qobuz and capture the audio live as the video plays in
@@ -410,6 +425,17 @@ rest is routine and the owner's calls.
       the fix is a second measure for it: the socket's bytes not yet sent against the
       upload rate the client has seen, or the kernel's own queue (`TCP_NOTSENT_LOWAT` on
       macOS, which node does not expose; a small native module would).
+    - **37x-4c-2. YouTube's acknowledgements are too coarse to judge by.** *(shipped
+      2026-11-08; story in `docs/plan-shipped.md` §37x-4c-2.)*
+    - **37x-4c-3. The client gives up its own 256 KB window.** *(open, S.)* On Set Peer
+      Bandwidth the client echoes the server's figure as the window it asks
+      acknowledgements on (`desktop/live.js`, as the RTMP spec has it), which undoes
+      `WINDOW_ACK`'s 256 KB against any real server (YouTube's is 59,768,832). Answering
+      with 256 KB instead was tried on 2026-11-08: `livedrop`'s throttled listener then
+      never recovered (dropping to the end, 0 of the last 90 frames). The existing lines
+      had only ever met 256-byte acknowledgements (the listener's own window echoed back).
+      Find why the drop never ends at a 256 KB window before asking for one, and add a
+      line that runs the slow case at it.
   - **37x-4d. The Live Show panel and the Pro gate.** *(shipped 2026-10-30.)* The Live
     Show panel in the Mac app (`src/components/LiveShowPanel.tsx`, one controller for it,
     the console and the phone in `src/lib/liveShow.ts`), the phone remote's live chip and
@@ -446,10 +472,16 @@ rest is routine and the owner's calls.
       carries). A Test to one unlisted destination proves only its own rate: the advice
       says "never filled the link" rather than guess. A destination that does not
       acknowledge (37x-4c's item) cannot fill the measure either.
-    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width the app
-      goes to the phone layout (`usePhoneLayout`), which has no Live Show and no live chip:
-      a stream running there keeps running, unseen. Small, since the Mac app is the
-      laptop at the desk; the fix is the remote's `LiveRemoteChip` on `PhonePlay`.
+    - *37x-4d-4. The Mac app's narrow window.* Narrowed under the desks' width (1024) the
+      app leaves the desks and the Live Show panel with them: a stream running there keeps
+      running, unseen. It goes to the floating overlay (`overlayUp` in `usePhoneLayout`),
+      not the phone layout as this item first said: `wantsPhoneLayout` wants a coarse
+      pointer and a short side under 600, which a Mac's window has not (found writing the
+      check, 2026-11-08). The fix is the remote's `LiveRemoteChip` on that overlay, and on
+      `PhonePlay` too should the app ever be opened at `/play`. Check written first, red
+      on main: `npm run liveshow -- --owed=narrow` (`scripts/liveshownarrow.mjs`): at
+      900x800 the chip on screen saying Live with its clock, its first tap only asking;
+      and, holding on main, the stream still live back at full width.
     - *37x-4d-5. Instagram's and TikTok's keys are per stream.* The panel keeps a key until
       it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
       change it each stream, the row could clear the key when a stream ends and say so,

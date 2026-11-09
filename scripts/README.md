@@ -27,7 +27,7 @@ A check that reads source as text reads App and its hooks through `appSource.mjs
 ## Helpers and files that are not checks
 
 - Shared by several checks: `judge.mjs` (a frame as numbers), `layoutProbe.mjs`, `liquidStandIn.mjs`, `arrangement.mjs` and `band.mjs` (synthesised songs and band), `media-read.mjs` (render containers), `rtmpListener.mjs`, `pagehold.mjs`, `recorder.mjs`.
-- CI and the Mac runner: `deploygate.sh`, `macrunner.mjs`, `macrunner-hook.sh`, `macrunner-setup.sh`, `macports.sh`, `debcache.sh`, `chromiumlibs.mjs`, `checkguard-api.mjs`, `measured.mjs`.
+- CI and the Mac runner: `deploygate.sh`, `macrunner.mjs`, `macrunner-hook.sh`, `macrunner-setup.sh`, `macports.sh`, `macbusy.sh`, `macdeploy.mjs` (a deploy shard's hold on the Mac, which `launchChromium` and `npm run desktop` wait for), `debcache.sh`, `chromiumlibs.mjs`, `checkguard-api.mjs`, `measured.mjs`.
 - Data: `sizes.json` (the size baseline, which only shrinks), `fixtures/`, `brand/`.
 
 ## Rules

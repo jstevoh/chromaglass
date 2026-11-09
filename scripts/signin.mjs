@@ -110,7 +110,7 @@
  * VITE_FIREBASE_AUTH_EMULATOR (the emulator's URL).
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { createServer } from 'node:http';
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, statSync, writeFileSync, mkdtempSync } from 'node:fs';
@@ -125,9 +125,9 @@ const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok
 
 const FIREBASE_TOOLS = 'firebase-tools@15.33.0';
 const PROJECT = 'demo-chromaglass'; // a "demo-" project: the emulator needs no real one
-const EMU_PORT = 9199;
+const EMU_PORT = port(9199);
 const EMU = `http://127.0.0.1:${EMU_PORT}`;
-const ON_PORT = 5281, OFF_PORT = 5282;
+const ON_PORT = port(5281), OFF_PORT = port(5282);
 const ON_DIST = resolve(process.env.SIGNIN_DIST ?? 'dist-signin');
 const OFF_DIST = resolve(process.env.SIGNIN_OFF_DIST ?? 'dist-signin-off');
 /** The sign-in's whole cost to a returning visit's first paint: a lazy import and a check of the cached user. */
@@ -138,7 +138,7 @@ const HOLD_MS = 10_000;
 const BOOT_MS = 90_000;
 const EMAIL = 'check@example.com';
 
-const LIC_PORT = 5283;
+const LIC_PORT = port(5283);
 const FIREBASE_ENV = {
   VITE_FIREBASE_API_KEY: 'demo-key',
   VITE_FIREBASE_AUTH_DOMAIN: `${PROJECT}.firebaseapp.com`,
@@ -612,10 +612,26 @@ try {
       const buys = [...document.querySelectorAll('[data-cg-landing-buy]')];
       const buyBad = buys.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
         || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad };
+      // The moiré pack's card under them (PLAN 45a-2): its own Buy, held to the same rules, and
+      // its four pictures each loaded from a file that exists (a lazy image is asked for here by
+      // scrolling the card into view, and naturalWidth is 0 for a file that 404s).
+      const pack = [...document.querySelectorAll('[data-cg-landing-pack]')];
+      const packBad = pack.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
+        || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
+      const card = document.querySelector('[data-cg-landing-moire]');
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad, pack: pack.length, packBad, card: !!card };
     }) : null;
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong` : 'landing page not drawn'}`);
+    let pics = -1;
+    if (f?.card) {
+      pics = await p.evaluate(async () => {
+        const imgs = [...document.querySelectorAll('[data-cg-landing-moire] img')];
+        imgs.forEach((i) => { i.loading = 'eager'; });
+        await Promise.all(imgs.map((i) => (i.complete ? null : new Promise((ok) => { i.onload = i.onerror = ok; }))));
+        return imgs.filter((i) => i.naturalWidth >= 960).length;
+      });
+    }
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0 && f.pack === 1 && f.packBad === 0 && pics === 4;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong; moiré card ${f.card ? `${f.pack} Buy, ${f.packBad} wrong, ${pics} pictures at 960 px` : 'missing'}` : 'landing page not drawn'}`);
     await c.close();
   }
   check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));

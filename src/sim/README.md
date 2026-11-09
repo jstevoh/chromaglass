@@ -33,8 +33,9 @@ the component.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
+- `speciesPoll.ts`: `SpeciesPoller` (`speciesShare` and `speciesSnapshot` polled once a second on a thin gap) and `stepPlateBubbles` (handing the snapshot to `BubbleField` on a thin gap and stepping the bubbles).
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
-  `resolveSimResolution`.
+  `resolveSimResolution`, `engineLabel`.
 - `tools.ts`: the hands' settle and hold, Blow's straw, the bottles' laying and reach, the pointer's press and stir along a move (`stirAlongMove`).
 
 ## Checks
