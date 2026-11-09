@@ -339,7 +339,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     // The clear film's dye (PLAN 20b-13): the colour one unit lets through, and the dial.
     const fd = hexToRgb(s.clearFilmDyeColor ?? '#ffd21a');
     pack.set('filmDye', fd.r, fd.g, fd.b, Number.isFinite(s.clearFilmDye) ? clamp01(s.clearFilmDye as number) : 0);
-    pack.set('droplets', clamp01(s.microDroplets ?? 0));
+    pack.set('droplets', clamp(s.microDroplets ?? 0, 0, 2));
     pack.set('thinFilm', clamp01(s.thinFilm ?? 0));
     // Not clamp01 alone: it passes NaN, and ?set=filmPhysics=x is how the owner is asked to try it.
     pack.set('filmPhysics', Number.isFinite(s.filmPhysics) ? clamp01(s.filmPhysics) : 0);
@@ -382,7 +382,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('beadDrops', Number.isFinite(s.beadDrops) ? clamp01(s.beadDrops) : 0);
     // Gathered back to the one plate as the closeup comes in (see `plateAmt` in wgsl/plate.ts).
     pack.set('dishSpread', clamp01(s.dishSpread ?? 0) * (1 - clamp01(view.macroAmount)));
-    pack.set('cells', clamp01(s.cells ?? 0));
+    pack.set('cells', clamp(s.cells ?? 0, 0, 1.4));
     pack.set('filmOn', filmOn);
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));

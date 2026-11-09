@@ -179,7 +179,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           label="Boundary Glow"
           value={settings.boundaryContrast}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ boundaryContrast: v })}
           settingKey="boundaryContrast"
@@ -217,7 +217,7 @@ export const LookSection = ({ c }: { c: SectionCtx }) => {
           label="Glossiness"
           value={settings.glossiness}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ glossiness: v })}
           settingKey="glossiness"
@@ -340,7 +340,7 @@ export const ShowSection = ({ c }: { c: SectionCtx }) => {
           label="Plate Cells"
           value={settings.cells ?? 0}
           min={0}
-          max={1.0}
+          max={1.4}
           step={0.05}
           onChange={(v: number) => onUpdate({ cells: v })}
           settingKey="cells"
@@ -453,7 +453,7 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
         <Slider disabled={(settings.camera ?? 0) <= 0.001 && 'needs Lens above 0'} label="Refraction" value={settings.refraction ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ refraction: v })}
           settingKey="refraction"
         />
-        <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })}
+        <Slider label="Micro-Droplets" value={settings.microDroplets ?? 0} min={0} max={2} step={0.05} onChange={(v: number) => onUpdate({ microDroplets: v })}
           settingKey="microDroplets"
         />
         <Slider label="Thin Film" value={settings.thinFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ thinFilm: v })}
@@ -551,7 +551,7 @@ export const StockSection = ({ c }: { c: SectionCtx }) => {
           label="Gate Edge"
           value={settings.stockGate ?? 0}
           min={0}
-          max={1.0}
+          max={2}
           step={0.05}
           onChange={(v: number) => onUpdate({ stockGate: v })}
           settingKey="stockGate"
