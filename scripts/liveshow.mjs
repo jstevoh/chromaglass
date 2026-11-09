@@ -40,7 +40,7 @@ import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
 import { engineQuery, installFrameReader } from './frame.mjs';
 import { presentsInXvfb, port } from './chromium.mjs';
-import { filmFile, stackJudge, gridOfPixels, barColumn, STACK_KEYSTONE } from './liveshowstack.mjs';
+import { filmFile, stackJudge, gridOfPixels, barColumnOfRow, barMoves, barMovesProof, STACK_KEYSTONE } from './liveshowstack.mjs';
 import { narrowLines } from './liveshownarrow.mjs';
 import {
   cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS,
@@ -445,10 +445,14 @@ function finish() {
              round, the control's colours, no corner dark and every cell of
              both edge columns the film's (no wedge, no pillarbox): square.
              Owed only while the panel has no Source choice.
-    moving   on a Mac, each stream's bar is somewhere else between its first
-             and last frames decoded, a second or more apart, so a stream that
-             sent one frame for ever is red. Skipped in software, which draws
-             a few frames a minute.
+    moving   on a Mac, each stream's bar is in at least two columns in each
+             half of its frames decoded, a second or more of them, and goes two
+             or more columns forward over them, so a stream that sent one frame
+             for ever (or froze in its first half) is red and a
+             moving one whose first and last frames are a whole number of the
+             bar's loops apart is not (37x-4d-7). Skipped in software, which
+             draws a few frames a minute; its judgement is proved on made-up
+             streams first, everywhere.
 
   Needs WebGPU (the projector's pass is src/gpu/output.ts): a Mac, or
   `PW_WEBGPU=1` on Linux, where it presents into Xvfb at a few frames a
@@ -488,14 +492,30 @@ async function stackLines() {
     frame decoded, at least a second apart. Not in software: there the plate
     draws a few frames a minute, the stream sends the last one again, and a
     still bar is the plate's pace, not the stream's.
+
+    Read on every frame decoded, not the first and the last (37x-4d-7): the
+    bar loops, and first against last read "column 6 then 6, 2.45 s apart"
+    on a moving stream once on the Mac. Why each half of the span needs two
+    columns is at `barMoves` (scripts/liveshowstack.mjs). Since the real line
+    cannot run in software, the judgement is first proved here on streams
+    made up from the film, on every machine.
   */
+  {
+    const p = barMovesProof();
+    check('the moving judgement passes every made-up moving stream and fails every frozen one, including those first-against-last read as still', p.ok,
+      `${p.cases} streams; ${p.aliased} moving ones read as still by first against last; ${p.wrong.length ? `wrong on ${p.wrong.length}: ${p.wrong.slice(0, 3).join('; ')}` : 'wrong on none'}`);
+  }
   const moving = (which, f, id) => {
     if (presentsInXvfb()) { console.log(` skip  the ${which} stream moves with the film: software WebGPU draws a few frames a minute`); return true; }
-    const a = barColumn(f?.first), b = barColumn(f);
-    const ok = a !== null && b !== null && a !== b && f.spanMs >= 1000;
-    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, ok,
-      `bar at column ${a} then ${b}, ${(f?.spanMs / 1000).toFixed(2)} s apart`, ok === false && f?.blackStream === true);
-    return ok;
+    const trail = (f?.trail ?? []).map(t => ({ ms: t.ms, col: barColumnOfRow(t.row) }));
+    const m = barMoves(trail);
+    // The strip's read of the last frame against the whole frame's, so a red
+    // says whether the strip reader itself is wrong on this machine.
+    const whole = f?.grid ? barColumnOfRow(f.grid.slice(7 * f.cols, 8 * f.cols)) : null;
+    const strip = trail.length ? trail[trail.length - 1].col : null;
+    due(id, `the ${which} stream moves with the film: its bar is somewhere else a second later`, m.ok,
+      `${m.detail}; last frame's bar at column ${strip} by the strip, ${whole} by the whole frame; ${f?.during ?? ''}`, m.ok === false && f?.blackStream === true);
+    return m.ok;
   };
   const STACK_LINE = 'with a film in the mixer and a keystone on the wall, the Mixer stack source\'s frames carry the film and are square';
 
@@ -544,8 +564,18 @@ async function stackLines() {
   await page.getByTestId('live-add-key').fill(SECRET);
   await page.getByTestId('live-add-save').click();
   await page.waitForTimeout(250);
+  // What drew while the stream ran, for the moving line's detail: the
+  // plate's frames and the film's own clock. A frozen stream on a Mac (red on
+  // this PR's first run, 61 frames all with the bar in column 7) says by
+  // these whether the stream stopped taking pictures or the film or the plate
+  // stopped making new ones.
+  const clocks = () => page.evaluate(() => {
+    const v = window.chromaglassDebug?.().film?.video;
+    return { plate: window.chromaglassDebug?.()?.webgpu?.frames ?? null, film: v ? v.currentTime : null, filmFrames: v?.getVideoPlaybackQuality?.().totalVideoFrames ?? null, paused: v ? v.paused : null };
+  });
   const stream = async () => {
     await page.evaluate(() => { const c = window.__liveStub.calls; c.keep = true; c.video = []; });
+    const before = await clocks();
     // Go live asks once more (the panel's lines above) and forgets the ask
     // after five seconds, which a software plate's page, a few frames a
     // minute, can spend between two of Playwright's presses: so both presses
@@ -565,9 +595,12 @@ async function stackLines() {
     // Two keyframes in: the stream asks for one every two seconds, and the
     // frames after the second are of a canvas drawn since Go live.
     await until(page, () => window.__liveStub.calls.video.filter(v => v.key).length >= 2, undefined, 60_000);
+    const after = await clocks();
     await page.getByTestId('live-stop').click();
     await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
-    return page.evaluate(async () => {
+    const d = (k) => (before[k] === null || after[k] === null ? '?' : after[k] - before[k]);
+    const during = `while it was live the plate drew ${d('plate')} frames and the film's clock went ${typeof d('film') === 'number' ? d('film').toFixed(2) : '?'} s, ${d('filmFrames')} of its frames${after.paused ? ', paused' : ''}`;
+    return { during, ...(await page.evaluate(async () => {
       const { video, desc } = window.__liveStub.calls;
       window.__liveStub.calls.keep = false;
       const pk = video.filter(v => v.output === 'landscape');
@@ -581,13 +614,37 @@ async function stackLines() {
       if (k < 0 || !d) return { error: `${pk.length} packets, ${k < 0 ? 'no keyframe' : 'no decoder configuration'}` };
       const hex = (n) => n.toString(16).padStart(2, '0');
       let first = null, last = null, firstTs = 0, lastTs = 0, n = 0, error = null;
+      // The bar's third (row 7 of the 9) of every frame decoded, as 16 mean
+      // colours, for the moving line (37x-4d-7): the strip alone, so the read
+      // is a ninth of a frame's.
+      const trail = [];
+      let strip = null, rowError = null;
+      const rowOf = (f) => {
+        const w = f.displayWidth, h = f.displayHeight, y0 = Math.floor((7 * h) / 9), sh = Math.floor((8 * h) / 9) - y0;
+        if (strip?.canvas.width !== w || strip.canvas.height !== sh) strip = new OffscreenCanvas(w, sh).getContext('2d', { willReadFrequently: true });
+        strip.drawImage(f, 0, y0, w, sh, 0, 0, w, sh);
+        const px = strip.getImageData(0, 0, w, sh).data, row = [];
+        for (let gx = 0; gx < 16; gx++) {
+          const x0 = Math.floor((gx * w) / 16), x1 = Math.floor(((gx + 1) * w) / 16);
+          let r = 0, g = 0, b = 0, m = 0;
+          for (let y = 0; y < sh; y += 2) for (let xx = x0; xx < x1; xx += 2) { const i = (y * w + xx) * 4; r += px[i]; g += px[i + 1]; b += px[i + 2]; m++; }
+          row.push([r / m, g / m, b / m]);
+        }
+        trail.push({ ms: f.timestamp / 1000, row });
+      };
       const dec = new VideoDecoder({
-        output: (f) => { n++; if (!first) { first = f; firstTs = f.timestamp; return; } last?.close(); last = f; lastTs = f.timestamp; },
+        output: (f) => {
+          n++;
+          try { rowOf(f); } catch (e) { rowError ??= `reading the bar's row: ${e}`; f.close(); return; }
+          if (!first) { first = f; firstTs = f.timestamp; return; }
+          last?.close(); last = f; lastTs = f.timestamp;
+        },
         error: (e) => { error = String(e); },
       });
       dec.configure({ codec: `avc1.${hex(d[1])}${hex(d[2])}${hex(d[3])}`, description: d });
       for (const p of pk.slice(k)) dec.decode(new EncodedVideoChunk({ type: p.key ? 'key' : 'delta', timestamp: Math.round(p.ts * 1000), data: p.data }));
       await dec.flush().catch((e) => { error ??= String(e); });
+      if (rowError) { first?.close(); last?.close(); return { error: rowError }; }
       if (!first) return { error: error ?? 'nothing decoded' };
       if (!last) { last = first; lastTs = firstTs; first = null; }
       const gridOf = (frame) => {
@@ -608,9 +665,10 @@ async function stackLines() {
         return { w, h, cols, rows, grid };
       };
       const out = { ...gridOf(last), frames: n, packets: pk.length, spanMs: (lastTs - firstTs) / 1000 };
-      out.first = first ? gridOf(first) : out;
+      first?.close();
+      out.trail = trail;
       return out;
-    });
+    })) };
   };
 
   // The plate itself, read in the frame task that drew it (`grabFrame`, the

@@ -6943,6 +6943,18 @@ socket in the check) and Art-Net in, and count real packets for a second each: n
 then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
 Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.
 
+### 34a-8. The YouTube channel, linked from the landing page (2026-11-08)
+
+Asked: the owner, on 2026-11-08, the day six films went public on the channel: the homepage did
+not link to it. A visitor deciding whether to press Play free learns more from a minute of a look
+moving to a 1920s record than from any still on the page. Shipped: a YouTube link in the landing
+header beside Sign in (a thumb's height, on the first screen of a phone upright and on its side),
+a line under the looks ("Watch the looks move to 1920s records"), and one in the footer, all to
+the channel's handle `@Chromaglassart` in a new tab. The landing is one responsive page, so the
+phone version is the same markup. Measured: `npm run signin` 11b now asserts the header link's
+href, new tab, height and place on the first screen at 1024×768, 390×844 and 844×390; before this
+change it reads "YouTube link missing" at all three, after it reads "ok".
+
 ## 35. Clear controls: on reads on, one name for one thing
 
 ### 35a. One look for on, every name unique (2026-10-24)
@@ -11101,6 +11113,34 @@ model cannot reach one, the PR says what it reached and asks.
     0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
     link for seconds (37x-4c's item).
 
+#### 37x-4d-7. The moving line read a looping bar on two frames
+
+  - **37x-4d-7. The moving line read a looping bar on two frames (shipped 2026-11-09).**
+    Found on the moiré pack PR's run: CI's fifth Mac shard red on "the Plate source's
+    stream moves with the film" with "bar at column 6 then 6, 2.45 s apart", green on the
+    re-run, in a PR that touched nothing in the stream. The test film's bar loops over
+    columns 2 to 13 every 45 frames of Chromium's fake camera, and the line compared the
+    first and the last frame decoded: two frames a whole number of loops apart read the
+    same column on a moving stream. The camera keeps its own pace, not the packets'
+    clock, so no fixed span avoids it. Now the page reads the bar's row on every frame
+    decoded and `barMoves` (`scripts/liveshowstack.mjs`) asks for a second or more, the
+    bar in two or more columns in each half of it (two anywhere would pass a stream that
+    froze after a moment), and two or more columns of travel forward (a still bar across
+    two cells flickers between them as the encoder's noise changes, back as often as
+    forward: the check's review). Since the line is skipped in software, the run first
+    proves the judgement on streams made up from the film and read by the same column
+    reader (camera 10 to 60 frames a second, stream 5 and 30, spans 1 to 4 s, three
+    starting frames): 36988 streams, every moving one passes; red are every frozen one,
+    every one frozen a third in, every flickering frozen one, every one with no bar and
+    every 0.9 s one; and 3182 of the moving ones (9%) were read as still by first against
+    last. Each of the four conditions taken out turns the proof red. Left: a stream that
+    froze in the second half of its span can pass.
+    Its first Mac run was red on a stream that really did not move: 61 frames over 2.24 s,
+    the bar in column 7 on every one (first against last would have been red on it too).
+    So the line now also prints what drew while the stream was live (the plate's frames,
+    the film's clock and frames) and the strip's read of the last frame against the whole
+    frame's, so the next red says whether the stream, the plate or the film stood still.
+
 #### 37x-4d-6. The stream's frames were black
 
   - **37x-4d-6. The stream's frames were black (shipped 2026-10-31).** Found writing
@@ -12064,6 +12104,58 @@ and 22 of 22 mutants (the large still read from its JPEG header, the still kept 
 phones, the song action's modes and kicks), the page's own still rule on the real
 `PadPictureSender`; `npm run songs` 25/25 (the pour on the second drop fires on the
 drop's first frame and no sooner, through the runtime's own reading, `songShowTime`).
+
+## 37x-10. The song's title painted as ink, then swept away (2026-11-08), with 37x-10d
+
+The owner's words of 2026-11-07, replacing a lower third: "let titles get painted on as
+ink and then swept away"; and on 2026-11-08, during the first live album show, "build the
+proper wash-away now". Built by Claude against the check written first
+(`npm run inktitle`, #695), its seven ids taken out of `--owed` together.
+
+**What it is.** When the identified song changes (`TrackIdentity`, 14z) and the Title
+switch is on, `inkTitleCue` (src/lib/inkTitle.ts) gives one title a song, keyed by its
+isrc, else artist and title, clipped at 40 characters. `inkTitleMask` rasterises the
+title and artist once, two rows (the artist at 0.68 of the title's height), in a 900-weight
+sans on an OffscreenCanvas at the solver's own N, rows turned over so row 0 is the plate's
+bottom; the size is fitted to the mask's own ink (the font's advance and its letters'
+ink differ by a side bearing, and at 192 cells that was 0.849 against the 0.85 bar), then
+the mask is shifted by whole cells so its middle lands at `inkTitleY`, inside the wall's
+square. `PlateSolver.pourInk` (gpu/fluid/inputs.ts, kernel `pourInk` in wgsl/splat.ts)
+takes the mask as an r8unorm texture, samples it onto N with area taps as the video pour
+samples its frame, writes the dye's delta and folds it through `foldDye` (pulled out of
+`foldDeltas`, so Oil Bodies shares the ink as any dye), adding `INK_TITLE_DENSITY` (1, a
+drop's depth) where coverage is 1. A plate without the WebGPU solver lays the mask at L
+through `addDensity`. Then `inkTitleWash` adds, over the title's rows and a margin one
+eddy tall, a drift across the plate and stirring cells a sixth of the plate wide from a
+stream function (so the push neither piles liquid up nor thins it), the cells turning
+and travelling; the stirring waits 5.5·(1 − dial) s, comes in over 1.5 s at the dial's
+bottom to 0.4 s at its top, runs 10 s and dies away. Nothing fades the title: the dye
+stays as colour. The frame loop's side is src/lib/inkTitleRun.ts (`queueInkTitle`,
+`stepInkTitle`, one call a step that returns at once when no title is up), so
+LiquidVisualizer.tsx shrank by 2,162 bytes (the old canvas pour went) and App.tsx is
+untouched: the cue's hook (`app/useInkTitle.ts`) is called from `useRemote`, beside the
+remote's `pour-text` message.
+
+**37x-10d.** The visualizer's `pourText` (the title card of a song show, its sign-off, the
+check hook, and 37x-10c's `pour-text` words from the phone, the relay and the assistant)
+now queues its rows into the same ink and wash instead of drawing a picture into the
+CPU's arrays at 192². Its `columns` option had no caller and went.
+
+**The dials** (`inkTitle` false, `inkTitleColor` '' for the look's first colour,
+`inkTitleSize` 0.5, `inkTitleY` 0.5, `inkTitleSweep` 0.5; rig keys, no look sets them,
+Evolve leaves them): Settings → Logo & Titles (switch, the look's ink or a picker, Size,
+Height, Sweep); Sweep, Size and Height on MIDI and the desk's pins; the phone's Title
+switch with its Sweep (`components/phone/PhoneInkTitle.tsx`) on the More sheet and the
+remote's Controls.
+
+**Measured** (`npm run inktitle`, SwiftShader): 7 of 7; the mask 54% clear and 32% solid at
+0.5, widths 0.25 → 0.86, size 0 0.063 tall, middles 0.20, 0.50, 0.80; lands at 0.944 with
+strokes 0.823 against gaps 0.024 and 875.8 of 869.8 poured; at the default 0.919 at 3 s and
+gone at 6 s, at the top gone at 1.5 s, at 0.01 0.900 at 6 s; kept 873 to 985 of 870. A side
+run of the same arms on the thin gap, which every look opens on and where a pushed cell is
+brought up to the push and no faster: 0.949 landing, 0.915 at 3 s, gone at 8.5 s and 1 s,
+870 of 870 kept. The first strengths, half these, passed on the old plate and left the
+title at 0.317 after 12 s on the thin one; 37x-10e puts thin arms in the check.
 
 ## 14c-4k, 14c-governor, 14b-120, 14c-readout, H2c-10. Wave 4 ladder, wall pacing, readout and grid32 (2026-11-07)
 

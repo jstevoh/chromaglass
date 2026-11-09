@@ -2478,6 +2478,24 @@ On the live site, signed out, in a private window:
 Bad: a second account for the same person, an error saying the provider is not enabled, or the Mac app's window
 stuck on "Finish in your browser" after the browser signed in.
 
+## 114. Song titles painted as ink, then swept away (PLAN 37x-10)
+
+The lab measures a still plate; how a look's own flow treats a title is taste, and only the
+Mac's film shows the letters at the solver's full grid.
+
+1. Settings → **Logo & Titles** → **Song titles as ink** on. Play a song the ear names (or
+   pour words from the phone remote's **Pour words**), on two or three looks: a calm one
+   (Classic), a busy one, and a dark one.
+2. The title should land as crisp ink in the look's first colour, readable for about three
+   seconds at the default **Title Sweep**, then drift and break up into the show's own
+   colour by about ten. **Title Sweep** at the top: gone in a second or two. Near the bottom:
+   it drifts, readable, for many seconds.
+3. **Title Size** small to the plate's width, a long title shrinking to fit; **Title Height**
+   moves it up and down; the phone's **Title** switch turns it on and off.
+4. Bad: soft or blocky letters (poured at the wrong grid), a title that fades rather than
+   moves, a wash that shakes the whole plate, a busy look that tears the title apart before
+   it can be read.
+
 ## 116. Song titles poured as ink from the phone (PLAN 37x-10c)
 
 `npm run assistant` and `npm run remotemix` hold the message: what the phone's box and the
