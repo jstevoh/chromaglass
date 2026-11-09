@@ -6943,6 +6943,18 @@ socket in the check) and Art-Net in, and count real packets for a second each: n
 then Home over the Pro key. With the gate: none 0/0/0, Pro 10 OSC, 36 Art-Net out, 10 Art-Net in,
 Home 0/0/0. On main's server the same run reads free 10/37/10 and Home 10/37/10, and 4c fails.
 
+### 34a-8. The YouTube channel, linked from the landing page (2026-11-08)
+
+Asked: the owner, on 2026-11-08, the day six films went public on the channel: the homepage did
+not link to it. A visitor deciding whether to press Play free learns more from a minute of a look
+moving to a 1920s record than from any still on the page. Shipped: a YouTube link in the landing
+header beside Sign in (a thumb's height, on the first screen of a phone upright and on its side),
+a line under the looks ("Watch the looks move to 1920s records"), and one in the footer, all to
+the channel's handle `@Chromaglassart` in a new tab. The landing is one responsive page, so the
+phone version is the same markup. Measured: `npm run signin` 11b now asserts the header link's
+href, new tab, height and place on the first screen at 1024×768, 390×844 and 844×390; before this
+change it reads "YouTube link missing" at all three, after it reads "ok".
+
 ## 35. Clear controls: on reads on, one name for one thing
 
 ### 35a. One look for on, every name unique (2026-10-24)
