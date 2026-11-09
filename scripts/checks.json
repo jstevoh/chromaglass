@@ -1439,6 +1439,23 @@
       ]
     },
     {
+      "name": "A song's title stays readable on a busy look's thin gap, then is rinsed away",
+      "shard": "lab4",
+      "run": "npm run inktitle -- --thin",
+      "timeout": 16,
+      "why": [
+        "PLAN 37x-10g and 37x-10e: in the private rehearsal of the first live stream the",
+        "title cards were smeared by the looks' own flow in about a second. On the thin",
+        "gap every look opens on, the title now lands on a pad of thick clear liquid and",
+        "the wash rinses it with clear liquid that fingers through the pad. Through the",
+        "app's own stepInkTitle on the lab's solver: under a lively flow (whose control,",
+        "the title in thin ink, reads under 0.6 at 1 s) it reads 0.7 at 2.5 s and 0.3 or",
+        "worse by 12 s; it lands at 0.8; the rinse takes it by 2 s at the top and leaves",
+        "it at 0.7 at 6 s at 0.01; every arm keeps 90% of its dye; the pad is there. About",
+        "21 s of plate, ten minutes on SwiftShader, in its own entry so lab3 keeps its pace."
+      ]
+    },
+    {
       "name": "A bubble's middle is the plate",
       "shard": "lab2",
       "run": "npm run bubblelook",

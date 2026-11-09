@@ -176,6 +176,8 @@ export class WebGPUFluid extends FluidCover {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
+      ['inkSpecies', [RGBA32], false],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       /*
