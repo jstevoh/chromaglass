@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
-import { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
+import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /*
  * The channel the looks are filmed for (PLAN 34a-8). The owner asked, on
@@ -91,6 +91,20 @@ const STEPS: { n: string; title: string; body: string }[] = [
   { n: '2', title: 'Pick a look', body: 'Dye in water, oil, soap film or ferrofluid over a magnet. Every look is a different liquid.' },
   { n: '3', title: 'Stir it', body: 'Drop dye, blow, press, or drag a magnet under the glass. The liquid does the rest.' },
   { n: '4', title: 'Put it on the wall', body: 'Send the plate to a TV or projector. In the app, your phone becomes the remote.' },
+];
+
+/*
+  The moiré pack (PLAN.md 45a-2), $15 on Home and in Pro: four of its seven looks, each a frame
+  the app drew on this Mac's GPU two dozen seconds after the look was opened (a still a page
+  load away, like LOOKS above). Kept at 960x600 for a 480x300 box: a pattern of fine lines
+  scaled down in the browser beats against the screen's own pixels, so these are the one set
+  that must not be drawn smaller than twice their box.
+*/
+const MOIRE: { id: string; name: string; line: string }[] = [
+  { id: 'moire-star', name: 'Moiré Star', line: 'Two spoke sheets, one face down, wheeling into diamonds.' },
+  { id: 'moire-ripple', name: 'Moiré Ripple', line: 'Two ring sheets slid apart, every pool of dye bending the fringes.' },
+  { id: 'moire-press', name: 'Colour Press', line: 'Printer\'s screens at their angles, beating in colour over the dye.' },
+  { id: 'moire-tunnel', name: 'Zoom Tunnel', line: 'Two log-polar grids, one turning, spiralling inward for ever.' },
 ];
 
 const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: string }[] = [
@@ -332,6 +346,51 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
               </div>
             </div>
           ))}
+        </div>
+        {/* The moiré pack (PLAN.md 45a-2): an add-on to Home, not a tier, so it sits under the
+            cards rather than beside them. Its checkout files the pack onto the Home key held by
+            the email it is bought with, hence the line about the email. On a phone the pictures
+            are a row to swipe, as the looks above are. */}
+        <div data-cg-landing-moire="" className="mt-4 rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-[16px] font-medium">The Moiré Pack</h3>
+            <span className="font-mono text-[13px] text-text-2">$15 on Home · in Pro</span>
+          </div>
+          <p className="mt-2 max-w-[44rem] text-[14px] leading-snug text-muted">
+            Seven looks with two printed transparencies on the light, stacked the way a light show crew stacks them on the overhead:
+            their lines cross into fringes that turn, slide and breathe with the song, and every drop of liquid under them bends the pattern.
+            Buy it with the email your Home key is under and it joins that key; Pro has it already. Anyone can try it for a minute in the app.
+          </p>
+          <ul className="-mx-5 mt-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
+            {MOIRE.map((l) => (
+              <li key={l.id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-lg border border-border min-[560px]:w-auto">
+                <img
+                  src={`/landing/moire/${l.id}.webp`}
+                  alt={`${l.name}: ${l.line}`}
+                  width={480}
+                  height={300}
+                  loading="lazy"
+                  decoding="async"
+                  className="block aspect-[8/5] w-full object-cover"
+                />
+                <div className="px-3 pb-3 pt-2">
+                  <p className="text-[13px] font-medium">{l.name}</p>
+                  <p className="mt-0.5 text-[12px] leading-snug text-muted">{l.line}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {CHECKOUT_MOIRE_URL && (
+            <a
+              href={CHECKOUT_MOIRE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-cg-landing-pack="moire"
+              className={`${btnGhost} mt-5 w-full sm:w-auto`}
+            >
+              Buy the Moiré Pack, $15
+            </a>
+          )}
         </div>
         {/* What a rig needs to know, on a page of its own (PLAN.md 34a-7). */}
         <p data-cg-landing-pro="" className="mt-4 text-[14px] leading-relaxed text-text-2">

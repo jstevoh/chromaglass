@@ -2444,3 +2444,18 @@ only the wall can say whether the seven looks read as the real transparencies do
 4. Bad: the screen's own shimmer (a grain that crawls when nothing moves), fringes that do
    not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
    45a-5).
+
+## 112. Saffron Lace beside the owner's lace still (PLAN 28l)
+
+The look menu (or the phone's Looks sheet) → **Saffron Lace**. Beside the still the owner
+sent on 2026-11-07 (yellow lace, lavender, cobalt, coral):
+
+1. Within a few seconds the yellow film tears into lace by itself, and keeps breaking: veins
+   bead into rows of drops (the spatter).
+2. The lace reads yellow, not amber or brown, over the white and over the lavender wash.
+3. The holes show the pools' colours: lilac on the right, cobalt and icy blue on the left,
+   coral low in the middle.
+4. A kick opens the lace a little (the press); the cobalt pool's soap opens fresh holes on
+   the bass; the coral pool's oil thickens the film where it lands.
+5. Bad: a flat yellow sheet that never tears, lace that is all rings (28l-3), or the pools
+   so deep under the film that they read navy, red or brown.
