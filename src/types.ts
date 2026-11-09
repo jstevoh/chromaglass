@@ -1,5 +1,6 @@
 import type { SourceName } from './lib/audioFeatures';
 import type { HitFeature } from './lib/hitSource';
+import type { NoteFeature } from './lib/noteVoices';
 
 export const BLEND_MODES = ['screen', 'lighter', 'exclusion', 'multiply', 'overlay'] as const;
 export type BlendMode = (typeof BLEND_MODES)[number];
@@ -207,7 +208,7 @@ export type SceneFeature =
  * (`lib/hitSource.ts`). Its own source because its features are its own
  * names, and Sound Impact is its master too.
  */
-export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape';
+export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'notes' | 'shape';
 
 /**
  * One patch cord: a thing that changes, on a thing it changes.
@@ -236,7 +237,7 @@ export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
   /** A room/film feature, an audio one or a named source, depending on the source. */
-  feature: SceneFeature | AudioFeature | SourceName | HitFeature;
+  feature: SceneFeature | AudioFeature | SourceName | HitFeature | NoteFeature;
   /**
    * Any numeric setting — the same list a MIDI fader can learn — or, on a
    * cord aimed at an area, what the hand does there (`AreaTarget`).

@@ -73,6 +73,7 @@ export function useControllers({
       selectDye,
       // Every note plays the envelopes, whatever else that pad is for.
       noteStruck: (velocity) => wallRef.current?.fireEnvelopes?.(velocity),
+      noteVoice: (e, target) => (visualizerRef.current ?? wallRef.current)?.noteVoice?.(e, target),
     },
     {
       activePresetId,
