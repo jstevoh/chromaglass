@@ -72,7 +72,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
@@ -260,6 +260,7 @@ interface LiquidVisualizerProps {
 }
 
 import type { LiquidVisualizerHandle } from './visualizerHandle';
+import { rgbToHex } from './layerSwatch';
 
 /** Held to 0..1 (a score of the frame loop's dials). */
 const c01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -268,23 +269,6 @@ export type { LiquidVisualizerHandle };
 
 // ─── React Component ─────────────────────────────────────────────────
 
-/**
- * A layer's mean dye as a swatch.
- *
- * Normalised by its own brightest channel rather than shown raw: a layer with
- * a little dye on it averages to almost black across the whole grid, and a row
- * of near-black squares says nothing. Scaling to the hue keeps a quiet layer
- * legible while `fill` carries how much is actually there.
- */
-function rgbToHex(r: number, g: number, b: number): string {
-  const peak = Math.max(r, g, b);
-  const k = peak > 0.001 ? 0.85 / peak : 0;
-  const to = (v: number) => {
-    const n = Math.round(c01(v * k) * 255);
-    return n.toString(16).padStart(2, '0');
-  };
-  return peak <= 0.001 ? '#111111' : `#${to(r)}${to(g)}${to(b)}`;
-}
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
@@ -1157,6 +1141,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const layer = g.layer ?? activeLayerRef.current;
     const af = fluidsRef.current[layer];
     if (!af || drainFrameRef.current > 0) return;
+    recordRemoteHold(remoteHoldsRef.current, layer, g.id, g.x, g.y);
     const S = GRID_SIZE;
     const kToolRaw = toolAmountRef.current;
     const kTool = kToolRaw * kToolRaw;
@@ -1334,6 +1319,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * solver steps read it, and keep the magnet there after the hand lets go.
    */
   const magnetHandRef = useRef<{ x: number; y: number; at: number } | null>(null);
+  const remoteHoldsRef = useRef<RemoteHoldMap>(new Map());
   /** Where the lead plate's look put its magnet last frame, to see it moved (see magnetFor). */
   const magnetLookRef = useRef<{ x: number; y: number } | null>(null);
   /** The magnet's own slow walk when nobody is holding it: where along its path. */
@@ -3218,6 +3204,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const hands: { hand: Hand; primary: boolean }[] = [];
           if (isMouseDownRef.current) hands.push({ hand: { ...mousePosRef.current, stroke: strokeLastRef.current, clock: dropClockRef.current, laid: dropLaidRef.current, blowDir: blowDirRef.current }, primary: true });
           for (const h of extraHandsRef.current.values()) hands.push({ hand: h, primary: false });
+          syncBoilHolds(fluidsRef.current, activeLayerRef.current, drainFrameRef.current, hands, remoteHoldsRef.current);
           for (const f of fluidsRef.current) f?.markHand();
           for (const { hand, primary } of hands) {
             /*
@@ -5415,6 +5402,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       mazeKickRef.current = { env: 0, at: 0 };
       magnetWalkAtRef.current = 0;
       magnetHandRef.current = null;
+      remoteHoldsRef.current.clear();
       handoffRef.current = null;
       /*
         The back plate's own look (§16a), let go of. A render lays its look on
