@@ -25,18 +25,19 @@ interface SignInScreenProps {
 getFirebaseAuth();
 
 /**
- * Sign in with Apple is not offered (the owner, 2026-10-24: "I don't want to do
- * the apple developer account or accept logins from them. maybe later - but not
- * now."). The provider was never finished on the live project either: Apple's
- * half needs a Services ID and a key from a paid Apple Developer account, which
- * the project does not have, so the button offered a sign-in that could not
- * complete. The code stays
- * behind this one switch rather than being deleted, because the iPhone app
- * brings it back (App Store guideline 4.8 asks for it beside Google's; PLAN
- * 23.15), and `npm run signin` line 4 holds the switch off: it fails if the
- * button is drawn.
+ * Sign in with Apple, beside Google's (PLAN 23.15; the owner, 2026-11-08:
+ * "should we add the apple login option as well, now that we have a developer
+ * ID?"). It was held off on 2026-10-24 ("maybe later - but not now") because
+ * Apple's half needs a Services ID and a key from a paid Apple Developer
+ * account, which the project did not have then, so the button offered a
+ * sign-in that could not complete. The account exists now (the Mac app is
+ * signed with it), and the iPhone app needs this button anyway: App Store
+ * guideline 4.8 asks for Sign in with Apple in any app that offers Google's.
+ * The switch stays, so the button can be taken off again in one line, and
+ * `npm run signin` line 4 holds it on: it fails if Apple is not offered or does
+ * not reach Apple's provider.
  */
-const APPLE_SIGN_IN = false;
+const APPLE_SIGN_IN = true;
 
 /**
  * The sign-in's buttons and the emailed-link form, without the screen around
@@ -63,7 +64,8 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
   // browser, on the app's own server, which hands the licence to the app (the
   // gate, AppLicenceGate.tsx, sees it arrive).
   const inApp = isDesktopApp();
-  const [inBrowser, setInBrowser] = useState(false);
+  // Which provider the Mac app sent to the browser, so only its button says "Finish in your browser".
+  const [inBrowser, setInBrowser] = useState<'google.com' | 'apple.com' | null>(null);
   const [method, setMethod] = useState<'link' | 'password'>(inApp ? 'password' : 'link');
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [password, setPassword] = useState('');
@@ -82,7 +84,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setError((err as { message?: string })?.message || 'Sign-in could not complete.');
+          setError(authErrorMessage(err));
         }
       });
     return () => {
@@ -102,7 +104,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
         return;
       }
-      setError((err as { message?: string })?.message || 'Could not sign in with provider.');
+      setError(authErrorMessage(err));
     }
   };
 
@@ -191,7 +193,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
             onClick={() => {
               if (!inApp) { void handleProvider('google.com'); return; }
               openSignInInBrowser();
-              setInBrowser(true);
+              setInBrowser('google.com');
             }}
             className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15 active:bg-white/20"
           >
@@ -205,26 +207,35 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn }) => {
                 d="M12.18 22c4.32 0 7.95-1.43 10.6-3.88l-5.18-3.62c-1.43.96-3.26 1.53-5.42 1.53-4.17 0-7.7-2.81-8.96-6.6H-2.1v3.73C.54 18.4 5.94 22 12.18 22z"
               />
             </svg>
-            <span>{inApp ? (inBrowser ? 'Finish in your browser…' : 'Continue with Google in your browser') : 'Continue with Google'}</span>
+            <span>{inApp ? (inBrowser === 'google.com' ? 'Finish in your browser…' : 'Continue with Google in your browser') : 'Continue with Google'}</span>
           </button>
-          {inApp && (
-            <p data-cg-signin-in-browser="" className="text-center text-[11px] leading-snug text-neutral-400">
-              Google's sign-in and the emailed link finish in your browser. This window opens the show by itself once you have signed in there.
-            </p>
-          )}
 
           {APPLE_SIGN_IN && (
             <button
               type="button"
               data-cg-signin-provider="apple.com"
-              onClick={() => handleProvider('apple.com')}
+              onClick={() => {
+                // The Mac app sends Apple to the browser for the reason it sends
+                // Google there: the app opens any outside address in the real
+                // browser (desktop/main.js), so Apple's popup would never come
+                // back to this window. The browser's page has this same button.
+                if (!inApp) { void handleProvider('apple.com'); return; }
+                openSignInInBrowser();
+                setInBrowser('apple.com');
+              }}
               className="flex min-h-[44px] w-full items-center justify-center gap-2.5 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-white/15 active:bg-white/20"
             >
               <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
               </svg>
-              <span>Continue with Apple</span>
+              <span>{inApp ? (inBrowser === 'apple.com' ? 'Finish in your browser…' : 'Continue with Apple in your browser') : 'Continue with Apple'}</span>
             </button>
+          )}
+
+          {inApp && (
+            <p data-cg-signin-in-browser="" className="text-center text-[11px] leading-snug text-neutral-400">
+              {APPLE_SIGN_IN ? "Google's and Apple's sign-in" : "Google's sign-in"} and the emailed link finish in your browser. This window opens the show by itself once you have signed in there.
+            </p>
           )}
 
           <button
