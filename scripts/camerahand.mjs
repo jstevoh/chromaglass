@@ -31,7 +31,8 @@
  *      the travel, 4x within half, and a value goes out and back unchanged.
  *   3. The arrows pan by the frame, not the plate (a tap at 8x is half a tap
  *      at 4x), a Shift is a frame, a held key is slower than a tap, the aim
- *      stays on the plate; and the app binds them only while the closeup is in.
+ *      stays on the plate; and the key handler (`macroKey`) pans only while
+ *      the closeup is in, from where the camera looks, and still zooms on + and -.
  *   4. Music Sync's label is true: through a song in Hold at Frame Sway 0 the
  *      shot is identical at Sync 0 and 1, and with Frame Sway up it is not.
  *      The panel greys the slider with that reason in exactly those two cases.
@@ -50,7 +51,7 @@ const out = 'node_modules/.cache/camerahand-lib.mjs';
 await build({
   stdin: {
     contents: [
-      "export { MacroCamera, holdRate, panAim } from './src/lib/macroCamera.ts';",
+      "export { MacroCamera, holdRate, panAim, macroKey } from './src/lib/macroCamera.ts';",
       "export { LEARNABLE_SETTINGS, curveOf, handValueAt, travelOf } from './src/lib/midi.ts';",
     ].join('\n'),
     resolveDir: '.', loader: 'ts',
@@ -114,10 +115,22 @@ check('3b. Shift moves a whole frame, and a held key is much slower than a tap',
 const edge = L.panAim({ x: 0.99, y: 0.01 }, { dx: 1, dy: -1 }, 2, { big: true });
 check('3c. the aim stays on the plate', edge.x === 1 && edge.y === 0, `${edge.x}, ${edge.y}`);
 check('3d. up is up and down is down: the aim\'s y grows downward, as the plate\'s uv does', L.panAim(mid, { dx: 0, dy: -1 }, 4).y < 0.5 && L.panAim(mid, { dx: 0, dy: 1 }, 4).y > 0.5);
+const press = (key, cur, extra = {}) => {
+  const got = { zoom: [], aim: [], prevented: false };
+  L.macroKey({ key, repeat: false, shiftKey: false, preventDefault: () => { got.prevented = true; }, ...extra }, cur, { macroCentre: () => ({ x: 0.2, y: 0.8 }) },
+    (d) => got.zoom.push(d), (x, y) => got.aim.push([x, y]));
+  return got;
+};
+const inHold = { macroZoom: 4, macroCamera: 'hold', macroAimX: 0.5, macroAimY: 0.5 };
+const right = press('ArrowRight', inHold), up = press('ArrowUp', inHold);
+check('3e. an arrow with the closeup in pans the aim by a tap and keeps the page from scrolling',
+  right.aim.length === 1 && Math.abs(right.aim[0][0] - 0.5 - tap4) < 1e-9 && right.aim[0][1] === 0.5 && right.prevented && up.aim[0][1] < 0.5);
+check('3f. with the plate at 1x the arrows do nothing and are left to the page', (() => { const g = press('ArrowLeft', { ...inHold, macroZoom: 1 }); return g.aim.length === 0 && !g.prevented; })());
+check('3g. in Follow or Auto a pan starts from where the camera is looking, not the stored aim', (() => { const g = press('ArrowRight', { ...inHold, macroCamera: 'follow' }); return Math.abs(g.aim[0][0] - 0.2 - tap4) < 1e-9 && Math.abs(g.aim[0][1] - 0.8) < 1e-9; })());
+check('3h. + and - still zoom', press('+', inHold).zoom[0] === 1 && press('=', inHold).zoom[0] === 1 && press('-', inHold).zoom[0] === -1 && press('_', inHold).zoom[0] === -1);
 const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-check('3e. the app pans on the four arrows, only with the closeup in, through the aim Alt-drag uses',
-  /ArrowLeft: \[-1, 0\], ArrowRight: \[1, 0\], ArrowUp: \[0, -1\], ArrowDown: \[0, 1\]/.test(app)
-  && /if \(arrow && \(settingsRef\.current\.macroZoom \?\? 1\) > 1\.05\)/.test(app) && /aimMacro\(to\.x, to\.y\)/.test(app));
+check('3i. the app hands its keys to macroKey with the settings, the visualizer, the zoom and the aim',
+  /macroKey\(e, settingsRef\.current, visualizerRef\.current, zoomMacro, aimMacro\)/.test(app));
 
 // ── 4. Music Sync's label ──────────────────────────────────────────────
 const song = (sway, sync) => {

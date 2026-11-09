@@ -751,3 +751,30 @@ export function panAim(
   const step = frame * (how.big ? 1 : how.repeat ? 1 / 45 : 0.25);
   return { x: clamp(from.x + dir.dx * step, 0, 1), y: clamp(from.y + dir.dy * step, 0, 1) };
 }
+
+const ARROWS: Record<string, [number, number] | undefined> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+/**
+ * The closeup's keys: + and - zoom, the arrows pan (`panAim`), only with the
+ * closeup in for the arrows. The pan is the aim Alt-drag moves, from where the
+ * camera is looking now, so a Follow or an Auto pans on from its own frame
+ * rather than jumping back to a stale aim. Kept here and not in the app's key
+ * handler, which is at its size ceiling (`npm run sizes`).
+ */
+export function macroKey(
+  e: { key: string; repeat: boolean; shiftKey: boolean; preventDefault(): void },
+  cur: { macroZoom?: number; macroCamera?: CameraMode; macroAimX?: number; macroAimY?: number },
+  view: { macroCentre: () => { x: number; y: number } | null } | null,
+  zoom: (dir: 1 | -1) => void,
+  aim: (x: number, y: number) => void,
+): void {
+  if (e.key === '+' || e.key === '=') zoom(1);
+  if (e.key === '-' || e.key === '_') zoom(-1);
+  const arrow = ARROWS[e.key];
+  if (!arrow || (cur.macroZoom ?? 1) <= 1.05) return;
+  e.preventDefault();
+  const aimed = { x: cur.macroAimX ?? 0.5, y: cur.macroAimY ?? 0.5 };
+  const here = (cur.macroCamera ?? 'hold') === 'hold' ? aimed : view?.macroCentre() ?? aimed;
+  const to = panAim(here, { dx: arrow[0], dy: arrow[1] }, cur.macroZoom ?? 1, { repeat: e.repeat, big: e.shiftKey });
+  aim(to.x, to.y);
+}
