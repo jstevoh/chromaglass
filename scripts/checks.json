@@ -481,14 +481,17 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs",
+      "run": "npm run rungs -- --owed=120hz",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
         "and nothing looked. And the lines written ahead of Wave 4",
         "(scripts/rungs-owed.mjs): 14c-4k, 14c-governor, 14b-120, 14c-readout and",
-        "H2c-10, owed until each ships."
+        "H2c-10, all shipped. And the plate on a 120 Hz screen (46e / 14aa-5,",
+        "scripts/rungs-120.mjs): the real draw gate, step clock and governor",
+        "replayed at 120 Hz; Poster's two lines owed until the build, which",
+        "takes 120hz out of --owed, and the controls green throughout."
       ]
     },
     {

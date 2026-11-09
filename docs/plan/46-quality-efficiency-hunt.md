@@ -36,7 +36,7 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
 - **Dropped frames are counted by hand.** `npm run stutter` (Mac only, 14aa-3) counts missed
   refreshes caught up with two steps, on-time two-step frames and climbs undone; it has run
   on three looks. 14aa-5 (the governor's lines are 60 Hz milliseconds, so a 120 Hz display's
-  missed refresh is not seen as one) and 14aa-4 (a climb's cost guessed from cells and
+  missed refresh is not seen as one; its check is written, 46e) and 14aa-4 (a climb's cost guessed from cells and
   pixels) are open, and are Claude's to write checks for first.
 
 ## Items
@@ -81,7 +81,23 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
 - **46d · The hunt's report** (Antigravity, no code): every look through `npm run stages` on
   the owner's Mac, and the slowest compiles of `openingtime`, written up as new items here,
   each with its measured share of a frame or of the opening. Claude writes their checks.
-- **46e · 120 Hz frames** (Claude, check first): 14aa-5's governor lines in refreshes, with a
-  replay in `rungs` at 120 Hz; then Antigravity builds it.
+- **46e · 120 Hz frames** (check **written**, `npm run rungs -- --owed=120hz`,
+  `scripts/rungs-120.mjs`; the build is Antigravity's): 14aa-5. The real draw gate, step
+  clock and governor replayed on a 120 Hz screen with the 60 Hz replay's machines. On main,
+  Poster's costs at one miss in eight or five give sixty up after 6.2 to 60 s or never (1135
+  steps drawn two to a frame in three minutes on one seed), where 60 Hz gives it up at
+  4.0 s: a frame that holds the loop three refreshes is 25.0 ms at 120 Hz, on `MISSED_MS`,
+  and Chrome's tenth-of-a-millisecond stamps put half of those under it. Owed: no step
+  skipped and at most 1 % of images held off a step's time after the opening, and sixty
+  given up within 6 s. Controls (green on main, so the fix cannot spend the picture): the
+  light, Classic and feather plates stay even at 120 Hz and keep the rung and step rate they
+  keep at 60 Hz; a governor with every line halved fails them. A one-line sketch passes all
+  of it (a miss is an interval past 1.25 steps; `antigravity/46e-proof-throwaway.diff` in
+  the project's shared files), not the build: the right line is the build's to argue. The
+  build takes `120hz` out of `--owed` in `scripts/checks.json`. Brief row: queue after
+  Antigravity's credits are back (not queued).
+- **46e-2 · Found:** the replay holds the loop for whole refreshes per frame; a browser
+  keeps a frame or two in flight and a ProMotion panel changes its own rate. The Mac's
+  `npm run stutter` on the owner's 120 Hz screen (46c) is what says the model is the app.
 - **46-1 · Found:** 19d-lazy (the first load's script, 527 KB gzipped) waits on 14h's precache
   and its offline line, so it is not in this hunt yet.
