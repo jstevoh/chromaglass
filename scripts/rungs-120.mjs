@@ -17,23 +17,35 @@
  * half a step too long and later draws two steps in one frame, the liquid
  * stopping and then jumping, which is exactly the stutter 14aa-3 took out at
  * 60 Hz. At 60 Hz that interval is 33 ms and plainly past `MISSED_MS`; at
- * 120 Hz it is 25.0 ms, which sits *on* the line, and with the browser's
- * refresh stamps rounded to a tenth of a millisecond about half of those
- * intervals read 24.9 or 25.0 and are not counted. So the share of missed
- * frames that gives the step rate up (`MISS_SHARE`) builds at half speed or
- * never: Poster, 1969's measured costs (the 60 Hz replay in rungs.mjs) at
- * one miss in eight give sixty up after 13.5 s on one seed, after 60 s on
- * another, and on the third never, 1135 frames of two steps in three
- * minutes; at one in five after 6.2 to 12.9 s. At 60 Hz the same machine
- * gives sixty up at 4.0 s every time, with no frame of two steps after the
- * opening.
+ * 120 Hz it is 25.0 ms, *on* the line, and `frameMs > MISSED_MS` does not
+ * count it. A display's vsync is regular to microseconds and three refreshes
+ * are exactly 25 ms, so Chrome's stamps, rounded to a tenth of a millisecond,
+ * read 25.0 every time; only a stamp scattered across a rounding edge reads
+ * 25.1 and is counted. (The first version of this comment said "about half"
+ * are counted. The check-skeptic measured the replay: with no scatter, 7 of
+ * 21,600 three-refresh gaps read over 25, from floating point. Every miss
+ * main counted was a 33 ms one.) So the share of missed frames that gives the
+ * step rate up (`MISS_SHARE`) builds from the rarer four-refresh frames
+ * alone: Poster, 1969's measured costs (the 60 Hz replay in rungs.mjs) at one
+ * miss in eight give sixty up after 13.5 s on one seed, 60 s on another, and
+ * on the third never, 1135 steps drawn two to a frame in three minutes; at
+ * one in five after 6.2 to 12.9 s. With the stamps scattered ±0.05 ms it is
+ * 4.3 to 12.1 s at one in eight, 20 steps skipped on one seed. At ±0.1 ms
+ * main all but passes, so how red main is on the owner's screen depends on a
+ * scatter nobody has measured (46e-2); the build is held to both scatters
+ * here. At 60 Hz the same machine gives sixty up at 4.0 s every time, with no
+ * step skipped after the opening.
  *
  * What the replay is. The real frame loop's three pieces, the real ones:
  * `DrawGate` (offered every refresh's stamp, as `render` in
  * LiquidVisualizer.tsx offers it), `StepClock` (fed the gate's interval, with
  * the visualizer's catch-up cap from `governor.frameMs`), and the governor
  * (fed the interval and the frame's GPU cost, as the visualizer feeds it). A
- * fix in any of the three is seen here. What is modelled is the machine: a
+ * fix in the governor or the step clock is seen here. The gate is offered
+ * one clock, the laptop's, so it draws every frame offered: a fix in its
+ * two-clock path (the wall up, 14b-120) is not this replay's. The catch-up
+ * cap is retyped from the visualizer, so a line reads it from the source and
+ * goes red the day the two differ. What is modelled is the machine: a
  * frame costs its drawing plus its steps (the same costs as the 60 Hz replays
  * in rungs.mjs, so the two are the same machine on two screens), and it holds
  * the loop for as many whole refreshes as that takes. Then, for a machine
@@ -67,16 +79,20 @@
  *
  * Owed (`--owed=120hz`, the convention of rungs-owed.mjs): Poster at 120 Hz
  * fails today, so its two lines print as owed while main's governor still
- * judges a miss as `frameMs > MISSED_MS` with `MISSED_MS = 25`, and are red
- * the day that line changes and they still fail. The controls are not owed:
- * they pass on main, and they are what keep the fix from buying 120 Hz's
- * evenness with the picture. A proof that the owed lines can pass: a
- * one-line change, a miss judged as an interval past a step and a quarter
- * (`frameMs > 1.25 * 1000 / STEP_RATES[this.steps]`), gives sixty up at
- * 4.0 s on all nine Poster runs at 120 Hz with no step skipped and no hold
- * uneven, and keeps all 133 of rungs' other lines and these controls green.
- * That is a sketch for the builder, not the build: what the right line is
- * (the step's time, the refresh, both) is the build's to argue.
+ * has its miss line exactly as it is (`MISSED_MS = 25` and the `missShare`
+ * line, read from the source), and are red the day that line changes and
+ * they still fail. A fix built in the step clock alone leaves that line as it
+ * is, so its PR takes `120hz` out of `--owed` to be judged. The controls are
+ * not owed: they pass on main, and they are what keep the fix from buying
+ * 120 Hz's evenness with the picture.
+ *
+ * Proofs that the owed lines can pass, on all 18 Poster runs: a miss judged
+ * as an interval past a step and a quarter (`frameMs > 1.25 * 1000 /
+ * STEP_RATES[this.steps]`), and the one character `frameMs >= MISSED_MS`.
+ * Both keep every other line green. The second is an honest fix for 120 Hz
+ * only (three refreshes are 25.0 ms there; at 60 Hz no interval is): at
+ * 144 Hz three refreshes are 20.8 ms and still not a miss, which this check
+ * does not replay (46e-3). Which line is right is the build's to argue.
  */
 
 import { readFileSync } from 'node:fs';
@@ -97,11 +113,18 @@ const HOLD_SLACK = 0.06;
  * another (`skipped`) and the images held off one step's time (`uneven`, of
  * `holds`).
  */
-export function replayAt({ QualityGovernor, DrawGate, ladder, start, machine, hz, seconds = 180, seed = 1 }) {
+export function replayAt({ QualityGovernor, DrawGate, ladder, start, machine, hz, seconds = 180, seed = 1, jitter = 0 }) {
   const R = 1000 / hz;
   let x = seed >>> 0;
   const next = () => { x = (x * 1664525 + 1013904223) >>> 0; return x / 2 ** 32; };
-  const stamp = (i) => Math.round(i * R * 10) / 10;
+  // The display's refresh, scattered by `jitter` ms either way (its own seeded stream), then rounded to 0.1 ms as Chrome's stamps are.
+  let y = (seed * 7919 + 17) >>> 0;
+  const wobble = () => { y = (y * 1664525 + 1013904223) >>> 0; return (y / 2 ** 32) * 2 - 1; };
+  const stamps = [];
+  const stamp = (i) => {
+    while (stamps.length <= i) stamps.push(Math.round((stamps.length * R + jitter * wobble()) * 10) / 10);
+    return stamps[i];
+  };
   const g = new QualityGovernor(ladder, start, 0);
   const gate = new DrawGate();
   const clock = new StepClock();
@@ -163,12 +186,25 @@ export function lines120({ line, check, ladderAt, QualityGovernor, DrawGate }) {
   const posters = [];
   for (const share of [1 / 8, 1 / 5, 1 / 3]) for (const seed of [1, 2, 3]) posters.push({ name: `Poster 1 in ${Math.round(1 / share)}, seed ${seed}`, machine: poster(share), seed });
   const calm = [{ name: 'light', machine: light, seed: 1 }, { name: 'Classic', machine: classic, seed: 1 }, { name: 'feather', machine: feather, seed: 1 }];
-  const at = (hz) => (p) => ({ ...p, ...replayAt({ QualityGovernor, DrawGate, ladder, start, machine: p.machine, hz, seed: p.seed }) });
-  const at60 = [...posters, ...calm].map(at(60));
-  const at120 = [...posters, ...calm].map(at(120));
+  /*
+    Each machine at two stamp scatters: none (a display's vsync is regular to
+    microseconds, so a rounded stamp is the refresh grid itself and three
+    refreshes read exactly 25.0 ms every time) and ±0.05 ms (a stamp that
+    rounds the other way now and then). The check-skeptic found the first
+    version ran only the first, and that at ±0.1 ms main's governor all but
+    passes, since half the 25.0s then read 25.1: whether main is red depends
+    on a scatter the owner's screen has not been measured for yet (46e-2).
+    Both are red on main, and a build is held to both.
+  */
+  const JITTERS = [0, 0.05];
+  const machines = [...posters, ...calm];
+  const at = (hz) => machines.flatMap((p) => JITTERS.map((jitter) => ({ ...p, name: `${p.name} ±${jitter} ms`, jitter,
+    ...replayAt({ QualityGovernor, DrawGate, ladder, start, machine: p.machine, hz, seed: p.seed, jitter }) })));
+  const at60 = at(60);
+  const at120 = at(120);
   const where = (r) => `${seen(r.g.rung)} ${r.g.stepRate}/s`;
   const evenText = (r) => `${r.name}: ${r.skipped} skipped, ${r.uneven}/${r.holds} uneven`;
-  const isPoster = (r) => posters.some((p) => p.name === r.name);
+  const isPoster = (r) => r.name.startsWith('Poster');
   const undone = (moves) => moves.filter((m, i) => i > 0 && i < moves.length - 1
     && (m.index < moves[i - 1].index || m.stepRate > moves[i - 1].stepRate) && moves[i + 1].at - m.at < 10).length;
 
@@ -192,10 +228,37 @@ export function lines120({ line, check, ladderAt, QualityGovernor, DrawGate }) {
   const calm120 = at120.filter((r) => !isPoster(r));
   check('46e: at 120 Hz the light, Classic and feather plates stay even, with no step skipped after the opening',
     calm120.every((r) => r.skipped === 0 && r.uneven === 0 && r.holds > 0), calm120.map(evenText).join('; '));
-  check('46e: and at 120 Hz every machine keeps the rung and step rate it keeps at 60 Hz (Poster its 60 Hz rung), with no climb undone within 10 s',
-    at120.every((r, i) => r.g.rungIndex <= at60[i].g.rungIndex && undone(r.moves) === 0
-      && (isPoster(r) || r.g.stepRate === at60[i].g.stepRate)),
-    at120.map((r, i) => `${r.name}: ${where(r)} (60 Hz ${where(at60[i])})`).join('; '));
+  /*
+    Judged move by move, not at the end: the check-skeptic's 120 Hz-only spike
+    on top of the sketch fix took feather's sixty away at 31.6 s and gave it
+    back at 122 s, ninety seconds at half rate that an end-state comparison
+    never saw. A calm machine makes the same moves at 120 Hz as at 60 Hz, to
+    the same rung and step rate within a second; Poster, whose step rate is
+    the thing at issue, never goes below the lowest rung it reaches at 60 Hz.
+    These are relative to a 60 Hz run of the same build; a governor that
+    spends the picture on both screens is the absolute 60 Hz lines' to catch
+    in rungs.mjs ("a plate over the climb budget with every frame on time
+    keeps sixty", which caught every line halved).
+  */
+  const movesText = (r) => r.moves.map((m) => `${m.at.toFixed(1)}s ${seen(ladder[m.index])} ${m.stepRate}/s`).join(' → ') || 'no moves';
+  const sameMoves = (a, b) => a.length === b.length
+    && a.every((m, i) => m.index === b[i].index && m.stepRate === b[i].stepRate && Math.abs(m.at - b[i].at) <= 1);
+  const lowest = (r) => Math.max(r.g.rungIndex, ...r.moves.map((m) => m.index));
+  check('46e: and at 120 Hz each calm plate makes the moves it makes at 60 Hz, and Poster never drops below its 60 Hz picture, with no climb undone within 10 s',
+    at120.every((r, i) => undone(r.moves) === 0
+      && (isPoster(r) ? lowest(r) <= lowest(at60[i]) : sameMoves(r.moves, at60[i].moves))),
+    at120.map((r, i) => `${r.name}: ${movesText(r)} (60 Hz ${movesText(at60[i])})`).join('; '));
+
+  /*
+    The replay retypes the visualizer's catch-up cap (the GPU path's, where
+    the frame interval caps it); if the loop's cap changes, this replay is no
+    longer the loop, so the cap is read from the source and the replay must
+    be brought along with it.
+  */
+  const viz = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
+  check('46e: the replay\'s catch-up cap is still the visualizer\'s (frame interval past 40 ms one step, past 24 two)',
+    /frameMsNow > 40 \? 1 : frameMsNow > 24 \? 2 : SIM_MAX_CATCHUP/.test(viz),
+    'src/components/LiquidVisualizer.tsx: `const behind = … frameMsNow > 40 ? 1 : frameMsNow > 24 ? 2 : SIM_MAX_CATCHUP`');
 
   /*
     The owed lines: Poster at 120 Hz does what it does at 60 Hz. Main's state
@@ -203,7 +266,8 @@ export function lines120({ line, check, ladderAt, QualityGovernor, DrawGate }) {
     line is there these two are owed; the day it changes they pass or are red.
   */
   const src = readFileSync('src/lib/governor.ts', 'utf8');
-  const mainState = /const MISSED_MS = 25;/.test(src) && /frameMs > MISSED_MS \?/.test(src);
+  const mainState = src.includes('const MISSED_MS = 25;')
+    && src.includes('this.missShare += ((frameMs > MISSED_MS ? 1 : 0) - this.missShare) * MISS_K;');
   const p120 = at120.filter(isPoster);
   line('120hz', '46e: Poster at 120 Hz skips no step after the opening and holds every image one step (at most 1 % uneven), at any share of missed refreshes',
     p120.every((r) => r.skipped === 0 && r.uneven <= 0.01 * r.holds && r.holds > 0), p120.map(evenText).join('; '), mainState);
