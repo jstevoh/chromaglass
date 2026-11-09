@@ -39,12 +39,12 @@ import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { PRESETS } from '../src/presets.ts';
 import { engineQuery, installFrameReader, lastFrameRead, frameOf } from './frame.mjs';
 import { readingOf } from './judge.mjs';
 
-const PORT = Number(process.env.GALLERY_PORT ?? 4344);
+const PORT = port(4344, 'GALLERY_PORT');
 const OUT = process.env.GALLERY_OUT ?? 'gallery';
 const ONLY = process.env.GALLERY_ONLY ? process.env.GALLERY_ONLY.split(',').map((s) => s.trim()).filter(Boolean) : null;
 const TIMES = (process.env.GALLERY_TIMES || '8,20,40').split(',').map(Number).filter((n) => n > 0).sort((a, b) => a - b);

@@ -22,6 +22,8 @@ export interface NativeLicenseBridge {
   exp?: number | null;
   error?: string | null;
   enforced?: boolean;
+  /** The art packs the Mac's held key names (PLAN 45a-2), read from its signed payload by desktop/main.js. */
+  packs?: string[];
 }
 
 interface NativeBridgeWindow {
@@ -37,7 +39,7 @@ export const FREE_RECORD_MAX_SECONDS = 15;
 export const FREE_RENDER_MAX_HEIGHT = 720;
 export const FREE_SITE_LOGO_TEXT = 'ChromaGlass';
 
-export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, buildCheckoutUrl } from './checkoutLinks';
+export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, CHECKOUT_MOIRE_URL, buildCheckoutUrl } from './checkoutLinks';
 
 export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
@@ -193,6 +195,8 @@ export function getActiveLicenseInfo(): {
   email: string | null;
   id: string | null;
   error: string | null;
+  /** The art packs the held key names (PLAN 45a-2); empty for a key that names none. */
+  packs: string[];
 } {
   const cached = getCachedLicenseStatus();
   if (cached.valid && cached.tier) {
@@ -202,6 +206,7 @@ export function getActiveLicenseInfo(): {
       email: cached.email,
       id: cached.id,
       error: null,
+      packs: Array.isArray(cached.payload?.packs) ? cached.payload.packs : [],
     };
   }
   const nativeLic = getNativeBridge()?.license;
@@ -212,6 +217,7 @@ export function getActiveLicenseInfo(): {
       email: nativeLic.email ?? null,
       id: nativeLic.id ?? null,
       error: null,
+      packs: Array.isArray(nativeLic.packs) ? nativeLic.packs : [],
     };
   }
   return {
@@ -220,6 +226,7 @@ export function getActiveLicenseInfo(): {
     email: null,
     id: null,
     error: nativeLic?.error ?? cached.error ?? null,
+    packs: [],
   };
 }
 
@@ -241,6 +248,34 @@ export function canUseHomeFeature(): boolean {
 
 export function canUseProFeature(): boolean {
   return getEffectiveTier() === 'pro';
+}
+
+/**
+ * Whether this copy may put the moiré pack's sheets on the stage (PLAN 45a).
+ * Everything is open where tiers are not enforced (a self-run copy, the
+ * checks, development); where they are, Pro includes every art pack
+ * (PLAN 23) and Home buys this one as an add-on, which the licence names
+ * in its signed `packs` (PLAN 45a-2). Like every site gate, a nudge.
+ */
+export function canUseMoirePack(): boolean {
+  return !isTierGatingEnforced() || canUseProFeature() || (canUseHomeFeature() && hasLicensePack('moire'));
+}
+
+/**
+ * Whether the licence held here names an art pack bought on top of Home (PLAN 45a-2).
+ * The pack is in the key's signed payload (`packs`), so it verifies offline as the
+ * tier does: the account sheet's verified key first, then the Mac's own (the Mac
+ * verifies its key in the main process and hands the page what it read). A key signed
+ * before packs were sold names none, and reads as no pack, which is what it bought.
+ */
+export function hasLicensePack(pack: string): boolean {
+  const lic = getActiveLicenseInfo();
+  return lic.valid && lic.packs.includes(pack);
+}
+
+/** Whether a look of this art pack (a `Preset.pack`) is locked here: the pack is not on this copy. */
+export function isPackLocked(pack: string | undefined): boolean {
+  return pack === 'moire' && !canUseMoirePack();
 }
 
 /**

@@ -38,10 +38,10 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { mixStack, moveInMix } from '../src/lib/mixer.ts';
 
-const PORT = Number(process.env.REMOTEMIX_PORT ?? 4193);
+const PORT = port(4193, 'REMOTEMIX_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 

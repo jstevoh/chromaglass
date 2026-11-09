@@ -330,6 +330,20 @@ jobs:
           npx playwright install-deps chromium || { echo "::error title=Chromium's system libraries::a library is missing (listed above) and apt could not install Playwright's packages"; exit 1; }
           node scripts/chromiumlibs.mjs || { echo "::error title=Chromium's system libraries::still missing after apt (listed above); every browser check after this fails on it"; exit 1; }
 
+      # actionlint's pinned binary (19ak-7), kept between runs so the lint
+      # needs no download at all once a run has fetched it. On 2026-11-08
+      # GitHub's release pages answered 504 for hours and the logic part went
+      # red on a lint with nothing to say. The key is scripts/actionlint.mjs,
+      # which holds the version and each platform's sha256, so a moved pin is a
+      # new key. On a miss the check fetches it as before (the release page,
+      # then the API's asset download) and still holds it to the sha256.
+      - name: actionlint's binary, from the cache when it is there
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        uses: actions/cache@v4
+        with:
+          path: scratch/actionlint
+          key: actionlint-${{ runner.os }}-${{ hashFiles('scripts/actionlint.mjs') }}
+
       # Every check in this part, from scripts/checks.json, in the manifest's
       # order (PLAN.md 19k). Each opens a `Run <command>` group as its own step
       # did, a red one is an error annotation with its name and its FAIL lines,
@@ -435,7 +449,19 @@ jobs:
     # Only `owner-mac` is asked for, not `macOS`, so `npm run macqueue` keeps
     # GitHub's Macs and the owner's apart.
     runs-on: ${{ github.event_name != 'pull_request' && contains(fromJSON(inputs.local || '[]'), matrix.shard) && fromJSON('["self-hosted","owner-mac"]') || 'macos-15' }}
-    timeout-minutes: 20
+    # 25 minutes, as Measure's parts have (PLAN 19k-13). At 20, on GitHub's
+    # Macs on 2026-11-07 (deploys 668-673 and #690's two runs, eleven
+    # attempts), the five shards ran 14:51 to 20:21 a job, 0:39 to 3:07 of it
+    # before the first check, so all five sat within three minutes of the
+    # bound and three were cancelled with every check they reached green:
+    # plate a minute past its 41 checks (19:51 of 20:01), open and fifth in
+    # their last check. Moving checks between shards only moved that (19k-12
+    # did it for fifth), and a sixth shard asks the Mac queue for one more
+    # runner on every run. The bound is not where slowness is caught: a shard
+    # whose checks pass 18 minutes, where 20 would have cancelled it, is a
+    # warning on the run's page from scripts/checks.mjs (ROOM there), and a
+    # check that hangs is stopped by its own timeout in scripts/checks.json.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       # The shards `reach` selected: every one, but for a PR whose change that
@@ -446,19 +472,38 @@ jobs:
         shard: ${{ fromJSON(needs.reach.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
-      # The owner's Mac is also where sessions run the harnesses by hand, on
-      # the same fixed ports (`PORT = 43xx` in scripts/), so a shard started
-      # beside one would fail to serve, or read the other's server. It waits
-      # for them to close, up to ten minutes, and then fails naming who holds
-      # them. GitHub's Macs are fresh and skip this.
-      - name: The harness ports are free on the owner's Mac
+      # First on the owner's Mac, before setup-node: is anything else drawing
+      # with its GPU (another session's harness, a build queue's checks, the
+      # ChromaGlass app: a test browser or the app at 5% of a core or more)? Two deploys of 2026-11-08 ran beside them three
+      # times slower than the same Mac alone and went red on timing lines and
+      # timeouts. It waits up to two minutes, then fails, and deploy.yml's
+      # watchdog moves the deploy to GitHub's Macs (scripts/macbusy.sh,
+      # PLAN.md 19ah-9). Its name is what the watchdog reads: keep the two
+      # the same (FREE_STEP in scripts/macwatch.mjs).
+      # From its first line it also marks the Mac held for this shard
+      # (~/.chromaglass-runner/deploy-<runner>.json), and harnesses a session
+      # or a build queue starts meanwhile wait for it (PLAN.md 19ah-9a).
+      - name: The owner's Mac is free of other work
         if: ${{ runner.environment == 'self-hosted' }}
-        timeout-minutes: 11
-        run: bash scripts/macports.sh 600
+        timeout-minutes: 4
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bash scripts/macbusy.sh 120
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
+      # Each runner on the owner's Mac serves the harnesses in a block of
+      # ports of its own (HARNESS_PORT_SHIFT in its .env, scripts/ports.mjs),
+      # apart from another runner's shard and a session's run by hand; what
+      # can still hold one is a cancelled job's server in this runner's block.
+      # It waits for them to close, up to ten minutes, and then fails naming
+      # who holds them. After setup-node: the list is scripts/ports.mjs's.
+      # GitHub's Macs are fresh and skip this.
+      - name: The harness ports are free on the owner's Mac
+        if: ${{ runner.environment == 'self-hosted' }}
+        timeout-minutes: 11
+        run: bash scripts/macports.sh 600
       - run: npm ci
       # The Mac shards have headroom (19w) and no Metal-side download has gone slow
       # yet, but the fetch is as unbounded here as the two above were, and the Mac
@@ -489,6 +534,18 @@ jobs:
         env:
           CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
+      # Last on the owner's Mac, whatever happened above, a cancel included:
+      # marks this shard's hold on the Mac ended (harnesses wait two minutes
+      # more, for the next shard), and fails if a look between the checks
+      # found other work drawing with the GPU (scripts/checks.mjs stopped the
+      # shard), which the watchdog reads as it reads the first step's failure
+      # (STAYED_STEP in scripts/macwatch.mjs; keep the names the same).
+      - name: The owner's Mac stayed free of other work
+        if: ${{ always() && runner.environment == 'self-hosted' }}
+        timeout-minutes: 1
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bash scripts/macbusy.sh --end
 
   # The one name the rest of the repository knows this stage by.
   # Green when every shard is, or when the change reached no Mac shard and

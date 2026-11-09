@@ -17,6 +17,14 @@
 
 import { existsSync } from 'node:fs';
 
+// A harness's port comes with its browser: most import only this file, and a
+// port asked for in scripts/ports.mjs moves with the runner the shard is on,
+// so two shards on one Mac never meet on one (PLAN.md 19ah-6).
+export { port, untilServing } from './ports.mjs';
+// And on the owner's Mac, a deploy's shard comes first: a launch waits while
+// one holds the Mac (PLAN.md 19ah-9a, scripts/macdeploy.mjs).
+import { untilMacDeployDone } from './macdeploy.mjs';
+
 const SANDBOX = '/opt/pw-browsers/chromium';
 
 export function chromiumPath() {
@@ -150,6 +158,7 @@ export const BASE_ARGS = [
  * through.
  */
 export async function launchChromium(chromium, { args = [], present = false, ...opts } = {}) {
+  await untilMacDeployDone();
   const executablePath = chromiumPath();
   // Headed wins over a harness's own `headless: true`: it asked to present.
   const display = PRESENTS && (present || !!process.env.PW_PRESENT) ? await virtualDisplay() : null;
