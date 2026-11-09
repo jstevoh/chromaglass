@@ -490,6 +490,25 @@ rest is routine and the owner's calls.
       it is replaced (New key), which suits YouTube, Twitch and Kick. For the two that
       change it each stream, the row could clear the key when a stream ends and say so,
       rather than fail the next show with last week's key.
+  - **37x-4f. The stream always carries an audio track.** *(built 2026-11-09; landing on
+    YouTube to be seen in the rehearsal.)* The Mac app 1.3.1250 streamed to YouTube for
+    minutes at 10 to 11 Mbps with no error and Studio showed "No data", while ffmpeg's test
+    pattern with a tone showed at once on the same key. With the sound source at None the
+    encoder had no track and sent video alone; our listener and ffmpeg's both take that,
+    YouTube's ingest does not start a broadcast from it. Now a stream with no source
+    carries AAC silence on the stream's clock (`src/lib/liveSilence.ts`), and a source
+    switched off on air hands over to silence from its last sample. `npm run live`'s four
+    new lines: both cases carry a track from first frame to last with no hole, and it
+    decodes (silence; the tone, then silence). Wire and media otherwise compared with
+    ffmpeg's on a local server, message by message: the same but for transaction ids,
+    chunk streams and ffmpeg's `_checkbw`.
+    - *37x-4f-1. Seen on YouTube.* The cloud cannot reach YouTube's ingest (its proxy drops
+      RTMPS), and the Mac's guard would not let a session read the key, so the proof is
+      the private rehearsal on the next Mac build: Studio shows the picture.
+    - *37x-4f-2. A source opened on air is not heard.* The encoder takes its track at the
+      start; a song started after Go streams as silence until the next start. The fix is
+      an audio bus the encoder reads (the current source mixed into one track, silence
+      its floor), so the source can change under a running stream.
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.
