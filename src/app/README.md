@@ -42,6 +42,7 @@ comments, which moved with it.
 | `useSongSequences` | the set item, sequence or preset made for a song, up when it is identified; a song's sequence stopped at its end (moved out of App for 28h-8) |
 | `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it) |
 | `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
+| `soundNow.ts` (not a hook) | what the show hears, for the remote link to report (`useSoundNow`, `publishSound`), and the door the owner's assistant changes it through (`askSound`, `setSoundDoor`, `ASSISTANT_SOURCES`), set by `useSoundSource` (PLAN 44j) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `useSongRendering` | a song rendered to a film |
 | `useControllers` | MIDI, the gamepad, the projector window |

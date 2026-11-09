@@ -12318,6 +12318,26 @@ chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte fi
 the bytes exact; private by default; an update naming only the title keeping the rest)
 and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
 
+
+## 44j. The live stream and the sound from the assistant (2026-11-09)
+
+The owner asked whether the live streaming was run through the assistant. It was
+not: the rehearsal drove the app through the show link, and the assistant could
+start and stop a stream but not see where it would go, how it was going, or what the
+show heard. Now `show_state` carries `liveSetup` (the Live Show panel's saved
+destinations by name, service and whether a key is kept, never an address or a key,
+and how the last start or stream ended, read every 5 s since the keys live in the Mac
+app's main process), `live.destinations` (each one's phase, kbps, seconds behind,
+dropping, reconnects, error) and `sound` (the source, and the file's name).
+`go_live {test?, destinations?}` starts the stream, to just the named destinations
+when given (matched in any case, on or off in the panel; a name not saved, or saved
+without a key, is an error that names the list, never a quiet drop:
+`liveShow.pickSaved`). `set_sound_source` goes through the Sound panel's own door
+(`app/soundNow.ts`, a holder because App.tsx may not grow), Full only, and is refused
+while on air: the stream keeps the track it started with, so a change would leave it
+silent (44j-2 is the real fix). Check: `npm run assistant`, 101 lines, five new
+mutants (on air, unknown source, unknown name, names dropped, a phone's sound).
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,

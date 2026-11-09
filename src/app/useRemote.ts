@@ -21,7 +21,8 @@ import type { CastState } from '../lib/castProtocol';
 import type { MidiAction } from '../lib/midi';
 import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
-import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
+import { useLiveShow, useLiveSetup, onAir, stopLive, startSavedLive } from '../lib/liveShow';
+import { useSoundNow, askSound } from './soundNow';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
@@ -122,10 +123,21 @@ export function useRemote({
     reaches the plate in a set, so the two are read in one place.
   */
   useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
+  // Each destination's health too (PLAN 44j), rounded to what a reader acts
+  // on, so the key turns over with the clock's second and not with each byte.
   const liveKey = onAir(liveShow)
-    ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
+    ? JSON.stringify({
+      test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live'),
+      destinations: liveShow.destinations.map(d => ({ name: d.name, phase: d.phase, kbps: Math.round(d.kbps), secondsBehind: Math.round(d.secondsBehind * 10) / 10, dropping: d.dropping, reconnects: d.reconnects, error: d.error })),
+      skipped: liveShow.skipped,
+    })
     : '';
   const live = useMemo<RemoteState['live']>(() => (liveKey ? JSON.parse(liveKey) : null), [liveKey]);
+  // What can be streamed to before going live, and what the show hears: the
+  // owner's assistant reads both from here (PLAN 44j). Neither carries an
+  // address or a key.
+  const liveSetup = useLiveSetup();
+  const sound = useSoundNow();
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -151,7 +163,9 @@ export function useRemote({
     markLoaded,
     rowFading,
     live,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live]);
+    liveSetup,
+    sound,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -259,8 +273,14 @@ export function useRemote({
           break;
         }
         case 'assistant-live':
-          void startSavedLive(message.test === true).catch(() => { /* the panel shows why */ });
+          // Why a start failed comes back in the state's `liveSetup.last`.
+          void startSavedLive(message.test === true, Array.isArray(message.names) ? message.names.filter((n): n is string => typeof n === 'string') : undefined).catch(() => { /* the panel and liveSetup say why */ });
           break;
+        case 'assistant-sound': {
+          const why = askSound(message.source);
+          if (why) console.warn(`The assistant's sound source: ${why}`);
+          break;
+        }
         // A still for the assistant to judge detail by (PLAN 44c-4), and a
         // song action it programmed, fired by the show's own clock (44f).
         case 'assistant-still':
