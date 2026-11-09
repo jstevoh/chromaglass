@@ -15,8 +15,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { launchChromium } from './chromium.mjs';
 import { clickAt } from './layoutProbe.mjs';
+import { port } from './ports.mjs';
 
-const PORT = Number(process.env.CLIP_PORT ?? 4183);
+const PORT = port(4188, 'CLIP_PORT');
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.2`;
 
 async function serve() {
