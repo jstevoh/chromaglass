@@ -100,6 +100,8 @@ picks it up in its next build. `detectTier()` already reads Electron as the
        fails the packed app only on the Mac's CI (#658: `osc.js`). `npm run desktop`
        (or `checks`) should fail when a relative import of a packed server file is not
        on that list.
+     - ~~**13.5-osc-beats**~~ **Shipped** (2026-11-09): the beat line waits for 12 kicks,
+       not 15 s; story in `docs/plan-shipped.md` §13.5-osc-beats.
      - **13.5-osc-scale.** Every value is 0..1 except `/bpm`; Resolume's tempo input
        wants its own range. Write the range a Resolume BPM shortcut takes into docs/osc.md
        once the owner's sitting has read it.
