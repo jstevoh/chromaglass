@@ -2459,3 +2459,21 @@ sent on 2026-11-07 (yellow lace, lavender, cobalt, coral):
    the bass; the coral pool's oil thickens the film where it lands.
 5. Bad: a flat yellow sheet that never tears, lace that is all rings (28l-3), or the pools
    so deep under the film that they read navy, red or brown.
+
+## 113. Sign in with Apple (PLAN 23.15)
+
+On the live site, signed out, in a private window:
+
+1. Play free. Three buttons: Continue with Google, Continue with Apple, Continue with email.
+2. Continue with Apple: Apple's sheet opens, asks for your name and email (try *Hide My Email* once), and the
+   plate starts. Profile & Store says "Signs in with Apple", and with the hidden address it adds the note that a
+   licence bought under your own email shows up when you sign in with that email.
+3. Sign out, then Continue with Apple again: straight in, no second account in Firebase's Users list.
+4. An address that already has a Google account, shared with your Apple ID: Apple says the email already has an
+   account; sign in with Google and Firebase's Users list shows that one account with both Google and Apple.
+5. The Mac app signed out: Continue with Apple in your browser opens the browser's sign-in, and the app opens the
+   show by itself once you finish there.
+6. A phone: the same three buttons fit, and Apple's sheet comes back to the show.
+
+Bad: a second account for the same person, an error saying the provider is not enabled, or the Mac app's window
+stuck on "Finish in your browser" after the browser signed in.
