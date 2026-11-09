@@ -31,9 +31,9 @@
  *      ENTRY_GROWTH_MAX bytes gzipped: the SDK is fetched beside the app, not
  *      in front of the intro
  *   3. a first visit sees the sign-in, and the plate does not start behind it
- *   4. it offers Google and an emailed link, and not Apple (the owner,
- *      2026-10-24: no Apple sign-in for now), and the Google button asks the
- *      emulator for Google
+ *   4. it offers Google, Apple and an emailed link (Apple back on, the owner
+ *      2026-11-08; PLAN 23.15), the Google button asks the emulator for
+ *      Google, and the Apple button asks for Apple with the email scope
  *   5. the emailed link signs in and the plate starts
  *   6. a returning visit goes straight to the plate: the sign-in is never
  *      drawn, not even for a frame
@@ -389,11 +389,10 @@ async function signInByEmail(page, origin) {
   return { sent, link, back, up: back && await waitFor(() => appUp(page), BOOT_MS) };
 }
 /** Everything on the sign-in inside the screen's width, each button a thumb's height. */
-// The sign-in's buttons: Google and the emailed link. It was three with Apple,
-// which the owner took off for now (2026-10-24; line 4 fails if it comes back
-// without this changing too). 11 and 15 count up to this, so a form missing
-// one of the two still fails them.
-const PROVIDER_BUTTONS = 2;
+// The sign-in's buttons: Google, Apple and the emailed link. Apple was off from
+// 2026-10-24 to 2026-11-08 (the owner; PLAN 23.10d, 23.15), when this was two.
+// 11 and 15 count up to this, so a form missing one of the three still fails them.
+const PROVIDER_BUTTONS = 3;
 
 const fits = (page) => page.evaluate(() => {
   const W = innerWidth, H = innerHeight;
@@ -458,10 +457,13 @@ try {
 
   const providers = await page.evaluate(() => [...document.querySelectorAll('[data-cg-signin-provider]')].map((b) => b.getAttribute('data-cg-signin-provider')));
   const asksFor = {};
-  // Apple is held off (SignInScreen.tsx, APPLE_SIGN_IN; the owner, 2026-10-24),
-  // so only Google is pressed, and the line below fails if an Apple button is
-  // drawn at all: a sign-in that cannot complete is worse than none.
-  for (const id of ['google.com']) {
+  // Both providers are pressed. Apple's must also ask for the email scope:
+  // the licence is kept under the account's email (`keys:<email>`), so an
+  // Apple account made without it could never hold one. Firebase writes the
+  // provider's scopes into the handler address it opens (`scopes=email,name`),
+  // which is what is read here.
+  const scopesOf = {};
+  for (const id of ['google.com', 'apple.com']) {
     // A popup or a redirect: either is Firebase's way of sending the browser to the provider.
     const popup = ctx.waitForEvent('page', { timeout: 10_000 }).catch(() => null);
     const nav = page.waitForURL((u) => u.toString().includes(`providerId=${encodeURIComponent(id)}`) || u.toString().includes(`providerId=${id}`), { timeout: 10_000 }).then(() => page.url(), () => null);
@@ -475,9 +477,10 @@ try {
       return u;
     }), nav]);
     asksFor[id] = !!p && p.startsWith(`${EMU}/emulator/auth/handler`) && p.includes('apiKey=demo-key') && p.includes(id);
+    scopesOf[id] = p ? (new URL(p).searchParams.get('scopes') || '') : '';
     if (!page.url().startsWith(ORIGIN)) { await page.goto(ON); await waitFor(() => signinOpen(page), 30_000); }
   }
-  check('4. Google and an emailed link are offered, Apple is not, and Google goes to its provider', ['google.com', 'email'].every((p) => providers.includes(p)) && !providers.includes('apple.com') && asksFor['google.com'], `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}`);
+  check('4. Google, Apple and an emailed link are offered; Google and Apple each go to their provider, Apple asking for the email', ['google.com', 'apple.com', 'email'].every((p) => providers.includes(p)) && asksFor['google.com'] && asksFor['apple.com'] && scopesOf['apple.com'].split(',').includes('email'), `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}, Apple's scopes "${scopesOf['apple.com']}"`);
 
   const first = await signInByEmail(page, ORIGIN);
   check('5. the emailed link signs in, lands on the page the visitor was on, and the plate starts', first.sent && first.back && first.up, `sent ${first.sent}, link ${first.link ? (first.back ? 'back to the same page' : 'to this site but not the same page') : 'none'}, plate ${first.up}`);
