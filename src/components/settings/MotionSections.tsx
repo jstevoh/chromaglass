@@ -2,7 +2,7 @@ import { Waves, Zap, Hourglass, Aperture, RotateCw } from 'lucide-react';
 import { AudioFeature } from '../../types';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
-import { LIT } from '../ui';
+import { LIT, Segmented } from '../ui';
 import { StrobeRing } from '../ui/Playful';
 import { TipPad } from '../ui/TipPad';
 import { SPIN_AUTO_NAMES } from '../../lib/turntable';
@@ -152,7 +152,7 @@ export const TiltSection = ({ c }: { c: SectionCtx }) => {
 };
 
 export const SpinSection = ({ c }: { c: SectionCtx }) => {
-  const { settings, onUpdate, spinBpm, focusSection, onFlickPlate, keep, shown, CARD, GRID, TITLE } = c;
+  const { settings, onUpdate, spinBpm, focusSection, onFlickPlate, pins, keep, shown, CARD, GRID, TITLE } = c;
   return (
     <>
 
@@ -231,14 +231,20 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
               : `Turning at ${Math.abs(settings.spinRpm ?? 6).toFixed(1)} rpm${Math.round(settings.spinAuto ?? 0) === 2 ? ' until a tempo is heard' : ''}.`}
           </p>
         </div>
-        <Slider
-          label={`Auto Spin — ${SPIN_AUTO_NAMES[Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))]}`}
-          value={settings.spinAuto ?? 0}
-          min={0}
-          max={2}
-          step={1}
-          onChange={(v: number) => onUpdate({ spinAuto: Math.round(v) })}
+        <Segmented
           settingKey="spinAuto"
+          label="Auto Spin"
+          chips={pins && <PinChips settingKey="spinAuto" />}
+          value={Math.max(0, Math.min(2, Math.round(settings.spinAuto ?? 0)))}
+          options={[
+            [0, SPIN_AUTO_NAMES[0], 'Auto Spin is off'],
+            [1, SPIN_AUTO_NAMES[1], 'Turn at the Spin Rate'],
+            [2, SPIN_AUTO_NAMES[2], 'Turn once every Beats a Turn'],
+          ]}
+          onChange={(v) => onUpdate({ spinAuto: v })}
+          height={32}
+          fill
+          testId="spin-auto"
         />
         <Slider
           label={`Spin Rate — ${(settings.spinRpm ?? 6).toFixed(1)} rpm`}
@@ -281,17 +287,20 @@ export const SpinSection = ({ c }: { c: SectionCtx }) => {
           answers and none of them is "0.4 of the way anticlockwise". Opposed
           is the default and is what every look did before there was a choice.
         */}
-        <Slider
-          label={`Spin Direction — ${
-            (settings.spinDirection ?? 0) > 0.5 ? 'all clockwise'
-              : (settings.spinDirection ?? 0) < -0.5 ? 'all anticlockwise'
-              : 'plates opposed'}`}
-          value={settings.spinDirection ?? 0}
-          min={-1}
-          max={1}
-          step={1}
-          onChange={(v: number) => onUpdate({ spinDirection: Math.round(v) })}
+        <Segmented
           settingKey="spinDirection"
+          label="Spin Direction"
+          chips={pins && <PinChips settingKey="spinDirection" />}
+          value={(settings.spinDirection ?? 0) > 0.5 ? 1 : (settings.spinDirection ?? 0) < -0.5 ? -1 : 0}
+          options={[
+            [-1, 'Anticlockwise', 'All plates turn anticlockwise'],
+            [0, 'Opposed', 'Plates turn opposite ways'],
+            [1, 'Clockwise', 'All plates turn clockwise'],
+          ]}
+          onChange={(v) => onUpdate({ spinDirection: v })}
+          height={32}
+          fill
+          testId="spin-direction"
         />
         <Slider
           label="Spin Wander"

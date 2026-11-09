@@ -1,7 +1,32 @@
-// The remote's slider, moved out of RemoteControl.tsx (PLAN 19ai, the size ratchet).
+// The remote's slider and action tile, moved out of RemoteControl.tsx (PLAN 19ai, the size ratchet).
+import type { ComponentType } from 'react';
 import type { VisualizerSettings } from '../types';
 import { PIN_RANGE } from '../lib/deskPins';
 import { curveOf, handValueAt, travelOf } from '../lib/midi';
+import { PaceTrack } from './ui/Pace';
+
+export function ActionButton({ label, icon: Icon, onPress, connected, tone = 'default' }: {
+  label: string;
+  icon: ComponentType<{ size?: number }>;
+  onPress: () => void;
+  connected: boolean;
+  tone?: 'default' | 'warn';
+}) {
+  return (
+    <button
+      onClick={onPress}
+      disabled={!connected}
+      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-30 ${
+        tone === 'warn'
+          ? 'border-red-400/25 bg-red-500/10 text-red-200 active:bg-red-500/20'
+          : 'border-white/10 bg-white/5 text-white/80 active:bg-white/15'
+      }`}
+    >
+      <Icon size={20} />
+      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
+    </button>
+  );
+}
 
 /**
  * Defined at module level on purpose: a component created inside the render
@@ -30,31 +55,34 @@ export function Slider({ label, field, step, format, value, connected, onDrag, o
   // is shorter here than anywhere else. See `curveOf` in `lib/midi.ts`.
   const curve = curveOf(field);
   const at = curve === 1 ? current : travelOf(current, min, max, curve);
+  const travel = curve === 1 ? (current - min) / (max - min) : at;
   return (
     <div className="mb-5">
       <div className="mb-2 flex items-baseline justify-between">
         <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">{label}</span>
         <span className="font-mono text-xs text-white/40">{format ? format(current) : current.toFixed(2)}</span>
       </div>
-      <input
-        id={`remote-${String(field)}`}
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={at}
-        disabled={!connected}
-        onPointerDown={() => onDrag(field, true)}
-        onPointerUp={() => onDrag(field, false)}
-        onPointerCancel={() => onDrag(field, false)}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(field, raw); return; }
-          onChange(field, handValueAt(raw, min, max, curve));
-        }}
-        className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30 md:h-12"
-        style={{ ['--fill' as string]: `${(curve === 1 ? (current - min) / (max - min) : at) * 100}%` }}
-      />
+      <PaceTrack settingKey={field} at={Math.max(0, Math.min(1, travel))}>
+        <input
+          id={`remote-${String(field)}`}
+          type="range"
+          min={curve === 1 ? min : 0}
+          max={curve === 1 ? max : 1}
+          step={curve === 1 ? step : 0.001}
+          value={at}
+          disabled={!connected}
+          onPointerDown={() => onDrag(field, true)}
+          onPointerUp={() => onDrag(field, false)}
+          onPointerCancel={() => onDrag(field, false)}
+          onChange={(e) => {
+            const raw = parseFloat(e.target.value);
+            if (curve === 1) { onChange(field, raw); return; }
+            onChange(field, handValueAt(raw, min, max, curve));
+          }}
+          className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30 md:h-12"
+          style={{ ['--fill' as string]: `${travel * 100}%` }}
+        />
+      </PaceTrack>
     </div>
   );
 }
