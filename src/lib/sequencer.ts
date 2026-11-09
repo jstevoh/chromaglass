@@ -301,6 +301,26 @@ export function saveUserSequences(seqs: ShowSequence[]): void {
   } catch { /* private mode, full storage: the show still runs */ }
 }
 
+/**
+ * Where a sequence started `offsetSec` into its song stands: the stage, and
+ * how far into it. Stages laid end to end by their seconds (a looping
+ * sequence wraps). The transport's `startAt` and the Listen check
+ * (`npm run listen`) both read it, so a designed sequence is checked against
+ * the walk that runs it, not a copy of it.
+ */
+export function stageAtOffset(stages: readonly Pick<ShowStage, 'seconds'>[], offsetSec: number, loop: boolean): { index: number; into: number } {
+  const total = stages.reduce((t, st) => t + Math.max(1, st.seconds), 0);
+  let off = Math.max(0, offsetSec);
+  if (loop && total > 0) off = off % total;
+  let index = 0;
+  for (; index < stages.length - 1; index++) {
+    const len = Math.max(1, stages[index].seconds);
+    if (off < len) break;
+    off -= len;
+  }
+  return { index, into: off };
+}
+
 /** A user-editable copy of a sequence (built-ins are read-only). */
 export function duplicateSequence(seq: ShowSequence, name?: string): ShowSequence {
   return {
