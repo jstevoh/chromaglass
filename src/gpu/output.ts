@@ -13,6 +13,7 @@
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import { groupOf, viewOf } from './groupCache';
 import { UniformPack } from './uniforms';
 import { OUTPUT_LAYOUT } from './wgsl/outputFields';
 import { OUTPUT_WGSL } from './wgsl/output';
@@ -201,7 +202,7 @@ export class WebGPUOutput {
       }));
       this.sceneSize = [width, height];
     }
-    return this.scene.createView();
+    return viewOf(this.scene);
   }
 
   /**
@@ -224,7 +225,7 @@ export class WebGPUOutput {
       this.sources.set(kind, got);
     }
     this.drawn.add(kind);
-    return got.tex.createView();
+    return viewOf(got.tex);
   }
 
   /**
@@ -268,28 +269,18 @@ export class WebGPUOutput {
     });
     if (quads > 0) {
       pass.setPipeline(pipeline);
-      pass.setBindGroup(0, this.device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.ubo } },
-          { binding: 1, resource: this.sampler },
-          { binding: 2, resource: this.scene.createView() },
-          { binding: 3, resource: this.bound('front') },
-          { binding: 4, resource: this.bound('back') },
-          { binding: 5, resource: this.bound('film') },
-        ],
-      }));
+      pass.setBindGroup(0, groupOf(this.device, pipeline, [this.ubo, this.sampler, this.scene, this.bound('front'), this.bound('back'), this.bound('film')]));
       pass.draw(6, quads);
     }
     pass.end();
-    this.drawn = new Set();
+    this.drawn.clear();
     return true;
   }
 
   /** A source's picture if it was drawn this frame, else the scene (never sampled: no surface asks for it). */
-  private bound(kind: PlateSource): GPUTextureView {
+  private bound(kind: PlateSource): GPUTexture {
     const got = this.drawn.has(kind) ? this.sources.get(kind) : undefined;
-    return (got ? got.tex : this.scene!).createView();
+    return got ? got.tex : this.scene!;
   }
 
   dispose(): void {

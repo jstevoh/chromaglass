@@ -116,6 +116,8 @@ export interface GpuStepParams {
   filmDust?: number;
   /** Marangoni flow: liquid pulled away from where soap lowers the tension. */
   surfactantFlow?: number;
+  /** First-order surfactant loss dial (0..1, 0 = none; soapBreakdownRate in soap.ts). */
+  soapBreakdown?: number;
   /** Dye makes the liquid heavier and heat lighter: buoyancy in the plate. */
   solutalBuoyancy?: number;
   /** How far the plate stands up (0 flat on the projector, 1 upright). */
@@ -146,6 +148,16 @@ export interface GpuStepParams {
   thinGap?: number;
   /** The liquid's thickness for a thin gap, 0 (water) to 1 (glycerine), log in viscosity. */
   gapThickness?: number;
+  /**
+   * The liquid on the plate and the cover glass on it (PLAN 38r-5,
+   * lib/cover.ts): Liquid in mL (a change is liquid added or wicked off at the
+   * rim), Cover weight in grams, and a two-finger pinch's hand on the glass,
+   * −1 lifting to 1 pressing. Absent, the plate holds today's 62.8 mL under a
+   * 157 g glass, which is today's 2 mm.
+   */
+  liquidMl?: number;
+  coverGrams?: number;
+  coverHand?: number;
   /**
    * The ferrofluid's kinematic viscosity in a thin gap, m²/s. Not a setting:
    * the default is a real ferrofluid's (FERRO_NU in fluid.ts), and only the
@@ -179,6 +191,10 @@ export interface GpuStepParams {
   time: number;
   /** Master dimmer / lamp brightness (0 blackout to 1 full brightness), scaling lamp heat (PLAN 18f). */
   dimmer?: number;
+  /** Lamp Heat dial (0..1, default 0): two-band lamp irradiance and two-phase boil model (PLAN §36e-2). */
+  heat?: number;
+  /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
+  boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
    * The lasting current (see `stepCurrent`). Everything here is per second in
    * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.
@@ -187,6 +203,8 @@ export interface GpuStepParams {
   currentBuoy: number;      // heat rising: × the temperature field
   rockX: number;            // the plate's rock, × (density − mean): heavy dye slides downhill
   rockY: number;
+  /** Plate Rock past real (lib/plateRock.ts rockPast): × the rock's pull on the colour and the oil's lift on a thin gap; 1 is the real gap's. */
+  rockGain?: number;
   /** The cover glass's slide over the film, m/s (lib/plateRock.ts): on a thin gap the liquid is dragged toward half of it, as by Glass Smear. */
   coverX?: number;
   coverY?: number;
@@ -283,7 +301,7 @@ export interface PlateSolver {
    * Optional because only the WebGPU solver carries a phase field.
    */
   addPhase?(x: number, y: number, radius: number, amount: number): void;
-  addLiquidDrop?(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number }, amount: number, seconds?: number): void;
+  addLiquidDrop?(x: number, y: number, radius: number, what: { soap?: number; body?: number; repel?: number; weight?: number; polarity?: number; bz?: number }, amount: number, seconds?: number): void;
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
@@ -293,9 +311,20 @@ export interface PlateSolver {
    * over the rim, and, for a liquid that mixes with the clear one (`sp`),
    * its share into the species field. Plate units.
    */
-  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number } | null, volume?: boolean): void;
+  /** The cover glass's gap on its liquid, metres (PLAN 38r-5): what a pour's share and the cover's drag are taken at. */
+  readonly coverMetres?: number;
+  /** The same in gap units (0.03 is 2 mm), as lib/turntable.ts dragSeconds takes it. */
+  readonly coverUnits?: number;
+  pour?(x: number, y: number, radius: number, take: number, sp: { lnNu: number; density: number; index: number; scatter?: number; tension?: number } | null, volume?: boolean, what?: { tension?: number; density?: number; weight?: number }, plateSigma?: number): void;
   /** The share of the dish that is poured liquid, read back (PLAN 18d-2): the automation's headroom for thick liquids. */
   speciesShare?(): Promise<number>;
+  /**
+   * The species field downsampled to the logical grid (L × L × 4, rgba32float)
+   * and the surface tension and density of the last poured species (PLAN 33f),
+   * read back on the same one-second read as `speciesShare`. Null when no
+   * species is live or after a clear.
+   */
+  speciesSnapshot?(): Promise<{ L: number; data: Float32Array; poured: { sigma: number; rho: number } } | null>;
   /** A pour onto the clear film (PLAN §20b): clear oil thickens it, a solvent lands where it can open a hole. Plate units. Nothing without a film. */
   addFilm?(x: number, y: number, radius: number, what: { film?: number; solvent?: number }): void;
   /** How much of the plate the oil poured since the last clear covers, 0..1 (Oil Bodies' budget). */
@@ -324,6 +353,22 @@ export interface PlateSolver {
    */
   handOver?(): SolverCarry | null;
   takeOver?(carry: SolverCarry): boolean;
+  /**
+   * A frame of the video pour, its dye and its motion worked out on the GPU
+   * and added to the CPU's deltas at the next flush (PLAN 14ab-2). Optional:
+   * without it the app pours the frame through the CPU's arrays
+   * (lib/videoFlow.ts). False when it poured nothing.
+   */
+  pourVideo?(src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, fresh: boolean): boolean;
+  /**
+   * A title poured as ink (PLAN 37x-10, lib/inkTitle.ts): `mask` n × n of
+   * coverage 0..1, row 0 at the plate's bottom, sampled onto the solver's own
+   * grid (area taps, as the video pour samples its frame) and added to the
+   * dye as `density` of the ink `rgb` (absorbances) where the coverage is 1.
+   * Optional: without it the app lays the mask through the CPU's arrays at
+   * the logical grid. False when nothing was poured.
+   */
+  pourInk?(mask: Float32Array, n: number, rgb: readonly number[], density: number): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   /**
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),
@@ -335,8 +380,12 @@ export interface PlateSolver {
    * `sheet`, when Beat Squeeze's rhythm sheet moved this step: L² of the
    * gap's change, solved (lib/sheet.ts), laid as it is: no film closing on
    * top and no ceiling at rest (squeezeUpdate's `sheetT`, PLAN 27f-4).
+   * `rows`, a mask of the rows written since the last call, one byte a row
+   * (lib/deltaRows.ts, PLAN 14ab-4), or null for all: outside them every array
+   * is zero (`dyeMul` one), and only those rows, with the rows the last upload
+   * wrote, go across.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null): void;
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

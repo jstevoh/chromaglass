@@ -1,6 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
+import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
+
+/*
+ * The channel the looks are filmed for (PLAN 34a-8). The owner asked, on
+ * 2026-11-08, for the homepage to point at it: six films went public that day,
+ * each a look played to a 1920s record, and a visitor deciding whether to press
+ * Play free learns more from a minute of the plate moving to music than from
+ * any still on this page. The handle, not a channel id, so the link reads as
+ * what it is if someone copies it. It sits in the header, beside Sign in, so a
+ * phone sees it on the first screen without scrolling past the looks, and again
+ * under the looks, where someone who liked the stills wants to see them move.
+ */
+const YOUTUBE_CHANNEL_URL = 'https://www.youtube.com/@Chromaglassart';
+
+/** YouTube's play mark, drawn small: recognisable at 18 px without loading their asset. */
+const YouTubeMark: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 17" aria-hidden="true" className={className}>
+    <rect width="24" height="17" rx="4.5" fill="#ff0033" />
+    <path d="M9.6 4.9v7.2l6.2-3.6z" fill="#fff" />
+  </svg>
+);
 
 /**
  * The page a first visit meets before the sign-in (PLAN.md 34a).
@@ -52,9 +73,9 @@ interface LookCard { id: string; name: string; line: string }
 const LOOKS: LookCard[] = [
   { id: 'ferro-paint', name: 'Ferro Paint', line: 'Black ferrofluid worked through amber, teal and coral under a wandering magnet.' },
   { id: 'aurora-borealis', name: 'Aurora Borealis', line: 'Curtains of jade and lime rippling across a night sky.' },
-  { id: 'cell-bloom', name: 'Cell Bloom', line: 'Silicone breaking into rings of paint cells under a magnifier.' },
+  { id: 'cell-bloom', name: 'Lens Pools', line: 'Three pools of silicone and oil turning under a magnifier.' },
   { id: 'poster-1969', name: 'Poster, 1969', line: 'Two opaque dyes, orange against ultramarine, flat like a Fillmore poster.' },
-  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: cells, lacing, razor edges.' },
+  { id: 'macro-bead', name: 'Macro Bead', line: 'The camera follows one bead close up: domed, wet, razor edges.' },
   { id: 'jellyfish-bloom', name: 'Jellyfish Bloom', line: 'Magenta and lavender bells pulsing through teal water.' },
   { id: 'lace-run', name: 'Lacing Run', line: 'A tongue of amber dye dragging black lace behind it.' },
   { id: 'neon-coral-reef', name: 'Neon Coral Reef', line: 'A reaction grows coral across the glass, branch by branch.' },
@@ -72,8 +93,23 @@ const STEPS: { n: string; title: string; body: string }[] = [
   { n: '4', title: 'Put it on the wall', body: 'Send the plate to a TV or projector. In the app, your phone becomes the remote.' },
 ];
 
-const TIERS: { name: string; price: string; lines: string[] }[] = [
+/*
+  The moiré pack (PLAN.md 45a-2), $15 on Home and in Pro: four of its seven looks, each a frame
+  the app drew on this Mac's GPU two dozen seconds after the look was opened (a still a page
+  load away, like LOOKS above). Kept at 960x600 for a 480x300 box: a pattern of fine lines
+  scaled down in the browser beats against the screen's own pixels, so these are the one set
+  that must not be drawn smaller than twice their box.
+*/
+const MOIRE: { id: string; name: string; line: string }[] = [
+  { id: 'moire-star', name: 'Moiré Star', line: 'Two spoke sheets, one face down, wheeling into diamonds.' },
+  { id: 'moire-ripple', name: 'Moiré Ripple', line: 'Two ring sheets slid apart, every pool of dye bending the fringes.' },
+  { id: 'moire-press', name: 'Colour Press', line: 'Printer\'s screens at their angles, beating in colour over the dye.' },
+  { id: 'moire-tunnel', name: 'Zoom Tunnel', line: 'Two log-polar grids, one turning, spiralling inward for ever.' },
+];
+
+const TIERS: { id: string; name: string; price: string; lines: string[]; buy?: string }[] = [
   {
+    id: 'free',
     name: 'Free',
     price: 'In your browser',
     lines: [
@@ -84,8 +120,10 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     ],
   },
   {
+    id: 'home',
     name: 'Home',
     price: '$35',
+    buy: CHECKOUT_HOME_URL,
     lines: [
       'Full-length recording, 1080p and 4K render, no mark',
       'Phone remote',
@@ -95,12 +133,15 @@ const TIERS: { name: string; price: string; lines: string[] }[] = [
     ],
   },
   {
+    id: 'pro',
     name: 'Pro',
     price: '$199',
+    buy: CHECKOUT_PRO_URL,
     lines: [
       'Everything in Home',
-      'Several projectors with edge blending',
-      'OSC, Art-Net / DMX and MIDI out',
+      'OSC and Art-Net / DMX in the Mac app',
+      'The finest 1024² grid, and cloud sync of your looks',
+      'Make your own liquids',
     ],
   },
 ];
@@ -170,22 +211,35 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             <img src="/favicon.svg" alt="" aria-hidden="true" className="h-7 w-7" />
             <span className="text-[15px] font-semibold tracking-wide">ChromaGlass</span>
           </div>
-          <button
-            type="button"
-            data-cg-landing-signin=""
-            onClick={onPlay}
-            className="min-h-[44px] rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
-          >
-            Sign in
-          </button>
+          <div className="flex items-center gap-1">
+            <a
+              href={YOUTUBE_CHANNEL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-cg-landing-youtube=""
+              aria-label="ChromaGlass on YouTube"
+              className="flex min-h-[44px] items-center gap-2 rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
+            >
+              <YouTubeMark className="h-[14px] w-[20px] shrink-0" />
+              YouTube
+            </a>
+            <button
+              type="button"
+              data-cg-landing-signin=""
+              onClick={onPlay}
+              className="min-h-[44px] rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
+            >
+              Sign in
+            </button>
+          </div>
         </header>
 
         <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col justify-end px-4 pb-[max(32px,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pb-16">
           <h1 className="max-w-[16ch] text-[clamp(38px,9vw,72px)] font-semibold leading-[1.04] tracking-[-0.025em]">
-            A liquid light show that moves to your music.
+            A liquid light show you play to your music.
           </h1>
           <p className="mt-4 max-w-[34rem] text-[17px] leading-relaxed text-text-2 sm:text-[18px]">
-            Oil, ink and ferrofluid on a glass plate, simulated drop by drop. Play a song, pour some colour, and put it on the wall.
+            Oil, ink and ferrofluid on a glass plate, simulated drop by drop. Put a song on, pour some colour and throw it on the wall, at a gig or in your living room.
           </p>
           <div className="mt-7 flex flex-col gap-3 sm:flex-row">
             <button type="button" data-cg-landing-play="" onClick={onPlay} className={btnPrimary}>
@@ -196,10 +250,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </a>
           </div>
           <p className="mt-4 text-[13px] leading-relaxed text-muted">
-            Free in your browser, nothing to install. Sign in with Google, an emailed link or a password.
+            Free in your browser for good, nothing to install. You sign in once with Google, Apple, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
-            Home $35 · Pro $199 · one-time payment, no subscription
+            Home $35 · Pro $199 · pay once, no subscription
           </p>
         </div>
       </section>
@@ -208,7 +262,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       <section id="looks" className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Real looks from the app</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
-          Each one is a frame from the solver, a different liquid with its own physics.
+          Every picture here is a frame the app drew. Each look is a different liquid with its own physics.
         </p>
         {/* On a phone the looks are a row to swipe, so eight of them are not four screens of scrolling. */}
         <ul className="-mx-4 mt-8 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
@@ -230,6 +284,15 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </li>
           ))}
         </ul>
+        <a
+          href={YOUTUBE_CHANNEL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 inline-flex min-h-[44px] items-center gap-2.5 text-[15px] text-text-2 underline-offset-4 transition-colors hover:text-text hover:underline"
+        >
+          <YouTubeMark className="h-[17px] w-[24px] shrink-0" />
+          Watch the looks move to 1920s records on our YouTube channel
+        </a>
       </section>
 
       {/* How it works */}
@@ -252,12 +315,13 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
       <section className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-8 sm:py-24">
         <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Free to play. Pay for the app.</h2>
         <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
-          The whole plate is free in your browser. The app adds what a room needs: unmarked recordings, the phone remote, more projectors.
-          One payment, no subscription. Buying opens soon.
+          The whole plate is free in your browser, and it stays free: this is not a trial. Home and Pro add the Mac app and what a show needs:
+          full-length recordings with no mark, the phone remote, OSC and Art-Net for a rig. Pay once, no subscription. Start with Home and move to
+          Pro later for the $164 difference. The store opens in a new tab: buy with the email you will sign in with, so the app finds your licence.
         </p>
         <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
           {TIERS.map((t) => (
-            <div key={t.name} className="rounded-xl border border-border bg-surface p-5">
+            <div key={t.name} className="flex flex-col rounded-xl border border-border bg-surface p-5">
               <div className="flex items-baseline justify-between">
                 <h3 className="text-[16px] font-medium">{t.name}</h3>
                 <span className="font-mono text-[13px] text-text-2">{t.price}</span>
@@ -265,9 +329,73 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
               <ul className="mt-4 space-y-2 text-[14px] leading-snug text-muted">
                 {t.lines.map((x) => <li key={x}>{x}</li>)}
               </ul>
+              <div className="mt-auto pt-6">
+                {t.buy ? (
+                  <a
+                    href={t.buy}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-cg-landing-buy={t.id}
+                    className={`${btnPrimary} w-full`}
+                  >
+                    Buy {t.name}, {t.price}
+                  </a>
+                ) : (
+                  <button type="button" data-cg-landing-tier-play="" onClick={onPlay} className={`${btnGhost} w-full`}>Play free</button>
+                )}
+              </div>
             </div>
           ))}
         </div>
+        {/* The moiré pack (PLAN.md 45a-2): an add-on to Home, not a tier, so it sits under the
+            cards rather than beside them. Its checkout files the pack onto the Home key held by
+            the email it is bought with, hence the line about the email. On a phone the pictures
+            are a row to swipe, as the looks above are. */}
+        <div data-cg-landing-moire="" className="mt-4 rounded-xl border border-border bg-surface p-5">
+          <div className="flex items-baseline justify-between gap-4">
+            <h3 className="text-[16px] font-medium">The Moiré Pack</h3>
+            <span className="font-mono text-[13px] text-text-2">$15 on Home · in Pro</span>
+          </div>
+          <p className="mt-2 max-w-[44rem] text-[14px] leading-snug text-muted">
+            Seven looks with two printed transparencies on the light, stacked the way a light show crew stacks them on the overhead:
+            their lines cross into fringes that turn, slide and breathe with the song, and every drop of liquid under them bends the pattern.
+            Buy it with the email your Home key is under and it joins that key; Pro has it already. Anyone can try it for a minute in the app.
+          </p>
+          <ul className="-mx-5 mt-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 min-[560px]:mx-0 min-[560px]:grid min-[560px]:grid-cols-2 min-[560px]:gap-4 min-[560px]:overflow-visible min-[560px]:px-0 lg:grid-cols-4">
+            {MOIRE.map((l) => (
+              <li key={l.id} className="w-[78%] shrink-0 snap-start overflow-hidden rounded-lg border border-border min-[560px]:w-auto">
+                <img
+                  src={`/landing/moire/${l.id}.webp`}
+                  alt={`${l.name}: ${l.line}`}
+                  width={480}
+                  height={300}
+                  loading="lazy"
+                  decoding="async"
+                  className="block aspect-[8/5] w-full object-cover"
+                />
+                <div className="px-3 pb-3 pt-2">
+                  <p className="text-[13px] font-medium">{l.name}</p>
+                  <p className="mt-0.5 text-[12px] leading-snug text-muted">{l.line}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          {CHECKOUT_MOIRE_URL && (
+            <a
+              href={CHECKOUT_MOIRE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-cg-landing-pack="moire"
+              className={`${btnGhost} mt-5 w-full sm:w-auto`}
+            >
+              Buy the Moiré Pack, $15
+            </a>
+          )}
+        </div>
+        {/* What a rig needs to know, on a page of its own (PLAN.md 34a-7). */}
+        <p data-cg-landing-pro="" className="mt-4 text-[14px] leading-relaxed text-text-2">
+          Playing a rig? <a href="/pro.html" className="underline underline-offset-2 hover:text-text">What it syncs with, plugs into and records</a>, for VJs, synth players and producers.
+        </p>
         {/* The Mac app's download is a public file (the owner's choice,
             2026-10-25); the app opens only on a Home or Pro key (PLAN.md
             23.17d: the owner chose Home too, 2026-10-26). On a phone or a PC
@@ -286,9 +414,10 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         <div className="max-w-[40rem]">
           <h2 className="text-[20px] font-semibold tracking-[-0.01em]">From the maker</h2>
           <p className="mt-3 text-[15px] leading-relaxed text-text-2">
-            I wanted the oil-and-glass light shows of the sixties on a screen I could play like an instrument, with a song on, in my own room.
-            So the liquid here is simulated for real: dye spreading, oil refusing to mix, a magnet pulling ferrofluid into a maze.
-            It is made by one person. If you try it and it is not for you, say so and I will make it right.
+            I wanted the oil-and-glass light shows of the sixties on a screen I could play like an instrument, with a record on, in my own front room.
+            So the liquid is simulated, not faked: dye spreads, oil refuses to mix with water, and a magnet pulls ferrofluid into spikes.
+            One person makes ChromaGlass. If something breaks, or it isn't what you hoped, write
+            to <a href="mailto:support@chromaglass.art" className="underline underline-offset-2 hover:text-text">support@chromaglass.art</a> and I'll answer you myself.
           </p>
         </div>
       </section>
@@ -301,9 +430,12 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
         </div>
         <footer className="mx-auto w-full max-w-[1120px] px-4 pb-[max(32px,env(safe-area-inset-bottom))] sm:px-8">
           <p className="text-[12px] leading-relaxed text-dim">
-            Refunds within 14 days of purchase, through the store. <a href="/terms.html" className="underline underline-offset-2 hover:text-text-2">Terms</a>
+            Refunds within 14 days of buying: write to <a href="mailto:support@chromaglass.art" className="underline underline-offset-2 hover:text-text-2">support@chromaglass.art</a> or ask the store.{' '}
+            <a href="/terms.html" className="underline underline-offset-2 hover:text-text-2">Terms</a>
             {' · '}
             <a href="/privacy.html" className="underline underline-offset-2 hover:text-text-2">Privacy</a>
+            {' · '}
+            <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-text-2">YouTube</a>
           </p>
         </footer>
       </section>

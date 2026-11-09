@@ -18,14 +18,14 @@
  * shrinks by 4 / (4 + 1/L²) a sweep.
  */
 import { Disposer, PipelineCache } from './kit';
-import { DROP_KERNELS } from './wgsl/ferroDrop';
-import { SPIKE_ONSET, SPIKE_PITCH } from './wgsl/spikes';
+import { groupOf } from './groupCache';
+import { DROP_KERNELS, GAP_LC } from './wgsl/ferroDrop';
+import { SPIKE_PITCH } from './wgsl/spikes';
+import { LIFT_ONSET } from './wgsl/standing';
 import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { CHI0, LANGEVIN } from './standing';
 
 const LC_UV = SPIKE_PITCH / (2 * Math.PI);
-/* The plate's gap at rest (fluid.ts, REST_GAP), in l_c: the most a drop can stand before the top glass. */
-const GAP_LC = 0.03 / LC_UV;
 const WARM_SWEEPS = 24;
 const COLD_SWEEPS = 200;
 /*
@@ -41,7 +41,7 @@ function langevin(x: number): number { return x < 1e-3 ? x / 3 : 1 / Math.tanh(M
   pressure, 0.50 per unit of ln(sinh ξ / ξ)). The film takes none of it on
   the plate; the picture's drop takes all of it.
 */
-const PULL = (2 / langevin(SPIKE_ONSET / LANGEVIN) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
+const PULL = (2 / langevin(LIFT_ONSET) ** 2) * (1 + 1 / (1 + CHI0)) / (3 * CHI0);
 
 /** The drop's height on a wide flat top, in l_c, at Relief / 3D `relief`: a large sessile drop's 2 sin(θ/2). */
 export function dropPlateau(relief: number): number {
@@ -122,19 +122,15 @@ export class FerroDrop {
     args.set(magnets.slice(0, 16), 8);
     this.device.queue.writeBuffer(s.args, 0, args);
     const groups = Math.ceil(n / 8);
-    const bind = (pipe: GPUComputePipeline, entries: GPUBindingResource[]) => this.device.createBindGroup({
-      layout: pipe.getBindGroupLayout(0),
-      entries: entries.map((resource, binding) => ({ binding, resource })),
-    });
     pass.setPipeline(source);
-    pass.setBindGroup(0, bind(source, [{ buffer: s.args }, view.createView(), s.src.createView()]));
+    pass.setBindGroup(0, groupOf(this.device, source, [s.args, view, s.src]));
     pass.dispatchWorkgroups(groups, groups);
     pass.setPipeline(mean);
-    pass.setBindGroup(0, bind(mean, [{ buffer: s.args }, s.src.createView(), { buffer: s.mean }]));
+    pass.setBindGroup(0, groupOf(this.device, mean, [s.args, s.src, s.mean]));
     pass.dispatchWorkgroups(1);
     pass.setPipeline(relax);
-    const ab = bind(relax, [{ buffer: s.args }, s.src.createView(), { buffer: s.mean }, s.h[0].createView(), s.h[1].createView()]);
-    const ba = bind(relax, [{ buffer: s.args }, s.src.createView(), { buffer: s.mean }, s.h[1].createView(), s.h[0].createView()]);
+    const ab = groupOf(this.device, relax, [s.args, s.src, s.mean, s.h[0], s.h[1]]);
+    const ba = groupOf(this.device, relax, [s.args, s.src, s.mean, s.h[1], s.h[0]]);
     // An even count, so the surface ends where it started (h[0]) and the next frame warm-starts from it.
     const sweeps = s.warm ? WARM_SWEEPS : COLD_SWEEPS;
     for (let k = 0; k < sweeps; k++) {

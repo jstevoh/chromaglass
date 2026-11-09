@@ -74,18 +74,28 @@
  * 0.6 is past the half with room for a millisecond or two of jitter either
  * way, and short of the next refresh by the same.
  *
- * Why the refresh is the faster clock's. Each clock's own interval is its
- * display's refresh (or what a busy machine manages of it), and neither is
+ * Why a running wall clock paces the draws when `paceTo` is `'wall'` (PLAN.md
+ * 14b-120), and the faster clock in `'faster'`. Each clock's own interval is
+ * its display's refresh (or what a busy machine manages of it), and neither is
  * changed by what the gate turns down: a turned-down show frame asks for the
  * next one at once, and the projector asks on every refresh whatever became of
  * the last ask. So the gaps between one clock's own offers measure its display
- * whatever the other is doing. The shorter of the two is used, so neither
- * window ever gets fewer frames than its own display would give it alone: a
- * 120 Hz laptop keeps its 120 with a 60 Hz projector beside it (the draw
- * rate is then the laptop's, not the sum of both), and a covered show draws
- * every frame the projector asks for. The gaps between *draws* would be the
- * wrong measure: once doubled they are half a refresh, the gate's threshold
- * falls with them, and the doubled rate holds itself up.
+ * whatever the other is doing. With `paceTo = 'wall'` (the show's setting), a
+ * running wall clock (`ask`) sets the refresh the gate works to when the desk's
+ * clock is faster than 60 Hz (`< AMBIENT_MIN_DRAW_MS`) and the wall's is not,
+ * so a 120 Hz desk with a 60 Hz projector draws at the projector's 60 Hz and
+ * the desk's preview takes those same frames, while with no wall running (or on
+ * a 60 Hz desk) the desk draws at its own rate (`'faster'` uses the shorter of
+ * the two clocks). Without the `frame < AMBIENT_MIN_DRAW_MS` guard, a 60 Hz
+ * wall missing refreshes on a busy runner (40.0 asks/s, median gap 33.3 ms of
+ * two refreshes) alongside a 60 Hz show window (53.0/s, median 16.7 ms) read as
+ * `frame < 0.8 * ask` with a 33.3 ms target refresh (0.6 of it 20.0 ms, over
+ * one 60 Hz refresh), turning down the show's own next frames where no ask drew
+ * (`npm run wall` on the Mac runner: 44.5 drawn/s against 47.7, and 27.5 show
+ * frames skipped/s against 19.0 asks drawn). The gaps
+ * between *draws* would be the wrong measure: once doubled they are half a
+ * refresh, the gate's threshold falls with them, and the doubled rate holds
+ * itself up.
  *
  * Why a median of the last few gaps, and bounds. One late frame (a long task,
  * a collection) is a single long gap, and a mean would carry it into the next
@@ -133,7 +143,10 @@
  * the app with the projector window open.
  */
 
+import { isGlobalAmbientMode } from './ambient.ts';
+
 export type DrawSource = 'frame' | 'ask';
+export type DrawPace = 'faster' | 'wall';
 
 /** An offer this soon after the last draw, as a fraction of a refresh, is turned down. */
 export const DRAW_SKIP_FRACTION = 0.6;
@@ -141,6 +154,8 @@ export const DRAW_SKIP_FRACTION = 0.6;
 export const REFRESH_MIN_MS = 1000 / 240;
 /** What is assumed before either clock has been measured. */
 export const REFRESH_DEFAULT_MS = 1000 / 60;
+/** Ambient mode's 60 Hz draw ceiling (14j / 23.8): 0.8 of a 60 Hz interval lets 60 Hz jitter through and halves 120 Hz. */
+export const AMBIENT_MIN_DRAW_MS = (1000 / 60) * 0.8;
 /**
  * How long a clock may go quiet and still count as running: a quarter of a
  * second, the same hold `lib/earClock.ts` gives the wall's ragged asks
@@ -222,8 +237,20 @@ export const stampMisses = { ahead: 0, aheadMs: 0, stale: 0, staleMs: 0, lastAt:
 export class DrawGate {
   /** When anything was last drawn (ms). */
   lastDraw = -Infinity;
+  /** Optional explicit per-gate ambient cap (defaults to global ambient mode). */
+  ambient = false;
+  /** Whether two clocks pace to the faster display or to the wall's refresh (14b-120). */
+  paceTo: DrawPace = 'faster';
   private readonly lastOffer: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
+
+  constructor(paceTo: DrawPace = 'faster') {
+    this.paceTo = paceTo;
+  }
   private readonly gaps: Record<DrawSource, number[]> = { frame: [], ask: [] };
+  private readonly medians: Record<DrawSource, number> = { frame: Infinity, ask: Infinity };
+  private readonly medianStamp: Record<DrawSource, number> = { frame: -Infinity, ask: -Infinity };
+  private readonly scratch: number[] = [];
+  private askFast = false;
   /**
    * Whether each clock has offered since the last draw (or made it): its one
    * refresh that draw stands for is spent, so its next offer is a refresh of
@@ -239,15 +266,45 @@ export class DrawGate {
     return now - this.lastOffer.ask <= CLOCK_FRESH_MS && now - this.lastOffer.frame <= CLOCK_FRESH_MS;
   }
 
-  /** The refresh the gate works to at `now` (ms): the faster running clock's median gap, never under 240 Hz's. */
-  refreshMs(now: number): number {
-    let best = Infinity;
-    for (const source of ['frame', 'ask'] as const) {
-      const g = this.gaps[source];
-      if (g.length === 0 || now - this.lastOffer[source] > CLOCK_FRESH_MS) continue;
-      const sorted = [...g].sort((a, b) => a - b);
-      best = Math.min(best, sorted[sorted.length >> 1]);
+  private updateMedian(source: DrawSource): number {
+    const g = this.gaps[source];
+    if (g.length === 0) return (this.medians[source] = Infinity);
+    const s = this.scratch;
+    s.length = g.length;
+    for (let i = 0; i < g.length; i++) s[i] = g[i];
+    s.sort((a, b) => a - b);
+    return (this.medians[source] = s[s.length >> 1]);
+  }
+
+  private clockMs(source: DrawSource, now: number): number {
+    if (now - this.lastOffer[source] > CLOCK_FRESH_MS) return Infinity;
+    if (this.medianStamp[source] !== this.lastOffer[source]) {
+      this.medianStamp[source] = this.lastOffer[source];
+      return this.updateMedian(source);
     }
+    return this.medians[source];
+  }
+
+  /**
+   * Whether the desk is a high-refresh display (> 60 Hz, `< AMBIENT_MIN_DRAW_MS`)
+   * pacing down to a slower running wall clock (PLAN 14b-120). A 60 Hz desk
+   * (`>= AMBIENT_MIN_DRAW_MS`) whose wall drops refreshes on a busy runner has
+   * `frame < 0.8 * ask` too (16.7 ms against a 33.3 ms two-refresh median),
+   * and must not mistake those dropped wall refreshes for a 30 Hz projector
+   * and skip its own 60 Hz frames.
+   */
+  private fasterDesk(now: number): boolean {
+    if (this.paceTo !== 'wall' || this.askFast) return false;
+    const frame = this.clockMs('frame', now);
+    const ask = this.clockMs('ask', now);
+    return frame < AMBIENT_MIN_DRAW_MS && ask >= AMBIENT_MIN_DRAW_MS && frame < 0.8 * ask;
+  }
+
+  /** The refresh the gate works to at `now` (ms): the faster running clock's median gap (or the wall's when `paceTo === 'wall'` on a faster desk), never under 240 Hz's. */
+  refreshMs(now: number): number {
+    const ask = this.clockMs('ask', now);
+    if (this.fasterDesk(now)) return Math.max(REFRESH_MIN_MS, Math.min(ask, REFRESH_DEFAULT_MS));
+    const best = Math.min(this.clockMs('frame', now), ask);
     if (!Number.isFinite(best)) return REFRESH_DEFAULT_MS;
     return Math.max(REFRESH_MIN_MS, best);
   }
@@ -263,13 +320,27 @@ export class DrawGate {
   offer(source: DrawSource, now: number): boolean {
     const gap = now - this.lastOffer[source];
     const g = this.gaps[source];
-    if (gap > CLOCK_FRESH_MS) g.length = 0;
-    else if (gap > 0) { g.push(gap); if (g.length > GAPS) g.shift(); }
+    if (gap > CLOCK_FRESH_MS) {
+      g.length = 0;
+      this.medians[source] = Infinity;
+      if (source === 'ask') this.askFast = false;
+    } else if (gap > 0) {
+      g.push(gap);
+      if (g.length > GAPS) g.shift();
+      this.updateMedian(source);
+      if (source === 'ask' && g.length >= 4 && this.medians.ask < AMBIENT_MIN_DRAW_MS) this.askFast = true;
+    }
     this.lastOffer[source] = now;
+    this.medianStamp[source] = now;
+    if ((this.ambient || isGlobalAmbientMode()) && now - this.lastDraw < AMBIENT_MIN_DRAW_MS) {
+      this.skipped[source]++;
+      return false;
+    }
     // Gated only while the other clock is running too: one clock alone, the
     // show with no wall or the wall with the show covered, draws every tick.
-    // And never this clock's own next refresh (see above).
-    const ownNext = this.spent[source] && gap >= REFRESH_MIN_MS;
+    // And never this clock's own next refresh (see above), unless pacing a
+    // >60 Hz desk down to a slower wall clock (14b-120).
+    const ownNext = !(source === 'frame' && this.fasterDesk(now)) && this.spent[source] && gap >= REFRESH_MIN_MS;
     if (this.twoClocks(now) && now - this.lastDraw < DRAW_SKIP_FRACTION * this.refreshMs(now) && !ownNext) {
       // An offer stamped behind the last draw (its callback ran late, after
       // the other clock's next refresh) is an earlier refresh, not the one

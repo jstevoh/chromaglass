@@ -44,6 +44,7 @@
  * in the same order.
  */
 import type { Rng } from './rng';
+import { MOIRE_LOOKS } from '../presetsMoire';
 
 /** Which of the music's hands land in an area. `any` takes whatever no area claims. */
 export type AreaBand = 'bass' | 'mid' | 'treble' | 'any';
@@ -168,12 +169,13 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
   /*
     Poster, 1969 (PLAN 25b-4, 28i-3b): three hard-edged poster shapes apart on
     the glass, so the bass and snare work separate shapes rather than one
-    middle stain. Left, an orange-and-coral milk shape on the bass; right, an
-    ultramarine-and-purple ink shape on the mids; low in the middle, an amber
-    milk shape on the treble.
+    middle stain. Left, a milk shape on the bass whose bottle the lead's note
+    picks (PLAN 25i): orange, ultramarine or purple, so the kick pours and
+    the melody colours; right, an ultramarine-and-purple ink shape on the
+    mids; low in the middle, an amber milk shape on the treble.
   */
   'poster-1969': [
-    { x: 0.28, y: 0.36, r: 0.14, liquid: 'milk', dye: 0, dyes: [0, 1], band: 'bass' },
+    { x: 0.28, y: 0.36, r: 0.14, liquid: 'milk', dye: 0, dyes: [0, 3, 4], band: 'bass' },
     { x: 0.72, y: 0.38, r: 0.14, liquid: 'ink', dye: 3, dyes: [3, 4], band: 'mid' },
     { x: 0.48, y: 0.72, r: 0.13, liquid: 'milk', dye: 2, dyes: [2], band: 'treble' },
   ],
@@ -199,7 +201,45 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
     { x: 0.31, y: 0.44, r: 0.14, liquid: 'acid', dye: 0, dyes: [0], band: 'mid' },
     { x: 0.69, y: 0.56, r: 0.14, liquid: 'base', dye: 1, dyes: [1], band: 'bass' },
   ],
+  /*
+    Chemical Clock (PLAN 25i): three places in the gel the kick touches,
+    one each kick in turn (areaForBand), as a projectionist touches a dish
+    of the reaction with a wire. The kick's own beat dose there is a drop of
+    the activator (the bottle, bottles.ts): the gel fires and a ring runs
+    out from it. A touch inside a ring still passing is in gel that has not
+    recovered and fires nothing (the Oregonator's refractory tail), so the
+    places pace themselves no faster than the gel can. Its own seed lays the
+    plate (OWN_SEED_AREAS): the areas are only where the music touches it.
+  */
+  'chemical-clock': [
+    { x: 0.3, y: 0.34, r: 0.12, liquid: 'activator', dye: 0, dyes: [0], band: 'bass' },
+    { x: 0.7, y: 0.38, r: 0.12, liquid: 'activator', dye: 1, dyes: [1], band: 'bass' },
+    { x: 0.5, y: 0.7, r: 0.12, liquid: 'activator', dye: 2, dyes: [2], band: 'bass' },
+  ],
+  /*
+    Saffron Lace (after the owner's lace still, 2026-11-07): the colour under
+    a yellow film, laid as pools on the lamp's white rather than as a ground,
+    because yellow over a lavender ground filters to amber (presets.ts says
+    the arithmetic). Right, a wide wash of lavender laid thin (fill), so the
+    film over it stays yellow and its holes show lilac; it pours glycerine,
+    whose body holds the wash in its place, and the mids land there. Left, cobalt with icy-blue drops, where the bass
+    lands and soap is poured: each kick there opens holes in the film over
+    it. Low in the middle, coral, where the treble drops oil, which joins the
+    film and thickens it, so the lace there tears again from fresh. The
+    fills were read off the lab (scratch renders, 2026-11-07): at a full pool
+    the lavender drew violet-blue, the cobalt navy and the coral red, each
+    under a film that darkened them further.
+  */
+  'saffron-lace': [
+    { x: 0.71, y: 0.48, r: 0.16, liquid: 'glycerine', dye: 0, dyes: [0], band: 'mid', fill: 0.2 },
+    { x: 0.28, y: 0.44, r: 0.09, liquid: 'soap', dye: 1, dyes: [1, 3], band: 'bass', fill: 0.28 },
+    { x: 0.46, y: 0.6, r: 0.07, liquid: 'oil', dye: 2, dyes: [2], band: 'treble', fill: 0.3 },
+  ],
 };
+
+// A look of the moiré pack has its house look's areas, as it has its dyes
+// and its dish (presetPlate.ts, PLAN 45a): its cords are the house look's.
+for (const m of MOIRE_LOOKS) if (PRESET_AREAS[m.from]) PRESET_AREAS[m.id] = PRESET_AREAS[m.from];
 
 /**
  * Looks whose areas take the music and the area cords but whose plate is laid
@@ -207,11 +247,28 @@ export const PRESET_AREAS: Record<string, PlateArea[]> = {
  * Bloom's bells, Milk Marbling's pale milk dish and food-colouring spots),
  * rather than as pools (layAreas).
  */
-export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom', 'milk-marble']);
+export const OWN_SEED_AREAS: ReadonlySet<string> = new Set(['jellyfish-bloom', 'milk-marble', 'chemical-clock']);
 
 /** The areas of a look, or null for a look built the old way. */
 export const plateAreas = (presetId: string | null | undefined): PlateArea[] | null =>
   (presetId && PRESET_AREAS[presetId]?.length ? PRESET_AREAS[presetId] : null);
+
+/**
+ * The angle a look's dish is set down at, radians: `drawn` (the plate's dice,
+ * a new one each night with the show's seed), or square for a look with areas.
+ *
+ * A look's areas are places on the glass and are laid in the plate's own
+ * frame, so the turned picture turns them with it, and the look's words
+ * (Red Cabbage's acid well on the left and its base well on the right,
+ * Poster's shape on the left) were true only on a night the dice came up
+ * near nought. Filmed on the owner's Mac, 2026-10-31, Red Cabbage's pink
+ * stood on the right and its green on the left: the chemistry was right
+ * and the dish was upside down. A projectionist sets a dish with places
+ * the way the plan has them, so a look with areas is set square; every
+ * other look keeps the dice's angle (still drawn, so nothing after it in
+ * the stream moves).
+ */
+export const layAngle = (presetId: string, drawn: number): number => (plateAreas(presetId) ? 0 : drawn);
 
 /**
  * The areas a band works in: those that claim it, else those that claim

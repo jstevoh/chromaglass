@@ -1,27 +1,37 @@
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import type { TempoReading } from '../../lib/tempo';
+import { linkLine, tempoSourceName, type TempoLabel, type TempoReading } from '../../lib/tempo';
 import type { MixTakes } from '../../lib/mixFade';
 import {
   Magnet,
   Play, Pause, Microscope, EyeOff, X, Music, Palette, Hourglass, MoreHorizontal, ChevronDown,
-  Mic, FileAudio, Settings, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
+  Mic, FileAudio, Settings, MessageSquare, Clapperboard, Circle, Square, BookOpen, Monitor, ImagePlus,
   Smartphone, Undo2, Shuffle, RotateCw, Trash2, Waves, SlidersVertical, Lightbulb,
   Laptop, Save, Video, User, LogIn,
   Crosshair, LayoutGrid, Plus, Share2,
 } from 'lucide-react';
 import { Slider, Segmented, LIT, LIVE } from '../ui';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { PIN_RANGE } from '../../lib/deskPins';
+import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
 import { MixerPanel } from '../MixerPanel';
+import { PhoneMoire } from './PhoneMoire';
+import { PhoneInkTitle } from './PhoneInkTitle';
+import { findPreset } from '../../presets';
+import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
+import { FeedbackPane } from '../settings/FeedbackPane';
 import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { canShareClip, shareClip } from '../../lib/shareClip';
 import type { ClipShape } from '../../lib/clipFrame';
+import { OscOutRow } from '../ui/OscOutRow';
+import type { OscOutLabel } from '../../lib/oscOut';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { TOOL_AMOUNT, TOOL_AMOUNT_MEANS } from '../../lib/toolAmount';
 import type { Track } from '../../lib/musicLibrary';
@@ -83,7 +93,7 @@ export interface PhoneLook {
   swatch: string;
 }
 
-type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs';
+type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 'feedback';
 
 /**
  * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
@@ -225,8 +235,15 @@ export interface PhoneStageProps {
   /** The plate's volume, 0 to 100, or null with no ear: what the VU needle in the Sound sheet is moved by. */
   readLevel: () => number | null;
   /** The tempo source: where the tempo comes from, a tap, and the reading the beat light polls. */
-  tempo: { source: string | null; bpm: number; taps: number };
+  tempo: TempoLabel;
   onTap: () => void;
+  /** Ableton Link on or off at the show server, offered while one is there (PLAN.md 13.5-link). */
+  onLink?: (on: boolean) => void;
+  /** Live's play and stop move the Sequence (13.5-link-transport), as on the desk. */
+  onLinkTransport?: (on: boolean) => void;
+  /** OSC out at the show server (PLAN.md 13.5-osc), the desk's own row at a phone's size; null until a server is there. */
+  oscOut?: OscOutLabel | null;
+  onOscOut?: (on: boolean, target?: string) => boolean;
   readTempo: () => TempoReading | null;
   /*
     The show from the phone: Light Show Night, the paced sequence played like
@@ -324,9 +341,10 @@ export interface PhoneStageProps {
    * Clear Film (PLAN §20b): a clear oil film over the dish that tears into
    * lace. On the Dye sheet, under the bottles, because it is a liquid
    * poured: the Oil and Alcohol bottles then thicken it and punch holes in it.
+   * With its dye (PLAN 20b-13) beside it, so the settings come as one piece.
    */
-  clearFilm: number;
-  onClearFilm: (v: number) => void;
+  film: Pick<VisualizerSettings, 'clearFilm' | 'clearFilmDye' | 'clearFilmDyeColor'>;
+  onFilm: (patch: Partial<VisualizerSettings>) => void;
   // Slosh: how far a tilt sloshes the liquid (lib/slosh.ts), beside the Tilt tile.
   slosh: number;
   onSlosh: (v: number) => void;
@@ -349,6 +367,8 @@ export interface PhoneStageProps {
   /** Back to Play (PhonePlay.tsx), the listening screen a phone opens on. */
   onPlayScreen?: () => void;
   onOpenAccount?: () => void;
+  ambientMode?: boolean;
+  onAmbientMode?: (on: boolean) => void;
 }
 
 /** A sheet from the bottom: over the lower part of the plate, gone with a tap above it. */
@@ -625,7 +645,7 @@ export function PhoneStage(p: PhoneStageProps) {
               label="Magnet · size"
               value={p.magnetSize}
               min={0}
-              max={1}
+              max={PIN_RANGE.get('magnetSize')?.max ?? 1}
               step={0.05}
               onChange={p.onMagnetSize}
               display={`${Math.round(p.magnetSize * 100)}%`}
@@ -698,7 +718,7 @@ export function PhoneStage(p: PhoneStageProps) {
             className={`flex h-[52px] min-w-0 flex-col landscape:h-12 items-center justify-center gap-0.5 rounded-lg border text-[12px] ${sheet === 'dye' ? LIT : 'border-transparent text-text-2 active:bg-active'}`}
           >
             {/* The bottle in hand, filled to what is left of the Dye Budget (PLAN 35e); it leans while its sheet is open. */}
-            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} />
+            <LiveBottle colour={liquid ? bottleSwatch(liquid).backgroundColor : '#fff'} read={p.dyeRoom} height={20} tipped={sheet === 'dye'} testId="phone-dye-bottle" />
             <span className="max-w-full truncate px-0.5">{liquid?.name ?? 'Dye'}</span>
           </button>
         </div>
@@ -761,10 +781,29 @@ export function PhoneStage(p: PhoneStageProps) {
           ))}
           {liquid?.description && <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-liquid-description">{liquid.description}</p>}
 
+          {(liquid?.id === 'soap' || (p.mixer?.settings.soapBreakdown ?? 0) > 0.001) && p.mixer && (
+            <div className="mt-3">
+              <Slider label="Soap Breakdown" value={p.mixer.settings.soapBreakdown ?? 0} min={0} max={1} step={0.01}
+                onChange={v => p.mixer!.onSetting({ soapBreakdown: v })}
+                display={readSetting('soapBreakdown', p.mixer.settings.soapBreakdown ?? 0, 0, 1)}
+                touch testId="phone-soap-breakdown" midiKey="setting:soapBreakdown" />
+            </div>
+          )}
+
           <div className="mt-3">
-            <Slider label="Clear Film" value={p.clearFilm} min={0} max={1} step={0.05} onChange={p.onClearFilm}
-              display={`${Math.round(p.clearFilm * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
+            <Slider label="Clear Film" value={p.film.clearFilm ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilm: v })}
+              display={`${Math.round((p.film.clearFilm ?? 0) * 100)}%`} touch testId="phone-clear-film" midiKey="setting:clearFilm" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">A clear film over the colour that tears into lace. Alcohol opens holes in it, oil thickens it. White on the Lamp Ground.</p>
+            {(p.film.clearFilm ?? 0) > 0.001 && (
+              <div className="mt-3 flex items-end gap-3">
+                <div className="flex-1">
+                  <Slider label="Film Dye" value={p.film.clearFilmDye ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.onFilm({ clearFilmDye: v })}
+                    display={`${Math.round((p.film.clearFilmDye ?? 0) * 100)}%`} touch testId="phone-film-dye" midiKey="setting:clearFilmDye" />
+                </div>
+                <input type="color" aria-label="Film dye colour" data-testid="phone-film-dye-colour" value={p.film.clearFilmDyeColor ?? '#ffd21a'}
+                  onChange={(e) => p.onFilm({ clearFilmDyeColor: e.target.value })} className="mb-5 h-11 w-11 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
+              </div>
+            )}
           </div>
 
           <SectionLabel>{liquid ? `${liquid.name}'s colour` : 'Colour'}</SectionLabel>
@@ -882,6 +921,7 @@ export function PhoneStage(p: PhoneStageProps) {
               display={`${Math.round(p.lampGround * 100)}%`} touch testId="phone-lamp-ground" midiKey="setting:lampGround" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">Black, or the lamp shining up through the dye: clear liquid white, deep dye dark.</p>
           </div>
+          <PhoneMoire settings={p.mixer.settings} onSetting={p.mixer.onSetting} />
           <div className="mt-3">
             <Slider label="Two Projectors" value={p.twoProjectors} min={0} max={1} step={1} onChange={p.onTwoProjectors}
               display={p.twoProjectors > 0.5 ? 'On' : 'Off'} touch testId="phone-two-projectors" midiKey="setting:twoProjectors" />
@@ -891,6 +931,11 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Projector Focus" value={p.projectorFocus} min={0} max={1} step={0.05} onChange={p.onProjectorFocus}
               display={`${Math.round(p.projectorFocus * 100)}%`} touch testId="phone-projector-focus" midiKey="setting:projectorFocus" />
             <p className="-mt-3 text-[12px] leading-snug text-dim">The lens's focus across the liquid: 50% is sharp; either way a bright and a dark line part at every edge.</p>
+          </div>
+          <div className="mt-3">
+            <Slider label="Heat" value={p.mixer.settings.heat ?? 0} min={0} max={1} step={0.05} onChange={(v) => p.mixer.onSetting({ heat: v })}
+              display={`${Math.round((p.mixer.settings.heat ?? 0) * 100)}%`} touch testId="phone-heat" midiKey="setting:heat" />
+            <p className="-mt-3 text-[12px] leading-snug text-dim">The projector lamp&apos;s heat in the dish: hold a finger on the glass to block the fan&apos;s air and boil the spot.</p>
           </div>
           {(printing || p.benDay > 0.001) && (
             <div className="mt-3">
@@ -928,7 +973,9 @@ export function PhoneStage(p: PhoneStageProps) {
                         // The switch is for one look: it goes back to Whole plate
                         // once that look is sent, so a pick an hour later is not
                         // sent to the back plate by a switch nobody remembers.
-                        if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
+                        // A pack's look without the pack opens the account sheet (PLAN 45a).
+                        if (isPackLocked(findPreset(l.id)?.pack)) openAccountSheet();
+                        else if (lookTo === 'back' && p.onBackLook) { p.onBackLook(l.id); setLookTo('all'); }
                         else p.onLook(l.id);
                         close();
                       }}
@@ -1036,8 +1083,35 @@ export function PhoneStage(p: PhoneStageProps) {
             <TapPad tempo={p.tempo} read={p.readTempo} onTap={p.onTap} touch />
           </div>
           <p className="mt-1 text-[12px] leading-snug text-dim" data-testid="phone-tempo-says">
-            {p.tempo.source ? `${p.tempo.bpm} bpm, ${p.tempo.source === 'clock' ? 'from MIDI clock' : p.tempo.source === 'tap' ? 'tapped' : 'set'}. Four taps give a good one.` : 'Listening for the tempo. Two taps give one, four give a good one.'}
+            {p.tempo.source ? `${p.tempo.bpm} bpm, ${p.tempo.source === 'clock' ? 'from MIDI clock' : p.tempo.source === 'link' ? 'from Ableton Link' : tempoSourceName(p.tempo.source)}. Four taps give a good one.` : 'Listening for the tempo. Two taps give one, four give a good one.'}
           </p>
+          {/* Link, where a show server is there to join it: the Mac app at a phone's width. */}
+          {p.tempo.link?.available && p.onLink && (
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                onClick={() => p.onLink?.(!p.tempo.link?.on)}
+                aria-pressed={p.tempo.link.on}
+                data-testid="phone-tempo-link"
+                className={`min-h-11 flex-none rounded-xl border px-4 text-[14px] font-medium ${p.tempo.link.on ? LIT : 'border-white/10 bg-white/5'}`}
+              >
+                Link
+              </button>
+              <span className="text-[12px] leading-snug text-dim">{linkLine(p.tempo.link)}</span>
+              {p.tempo.link.on && p.onLinkTransport && (
+                <button
+                  onClick={() => p.onLinkTransport?.(!p.tempo.link?.follows)}
+                  aria-pressed={!!p.tempo.link.follows}
+                  data-testid="phone-tempo-link-transport"
+                  className={`ml-auto min-h-11 flex-none rounded-xl border px-4 text-[14px] font-medium ${p.tempo.link.follows ? LIT : 'border-white/10 bg-white/5'}`}
+                >
+                  Play/Stop
+                </button>
+              )}
+            </div>
+          )}
+          {p.oscOut && p.onOscOut && (
+            <div className="mt-2"><OscOutRow oscOut={p.oscOut} onOscOut={p.onOscOut} touch testId="phone-osc-out" /></div>
+          )}
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
@@ -1055,6 +1129,9 @@ export function PhoneStage(p: PhoneStageProps) {
             {p.tilt.supported && (
               <Tile icon={Smartphone} label={p.tilt.on ? 'Tilting' : 'Tilt'} on={p.tilt.on} onPress={p.tilt.onToggle} testId="phone-tilt" />
             )}
+            {p.onAmbientMode && (
+              <Tile icon={Monitor} label={p.ambientMode ? 'Ambient on' : 'Ambient TV'} on={!!p.ambientMode} onPress={() => p.onAmbientMode?.(!p.ambientMode)} testId="phone-ambient" />
+            )}
           </div>
           {(p.show.running || p.show.paused) && (
             <p className="mt-2 text-[13px] leading-snug text-muted" data-testid="phone-show-says">
@@ -1067,6 +1144,18 @@ export function PhoneStage(p: PhoneStageProps) {
               <SongScore {...p.score} touch />
             </>
           )}
+          {/*
+            The desk's Tip pad under a thumb (PLAN 18a-13j): for a phone on a stand,
+            an iPad, or a hand that would rather not tip the phone itself. Hidden
+            while Tilt is on, since the phone is then the dish and both would write
+            the same two settings.
+          */}
+          {!p.tilt.on && (
+            <div className="mt-3 flex items-center gap-4" data-testid="phone-tip">
+              <TipPad settings={p.mixer.settings} onSetting={p.mixer.onSetting} size={128} testId="phone-tip-pad" />
+              <p className="min-w-0 text-[13px] leading-snug text-muted">Drag the dot toward an edge and the liquid runs there. Let go and the dish lies flat, and the liquid sloshes back.</p>
+            </div>
+          )}
           {p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-muted">Tip the phone and the liquid runs downhill. The way you held it when you turned this on is level. Tip it one way and then the other, and with Slosh up it slops across.</p>}
           <div className="mt-3">
             <Slider label="Slosh" value={p.slosh} min={0} max={1} step={0.05} onChange={p.onSlosh}
@@ -1075,7 +1164,7 @@ export function PhoneStage(p: PhoneStageProps) {
           {p.tilt.silent && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">No motion sensor answered, so Tilt is off. It needs a phone or a tablet.</p>}
           {p.tilt.refused && !p.tilt.on && <p className="mt-2 text-[13px] leading-snug text-warn">The phone said no to its motion sensor. Settings → Safari → Motion &amp; Orientation Access turns it back on.</p>}
           <div className={`mt-4 transition-opacity ${p.evolving ? '' : 'opacity-50'}`}>
-            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={1} step={0.01} onChange={p.onEvolveSpeed}
+            <Slider label="Evolve speed" value={p.evolveSpeed} min={0} max={PIN_RANGE.get('automateRate')?.max ?? 1} step={0.01} onChange={p.onEvolveSpeed}
               display={`${Math.round(p.evolveSpeed * 100)}%`} touch testId="phone-evolve-speed" midiKey="setting:automateRate" />
           </div>
           {/*
@@ -1174,9 +1263,27 @@ export function PhoneStage(p: PhoneStageProps) {
           </PanelGuard>
         </PhoneSheet>
       )}
+      {/* Settings → Feedback, the same pane the sheet draws (PLAN 39a), a tap from More rather than at the far end of the Settings strip. */}
+      {sheet === 'feedback' && (
+        <PhoneSheet title="Feedback" onClose={close} testId="phone-sheet-feedback">
+          <PanelGuard name="The Feedback sheet" inline onClose={close}>
+            <FeedbackPane card="" title="hidden" />
+          </PanelGuard>
+        </PhoneSheet>
+      )}
       {sheet === 'more' && (
         <PhoneSheet title="More" onClose={close} testId="phone-sheet-more">
           <PanelGuard name="The More sheet" inline onClose={close}>
+          {/*
+            Song titles as ink (PLAN 37x-10): the desk's Logo & Titles switch,
+            on the phone. Above the tiles, not after Record makes where it
+            first went: Songs, Settings, Guide and the rest close this sheet
+            to open their own, so anything below them is a sheet the hand (and
+            `npm run switches`, which walks the sheet in order and found the
+            switch gone by the time it reached it) has to open again. The
+            switch is the one thing here changed mid-set; the tiles lead away.
+          */}
+          {p.mixer && <div className="mb-3"><PhoneInkTitle settings={p.mixer.settings} onSetting={p.mixer.onSetting} /></div>}
           <div className="grid grid-cols-3 gap-1.5">
             <Tile
               icon={p.recording.on ? Square : Circle}
@@ -1189,6 +1296,7 @@ export function PhoneStage(p: PhoneStageProps) {
             />
             <Tile icon={Clapperboard} label="Songs" onPress={() => { close(); p.onSongs(); }} testId="phone-songs" />
             <Tile icon={Settings} label="Settings" onPress={() => { close(); p.onSettings(); }} testId="phone-settings" />
+            <Tile icon={MessageSquare} label="Feedback" onPress={() => open('feedback')} testId="phone-feedback" />
             <Tile icon={BookOpen} label="Guide" onPress={() => { close(); p.onGuide(); }} testId="phone-guide" />
             <Tile icon={Monitor} label="Full layout" onPress={() => { close(); p.onFullLayout(); }} testId="phone-full-layout" />
             {p.deskTabs && <Tile icon={LayoutGrid} label="Tabs" onPress={() => open('tabs')} testId="phone-tabs" />}

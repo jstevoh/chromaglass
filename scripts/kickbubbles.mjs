@@ -54,11 +54,11 @@
  * the bubbles', and the Mac's run is the one that says.
  */
 import { chromium } from 'playwright';
-import { launchChromium, presentsInXvfb } from './chromium.mjs';
+import { launchChromium, presentsInXvfb, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = Number(process.env.KICKBUBBLES_PORT ?? 4363);
+const PORT = port(4363, 'KICKBUBBLES_PORT');
 // A Linux box with PW_WEBGPU presents headed into Xvfb below (chromium.mjs, PLAN.md 19l), so its plate
 // draws too, a frame every few seconds. The listening window is the wall clock's there as on a Mac
 // (`settlePlate` only ever adds steps to it), so the kicks heard in it are as few as its frames: see the
@@ -160,7 +160,26 @@ try {
     await settlePlate(page, 500);
     if (c.screen.touch) await page.touchscreen.tap(at.x, at.y);
     else await page.mouse.click(at.x, at.y);
-    await settlePlate(page, c.listenMs ?? LISTEN_MS);
+    /*
+      Room, made the way the bubbles used to make it themselves. A chance is
+      a kick that finds room on the plate, and until PLAN 38b the room came
+      back as each bubble's 13 to 35 second timer ran out. A pocket between
+      glasses has no timer (#603): it goes only at the rim, by a merge or
+      under a drop, so on Classic's quiet plate the first dozen chances
+      filled the room for the rest of the window, and the deploy after #603
+      counted 11 chances where the floor is 15. What this check measures is
+      the decision on a kick (Audio Impact's odds), not how long a bubble
+      lasts, so the look's own bubbles are let go every eight seconds of the
+      window, as a hand wiping the plate would, and the last eight seconds or
+      more are left alone so the plate still carries what the music released.
+    */
+    const listen = c.listenMs ?? LISTEN_MS, slice = 8000;
+    let t = 0;
+    for (; t + 2 * slice <= listen; t += slice) {
+      await settlePlate(page, slice);
+      await page.evaluate(() => window.chromaglassDebug().bubbles?.clearLooks());
+    }
+    await settlePlate(page, listen - t);
     const after = await read(page);
     const kicks = (after.kicks ?? 0) - (before.kicks ?? 0);
     const m0 = before.music ?? {}, m1 = after.music ?? {};

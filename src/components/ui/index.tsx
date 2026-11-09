@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { useMidiTouch } from '../../hooks/useMidiTouch';
 import { useEscape } from '../../hooks/useEscape';
-import { curveOf, settingKeyOf, handValueAt, travelOf } from '../../lib/midi';
+import { curveOf, handValueAt, travelOf } from '../../lib/midi';
 import { KNOB_PX, onRing, ringTravel } from '../../lib/knobDrag';
 import { helpFor } from '../../lib/controlHelp';
 import { useControlTip } from './ControlTip';
@@ -367,9 +367,15 @@ export interface SliderProps extends Keyed {
   resetTo?: number;
   /** What it does, one line. A setting's own line is found by `midiKey`. */
   help?: string;
+  /**
+   * The name, the travel and the value on one line, for a strip that has to
+   * show all of itself in a short column (the desk's Rides). Ignored on touch,
+   * where the 48 px rule needs the full row.
+   */
+  dense?: boolean;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -392,9 +398,14 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     would put a third of the way along. The panel and the phone were right
     and the desk was wrong, which is the hardest kind of wrong to notice.
   */
-  const settingKey = settingKeyOf(midiKey);
   const bareSettingKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
-  const curve = settingKey ? curveOf(settingKey) : 1;
+  /*
+    The curve by the bare name, not `settingKey`, which is only a setting MIDI
+    can learn: a panel dial with a curve of its own (`PANEL_CURVES`, such as
+    Gel Speed's, widened to 30 rpm) pinned to a desk would otherwise ride a
+    straight throw with the look's value hard against the left stop.
+  */
+  const curve = bareSettingKey ? curveOf(bareSettingKey as keyof VisualizerSettings) : 1;
   const at = curve === 1 ? (value - min) / (max - min) : travelOf(value, min, max, curve);
   const pct = at * 100;
   /*
@@ -415,6 +426,50 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     name: label, help: line, value: display,
     hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
+  const track = (
+    <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
+      <input
+        type="range"
+        min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
+        step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
+        value={curve === 1 ? value : at}
+        onChange={e => {
+          const raw = Number(e.target.value);
+          if (curve === 1) { onChange(raw); return; }
+          onChange(handValueAt(raw, min, max, curve));
+        }}
+        aria-label={label}
+        onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
+        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''}`}
+        style={{ '--fill': `${pct}%` } as CSSProperties}
+      />
+    </PaceTrack>
+  );
+  /*
+    One line, for the Rides (the owner, 2026-11-07: "where is the macro zoom
+    control?"). On the Perform tab the Rides sit under the Bottles, and at
+    1440×900 the column left them room for three of their eight 88 px rows:
+    Macro Zoom, the seventh, was below the fold with the scrollbar hidden. The
+    owner chose denser faders over moving it. The name keeps the left, the
+    travel takes the middle and the value the right, so a row is 25 px and the
+    strip shows whole (`npm run layout`). The hand still gets the full width of
+    travel left after the name, the same curve, the CC chip and the card.
+  */
+  if (dense && !touch) {
+    return (
+      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+        {tip.card}
+        <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
+        <div className="min-w-0 flex-1">{track}</div>
+        {cc != null && (
+          <span className={`shrink-0 rounded-xs px-1 font-mono text-[11px] transition-colors duration-[120ms] ${
+            hit ? 'bg-text text-bg' : 'text-faint'
+          }`}>{cc}</span>
+        )}
+        <span className="w-[46px] shrink-0 rounded-xs bg-elevated px-1 text-right leading-[18px] font-mono text-[11px] font-medium text-text-2">{display}</span>
+      </div>
+    );
+  }
   return (
     <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
@@ -442,23 +497,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           <span className="rounded-xs bg-elevated px-1.5 py-0.5 font-mono text-[12px] font-medium text-text-2">{display}</span>
         </span>
       </div>
-      <PaceTrack settingKey={bareSettingKey} at={Math.max(0, Math.min(1, at))}>
-        <input
-          type="range"
-          min={curve === 1 ? min : 0} max={curve === 1 ? max : 1}
-          step={curve === 1 ? (step ?? (max - min) / 200) : 0.001}
-          value={curve === 1 ? value : at}
-          onChange={e => {
-            const raw = Number(e.target.value);
-            if (curve === 1) { onChange(raw); return; }
-            onChange(handValueAt(raw, min, max, curve));
-          }}
-          aria-label={label}
-          onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-          className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''}`}
-          style={{ '--fill': `${pct}%` } as CSSProperties}
-        />
-      </PaceTrack>
+      {track}
     </div>
   );
 }
@@ -566,11 +605,11 @@ const RING = 2 * Math.PI * 16;          // 100.53
 const SWEEP = RING * 0.75;              // 75.4
 
 export function Knob({ label, value, min, max, step, onChange, display, mapping, resetTo, disabled, midiKey, testId, size = 40, help }: KnobProps) {
-  const settingKey = settingKeyOf(midiKey);
   // The setting's own name even where no controller can learn it (Gel Speed): its group and its pace are by name.
   const bareKey = midiKey?.startsWith('setting:') ? midiKey.slice('setting:'.length) : midiKey;
   const pace = paceOf(bareKey);
-  const curve = settingKey ? curveOf(settingKey) : 1;
+  // By the bare name too, as the Slider's: a panel dial's own curve (`PANEL_CURVES`).
+  const curve = bareKey ? curveOf(bareKey as keyof VisualizerSettings) : 1;
   const travel = (v: number) => Math.max(0, Math.min(1, curve === 1 ? (v - min) / (max - min || 1) : travelOf(v, min, max, curve)));
   const valueAt = (t: number) => {
     const c = Math.max(0, Math.min(1, t));

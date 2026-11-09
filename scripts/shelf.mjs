@@ -12,12 +12,12 @@
  * the visuals are actually driven by.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { LIBRARY, librarySeconds, credits } from '../src/lib/musicLibrary.ts';
 
-const PORT0 = Number(process.env.SHELF_PORT ?? 4900);
-let server = null, port = PORT0, leaving = false;
+const PORT0 = port(4900, 'SHELF_PORT');
+let server = null, served = PORT0, leaving = false;
 for (let t = 0; t < 6 && !server; t++) {
   const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT0 + t), '--strictPort'],
     { detached: true, stdio: ['ignore', 'ignore', 'ignore'] });
@@ -25,7 +25,7 @@ for (let t = 0; t < 6 && !server; t++) {
   child.on('exit', () => { died = true; });
   await new Promise(r => setTimeout(r, 2500));
   if (died) continue;
-  server = child; port = PORT0 + t;
+  server = child; served = PORT0 + t;
 }
 if (!server) { console.error('no free port'); process.exit(2); }
 const stop = () => { leaving = true; try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
@@ -43,7 +43,7 @@ const browser = await launchChromium(chromium);
 try {
   // Wide enough for the desk: the tabs only exist when there is room for it.
   const page = await browser.newPage({ viewport: { width: 1500, height: 940 } });
-  await page.goto(`http://localhost:${port}/?debug`, { waitUntil: 'load' });
+  await page.goto(`http://localhost:${served}/?debug`, { waitUntil: 'load' });
   await page.waitForTimeout(1500);
 
   // Every file on the shelf is actually served, and is actually audio.
@@ -69,19 +69,25 @@ try {
     opened and hid again whenever a desk was up. The shelf shipped where
     nobody could reach it and the harness proved the audio path while saying
     nothing about whether a hand could get to it. So this clicks the tab.
+
+    The tab was "Sound", beside Perform and Design, until every tab became a
+    set of panels (2026-10-27): the sheet is the Music & Drone panel now, and
+    Setup ships with it docked. This went on looking for a button whose text
+    was exactly "Sound", found none, and stopped at its first line, red, with
+    nothing in a shard to run it (PLAN 35c-5). It clicks Setup.
   */
   const first = LIBRARY[1];   // a short one, so the test is not waiting on a 31-minute set
   const tab = await page.evaluate(() => {
-    const b = [...document.querySelectorAll('button')].find(x => x.textContent?.trim() === 'Sound');
+    const b = document.querySelector('[data-testid="mode-segmented-setup"]');
     if (!b) return false;
     b.click();
     return true;
   });
-  check('there is a Sound tab on the desk', tab, 'beside Perform and Design');
-  if (!tab) throw new Error('no Sound tab, so nothing below can be reached by hand');
+  check('there is a Setup tab on the desk', tab, 'beside Perform and Sequence');
+  if (!tab) throw new Error('no Setup tab, so nothing below can be reached by hand');
   await page.waitForTimeout(700);
-  const panel = await page.evaluate(() => !!document.querySelector('[data-testid="sound-panel"]'));
-  check('and it opens the sound panel', panel, `${LIBRARY.length} tracks, ${Math.round(librarySeconds() / 60)} minutes`);
+  const panel = await page.evaluate(() => !!document.querySelector('[data-panel="player"] [data-testid="sound-panel-box"]'));
+  check('and it has the Music & Drone panel out', panel, `${LIBRARY.length} tracks, ${Math.round(librarySeconds() / 60)} minutes`);
 
   const clicked = await page.evaluate((id) => {
     const b = document.querySelector(`[data-testid="sound-track-${id}"]`);
@@ -163,11 +169,7 @@ try {
     energy the show is driven by actually move? Four voices tuned from the
     plate should read well clear of silence within a few seconds.
   */
-  await page.evaluate(() => {
-    const b = [...document.querySelectorAll('button')].find(x => x.textContent?.trim() === 'Sound');
-    b?.click();
-  });
-  await page.waitForTimeout(600);
+  // Still on Setup, with the Music & Drone panel out from the shelf's first step.
   const droneOn = await page.evaluate(() => {
     const b = document.querySelector('[data-testid="sound-source-drone"]');
     if (!b) return false;

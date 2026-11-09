@@ -108,6 +108,10 @@ const ALLOW = {
     crypto: 1,
     why: 'the id a device stamps on its cloud-sync records, so the cloud copy can tell two computers apart even when both opened on the same ?seed=; never drawn',
   },
+  'src/lib/liveShow.ts': {
+    crypto: 1,
+    why: 'the id a Live Show destination keeps its stream key under in the keychain store (live-<id>); seeded, two destinations added on the same ?seed= would share one key; never drawn',
+  },
 };
 
 /** Every source of randomness in one file, by kind, with lines. */
@@ -294,7 +298,7 @@ const lay = (seed) => { setShowSeed(seed); restartStreams('look:fillmore-1969', 
 
 const churnBubbles = () => {
   const f = new BubbleField(N);
-  for (let t = 0; t < 240; t++) { if (t % 20 === 0) f.spawn(60 + t / 4, 90, 5, 3, 20); f.step(dt, swirl, 0, 0, 1, 0.8); }
+  for (let t = 0; t < 240; t++) { if (t % 20 === 0) f.spawn(60 + t / 4, 90, 5, 3, 20); f.step(dt, swirl, 0, 0, 0.8); }
 };
 const churnBeads = () => {
   const f = new BeadField(N);
@@ -317,11 +321,11 @@ const bubbles = (seed, churn = false) => {
   f.spawn(96, 96, 6, 8, 24);
   for (let t = 0; t < 360; t++) {
     if (t < 90) f.blow(50, 140, dt, 1);
-    f.step(dt, swirl, 0, 0, 1, 0.6);
+    f.step(dt, swirl, 0, 0, 0.6);
     if (t % 90 === 45) f.spawn(40 + t / 6, 60, 5, 4, 16);
   }
-  f.pack(1);
-  return { n: f.bubbles.length, nums: [...f.bubbles.flatMap((b) => [b.x, b.y, b.r, b.wph, b.lobes]), ...f.packed] };
+  f.pack();
+  return { n: f.bubbles.length, nums: [...f.bubbles.flatMap((b) => [b.x, b.y, b.r, b.film, b.lobes]), ...f.packed] };
 };
 const macro = (seed) => {
   lay(seed);
@@ -463,8 +467,8 @@ if (process.argv.includes('--lab')) {
     for (let i = 0; i < 12; i++) kicks.push({ x: 0.1 + r.float() * 0.8, y: 0.1 + r.float() * 0.8, v: [r.centred() * 0.02, r.centred() * 0.02, 0, 0] });
     const f = new BubbleField(256);
     f.spawn(128, 128, 8, 10, 60);
-    for (let t = 0; t < 60; t++) f.step(dt, swirl, 0, 0, 1, 0.5);
-    const count = f.pack(1);
+    for (let t = 0; t < 60; t++) f.step(dt, swirl, 0, 0, 0.5);
+    const count = f.pack();
     return { blobs, kicks, bubbles: { packed: Array.from(f.packed), finger: Array.from(f.packedFinger), count } };
   };
   const { page, close } = await openLab();
@@ -504,21 +508,22 @@ if (process.argv.includes('--lab')) {
 if (process.argv.includes('--app')) {
   const { spawn } = await import('node:child_process');
   const { chromium } = await import('playwright');
-  const { launchChromium } = await import('./chromium.mjs');
-  let server = null, port = 4390;
+  const { launchChromium, port } = await import('./chromium.mjs');
+  const BASE = port(4390);
+  let server = null, served = BASE;
   for (let t = 0; t < 6 && !server; t++) {
-    const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(4390 + t), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
+    const child = spawn('./node_modules/.bin/vite', ['preview', '--port', String(BASE + t), '--strictPort'], { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
     let died = false;
     child.on('exit', () => { died = true; });
     await new Promise((r) => setTimeout(r, 2500));
-    if (!died) { server = child; port = 4390 + t; }
+    if (!died) { server = child; served = BASE + t; }
   }
-  if (!server) { console.error('the preview did not start on ports 4390-4395 (a busy port, or vite preview failing: its errors are above)'); process.exit(2); }
+  if (!server) { console.error(`the preview did not start on ports ${BASE}-${BASE + 5} (a busy port, or vite preview failing: its errors are above)`); process.exit(2); }
   const browser = await launchChromium(chromium);
   try {
     const seedOf = async (query) => {
       const page = await browser.newPage();
-      await page.goto(`http://localhost:${port}/${query}`, { waitUntil: 'load' });
+      await page.goto(`http://localhost:${served}/${query}`, { waitUntil: 'load' });
       await page.waitForFunction(() => typeof window.__cgSeed === 'number', null, { timeout: 30000 });
       const seed = await page.evaluate(() => window.__cgSeed);
       await page.close();

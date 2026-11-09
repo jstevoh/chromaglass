@@ -1,0 +1,164 @@
+# 33. Bubbles and the closeup, per liquid (asked 2026-10-19)
+
+The owner, 2026-10-19: bubbles still look pixelated around themselves and sometimes
+draw as a donut; bubbles should answer the liquid they are in; and the closeup looks
+like a sheet of biological cells, where what is wanted is the liquid on the plate,
+nearer and in relief. The research behind the bubble items is item 2 of
+`/mnt/project-files/drops/research/bubbles-and-drops.md` (§1.4–1.5, the projected
+bubble), in the project's shared files. Pictures of the report's halo and donut, before
+and after 33a, are in `/mnt/project-files/drops/bubbles-2026-10-19/`.
+
+Every item keeps the standing rule: nothing moves the frame as a whole from sound, and
+each feature ships its phone version in the same PR (the plate shader is shared, so the
+phone and the iPad draw what the desk draws; a new control goes on the phone too).
+
+## ~~33a. No stepped ring round a bubble's hole~~ — **Shipped** (a hue gate on the line between two dyes, `boundaryDiff` in `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33a (moved 2026-10-29, 19m-2).
+
+## ~~33b. The soft glow still left round a hole~~ — **Shipped** (`airNear` flattens the dye's normal beside an air hole, `src/gpu/wgsl/plate.ts`; `npm run holeline`). Story in `docs/plan-shipped.md` §33b (moved 2026-10-29, 19m-2).
+
+Left from it, so none of it is lost:
+- **33b-2. A fixed reach and a wholesale flatten.** `airNear` looks 4.5 cells out and
+  flattens the dye's whole normal there, so a real dye-to-dye step beside a bubble loses
+  its relief inside that reach. Derive the reach from the Sobel and bicubic taps, and
+  flatten only the air's own contribution (the slope of the density the air removed)
+  once 33g's closeup changes how the relief is read.
+  *Check:* `holeline` with two dyes meeting beside a hole: the step's relief at 4 cells
+  from the rim at least 0.8 of its relief far from any hole.
+- **33b-3. The smallest hole is only partly flattened.** At the hole of 1.8 cells the
+  worst pixel in the ring is still 22 levels from the dye 10 cells out (the control's
+  worst is the same 22, with the bubbles at 0), and Edge Relief still moves its first 3
+  cells 4.6 levels (the control 5.5): `airNear`'s nine taps reach 4.5 cells out and
+  find a hole that small only along a few directions, so the mask is patchy. Sample
+  the air at the radius of the hole's own coverage (a blurred air mip), or take the
+  taps from the Sobel's own footprint, and bring `holeline` to cover the 1.8-cell hole
+  at the same bar (1 level) as the others; then find what draws the 22-level pixel.
+- **33b-4. The lace and the boundary line at a hole** are not masked by `airNear`; 33c is
+  the lace, and the boundary line is 33a's hue gate. Apply `airNear` there only if 33c's
+  check finds a ring.
+- For 33g (the closeup): the closeup is a different branch (`dropCam`); `airNear` applies
+  to the shared normal so the closeup's dye beside a hole is flattened too. Check the
+  closeup's meniscus on a bubble in `look` pictures before reshaping it.
+
+## 33c. The lace reads the same lit difference (S)
+
+`lacing()` (plate.ts) compares lit colours across taps 3 cells apart, the pattern that
+drew 33a's ring, so a look with Lacing up likely rings every hole the same way
+(inferred from the code, not rendered). Gate it the way 33a gated `boundaryDiff`.
+*Check:* `holeline` runs its hole plate a second time with Lacing at 1: under 1 % of
+the ring moved, and the lace on its own plate (`npm run lace`) unchanged.
+
+## 33d. A bubble's edge at the screen's resolution (M)
+
+Close up (zoom 3 to 5 in the lab) a bubble's outer edge is faceted: the band is drawn
+from the air field, linear between texels, and its softness is clamped to 0.02–0.3 of
+the curved band, so a small bubble's edge steps with the solver's cells, not the
+screen's pixels. Reconstruct the edge's distance at sub-texel (bicubic of the air
+field, or the bubble list's own circle where a bubble is still round) and antialias
+it over one screen pixel at every zoom. Keep the air field's shape where a bubble is
+deformed: a sheared bubble is not a circle.
+*Check:* new `npm run bubbleedge` (lab): bubbles of 1.8 to 14 cells at zoom 1, 3 and 5,
+the rim's radius found along 64 rays: RMS deviation from a circle under 0.5 screen
+pixel, and the 10–90 % rise of the edge no wider than 1.5 pixels. Today's numbers
+printed first.
+
+## ~~33e. The bubble as the projector throws it, not a donut~~ — **Shipped** (the clear middle is the plate, `plate.ts`'s projected bubble; `npm run bubblelook`). Story in `docs/plan-shipped.md` §33e (moved 2026-10-29, 19m-2).
+
+Left from it, so none of it is lost:
+- **33e-2. The band's width from the meniscus, for small bubbles too.** The old text
+  here said the band is "a share of R"; that is wrong past R = half the gap (the big
+  bubble's band is already half the gap, and `airlens` holds it there), so only a
+  bubble under a few cells is mostly dark, and the dark share does fall as the bubble
+  grows (`bubblelook`, 80 → 34 %). What is not done is the width against the liquid's
+  index (u* from the cell's index), which waits on 33f's per-liquid index.
+- **Shortcuts, named.** (a) The lens is not drawn minifying (focal length about
+  −1.5 R): the middle is flat, which is the lamp through a slab of air and right for
+  a pancake, and a little wrong for a bubble that is nearly a sphere. (b) The meniscus
+  is a circular arc of radius gap/2 (a contact angle of zero). (c) One index per cell
+  (33f). (d) The middle takes at most a tenth of the wetting film's tint (`0.1·k1`),
+  a choice, not a measurement.
+- **A bubble in clear water is drawn at 70 % of the strength of one in dye** (found
+  here, not changed): the compositing weight is `bubbleStrength·mix(0.7, 1, filmT)` and
+  `filmT` is the dye's alpha at the rim, so with no dye the band can never be darker
+  than 30 % of the plate, and with Bubbles at 0.8 and dye it is 28 %, at 1 and dye 10 %.
+  Whether the 0.7 is a choice to keep, or a bug (a hole in clear water should be as dark
+  at its rim as one in dye), is for 33f's per-liquid pass to settle with a picture.
+
+## 33f. Bubbles that know their liquid (M) — **Motion shipped** (`src/lib/bubbleLiquid.ts`, `BubbleField.species` in `src/lib/bubbles.ts`, `speciesSnapshot` in `src/gpu/fluid/reads.ts`, `src/sim/speciesPoll.ts`; `npm run bubbleliquid` 9/9; 33f-2 to 33f-4 open). Story in `docs/plan-shipped.md` §33f (moved 2026-11-07).
+
+Left from it, so none of it is lost:
+- **33f-2. The drawing per liquid** (33e's band from the cell's index, ferrofluid's
+  window, milk's bright middle): not in `bubbleliquid`; blocked by the 11-bit air-alpha
+  pack and the 16-sampled-texture ceiling (found on #420).
+- **33f-3. The species readback's rows against the bubbles' y on a GPU.** `local` holds
+  the CPU side (row 0 first, y = row·grid/L); that the GPU's read lands the same way up
+  is a Metal run, not yet made.
+- **33f-4. Per-cell σ and ρ when two miscible bottles are on the plate at once.** The
+  species field carries share and Σ share·ln(ν/ν_w) in channels r and g, while channel b
+  was traded from ρ to milk's scatter μs′ (18d-4a) and channel a holds refractive index n,
+  so the field holds no σ or ρ of its own; `pouredOf` records the last-poured species
+  bottle's σ and ρ and `liquidAtCell` blends `(1 − r)·plate + r·poured` (exact for one
+  poured liquid; when two miscible bottles sit on the plate together, the earlier pool's
+  viscosity ν stays its own in channel g while its σ and ρ read the newer bottle's).
+  Carry Σ share·ρ and Σ share·σ per cell once 18d-4a gives scatter its own home.
+- **33f-5. A bottle the owner made with no tension, on a water plate.** `pour` in
+  `src/gpu/fluid/inputs.ts` hands `pouredOf` the oil's σ (`LIQUID_SIGMA`, 30 mN/m) as
+  the plate's, since the solver does not know the look's carrier: on a water look
+  (72 mN/m) such a bottle's pool reads 30, not the plate's 72. Every shelf bottle that
+  lays a species names its tension, so only Liquid Designer bottles meet it. Fix: the
+  app passes the BubbleField's `liquidSigma` into `pour` (found in review of #715).
+*Check (for 33f-2):* `npm run bubblephysics` or `bubblelook` extended: the band width oil
+against water follows u* from the cell's index within 15 %, ferrofluid draws a bright
+window and milk a bright middle.
+
+## ~~33g. The closeup: the liquid nearer and in relief, not cells~~ — **Shipped** (Paint Cells and Macro Lacing default to 0; `npm run macroview`; 20c-1 is closed by it)
+
+**Shipped.** Story in `docs/plan-shipped.md` §33g (moved 2026-10-29, 19m; the heading's numbers moved 2026-10-29, 19m-2).
+
+- **33g-2. The closeup is still lit, not refracted.** The relief is the dye's own
+  gradient read as a dome under a lowered lamp (shortcut: not a physical height field,
+  the gap's thickness is not magnified), and the boundary line is thinned by 80 % at
+  full closeup so it does not read as an outline. Not done from the first plan: the
+  substrate seen through the surface's normal (refraction), a shallow depth of field
+  and the dye's two layers parting in parallax. Each is a camera-pass term; take them
+  one at a time with a `look` render, and keep `steadycam` green.
+- ~~**33g-3. Three looks keep their cells by name.**~~ **Shipped** (the owner, 2026-10-29:
+  "No I don't want cells"). `macro-bead`, `cell-bloom` and `lace-run` now set Paint Cells
+  to 0; Macro Bead and Cell Bloom set Macro Lacing to 0 as well, and Lacing Run keeps its
+  lacing (its subject, dendrites rather than cells). Descriptions, the landing page and
+  the Guide say so, and `macroview` line 1 now audits every look. Open: Cell Bloom's name
+  says cells; the owner to say whether to rename it (its id is in set lists and saved
+  shows, so a rename keeps the id). Story in `docs/plan-shipped.md` §33g.
+- ~~**33g-2a. The closeup's beads are the 3D.**~~ **Shipped** (the owner, 2026-10-30:
+  "a couple really cool macro 3d looking views", on the card "Beads first"). The oil beads
+  are the closeup's strongest depth cue (each a lens that turns the plate upside down inside
+  a dark meniscus, `dropCam`), but at the plate's size they were grain. In the closeup
+  (`macroMode`) the beads are now laid at 2.0 times the size scale (`beadPopulation` in
+  `lib/beads.ts`; the plate's is as it was, to the bit), Macro Bead's Beads dial is 0.7 (was
+  0.35), and Cell Bloom is Lens Pools (id kept: `cell-bloom`). Story in `docs/plan-shipped.md`
+  §33g. Shortcuts, named: the factor is a taste choice (1.6 gave the mean radius 1.35 times,
+  2.0 gives 1.44 to 1.49, 3.0 starts to leave the plate short of beads); beads already on the
+  plate keep their size until they retire. Open: no new setting (the size follows
+  `macroMode`, so a look cannot ask for smaller closeup beads); 33g-2 proper (refraction of
+  the ground, depth of field, parallax) is still the next optics step, and `lampjudge.mjs`
+  still quotes Cell Bloom's old description for its judge.
+- **33g-2b. Round rims and clear windows on the closeup's beads: built, reverted, open.**
+  Shipped as #611 (rim wobble at 5x on SwiftShader 1.2 px to 0.3-0.6 px, a pancake bead's
+  clear window, `droplens` 32/32, green on GitHub's Macs) and reverted the same night
+  because the owner's Mac (a real Apple GPU, `owner-mac`, which only a deploy reaches)
+  failed `droplens` on it: the old line "dark round it from where the aperture says" read
+  0.687 of the radius against 0.709 before and an allowed 0.72 +- 0.03, and the seven new
+  roundness lines read 3.4 to 3.7 px (0.45 to 0.50 of a mask texel) at every size, 3 px
+  more radius than SwiftShader, the same on two runs. So something the fit leans on
+  (the clean read three texels in, the cone's slope from taps one texel either side,
+  the edge coverage from `dpdx` of the surface uv) is not the same on Metal hardware as on
+  the software rasteriser, and a pull request's run cannot see it. Next: put the fit back
+  with the roundness lines printing what they read (the fit's accepted share, the mean
+  `dropPx`, a row of raw mask taps) in a run that reaches `owner-mac` before it merges.
+  The dimple half (`power`, the bend held to the rim) was not isolated and comes back
+  with it. Shortcuts and numbers of the first build are in the pull request #611.
+- **33g-4. A Metal run: `macroview` done, the thin boundary line open.** The CI `open`
+  shard (Metal) ran `macroview`: relief 0.0386 to 0.051, smoothness 0.988 to 0.991, the
+  old-defaults control draws cells at 0.1397 and 0.1693 (smoothness 0.69, 0.716), chroma
+  distance 1.21 to 3.11, half-turned crop least 9.25, 1x chroma least 7.62. These match
+  SwiftShader's. `edgeK` (the thinner boundary line at the closeup) has no measuring
+  line, so it stands unmeasured; a `look` render at zoom 4 and 6 is still optional.

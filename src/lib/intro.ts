@@ -19,8 +19,9 @@
  * plate's first frame (`introPlateFrame`), cross-fading into it: it never
  * holds the plate back, it is only ever up while there is nothing to see.
  *
- * It starts still, and moves once the opening's render pipelines are built
- * (`introMove`, from `Quiet` in `gpu/prepare.ts`). What was reported: the
+ * It starts still, and moves once the opening is built, every pipeline of
+ * it and their first uses (`introMove`, from `Quiet` in `gpu/prepare.ts`,
+ * which says why the end and not, as first, the last render pipeline). What was reported: the
  * Mac's `npm run startup` went red on "no stop in the opening" on about half
  * of 10 October's runs, across PRs that never touched the opening (2.17 and
  * 2.57 s against a 2 s bar). What was measured: over the open shard's 176
@@ -55,6 +56,8 @@
  * from outside.
  */
 
+import { stillFrame, stillNextTick, stillTick, stillWait, type StillDone } from './stillWait';
+
 export type IntroOut = 'plate' | 'failure' | 'skip' | 'slow' | 'elsewhere' | 'cap';
 
 interface IntroRecord {
@@ -65,8 +68,10 @@ interface IntroRecord {
   reason?: IntroOut;
   /** When it was gone from the page. */
   gone?: number;
-  /** The stretches it was held still while the opening's render pipelines compiled, [from, to] (`introStill`). */
+  /** The stretches it was held still while the opening built, [from, to] (`introStill`). */
   still?: [number, number | null][];
+  /** Each wait for the page's frames before the first compile, [from, to, what ended it] (`introStill`). */
+  stillWait?: [number, number, StillDone][];
 }
 
 /**
@@ -176,9 +181,9 @@ export function introPlateFrame(stepped: boolean): void {
 }
 
 /**
- * Held still while the opening's first fills and render pipelines compile
- * (`Quiet` in `gpu/prepare.ts` says why: a moving intro there stopped the
- * page's frames for as long as the display compiled). Paused, not hidden: the
+ * Held still while the opening builds (`Quiet` in `gpu/prepare.ts` says
+ * why: a moving intro there stopped the page's frames for as long as the
+ * display compiled, and later as long as a solver kernel did). Paused, not hidden: the
  * picture stays exactly where it was and moves on from there. The first
  * opening finds it still already, from the first paint (the top of this file
  * says why); a later one, a lost device's replacement, holds it here.
@@ -189,9 +194,12 @@ export function introPlateFrame(stepped: boolean): void {
  * the GPU hold releases, and its post-mount frames took 0.30–0.39 s across
  * three to four animation frames; a 200 ms cap fired before the first of them
  * had even rendered, leaving those frames to stall on the GPU process behind
- * `fluid/fill`). A hidden tab draws no frames and resolves at once; a 1.5 s
- * cap guards a tab hidden mid-wait. Nothing to hold (gone, leaving, or never
- * shown) resolves at once.
+ * `fluid/fill`). Or sooner, once the page has been free for half a second
+ * with no frame drawn: those frames are then held in a busy GPU process, and
+ * waiting longer only leaves the opening idle (`lib/stillWait.ts` has the
+ * runs, PLAN.md 19aa-7). A hidden tab draws no frames and resolves at once;
+ * a 1.5 s cap guards a tab hidden mid-wait. Nothing to hold (gone, leaving,
+ * or never shown) resolves at once.
  */
 export function introStill(): Promise<void> {
   const el = node();
@@ -202,13 +210,30 @@ export function introStill(): Promise<void> {
   }
   if (document.visibilityState === 'hidden') return Promise.resolve();
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, 1500);
-    let left = 4;
-    const step = () => {
-      if (--left > 0) requestAnimationFrame(step);
-      else setTimeout(() => { clearTimeout(timer); resolve(); }, 0);
+    const w = stillWait(performance.now());
+    let timer = 0;
+    let done = false;
+    const end = (why: StillDone) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      (record.stillWait ??= []).push([w.from, performance.now(), why]);
+      resolve();
     };
-    requestAnimationFrame(step);
+    const tick = () => {
+      const now = performance.now();
+      const why = stillTick(w, now);
+      if (why) end(why);
+      else timer = window.setTimeout(tick, stillNextTick(w, now));
+    };
+    const frame = () => {
+      if (done) return;
+      // Past the last frame by a task, so it has been handed on to be presented.
+      if (stillFrame(w, performance.now())) setTimeout(() => end('frames'), 0);
+      else requestAnimationFrame(frame);
+    };
+    timer = window.setTimeout(tick, stillNextTick(w, w.from));
+    requestAnimationFrame(frame);
   });
 }
 

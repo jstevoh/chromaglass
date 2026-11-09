@@ -26,6 +26,7 @@
  */
 
 import { Disposer, PipelineCache, bindGroup } from './kit';
+import { PAD_PICTURE_IN_FLIGHT } from '../lib/padPicture';
 
 /*
   Four bilinear taps a pixel, a quarter of a pixel either side of its
@@ -123,7 +124,14 @@ export class WebGPUPadGrab {
     }, () => { slot.busy = false; return null; });
   }
 
-  /** A free slot of this size: one is reused, or made, up to three. */
+  /**
+   * A free slot of this size: one is reused, or made, up to as many as the
+   * sender lets out at once. They are made only when every one is out, so a
+   * fast show keeps one or two; a show starved to 14 frames a second, whose
+   * reads land behind its own queued frames, needs most of the eight, and
+   * at three it was the slots as much as the sender that held the pad to 6
+   * pictures a second. Each is about 1.4 MB at the widest picture.
+   */
   private slot(w: number, h: number): Slot | null {
     const free = this.slots.find(s => !s.busy && s.w === w && s.h === h);
     if (free) return free;
@@ -134,7 +142,7 @@ export class WebGPUPadGrab {
       s.tex.destroy();
       s.buf.destroy();
     }
-    if (this.slots.length >= 3) return null;
+    if (this.slots.length >= PAD_PICTURE_IN_FLIGHT) return null;
     const row = Math.ceil((w * 4) / 256) * 256;
     const s: Slot = {
       tex: this.device.createTexture({

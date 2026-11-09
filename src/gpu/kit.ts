@@ -109,6 +109,8 @@ const ledger: PipelineLedger = { devices: 0, ahead: 0, onFrame: [], asking: null
  */
 const failedPipelines = new Set<string>();
 const simulatedFailures = new Set<string>();
+/** Counts every change to the two sets above, so a cache's kept verdicts know when to go. */
+let failuresMoved = 0;
 
 function deviceStore(device: GPUDevice) {
   let dev = shared.get(device);
@@ -160,12 +162,14 @@ export class PipelineCache {
    */
   static failPipeline(name: string): void {
     simulatedFailures.add(name);
+    failuresMoved++;
   }
 
   /** Clear recorded and simulated failures (for harness test resets). */
   static resetFailures(): void {
     failedPipelines.clear();
     simulatedFailures.clear();
+    failuresMoved++;
   }
 
   /** Whether a pipeline is currently marked failed or simulated to fail. */
@@ -228,7 +232,22 @@ export class PipelineCache {
     return false;
   }
 
+  /**
+   * Asked on every dispatch, and the answer is almost always no; working it
+   * out is four new strings and an array each time (`npm run encode`). So the
+   * answer is kept per name until either set changes (`failuresMoved`).
+   */
   private isFailed(name: string): boolean {
+    if (this.verdictsAt !== failuresMoved) { this.verdicts.clear(); this.verdictsAt = failuresMoved; }
+    let v = this.verdicts.get(name);
+    if (v === undefined) { v = this.workOutFailed(name); this.verdicts.set(name, v); }
+    return v;
+  }
+
+  private readonly verdicts = new Map<string, boolean>();
+  private verdictsAt = -1;
+
+  private workOutFailed(name: string): boolean {
     const base = name.split(':')[0];
     const scopedName = this.scope ? `${this.scope}/${name}` : name;
     const scopedBase = this.scope ? `${this.scope}/${base}` : base;
@@ -245,10 +264,32 @@ export class PipelineCache {
     failedPipelines.add(scopedName);
     failedPipelines.add(name);
     failedPipelines.add(name.split(':')[0]);
+    failuresMoved++;
     crashLog.record('error', 'pipeline', `${scopedName} failed to build: ${reason}`);
   }
 
   computePipeline(name: string, code: string, entryPoint = 'main'): GPUComputePipeline | null {
+    /*
+      The answer last given for this name, while nothing has failed since and
+      no harness is listening: the solver asks here on every dispatch, five
+      hundred times a step, for a pipeline it was given a moment ago, and the
+      way below to that answer cost the page ~50 bytes of garbage a time
+      (`npm run encode`). The same source string as last time is compared by
+      identity, so a name asked with other source goes the long way and gets
+      its own pipeline as before.
+    */
+    if (entryPoint === 'main' && this.ledger?.asking == null) {
+      const hot = this.hot.get(name);
+      if (hot !== undefined && hot.code === code && hot.at === failuresMoved) return hot.pipe;
+    }
+    const p = this.computePipelineSlow(name, code, entryPoint);
+    if (p && entryPoint === 'main') this.hot.set(name, { code, pipe: p, at: failuresMoved });
+    return p;
+  }
+
+  private readonly hot = new Map<string, { code: string; pipe: GPUComputePipeline; at: number }>();
+
+  private computePipelineSlow(name: string, code: string, entryPoint: string): GPUComputePipeline | null {
     if (this.isFailed(name)) {
       if (!failedPipelines.has(name)) this.markFailed(name, 'refused by debug hook');
       return null;

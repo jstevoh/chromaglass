@@ -40,7 +40,7 @@
  * drift in silence.
  */
 
-import { LEARNABLE_SETTINGS } from './midi.ts';
+import { LEARNABLE_SETTINGS, curveOf, travelOf, handValueAt } from './midi.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { LAMP_WARMTH_MAX } from './lampKelvin.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
@@ -74,6 +74,12 @@ export interface DeskSpec {
    * size of one. Every surface that can move it lands on a step.
    */
   step?: number;
+  /**
+   * Set only on a dial widened past where the looks live: the width its
+   * travel had before, which Evolve's wander is still a fifth of (see
+   * `wanderSpan` on `LEARNABLE_SETTINGS` in `midi.ts`).
+   */
+  wanderSpan?: number;
 }
 
 /** Where each of the MIDI forty is shown in the panel. */
@@ -89,6 +95,7 @@ const SECTION_OF: Record<string, string> = {
   slosh: 'tilt',
   beatSqueeze: 'show',
   kickBloom: 'show',
+  melodyWalk: 'show',
   beatAccent: 'show',
   fingering: 'show',
   beads: 'show',
@@ -107,6 +114,7 @@ const SECTION_OF: Record<string, string> = {
   lampHotspot: 'lamp',
   secondLamp: 'lamp',
   lampGround: 'lamp',
+  heat: 'lamp',
   iridescence: 'lamp',
   camera: 'camera',
   focus: 'camera',
@@ -116,6 +124,9 @@ const SECTION_OF: Record<string, string> = {
   markX: 'mark',
   markY: 'mark',
   markScale: 'mark',
+  inkTitleSize: 'mark',
+  inkTitleY: 'mark',
+  inkTitleSweep: 'mark',
   sharpness: 'look',
   particles: 'look',
   particleMix: 'look',
@@ -134,12 +145,21 @@ const SECTION_OF: Record<string, string> = {
   turingInk: 'reactions',
   turingDrift: 'reactions',
   gelWheel: 'lamp',
+  moireAmount: 'moire',
+  moireAngle: 'moire',
+  moireSpin: 'moire',
   beatLead: 'audio-input',
   filmDrive: 'film',
   // The four masters, with the patch bay they pull down.
   filmImpact: 'film',
   soundImpact: 'audio-input',
   shapeImpact: 'patches',
+  lfo1Bars: 'patches', lfo1Shape: 'patches', lfo1Restart: 'patches',
+  lfo2Bars: 'patches', lfo2Shape: 'patches', lfo2Restart: 'patches',
+  lfo3Bars: 'patches', lfo3Shape: 'patches', lfo3Restart: 'patches',
+  lfo4Bars: 'patches', lfo4Shape: 'patches', lfo4Restart: 'patches',
+  env1Attack: 'patches', env1Decay: 'patches', env1On: 'patches',
+  env2Attack: 'patches', env2Decay: 'patches', env2On: 'patches',
   sceneImpact: 'room',
   sceneDrive: 'room',
   sceneHands: 'room',
@@ -152,9 +172,12 @@ const SECTION_OF: Record<string, string> = {
   phaseDisplace: 'ferro',
   oilBodies: 'oil',
   filmHold: 'oil',
+  soapBreakdown: 'oil',
   clearFilm: 'oil',
+  clearFilmDye: 'oil',
   thinGap: 'squish',
   gapThickness: 'squish',
+  liquidMl: 'squish', coverWeight: 'squish',
   pacing: 'automation',
   songFollow: 'automation',
   spinRpm: 'spin',
@@ -175,12 +198,12 @@ const FROM_MIDI: DeskSpec[] = LEARNABLE_SETTINGS.map(s => ({ ...s, section: SECT
  */
 const FROM_PANEL: DeskSpec[] = [
   { key: 'sensitivity', label: "Sensitivity", min: 0.1, max: 3, section: 'audio-input' },
-  { key: 'bassBoost', label: "Bass Boost", min: 1, max: 3, section: 'audio-input' },
+  { key: 'bassBoost', label: "Bass Boost", min: 0.25, max: 5, section: 'audio-input', wanderSpan: 2 },
   { key: 'beatPrediction', label: "Beat Prediction", min: 0, max: 1, section: 'audio-input' },
   { key: 'turbulenceDetail', label: "Turbulence Detail", min: 1, max: 4, section: 'look', step: 1 },
-  { key: 'grainScale', label: "Grain Fineness", min: 60, max: 900, section: 'look' },
+  { key: 'grainScale', label: "Grain Fineness", min: 20, max: 1200, section: 'look', wanderSpan: 840 },
   { key: 'blobSurfaceTension', label: "Blob Surface Tension", min: 0, max: 1, section: 'look' },
-  { key: 'layerScaleVariety', label: "Layer Scale Variety", min: 0, max: 1, section: 'look' },
+  { key: 'layerScaleVariety', label: "Layer Scale Variety", min: 0, max: 2, section: 'look', wanderSpan: 1 },
   { key: 'boundaryContrast', label: "Boundary Glow", min: 0, max: 1, section: 'look' },
   { key: 'glossiness', label: "Glossiness", min: 0, max: 1, section: 'look' },
   { key: 'colourBody', label: "Colour Body", min: 0, max: 1, section: 'look' },
@@ -191,47 +214,53 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'thinFilm', label: "Thin Film", min: 0, max: 1, section: 'camera' },
   { key: 'sceneDeadzone', label: "Deadzone", min: 0, max: 1, section: 'room' },
   { key: 'sceneSmooth', label: "Smoothing", min: 0, max: 1, section: 'room' },
-  { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 3, section: 'lamp' },
+  { key: 'gelSpeed', label: "Gel Speed (rpm)", min: 0, max: 30, section: 'lamp', wanderSpan: 3 },
+  // The moiré pack's sheets (PLAN 45a); the ink, turn and spin are MIDI's.
+  { key: 'moireSlide', label: "Moiré Slide", min: -0.5, max: 0.5, section: 'moire' },
+  { key: 'moireRatio', label: "Moiré Scale", min: 0.5, max: 2, section: 'moire' },
+  { key: 'moireDensity', label: "Moiré Lines", min: 4, max: 400, section: 'moire' },
+  { key: 'moireGap', label: "Moiré Gap (mm)", min: 0, max: 20, section: 'moire' },
+  { key: 'moireCurl', label: "Moiré Curl", min: 0, max: 1, section: 'moire' },
   { key: 'lampWarmth', label: "Lamp Warmth", min: 0, max: LAMP_WARMTH_MAX, section: 'lamp' },
   // Film stock (F1): what the whole show is photographed on, as against the
   // `film*` settings, which drive the projector that plays video through dye.
   { key: 'stock', label: "Film Stock", min: 0, max: 1, section: 'stock' },
-  { key: 'stockGrain', label: "Grain", min: 0, max: 1, section: 'stock' },
-  { key: 'stockGrainSize', label: "Grain Size", min: 1, max: 6, section: 'stock' },
-  { key: 'stockWeave', label: "Gate Weave", min: 0, max: 3, section: 'stock' },
+  { key: 'stockGrain', label: "Grain", min: 0, max: 3, section: 'stock', wanderSpan: 1 },
+  { key: 'stockGrainSize', label: "Grain Size", min: 1, max: 16, section: 'stock', wanderSpan: 5 },
+  { key: 'stockWeave', label: "Gate Weave", min: 0, max: 12, section: 'stock', wanderSpan: 3 },
   { key: 'stockGate', label: "Gate Edge", min: 0, max: 1, section: 'stock' },
   { key: 'transmission', label: "Light Through Dye", min: 0, max: 1, section: 'lamp' },
   { key: 'exposure', label: "Exposure", min: 0, max: 1, section: 'lamp' },
   { key: 'filmMix', label: "Film Mix", min: 0, max: 1, section: 'film' },
   { key: 'filmKey', label: "Film Key", min: 0, max: 0.9, section: 'film' },
-  { key: 'macroHold', label: "Shot Length", min: 1, max: 15, section: 'macro' },
+  { key: 'macroHold', label: "Shot Length", min: 1, max: 60, section: 'macro', wanderSpan: 14 },
   { key: 'macroAimX', label: "Macro Aim Across", min: 0, max: 1, section: 'macro' },
   { key: 'macroAimY', label: "Macro Aim Up", min: 0, max: 1, section: 'macro' },
-  { key: 'macroCells', label: "Paint Cells", min: 0, max: 1, section: 'macro' },
-  { key: 'macroCellScale', label: "Cell Size", min: 0.15, max: 1.5, section: 'macro' },
+  { key: 'macroCells', label: "Paint Cells", min: 0, max: 2, section: 'macro', wanderSpan: 1 },
+  { key: 'macroCellScale', label: "Cell Size", min: 0.15, max: 3, section: 'macro', wanderSpan: 1.35 },
   { key: 'macroLacing', label: "Macro Lacing", min: 0, max: 1, section: 'macro' },
   { key: 'macroDepth', label: "Depth / Focus", min: 0, max: 1, section: 'macro' },
-  { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 1, section: 'macro' },
+  { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 2.5, section: 'macro', wanderSpan: 1 },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
   { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
   { key: 'phaseAmount', label: "Ferrofluid", min: 0, max: 1, section: 'ferro' },
   { key: 'phaseScale', label: "Domain Size", min: 0, max: 1, section: 'ferro' },
   { key: 'phaseSharp', label: "Phase Edge", min: 0, max: 1, section: 'ferro' },
-  { key: 'magnetStrength', label: "Magnet Strength", min: 0, max: 1, section: 'ferro' },
+  { key: 'magnetStrength', label: "Magnet Strength", min: 0, max: 3, section: 'ferro', wanderSpan: 1 },
   { key: 'magnetHeight', label: "Magnet Height", min: 0.02, max: 1, section: 'ferro' },
   { key: 'magnetX', label: "Magnet Across", min: 0, max: 1, section: 'ferro' },
   { key: 'magnetY', label: "Magnet Up", min: 0, max: 1, section: 'ferro' },
   { key: 'magnetWalk', label: "Magnet Walk", min: 0, max: 1, section: 'ferro' },
   { key: 'plateCurve', label: "Plate Shape", min: -1, max: 1, section: 'squish' },
   { key: 'depthDrag', label: "Depth Drag", min: 0, max: 3, section: 'squish' },
-  { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1, section: 'master' },
-  { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 1, section: 'physics' },
+  { key: 'tempoSync', label: "Tempo Sync", min: 0, max: 1.6, section: 'master', wanderSpan: 1 },
+  { key: 'vorticityConfinement', label: "Swirl", min: 0, max: 2, section: 'physics', wanderSpan: 1 },
   { key: 'oilTension', label: "Oil Tension", min: 0, max: 1, section: 'oil' },
   { key: 'surfactantFlow', label: "Soap Bursts", min: 0, max: 1, section: 'oil' },
-  { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 1, section: 'physics' },
+  { key: 'solutalBuoyancy', label: "Dye Weight", min: 0, max: 2, section: 'physics', wanderSpan: 1 },
   { key: 'plateUpright', label: "Gravity", min: 0, max: 1, section: 'tilt' },
   { key: 'tiltDirection', label: "Tilt Direction", min: 0, max: 360, section: 'tilt' },
-  { key: 'doubleDiffusion', label: "Heat Spread", min: 0, max: 1, section: 'physics' },
+  { key: 'doubleDiffusion', label: "Heat Spread", min: 0, max: 2, section: 'physics', wanderSpan: 1 },
   { key: 'ferroLabyrinth', label: "Labyrinth", min: 0, max: 1, section: 'ferro' },
   { key: 'phIndicator', label: "pH Indicator", min: 0, max: 1, section: 'reactions' },
   { key: 'bzReaction', label: "BZ Reaction", min: 0, max: 1, section: 'reactions' },
@@ -239,16 +268,16 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'thicknessOptics', label: "Layer Depth", min: 0, max: 1, section: 'lamp' },
   { key: 'spectralOptics', label: "Spectral Mix", min: 0, max: 1, section: 'lamp' },
   { key: 'plateSpring', label: "Press Lift", min: 0, max: 1, section: 'squish' },
-  { key: 'glassSmear', label: "Glass Smear", min: 0, max: 1, section: 'squish' },
-  { key: 'rainDrip', label: "Rain Drip", min: 0, max: 1, section: 'squish' },
+  { key: 'glassSmear', label: "Glass Smear", min: 0, max: 3, section: 'squish', wanderSpan: 1 },
+  { key: 'rainDrip', label: "Rain Drip", min: 0, max: 2, section: 'squish', wanderSpan: 1 },
   { key: 'polarity', label: "Polarity (Repulsion)", min: 0, max: 1, section: 'oil' },
-  { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.08, section: 'physics' },
+  { key: 'evaporationRate', label: "Evaporation Rate", min: 0, max: 0.5, section: 'physics', wanderSpan: 0.08 },
   { key: 'heatDecay', label: "Heat Decay", min: 0.8, max: 1, section: 'physics' },
   { key: 'airVelocity', label: "Updraft", min: 0, max: 1, section: 'interaction' },
   { key: 'vibrationFrequency', label: "Vibration", min: 0, max: 1, section: 'interaction' },
 
 
-  { key: 'dropHeight', label: "Drop Height", min: 0, max: 1, section: 'interaction' },
+  { key: 'dropHeight', label: "Drop Height", min: 0, max: 2, section: 'interaction', wanderSpan: 1 },
   /*
     The ceiling is the control's own maximum, which is the only place a
     ceiling can honestly live.
@@ -280,8 +309,8 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'markX', label: "Logo Across", min: 0, max: 1, section: 'mark' },
   { key: 'markY', label: "Logo Up", min: 0, max: 1, section: 'mark' },
   { key: 'layerCount', label: "Layers", min: 1, max: 2, section: 'layers', step: 1 },
-  { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1, section: 'spin' },
-  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 1, section: 'spin' },
+  { key: 'rotationSpeed', label: "Rotation Speed", min: 0, max: 1.3, section: 'spin', wanderSpan: 1 },
+  { key: 'spinImpulse', label: "Flick Strength", min: 0, max: 2, section: 'spin', wanderSpan: 1 },
   { key: 'spinDrag', label: "Plate Drag", min: 0, max: 1, section: 'spin' },
   { key: 'spinDirection', label: "Spin Direction", min: -1, max: 1, section: 'spin', step: 1 },
   { key: 'spinWander', label: "Spin Wander", min: 0, max: 1, section: 'spin' },
@@ -296,6 +325,24 @@ const FROM_PANEL: DeskSpec[] = [
 export const PINNABLE: DeskSpec[] = [...FROM_MIDI, ...FROM_PANEL];
 
 export const PIN_RANGE = new Map<string, DeskSpec>(PINNABLE.map(s => [String(s.key), s]));
+
+/**
+ * A setting's value as how far along its own control it sits (0 to 1), and back.
+ *
+ * For a surface that draws its own native slider rather than one of the
+ * shared ones (the Design sheet's Evolve Speed), so that it still takes the
+ * registry's range and the setting's curve instead of a copy of either: when
+ * Evolve Speed went on to 3 (PLAN 27h-1), that sheet was the one place left
+ * stopping at 1 on a straight throw.
+ */
+export function travelOfKey(key: keyof VisualizerSettings, value: number | undefined): number {
+  const s = PIN_RANGE.get(String(key));
+  return s ? travelOf(value ?? s.min, s.min, s.max, curveOf(key)) : value ?? 0;
+}
+export function valueOfKey(key: keyof VisualizerSettings, at: number): number {
+  const s = PIN_RANGE.get(String(key));
+  return s ? handValueAt(at, s.min, s.max, curveOf(key)) : at;
+}
 
 /**
  * Where a value lands on a control that only takes whole steps; on any other
@@ -322,20 +369,65 @@ export const onSettingStep = (key: string, value: number): number => {
 export type DeskSurface = 'perform' | 'design';
 
 /**
- * What Design's recipe starts as: the eight a look is actually built from.
+ * What Design's recipe starts as: the controls a look is actually built from.
  *
  * It used to be a constant inside the bench, which is why the bench could not
  * be changed — the eight were the right eight and also the only eight.
+ *
+ * The owner (2026-11-07): "the recipe box only has two controls?" The first
+ * eight are the owner's, and six of them (Speed, Turbulence, Soap Bursts, Beat
+ * Squeeze, Macro Zoom, Evolve Speed) are rides too. Since a tab could hold
+ * both strips, one control is drawn in one place (`drawnElsewhere` in
+ * deskLayout.ts) and the Rides keep theirs, so on the Perform tab that ships
+ * the Recipe drew Swirl and Gravity and a line saying where the rest were.
+ * The rule is right; the strip was a copy of the other one. The six after
+ * the owner's eight are look-building controls that no ride and no panel on
+ * Perform's deck already has: the oil's tension, the bubbles, the colour's
+ * saturation and sheen, the lamp's warmth and the hue's journey. On Perform
+ * the Recipe draws eight of its own again, and on a tab without the Rides it
+ * draws all fourteen, two short of `MAX_PINS` so a pick still fits.
+ * `npm run desklayout` counts them.
  */
 export const DEFAULT_RECIPE: (keyof VisualizerSettings)[] = [
   // Granulation is off the strip: it made a few jagged cuts in the dye and
   // read as a fault. The physics dials in its place each do something large.
   'globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright',
   'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate',
+  'oilTension', 'bubbles', 'saturationBoost', 'iridescence', 'lampWarmth', 'hueJourney',
 ];
 
-/** How many a strip will hold before it stops being a surface you can read. */
-export const MAX_PINS = 14;
+/*
+  What a performer rides. Each has to pass three tests: it shows on any look
+  within a second, pulling it back undoes it, and it does something no other
+  ride does.
+
+  Dimmer (intensity), Speed (motion), Turbulence (calm glass to boiling),
+  Beat Press (the kick squeezes the glass), Plate Rock (the kick tips the
+  plate and it sloshes back), Soap Bursts (the dye blown apart on the beat),
+  Zoom (a dive into the liquid), and Evolve Speed (how far the show wanders
+  on its own; raising it from zero switches Random Evolve on).
+
+  Swirl and Gravity were here and are not now, though Choose still has both.
+  Swirl only spins up eddies a look already has, so on a calm one it did
+  next to nothing. Gravity pours the dye down the plate and pulling it back
+  does not bring the dye up again: it is a scene change, not a ride.
+*/
+export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
+  'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
+];
+
+/**
+ * How many a strip will hold before it stops being a surface you can read.
+ *
+ * 14 until 2026-11-07, when the Recipe that ships grew to fourteen (35c-6) and
+ * so was full the day it shipped: Choose answered a pick with "A strip holds
+ * 14. Take one off first", which `npm run qa`'s recipe pick (Refraction onto
+ * the Recipe) caught on the Mac. Sixteen leaves the shipped Recipe room for two
+ * picks; on the Rides sixteen one-line rows are 400 px, still a strip read at
+ * a glance, and the Recipe's knobs are four rows of four.
+ * `npm run desklayout` asks that each strip that ships leaves room for a pick.
+ */
+export const MAX_PINS = 16;
 
 const KEYS: Record<DeskSurface, string> = {
   perform: 'chromaglass-ride-keys',
@@ -360,6 +452,7 @@ const SHIPPED: Record<DeskSurface, string[][]> = {
   ],
   design: [
     ['globalSpeed', 'turbulenceScale', 'audioImpact', 'beatSqueeze', 'bloom', 'granulation', 'macroZoom', 'automateRate'],
+    ['globalSpeed', 'turbulenceScale', 'vorticityConfinement', 'plateUpright', 'surfactantFlow', 'beatSqueeze', 'macroZoom', 'automateRate'],
   ],
 };
 const sameSet = (a: readonly string[], b: readonly string[]) =>

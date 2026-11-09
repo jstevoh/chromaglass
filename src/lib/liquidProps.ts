@@ -30,10 +30,10 @@
  * a little faster than water, not a little slower.
  */
 import type { LiquidBehaviour } from '../types';
-import { DISH_METRES, DISH_REST_GAP } from './turntable.ts';
+import { DISH_METRES, DISH_GAP_METRES } from './turntable.ts';
 
 /** What speciesOf reads of a bottle: its behaviour, or the deposit made from it (lib/liquidPhase.ts). */
-type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'index' | 'scatter'>;
+type Poured = Pick<LiquidBehaviour, 'magnetic' | 'polarity' | 'body' | 'weight' | 'viscosity' | 'density' | 'tension' | 'index' | 'scatter'>;
 
 /** Water's kinematic viscosity, m²/s: Thickness 0 (thinGapViscosity). */
 export const WATER_NU = 1e-6;
@@ -68,6 +68,8 @@ export interface Species {
   index: number;
   /** Reduced scattering coefficient μs′, 1/mm. */
   scatter: number;
+  /** Surface tension against air, mN/m (when the bottle names one). */
+  tension?: number;
 }
 
 /**
@@ -94,7 +96,7 @@ export function speciesOf(what: Poured | undefined): Species | null {
     is thinner than water by more than alcohol's few percent, which on a
     plate whose clear liquid is water is no contrast at all.
   */
-  return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333, scatter };
+  return { lnNu: Math.max(0, lnNu), density, index: what.index && what.index > 0 ? what.index : 1.333, scatter, ...(what.tension && what.tension > 0 ? { tension: what.tension } : {}) };
 }
 
 /*
@@ -121,13 +123,14 @@ export const HELD_POUR = 0.5e-6;
  *
  * `radius` is in plate widths. With `seconds`, a held bottle's stream for
  * that long: HELD_POUR·seconds over the dome the pour lands as, half the
- * disc's area times the 6 mm rest gap. Without, a one-shot dose (a drop
+ * disc's area times the rest gap (lib/turntable.ts DISH_GAP_METRES). Without, a one-shot dose (a drop
  * that falls, the automation's): `amount` is the share, as the body's is.
  */
-export function pourShare(radius: number, amount: number, seconds?: number): number {
+export function pourShare(radius: number, amount: number, seconds?: number, gap = DISH_GAP_METRES): number {
   if (!(amount > 0)) return 0;
   if (seconds === undefined) return Math.min(1, amount);
   const r = radius * DISH_METRES;
-  const dome = (Math.PI * r * r) / 2 * DISH_REST_GAP * DISH_METRES;
+  // At the cover's live gap (PLAN 38r-5): the same mL is less of a deep column.
+  const dome = (Math.PI * r * r) / 2 * gap;
   return Math.min(1, (amount * HELD_POUR * Math.max(0, seconds)) / dome);
 }

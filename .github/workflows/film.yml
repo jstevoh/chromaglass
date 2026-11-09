@@ -41,6 +41,11 @@ concurrency:
   group: film-${{ github.ref }}
   cancel-in-progress: false
 
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+
 jobs:
   film:
     # `&& ''` would fall through (an empty string is false in an expression),

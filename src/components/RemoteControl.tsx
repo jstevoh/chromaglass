@@ -12,10 +12,13 @@ import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
 import { useWakeLock } from '../hooks/useWakeLock';
-import { PIN_RANGE } from '../lib/deskPins';
 import { SPIN_AUTO_NAMES } from '../lib/turntable';
+import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
-import { curveOf, handValueAt, travelOf } from '../lib/midi';
+import { LiveRemoteChip } from './LiveRemoteChip';
+import { RemotePourText } from './RemotePourText';
+import { PhoneInkTitle } from './phone/PhoneInkTitle';
+import { Slider } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
@@ -36,62 +39,6 @@ import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './Dr
  * screen, which is what most hands pick a phone up to do. This page is its
  * Controls.
  */
-
-/**
- * Defined at module level on purpose: a component created inside the render
- * body gets a new identity on every state message from the laptop, which
- * remounts the slider under the thumb that is dragging it.
- *
- * The travel is not written here. It is the setting's one range, from the
- * registry every other surface reads: this page had Speed at 0.005–0.6, twice
- * the sheet's top, and the macro zoom stopping at 12 where the sheet goes to
- * 16, so the same thumb position meant a different plate from the phone.
- */
-function Slider({ label, field, step, format, value, connected, onDrag, onChange }: {
-  label: string;
-  field: keyof VisualizerSettings;
-  step: number;
-  format?: (v: number) => string;
-  value: number | undefined;
-  connected: boolean;
-  onDrag: (field: keyof VisualizerSettings, dragging: boolean) => void;
-  onChange: (field: keyof VisualizerSettings, v: number) => void;
-}) {
-  const { min, max } = PIN_RANGE.get(String(field)) ?? { min: 0, max: 1 };
-  const current = value ?? min;
-  // The same bent travel as the desk and a MIDI fader — Speed's is cubed, so
-  // the slow end where the looks live gets the bottom third of a throw that
-  // is shorter here than anywhere else. See `curveOf` in `lib/midi.ts`.
-  const curve = curveOf(field);
-  const at = curve === 1 ? current : travelOf(current, min, max, curve);
-  return (
-    <div className="mb-5">
-      <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">{label}</span>
-        <span className="font-mono text-xs text-white/40">{format ? format(current) : current.toFixed(2)}</span>
-      </div>
-      <input
-        id={`remote-${String(field)}`}
-        type="range"
-        min={curve === 1 ? min : 0}
-        max={curve === 1 ? max : 1}
-        step={curve === 1 ? step : 0.001}
-        value={at}
-        disabled={!connected}
-        onPointerDown={() => onDrag(field, true)}
-        onPointerUp={() => onDrag(field, false)}
-        onPointerCancel={() => onDrag(field, false)}
-        onChange={(e) => {
-          const raw = parseFloat(e.target.value);
-          if (curve === 1) { onChange(field, raw); return; }
-          onChange(field, handValueAt(raw, min, max, curve));
-        }}
-        className="remote-slider h-10 w-full cursor-pointer disabled:opacity-30 md:h-12"
-        style={{ ['--fill' as string]: `${(curve === 1 ? (current - min) / (max - min) : at) * 100}%` }}
-      />
-    </div>
-  );
-}
 
 function ActionButton({ label, icon: Icon, onPress, connected, tone = 'default' }: {
   label: string;
@@ -672,7 +619,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
       className="min-h-screen bg-[#0a0a0a] text-white"
       style={{
         paddingTop: 'env(safe-area-inset-top)',
-        paddingBottom: 'calc(env(safe-area-inset-bottom) + 6.5rem)',   // clear of the fixed transport bar
+        paddingBottom: `calc(env(safe-area-inset-bottom) + ${state?.live ? '10rem' : '6.5rem'})`,   // clear of the fixed transport bar, and the live chip on it
         paddingLeft: 'env(safe-area-inset-left)',
         paddingRight: 'env(safe-area-inset-right)',
         touchAction: 'manipulation',
@@ -754,6 +701,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </button>
           </div>
 
+          {/* A song's name poured as ink (PLAN 37x-10c), its own file */}
+          <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
+
           {/* The dials that change the mood most */}
           <Slider label="Sound Drive" field="audioImpact" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Speed" field="globalSpeed" step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
@@ -776,7 +726,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Projector Focus" field="projectorFocus" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Heat" field="heat" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Slosh" field="slosh" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('slosh') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Frame Sway" field="frameSway" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('frameSway') as number | undefined} {...sliderProps} connected={connected} />
@@ -851,11 +803,18 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.thinGap ?? 1) > 0.5 && (
             <Slider label="Thickness" field="gapThickness" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('gapThickness') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* The liquid under the cover and the glass on it (PLAN 38r-5), as on the desk. */}
+          <Slider label="Liquid" field="liquidMl" step={1} format={(v) => `${Math.round(v)} mL`} value={value('liquidMl') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Cover Weight" field="coverWeight" step={5} format={(v) => `${Math.round(v)} g`} value={value('coverWeight') as number | undefined} {...sliderProps} connected={connected} />
           {/*
             The clear film that tears into lace (PLAN §20b), always: laying it
             and thickening it is a pour, worth a thumb from across the room.
           */}
           <Slider label="Clear Film" field="clearFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilm') as number | undefined} {...sliderProps} connected={connected} />
+          {/* Its dye (PLAN 20b-13), while there is a film to dye. */}
+          {(settings?.clearFilm ?? 0) > 0.001 && (
+            <Slider label="Film Dye" field="clearFilmDye" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('clearFilmDye') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* And Oil Bodies only while there is oil for the colours to keep to. */}
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Oil Bodies" field="oilBodies" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('oilBodies') as number | undefined} {...sliderProps} connected={connected} />
@@ -864,6 +823,15 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
+          {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
+            <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+
+          {/* Song titles as ink in a live set (PLAN 37x-10), the phone's Title switch. */}
+          <div className="mb-6">
+            <PhoneInkTitle settings={settings} onSetting={patch} disabled={!connected} testId="remote-ink-title" />
+          </div>
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -1055,6 +1023,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
         data-testid="remote-transport"
       >
+        {state?.live && (
+          <div className="mx-auto mb-3 flex max-w-6xl">
+            <LiveRemoteChip live={state.live} action={action} className="flex-1" />
+          </div>
+        )}
         <div className="mx-auto flex max-w-6xl items-center gap-3">
           <button
             aria-pressed={!!state?.blackout}

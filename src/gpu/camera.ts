@@ -14,6 +14,7 @@
  */
 
 import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe } from './kit';
+import { groupOf, viewOf } from './groupCache';
 import type { Opening } from './opening';
 import { UniformPack } from './uniforms';
 import { CAMERA_LAYOUT } from './wgsl/cameraFields';
@@ -125,7 +126,7 @@ export class WebGPUCamera {
       }));
       this.sceneSize = [width, height];
     }
-    return this.scene.createView();
+    return viewOf(this.scene);
   }
 
   /** The photograph: the scene and the plate's aux attachment, onto `target`. */
@@ -149,15 +150,7 @@ export class WebGPUCamera {
       timestampWrites: timestamps,
     });
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, this.device.createBindGroup({
-      layout: pipeline.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: this.ubo } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: this.scene.createView() },
-        { binding: 3, resource: aux.createView() },
-      ],
-    }));
+    pass.setBindGroup(0, groupOf(this.device, pipeline, [this.ubo, this.sampler, this.scene, aux]));
     pass.draw(6);
     pass.end();
   }

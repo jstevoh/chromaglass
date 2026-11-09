@@ -4,11 +4,11 @@
  *
  *   npm run startup
  *
- * What was reported, by `npm run depth` on every fresh Mac runner: a few
+ * What was reported, by `npm run depth` on each fresh Mac runner: a few
  * seconds after load the plate took eight steps and then stopped for about
  * nine seconds (9.30 s on run 36245105594, 8.58 s on 36243996678), with no
- * animation frame and no loop heartbeat while the page's own timers kept
- * firing. The black box logged it as "no frame for 6s". The first step had
+ * animation frame or loop heartbeat while the page's own timers kept
+ * firing. The black box logged it as "no frame for 6s". The first step
  * asked for forty-four pipelines on the frame, and the GPU process compiled
  * them, cold, before it would present another.
  *
@@ -16,7 +16,7 @@
  * look opens with while the starting frame is up, the rest behind the show
  * once it is. The show is opened twice, each time on a cold shader cache:
  * once with `?prepare=0`, the old way, as the control, and once as it ships.
- * The control is printed, and judged only as the bar for 1b: it is what
+ * The control is printed and judged only as the bar for 1b: it is what
  * says the cache really was cold and the instruments below really can see
  * the freeze. The show as it ships is asked:
  *
@@ -97,7 +97,7 @@
  * Only a Mac shows the freeze itself.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -107,7 +107,7 @@ import { heldStretches, selfCheck } from './pagehold.mjs';
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 
-const PORT = 4357;
+const PORT = port(4357);
 /**
  * The longest a frame, a heartbeat or a step may take to follow the last
  * one. Two seconds, because the freeze was nine and a healthy show on the
@@ -298,8 +298,8 @@ const frameStops = (x) => {
  * kernel of all (2.4 to 4.6 s for `fluid/fill`, a few lines); in all 41 the
  * page's own long tasks in the gap came to 0.7 s at most (in 38, none), and
  * every gap had ended before the intro let go of its still (4.64 to 11.96 s).
- * The intro is held still from the first paint until the opening's render
- * pipelines are built (`introStill`, 14v-5) precisely because on a cold Mac
+ * The intro is held still from the first paint until the opening is built
+ * (`introStill`, 14v-5, 14v-11) precisely because on a cold Mac
  * that is when the GPU stops the page's frames, and a turning mark froze
  * where a still one shows nothing. So those 41 were a still picture with
  * the page idle and Chromium busy, which no audience sees and the app
@@ -448,7 +448,7 @@ function coldCache() {
   return found.length ? `emptied ${found.length} (${found.map((p) => p.slice(root.length)).join(', ')})` : `none found under ${root}`;
 }
 
-const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'],
+const server = spawn('./node_modules/.bin/vite', ['preview', '--port', `${PORT}`, '--strictPort'],
   { detached: true, stdio: ['ignore', 'ignore', 'inherit'] });
 let up = true, leaving = false;
 // Only a surprise before we ask it to go (depth.mjs has the long version).
@@ -1538,7 +1538,7 @@ try {
     quarter-second row it was seen in; the intro's own leaving is exact.
   */
   const intro = o.intro ?? {};
-  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}; held still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never let go' : `${(e / 1000).toFixed(2)} s`}`).join(', ') || 'never'} (from the first paint until the opening's render pipelines were built)`);
+  console.log(`     the intro: into the plate at ${intro.adopted == null ? 'never' : `${(intro.adopted / 1000).toFixed(2)} s`}, leaving at ${intro.out == null ? 'never' : `${(intro.out / 1000).toFixed(2)} s for "${intro.reason}"`}, the plate's first step seen by ${o.firstStep == null ? 'never' : `${(o.firstStep / 1000).toFixed(2)} s`}; held still ${(intro.still ?? []).map(([a, e]) => `${(a / 1000).toFixed(2)}–${e == null ? 'never let go' : `${(e / 1000).toFixed(2)} s`}`).join(', ') || 'never'} (from the first paint until the opening was built)`);
   const p = o.prepared;
   const b = o.behind;
   check('the show opens and the plate is stepping',

@@ -22,6 +22,8 @@ export interface NativeLicenseBridge {
   exp?: number | null;
   error?: string | null;
   enforced?: boolean;
+  /** The art packs the Mac's held key names (PLAN 45a-2), read from its signed payload by desktop/main.js. */
+  packs?: string[];
 }
 
 interface NativeBridgeWindow {
@@ -37,19 +39,7 @@ export const FREE_RECORD_MAX_SECONDS = 15;
 export const FREE_RENDER_MAX_HEIGHT = 720;
 export const FREE_SITE_LOGO_TEXT = 'ChromaGlass';
 
-export const CHECKOUT_HOME_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/e4ac2797-90f4-413a-b423-d9b73b41cdaa';
-export const CHECKOUT_PRO_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/08ac3a98-9a0b-4630-ab3f-fef720ca215c';
-export const CHECKOUT_UPGRADE_URL =
-  'https://chromaglass.lemonsqueezy.com/checkout/buy/4f942048-d8c3-473a-a5ce-4622e28af245';
-
-export function buildCheckoutUrl(baseUrl: string, email?: string | null): string {
-  const clean = email?.trim();
-  if (!clean || !clean.includes('@')) return baseUrl;
-  const sep = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${sep}checkout[email]=${encodeURIComponent(clean)}`;
-}
+export { CHECKOUT_HOME_URL, CHECKOUT_PRO_URL, CHECKOUT_UPGRADE_URL, CHECKOUT_MOIRE_URL, buildCheckoutUrl } from './checkoutLinks';
 
 export function openAccountSheet(): void {
   if (typeof window !== 'undefined') {
@@ -149,17 +139,23 @@ export const APP_FEATURE_TILES: AppTileSpec[] = [
     tier: 'home',
     summary: 'In the ChromaGlass app — put your own band mark or SVG on the glass instead of the ChromaGlass mark.',
   },
+  // The two Pro tiles sold several projectors with edge blending and MIDI out,
+  // and neither ships: the app drives one projector output (mapped into up to
+  // sixteen surfaces, on every tier), and MIDI out is only a controller's LEDs
+  // (PLAN.md 34a-7, which checked every claim against the code for the Pro
+  // page, public/pro.html). They now name what a Pro key does open. The first
+  // keeps its id because `npm run tiers` counts the tiles by it.
   {
     id: 'multi-projector',
-    title: 'Multi-projector & edge blend',
+    title: '1024² grid & cloud sync',
     tier: 'pro',
-    summary: 'In the ChromaGlass app (Pro) — span multiple projectors with feathered overlap.',
+    summary: 'Pro — the finest fluid grid, and your looks, sets and MIDI map the same in every browser you sign in to.',
   },
   {
     id: 'pro-io',
-    title: 'OSC, Art-Net / DMX & MIDI Out',
+    title: 'OSC & Art-Net / DMX',
     tier: 'pro',
-    summary: 'In the ChromaGlass app (Pro) — lock into lighting desks, Resolume, TouchDesigner and house rigs.',
+    summary: 'In the ChromaGlass app (Pro) — Resolume, TouchDesigner and lighting desks drive the show, and the room’s lights follow the plate.',
   },
 ];
 
@@ -199,6 +195,8 @@ export function getActiveLicenseInfo(): {
   email: string | null;
   id: string | null;
   error: string | null;
+  /** The art packs the held key names (PLAN 45a-2); empty for a key that names none. */
+  packs: string[];
 } {
   const cached = getCachedLicenseStatus();
   if (cached.valid && cached.tier) {
@@ -208,6 +206,7 @@ export function getActiveLicenseInfo(): {
       email: cached.email,
       id: cached.id,
       error: null,
+      packs: Array.isArray(cached.payload?.packs) ? cached.payload.packs : [],
     };
   }
   const nativeLic = getNativeBridge()?.license;
@@ -218,6 +217,7 @@ export function getActiveLicenseInfo(): {
       email: nativeLic.email ?? null,
       id: nativeLic.id ?? null,
       error: null,
+      packs: Array.isArray(nativeLic.packs) ? nativeLic.packs : [],
     };
   }
   return {
@@ -226,6 +226,7 @@ export function getActiveLicenseInfo(): {
     email: null,
     id: null,
     error: nativeLic?.error ?? cached.error ?? null,
+    packs: [],
   };
 }
 
@@ -247,6 +248,34 @@ export function canUseHomeFeature(): boolean {
 
 export function canUseProFeature(): boolean {
   return getEffectiveTier() === 'pro';
+}
+
+/**
+ * Whether this copy may put the moiré pack's sheets on the stage (PLAN 45a).
+ * Everything is open where tiers are not enforced (a self-run copy, the
+ * checks, development); where they are, Pro includes every art pack
+ * (PLAN 23) and Home buys this one as an add-on, which the licence names
+ * in its signed `packs` (PLAN 45a-2). Like every site gate, a nudge.
+ */
+export function canUseMoirePack(): boolean {
+  return !isTierGatingEnforced() || canUseProFeature() || (canUseHomeFeature() && hasLicensePack('moire'));
+}
+
+/**
+ * Whether the licence held here names an art pack bought on top of Home (PLAN 45a-2).
+ * The pack is in the key's signed payload (`packs`), so it verifies offline as the
+ * tier does: the account sheet's verified key first, then the Mac's own (the Mac
+ * verifies its key in the main process and hands the page what it read). A key signed
+ * before packs were sold names none, and reads as no pack, which is what it bought.
+ */
+export function hasLicensePack(pack: string): boolean {
+  const lic = getActiveLicenseInfo();
+  return lic.valid && lic.packs.includes(pack);
+}
+
+/** Whether a look of this art pack (a `Preset.pack`) is locked here: the pack is not on this copy. */
+export function isPackLocked(pack: string | undefined): boolean {
+  return pack === 'moire' && !canUseMoirePack();
 }
 
 /**

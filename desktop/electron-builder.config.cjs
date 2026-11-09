@@ -43,10 +43,14 @@ module.exports = {
   files: [
     'main.js',
     'updates.js',
+    'live.js',
+    'liveSession.js',
+    'rtmp.js',
+    'keys.js',
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
-    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js'] },
+    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'osc.js', 'abletonLink.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'license-key.js', 'assistant.js', 'assistant-room-keys.json'] },
   ],
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --
@@ -63,7 +67,9 @@ module.exports = {
   mac: {
     target: [{ target: 'dmg', arch: ['arm64'] }, { target: 'zip', arch: ['arm64'] }],
     category: 'public.app-category.entertainment',
-    icon: '../public/icon-512.png',
+    // macOS's own icon, drawn on its grid by `npm run brand` (PLAN 13-icon); it
+    // was the website's flat 512 tile, edge to edge in the Dock.
+    icon: 'resources/icon.icns',
     identity: signed ? undefined : '-',
     hardenedRuntime: signed,
     gatekeeperAssess: false,
@@ -72,6 +78,7 @@ module.exports = {
     entitlementsInherit: 'resources/entitlements.mac.plist',
     extendInfo: {
       NSMicrophoneUsageDescription: 'ChromaGlass listens to the music to play the plate. The sound is analysed on this Mac and never recorded or sent anywhere.',
+      NSAudioCaptureUsageDescription: 'ChromaGlass listens to your Mac’s system audio so any music or streaming app plays the plate without sharing a browser tab. The sound is analysed on this Mac and never recorded or sent anywhere.',
       NSCameraUsageDescription: 'ChromaGlass can use a camera as a source on the plate (the scene camera and the Mixer).',
       NSLocalNetworkUsageDescription: 'ChromaGlass serves the show to phones (the remote) and network displays on this network, and hears OSC and Art-Net.',
     },

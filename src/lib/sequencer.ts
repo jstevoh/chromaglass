@@ -271,11 +271,11 @@ export function builtInSequences(): ShowSequence[] {
       loop: true,
       builtIn: true,
       stages: [
-        s('Out of the dark', 28, { presetId: 'poster-1969', transition: 3, paletteSize: 3, paletteLead: 0, settings: { pacing: 0.7 } }),
+        s('Out of the dark', 28, { presetId: 'classic', transition: 3, paletteSize: 3, paletteLead: 0, settings: { pacing: 0.7 } }),
         s('Clock glass', 24, { presetId: 'clock-glass', transition: 3, pace: { moments: ['dyes', 'pour', 'burst'] }, settings: { pacing: 0.7 } }),
         s('Poster', 22, { presetId: 'poster-1969', transition: 3, pace: { moments: ['burst', 'dyes'] }, settings: { pacing: 0.75 } }),
         s('Chemistry', 26, { presetId: 'turing-print', transition: 3, settings: { pacing: 0.7 } }),
-        s('The dish, pressed', 24, { presetId: 'poster-1969', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
+        s('The dish, pressed', 24, { presetId: 'oil-and-water', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
         s('Lumia, draining away', 30, { presetId: 'lumia', transition: 3, pace: { endDark: true, moments: ['dyes', 'pour', 'drain'] }, settings: { pacing: 0.6 } }),
       ],
     },
@@ -299,6 +299,26 @@ export function saveUserSequences(seqs: ShowSequence[]): void {
   try {
     localStorage.setItem(SEQUENCES_KEY, JSON.stringify(seqs.filter(q => !q.builtIn)));
   } catch { /* private mode, full storage: the show still runs */ }
+}
+
+/**
+ * Where a sequence started `offsetSec` into its song stands: the stage, and
+ * how far into it. Stages laid end to end by their seconds (a looping
+ * sequence wraps). The transport's `startAt` and the Listen check
+ * (`npm run listen`) both read it, so a designed sequence is checked against
+ * the walk that runs it, not a copy of it.
+ */
+export function stageAtOffset(stages: readonly Pick<ShowStage, 'seconds'>[], offsetSec: number, loop: boolean): { index: number; into: number } {
+  const total = stages.reduce((t, st) => t + Math.max(1, st.seconds), 0);
+  let off = Math.max(0, offsetSec);
+  if (loop && total > 0) off = off % total;
+  let index = 0;
+  for (; index < stages.length - 1; index++) {
+    const len = Math.max(1, stages[index].seconds);
+    if (off < len) break;
+    off -= len;
+  }
+  return { index, into: off };
 }
 
 /** A user-editable copy of a sequence (built-ins are read-only). */

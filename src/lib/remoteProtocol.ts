@@ -64,7 +64,14 @@ export type RemoteAction =
   | 'performance-toggle'
   /** A Mixer row's take button (lib/mixFade.ts): out over its fade time, or back in. */
   | 'mix-fade-led' | 'mix-fade-gel' | 'mix-fade-lumia' | 'mix-fade-front'
-  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark';
+  | 'mix-fade-back' | 'mix-fade-film' | 'mix-fade-mark'
+  /**
+   * End the Mac app's live stream (PLAN 37x-4d). Stop only: going live is the
+   * one press that cannot be taken back, so it is made at the desk, where the
+   * panel names every destination before it goes; a phone in a pocket can
+   * end a stream, never start one.
+   */
+  | 'live-stop';
 
 /** The sequencer as the phone sees it. */
 export interface RemoteSequencer {
@@ -111,24 +118,45 @@ export interface RemoteState {
    * level alone, a fade half-way out read "Fade out", and a press turned it back in.
    */
   rowFading?: Partial<Record<'led' | 'gel' | 'lumia' | 'front' | 'back' | 'film' | 'mark', 'in' | 'out'>>;
+  /**
+   * The Mac app's live stream while it is on air (PLAN 37x-4d), so the phone
+   * can say so and stop it: a test or the real thing, for how long, to
+   * where, and whether a destination is dropping frames or retrying.
+   */
+  live?: { test: boolean; seconds: number; names: string[]; trouble: boolean } | null;
 }
+
+/** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
+export type TvSignal =
+  | { kind: 'offer' | 'answer'; sdp: string }
+  | { kind: 'ice'; candidate: RTCIceCandidateInit | null }
+  | { kind: 'refused'; reason: 'tier' | 'full' };
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror'; key?: string }
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
    * minutes, `retryMs` from now. A locked phone waits that long rather than
    * knocking again, since every knock while locked is refused unread.
    */
-  | { type: 'denied'; reason: 'key' | 'locked'; retryMs?: number }
+  | { type: 'denied'; reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop'; retryMs?: number }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
   | { type: 'mirrors'; count: number }
   /** Relay → display: how many phones (controllers) are connected. */
   | { type: 'controllers'; count: number }
+  /**
+   * Relay → display: Ableton Link (PLAN.md 13.5-link), sent on connect and,
+   * while it is on, twenty times a second. `beat` is the session's beat at the
+   * moment of sending, so its fraction is the beat's phase and its value modulo
+   * four is the bar's (beat zero is every peer's bar line); null while no session is joined.
+   */
+  | { type: 'link'; on: boolean; peers: number; bpm: number; beat: number | null; playing: boolean; locked?: boolean }
+  /** Display → relay: switch Link on or off. The relay takes it from the laptop's own page only. */
+  | { type: 'link-enable'; on: boolean }
   /** Display → network displays: the show itself, the same messages a cast receiver gets. */
   | { type: 'cast'; message: CastMessage }
   /**
@@ -139,14 +167,87 @@ export type RemoteMessage =
    * twenty of these a second — and the browser could not send the UDP itself
    * in any case.
    */
-  | { type: 'lights'; layers: { colour: string; fill: number }[]; master: number }
+  | {
+      type: 'lights'; layers: { colour: string; fill: number }[]; master: number;
+      /** The ear's fast readings, 0..1 (`oscOut.ts`'s SOUND_OUT), for OSC out (PLAN.md 13.5-osc); absent while nothing is heard. */
+      sound?: Record<string, number>;
+      /** The ear's bands, 0..1, low to high. */
+      bands?: number[];
+      /** The beat clock's tempo, 0 before it has one. */
+      bpm?: number;
+    }
+  /**
+   * A TV at home (PLAN 12-tv, lib/tvFeed.ts). Relay → display: a TV joined,
+   * under an id the relay made for its socket; a TV left. Relay → TV: the show
+   * is here (a display joined) or gone (the last display left), so a TV
+   * playing films while the laptop is off goes live when it comes on.
+   */
+  | { type: 'tv-join'; id: string }
+  | { type: 'tv-leave'; id: string }
+  | { type: 'tv-show'; here: boolean }
+  /**
+   * The offer, the answer and the ICE candidates, both ways through the relay.
+   * Display → relay carries `to` (the TV's id); the relay hands the TV the
+   * signal alone. TV → relay carries the signal alone; the relay adds `from`.
+   */
+  | { type: 'tv-signal'; to?: string; from?: string; signal: TvSignal }
+  /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
+  | { type: 'beat' }
+  /**
+   * Relay → display: where OSC out goes and whether it is sending (PLAN.md
+   * 13.5-osc). Sent on hello, which is how a page learns there is a show
+   * server to switch it on at; `pro` false means the server holds its packets.
+   */
+  | {
+      type: 'osc-out'; on: boolean; target: string | null; pro: boolean; says: string;
+      /** Off because someone switched it off (this page, another, the Mac app), not because the server has just started: the page does not switch it back on. */
+      stopped?: boolean;
+    }
+  /** Display → relay: OSC out on at `target` ("host:port"), or off. The relay takes it from the laptop's own page only. */
+  | { type: 'osc-out-enable'; on: boolean; target?: string }
   /** Relay → display, when a controller joins and needs a snapshot. */
   | { type: 'request-state' }
   /** Display → controllers. */
   | { type: 'state'; state: RemoteState }
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
+  /**
+   * The owner's assistant (PLAN 44b–44d; the relay's guard is
+   * `server/assistant.js`, the program the assistant talks to
+   * `mcp/chromaglass-mcp.js`). Only the relay's guard sends the first two to
+   * the display, and the relay drops either from anyone else, so a phone can
+   * still end a stream and never start one.
+   *
+   * `cue-look`: arm a look the assistant made, a base from the library with
+   * its own settings over it (`lib/assistantLook.ts`), for the performer's Go.
+   * `assistant-live`: start the live stream to the saved destinations, or the
+   * test ones; Full mode only. The rest pass between the relay and the
+   * assistant and never reach the display: the switch's mode, the guard's
+   * answer to a numbered message, and Undo.
+   */
+  | { type: 'cue-look'; name: string; base: string | null; settings: Partial<VisualizerSettings> }
+  | { type: 'assistant-live'; test: boolean }
+  | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
+  | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
+  | { type: 'assistant-undo' }
+  /**
+   * The owner's assistant (PLAN 44c-4, 44f), relayed only from the guard. A
+   * still: one frame up to 1280 wide, answered as a `picture` with
+   * `still: true` (lib/padPicture.ts). A song action: a *when* and a *what*
+   * added to the show of the song playing now, as a cue pinned on the score
+   * is (lib/songShows.ts `parseSongAction`, app/songCue.ts).
+   */
+  | { type: 'assistant-still'; width: number }
+  | { type: 'song-action'; when: unknown; what: unknown }
   | { type: 'preset'; presetId: string }
+  /**
+   * Words poured onto the plate as dye, which the flow then carries off
+   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
+   * of each track in a live set. From the phone remote's text box, or
+   * through the relay's guard; the display reads it with `parsePourText`
+   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   */
+  | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
   /**
    * Arm a look without sending it. `null` disarms.
    *
@@ -211,7 +312,7 @@ export type RemoteMessage =
    * URL. `aspect` is the canvas's own (width over height), so the remote's
    * frame takes the wall's shape rather than a 16:9 it assumed.
    */
-  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number };
+  | { type: 'picture'; src: string; w: number; h: number; aspect: number; seq: number; still?: true };
 
 /**
  * Build the ws:// URL for the relay: the page's own origin, which is the show
@@ -226,7 +327,7 @@ export type RemoteMessage =
  * the link named (found in review, and checked by `npm run applink`). A
  * controller outside the app has no reason to go anywhere but home either.
  */
-export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror'): string {
+export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror' | 'tv'): string {
   const relay = role === 'controller' && isPhoneApp() ? relayFromUrl() : null;
   if (relay) return relaySocketUrl(relay, REMOTE_WS_PATH);
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

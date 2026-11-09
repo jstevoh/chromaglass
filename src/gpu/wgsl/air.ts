@@ -72,14 +72,16 @@ fn vs(@builtin(vertex_index) v: u32, @builtin(instance_index) i: u32) -> VOut {
   o.rim = f;
   /*
     Its size (16 steps on a log scale, 0.004 to 0.16 of the plate, so a
-    small bubble's size is as well told as a large one's), its film's age (16 steps)
-    and a number of its own (8, from its finger phase, random per bubble),
-    as one whole number under 2048, which half floats hold exactly.
+    small bubble's size is as well told as a large one's), its film (16
+    steps of the log of the film its own speed laid on the glass, bubbles.ts
+    pack; it was the film's age, which a pocket between glasses does not
+    have) and a number of its own (8, from its finger phase, random per
+    bubble), as one whole number under 2048, which half floats hold exactly.
   */
   let sizeQ = floor(clamp(log2(max(d.z, 1e-4) / 0.004) / 5.321928, 0.0, 1.0) * 15.0 + 0.5);
-  let ageQ = floor(clamp(f.w, 0.0, 1.0) * 15.0 + 0.5);
+  let filmQ = floor(clamp(f.w, 0.0, 1.0) * 15.0 + 0.5);
   let idQ = floor(fract(f.z / 6.2831853) * 7.99);
-  o.look = vec2f((sizeQ * 128.0 + ageQ * 8.0 + idQ) / 2048.0, 0.0);
+  o.look = vec2f((sizeQ * 128.0 + filmQ * 8.0 + idQ) / 2048.0, 0.0);
   return o;
 }
 
@@ -141,3 +143,52 @@ fn fs(in: VOut) -> @location(0) vec4f {
   return vec4f(a, a * (0.5 + 0.5 * q.x), a * (0.5 - 0.5 * q.y), in.look.x);
 }
 `;
+
+/**
+ * Full-screen pass that merges the plate's boiling vapour fraction field
+ * (`boilAlpha`, rg32float, PLAN §36e-2) into the `rgba16float` air field (`H6`),
+ * reconstructing each steam pocket's outward radial coordinate `q` from the
+ * coverage gradient so `plate.ts` shades boiling steam pockets with the same
+ * refractive meniscus and wetting-film optics as blown bubbles.
+ */
+export const AIR_BOIL_WGSL = /* wgsl */ `
+@group(0) @binding(0) var boilAlpha: texture_2d<f32>;
+
+struct BoilVOut {
+  @builtin(position) pos: vec4f,
+};
+
+@vertex
+fn vs(@builtin(vertex_index) v: u32) -> BoilVOut {
+  let x = f32((v << 1u) & 2u) * 2.0 - 1.0;
+  let y = f32(v & 2u) * 2.0 - 1.0;
+  var o: BoilVOut;
+  o.pos = vec4f(x, y, 0.0, 1.0);
+  return o;
+}
+
+fn alphaAt(p: vec2i, n: i32) -> f32 {
+  let c = clamp(p, vec2i(0), vec2i(n - 1));
+  return clamp(textureLoad(boilAlpha, c, 0).r, 0.0, 1.0);
+}
+
+@fragment
+fn fs(in: BoilVOut) -> @location(0) vec4f {
+  let dims = vec2i(textureDimensions(boilAlpha));
+  let p = clamp(vec2i(in.pos.xy), vec2i(0), dims - vec2i(1));
+  let a = alphaAt(p, dims.x);
+  if (a <= 1e-4) { discard; }
+  let gx = 0.5 * (alphaAt(p + vec2i(1, 0), dims.x) - alphaAt(p - vec2i(1, 0), dims.x));
+  let gy = 0.5 * (alphaAt(p + vec2i(0, 1), dims.x) - alphaAt(p - vec2i(0, 1), dims.x));
+  let gl = sqrt(gx * gx + gy * gy);
+  let outward = select(vec2f(0.0), vec2f(-gx, -gy) / gl, gl > 1e-5);
+  let r = clamp(1.0 - a, 0.0, 1.0);
+  let q = clamp(outward * r, vec2f(-1.0), vec2f(1.0));
+  let sizeQ = 6.0;
+  let filmQ = 8.0;
+  let idQ = floor(fract(sin(f32(p.x / 4) * 12.9898 + f32(p.y / 4) * 78.233) * 43758.5453) * 7.99);
+  let look = (sizeQ * 128.0 + filmQ * 8.0 + idQ) / 2048.0;
+  return vec4f(a, a * (0.5 + 0.5 * q.x), a * (0.5 + 0.5 * q.y), look);
+}
+`;
+

@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — song titles painted as ink, then swept away (PLAN 37x-10)
+
+- **Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone): when a new
+  song is named, its title and artist are poured into the liquid as ink at the plate's full
+  resolution, then a wash (a drift and eddies, a real flow) breaks the letters up. Title ink,
+  Size, Height and Sweep set it. Song-show title cards and words poured from the phone, the
+  show server or the assistant go through the same ink and wash.
+
+### Added — Heat from the lamp, and boiling under a held hand (PLAN 36e-2)
+
+- **Heat** (`heat`, Settings → Lamp & Light, Perform desk, MIDI, the remote and the phone's Looks
+  sheet; 0 by default and held out of Evolve and Lucky): the projector lamp's thermal flux on the
+  dish in $\text{W/m}^2$ across its visible (dye-absorbed) and infrared (water-absorbed) bands,
+  with two-face radiation, sideways conduction, Kell water-density buoyancy without the old
+  `clamp(temp, 0, 50)` ceiling, thermal expansion and vapour volume sources in the thin gap's
+  projection, and cavity nucleation into vapour pockets shaded as air (`src/gpu/lampBoil.ts`,
+  `src/gpu/wgsl/lampBoil.ts`, `npm run boilgpu`). Holding a pointer or finger on the dish blocks
+  the cooling fan's air under the hand ($h = 50 \to 10\,\text{W/(m}^2\text{K)}$) so the spot boils
+  while held and condenses when released.
+
+### Added — LFOs and envelopes you set (PLAN 30b)
+
+- In **Settings → Patches** (on the desk and the phone, and learnable over MIDI), each of the four LFOs (`lfo1`..`lfo4`) now sets its bar rate (`¼` to `16` bars), waveform shape (`sine`, `triangle`, `ramp`, `stepped`, or `smoothed random` gliding by cosine each period) and optional restart trigger (`free`, `kick`, `snare`, `note`, `pad`); each of the two envelopes (`env1`, `env2`) sets its attack (`1 ms`–`1 s`), decay (`20 ms`–`4 s`) and trigger source (`any`, `kick`, `snare`, `note`, `pad`). Today's fixed rates and shapes remain the defaults sample for sample (`npm run soundowed`, `npm run shapes`).
+
+### Added — the liquid's amount sets the gap: Liquid and Cover Weight (PLAN 38r-5)
+
+- The plate now knows how much liquid is under its cover glass. Two dials, Liquid (mL) and
+  Cover Weight (g), set the gap between the glasses through the real physics: the glass
+  floats on the liquid while the meniscus at its edge holds it, and squeezes the extra out
+  over the rim, by Stefan's law, when it cannot. Pours lift the glass. The defaults are
+  today's 2 mm plate.
+
+### Added — Soap Breakdown (PLAN 38c-3)
+
+- A new **Soap Breakdown** control (`soapBreakdown`, Settings → Oil & Soap under Soap Bursts,
+  MIDI, both desks, the remote while Soap Bursts is on, and the phone's Dye sheet with Soap
+  in hand; `0` by default on every look): a first-order surfactant loss $d\Gamma/dt = -k\Gamma$
+  on the mix's `.g` channel in `mixUpdate` (`soapBreakdownRate` in `src/gpu/fluid/soap.ts`),
+  scaled by the step's real seconds (`magnetSeconds`), never by frames or the look's Speed,
+  and shown on the desk as its half-life ($\ln 2 / k$, from `1.9h` at `0.01` down to `10s` at
+  `1`). At `0` (`Off`), all soap is conserved on the plate; turning it up clears soap over the
+  chosen half-life so a long show keeps bursting (`npm run soapbreak`).
+
+### Added — Film Dye: a colour for the clear film (PLAN 20b-13)
+
+- Beside Clear Film, while there is a film: **Film Dye** and a colour swatch, an
+  oil-soluble dye dissolved in the film. The lamp is filtered by it over the film's own
+  thickness (Beer–Lambert), so the lace takes the colour, deeper where the film is thick,
+  and the holes show the water's. On the desk, the phone's Dye sheet, the remote and MIDI.
+  0 in every look, which leaves the plate exactly as it was (`npm run lace` 8).
+
+### Changed — bigger lens beads in the closeup, and Lens Pools (PLAN 33g-2a)
+
+- The oil beads are laid larger in the macro view (twice the size scale), where each is a
+  lens that turns the plate upside down, so the closeup reads as glass and liquid with
+  depth. Macro Bead's Beads dial is 0.7 (was 0.35). Cell Bloom is now **Lens Pools**
+  (the same look, the same id). The plate's own beads are unchanged.
+
+### Changed — no look draws cells (PLAN 33g-3)
+
+- Macro Bead, Cell Bloom and Lacing Run no longer turn Paint Cells on (and Macro Bead and
+  Cell Bloom no longer turn Macro Lacing on); Lacing Run keeps its lacing. The Guide, the
+  landing page and the looks' descriptions follow. `npm run macroview` now asks every
+  shipped look, not just the ones that did not name cells.
+
+### Added — Shaped sound cords and dragged spectrum bands (PLAN 30a)
+
+- Sound and band cords in the patch bay (**Settings → Patches**, on both the desk and the phone) now carry **Mode** (**Follow** or **Gate**), **Gain** (applied before the threshold in both modes), **Gate** (`threshold`), **Rise** (`attack`) and **Fall** (`release`), so whole-plate cords as well as area cords can fire shaped pulses on a hit (`PatchBay.fold` in `src/lib/sceneMap.ts`, closing 25h-2). Absent fields read as before (`follow`, gain `1`), leaving every saved look and preset unchanged.
+- **Bands** cords now include a live log-frequency spectrum strip (`40 Hz`–`16 kHz`, `src/components/phone/BandStrip.tsx`) with the eight fixed bands marked and the gate threshold drawn on the cord's own live reading. Dragging across the strip sets a custom `[loHz, hiHz]` band (`BandRange`, `src/lib/audioFeatures.ts`) heard against its own recent range with the same floor and 6–30 dB `AutoRange` as the named bands, while writing `feature` as the named band holding the drag's middle for fallback (`npm run soundcords`).
+
 ### Added — the Splodascope, and Film Hold (PLAN 28k)
 
 - A new look, **Splodascope**, after a photograph of one: a crowd of yellow, green, red and

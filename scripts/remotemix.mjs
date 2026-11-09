@@ -27,6 +27,8 @@
  *   stack's own rule (`moveInMix`);
  * - a blend picked on the phone is the display's blend for that row;
  * - the level, stepped from the phone's slider, is the display's level;
+ * - words typed in the remote's text box and poured (PLAN 37x-10c) reach
+ *   the display as one pour-text message, laid out as a title card;
  * - the take button (PLAN.md §11 step 4) walks the display's level down
  *   over the fade time set on the display with no jump, lights on the phone
  *   while it runs and then says "Fade in", and a second press brings it
@@ -38,10 +40,10 @@
  */
 import { chromium } from 'playwright';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { mixStack, moveInMix } from '../src/lib/mixer.ts';
 
-const PORT = Number(process.env.REMOTEMIX_PORT ?? 4193);
+const PORT = port(4193, 'REMOTEMIX_PORT');
 const KEY = '4321';
 const BASE = `http://localhost:${PORT}`;
 
@@ -217,6 +219,39 @@ try {
   }
   check('the back plate\'s button takes the back plate out, and leaves the front plate where it is',
     backWas > 0 && backNow === 0 && frontHeld, `back ${backWas} → ${backNow}${frontHeld ? '' : ', the front plate moved'}`);
+
+  // ── Words poured from the phone (PLAN 37x-10c) ──────────────────
+  // The remote's text box, typed into on the phone and pressed, reaches the
+  // display as one pour-text message whose rows are the box's own reading
+  // (the name in capitals, the credit under it). Witnessed by a second
+  // display socket on the relay, holding the display's key as the laptop's
+  // page does, because the display page without a GPU has no plate to pour
+  // on and so nothing of its own to read back; the page still takes the
+  // message ("no page threw" below), and lib/pourText's parse is checked in
+  // node by `npm run assistant`.
+  {
+    const info = await (await fetch(`${BASE}/remote-info.json`)).json();
+    const witness = new WebSocket(`ws://localhost:${PORT}/remote-ws`);
+    const heard = [];
+    await new Promise((resolve, reject) => {
+      witness.onopen = () => { witness.send(JSON.stringify({ type: 'hello', role: 'display', key: info.displayKey })); resolve(); };
+      witness.onerror = reject;
+    });
+    witness.onmessage = (e) => { try { const m = JSON.parse(String(e.data)); if (m.type === 'pour-text') heard.push(m); } catch { /* not ours */ } };
+    await remote.waitForTimeout(300);
+    const box = remote.getByTestId('remote-pour-text-input');
+    await box.evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await box.fill('Sunshine of Your Love - Cream');
+    const label = await remote.getByTestId('remote-pour-text-go').innerText();
+    await press(remote.getByTestId('remote-pour-text-go'));
+    for (let i = 0; i < 20 && heard.length === 0; i++) await remote.waitForTimeout(100);
+    await remote.waitForTimeout(300);   // a second pour from one press would land in this
+    const rows = heard[0]?.rows?.map(r => `${r.text}@${r.weight}`).join('|');
+    check('words typed in the phone\'s box and poured reach the display as one pour, the name in capitals over the credit',
+      heard.length === 1 && rows === 'SUNSHINE OF@1.25|YOUR LOVE@1.25|Cream@0.75' && heard[0].colour === 'contrast', `${heard.length} pours: ${rows} (button "${label}")`);
+    check('and the box is empty after, so the same title is never one tap from pouring twice', (await box.inputValue()) === '' && await remote.getByTestId('remote-pour-text-go').isDisabled(), `"${await box.inputValue()}"`);
+    witness.close();
+  }
 
   // ── S14n: One malformed message cannot end the plate (PLAN.md §14n) ──
   const settingsBefore = await shown();

@@ -387,7 +387,8 @@ export function Desk(p: DeskProps) {
         midiName={p.midiName}
         onSound={p.onSound}
         onVideo={p.onVideo}
-        onWall={p.onOpenWall ?? p.onSendToWall}
+        onWall={p.onSendToWall}
+        wallSends={!live && !!p.dots.wall}
         onMidi={p.onMidi}
         onRecord={p.onRecordOptions ?? p.onToggleRecord}
         onSearch={p.onSearch}
@@ -433,7 +434,7 @@ export function Desk(p: DeskProps) {
         {/*
           The plate bar. It wraps rather than runs under a column: at 1024 in
           Gig the plate is 440 px wide and its bar holds the name, Record, the
-          layers, Live | Preview, Send to wall and Save.
+          layers, Live | Preview and Save.
         */}
         <div className="mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2">
           {/* The name gives way first, so the bar is one row wherever the plate is wider than about 930 px. */}
@@ -441,7 +442,7 @@ export function Desk(p: DeskProps) {
             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: live ? 'var(--color-live)' : 'var(--color-accent)' }} />
             <span className="truncate text-[16px] font-medium" data-testid="plate-name">{plateName}</span>
             <span className="hidden shrink-0 whitespace-nowrap font-mono text-[12px] text-dim 2xl:inline">
-              {live ? `live · ${p.liveFor}` : 'preview · not on wall'}
+              {live ? `live · ${p.liveFor}` : p.dots.wall ? 'preview · ⌘⏎ sends to wall' : 'preview · not on wall'}
             </span>
           </span>
           <RecordControls
@@ -459,7 +460,13 @@ export function Desk(p: DeskProps) {
               Preview holds the sequencer, a song's show and a new song's
               look off, so a look is not rewritten while it is being built,
               and with a wall up builds on a copy the wall does not see until
-              Send to wall (PLAN.md 8b).
+              Send to wall (PLAN.md 8b): the header's Wall, or ⌘⏎.
+
+              Send to wall was a button here too until 2026-10-29, when the
+              owner asked why it was there with Wall in the bar above it, and
+              to take it away. In Live the two did the same thing, open the
+              projector; only in Preview with a wall up did the button do
+              something of its own, and Wall does that now (`wallSends`).
             */}
             <Segmented
               value={l.plateMode}
@@ -468,9 +475,6 @@ export function Desk(p: DeskProps) {
               height={32}
               testId="plate-mode-segmented"
             />
-            <Button height={32} kbd="⌘⏎" onClick={p.onSendToWall} testId="send-to-wall">
-              <span className="hidden xl:inline">Send to&nbsp;</span>wall
-            </Button>
             {/*
               The dirty mark takes no width. It used to be "Save •", 11 px
               wider than "Save", and at 1280 in Build this bar is one row with

@@ -21,6 +21,7 @@ import { SURFACES, surfaceFor } from '../lib/controllerSurface';
 interface MidiPanelProps {
   midi: MidiController;
   presets: { id: string; name: string }[];
+  setItems?: { index: number; name: string }[];
   /** Whether the controller's own readout is up on the desk, and how to change it. */
   activity: boolean;
   onActivity: (on: boolean) => void;
@@ -137,8 +138,8 @@ function SoundLearnEditor({ target, label, existing, onBind }: {
   );
 }
 
-export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClose }: MidiPanelProps) {
-  const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'dyes'>('settings');
+export function MidiPanel({ midi, presets, setItems = [], activity, onActivity, onSetup, onClose }: MidiPanelProps) {
+  const [tab, setTab] = useState<'settings' | 'actions' | 'presets' | 'setlist' | 'dyes'>('settings');
   const lastEvent = useMidiLastEvent(midi);
   /*
     The activity light goes out 400 ms after the last message, and the panel
@@ -162,6 +163,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
   /** Which row's music editor is open, by its key; one at a time. */
   const [musicOpen, setMusicOpen] = useState<string | null>(null);
   const presetName = (id: string) => presets.find(p => p.id === livePresetId(id))?.name;
+  const setItemName = (index: number) => setItems.find(item => item.index === index)?.name;
 
   const learnButton = (target: MidiTarget, label: string, key: string) => {
     const isLearning = midi.learning && JSON.stringify(midi.learning.target) === JSON.stringify(target);
@@ -361,17 +363,20 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
 
       {/* Learn targets */}
       <div className="flex gap-1 mb-3" role="tablist" aria-label="Learn targets">
-        {(['settings', 'actions', 'presets', 'dyes'] as const).map(t => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t}</button>
+        {(['settings', 'actions', 'presets', 'setlist', 'dyes'] as const).map(t => (
+          <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={`${chip(tab === t)} flex-1`} data-testid={`midi-tab-${t}`}>{t === 'setlist' ? 'set list' : t}</button>
         ))}
       </div>
       {midi.learning && (
-        <p className="text-[12px] text-amber-200 mb-2 animate-pulse" data-testid="midi-learning">Move or press the control for “{targetLabel(midi.learning.target, presetName)}”…</p>
+        <p className="text-[12px] text-amber-200 mb-2 animate-pulse" data-testid="midi-learning">Move or press the control for “{targetLabel(midi.learning.target, presetName, setItemName)}”…</p>
       )}
       <div className="mb-6" data-testid="midi-targets">
         {tab === 'settings' && LEARNABLE_SETTINGS.map(s => learnButton({ kind: 'setting', key: s.key, min: s.min, max: s.max }, s.label, `setting-${String(s.key)}`))}
         {tab === 'actions' && (Object.keys(ACTION_LABELS) as MidiAction[]).map(a => learnButton({ kind: 'action', action: a }, ACTION_LABELS[a], `action-${a}`))}
         {tab === 'presets' && presets.map(p => learnButton({ kind: 'preset', presetId: p.id }, p.name, `preset-${p.id}`))}
+        {tab === 'setlist' && (setItems.length > 0
+          ? setItems.map(item => learnButton({ kind: 'setlist', index: item.index }, `#${item.index + 1} · ${item.name}`, `setlist-${item.index}`))
+          : <p className="text-[12px] text-white/40">No items in the set list.</p>)}
         {tab === 'dyes' && PALETTE.map((c, i) => learnButton({ kind: 'dye', paletteIndex: i }, c.name, `dye-${i}`))}
       </div>
 
@@ -381,8 +386,8 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
         {midi.map.bindings.length === 0 && !midi.map.sound?.length && <p className="text-[12px] text-white/40">None yet.</p>}
         {midi.map.bindings.map(b => (
           <div key={b.id} className={`flex items-center gap-2 py-1 border-b border-white/5 text-[12px] ${b.bank !== undefined && b.bank !== midi.bank ? 'opacity-40' : ''}`} data-testid="midi-binding">
-            <span className="font-mono text-white/50 w-24 shrink-0">{sourceLabel(b.source)}</span>
-            <span className="flex-1 truncate">{targetLabel(b.target, presetName)}</span>
+            <span className="font-mono text-white/50 w-28 shrink-0">{sourceLabel(b.source)}</span>
+            <span className="flex-1 truncate">{targetLabel(b.target, presetName, setItemName)}</span>
             {b.target.kind === 'setting' && b.source.kind === 'cc' && (
               <button onClick={() => midi.setBindingMode(b.id, b.mode === 'relative' ? 'absolute' : 'relative')} className="text-[8px] uppercase text-white/40 hover:text-white" title="Absolute fader or endless encoder">{b.mode === 'relative' ? 'enc' : 'abs'}</button>
             )}
@@ -400,7 +405,7 @@ export function MidiPanel({ midi, presets, activity, onActivity, onSetup, onClos
         {(midi.map.sound ?? []).map(b => (
           <div key={b.id} className="flex items-center gap-2 py-1 border-b border-white/5 text-[12px]" data-testid={`sound-binding-${b.id}`}>
             <span className="w-28 shrink-0 truncate font-mono text-amber-100/80" title={MUSIC_SOURCE_LABELS[b.source]}>{'♪'} {MUSIC_SOURCE_LABELS[b.source]}</span>
-            <span className="flex-1 truncate">{targetLabel(b.target, presetName)}</span>
+            <span className="flex-1 truncate">{targetLabel(b.target, presetName, setItemName)}</span>
             <span className="shrink-0 font-mono text-[11px] text-white/60">{isMapping(b) ? depthLabel(b.depth) : 'on hit'}</span>
             <button
               onClick={() => midi.removeSound(b.id)}

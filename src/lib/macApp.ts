@@ -27,8 +27,14 @@ export const MAC_RELEASES_URL = 'https://github.com/jstevoh/chromaglass/releases
  * after one refused open. So until the app is notarised the site says how, next
  * to the button, and once it is (13-update-signed) this turns true and the line
  * goes: a notarised app opens on a double-click and needs no instructions.
+ *
+ * True since 1.3.692 (2026-10-27, 7:12 PM PT), the first release signed with the
+ * owner's Developer ID and accepted by Apple's notary service. Earlier ad hoc
+ * builds (1.3.622, 1.3.642) still carry the warning, but they update to a signed
+ * one, so the way round is no longer shown. MAC_FIRST_OPEN stays for a build the
+ * notary ever refuses again, when this goes false.
  */
-export const MAC_APP_NOTARISED = false;
+export const MAC_APP_NOTARISED = true;
 
 /** The first open of an app macOS cannot check, in the words of its own Settings. */
 export const MAC_FIRST_OPEN = 'The first time, macOS says it cannot check the app. Click Done, then open System Settings → Privacy & Security and click Open Anyway beside ChromaGlass.';

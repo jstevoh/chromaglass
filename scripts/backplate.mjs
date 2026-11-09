@@ -47,6 +47,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { appFiles } from './appSource.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = (p) => readFileSync(join(root, p), 'utf8');
@@ -233,7 +234,7 @@ console.log('\n The wiring');
 // Comments out, so a sentence about the wiring cannot stand in for it.
 const code = (p) => src(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
 const lv = code('src/components/LiquidVisualizer.tsx');
-const app = code('src/App.tsx');
+const app = appFiles().map(code).join('\n');
 const desk = code('src/components/desk/DeskPanels.tsx');
 const phone = code('src/components/phone/PhoneStage.tsx');
 const mixer = code('src/components/MixerPanel.tsx');

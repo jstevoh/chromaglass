@@ -15,13 +15,13 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types.ts';
 // node resolves no extensionless import.
 import { BAND_EDGES_HZ, BAND_SOURCES, SOURCE_NAMES, type SourceName } from './audioFeatures.ts';
 import { SONG_EVENTS, type SongEventKind } from './songShape.ts';
-import { HIT_FEATURES, HIT_FEATURE_LABELS, type HitFeature } from './hitSource.ts';
+import { HIT_FEATURES, HIT_FEATURE_LABELS, isClassFeature, type HitFeature } from './hitSource.ts';
 import { MIX_CONTROLS } from './mixer.ts';
 import { FADE_CONTROLS } from './mixFade.ts';
 
-/** Where a message comes from: a controller or a note, on a channel (0–15). */
+/** Where a message comes from: a controller, a note or a program change, on a channel (0–15). */
 export interface MidiSource {
-  kind: 'cc' | 'note';
+  kind: 'cc' | 'note' | 'program';
   channel: number;
   number: number;
 }
@@ -110,6 +110,8 @@ export type MidiTarget =
   | { kind: 'setting'; key: keyof VisualizerSettings; min: number; max: number }
   | { kind: 'action'; action: MidiAction }
   | { kind: 'preset'; presetId: string }
+  /** A set-list item by 0-based index, played with its own fade. */
+  | { kind: 'setlist'; index: number }
   /** The dye colour the dropper paints with, by palette index. */
   | { kind: 'dye'; paletteIndex: number };
 
@@ -163,8 +165,10 @@ export const MUSIC_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, 'beat', '
  * sources and the bands, and the hits as levels (`hitSource.ts`): how hard
  * each drum's last hit was, falling over a quarter second, and the note.
  * Levels and not triggers: a kick as a *moment* is `kick` above, and fires.
+ * And not the note's name (`noteClass`, PLAN 25i): a fader riding it would
+ * jump from one end to the other between B and C, a level it is not.
  */
-export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES];
+export const MAPPABLE_SOURCES: readonly MusicSource[] = [...SOURCE_NAMES, ...HIT_FEATURES.filter(f => !isClassFeature(f))];
 
 const hz = (f: number): string => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 0 : 1)}k` : `${Math.round(f)}`);
 /**
@@ -295,6 +299,11 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Clear Film, which pours over the whole dish: the same list again.
 // Nor Two Projectors, which switches the rig between one lamp and two.
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+  'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
+  'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
+  'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
+  // Its dye (PLAN 20b-13), dissolved in the oil: a hand's, not the beat's (sceneMap NOT_A_TARGET).
+  'clearFilmDye',
   // Frame Sway is a hand's alone (the owner, 2026-10-11): a kick routed to it would slide the whole frame on the beat (lib/plateRock.ts).
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
@@ -376,7 +385,24 @@ export const settingKeyOf = (midiKey: string | null | undefined): keyof Visualiz
 };
 
 export const curveOf = (key: keyof VisualizerSettings): number =>
-  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? 1;
+  LEARNABLE_SETTINGS.find((s) => s.key === key)?.curve ?? PANEL_CURVES[key] ?? 1;
+
+/**
+ * The curve of a panel control MIDI does not learn, for the same reason.
+ *
+ * The owner, 2026-10-31: "very gentle options and very extreme options (which
+ * should be a general principle for all dials)". Widening a dial's top by four
+ * or ten times on a straight throw pushes the look's own value into the first
+ * few percent of the travel, where the gentle end has no room left: Gel Speed
+ * at 30 rpm put the looks' half a turn a minute at 1.7% of the slider. A curve
+ * gives the gentle end its travel back and leaves every stored value alone.
+ * Kept here rather than in `deskPins.ts`, which reads this file, so that every
+ * surface asks `curveOf` and nobody has two tables to keep together.
+ */
+export const PANEL_CURVES: Partial<Record<keyof VisualizerSettings, number>> = {
+  gelSpeed: 2, stockGrain: 2, stockGrainSize: 2, stockWeave: 2, grainScale: 2,
+  macroHold: 2, bassBoost: 2, evaporationRate: 3, spinImpulse: 1.5,
+};
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -395,8 +421,16 @@ export const valueAt = (t: number, min: number, max: number, curve = 1): number 
  * values readable and the travel smooth to the bottom.
  */
 export const handValueAt = (t: number, min: number, max: number, curve: number): number => {
-  const v = valueAt(t, min, max, curve);
-  return v === 0 ? 0 : Number(v.toPrecision(3));
+  /*
+    The three figures are the distance above the bottom, not the value. Every
+    curved control started at 0 until Macro Zoom took a curve (PLAN 27h-1),
+    whose bottom is 1: there 1.8% of the travel is 1.005, three figures made
+    it 1.00, and the knob jumped back to the stop (`npm run rungs`, worst 1.8%
+    off). Measured from its own bottom a control keeps its fine end whatever
+    number that end is, and a bottom of 0 rounds exactly as before.
+  */
+  const above = valueAt(t, min, max, curve) - min;
+  return above === 0 ? min : min + Number(above.toPrecision(3));
 };
 
 /** The inverse: where a value sits on the control, 0..1. */
@@ -404,13 +438,21 @@ export const travelOf = (value: number, min: number, max: number, curve = 1): nu
   const at = clamp01((value - min) / (max - min || 1));
   return curve === 1 ? at : Math.pow(at, 1 / curve);
 };
-export const sourceLabel = (s: MidiSource): string => `${s.kind === 'cc' ? 'CC' : 'Note'} ${s.number} ch ${s.channel + 1}`;
+export const sourceLabel = (s: MidiSource): string => `${s.kind === 'cc' ? 'CC' : s.kind === 'program' ? 'Program' : 'Note'} ${s.number} ch ${s.channel + 1}`;
 
-export function targetLabel(t: MidiTarget, presetName?: (id: string) => string | undefined): string {
+export function targetLabel(
+  t: MidiTarget,
+  presetName?: (id: string) => string | undefined,
+  setItemName?: (index: number) => string | undefined,
+): string {
   switch (t.kind) {
     case 'setting': return SETTING_LABELS[t.key] ?? String(t.key);
     case 'action': return ACTION_LABELS[t.action];
     case 'preset': return `Preset palette: ${presetName?.(t.presetId) ?? t.presetId}`;
+    case 'setlist': {
+      const item = setItemName?.(t.index);
+      return item ? `Set list #${t.index + 1}: ${item}` : `Set list #${t.index + 1}`;
+    }
     case 'dye': return `Dye ${t.paletteIndex + 1}`;
   }
 }
@@ -461,19 +503,27 @@ export const MIDI_BANKS = 4;
  * difference. `npm run panel` holds the two together now.
  *
  * `step` marks a control that only takes whole steps; see `deskPins.ts`.
+ *
+ * `wanderSpan` is the width the travel had before the dial was widened to its
+ * extreme (the owner, 2026-10-31: every dial from very gentle to very
+ * extreme). The hand and a fader reach `max`; Evolve's wander is still a
+ * fifth of this old width (`dialWindow`, `drift.ts`), so a slow drift moves a
+ * widened dial by what it always moved it by and never walks a look out to
+ * the far end on its own. The far end is the performer's to take.
  */
-export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number }[] = [
+export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string; min: number; max: number; step?: number; curve?: number; wanderSpan?: number }[] = [
   { key: 'dimmer',          label: 'Dimmer',           min: 0, max: 1 },
   { key: 'audioImpact',     label: 'Sound Drive',      min: 0, max: 1 },
-  { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 1 },
+  { key: 'automateRate',    label: 'Evolve Speed',     min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'globalSpeed',     label: 'Speed',            min: 0,   max: 0.3, curve: 3 },
   { key: 'twoProjectors',   label: 'Two Projectors',   min: 0, max: 1, step: 1 },
   { key: 'dyeBudget',       label: 'Dye Budget',       min: 0.1, max: 1.2 },
   { key: 'turbulenceScale', label: 'Turbulence',       min: 0, max: 1 },
-  { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 1 },
+  { key: 'plateRock',       label: 'Plate Rock',       min: 0, max: 3, curve: 2, wanderSpan: 1 },
   { key: 'frameSway',       label: 'Frame Sway',       min: 0, max: 1 },
   { key: 'slosh',           label: 'Slosh',            min: 0, max: 1 },
-  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 1.5 },
+  { key: 'kickBloom',       label: 'Kick Bloom',       min: 0, max: 4, curve: 1.5, wanderSpan: 1.5 },
+  { key: 'melodyWalk',      label: 'Melody Walk',      min: 0, max: 2, wanderSpan: 1 },
   { key: 'beatSqueeze',     label: 'Beat Squeeze',     min: 0, max: 1 },
   // A knob: a verse wants every kick, a chorus the one.
   { key: 'beatAccent',      label: 'Accent the One',   min: 0, max: 1 },
@@ -483,7 +533,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'dishSpread',      label: 'Dish Spread',      min: 0, max: 1 },
   { key: 'cells',           label: 'Plate Cells',      min: 0, max: 1 },
   { key: 'bubbles',         label: 'Bubbles',          min: 0, max: 1 },
-  { key: 'saturationBoost', label: 'Saturation',       min: 0.5, max: 2 },
+  { key: 'saturationBoost', label: 'Saturation',       min: 0, max: 3, wanderSpan: 1.5 },
   { key: 'edgeRelief',      label: 'Edge Relief',      min: 0, max: 1 },
   { key: 'projectorFocus',  label: 'Projector Focus',  min: 0, max: 1 },
   { key: 'lacing',          label: 'Lacing',           min: 0, max: 1 },
@@ -496,6 +546,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The ground the dye is seen on (PLAN 18b): a fader fades a look from dye
   // as light on black to the lamp shining through it.
   { key: 'lampGround',      label: 'Lamp Ground',      min: 0, max: 1 },
+  { key: 'heat',            label: 'Heat',             min: 0, max: 1 },
   { key: 'iridescence',     label: 'Iridescence',      min: 0, max: 1 },
   { key: 'camera',          label: 'Lens',             min: 0, max: 1 },
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
@@ -505,11 +556,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'particles',       label: 'Dye Particles',    min: 0, max: 1 },
   { key: 'particleMix',     label: 'Particle Colour',  min: 0, max: 1 },
   { key: 'granulation',     label: 'Granulation',      min: 0, max: 1 },
-  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16 },
+  { key: 'macroZoom',       label: 'Macro Zoom',       min: 1, max: 16, curve: 2 },
   { key: 'macroSync',       label: 'Macro Music Sync', min: 0, max: 1 },
-  { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 1 },
-  { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 10 },
-  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1 },
+  { key: 'macroChase',      label: 'Macro Chase',      min: 0, max: 3, wanderSpan: 1 },
+  { key: 'hueJourney',      label: 'Hue Journey',      min: 0, max: 30, curve: 2, wanderSpan: 10 },
+  { key: 'backgroundLoop',  label: 'Background Loop',  min: 0, max: 1.4, wanderSpan: 1 },
   { key: 'dishVignette',    label: 'Round Dish',       min: 0, max: 1 },
   { key: 'lumia',           label: 'Lumia',            min: 0, max: 1 },
   { key: 'chemistry',       label: 'Chemistry',        min: 0, max: 1 },
@@ -520,6 +571,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'turingInk',       label: 'Turing Print Ink', min: 0, max: 1 },
   { key: 'turingDrift',     label: 'Turing Print Drift', min: 0, max: 1 },
   { key: 'gelWheel',        label: 'Gel Wheel',        min: 0, max: 1 },
+  // The moiré pack's sheets (PLAN 45a): the ink, and the upper sheet's turn
+  // and spin, the three a hand on the real stage plays.
+  { key: 'moireAmount',     label: 'Moiré Sheets',     min: 0, max: 1 },
+  { key: 'moireAngle',      label: 'Moiré Turn',       min: -180, max: 180 },
+  { key: 'moireSpin',       label: 'Moiré Spin (rpm)', min: -30, max: 30 },
   // The mirror rig, which is the one optical trick people reach for mid-song.
   // Folds is a stepped choice and rides a fader as one: the sheet's five
   // buttons, Off, 2, 4, 6 and 8, each a fifth of the travel.
@@ -549,28 +605,42 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // about 0.6 (MAZE_FINEST in src/gpu/fluid.ts).
   { key: 'mazeDetail',      label: 'Maze Detail',      min: 0, max: 1 },
   // The Magnet's size (lib/magnetSize.ts): a knob to grow the hedgehog under a held magnet.
-  { key: 'magnetSize',      label: 'Magnet Size',      min: 0, max: 1 },
+  { key: 'magnetSize',      label: 'Magnet Size',      min: 0, max: 1.5, wanderSpan: 1 },
   // The film's colours, the rainbow to a real soap film's. A fader because
   // the mix between them is a look of its own, not only the two ends.
   { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.
-  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1 },
+  { key: 'phaseDisplace',   label: 'Pushes Dye',       min: 0, max: 1.2, wanderSpan: 1 },
   // How firmly the oil and the water each keep their own colour. A fader
   // because the way down is a gesture too: the colours start to cross the
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
   { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
+  { key: 'soapBreakdown',   label: 'Soap Breakdown',   min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.
   { key: 'clearFilm',       label: 'Clear Film',       min: 0, max: 1 },
+  // Its dye (PLAN 20b-13): a fader deepens the lace's colour from clear.
+  { key: 'clearFilmDye',    label: 'Film Dye',         min: 0, max: 1 },
   // The plate as a thin gap (PLAN §18a). A switch, stepped, so a pad or the
   // top half of a fader turns it on; and the liquid's thickness in it on a
   // fader, because thinning the liquid mid-song is a gesture: pushes start
   // to coast and the plate loosens.
   { key: 'thinGap',         label: 'Thin Gap',         min: 0, max: 1, step: 1 },
   { key: 'gapThickness',    label: 'Thickness',        min: 0, max: 1 },
+  // The liquid under the cover and the glass's weight (PLAN 38r-5). A fader
+  // up pours liquid in at the rim and the glass rises; down wicks it off.
+  // The weight on a squared curve, so the default 157 g sits two fifths up
+  // and the bottom of the travel is a whisper of a glass.
+  { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
+  { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
+  // The song's title as ink (PLAN 37x-10): how fast the wash takes one, on a knob, ridden in a set;
+  // its size and where it lands. The switch is the desk's and the phone's (a boolean, not a fader).
+  { key: 'inkTitleSweep',   label: 'Title Sweep',      min: 0, max: 1 },
+  { key: 'inkTitleSize',    label: 'Title Size',       min: 0, max: 1 },
+  { key: 'inkTitleY',       label: 'Title Height',     min: 0, max: 1 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.
@@ -585,6 +655,26 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'spinRpm',         label: 'Spin Rate',        min: -45, max: 45 },
   { key: 'spinAuto',        label: 'Auto Spin',        min: 0, max: 2, step: 1 },
   { key: 'spinBeats',       label: 'Beats a Turn',     min: 1, max: 64, step: 1 },
+  // The modulators (PLAN 30b): each LFO's bars, shape and restart trigger, and
+  // each envelope's attack, decay and trigger source.
+  { key: 'lfo1Bars',        label: 'LFO 1 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo1Shape',       label: 'LFO 1 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo1Restart',     label: 'LFO 1 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'lfo2Bars',        label: 'LFO 2 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo2Shape',       label: 'LFO 2 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo2Restart',     label: 'LFO 2 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'lfo3Bars',        label: 'LFO 3 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo3Shape',       label: 'LFO 3 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo3Restart',     label: 'LFO 3 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'lfo4Bars',        label: 'LFO 4 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo4Shape',       label: 'LFO 4 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo4Restart',     label: 'LFO 4 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'env1Attack',      label: 'Envelope 1 Attack', min: 0.001, max: 1 },
+  { key: 'env1Decay',       label: 'Envelope 1 Decay',  min: 0.02, max: 4 },
+  { key: 'env1On',          label: 'Envelope 1 Trigger', min: 0, max: 4, step: 1 },
+  { key: 'env2Attack',      label: 'Envelope 2 Attack', min: 0.001, max: 1 },
+  { key: 'env2Decay',       label: 'Envelope 2 Decay',  min: 0.02, max: 4 },
+  { key: 'env2On',          label: 'Envelope 2 Trigger', min: 0, max: 4, step: 1 },
   /*
     The mixer (lib/mixer.ts): each source's level and its four grade controls.
     Learnable because they are what a video mixer's channel strip is, and a
@@ -622,7 +712,7 @@ export function onTodaysTravel(t: MidiTarget): MidiTarget {
 
 /** One incoming message, reduced to what a binding needs. */
 export interface MidiEvent {
-  kind: 'cc' | 'noteon' | 'noteoff';
+  kind: 'cc' | 'noteon' | 'noteoff' | 'program';
   channel: number;
   number: number;
   /** 0..127 */
@@ -658,10 +748,32 @@ export function parseMidi(data: Uint8Array | number[]): MidiEvent | null {
   if (status === 0xb0) return { kind: 'cc', channel, number, value };
   if (status === 0x90) return value > 0 ? { kind: 'noteon', channel, number, value } : { kind: 'noteoff', channel, number, value: 0 };
   if (status === 0x80) return { kind: 'noteoff', channel, number, value: 0 };
+  if (status === 0xc0) return { kind: 'program', channel, number, value: 0 };
   return null;
 }
 
-export const eventSource = (e: MidiEvent): MidiSource => ({ kind: e.kind === 'cc' ? 'cc' : 'note', channel: e.channel, number: e.number });
+export const eventSource = (e: MidiEvent): MidiSource => ({
+  kind: e.kind === 'cc' ? 'cc' : e.kind === 'program' ? 'program' : 'note',
+  channel: e.channel,
+  number: e.number,
+});
+
+/** Whether an incoming event presses a button/pad/trigger binding. */
+export const pressedBy = (e: MidiEvent): boolean =>
+  e.kind === 'program' || e.kind === 'noteon' || (e.kind === 'cc' && e.value > 63);
+
+/**
+ * The bindings a message reaches on the active bank.
+ *
+ * A bank's own binding for a source wins over an always-live one (`bank === undefined`),
+ * so a shift layer can borrow a pad or program without firing what sits underneath.
+ */
+export function liveBindings(map: MidiMap, source: MidiSource, bank: number): MidiBinding[] {
+  const key = sourceKey(source);
+  const forSource = map.bindings.filter(b => sourceKey(b.source) === key);
+  const inBank = forSource.filter(b => b.bank === bank);
+  return inBank.length > 0 ? inBank : forSource.filter(b => b.bank === undefined);
+}
 
 /**
  * Endless encoders send nudges, not positions. The common "relative 2"
@@ -739,56 +851,7 @@ export class SoftTakeover {
   reset(): void { this.lastSeen.clear(); this.picked.clear(); this.wrote.clear(); }
 }
 
-// ── Pad colours ─────────────────────────────────────────────────────
-// Launchpad and APC mini mk2 pads take a velocity that indexes a palette of
-// 128 colours. A coarse copy of that palette is enough to light each preset
-// pad in its lead dye: the nearest entry is chosen by colour distance.
-const PAD_PALETTE: [number, number, number, number][] = [
-  [0, 0, 0, 0], [1, 0.11, 0.11, 0.11], [2, 0.49, 0.49, 0.49], [3, 1, 1, 1],
-  [4, 1, 0.37, 0.37], [5, 1, 0, 0], [6, 0.35, 0, 0], [7, 0.1, 0, 0],
-  [8, 1, 0.74, 0.43], [9, 1, 0.33, 0], [10, 0.35, 0.11, 0], [11, 0.1, 0.05, 0],
-  [12, 1, 0.98, 0.57], [13, 1, 1, 0], [14, 0.35, 0.35, 0], [15, 0.1, 0.1, 0],
-  [16, 0.7, 1, 0.3], [17, 0.33, 1, 0], [18, 0.1, 0.35, 0], [19, 0.05, 0.1, 0],
-  [20, 0.35, 1, 0.35], [21, 0, 1, 0], [22, 0, 0.35, 0], [23, 0, 0.1, 0],
-  [24, 0.35, 1, 0.5], [25, 0, 1, 0.33], [26, 0, 0.35, 0.11], [27, 0, 0.1, 0.05],
-  [28, 0.35, 1, 0.75], [29, 0, 1, 0.6], [30, 0, 0.35, 0.2], [31, 0, 0.1, 0.05],
-  [32, 0.35, 1, 1], [33, 0, 1, 1], [34, 0, 0.35, 0.35], [35, 0, 0.1, 0.1],
-  [36, 0.35, 0.75, 1], [37, 0, 0.6, 1], [38, 0, 0.2, 0.35], [39, 0, 0.05, 0.1],
-  [40, 0.35, 0.5, 1], [41, 0, 0.33, 1], [42, 0, 0.11, 0.35], [43, 0, 0.03, 0.1],
-  [44, 0.35, 0.35, 1], [45, 0, 0, 1], [46, 0, 0, 0.35], [47, 0, 0, 0.1],
-  [48, 0.6, 0.35, 1], [49, 0.33, 0, 1], [50, 0.1, 0, 0.35], [51, 0.03, 0, 0.1],
-  [52, 1, 0.35, 1], [53, 1, 0, 1], [54, 0.35, 0, 0.35], [55, 0.1, 0, 0.1],
-  [56, 1, 0.35, 0.6], [57, 1, 0, 0.33], [58, 0.35, 0, 0.11], [59, 0.1, 0, 0.03],
-  [60, 1, 0.13, 0], [61, 0.6, 0.23, 0], [62, 0.47, 0.35, 0], [63, 0.25, 0.4, 0],
-  [64, 0, 0.35, 0.03], [65, 0, 0.35, 0.3], [66, 0, 0.2, 0.5], [67, 0, 0, 1],
-  [68, 0, 0.27, 0.35], [69, 0.13, 0, 0.8], [70, 0.49, 0.49, 0.49], [71, 0.13, 0.13, 0.13],
-  [72, 1, 0, 0], [73, 0.74, 1, 0.19], [74, 0.68, 0.92, 0.03], [75, 0.33, 1, 0.03],
-  [76, 0.05, 0.53, 0], [77, 0, 1, 0.53], [78, 0, 0.66, 1], [79, 0, 0.16, 1],
-  [80, 0.24, 0, 1], [81, 0.5, 0, 1], [82, 0.71, 0.1, 0.5], [83, 0.24, 0.1, 0],
-  [84, 1, 0.3, 0], [85, 0.52, 0.9, 0], [86, 0.35, 1, 0], [87, 0, 1, 0],
-  [88, 0, 1, 0], [89, 0.23, 1, 0.43], [90, 0, 0.9, 0.79], [91, 0.35, 0.6, 1],
-  [92, 0.27, 0.35, 0.85], [93, 0.5, 0.35, 0.85], [94, 0.85, 0.13, 1], [95, 1, 0, 0.35],
-  [96, 1, 0.5, 0], [97, 0.72, 0.7, 0], [98, 0.5, 1, 0], [99, 0.5, 0.35, 0.1],
-  [100, 0.2, 0.15, 0], [101, 0.05, 0.3, 0.1], [102, 0, 0.35, 0.4], [103, 0.1, 0.1, 0.25],
-  [104, 0.06, 0.13, 0.4], [105, 0.4, 0.2, 0.1], [106, 0.65, 0.05, 0], [107, 0.85, 0.35, 0.1],
-  [108, 0.85, 0.65, 0.1], [109, 0.6, 0.9, 0.1], [110, 0.35, 0.65, 0.1], [111, 0.1, 0.1, 0.2],
-  [112, 0.85, 0.9, 0.35], [113, 0.5, 1, 0.75], [114, 0.6, 0.6, 1], [115, 0.6, 0.35, 1],
-  [116, 0.25, 0.25, 0.25], [117, 0.45, 0.45, 0.45], [118, 0.9, 1, 1], [119, 0.65, 0, 0],
-  [120, 0.2, 0, 0], [121, 0.1, 0.8, 0], [122, 0.05, 0.25, 0], [123, 0.7, 0.55, 0],
-  [124, 0.25, 0.2, 0], [125, 0.7, 0.35, 0], [126, 0.3, 0.1, 0], [127, 0.05, 0.05, 0],
-];
-
-/** The pad velocity whose palette colour is nearest to an RGB (0..1) colour. */
-export function padVelocityFor(r: number, g: number, b: number, dim = false): number {
-  const k = dim ? 0.35 : 1;
-  let best = 0, bestD = Infinity;
-  for (const [v, pr, pg, pb] of PAD_PALETTE) {
-    if (v === 0) continue;
-    const d = (pr - r * k) ** 2 + (pg - g * k) ** 2 + (pb - b * k) ** 2;
-    if (d < bestD) { bestD = d; best = v; }
-  }
-  return best;
-}
+export { padVelocityFor } from './padColours.ts';
 
 export function serializeMidiMap(map: MidiMap): string { return JSON.stringify(map, null, 2) + '\n'; }
 
@@ -810,7 +873,8 @@ export function parseMidiMap(text: string): MidiMap {
   if (!Array.isArray(o.bindings)) throw new Error('The MIDI map has no bindings.');
   const bindings = o.bindings.filter((b): b is MidiBinding =>
     !!b && typeof b === 'object' && !!b.source && !!b.target &&
-    (b.source.kind === 'cc' || b.source.kind === 'note') && Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
+    (b.source.kind === 'cc' || b.source.kind === 'note' || b.source.kind === 'program') &&
+    Number.isInteger(b.source.channel) && Number.isInteger(b.source.number))
     .map(b => ({
       ...b,
       target: onTodaysTravel(b.target),
@@ -828,6 +892,9 @@ export function parseMidiMap(text: string): MidiMap {
         b.target.min = spec.min;
         b.target.max = spec.max;
         return true;
+      }
+      if (b.target.kind === 'setlist') {
+        return Number.isInteger(b.target.index) && b.target.index >= 0;
       }
       return true;
     });
@@ -866,6 +933,7 @@ function parseSoundBindings(raw: unknown[]): SoundBinding[] {
     else if (!moment) target = null;
     else if (t.kind === 'action' && t.action in ACTION_LABELS && triggerable(t.action)) target = { kind: 'action', action: t.action };
     else if (t.kind === 'preset' && typeof t.presetId === 'string') target = { kind: 'preset', presetId: t.presetId };
+    else if (t.kind === 'setlist' && Number.isInteger(t.index) && t.index >= 0) target = { kind: 'setlist', index: t.index };
     else if (t.kind === 'dye' && Number.isInteger(t.paletteIndex) && t.paletteIndex >= 0) target = { kind: 'dye', paletteIndex: t.paletteIndex };
     if (!target) continue;
     const binding: SoundBinding = {

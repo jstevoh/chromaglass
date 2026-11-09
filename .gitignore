@@ -32,6 +32,7 @@ dist-signin/
 dist-signin-off/
 dist-accountlink/
 dist-tiers/
+dist-landing/
 
 # Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
 scratch/
@@ -50,4 +51,5 @@ desktop/release/
 
 # The show server's key and local licence state, kept between launches (PLAN 14m, 23.4): private to the machine.
 server/.show-key
+server/.assistant
 server/.license.json

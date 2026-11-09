@@ -74,7 +74,7 @@ const read = (p) => fs.readFileSync(p, 'utf8');
   const phone = read('src/components/phone/PhoneStage.tsx');
   check('the phone says the clip\'s frame and can share the last clip, beside the one Record tile',
     /phone-record-shape/.test(phone) && /phone-share-clip/.test(phone) && (phone.match(/testId="phone-record"/g) ?? []).length === 1);
-  const app = read('src/App.tsx');
+  const app = read('src/app/useRecording.ts');
   check('a phone opens on the portrait frame, a desk on the plate', /useRecorder\(\{ shape: phone \? 'portrait' : 'plate' \}\)/.test(app));
   check('the wall\'s canvas is only reshaped when no projector owns it, and always put back',
     /!stageRef\.current && !phone/.test(app) && /wallRef\.current\?\.setStage\(stageRef\.current\)/.test(app));

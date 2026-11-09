@@ -236,10 +236,6 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   let fillsDone: (() => void) | null = null;
   const fillsBusy: Promise<void> | null = fillLeft > 0 ? new Promise((r) => { fillsDone = r; }) : null;
   let renderBusy: Promise<void> | null = null;
-  // The page held still across the opening's first fills and render compiles
-  // (`Quiet`, below): asked once, before the first of them, and let go when the
-  // last has settled.
-  let quietLeft = quiet ? builds.filter((b) => isFill(b) || b.kind === 'render').length : 0;
   const take = (): Prep | undefined => {
     if (fillLeft > 0) {
       const i = queue.findIndex(isFill);
@@ -293,15 +289,9 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       const built = prep.build(stamps);
       const waited = within(built.then(() => undefined), left);
       if (isFill(prep)) {
-        void waited.then(() => {
-          if (fillLeft > 0 && --fillLeft === 0) fillsDone?.();
-          if (quiet && --quietLeft === 0) quiet.go();
-        });
+        void waited.then(() => { if (fillLeft > 0 && --fillLeft === 0) fillsDone?.(); });
       } else if (prep.kind === 'render') {
-        renderBusy = waited.then(() => {
-          renderBusy = null;
-          if (quiet && --quietLeft === 0) quiet.go();
-        });
+        renderBusy = waited.then(() => { renderBusy = null; });
       }
       const settled = await waited;
       const now = performance.now();
@@ -322,22 +312,28 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     through a 2.15 s frame gap). Waiting here also lets the opening's mount
     frames present before the first fill is asked of the GPU.
   */
-  if (quietLeft > 0) await quiet?.still().catch(() => undefined);
-  await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
-  // Gone, timed out or a build that never settled: never left held still.
-  if (quiet && quietLeft > 0) quiet.go();
-  /*
-    The first uses, handed over as each compile came in and not waited for
-    there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
-    the show still opens with them paid. Within what is left of the
-    timeout, like the builds.
-  */
+  if (quiet && builds.length > 0) await quiet.still().catch(() => undefined);
   let useWait: number | null = null;
-  if (stage === 'opening' && !gone) {
-    const w0 = performance.now();
-    const left = t0 + PREPARE_TIMEOUT_MS - w0;
-    if (left <= 0 || !await within(device.queue.onSubmittedWorkDone().catch(() => undefined), left)) timedOut = true;
-    useWait = Math.round(performance.now() - w0);
+  // Let go only once the opening is done, with every build settled and its
+  // first uses paid (`Quiet` says why), and the same however else it ends
+  // (gone, timed out, a build that never settled, a lane that threw): never
+  // left held still.
+  try {
+    await Promise.all(Array.from({ length: Math.max(1, Math.min(lanes, builds.length)) }, lane));
+    /*
+      The first uses, handed over as each compile came in and not waited for
+      there (`firstUse` in `gpu/kit.ts` on why), waited for here, once, so
+      the show still opens with them paid. Within what is left of the
+      timeout, like the builds.
+    */
+    if (stage === 'opening' && !gone) {
+      const w0 = performance.now();
+      const left = t0 + PREPARE_TIMEOUT_MS - w0;
+      if (left <= 0 || !await within(device.queue.onSubmittedWorkDone().catch(() => undefined), left)) timedOut = true;
+      useWait = Math.round(performance.now() - w0);
+    }
+  } finally {
+    quiet?.go();
   }
   const done: Prepared = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, ready,
@@ -348,8 +344,8 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
 }
 
 /**
- * What the page holds still while the opening's first fills and render
- * pipelines compile.
+ * What the page holds still while the opening builds: from before its first
+ * fill is asked until its last build has settled and its first uses are paid.
  *
  * What was reported: the first deploy with the intro over the opening
  * (`lib/intro.ts`, run 37233245217) went red on `npm run startup`'s "no
@@ -380,6 +376,23 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
  * opening's `still` waits two frames after the desk has taken it in so
  * nothing from the mount is still in flight when the first fill is asked;
  * `go` here is still what lets it move.
+ *
+ * And it caught the render compiles and not the compute kernels after them.
+ * `go` used to come when the last render pipeline settled, with the solver's
+ * kernels still compiling in the other lanes; the turning intro then needed
+ * the GPU process on every frame while it was as busy as before. What was
+ * measured (PLAN.md 14v-10): on PR #540's run 40741268086 the Mac's startup
+ * went red on "no stop in the opening", a 2.35 s stop from 8.70 s, 0.13 s
+ * after the intro let go at 8.57 s, with `fluid/dampGridCurv` compiling; on
+ * that thread's runs the slow compiles of a cold opening fell at 6 to 7.7 s,
+ * whatever was asked then, still intro or moving. Held still to the end of
+ * the opening (that thread's `?stillall`, since removed) the first step came
+ * no later: 13.5 to 14.8 s on all twelve openings, either way. So `go` now
+ * comes once, at the end of the opening, when nothing of it is left for the
+ * GPU process to do (the owner's choice, 2026-10-29: never a stutter, even if
+ * it moves later). On a cold machine that is moments before the plate's
+ * first step takes it away, so it is a still mark for the whole wait; warm,
+ * the opening is the cache's and over in moments, and so is the hold.
  */
 export interface Quiet {
   still(): Promise<void>;
@@ -396,7 +409,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUPlate.prepare(device, format, PICTURE_FORMAT, open),
     ...WebGPUFrameProbe.prepare(device),
     ...WebGPUAir.prepare(device),
-    ...WebGPUSlosh.prepare(device),
+    ...WebGPUSlosh.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),

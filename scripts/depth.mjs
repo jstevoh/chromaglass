@@ -23,14 +23,14 @@
  * whole of the change.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader, settlePlate, waitForEngine, developPlate } from './frame.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
 
-const PORT = 4343;
+const PORT = port(4343);
 const CURVE = Number(process.env.DEPTH_CURVE ?? 1);
 const DRAG = Number(process.env.DEPTH_DRAG ?? 3);
 // What the solver is handed: `deriveStep` clamps the curve to [-1, 1], so a
@@ -526,7 +526,18 @@ try {
     it. So the shape change is a *shift*: every cell moves by the difference
     between the old rest and the new one, and whatever a press pushed it away
     from rest stays pushed.
+
+    Asked on the old plate. On a thin gap since 38l the glass comes back up
+    against the film's suction, (h/h_s)³ times Press Lift's rate, so this
+    hand's shallow dent (0.004 of a 0.03 gap) is back at (1/STEFAN_FILM)³,
+    some forty times Press Lift's own pace: gone within the quarter second
+    the plate is given to step after the change, shifted or reset, which is
+    the physics and not the shift (the Mac on #610: lifted 0.0337, after
+    0.0596 against 0.06). Held through the change instead, the hand would
+    re-press a reset gap to the same dent. The shift is the one 'gap
+    reshape' kernel on either plate, so the old plate's plain spring asks it.
   */
+  await thinTo(false);
   await set({ plateCurve: 0, depthDrag: 0 });
   await settlePlate(page, 4000);
   const gapAt = () => page.evaluate(async () => {
@@ -573,6 +584,7 @@ try {
     + ` lifted ${(after - pressed).toFixed(4)} by it; ${said(reshaped)}${same ? '' : '; the solver was rebuilt under the press'}`);
 
   await set({ plateCurve: CURVE });
+  await thinTo(true);
   check('and switching it off puts the plate back',
     Math.abs(off[0].outer / off[0].inner - off[off.length - 1].outer / off[off.length - 1].inner) < rOff * 0.5,
     `first ${(off[0].outer / off[0].inner).toFixed(3)}, last ${(off[off.length - 1].outer / off[off.length - 1].inner).toFixed(3)}`);

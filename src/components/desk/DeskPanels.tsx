@@ -4,6 +4,7 @@ import { usePortalBody } from '../portalBody';
 import { ImagePlus, SlidersHorizontal, Video } from 'lucide-react';
 import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LIT } from '../ui';
 import { MixerPanel } from '../MixerPanel';
+import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
 import { CartoonShelf } from '../CartoonShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
@@ -11,7 +12,7 @@ import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
 import { FADE_CHOICES } from '../../lib/lookFade';
 import { PINNABLE, PIN_RANGE, type DeskSpec } from '../../lib/deskPins';
-import { PANEL_BY_ID, whereIs } from '../../lib/deskLayout';
+import { PANEL_BY_ID, drawnElsewhere, whereIs } from '../../lib/deskLayout';
 import { relayInfo, type RelayInfo } from '../../lib/remoteProtocol';
 import { useAccountShows, joinAccountShow } from '../../lib/accountShows';
 import { encodeQr, qrPath } from '../../lib/qr';
@@ -21,6 +22,7 @@ import { PickList } from './PickList';
 import { SongScore } from '../SongScore';
 import { DESK_TOOLS } from './tools';
 import { ToolGlyph } from '../ui/ToolGlyph';
+import { TipPad } from '../ui/TipPad';
 import { Bottle, LiveBottle, SlideMount } from '../ui/Playful';
 import type { DeskProps, SetAction, SetItemAction } from './deskProps';
 import { SHOW_PATH } from '../../lib/showPath';
@@ -35,26 +37,6 @@ import { SHOW_PATH } from '../../lib/showPath';
  * them (`npm run saves`, `npm run layout`, the Mac's `qa`) are asking about
  * the controls, not about which column they were in.
  */
-
-/*
-  What a performer rides. Each has to pass three tests: it shows on any look
-  within a second, pulling it back undoes it, and it does something no other
-  ride does.
-
-  Dimmer (intensity), Speed (motion), Turbulence (calm glass to boiling),
-  Beat Press (the kick squeezes the glass), Plate Rock (the kick tips the
-  plate and it sloshes back), Soap Bursts (the dye blown apart on the beat),
-  Zoom (a dive into the liquid), and Evolve Speed (how far the show wanders
-  on its own; raising it from zero switches Random Evolve on).
-
-  Swirl and Gravity were here and are not now, though Choose still has both.
-  Swirl only spins up eddies a look already has, so on a calm one it did
-  next to nothing. Gravity pours the dye down the plate and pulling it back
-  does not bring the dye up again: it is a scene change, not a ride.
-*/
-export const DEFAULT_RIDES: (keyof VisualizerSettings)[] = [
-  'dimmer', 'globalSpeed', 'turbulenceScale', 'beatSqueeze', 'plateRock', 'surfactantFlow', 'macroZoom', 'automateRate',
-];
 
 const RANGE = PIN_RANGE;
 
@@ -85,7 +67,7 @@ function setControl(p: DeskProps, key: keyof VisualizerSettings, n: number) {
  * in place. The value is the settings' own, so a fader, the mouse and the
  * phone are three ways to move one number.
  */
-function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean }) {
+function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: DeskProps; testId: string; asKnob: boolean; dense?: boolean }) {
   const key = spec.key;
   const raw = p.settings[key];
   const v = typeof raw === 'number' ? raw : spec.min;
@@ -124,6 +106,7 @@ function DeskControl({ spec, p, testId, asKnob }: { spec: DeskSpec; p: DeskProps
       onChange={n => setControl(p, key, n)}
       midiKey={`setting:${String(key)}`}
       testId={testId}
+      dense={dense}
     />
   );
 }
@@ -202,7 +185,8 @@ function CuesBody({ p }: { p: DeskProps }) {
             testId="set-save"
             title={`Keep this set as “${p.setName}”, to open again from the menu`}
           >
-            {saved ? 'Saved' : 'Save'}
+            {/* "Save set", not "Save": the plate bar's Save keeps the look, and one name meant two things (PLAN 35c-5). */}
+            {saved ? 'Saved' : 'Save set'}
           </Button>
           <Button height={28} onClick={() => setSetMenu(v => !v)} testId="set-menu" title="Sets: open, new, import, export, song shows">⋯</Button>
         </span>
@@ -403,19 +387,6 @@ function RidesBody({ p }: { p: DeskProps }) {
   const side = where === 'left' ? 'left' : 'right';
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="rides">
-      <div className="flex h-9 shrink-0 items-center justify-end px-3">
-        <button
-          aria-pressed={picking}
-          onClick={() => setPicking(v => !v)}
-          className={`inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
-            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
-          }`}
-          title="Choose which controls ride here"
-          data-testid="ride-pick"
-        >
-          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
-        </button>
-      </div>
       {picking ? (
         <PickList chosen={p.rideKeys} onChange={p.onRideKeys} testId="ride-picker" />
       ) : (
@@ -425,13 +396,20 @@ function RidesBody({ p }: { p: DeskProps }) {
               Nothing on the strip. <span className="text-text">Choose</span> picks what rides here.
             </p>
           )}
-          {/* Rides are faders in every case: a ride is a hand on a strip. */}
+          {/*
+            Rides are faders in every case: a ride is a hand on a strip. One
+            line each (`Slider dense`): the owner (2026-11-07) could not find
+            Macro Zoom, the seventh, because under the Bottles the column had
+            room for three of the old two-line rows, and chose denser faders
+            over moving it. `npm run layout` asks that all eight show whole on
+            the Perform tab at 1440×900.
+          */}
           {p.rideKeys.map(key => {
             const spec = RANGE.get(String(key));
             if (!spec) return null;          // a key saved by an older build
-            return <DeskControl key={String(key)} spec={spec} p={p} testId={`ride-${String(key)}`} asKnob={false} />;
+            return <DeskControl key={String(key)} spec={spec} p={p} testId={`ride-${String(key)}`} asKnob={false} dense />;
           })}
-          <div className="mt-2 border-t border-border pt-3">
+          <div className="mt-1.5 border-t border-border pt-1.5">
             <Toggle
               label="Random evolve"
               // The real switch. This used to write automateRate between 0 and
@@ -444,28 +422,23 @@ function RidesBody({ p }: { p: DeskProps }) {
               }}
               testId="toggle-evolve"
             />
-            <Toggle
-              label="Follow beat"
-              on={(p.settings.beatPrediction ?? 0) > 0.05}
-              onChange={on => p.onSetting({ beatPrediction: on ? 0.7 : 0 })}
-              testId="toggle-beat"
-            />
+            {/*
+              Follow beat stood here, a switch that wrote Beat Prediction as 0
+              or 0.7: the same setting as the Sound section's slider, drawn
+              twice, and the switch read "off" at 0.04 and set 0.7 over
+              whatever the slider had (PLAN 35c-5). Beat Prediction is a
+              pinnable control, so a performer who wants it on the strip
+              chooses it and gets the real one.
+            */}
           </div>
           {/*
-            The line that says there is no controller is the one place someone
-            reads when their controller is not working, so it is a button that
-            goes there rather than a route to walk by hand.
+            With a controller, the strip says its faders move these. Without
+            one, nothing: "No controller yet — set one up" was a button here
+            that did what the header's MIDI light does, on every tab, with the
+            same words in its title (PLAN 35c-5).
           */}
-          {p.midiName ? (
+          {p.midiName && (
             <p className="mt-3 pb-2 text-[12px] text-faint">{`${p.midiName} · a CC on a fader moves it here too`}</p>
-          ) : (
-            <button
-              onClick={p.onMidi}
-              className="mt-3 pb-2 text-left text-[12px] text-faint underline decoration-dotted underline-offset-2 hover:text-text-2"
-              data-testid="no-controller-hint"
-            >
-              No controller yet — set one up
-            </button>
           )}
         </div>
       )}
@@ -475,12 +448,26 @@ function RidesBody({ p }: { p: DeskProps }) {
         mixer is opened, set and closed far more often than it is watched, and
         a level is a ride. `npm run layout` asks that it covers none of the plate.
       */}
-      <div className="flex shrink-0 gap-2 border-t border-border px-3 pt-3">
-        {!mixerOut && <Button full height={40} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
-        <Button full height={40} onClick={p.onOpenSettings} testId="open-all-settings-rides">All settings…</Button>
-      </div>
-      <div className="flex shrink-0 gap-2 p-3">
-        <Button full height={40} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
+      {/* The way into every setting is the status bar's, on every tab; a copy stood here until PLAN 35c-5. */}
+      {/*
+        Choose, Mixer and Drain share one row under the strip, so the faders
+        start at the panel's top and keep the column's height: Choose stood in
+        a row of its own above them until 2026-11-07.
+      */}
+      <div className="flex shrink-0 items-center gap-2 border-t border-border p-2.5">
+        <button
+          aria-pressed={picking}
+          onClick={() => setPicking(v => !v)}
+          className={`inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] transition-colors ${
+            picking ? LIT : 'text-dim hover:bg-hover hover:text-text'
+          }`}
+          title="Choose which controls ride here"
+          data-testid="ride-pick"
+        >
+          <SlidersHorizontal size={13} /> {picking ? 'Done' : 'Choose'}
+        </button>
+        {!mixerOut && <Button full height={34} onClick={() => setMixerOpen(true)} testId="open-mixer">Mixer</Button>}
+        <Button full height={34} onClick={p.onDrain} midiKey="action:drain" testId="drain-button">Drain</Button>
       </div>
       {mixerOpen && !mixerOut && createPortal(
         /*
@@ -514,12 +501,15 @@ function RidesBody({ p }: { p: DeskProps }) {
 function RecipeBody({ p }: { p: DeskProps }) {
   const [picking, setPicking] = useState(false);
   /*
-    Random evolve and All settings are the rides' too. With both panels out
-    (anyone can dock the recipe beside the rides now) they would be on the
-    screen twice, and a control in two places is one nobody trusts mid-set:
-    the recipe leaves them to the rides, which is where Gig keeps them.
+    Random evolve is the rides' too. With both panels out (anyone can dock the
+    recipe beside the rides now) it would be on the screen twice, and a control
+    in two places is one nobody trusts mid-set: the recipe leaves it to the
+    rides, which is where Gig keeps it. The way into every setting is the status bar's, on
+    every tab, so neither panel draws it (PLAN 35c-5).
   */
   const ridesOut = whereIs(p.layout, 'rides') !== null;
+  // And so are the controls themselves: one control, one place on a tab (`drawnElsewhere`).
+  const elsewhere = drawnElsewhere(p.layout, 'recipe', p.recipeKeys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
   return (
     <div className="-mx-3 -mb-2.5 flex min-h-0 flex-1 flex-col" data-testid="recipe">
       <div className="flex h-7 shrink-0 items-center justify-end px-3">
@@ -544,7 +534,8 @@ function RecipeBody({ p }: { p: DeskProps }) {
               Nothing on the recipe. <span className="text-text">Choose</span> picks what is here.
             </p>
           )}
-          <ControlGrid keys={p.recipeKeys} p={p} prefix="recipe" />
+          <ControlGrid keys={p.recipeKeys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="recipe" />
+          <Elsewhere held={elsewhere} testId="recipe-elsewhere" />
           {!ridesOut && (
             <div className="mt-2 border-t border-border pt-1">
               <Toggle
@@ -560,15 +551,10 @@ function RecipeBody({ p }: { p: DeskProps }) {
           )}
         </div>
       )}
-      {/*
-        The way in to the rest, pinned rather than at the end of a list that
-        scrolls: the one control whose job is to be found must not be below
-        the fold (the Mac's `qa` checks it is on screen).
-      */}
+      {/* Pinned rather than at the end of a list that scrolls. */}
       <div className="flex shrink-0 gap-1.5 border-t border-border px-3 pt-2">
-        {!ridesOut && <Button full height={32} onClick={p.onOpenSettings} testId="open-all-settings-bench">All settings…</Button>}
         <Button
-          height={32}
+          full height={32}
           pressed={!!p.settings.macroMode}
           title="The closeup camera, in among the drops (M). Lit while it is on."
           onClick={() => p.onSetting({ macroMode: !p.settings.macroMode })}
@@ -579,7 +565,7 @@ function RecipeBody({ p }: { p: DeskProps }) {
         </Button>
         {/* Randomise replaces every setting at once, so it asks first. */}
         <Button
-          height={32}
+          full height={32}
           variant={p.randomiseArmed ? 'primary' : 'secondary'}
           onClick={p.onRandomise}
           midiKey="action:lucky"
@@ -804,6 +790,26 @@ function ToolsBody({ p }: { p: DeskProps }) {
             </button>
           );
         })}
+        {/*
+          Tip the dish (PLAN 18a-13j, lib/tipPad.ts): the hand on the rim, beside
+          the hands on the liquid, in the two keycaps the last row leaves empty.
+          The owner never found a way to slosh the plate (2026-10-31): it was
+          three faders in a section no tab puts out. Here it is on every tab
+          that has the tools, with nothing to open and nothing to scroll to
+          (`npm run tippad`). It is not a tool: it needs no pointer on the
+          plate, so a pour and a tip can go together.
+        */}
+        <div
+          className="col-span-2 flex h-12 min-w-0 items-center gap-2 rounded-md border border-border bg-elevated px-1.5"
+          data-testid="tool-tip"
+          title="Tip the dish: drag the dot toward an edge and the liquid runs there; let go and it sloshes back. A first grab turns Slosh up to half if it was off."
+        >
+          <TipPad settings={p.settings} onSetting={p.onSetting} size={40} reach={72} testId="tip-pad" />
+          <span className="min-w-0 truncate text-[11px] font-medium leading-tight text-muted">
+            Tip
+            <span className="block font-mono text-[10px] font-normal text-faint" data-testid="tip-slosh">slosh {Math.round((p.settings.slosh ?? 0) * 100)}%</span>
+          </span>
+        </div>
       </div>
       {p.onToolAmount && (
         <div className="flex items-center gap-2">
@@ -841,6 +847,22 @@ function ToolsBody({ p }: { p: DeskProps }) {
   );
 }
 
+/**
+ * The line under a panel that left some of its controls to another on the
+ * tab: which, and where. Without it a control chosen for the Recipe and not
+ * drawn there would look lost, and the panel that has it is the one to open.
+ */
+function Elsewhere({ held, testId }: { held: Map<string, string>; testId: string }) {
+  if (held.size === 0) return null;
+  const by = new Map<string, string[]>();
+  for (const [key, panel] of held) by.set(panel, [...(by.get(panel) ?? []), RANGE.get(key)?.label ?? key]);
+  return (
+    <p className="pt-2 pb-1 text-[12px] leading-snug text-faint" data-testid={testId}>
+      {[...by].map(([panel, labels]) => `${labels.join(', ')} on ${PANEL_BY_ID.get(panel)?.name ?? panel}`).join(' · ')}
+    </p>
+  );
+}
+
 // ── A section, as knobs or whole ─────────────────────────────────────
 
 const SECTION_KEYS = new Map<string, (keyof VisualizerSettings)[]>();
@@ -849,10 +871,13 @@ for (const s of PINNABLE) SECTION_KEYS.set(s.section, [...(SECTION_KEYS.get(s.se
 function KnobsBody({ id, p }: { id: string; p: DeskProps }) {
   const keys = SECTION_KEYS.get(id) ?? [];
   const name = PANEL_BY_ID.get(id)?.name ?? id;
+  // A knob the Rides or the Recipe have out is drawn there, not here as well (`drawnElsewhere`).
+  const elsewhere = drawnElsewhere(p.layout, id, keys.map(String), p.rideKeys.map(String), p.recipeKeys.map(String));
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid={`section-knobs-${id}`}>
       <div className={scroller}>
-        <ControlGrid keys={keys} p={p} prefix="knob" />
+        <ControlGrid keys={keys.filter(k => !elsewhere.has(String(k)))} p={p} prefix="knob" />
+        <Elsewhere held={elsewhere} testId={`panel-${id}-elsewhere`} />
       </div>
       {/*
         The rest of the section: its switches and pickers are not numbers, so
@@ -1060,6 +1085,7 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'dyes': return <DyesBody p={p} />;
     case 'tools': return <ToolsBody p={p} />;
     case 'phone': return <PhoneBody p={p} />;
+    case 'live': return <LiveShowPanel />;
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;

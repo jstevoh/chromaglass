@@ -42,13 +42,13 @@
  */
 import { chromium } from 'playwright';
 import { spawn, spawnSync } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { pseudoIsrc } from '../src/lib/evolution.ts';
 import { FOLLOW_RATE, mapChroma, storedChroma } from '../src/lib/songFollow.ts';
 import { bandStep, BAND_STEP_S } from '../src/lib/simulatedMusic.ts';
 import { renderBand } from './band.mjs';
 
-const PORT = Number(process.env.FOLLOWVIEW_PORT ?? 4197);
+const PORT = port(4197, 'FOLLOWVIEW_PORT');
 const ORIGIN = `http://localhost:${PORT}`;
 const results = [];
 const check = (name, ok, detail = '') => {

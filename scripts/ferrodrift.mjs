@@ -51,11 +51,11 @@
  * Needs a GPU that presents WebGPU: the macOS runner, in checks.yml.
  */
 import { chromium } from 'playwright';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, isGpuEngine, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = 4347;
+const PORT = port(4347);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });
@@ -174,7 +174,7 @@ try {
         n, disc: disc / Math.max(1, discCells), total: total / (n * n), r: total ? rsum / total : 0,
         bubbles: d.bubbles?.bubbles?.length ?? -1, drawn: d.bubbleUniforms?.().count ?? -1, kicks: d.kicks?.() ?? -1,
         thin: !!d.fluids?.[0]?.thinGap, lays: d.phaseLays?.() ?? -1,
-        // __band stays defined once the band has started and returns null when it is not playing (App.tsx).
+        // __band stays defined once the band has started and returns null when it is not playing (App's).
         band: (window.__band?.() ?? null) != null,
         held: { turbulenceScale: d.settings.turbulenceScale, audioImpact: d.settings.audioImpact, phaseAmount: d.settings.phaseAmount },
       };

@@ -76,6 +76,9 @@ const CALIBRATION = new Set([
   'beatLead', 'filmDrive', 'filmImpact', 'filmMix', 'filmKey', 'soundImpact',
   'shapeImpact', 'sceneDrive', 'sceneHands', 'sceneImpact', 'sceneDeadzone',
   'sceneSmooth', 'camera',
+  'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
+  'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
+  'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // How the show follows the music, not what the look is (lib/tempoPace.ts).
   'tempoSync',
   // The set's shape, not the look's (lib/scenePacing.ts): a nudge across its
@@ -101,6 +104,9 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
   'plateRock', 'frameSway', 'beatSqueeze', 'beatAccent', 'kaleidoSpin', 'kaleidoZoom',
   'spinRpm', 'rotationSpeed', 'spinImpulse', 'spinWander', 'spinAudioDepth', 'spinDrag',
   'plateSpring', 'lampMotion', 'stockWeave',
+  // The liquid under the cover and the cover's weight (PLAN 38r-5) set the whole dish's gap as one,
+  // and a wander down either spills liquid over the rim for good: a hand's, never Evolve's.
+  'liquidMl', 'coverWeight',
 ]);
 /*
   And what Evolve does itself, so it does not also wander: the palette moves at
@@ -113,6 +119,8 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
 const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle']);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
+  // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
+  'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
   // How far the music moves the frame (lib/plateRock.ts): a wander would
@@ -127,6 +135,10 @@ const NOT_THE_LOOK = new Set([
   // tear a look's crowd of drops into a few blobs for good, and up adds
   // nothing to a look without one. The look's own number, held.
   'filmHold',
+  // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
+  // soap clear off the plate at a chosen half-life; Evolve must not start a
+  // loss by itself.
+  'soapBreakdown',
   // How much of a burst each kick throws (Kick Bloom): the owner's hand, as
   // Frame Sway is. It is 1 on every look so none changes, and a wander would
   // walk a look off the amount it ships with and into the dye-free calm of 0
@@ -134,6 +146,12 @@ const NOT_THE_LOOK = new Set([
   // which one it reached for, so `npm run slowevolve`'s answer-in-half-a-minute
   // check read 63.5 s with this dial in the pool and passes without it.
   'kickBloom',
+  // The melody's drops (Melody Walk): the look's own, 0 on every look but the
+  // ones written for it. A wander would switch the notes on in a look that
+  // has no line for them, and walk the two that do off their size.
+  'melodyWalk',
+  // The projector lamp's heat (PLAN 36e-2): played by hand with a hold on the glass, not drifted by Evolve.
+  'heat',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*
@@ -150,6 +168,8 @@ const NOT_THE_LOOK = new Set([
   // The clear film (PLAN §20b): moving it pours clear oil over the dish or
   // draws it off, so a wander would fill the lace's holes back in by itself.
   'clearFilm',
+  // And its dye (PLAN 20b-13): a dye dissolved in the oil does not thin or deepen by itself.
+  'clearFilmDye',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),
@@ -233,7 +253,8 @@ export function dialWindow(key: string, current: VisualizerSettings, anchor: Vis
   const spec = PIN_RANGE.get(key);
   if (!spec) return null;
   const { min, max } = spec;
-  const span = max - min;
+  // A widened dial wanders by its old width, not its new one (`wanderSpan`).
+  const span = spec.wanderSpan ?? max - min;
   const read = (s: VisualizerSettings) => {
     const v = s[key as keyof VisualizerSettings];
     return typeof v === 'number' && Number.isFinite(v) ? v : undefined;

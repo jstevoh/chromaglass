@@ -21,11 +21,11 @@
  * frame loop: the macOS runner, in checks.yml.
  */
 import { chromium } from 'playwright';
-import { launchChromium, presentsInXvfb } from './chromium.mjs';
+import { launchChromium, presentsInXvfb, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, settlePlate, waitForEngine } from './frame.mjs';
 
-const PORT = 4343;
+const PORT = port(4343);
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok, detail });

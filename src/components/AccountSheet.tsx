@@ -3,6 +3,7 @@ import { User } from 'lucide-react';
 import { getCachedEmail } from '../lib/authFlag';
 import CloudSyncCard from './CloudSyncCard';
 import { MacAppCard } from './MacAppCard';
+import { MoirePackBuy } from './MoirePackBuy';
 import { cloudSync } from '../lib/cloudSyncApp';
 import { ACCOUNTS_ON, useSignedIn } from '../lib/useSignedIn';
 import { allowAccountKeys, declineAccountKey, lastAccountLicense, syncAccountLicense, type AccountLicenseResult } from '../lib/accountLicense';
@@ -181,11 +182,11 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
         refreshLicenseState();
       } else {
         setLicenseError(
-          res.error === 'expired'
+          res.detail ?? (res.error === 'expired'
             ? 'This licence key has expired.'
             : res.error === 'machine-limit'
               ? 'This licence key is already active on 2 machines.'
-              : 'That is not a valid licence key.',
+              : 'That is not a valid licence key.'),
         );
       }
     } catch {
@@ -381,7 +382,7 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                     <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$164</span> once</span>
                   </div>
                   <p className="mt-1 text-[12px] leading-snug text-text-2">
-                    Pay the difference for several projectors, video out, Art-Net, OSC and your own logo.
+                    Pay the difference for OSC, Art-Net, the 1024² grid and cloud sync.
                   </p>
                 </a>
               ) : (
@@ -406,10 +407,11 @@ export const AccountSheet: React.FC<AccountSheetProps> = ({ onClose }) => {
                   >
                     <span className="text-[13px] font-medium text-text">Pro</span>
                     <span className="text-[12px] text-muted"><span className="font-mono font-medium text-accent-text">$199</span> once</span>
-                    <span className="mt-1.5 text-[12px] leading-snug text-text-2">All of Home, plus several projectors, video out, Art-Net, OSC.</span>
+                    <span className="mt-1.5 text-[12px] leading-snug text-text-2">All of Home, plus OSC, Art-Net, the 1024² grid and cloud sync.</span>
                   </a>
                 </div>
               )}
+              <MoirePackBuy tier={currentTier} email={checkoutEmail} />
             </div>
           )}
 

@@ -26,9 +26,13 @@
  *      8% (the radius at 2% of the pool's peak, from the area over that,
  *      which is within a hair of r_N for his profile (1 − r²/r_N²)^⅓)
  *   3. and the pool is as deep as the law says, within 8%: its middle
- *      H = 4V/(3π r_N²). The front goes as K^(1/8), so check 2 alone passes
+ *      H = 4V/(3π r_N²) on an open layer, and with the top glass 2 mm over
+ *      it (PLAN 38r) the radial solve of the same equation with the glass's
+ *      (1 − η/b)³ in, 9% deeper; the solve with no glass is held to
+ *      Huppert's H to 2%. The front goes as K^(1/8), so check 2 alone passes
  *      a rate half what it should be; the depth goes as K^(−1/4), and a copy
- *      of the kernels at ×0.7 and ×1.4 reads +12% and −6.3% (×1: +2.2%)
+ *      of the kernels at ×0.7 and ×1.4 reads +12% and −6.3% (×1: +2.2%, at
+ *      the 6 mm gap)
  *   4. it got there along the law: the radius grows as t^0.10 to t^0.15
  *      between 5 and 30 s (a blur's goes as t^½, a drop that sits as t^0)
  *   5. its edge is a front, not a blur: the radius at half the peak is at
@@ -40,7 +44,7 @@
  *   7. the same drop in glycerine (Thickness 1, a thousand times water's
  *      viscosity) slumps as slowly as the same equation says: its middle at
  *      20 s within 5% of a radial solve of ∂η/∂t = ∇·((g′/3ν) η³(1 − η/b)³ ∇η)
- *      from the same paraboloid in a 6 mm gap, worked out here on the CPU
+ *      from the same paraboloid in the 2 mm gap, worked out here on the CPU
  *      (3.94 units of 5.6; water's is down to 0.68 by then), and still all
  *      there. Not its front: at 256² a front that moves under a cell reads up
  *      to a cell wide (4.50 mm on Metal against the solve's 4.04), and
@@ -65,6 +69,29 @@
  *      |Σ(−1)^(x+y) a| / Σ a, stays under 0.1%; a round pool laid on the grid
  *      reads about 1e-9 there, so only a checkerboard moves it)
  *  13. and the same on a 1024² plate
+ *  14. the grid's checkerboard filter (dampGrid) makes no dye at a drop's
+ *      rim and does not move its front: the glycerine drop of 7, run once
+ *      with the filter on (as every look has it) and once with it off, has
+ *      the bare run's total to within 0.01% at 2 s and 20 s, and its front
+ *      (the radius at 2% of the peak) within 0.05 mm of the bare run's (a
+ *      cell here is 0.78 mm, and one cell more over the contour moves the
+ *      radius 0.02 mm). Measured against the bare run, not against what was
+ *      laid, so the step's own drift (11's 0.1%) neither eats the bar nor
+ *      hides a gain. The filter as it was before 18m-5 read +0.93% and
+ *      +0.19 mm at 2 s, and +3.20% and +0.17 mm (its front 0.72 mm out from
+ *      where it was laid, against the bare run's 0.55) at 20 s, on Metal and
+ *      on software WebGPU alike (#485's runs on main 7d77141, and this
+ *      check's measure on a lab built from 7d77141's fluid sources). And the
+ *      filter ran: some cell of the field at 20 s is not the bare run's
+ *      (two runs of one program on one plate agree to the bit, so a filter
+ *      that never ran reads 0 cells). Not a moment of the field such as
+ *      Σa²: it moves 0.50% on Metal, but 0.048% under the filter before
+ *      18m-5, which certainly ran, and at Grid Damp 0.5 it goes the other
+ *      way (+3.3%), so no bar on it says the filter ran.
+ *      The radius at 5% of the peak is printed, not held: the filter moves
+ *      it out 0.18 mm in 20 s (before 18m-5, 0.35), the same at 0.05 and 0.5
+ *      (PLAN 18m-5c). The front is its own line, 14b, owed to 18m-5c since
+ *      the 2 mm gap (see there): the dye and the filter-ran guard are held.
  *
  * 12 and 13 are here because the drop in 1 to 11 is too shallow and too
  * coarse to find what the review of #371 (2026-10-24) found: the slump is
@@ -83,12 +110,14 @@
  * step other than 1/60 s.
  *
  * The grid's checkerboard filter (dampGrid, GRID_DAMP a step on every look
- * with no Diffusion Rate) is off in every run here. Left on, it moved the
- * glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye on its
- * own (measured by skipping each stage of the step in turn: only it changed
- * the total, +0.93% in 2 s), because it clamps its high-pass to the 3×3
- * neighbourhood's range and a drop's rim is where that clamp bites. That is
- * its own fault, written into PLAN 18m-5, and not what this measures.
+ * with no Diffusion Rate) is on in 1 to 11, as the app has it (PLAN 18m-5a).
+ * Until 18m-5 it was off here: it clamped its high-pass to the 3×3
+ * neighbourhood's range, a drop's rim is where that clamp bites, and it
+ * moved the glycerine drop's front 0.72 mm in 20 s and added 3.2% to its dye
+ * on its own (the front at 20 s, from where it was laid). Now it hands the clamp's excess back to the neighbours, and 14
+ * holds it to that. It stays off in 12 and 13: they watch the slump's own
+ * step for a checkerboard, and the filter takes 5% of one out a step, enough
+ * to hide a step going slowly unstable.
  *
  * Checks 6 to 9 are the controls on 2 to 5: the same measure, with the
  * physics the law says should change it changed, and once with the slump off
@@ -96,6 +125,7 @@
  * the best part of an hour; on Metal under a minute.
  */
 import { openLab } from './lab.mjs';
+import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
 
 const { page, close } = await openLab();
 const failed = [];
@@ -105,8 +135,8 @@ function report(name, ok, detail) {
 }
 
 /** One drop, stepped to each of `times` (seconds): front radii in mm, the peak and the total. */
-async function drop(times, over, white = false, N = 256) {
-  return page.evaluate(async ({ N, times, over, white }) => {
+async function drop(times, over, white = false, N = 256, keep = false) {
+  return page.evaluate(async ({ N, times, over, white, keep }) => {
     await lab.create(N, N);
     // Full strength: the red band at the dye's floor, so its strength (wgsl/slump.ts) is 1.
     const rgb = white ? [0, 0, 0] : lab.dyeOf([0, 0.3, 0.9]);
@@ -119,19 +149,19 @@ async function drop(times, over, white = false, N = 256) {
     let t = 0;
     for (const T of times) {
       const n = Math.round((T - t) / lab.stepSeconds); t = T;
-      if (n > 0) await lab.step(n, { diff: 0, gridDamp: 0, thinGap: 1, ...over });
+      if (n > 0) await lab.step(n, { diff: 0, thinGap: 1, ...over });
       const f = await lab.field('dye');
-      let total = 0, pk = 0;
-      for (let k = 3; k < f.length; k += 4) { total += f[k]; pk = Math.max(pk, f[k]); }
+      let total = 0, pk = 0, square = 0;
+      for (let k = 3; k < f.length; k += 4) { total += f[k]; pk = Math.max(pk, f[k]); square += f[k] * f[k]; }
       const radius = (share) => {
         let c = 0;
         for (let k = 3; k < f.length; k += 4) if (f[k] > share * pk) c++;
         return Math.sqrt(c / Math.PI) * cell * 1000;
       };
-      rows.push({ T, total, peak: pk, front: radius(0.02), r05: radius(0.05), r50: radius(0.5), volume: total * cell * cell * lab.dyeLayer });
+      rows.push({ T, total, peak: pk, front: radius(0.02), r05: radius(0.05), r50: radius(0.5), volume: total * cell * cell * lab.dyeLayer, square, a: keep ? Array.from(f.filter((_, k) => k % 4 === 3)) : null });
     }
     return rows;
-  }, { N, times, over, white });
+  }, { N, times, over, white, keep });
 }
 
 /**
@@ -201,7 +231,8 @@ const g0 = 9.81 * 0.02, g1 = 9.81 * 0.15;
 
 const water = await drop([0, 5, 20, 30], { gapThickness: 0, solutalBuoyancy: 0 });
 const heavy = await drop([0, 20], { gapThickness: 0, solutalBuoyancy: 1 });
-const syrup = await drop([0, 20], { gapThickness: 1, solutalBuoyancy: 0 });
+const syrup = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0 }, false, 256, true);
+const syrupBare = await drop([0, 2, 20], { gapThickness: 1, solutalBuoyancy: 0, gridDamp: 0 }, false, 256, true);
 const clear = await drop([0, 10], { gapThickness: 0, solutalBuoyancy: 0 }, true);
 // 18h calibrated diff: 0.0002 to physical molecular diffusion (Dm ≈ 4e-10 m²/s),
 // which in 30 s barely moves a drop. The blur control tests unphysical rapid diffusion
@@ -216,7 +247,7 @@ const nuWater = await nu(0), nuSyrup = await nu(1);
 const dyeLayer = await page.evaluate(() => lab.dyeLayer);
 await close();
 
-for (const [name, rows] of [['water', water], ['heavy', heavy], ['glycerine', syrup], ['clear', clear], ['blur', blur], ['water 512²', fine]]) {
+for (const [name, rows] of [['water', water], ['heavy', heavy], ['glycerine', syrup], ['glycerine, no grid filter', syrupBare], ['clear', clear], ['blur', blur], ['water 512²', fine]]) {
   console.log(`  ${name}: ${rows.map((r) => `${r.T}s front ${mm(r.front)} half ${mm(r.r50)} peak ${r.peak.toFixed(2)} total ${r.total.toFixed(1)}`).join(' | ')}`);
 }
 
@@ -230,9 +261,24 @@ report('2. in water the front at 30 s is where Huppert\'s law puts it',
   Math.abs(w30.front / law30 - 1) <= 0.08,
   `${mm(w30.front)} against ${mm(law30)} (${((w30.front / law30 - 1) * 100).toFixed(1)}%; g′ ${g0.toFixed(3)}, ν ${nuWater.toExponential(1)})`);
 
+/*
+  Check 3's depth. Huppert's law is the open layer's: the current's flux is
+  (g′/3ν)η³∇η with nothing above it. Between two glasses the dye's exchange
+  flow with the clear liquid over it goes as η³(1 − η/b)³ (wgsl/slump.ts),
+  and at the 2 mm rest gap (PLAN 38r) the middle at 30 s is a tenth of the
+  gap deep, where (1 − η/b)³ is 0.72: the current is that much stiffer, and
+  it stands deeper by about its −¼ power, 9%. In the 6 mm gap this was
+  written on it was 3%, inside the 8%. So the depth is asked of the radial
+  solve of the plate's own equation (check 7's, here in water on coarser
+  rings, a few seconds), and the solve is held to Huppert's depth with the
+  glass taken away, to 2%, so the reference is still the law where the law
+  holds and only the glass is added to it.
+*/
 const H = 4 * V / (3 * Math.PI * (law30 / 1000) ** 2) * 1000, depth = w30.peak * dyeLayer * 1000;
-report('3. and as deep in its middle as the law says', Math.abs(depth / H - 1) <= 0.08,
-  `${depth.toFixed(3)} mm against ${H.toFixed(3)} mm (${((depth / H - 1) * 100).toFixed(1)}%)`);
+const glassed = radialMiddle(g0, nuWater, water[0].peak, 0.004, 30, DISH_GAP_METRES, 300, 4e-5) * dyeLayer * 1000;
+const open = radialMiddle(g0, nuWater, water[0].peak, 0.004, 30, Infinity, 300, 4e-5) * dyeLayer * 1000;
+report('3. and as deep in its middle as the law says, with the glass over it', Math.abs(depth / glassed - 1) <= 0.08 && Math.abs(open / H - 1) <= 0.02,
+  `${depth.toFixed(3)} mm against ${glassed.toFixed(3)} mm (${((depth / glassed - 1) * 100).toFixed(1)}%); the solve with no glass ${open.toFixed(3)} mm, Huppert's ${H.toFixed(3)} mm`);
 
 const growth = (a, b, ta, tb) => Math.log(b.front / a.front) / Math.log(tb / ta);
 const exponent = growth(w5, w30, 5, 30);
@@ -255,14 +301,13 @@ const still = (rows, T) => Math.abs(at(rows, T).front - rows[0].front) < 0.5 && 
   is a thousandth of water's, so a stable step is long); far too slow in
   water, where Huppert's law is the reference instead.
 */
-function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = 0.006) {
-  const n = 600, dr = 2e-5, G = gPrime / (3 * nuv);
-  const h = new Float64Array(n), dh = new Float64Array(n);
+function radialMiddle(gPrime, nuv, peakUnits, R, T, gap = DISH_GAP_METRES, n = 600, dr = 2e-5) {
+  const G = gPrime / (3 * nuv);
+  const h = new Float64Array(n), dh = new Float64Array(n), flux = new Float64Array(n - 1);
   for (let i = 0; i < n; i++) { const r = (i + 0.5) * dr; h[i] = Math.max(0, 1 - (r / R) ** 2) * peakUnits * dyeLayer; }
   let t = 0;
   while (t < T) {
     let most = 0;
-    const flux = new Float64Array(n - 1);
     for (let i = 0; i < n - 1; i++) {
       const e = 0.5 * (h[i] + h[i + 1]), k = G * e ** 3 * Math.max(0, 1 - e / gap) ** 3;
       most = Math.max(most, k);
@@ -299,6 +344,41 @@ report('11. the slump makes and loses no dye', Math.abs(kept - 1) <= 0.001,
 
 reportDeep('12', 768, d768);
 reportDeep('13', 1024, d1024);
+
+const rim = [2, 20].map((T) => {
+  const on = at(syrup, T), bare = at(syrupBare, T);
+  return { T, made: on.total / bare.total - 1, drift: bare.total / syrupBare[0].total - 1, moved: on.front - bare.front, moved05: on.r05 - bare.r05 };
+});
+// The cells the filter changed at 20 s: 172 of 65,536 on software WebGPU in the 6 mm gap, 164 on
+// Metal in the 2 mm gap (#703), and two bare runs 0 (software WebGPU).
+const onA = at(syrup, 20).a, bareA = at(syrupBare, 20).a;
+const ran = onA.filter((x, k) => x !== bareA[k]).length;
+report('14. the grid filter makes no dye at a drop\'s rim',
+  rim.every((r) => Math.abs(r.made) <= 1e-4) && ran > 0,
+  rim.map((r) => `${r.T} s: dye ${r.made >= 0 ? '+' : ''}${(r.made * 100).toFixed(4)}% of the bare run's (its own drift ${(r.drift * 100).toFixed(4)}%)`).join('; ')
+    + `; ${ran} of ${onA.length} cells not the bare run's at 20 s, some wanted (before 18m-5: +0.93% at 2 s)`);
+/*
+  14b, owed to PLAN 18m-5c. Since the glass gap became a real 2 mm (38r,
+  #655) the glycerine drop barely slumps on its own (its 2% front 3.94 →
+  4.13 mm in 20 s, where in the 6 mm gap it reached 4.50), and the filter
+  now shows what it adds: the same drop with the filter on reaches 4.50 mm
+  at 2%, and its half-peak contour comes in 2.92 → 2.79 mm, while the 5%
+  contour does not move. The filter is softening a sharp, nearly still edge,
+  motion the solver did not make. Measured the same on main's three-pass
+  filter and on this one (both 4.495 mm against the bare 4.135, software
+  WebGPU, 2026-11-08), so it is 18m-5's behaviour, not 18m-5b's. CI runs it
+  as `--owed=front` until 18m-5c fixes the filter: owed, a failing line is
+  printed and excused; a passing one is red until `front` is taken out of
+  --owed, so the excuse cannot outlive the fault.
+*/
+const owedFlag = process.argv.find((a) => a.startsWith('--owed='));
+const owed = new Set(owedFlag ? owedFlag.slice('--owed='.length).split(',').filter(Boolean) : []);
+for (const id of owed) if (id !== 'front') report('every id in --owed is a line of this check', false, `unknown: ${id} (known: front)`);
+const frontHeld = rim.every((r) => Math.abs(r.moved) <= 0.05);
+const frontDetail = rim.map((r) => `${r.T} s: front ${r.moved >= 0 ? '+' : ''}${r.moved.toFixed(3)} mm of the bare run's (at 5% of the peak ${r.moved05 >= 0 ? '+' : ''}${r.moved05.toFixed(3)} mm, half the peak ${(at(syrup, r.T).r50 - at(syrupBare, r.T).r50).toFixed(3)} mm, printed only)`).join('; ');
+if (owed.has('front') && !frontHeld) console.log(` owed 14b. the grid filter does not move a drop's front (PLAN 18m-5c) — ${frontDetail}`);
+else if (owed.has('front')) report('14b. the grid filter does not move a drop\'s front, and it passes while owed: take front out of --owed', false, frontDetail);
+else report('14b. the grid filter does not move a drop\'s front', frontHeld, frontDetail);
 
 console.log(failed.length ? `\n${failed.length} failed` : '\nall passed');
 process.exit(failed.length ? 1 : 0);

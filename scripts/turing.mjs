@@ -93,6 +93,8 @@ import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 import { turingInk } from '../src/lib/turingInk.ts';
 
+const source = (path) => readFileSync(new URL(`../src/${path}`, import.meta.url), 'utf8');
+
 const checks = [];
 const check = (name, ok, detail = '') => {
   checks.push({ name, ok: !!ok });
@@ -110,7 +112,7 @@ const RUNGS = [256, 384, 512];
 const WIDTH_SPREAD = 1.10, STIR_HELD = 0.10, MOVED = 0.5, SWIRL = 0.3, CARRIED = 0.15;
 const MID_MOST = 0.20, SIDE_LEAST = 0.20, WHERE = 0.7, BUILDS = 0.03;
 const FILLED = 0.001;
-const DRIFT_SETTLE = 9000, DRIFT_RUN = 9000, DRIFT_MOVES = 0.8, DRIFT_GAP = 0.1, DRIFT_FULL_MOVES = 0.7, DRIFT_CONTROL_STILL = 0.8, DRIFT_ALIVE_LO = 0.5, DRIFT_ALIVE_HI = 0.9, DRIFT_ALIVE_SLACK = 0.05, DRIFT_BREAKS = 10, DRIFT_SPOT_SNAPS = 6, DRIFT_STILL_PIECES = 3, DRIFT_SPOTS_LEAD = 0.1, DRIFT_SPOTS_LIVE = 0.3, DRIFT_TILE_KEEPS = 0.6, DRIFT_WIDTH = 0.15, ALIVE_ABOVE = 0.1, TILE = 32, DRIFT_UNITS_PER_SECOND = 180;
+const DRIFT_SETTLE = 9000, DRIFT_RUN = 9000, DRIFT_MOVES = 0.8, DRIFT_GAP = 0.1, DRIFT_FULL_MOVES = 0.7, DRIFT_CONTROL_STILL = 0.8, DRIFT_ALIVE_LO = 0.5, DRIFT_ALIVE_HI = 0.9, DRIFT_ALIVE_SLACK = 0.05, CORNER_RAMP = 3000, CORNER_HOLD = 9000, CORNER_SETTLE = 6000, CORNER_FLOOR = 0.4, DRIFT_BREAKS = 10, DRIFT_SPOT_SNAPS = 6, DRIFT_STILL_PIECES = 3, DRIFT_SPOTS_LEAD = 0.1, DRIFT_SPOTS_LIVE = 0.3, DRIFT_TILE_KEEPS = 0.6, DRIFT_WIDTH = 0.15, ALIVE_ABOVE = 0.1, TILE = 32, DRIFT_UNITS_PER_SECOND = 180;
 const INK_SHOWS = 0.3, INK_PURE = 0.9, INKS_APART = 0.5, POURED_SHOWS = 3, POOL_KEEPS = 0.8, POOL_CONTROL_GAP = 0.3, SLIDE = 5;
 
 /** In-place radix-2 FFT of one row. */
@@ -518,8 +520,8 @@ try {
     session.
   */
   {
-    const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
-    const types = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+    const vis = source('components/LiquidVisualizer.tsx');
+    const types = source('types.ts');
     const wired = /print > 0\s*\?\s*turingInk\(currentSettings\.turingInk \?\? 0\)/.test(vis);
     const defaults = (types.match(/^\s*turingInk: 0,/gm) || []).length;
     check('the visualizer draws the print in the turingInk setting, defaulting to starch', wired && defaults === 1,
@@ -583,29 +585,35 @@ try {
     stripes; 389 and 374 at the run's end for Drift 0.7 and 1; 608 for held
     spots). Movement: correlation 0.901 at Drift 0, 0.641 at 0.7, 0.591 at 1.
   */
-  const presetsSrc = readFileSync(new URL('../src/presets.ts', import.meta.url), 'utf8');
-  const typesSrc = readFileSync(new URL('../src/types.ts', import.meta.url), 'utf8');
+  const presetsSrc = source('presets.ts');
+  const typesSrc = source('types.ts');
   const turingPreset = presetsSrc.slice(presetsSrc.indexOf("id: 'turing-print'"));
   const presetDrift = Number(/^\s*turingDrift: ([0-9.]+),/m.exec(turingPreset.slice(0, turingPreset.indexOf("id: '", 10)))?.[1] ?? 0);
   // The held-spots plate is the shader's own spots end, so its numbers are read from the shader's
   // text (as the preset's Drift is from presets.ts) and not typed a second time: if the cap or the
   // share moves there, this follows, and if the lines are not found the check cannot run.
-  const fluidSrc = readFileSync(new URL('../src/gpu/wgsl/fluid.ts', import.meta.url), 'utf8');
-  const capM = /let cap = max\(([0-9.]+) - ([0-9.]+) \* f1,/.exec(fluidSrc);
+  const fluidSrc = source('gpu/wgsl/fluid/reactions.ts');
+  const capM = /let cap = max\(([0-9.]+) \* min\(f1, ([0-9.]+) - f1\), ([0-9.]+)\);/.exec(fluidSrc);
   const shareM = /let above = cap \* mix\(([0-9.]+), ([0-9.]+), r\);/.exec(fluidSrc);
-  if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in fluid.ts');
-  const SPOT_CAP = Number(capM[1]) - Number(capM[2]) * FEED, SPOT_SHARE = Number(shareM[2]);
-  // The rate the app moves the Drift it hands the solver by is read from the visualizer, so the
+  if (!capM || !shareM) throw new Error('turing: the regime lines (cap, above) were not found in wgsl/fluid/reactions.ts');
+  // The held-corner line below rebuilds the shader's kill from the saddle-node and the cap, so
+  // the line it copies is asserted to be there as written: a shader that changes how the target
+  // is made stops this check, rather than leaving it measuring a kill the shader no longer uses.
+  if (!fluidSrc.includes('target_kill = 0.5 * sqrt(f1) - f1 + above;')) throw new Error('turing: the shader\'s target_kill line was not found as the held-corner line copies it');
+  // The cap is a tent in the feed (rising to half of capM[2], falling after it), floored.
+  const capAt = (f) => Math.max(Number(capM[1]) * Math.min(f, Number(capM[2]) - f), Number(capM[3]));
+  const SPOT_CAP = capAt(FEED), SPOT_SHARE = Number(shareM[2]);
+  // The rate the app moves the Drift it hands the solver by is read from the app (sim/constants.ts), so the
   // lab ramps as the app does and not as a number typed twice (a step of full Drift starves a tile).
-  const visSrc = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+  const visSrc = source('sim/constants.ts');
   const rateM = /const TURING_DRIFT_PER_SECOND = ([0-9.]+);/.exec(visSrc);
-  if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in LiquidVisualizer.tsx');
+  if (!rateM) throw new Error('turing: TURING_DRIFT_PER_SECOND was not found in sim/constants.ts');
   const DRIFT_RATE = Number(rateM[1]);
   // A "." parses to NaN, which Math.min would hand the shader without a word.
   if (!(Number.isFinite(DRIFT_RATE) && DRIFT_RATE > 0 && DRIFT_RATE <= 1)) throw new Error(`turing: TURING_DRIFT_PER_SECOND read as ${rateM[1]}, wanted a number in (0, 1]`);
   // The app counts the rate in solver iterations (a slow machine runs fewer a frame), and so does the lab.
   const iterM = /const TURING_ITERATIONS_PER_SECOND = ([0-9.]+);/.exec(visSrc);
-  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in LiquidVisualizer.tsx is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
+  if (!iterM || Number(iterM[1]) !== DRIFT_UNITS_PER_SECOND) throw new Error(`turing: TURING_ITERATIONS_PER_SECOND in sim/constants.ts is ${iterM ? iterM[1] : 'missing'}, the lab ramps at ${DRIFT_UNITS_PER_SECOND}`);
   const drift = await page.evaluate(async ({ FEED, KILL, DU, DV, SEEDS, SETTLE, RUN, ABOVE, TILE, PER_SECOND, RATE, DRIFTS, SPOT_KILL, SNAPS }) => {
     const N = 256;
     // Connected pieces of the activator (over ABOVE, four-way, the plate's outer 16 pixels left out
@@ -694,6 +702,67 @@ try {
     }
     return { N, runs, spots, apart, instrument: { clean: flattestOf(runs[0].later), patched: flattestOf(patched) } };
   }, { FEED, KILL, DU, DV, SEEDS, SETTLE: DRIFT_SETTLE, RUN: DRIFT_RUN, ABOVE: ALIVE_ABOVE, TILE, PER_SECOND: DRIFT_UNITS_PER_SECOND, RATE: DRIFT_RATE, DRIFTS: [0, presetDrift, 1], SPOT_KILL: Math.sqrt(FEED) / 2 - FEED + SPOT_SHARE * SPOT_CAP, SNAPS: DRIFT_SPOT_SNAPS });
+  /*
+    The held corners of the cap (PLAN.md 26d-6a). The drift's regime map can sit at
+    its spots end (nine tenths of the cap) wherever the feed's own waves put the
+    plate, and the feed ranges FEED +/- the shader's DRIFT_FEED, 0.02 to 0.06. The
+    run above holds spots only at F 0.04, so a cap that was too generous at the
+    ends of that range passed every line: the first fit (0.0105 less 0.15 F) went
+    on to 0.0075 at F 0.02, and a plate held there at nine tenths of it keeps 0.313
+    of its cells alive (0.42 at F 0.03) against the floor below, 0.433, while a
+    ramped run only 6000 units long had not yet shown it (0.36 at the end of the
+    ramp). So each corner here is what the app does: settle at the look's feed and
+    kill, slew the feed and the kill to the corner over CORNER_RAMP units (a step
+    there collapses it, alive 0.06, and the app never steps: the Drift it hands the
+    solver is slewed, and so are the feed and kill), then hold CORNER_HOLD units and
+    read the live share every third of the hold. The kill is the shader's own line,
+    the saddle-node plus the cap at that feed times its spots share, with the cap
+    read from fluid/reactions.ts (capAt above), so moving the cap moves this. Every read of
+    every corner must stay over the spots' floor (the held spots' share less
+    DRIFT_ALIVE_SLACK, the same floor the drifting run is held to). The instrument
+    goes red on a corner pushed to twice the cap at F 0.02, which the line must
+    read as emptied. Measured, lab, first fit: F 0.02 0.313, F 0.03 0.42, F 0.06
+    0.609; after the tent fit: F 0.02 0.462 to 0.473, F 0.03 0.491 to 0.495, F 0.06 0.609
+    to 0.611, against a floor of 0.433, so the margin at F 0.02 is thin (0.03): a Metal read
+    that finds it under the floor means the cap wants refitting, not the bar lowering.
+  */
+  const driftFeedM = /const DRIFT_FEED = ([0-9.]+);/.exec(fluidSrc);
+  if (!driftFeedM) throw new Error('turing: DRIFT_FEED was not found in fluid/reactions.ts');
+  const DRIFT_FEED_SPAN = Number(driftFeedM[1]);
+  // The three corners, and the tent's peak (F 0.035 with the look's 0.04 and a span of 0.02): the
+  // peak is the most generous point of the cap, and a wrong apex shows only between the corners.
+  const cornerFeeds = [FEED - DRIFT_FEED_SPAN, FEED - DRIFT_FEED_SPAN / 2, FEED - DRIFT_FEED_SPAN / 4, FEED + DRIFT_FEED_SPAN];
+  const corners = cornerFeeds.map((f) => ({ F: f, d: capAt(f) * SPOT_SHARE }));
+  const pushed = { F: cornerFeeds[0], d: 2 * capAt(cornerFeeds[0]) * SPOT_SHARE };
+  const held = await page.evaluate(async ({ FEED, KILL, DU, DV, SEEDS, SETTLE, RAMP, HOLD, ABOVE, corners, pushed }) => {
+    const N = 256;
+    const one = async ({ F, d }) => {
+      await lab.create(N);
+      const g = lab.solver();
+      let s = 777; const rnd = () => (s = s * 16807 % 2147483647) / 2147483647;
+      g.chemLive = true;
+      for (let t = 0; t < 300; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+      for (let k = 0; k < SEEDS; k++) g.seedChemistry(0.1 + rnd() * 0.8, 0.1 + rnd() * 0.8, 0.012);
+      for (let t = 0; t < SETTLE; t += 10) g.stepChemistry(10, FEED, KILL, DU, DV, 1);
+      const kill = Math.sqrt(F) / 2 - F + d;
+      const alives = [];
+      for (let t = 0; t < RAMP + HOLD; t += 10) {
+        const u = Math.min(1, (t + 10) / RAMP);
+        g.stepChemistry(10, FEED + (F - FEED) * u, KILL + (kill - KILL) * u, DU, DV, 1);
+        if (t >= RAMP && (t + 10 - RAMP) % (HOLD / 3) === 0) {
+          const f = await g.readChemistry('chem');
+          if (f.n !== N) throw new Error(`readChemistry gave ${f.n} wide, wanted ${N}`);
+          let n = 0; for (let i = 0; i < N * N; i++) if (f.data[i * 4 + 1] > ABOVE) n++;
+          alives.push(n / (N * N));
+        }
+      }
+      if (alives.length !== 3) throw new Error(`took ${alives.length} reads of a held corner, wanted 3`);
+      return { F, d, alives };
+    };
+    const out = [];
+    for (const c of corners) out.push(await one(c));
+    return { corners: out, pushed: await one(pushed) };
+  }, { FEED, KILL, DU, DV, SEEDS, SETTLE: CORNER_SETTLE, RAMP: CORNER_RAMP, HOLD: CORNER_HOLD, ABOVE: ALIVE_ABOVE, corners, pushed });
   {
     const [still, shipped, full] = drift.runs;
     const cStill = correlation(still.settled, still.later);
@@ -733,6 +802,21 @@ try {
       `wavelength ${pct(w0)} for the control, ${pct(w1)} at Drift ${presetDrift}, ${pct(w2)} at Drift 1 (within ${DRIFT_WIDTH * 100}% of the control's, and on the plate)`);
     check('Drift 0 ignores the clock', drift.apart === 0,
       `largest difference in the activator after 300 units under clocks 0 and 123.4: ${drift.apart.toExponential(1)} (exactly 0)`);
+    const cornerLine = (c) => `F ${c.F.toFixed(3)} (d ${c.d.toFixed(5)}) ${c.alives.map((a) => a.toFixed(3)).join(', ')}`;
+    /*
+      The floor is the held spots' less the slack, as the drifting run's, but never under
+      CORNER_FLOOR. The held spots are grown at the cap too (SPOT_KILL), so a cap too generous
+      everywhere also thins them and would lower their floor with it: at 0.32 held, the floor
+      would be 0.27 and the old collapse at F 0.02 (0.313) would pass. CORNER_FLOOR sits under
+      the lab's floor today (0.433), so it decides only when the spots themselves have thinned.
+    */
+    const cornerLo = Math.max(lo, CORNER_FLOOR);
+    check('the cap holds its spots at the corners of the feed\'s range, a minute on',
+      held.corners.every((c) => c.alives.every((a) => a > cornerLo)),
+      `share of cells with activator over ${ALIVE_ABOVE}, three reads over ${CORNER_HOLD} units held at ${SPOT_SHARE} of the cap, after a ${CORNER_RAMP}-unit slew (each over the spots' less ${DRIFT_ALIVE_SLACK} and over ${CORNER_FLOOR}, ${cornerLo.toFixed(3)}): ${held.corners.map(cornerLine).join('; ')}`);
+    check('the held-corner line can see a collapse (the instrument goes red)',
+      held.pushed.alives.every((a) => a < cornerLo),
+      `${cornerLine(held.pushed)}, twice the cap at the lowest feed: every read under ${cornerLo.toFixed(3)}`);
   }
   /*
     And the wiring, read from the source as the ink's is: the visualizer's
@@ -746,7 +830,7 @@ try {
     ships off, and the preset that is the print ships it on (the number read, not just the line).
   */
   {
-    const vis = readFileSync(new URL('../src/components/LiquidVisualizer.tsx', import.meta.url), 'utf8');
+    const vis = source('components/LiquidVisualizer.tsx');
     const clock = /turingClockRef\.current \+= sixtieths \/ 60;/.test(vis)
       && (vis.match(/turingClockRef\.current\s*[-+*/]?=/g) || []).length === 1;
     const gated = /print0 > 0\s*\?\s*Math\.max\(0,\s*Math\.min\(1,\s*currentSettings\.turingDrift \?\? 0\)\)\s*:\s*0/.test(vis);

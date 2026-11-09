@@ -24,7 +24,7 @@ export const SHOW_PATH = '/show';
  * Mac app's sign-in. Anything else (`?debug`, a campaign's `utm_` words) is a
  * visit to the webpage.
  */
-const APP_WORDS = ['remote', 'cast', 'key', 'look', 'phone', 'play', 'profile', 'unsubscribe', 'requireSignIn'];
+export const APP_WORDS = ['remote', 'cast', 'key', 'look', 'phone', 'play', 'profile', 'unsubscribe', 'requireSignIn'];
 
 /** Does this address show the webpage, the way chromaglass.art itself does? */
 export function isLandingAddress(path: string, search: string): boolean {

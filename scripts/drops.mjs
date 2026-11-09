@@ -40,6 +40,7 @@ await build({
   stdin: { contents: "export * from './src/lib/beads.ts'; export { setShowSeed } from './src/lib/rng.ts';", resolveDir: '.', loader: 'ts' },
   bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning',
 });
+const beadsMod = await import(`../${out}`);
 const { BeadField, rasterDrops, paletteSlot, innerLife, setShowSeed, dropWall, mergeRelax, mergeStretch } = await import(`../${out}`);
 
 // The field draws from the show's seeded `plate.beads` stream (lib/rng.ts),
@@ -798,6 +799,47 @@ const clusterStats = (fld, withColour) => {
   }
   check('and meets a neighbour its long end reaches along a wall, not over it',
     taken.every((t) => t.startsWith('0 of')), `pixels of the neighbour's circle the oval took, drawn first and second: ${taken.join(', ')}`);
+}
+
+// ── The closeup lays its beads larger (PLAN 33g-2a) ──────────────────
+/*
+  The owner asked for "a couple really cool macro 3d looking views", and the
+  beads, each a lens that turns the plate upside down, are the closeup's
+  strongest cue to depth. At the plate's size they are grain in a frame that
+  magnifies a few of them, so in the closeup `beadPopulation` hands populate()
+  a larger size scale. Three claims, none of which a pixel can make from here:
+  the plate's population is exactly what it was (the dial's two numbers,
+  untouched by the closeup's factor), the closeup's scale is the plate's times
+  MACRO_BEAD_SCALE, and a field populated at it holds larger beads and still
+  most of the count, so the crowding step has not left a bare plate. The mean
+  radius grows by less than the scale (the crowding step turns the big ones
+  away): a scale of 1.6 read 1.31 to 1.35 times on three seeds, which is
+  why the factor is 2.0, 1.46 to 1.49 times, and the bar is 1.4 to 1.8. The last is measured on populated fields, seed 4242, in
+  the app's way (repopulate every thirtieth frame), on the same plate for
+  both; with the factor at 1 the ratio reads 1.00 and the line fails, which is
+  its control.
+*/
+{
+  const { beadPopulation, MACRO_BEAD_SCALE } = beadsMod;
+  const OLD_COUNT = (a) => Math.round(60 + 360 * a), OLD_SCALE = (a) => 0.8 + 0.4 * a;
+  const dials = [0.1, 0.35, 0.8, 1];
+  const plateSame = dials.every((a) => { const p = beadPopulation(a, false); return p[0] === OLD_COUNT(a) && p[1] === OLD_SCALE(a); });
+  check('out of the closeup the plate holds the beads it always held, the dial\'s count and size to the bit',
+    plateSame, `Beads ${dials.join(', ')}: ${dials.map((a) => { const p = beadPopulation(a, false); return `${p[0]} at ${p[1].toFixed(3)}`; }).join(', ')}`);
+  const macroOk = dials.every((a) => { const p = beadPopulation(a, true), q = beadPopulation(a, false); return p[0] === q[0] && Math.abs(p[1] / q[1] - MACRO_BEAD_SCALE) < 1e-12; });
+  check(`in the closeup the count is the same and each bead's size is ${MACRO_BEAD_SCALE} times larger`, macroOk && MACRO_BEAD_SCALE > 1.3);
+  const filled = (macro) => {
+    seed(4242);
+    const f = new BeadField(N);
+    const pop = beadPopulation(0.8, macro);
+    for (let i = 0; i < 600; i++) { if (i % 30 === 0) f.populate(...pop); f.step(1 / 60, current, 0, 0); }
+    const rs = f.beads.map((b) => b.r);
+    return { n: rs.length, mean: rs.reduce((a, b) => a + b, 0) / Math.max(1, rs.length) };
+  };
+  const pl = filled(false), mc = filled(true);
+  check('and a field populated that way holds beads larger by about that factor, and most of the count',
+    mc.mean / pl.mean > 1.4 && mc.mean / pl.mean < 1.8 && mc.n >= 0.6 * pl.n,
+    `mean radius ${pl.mean.toFixed(3)} -> ${mc.mean.toFixed(3)} cells (${(mc.mean / pl.mean).toFixed(2)}x, bar 1.4 to 1.8), beads ${pl.n} -> ${mc.n} (bar at least 60%)`);
 }
 
 console.log(`     the mask for ${beads.length} drops took ${ms.toFixed(1)} ms to draw (the rings' canvas is not timed here)`);

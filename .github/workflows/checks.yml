@@ -14,7 +14,7 @@ name: Checks
 #
 #   reach     which files the PR changed, and whether any of them can reach
 #             a Mac shard (a few seconds).
-#   measure   the harnesses that need no GPU, in five parts side by side,
+#   measure   the harnesses that need no GPU, in six parts side by side,
 #             ten to twenty minutes each, on ubuntu.
 #   webgpu    everything with a picture in it, on a runner with a GPU: the
 #             stage, a show night, the post chain and the wall.
@@ -39,6 +39,13 @@ on:
       mac:
         type: boolean
         default: true
+      # The Mac shards to run on the owner's own Mac rather than GitHub's, as a
+      # JSON list of shard names (PLAN.md 19ah). Only `deploy.yml` passes one,
+      # from its `mac` probe, on a push to main or a run by hand on main; a
+      # pull request never has inputs, so its shards always run on GitHub's.
+      local:
+        type: string
+        default: '[]'
   pull_request:
 
 # A second push to a branch makes the first push's run pointless, and these are
@@ -58,6 +65,14 @@ on:
 concurrency:
   group: checks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' && github.run_attempt == 1 }}
+
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+  # reach.mjs reads this PR's earlier runs, checkguard.mjs the PR's commits and body.
+  actions: read
+  pull-requests: read
 
 jobs:
   # What the pull request's diff can reach (scripts/reach.mjs, PLAN.md 19h). A
@@ -79,6 +94,7 @@ jobs:
       shards: ${{ steps.reach.outputs.shards }}
       parts: ${{ steps.reach.outputs.parts }}
       only: ${{ steps.reach.outputs.only }}
+      maconly: ${{ steps.reach.outputs.maconly }}
     steps:
       # Two deep: the pull request's merge commit and the base it was merged
       # into, which is the whole of what the PR changes.
@@ -92,28 +108,46 @@ jobs:
       # job leaves a "carried" notice naming the run, which the deploy gate
       # follows back to it. The earlier runs are read with this job's token
       # (the repository's default is read for every scope).
+      # esbuild alone, at the lockfile's version, for what each check imports
+      # (PLAN.md 19ak-2): a change to src/ or public/ runs only the Mac checks
+      # that open the app and the lab checks whose bundles import it. A few
+      # seconds, where `npm ci` would be most of a minute before any job could
+      # start. If it fails, reach.mjs finds no esbuild and runs every Mac
+      # check for such a change, as before; it never makes this job red.
+      - name: esbuild, to read what each check imports
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          v=$(node -p "require('./package-lock.json').packages['node_modules/esbuild'].version")
+          npm install --prefix "$RUNNER_TEMP/esbuild" --no-audit --no-fund --no-save "esbuild@$v"
       - name: Which files reach a Mac shard
         id: reach
         env:
+          ESBUILD_MODULE: ${{ runner.temp }}/esbuild/node_modules/esbuild/lib/main.js
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GH_TOKEN: ${{ github.token }}
           CALL_MAC: ${{ inputs.mac }}
         run: node scripts/reach.mjs --diff
 
-  # Measure, in five parts side by side. As one job it took a median 14.3
+  # Measure, in seven parts side by side. As one job it took a median 14.3
   # minutes and at most 14.9 over 87 green runs on 2026-10-03 against its
   # 15-minute timeout, so the next slow runner would have turned it red with
   # nothing wrong; and its first red step skipped every step after it, so a
   # push with two things wrong found one (PLAN.md 19b). Split by what each
   # step needs: the arithmetic (`logic`, about four minutes, most of it the
   # drops), the sound harnesses that want ffmpeg (`sound`, about six), the
-  # ones that want Chromium (`browser`, about twelve), and the lab on the
-  # CPU rasteriser, in two halves (`lab` and `lab2`, about twelve and ten:
-  # Chromium, then `holeline` building three labs on one, `lampzero` drawing
-  # every look in two labs on the other). Every check runs whatever failed
-  # before it in its part. GitHub's ubuntu runners are not the queue the Mac's
-  # are, so five at once cost the queue nothing.
+  # ones that want Chromium, in two (`browser` and `browser2`, about
+  # fourteen and eleven: the site's pages and desks, then the remote, the
+  # show's wires and the sound in the app), and the lab on the CPU
+  # rasteriser, in five (`lab` to `lab5`: Chromium, then the
+  # frame's passes and the GPU dishes on the first, `lampzero` drawing every
+  # look in two labs on the second, the soap's two checks on the third,
+  # `holeline` building three labs on the fourth, and on the fifth `samelook`,
+  # two trees' labs side by side, which runs only on a pull request of the
+  # speed hunt's and says "not asked" on any other, PLAN.md 46-0). Every
+  # check runs whatever failed before it in its part. GitHub's ubuntu runners
+  # are not the queue the Mac's are, so nine at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -134,6 +168,30 @@ jobs:
     # rest 2.2); the lab part of main's deploys ran 24:52 and 23:29, and a PR's
     # full run was cancelled at the limit. The bound stays; the part is split in
     # two, so the slowest of the five is the browser's, 19:14.
+    # Then soap (#609, 6:39) and soapbreak (#631, 3:47) joined lab2, which ran
+    # 24:18 of the 25 on 2026-11-01 and was cancelled at the limit on two PRs
+    # the same evening; browser and lab ran 22:48 and 19:49, so neither had the
+    # room. The two went to a part of their own, `lab3` (PLAN 19k-8), and the
+    # bound stays: raising it would only let the next check push a part past
+    # it unseen, and an ubuntu runner costs the queue nothing.
+    # The browser part was next: 23:43 of the 25 measuring on #650's run of
+    # 2026-11-01, 24:11 with its setup. Its last sixteen checks, from the
+    # iPhone app's remote on, went to `browser2` (PLAN 19k-9), cut where a
+    # check builds `dist/` itself, since several after it serve the site
+    # without building and would otherwise measure a missing one.
+    # Then widedials (#646, 3:40) joined lab after the soap left it, and lab was
+    # cancelled at the limit twice on #658's run with main merged, in holeline
+    # at 25:00 (it ran 23:23 before). widedials went to lab3, which ran 11:08.
+    # Then the runners: GitHub's ubuntu machines come in speed tiers about 2x
+    # apart (videoflow's CPU loop reads 0.70, 1.05 or 1.40 ms a frame), and on
+    # main's deploys 667 and 670 of 2026-11-07, on the slow one (1.39 ms), lab
+    # reached holeline at 14:15 and was cancelled in it at the limit, every
+    # check before it green; on the middle tier (1.06 ms) it ran 19:54. No
+    # other part had ten minutes to spare on that tier (lab3 ran 24:51 with it
+    # on #655), so holeline went to a part of its own, `lab4` (PLAN 19k-11),
+    # #688 had meanwhile moved sloshgpu, soapgpu and beadmask to lab3 (19k-11a);
+    # with holeline gone, sloshgpu and beadmask came back, leaving lab about
+    # 13:20, lab3 about 15:20 and lab4 about 11 on the slow tier.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -217,7 +275,7 @@ jobs:
           path: ~/ffmpeg-debs
           key: ffmpeg-debs-${{ steps.image.outputs.os }}-${{ steps.image.outputs.version }}
 
-      # The browser, for the browser, lab and lab2 parts' checks.
+      # The browser, for the browser, browser2, lab, lab2, lab3 and lab4 parts' checks.
       # The browser is fetched inside the same 25 minutes as the measuring, so a
       # cold download is a red with nothing wrong in the diff (PLAN 19ab). On
       # 2026-10-22 this step took 650 s on the browser shard and 683 s on the lab
@@ -235,10 +293,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -247,7 +305,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -265,7 +323,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","lab","lab2"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0
@@ -273,6 +331,20 @@ jobs:
           printf 'Acquire::Retries "3";\nAcquire::http::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-ci-retries > /dev/null
           npx playwright install-deps chromium || { echo "::error title=Chromium's system libraries::a library is missing (listed above) and apt could not install Playwright's packages"; exit 1; }
           node scripts/chromiumlibs.mjs || { echo "::error title=Chromium's system libraries::still missing after apt (listed above); every browser check after this fails on it"; exit 1; }
+
+      # actionlint's pinned binary (19ak-7), kept between runs so the lint
+      # needs no download at all once a run has fetched it. On 2026-11-08
+      # GitHub's release pages answered 504 for hours and the logic part went
+      # red on a lint with nothing to say. The key is scripts/actionlint.mjs,
+      # which holds the version and each platform's sha256, so a moved pin is a
+      # new key. On a miss the check fetches it as before (the release page,
+      # then the API's asset download) and still holds it to the sha256.
+      - name: actionlint's binary, from the cache when it is there
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && matrix.part == 'logic' }}
+        uses: actions/cache@v4
+        with:
+          path: scratch/actionlint
+          key: actionlint-${{ runner.os }}-${{ hashFiles('scripts/actionlint.mjs') }}
 
       # Every check in this part, from scripts/checks.json, in the manifest's
       # order (PLAN.md 19k). Each opens a `Run <command>` group as its own step
@@ -337,12 +409,61 @@ jobs:
   # setup is about half a minute (checkout, Node, npm ci, Chromium, the
   # build), so a run costs that much more Mac time and needs five runners
   # at once rather than four, but holds each for less.
+  # The Mac waits for the typecheck (PLAN.md 19ak-3c). A PR that does not
+  # compile used to take five Mac runners for the length of its first red
+  # check, and every check after it ran as well; on ubuntu `tsc --noEmit` is
+  # about half a minute after `npm ci`, beside `reach`, which the Mac waits for
+  # anyway. It is a gate, not a check: Measure's "The typecheck"
+  # (`scripts/checks.json`) is the one that reports, with its backtick hint,
+  # and this job runs the compiler itself so that no step here runs a
+  # manifest check's script (`npm run checks`). When it is red the Mac
+  # shards are skipped and `WebGPU (macOS)` is red with it. Building the app
+  # once here for all five shards was measured and left: `dist/` is 116 MB
+  # (the films in public/), whose upload and five downloads would cost more
+  # than the 15 s build each shard does now.
+  typecheck:
+    name: Compiles, before the Mac
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc --noEmit
+        run: npx tsc --noEmit
+
   webgpu:
     name: WebGPU (macOS) · ${{ matrix.shard }}
-    needs: reach
+    needs: [reach, typecheck]
     if: ${{ needs.reach.outputs.mac == 'true' }}
-    runs-on: macos-15
-    timeout-minutes: 20
+    # GitHub's Mac, or the owner's (PLAN.md 19ah) for a shard `deploy.yml`'s
+    # probe named. The repository is public, so a self-hosted runner must
+    # never take a pull request's job: anyone's fork can open one, and its
+    # workflow is the fork's. Hence the event test as well as the input,
+    # which a pull request cannot set. This line is not the guard, though: a
+    # branch can edit it, or bring its own workflow asking for `owner-mac`.
+    # The runner itself refuses any job that is not deploy.yml on main from
+    # a push or a run by hand (its job-started hook, scripts/macrunner-hook.sh),
+    # and a fork's PR waits for the owner's approval (docs/mac-runner.md).
+    # Only `owner-mac` is asked for, not `macOS`, so `npm run macqueue` keeps
+    # GitHub's Macs and the owner's apart.
+    runs-on: ${{ github.event_name != 'pull_request' && contains(fromJSON(inputs.local || '[]'), matrix.shard) && fromJSON('["self-hosted","owner-mac"]') || 'macos-15' }}
+    # 25 minutes, as Measure's parts have (PLAN 19k-13). At 20, on GitHub's
+    # Macs on 2026-11-07 (deploys 668-673 and #690's two runs, eleven
+    # attempts), the five shards ran 14:51 to 20:21 a job, 0:39 to 3:07 of it
+    # before the first check, so all five sat within three minutes of the
+    # bound and three were cancelled with every check they reached green:
+    # plate a minute past its 41 checks (19:51 of 20:01), open and fifth in
+    # their last check. Moving checks between shards only moved that (19k-12
+    # did it for fifth), and a sixth shard asks the Mac queue for one more
+    # runner on every run. The bound is not where slowness is caught: a shard
+    # whose checks pass 18 minutes, where 20 would have cancelled it, is a
+    # warning on the run's page from scripts/checks.mjs (ROOM there), and a
+    # check that hangs is stopped by its own timeout in scripts/checks.json.
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       # The shards `reach` selected: every one, but for a PR whose change that
@@ -353,10 +474,38 @@ jobs:
         shard: ${{ fromJSON(needs.reach.outputs.shards) }}
     steps:
       - uses: actions/checkout@v5
+      # First on the owner's Mac, before setup-node: is anything else drawing
+      # with its GPU (another session's harness, a build queue's checks, the
+      # ChromaGlass app: a test browser or the app at 5% of a core or more)? Two deploys of 2026-11-08 ran beside them three
+      # times slower than the same Mac alone and went red on timing lines and
+      # timeouts. It waits up to two minutes, then fails, and deploy.yml's
+      # watchdog moves the deploy to GitHub's Macs (scripts/macbusy.sh,
+      # PLAN.md 19ah-9). Its name is what the watchdog reads: keep the two
+      # the same (FREE_STEP in scripts/macwatch.mjs).
+      # From its first line it also marks the Mac held for this shard
+      # (~/.chromaglass-runner/deploy-<runner>.json), and harnesses a session
+      # or a build queue starts meanwhile wait for it (PLAN.md 19ah-9a).
+      - name: The owner's Mac is free of other work
+        if: ${{ runner.environment == 'self-hosted' }}
+        timeout-minutes: 4
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bash scripts/macbusy.sh 120
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
+      # Each runner on the owner's Mac serves the harnesses in a block of
+      # ports of its own (HARNESS_PORT_SHIFT in its .env, scripts/ports.mjs),
+      # apart from another runner's shard and a session's run by hand; what
+      # can still hold one is a cancelled job's server in this runner's block.
+      # It waits for them to close, up to ten minutes, and then fails naming
+      # who holds them. After setup-node: the list is scripts/ports.mjs's.
+      # GitHub's Macs are fresh and skip this.
+      - name: The harness ports are free on the owner's Mac
+        if: ${{ runner.environment == 'self-hosted' }}
+        timeout-minutes: 11
+        run: bash scripts/macports.sh 600
       - run: npm ci
       # The Mac shards have headroom (19w) and no Metal-side download has gone slow
       # yet, but the fetch is as unbounded here as the two above were, and the Mac
@@ -380,9 +529,25 @@ jobs:
         timeout-minutes: 5
         run: command -v ffmpeg || python3 -m pip install --quiet --user imageio-ffmpeg || python3 -m pip install --quiet --break-system-packages imageio-ffmpeg
       # The shard's checks, from scripts/checks.json, as Measure's are.
+      # On a PR whose site files only some Mac checks read, those checks by
+      # name (PLAN.md 19ak-2); empty, every check of the shard.
       - name: The checks
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
+      # Last on the owner's Mac, whatever happened above, a cancel included:
+      # marks this shard's hold on the Mac ended (harnesses wait two minutes
+      # more, for the next shard), and fails if a look between the checks
+      # found other work drawing with the GPU (scripts/checks.mjs stopped the
+      # shard), which the watchdog reads as it reads the first step's failure
+      # (STAYED_STEP in scripts/macwatch.mjs; keep the names the same).
+      - name: The owner's Mac stayed free of other work
+        if: ${{ always() && runner.environment == 'self-hosted' }}
+        timeout-minutes: 1
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bash scripts/macbusy.sh --end
 
   # The one name the rest of the repository knows this stage by.
   # Green when every shard is, or when the change reached no Mac shard and
@@ -418,15 +583,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Every change to a check's bar or input is named in the PR's body
+      - name: Every change to a check's bar or input is named, and an Antigravity PR's Measured lines quote what they printed
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
           PR_BODY: ${{ github.event.pull_request.body }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/checkguard.mjs --diff
 
-  # The one name for the five Measure parts and the check-change guard: green
+  # The one name for the six Measure parts and the check-change guard: green
   # only when all of them are. The guard is under this name because the branch
   # rule requires Measure, so a PR cannot merge past an unnamed change.
   measure:

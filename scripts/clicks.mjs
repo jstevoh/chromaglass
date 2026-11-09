@@ -66,6 +66,7 @@ import { HandSounds, HAND_HEARD_FOR_S } from '../src/lib/handSounds.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { stream, setShowSeed } from '../src/lib/rng.ts';
 import { renderBand } from './band.mjs';
+import { port } from './ports.mjs';
 
 const APP = process.argv.includes('--app');
 const checks = [];
@@ -250,13 +251,14 @@ async function app() {
   const { chromium } = await import('playwright');
   const { launchChromium } = await import('./chromium.mjs');
   const { spawn, spawnSync } = await import('node:child_process');
-  // On CI the phone's step has just built dist/; anywhere else build it, so
+  // On CI an earlier check in its part has built dist/ (the shelf's or the
+  // Live Show's, in Measure's browser2, PLAN 19k-9); anywhere else build it, so
   // a stale build is never what is measured.
   if (!process.env.CI) {
     const b = spawnSync('npm', ['run', 'build'], { stdio: ['ignore', 'ignore', 'inherit'] });
     if (b.status !== 0) { check('the site builds', false, `exit ${b.status}`); return; }
   }
-  const PORT = Number(process.env.CLICKS_PORT ?? 4371);
+  const PORT = port(4371, 'CLICKS_PORT');
   const notes = [];
   const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'],
     { stdio: ['ignore', 'pipe', 'pipe'], detached: true });

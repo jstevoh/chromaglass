@@ -52,6 +52,12 @@ export interface LiquidBehaviour {
   /** Acid (+) or base (−), for a pH indicator in the dye. An amount: acid and base cancel. */
   acid?: number;
   /**
+   * The BZ reaction's activator (bromous acid), into its gel: where it lands
+   * the gel fires and a wave runs out from there, as a real dish of it does
+   * where a silver wire touches it (PLAN 25i). Nothing without BZ Reaction on.
+   */
+  bz?: number;
+  /**
    * Ferrofluid: how much of each drop goes into the dark liquid a magnet
    * pulls (the solver's second phase). That liquid never mixes with the dye;
    * the magnet, and the maze field, move it.
@@ -104,7 +110,7 @@ export interface LiquidType {
   color: string;
   /**
    * The liquid's own colour, with no dye in it: what a dish's depth of it
-   * (the 6 mm rest gap) lets through of the lamp's light, per channel.
+   * (6 mm, the rest gap before PLAN 38r; 38r-5) lets through of the lamp's light, per channel.
    * White is clear. A bottle without one is a dye (Ink, the owner's own),
    * and its colour is all it is. See lib/liquidColour.ts for how a dye
    * picked for it tints it.
@@ -118,133 +124,7 @@ export interface LiquidType {
   behaviour?: LiquidBehaviour;
 }
 
-/*
-  Every bottle now says what it *is*, not only what it does.
-
-  The five below carried no behaviour at all: Oil was described as "repels
-  water" and Syrup as "very heavy" in prose that nothing read, so a plate of
-  oil and a plate of water behaved identically and the descriptions were a
-  promise the solver never kept. `weight` and `polarity` are that promise,
-  written as numbers — roughly the real ones, because the real ones are what
-  makes a dish of them look like a dish of them.
-
-  And each says what colour it is (`own`, lib/liquidColour.ts): the swatches
-  were dye colours that said nothing about the liquid (Syrup red-orange,
-  Alcohol mint, Glycerine and Silicone a pale blue-grey). Each now pours its
-  own colour until a dye is picked for it, and a dye picked tints it. The
-  colours are what a dish's depth of each, 6 mm, lets through of the lamp's
-  light:
-    - Water, Glycerine (water-white, under 10 on the APHA scale), Alcohol,
-      Silicone oil, Soap (a surfactant solution: washing-up liquid's green
-      is a dye put in it), white vinegar and washing soda are clear.
-    - Syrup is amber. The bottle is a 65% sucrose syrup, 147 mPa·s and 1.32
-      g/cm³, which is maple syrup's, and maple syrup's colour is graded by
-      what 10 mm passes at 560 nm: 50 to 75% for Amber. 62% at 10 mm is 75%
-      at 6 mm in the green, and the browning that colours it absorbs about
-      four times as hard in the blue and half as hard in the red: about 27%
-      and 87% at 6 mm.
-    - Sunflower oil is a pale gold: refined, its carotenoids take about a
-      fifth of the blue at 6 mm and almost nothing of the rest.
-    - Ferrofluid is black (magnetite), and opaque: the plate draws it from
-      its phase, and a dye in it could not be seen.
-    - Milk is white because it scatters (`scatter`), not because it absorbs.
-  Water keeps a blue dye in it by default: it is the bottle a show colours
-  with, the first thing a hand drops, and clear water dropped on a black
-  ground shows nothing. Its own colour is clear (Natural).
-*/
-export const DEFAULT_LIQUID_TYPES: LiquidType[] = [
-  // The carrier, and therefore the zero of both scales.
-  { id: 'water',   name: 'Water',   color: '#4488ff', own: '#ffffff', description: 'Flows freely, spreads evenly',         injectRadius: 3, injectAmount: 0.6, heatAmount: 0.05,
-    behaviour: { weight: 0, polarity: 0 } },
-  // Lighter than water and about as unlike it as a kitchen gets: it rides up
-  // over water and will not mix with it.
-  { id: 'oil',     name: 'Oil',     color: '#faf6cc', own: '#faf6cc', description: 'Lighter than water and will not mix with it — rides up and beads',  injectRadius: 2, injectAmount: 1.4, heatAmount: 0.0,
-    // Sunflower oil: 49 mPa·s, 0.92 g/cm³, 33 mN/m, n 1.47 (an immiscible
-    // bottle: its own phase, the oil, and not the species field).
-    behaviour: { weight: -0.12, polarity: -0.9, repel: 0.3, viscosity: 49, density: 0.92, tension: 33, index: 1.47 } },
-  // Lighter still, and polar enough to go into water rather than sit on it.
-  { id: 'alcohol', name: 'Alcohol', color: '#ffffff', own: '#ffffff', description: 'Light and thin: it rises through water and disperses with heat, and opens holes in a clear film',  injectRadius: 4, injectAmount: 0.3, heatAmount: 0.5,
-    // Ethanol: 1.2 mPa·s at 0.79 g/cm³, so a little thinner than water by
-    // the kinematic measure that sets a thin gap's drag; 22 mN/m; n 1.361.
-    behaviour: { weight: -0.2, polarity: -0.15, solvent: 1, viscosity: 1.2, density: 0.79, tension: 22, index: 1.361 } },
-  { id: 'ink',     name: 'Ink',     color: '#cc44ff', description: 'Spreads wide and diffuses slowly',     injectRadius: 5, injectAmount: 0.3, heatAmount: 0.0,
-    behaviour: { weight: 0.02, polarity: 0.2 } },
-  // The heavy one, and it is sugar in water, so it is polar: it sinks through
-  // water without refusing to mix with it.
-  { id: 'syrup',   name: 'Syrup',   color: '#debf45', own: '#debf45', description: 'Heavy and polar: it sinks through water and drags where it settles', injectRadius: 2, injectAmount: 2.0, heatAmount: 0.0,
-    // A 65% sucrose syrup: 147 mPa·s, 1.32 g/cm³, 76 mN/m, n 1.452.
-    behaviour: { weight: 0.35, polarity: 0.6, body: 0.5, viscosity: 147, density: 1.32, tension: 76, index: 1.452 } },
-
-  // The four that change what the plate does rather than only what colour it
-  // is. Each writes into the liquid field, and the field goes on acting for as
-  // long as the liquid is there — which is the whole difference between soap
-  // and a blue dye called Soap.
-  // The Turing reaction's own solution, CIMA's: chlorine dioxide, iodine and
-  // malonic acid, a pale straw from the free iodine, which is its colour out
-  // of the box. The pattern it grows prints in starch-iodine indigo
-  // (TURING_PRODUCT, lib/chemistry.ts). It poured a hot pink before.
-  { id: 'reagent', name: 'Turing Reagent', color: '#f5e69e', own: '#f5e69e', description: 'Feeds the Turing reaction where it lands', injectRadius: 3, injectAmount: 0.6, heatAmount: 0.0,
-    behaviour: { reagent: 1, weight: 0.02 } },
-  { id: 'soap',      name: 'Soap',      color: '#ffffff', own: '#ffffff',
-    description: 'Breaks the film: colour runs away from it and curls into filaments',
-    // 0.12 before, which was physically right and a usability trap: the
-    // bottle still carries a colour swatch and a colour picker, so picking
-    // Cherry Red with Soap selected laid so little dye that what you saw was
-    // the plate underneath — it read as "red is broken". Picking a colour is
-    // a statement of intent, so it has to land. Still the lightest bottle
-    // there is: a fifth of syrup, and soap goes on thinning what it lands in.
-    injectRadius: 3, injectAmount: 0.4, heatAmount: 0.0,
-    // Amphiphilic: one end likes water and the other does not, so it sits at
-    // the boundary rather than choosing a side. Near zero, and weightless.
-    behaviour: { soap: 1, weight: -0.02, polarity: -0.25 } },
-  { id: 'milk',      name: 'Milk',      color: '#ffffff', own: '#ffffff',
-    description: 'A pale ground that holds its own edge instead of blending away',
-    injectRadius: 4, injectAmount: 2.0,  heatAmount: 0.0,
-    // Whole milk: 2.0 mPa·s, 1.03 g/cm³, 46 mN/m, n 1.345. Thin: what holds
-    // its edge is `repel`, not a body (18d keeps that as a named stand-in).
-    behaviour: { repel: 1, body: 0.35, weight: 0.03, polarity: 0.45, viscosity: 2.0, density: 1.03, tension: 46, index: 1.345, scatter: 2 } },
-  { id: 'silicone',  name: 'Silicone',  color: '#ffffff', own: '#ffffff',
-    description: 'Shoulders colour aside into a ring — the cell maker',
-    // 0.05 before — forty times less than syrup, which made every colour
-    // picked with Silicone selected invisible on a live plate.
-    injectRadius: 3, injectAmount: 0.35, heatAmount: 0.0,
-    // The least polar thing on the shelf, which is why it shoulders colour
-    // aside instead of tinting it.
-    // A 50 cSt silicone oil (PDMS): 48 mPa·s, 0.96 g/cm³, 21 mN/m, n 1.402;
-    // immiscible, so the oil's phase, not the species field.
-    behaviour: { soap: 0.8, repel: 0.45, weight: -0.04, polarity: -0.95, viscosity: 48, density: 0.96, tension: 21, index: 1.402 } },
-  /*
-    Acid and base, for a pH indicator in the dye (docs/physics-plan.md): they
-    do nothing to the flow, and with pH Indicator up the dye they land in
-    turns pink (acid) or green (base), and they neutralise where they meet.
-  */
-  { id: 'acid',      name: 'Acid',      color: '#ffffff', own: '#ffffff',
-    description: 'Vinegar: turns a pH indicator in the dye pink, and neutralises a base',
-    injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
-    behaviour: { acid: 1 } },
-  { id: 'base',      name: 'Base',      color: '#ffffff', own: '#ffffff',
-    description: 'Washing soda: turns a pH indicator in the dye green, and neutralises an acid',
-    injectRadius: 4, injectAmount: 0.3, heatAmount: 0.0,
-    behaviour: { acid: -1 } },
-  { id: 'glycerine', name: 'Glycerine', color: '#ffffff', own: '#ffffff',
-    description: 'Thick and slow: it crawls where it lands while the plate moves past it',
-    injectRadius: 2, injectAmount: 1.6,  heatAmount: 0.0,
-    // Glycerol: 1412 mPa·s, 1.261 g/cm³, 63.4 mN/m, n 1.4746.
-    behaviour: { body: 1, repel: 0.25, weight: 0.26, polarity: 0.8, viscosity: 1412, density: 1.261, tension: 63.4, index: 1.4746 } },
-  /*
-    Ferrofluid was the plate's, not a bottle: a look laid it, or picking the
-    Magnet poured some over the whole plate. As a bottle it goes where it is
-    dropped, and only there. Its colour is its own (the dark liquid is drawn
-    by the plate, not by the dye), so it lays next to no dye; heavy, oily and
-    immiscible, as a real one is (magnetite in a carrier oil).
-  */
-  { id: 'ferrofluid', name: 'Ferrofluid', color: '#1b1c22', own: '#1b1c22',
-    description: 'Black and magnetic: it will not mix, and the Magnet pulls it into spikes and mazes',
-    injectRadius: 3, injectAmount: 0.05, heatAmount: 0.0,
-    // Ferrotec's EFH1: 6 mPa·s, 1.21 g/cm³, about 29 mN/m; opaque, so no index.
-    // Its viscosity reaches the thin gap through the phase (FERRO_NU).
-    behaviour: { magnetic: 1, weight: 0.3, polarity: -0.6, viscosity: 6, density: 1.21, tension: 29 } },
-];
+export { DEFAULT_LIQUID_TYPES } from './bottles.ts';
 export const LED_MODES = ['single', 'rainbow', 'ocean', 'fire', 'cyberpunk'] as const;
 export type LedMode = (typeof LED_MODES)[number];
 /**
@@ -345,6 +225,13 @@ export type PatchSource = 'room' | 'film' | 'sound' | 'bands' | 'hits' | 'shape'
  */
 export type AreaTarget = 'areaHeat' | 'areaStir' | 'areaPour' | 'areaHue';
 
+/**
+ * How a sound or band cord shapes its reading before it moves a setting or an
+ * area (PLAN 30a): `follow` rides the reading directly (with `gain` applied),
+ * while `gate` fires a shaped pulse when the gained reading crosses `threshold`.
+ */
+export type CordMode = 'follow' | 'gate';
+
 export interface SceneMapping {
   /** Absent on anything saved before there was more than one source. */
   source?: PatchSource;
@@ -373,11 +260,31 @@ export interface SceneMapping {
    */
   area?: number;
   /**
-   * The cord's gate (the least of PLAN 30a): it opens when the reading
+   * Whether the cord rides its reading continuously (`'follow'`) or fires a
+   * shaped pulse when the reading crosses `threshold` (`'gate'`, PLAN 30a).
+   * Absent on a whole-plate cord reads as `'follow'` even if `threshold`,
+   * `attack` or `release` are present; an area cord keeps `CordGate`'s rule.
+   */
+  mode?: CordMode;
+  /**
+   * Multiplier on the cord's reading before the threshold and before it rides
+   * the setting (`0..1` after clamping, absent = 1; PLAN 30a). Lets a quiet
+   * band or room hit cross its gate without moving the whole app's sensitivity.
+   */
+  gain?: number;
+  /**
+   * Custom frequency edges `[loHz, hiHz]` dragged on the live spectrum strip
+   * for a `bands` cord (PLAN 30a). When present on a `bands` cord it wins over
+   * `feature`; the panel still writes `feature` as the named band holding the
+   * drag's middle so an older build falls back cleanly.
+   */
+  band?: [number, number];
+  /**
+   * The cord's gate (PLAN 25h / 30a): it opens when the gained reading
    * crosses `threshold` (0..1), rises to the hit's height over `attack`
-   * seconds while open and falls over `release` once the reading drops back.
-   * All three absent, the cord follows its reading as it always has. Read on
-   * area cords (lib/areaCords.ts CordGate).
+   * seconds (2%–98% rise time) while open and falls over `release` (98%–2%
+   * fall time) once the reading drops back. Read on whole-plate cords when
+   * `mode === 'gate'` and on area cords (`CordGate`, lib/areaCords.ts).
    */
   threshold?: number;
   attack?: number;
@@ -405,6 +312,23 @@ export interface VisualizerSettings {
   stockWeave: number;
   stockGate: number;
   onNewSong: OnNewSongMode;
+  /*
+    The song's title painted as ink, then swept away (PLAN 37x-10,
+    lib/inkTitle.ts). `inkTitle` is the switch: when the identified song
+    changes, its title and artist are poured into the dye at the solver's
+    grid, and a wash (a real flow, added to the step's velocity) drifts and
+    stirs them until the letters break up. `inkTitleColor` is '' for the
+    look's own first colour or a '#rrggbb'; `inkTitleSize` runs from a small
+    credit to the plate's width (a long title shrinks to fit);
+    `inkTitleY` is where it lands, up the plate; `inkTitleSweep` is the
+    wash: at 0.01 a drift that leaves it readable past six seconds, at 0.5
+    read for three and gone by twelve, at 1 gone in two.
+  */
+  inkTitle: boolean;
+  inkTitleColor: string;
+  inkTitleSize: number;
+  inkTitleY: number;
+  inkTitleSweep: number;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -512,6 +436,21 @@ export interface VisualizerSettings {
   thinGap: number;
   gapThickness: number;
   /*
+    The liquid on the plate and the glass on it (PLAN 38r-5, lib/cover.ts).
+    `liquidMl` is how much liquid is under the cover, in mL: 62.83 fills the
+    0.1 m cover at today's 2 mm. A turn of it is liquid added (poured at the
+    rim, drawn in under the glass) or wicked off there; the solver keeps the
+    running total, which pours add to and a press past what the edge's
+    meniscus holds spills from, so the dial is what you put in, not a
+    reading of what is left. `coverWeight` is the cover glass in grams:
+    157 is a 2 mm float glass (5 kg/m²). The gap is a result of the two,
+    never set: the edge holds the glass up to 2σ sinθ/h, past that it sinks
+    by Stefan's law and the liquid goes over the rim. The defaults are
+    today's plate to the digit, so every look keeps its 2 mm.
+  */
+  liquidMl: number;
+  coverWeight: number;
+  /*
     The second phase, and the magnet under the glass (H7,
     docs/bubbles-plan.md B).
 
@@ -573,6 +512,13 @@ export interface VisualizerSettings {
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
+   * Soap Breakdown (PLAN 38c-3): first-order loss of soap on the plate
+   * (dΓ/dt = −k Γ in real seconds, shown as the half-life ln(2)/k), for soap
+   * taken up by the oil's interface or washed through the trough. 0 is none
+   * (all soap kept), the real dish and the default on every look.
+   */
+  soapBreakdown: number;
+  /**
    * A clear film against the glass (PLAN §20b): 0 none; up, a clear oil film
    * that thick (1 is 0.86 of the gap) laid over the plate, which tears open
    * into a lace of holes by its own physics (dewetting: thin parts and the
@@ -582,6 +528,16 @@ export interface VisualizerSettings {
    * it. Moved while a film is on, the film is raised or lowered everywhere.
    */
   clearFilm?: number;
+  /**
+   * The clear film's own dye (PLAN 20b-13): an oil-soluble dye dissolved in
+   * it, how much (0 clear, as it was laid). The lamp is filtered by it over
+   * the film's own thickness (Beer–Lambert), so the lace takes the colour
+   * where the film is whole, deeper where it is thick, and the holes show the
+   * water's. On the black ground it is painted as the water's dye is.
+   */
+  clearFilmDye?: number;
+  /** What one unit of the film's dye lets through (hex): the colour the lace takes at the dial's middle on a film thin enough to tear. */
+  clearFilmDyeColor?: string;
   /** Dye makes the liquid heavier and heat lighter: on a plate that stands up, heavy dye sinks in fingers (Rayleigh–Taylor); flat, a pool of it slumps out along the lower glass, further the heavier it is (PLAN 18m). */
   solutalBuoyancy: number;
   /** How far the plate stands up, from flat on the projector (0) to upright on the wall (1): what gravity can do in it. */
@@ -636,6 +592,8 @@ export interface VisualizerSettings {
     exists is reachable through Buoyancy, and boiling is unbuilt.
   */
   evaporationRate: number;
+  /** The projector lamp's thermal power (PLAN 36e-2): 0 is off (every look opens as today); up to 1 heats the dish under the lamp so a held finger blocking the fan's air boils the spot. */
+  heat?: number;
   
   // Manual/Interaction
   airVelocity: number;
@@ -785,7 +743,7 @@ export interface VisualizerSettings {
   /** The projector's focal plane across the gap (PLAN 18e): 0.5 is sharp in-focus, defocus shifts Becke lines. */
   projectorFocus?: number;
   lacing: number;             // pale filaments along a colour boundary, width set by the strain across it
-  bubbles: number;            // trapped-air bubbles: spawn rate and lifetime (0 = none; a few go a long way)
+  bubbles: number;            // trapped-air bubbles: how many the plate carries (0 = none; a few go a long way); they leave by the rim and merges, never a clock
   plateRock: number;          // a hand tips the dish on the one and three, the heavier colour running downhill each way (lib/plateRock.ts)
   /**
    * How far the music may move the frame itself rather than the liquid
@@ -806,6 +764,22 @@ export interface VisualizerSettings {
   turingDrift: number;        // how far the print's feed and kill wander across the plate over 30 to 90 s, so the pattern keeps changing once it has grown (26d-6); 0 is the constant map
   gelWheel: number;           // a rotating four-segment colour gel over the lamp (or over the lens, by the Mixer's order)
   gelSpeed: number;           // gel wheel turns per minute
+  /*
+    The moiré pack (PLAN 45a; lib/moire.ts, gpu/wgsl/plateMoire.ts): two
+    printed transparencies on the stage, A under the glass (seen through the
+    liquid) and B on the cover, B turned, slid and scaled against A.
+  */
+  moireAmount: number;        // how dense the sheets' ink is: 0 takes them off, 1 is a good print (2% through the ink)
+  moireSheetA: string;        // the lower sheet's design (MOIRE_SHEETS)
+  moireSheetB: string;        // the upper sheet's design
+  moireAngle: number;         // the upper sheet's turn, degrees
+  moireSpin: number;          // the upper sheet's spin, turns a minute (negative turns it back)
+  moireSlide: number;         // the upper sheet slid sideways, in frame heights
+  moireRatio: number;         // the upper sheet's line pitch against the lower's (1 the same print)
+  moireDensity: number;       // lines per frame height on the lower sheet
+  moireGap: number;           // each sheet's distance from the liquid, mm: the lens's defocus and the liquid's bend
+  moireCurl: number;          // the one shape dial the designs share (sweep, starts, wave height, wiggle, twist)
+  moireFlip: boolean;         // the upper sheet laid face down, mirrored: two spoke or spiral sheets cross into flowers
   filmMix: number;            // how strongly a loaded film loop or the camera shows through the dye
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
@@ -888,6 +862,15 @@ export interface VisualizerSettings {
    */
   kickBloom: number;
   /**
+   * The melody walks across the plate (lib/melodyWalk.ts, PLAN 24.3-place):
+   * each note the ear hears lets go of one drop of the look's liquid, low
+   * notes on one side of the plate and high notes on the other, a harder
+   * note a bigger drop. This is how big: 0 lays none (what every look had),
+   * 1 a full drop. Fast readings only, a tenth of a second behind the note
+   * while its pitch settles; a drum is not a note.
+   */
+  melodyWalk: number;
+  /**
    * Accent the One: how far the kick's press (Beat Squeeze) and push (Plate
    * Rock) follow the kick's place in the bar, as a projectionist plays a
    * rhythm plate: the one pressed hardest, three lighter, two, four and the
@@ -914,11 +897,11 @@ export interface VisualizerSettings {
    * and it becomes fine and busy. The other half of playing one.
    */
   kaleidoZoom: number;
-  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, a thin bright ring at it
-  lightPlay: number;          // how much the lamp's direction shows: bubbles shaded as lenses with a caustic arc, dye rims lit on the lamp side and shadowed away from it
+  dishVignette: number;       // the round edge of a projected dish: dark beyond the rim, its glass wall a thin dark line
+  lightPlay: number;          // the closeup photographer's softbox above the glass, seen only by Fresnel reflection in a bubble's curved wall (PLAN 38h-7)
   lampMotion: number;         // how far the lamp wanders under the plate (and follows the plate's rock), so the light keeps moving across everything
   lampHotspot: number;        // the projector's hot-spot: brightest over the lamp, falling away toward the rim
-  secondLamp: number;         // a second, cooler lamp from the other side of the plate, so two lights play across every bubble and edge
+  secondLamp: number;         // a second, cooler bulb beside the first, adding to one side of the hot spot (lampField)
   iridescence: number;        // thin-film colour running round bubble rims
 
   // Photograph — the macro shot of oil on water rather than the projected show
@@ -934,7 +917,7 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
-  glossiness: number;         // specular highlight intensity (0 = flat backlit dye)
+  glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
   // Macro Closeup — magnified camera that chases a single bead of liquid
@@ -959,7 +942,7 @@ export interface VisualizerSettings {
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
-  macroRelief: number;        // surface relief — per-pixel normals, wet highlights, occlusion
+  macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
   // Every one of these defaults to nothing happening: a look saved before the
@@ -970,6 +953,14 @@ export interface VisualizerSettings {
   soundImpact: number;        // master depth over every patch whose source is the sound
   /** Master depth over every patch driven by an LFO or an envelope. */
   shapeImpact: number;
+  /** Cycle length in bars (0.25..16), shape index (`LFO_SHAPES`) and restart trigger (`LFO_TRIGGERS`) per LFO. */
+  lfo1Bars: number; lfo1Shape: number; lfo1Restart: number;
+  lfo2Bars: number; lfo2Shape: number; lfo2Restart: number;
+  lfo3Bars: number; lfo3Shape: number; lfo3Restart: number;
+  lfo4Bars: number; lfo4Shape: number; lfo4Restart: number;
+  /** Attack and decay in seconds, and trigger source index (`ENVELOPE_TRIGGERS`) per envelope. */
+  env1Attack: number; env1Decay: number; env1On: number;
+  env2Attack: number; env2Decay: number; env2On: number;
   sceneMappings: SceneMapping[]; // a scene feature on any setting, with its own depth
   sceneDeadzone: number;      // motion below this is the room breathing, not a person
   sceneSmooth: number;        // how much the flow field is smoothed in time
@@ -1000,6 +991,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     keeps the look unless someone asks for more. `npm run music` holds this.
   */
   onNewSong: 'off',
+  // Off: no song is titled until Settings > Logo & Titles or the phone's Title switch turns it on (PLAN 37x-10).
+  inkTitle: false,
+  inkTitleColor: '',
+  inkTitleSize: 0.5,
+  inkTitleY: 0.5,
+  inkTitleSweep: 0.5,
   beatPrediction: 0.7,
   beatLead: 80,
   /*
@@ -1044,6 +1041,8 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   depthDrag: 0,
   thinGap: 1,               // on in every look: the owner's pick (2026-10-03), see the note above
   gapThickness: 0.45,       // a light mineral oil: a push lasts about a tenth of a second
+  liquidMl: 62.83185307179587,     // A·2 mm under the 0.1 m cover (lib/cover.ts COVER_FULL_ML): today's gap
+  coverWeight: 157.07963267948966, // a 2 mm float glass, 5 kg/m² (COVER_GLASS_G)
   plateSpring: 0.35,        // a press takes about a second to lift
   phaseAmount: 0,           // off: every existing look is a plate with no ferrofluid on it
   phaseScale: 0.4,
@@ -1059,7 +1058,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
   surfactantFlow: 0,
+  soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)
+  clearFilmDye: 0,          // undyed: the film as every look has it, byte for byte (npm run lace, 8)
+  clearFilmDyeColor: '#ffd21a', // a warm yellow, the owner's lace still's
   solutalBuoyancy: 0,
   plateUpright: 0,
   tiltDirection: 180,
@@ -1128,6 +1130,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   advection: 0.45,
   damping: 0.97,
   heatDecay: 0.98,
+  heat: 0,                  // off: every look opens as today, byte for byte (PLAN 36e-2)
   cometSpeed: 0.0,
   cometAngle: 0.0,
   // Enough to be felt without the plate ever looking like it is pulsing to a
@@ -1157,6 +1160,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   hueJourney: 3,
   beatSqueeze: 0.0,
   kickBloom: 1,               // the ring each kick has always thrown
+  melodyWalk: 0,              // off: no note lays a drop, as every look had it
   beatAccent: 0,            // off: every kick pressed alike, as every look had it
   backgroundLoop: 0.5,
   kaleidoscope: 0,
@@ -1189,6 +1193,17 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turingDrift: 0,
   gelWheel: 0,
   gelSpeed: 0.5,
+  moireAmount: 0,
+  moireSheetA: 'spokes',
+  moireSheetB: 'spokes',
+  moireAngle: 4,
+  moireSpin: 0,
+  moireSlide: 0,
+  moireRatio: 1,
+  moireDensity: 48,
+  moireGap: 3,
+  moireCurl: 0.3,
+  moireFlip: true,
   filmMix: 0.7,
   filmKey: 0.18,
   // A film is a slide until it is asked to be a force: a look saved before
@@ -1261,6 +1276,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // source whose master starts at zero makes a patch you just made look broken.
   soundImpact: 1,
   shapeImpact: 1,
+  lfo1Bars: 8, lfo1Shape: 0, lfo1Restart: 0,
+  lfo2Bars: 2, lfo2Shape: 0, lfo2Restart: 0,
+  lfo3Bars: 1, lfo3Shape: 1, lfo3Restart: 0,
+  lfo4Bars: 0.25, lfo4Shape: 3, lfo4Restart: 0,
+  env1Attack: 0.012, env1Decay: 0.28, env1On: 0,
+  env2Attack: 0.09, env2Decay: 1.6, env2On: 0,
   sceneMappings: [],
   sceneDeadzone: 0.25,      // a lit room's own noise sits well under this
   sceneSmooth: 0.35,

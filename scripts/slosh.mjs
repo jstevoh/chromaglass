@@ -100,7 +100,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.abs(b);
 const DT = 1 / 60;
 // The default Thickness the plate ships with, read from the solver's source so a change to it moves this check with
 // it (src/gpu/fluid.ts imports shaders and cannot be loaded in node).
-const DEFAULT_THICKNESS = Number(/export const THIN_GAP_THICKNESS = ([0-9.]+);/.exec(readFileSync(new URL('../src/gpu/fluid.ts', import.meta.url), 'utf8'))?.[1]);
+const DEFAULT_THICKNESS = Number(/export const THIN_GAP_THICKNESS = ([0-9.]+);/.exec(readFileSync(new URL('../src/gpu/fluid/constants.ts', import.meta.url), 'utf8'))?.[1]);
 
 /** The depth's centre of mass from the middle, plate widths: where the liquid is piled. */
 function com(d) {
