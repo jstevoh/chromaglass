@@ -378,8 +378,25 @@ Progress (2026-11-08): the transport is settled without HLS. LiveKit's
 `webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag
 150.7871.05) ships a tvOS slice, so the app answers the Mac's WebRTC offer exactly
 as the `/tv` page does, at LAN latency, and 12-tv-hls is a fallback, not a
-prerequisite. The sign-in it needs shipped first (12-tv-signin below); the Swift
-app itself waits on Xcode with the tvOS SDK on the owner's Mac.
+prerequisite. The sign-in it needs shipped first (12-tv-signin below).
+
+Progress (2026-11-08, later): the app's core is written, in `tvos/` as a Swift
+package that builds without Xcode: the offline pass check, the sign-in client that
+keeps a live code on screen, and the relay's messages. `npm run tvswift` builds it
+and runs it against the Worker's own `/tv/` handler (link, a code running out, the
+pass verified, renewed to the next generation, a spent pass unlinking). Left: the
+app target in `tvos/App` (the code screen with its QR, the video view answering the
+Mac's offer through LiveKitWebRTC, the pass in the keychain), which waits on Xcode
+with the tvOS SDK on the owner's Mac. Open from it:
+
+- **12-tv-apple-1, finding the Mac.** Today the TV reads the Mac's "TV at home"
+  address (`RelayAddress`), typed with the remote. Bonjour (`_chromaglass._tcp`)
+  would find it with no typing; the Mac side is route 2's, so it is agreed with the
+  Google TV app before either builds it.
+- **12-tv-apple-2, swift-crypto on Linux.** `npm run tvswift` runs on Measure's
+  `logic` part, so a cold runner compiles swift-crypto's BoringSSL (about a minute)
+  each time it runs. If that shows in the shard's time, cache `tvos/.build` or move
+  the check to a Mac shard, where CryptoKit needs no build.
 
 **~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
 `/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
