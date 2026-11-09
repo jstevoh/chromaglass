@@ -935,6 +935,20 @@
       "run": "npm run license-worker"
     },
     {
+      "name": "A TV's sign-in by a short code",
+      "shard": "logic",
+      "run": "npm run tvcode",
+      "why": [
+        "The licence Worker's /tv/ routes (server/tv-code.js, PLAN.md 12-tv-signin):",
+        "a TV shows a code, a signed-in phone claims it for an account with Home or",
+        "Pro, and only the TV holding the device code collects a pass, once. Read from",
+        "what the TV and the phone receive: the pass verifies, names the right key,",
+        "is refused by /activate and verifyLicenseKey (a TV takes no Mac seat), stops",
+        "renewing once the key is refunded, and the hourly allowances bite. An",
+        "in-memory KV and generated key pairs, so `logic`."
+      ]
+    },
+    {
       "name": "The Mac app's updates",
       "shard": "logic",
       "run": "npm run updates",
