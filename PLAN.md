@@ -172,8 +172,8 @@ merge conflicts are the shared documents', which 0.6 ends.
   H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-7 and H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
-- **4.7** ~~**14c-4k, 14c-governor, H2c-10**~~ (shipped, `npm run rungs`; story in `docs/plan-shipped.md`), **H2c-labels** (S). Then **H2a**, **H1**, **H3a**.
-  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07 (#706) and green with the three shipped; H2c-labels' owed line is `npm run timelabels`: Antigravity-ready.
+- **4.7** ~~**14c-4k, 14c-governor, H2c-10**~~ (shipped, `npm run rungs`; story in `docs/plan-shipped.md`), ~~**H2c-labels**~~ (S, shipped, `npm run timelabels`: 133 → 0 readings off their pass, `gpuFrameMs` move on a change 30.0 % → 0.0 %; story in `docs/plan-shipped.md`). Then **H2a**, **H1**, **H3a**.
+  14c-4k's first-10-s clause and H2c-10's residual guard written 2026-11-07 (#706) and green with the three shipped; H2c-labels' `npm run timelabels` green with `labels` out of `--owed`.
 
 ### Wave 5. Playing it: the instrument
 

@@ -12165,3 +12165,28 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+
+## H2c-labels. Timestamp labels kept with their ring slot (2026-11-08)
+
+`GpuProfiler` (`src/gpu/kit.ts`) handed out timestamp slots as a frame encoded, resolved
+them into a `ReadbackRing` slot in `resolveInto`, and in `afterSubmit` set `lastLabels` to
+the labels of the frame just handed to `collect` while reading `ring.latest`, which held a
+copy that had landed one to three frames earlier. When a frame's pass list changed
+(camera, particles, finish, output, a projector's source), every pass after the change
+read its neighbour's timestamps for as long as the ring lagged, and `gpuFrameMs` jumped on
+the frame of the change instead of when the frame that ran the new pass landed.
+
+Now `resolveInto` keeps each copy's label list in `labelsBySeq` under `ring.issued` when
+`ring.copyFrom` succeeds (frames dropped when every ring slot is busy are left untimed),
+and `afterSubmit` reads `ring.latest` against the labels stored for `ring.landed`,
+dropping entries older than `ring.landed`. Keyed by the copy's sequence number rather than
+the slot buffer because `resolveInto` reuses a freed slot at the end of encoding before
+`afterSubmit` folds in the reading that slot just published.
+
+Measured (`npm run timelabels`, five runs with mappings landing 0 to 3 frames after their
+copy and one stalling until the ring fills, camera on at frame 100 and off at frame 110):
+133 → 0 readings off their pass in the 8 frames from each change, `gpuFrameMs` move on a
+change 30.0 % → 0.0 % (bar ≤ 10 %), 2/2 checks passed (`labels` removed from `--owed` in
+`scripts/checks.json`). The flash probe's pixel count has the same fault and remains open
+under 14r.
