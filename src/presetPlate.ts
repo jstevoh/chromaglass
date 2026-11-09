@@ -89,6 +89,10 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
   'splodascope':        [9, 0, 6, 3, 2],        // cobalt water; yellow, green, red and hot pink oil, as the owner's photograph (the first is the water; cobalt under yellow is the photograph's green)
+  // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
+  // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
+  // under a yellow film laid an olive-black blot in the lab.
+  'saffron-lace':       [23, 9, 21, 7],
   // Fully saturated sets only: white and graphite wash out fast under
   // subtractive mixing, and at this magnification the highlights and the
   // blacks come from the cell rings and lacing, not from the dye. The three
@@ -142,6 +146,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
   'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
+  'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
 };
 
 /**
@@ -238,6 +243,10 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'clock-glass':        ['oil', 'water', 'oil', 'syrup'],
   // More oil into the crowd, and now and then the soapy water that holds the films.
   'splodascope':        ['oil', 'oil', 'water'],
+  // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
+  // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
+  // is the lavender wash's body, which holds its place under the film.
+  'saffron-lace':       ['glycerine', 'soap', 'oil', 'alcohol'],
 };
 
 /**

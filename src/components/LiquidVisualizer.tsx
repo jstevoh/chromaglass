@@ -72,7 +72,7 @@ import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, pourTextOnFluid } from '../sim/tools';
-import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, postLevelLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
+import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
@@ -2141,14 +2141,12 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
 
     /*
       Which offers of a frame are drawn, from either window (PLAN.md §14b,
-      lib/drawGate.ts). The projector window asks for a frame on every one of
-      its refreshes (see __chromaglassFrame below) and this window's own
-      animation frames keep coming while it is visible, so with the wall up
-      there are two clocks. The gate stamps every draw, whichever of them
-      asked, and turns down any offer that comes within 0.6 of a refresh of
-      the last one: one draw a refresh, not one per clock.
+      lib/drawGate.ts). The projector window asks on every one of its refreshes
+      (see __chromaglassFrame below) and this window's animation frames keep
+      coming while visible: a running wall clock paces the draws, and with no
+      wall up this window draws at its own rate.
     */
-    const drawGate = new DrawGate();
+    const drawGate = new DrawGate('wall');
     /*
       The loop, guarded.
 
@@ -2987,9 +2985,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const lead = fluidsRef.current[0];
           const gpuUnavailable = wantRes > 0 && gpuSupportedRef.current === false;
           const status: EngineStatus = {
-            label: lead?.gpu
-              ? `WebGPU · ${lead.gpu.N}² · ${dprRef.current.toFixed(1)}x${postLevelLabel(governorRef.current)}`
-              : `WebGPU · ${gpuUnavailable ? 'unavailable' : 'starting'}`,
+            label: lead?.gpu ? engineLabel({ grid: lead.gpu.N, dpr: dprRef.current, post: governorRef.current, stage: stageRef.current }) : `WebGPU · ${gpuUnavailable ? 'unavailable' : 'starting'}`,
             engine: lead?.gpu ? 'webgpu' : 'none',
             grid: lead?.gpu ? lead.gpu.N : 0,
             dpr: dprRef.current,
@@ -6144,12 +6140,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       ladderKey = key;
       const was = fresh ? null : governorRef.current?.rung;
       const keep = was ? ladder.rungs.findIndex((x) => x.grid === was.grid && x.dpr === was.dpr) : -1;
-      governorRef.current = new QualityGovernor(
-        ladder.rungs,
-        PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start),
-        performance.now() * 0.001,
-        PINNED_RUNG !== null,
-      );
+      governorRef.current = QualityGovernor.carry(fresh ? null : governorRef.current, ladder.rungs, PINNED_RUNG ?? (keep >= 0 ? keep : ladder.start), performance.now() * 0.001, PINNED_RUNG !== null);
       // Below whatever ran out of memory before.
       const g = governorRef.current;
       while (g.rung.grid > gridCapRef.current && g.failRung(performance.now() * 0.001)) { /* down a rung */ }

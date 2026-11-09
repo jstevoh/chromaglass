@@ -98,6 +98,12 @@ export function postLevelLabel(governor: QualityGovernor | null | undefined): st
   return level === 1 ? ' · effects ½' : level === 2 ? ' · effects off' : '';
 }
 
+/** The engine readout's label; with a stage it names the share as "of the wall" (PLAN 14c-readout). */
+export function engineLabel({ grid, dpr, post, stage }: { grid: number; dpr: number; post?: string | QualityGovernor | null; stage: unknown }): string {
+  const suffix = typeof post === 'string' ? post : postLevelLabel(post);
+  return `WebGPU · ${grid}² · ${dpr.toFixed(1)}x${stage ? ' of the wall' : ''}${suffix}`;
+}
+
 /**
  * The stage draws the show (docs/webgpu-plan.md): there is one engine.
  */
@@ -142,12 +148,12 @@ export const resolveSimResolution = (setting: SimResolution | undefined, governo
   // A pin is held to what this GPU can actually allocate, so an old saved
   // look or a hand-typed query cannot ask for a texture the device refuses.
   //
-  // And to an even number: the pressure solve colours the grid like a
-  // chessboard and sweeps each colour in a half-sized dispatch (H2), which
-  // only divides evenly if the edge does. Every rung on every ladder is even
-  // already; this is for `?sim=513` and for a saved look that carries one.
-  const held = Math.max(64, Math.min(Math.round(want), maxTexture, MAX_PINNED_GRID));
-  return held - (held % 2);
+  // And to a multiple of 32 (H2c-10): the multigrid's coarse levels and the
+  // chessboard pressure sweeps divide evenly by 32. Every rung on every ladder
+  // is a multiple of 32 already; this is for `?sim=514`, `?sim=1000` and a
+  // saved look that carries one.
+  const cap = Math.floor(Math.min(maxTexture, MAX_PINNED_GRID) / 32) * 32;
+  return Math.max(64, Math.min(Math.round(want / 32) * 32, cap));
 };
 
 // The solver advances at a fixed rate in wall-clock time rather than once per

@@ -198,10 +198,10 @@ export class WebGPUFluid extends FluidCover {
       // 9w): only when the governor moves the grid, a few seconds into a
       // show at the earliest, so built behind it.
       ['carryArea', [R32, RGBA32], false],
-      // The clear film (PLAN §20b): no look lays one, so built behind the show.
-      ['filmAdvect', [RGBA32], false],
-      ['filmMu', [R32], false],
-      ['filmUpdate', [RGBA32], false],
+      // The clear film (§20b), if a look lays one (Opening.film).
+      ['filmAdvect', [RGBA32], open.film],
+      ['filmMu', [R32], open.film],
+      ['filmUpdate', [RGBA32], open.film],
       ['filmSplat', [RGBA32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
