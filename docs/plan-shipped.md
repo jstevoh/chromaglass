@@ -12093,3 +12093,32 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+## 12-tv-signin. A TV signs in by a short code (2026-11-08)
+
+A TV receiver (12-tv route 2, 12-tv-apple) has no keyboard worth typing a password
+on and no browser for Google's sign-in, so it signs in the way TV apps do: it shows
+a code, the player types it on a phone where they are already signed in, and the
+TV is told. The licence Worker answers four routes in `server/tv-code.js`:
+`/tv/code` draws an eight-letter code (consonants only, so no word and no 0/O or
+1/I) and a 43-character device code, and keeps only the device code's SHA-256
+under `tvcode:<code>` for ten minutes; `/tv/claim` takes the phone's Firebase
+token and the code and files the account's best licence on it (Pro over Home,
+newest first, never a revoked or expired key, 403 `needs: home` when there is
+none); `/tv/poll` hands the TV its pass exactly once, comparing the device code's
+hash in constant time and deleting the record before signing.
+
+What the TV gets is not the licence key. A `cg1.` key carries the buyer's email
+and counts machines (two per key), and a TV taking a seat would lock a buyer out
+of their second Mac; a refunded key would also keep working on a TV forever. So
+the TV gets a `cgtv1.` pass (key id, tier, 30 days) signed with the same Ed25519
+key, which `verifyLicenseKey` and `/activate` refuse, and renews it through
+`/tv/renew`, which reads the stored key and so drops a refunded one within the
+pass's life and takes a tier change from the store. Each route is rate-limited by
+the same hourly counters `/activate` uses (codes per address, claim misses per
+account, renewals per address), so eight letters from twenty are not guessable
+inside ten minutes. The phone's half is `?tvlink` (`src/components/phone/TvLink.tsx`
+over `src/lib/tvCode.ts`): the site's own sign-in form, then a code field that
+formats as it is typed, prefilled from the TV's QR code. `npm run tvcode` (34
+checks) proves each route against the real handler and a fake KV.
+

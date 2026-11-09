@@ -261,6 +261,37 @@ check('a GET is refused', (await call(env, '/tv/code', { method: 'GET' })).statu
   check('an oversized body is refused', big.status === 413, `${big.status}`);
 }
 
+/* The phone's half (src/lib/tvCode.ts) reads the same codes. It is TypeScript
+   for the page, so it is bundled for node here, its Firebase import left out
+   (claimTvCode is not called). What could drift is the alphabet and the
+   format: a phone that drops a letter the Worker draws, or keeps a dash in the
+   claim, sends a code no TV is waiting on, and every link would fail as "no such
+   code" with nothing in the logs to say why. */
+{
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [new URL('../src/lib/tvCode.ts', import.meta.url).pathname],
+    bundle: true, platform: 'node', format: 'esm', write: false, logLevel: 'silent',
+    external: ['./firebaseAuth'],
+  });
+  const phone = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+  check('the phone draws codes from the Worker\'s letters', phone.TV_CODE_ALPHABET === TV_CODE_ALPHABET);
+  let agree = 0;
+  const drawn = [];
+  for (let i = 0; i < 40; i++) {
+    const r = await call(env, '/tv/code', { body: {}, ip: `10.9.${i}.1` });
+    if (r.status !== 200) continue;
+    drawn.push(r.data.userCode);
+    const typed = phone.formatTvCodeInput(r.data.userCode.toLowerCase().replace('-', ' '));
+    if (typed === r.data.userCode && phone.normalizeTvCode(typed) === normalizeTvCode(r.data.userCode)) agree++;
+  }
+  check('every code the Worker shows, typed on the phone in lower case, formats back to itself and claims as the Worker reads it',
+    drawn.length === 40 && agree === 40, `${agree}/${drawn.length}`);
+  check('the phone drops what no code holds, and caps a code at eight letters',
+    phone.formatTvCodeInput('b0d1-kaem qxtzz') === 'BDKM-QXTZ' && phone.normalizeTvCode('BDKM-QXT') === null
+      && phone.normalizeTvCode('BDKA-QXTZ') === null);
+}
+
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);
 process.exit(failed.length ? 1 : 0);

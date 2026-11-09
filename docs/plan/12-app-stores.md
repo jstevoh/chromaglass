@@ -239,6 +239,27 @@ only opens what an account bought on the web, with no buy button or price, shoul
 fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs the
 App Store Connect record from 12-ship. Size: M, after route 2's first PR.
 
+Progress (2026-11-08): the transport is settled without HLS. LiveKit's
+`webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag
+150.7871.05) ships a tvOS slice, so the app answers the Mac's WebRTC offer exactly
+as the `/tv` page does, at LAN latency, and 12-tv-hls is a fallback, not a
+prerequisite. The sign-in it needs shipped first (12-tv-signin below); the Swift
+app itself waits on Xcode with the tvOS SDK on the owner's Mac.
+
+**~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
+`/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
+§12-tv-signin.** Open from it:
+
+- **12-tv-signin-1, the TVs read it.** The Apple TV app (12-tv-apple) and the
+  Google TV shell (route 2) call `/tv/code` and `/tv/poll`, show the code and a QR
+  of `https://chromaglass.art/?tvlink=<code>`, keep the `cgtv1.` pass in the
+  keychain (Android: EncryptedSharedPreferences), verify it offline against the
+  built-in public key, and renew it through `/tv/renew` within a week of `exp`.
+- **12-tv-signin-2, a list of linked TVs.** The account page shows nothing yet:
+  a pass is not stored server-side, so unlinking one TV means revoking passes by
+  id. Add a `tvpass:<keyId>` list (id, issuedAt, a name the TV sends) so the
+  account can see and drop them, if owners ask.
+
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`
 exists and what grid it holds. If it holds nothing, route 3 closes for good.

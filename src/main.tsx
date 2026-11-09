@@ -26,7 +26,7 @@ import {
 installCrashLog();
 
 const params = new URLSearchParams(window.location.search);
-const show = !params.has('remote') && !params.has('cast');
+const show = !params.has('remote') && !params.has('cast') && !params.has('tvlink');
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
@@ -39,7 +39,11 @@ const Root = params.has('remote')
   ? lazy(() => import('./components/RemoteControl'))
   : params.has('cast')
     ? lazy(() => import('./components/CastDisplay'))
-    : lazy(() => import('./App'));
+    // The page a TV sends the player to, to link it to their account by a code
+    // (PLAN.md 12-tv-signin). Its own sign-in, no engine.
+    : params.has('tvlink')
+      ? lazy(() => import('./components/phone/TvLink'))
+      : lazy(() => import('./App'));
 
 const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))
