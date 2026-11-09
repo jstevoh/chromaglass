@@ -93,6 +93,19 @@ export const WINDOW_ACK = 262144;
 export const BEHIND_LIMIT_SECONDS = 2;
 /** A server's acknowledgement older than this is taken as one that has stopped acknowledging, and the socket's own word is used instead. */
 const ACK_STALE_MS = 5000;
+/**
+ * A server whose acknowledgements come further apart than this share of the
+ * bound (in seconds of the stream) is too coarse to judge by, and the socket's
+ * word is used instead. YouTube's ingest, probed 2026-11-08, sends Window
+ * Acknowledgement Size 2,500,000 and Set Peer Bandwidth 59,768,832: its words
+ * come at least 2.5 MB apart, 3.2 s of a 6.2 Mbps 1080p stream. Read as
+ * "arrived", that is a readout that climbs past the 2 s bound between every
+ * two acknowledgements on a perfect link, and the client dropped video to the
+ * next keyframe over and over and the show said "trouble" on the owner's fast
+ * connection (the first live album show). Half the bound: an acknowledgement
+ * every second of the stream can still say the link is two seconds behind.
+ */
+export const ACK_COARSE_SHARE = 0.5;
 const CONNECT_TIMEOUT_MS = 15000;
 
 /** `rtmps://host[:port]/app[/more]` into what the connection needs. The key is never in the URL. */
@@ -145,7 +158,7 @@ export class LiveClient extends EventEmitter {
      * kernel (each write's callback, in order); `serverAck` what the server
      * last said it has (its count wraps at 2^32, unwrapped here).
      */
-    this.delivery = { queue: [], head: 0, flushed: 0, serverAck: 0, serverAckAt: 0, lastAckRaw: 0, wraps: 0, writtenTs: 0, deliveredTs: 0, rate: [] };
+    this.delivery = { queue: [], head: 0, flushed: 0, serverAck: 0, serverAckAt: 0, ackStep: 0, lastAckRaw: 0, wraps: 0, writtenTs: 0, deliveredTs: 0, rate: [] };
     this.ackedAt = 0;
     this.peerWindow = 0;
     this.startedAt = 0;
@@ -177,7 +190,10 @@ export class LiveClient extends EventEmitter {
    */
   behind() {
     const d = this.delivery;
-    const fresh = d.serverAckAt > 0 && Date.now() - d.serverAckAt < ACK_STALE_MS;
+    // The server's word only while it is fresh and fine enough: the bytes between its last two acknowledgements, as seconds of this stream, under a share of the bound (ACK_COARSE_SHARE).
+    const streamBytesPerSecond = ((this.meta?.videoBitrate ?? 0) + (this.meta?.audio?.bitrate ?? 0)) / 8;
+    const fine = streamBytesPerSecond <= 0 || d.ackStep <= streamBytesPerSecond * BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE;
+    const fresh = fine && d.serverAckAt > 0 && Date.now() - d.serverAckAt < ACK_STALE_MS;
     const arrived = fresh ? Math.min(d.serverAck, d.flushed) : d.flushed;
     while (d.head < d.queue.length && d.queue[d.head][0] <= arrived) d.deliveredTs = d.queue[d.head++][1];
     if (d.head > 4096) { d.queue = d.queue.slice(d.head); d.head = 0; }
@@ -354,12 +370,15 @@ export class LiveClient extends EventEmitter {
           const raw = m.body.readUInt32BE(0);
           if (raw < d.lastAckRaw) d.wraps++;
           d.lastAckRaw = raw;
-          d.serverAck = d.wraps * 2 ** 32 + raw;
+          const ack = d.wraps * 2 ** 32 + raw;
+          d.ackStep = ack - d.serverAck;
+          d.serverAck = ack;
           d.serverAckAt = Date.now();
           this.counts.serverAcks++;
         }
         break;
       case MSG.SET_PEER_BANDWIDTH:
+        // Echoed as the window to acknowledge on, as the spec has it. Against YouTube (59,768,832, 2026-11-08) that undoes WINDOW_ACK's reason above; asking 256 KB instead left the throttled client in `npm run livedrop` never recovering, so that is its own found item (PLAN 37x-4c-3), and ACK_COARSE_SHARE is what keeps a coarse server from being judged by.
         if (m.body.length >= 4) { this.peerWindow = m.body.readUInt32BE(0); this.send(CSID.CONTROL, MSG.WINDOW_ACK_SIZE, u32(this.peerWindow)); }
         break;
       case MSG.USER_CONTROL:

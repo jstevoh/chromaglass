@@ -89,6 +89,17 @@ try {
     },
     testPrivateJwk,
   );
+  // The same Home key signed again with the moiré pack on it (PLAN.md 45a-2): what the
+  // licence Worker files when a Home buyer buys the pack (server/license-packs.js).
+  const homeMoireKey = await signLicenseKey(
+    {
+      tier: 'home',
+      email: 'home@example.com',
+      id: 'lic-home-check',
+      packs: ['moire'],
+    },
+    testPrivateJwk,
+  );
   const proKey = await signLicenseKey(
     {
       tier: 'pro',
@@ -529,6 +540,10 @@ try {
       .locator('#settings-mark [data-cg-free-logo-mark="ChromaGlass"]')
       .count();
     const freeMarkFileCount = await page.locator('#settings-mark #mark-file').count();
+    // The moiré pack's note in the Moiré Sheets section (PLAN.md 45a): drawn while the pack
+    // is not on this copy. Read on Free, on Home, and on Home with the pack (14 below).
+    const moireNote = () => page.locator('[data-testid="moire-pack-note"]').count();
+    const freeMoireNote = await moireNote();
     check(
       '8. free tier shows "In the ChromaGlass app" tiles (23.2) and locks the logo layer to the ChromaGlass mark (23.6)',
       freeTiles.length === 7 && freeLogoLocked === 1 && freeMarkFileCount === 0,
@@ -601,6 +616,7 @@ try {
       () => page.locator('[data-cg-account]').isVisible().catch(() => false),
       10_000,
     );
+    const freeMoireLine = await page.locator('[data-cg-moire-pack="free"]').count();
     await page.fill('[data-cg-license-input]', homeKey);
     await page.click('[data-cg-license-activate]');
     await waitFor(
@@ -626,6 +642,37 @@ try {
         homeRemainingTiles.includes('multi-projector') &&
         homeRemainingTiles.includes('pro-io'),
       `remainingTiles=${JSON.stringify(homeRemainingTiles)}`,
+    );
+
+    // 14. The moiré pack on Home (PLAN.md 45a-2): a plain Home key leaves the pack locked
+    // and the account sheet offers it; the same key signed again with `packs: ['moire']`
+    // opens it, and the sheet says it is on the licence. Read by the section's own note
+    // and the sheet's own lines, on the same page, so the key is the only thing changed.
+    const homeMoireNote = await moireNote();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.click('[data-cg-account-open]');
+    await waitFor(() => page.locator('[data-cg-account]').isVisible().catch(() => false), 10_000);
+    const homeBuyMoire = await page.locator('[data-cg-buy-moire]').getAttribute('href').catch(() => null);
+    const homeOwnedBefore = await page.locator('[data-cg-moire-pack="owned"]').count();
+    await page.click('[data-cg-license-deactivate]');
+    await waitFor(async () => (await page.locator('[data-cg-license-tier]').getAttribute('data-cg-license-tier')) === 'free', 10_000);
+    await page.fill('[data-cg-license-input]', homeMoireKey);
+    await page.click('[data-cg-license-activate]');
+    await waitFor(async () => (await page.locator('[data-cg-license-tier]').getAttribute('data-cg-license-tier')) === 'home', 10_000);
+    const homeOwnedAfter = await page.locator('[data-cg-moire-pack="owned"]').count();
+    const homeBuyAfter = await page.locator('[data-cg-buy-moire]').count();
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.click('[data-testid="open-all-settings"]');
+    await page.waitForTimeout(500);
+    const packMoireNote = await moireNote();
+    check(
+      '14. the moiré pack: locked on Free and Home (the section\'s note; the sheet offers it to Home with the account\'s email, and tells Free where it comes from), open on a Home key that names it',
+      freeMoireNote === 1 && freeMoireLine === 1 && homeMoireNote === 1 &&
+        typeof homeBuyMoire === 'string' && homeBuyMoire.includes('lemonsqueezy.com/checkout/buy/') && homeBuyMoire.includes('home%40example.com') &&
+        homeOwnedBefore === 0 && homeOwnedAfter === 1 && homeBuyAfter === 0 && packMoireNote === 0,
+      `note free/home/pack ${freeMoireNote}/${homeMoireNote}/${packMoireNote}, free line ${freeMoireLine}, buy ${homeBuyMoire}, owned ${homeOwnedBefore}→${homeOwnedAfter}, buy after ${homeBuyAfter}`,
     );
 
     // Upgrade to Pro key via AccountSheet and verify all tiles unlock

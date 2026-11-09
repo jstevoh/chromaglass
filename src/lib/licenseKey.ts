@@ -13,6 +13,32 @@ export interface LicensePayload {
   maxMachines: number;
   exp?: number;
   upgradeFrom?: string;
+  /** The art packs bought on top of the tier, e.g. `moire` (PLAN.md 45a-2); absent on a key with none. */
+  packs?: string[];
+}
+
+/** The pack names a payload may carry, as the signer keeps them (server/license-key.js `normalizePacks`). */
+export function normalizePacks(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const names = list.filter((p): p is string => typeof p === 'string' && /^[a-z0-9-]{1,24}$/.test(p));
+  return [...new Set(names)].sort().slice(0, 16);
+}
+
+/**
+ * Whether the account's key listed under the held key's own id should replace it
+ * (PLAN.md 45a-2). The Worker signs a key again under the same id when a pack is bought
+ * or refunded (the packs change) and when Home is upgraded (the tier rises, the packs
+ * carried over). Take it when the tier is higher, or the tier is the same and the packs
+ * differ; never when the tier is lower, so a stale listing cannot downgrade a copy.
+ * Kept pure, beside the payload it reads, so `npm run license-worker` can hold it.
+ */
+export function sameIdKeyWins(
+  held: { tier: LicenseTier; packs?: unknown },
+  listed: { tier: LicenseTier; packs?: unknown },
+): boolean {
+  const rank: Record<LicenseTier, number> = { free: 0, home: 1, pro: 2 };
+  if (rank[listed.tier] !== rank[held.tier]) return rank[listed.tier] > rank[held.tier];
+  return normalizePacks(listed.packs).join(',') !== normalizePacks(held.packs).join(',');
 }
 
 export interface LicenseStatus {
@@ -123,6 +149,7 @@ export async function verifyLicenseKey(
       maxMachines: Number(payload.maxMachines) || 2,
       ...(typeof payload.exp === 'number' ? { exp: payload.exp } : {}),
       ...(typeof payload.upgradeFrom === 'string' ? { upgradeFrom: payload.upgradeFrom } : {}),
+      ...(normalizePacks(payload.packs).length ? { packs: normalizePacks(payload.packs) } : {}),
     },
   };
 }
