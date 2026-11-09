@@ -119,6 +119,8 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
 const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle']);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
+  // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
+  'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
   // How far the music moves the frame (lib/plateRock.ts): a wander would

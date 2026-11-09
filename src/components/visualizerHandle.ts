@@ -17,12 +17,14 @@ export interface LiquidVisualizerHandle {
   pourVideo: (video: HTMLVideoElement) => void;
   stopPourVideo: () => void;
   /**
-   * Pour words into the lead plate: each row drawn at the biggest size its
-   * share of the box allows, in `colour` (default: the look's brightest dye;
-   * 'contrast' picks an ink that reads against the plate as it is), level on
-   * the frame whatever angle the plate is turned to.
+   * Pour words into the lead plate as ink at the solver's grid, then sweep
+   * them away with the wash (PLAN 37x-10, lib/inkTitleRun.ts): each row's
+   * height by its weight, at the Title size and height, in `colour` ('' the
+   * look's first dye, a '#rrggbb', 'contrast' an ink that reads against the
+   * plate as it is; left out, the Title colour setting), level on the frame
+   * whatever angle the plate is turned to.
    */
-  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; columns?: [number, number] }) => void;
+  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast' }) => void;
   /** Kicks heard (or predicted) since the plate started: a count to take differences of. */
   kicks: () => number;
   /**

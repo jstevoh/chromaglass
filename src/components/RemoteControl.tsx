@@ -16,6 +16,7 @@ import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
+import { PhoneInkTitle } from './phone/PhoneInkTitle';
 import { Slider } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
@@ -821,6 +822,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
             <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
+
+          {/* Song titles as ink in a live set (PLAN 37x-10), the phone's Title switch. */}
+          <div className="mb-6">
+            <PhoneInkTitle settings={settings} onSetting={patch} disabled={!connected} testId="remote-ink-title" />
+          </div>
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
