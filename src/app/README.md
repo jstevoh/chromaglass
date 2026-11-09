@@ -36,7 +36,7 @@ comments, which moved with it.
 | `useRecording` | the one Record button |
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
-| `useRemote` | the phone remote's link, both ways |
+| `useRemote` | the phone remote's link, both ways; and the TVs at home, `tvCount` (PLAN 12-tv, `lib/tvFeed.ts`) |
 | `useInkTitle` | the identified song's title poured as ink when it changes and the Title switch is on (PLAN 37x-10), called by `useRemote` |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
 | `useSongSequences` | the set item, sequence or preset made for a song, up when it is identified; a song's sequence stopped at its end (moved out of App for 28h-8) |

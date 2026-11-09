@@ -126,9 +126,15 @@ export interface RemoteState {
   live?: { test: boolean; seconds: number; names: string[]; trouble: boolean } | null;
 }
 
+/** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
+export type TvSignal =
+  | { kind: 'offer' | 'answer'; sdp: string }
+  | { kind: 'ice'; candidate: RTCIceCandidateInit | null }
+  | { kind: 'refused'; reason: 'tier' | 'full' };
+
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant'; key?: string }
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
@@ -170,6 +176,21 @@ export type RemoteMessage =
       /** The beat clock's tempo, 0 before it has one. */
       bpm?: number;
     }
+  /**
+   * A TV at home (PLAN 12-tv, lib/tvFeed.ts). Relay → display: a TV joined,
+   * under an id the relay made for its socket; a TV left. Relay → TV: the show
+   * is here (a display joined) or gone (the last display left), so a TV
+   * playing films while the laptop is off goes live when it comes on.
+   */
+  | { type: 'tv-join'; id: string }
+  | { type: 'tv-leave'; id: string }
+  | { type: 'tv-show'; here: boolean }
+  /**
+   * The offer, the answer and the ICE candidates, both ways through the relay.
+   * Display → relay carries `to` (the TV's id); the relay hands the TV the
+   * signal alone. TV → relay carries the signal alone; the relay adds `from`.
+   */
+  | { type: 'tv-signal'; to?: string; from?: string; signal: TvSignal }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**
@@ -298,7 +319,7 @@ export type RemoteMessage =
  * the link named (found in review, and checked by `npm run applink`). A
  * controller outside the app has no reason to go anywhere but home either.
  */
-export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror'): string {
+export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror' | 'tv'): string {
   const relay = role === 'controller' && isPhoneApp() ? relayFromUrl() : null;
   if (relay) return relaySocketUrl(relay, REMOTE_WS_PATH);
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

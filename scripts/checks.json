@@ -481,14 +481,17 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs",
+      "run": "npm run rungs -- --owed=120hz",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
         "pixels actually gets fewer. That last one was inert for a long while",
         "and nothing looked. And the lines written ahead of Wave 4",
         "(scripts/rungs-owed.mjs): 14c-4k, 14c-governor, 14b-120, 14c-readout and",
-        "H2c-10, owed until each ships."
+        "H2c-10, all shipped. And the plate on a 120 Hz screen (46e / 14aa-5,",
+        "scripts/rungs-120.mjs): the real draw gate, step clock and governor",
+        "replayed at 120 Hz; Poster's two lines owed until the build, which",
+        "takes 120hz out of --owed, and the controls green throughout."
       ]
     },
     {
@@ -1855,6 +1858,21 @@
         "stand-in laptop on the show server's relay hears every touch, tool,",
         "dye and button a phone and an iPad send, and where a touch lands in",
         "the wall's frame. No GPU; dist/ is the phone step's build."
+      ]
+    },
+    {
+      "name": "A TV at home plays the show's plate",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tv.mjs",
+      "why": [
+        "A TV at home (scripts/tv.mjs, PLAN.md 12-tv): the real show server, the",
+        "built /tv page at the server's network address, and a stand-in laptop",
+        "running the real WebRTC sender over a canvas painted one colour at a",
+        "time. The TV's own pixels follow each change within 700 ms, sharp from",
+        "the first two seconds, H.264 where both ends have it; three TVs and a",
+        "fourth refused, free and wrong key refused, a TV never driving the",
+        "show, films with no show, a frozen plate, the phone. No GPU; dist/ is",
+        "the phone step's build. About forty seconds."
       ]
     },
     {

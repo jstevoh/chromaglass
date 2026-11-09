@@ -12207,6 +12207,57 @@ chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte fi
 the bytes exact; private by default; an update naming only the title keeping the rest)
 and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
 
+## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
+
+The owner asked for a Google TV app that plays the show on a big screen at home,
+for Home and Pro, and chose route 2 of 12-tv: a receiver that plays the Mac's own
+plate, since a TV box's GPU cannot run the solver. This is its first half.
+
+The show's page (the Mac app's window, or any show on a show server) sends the
+wall's canvas to each TV as a WebRTC video track (`src/lib/tvFeed.ts`). The frame
+task copies the canvas into a 2D stage of at most 1920 x 1080, thirty times a
+second, only while a TV is connected (a line in `lib/frameTaps.ts` beside the Live
+Show's and Draw's); `captureStream` on the stage is one track for every TV. The
+offer puts H.264 first, which every TV box decodes in hardware (VP8 is Chrome's
+first choice and a software decode on a Cortex-A55). The handshake goes through
+the show server's relay: a new `tv` role with the show key, an id per TV, each TV
+paired with one display so two of the laptop's tabs never both offer, `tv-show` to
+tell a TV the show came or went, and nothing else a TV says reaches the show. Home
+or Pro on the laptop (`canUseHomeFeature`), asked at each join; three TVs at most.
+The Mac app offers its real network address rather than an mDNS name, for routers
+that drop multicast.
+
+`/tv?key=…` (`src/components/TvDisplay.tsx`) answers the offer and shows the
+track: no visualizer, no GPU, and it works on plain http, where WebGPU would not
+start. With no show it plays the press clips of the plate, and goes live by itself
+when the show comes. A phone or tablet opens the same page as a second screen,
+the picture fitted to the way it is held (the feature's phone version). The cast
+menu's TV entry (`components/CastNetworkItems.tsx`, the network-display block moved
+out of `App.tsx` with it) gives the address and the count.
+
+Found while building it, and fixed in it: Chrome's encoder starts at 300 kb/s, so
+the TV showed 320 x 180 for 11.7 s on loopback before climbing to 1280; the
+sender now writes a 4 Mb/s start into the answer (`x-google-start-bitrate`) and the
+first frames are the stage's size. A plate that draws slowly or not at all (the
+real app on a software GPU; Freeze) left a joining TV connected with no frame,
+restarting every ten seconds; the sender now re-sends the stage once a second when
+nothing new is drawn, and the TV waits for its first frame once connected. And
+(found by the check's review) a TV joining a frozen plate after the other TVs had
+left got a 2 x 2 black stage; the stage now keeps its last picture between TVs.
+
+Check: `npm run tv`, 33 lines (one skeptic pass: four lines that could not fail
+were made to, among them the GPU count on a page with no `navigator.gpu` and the
+phone's fit measured on the element rather than the picture): the codec order, the start rate and the stage size
+in node; then a real show server, the built `/tv` page at the server's network
+address, and a stand-in laptop running the real sender over a canvas painted one
+colour at a time. The TV's own pixels follow each change of colour (55–82 ms on
+the cloud's loopback, under a 700 ms bar), H.264 agreed, three TVs and a fourth
+refused, free and wrong key refused with their reasons, a TV's patch never reaching
+the laptop, films when the laptop goes and live again when it comes, the last TV
+gone stopping the stage, a frozen plate after it, and the phone. By hand on the cloud:
+the real app on a software GPU feeding a TV page in a second browser over the
+network address, the plate on the TV.
+
 ## 45a-2. Selling the moiré pack to Home (2026-11-07)
 
 The owner chose to sell the moiré pack as a $15 add-on to Home and to include it in Pro.
