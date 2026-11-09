@@ -282,7 +282,9 @@ style (§31).
   Mac app; OBS until then) and **37x-3** (the album sheet; its checks shipped 2026-11-08,
   `npm run album` and `albumplate`; Antigravity builds, with 37x-4d-4's chip, `liveshow --owed=narrow`), each its own thread, then
   **37x-7**'s routine. **37x-10**, the song's title painted as ink and swept away
-  (shipped 2026-11-08 with 37x-10d, `npm run inktitle`), then **37x-10b**, **37x-10e**.
+  (shipped 2026-11-08 with 37x-10d, `npm run inktitle`), then **37x-10b**, **37x-10e**;
+  **37x-10c** (words poured from the phone, the show server and the assistant) shipped
+  2026-11-08 and pours through 37x-10's ink.
 
 ### One home for work written twice
 

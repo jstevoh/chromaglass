@@ -417,6 +417,26 @@ export function createAssistantGuard(send, now = Date.now) {
         return { ok: true };
       }
 
+      /*
+        Words poured as ink (PLAN 37x-10c): what the song action {do:'title'}
+        pours, with words the assistant names, for a song nothing identified
+        (a set played from files). A hand at the plate could do it, so Play,
+        paced as a setting change. The page reads the rows as untrusted and
+        caps them (src/lib/pourText.ts `parsePourText`); here only the shape
+        is held, so nothing but rows and a colour goes on.
+      */
+      if (type === 'pour-text') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const rows = Array.isArray(message.rows)
+          ? message.rows.slice(0, 8).map((r) => ({ text: String(r?.text ?? '').slice(0, 200), weight: Number(r?.weight ?? 1) })).filter((r) => r.text.trim())
+          : [];
+        if (rows.length === 0) return refuse('pour text needs rows with words in them');
+        count('patch', mode, t);
+        send({ type: 'pour-text', rows, ...(typeof message.colour === 'string' ? { colour: message.colour } : {}) });
+        return { ok: true };
+      }
+
       if (GESTURES.has(type)) {
         const why = needs(mode, 'play') ?? paced('gesture', mode, t);
         if (why) return refuse(why);

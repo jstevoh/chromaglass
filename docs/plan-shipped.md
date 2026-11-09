@@ -11138,6 +11138,36 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 37. Marketing and social media (asked 2026-10-29)
 
+#### 37x-10c. Words poured from the phone, the show server and the assistant
+
+  - **37x-10c. Words poured from the phone, the show server and the assistant (shipped
+    2026-11-08).** The owner asked, during the first live album show: "use the ability
+    to paste in song info at the beginning of each song as ink/liquids that eventually
+    get swept away". The pour existed (the song action `{do:'title'}` hands
+    `titleRows(song)` to the visualizer's `pourText`), but it fired only for a song the
+    ear had identified, and the album was playing from files through the Mac's
+    speakers, which names nothing; and no remote, show server or assistant message
+    could pour words at all (`pourText` was on the check hooks only). So:
+    - `src/lib/pourText.ts`: `parsePourText` reads a `pour-text` message as untrusted
+      whoever sent it (four rows, sixty characters each, weights 0.25 to 3, a hex
+      colour or `contrast`), and `pourTextRows` lays out what a person typed as a title
+      card: the first line the name in capitals on one or two rows, each line after it
+      a credit, and "Song - Artist" on one line read as both.
+    - `remoteProtocol.ts`: `{type:'pour-text', rows, colour?}`; `useRemote` pours it,
+      one pour every 1.5 s at most (a pour adds dye, and a double tap stacked the words).
+    - The relay passes a phone's straight through (a hand at the plate); the guard
+      (`server/assistant.js`) passes the assistant's in Play, paced as a setting change,
+      shape only. The assistant's program gains `pour_text` and a line in its guide.
+    - The phone remote's Controls gain "Pour words" (`RemotePourText.tsx`, its own file
+      beside the 61 KB remote), with "This song" to fill it from the ear's name; the box
+      empties once poured.
+    - Checks: `npm run assistant` (Suggest refuses, Play passes rows and colour only,
+      blank rows refused, a phone's pour reaches the display, the page's parse caps and
+      lays out; two new mutants), `npm run remotemix` (typed and pressed on the phone,
+      one pour on a display socket, the box empty after). Not measured in a cloud
+      session: how the words look and how long a look's flow takes to carry them off;
+      that is the Mac's (docs/judging.md §117), and 37x-10d is the sweep.
+
 #### 37x-4c-2. YouTube's acknowledgements are too coarse to judge by
 
   - **37x-4c-2. YouTube's acknowledgements are too coarse to judge by (shipped

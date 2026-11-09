@@ -16,6 +16,7 @@ import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
+import { RemotePourText } from './RemotePourText';
 import { PhoneInkTitle } from './phone/PhoneInkTitle';
 import { Slider } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
@@ -699,6 +700,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="text-[10px] font-bold uppercase tracking-widest">Auto</span>
             </button>
           </div>
+
+          {/* A song's name poured as ink (PLAN 37x-10c), its own file */}
+          <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
 
           {/* The dials that change the mood most */}
           <Slider label="Sound Drive" field="audioImpact" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />

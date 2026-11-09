@@ -227,7 +227,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -274,9 +274,12 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const sSet = await mcp.call('set', { settings: { stockGrain: 0.1 } });
     const sPour = await mcp.call('pour', { x: 0.5, y: 0.5 });
     const sSong = await mcp.call('add_song_action', { when: { at: 'section', section: 'drop', nth: 2 }, what: { do: 'pour', color: '#2244ff', amount: 0.8 } });
+    const sWords = await mcp.call('pour_text', { rows: [{ text: 'Song', weight: 1.25 }] });
     await sleep(200);
     const leaked = display.since(t).filter((m) => m.type !== 'request-state');
-    check('suggest', 'Suggest refuses Go, a setting, a pour and a song action, and nothing reaches the display', !sGo.ok && !sSet.ok && !sPour.ok && !sSong.ok && leaked.length === 0, `${sGo.text} | ${sSet.text} | ${sSong.text} | ${leaked.map((m) => m.type).join(',')}`.slice(0, 160));
+    check('suggest', 'Suggest refuses Go, a setting, a pour, a song action and poured words, and nothing reaches the display', !sGo.ok && !sSet.ok && !sPour.ok && !sSong.ok && !sWords.ok && leaked.length === 0, `${sGo.text} | ${sSet.text} | ${sSong.text} | ${sWords.text} | ${leaked.map((m) => m.type).join(',')}`.slice(0, 200));
+
+    check('pour-suggest', 'Suggest refuses poured words on their own rule, and none reach the display', !sWords.ok && /Play/.test(sWords.text) && display.since(t, 'pour-text').length === 0, sWords.text.slice(0, 100));
 
     // Play.
     await setMode('play');
@@ -334,6 +337,11 @@ async function scenario(serverDir, port, { full = true } = {}) {
     phone.ws.send(JSON.stringify({ type: 'assistant-still', width: 1280 }));
     await sleep(200);
     check('phone-live', 'a phone\'s assistant-live, cue-look, song-action and still never reach the display', display.since(t).every((m) => !['assistant-live', 'cue-look', 'song-action', 'assistant-still'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
+    // But a phone pours words: the remote's text box (37x-10c) is a hand at the plate.
+    t = Date.now();
+    phone.ws.send(JSON.stringify({ type: 'pour-text', rows: [{ text: 'SONG', weight: 1.25 }], colour: 'contrast' }));
+    await sleep(200);
+    check('phone-pour', 'a phone\'s poured words reach the display', display.since(t, 'pour-text').length === 1, display.since(t).map((m) => m.type).join(','));
 
     // The large look (44c-4): one still, as wide as asked, to the assistant alone.
     const phoneHad = phone.got.length;
@@ -364,6 +372,24 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('song-room', 'Play: a song action that would move a room setting is refused', !songRoom.ok && /room/.test(songRoom.text), songRoom.text.slice(0, 80));
     check('song-kick', 'Play: a song action on every kick, and a look on any kicks, are refused', !kickPour.ok && /kicks/.test(kickPour.text) && !kickLook.ok && /section/.test(kickLook.text), `${kickPour.text.slice(0, 60)} | ${kickLook.text.slice(0, 60)}`);
     check('-', 'and none of the refused reached the display', display.since(t, 'song-action').length === 1, `${display.since(t, 'song-action').length} song actions`);
+
+    // Words poured as ink (37x-10c): a song's name and credit reach the
+    // display as the guard passed them, rows and colour only; rows with no
+    // words in them are refused, and nothing reaches the display.
+    await sleep(1100);
+    t = Date.now();
+    const words = await mcp.call('pour_text', { rows: [{ text: 'BEATROOT', weight: 1.25 }, { text: 'Legendary Flower Punk', weight: 0.75 }, { text: 'x', weight: 1, href: 'y' }], colour: '#ffcc00', extra: 'x' });
+    const blank = await mcp.call('pour_text', { rows: [{ text: '   ' }] });
+    await sleep(150);
+    const pt = display.since(t, 'pour-text');
+    check('-', 'Play: poured words reach the display with their rows, weights and colour', words.ok && pt.length === 1 && pt[0].rows?.length === 3 && pt[0].rows[0].text === 'BEATROOT' && pt[0].rows[1].weight === 0.75 && pt[0].colour === '#ffcc00' && Object.keys(pt[0]).sort().join() === 'colour,rows,type' && Object.keys(pt[0].rows[2]).sort().join() === 'text,weight', `${words.text.slice(0, 50)} | ${JSON.stringify(pt).slice(0, 140)}`);
+    check('pour-blank', 'Play: poured words with no words in them are refused, and nothing reaches the display', !blank.ok && /words/.test(blank.text) && pt.length === 1, `${blank.text.slice(0, 80)} | ${pt.length} pours`);
+    // Paced as a setting change: four in a second, and the fifth refused.
+    await sleep(1100);
+    t = Date.now();
+    const fast = await Promise.all(Array.from({ length: 5 }, (_, i) => mcp.call('pour_text', { rows: [{ text: `Song ${i}` }] })));
+    await sleep(150);
+    check('pour-rate', 'Play: the fifth pour of words inside a second is refused, and four reach the display', fast.filter((r) => r.ok).length === 4 && fast.some((r) => !r.ok && /too fast/.test(r.text)) && display.since(t, 'pour-text').length === 4, fast.map((r) => (r.ok ? 'ok' : r.text.slice(17, 40))).join(' | '));
 
     // A desk move in the middle of a glide stops the glide there.
     await sleep(1100);
@@ -476,6 +502,10 @@ const MUTANTS = [
   { rule: 'echo', file: 'assistant.js', find: 'if (!echoOf(k, v, t))', replace: 'if (true)' },
   { rule: 'song-full', file: 'assistant.js', find: "needs(mode, SONG_PLAY.has(what.do) ? 'play' : 'full')", replace: "needs(mode, 'play')" },
   { rule: 'song-room', file: 'assistant.js', find: "if (what.do === 'set') {", replace: 'if (false) {' },
+  { rule: 'pour-rate', file: 'assistant.js', find: "count('patch', mode, t);\n        send({ type: 'pour-text'", replace: "send({ type: 'pour-text'" },
+  { rule: 'pour-suggest', file: 'assistant.js', find: "if (type === 'pour-text') {\n        const why = needs(mode, 'play') ?? paced('patch', mode, t);", replace: "if (type === 'pour-text') {\n        const why = paced('patch', mode, t);" },
+  { rule: 'pour-blank', file: 'assistant.js', find: "if (rows.length === 0) return refuse('pour text needs rows with words in them');", replace: '' },
+  { rule: 'phone-pour', file: 'remote-server.js', find: "const ASSISTANT_ONLY = new Set(['cue-look',", replace: "const ASSISTANT_ONLY = new Set(['pour-text', 'cue-look'," },
   { rule: 'song-kick', file: 'assistant.js', find: "if (mode !== 'full' && when.at === 'kick'", replace: "if (false && when.at === 'kick'" },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
@@ -498,7 +528,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -511,6 +541,21 @@ const a1 = page.assistantLook({ name: '  Slow purple  ', base: 'calm', settings:
 say(a1?.id === 'calm' && a1.name === 'Slow purple' && a1.settings.stock === 1 && a1.settings.stockGrain < 9 && !('dimmer' in a1.settings) && !('simResolution' in a1.settings) && !('nonsense' in a1.settings),
   `the display's assistantLook takes the base, clamps, drops unknown keys and the room (${JSON.stringify(a1)})`);
 say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null) === null, 'a made look with no base found and no settings arms nothing');
+
+/* The page's own half of poured words (37x-10c): whoever sent them, a phone
+   straight from the relay included, the display reads the rows as untrusted. */
+{
+  const long = 'x'.repeat(500);
+  const p1 = page.parsePourText({ rows: [{ text: ' Song\u0007 name ', weight: 1e6 }, { text: '' }, { text: long, weight: -4 }, 'plain', { text: 'four' }, { text: 'five' }], colour: 'red; background:url(x)' });
+  say(p1?.rows.length === page.POUR_TEXT_MAX_ROWS && p1.rows[0].text === 'Song name' && p1.rows[0].weight === 3 && p1.rows[1].text.length === page.POUR_TEXT_MAX_CHARS && p1.rows[1].weight === 0.25 && p1.rows[2].text === 'plain' && p1.rows[2].weight === 1 && p1.colour === 'contrast' && page.parsePourText({ rows: [{ text: 'n', weight: NaN }] })?.rows[0].weight === 1,
+    `the display's parsePourText drops empty rows, caps rows, characters and weights, and takes no CSS for a colour (${JSON.stringify(p1).slice(0, 160)})`);
+  say(page.parsePourText({ rows: [{ text: '  ' }] }) === null && page.parsePourText({ rows: 'Song' }) === null && page.parsePourText({ rows: [{ text: 'a' }], colour: '#AbCdEf' })?.colour === '#abcdef',
+    'no words pour nothing, and a hex colour is kept');
+  const r1 = page.pourTextRows('Sunshine of Your Love - Cream');
+  const r2 = page.pourTextRows('One\nTwo\nThree\nFour\nFive');
+  say(r1.map((r) => r.text).join('|') === 'SUNSHINE OF|YOUR LOVE|Cream' && r1[2].weight === 0.75 && r2.length === 4 && r2[0].text === 'ONE' && r2[3].text === 'Four',
+    `the remote's box reads the first line as the name and the rest as credits, "Song - Artist" as both (${JSON.stringify(r1.map((r) => r.text))}, ${JSON.stringify(r2.map((r) => r.text))})`);
+}
 
 /* The page's own still (44c-4), on the real PadPictureSender: its GPU grab
    and its encoder stood in for (a worker that answers each picture with a
@@ -549,6 +594,12 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const stills = sent.filter((m) => m.still);
   say(stills.length === 1 && stills[0].w === 960 && sent.some((m) => !m.still && m.w === 480) && grabs[0][0] === 1280,
     `a still too big for the relay's frame is taken again at three quarters, and the pad's stream carries on (grabs ${JSON.stringify(grabs.map((g) => g[0]))}, sent ${JSON.stringify(sent.map((m) => [m.w, m.still ?? false]))})`);
+  // The display's gap between two pours: the one rule against stacking the same words into a blot.
+  const msg = { rows: [{ text: 'Song' }] };
+  const g = page.POUR_TEXT_GAP_MS;
+  const at = (now, last) => page.takePourText(msg, now, last) !== null;
+  say(g === 1500 && at(0, -Infinity) && !at(1000, 0) && !at(g - 1, 0) && at(g, 0) && at(1600, 0) && page.takePourText({ rows: [{ text: ' ' }] }, 5000, 0) === null,
+    `the display takes a pour, refuses one inside ${g} ms of the last, takes one after, and pours nothing for blank rows`);
 }
 
 // The edges of the code.
