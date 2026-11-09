@@ -2530,5 +2530,9 @@ the song and whether the show it designs plays well.
    the last chorus, and the drain; Stage sequences lists "<title> (Listen)".
 3. Play the song again: the stages should open up on each chorus and settle in the verses,
    the bridge go in close and come back out, the cues land on their sections.
-4. Bad: a burst a few seconds before its chorus on every play (the map's offset, 28h-9), a
-   look change when the song is added, the plate left in close after the bridge.
+4. Press **Listen** again on a song a minute in (a song not heard before): on its second
+   play the stages should still change on the song's sections, an *Unheard* stage covering
+   the start it missed (28h-9 moved the map to the song's own seconds).
+5. Bad: a burst a few seconds before its chorus on every play (the map's offset, 28h-9, on
+   a song first heard after this fix), a look change when the song is added, the plate left
+   in close after the bridge.

@@ -6144,6 +6144,30 @@ The phone has it, as the Songs tile opens the same panel. *Measure:* `npm run li
 the bursts), every half-second of the song lands in its section's stage, the ballad, a
 song with no chorus, a map with one section, designing twice, and each step of the flow.
 
+### 28h-9. A first listen's map in the song's seconds (found 2026-11-09)
+
+Found building 28h-8: the recorder that makes a song's map starts when the song is named
+(`adoptTrack`), which is seconds into the song (the fingerprint needs a few seconds of
+sound, the service a moment more) and halfway through it when Listen is pressed mid-song.
+The analysis counts from the recording's first sample, so the sections, curves and the
+fingerprint stored with the map were early by that much against the song's position,
+which counts from the song's start: the Score drew a chorus early, Listen's stages changed
+early and a burst pinned to the chorus fired early. The map moves, not the clock: the
+clock is re-anchored by every match, so the recording's first sample is given the song
+second the clock read then, by the newest anchor the track has when the listen ends
+(`songSecAt`), and `generateSongMap` moves everything by it (`shiftSongMap`,
+`shiftFingerprintFrames`; `lib/songMapLead.ts` says why not a rolling buffer). The part
+never heard is an `unheard` section at the first heard section's energy, no pitch and no
+harmony; a lead under eight seconds, or one inside a short intro, folds into the first
+section, and a first section only called the intro because the recording began there
+becomes a verse. Without the fingerprint's frames moved too, the next local match would
+set the clock early and undo it. The phone shares the hook, so it has it. *Measure:*
+`npm run listen`, 22 → 29 checks: a song heard from 0:30 had its choruses at 0:10, 1:00,
+1:44 and its bursts there, now 0:40, 1:30, 2:14 where the song's are; every half-second
+from 0:30 lands in its own section's stage; the curves read the song's own values; and the
+real local matcher names a snippet ending at 0:54 at 54.02 s (34.00 s before). Old maps
+stay early: 28h-11.
+
 ## 28i. Every look judged again, after the lamp, the soap film and the breakdown
 
 ### 28i-1. Nine looks retired (#408; Antigravity, batch 1 of the overhaul)

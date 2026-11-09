@@ -240,14 +240,15 @@ Turing Print" work (#331), which also made the reaction grow at all.
   - **28h-8. Listen in the Songs panel** (**shipped**, this PR; the story is in
     `docs/plan-shipped.md` §28h-8). One press names the song, adds it, and designs its
     show from its map once heard through (`lib/songDesign.ts`, `npm run listen`).
-  - **28h-9.** A map's seconds start where the recording did, not at the song's start.
-    The recorder starts when the song is identified (`adoptTrack`), seconds into the
-    song (the fingerprint's own `offsetSec`, more when Listen is pressed mid-song), and
-    `generateSongMap` takes no offset, so the map's sections, the Score drawn from them
-    and the stages Listen designs sit early by that much against the song's position,
-    which counts from the song's start. Measure: a song identified at 0:30 whose
-    chorus starts at 1:00 has its map's chorus at 1:00, not 0:30. Fix by shifting the
-    map by the offset at identification, or by recording from a buffer.
+  - **28h-9. A first listen's map in the song's seconds** (**shipped**, this PR; the
+    story is in `docs/plan-shipped.md` §28h-9). The map and its fingerprint are moved
+    by where the clock put the recording's first sample (`lib/songMapLead.ts`,
+    `npm run listen`).
+  - **28h-11.** Maps made before 28h-9 are still early by their song's ID offset, and
+    nothing kept says by how much. Offer "hear it again" on a song in the Songs panel
+    (forget its map and fingerprint so the next play maps it afresh), or re-anchor an
+    old map from its fingerprint the next time the song is matched locally (the match's
+    offset against the API's says the lead).
   - **28h-10.** Judge Listen on the owner's Mac (docs/judging.md): press it over a
     record, watch the song fill in, play it through, and judge the designed stages and
     cues on the second play. Then decide whether a heard song should be designed from
