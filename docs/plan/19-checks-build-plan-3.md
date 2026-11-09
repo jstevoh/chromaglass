@@ -1,6 +1,6 @@
 # 19. The checks, the build and the plan itself (continued)
 
-Part 3 of 3 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
+Part 3 of 4 of §19; it begins at 19aa-9. The section starts in `19-checks-build-plan.md`.
 
 - **19aa-9. Bottles' Splat with the Ferrofluid bottle, "not at its mirror" (read 2026-10-25).**
   3 reds of 183 Mac runs in the week, all on the Splat and on no other tool or the replays

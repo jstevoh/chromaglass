@@ -23,6 +23,7 @@ import {
   verifyLicenseKey,
 } from './license-key.js';
 import { SYNC_PATH, handleSync } from './cloud-sync.js';
+import { addPack, packFields, packForProduct, removePack } from './license-packs.js';
 
 const ALLOWED_ORIGINS = [
   /^https:\/\/(www\.)?chromaglass\.art$/,
@@ -149,10 +150,15 @@ async function handleWebhook(request, env, cors) {
         ? 'pro'
         : productIdIn(env.LS_HOME_PRODUCT_IDS, lsProductId, [1450525, 1479217])
           ? 'home'
-          : 'unknown';
+          : packForProduct(env, lsProductId)
+            ? 'pack'
+            : 'unknown';
+  // An art pack (PLAN.md 45a-2, server/license-packs.js) signs the buyer's Home key again with
+  // the pack in it, as an Upgrade signs it again as Pro; its order is filed as `order_pack`.
+  const pack = productKind === 'pack' ? packForProduct(env, lsProductId) : null;
   const rawEvent = String(body.event || body.meta?.event_name || '');
   const isLsUpgrade = rawEvent === 'order_created' && productKind === 'upgrade';
-  const event = isLsUpgrade ? 'order_upgraded' : rawEvent;
+  const event = isLsUpgrade ? 'order_upgraded' : rawEvent === 'order_created' && pack ? 'order_pack' : rawEvent;
 
   const rawEmail = body.email || lsAttr.user_email || body.meta?.custom_data?.email || '';
   const email = typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
@@ -185,7 +191,7 @@ async function handleWebhook(request, env, cors) {
   // security audit, finding 6). A held order files nothing; the owner sees it in KV under
   // `held:<order>` and in the Worker's log, and a paid order Lemon Squeezy re-sends files its
   // key as normal.
-  if (isLs && (event === 'order_created' || event === 'order_upgraded')) {
+  if (isLs && (event === 'order_created' || event === 'order_upgraded' || event === 'order_pack')) {
     if (productKind === 'unknown') {
       return await holdOrder(env, cors, keyId, { reason: 'unknown product', email, productId: lsProductId, status: lsStatus });
     }
@@ -236,6 +242,15 @@ async function handleWebhook(request, env, cors) {
     return json({ ok: true, id: keyId, tier }, 200, cors);
   }
 
+  if (event === 'order_pack') {
+    // Only a store order names its pack (by product); our own JSON cannot say which.
+    if (!pack) return json({ error: 'unknown pack' }, 400, cors);
+    if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
+    const done = await addPack({ env, email, orderId: orderId || keyId, pack, privateJwk, readEmailKeys });
+    if (done.held) return await holdOrder(env, cors, keyId, { reason: done.held, email, productId: lsProductId, status: lsStatus, pack });
+    return json({ ok: true, id: done.record.id, tier: done.record.tier, packs: done.record.packs ?? [] }, 200, cors);
+  }
+
   if (event === 'order_upgraded') {
     if (!email || !email.includes('@')) return json({ error: 'missing email' }, 400, cors);
     const existing = await readEmailKeys(env, email);
@@ -266,6 +281,9 @@ async function handleWebhook(request, env, cors) {
         updatesUntil,
         maxMachines,
         ...(target ? { upgradeFrom: target.id } : {}),
+        // The packs bought on the Home go on with it (Pro includes them anyway, but a refund of
+        // the upgrade alone gives the Home back, packs and all: `replaces` below).
+        ...(packFields(target).packs ? { packs: packFields(target).packs } : {}),
       },
       privateJwk,
     );
@@ -279,6 +297,7 @@ async function handleWebhook(request, env, cors) {
       updatesUntil,
       maxMachines,
       upgradeFrom: target?.id ?? null,
+      ...packFields(target),
       // What the upgrade overwrote, for a refund of just the upgrade to put
       // back (PLAN.md 23.17i). The Home record shares the Pro key's id, so
       // nothing else in KV remembers it.
@@ -290,6 +309,7 @@ async function handleWebhook(request, env, cors) {
               issuedAt: target.issuedAt,
               updatesUntil: target.updatesUntil,
               maxMachines: target.maxMachines,
+              ...packFields(target),
             },
           }
         : {}),
@@ -316,6 +336,10 @@ async function handleWebhook(request, env, cors) {
     // Remembered so the same order's `order_created`, delivered again, is not filed (see the
     // gate above). Written for the owner's direct refund too; only a Lemon Squeezy order reads it.
     if (orderId) await env.LICENSE_KV.put(`refunded:${orderId}`, JSON.stringify({ at: Date.now() }));
+    // A pack's own order refunded takes the pack off the key it is on and leaves the key
+    // (PLAN.md 45a-2); its order id is no key's, so the lines below would revoke nothing.
+    const unpacked = await removePack({ env, email, orderId, privateJwk, readEmailKeys });
+    if (unpacked) return json({ ok: true, unpacked: unpacked.pack, id: unpacked.record.id }, 200, cors);
     let targetEmail = email;
     let targetId = typeof body.keyId === 'string' && body.keyId ? body.keyId.trim() : orderId ? `key_${orderId}` : '';
 
@@ -383,8 +407,10 @@ async function refileHome(env, pro, upgradeOrderId, privateJwk) {
   const issuedAt = typeof was.issuedAt === 'number' ? was.issuedAt : pro.issuedAt;
   const updatesUntil = typeof was.updatesUntil === 'number' ? was.updatesUntil : pro.updatesUntil;
   const maxMachines = typeof was.maxMachines === 'number' ? was.maxMachines : pro.maxMachines;
+  // The packs the Home carried before the upgrade come back with it (PLAN.md 45a-2).
+  const packs = packFields(was);
   const token = await signLicenseKey(
-    { id, tier: 'home', email: pro.email, issuedAt, updatesUntil, maxMachines },
+    { id, tier: 'home', email: pro.email, issuedAt, updatesUntil, maxMachines, ...(packs.packs ? { packs: packs.packs } : {}) },
     privateJwk,
   );
   return {
@@ -396,6 +422,7 @@ async function refileHome(env, pro, upgradeOrderId, privateJwk) {
     issuedAt,
     updatesUntil,
     maxMachines,
+    ...packs,
     revoked: false,
   };
 }
@@ -421,6 +448,9 @@ async function handleGetKeys(request, env, cors) {
       issuedAt: k.issuedAt,
       updatesUntil: k.updatesUntil,
       maxMachines: k.maxMachines,
+      // The packs the token carries, so the app can see a key it already holds was signed
+      // again with a pack (PLAN.md 45a-2) without opening every token.
+      ...(Array.isArray(k.packs) && k.packs.length ? { packs: k.packs } : {}),
     }));
 
   let marketingOptIn = null;
