@@ -680,6 +680,17 @@ messages, a beat arrives 1.0 ms after it is sent and is released 50 ms later, a 
 moves nothing, off and below-Pro send nothing; the built app's switch, refused target,
 its own reports and the switch back on after a reload.
 
+### 13.5-osc-beats. The beat line waits for kicks, not seconds (2026-11-09)
+
+The fifth Mac shard's line in `npm run oscout`, "each beat the plate presses on reaches
+the VJ app, one for one", counted the plate's kicks in a fixed 15 s of wall time against
+a floor of 10. It went red twice on #772 (8 kicks, then 5) while the pairing it is there
+to prove held both times (8 sent for 8, 4 for 5): both shards ran slow, and the ear hears
+on frames, so a slow hosted Mac lands fewer kicks a second. It now waits for 12 kicks, up
+to 60 s, and asks the same ±1 pairing; a plate that presses on no beat still fails, after
+the minute. How many kicks a second the ear lands on a slow runner stays the ear's line
+(`npm run music`), not OSC out's.
+
 ### 13.4. Control, written up (2026-10-31)
 
 `docs/osc.md` is every address the show server takes over OSC (settings, every
