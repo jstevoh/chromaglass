@@ -12046,3 +12046,50 @@ day). Check: `npm run youtube`, 19 lines against a stand-in Google on loopback
 chunk and a 503 resumed with 2,617,119 bytes on the wire for a 2,617,119-byte file;
 the bytes exact; private by default; an update naming only the title keeping the rest)
 and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
+
+## 45a-2. Selling the moiré pack to Home (2026-11-07)
+
+The owner chose to sell the moiré pack as a $15 add-on to Home and to include it in Pro.
+A pack is not a tier, so it does not get a key of its own: a buyer would then hold two keys,
+and every place that holds one (the account sheet, the Mac's seats) would have to hold a set.
+The signed payload gained an optional `packs` list (`normalizePacks` in `server/license-key.js`
+and `src/lib/licenseKey.ts`: lower-case names, unique, sorted, at most 16), and a pack order
+signs the buyer's Home key again under the same id with the pack added
+(`server/license-packs.js`), as an upgrade signs it again as Pro. The record keeps which
+order bought which pack (`packOrders`), so a refund of the pack takes the pack off and
+leaves the Home, a refund of the Home takes the key, an upgrade carries the packs into Pro,
+and a refunded upgrade refiles the Home with them. A pack order is held for the owner when
+the email has no Home key, already has Pro (which includes it), or already has the pack.
+
+The device adopts the new token by itself: `accountLicense.ts`'s `pick()` takes a listed key
+with the held key's id whose packs differ and activates it, so a Home buyer signed in on the
+web or the Mac gets the pack without pasting anything. The Mac app passes the payload's packs
+through its bridge (`server-license.js` `currentStatus`, `desktop/main.js`). The gate is
+`canUseMoirePack` (Pro, or Home with `hasLicensePack('moire')`). The account sheet shows a
+Buy card to Home without the pack (`MoirePackBuy.tsx`), says where it comes from to Free, and
+says it is on the licence once bought; the Moiré Sheets section and the phone's Looks sheet
+have a Get it button beside Try. Checks: `npm run license-worker` 13g–13q (filed, refunded,
+upgraded, held; a pack order with no store product refused, 13o; a re-signed key under the
+held id taken on a device only for a pack change or a higher tier, 13p; the store's own pack
+ids filed with no Worker setting, 13q; forcing the signed packs empty fails 13h and 13j), `npm run tiers` 14 (locked
+on Free and Home, the Buy link carries the email, open on a Home key that names the pack).
+
+## 45a-8. The website sells the moiré pack (2026-11-07)
+
+The owner asked for the pack on the website with demo pictures once the store product existed.
+The landing page now has a card under its three price cards: what the pack is, $15 on Home and
+in Pro, four of its looks as pictures, and a Buy that opens the store's live checkout in a
+new tab (its own `data-cg-landing-pack`, so the Home and Pro count of `data-cg-landing-buy` is
+unchanged). The pack is an add-on, not a tier, which is why it sits under the cards rather than
+as a fourth beside them. `pro.html`'s tier table gains a row for it.
+
+The pictures are frames the app drew on the Mac's GPU, about 22 s after each look opened from
+`/show?debug&look=<id>`, cropped to 8:5 from the plate's own read-back (`grabFrame`). They are
+960x600 for a 480x300 box, unlike the other landing looks: a pattern of fine lines scaled down
+by the browser beats against the screen's pixels and draws a moiré of its own that is not the
+app's. Song Groove came out with no fringes at all and is left off (45a-10); Quasicrystal
+Garden read as scattered specks at this size and is left off too.
+
+`npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
+card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
+four pictures load at 960 px wide.
