@@ -36,10 +36,10 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
 - `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.
 - `selftest.ts`: kit tests, `?debug`.
-- `slosh.ts`, `soapFilm.ts`, `standing.ts`: slosh dish, soap film, ferrofluid domes.
+- `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `standing.ts`: slosh dish, soap film, lamp-boiling dish, ferrofluid domes.
 - `splats.ts`: a frame's pours as GPU records.
 - `uniforms.ts`: `layOut`, `wgslStruct`, `UniformPack`.
 
 ## Checks
 
-`npm run quick`; by hand `lint`, `wgsl`, `physics`, `maze`, `spikes`, `disc`, `straw`, `derive`. `output.ts`: `map`, `beams`, `wallpattern`. Per-frame calls: `framegroups`, `framereads`, `frameuploads`. `slosh.ts`, `soapFilm.ts`, `particles.ts`: `sloshgpu`, `soapgpu`, `particles`. `standing.ts`: `standing`. A changed constant: `checkguard`.
+`npm run quick`; by hand `lint`, `wgsl`, `physics`, `maze`, `spikes`, `disc`, `straw`, `derive`. `output.ts`: `map`, `beams`, `wallpattern`. Per-frame calls: `framegroups`, `framereads`, `frameuploads`. `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `particles.ts`: `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. `standing.ts`: `standing`. A changed constant: `checkguard`.

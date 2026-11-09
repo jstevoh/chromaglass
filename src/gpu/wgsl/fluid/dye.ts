@@ -216,24 +216,26 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   v = vec4f(v.xy * S.damping, v.z, v.w);
   let sp = length(v.xy);
   if (sp > S.maxSpeed) { v = vec4f(v.xy * (S.maxSpeed / sp), v.z, v.w); }
-  // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
-  let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
-  var temp = v.z * cool;
-  // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
-  let d = textureLoad(dye, vec2i(id.xy), 0);
-  var absorbed = 0.0;
-  if (d.a > 1e-4) {
-    let norm = 1.0 / d.a;
-    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
-    let through = lampThrough(unit, d.a);
-    absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+  if (A.a.x <= 0.0) {
+    // Newton cooling with physical time constant tau ≈ 12.4s (PLAN §18f):
+    let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
+    var temp = v.z * cool;
+    // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
+    let d = textureLoad(dye, vec2i(id.xy), 0);
+    var absorbed = 0.0;
+    if (d.a > 1e-4) {
+      let norm = 1.0 / d.a;
+      let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
+      let through = lampThrough(unit, d.a);
+      absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
+    }
+    // The same at every point of the stage (PLAN 38a): the condenser lights the
+    // liquid evenly, and the hot-spot is light the lens's aperture turns away
+    // after it has gone through the liquid (wgsl/lampField.ts). The old
+    // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
+    temp += S.lampHeat * absorbed * S.dt;
+    v.z = temp;
   }
-  // The same at every point of the stage (PLAN 38a): the condenser lights the
-  // liquid evenly, and the hot-spot is light the lens's aperture turns away
-  // after it has gone through the liquid (wgsl/lampField.ts). The old
-  // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
-  temp += S.lampHeat * absorbed * S.dt;
-  v.z = temp;
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 

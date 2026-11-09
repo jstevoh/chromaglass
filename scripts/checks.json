@@ -2063,7 +2063,7 @@
     {
       "name": "The plate boils under a held hand at 60 fps, not under the fan (36e-2b)",
       "shard": "plate",
-      "run": "npm run plateboil -- --part=boil --owed=rate,hold,fan,steam,writes",
+      "run": "npm run plateboil -- --part=boil",
       "timeout": 15,
       "why": [
         "The live plate's own boil (PLAN 36e-2b), which boilgpu's dishes do not reach:",
@@ -2422,6 +2422,22 @@
         "ruptured hole unrefilled and black spreading within 15%, every step",
         "submitting GPU work and every read mapping a buffer, and the CPU",
         "reference absent from the solver's bundle."
+      ]
+    },
+    {
+      "name": "The dish that boils on Metal",
+      "shard": "plate",
+      "run": "npm run boilgpu",
+      "why": [
+        "The lamp-boiling dish's GPU solver (src/gpu/lampBoil.ts,",
+        "src/gpu/wgsl/lampBoil.ts) against the CPU reference (src/lib/lampBoil.ts),",
+        "on Metal (PLAN 36e-2, scripts/boilgpu.mjs): all six boil checks (heating",
+        "and Beer-Lambert, forced vs natural convection under a held hand, Kell",
+        "buoyancy and thermal expansion, cavity nucleation and condensation,",
+        "the hand's boil and lift, and Heat = 0 no-op), a single nucleus,",
+        "cell-by-cell agreement with the reference across seven scenes, every step",
+        "submitting GPU work and every read mapping a buffer, the CPU reference",
+        "absent from the solver's bundle, and its step cost at 768²."
       ]
     },
     {

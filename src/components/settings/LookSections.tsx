@@ -614,6 +614,15 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           settingKey="lampHotspot"
         />
         <Slider
+          label="Heat"
+          value={settings.heat ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ heat: v })}
+          settingKey="heat"
+        />
+        <Slider
           label="Second Lamp"
           value={settings.secondLamp ?? 0}
           min={0}

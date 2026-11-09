@@ -36,8 +36,8 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `particles.ts`: particle dye.
 - `post.ts`, `postFields.ts`: post chain.
 - `probe.ts`: brightness probe.
-- `slosh.ts`, `soapFilm.ts`, `slump.ts`: slosh, soap film, ink slump.
+- `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `slump.ts`: slosh, soap film, lamp-boiling dish, ink slump.
 
 ## Checks
 
-`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `particles`. A changed constant: `checkguard`.
+`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. A changed constant: `checkguard`.
