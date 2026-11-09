@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — song titles painted as ink, then swept away (PLAN 37x-10)
+
+- **Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone): when a new
+  song is named, its title and artist are poured into the liquid as ink at the plate's full
+  resolution, then a wash (a drift and eddies, a real flow) breaks the letters up. Title ink,
+  Size, Height and Sweep set it. Song-show title cards and words poured from the phone, the
+  show server or the assistant go through the same ink and wash.
+
 ### Added — Heat from the lamp, and boiling under a held hand (PLAN 36e-2)
 
 - **Heat** (`heat`, Settings → Lamp & Light, Perform desk, MIDI, the remote and the phone's Looks

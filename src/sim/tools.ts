@@ -10,7 +10,6 @@
  */
 import { LiquidType } from '../types';
 import { LIQUIDS_BY_ID, AUTO_DOSE } from '../presetPlate';
-import { PALETTE_RGB } from '../constants';
 import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
@@ -319,55 +318,4 @@ export function syncBoilHolds(
     }
     holds.length = count;
   }
-}
-
-export function pourTextOnFluid(
-  fluid: FluidSimulation | undefined,
-  rows: { text: string; weight?: number }[],
-  opts: { colour?: string; columns?: [number, number] },
-  idx: number[],
-  angle: number,
-): void {
-  if (!fluid || rows.length === 0) return;
-  const S = fluid.size;
-  const w = Math.round(S * 0.81) - Math.round(S * 0.19);
-  const h = Math.round(S * 0.69) - Math.round(S * 0.31);
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const g = c.getContext('2d');
-  if (!g) return;
-  const lum = (r: number, gg: number, b: number) => 0.2126 * r + 0.7152 * gg + 0.0722 * b;
-  const brightest = (): string => {
-    let best = { r: 1, g: 1, b: 1 }, bl = -1;
-    for (const i of idx) { const p = PALETTE_RGB[i]; if (p && lum(p.r, p.g, p.b) > bl) { bl = lum(p.r, p.g, p.b); best = p; } }
-    return `rgb(${Math.round(best.r * 255)}, ${Math.round(best.g * 255)}, ${Math.round(best.b * 255)})`;
-  };
-  let colour = opts.colour ?? brightest();
-  if (colour === 'contrast') {
-    const m = fluid.meanColor, d = Math.min(1, fluid.meanDensity);
-    colour = m && d > 0.25 && lum(m[0], m[1], m[2]) > 0.3 ? 'rgb(14, 14, 18)' : brightest();
-  }
-  const [c0, c1] = opts.columns ?? [0, 1];
-  const x0 = Math.round(c0 * w), x1 = Math.round(c1 * w);
-  const room = (x1 - x0) - 6;
-  const face = (px: number) => `900 ${px}px -apple-system, "SF Pro Display", "Helvetica Neue", Arial, sans-serif`;
-  const share = rows.reduce((a, r) => a + (r.weight ?? 1), 0);
-  const usable = h - 6;
-  g.fillStyle = colour;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  if (angle) { g.translate(w / 2, h / 2); g.rotate(angle); g.translate(-w / 2, -h / 2); }
-  let y = 3;
-  for (const r of rows) {
-    const band = usable * (r.weight ?? 1) / share;
-    let px = Math.floor(band * 0.95);
-    g.font = face(px);
-    while (px > 6 && g.measureText(r.text).width > room) { px -= 1; g.font = face(px); }
-    g.fillText(r.text, (x0 + x1) / 2, y + band / 2);
-    y += band;
-  }
-  const img = g.getImageData(0, 0, w, h);
-  const flipped = g.createImageData(w, h);
-  for (let yy = 0; yy < h; yy++) flipped.data.set(img.data.subarray((h - 1 - yy) * w * 4, (h - yy) * w * 4), yy * w * 4);
-  fluid.injectImage(flipped);
 }

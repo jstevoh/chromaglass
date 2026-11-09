@@ -69,9 +69,10 @@ import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, ty
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
 import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
+import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
 import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SECOND, TURING_ITERATIONS_PER_SECOND, particleFlowScale, GRID_AREA, FILM_BINS, FILM_BIN_SCALE } from '../sim/constants';
-import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds, pourTextOnFluid } from '../sim/tools';
+import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
@@ -259,6 +260,7 @@ interface LiquidVisualizerProps {
 }
 
 import type { LiquidVisualizerHandle } from './visualizerHandle';
+import { rgbToHex } from './layerSwatch';
 
 /** Held to 0..1 (a score of the frame loop's dials). */
 const c01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -267,23 +269,6 @@ export type { LiquidVisualizerHandle };
 
 // ─── React Component ─────────────────────────────────────────────────
 
-/**
- * A layer's mean dye as a swatch.
- *
- * Normalised by its own brightest channel rather than shown raw: a layer with
- * a little dye on it averages to almost black across the whole grid, and a row
- * of near-black squares says nothing. Scaling to the hue keeps a quiet layer
- * legible while `fill` carries how much is actually there.
- */
-function rgbToHex(r: number, g: number, b: number): string {
-  const peak = Math.max(r, g, b);
-  const k = peak > 0.001 ? 0.85 / peak : 0;
-  const to = (v: number) => {
-    const n = Math.round(c01(v * k) * 255);
-    return n.toString(16).padStart(2, '0');
-  };
-  return peak <= 0.001 ? '#111111' : `#${to(r)}${to(g)}${to(b)}`;
-}
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
@@ -603,6 +588,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const markRef = useRef<{ source: CanvasImageSource; aspect: number; dirty: boolean } | null>(null);
 
   const videoPourRef = useRef<HTMLVideoElement | null>(null);
+  const inkTitleRef = useRef(newInkTitleRun());
   const videoFlowCtxRef = useRef<CanvasRenderingContext2D | null>(null);
   /** The video the pour's last frame was of, and that frame for the CPU's loop (lib/videoFlow.ts). */
   const videoFlowRef = useRef<VideoPourState>({ source: null, prev: null });
@@ -1589,9 +1575,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         videoPourRef.current = null;
       }
     },
-    pourText: (rows, opts: { colour?: string; columns?: [number, number] } = {}) => {
-      pourTextOnFluid(fluidsRef.current[0], rows, opts, presetContractRef.current ?? harmonyRef.current, rotationAnglesRef.current[0] ?? 0);
-    },
+    // A title as ink at the solver's grid, swept away by the wash (PLAN 37x-10, lib/inkTitleRun.ts).
+    pourText: (rows, opts = {}) => queueInkTitle(inkTitleRef.current, rows, opts.colour),
     kicks: () => kickCountRef.current,
     songShape: () => ({ now: { ...songShapeRef.current.now }, bar: { ...barGridRef.current.now }, events: songEventsRef.current.slice() }),
     // Off the closeup the camera is not running, and the centre it last had is
@@ -3169,6 +3154,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         }
 
         for (let simStep = 0; simStep < simSteps; simStep++) {
+          // A title poured as ink, then its wash, on the lead plate (PLAN 37x-10).
+          stepInkTitle(inkTitleRef.current, fluidsRef.current[0], currentSettings, simStepS, presetContractRef.current ?? harmonyRef.current, rotationAnglesRef.current[0] ?? 0);
           // The room stirs the lead plate: it is ambient, not a tool, so it
           // goes where the show is rather than onto whichever layer happens to
           // be selected.

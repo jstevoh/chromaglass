@@ -312,6 +312,23 @@ export interface VisualizerSettings {
   stockWeave: number;
   stockGate: number;
   onNewSong: OnNewSongMode;
+  /*
+    The song's title painted as ink, then swept away (PLAN 37x-10,
+    lib/inkTitle.ts). `inkTitle` is the switch: when the identified song
+    changes, its title and artist are poured into the dye at the solver's
+    grid, and a wash (a real flow, added to the step's velocity) drifts and
+    stirs them until the letters break up. `inkTitleColor` is '' for the
+    look's own first colour or a '#rrggbb'; `inkTitleSize` runs from a small
+    credit to the plate's width (a long title shrinks to fit);
+    `inkTitleY` is where it lands, up the plate; `inkTitleSweep` is the
+    wash: at 0.01 a drift that leaves it readable past six seconds, at 0.5
+    read for three and gone by twelve, at 1 gone in two.
+  */
+  inkTitle: boolean;
+  inkTitleColor: string;
+  inkTitleSize: number;
+  inkTitleY: number;
+  inkTitleSweep: number;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -974,6 +991,12 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
     keeps the look unless someone asks for more. `npm run music` holds this.
   */
   onNewSong: 'off',
+  // Off: no song is titled until Settings > Logo & Titles or the phone's Title switch turns it on (PLAN 37x-10).
+  inkTitle: false,
+  inkTitleColor: '',
+  inkTitleSize: 0.5,
+  inkTitleY: 0.5,
+  inkTitleSweep: 0.5,
   beatPrediction: 0.7,
   beatLead: 80,
   /*

@@ -209,6 +209,9 @@ export const CONTROL_HELP: Record<string, string> = {
   // Logo
   markMix: 'How opaque the logo or title is over the finished frame. Zero takes it off.',
   markScale: 'How wide the logo is, as a share of the frame.',
+  inkTitleSize: 'How big the title is, from a small credit to the width of the plate. A long title shrinks to fit.',
+  inkTitleY: 'Where the title lands, from the bottom of the plate to the top.',
+  inkTitleSweep: 'How hard the wash takes the title away: low and it drifts, readable, for many seconds; high and it is gone in two.',
   markX: 'Where the logo\'s centre sits across the frame.',
   markY: 'Where the logo\'s centre sits up the frame.',
 
