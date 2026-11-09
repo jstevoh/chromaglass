@@ -191,6 +191,18 @@
       ]
     },
     {
+      "name": "Main held red lets only the fix merge",
+      "shard": "logic",
+      "run": "npm run mainhold -- --self-test",
+      "why": [
+        "The rule hold.yml posts on every open PR (PLAN.md 19am): the same job red",
+        "on two finished main deploys running holds main, cancelled runs left out,",
+        "the summary jobs and the runner's plumbing not counted, a green deploy",
+        "lifts it, and a PR labelled fixes-main passes. Against 11-08's deploys",
+        "699 to 738: held after 701 (fifth), lifted by 704."
+      ]
+    },
+    {
       "name": "A closed PR stops its runs",
       "shard": "logic",
       "run": "npm run closedruns",

@@ -12404,3 +12404,58 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
+
+**19am-1.** The owner's rule (2026-11-01, docs/handoff.md): when the same check is red on
+two main deploys in a row, nothing merges but the fix until a deploy is green. It was a
+rule for whoever read it. On 2026-11-08 the fifth Mac shard was red on deploys 699 and
+701, the open shard on 685 and 699, and 16 of that day's 34 merges landed while main's
+last deploy was red; each one started another deploy that ran the same red shard and
+gave the fix one more commit to be bisected against. The owner adopted making it
+mechanical on 2026-11-09 (13:12Z).
+
+Changed: `scripts/mainhold.mjs` judges each check on its own. "A check" is a job of the
+deploy: a Mac shard, a Measure part, the build; not the summary jobs `Checks / WebGPU
+(macOS)` and `Checks / Measure` (red whenever any shard is, they would make two shards
+look like one check) and not the owner's-Mac probe, the watchdog or the deploy gate. For
+each check it walks main's deploys newest first and takes only those that ran it; main is
+held when some check's newest two results are both red, and lifted the first time it runs
+green. Cancelled deploys are left out (31 of the last 40: the deploy's concurrency group
+cancels a run the next push supersedes, and the watchdog one it hands to GitHub's Macs).
+A deploy whose PR passed its exact tree (`deploygate.sh` said `tested`, so Checks was
+skipped and it built) counts green for every check, or a fix merged with main in its head
+would never lift the hold. A re-run in progress keeps its last attempt's results.
+
+The first draft judged whole deploys (two red deploys running, any green one lifts), and
+its review found the hole: a docs-only deploy, a `disjoint` one (Measure, no Mac) and a
+red one whose typecheck stopped the shards all run no Mac check, and the draft let any of
+them break a run or lift a hold the fix never touched. It also read only 30 runs with no
+paging, posted one PR at a time with no concurrency group (a slow run that read "held"
+could post after a later green), and never posted on a PR retargeted to main.
+
+`.github/workflows/hold.yml` posts the verdict as the commit status `Main not held red`,
+red with the check and the two deploys, or green on a PR labelled `fixes-main`. Each run
+reads every open PR's current status in one GraphQL query and posts only where it
+differs, so a push costs one post, and runs queue one at a time in one group. It runs
+when a deploy finishes, on a PR's opening, push, label or retargeting, and by hand. It
+uses `pull_request_target` so that a fork's PR gets the status too, and checks out only
+main's copy of the script, never the PR's code. Its job is named `Post the main hold`, not
+like the status, so that a green job can never stand in for the status in a required check.
+
+Measured: `npm run mainhold -- --self-test` (Measure, logic) holds the rule against main's
+deploys 738 down to 699 with every job as the API listed them
+(`scripts/mainhold-deploys.json`): held after 701 (fifth red on 699 and 701, 700
+cancelled between) and after no other of the 40 that finished, still held through 702
+and 703 (cancelled), lifted by 704 (fifth green). Against made-up histories it holds
+across a cancelled, docs-only, `disjoint` or shard-less deploy, lifts on a green run of
+the check or a tested-on-its-PR deploy, and does not hold on two different shards, the
+plumbing red twice or one red. The API reading stops early, and the self-test replays
+the stop from each of the 40 to show the verdict at the stop is the verdict on all.
+
+Edge cases, the rule as written: "two deploys in a row" is read per check, so the two
+reds may have deploys between them that did not run that check (the 11-08 pair had a
+cancelled one). A quarantined flake (19ak-1) is a warning only on a pull request: main's
+deploy holds every line to its bar, so a quarantined line red on two deploys running
+holds main like any check. That is the rule as adopted; 19am-3 is where a line-level
+hold could choose otherwise.

@@ -166,6 +166,7 @@
     "wgsl": "node scripts/wgsl.mjs",
     "deploygate": "bash scripts/deploygate.sh",
     "closedruns": "node scripts/closedruns.mjs",
+    "mainhold": "node scripts/mainhold.mjs",
     "cisecrets": "node scripts/cisecrets.mjs",
     "sizes": "node scripts/sizes.mjs",
     "checkguard": "node scripts/checkguard.mjs",
