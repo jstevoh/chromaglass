@@ -9,12 +9,20 @@
 // and an emailed link all work, and the account a TV is linked to is the account
 // the player already signs in to everywhere else.
 
-import React, { useEffect, useRef, useState } from 'react';
-import { SignInForm } from '../SignInScreen';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { claimTvCode, formatTvCodeInput, normalizeTvCode, type TvClaimResult } from '../../lib/tvCode';
 import { CHECKOUT_HOME_URL, buildCheckoutUrl } from '../../lib/checkoutLinks';
 
 type Phase = 'checking' | 'signin' | 'code' | 'sending' | 'done';
+
+/* The sign-in form starts Firebase Auth when its module loads, and a build with
+   no Firebase keys (a local checkout, the checks' builds) throws there and takes
+   the whole page down with "could not start". main.tsx guards its own sign-in
+   the same way: only a build with keys loads the form, and one without says that
+   linking needs the site. */
+const LazySignInForm = import.meta.env.VITE_FIREBASE_API_KEY
+  ? lazy(() => import('../SignInScreen').then((m) => ({ default: m.SignInForm })))
+  : null;
 
 function messageFor(r: TvClaimResult | null): string {
   if (!r) return '';
@@ -75,7 +83,15 @@ export default function TvLink(): React.ReactElement {
         {phase === 'signin' && (
           <div className="mt-6 rounded-2xl border border-white/15 bg-neutral-900/80 px-4 py-3">
             {result && <p className="mb-2 text-sm text-amber-300" role="alert">{messageFor(result)}</p>}
-            <SignInForm onSignedIn={() => { setResult(null); void refreshAccount(); }} />
+            {LazySignInForm ? (
+              <Suspense fallback={<p className="text-sm text-neutral-500">One moment…</p>}>
+                <LazySignInForm onSignedIn={() => { setResult(null); void refreshAccount(); }} />
+              </Suspense>
+            ) : (
+              <p data-cg-tvnosignin="" className="text-sm text-neutral-400">
+                Sign-in is not set up on this copy of ChromaGlass. Link the TV from chromaglass.art.
+              </p>
+            )}
           </div>
         )}
 
