@@ -140,8 +140,8 @@ const OWN: PanelSpec[] = [
  */
 const WHOLE = new Set(['audio-input', 'room', 'film', 'patches', 'midi', 'liquids', 'projectors', 'mapping', 'mark', 'simulation']);
 
-/** Wider in the deck: the patch bay's rows and the Wall's corner pin need the room. */
-const WIDE: Record<string, number> = { patches: 340, projectors: 340, mapping: 312, midi: 312, 'audio-input': 312, simulation: 304, mixer: 312 };
+/** Wider in the deck: the patch bay's rows, the Wall's corner pin and the closeup's eleven dials need the room. */
+const WIDE: Record<string, number> = { patches: 340, projectors: 340, macro: 320, mapping: 312, midi: 312, 'audio-input': 312, simulation: 304, mixer: 312 };
 
 const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => ({
   id: s.id,

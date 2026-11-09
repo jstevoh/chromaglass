@@ -77,18 +77,12 @@ desk panel, phone sheet, the remote and Draw) is in the project's shared files.*
   the Recipe adds six controls no ride has (8 of its own on Perform, was 2), and the Rides are one
   line each so all eight, Macro Zoom among them, show under the Bottles at 1440×900 and 1512×860
   (was 3 and 2). Story in `docs/plan-shipped.md` §35c-6. Left from it:
-  - **35c-6a** At 1280×800 the Rides show 7 of 8 (Evolve Speed under the fold), and the right
+  - ~~**35c-6a** At 1280×800 the Rides show 7 of 8 (Evolve Speed under the fold), and the right
     column still scrolls with its scrollbar hidden, so a strip longer than the column says nothing
-    about what is below. A fade at the cut, or the Bottles folding to one row when the column is short.
-    Check written first (2026-11-08): `npm run deskreach` lines `rides1280` (every ride whole at
-    1280×800; main shows 7 of 8, Automate Rate under the fold) and `ridemark` (a `data-more-mark`
-    at the column's cut while more is below, gone at the end), owed in `scripts/checks.json`.
-  - **35c-6b** On Perform at 1440 the deck's Macro panel (and Squish, Lens) start off the right of
+    about what is below.~~ **Shipped** 2026-11-08: the Bottles fold to one row of six under 840 px tall so all 8 Rides show whole at 1280×800, and `desk-right` draws a `data-more-mark="below"` fade and cue while more than 8 px lies below (`npm run deskreach` `rides1280`, `ridemark`). Story in `docs/plan-shipped.md` §35c-6a.
+  - ~~**35c-6b** On Perform at 1440 the deck's Macro panel (and Squish, Lens) start off the right of
     the screen, and the deck's sideways scroll has no mark either: the closeup's own dials (aim,
-    camera, depth) are as hard to find as its zoom was.
-    Check written first (2026-11-08): `npm run deskreach` lines `deckmark` (the deck's mark at its
-    right edge, 1280 px past it on main at 1440) and `macro` (the Macro panel wholly on the screen at
-    1440×900, unscrolled; main draws it at x 1874), owed.
+    camera, depth) are as hard to find as its zoom was.~~ **Shipped** 2026-11-08: Perform's default deck puts Macro right after Recipe (in two rows of six across 320 px so all 11 dials lie whole on screen at 1440×900 unscrolled, with Dyes, Tools and Recipe on screen beside it), and `desk-deck` draws a `data-more-mark="right"` fade and cue while more than 8 px lies to the right (`npm run deskreach` `deckmark`, `macro`). Story in `docs/plan-shipped.md` §35c-6b.
 - ~~**35d** Colour and keys (batch A of the owner's playful-controls choice, 2026-10-25).~~
   Story in `docs/plan-shipped.md` §35d (moved 2026-10-29, 19m).
 - ~~**35e** Liquid in the controls (batch B of the playful-controls choice, 2026-10-25).~~

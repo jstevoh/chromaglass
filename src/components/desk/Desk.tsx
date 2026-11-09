@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { LogIn, User } from 'lucide-react';
+import { Laptop, LogIn, User } from 'lucide-react';
 import { Button, PanelFrame, Segmented, Tag } from '../ui';
 import { LensCap } from '../ui/Playful';
 import { PanelGuard } from '../PanelGuard';
@@ -14,6 +14,7 @@ import {
   placeFloating, raiseFloating, toggleCollapsed, whereIs,
   type DeskLayout, type Slot,
 } from '../../lib/deskLayout';
+import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { getEffectiveTier } from '../../lib/tierGates';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import type { DeskProps } from './deskProps';
@@ -329,17 +330,56 @@ export function Desk(p: DeskProps) {
   const dropping = !!drag?.moved;
   const dashed = dropping ? 'outline-dashed outline-1 outline-offset-[-4px] outline-accent-border' : '';
 
+  /*
+    A scroller with its scrollbar hidden (`scrollbar-hide`, and macOS hides
+    scrollbars until something moves) says when more lies past its edge
+    (PLAN 35c-6a, 35c-6b): `moreBelow` for the right column, `moreRight` for
+    the deck. Measured on scroll, resize and layout change, and gone within
+    8 px of the end (`scripts/deskreach.mjs`).
+  */
+  const rightRef = useRef<HTMLElement | null>(null);
+  const deckRef = useRef<HTMLDivElement | null>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+  const [moreRight, setMoreRight] = useState(false);
+  const measureMore = useCallback(() => {
+    const r = rightRef.current;
+    setMoreBelow(!!r && r.scrollHeight - r.clientHeight - r.scrollTop > 8);
+    const d = deckRef.current;
+    setMoreRight(!!d && d.scrollWidth - d.clientWidth - d.scrollLeft > 8);
+  }, []);
+  useLayoutEffect(() => {
+    measureMore();
+    const r = rightRef.current, d = deckRef.current;
+    const ro = new ResizeObserver(measureMore);
+    if (r) { ro.observe(r); for (const c of r.children) ro.observe(c); }
+    if (d) { ro.observe(d); for (const c of d.children) ro.observe(c); }
+    window.addEventListener('resize', measureMore);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measureMore); };
+  }, [l, p.tab, windowW, measureMore]);
+
   const column = (slot: 'left' | 'right') => {
     const ids = l[slot];
     if (ids.length === 0) return null;
     const one = ids.length === 1 && !l.collapsed.includes(ids[0]);
     return (
       <aside
-        className={`flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide p-2 ${slot === 'left' ? 'border-r' : 'border-l'} border-border ${dashed}`}
+        ref={slot === 'right' ? rightRef : undefined}
+        onScroll={slot === 'right' ? measureMore : undefined}
+        className={`relative flex min-h-0 flex-col gap-2 overflow-y-auto overflow-x-hidden scrollbar-hide p-2 ${slot === 'left' ? 'border-r' : 'border-l'} border-border ${dashed}`}
         data-slot={slot}
         data-testid={`desk-${slot}`}
       >
         {ids.map(id => frame(id, { className: one ? 'min-h-0 flex-1' : 'shrink-0' }))}
+        {slot === 'right' && moreBelow && (
+          <div
+            aria-hidden
+            data-more-mark="below"
+            className="pointer-events-none sticky bottom-0 -mx-2 -mb-2 z-20 flex h-8 shrink-0 items-end justify-center pb-1"
+            style={{ background: 'linear-gradient(to bottom, transparent, var(--color-bg) 85%)' }}
+          >
+            <span className="rounded-full border border-border-strong bg-elevated px-2.5 py-0.5 font-mono text-[10px] leading-none text-text-2">↓ more</span>
+          </div>
+        )}
       </aside>
     );
   };
@@ -539,7 +579,9 @@ export function Desk(p: DeskProps) {
         </div>
       ) : (
         <div
-          className={`col-[1/-1] flex min-h-0 items-stretch gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide border-t border-border p-2 ${dashed}`}
+          ref={deckRef}
+          onScroll={measureMore}
+          className={`relative col-[1/-1] flex min-h-0 items-stretch gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide border-t border-border p-2 ${dashed}`}
           data-slot="deck"
           data-testid="desk-deck"
         >
@@ -564,6 +606,16 @@ export function Desk(p: DeskProps) {
               aria-label="Fold the deck"
               data-testid="deck-fold"
             >⌄</button>
+          )}
+          {moreRight && (
+            <div
+              aria-hidden
+              data-more-mark="right"
+              className="pointer-events-none sticky right-0 -my-2 -mr-2 z-20 flex w-9 shrink-0 items-center justify-end pr-1"
+              style={{ background: 'linear-gradient(to right, transparent, var(--color-bg) 85%)' }}
+            >
+              <span className="rounded-full border border-border-strong bg-elevated px-1 py-2 font-mono text-[10px] leading-none text-text-2 [writing-mode:vertical-rl]">more →</span>
+            </div>
           )}
         </div>
       )}
@@ -615,6 +667,25 @@ export function Desk(p: DeskProps) {
           >
             All settings…
           </button>
+          {/*
+            In the iPhone/iPad app (PLAN 12 step 4a): the full layout's way to
+            become the laptop's remote, calling the same `goRemote()` as the
+            phone layout's More › Laptop remote (`lib/appLink.ts`). Absent on
+            the website, whose https page cannot open a plain ws:// socket to a
+            laptop.
+          */}
+          {isPhoneApp() && (
+            <button
+              type="button"
+              onClick={goRemote}
+              className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-border-strong bg-elevated px-2.5 font-sans text-[11px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
+              title="Use this device as the remote for a show on the laptop"
+              data-testid="desk-laptop-remote"
+            >
+              <Laptop size={12} className="shrink-0 text-muted" />
+              <span>Laptop remote</span>
+            </button>
+          )}
           <span className="truncate" data-testid="status-hearing">
             {p.status.audio}
             {p.status.sequence && ` · ${p.status.sequence}`}

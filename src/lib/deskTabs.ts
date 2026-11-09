@@ -46,9 +46,10 @@ const L = (x: Partial<DeskLayout> & Pick<DeskLayout, 'plateMode'>): DeskLayout =
 
   Perform is Gig with Build's materials beside it: the set list on the left
   to go to the next look, the bottles and the rides on the right, and the
-  dyes, the tools, the recipe, Build's four sections of knobs (the fluid,
-  the squish, the lens and the closeup: the visuals, to manipulate) and the
-  patch bay under the plate. It ships
+  dyes, the tools, the recipe, the closeup (Macro, right after the recipe so
+  its aim, camera and depth dials sit on the screen without scrolling) and
+  Build's other three sections of knobs (the fluid, the squish and the lens:
+  the visuals, to manipulate) and the patch bay under the plate. It ships
   Live, because it is the show; building a look in it is the plate bar's
   Preview, one click, which is all Build's Preview ever was.
 
@@ -58,7 +59,7 @@ const L = (x: Partial<DeskLayout> & Pick<DeskLayout, 'plateMode'>): DeskLayout =
   Setup is Load-in with the Sound screen's player and drone in it.
 */
 export const DEFAULT_TABS: readonly DeskTab[] = Object.freeze([
-  { id: 'perform', name: 'Perform', layout: L({ left: ['cues'], right: ['bottles', 'rides'], deck: ['dyes', 'tools', 'recipe', 'physics', 'squish', 'camera', 'macro', 'patches'], plateMode: 'live' }) },
+  { id: 'perform', name: 'Perform', layout: L({ left: ['cues'], right: ['bottles', 'rides'], deck: ['dyes', 'tools', 'recipe', 'macro', 'physics', 'squish', 'camera', 'patches'], plateMode: 'live' }) },
   { id: 'sequence', name: 'Sequence', layout: L({ left: ['cues'], right: ['songs', 'sequences'], deck: ['score'], plateMode: 'live' }) },
   { id: 'setup', name: 'Setup', layout: L({ left: ['midi', 'audio-input', 'player'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' }) },
 ]);

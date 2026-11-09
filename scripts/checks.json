@@ -1447,7 +1447,7 @@
     {
       "name": "What the desk has that nobody can see, owed",
       "shard": "browser",
-      "run": "npm run deskreach -- --owed=rides1280,ridemark,deckmark,macro,remote",
+      "run": "npm run deskreach",
       "why": [
         "Written before their builds (scripts/deskreach.mjs, 2026-11-08): every ride",
         "whole at 1280x800 and a mark when the right column or the deck has more than",

@@ -123,13 +123,8 @@ forms and a 15 % cut.
    handed its show key and the show to any host it named; fixed before
    merge. `npm run applink` (Measure) checks all of it on a real relay with a
    stand-in laptop, the page on another origin and a stranger's host. ***Built***, not yet on a
-   phone. Open: the iPad in the app gets the full layout, which has no Laptop
-   remote button yet, and neither does a phone that took More › Full layout
-   (until the app is reopened); a QR code on the laptop that opens the app straight
-   into its remote (a `chromaglass://` link) would save the typing. The full layout's button has its
-   check written first (2026-11-08): `npm run deskreach` line `remote` (in the app at 1024×1366 and
-   1366×1024, `desk-laptop-remote` drawn without a tap, asking for the laptop as the phone's does),
-   owed; the QR code needs Xcode's URL scheme and is not in it.
+   phone; ~~the full layout's Laptop remote button (`desk-laptop-remote`, sharing `goRemote` with the phone's More › Laptop remote)~~ **shipped** 2026-11-08 (`npm run deskreach` `remote`; story in `docs/plan-shipped.md` §12.4a). Open: a QR code on the laptop that opens the app straight
+   into its remote (a `chromaglass://` link, needing Xcode's URL scheme) would save the typing.
 5. **Record and Render save natively on the iPhone** (one PR): the share sheet or
    Photos. The only feature that needs new code to work at all. *Not started.*
 6. **A privacy policy page** on Firebase Hosting, and the store listings: text,

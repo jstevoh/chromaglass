@@ -7127,6 +7127,39 @@ scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off th
   Drain. `npm run layout`: every ride shows whole, Macro Zoom among them, at 1440×900 (3 of 8
   before) and 1512×860 (2 of 8 before).
 
+### 35c-6a, 35c-6b, 12.4a. What the desk has that nobody can see (shipped 2026-11-08)
+
+`src/components/desk/DeskPanels.tsx`, `src/components/desk/Desk.tsx`, `src/lib/deskTabs.ts`,
+`src/lib/deskLayout.ts`, `scripts/checks.json`
+
+Built against `scripts/deskreach.mjs` (#728), taking `rides1280`, `ridemark`, `deckmark`,
+`macro` and `remote` out of `--owed`:
+
+- **35c-6a (`rides1280`, `ridemark`).** Under 840 px tall (`@media (min-height: 840px)`),
+  `BottlesBody` folds from its 3×2 labelled grid to one row of six bottles (`grid-cols-6`,
+  36 px tall, `aria-label` and `title` kept), so at 1280×800 all 8 Rides show whole under the
+  Bottles (rows ≥ 20 px, was 7 of 8 with Automate Rate under the fold), while 1440×900 and
+  1512×860 stay 3×2 as before. When `desk-right` has more than 8 px below its bottom edge, it
+  draws a sticky `data-more-mark="below"` fade and pill at the cut (`421` of `14976` band
+  pixels at 1440×900, `875` at 1280×700, still seen halfway, gone at the end, and absent at
+  1440×1400 when 0 px lies past the edge).
+- **35c-6b (`deckmark`, `macro`).** Perform's shipped default deck (`DEFAULT_TABS` in
+  `src/lib/deskTabs.ts`) moves `macro` right after `recipe`
+  (`['dyes', 'tools', 'recipe', 'macro', 'physics', 'squish', 'camera', 'patches']`; saved tabs
+  arranged by the owner keep their stored order). In `DeskPanels.tsx` and `deskLayout.ts`, a
+  knob section with 9–12 dials (`macro` has 11 after giving `macroZoom` to the Rides) lays out
+  in 6 columns across `320 px` (2 rows instead of 3), so at 1440×900 unscrolled, Macro sits at
+  `x = 1052..1372` with 11 of 11 dials wholly on screen and hit-testable, while Dyes, Tools and
+  Recipe stay wholly on screen (`main` had Macro at `x = 1874`, 0 of 11 dials). When
+  `desk-deck` has more than 8 px to the right of its right edge, it draws a sticky
+  `data-more-mark="right"` fade and pill at the right cut (`1683` of `12864` band pixels at
+  1440×900, `882` at 1280×800, still seen halfway, gone at the end).
+- **12 step 4a (`remote`, full-layout button).** In the native app (`isPhoneApp()`,
+  `window.Capacitor.isNativePlatform()`), the desk footer draws `data-testid="desk-laptop-remote"`
+  (`Laptop remote`) without a tap, calling the shared `goRemote()` from `src/lib/appLink.ts`
+  (the same call the phone layout's More › Laptop remote already uses). Absent on the website.
+  Measured by `npm run deskreach`: `18/18 passed` with nothing owed.
+
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this

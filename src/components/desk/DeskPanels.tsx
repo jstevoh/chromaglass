@@ -111,16 +111,17 @@ function DeskControl({ spec, p, testId, asKnob, dense }: { spec: DeskSpec; p: De
   );
 }
 
-/** Faders first, full width; then the knobs, four to a row. */
+/** Faders first, full width; then the knobs, four to a row (six when a wide knob panel holds more than two rows). */
 function ControlGrid({ keys, p, prefix }: { keys: (keyof VisualizerSettings)[]; p: DeskProps; prefix: string }) {
   const specs = keys.map(k => RANGE.get(String(k))).filter((s): s is DeskSpec => !!s);
   const faders = specs.filter(s => p.kindFor(s.key) === 'fader');
   const knobs = specs.filter(s => p.kindFor(s.key) !== 'fader');
+  const cols = prefix === 'knob' && knobs.length > 8 && knobs.length <= 12 ? 'grid-cols-6' : 'grid-cols-4';
   return (
     <>
       {faders.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob={false} />)}
       {knobs.length > 0 && (
-        <div className="grid grid-cols-4 justify-items-center gap-x-1 gap-y-2 pt-1">
+        <div className={`grid ${cols} justify-items-center gap-x-1 gap-y-2 pt-1`}>
           {knobs.map(s => <DeskControl key={String(s.key)} spec={s} p={p} testId={`${prefix}-${String(s.key)}`} asKnob />)}
         </div>
       )}
@@ -581,15 +582,22 @@ function RecipeBody({ p }: { p: DeskProps }) {
 // ── Bottles, dyes, tools ─────────────────────────────────────────────
 
 function BottlesBody({ p }: { p: DeskProps }) {
+  /*
+    At 1280×800 the right column has 448 px between the header and the deck;
+    three rows of bottles (108 px with their header) left the Rides 7 of their
+    8 faders and pushed Evolve Speed under the fold (PLAN 35c-6a). Below 840 px
+    of window height the six bottles sit in one row, saving 70 px so every ride
+    shows whole while the Bottles stay whole above them.
+  */
   return (
-    <div className="grid grid-cols-3 gap-1.5" data-testid="bench-left">
+    <div className="grid grid-cols-6 gap-1 min-[1px]:[@media(min-height:840px)]:grid-cols-3 min-[1px]:[@media(min-height:840px)]:gap-1.5" data-testid="bench-left">
       {[...p.dyeBottles, ...p.behaviourBottles].map(l => (
         <button
           aria-pressed={p.bottleId === l.id}
           key={l.id}
           onClick={() => p.onBottle(l.id)}
           title={l.behaviour ? `${l.name}: changes the plate where it lands` : l.name}
-          className={`flex h-8 min-w-0 items-center gap-2 rounded-md border px-2 text-left transition-colors ${
+          className={`flex h-8 min-w-0 items-center justify-center gap-1.5 rounded-md border px-1 text-left transition-colors min-[1px]:[@media(min-height:840px)]:justify-start min-[1px]:[@media(min-height:840px)]:gap-2 min-[1px]:[@media(min-height:840px)]:px-2 ${
             p.bottleId === l.id ? LIT : 'border-transparent text-muted hover:bg-hover hover:text-text'
           }`}
           data-testid={`bottle-${l.id}`}
@@ -603,7 +611,7 @@ function BottlesBody({ p }: { p: DeskProps }) {
           {p.bottleId === l.id
             ? <LiveBottle colour={bottleSwatch(l).backgroundColor} read={p.dyeRoom} testId="bottle-in-hand" />
             : <Bottle colour={bottleSwatch(l).backgroundColor} level={1} />}
-          <span className="truncate text-[13px] font-medium">{l.name}</span>
+          <span className="hidden truncate text-[13px] font-medium min-[1px]:[@media(min-height:840px)]:inline">{l.name}</span>
         </button>
       ))}
     </div>
