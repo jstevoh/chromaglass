@@ -23,6 +23,17 @@
  * forty-five seconds says so; a song named with no map waits; a map for
  * another song is not this song's; an analysis still running is not "too
  * short"; a song heard before is designed the moment it is named.
+ *
+ * And the map is in the song's seconds (PLAN 28h-9). The recorder starts when
+ * the song is named, seconds in or halfway through, so the analysis measures
+ * from the wrong zero. Here a song is "heard" from 0:30 the way the analysis
+ * would hear it (its sections clipped and counted from the recording, the
+ * first one called an intro by the analysis's own rule, its curves sliced),
+ * moved by the lead the clock gives (`songSecAt`), and must then fire its
+ * cues where the song's choruses really start, keep each moment in its own
+ * section's stage, and read the same energy and harmony at every second as
+ * the song does. Its fingerprint must make the real local matcher name the
+ * song's position, not the recording's.
  */
 
 import {
@@ -30,6 +41,9 @@ import {
 } from '../src/lib/songDesign.ts';
 import { scoreOf } from '../src/lib/songScore.ts';
 import { GLIDES, stageAtOffset } from '../src/lib/sequencer.ts';
+import { songSecAt, shiftSongMap, shiftFingerprintFrames, FOLD_LEAD_SEC, CHROMA_RATE } from '../src/lib/songMapLead.ts';
+import { FOLLOW_RATE } from '../src/lib/songFollow.ts';
+import { extractPeakHashes, buildIndex, matchSnippet, FP_RATE } from '../src/lib/localFingerprint.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -155,6 +169,94 @@ check('named by hand after a miss, it carries on as if heard (and keeps no made-
   r.state.phase === 'learning' && r.heard?.isrc === undefined);
 check('idle and designed do nothing', listenStep(LISTEN_IDLE, ear({ track: track(), songMap: ROCK })).design === null
   && listenStep({ ...learning, phase: 'designed' }, ear({ heardMap: ROCK })).design === null);
+
+// ── The map in the song's seconds (PLAN 28h-9) ─────────────────────────
+/**
+ * What the analysis makes of `song` recorded from `lead` s in: its sections
+ * cut where the song's are and counted from the recording, the first called
+ * the intro if it is short and not a chorus (`segment`'s own rule), and its
+ * curves from the recording's first frame.
+ */
+const heardFrom = (song, lead) => {
+  const sections = song.sections.filter((x) => x.end > lead).map((x) => ({ ...x, start: Math.max(0, x.start - lead), end: x.end - lead }));
+  if (sections[0] && sections[0].end - sections[0].start < 25 && sections[0].label !== 'chorus') sections[0].label = 'intro';
+  const f = Math.round(lead * song.frameRate);
+  return { ...song, durationSec: song.durationSec - lead, sections, energyCurve: song.energyCurve.slice(f), pitchCurve: song.pitchCurve.slice(f), chroma: song.chroma?.slice(Math.round(lead * 4) * 12) };
+};
+const SONG = { ...ROCK, pitchCurve: Array.from({ length: 720 }, (_, i) => 50 + (i % 24)), chroma: Array.from({ length: 720 * 12 }, (_, i) => ((i * 7919) % 1000) / 1000) };
+// Named 0:30 into the song by a match taken at 5.0 s on the show's clock; the
+// recorder got going 0.6 s later; a re-identification a minute on, 0.1 s
+// wiser about where the song is, is the newest anchor when the listen ends.
+const firstMatch = { offsetSec: 30, identifiedAtMs: 5000 }, reAnchored = { offsetSec: 90, identifiedAtMs: 65_100 };
+const lead = songSecAt(reAnchored, 5600);
+check('the recording\'s first sample is the song second the newest anchor puts it at; named by hand or with no clock, it is the start',
+  Math.abs(lead - 30.5) < 1e-9 && Math.abs(songSecAt(firstMatch, 5600) - 30.6) < 1e-9
+  && songSecAt({ offsetSec: undefined, identifiedAtMs: undefined }, 5600) === 0 && songSecAt(null, 5600) === 0 && songSecAt({ offsetSec: NaN, identifiedAtMs: 0 }, 1) === 0,
+  `lead ${lead.toFixed(2)} s (first match alone said ${songSecAt(firstMatch, 5600).toFixed(2)})`);
+const heard = heardFrom(SONG, 30);
+const moved = shiftSongMap(heard, 30);
+const choruses = (m) => m.sections.filter((x) => x.label === 'chorus').map((x) => x.start);
+check('heard from 0:30, the map\'s choruses sit where the song\'s do (0:40, 1:30, 2:14), not 30 s early',
+  JSON.stringify(choruses(moved)) === JSON.stringify([40, 90, 134]) && moved.durationSec === 180,
+  `before ${choruses(heard).join(', ')} s; after ${choruses(moved).join(', ')} s`);
+const unheardDesign = designFromMap(moved);
+const mf = fires(moved, unheardDesign), bf = fires(heard, designFromMap(heard));
+check('its designed cues fire on the song\'s own choruses, bridge and end',
+  ['Burst@40', 'Burst@90', 'Next dyes@112', 'Burst@134', 'Next dyes@134', 'Drain the plate@172', 'Pour the title@0'].every((w) => mf.includes(w)),
+  `before ${bf.filter((f) => !f.startsWith('Pour')).join(', ')}; after ${mf.filter((f) => !f.startsWith('Pour')).join(', ')}`);
+const offStage = [];
+for (let t = 0; t < 180; t += 0.5) {
+  const want = t < 30 ? 'unheard' : SONG.sections.find((x) => t >= x.start && t < x.end).label;
+  const st = stageAt(unheardDesign.stages, t);
+  if (!st.name.toLowerCase().startsWith(want)) offStage.push(`${t}s ${st.name}/${want}`);
+}
+check('the part before the recording is one "Unheard" stage, and from 0:30 every moment is in its own section\'s stage (the one heard first a verse, not an intro)',
+  offStage.length === 0 && unheardDesign.stages[0].name === 'Unheard' && unheardDesign.stages[1].name.startsWith('Verse'),
+  offStage.length ? offStage.slice(0, 4).join(', ') : unheardDesign.stages.slice(0, 3).map((st) => `${st.name} ${st.seconds}s`).join(', '));
+let curvesAgree = CHROMA_RATE === FOLLOW_RATE && moved.energyCurve.length === 720 && moved.pitchCurve.length === 720 && moved.chroma.length === 180 * FOLLOW_RATE * 12;
+for (let f = 120; f < 720 && curvesAgree; f++) {
+  if (moved.energyCurve[f] !== SONG.energyCurve[f] || moved.pitchCurve[f] !== SONG.pitchCurve[f]) curvesAgree = false;
+  for (let k = 0; k < 12; k++) if (moved.chroma[f * 12 + k] !== SONG.chroma[f * 12 + k]) curvesAgree = false;
+}
+const silentBefore = moved.pitchCurve.slice(0, 120).every((p) => p === 0) && moved.chroma.slice(0, 120 * 12).every((c) => c === 0)
+  && moved.energyCurve.slice(0, 120).every((e) => e === moved.sections[1].energy);
+check('energy, pitch and harmony read the song\'s own values at every quarter second heard; before it, no pitch, no harmony and the first heard section\'s energy',
+  curvesAgree && silentBefore);
+const INTRO_SONG = mapOf([[0, 20, 'intro', 0.2], [20, 50, 'verse', 0.5], [50, 80, 'chorus', 0.9], [80, 100, 'outro', 0.1]], 100, 'E');
+const midIntro = shiftSongMap(heardFrom(INTRO_SONG, 10), 10);
+const firstSecs = shiftSongMap(heardFrom(ROCK, FOLD_LEAD_SEC - 2), FOLD_LEAD_SEC - 2);
+// A song opening on a long verse (no intro to take it), matched 5 s in.
+const verseFirst = shiftSongMap(heardFrom(PLAIN, 5), 5);
+check('a first match a few seconds in (into an intro or a verse), or named in the intro, takes the unheard start into the first section rather than a stage of its own',
+  firstSecs.sections.length === 8 && firstSecs.sections[0].start === 0 && firstSecs.sections[0].label === 'intro'
+  && midIntro.sections.length === 4 && midIntro.sections[0].start === 0 && midIntro.sections[0].end === 20 && midIntro.sections[0].label === 'intro'
+  && verseFirst.sections.length === PLAIN.sections.length && verseFirst.sections[0].start === 0 && verseFirst.sections[0].label === 'verse'
+  && shiftSongMap(ROCK, 0) === ROCK,
+  `named at 0:06: ${firstSecs.sections[0].label} ${firstSecs.sections[0].start}-${firstSecs.sections[0].end}; named at 0:10 of a 20 s intro: ${midIntro.sections[0].label} ${midIntro.sections[0].start}-${midIntro.sections[0].end}`);
+
+// The fingerprint stored with the map, through the real local matcher. A
+// made-up record: a chord of three tones every fifth of a second, seeded, so
+// its peaks are sharp and never repeat.
+const toneSong = (() => {
+  const out = new Float32Array(90 * FP_RATE);
+  let seed = 7;
+  const rnd = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296);
+  const step = Math.round(0.2 * FP_RATE);
+  for (let a = 0; a < out.length; a += step) {
+    const fs = [0, 1, 2].map(() => 300 + rnd() * 3500);
+    for (let i = a; i < Math.min(out.length, a + step); i++) for (const f of fs) out[i] += 0.2 * Math.sin((2 * Math.PI * f * i) / FP_RATE);
+  }
+  return out;
+})();
+const fpLead = 20;
+const recorded = extractPeakHashes(toneSong.subarray(fpLead * FP_RATE), FP_RATE);
+const indexOf = (frames) => buildIndex([{ isrc: 'TONES', hashes: recorded.hashes, frames, durationSec: recorded.durationSec, createdAt: 0 }]);
+const snippet = toneSong.subarray(50 * FP_RATE, 54 * FP_RATE);
+const after = matchSnippet(snippet, FP_RATE, indexOf(shiftFingerprintFrames(recorded.frames, fpLead)));
+const before = matchSnippet(snippet, FP_RATE, indexOf(recorded.frames));
+check('the fingerprint it stores names the song\'s position: a snippet ending at 0:54 matches at 0:54, not 20 s early',
+  after && Math.abs(after.offsetSec - 54) < 0.25,
+  `before ${before ? before.offsetSec.toFixed(2) : 'no match'} s; after ${after ? after.offsetSec.toFixed(2) : 'no match'} s`);
 
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} listen checks pass`);

@@ -732,7 +732,9 @@
         "Listen (PLAN 28h-8): the show designed from a heard song's map plays on",
         "the song (its cues through the real scheduler, its stages where startAt",
         "lays them, louder sections fuller against the song's own range), and",
-        "the flow waits for the right map and says when nothing was named."
+        "the flow waits for the right map and says when nothing was named; and",
+        "a map heard from halfway in sits on the song's own seconds (28h-9): its",
+        "cues fire on the song's choruses and its fingerprint names the song's place."
       ]
     },
     {

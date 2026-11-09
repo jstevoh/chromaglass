@@ -21,6 +21,7 @@ import { identify, manualIdentity, fingerprintingAvailable, capturePcm } from '.
 import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '../lib/localFingerprint';
 import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
 import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/songMap';
+import { songSecAt } from '../lib/songMapLead';
 import { SongPosition, nudgeFor, type NudgeKind } from '../lib/songScore';
 import { FollowedPlace, readSection } from '../lib/followedPlace';
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
@@ -185,6 +186,8 @@ export function useMusicIntelligence(
   const audioRef = useRef<AudioData | null>(null);
   const lastLoudMsRef = useRef(performance.now());
   const listenStartMsRef = useRef(0);
+  // When the first listen's recorder really started: after the awaits in adoptTrack, so a little after listenStartMsRef.
+  const recordStartMsRef = useRef<number | null>(null);
   const lastIdentifyMsRef = useRef(-Infinity); // first attempt fires as soon as sound is present
   const lastPosRef = useRef(0);
   /** Where the show reads the map (lib/followedPlace.ts); null while no track has been identified. */
@@ -334,6 +337,7 @@ export function useMusicIntelligence(
     // First listen of this track: record it for offline analysis
     if (!cached && streamForRecording) {
       const ok = recorderRef.current.start(streamForRecording);
+      recordStartMsRef.current = ok ? performance.now() : null;
       setRecordingActive(ok);
     }
 
@@ -359,9 +363,14 @@ export function useMusicIntelligence(
     // Generate + cache the song map from the first-listen recording
     if (recording && !songMapRef.current && listenMs > MIN_LISTEN_MS) {
       setAnalyzing(true);
+      // The recording began seconds into the song (PLAN 28h-9): its first
+      // sample is the song second the clock read then, by the newest anchor
+      // the track has now. The trim was counted from the listen's start.
+      const recStart = recordStartMsRef.current ?? listenStartMsRef.current;
+      const trim = trimToSec == null ? undefined : trimToSec - (recStart - listenStartMsRef.current) / 1000;
       const generated = await generateSongMap(currentTrack.isrc, recording, {
         title: currentTrack.title, artist: currentTrack.artist,
-      }, trimToSec);
+      }, trim, songSecAt(currentTrack, recStart));
       // Before the awaits below, in the same render as the analysis ending:
       // Listen reads "analysis over and no map" as a song heard too short.
       if (generated) setHeardMap(generated.map);
