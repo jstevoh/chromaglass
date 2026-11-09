@@ -154,8 +154,13 @@ function standInDisplay(port, displayKey) {
     if (m.type === 'action' && m.action === 'go' && look.cued) { look.on = look.cued; look.cued = null; sendState(); }
     if (m.type === 'assistant-live') {
       const names = m.names ?? stream.setup.destinations.filter((d) => d.on && d.test === m.test).map((d) => d.name);
-      stream.live = { test: m.test, seconds: 0, names, trouble: false, skipped: 0, destinations: names.map((name) => ({ name, phase: 'live', kbps: 6200, secondsBehind: 0.1, dropping: false, reconnects: 0, error: null })) };
-      sendState();
+      // On air a second later, as the app's display reports it only once
+      // the keys are read and the encoder has started, so a guard that
+      // waited for the display's word would be caught in that second.
+      setTimeout(() => {
+        stream.live = { test: m.test, seconds: 0, names, trouble: false, skipped: 0, destinations: names.map((name) => ({ name, phase: 'live', kbps: 6200, secondsBehind: 0.1, dropping: false, reconnects: 0, error: null })) };
+        sendState();
+      }, 1000);
     }
     if (m.type === 'action' && m.action === 'live-stop') { stream.live = null; sendState(); }
     if (m.type === 'assistant-sound') { stream.sound = { source: m.source, file: null }; sendState(); }
@@ -437,7 +442,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const sndPlay = await mcp.call('set_sound_source', { source: 'microphone' });
     const goPlay = await mcp.call('go_live', { destinations: ['YouTube'] });
     await sleep(150);
-    check('fullonly', 'the sound source and go_live are refused in Play', !sndPlay.ok && !goPlay.ok && display.since(t).every((m) => !['assistant-sound', 'assistant-live'].includes(m.type)), `${sndPlay.text} | ${goPlay.text}`.slice(0, 140));
+    check('fullonly', 'the sound source and go_live are refused in Play, for want of Full', !sndPlay.ok && !goPlay.ok && /Full mode is needed/.test(sndPlay.text) && /Full mode is needed/.test(goPlay.text) && display.since(t).every((m) => !['assistant-sound', 'assistant-live'].includes(m.type)), `${sndPlay.text} | ${goPlay.text}`.slice(0, 140));
 
     // Ten deep.
     await sleep(1100);
@@ -511,13 +516,18 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const goNowhere = await mcp.call('go_live', { destinations: ['Nowhere'] });
     await sleep(300);
     const goTestByName = await mcp.call('go_live', { destinations: ['YouTube'], test: true });
+    await sleep(300);
+    const goNone = await mcp.call('go_live', { destinations: [] });
     await sleep(150);
     check('live-unknown', 'go_live to a name that is not a saved destination of that kind is refused with the saved list, and nothing reaches the display',
-      !goNowhere.ok && /YouTube, Twitch/.test(goNowhere.text) && !goTestByName.ok && /Test server/.test(goTestByName.text) && display.since(t, 'assistant-live').length === 0, `${goNowhere.text} | ${goTestByName.text}`.slice(0, 200));
+      !goNowhere.ok && /YouTube, Twitch\)/.test(goNowhere.text) && !goTestByName.ok && /Test server\)/.test(goTestByName.text) && display.since(t, 'assistant-live').length === 0, `${goNowhere.text} | ${goTestByName.text}`.slice(0, 200));
+    check('live-none', 'go_live naming no destinations at all is refused, never read as the panel\'s choice', !goNone.ok && /destinations/.test(goNone.text) && display.since(t, 'assistant-live').length === 0, goNone.text.slice(0, 120));
     await sleep(300);
     t = Date.now();
     const goNamed = await mcp.call('go_live', { destinations: ['twitch '] });
+    const sndRace = await mcp.call('set_sound_source', { source: 'microphone' });
     await sleep(300);
+    check('sound-race', 'a sound change sent before the display reports the new stream on air is refused too', !sndRace.ok && /on air/.test(sndRace.text) && display.since(t, 'assistant-sound').length === 0, sndRace.text.slice(0, 120));
     const lvNamed = display.since(t, 'assistant-live');
     check('live-names', 'go_live with names reaches the display with just those names, and not as a test', goNamed.ok && lvNamed.length === 1 && lvNamed[0].test === false && JSON.stringify(lvNamed[0].names) === '["twitch"]', `${goNamed.text} | ${JSON.stringify(lvNamed)}`.slice(0, 160));
     await sleep(300);
@@ -577,6 +587,8 @@ const MUTANTS = [
   { rule: 'sound-air', file: 'assistant.js', find: 'if (show.onAir) return refuse(', replace: 'if (false) return refuse(' },
   { rule: 'sound-source', file: 'assistant.js', find: 'if (!SOUND_SOURCES.has(message.source)) return refuse(', replace: 'if (false) return refuse(' },
   { rule: 'live-unknown', file: 'assistant.js', find: 'if (unknown.length) return `no saved', replace: 'if (false) return `no saved' },
+  { rule: 'live-none', file: 'assistant.js', find: '!Array.isArray(raw) || raw.length === 0 ||', replace: '!Array.isArray(raw) ||' },
+  { rule: 'sound-race', file: 'assistant.js', find: 'show.onAir = true;', replace: '' },
   { rule: 'live-names', file: 'assistant.js', find: '...(names ? { names } : {})', replace: '' },
   { rule: 'phone-live', file: 'remote-server.js', find: "'assistant-live', 'assistant-sound',", replace: "'assistant-live'," },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
@@ -600,7 +612,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -687,7 +699,7 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const byName = page.pickSaved(list, kept, false, [' twitch', 'YOUTUBE', 'youtube']);
   say(names(byName) === 'Twitch,YouTube', `with names, just those, in any case, once each, a destination switched off in the panel included (${names(byName)})`);
   const unknown = page.pickSaved(list, kept, false, ['YouTube', 'Test server']), keyless = page.pickSaved(list, kept, false, ['Facebook']);
-  say('error' in unknown && /Test server/.test(unknown.error) && /saved: YouTube, Twitch, Facebook/.test(unknown.error) && 'error' in keyless && /Facebook" has no stream key/.test(keyless.error),
+  say('error' in unknown && /Test server/.test(unknown.error) && /saved: YouTube, Twitch, Facebook\)$/.test(unknown.error) && 'error' in page.pickSaved(list, kept, false, []) && 'error' in keyless && /Facebook" has no stream key/.test(keyless.error),
     `a name not saved as that kind, or one with no key kept, is an error that says which, never a quiet drop (${'error' in unknown ? unknown.error : '-'} | ${'error' in keyless ? keyless.error : '-'})`);
   const idle = { phase: 'idle', test: false, error: null, seconds: 0, names: [], destinations: [], frames: 0, skipped: 0 };
   const setup = page.setupOf(list, kept, { height: 1080, fps: 30 }, { ...idle, phase: 'failed', error: 'refused', seconds: 3 }, null);
@@ -695,6 +707,22 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   say(setup.destinations.length === 5 && setup.destinations[0].keyKept && !setup.destinations[2].keyKept && !setup.destinations[4].urlValid && !/rtmps|example|live-yt/.test(text) && setup.last?.error === 'refused'
     && page.setupOf(list, kept, { height: 1080, fps: 30 }, idle, 'no key').last?.error === 'no key' && page.setupOf(list, kept, { height: 1080, fps: 30 }, { ...idle, phase: 'live' }, 'old').last === null,
     `the setup readout names each destination and whether its key is kept, carries no address or key name, and says how the last start or stream ended (${text.slice(0, 140)})`);
+}
+
+/* The page's own sound door (44j), on the real soundNow: the sources it takes
+   are the guard's and the tool's, and it changes nothing it was not handed. */
+{
+  const guardSources = [...(await import(join(ROOT, 'server', 'assistant.js'))).SOUND_SOURCES].sort().join(',');
+  const toolSources = [...readFileSync(join(ROOT, 'mcp', 'chromaglass-mcp.js'), 'utf8').matchAll(/name: 'set_sound_source'[^\n]*?enum: \[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1]).sort().join(','))[0];
+  const pageSources = [...page.ASSISTANT_SOURCES].sort().join(',');
+  say(guardSources === pageSources && toolSources === pageSources, `the guard's, the tool's and the page's sound sources are one list (guard ${guardSources}; tool ${toolSources}; page ${pageSources})`);
+  const noDoor = page.askSound('microphone');
+  const asked = [];
+  page.setSoundDoor((s) => asked.push(s));
+  const bad = page.askSound('file'), good = page.askSound('system');
+  page.setSoundDoor(null);
+  say(/not running/.test(noDoor ?? '') && /no such source/.test(bad ?? '') && good === null && asked.join(',') === 'system',
+    `the page's door changes the source it is handed, refuses one it may not pick, and says so with no sound running (${noDoor} | ${bad} | ${good} | ${asked.join(',')})`);
 }
 
 // The edges of the code.

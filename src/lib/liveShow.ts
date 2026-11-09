@@ -331,7 +331,8 @@ export async function startSavedLive(test: boolean, only?: string[]): Promise<Li
  * failure the owner would only find from the audience.
  */
 export function pickSaved(list: LiveDestination[], kept: Set<string>, test: boolean, only?: string[]): { to: LiveDestination[] } | { error: string } {
-  if (!only || only.length === 0) {
+  if (only && only.length === 0) return { error: 'no destinations named: name at least one, or none at all for the panel\'s choice' };
+  if (!only) {
     const to = chosenFor(list, test).filter((d) => kept.has(keyNameFor(d)));
     return to.length ? { to } : { error: test ? 'no test destination with a kept key' : 'no live destination with a kept key' };
   }

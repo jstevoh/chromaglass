@@ -111,7 +111,7 @@ const FULL_ACTIONS = new Set([
 ]);
 const RANK = { off: 0, suggest: 1, play: 2, full: 3 };
 /** The sources the assistant may pick (app/soundNow.ts's ASSISTANT_SOURCES): a file needs the player's own choice of file. */
-const SOUND_SOURCES = new Set(['none', 'microphone', 'system', 'simulated', 'drone']);
+export const SOUND_SOURCES = new Set(['none', 'microphone', 'system', 'simulated', 'drone']);
 
 /**
  * The owner's switch. `CHROMAGLASS_ASSISTANT` (off, suggest, play or full)
@@ -407,7 +407,13 @@ export function createAssistantGuard(send, now = Date.now) {
           if (action === 'blackout-toggle') remember({ kind: 'action', action, after: !show.blackout });
           // The stream has its own message, which the relay takes from no one
           // but this guard: a phone may end a stream and never start one.
-          if (going) send({ type: 'assistant-live', test: action === 'live-test', ...(names ? { names } : {}) });
+          if (going) {
+            send({ type: 'assistant-live', test: action === 'live-test', ...(names ? { names } : {}) });
+            // On air from here, not from the display's next state, which comes
+            // only once the encoder has started: a sound change in between
+            // would end the new stream's track as surely as one a minute in.
+            show.onAir = true;
+          }
           else send({ type: 'action', action });
           return { ok: true };
         }

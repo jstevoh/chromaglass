@@ -12335,8 +12335,11 @@ without a key, is an error that names the list, never a quiet drop:
 `liveShow.pickSaved`). `set_sound_source` goes through the Sound panel's own door
 (`app/soundNow.ts`, a holder because App.tsx may not grow), Full only, and is refused
 while on air: the stream keeps the track it started with, so a change would leave it
-silent (44j-2 is the real fix). Check: `npm run assistant`, 101 lines, five new
-mutants (on air, unknown source, unknown name, names dropped, a phone's sound).
+silent (44j-2 is the real fix); the guard counts the stream on air from the start it
+sends, not from the display's next word a second later. Check: `npm run assistant`,
+107 lines, seven new mutants (on air, on air before the display says so, unknown
+source, unknown name, no names, names dropped, a phone's sound), and the guard's,
+the tool's and the page's source lists compared.
 
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
