@@ -93,7 +93,7 @@ forms and a 15 % cut.
    as the LLC (12-play-org).* Still owed on Apple's side when the work starts: the
    App Store Connect record for `app.chromaglass`, and an App Store Connect API key
    as a secret in one of main's environments so CI can upload to TestFlight.
-3. **The Android shell** (one PR): a Bubblewrap project, `assetlinks.json` in
+3. **The Android shell** (one PR; *replaced by 12-ctl-3, 2026-11-09: a Capacitor app, since a TWA cannot be the Mac's controller*): a Bubblewrap project, `assetlinks.json` in
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
    The upload key stays with the owner, never in the repo. Then the closed test
@@ -183,6 +183,48 @@ feature ships its phone version is what keeps them whole.
   $199 against Lemon Squeezy's about $10, and the tools VJs pay for (Resolume, VDMX,
   MadMapper, TouchDesigner) sell direct. Reopen only if Home's sales show buyers
   who would have found it in the store, and then as Home alone.
+
+**12-ctl: the phone apps are the show's controller (asked 2026-11-08).** The owner: "shouldn't
+we have 2 apps on each platform? tv apps to just show the visuals, and android and ios apps to
+control the show?", then "lets get antigravity to build those apps". So on each store a TV app
+(12-tv, it only shows the plate) and a phone app, which is one app doing both things the iPhone
+shell already does: it plays the show itself (a pocket plate), and it is the Mac app's
+controller, with the dials, the songs and the looks. Draw, the dials, the sequencer and the looks
+are on the remote now (4a, `npm run applink`); what the controller lacks is written first as
+`npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
+builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
+
+- **12-ctl-1** (M, Antigravity): **the songs on the phone.** The Perform desk's set list (its cue
+  list, `lib/setList.ts`) and the song shows (`lib/songShows.ts`) reach the remote in
+  `RemoteState.setList` and `RemoteState.songs`, on a Songs screen one tap from Draw and from
+  Controls: an item tapped is armed for the next Go, a song show run or stopped, Follow songs
+  turned over. The laptop's half sends them from what it has saved and acts on `cue-set-item`,
+  `song-run`, `song-stop`, `song-follow` with the functions the desk's rows call. *Measure:*
+  `controller` lines `setlist`, `songs`, `display`.
+- **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
+  which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
+  Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
+  refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
+  camera (it opens the show server's own remote in the browser) and the app. *Measure:*
+  `controller` line `scan`.
+- **12-ctl-3** (M, Antigravity): **the Android app, as Capacitor, not a TWA.** Step 3 planned a
+  Trusted Web Activity: the hosted https site in Chrome, which cannot open a plain `ws://` socket
+  to the Mac on the LAN (mixed content; 12-play-org's open question), so it could never be the
+  controller. The Android app is therefore the iPhone's shell on Android: `npx cap add android`
+  beside `ios/`, the same bundled build and app id `app.chromaglass`, the microphone and camera,
+  cleartext and mixed content allowed for the LAN, and a CI workflow that builds an unsigned debug
+  APK (no secrets). What it gives up is the TWA's every-deploy-reaches-the-app; a release builds a
+  new bundle (12-ctl-ship). Android's WebView has WebGPU on fewer phones than Chrome does, so when
+  the plate cannot start in the app it says so, offers the Laptop remote, and opens the show in
+  Chrome. Step 1's Android smoke test still stands for Chrome. *Measure:* `controller` lines
+  `android`, `nogpu`, and the workflow green.
+- **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
+  Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
+  when 12-tv-2's advert is on main.
+- **12-ctl-ship** (Claude): the Android bundle signed through Play App Signing (the upload key
+  stays with the owner, the CI secret is Claude's to wire), an upload job to the Play closed test
+  from main, and the iPhone's half is 12-ship. Sign-in, in-app account deletion (5.1.1(v)), the
+  licence Worker and anything that touches a key are Claude's, never in an Antigravity brief.
 
 **12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
 owner asked whether a Google TV / Android TV app should play the plate on a big
