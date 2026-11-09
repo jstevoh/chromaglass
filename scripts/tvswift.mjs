@@ -21,6 +21,20 @@
 // says what each reads). This script counts them, and fails if the probe ran fewer than it
 // should, so a probe that stops early cannot pass on the lines it did print.
 //
+// Then the receiver: a stand-in for the Mac's relay (`/remote-ws`, draft PR #752's
+// protocol, as the /tv page speaks it) plays one scripted show per connection, and the
+// probe's receiver, with a stand-in peer connection, has to find its way through it:
+//
+//  1. hello, the show comes on, an offer; once the TV's answer and candidates are in, the
+//     Mac's candidate (the stand-in peer then connects and draws a frame), then "full"
+//     (a fourth TV), then the socket drops;
+//  2. the TV reconnects by itself: hello, the show, an offer, and no picture ever, so the
+//     TV's stuck timer must give up and start over;
+//  3. the fresh hello is told the key is wrong, and the TV must not knock again.
+//
+// The relay records what the TV sent, and this script checks it, so the probe's own idea
+// of what it sent is never the evidence.
+//
 // Swift and CryptoKit: on a Mac the package uses CryptoKit; on Linux (the Measure shards)
 // it builds Apple's swift-crypto, the same API, so the check runs where Measure runs.
 
@@ -28,13 +42,14 @@ import http from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { WebSocketServer } from 'ws';
 import worker from '../server/license-worker.js';
 import { signLicenseKey } from '../server/license-key.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = resolve(root, 'tvos');
 // The probe's own count of checks, kept here so a probe cut short reads as a failure.
-const PROBE_CHECKS = 16;
+const PROBE_CHECKS = 22;
 
 const lines = [];
 const say = (ok, name, detail = '') => {
@@ -137,13 +152,42 @@ const server = http.createServer(async (req, res) => {
 await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
 const base = `http://127.0.0.1:${server.address().port}`;
 
+const RELAY_KEY = 'K3YTV';
+const MAC_ICE = { candidate: 'candidate:1 1 udp 2122260223 10.0.0.2 50000 typ host', sdpMid: '0', sdpMLineIndex: 0 };
+const conns = [];
+const relayHttp = http.createServer((_, res) => { res.writeHead(404); res.end(); });
+const wss = new WebSocketServer({ server: relayHttp, path: '/remote-ws' });
+wss.on('connection', (ws) => {
+  const n = conns.length;
+  const conn = { msgs: [] };
+  conns.push(conn);
+  const send = (m) => ws.send(JSON.stringify(m));
+  ws.on('message', (raw) => {
+    let m;
+    try { m = JSON.parse(String(raw)); } catch { return; }
+    conn.msgs.push(m);
+    if (m.type === 'hello') {
+      if (n >= 2) { send({ type: 'denied', reason: 'key' }); setTimeout(() => ws.close(), 50); return; }
+      send({ type: 'tv-show', here: true });
+      send({ type: 'tv-signal', signal: { kind: 'offer', sdp: `offer-${n + 1}` } });
+    }
+    if (n === 0 && m.type === 'tv-signal' && m.signal?.kind === 'ice' && m.signal.candidate === null) {
+      send({ type: 'tv-signal', signal: { kind: 'ice', candidate: MAC_ICE } });
+      setTimeout(() => send({ type: 'tv-signal', signal: { kind: 'refused', reason: 'full' } }), 300);
+      setTimeout(() => ws.close(), 600);
+    }
+  });
+});
+await new Promise((ok) => relayHttp.listen(0, '127.0.0.1', ok));
+const tvAddress = `http://127.0.0.1:${relayHttp.address().port}/tv?key=${RELAY_KEY}`;
+
 const built = spawnSync('swift', ['build', '--product', 'cgtv-probe'], { cwd: pkg, encoding: 'utf8' });
 say(built.status === 0, 'the Apple TV core builds', built.status === 0 ? '' : (built.stderr || built.stdout).split('\n').filter((l) => /error/.test(l)).slice(0, 5).join(' | '));
-if (built.status !== 0) { server.close(); process.exit(1); }
+if (built.status !== 0) { server.close(); relayHttp.close(); wss.close(); process.exit(1); }
 const bin = spawnSync('swift', ['build', '--product', 'cgtv-probe', '--show-bin-path'], { cwd: pkg, encoding: 'utf8' }).stdout.trim();
 
 const probe = spawn(resolve(bin, 'cgtv-probe'), [], {
-  env: { ...process.env, CGTV_BASE: base, CGTV_KEY_X: pubJwk.x },
+  env: { ...process.env, CGTV_BASE: base, CGTV_KEY_X: pubJwk.x, CGTV_TV_ADDRESS: tvAddress },
   stdio: ['ignore', 'pipe', 'inherit'],
 });
 let printed = '';
@@ -152,11 +196,21 @@ const timer = setTimeout(() => probe.kill('SIGKILL'), 120_000);
 const code = await new Promise((ok) => probe.on('close', ok));
 clearTimeout(timer);
 server.close();
+for (const c of wss.clients) c.terminate();
+wss.close();
+relayHttp.close();
 
 const okLines = printed.split('\n').filter((l) => l.startsWith(' ok ')).length;
 const failLines = printed.split('\n').filter((l) => l.startsWith('FAIL')).length;
 say(claims.length === 1 && claims[0].status === 200 && claims[0].data?.tier === 'pro',
   'the phone\'s claim of the second code was taken, for the account\'s Pro key', JSON.stringify(claims));
+const hello = (c) => c?.msgs[0]?.type === 'hello' && c.msgs[0].role === 'tv' && c.msgs[0].key === RELAY_KEY;
+const first = (conns[0]?.msgs ?? []).map((m) => (m.type === 'hello' ? 'hello' : `${m.signal?.kind}:${m.signal?.kind === 'answer' ? m.signal.sdp : m.signal?.candidate === null ? 'end' : m.signal?.candidate?.candidate?.split(' ')[0]}`));
+say(JSON.stringify(first) === JSON.stringify(['hello', 'answer:answer-to:offer-1', 'ice:candidate:9', 'ice:end']) && hello(conns[0]),
+  'the TV said hello with the show key, answered the offer, then sent its candidate and the end of them', JSON.stringify(first));
+say(conns.length === 3 && conns.every(hello),
+  'it came back after the drop and after a picture that never came, each time with a fresh hello, and never after a wrong key',
+  `${conns.length} connections: ${JSON.stringify(conns.map((c) => c.msgs.map((m) => m.type)))}`);
 say(code === 0 && failLines === 0 && okLines === PROBE_CHECKS,
   'the probe ran every one of its checks and all passed', `${okLines} ok, ${failLines} failed of ${PROBE_CHECKS}, exit ${code}`);
 

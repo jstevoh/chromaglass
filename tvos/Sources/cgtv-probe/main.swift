@@ -137,5 +137,101 @@ check("the Mac's TV address, typed with or without http://, gives the relay and 
         && address?.socketURL.absoluteString == "ws://192.168.1.20:8787/remote-ws"
         && RelayAddress(tvAddress: "http://192.168.1.20:8787/tv") == nil)
 
+// 5. The receiver's rules, on the machine alone (Receiver.swift), then the driver against
+// the harness's stand-in relay with a stand-in peer connection.
+do {
+    var m = ReceiverMachine(key: "K", timing: ReceiverTiming(connect: 10, restart: 2, retryMin: 0.5, retryMax: 8, lockout: 300))
+    _ = m.handle(.socketOpened)
+    _ = m.handle(.relay(.offer(sdp: "a")))
+    _ = m.handle(.relay(.offer(sdp: "b")))
+    let stale = m.handle(.firstFrame(peer: 1)) + m.handle(.localAnswer(peer: 1, sdp: "old")) + m.handle(.stuckFired(token: 1))
+    let connected = m.handle(.peerConnected(peer: 2))
+    let lateStuck = m.handle(.stuckFired(token: 2))
+    check("a report from a peer connection already replaced, and its stuck timer, change nothing",
+          stale.isEmpty && m.screen == .looking && m.activePeer == 2, "\(stale)")
+    check("a peer that connects is not stuck, though its first frame has not come",
+          connected == [.clearStuck] && lateStuck.isEmpty && m.screen == .looking, "\(connected) \(lateStuck)")
+
+    var b = ReceiverMachine(key: "K")
+    var waits: [TimeInterval] = []
+    for _ in 0..<6 {
+        for case .reconnect(let w) in b.handle(.socketClosed) { waits.append(w) }
+    }
+    _ = b.handle(.socketOpened)
+    var after: TimeInterval = -1
+    for case .reconnect(let w) in b.handle(.socketClosed) { after = w }
+    check("a relay that stops answering is knocked on at doubling waits up to 8 s, and from 0.5 s again once it answers",
+          waits == [0.5, 1, 2, 4, 8, 8] && after == 0.5 && b.screen == .connecting, "\(waits) then \(after)")
+
+    var l = ReceiverMachine(key: "K")
+    _ = l.handle(.socketOpened)
+    let lock = l.handle(.relay(.denied(reason: "locked", retry: 1)))
+    let lockClose = l.handle(.socketClosed)
+    var d = ReceiverMachine(key: "K")
+    _ = d.handle(.socketOpened)
+    _ = d.handle(.relay(.denied(reason: "key", retry: nil)))
+    let deniedClose = d.handle(.socketClosed)
+    check("a lockout waits at least 8 s and its close does not knock early; a wrong key does not knock again",
+          lock == [.reconnect(after: 8)] && lockClose.isEmpty && l.screen == .locked
+            && deniedClose.isEmpty && d.screen == .denied, "\(lock) \(lockClose) \(deniedClose)")
+}
+
+@MainActor final class StandInPeer: PeerLink {
+    var report: ((ReceiverEvent) -> Void)?
+    var answered: [String] = []
+    var macIce: [Int: [IceCandidate?]] = [:]
+    var hangUps = 0
+    func answer(peer: Int, offerSDP: String) {
+        answered.append(offerSDP)
+        let r = report
+        // As a WebRTC stack would: the answer, a candidate, then the end of candidates.
+        DispatchQueue.main.async {
+            r?(.localAnswer(peer: peer, sdp: "answer-to:\(offerSDP)"))
+            r?(.localIce(peer: peer, IceCandidate(candidate: "candidate:9 1 udp 9 10.0.0.9 9000 typ host", sdpMid: "0", sdpMLineIndex: 0)))
+            r?(.localIce(peer: peer, nil))
+        }
+    }
+    func addIce(peer: Int, _ candidate: IceCandidate?) {
+        macIce[peer, default: []].append(candidate)
+        // The Mac's candidate is what lets the stand-in connect and draw a frame.
+        if candidate != nil {
+            let r = report
+            DispatchQueue.main.async { r?(.peerConnected(peer: peer)); r?(.firstFrame(peer: peer)) }
+        }
+    }
+    func hangUp() { hangUps += 1 }
+}
+
+@MainActor func runReceiver(_ tvAddress: String) async {
+    guard let relay = RelayAddress(tvAddress: tvAddress) else {
+        check("the stand-in relay's TV address reads", false, tvAddress)
+        return
+    }
+    let peer = StandInPeer()
+    let driver = ReceiverDriver(address: relay, peer: peer,
+                                timing: ReceiverTiming(connect: 1, restart: 0.3, retryMin: 0.2, retryMax: 1, lockout: 5))
+    var screens: [TvScreen] = []
+    driver.onScreen = { screens.append($0) }
+    driver.start()
+    let deadline = Date().addingTimeInterval(20)
+    while driver.screen != .denied && Date() < deadline { try? await Task.sleep(nanoseconds: 50_000_000) }
+    // A denied TV must not knock again: the harness counts the relay's connections.
+    try? await Task.sleep(nanoseconds: 1_500_000_000)
+    driver.stop()
+    let want: [TvScreen] = [.waiting, .looking, .live, .refused(reason: "full"), .looking, .lost, .waiting, .denied]
+    check("against the relay the TV shows: waiting, looking, live, refused when full, looking again, lost when no picture comes, then denied",
+          screens == want, "\(screens)")
+    let macIce = peer.macIce[1] ?? []
+    check("each offer was answered on a fresh peer connection, and the Mac's candidate reached the first",
+          peer.answered == ["offer-1", "offer-2"] && macIce.count == 1 && macIce.first??.candidate.hasPrefix("candidate:1 ") == true
+            && peer.macIce[2] == nil, "\(peer.answered) \(peer.macIce)")
+}
+
+if let tvAddress = env["CGTV_TV_ADDRESS"] {
+    await runReceiver(tvAddress)
+} else {
+    check("CGTV_TV_ADDRESS names the stand-in relay", false)
+}
+
 print("\n\(passes)/\(passes + failures) probe checks passed")
 exit(failures == 0 ? 0 : 1)

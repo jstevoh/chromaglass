@@ -20,8 +20,15 @@ answering the same offer the `/tv` page answers. Nothing is sold on the TV.
   - `Relay.swift`: the messages the TV and the show's relay exchange at `/remote-ws`
     (hello, denied, tv-show, tv-signal), as `src/components/TvDisplay.tsx` writes them,
     and the Mac's "TV at home" address read into host, port and show key.
+  - `Receiver.swift`: the receiver's logic as one value, `ReceiverMachine` (events in,
+    actions out): the /tv page's connection rules (TvDisplay.tsx, useRemoteLink.ts)
+    with nothing platform in it, so they are checked on any machine with Swift.
+  - `ReceiverDriver.swift`: runs the machine against URLSession's WebSocket to the
+    relay, real timers, and a `PeerLink`, the one protocol the app implements over
+    LiveKit's WebRTC build.
   - `Base64URL.swift`.
-- `Sources/cgtv-probe/`: what `npm run tvswift` runs against the Worker's real handler.
+- `Sources/cgtv-probe/`: what `npm run tvswift` runs against the Worker's real handler
+  and a stand-in for the Mac's relay.
 
 The app target (SwiftUI screens, the video view over LiveKit's tvOS WebRTC build)
 goes in `App/` and links the core; it needs Xcode with the tvOS SDK.
