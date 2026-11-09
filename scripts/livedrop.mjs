@@ -81,8 +81,8 @@
  *                 under half the bound, not at the bound: a client fed a
  *                 scripted readout
  *   skew          a scripted client whose audio is stamped 3 s after or
- *                 before its video, on a socket that holds each keyframe
- *                 50 ms (a link that keeps up, as a real uplink does: on
+ *                 before its video, on a socket that waits 25 ms before and
+ *                 50 ms after each keyframe (a link that keeps up, as a real uplink does: on
  *                 loopback nothing waits and the fault cannot show) drops no
  *                 frame; and the same client with 3.5 s of video truly held
  *                 still drops, in one run, and recovers, at every skew. Before 37x-4g the
@@ -300,7 +300,8 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
 
 // Skew: the readout judges each track on its own clock, so audio stamped seconds off the video is not a backlog, and a real backlog still is.
 {
-  const run = (skewMs, holdFrom = -1, holdUntil = -1) => {
+  const STEP = 1000 / FPS, AAC = 1024 / 48, KEY_PERIOD = KEY_EVERY * STEP;
+  const run = (skewMs, holdFrom = -1, holdUntil = -1, byServer = false) => {
     const c = new LiveClient({ url: 'rtmp://127.0.0.1:1/live', key: 'k', meta: {} });
     c.phase = 'live';
     c.sequenced.video = c.sequenced.audio = true;
@@ -308,7 +309,6 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
     // The kernel's word: each write's callback, held while the link is said to be busy and run in order once it is not.
     const pending = [];
     c.socket = { destroyed: false, writableLength: 0, write: (_b, cb) => { pending.push(cb); return true; } };
-    const STEP = 1000 / FPS, AAC = 1024 / 48;
     const events = [];
     for (let t = 0; t < 20000; t += STEP) events.push([t, 'v']);
     for (let t = 0; t < 20000; t += AAC) events.push([t, 'a']);
@@ -316,8 +316,15 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
     let busyUntil = 0, frame = 0, sentAfter = 0;
     const lastSecond = 20000 - 1000;
     for (const [t, kind] of events) {
-      const held = (t >= holdFrom && t < holdUntil) || t < busyUntil;
-      if (!held) while (pending.length) pending.shift()?.();
+      // The link waits 25 ms before each keyframe as well as 50 ms after it, so the packet last in line before a keyframe
+      // is sometimes a video frame, sometimes a sound: the old one-clock readout misread either, depending on the skew's sign.
+      const preKey = t % KEY_PERIOD > KEY_PERIOD - 25;
+      const held = (t >= holdFrom && t < holdUntil) || t < busyUntil || preKey;
+      if (!held) {
+        while (pending.length) pending.shift()?.();
+        // A server whose acknowledgements are fresh and fine: the readout is on its word, not the socket's.
+        if (byServer) { c.delivery.serverAck = c.delivery.flushed; c.delivery.serverAckAt = Date.now(); }
+      }
       // Timestamps from 3 s, so audio 3 s early still has a clock above zero.
       if (kind === 'v') {
         const key = frame % KEY_EVERY === 0;
@@ -329,13 +336,20 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
         c.audio(3000 + t + skewMs, new Uint8Array(AUDIO_BYTES));
       }
     }
-    return { dropped: c.counts.videoDropped, runs: c.counts.dropRuns, sentAfter, skew: c.state().avSkewSeconds };
+    return { dropped: c.counts.videoDropped, runs: c.counts.dropRuns, sentAfter, skew: c.state().avSkewSeconds, by: c.behind().by };
   };
   const skews = [-3000, 0, 3000];
   const kept = skews.map((k) => run(k));
-  check('audio stamped 3 s before, with or after its video, on a link that keeps up (each keyframe waits 50 ms): no frame dropped, and the readout reports the skew', kept.every((r) => r.dropped === 0 && r.runs === 0) && kept.every((r, i) => Math.abs(r.skew - skews[i] / 1000) < 0.1), kept.map((r, i) => `skew ${skews[i] / 1000} s: ${r.dropped} dropped in ${r.runs} run(s), read ${fmt(r.skew, 2)} s`).join('; '));
-  const held = skews.map((k) => run(k, 5000, 8500));
-  check('the same client with 3.5 s of the stream truly held still drops to a keyframe, in one run, and is sending every frame again by the end, at each skew', held.every((r) => r.runs === 1 && r.dropped > 0 && r.sentAfter >= FPS - 1), held.map((r, i) => `skew ${skews[i] / 1000} s: ${r.dropped} dropped in ${r.runs} run(s), ${r.sentAfter} frames in the last second`).join('; '));
+  check('audio stamped 3 s before, with or after its video, on a link that keeps up (it waits 25 ms before each keyframe and 50 ms after): no frame dropped, and the readout reports the skew', kept.every((r) => r.dropped === 0 && r.runs === 0) && kept.every((r, i) => Math.abs(r.skew - skews[i] / 1000) < 0.1), kept.map((r, i) => `skew ${skews[i] / 1000} s: ${r.dropped} dropped in ${r.runs} run(s), read ${fmt(r.skew, 2)} s`).join('; '));
+  const kServer = run(-3000, -1, -1, true);
+  check('the same, sound 3 s behind, read on a server\'s fresh acknowledgements: no frame dropped', kServer.by === 'server' && kServer.dropped === 0 && kServer.runs === 0, `read on the ${kServer.by}'s word: ${kServer.dropped} dropped in ${kServer.runs} run(s)`);
+  // A backlog held from 5 s to 8.5 s: video drops from the first frame more than the bound behind the last one delivered
+  // before the hold, to the first keyframe once it is let go. Worked from the constants, so a readout off by a third is seen.
+  const HOLD_FROM = 5000, HOLD_UNTIL = 8500;
+  const dropFrom = HOLD_FROM + BEHIND_LIMIT_SECONDS * 1000, dropUntil = Math.ceil(HOLD_UNTIL / KEY_PERIOD) * KEY_PERIOD;
+  const expected = Math.round((dropUntil - dropFrom) / STEP);
+  const held = skews.map((k) => run(k, HOLD_FROM, HOLD_UNTIL));
+  check(`the same client with 3.5 s of the stream truly held drops about ${expected} frames (from ${dropFrom / 1000} s to the keyframe at ${(dropUntil / 1000).toFixed(1)} s), in one run, and is sending every frame again by the end, at each skew`, held.every((r) => r.runs === 1 && Math.abs(r.dropped - expected) <= 2 && r.sentAfter >= FPS - 1), held.map((r, i) => `skew ${skews[i] / 1000} s: ${r.dropped} dropped in ${r.runs} run(s), ${r.sentAfter} frames in the last second`).join('; '));
 }
 
 // None reachable.

@@ -11233,12 +11233,15 @@ model cannot reach one, the PR says what it reached and asks.
     here. Now each track is judged on its own clock: how far the newest packet written on
     a track is ahead of that track's oldest packet still waiting. A first draft used the
     track's last *delivered* timestamp; it went stale across a drop, so the keyframe that
-    ended one drop started the next (five runs for one backlog). `npm run livedrop`'s six
-    new lines, a scripted client with sound 3 s behind, in step and 3 s ahead: before, 590
-    frames dropped in 10 runs with sound 3 s behind and no backlog at all, and 592 in 8
-    runs with one frame in the last second after a real 3.5 s backlog; after, none dropped
-    without a backlog at every skew, and one run of 89 frames with 31 in the last second
-    after it. The readout now shows the skew (`avSkewSeconds`, "sound X s late" past half
+    ended one drop started the next (five runs for one backlog). `npm run livedrop`'s seven
+    new lines, a scripted client with sound 3 s behind, in step and 3 s ahead on a link
+    that waits briefly around each keyframe: before, with no backlog at all, 593 frames
+    dropped in 8 runs with sound 3 s behind (the same on a server's fresh acknowledgements)
+    and 120 in 3 runs with it 3 s ahead, and after a real 3.5 s backlog 594 in 7 runs with
+    no frame in the last second; after, none dropped without a backlog at every skew, and
+    one run of 89 frames (90 worked from the bound and the keyframes) with 31 in the last
+    second after it. (The in-step rows' 59 frames before the first keyframe were the old
+    readout comparing against a delivered timestamp of zero, not the skew.) The readout now shows the skew (`avSkewSeconds`, "sound X s late" past half
     a second) and the audio encoder's queue (`audioQueue`), the numbers the next rehearsal
     needs to say where the skew comes from (37x-4g-1). A fifteen-minute local run under
     load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
