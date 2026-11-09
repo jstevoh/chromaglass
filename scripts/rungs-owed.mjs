@@ -31,7 +31,9 @@
  *     today is a template inline in LiquidVisualizer.tsx.
  */
 
-export const RUNGS_OWED = ['4k', 'governor', '120', 'readout', 'grid32'];
+import { lines120 } from './rungs-120.mjs';
+
+export const RUNGS_OWED = ['4k', 'governor', '120', 'readout', 'grid32', '120hz'];
 
 export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW, QualityGovernor, DrawGate }) {
   /*
@@ -246,4 +248,7 @@ export async function owedLines({ check, ladderAt, canvasPixelsFor, CAP, WINDOW,
       got.every((g, i) => g === want[i]), asked.map((n, i) => `${n} → ${got[i]} (want ${want[i]})`).join(', '),
       got.some((g) => g % 32 !== 0) && got.every((g) => g % 2 === 0));
   }
+
+  // ── 46e / 14aa-5: the plate on a 120 Hz screen (scripts/rungs-120.mjs says why) ──
+  lines120({ line, check, ladderAt, QualityGovernor, DrawGate });
 }

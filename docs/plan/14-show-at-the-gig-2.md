@@ -291,6 +291,10 @@ Open, found doing it:
 - **14aa-5** (open): the governor's lines are 60 Hz milliseconds (`SLOW_MS`, `FAST_MS`,
   `MISSED_MS`): on a 120 Hz display a missed refresh is 8.3 ms late and is not seen as one. Take
   the refresh from the draw gate (`drawGate.refreshMs`) and draw the lines in refreshes.
+  Its check is written (46e, `npm run rungs -- --owed=120hz`): measured, it is Poster's
+  sixty given up late or never at 120 Hz. Not necessarily via `drawGate.refreshMs`: once
+  every frame steps and takes two refreshes, that median reads the loop's pace (16.7 ms),
+  not the screen's.
 - **14aa-6** (open): `npm run stutter` runs by hand on the Mac (the watcher). Whether it joins
   a Mac shard depends on what the CI runner's GPU makes of Poster, which no run has asked yet.
 
