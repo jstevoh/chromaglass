@@ -1,5 +1,5 @@
 import { SceneFeature, PatchSource, AudioFeature } from '../../types';
-import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../../lib/modulators';
+import { MODULATOR_FEATURES, modulatorLabel, type ModulatorSettingsSlice } from '../../lib/modulators';
 import { SOURCE_NAMES } from '../../lib/audioFeatures';
 import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../../lib/hitSource';
 import { NOTE_FEATURES, NOTE_FEATURE_LABELS } from '../../lib/noteVoices';
@@ -65,12 +65,12 @@ export const PATCH_SOURCES: [PatchSource, string][] = [
  * them has to change the list — "how many people" is not something a microphone
  * can tell you.
  */
-export const featuresFor = (source: PatchSource): [string, string][] =>
+export const featuresFor = (source: PatchSource, settings?: ModulatorSettingsSlice): [string, string][] =>
   source === 'sound' ? AUDIO_FEATURES
     : source === 'bands' ? SOURCE_NAMES.map(f => [f, MUSIC_SOURCE_LABELS[f]] as [string, string])
     : source === 'hits' ? HIT_FEATURES.map(f => [f, HIT_FEATURE_LABELS[f]] as [string, string])
     : source === 'notes' ? NOTE_FEATURES.map(f => [f, NOTE_FEATURE_LABELS[f]] as [string, string])
-    : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, MODULATOR_LABELS[f]] as [string, string])
+    : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, modulatorLabel(f, settings)] as [string, string])
     : SCENE_FEATURES;
 
 /**

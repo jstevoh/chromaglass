@@ -151,9 +151,24 @@ picks it up in its next build. `detectTier()` already reads Electron as the
      "DAW". Done when it takes `app` out of `--owed` in `scripts/checks.json` and the
      check is green in `browser2`. The phone rule: the bridge's state and its slot
      bindings in the More sheet.
-   - **13.7b** (the plugin, Antigravity's lane, after 13.7a): `plugin/dawbridge/` in
-     JUCE, `BridgeProtocol.h` and the `DawBridgeSelfTest` target as the contract says;
-     its PR quotes `npm run dawbridge -- --plugin` and `auval` from the owner's Mac.
+   - ~~**13.7b**~~ (shipped 2026-11-07, built by Claude on the owner's Mac): the plugin,
+     `plugin/dawbridge/` in JUCE 8, an AU and VST3 effect with `DawBridgeSelfTest`;
+     `auval` passes and `npm run dawbridge -- --plugin` is 36 of 36 there. Story in
+     `docs/plan-shipped.md` §13.7b.
+   - ~~**13.7b-film**~~ (shipped 2026-11-08): filmed in Ableton Live on the owner's Mac,
+     Slot 4 driving Plate Rock with the tempo locked to Live. Story in
+     `docs/plan-shipped.md` §13.7b. Logic waits for 13.7c's sitting (no Logic on that Mac).
+   - **13.7b-hostfirst** (found filming 13.7b-film, in 13.7a's server on #694): the show
+     server follows the first bridge instance that says hello and ignores every other
+     until that one says bye or goes quiet. A playing Live never goes quiet (hello once a
+     second), so a second instance (the self-test host, a second DAW, a second track) is
+     dropped without a word. Show which instance is followed in the More sheet's bridge
+     row and give a way to switch to another one, on the desk and the phone.
+   - **13.7b-ahead** (found building 13.7b): the transport's `ahead` comes from the host's
+     own host-time stamp, which Live and Logic fill but other hosts may not (it is then
+     0 and the app's clock carries the latency alone). Measure `ahead` and the host's
+     reported latency in Live, Logic and Reaper, and write each host's figure into
+     `docs/dawbridge.md`.
    - **13.7c** (Claude: signing): the macOS runner builds the AU and VST3, signs and
      notarises them with the Mac app's Developer ID, and a Mac shard runs the check
      without `plugin` owed. Then the owner's sitting in Logic and Live.

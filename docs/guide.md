@@ -253,16 +253,18 @@ Four LFOs and two envelopes, a source in the patch bay (**Settings → Patches**
 
 **The LFOs run on bars, not on seconds.** A free-running LFO against music
 drifts in and out of time and everything it touches looks almost-but-not-quite
-deliberate. These are divisions of a bar and stay put against MIDI clock, a
-tapped tempo or the beat clock listening; with no tempo at all they run the same
-divisions at 120.
+deliberate. Each LFO picks its rate in bars (`¼` to `16`), its shape (`sine`,
+`triangle`, `ramp`, `stepped` or `smoothed random`, which glides to a new
+target each period) and an optional restart trigger (`kick`, `snare`, `note`
+or `pad`), staying put against MIDI clock, a tapped tempo or the beat clock
+listening; with no tempo at all they run the same divisions at 120.
 
-**The envelopes are fired, not free.** Every MIDI note fires both, whatever else
-that pad is bound to — an envelope is not something you assign a pad to, it is
-what the pad being hit feels like. Velocity scales them, so a soft note is a
-small one. Without a controller they sit at zero, which is the honest answer.
+**The envelopes are fired, not free.** Each envelope sets its attack (`1 ms` to
+`1 s`), its decay (`20 ms` to `4 s`) and what fires it (`any`, `kick`, `snare`,
+`note` or `pad`). On `any` (the default), every MIDI note or pad and every
+kick or snare onset fires them, scaled by velocity or hit strength.
 
-`npm run shapes` checks the arithmetic: that a one-bar LFO is back where it
+`npm run shapes` and `npm run soundowed` check the arithmetic: that a one-bar LFO is back where it
 started one bar later and gets there twice as fast at twice the tempo, that the
 triangle climbs at one rate and the sine does not, that the stepped one holds
 and jumps, and that the snap is over while the swell is still going.
@@ -499,7 +501,7 @@ with.
 | Lucky | Randomize all settings |
 | Ben-Day Dots | Settings → Look (also MIDI, the desks, the remote, and the phone's Looks sheet while a look prints): the finished plate printed as a comic, in flat red, yellow and blue inks with a black outline and the pale washes as even dots; 0 by default, and only Roy, 1963 turns it up |
 | Turing Print | Settings → Lamp & Light, under Chemistry (also MIDI, the desks, the remote, and the phone's Looks sheet while a look runs the reaction, with Pattern and Pattern Width): starch in the dish, so the reaction prints as the blue-black starch–iodine complex in step with the pattern, black on the lamp, instead of laying colour the flow carries off. 0 by default; the Turing Print look turns it to 1 **Print Drift** (`turingDrift`, 0 by default, on the same sheet, MIDI, the desks, the remote and the phone) slides the feed and kill across the plate on a 40 to 90 second clock, so the maze keeps rearranging instead of settling; the Turing Print look sets it to 0.7. |
-| Moiré Sheets | Settings → Moiré Sheets (also MIDI for the ink, Turn and Spin, and the phone's Looks sheet), the moiré pack: two printed transparencies on the stage, one under the glass and one on the cover, as a liquid light crew stacks them on the overhead. The light goes through both, and two line patterns multiplied beat into fringes far larger than their lines: Turn the upper sheet a few degrees, Spin it, Slide it, or change its Scale against the lower. Ten designs: Lines, Rings, Spokes, Spiral, Dot Screen, Waves, Quasicrystal (five-fold, never repeats), Colour Inks (fringes in colour), Song Groove (a record's groove the pack's look wiggles with the bass) and Zoom Grid (the fringes spiral in for ever). **Flip** lays the upper sheet face down, which crosses two spoke or spiral sheets into diamonds and flowers. **Gap** is each sheet's distance from the liquid in mm: the lens blurs the fine lines, and the lower sheet, seen through the liquid, is bent by every drop and shows it magnified in the fringes. **Curl** is the designs' shape dial. 0 ink by default; the six looks in the look menu's Moiré pack group turn it on, on the lamp. Included in Pro and an add-on for Home; anyone can try it for a minute |
+| Moiré Sheets | Settings → Moiré Sheets (also MIDI for the ink, Turn and Spin, and the phone's Looks sheet), the moiré pack: two printed transparencies on the stage, one under the glass and one on the cover, as a liquid light crew stacks them on the overhead. The light goes through both, and two line patterns multiplied beat into fringes far larger than their lines: Turn the upper sheet a few degrees, Spin it, Slide it, or change its Scale against the lower. Ten designs: Lines, Rings, Spokes, Spiral, Dot Screen, Waves, Quasicrystal (five-fold, never repeats), Colour Inks (fringes in colour), Song Groove (a record's groove the pack's look wiggles with the bass) and Zoom Grid (the fringes spiral in for ever). **Flip** lays the upper sheet face down, which crosses two spoke or spiral sheets into diamonds and flowers. **Gap** is each sheet's distance from the liquid in mm: the lens blurs the fine lines, and the lower sheet, seen through the liquid, is bent by every drop and shows it magnified in the fringes. **Curl** is the designs' shape dial. 0 ink by default; the seven looks in the look menu's Moiré pack group (Moiré Star, Moiré Waves, Moiré Ripple, Quasicrystal Garden, Colour Press, Song Groove, Zoom Tunnel) turn it on, on the lamp. Included in Pro and an add-on for Home ($15 once: Settings → Account → Moiré pack, or Get it in the section; the pack is added to your Home licence and reaches your other devices when you sign in); anyone can try it for a minute |
 | Lamp Ground | Settings → Lamp & Light (also MIDI, the desks, the remote, and the phone's Looks sheet): what the dye is seen on. 0, as every look ships, the dye glows on black; 1, the lamp under the dish shines up through it (Beer–Lambert), so clear liquid is the lamp's white, a gel or LED ring under the glass passes through the dye, and dense dye deepens and then goes dark. Not in the photograph, which has its own paper |
 | Two Projectors | Settings → Plates & LED, under Layers (also MIDI, the desks, the remote, and the phone's Looks sheet): each plate has its own overhead projector aimed at the screen, so its clear parts throw its lamp onto the screen and wash the other plate's colour, and where both are dyed the colours add. Off by default, when the back plate is a second glass dish in the same projector; Fillmore East, 1969 turns it on |
 | Frame Sway | Settings → Look, under Bubbles (Plate Rock is in Tilt & Rock now) (also MIDI, the desks, the remote and the phone's settings sheet): how far the music may move the frame itself rather than the liquid. Up, Plate Rock's cover glass slides on its film and drags the whole picture with each kick, the lamp follows the rock, and a kaleidoscope turns and breathes on the beat. 0 in every look and never turned on by a look, a patch, Evolve or Lucky: only a hand. Plate Rock's tilt, which moves the heavier colour, plays at 0 |

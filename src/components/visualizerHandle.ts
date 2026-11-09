@@ -166,7 +166,7 @@ export interface LiquidVisualizerHandle {
    * and because the thing firing it should not have to know what an envelope
    * is. `velocity` scales how far they swing, so a hard note hits harder.
    */
-  fireEnvelopes: (velocity?: number) => void;
+  fireEnvelopes: (velocity?: number, source?: 'note' | 'pad') => void;
   /** Route a MIDI note-on or note-off from a learned `{ kind: 'voices' }` channel to the plate's note voices (PLAN 24.3). */
   noteVoice?: (e: MidiEvent, target: Extract<MidiTarget, { kind: 'voices' }>) => void;
   /**
