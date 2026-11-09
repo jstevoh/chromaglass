@@ -15,6 +15,7 @@ The checks, one script per check (about 265 `.mjs` files), and the helpers they 
 
 - **Node harnesses** (`setlist`, `desk`, `plate`, `music`): esbuild bundles the script with the `src/` it imports, or node runs it with `--experimental-strip-types`. No browser.
 - **The lab** (`physics`, `maze`, `spikes`, `straw`): `openLab()` loads `lab-entry.ts`, so physics runs on SwiftShader too. Other entries: `sloshgpu-entry.ts`, `areacords-entry.ts`, `render-lab-entry.ts`, `live-entry.ts`, `wgsl-entry.ts`.
+- **Two trees** (`samelook`): the lab run in this tree and in a checkout of another commit (`samelook-scenes.mjs`), the same plates compared; the guard a speed-up is held to (PLAN.md 46).
 - **App harnesses** (`panel`, `phone`, `layout`, `qa`): Playwright drives the built app at `?debug`. Mac-only ones (`qa`, `gallery`, `moving`, `film`) need Metal's speed.
 - **CI's own** (`reach`, `checkguard`, `deploygate`, `closedruns`, `cisecrets`, `actionlint`, `macqueue`, `sizes`).
 

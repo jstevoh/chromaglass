@@ -460,6 +460,10 @@ rest is routine and the owner's calls.
       story in `docs/plan-shipped.md` §37x-4d-6. The Mixer stack's draw (37x-4d-1) calls
       `tapLiveFrame('stack', canvas)` from the same task and the panel starts the encoder
       with `frames: 'stack'`; it can skip its draw unless `liveFrameWanted('stack')`.
+    - *37x-4d-7. The moving line read a looping bar on two frames.* *(shipped 2026-11-09.)*
+      `npm run liveshow -- --stack`'s moving line now reads the bar on every frame decoded
+      (`barMoves`, `scripts/liveshowstack.mjs`) and proves its judgement on made-up streams
+      first; story in `docs/plan-shipped.md` §37x-4d-7.
     - *37x-4d-2. The panel is not on a shipped tab.* The tabs are the owner's, kept in the
       account (`deskTabs.ts`), so a new entry in Perform's shipped layout would reach only a
       new desk; and it would sit on the website's Perform too, where it cannot stream. It

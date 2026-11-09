@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1123,6 +1123,29 @@
       ]
     },
     {
+      "name": "The look kept, against the pull request's base",
+      "shard": "lab5",
+      "run": "node scripts/samelook.mjs",
+      "always": true,
+      "timeout": 22,
+      "why": [
+        "The guard a speed-up is held to (scripts/samelook.mjs, PLAN.md 46-0):",
+        "six shipped looks laid, stepped and drawn by this tree's solver and",
+        "plate shader and by the base's, in the lab, the same pixels after five",
+        "steps and the same picture (colour, detail, histogram) after sixty,",
+        "with controls every run (the same tree twice byte for byte, a",
+        "rounding-sized change passing, a coarser grid, half the pixels and a",
+        "tenth slower flow each failing). It runs only on a pull request",
+        "labelled same-look or titled with a §46 id, since a pull request that",
+        "means to change the look is supposed to fail it; on anything else it",
+        "prints that it was not asked. `always` because its gate is its own:",
+        "the reach of a diff says nothing about whether the look was promised",
+        "kept. About eleven minutes on four cores when it runs, so it has a",
+        "Measure part of its own (lab5), which prints \"not asked\" and ends on",
+        "every other pull request."
+      ]
+    },
+    {
       "name": "A pinned grid solves as well as the ladder's",
       "shard": "lab4",
       "run": "npm run encode -- --grids",
@@ -1979,6 +2002,26 @@
         "bar, the track panel and the phone's Sound sheet each saying which",
         "song is followed and how sure, the track panel's section the band's.",
         "The ear and the DOM, not the plate, so no GPU; on the same dist/."
+      ]
+    },
+    {
+      "name": "The opening waits for fewer pipelines, owed",
+      "shard": "browser2",
+      "run": "node scripts/openingtime.mjs --bar --runs 1 --owed=count",
+      "env": {
+        "PW_WEBGPU": "1"
+      },
+      "why": [
+        "Classic's opening counted (scripts/openingtime.mjs --bar, PLAN.md 46a):",
+        "at most 52 pipelines asked of WebGPU before the first step. Main asks",
+        "for 66 (the app's ledger lists 65; on the owner's Mac, 2026-11-08, they",
+        "built in 13.51 s and the first step came at 15.48 s). A count, not",
+        "seconds, because a cold Mac's opening varies by seconds on one commit",
+        "and the Mac's compiler sets the pace (14v-10), so the seconds follow",
+        "the count; they are printed beside it. The count is the same on any",
+        "GPU, so it runs here on software WebGPU (about ten seconds) rather",
+        "than in the Mac's queue, last in browser2, after the part's builds of",
+        "the site. Owed until 46a ships."
       ]
     },
     {
