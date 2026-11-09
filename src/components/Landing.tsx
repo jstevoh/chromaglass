@@ -217,7 +217,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </a>
           </div>
           <p className="mt-4 text-[13px] leading-relaxed text-muted">
-            Free in your browser for good, nothing to install. You sign in once with Google, an emailed link or a password.
+            Free in your browser for good, nothing to install. You sign in once with Google, Apple, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
             Home $35 · Pro $199 · pay once, no subscription
