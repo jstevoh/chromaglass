@@ -1,4 +1,4 @@
-import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 import { PRESETS } from '../presets';
@@ -6,8 +6,8 @@ import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
 import { bottleSwatch, isClearLiquid } from '../lib/liquidColour';
 import { useRemoteLink } from '../hooks/useRemoteLink';
-import { SwitchPill, LIT, LIVE } from './ui';
-import { LensCap } from './ui/Playful';
+import { Segmented, SwitchPill, LIT, LIVE } from './ui';
+import { LensCap, SlideMount, presetSwatch } from './ui/Playful';
 import type { RemoteAction, RemoteState } from '../lib/remoteProtocol';
 import { PAD_PICTURE_RENEW_MS, type PadPictureMessage } from '../lib/padPicture';
 import type { VisualizerSettings } from '../types';
@@ -16,7 +16,7 @@ import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
-import { Slider } from './RemoteSlider';
+import { ActionButton, Slider, pressureOf, tiltOf } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
@@ -37,43 +37,6 @@ import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './Dr
  * screen, which is what most hands pick a phone up to do. This page is its
  * Controls.
  */
-
-function ActionButton({ label, icon: Icon, onPress, connected, tone = 'default' }: {
-  label: string;
-  icon: ComponentType<{ size?: number }>;
-  onPress: () => void;
-  connected: boolean;
-  tone?: 'default' | 'warn';
-}) {
-  return (
-    <button
-      onClick={onPress}
-      disabled={!connected}
-      className={`flex flex-1 flex-col items-center gap-1.5 rounded-2xl border py-4 transition-colors active:scale-95 disabled:opacity-30 ${
-        tone === 'warn'
-          ? 'border-red-400/25 bg-red-500/10 text-red-200 active:bg-red-500/20'
-          : 'border-white/10 bg-white/5 text-white/80 active:bg-white/15'
-      }`}
-    >
-      <Icon size={20} />
-      <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>
-    </button>
-  );
-}
-
-/** How hard a pointer presses, 0..1. Fingers on most screens report 0 or 1: treat them as a mouse. */
-function pressureOf(e: ReactPointerEvent): number {
-  if (e.pointerType === 'pen') return Math.max(0.05, Math.min(1, e.pressure || 0.5));
-  if (e.pointerType === 'touch' && e.pressure > 0 && e.pressure < 1) return Math.max(0.05, e.pressure);  // Sensel, 3D Touch
-  return 0.5;
-}
-/** Which way a pen leans, as a plate direction (y up); zero for anything without tilt. */
-function tiltOf(e: ReactPointerEvent): { dx: number; dy: number } | null {
-  if (e.pointerType !== 'pen') return null;
-  const tx = e.tiltX ?? 0, ty = e.tiltY ?? 0;
-  if (Math.abs(tx) < 8 && Math.abs(ty) < 8) return null;
-  return { dx: tx / 90, dy: -ty / 90 };
-}
 
 /**
  * In the iPhone app with no laptop chosen yet, ask for one first: the app's
@@ -733,7 +696,23 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             Turn stays on the laptop and the phone's Play sheet: it is set
             once for a set, not played.
           */}
-          <Slider label="Auto Spin" field="spinAuto" step={1} format={(v) => SPIN_AUTO_NAMES[Math.round(v)] ?? 'Off'} value={value('spinAuto') as number | undefined} {...sliderProps} connected={connected} />
+          <div className="mb-5">
+            <div className="mb-2 flex items-baseline justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Auto Spin</span>
+            </div>
+            <Segmented
+              value={Math.max(0, Math.min(2, Math.round((value('spinAuto') as number | undefined) ?? 0)))}
+              options={[
+                [0, SPIN_AUTO_NAMES[0], 'Auto Spin is off'],
+                [1, SPIN_AUTO_NAMES[1], 'Turn at the Spin Rate'],
+                [2, SPIN_AUTO_NAMES[2], 'Turn once every Beats a Turn'],
+              ]}
+              onChange={(v) => patch({ spinAuto: v })}
+              disabled={!connected}
+              fill
+              testId="remote-spin-auto"
+            />
+          </div>
           <Slider label="Spin Rate" field="spinRpm" step={0.5} format={(v) => `${v.toFixed(1)} rpm`} value={value('spinRpm') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Accent the One" field="beatAccent" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('beatAccent') as number | undefined} {...sliderProps} connected={connected} />
           {/*
@@ -974,21 +953,24 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                       key={preset.id}
                       onClick={() => send({ type: 'cue', presetId: preset.id })}
                       disabled={!connected}
-                      className={`rounded-2xl border px-3 py-4 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                      className={`flex items-center gap-2.5 rounded-2xl border px-3 py-4 text-left transition-colors active:scale-95 disabled:opacity-30 ${
                         isActive ? LIT
                         : isCued ? 'border-lit bg-elevated'
                         : 'border-white/10 bg-white/5'
                       }`}
                       data-testid={`remote-preset-${preset.id}`}
                     >
-                      <span className={`block text-sm font-bold leading-tight ${isActive ? 'text-white' : 'text-white/75'}`}>
-                        {preset.name}
-                      </span>
-                      {(isActive || isCued) && (
-                        <span className={`mt-1 block text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-red-300' : 'text-violet-300'}`}>
-                          {isActive ? 'live' : 'next'}
+                      <SlideMount swatch={presetSwatch(preset.id)} size={24} />
+                      <span className="min-w-0 flex-1">
+                        <span className={`block truncate text-sm font-bold leading-tight ${isActive ? 'text-white' : 'text-white/75'}`}>
+                          {preset.name}
                         </span>
-                      )}
+                        {(isActive || isCued) && (
+                          <span className={`mt-1 block text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-red-300' : 'text-violet-300'}`}>
+                            {isActive ? 'live' : 'next'}
+                          </span>
+                        )}
+                      </span>
                     </button>
                   );
                 })}
@@ -1049,18 +1031,21 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
                   key={preset.id}
                   onClick={() => send({ type: 'cue', presetId: preset.id })}
                   disabled={!connected}
-                  className={`flex h-14 w-[170px] shrink-0 flex-col justify-center rounded-xl border px-3 text-left transition-colors active:scale-95 disabled:opacity-30 ${
+                  className={`flex h-14 w-[170px] shrink-0 items-center gap-2.5 rounded-xl border px-3 text-left transition-colors active:scale-95 disabled:opacity-30 ${
                     live ? LIT
                     : next ? 'border-lit bg-elevated'
                     : 'border-white/10 bg-white/5'
                   }`}
                   data-testid={`remote-cue-${preset.id}`}
                 >
-                  <span className="truncate text-[13px] font-semibold text-white/85">{preset.name}</span>
-                  <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                    live ? 'text-red-300' : next ? 'text-violet-300' : 'text-white/30'
-                  }`}>
-                    {live ? 'live' : next ? 'next' : preset.user ? 'yours' : preset.macro ? 'closeup' : 'look'}
+                  <SlideMount swatch={presetSwatch(preset.id)} size={22} />
+                  <span className="flex min-w-0 flex-1 flex-col justify-center">
+                    <span className="truncate text-[13px] font-semibold text-white/85">{preset.name}</span>
+                    <span className={`text-[10px] font-bold uppercase tracking-widest ${
+                      live ? 'text-red-300' : next ? 'text-violet-300' : 'text-white/30'
+                    }`}>
+                      {live ? 'live' : next ? 'next' : preset.user ? 'yours' : preset.macro ? 'closeup' : 'look'}
+                    </span>
                   </span>
                 </button>
               );

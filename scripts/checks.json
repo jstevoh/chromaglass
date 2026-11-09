@@ -169,7 +169,7 @@
     {
       "name": "What the clear controls left, owed",
       "shard": "logic",
-      "run": "npm run clearleft -- --owed=pace,spin,tray,dimmed",
+      "run": "npm run clearleft",
       "why": [
         "PLAN 35a-2, 35d-2, 35f-2, 35g-2 written ahead of their build (scripts/clearleft.mjs):",
         "the remote's Speed and Evolve Speed draw the snail and hare, Auto Spin and",

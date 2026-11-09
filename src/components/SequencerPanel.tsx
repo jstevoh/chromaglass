@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { Sheet, LIT } from './ui';
+import { SlideMount, presetSwatch } from './ui/Playful';
 import { Play, Pause, Square, SkipBack, SkipForward, Plus, Trash2, Copy, ChevronUp, ChevronDown, Clapperboard, Download, FolderOpen } from 'lucide-react';
 import { PRESETS, livePresetId, type Preset } from '../presets';
 import type { VisualizerSettings } from '../types';
@@ -176,7 +177,10 @@ export const SequencerPanel: React.FC<SequencerPanelProps> = ({
             >
               <span className="absolute inset-y-0 left-0 bg-white/15" style={{ width: `${prog * 100}%` }} />
               <span className="relative flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold truncate">{i + 1}. {st.name}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {st.presetId && <SlideMount swatch={presetSwatch(st.presetId)} size={18} />}
+                  <span className="text-xs font-semibold truncate">{i + 1}. {st.name}</span>
+                </span>
                 <span className="text-[9px] font-mono opacity-50 shrink-0">
                   {st.advance === 'section' ? 'section' : st.advance === 'hold' ? 'hold' : fmt(st.seconds)}
                   {st.presetId ? ` · ${presets.find(p => p.id === livePresetId(st.presetId!))?.name ?? st.presetId}` : ''}

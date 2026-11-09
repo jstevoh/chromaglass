@@ -12137,3 +12137,12 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+## 35-owed. What the clear controls left: remote pace track, spin pickers, slide mounts, disabled phone rows (2026-11-08)
+
+Four items from `docs/plan/35-clear-controls.md` checked by `scripts/clearleft.mjs` (`npm run clearleft`).
+- **35d-2 (`pace`)**: `src/components/RemoteSlider.tsx` wraps its range input in `<PaceTrack settingKey={field} at={Math.max(0, Math.min(1, travel))}>` (`src/components/ui/Pace.tsx`), so the remote's `Speed` (`globalSpeed`) and `Evolve Speed` (`automateRate`) draw the snail and hare as the desk's do. `ActionButton` moved into `RemoteSlider.tsx` so `RemoteControl.tsx` stays below its size ceiling.
+- **35a-2, 35f-2 (`spin`)**: `Segmented` in `src/components/ui/index.tsx` now takes a `string | number` option id, an optional per-option hover `title`, `settingKey` (with `useMidiTouch` and `data-group`), `disabled`, `label`, and `chips`. `SpinSection` (`src/components/settings/MotionSections.tsx`) replaces its stepped `Auto Spin` and `Spin Direction` sliders with `<Segmented settingKey="spinAuto" ...>` (`Off` / `Steady` / `To the beat`) and `<Segmented settingKey="spinDirection" ...>` (`Anticlockwise` / `Opposed` / `Clockwise`) with `<PinChips>`, and the remote (`src/components/RemoteControl.tsx`) uses `<Segmented>` for `Auto Spin` (`remote-spin-auto`).
+- **35g-2 (`tray`)**: `presetSwatch` exported from `src/components/ui/Playful.tsx` reads the look's contract palette (`PRESET_CONTRACTS[livePresetId(presetId)]`, matching `App.tsx`), and `<SlideMount>` is drawn on the remote's look grid buttons (`remote-preset-*`), its cue strip (`remote-cue-*`), and the Sequencer's stage rows (`seq-stage-*` in `src/components/SequencerPanel.tsx`).
+- **35a-2 (`dimmed`)**: `src/components/phone/PhoneStage.tsx`'s Show, Evolve and Spin groups drop their `opacity-50` ternaries; their child controls take `disabled={...}` (`Slider` in `src/components/ui/index.tsx` now forwards `disabled` to `<input type="range">`, `data-disabled`, and `useControlTip`), with the reason written beside them when off (`"Turn Evolve on to set its speed."`, `"Turn Auto Spin on to set its rate."`).
+`--owed=pace,spin,tray,dimmed` removed from `scripts/checks.json` (`npm run clearleft` 4/4).

@@ -7,6 +7,9 @@ import { strobeOf } from '../../lib/strobeRing';
 import { shownRoom } from '../../lib/dyeTarget';
 import { NOTCH_MM, MOUNT_MM, SLOT_DEG, TRAY_SLOTS, WINDOW_H, WINDOW_W, stepOf, trayDeg } from '../../lib/slideTray';
 import type { TempoReading } from '../../lib/tempo';
+import { PALETTE } from '../../constants';
+import { PRESET_CONTRACTS } from '../../presetPlate';
+import { livePresetId } from '../../presets';
 
 /*
   Small machines inside controls (PLAN 35e, 35f): a bottle that tips and holds
@@ -474,6 +477,15 @@ export function StrobeRing({ mode, rpm, beats, bpm, size = 40 }: { mode: number;
 }
 
 // ── Slide mount and tray ─────────────────────────────────────────────
+
+/** The two-dye gradient a look's slide mount shows, from its contract in PRESET_CONTRACTS (as App's swatchOf draws it for PresetMenu and CueBar). */
+export function presetSwatch(presetId: string | undefined, contract?: readonly number[] | null): string {
+  const c = contract ?? (presetId ? PRESET_CONTRACTS[livePresetId(presetId)] : null);
+  const [a, b] = c && c.length
+    ? [PALETTE[c[0]]?.hex ?? '#666', PALETTE[c[1] ?? c[0]]?.hex ?? '#333']
+    : ['#52525B', '#27272A'];
+  return `linear-gradient(135deg, ${a}, ${b})`;
+}
 
 /** Cardboard, the colour of an unprinted Kodak mount; one colour on every look, so it says only "a slide". */
 const MOUNT_COLOUR = '#cfc9ba';

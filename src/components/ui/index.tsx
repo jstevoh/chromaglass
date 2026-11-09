@@ -141,11 +141,11 @@ export function Button({
 
 // ── Segmented control ────────────────────────────────────────────────
 
-export function Segmented<T extends string>({
-  value, options, onChange, height = 36, testId, compact = false, divideBefore, tight = false, fill = false,
+export function Segmented<T extends string | number>({
+  value, options, onChange, height = 36, testId, compact = false, divideBefore, tight = false, fill = false, settingKey, disabled = false, label, chips,
 }: {
   value: T;
-  options: readonly (readonly [T, string] | readonly [T, string, string])[];
+  options: readonly (readonly [T, string] | readonly [T, string, string] | readonly [T, string, string | undefined, string])[];
   onChange: (v: T) => void;
   height?: number;
   testId?: string;
@@ -179,30 +179,52 @@ export function Segmented<T extends string>({
    * past a 272px column.
    */
   fill?: boolean;
+  settingKey?: keyof VisualizerSettings;
+  disabled?: boolean;
+  label?: string;
+  chips?: ReactNode;
 }) {
-  return (
-    <div className={`${fill ? 'flex w-full min-w-0' : 'inline-flex'} items-center rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''}`} role="tablist" data-testid={testId}>
-      {options.map(([id, label, kbd]) => (
+  const hit = useMidiTouch(settingKey ? `setting:${String(settingKey)}` : null);
+  const bar = (
+    <div
+      className={`${fill ? 'flex w-full min-w-0' : 'inline-flex'} items-center rounded-md border border-border bg-elevated p-0.5 ${compact ? 'max-w-full flex-wrap' : ''} ${hit ? MIDI_HIT : ''}`}
+      role="tablist"
+      data-testid={testId}
+      data-midi-hit={hit ? 'true' : undefined}
+      data-group={groupOfSetting(settingKey ? String(settingKey) : null)}
+    >
+      {options.map(([id, text, title, kbd]) => (
         <span key={id} className="contents">
         {divideBefore === id && <span className="mx-1 h-5 w-px shrink-0 bg-white/10" aria-hidden />}
         <button
           key={id}
           role="tab"
           aria-selected={value === id}
+          disabled={disabled}
           onClick={() => onChange(id)}
           style={{ height: height - 4 }}
           data-testid={testId ? `${testId}-${id}` : undefined}
           // The key in the hover title, never on the segment (see Button's kbd).
-          title={kbd ? `${label} (${kbd})` : undefined}
+          title={kbd ? `${title ?? text} (${kbd})` : title}
           aria-keyshortcuts={kbd}
-          className={`inline-flex items-center gap-1.5 rounded-sm ${fill ? 'min-w-0 flex-1 justify-center px-1 text-[12px]' : compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] ${
+          className={`inline-flex items-center gap-1.5 rounded-sm ${fill ? 'min-w-0 flex-1 justify-center px-1 text-[12px]' : compact ? 'px-1.5 text-[12px] xl:text-[13px] 2xl:px-4' : tight ? 'px-2.5 text-[13px] xl:px-3.5' : 'px-4 text-[13px]'} font-medium transition-colors duration-[120ms] disabled:opacity-60 ${
             value === id ? 'bg-lit text-on-lit' : 'text-muted hover:bg-hover hover:text-text-2'
           }`}
         >
-          {label}
+          {text}
         </button>
         </span>
       ))}
+    </div>
+  );
+  if (!label) return bar;
+  return (
+    <div className="mb-3 flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[13px] font-medium text-text-2">{label}</div>
+        {chips}
+      </div>
+      {bar}
     </div>
   );
 }
@@ -373,9 +395,10 @@ export interface SliderProps extends Keyed {
    * where the 48 px rule needs the full row.
    */
   dense?: boolean;
+  disabled?: boolean;
 }
 
-export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense }: SliderProps) {
+export function Slider({ label, value, min, max, step, onChange, display, cc, white, touch, testId, midiKey, resetTo, help, dense, disabled }: SliderProps) {
   /*
     The travel is not always the value.
 
@@ -423,7 +446,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   const line = help ?? helpFor(midiKey);
   const tip = useControlTip({
-    name: label, help: line, value: display,
+    name: label, help: line, value: display, disabled: !!disabled,
     hint: !touch && resetTo !== undefined ? 'Double-click for the look\'s value' : undefined,
   });
   const track = (
@@ -439,8 +462,9 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
           onChange(handValueAt(raw, min, max, curve));
         }}
         aria-label={label}
+        disabled={disabled}
         onDoubleClick={resetTo === undefined ? undefined : () => onChange(resetTo)}
-        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''}`}
+        className={`ride-slider w-full ${touch ? 'is-touch' : ''} ${white ? 'is-white' : ''} ${dense && !touch ? 'is-dense' : ''} disabled:opacity-40`}
         style={{ '--fill': `${pct}%` } as CSSProperties}
       />
     </PaceTrack>
@@ -457,7 +481,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
   */
   if (dense && !touch) {
     return (
-      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
+      <div className="mb-px flex h-6 items-center gap-2" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-disabled={disabled ? 'true' : undefined} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} data-dense="true" {...tip.bind}>
         {tip.card}
         <span className="w-[84px] shrink-0 truncate text-[12px] font-medium text-text">{label}</span>
         <div className="min-w-0 flex-1">{track}</div>
@@ -471,7 +495,7 @@ export function Slider({ label, value, min, max, step, onChange, display, cc, wh
     );
   }
   return (
-    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
+    <div className="mb-5" ref={el => { tip.anchor.current = el; }} data-testid={testId} data-disabled={disabled ? 'true' : undefined} data-midi-hit={hit ? 'true' : undefined} data-group={groupOfSetting(bareSettingKey)} {...tip.bind}>
       {tip.card}
       <div className="mb-2 flex items-baseline justify-between gap-2">
         {touch && line ? (
