@@ -16,8 +16,12 @@
 //  - the pass is handed out once, verifies under the licence public key, and is refused
 //    by everything that takes a licence key (`/activate`, `verifyLicenseKey`), so a TV
 //    never takes one of a key's two Mac seats;
-//  - renewing checks the key is still live, and a forged, tampered or run-out pass fails;
-//  - the per-address and per-account allowances bite.
+//  - renewing checks the key is still live (moving to the account's next live key after a
+//    refund of an upgrade), and a forged, tampered or run-out pass fails;
+//  - a pass belongs to one link: each renewal moves its generation on, a copy that renews
+//    after the original kills the link for both, and an account's eleventh TV drops its
+//    first;
+//  - the per-address and per-account allowances bite, polling included.
 
 import worker from '../server/license-worker.js';
 import { signLicenseKey, verifyLicenseKey } from '../server/license-key.js';
@@ -215,15 +219,36 @@ const renewedOpen = await verifyTvPass(renewed.data?.pass, pubJwk);
 check('a live pass renews for another thirty days', renewed.status === 200 && renewedOpen?.keyId === 'k_pro', `${renewed.status}`);
 const tampered = pass.slice(0, pass.lastIndexOf('.') - 2) + (pass[pass.lastIndexOf('.') - 2] === 'A' ? 'B' : 'A') + pass.slice(pass.lastIndexOf('.') - 1);
 check('a tampered pass does not renew', (await call(env, '/tv/renew', { body: { pass: tampered } })).status === 401);
-const foreign = await signTvPass({ v: 1, keyId: 'k_pro', tier: 'pro', issuedAt: Date.now(), exp: Date.now() + 1e9 }, otherPrivJwk);
+check('the pass names its link and generation 1, and the renewal generation 2',
+  typeof opened?.id === 'string' && opened.id.length >= 20 && opened.gen === 1 && renewedOpen?.id === opened.id && renewedOpen?.gen === 2,
+  `${opened?.gen} → ${renewedOpen?.gen}`);
+const foreign = await signTvPass({ v: 1, id: opened.id, gen: 2, keyId: 'k_pro', tier: 'pro', issuedAt: Date.now(), exp: Date.now() + 1e9 }, otherPrivJwk);
 check('a pass signed by another key does not renew', (await call(env, '/tv/renew', { body: { pass: foreign } })).status === 401);
-const old = await signTvPass({ v: 1, keyId: 'k_pro', tier: 'pro', issuedAt: Date.now() - 4e9, exp: Date.now() - 1000 }, privJwk);
+const old = await signTvPass({ v: 1, id: opened.id, gen: 2, keyId: 'k_pro', tier: 'pro', issuedAt: Date.now() - 4e9, exp: Date.now() - 1000 }, privJwk);
 check('a pass that has run out does not renew (the TV pairs again)', (await call(env, '/tv/renew', { body: { pass: old } })).status === 401);
 {
+  // A copy: the first pass (generation 1) renewed after the TV already renewed it.
+  const copy = await call(env, '/tv/renew', { body: { pass } });
+  const original = await call(env, '/tv/renew', { body: { pass: renewed.data.pass } });
+  check('a copied pass renewing after the original kills the link for both',
+    copy.status === 401 && copy.data?.error === 'unlinked' && original.status === 401, `copy ${copy.status}, original ${original.status}`);
+}
+{
+  // A fresh link to test refunds on, as a TV would make it.
+  const lc = (await call(env, '/tv/code')).data;
+  await call(env, '/tv/claim', { body: { userCode: lc.userCode }, token: await idToken(fan) });
+  const live = (await call(env, '/tv/poll', { body: { userCode: lc.userCode, deviceCode: lc.deviceCode } })).data?.pass;
   const rec = JSON.parse(await env.LICENSE_KV.get('key:k_pro'));
   await env.LICENSE_KV.put('key:k_pro', JSON.stringify({ ...rec, revoked: true }));
-  const refunded = await call(env, '/tv/renew', { body: { pass } });
-  check('once the key is refunded, its pass no longer renews', refunded.status === 401 && refunded.data?.error === 'key revoked', `${refunded.status}`);
+  const moved = await call(env, '/tv/renew', { body: { pass: live } });
+  const movedOpen = await verifyTvPass(moved.data?.pass, pubJwk);
+  check('once the Pro key is refunded, the TV renews on the account\'s Home key instead of going dark',
+    moved.status === 200 && movedOpen?.keyId === 'k_home' && movedOpen?.tier === 'home', `${moved.status} ${movedOpen?.keyId}`);
+  const home = JSON.parse(await env.LICENSE_KV.get('key:k_home'));
+  await env.LICENSE_KV.put('key:k_home', JSON.stringify({ ...home, revoked: true }));
+  const refunded = await call(env, '/tv/renew', { body: { pass: moved.data.pass } });
+  check('and once no live key is left, the pass no longer renews', refunded.status === 401 && refunded.data?.error === 'key revoked', `${refunded.status}`);
+  await env.LICENSE_KV.put('key:k_home', JSON.stringify(home));
 
   // And a fresh claim now passes over the refunded Pro key (revoked only under its id,
   // as a refund of an upgrade writes it) for the Home key.
@@ -232,7 +257,25 @@ check('a pass that has run out does not renew (the TV pairs again)', (await call
   check('a claim after the refund passes over the refunded Pro key and hands out Home', cl.data?.tier === 'home', JSON.stringify(cl.data));
 }
 
-// ── 7. Allowances ────────────────────────────────────────────────
+// ── 7. One account, many TVs ─────────────────────────────────────
+{
+  const e = makeEnv();
+  const owner = 'many@example.com';
+  await fileKey(e, { id: 'k_many', tier: 'home', email: owner });
+  const passes = [];
+  for (let i = 0; i < 11; i++) {
+    const c = (await call(e, '/tv/code')).data;
+    await call(e, '/tv/claim', { body: { userCode: c.userCode }, token: await idToken(owner) });
+    passes.push((await call(e, '/tv/poll', { body: { userCode: c.userCode, deviceCode: c.deviceCode } })).data?.pass);
+  }
+  const first = await call(e, '/tv/renew', { body: { pass: passes[0] } });
+  const second = await call(e, '/tv/renew', { body: { pass: passes[1] } });
+  const last = await call(e, '/tv/renew', { body: { pass: passes[10] } });
+  check('an account\'s eleventh TV drops its first, and the rest still renew',
+    first.status === 401 && second.status === 200 && last.status === 200, `${first.status} ${second.status} ${last.status}`);
+}
+
+// ── 8. Allowances ────────────────────────────────────────────────
 {
   const e = makeEnv();
   let firstRefused = 0;
@@ -251,6 +294,15 @@ check('a pass that has run out does not renew (the TV pairs again)', (await call
     if (r.status === 429 && !firstRefused) firstRefused = i;
   }
   check('an account gets twenty wrong codes an hour, and the 21st is refused', firstRefused === 21, `first refusal at ${firstRefused}`);
+}
+{
+  const e = makeEnv();
+  let firstRefused = 0;
+  for (let i = 1; i <= 1441; i++) {
+    const r = await call(e, '/tv/poll', { body: { userCode: 'BCDF-GHJK', deviceCode: 'x' }, ip: '192.0.2.9' });
+    if (r.status === 429 && !firstRefused) firstRefused = i;
+  }
+  check('one address gets 1440 polls an hour (a dozen TVs pairing), and the 1441st is refused', firstRefused === 1441, `first refusal at ${firstRefused}`);
 }
 check('a GET is refused', (await call(env, '/tv/code', { method: 'GET' })).status === 405);
 {

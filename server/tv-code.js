@@ -12,7 +12,7 @@
 //   POST /tv/code   {}                         → { userCode, deviceCode, expiresIn, interval }
 //   POST /tv/claim  Bearer <Firebase ID token>, { userCode }  → { ok, tier }
 //   POST /tv/poll   { userCode, deviceCode }   → { status: 'pending' | 'ok' | 'expired', pass? }
-//   POST /tv/renew  { pass }                   → { ok, pass } or 401 when the key is gone
+//   POST /tv/renew  { pass }                   → { ok, pass } or 401 when the key or the link is gone
 //
 // Two codes, not one, because the short code is read off a screen in a room full of
 // people. Anyone who sees `BDKM-QXTZ` could claim it with their own account, which only
@@ -34,8 +34,24 @@
 // online, and a renewal checks the key has not been refunded since. So a refund reaches
 // the TV within thirty days and usually at its next launch, and a TV never takes a seat.
 //
-// KV layout: `tvcode:<USERCODE>` → `{ h, state: 'pending' | 'claimed', at, keyId?, tier? }`
-// with a ten-minute TTL, where `h` is the hex SHA-256 of the device code.
+// Each pass is also filed, by a random id the pass carries, so a pass belongs to one TV
+// and can be taken back. The review before this merged (2026-11-08) found two holes in a
+// pass that only carried its key's id: copied off a TV it unlocked any number of TVs, and
+// renewed forever, and the owner had no way to drop a lost TV short of refunding the key.
+// So the record holds a generation number that every renewal moves on by one, and a pass
+// renews only at its record's current generation. A copy and the TV it was copied from
+// cannot both renew: the second to try finds the generation moved, and that is taken as
+// the sign of a copy, so the record is deleted and neither renews again (the real TV shows
+// its code and is linked again in a minute; the copy is dead). The same rule makes a
+// renewal whose answer was lost on the way to the TV cost a re-link, which at one renewal
+// in about three weeks is the price of copies dying. An account holds at most
+// `TV_PASSES_PER_ACCOUNT` records; linking one more drops the oldest.
+//
+// KV layout:
+//   `tvcode:<USERCODE>` → `{ h, state: 'pending' | 'claimed', at, keyId?, tier?, email? }`
+//     with a ten-minute TTL, where `h` is the hex SHA-256 of the device code;
+//   `tvpass:<id>` → `{ keyId, tier, email, issuedAt, gen }`, alive a day past the pass;
+//   `tvpasses:<email>` → `[id, …]`, oldest first, for the cap (and later a list to unlink).
 
 import { DEFAULT_PUBLIC_JWK } from './license-key.js';
 
@@ -47,6 +63,8 @@ const DAY_MS = 24 * 3600 * 1000;
 // Twenty consonants, no vowels and no Y: never a word, and nothing that reads as 0 or 1.
 export const TV_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
 const MAX_BODY = 2048;
+export const TV_PASSES_PER_ACCOUNT = 10;
+const PASS_RECORD_TTL_S = (TV_PASS_DAYS + 1) * 24 * 3600;
 
 function toBase64Url(bytes) {
   let bin = '';
@@ -128,6 +146,7 @@ export async function verifyTvPass(pass, publicJwk, now = Date.now()) {
     if (!ok) return null;
     const p = JSON.parse(new TextDecoder().decode(body));
     if (!p || typeof p.keyId !== 'string' || (p.tier !== 'home' && p.tier !== 'pro')) return null;
+    if (typeof p.id !== 'string' || !Number.isInteger(p.gen)) return null;
     if (typeof p.exp !== 'number' || p.exp <= now) return null;
     return p;
   } catch {
@@ -163,9 +182,34 @@ async function bestKey(env, email, h) {
   return null;
 }
 
-async function issuePass(env, keyId, tier) {
+async function readJson(env, k) {
+  try { const raw = await env.LICENSE_KV.get(k); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+async function issuePass(env, id, rec) {
   const now = Date.now();
-  return signTvPass({ v: 1, keyId, tier, issuedAt: now, exp: now + TV_PASS_DAYS * DAY_MS }, env.LICENSE_PRIVATE_KEY);
+  await env.LICENSE_KV.put(`tvpass:${id}`, JSON.stringify(rec), { expirationTtl: PASS_RECORD_TTL_S });
+  return signTvPass(
+    { v: 1, id, gen: rec.gen, keyId: rec.keyId, tier: rec.tier, issuedAt: now, exp: now + TV_PASS_DAYS * DAY_MS },
+    env.LICENSE_PRIVATE_KEY,
+  );
+}
+
+// A new TV on the account: filed on the account's list, and the oldest dropped (record
+// and all, so its pass stops renewing) once the list is past the cap. Ids whose records
+// have lapsed are pruned on the way.
+async function linkPass(env, email, keyId, tier) {
+  const id = toBase64Url(crypto.getRandomValues(new Uint8Array(16)));
+  const listKey = `tvpasses:${email}`;
+  const old = await readJson(env, listKey);
+  const ids = [];
+  for (const x of Array.isArray(old) ? old : []) {
+    if (typeof x === 'string' && (await env.LICENSE_KV.get(`tvpass:${x}`))) ids.push(x);
+  }
+  ids.push(id);
+  while (ids.length > TV_PASSES_PER_ACCOUNT) await env.LICENSE_KV.delete(`tvpass:${ids.shift()}`);
+  await env.LICENSE_KV.put(listKey, JSON.stringify(ids));
+  return issuePass(env, id, { keyId, tier, email, issuedAt: Date.now(), gen: 1 });
 }
 
 /**
@@ -228,7 +272,7 @@ export async function handleTv(request, env, url, h) {
     const left = Math.max(60, TV_CODE_TTL_S - Math.floor((Date.now() - (rec.at || 0)) / 1000));
     await env.LICENSE_KV.put(
       `tvcode:${code}`,
-      JSON.stringify({ ...rec, state: 'claimed', keyId: key.id, tier: key.tier }),
+      JSON.stringify({ ...rec, state: 'claimed', keyId: key.id, tier: key.tier, email: who.email }),
       { expirationTtl: left },
     );
     return h.json({ ok: true, tier: key.tier }, 200, h.cors);
@@ -237,6 +281,11 @@ export async function handleTv(request, env, url, h) {
   if (route === 'poll') {
     const { body, error } = await readJsonBody(request, h);
     if (error) return error;
+    // A TV waiting on its code polls every five seconds for ten minutes, 120 times, so
+    // 1440 an hour is a dozen TVs pairing behind one address (a venue's Wi-Fi) and still
+    // stops a loop spending KV reads for nothing.
+    const wait = await h.takeTurn('tvpoll', h.addressOf(), env.TV_POLL_PER_HOUR, 1440);
+    if (wait) return h.tooMany(wait);
     const code = normalizeTvCode(body.userCode);
     if (!code || typeof body.deviceCode !== 'string') return h.json({ ok: false, error: 'bad code' }, 400, h.cors);
     const raw = await env.LICENSE_KV.get(`tvcode:${code}`);
@@ -248,11 +297,14 @@ export async function handleTv(request, env, url, h) {
       return h.json({ ok: true, status: 'expired' }, 200, h.cors);
     }
     if (rec.state !== 'claimed') return h.json({ ok: true, status: 'pending' }, 200, h.cors);
-    // Handed out once: the record goes before the pass is returned, so a second poll with
-    // the same codes (a replay, or the TV retrying after a dropped answer) gets 'expired'
-    // and starts over with a new code, and no pass is ever handed out twice.
+    // Handed out once, as far as KV allows: the record goes before the pass is returned, so
+    // a later poll with the same codes (a replay, or the TV retrying after a dropped answer)
+    // gets 'expired' and starts over with a new code. KV is eventually consistent, so two
+    // polls in the same instant from different places could both read 'claimed' before the
+    // delete reaches them; only the TV holds the device code, so that is the TV linking
+    // itself twice, which the account's cap absorbs.
     await env.LICENSE_KV.delete(`tvcode:${code}`);
-    const pass = await issuePass(env, rec.keyId, rec.tier);
+    const pass = await linkPass(env, rec.email || '', rec.keyId, rec.tier);
     return h.json({ ok: true, status: 'ok', tier: rec.tier, pass }, 200, h.cors);
   }
 
@@ -263,11 +315,31 @@ export async function handleTv(request, env, url, h) {
     if (wait) return h.tooMany(wait);
     const p = await verifyTvPass(body.pass, env.LICENSE_PUBLIC_KEY || DEFAULT_PUBLIC_JWK);
     if (!p) return h.json({ ok: false, error: 'bad pass' }, 401, h.cors);
-    const stored = await h.readKeyById(env, p.keyId);
-    if (!stored || stored.revoked) return h.json({ ok: false, error: 'key revoked' }, 401, h.cors);
+    const rec = await readJson(env, `tvpass:${p.id}`);
+    if (!rec) return h.json({ ok: false, error: 'unlinked' }, 401, h.cors);
+    if (rec.gen !== p.gen) {
+      // Two passes from one link: a copy. Neither renews again (see the top of this file).
+      await env.LICENSE_KV.delete(`tvpass:${p.id}`);
+      return h.json({ ok: false, error: 'unlinked' }, 401, h.cors);
+    }
+    let keyId = rec.keyId;
+    let stored = await h.readKeyById(env, keyId);
+    if (!stored || stored.revoked) {
+      // A refund of an upgrade revokes the Pro key and files the Home again under a new
+      // id (license-worker.js), so a dead key is not yet a dead account: the TV moves to
+      // the account's best live key, and only an account with none stops renewing.
+      const next = rec.email ? await bestKey(env, rec.email, h) : null;
+      if (!next) {
+        await env.LICENSE_KV.delete(`tvpass:${p.id}`);
+        return h.json({ ok: false, error: 'key revoked' }, 401, h.cors);
+      }
+      keyId = next.id;
+      stored = next;
+    }
     // The tier comes from the key on file, so a Home key upgraded in place renews as Pro.
-    const tier = stored.tier === 'pro' || stored.tier === 'home' ? stored.tier : p.tier;
-    return h.json({ ok: true, tier, pass: await issuePass(env, p.keyId, tier) }, 200, h.cors);
+    const tier = stored.tier === 'pro' || stored.tier === 'home' ? stored.tier : rec.tier;
+    const pass = await issuePass(env, p.id, { ...rec, keyId, tier, gen: rec.gen + 1 });
+    return h.json({ ok: true, tier, pass }, 200, h.cors);
   }
 
   return h.json({ error: 'not found' }, 404, h.cors);

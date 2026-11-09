@@ -6,7 +6,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 - `remote-server.js` (40 KB, grep it): the show server (`npm run remote`): serves the built app on the LAN, relays the remote's messages between laptop and phones over WebSocket, takes OSC, Art-Net and Ableton Link, sends OSC out. Exports `setOsc`/`oscState` and `setOscOut`/`oscOutState` for the Mac app.
 - `license-worker.js` (38 KB, grep it): the licence Worker: merchant webhooks, keys, machine seats, cloud sync.
-- `tv-code.js`: the licence Worker's `/tv/` routes, a TV's sign-in by a short code and its 30-day `cgtv1.` pass (`handleTv`, `signTvPass`, `verifyTvPass`, `normalizeTvCode`); never the licence key, so a TV takes no seat.
+- `tv-code.js`: the licence Worker's `/tv/` routes, a TV's sign-in by a short code and its 30-day `cgtv1.` pass (`handleTv`, `signTvPass`, `verifyTvPass`, `normalizeTvCode`, `TV_PASSES_PER_ACCOUNT`); never the licence key, so a TV takes no seat.
 - `report-worker.js`: where the crash log's Send goes.
 - `feedback-worker.js`: where Settings → Feedback goes: one D1 table (`feedback-schema.sql`) and a mail to support@ (PLAN 39a).
 - `license-key.js`: `signLicenseKey`, `verifyLicenseKey` (Ed25519), `normalizePacks` (the payload's optional `packs` list, PLAN 45a-2).

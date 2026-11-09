@@ -255,10 +255,23 @@ app itself waits on Xcode with the tvOS SDK on the owner's Mac.
   of `https://chromaglass.art/?tvlink=<code>`, keep the `cgtv1.` pass in the
   keychain (Android: EncryptedSharedPreferences), verify it offline against the
   built-in public key, and renew it through `/tv/renew` within a week of `exp`.
-- **12-tv-signin-2, a list of linked TVs.** The account page shows nothing yet:
-  a pass is not stored server-side, so unlinking one TV means revoking passes by
-  id. Add a `tvpass:<keyId>` list (id, issuedAt, a name the TV sends) so the
-  account can see and drop them, if owners ask.
+- **12-tv-signin-2, a list of linked TVs.** The Worker keeps each link now
+  (`tvpass:<id>`, and `tvpasses:<email>` lists an account's ten), so dropping one
+  is deleting its record; what is missing is the account page that lists them
+  (when linked, a name the TV sends) with a button to unlink, if owners ask.
+- **12-tv-signin-3, KV's lag between locations.** Workers KV is eventually
+  consistent across Cloudflare's locations, for up to about a minute. A phone and
+  a TV served by different locations can see each other's writes late: the phone
+  may be told "no such code" for a code the TV drew a moment ago, and the TV may
+  poll "pending" for up to a minute after the phone linked it. Both recover on
+  their own (the phone's player tries again, the TV keeps polling), so it is a
+  delay, not a failure; if owners meet it, move the code and pass records to a
+  Durable Object, which is consistent.
+- **12-tv-signin-4, a renewal lost on the way.** Each renewal moves the link's
+  generation on, and a pass from an older generation kills the link (that is how
+  a copied pass dies). So a renewal whose answer never reaches the TV (the Wi-Fi
+  drops mid-reply) costs a re-link with a fresh code. Rare, and safe; if it is
+  met, keep the previous generation valid for a few minutes after a renewal.
 
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`

@@ -44,6 +44,14 @@ export default function TvLink(): React.ReactElement {
   const [code, setCode] = useState(prefill);
   const [result, setResult] = useState<TvClaimResult | null>(null);
   const [email, setEmail] = useState<string | null>(null);
+  /* A code that arrived in the address, not typed, asks for one more tap. The review
+     before this merged found the one-tap phish: anyone can send `?tvlink=THEIRCODE` (or
+     a QR of it) with "link your TV", and a tap would give their TV this account's
+     licence. Codes typed by hand need no question, since the player read them off a
+     screen; a code from a link is sent only once the player says the TV in front of
+     them shows it. */
+  const [sure, setSure] = useState(false);
+  const fromLink = prefill !== '' && code === prefill;
   const input = useRef<HTMLInputElement>(null);
 
   const refreshAccount = async () => {
@@ -56,7 +64,7 @@ export default function TvLink(): React.ReactElement {
   useEffect(() => { if (phase === 'code' && !prefill) input.current?.focus(); }, [phase, prefill]);
 
   const send = async () => {
-    if (!normalizeTvCode(code)) return;
+    if (!normalizeTvCode(code) || (fromLink && !sure)) return;
     setPhase('sending');
     const r = await claimTvCode(code);
     setResult(r);
@@ -65,7 +73,7 @@ export default function TvLink(): React.ReactElement {
     else setPhase('code');
   };
 
-  const whole = normalizeTvCode(code) !== null;
+  const whole = normalizeTvCode(code) !== null && (!fromLink || sure);
   return (
     <div
       data-cg-tvlink=""
@@ -117,6 +125,22 @@ export default function TvLink(): React.ReactElement {
               placeholder="BDKM-QXTZ"
               className="mt-1 w-full rounded-xl border border-white/20 bg-neutral-900 px-4 py-4 text-center text-3xl font-mono tracking-[0.2em] text-neutral-100 placeholder:text-neutral-700 focus:outline-none focus:border-white/50"
             />
+            {fromLink && (
+              <label data-cg-tvsure="" className="mt-3 flex items-start gap-3 rounded-xl border border-amber-300/30 bg-amber-300/5 px-3 py-3 text-sm text-neutral-200">
+                <input
+                  type="checkbox"
+                  checked={sure}
+                  onChange={(e) => setSure(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-amber-300"
+                />
+                <span>
+                  The TV in front of me shows this code.
+                  <span className="block mt-1 text-xs text-neutral-400">
+                    This code came from a link. A code someone sent you would give their TV your licence.
+                  </span>
+                </span>
+              </label>
+            )}
             {result && result.state !== 'ok' && (
               <p className="mt-2 text-sm text-amber-300" role="alert">{messageFor(result)}</p>
             )}
@@ -151,7 +175,7 @@ export default function TvLink(): React.ReactElement {
             <button
               type="button"
               className="mt-6 text-sm underline text-neutral-300"
-              onClick={() => { setCode(''); setResult(null); setPhase('code'); }}
+              onClick={() => { setCode(''); setResult(null); setSure(false); setPhase('code'); }}
             >
               Link another TV
             </button>

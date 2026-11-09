@@ -12122,3 +12122,19 @@ over `src/lib/tvCode.ts`): the site's own sign-in form, then a code field that
 formats as it is typed, prefilled from the TV's QR code. `npm run tvcode` (34
 checks) proves each route against the real handler and a fake KV.
 
+The one review the licence Worker's changes get found five things, fixed before
+merge. A pass worked on any TV it was copied to and renewed forever, so each link
+is now a record (`tvpass:<id>`: key, tier, account, a generation), the pass names
+its link and generation, and a renewal must match the record's generation and moves
+it on: a copied pass and its original cannot both keep renewing, and the first
+mismatch deletes the link, so both die. An account keeps at most ten links, and the
+eleventh drops the oldest. A refund of an upgrade stranded the TV on the refunded
+key; a renewal now falls back to the account's best remaining key. `/tv/poll` had no
+allowance; it has 1440 an hour per address (one every few seconds for an hour from
+a TV is about 720). And a code that arrived in a link was sent on one tap, which
+let anyone send their own TV's code and take the victim's licence onto it; the
+phone now asks the player to tick that the TV in front of them shows the code,
+and a code typed by hand asks nothing. `npm run tvcode` (42 checks, from 37) and
+`npm run tvlink` (6 checks, the phone page in Chromium; the phish check is red on
+the page before the fix). Two found things stay open as 12-tv-signin-3 and -4.
+

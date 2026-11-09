@@ -944,8 +944,23 @@
         "Pro, and only the TV holding the device code collects a pass, once. Read from",
         "what the TV and the phone receive: the pass verifies, names the right key,",
         "is refused by /activate and verifyLicenseKey (a TV takes no Mac seat), stops",
-        "renewing once the key is refunded, and the hourly allowances bite. An",
-        "in-memory KV and generated key pairs, so `logic`."
+        "renewing once the key is refunded (or moves to the account's other key),",
+        "a copied pass dies with its original at the next renewal, an account's",
+        "eleventh TV drops its first, and the hourly allowances bite, the poll's",
+        "included. An in-memory KV and generated key pairs, so `logic`."
+      ]
+    },
+    {
+      "name": "The phone's page to link a TV",
+      "shard": "browser",
+      "run": "npm run tvlink",
+      "why": [
+        "The phone page a TV sends the player to (src/components/phone/TvLink.tsx,",
+        "PLAN.md 12-tv-signin), rendered in Chromium at a phone's size with the",
+        "account and the Worker stood in for: a typed code formats as it is typed",
+        "and is sent whole with the account's token; a code that came in a link",
+        "sends nothing on a tap or Enter until the player ticks that the TV in front",
+        "of them shows it (the review found the one-tap phish). No GPU, so `browser`."
       ]
     },
     {
