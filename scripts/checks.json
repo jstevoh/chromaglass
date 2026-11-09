@@ -1807,6 +1807,21 @@
       ]
     },
     {
+      "name": "A TV at home plays the show's plate",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tv.mjs",
+      "why": [
+        "A TV at home (scripts/tv.mjs, PLAN.md 12-tv): the real show server, the",
+        "built /tv page at the server's network address, and a stand-in laptop",
+        "running the real WebRTC sender over a canvas painted one colour at a",
+        "time. The TV's own pixels follow each change within 700 ms, sharp from",
+        "the first two seconds, H.264 where both ends have it; three TVs and a",
+        "fourth refused, free and wrong key refused, a TV never driving the",
+        "show, films with no show, a frozen plate, the phone. No GPU; dist/ is",
+        "the phone step's build. About forty seconds."
+      ]
+    },
+    {
       "name": "The wall under Draw's pad",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/drawwall.mjs",

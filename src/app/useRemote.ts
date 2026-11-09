@@ -1,9 +1,11 @@
-import { useMemo, useRef, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, useRef, useEffect, useState, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import { type RemoteState, parseRemoteGesture, type RemoteMessage } from '../lib/remoteProtocol';
 import { isUserPresetId } from '../lib/userPresets';
 import type { VisualizerSettings, LiquidType } from '../types';
 import { sanitizePatch } from '../lib/sanitizeSettings';
 import { PadPictureSender, setPadPictureSender } from '../lib/padPicture';
+import { TvFeedSender, setTvFeedSender } from '../lib/tvFeed';
+import { canUseHomeFeature } from '../lib/tierGates';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { MixSource } from '../lib/mixer';
 import { unhandled } from '../lib/unhandled';
@@ -186,6 +188,9 @@ export function useRemote({
     return { x: p.x, y: p.y, dx: dx * Math.cos(a) - dy * Math.sin(a), dy: dx * Math.sin(a) + dy * Math.cos(a) };
   };
   const padPictureRef = useRef<PadPictureSender | null>(null);
+  // TVs at home showing the plate (PLAN 12-tv), and how many, for the cast menu.
+  const tvFeedRef = useRef<TvFeedSender | null>(null);
+  const [tvCount, setTvCount] = useState(0);
   const linkAskedRef = useRef(-Infinity);
   /*
     Live's play and stop, when the operator asked for them (PLAN.md
@@ -214,6 +219,17 @@ export function useRemote({
         case 'request-cast':
           relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
           break;
+        case 'tv-join':
+          void tvFeedRef.current?.join(message.id);
+          break;
+        case 'tv-leave':
+          tvFeedRef.current?.leave(message.id);
+          break;
+        case 'tv-signal':
+          if (message.from) void tvFeedRef.current?.signal(message.from, message.signal);
+          break;
+        case 'tv-show':
+          break;   // the relay's word to a TV, never a display's
         case 'patch':
           queuePatch(message.settings);
           break;
@@ -414,6 +430,21 @@ export function useRemote({
     setPadPictureSender(sender);
     return () => { if (padPictureRef.current === sender) padPictureRef.current = null; setPadPictureSender(null); };
   }, [remoteSend]);
+  // And the TVs': one sender while the link is up, fed by the same frame task.
+  // Home or Pro is asked at each TV's join, not here, so a licence that lands
+  // after the page opened lets the next TV in without a reload.
+  useEffect(() => {
+    const sender = new TvFeedSender(remoteSend, canUseHomeFeature);
+    sender.onCount = setTvCount;
+    tvFeedRef.current = sender;
+    setTvFeedSender(sender);
+    return () => {
+      sender.close();
+      if (tvFeedRef.current === sender) tvFeedRef.current = null;
+      setTvFeedSender(null);
+      setTvCount(0);
+    };
+  }, [remoteSend]);
   // The desk's Link switch goes to the show server over this link.
   useEffect(() => {
     const t = tempoRef.current;
@@ -424,5 +455,6 @@ export function useRemote({
 
   return {
     remoteLink,
+    tvCount,
   };
 }
