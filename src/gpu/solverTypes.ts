@@ -191,6 +191,10 @@ export interface GpuStepParams {
   time: number;
   /** Master dimmer / lamp brightness (0 blackout to 1 full brightness), scaling lamp heat (PLAN 18f). */
   dimmer?: number;
+  /** Lamp Heat dial (0..1, default 0): two-band lamp irradiance and two-phase boil model (PLAN §36e-2). */
+  heat?: number;
+  /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
+  boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
    * The lasting current (see `stepCurrent`). Everything here is per second in
    * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.
