@@ -509,6 +509,16 @@ rest is routine and the owner's calls.
       start; a song started after Go streams as silence until the next start. The fix is
       an audio bus the encoder reads (the current source mixed into one track, silence
       its floor), so the source can change under a running stream.
+  - **37x-4g. Sound and picture judged on one clock dropped a healthy stream** *(shipped
+    2026-11-09; story in docs/plan-shipped.md §37x-4g.)*
+    - *37x-4g-1. The audio encoder's queue has no bound.* Video skips a frame at three
+      waiting; `audio.encode()` is never gated, so a loaded Mac can emit AAC seconds late
+      in write order. Likely source of the rehearsal's skew; the new `audioQueue` and
+      "sound X s late" readouts will say. Bound it (drop or skip the oldest audio, never
+      the clock) once a rehearsal shows the number.
+    - *37x-4g-2. Did 37x-4c-3's 256 KB window share the bug?* Its listener never recovered
+      in `npm run livedrop`; the old readout compared against a delivered timestamp that
+      went stale across a drop, the same five-runs trap this fix found. Re-run it on main.
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.

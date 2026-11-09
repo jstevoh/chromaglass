@@ -139,7 +139,7 @@ export function LiveShowPanel() {
               <span className="min-w-0 flex-1 truncate text-text">{d.name}</span>
               <span className="shrink-0 font-mono text-text-2">
                 {d.phase === 'live'
-                  ? `${mbps(d.kbps)} Mb/s · ${d.secondsBehind.toFixed(1)} s behind${d.dropping ? ' · dropping' : ''}`
+                  ? `${mbps(d.kbps)} Mb/s · ${d.secondsBehind.toFixed(1)} s behind${d.avSkewSeconds != null && Math.abs(d.avSkewSeconds) >= 0.5 ? ` · sound ${Math.abs(d.avSkewSeconds).toFixed(1)} s ${d.avSkewSeconds < 0 ? 'late' : 'early'}` : ''}${d.dropping ? ' · dropping' : ''}`
                   : d.retryInMs != null ? `retrying in ${Math.ceil(d.retryInMs / 1000)} s` : d.error ? `ended: ${d.error}` : d.phase}
               </span>
             </li>

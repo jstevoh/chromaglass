@@ -11218,6 +11218,32 @@ model cannot reach one, the PR says what it reached and asks.
     0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
     link for seconds (37x-4c's item).
 
+#### 37x-4g. Sound and picture judged on one clock dropped a healthy stream
+
+  - **37x-4g. Sound and picture judged on one clock dropped a healthy stream (shipped
+    2026-11-09).** Found in the private rehearsal on the Mac app 1.3.1257: six minutes
+    Excellent on YouTube, then the upload fell from about 7 Mbps to under 1 and Studio said
+    "No data"; a restart held for fifteen seconds, then eighteen minutes stuck. The uplink
+    measured 592 Mbps. The readout that decides to drop video (37x-4c) took the newest
+    timestamp written on *either* track and subtracted the timestamp of the last packet
+    delivered on *either* track. With sound and picture apart by more than the 2 s bound,
+    any brief wait on a WAN (a keyframe pending a few milliseconds) read as more than 2 s
+    behind, and the client dropped video to the next keyframe, again and again: keyframes
+    and sound only, the rehearsal's picture. On loopback nothing waits, so it never showed
+    here. Now each track is judged on its own clock: how far the newest packet written on
+    a track is ahead of that track's oldest packet still waiting. A first draft used the
+    track's last *delivered* timestamp; it went stale across a drop, so the keyframe that
+    ended one drop started the next (five runs for one backlog). `npm run livedrop`'s six
+    new lines, a scripted client with sound 3 s behind, in step and 3 s ahead: before, 590
+    frames dropped in 10 runs with sound 3 s behind and no backlog at all, and 592 in 8
+    runs with one frame in the last second after a real 3.5 s backlog; after, none dropped
+    without a backlog at every skew, and one run of 89 frames with 31 in the last second
+    after it. The readout now shows the skew (`avSkewSeconds`, "sound X s late" past half
+    a second) and the audio encoder's queue (`audioQueue`), the numbers the next rehearsal
+    needs to say where the skew comes from (37x-4g-1). A fifteen-minute local run under
+    load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
+    skew's source on the owner's Mac is not yet reproduced here.
+
 #### 37x-4d-7. The moving line read a looping bar on two frames
 
   - **37x-4d-7. The moving line read a looping bar on two frames (shipped 2026-11-09).**
