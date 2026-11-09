@@ -16,7 +16,7 @@ Part 2 of 2 of §23; it begins at 23.15. The section starts in `23-selling.md`.
   `app.chromaglass`, Services ID `app.chromaglass.signin`, the key, the provider in Firebase,
   the relay email source) is in the project's shared files, never the repo. *Measure:*
   `npm run signin` line 4 (Apple offered, reaches Apple's provider, asks for the email) and
-  11/15 (three buttons fit every screen); judging §112 on the live site.
+  11/15 (three buttons fit every screen); judging §113 on the live site.
   - **23.15a** (open, with §12's iPhone app): native Sign in with Apple in the iPhone app
     (the `AuthenticationServices` sheet, not the web popup; the App ID already carries the
     capability) and deleting the account inside the app (App Store guideline 5.1.1(v)). The
