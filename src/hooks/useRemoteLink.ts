@@ -16,7 +16,8 @@ import {
 export type RemoteStatus = 'connecting' | 'connected' | 'offline' | 'denied' | 'locked';
 
 interface UseRemoteLinkOptions {
-  role: 'display' | 'controller' | 'mirror';
+  /** `tv` is a TV at home playing the plate as video (PLAN 12-tv, components/TvDisplay.tsx); it takes the show key, as a mirror does. */
+  role: 'display' | 'controller' | 'mirror' | 'tv';
   /** Called for every message addressed to this role. */
   onMessage?: (message: RemoteMessage) => void;
   /**

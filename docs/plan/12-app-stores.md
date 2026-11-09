@@ -279,7 +279,50 @@ low-latency HLS that `AVPlayer` plays natively (a second or two of lag, fine for
 evening) or the app carries a community WebRTC build. Store rules: a free app that
 only opens what an account bought on the web, with no buy button or price, should
 fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs the
-App Store Connect record from 12-ship. Size: M, after route 2's first PR.
+App Store Connect record from 12-ship. Size: M, after route 2's first PR, and
+after 12-tv-hls (below).
+
+**12-tv-1: the stream and the `/tv` page (shipped, PR 1 of route 2; story in
+`docs/plan-shipped.md` §12-tv-1).** The show's page sends the wall's canvas to a
+TV on the network as WebRTC video, signalled through the show server's relay
+(`src/lib/tvFeed.ts`, `server/remote-server.js`'s `tv` role); `/tv?key=…` plays it
+with no GPU (`src/components/TvDisplay.tsx`), films while the show is off; Home or
+Pro on the laptop, three TVs at most; `npm run tv`.
+
+What route 2 still needs, found while building 12-tv-1:
+
+- **12-tv-2: the Android TV shell and the Play listing (M, next).** A WebView app
+  that finds the Mac by itself and opens its `/tv`. Finding it: the Mac app
+  advertises the show server over Bonjour (`_chromaglass._tcp`, a small mDNS
+  responder in `desktop/main.js`; nothing advertises it today) and the shell
+  looks with Android's NSD. Pairing without typing the show key on a remote: the
+  TV shows four digits, the Mac's cast menu shows "a TV wants to join: 4821
+  [Allow]", and Allow hands that TV a key of its own (a relay change: a `tv`
+  hello with no key waits in a pending list the display can admit). D-pad: the
+  page has no controls today; the shell's own screens (pick a Mac, sign in) are
+  focusable. WebView settings: autoplay without a gesture, keep the screen on.
+  Listing under 12-play-org, the Android TV banner (320 x 180), no price in it.
+- **12-tv-signin: films with the Mac off, and the TV-code sign-in (M).** Today
+  `/tv` plays films only while the Mac's show server answers. With the Mac off,
+  the shell opens the site's `/tv`, which shows a code and a QR; the phone signs
+  in (a device-code flow: the licence Worker issues the code, the phone's signed-in
+  page claims it, the TV polls and gets a short-lived token naming the tier) and
+  the TV plays the long rendered films (§6) for Home and Pro. Licence Worker and
+  auth: gets one Claude review before merge.
+- **12-tv-hls: low-latency HLS beside WebRTC, for Apple TV (M, before
+  12-tv-apple).** `AVPlayer` plays HLS natively and tvOS has no official
+  libwebrtc. The Mac app's Live Show encoder (`lib/liveStream.ts`) already makes
+  H.264 packets; the show server would cut them into fMP4 parts and serve an
+  `.m3u8` on the LAN. A second or two of lag, fine at home.
+- **12-tv-flat: the TV gets the plate without the wall's geometry (S).** The TV
+  is sent `#liquid-canvas`, the wall as the projector has it, keystone and corner
+  pin included; at home with no projector that is the plate as it is, but a rig
+  that also feeds a projector sends its warp to the TV too. The Live Show's
+  `stack` frames (37x-4d-1) are the flat picture to send instead.
+- **12-tv-sound: the music on the TV's speakers (S, if asked).** The TV is sent
+  no sound: the music plays where the Mac plays it. Sending the show's audio as a
+  second track would keep it in step with the picture (WebRTC syncs the two),
+  for a Mac whose music should come out of the TV.
 
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`

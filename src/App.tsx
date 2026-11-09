@@ -12,6 +12,7 @@ import { resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
+import { CastNetworkItems } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
@@ -1944,7 +1945,7 @@ export default function App() {
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
-    remoteLink,
+    remoteLink, tvCount,
   } = useRemote({
     settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
@@ -3620,33 +3621,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="px-3 py-2.5 rounded-lg" data-testid="cast-network">
-                  <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
-                  {relay ? (
-                    <>
-                      <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
-                      {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                      ))}
-                      {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
-                        <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                      )}
-                      <div className="mt-2">
-                        <Info label="">
-                          Open one of these on a projector, a TV or a tablet and it shows the
-                          show. Across buildings or other access points: run{' '}
-                          <span className="font-mono">npm run tunnel</span> and use the https
-                          address it prints, with the same{' '}
-                          <span className="font-mono">?cast=true&amp;key=…</span>.
-                        </Info>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">
-                      Needs the show server: run <span className="font-mono">npm run remote</span>.
-                    </div>
-                  )}
-                </div>
+                <CastNetworkItems relay={relay} mirrorCount={mirrorCount} tvCount={tvCount} />
 
                 <div className="flex items-start gap-1">
                   <button

@@ -29,7 +29,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useMidiTouch.ts`: flash on a controller touch.
 - `usePreviewFrame.ts`: where the plate is painted.
 - `useRecorder.ts`: record the canvas.
-- `useRemoteLink.ts`: laptop side of the phone remote.
+- `useRemoteLink.ts`: laptop side of the phone remote; also a network display's, and a TV's at home (role `tv`, PLAN 12-tv).
 - `useSceneCamera.ts`: the room camera.
 - `useSongChange.ts`: a new song, on a beat.
 - `useSongRender.ts`: render a song.
@@ -39,4 +39,4 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 ## Checks
 
-`npm run lint` always. Sound (`useAudioAnalyzer`): `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. `useCastSession`, `useProjector`: `desktop`. `useRemoteLink`: `applink`, `remotemix`, `phonelink`. `useDeviceTilt`: `phone`, `layout`. `useDeskLayout`: `panel`, `desk`.
+`npm run lint` always. Sound (`useAudioAnalyzer`): `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. `useCastSession`, `useProjector`: `desktop`. `useRemoteLink`: `applink`, `remotemix`, `phonelink`, `tv`. `useDeviceTilt`: `phone`, `layout`. `useDeskLayout`: `panel`, `desk`.
