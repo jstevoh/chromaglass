@@ -12,7 +12,7 @@ import { resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
-import { CastNetworkItems } from './components/CastNetworkItems';
+import { CastNetworkItems, TvAsks } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
@@ -748,7 +748,7 @@ export default function App() {
   // (the settings state itself is untouched, so preset detection keeps working).
   // And a back plate with a look of its own is on the stage whatever the front
   // look's plate count says: a Go on the front to a one-plate look would
-  // otherwise drop the plate someone had just sent a look to.
+  // otherwise drop the plate someone just sent a look to.
   const effectiveSettings = useMemo(() => {
     const s = musicIntel.overrides ? { ...settings, ...musicIntel.overrides } : settings;
     return (s.layerCount ?? 1) < stageLayers ? { ...s, layerCount: stageLayers } : s;
@@ -1104,7 +1104,7 @@ export default function App() {
   /*
     A hand on the closeup camera (Alt-drag or Alt-click on the plate): it goes
     where it is aimed. Taken off Auto, since a camera that roams on its own
-    would leave the spot the hand just chose.
+    would leave the spot the hand chose.
   */
   const aimMacro = useCallback((x: number, y: number) => {
     const auto = (settingsRef.current.macroCamera ?? 'hold') === 'auto';
@@ -1937,15 +1937,12 @@ export default function App() {
     updateLiquidColor(selectedLiquidId, c.hex);
   };
   /** The selected liquid takes a palette colour; the dropper becomes the tool. A hand on a dye pad. */
-  const selectDye = (paletteIndex: number) => {
-    colourDye(paletteIndex);
-    
-  };
+  const selectDye = (paletteIndex: number) => { colourDye(paletteIndex); };
   const selectedDyeIndex = PALETTE.findIndex(c => c.hex.toLowerCase() === (selectedLiquid?.color ?? '').toLowerCase());
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
-    remoteLink, tvCount,
+    remoteLink, tv,
   } = useRemote({
     settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
@@ -2514,6 +2511,7 @@ export default function App() {
         <div className="pointer-events-none fixed top-3 right-1/2 translate-x-[120px] z-40 rounded-full border border-red-400/30 bg-red-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-red-200" data-testid="blackout-chip">Blackout · B</div>
       )}
 
+      <TvAsks tv={tv} />
       {/* ── Clean-screen hint: the one thing shown after everything is hidden ── */}
       <AnimatePresence>
 
@@ -3621,7 +3619,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <CastNetworkItems relay={relay} mirrorCount={mirrorCount} tvCount={tvCount} />
+                <CastNetworkItems relay={relay} mirrorCount={mirrorCount} tv={tv} />
 
                 <div className="flex items-start gap-1">
                   <button

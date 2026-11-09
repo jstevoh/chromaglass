@@ -740,6 +740,10 @@ async function start() {
   // The owner's assistant switch (PLAN 44b): one word in this file, read by
   // the show server every second. No file, as on every customer's Mac, is off.
   process.env.CHROMAGLASS_ASSISTANT_FILE ??= join(app.getPath('userData'), 'assistant');
+  // The TVs paired by four digits, and the show's random id the Bonjour
+  // advert carries (PLAN 12-tv-2, server/tv-pairing.js): kept with the app's
+  // own data, since the app's copy of the server is read-only.
+  process.env.CHROMAGLASS_TV_FILE ??= join(app.getPath('userData'), 'tvs.json');
   process.env.OSC_PORT = String(show.oscMode === 'off' ? 0 : show.osc);
   process.env.OSC_BIND = OSC_BINDS[show.oscMode] ?? OSC_BINDS.local;
   const { createServerLicenseManager } = await import(pathToFileURL(join(ROOT, 'server', 'server-license.js')).href);
@@ -817,6 +821,8 @@ function fail(title, err) {
 }
 
 app.on('will-quit', () => {
+  // The Bonjour goodbye (PLAN 12-tv-2): a TV's list drops this Mac now, not in two minutes.
+  try { showServer?.stopBonjour?.(); } catch { /* quitting */ }
   if (loopbackAudioSocket) {
     try { loopbackAudioSocket.close(); } catch { /* ignore */ }
     loopbackAudioSocket = null;

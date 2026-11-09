@@ -26,6 +26,7 @@ import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
 import { useInkTitle } from './useInkTitle';
+import type { TvAtHome } from '../components/CastNetworkItems';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -200,6 +201,8 @@ export function useRemote({
   // TVs at home showing the plate (PLAN 12-tv), and how many, for the cast menu.
   const tvFeedRef = useRef<TvFeedSender | null>(null);
   const [tvCount, setTvCount] = useState(0);
+  // TVs asking to pair by four digits, and how many hold a key (PLAN 12-tv-2).
+  const [tvPairing, setTvPairing] = useState<{ asks: { id: string; code: string }[]; paired: number }>({ asks: [], paired: 0 });
   const linkAskedRef = useRef(-Infinity);
   /*
     Live's play and stop, when the operator asked for them (PLAN.md
@@ -236,6 +239,9 @@ export function useRemote({
           break;
         case 'tv-signal':
           if (message.from) void tvFeedRef.current?.signal(message.from, message.signal);
+          break;
+        case 'tv-pairing':
+          setTvPairing({ asks: message.asks, paired: message.paired });
           break;
         case 'tv-show':
           break;   // the relay's word to a TV, never a display's
@@ -407,6 +413,8 @@ export function useRemote({
           `lights` and `state` this display *sends*: the first a few lines
           down from here, the second from the hook.
           `cast` is the mirror's, and `CastDisplay` has it.
+          `tv-code` and `tv-key` are a pairing TV's (TvDisplay); `tv-allow`,
+          `tv-refuse` and `tv-forget` this display sends (PLAN 12-tv-2).
         */
         case 'hello':
         case 'denied':
@@ -421,6 +429,11 @@ export function useRemote({
         case 'assistant-mode':
         case 'assistant-reply':
         case 'assistant-undo':
+        case 'tv-code':
+        case 'tv-key':
+        case 'tv-allow':
+        case 'tv-refuse':
+        case 'tv-forget':
           break;
         default: unhandled('a message from the phone', message);
       }
@@ -462,8 +475,19 @@ export function useRemote({
     return () => { t.onLinkSwitch = null; };
   }, [tempoRef, remoteSend]);
 
+  // What the cast menu and the pairing card hold: the TVs watching, asking
+  // and paired, and the laptop's three answers to them.
+  const tv = useMemo<TvAtHome>(() => ({
+    count: tvCount,
+    asks: tvPairing.asks,
+    paired: tvPairing.paired,
+    allow: (id) => remoteSend({ type: 'tv-allow', id }),
+    refuse: (id) => remoteSend({ type: 'tv-refuse', id }),
+    forget: () => remoteSend({ type: 'tv-forget' }),
+  }), [tvCount, tvPairing, remoteSend]);
+
   return {
     remoteLink,
-    tvCount,
+    tv,
   };
 }

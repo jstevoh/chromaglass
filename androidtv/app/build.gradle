@@ -1,0 +1,42 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'app.chromaglass.tv'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'app.chromaglass.tv'
+        // Android 7: every Google TV, and Android TV boxes back to 2016. The
+        // WebView is updated through the Play Store on all of them, so the
+        // page's WebRTC is the same on each.
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '0.1.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        // Lint's TV rules (a banner, a Leanback launcher, no touchscreen
+        // required) are what the Play review for TV checks first.
+        abortOnError true
+        warningsAsErrors false
+        checkReleaseBuilds false
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}

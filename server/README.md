@@ -4,7 +4,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 ## Start here
 
-- `remote-server.js` (40 KB, grep it): the show server (`npm run remote`): serves the built app on the LAN, relays the remote's messages between laptop and phones over WebSocket (and a TV's WebRTC handshake with the laptop, the `tv` role, PLAN 12-tv), takes OSC, Art-Net and Ableton Link, sends OSC out. Exports `setOsc`/`oscState` and `setOscOut`/`oscOutState` for the Mac app.
+- `remote-server.js` (54 KB, grep it): the show server (`npm run remote`): serves the built app on the LAN, relays the remote's messages between laptop and phones over WebSocket (and a TV's WebRTC handshake with the laptop, the `tv` role, PLAN 12-tv, and its pairing by four digits, 12-tv-2), takes OSC, Art-Net and Ableton Link, sends OSC out. Exports `setOsc`/`oscState`, `setOscOut`/`oscOutState` and `stopBonjour` for the Mac app.
 - `license-worker.js` (35 KB, grep it): the licence Worker: merchant webhooks, keys, machine seats, cloud sync.
 - `report-worker.js`: where the crash log's Send goes.
 - `feedback-worker.js`: where Settings → Feedback goes: one D1 table (`feedback-schema.sql`) and a mail to support@ (PLAN 39a).
@@ -23,6 +23,8 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `account-shows.js`: an account's running shows (served by the show server).
 - `assistant.js`: the guard for the owner's AI assistant (PLAN 44b–44d): `readAssistantMode(env, file)` (the switch: `CHROMAGLASS_ASSISTANT`, or one word in `CHROMAGLASS_ASSISTANT_FILE`, default `server/.assistant`; off, suggest, play or full), `createAssistantGuard(send)`, `ROOM_KEYS` (from `assistant-room-keys.json`, the page's `RIG_KEYS` and `SETUP_KEYS`, rewritten by `node scripts/assistant.mjs --write`). `remote-server.js` admits the `assistant` role only from the laptop, with the show key, while the switch is on, and passes its every message through the guard. The guard also passes a `song-action` (PLAN 44f: Play for a pour, burst, dyes, zoom, kaleidoscope, look, title or a look setting; Full for the rest), and the relay answers `assistant-still` itself (44c-4, any mode on) and hands a `picture` marked `still` to the assistant alone. `mcp/` imports `ROOM_KEYS`; nothing here imports `mcp/`.
 - `artnet.js`: Art-Net in and out.
+- `bonjour.js`: the show server's Bonjour advert (PLAN 12-tv-2): a small mDNS responder for `_chromaglass._tcp` (`advertise`, `browse`, `instanceLabel`, `encodeMessage`, `decodeMessage`), so the Android TV app finds the Mac by itself. Carries the show's random id, never its key. `remote-server.js` starts it on listen (`CHROMAGLASS_BONJOUR=0` keeps it quiet) and exports `stopBonjour` for the Mac app's quit. `node server/bonjour.js` lists the shows a network answers with.
+- `tv-pairing.js`: pairing a TV by four digits the laptop allows (PLAN 12-tv-2): `createTvPairing({ file })` (asks, codes, Allow, No, Forget, the TV keys and the show id, kept in `CHROMAGLASS_TV_FILE`, default `server/.tvs.json`), `PAIR_MS`, `PAIR_MAX`, `TV_KEY`.
 - `osc.js`: OSC both ways: the reader and the address space the show takes in (`readOsc`, `oscToMessage`), the writer and the feed it sends out (`encodeOsc`, `encodeBundle`, `feedMessages`, `oscOutTarget`; PLAN 13.5-osc).
 - `cloud-sync.js`: Pro cloud sync store.
 - `fingerprint-worker.js`: song ID proxy.
@@ -34,4 +36,4 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 ## Checks
 
-Every file must pass `node --check` (Measure's "The scripts parse"). `npm run report-worker`, `feedback-worker`, `license-worker`, `fingerprint-worker`, `cloudsync`, `accountlink`, `signin`, `tiers`, `showkey`, `assistant` (the assistant role and guard), `lights` (Art-Net), `link` (Ableton Link), `oscout` (OSC out). The relay: `applink`, `remotemix`, `phonelink`, `draw`, `drawwall`, `tv`. The Mac app: `desktop`.
+Every file must pass `node --check` (Measure's "The scripts parse"). `npm run report-worker`, `feedback-worker`, `license-worker`, `fingerprint-worker`, `cloudsync`, `accountlink`, `signin`, `tiers`, `showkey`, `assistant` (the assistant role and guard), `lights` (Art-Net), `link` (Ableton Link), `oscout` (OSC out). The relay: `applink`, `remotemix`, `phonelink`, `draw`, `drawwall`, `tv`, `tvpair` (the advert and pairing). The Mac app: `desktop`.
