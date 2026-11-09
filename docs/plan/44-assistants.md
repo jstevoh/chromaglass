@@ -158,6 +158,30 @@ through cords and preset patches, and the plate shader is untouched.
   (`parseSongAction` to `addSongCue` to the pinned cue), which `npm run assistant`
   stops short of at its stand-in display. Pass: an `npm run assistant` line where the
   display refuses and the tool says why.
+- **44i.** The owner's YouTube channel from the assistant: a second local MCP server, `mcp/youtube-mcp.js` (upload that resumes, update, thumbnails, playlists; private unless told otherwise): **shipped** (`npm run youtube`; story in `docs/plan-shipped.md` §44). Owed: the owner's one-time Google setup and a first real upload (44i-1).
+- **44i-1. The owner's Google setup and a first real upload.** *(Owner, about ten
+  minutes; then Claude on the Mac.)* A Google Cloud project with the YouTube Data API
+  v3 on, its consent screen published (In production, so the sign-in does not lapse
+  every 7 days as Testing's does), a "Desktop app" client's JSON saved as
+  `~/.chromaglass/youtube/client_secret.json`; then `node mcp/youtube-mcp.js login` and
+  the server added to the assistant. Steps in the owner's private setup file. Pass: one
+  private upload of a music film, resumed across a pulled connection, and its title
+  changed from the assistant.
+- **44i-2. Publish it for others?** *(The owner's call, asked 2026-11-08.)* The server
+  imports nothing from the repo (`npm run youtube` holds that), so it can move to a
+  repository of its own and the public MCP registry unchanged. Each user would still
+  make their own Google Cloud project; a one-click sign-in for strangers means Google's
+  verification of our app for the `youtube` scope (a privacy policy, a review of
+  weeks) and us running the sign-in. Decide after the owner has used it for a few
+  uploads. Not in the store, and not named on the site while undecided.
+- **44i-3. The channel from claude.ai on the web and the phone.** A local server is
+  reachable only from the Mac's own assistant apps. Once 44h's Worker exists, the
+  same tools can ride it (the Mac's server doing the upload, since the films are on
+  the Mac). Only if the owner wants uploads started from the phone.
+- **44i-4. Progress while an upload runs.** `upload_video` answers within 45 s and
+  the assistant asks `upload_status` after. MCP's progress notifications would let a
+  client show a bar instead; Claude's apps did not all show them when checked. Pass: a
+  `youtube` line where a client that sends a `progressToken` receives rising progress.
 - **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
   lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
   ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
@@ -174,5 +198,5 @@ through cords and preset patches, and the plate shader is untouched.
 
 ## Order
 
-44h next, in its own PR; then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
+44h next, in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
 are wanted.

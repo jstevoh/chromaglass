@@ -334,11 +334,13 @@ for (const devicePx of [1, 1.5, 2, 3]) {
     them (the check-skeptic). These say where: the pixel rungs are three
     quarters and half of the wall, and the grids below the opening one are
     drawn at half. Written from §14c's design, not printed from the code.
+    The 4K wall opens on its three-quarter share (2880×1620, 4.67 Mpx), not
+    all 8.3 Mpx: PLAN 14c-4k, whose line in rungs-owed.mjs says why.
   */
   {
     const WANT = {
       '1920x1080': '1024@1920x1080 768@1920x1080 512@1920x1080 512@1440x810 512@960x540 384@960x540 256@960x540 from 2',
-      '3840x2160': '768@3840x2160 512@3840x2160 512@2880x1620 512@1920x1080 384@1920x1080 256@1920x1080 from 1',
+      '3840x2160': '768@3840x2160 512@3840x2160 512@2880x1620 512@1920x1080 384@1920x1080 256@1920x1080 from 2',
     };
     const off = [];
     for (const stage of [P1080, K4]) {

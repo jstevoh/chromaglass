@@ -249,7 +249,11 @@
         "the Mac moves the deploy to GitHub's Macs; and that step's own rule",
         "(scripts/macbusy.sh) against made-up process lists and this machine's own:",
         "another session's working browser or the app counted; a deploy's own, an",
-        "idle leftover and a vite server alone not."
+        "idle leftover and a vite server alone not. And 19ah-9a (scripts/macdeploy.mjs):",
+        "the mark a shard writes holds a harness's launch while its worker lives and",
+        "for a grace after it ends, never for a shard that gave up or died; macbusy.sh's",
+        "own marks read back; the last step fails when a look between the checks found",
+        "the Mac busy, and the watchdog reads that failure as busy too."
       ]
     },
     {
@@ -477,7 +481,7 @@
     {
       "name": "The ladder's shape",
       "shard": "logic",
-      "run": "npm run rungs -- --owed=4k,governor,120,readout,grid32",
+      "run": "npm run rungs",
       "why": [
         "The shape of the quality ladder: that every rung is a rung, that a",
         "step down gives something up, and that a rung asking for fewer device",
@@ -656,7 +660,7 @@
     {
       "name": "Three sound builds, their checks written first",
       "shard": "logic",
-      "run": "npm run soundowed -- --owed=voices,lfo",
+      "run": "npm run soundowed -- --owed=voices",
       "why": [
         "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
         "notes as voices placed by Melody Walk's scale with an attack, a release",
@@ -1690,6 +1694,23 @@
       ]
     },
     {
+      "name": "The phone controller apps, owed",
+      "shard": "browser2",
+      "run": "npm run controller -- --owed=setlist,songs,display,scan,android,nogpu",
+      "why": [
+        "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
+        "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
+        "song shows on the phone's remote, and the laptop's half that sends them and",
+        "acts on a tap (12-ctl-1); Scan the Phone panel's QR code instead of typing",
+        "(12-ctl-2); the Android app as a Capacitor project that may open ws:// to the",
+        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). --owed: each",
+        "line is excused only in main's state and printed as owed; the PR that builds",
+        "it takes its id out and never edits a line. The lines with no id hold on main:",
+        "the looks stay on Controls, the laptop answers a controller, no Scan on the",
+        "website, no Open in Chrome on the iPhone. No plate needed; about a minute."
+      ]
+    },
+    {
       "name": "OSC out reaches a VJ app",
       "shard": "browser2",
       "run": "npm run oscout",
@@ -1785,6 +1806,21 @@
         "notes; the room keys against lookFade.ts; nothing public naming it. Then eighteen",
         "mutants, each a rule removed from a copy of server/, each of which must fail its",
         "own line. No GPU, no build; about a minute."
+      ]
+    },
+    {
+      "name": "The owner's YouTube connector",
+      "shard": "browser2",
+      "run": "npm run youtube",
+      "why": [
+        "The YouTube MCP server (PLAN 44i; scripts/youtube.mjs): mcp/youtube-mcp.js over stdio",
+        "against a stand-in Google on loopback. The sign-in (state refused, PKCE S256, the key",
+        "file 600 in a 700 folder), a refused access key refreshed, an upload killed mid-file",
+        "and resumed by a second server in the same session, a dropped chunk and a 503 resumed",
+        "from Google's count, the bytes exact, private when no privacy is named (Google's default",
+        "is public since 2026-11-02), the same file twice refused, an update keeping what it did",
+        "not name, no secret in any reply or log. Then fourteen mutants, each of which must fail",
+        "its own line. No GPU, no build, no network; about half a minute."
       ]
     },
     {

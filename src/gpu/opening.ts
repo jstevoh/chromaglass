@@ -103,6 +103,15 @@ export interface Opening {
    * then as before. Off the thin gap the dish is never stepped (`stepSlosh`).
    */
   slosh: boolean;
+  /**
+   * The clear film (PLAN §20b): carried, its pressure and its update, from
+   * the first step, when the look lays a film (Clear Film above nought).
+   * Added with Saffron Lace (PLAN 28l), the first look to lay one: `npm run
+   * startup` on the Mac found it asking for all three in its first steps
+   * with no list naming them. The film's level change (filmSplat) is a hand
+   * on the control mid-show, never an opening, so it stays behind the show.
+   */
+  film: boolean;
 }
 
 /**
@@ -155,5 +164,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     gravity: on(s.plateUpright) || on(s.solutalBuoyancy),
     slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
       && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
+    film: (s.clearFilm ?? 0) > 0.001,
   };
 }
