@@ -4790,6 +4790,61 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   stencil and 3×3 bounds remain, now done once rather than three times.
   `npm run slump` (14/14) and `npm run grating` (24/24) passed on the same Mac.
 
+#### 18m-5c. The grid filter still reshapes a slumping drop's edge (shipped 2026-11-08)
+
+- **Reported:** since the glass gap became a real 2 mm (38r, #655), the glycerine drop at
+  256² barely slumps on its own: its 2% front goes `3.94 → 4.13 mm` in 20 s with `dampGrid`
+  off, but `3.94 → 4.50 mm` (`+0.360 mm`) with it on, and its half-peak contour comes in
+  `2.92 → 2.79 mm` (`-0.136 mm`). In the 6 mm gap before #655, the filter moved the 2% front
+  `0.00 mm`, the 5% contour out `0.18 mm` and the half-peak contour in `0.22 mm`, the same at
+  Grid Damp `0.05` and `0.5`.
+- **What the rim slice showed** (slicing the glycerine drop's rim from the centre `(128, 128)`
+  at `t = 2 s` and `t = 20 s`, filter off vs on, and decomposing one filter step on the bare
+  field into `curv = u`, `limit = c − (here + u)` and `return = final − c`):
+  - Before the fix (`main`, `1a1c748d`), at `t = 20 s` the bare 2% threshold (`0.1098`) sits
+    inside `r = 5.00 cells` (`3.91 mm`), with `(5, 0) = 0.0643` and `(5, 1) = 0.0197` below
+    2% and only `(4, 2) = 0.1561` (`r = 4.47 cells`, `3.49 mm`) and `(4, 3)` (`r = 5.00`)
+    above it (`front = 4.135 mm`). With the filter on, `(5, 0)` climbed `0.0643 → 0.1107`
+    (`Δ = +0.0464`, `[curv=+2.26e-4, limit=-2.26e-4]`) and `(5, 1)` climbed `0.0197 → 0.1108`
+    (`Δ = +0.0911`, `[curv=+5.72e-5, return=+1.27e-7]`), both crossing `0.1095` (`r = 5.10
+    cells`, pushing the 95th-percentile 2% front to `4.495 mm`, `+0.360 mm`). At `(5, 1)`,
+    once the slump raised `here` to `0.0197` between `nE = 0` and `nW = 1.0220`, the one-sided
+    foot gate `6.0 * (here − mn) > mx − here` opened `hi` to `nW` so the positive `curv` lobe
+    (`k_{±1} = -4`) passed unclamped (`limit = 0`). Meanwhile, on the inner shoulder `(2, 2)`
+    (`r = 2.83 cells`, `2.21 mm`, right at the half-peak contour `2.745`), `curv = -1.53e-4`
+    eroded `(2, 2)` from `2.8107` to `2.6997` (`Δ = -0.1110`, pulling the half-peak contour in
+    `-0.136 mm`) because the smooth axial dome cells `(1, 0)` and `(2, 0)` had large room `w`
+    and absorbed the 7×7 returned excess (`(2, 0)` grew `3.9644 → 4.0606`, `Δ = +0.0963`),
+    leaving `(2, 2)` with only `return = +9.39e-5` against `curv = -1.53e-4`.
+- **Why 1D difference gates fail on `pressed`:** gating on 1D second differences `δx²f`, `δy²f`
+  is blinded by the dome's own radial curvature (`pressed` `94%–98%` vs `< 68%`), and gating
+  on 1D fourth differences `δx⁴f`, `δy⁴f` is blinded by 1D front steps (`pressed` `72%–75%`).
+  A 1D profile `f(x) + g(y)` or a radially symmetric dome `a − b(x² + y²)` is separable, so
+  its cross second difference `m = δx²δy²f` vanishes identically inside the dome and on 1D
+  fronts while seeing every 2D wave `cos(kx x + ky y)` with factor `4(1 − cos kx)(1 − cos ky)`.
+- **What changed** (`src/gpu/wgsl/fluid/gridFilter.ts`): inside the existing 5×5 stencil loop
+  (with zero extra texture loads), `dampGridCurv`, `dampGridLimit` and `dampGrid` accumulate
+  the 5 row and 5 column second differences `r2[0..4]`, `c2[0..4]` (`k2 = [0, 1, -2, 1, 0]`)
+  to form `m = δx²δy²f` at the cell (`m0`) and its four axial neighbours (`mW, mE, mS, mN`),
+  and hold `[lo, hi]` to `here` (`lo = select(here, lo, alt); hi = select(here, hi, alt);`,
+  `alt = ax & ay`) unless `m` oscillates along both X and Y — either changing sign to an axial
+  neighbour (`mW * m0 < 0 | mE * m0 < 0`) or having both axial neighbours below `m0 / 2`
+  (`(2*mW − m0)*m0 < 0 & (2*mE − m0)*m0 < 0`, which holds at wave crests whenever `cos k < 1/2`,
+  i.e. `k in (π/3, π]`, covering `grating`'s `near` and `far` wave packets as well as `(π, π)`).
+  At the drop's rim `(5, 0)` and `(5, 1)`, `m` does not oscillate along the front (`alt = false`),
+  so `lo = hi = here` clamps `c = here` (`limit = -curv`) and sets `w = 0`: `(5, 0)` stays at
+  `0.0488` and `(5, 1)` at `0.0625` (both below the `0.1094` 2% contour), while inside the dome
+  `(1, 0)` and `(2, 0)` have `w = 0` so `(2, 2)` gets `return = +1.51e-4` against
+  `curv = -1.56e-4` and holds `2.7574 > 2.7355` above the half-peak contour.
+- **Measured:** `npm run slump` (no `--owed`, removed `-- --owed=front` from `scripts/checks.json`),
+  15/15 passed: check 14 reads `2 s: dye -0.0000%`, `20 s: dye +0.0001%`, `156 of 65536 cells
+  not the bare run's at 20 s`; check 14b reads `2 s: front +0.000 mm of the bare run's (at 5%
+  of the peak +0.000 mm, half the peak 0.000 mm, printed only); 20 s: front +0.000 mm of the
+  bare run's (at 5% of the peak +0.000 mm, half the peak 0.000 mm, printed only)`.
+  `npm run grating`: 24/24 ok (`1 step 94.6%`, `60 steps 4.3%`, `faint 4.3%`, `near 29.7%`,
+  `far 6.9%`, `pressed 66.8% < 68%`, `lines/rows 0.000%`, `disc ring 0.001%`, `halo 0.0%`,
+  `cons +1.21 ppm/s`).
+
 ### 19aa-3. The API scripts never print the token
 
 **Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on
