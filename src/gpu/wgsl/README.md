@@ -24,6 +24,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `camera.ts`, `cameraFields.ts`: camera pass.
 - `ferroDrop.ts`: closeup drop. `standing.ts`: domes.
 - `plateThinFilm.ts`: `THIN_FILM_WGSL`, Thin Film's rings over the plate, the film's amount read through a B-spline (PLAN 1i; `npm run filmrings`).
+- `plateBenDay.ts`: `BENDAY_OUTLINE_WGSL` (`benDayStrength`, `benDayEdge`), the Ben-Day print's pen line round each plate's shapes and seams, kept beside `plate.ts` (PLAN 21b; `npm run benday`).
 - `lampField.ts`: `LAMP_FIELD_WGSL`, `lampField`, `pupilPass`: the projector's light on the stage (the lamp lever, the aperture), with the CPU twin `npm run lampfield` reads.
 - `plateTransmit.ts`: `TRANSMIT_WGSL` (Glossiness as relief, the gel as a filter, the satellite droplets as lenses, PLAN 38h) and `EDGE_LIGHT_WGSL` (every edge's share of the light from beneath, `edgePass`, and the drops' aperture and indices, PLAN 38h-2; and `camBubble`, the closeup bubble's centre and radius fitted to the air texels, PLAN 38h-7): pieces of the plate shader kept beside `plate.ts`; `npm run nolight` checks them. `TRANSMIT_WGSL` carries `MOIRE_WGSL`.
 - `plateMoire.ts`: `MOIRE_WGSL`, the moiré pack's two printed sheets on the stage (`moireSheets`, the product of two box-integrated gratings, the lens's defocus by the sheet's gap, the lower sheet bent through the liquid) and `mixBelowBack`, which `plate.ts` calls for the Mixer rows between the plates, after the sheets (PLAN 45a); `npm run moire` checks it.
