@@ -594,20 +594,24 @@ rest is routine and the owner's calls.
   - **37x-10e. The check's arms on the thin gap too.** *(shipped 2026-11-09 with
     37x-10g: `npm run inktitle -- --thin`.)*
   - **37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a
-    rinse.** *(shipped 2026-11-09.)* In the private rehearsal of the first live stream the
-    title cards were smeared by the looks' own flow in about a second, before the wash
-    began. On a thin gap the title now lands on a pad of the plate's liquid thickened 20
-    times (the species field, PLAN 18d), which the flow goes round, and the wash squirts
-    clear liquid into it, which fingers through the thick pad (Saffman–Taylor).
-    `npm run inktitle -- --thin`; story in `docs/plan-shipped.md` §37x-10g. Found building it:
-    - **37x-10h. The pad's gum thins under shear.** *(S.)* A real gum-thickened ink is
-      shear-thinning: thick under the look's gentle flow, thin under the rinse's sharp
-      one. The species field carries one Newtonian viscosity a cell, so the pad is
-      Newtonian and the rinse does all the breaking. A fifth species channel (or the
-      title's own field) for a power-law share would let the stirring alone break it.
-    - **37x-10i. One pour call for the rinse's twelve points.** *(S.)* Each rinse point is
-      its own `pour` (an encoder and a submit), twelve a step for about two seconds a
-      title; a `pourMany` taking a list would make it one.
+    rinse.** *(shipped 2026-11-09; superseded 2026-11-10 by 37x-10j.)* The owner judged
+    the thick-ink titles still not readable enough and asked for a corner caption instead.
+    The pad and rinse stay as the ink choice's (`npm run inktitle -- --thin`); story in
+    `docs/plan-shipped.md` §37x-10g. Its follow-ups 37x-10h (a shear-thinning gum) and
+    37x-10i (one pour call for the rinse) are dropped with it.
+  - **37x-10j. Song titles as a corner caption, like a 1980s music channel.** *(shipped
+    2026-11-10.)* The default for song titles: artist, the song in quotes, album and label,
+    white in the bottom-left corner for seven seconds, on the screen and burned into the
+    live stream; ink is the other choice (`titleCaption`). `npm run caption`; story in
+    `docs/plan-shipped.md` §37x-10j. Found building it:
+    - **37x-10k. The caption on the projector, the cast and recordings.** *(S.)* The card
+      is drawn on the window's own layer and on the stream's encode; the projector window
+      (CastDisplay's mirror), a cast, Syphon and the Record button take the plate's canvas
+      and do not carry it. Draw it where those copy the frame (`lib/frameTaps.ts`).
+    - **37x-10l. The conductor sends `song_title`.** *(S.)* The rehearsal's conductor
+      script poured `pour_text` at 4 s into each track; it should call `song_title` with the
+      album sheet's artist, title, album and label, and 37x-10b's cue from the album queue
+      should do the same in the app.
   - **37x-10f. The dead GPU picture pour.** *(S.)* `WebGPUFluid.pourImage` (gpu/fluid/
     inputs.ts) has no caller (the app's `injectImage` lays a picture through the CPU's
     arrays), and its fold binds three textures to `deltaDye`, which reads four since

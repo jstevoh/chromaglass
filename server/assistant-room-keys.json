@@ -70,5 +70,6 @@
  "sceneSmooth",
  "sensitivity",
  "simResolution",
- "songFollow"
+ "songFollow",
+ "titleCaption"
 ]

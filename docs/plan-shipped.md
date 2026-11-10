@@ -12624,3 +12624,31 @@ cancelled one). A quarantined flake (19ak-1) is a warning only on a pull request
 deploy holds every line to its bar, so a quarantined line red on two deploys running
 holds main like any check. That is the rule as adopted; 19am-3 is where a line-level
 hold could choose otherwise.
+
+## 37x-10j. Song titles as a corner caption, like a 1980s music channel (2026-11-10)
+
+**What was wrong.** The owner judged 37x-10g's thick-ink titles on the Mac's film "not
+very readable honestly" and asked for titles that "just show up like MTV used to have them
+in the bottom left corner and then fade away. Simple ui overlay", then "as much like 1980s
+MTV as possible". Ink in a moving liquid is the wrong medium for words a viewer must read
+in a few seconds.
+
+**What changed.** `lib/songCaption.ts` holds the card: artist, the song in quotation
+marks, album, label, white "Helvetica Neue" at a twenty-fourth of the picture's height,
+left-aligned in the title-safe corner, a black drop shadow under the white, up in 200 ms,
+held 7 s, out in 450 ms. The screen draws it on a window-sized canvas layer
+(`components/songCaptionLayer.ts`, mounted by useRemote because App.tsx may not grow);
+the live stream's encoder draws it on each output's staging canvas after the plate
+(`lib/liveStream.ts` `stage`), so YouTube receives it and the portrait encode has it in
+its own corner. `app/songTitle.ts` chooses caption or ink by the new `titleCaption`
+setting (default the caption) for the ear's titles and a song show's title; a new
+`song-title` message (phone, show server, the assistant's `song_title` MCP tool) always
+shows the caption. Desk: Logo & Titles → As a corner caption. Phone: Caption / Ink under
+the Title switch.
+
+**What it measured.** `npm run caption`: the card's lines and fade; on a dark 1280x720
+plate 3.7% of the bottom-left box white and the other corners untouched; on bright cream
+a blurred shadow alone left 0.0% of the box near-black round the letters (white on cream,
+unreadable), the drop shadow 2.1%; streamed and decoded, the landscape's bottom-left box
+0.0% white before the card, at least 2.0% while it is up, 0.0% after, the top-right
+never touched, and the portrait at least 5.3% in its own corner.

@@ -249,6 +249,14 @@ export type RemoteMessage =
    */
   | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
   /**
+   * A song's credit shown as the corner caption over the plate and burned
+   * into the live stream (PLAN 37x-10j, `lib/songCaption.ts`): the artist,
+   * the title, and the album and label when known, as a music channel's
+   * card of the early 1980s, for about seven seconds. The display reads it
+   * with `parseSongCaption` whoever sent it.
+   */
+  | { type: 'song-title'; title: string; artist?: string; album?: string; label?: string }
+  /**
    * Arm a look without sending it. `null` disarms.
    *
    * Separate from `preset` on purpose: `preset` applies, which cuts the plate

@@ -2578,3 +2578,16 @@ for two or three seconds, then run and finger apart and melt into the colour wit
 six seconds, leaving its teal in the show. Bad: a logo too faint to read on a bright or a
 dark look, one that smears before it can be read, one that never melts on a still look, a
 square or a halo around it, the plate around it clearing or dimming.
+
+## 120. Song titles as a 1980s corner caption (PLAN 37x-10j)
+
+1. Settings → **Logo & Titles** → **Song titles** on, **As a corner caption** on (the
+   default). Play a song the ear names, or have the assistant call `song_title`, on a dark
+   look and a bright one, and once with the Live Show on air.
+2. The card should come up in the bottom-left corner in about a fifth of a second: the
+   artist, the song in quotation marks, the album, the label, white with a dark drop shadow,
+   one size, left-aligned; it should sit still for seven seconds and fade out in under half
+   a second. The stream (and its portrait encode) should carry the same card in its own
+   bottom-left corner.
+3. Bad: letters lost on a bright plate, a card cut off at the edge on the portrait stream, a
+   card over the desk's controls, a second card stacked on the first.

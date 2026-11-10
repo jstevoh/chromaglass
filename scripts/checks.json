@@ -1111,6 +1111,21 @@
       ]
     },
     {
+      "name": "A song's credit in the corner, on the screen and in the stream",
+      "shard": "browser",
+      "run": "npm run caption",
+      "why": [
+        "PLAN 37x-10j: the owner found the poured-ink titles hard to read and asked for a",
+        "1980s music channel's corner caption. In Chromium: the card's lines (artist, the",
+        "song in quotes, album, label) and its fade; drawn on a dark plate, white only in",
+        "the bottom-left corner; on bright cream, a dark drop shadow round the letters (a",
+        "blurred shadow alone left none); streamed through the app's LiveEncoder and",
+        "decoded, the card in the landscape's and the portrait's own bottom-left only",
+        "while it is up; and the wiring (the screen's layer, song-title, the song show's",
+        "and the ear's titles, the MCP, the assistant, the phone). About ten seconds."
+      ]
+    },
+    {
       "name": "The live stream",
       "shard": "lab",
       "run": "npm run live",
