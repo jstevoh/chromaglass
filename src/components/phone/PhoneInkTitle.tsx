@@ -2,8 +2,11 @@ import { SwitchPill } from '../ui';
 import type { VisualizerSettings } from '../../types';
 
 /**
- * The phone's Title switch (PLAN 37x-10): song titles painted onto the plate
- * as ink when a song starts, then washed away. The same setting as the desk's
+ * The phone's Title switch (PLAN 37x-10): song titles put up when a song
+ * starts, as the corner caption (37x-10j, `titleCaption`, the default) or
+ * painted onto the plate as ink and washed away, with the choice between
+ * the two under the switch while it is on, as the desk's "As a corner
+ * caption" is. The same setting as the desk's
  * "Song titles as ink" (Logo & Titles), bound to `inkTitle`, with its Sweep
  * beside it while it is on, since how fast a title goes is the one thing
  * about it a performer changes mid-set. Shared by the phone's own layout
@@ -11,13 +14,14 @@ import type { VisualizerSettings } from '../../types';
  * Live Show is run from (CLAUDE.md: the phone shares, never forks).
  */
 export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 'phone-ink-title' }: {
-  settings: Partial<Pick<VisualizerSettings, 'inkTitle' | 'inkTitleSweep'>> | null | undefined;
+  settings: Partial<Pick<VisualizerSettings, 'inkTitle' | 'inkTitleSweep' | 'titleCaption'>> | null | undefined;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   disabled?: boolean;
   testId?: string;
 }) {
   const on = !!settings?.inkTitle;
   const sweep = settings?.inkTitleSweep ?? 0.5;
+  const caption = settings?.titleCaption !== false;
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={testId}>
       <button
@@ -31,11 +35,29 @@ export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 
       >
         <span className="flex flex-col">
           <span className="text-[13px] font-semibold text-text">Title</span>
-          <span className="text-[12px] text-dim">Each new song&apos;s name poured as ink, then washed away</span>
+          <span className="text-[12px] text-dim">{caption ? 'Each new song\'s credit in the corner, then gone' : 'Each new song\'s name poured as ink, then washed away'}</span>
         </span>
         <SwitchPill on={on} />
       </button>
       {on && (
+        <div className="flex gap-2" role="radiogroup" aria-label="How titles go up">
+          {([[true, 'Caption'], [false, 'Ink']] as const).map(([v, name]) => (
+            <button
+              key={name}
+              type="button"
+              role="radio"
+              aria-checked={caption === v}
+              onClick={() => onSetting({ titleCaption: v })}
+              disabled={disabled}
+              data-testid={`${testId}-${v ? 'caption' : 'ink'}`}
+              className={`min-h-11 flex-1 rounded-xl border text-[13px] font-semibold disabled:opacity-30 ${caption === v ? 'border-accent-border bg-accent-bg text-text' : 'border-white/10 bg-white/5 text-dim'}`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      )}
+      {on && !caption && (
         <label className="flex items-center gap-3 text-[12px] text-dim">
           <span className="w-12 shrink-0">Sweep</span>
           <input

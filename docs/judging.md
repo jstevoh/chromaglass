@@ -2568,3 +2568,16 @@ rig on a slider, never a lurch. Then move Chase Speed from 0 to 3 while pressing
 Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about three seconds,
 at 0.4 (the default) as it always did, at 3 snap there. Music Sync is greyed in Hold and Follow
 until Frame Sway is up; nothing the sound does should move the frame meanwhile.
+
+## 119. Song titles as a 1980s corner caption (PLAN 37x-10j)
+
+1. Settings → **Logo & Titles** → **Song titles** on, **As a corner caption** on (the
+   default). Play a song the ear names, or have the assistant call `song_title`, on a dark
+   look and a bright one, and once with the Live Show on air.
+2. The card should come up in the bottom-left corner in about a fifth of a second: the
+   artist, the song in quotation marks, the album, the label, white with a dark drop shadow,
+   one size, left-aligned; it should sit still for seven seconds and fade out in under half
+   a second. The stream (and its portrait encode) should carry the same card in its own
+   bottom-left corner.
+3. Bad: letters lost on a bright plate, a card cut off at the edge on the portrait stream, a
+   card over the desk's controls, a second card stacked on the first.

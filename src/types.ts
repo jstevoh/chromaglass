@@ -329,6 +329,17 @@ export interface VisualizerSettings {
   inkTitleSize: number;
   inkTitleY: number;
   inkTitleSweep: number;
+  /**
+    How a song's title goes up (PLAN 37x-10j, app/songTitle.ts): true, the
+    default, is the corner caption of a 1980s music channel (artist, the
+    song in quotes, album, label; lib/songCaption.ts), on the screen and
+    burned into the live stream; false pours it as ink, as 37x-10 did. It
+    chooses for the ear's titles (`inkTitle`) and a song show's Pour the title.
+    The default is the caption on the owner's word (2026-11-10, "simple ui
+    overlay"), not today's ink: a saved show with titles on now captions
+    them. Titles themselves stay off by default, so no plate changes.
+  */
+  titleCaption: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -997,6 +1008,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleSize: 0.5,
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
+  titleCaption: true,
   beatPrediction: 0.7,
   beatLead: 80,
   /*

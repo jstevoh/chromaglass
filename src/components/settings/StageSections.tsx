@@ -204,8 +204,16 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
           Live Show set by the phone's Title switch too.
         */}
         <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.07] pt-4" data-testid="ink-title">
-          <Toggle label="Song titles as ink" on={!!settings.inkTitle} onChange={(v) => onUpdate({ inkTitle: v })} testId="ink-title-switch"
-            title="When a new song is named, its title and artist are poured onto the plate as ink, then washed away" />
+          <Toggle label="Song titles" on={!!settings.inkTitle} onChange={(v) => onUpdate({ inkTitle: v })} testId="ink-title-switch"
+            title="When a new song is named, its title and artist go up: as the corner caption, or poured onto the plate as ink and washed away" />
+          {/*
+            The corner caption or the ink (PLAN 37x-10j, `titleCaption`): the
+            caption by default since the owner found the poured title hard to
+            read. It chooses for a song show's Pour the title too; the ink's
+            colour, size, height and sweep below are the ink's alone.
+          */}
+          <Toggle label="As a corner caption" on={settings.titleCaption !== false} onChange={(v) => onUpdate({ titleCaption: v })} testId="title-caption-switch"
+            title="On: artist, title, album and label in the bottom-left corner for seven seconds, on the screen and in the live stream. Off: poured as ink" />
           <div className="flex items-center gap-2">
             <span className="flex-1 text-[13px] font-medium text-text">Title ink</span>
             <button
@@ -233,7 +241,10 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
           <Slider label="Title Sweep" value={settings.inkTitleSweep ?? 0.5} min={0} max={1} step={0.01}
             onChange={(v: number) => onUpdate({ inkTitleSweep: v })} settingKey="inkTitleSweep" />
           <Info>
-            Poured into the liquid as dye at the plate&apos;s full resolution, so it is on the wall, in the stream and in every
+            The caption is the card a music channel put over a video in the early 1980s: white letters low in the left
+            corner, the artist, the song in quotes, the album and the label, up for seven seconds and gone. It is laid over
+            the picture, on this screen and burned into the live stream; the plate under it is untouched. As ink, the title is
+            poured into the liquid as dye at the plate&apos;s full resolution, so it is on the wall, in the stream and in every
             recording, and the wash that takes it away is a real flow: a drift across the plate and eddies that break the
             letters up. Sweep is how hard: low and the title drifts, readable, for many seconds; high and it is gone in two.
             The dye stays on the plate as colour.

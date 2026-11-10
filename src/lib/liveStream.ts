@@ -62,6 +62,7 @@ import { avcCodec, videoBitrate as bitrateFor } from './render';
 import { silenceChunk, SILENCE_CHANNELS, SILENCE_RATE, SILENCE_STEP_MS } from './liveSilence';
 import { fitChunk, fitMatches, makeAudioFit, switchedOffsetUs, SWITCH_FLOOR_US, SWITCH_SLACK_US, type AudioFit } from './liveAudioSwitch';
 import { listenLiveFrames, type LiveFrameKind } from './liveFrame';
+import { drawSongCaption, songCaptionNow } from './songCaption';
 
 export interface LivePacket { kind: 'video' | 'audio'; timestampMs: number; key?: boolean; data: Uint8Array; /** A video packet's encode (an output's id); audio goes to every destination. */ output?: string }
 export interface LiveAudioMeta { codec: 'aac' | 'opus'; sampleRate: number; channels: number; bitrate: number }
@@ -592,7 +593,8 @@ export class LiveEncoder {
   /** The canvas drawn at the output's size and shape (see `VideoOut.stage`); the canvas itself when it already is both. */
   private staged(canvas: HTMLCanvasElement, o: VideoOut): HTMLCanvasElement | OffscreenCanvas {
     const { width, height } = o.spec;
-    if (canvas.width === width && canvas.height === height) return canvas;
+    // A song's caption up (lib/songCaption.ts) is drawn on the stage, so the canvas itself will not do while one shows.
+    if (canvas.width === width && canvas.height === height && !songCaptionNow()) return canvas;
     return this.stage(canvas, o);
   }
 
@@ -616,6 +618,18 @@ export class LiveEncoder {
     const c = liveCrop(canvas.width, canvas.height, width, height, fit);
     if (fit === 'contain') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, width, height); }
     ctx.drawImage(canvas, c.sx, c.sy, c.sw, c.sh, c.dx, c.dy, c.dw, c.dh);
+    /*
+      The song's caption (PLAN 37x-10j), burned in here rather than read off
+      the screen: the screen's card is a canvas over the plate that the
+      frame task never draws, so the stream would carry the plate without
+      it. Drawn on each output at its own size and shape, so the portrait
+      encode's card sits in its own bottom-left corner, not cropped off the
+      landscape's; and after the plate, every time the plate is copied, so
+      it never stacks on itself. Per output and per frame this is four
+      fillText calls on a 2D canvas, under a millisecond.
+    */
+    const cap = songCaptionNow();
+    if (cap) drawSongCaption(ctx, width, height, cap.lines, cap.alpha);
     return stage;
   }
 
