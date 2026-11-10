@@ -366,9 +366,12 @@ export interface PlateSolver {
    * grid (area taps, as the video pour samples its frame) and added to the
    * dye as `density` of the ink `rgb` (absorbances) where the coverage is 1.
    * Optional: without it the app lays the mask through the CPU's arrays at
-   * the logical grid. False when nothing was poured.
+   * the logical grid. False when nothing was poured. `carrier` (PLAN
+   * 37x-10g): on a thin gap, the liquid the ink is made up in, laid into the
+   * species field under the same mask (`share` of the column at coverage 1,
+   * its ln(ν/ν_water) and refractive index), so thick ink holds its letters.
    */
-  pourInk?(mask: Float32Array, n: number, rgb: readonly number[], density: number): boolean;
+  pourInk?(mask: Float32Array, n: number, rgb: readonly number[], density: number, carrier?: { share: number; lnNu: number; index: number }): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   /**
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),

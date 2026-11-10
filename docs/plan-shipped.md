@@ -12291,6 +12291,35 @@ brought up to the push and no faster: 0.949 landing, 0.915 at 3 s, gone at 8.5 s
 870 of 870 kept. The first strengths, half these, passed on the old plate and left the
 title at 0.317 after 12 s on the thin one; 37x-10e puts thin arms in the check.
 
+## 37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a rinse (2026-11-09), with 37x-10e
+
+**What was wrong.** In the private rehearsal of the first live stream (2026-11-09) every
+title card poured, and the looks' own flow smeared it in about a second, before anyone
+could read it and before 37x-10's wash had begun. The ink was dye in the plate's own
+liquid, as thin as what it lay in, so every eddy the music stirred carried its letters off
+at the eddy's speed.
+
+**What changed.** On a thin gap (every look's plate) `stepInkTitle` now pours the title's
+dye onto a pad of the plate's liquid thickened `INK_TITLE_THICK` (20) times: the letters'
+mask blurred over a tenth of the title's height and raised three times (`inkTitlePad`), laid
+into the species field under the dye by `pourInk`'s new optional `carrier` (kernel
+`inkSpecies`, wgsl/fluid/splats.ts), index left at water's (a gum's share of a percent), so
+hsPrep's Darcy drag and mobility make the flow go round it (PLAN 18d). Thick letters alone
+were tried first and only doubled the time: a thin stroke across the flow cannot be gone
+round, only pushed. The pad also resists the wash's stirring (0.60 after 12 s), so the wash
+now rinses: when it comes in, `inkTitleRinse` gives twelve points (two rows of six across
+the box) where clear liquid is poured with its volume (the solver's `pour`, PLAN 18c) for
+about two seconds, which fingers through the thick pad (Saffman–Taylor) and splits it; the
+stirring mixes what it splits. The old plate is unchanged (no species viscosity, no thin
+solve to pour into).
+
+**Measured** (`npm run inktitle -- --thin`, SwiftShader, through the app's `stepInkTitle` on
+the lab's solver): under a lively flow (eddies an eighth of the plate across) the title as
+37x-10 poured it read 0.533 a second after landing; as poured now 0.816 at 2.5 s, then
+gone 1.5 s after the rinse came in; on a still plate 0.952 at landing, gone in 1 s at the
+dial's top, 0.947 at 6 s at 0.01; every arm kept 96% or more of its dye; the pad's share
+under the box 0.70. 37x-10e (the thin-gap arms the check owed) ships as these arms.
+
 ## 14c-4k, 14c-governor, 14b-120, 14c-readout, H2c-10. Wave 4 ladder, wall pacing, readout and grid32 (2026-11-07)
 
 Five Wave 4 items checked by `scripts/rungs-owed.mjs` (`npm run rungs`). **14c-4k**

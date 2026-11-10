@@ -505,10 +505,26 @@ rest is routine and the owner's calls.
     - *37x-4f-1. Seen on YouTube.* The cloud cannot reach YouTube's ingest (its proxy drops
       RTMPS), and the Mac's guard would not let a session read the key, so the proof is
       the private rehearsal on the next Mac build: Studio shows the picture.
-    - *37x-4f-2. A source opened on air is not heard.* The encoder takes its track at the
-      start; a song started after Go streams as silence until the next start. The fix is
-      an audio bus the encoder reads (the current source mixed into one track, silence
-      its floor), so the source can change under a running stream.
+    - *37x-4f-2. A source opened on air is heard at once.* *(built 2026-11-09.)* The
+      encoder took its track at Go, so a song started after Go streamed as silence until
+      the next start. Now useAudioAnalyzer hands every change of source to the stream on
+      air (`setLiveAudio` → `LiveEncoder.setAudio`): the old track's reader is let go,
+      silence carries the track until the new source's first chunk, which is placed where
+      it was made on the stream's clock; the source is fitted to the encoder's rate and
+      channels (a 44.1 kHz source into the 48 kHz silent track is resampled, or it plays
+      a semitone and a half sharp), and silence stays under it as a floor 150 ms behind
+      now if it stalls (`src/lib/liveAudioSwitch.ts`). Not an AudioContext bus, as first
+      planned: a context the stream makes can start suspended and make no samples, the
+      hole 37x-4f closed. `npm run live`'s four new lines: silence then the tone at
+      220.0 Hz; a step in the tone lands where the page made it within 30 ms (measured
+      +2 ms); the track runs to the last frame; one switch, resampled. Red without the
+      fix (0/641 loud), without the resampling (239.5 Hz), and with a 100 ms hole at the
+      switch (the step 93 ms early: the encoder stamps by sample count, so a hole is the
+      rest of the sound arriving early, not a gap).
+      - *37x-4f-3. A cubic, not a polyphase filter.* The resampler is Catmull-Rom: fine
+        for a 160 kbit stream, but a proper band-limited resampler (or one shared with
+        Record's) would keep the top octave whole. Only met when the source's rate is not
+        the encoder's (most Macs run 48 kHz throughout).
   - **37x-4g. Sound and picture judged on one clock dropped a healthy stream** *(shipped
     2026-11-09; story in docs/plan-shipped.md §37x-4g.)*
     - *37x-4g-1. The audio encoder's queue has no bound.* Video skips a frame at three
@@ -575,13 +591,23 @@ rest is routine and the owner's calls.
   the letters up; Settings → Logo & Titles and the phone's Title switch; every title pour
   (song-show title cards, 37x-10c's `pour-text` words) goes through it, which was
   37x-10d. `npm run inktitle`; story in `docs/plan-shipped.md` §37x-10. Found building it:
-  - **37x-10e. The check's arms on the thin gap too.** *(S, Claude: a check change.)*
-    `npm run inktitle` steps the old plate (the lab's default), but every look opens on
-    the thin gap, where a push in the deltas is a solid bringing the liquid up to its
-    speed and no faster (Brinkman, PLAN 15b), so the same wash is weaker there. The
-    build was tuned on both by a side run (thin: 0.949 landing, 0.915 at 3 s, gone at
-    8.5 s at the default, 1 s at the top, all its dye kept), but only the old plate is
-    held by the check. Add the three arms on the thin gap, same bars.
+  - **37x-10e. The check's arms on the thin gap too.** *(shipped 2026-11-09 with
+    37x-10g: `npm run inktitle -- --thin`.)*
+  - **37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a
+    rinse.** *(shipped 2026-11-09.)* In the private rehearsal of the first live stream the
+    title cards were smeared by the looks' own flow in about a second, before the wash
+    began. On a thin gap the title now lands on a pad of the plate's liquid thickened 20
+    times (the species field, PLAN 18d), which the flow goes round, and the wash squirts
+    clear liquid into it, which fingers through the thick pad (Saffman–Taylor).
+    `npm run inktitle -- --thin`; story in `docs/plan-shipped.md` §37x-10g. Found building it:
+    - **37x-10h. The pad's gum thins under shear.** *(S.)* A real gum-thickened ink is
+      shear-thinning: thick under the look's gentle flow, thin under the rinse's sharp
+      one. The species field carries one Newtonian viscosity a cell, so the pad is
+      Newtonian and the rinse does all the breaking. A fifth species channel (or the
+      title's own field) for a power-law share would let the stirring alone break it.
+    - **37x-10i. One pour call for the rinse's twelve points.** *(S.)* Each rinse point is
+      its own `pour` (an encoder and a submit), twelve a step for about two seconds a
+      title; a `pourMany` taking a list would make it one.
   - **37x-10f. The dead GPU picture pour.** *(S.)* `WebGPUFluid.pourImage` (gpu/fluid/
     inputs.ts) has no caller (the app's `injectImage` lays a picture through the CPU's
     arrays), and its fold binds three textures to `deltaDye`, which reads four since

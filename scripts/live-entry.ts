@@ -182,6 +182,40 @@ const api = {
     stream = dest.stream;
     (window as unknown as { __liveDest: MediaStreamAudioDestinationNode }).__liveDest = dest;
   },
+  /**
+   * A sound source opened on air (37x-4f-2): a fresh tone, in a context of
+   * its own at `rate` (44.1 kHz, against the silent track's 48, so the
+   * encoder has to resample it), handed to the running stream as
+   * useAudioAnalyzer hands the app's (`setLiveAudio` → `setAudio`). The tone
+   * is silent for its first `stepInMs` and then steps up: a mark at a known
+   * instant, so the check can find where the source's sound landed on the
+   * stream's clock. Its onset alone could not tell: the track is read from
+   * whenever the hand-over happens, and a hole or a cut at the switch moves
+   * everything after it (Chromium's AudioEncoder stamps its packets by
+   * sample count, so a gap in the input is not a gap in the output, it is
+   * the rest of the sound arriving early; the check-skeptic's control put
+   * 100 ms of hole at the switch and an onset line still read 8 ms). The
+   * step's stream time is its render time, worked out as `event()` does.
+   */
+  async openTone(rate = 44100, stepInMs = 1000): Promise<{ openedMs: number; stepMs: number; rate: number }> {
+    if (!encoder) throw new Error('start first');
+    const c = new AudioContext({ sampleRate: rate });
+    await c.resume();
+    const dest = c.createMediaStreamDestination();
+    const tone = c.createOscillator(); tone.frequency.value = 220;
+    const g = c.createGain();
+    const t0 = encoder['t0'] as number;
+    // A context just resumed reports no output timestamp yet (0 and 0, which read as a step a minute in the past): wait for its first.
+    let pair = c.getOutputTimestamp();
+    for (let i = 0; i < 50 && !(pair.performanceTime && pair.contextTime); i++) { await new Promise((r) => setTimeout(r, 10)); pair = c.getOutputTimestamp(); }
+    const ctxNow = pair.contextTime ?? c.currentTime, perfNow = pair.performanceTime ?? performance.now();
+    const renderAheadMs = Math.max(0, c.currentTime - ctxNow) * 1000;
+    g.gain.setValueAtTime(0, 0); g.gain.setValueAtTime(0.05, ctxNow + stepInMs / 1000);
+    tone.connect(g).connect(dest); tone.start();
+    const openedMs = performance.now() - t0;
+    encoder.setAudio(dest.stream);
+    return { openedMs, stepMs: perfNow + stepInMs - renderAheadMs - t0, rate: c.sampleRate };
+  },
   state: async () => encoder ? encoder.refresh() : null,
   async stop(): Promise<unknown> {
     if (plateTimer) clearInterval(plateTimer);
@@ -228,6 +262,19 @@ const api = {
     if (vdec.state !== 'closed') vdec.close();
 
     const levels: { ts: number; rms: number }[] = [];
+    /*
+      And its pitch, every tenth of a second, from the rising zero crossings
+      (interpolated between samples) of the first channel: the tone is 220 Hz
+      and a pure sine, which this reads to a fraction of a hertz. A source
+      at 44.1 kHz fed unconverted into a 48 kHz track reads 239.5.
+    */
+    const pitch: { ts: number; hz: number }[] = [];
+    let pBuf: number[] = [], pTs = 0, pRate = 0;
+    const pitchOf = () => {
+      const ups: number[] = [];
+      for (let i = 1; i < pBuf.length; i++) if (pBuf[i - 1] < 0 && pBuf[i] >= 0) ups.push(i - 1 + -pBuf[i - 1] / (pBuf[i] - pBuf[i - 1]));
+      if (ups.length >= 3) pitch.push({ ts: pTs, hz: ((ups.length - 1) * pRate) / (ups[ups.length - 1] - ups[0]) });
+    };
     let audioError: string | null = null;
     let audioSeconds = 0;
     if (audio) {
@@ -241,6 +288,9 @@ const api = {
             let s = 0; for (let j = i; j < i + win; j++) s += buf[j] * buf[j];
             levels.push({ ts: a.timestamp / 1000 + (i / a.sampleRate) * 1000, rms: Math.sqrt(s / win) });
           }
+          if (!pBuf.length) { pTs = a.timestamp / 1000; pRate = a.sampleRate; }
+          for (let i = 0; i < n; i++) pBuf.push(buf[i]);
+          if (pBuf.length >= a.sampleRate / 10) { pitchOf(); pBuf = []; }
           audioSeconds += n / a.sampleRate;
           a.close();
         },
@@ -268,7 +318,7 @@ const api = {
       const samples = await codecDelay(audio.codec, audio.sampleRate, audio.channels);
       primingMs = samples === null ? null : (samples / (audio.codec === 'aac' ? audio.sampleRate : 48000)) * 1000;
     }
-    return { frames, size, videoError, levels, audioError, audioSeconds, primingMs };
+    return { frames, size, videoError, levels, pitch, audioError, audioSeconds, primingMs };
   },
 };
 

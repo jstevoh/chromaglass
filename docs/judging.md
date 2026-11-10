@@ -2495,6 +2495,13 @@ Mac's film shows the letters at the solver's full grid.
 4. Bad: soft or blocky letters (poured at the wrong grid), a title that fades rather than
    moves, a wash that shakes the whole plate, a busy look that tears the title apart before
    it can be read.
+5. Since 37x-10g the ink is made up thick, on a clear pad under the letters, and the wash
+   rinses it with clear liquid. On a busy look (the private rehearsal's album looks) the
+   title should now sit, sliding and turning slowly, for two or three seconds while the
+   colour moves round it, then burst into branching fingers where the rinse goes in and
+   mix into the show. Bad: a visible box or rim round the title (the pad is meant to be
+   clear), a title that never leaves, a rinse that pushes the whole plate's colour out over
+   the rim.
 
 ## 115. Heat from the lamp, and blocking the fan's air by hand (PLAN 36e-2)
 

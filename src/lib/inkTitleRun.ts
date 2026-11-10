@@ -15,20 +15,27 @@
  * flow; now they are ink at the solver's grid and the wash takes them.
  */
 import { PALETTE_RGB } from '../constants';
-import { inkTitleMask, inkTitleInk, inkTitleWash, inkHex, INK_TITLE_DENSITY, type InkRow } from './inkTitle';
+import { inkTitleMask, inkTitleInk, inkTitleWash, inkHex, INK_TITLE_DENSITY, inkTitlePad, inkTitleCarrier, inkTitleRinse, inkTitleRinseRadius, INK_TITLE_RINSE_POINTS, type InkRow } from './inkTitle';
+import { thicknessViscosity } from './turntable';
 
 /** What of a plate a title needs: FluidSimulation's face. */
 export interface InkTitleTarget {
   size: number;
-  gpu: { readonly N: number; pourInk?(mask: Float32Array, n: number, rgb: readonly number[], density: number): boolean } | null;
+  gpu: {
+    readonly N: number;
+    readonly thinGapLive?: boolean;
+    pourInk?(mask: Float32Array, n: number, rgb: readonly number[], density: number, carrier?: { share: number; lnNu: number; index: number; mask?: Float32Array }): boolean;
+    pour?(x: number, y: number, radius: number, take: number, sp: null, volume?: boolean): void;
+  } | null;
   addDensity(x: number, y: number, amount: number, r?: number, g?: number, b?: number): void;
   addVelocity(x: number, y: number, vx: number, vy: number): void;
   meanColor: readonly number[];
   meanDensity: number;
 }
 
-/** The settings a title reads (VisualizerSettings' five). */
+/** The settings a title reads (VisualizerSettings' five, and the plate's Thickness for its ink's). */
 export interface InkTitleSettings {
+  gapThickness?: number;
   inkTitleColor?: string;
   inkTitleSize?: number;
   inkTitleY?: number;
@@ -44,9 +51,11 @@ export interface InkTitleRun {
   since: number;
   /** The wash's deltas, L × L × 4, reused step to step. */
   vel: Float32Array;
+  /** The rinse's pours of a step, (x, y, take) a point (PLAN 37x-10g), reused step to step. */
+  rinse: Float32Array;
 }
 
-export const newInkTitleRun = (): InkTitleRun => ({ pending: null, box: null, since: 0, vel: new Float32Array(0) });
+export const newInkTitleRun = (): InkTitleRun => ({ pending: null, box: null, since: 0, vel: new Float32Array(0), rinse: new Float32Array(INK_TITLE_RINSE_POINTS * 3) });
 
 /**
  * Ask for a title: poured at the plate's next step. `colour` is '' for the
@@ -93,7 +102,10 @@ export function stepInkTitle(run: InkTitleRun, fluid: InkTitleTarget | null | un
     const { mask, box } = inkTitleMask(rows, size, y, n, angle);
     if (box[2] <= box[0]) return;
     const rgb = inkTitleInk(colour, pal);
-    if (!gpu?.pourInk?.(mask, n, rgb, INK_TITLE_DENSITY)) {
+    // On a thin gap the ink is made up thick, on a pad under its letters (PLAN 37x-10g, inkTitle.ts).
+    const carrier = gpu?.pourInk && gpu.thinGapLive
+      ? inkTitleCarrier(thicknessViscosity(s.gapThickness ?? 0.45), inkTitlePad(mask, n, box)) : undefined;
+    if (!gpu?.pourInk?.(mask, n, rgb, INK_TITLE_DENSITY, carrier)) {
       // The CPU's arrays take a colour and make the absorbance themselves (addDensity), at the logical grid.
       const m = n === L ? mask : inkTitleMask(rows, size, y, L, angle).mask;
       const c = inkHex(colour) ?? pal[0] ?? [0.1, 0.1, 0.12];
@@ -108,7 +120,14 @@ export function stepInkTitle(run: InkTitleRun, fluid: InkTitleTarget | null | un
   }
   if (run.vel.length !== L * L * 4) run.vel = new Float32Array(L * L * 4);
   const vel = run.vel;
-  const rows = inkTitleWash(seconds, run.since, s.inkTitleSweep ?? 0.5, run.box!, vel, L);
+  const dial = s.inkTitleSweep ?? 0.5;
+  const rows = inkTitleWash(seconds, run.since, dial, run.box!, vel, L);
+  // The rinse that fingers through a thick title's pad (PLAN 37x-10g): pours of clear liquid with their volume, a thin gap's only.
+  const gpu = fluid.gpu;
+  if (gpu?.pour && gpu.thinGapLive) {
+    const k = inkTitleRinse(seconds, run.since, dial, run.box!, run.rinse);
+    for (let p = 0; p < k; p++) gpu.pour(run.rinse[p * 3], run.rinse[p * 3 + 1], inkTitleRinseRadius, run.rinse[p * 3 + 2], null, true);
+  }
   run.since += seconds;
   if (!rows) {
     // The wash has passed (or the dial is at 0): the dye stays, as colour in the show.
