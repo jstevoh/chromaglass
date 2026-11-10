@@ -49,7 +49,7 @@ import { BeadField, beadPopulation } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
-import { AreaHands, type AreaSink } from '../lib/areaCords';
+import { AreaHands, musicDyeIn, type AreaSink } from '../lib/areaCords';
 import { throwKickBloom } from '../lib/kickBloom';
 import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
@@ -460,7 +460,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const at = pointInArea(area, GRID_SIZE, DICE.lay, 0.7);
     const rx = Math.floor(at.x), ry = Math.floor(at.y);
     const color = areaColor(layer, area);
-    fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+    fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5, false, musicDyeIn(area));
     fluid.addTemp(rx, ry, 1.2);
     doseArea(fluid, layer, area, rx, ry, 0.8);
   };
@@ -3669,7 +3669,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
                   if (evolveDt > 0.001) {
-                    af.autoInject(style, rx, ry, (1.5 + energy * 4) * evolveDt, color.r, color.g, color.b, energy);
+                    af.autoInject(style, rx, ry, (1.5 + energy * 4) * evolveDt, color.r, color.g, color.b, energy, false, musicDyeIn(area));
                   }
                   af.addTemp(rx, ry, 0.3 + energy * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
@@ -4115,7 +4115,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (densityMod > 0.005) {
                     const pc = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime) : audioCol;
                     const st = contStyle();
-                    if (pourDt > 0.001) activeFluid.autoInject(st, bassX, bassY, densityMod * 0.025 * autoAmp * pourDt, pc.r, pc.g, pc.b, densityMod);
+                    if (pourDt > 0.001) activeFluid.autoInject(st, bassX, bassY, densityMod * 0.025 * autoAmp * pourDt, pc.r, pc.g, pc.b, densityMod, false, musicDyeIn(bassArea));
                     activeFluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
                   }
 
@@ -4173,8 +4173,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
                     const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
-                    // Not a ring: clumps at random angles (lib/kickBloom.ts has why).
-                    throwKickBloom(activeFluid, DICE.music, GRID_SIZE, bassX, bassY, ringR, ringCol, bass01 * boostGain, autoAmp * pourDt * bloomGain, bloomGain);
+                    // Not a ring: clumps at random angles (lib/kickBloom.ts has why). No dye on a reagent (musicDyeIn).
+                    throwKickBloom(activeFluid, DICE.music, GRID_SIZE, bassX, bassY, ringR, ringCol, bass01 * boostGain, autoAmp * pourDt * bloomGain * musicDyeIn(bassArea), bloomGain);
                     // The beat dose: lands organically around the active area
                     {
                       const da = DICE.music.angle();
@@ -4201,7 +4201,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const my = Math.floor(midAt.y + (noise2D(47.1, time * 0.25) * 0.7 + Math.sin(time * 0.55) * 0.3) * orbitR);
                     if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
                       const st = contStyle();
-                      if (pourDt > 0.001) activeFluid.autoInject(st, mx, my, mid01 * 0.06 * autoAmp * pourDt, midCol.r, midCol.g, midCol.b, mid01);
+                      if (pourDt > 0.001) activeFluid.autoInject(st, mx, my, mid01 * 0.06 * autoAmp * pourDt, midCol.r, midCol.g, midCol.b, mid01, false, musicDyeIn(midArea));
                       activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
                     }
                   }
@@ -4235,7 +4235,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                           for (let ddy = -1; ddy <= 1; ddy++) {
                             for (let ddx = -1; ddx <= 1; ddx++) {
                               const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                              activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w,
+                              activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w * musicDyeIn(trebleArea),
                                 sparkCol.r, sparkCol.g, sparkCol.b);
                             }
                           }
@@ -4244,7 +4244,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                         for (let ddy = -1; ddy <= 1; ddy++) {
                           for (let ddx = -1; ddx <= 1; ddx++) {
                             const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 1.1 * w,
+                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 1.1 * w * musicDyeIn(trebleArea),
                               sparkCol.r * 0.5 + 0.5, sparkCol.g * 0.5 + 0.5, sparkCol.b * 0.5 + 0.5);
                           }
                         }
@@ -4267,7 +4267,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ex = Math.floor(swellAt.x + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * swellR);
                     const ey = Math.floor(swellAt.y + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * swellR);
                     const st = contStyle();
-                    if (pourDt > 0.001) activeFluid.autoInject(st, ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01);
+                    if (pourDt > 0.001) activeFluid.autoInject(st, ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01, false, musicDyeIn(swellArea));
                   }
                 }
               }

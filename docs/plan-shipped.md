@@ -5613,6 +5613,38 @@ notes), three of 25i's looks misbehaved.
   `npm run areacords` now holds that no look carries a cord on a reaction's strength); the snare
   drops activator in the third place instead, beside the kick's own touches in turn.
 
+### 25i-10. The loop's own hands still poured dye on a reagent (shipped)
+
+The owner, on the second private rehearsal stream (2026-11-10, Mac app 1.3.1276, Chemical Clock
+for the whole set): "we're still getting these flower like bubble things showing up. I thought we
+fixed that". The frame showed dark green and teal clusters in the upper right, over the gel's
+blue waves, where the clock's second place is (0.7, 0.38), and a larger dark mass at the bottom
+place.
+
+What was fixed before was 25i: an area cord on a reagent area (Chemical Clock's activator,
+Red Cabbage's acid and base) pours a drop of that reagent and no dye. The visualizer's own hands
+on the music were left as they were, and on an area look each lands in an area in that area's
+dye: the kick's bloom (5 to 11 droplets a kick, pushed out in lobes), the bass's pulse in the
+area's middle, the mid's stream, the treble's sparks, the energy's swell and the automation's
+drops. Chemical Clock's three places are all on the bass, so every kick threw a cluster of a
+pool's dye at one of them; the gel stands still (Global Speed 0.024, Thick), so kick after kick
+the clusters piled up there. A real BZ dish touched with a drop of bromous acid gains no colour:
+the ring that runs out is the ferroin turning blue.
+
+`musicDyeIn(area)` (lib/areaCords.ts) is 0 for an area of a reagent and 1 for any other, and
+every one of those pours takes it as the share of its amount that is colour (`autoInject`'s
+`dye`, the bloom's dye gain, the sparks' amount). The hands still land where they did, with the
+same splash, push and drop of the reagent (`doseArea`), so the gel still fires on each kick.
+Red Cabbage's wells had the same fault (painted pink and green over the indicator's). First the
+bloom moved out of the frame loop to lib/kickBloom.ts in a commit of its own (19ai-10), and
+panel.mjs's two text lines on it became `npm run kickbloom`, which runs it on a recording sink.
+
+`npm run kickbloom` (logic shard), 7 lines: the dial scales the dye x2.000 and the push x2.000,
+each alone; a dye gain of 0 lays no dye and the same push; the droplets' largest gap is 2.44x an
+even ring's; 5 to 11 droplets; `musicDyeIn` is 0 on all 5 reagent areas (the clock's 3) and 1 on
+the 31 others; and every pour of an area's colour in the loop carries `musicDyeIn` of that same
+area (6 colours, 8 pours; on main 6 of them miss it, the line is red).
+
 ## 26. A reaction that prints: Turing stripes in black and white
 
 ### 26a. Gray–Scott on the GPU, carried by the flow (#327; carried once since 26d)

@@ -20,7 +20,7 @@
  *     kick of n droplets on one circle every gap is 2π/n; here the largest
  *     gap in a kick averages well over twice that (a lobe of clumps and an
  *     empty side). And 5 to 11 droplets a kick, as the comment says.
- *  3. A touch on a reagent lays no dye (PLAN 25i-8). An area whose liquid is
+ *  3. A touch on a reagent lays no dye (PLAN 25i-10). An area whose liquid is
  *     a reagent (Chemical Clock's three activator places, Red Cabbage's acid
  *     and base wells) answers the music with a drop of that reagent, and its
  *     colour is the chemistry's. The cords were made so in 25i; the loop's
@@ -35,6 +35,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { throwKickBloom } from '../src/lib/kickBloom.ts';
+import { musicDyeIn, reagentArea } from '../src/lib/areaCords.ts';
+import { PRESET_AREAS } from '../src/lib/plateAreas.ts';
 import { makeRng } from '../src/lib/rng.ts';
 
 const checks = [];
@@ -95,6 +97,49 @@ function kick(seed, dyeGain, pushGain, hit = 0.8) {
     gapRatio > 2 && bloomSrc.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(bloomSrc),
     `largest gap ${gapRatio.toFixed(2)}x an even ring's, over ${kicks} kicks`);
   check('5 to 11 droplets a kick', fewest >= 5 && most <= 11, `${fewest} to ${most}`);
+}
+
+// ── 3. A touch on a reagent lays no dye ──
+{
+  const wrong = [];
+  let reagents = 0, others = 0;
+  for (const [id, areas] of Object.entries(PRESET_AREAS)) {
+    areas.forEach((a, i) => {
+      const want = reagentArea(a) ? 0 : 1;
+      if (want === 0) reagents++; else others++;
+      if (musicDyeIn(a) !== want) wrong.push(`${id} area ${i} (${a.liquid}) ${musicDyeIn(a)}`);
+    });
+  }
+  const clock = PRESET_AREAS['chemical-clock'] ?? [];
+  check('the music lays no dye in a reagent area and all of it in any other',
+    wrong.length === 0 && musicDyeIn(null) === 1 && reagents >= 5 && others > reagents
+      && clock.length === 3 && clock.every(a => musicDyeIn(a) === 0),
+    wrong.length ? wrong.join('; ') : `${reagents} reagent areas (Chemical Clock's 3 among them), ${others} others`);
+
+  // Every variable the loop reads an area's colour into, with the area it read and the line it is read on.
+  const lineOf = (i) => vis.slice(0, i).split('\n').length - 1;
+  const colourVars = [...vis.matchAll(/const (\w+) = (\w+) \? (?:areaCycle\([^,]+, (\w+)|areaColor\([^,]+, (\w+))/g)]
+    .map(m => ({ v: m[1], area: m[3] ?? m[4], from: lineOf(m.index) }));
+  const pourIntoArea = vis.match(/const color = areaColor\(layer, area\);\n\s*(.+)\n/);
+  const misses = [];
+  let pours = 0;
+  const lines = vis.split('\n');
+  for (const { v, area, from } of colourVars) {
+    // Its uses in the block that read it (the next 50 lines): a `color` elsewhere is another pour's.
+    for (let i = from + 1; i < from + 50; i++) {
+      if (!lines[i].includes(`${v}.r`)) continue;
+      // The call, with the line or two it opens on when its colour is wrapped onto a line of its own.
+      const call = lines.slice(i - 2, i + 1).join(' ');
+      pours++;
+      if (!call.includes(`musicDyeIn(${area})`)) misses.push(`${v}: ${lines[i].trim().slice(0, 90)}`);
+    }
+  }
+  if (!pourIntoArea || !pourIntoArea[1].includes('musicDyeIn(area)')) misses.push(`pourIntoArea: ${pourIntoArea?.[1]?.trim().slice(0, 90)}`);
+  const bloomCall = vis.match(/throwKickBloom\(activeFluid[^;]*\);/)?.[0] ?? '';
+  if (!/ringCol, [^;]*musicDyeIn\(bassArea\), bloomGain\)/.test(bloomCall)) misses.push(`bloom: ${bloomCall.slice(0, 120)}`);
+  check('every pour of an area\'s colour in the frame loop carries musicDyeIn of that area',
+    colourVars.length >= 6 && pours >= 6 && misses.length === 0,
+    misses.length ? misses.join(' | ') : `${colourVars.length} colours, ${pours + 2} pours`);
 }
 
 const failed = checks.filter(c => !c.ok);
