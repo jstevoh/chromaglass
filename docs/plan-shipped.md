@@ -5639,11 +5639,14 @@ Red Cabbage's wells had the same fault (painted pink and green over the indicato
 bloom moved out of the frame loop to lib/kickBloom.ts in a commit of its own (19ai-10), and
 panel.mjs's two text lines on it became `npm run kickbloom`, which runs it on a recording sink.
 
-`npm run kickbloom` (logic shard), 7 lines: the dial scales the dye x2.000 and the push x2.000,
+`npm run kickbloom` (logic shard), 8 lines: the dial scales the dye x2.000 and the push x2.000,
 each alone; a dye gain of 0 lays no dye and the same push; the droplets' largest gap is 2.44x an
-even ring's; 5 to 11 droplets; `musicDyeIn` is 0 on all 5 reagent areas (the clock's 3) and 1 on
-the 31 others; and every pour of an area's colour in the loop carries `musicDyeIn` of that same
-area (6 colours, 8 pours; on main 6 of them miss it, the line is red).
+even ring's (the old ring 1.38x); 5 to 11 droplets; `musicDyeIn` is 0 on all 5 reagent areas
+and 1 on the 31 others; `autoInject` with no colour lays none in any of its five styles (only the
+drop honoured its `dye` before, so a spray or pour of reagent was still coloured: the review
+found it); and every area colour in the loop is read into a const used only in pours, each with
+`musicDyeIn` of the same area in the argument that lays the colour (7 colours, 8 pours; on main
+6 miss it, and six planted faults each turn the line red).
 
 ## 26. A reaction that prints: Turing stripes in black and white
 
