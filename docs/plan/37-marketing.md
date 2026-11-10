@@ -581,13 +581,23 @@ rest is routine and the owner's calls.
   the letters up; Settings → Logo & Titles and the phone's Title switch; every title pour
   (song-show title cards, 37x-10c's `pour-text` words) goes through it, which was
   37x-10d. `npm run inktitle`; story in `docs/plan-shipped.md` §37x-10. Found building it:
-  - **37x-10e. The check's arms on the thin gap too.** *(S, Claude: a check change.)*
-    `npm run inktitle` steps the old plate (the lab's default), but every look opens on
-    the thin gap, where a push in the deltas is a solid bringing the liquid up to its
-    speed and no faster (Brinkman, PLAN 15b), so the same wash is weaker there. The
-    build was tuned on both by a side run (thin: 0.949 landing, 0.915 at 3 s, gone at
-    8.5 s at the default, 1 s at the top, all its dye kept), but only the old plate is
-    held by the check. Add the three arms on the thin gap, same bars.
+  - **37x-10e. The check's arms on the thin gap too.** *(shipped 2026-11-09 with
+    37x-10g: `npm run inktitle -- --thin`.)*
+  - **37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a
+    rinse.** *(shipped 2026-11-09.)* In the private rehearsal of the first live stream the
+    title cards were smeared by the looks' own flow in about a second, before the wash
+    began. On a thin gap the title now lands on a pad of the plate's liquid thickened 20
+    times (the species field, PLAN 18d), which the flow goes round, and the wash squirts
+    clear liquid into it, which fingers through the thick pad (Saffman–Taylor).
+    `npm run inktitle -- --thin`; story in `docs/plan-shipped.md` §37x-10g. Found building it:
+    - **37x-10h. The pad's gum thins under shear.** *(S.)* A real gum-thickened ink is
+      shear-thinning: thick under the look's gentle flow, thin under the rinse's sharp
+      one. The species field carries one Newtonian viscosity a cell, so the pad is
+      Newtonian and the rinse does all the breaking. A fifth species channel (or the
+      title's own field) for a power-law share would let the stirring alone break it.
+    - **37x-10i. One pour call for the rinse's twelve points.** *(S.)* Each rinse point is
+      its own `pour` (an encoder and a submit), twelve a step for about two seconds a
+      title; a `pourMany` taking a list would make it one.
   - **37x-10f. The dead GPU picture pour.** *(S.)* `WebGPUFluid.pourImage` (gpu/fluid/
     inputs.ts) has no caller (the app's `injectImage` lays a picture through the CPU's
     arrays), and its fold binds three textures to `deltaDye`, which reads four since

@@ -33,6 +33,8 @@ export class FluidInputs extends FluidPasses {
   private videoRefused = false;
   /** The last ink title's mask (pourInk), kept for the next title at the same size. */
   private inkSrc: GPUTexture | null = null;
+  /** The ink's carrier's own mask when it is not the letters' (pourInk's `carrier.mask`, PLAN 37x-10g). */
+  private padSrc: GPUTexture | null = null;
 
   /**
    * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
@@ -194,8 +196,20 @@ export class FluidInputs extends FluidPasses {
    * `pourInk`), so a mask at any size lands at this one. Then the same fold
    * a pour's dye takes (`foldDye`), with Oil Bodies' share of it, so the
    * ink is ordinary dye from here on. False when nothing was poured.
+   *
+   * `carrier`, on a thin gap: the liquid the ink is made up in (PLAN
+   * 37x-10g), laid into the species field under the same mask, `share` of
+   * the column where the coverage is 1, with its ln(ν/ν_water). A title
+   * poured in the plate's own liquid was smeared by a lively look's flow in
+   * about a second, before anyone could read it (the private rehearsal,
+   * 2026-11-09): the ink was as thin as what it lay in. Made up thick, the
+   * letters are a liquid the flow has to go round (hsPrep reads the
+   * species' viscosity into the drag and the mobility, PLAN 18d), so they
+   * hold their shape while the clear liquid round them moves, and the
+   * carrier's share is carried with the dye from then on, so the two stay
+   * together until the wash breaks them up and the plate mixes them in.
    */
-  pourInk(mask: Float32Array, n: number, rgb: readonly number[], density: number): boolean {
+  pourInk(mask: Float32Array, n: number, rgb: readonly number[], density: number, carrier?: { share: number; lnNu: number; index: number; mask?: Float32Array }): boolean {
     if (!(n > 0) || mask.length < n * n || !(density > 0)) return false;
     const d = this.device;
     if (!this.inkSrc || this.inkSrc.width !== n) {
@@ -219,6 +233,28 @@ export class FluidInputs extends FluidPasses {
     this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // the ink adds; it takes nothing away
     const poured = this.splatRun(pass, 'pourInk', RGBA32, [this.splatBuf!, this.inkSrc, this.sampler, this.deltaDyeTex], this.N, false);
     if (poured) this.foldDye(pass);
+    if (poured && carrier && carrier.share > 0 && this.thinLive) {
+      if (!this.species) this.species = new PingPong(this.device, this.disposer, [this.N, this.N], 'rgba32float', 'species');
+      const s = this.species;
+      if (!this.speciesLive) for (const t of [s.a, s.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+      let pad = this.inkSrc;
+      if (carrier.mask && carrier.mask.length >= n * n) {
+        if (!this.padSrc || this.padSrc.width !== n) {
+          if (this.padSrc) this.disposer.release(this.padSrc);
+          this.padSrc = this.disposer.track(d.createTexture({
+            label: 'ink pad', size: [n, n], format: 'r8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+          }));
+        }
+        for (let k = 0; k < n * n; k++) bytes[k] = Math.round(Math.min(1, Math.max(0, carrier.mask[k])) * 255);
+        d.queue.writeTexture({ texture: this.padSrc }, bytes, { bytesPerRow: n }, [n, n]);
+        pad = this.padSrc;
+      }
+      this.run(pass, 'inkSpecies', s.write, [s.read, pad, this.sampler], this.arg('ink species', [Math.min(1, carrier.share), Math.max(0, carrier.lnNu), 0, carrier.index]));
+      s.swap();
+      this.speciesLive = true;
+      this.speciesQuiet++;
+    }
     pass.end();
     this.submit(enc);
     return poured;
