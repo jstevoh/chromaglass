@@ -43,7 +43,7 @@ import { presentsInXvfb, port } from './chromium.mjs';
 import { filmFile, stackJudge, gridOfPixels, barColumnOfRow, barMoves, barMovesProof, STACK_KEYSTONE } from './liveshowstack.mjs';
 import { narrowLines } from './liveshownarrow.mjs';
 import {
-  cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS, DEFAULT_FORMAT,
+  cleanDestination, needKbps, uploadAdvice, noteUpload, chosenFor, keyProblem, liveOptionsFor, HEADROOM, AUDIO_KBPS, loadFormat,
 } from '../src/lib/liveShow.ts';
 import { liveRates, keepCeiling, LIVE_FLOOR_KBPS, CEILING_HOURS } from '../src/lib/liveRate.ts';
 import { liveConsolePlan } from '../src/lib/liveStream.ts';
@@ -84,9 +84,10 @@ check('three need three copies: two of the wide encode and one of the tall', nea
 check('720p60 is its own rate', near(n720, wide720at60 + AUDIO_KBPS), `${n720} kb/s, by hand ${(wide720at60 + AUDIO_KBPS).toFixed(1)}`);
 
 // What the encoder is handed: the rate above, on each output, not left for
-// LiveEncoder to fill in. 1080p60 is the panel's default (the rehearsal's
-// stream went at 30 while the plate was drawn at 60).
-const f60 = DEFAULT_FORMAT;
+// LiveEncoder to fill in. 1080p60 is what the panel opens at with nothing
+// saved (the rehearsal's stream went at 30 while the plate was drawn at 60):
+// loadFormat itself, which the panel calls, not the constant it falls back to.
+const f60 = loadFormat();
 const plan60 = liveConsolePlan(liveOptionsFor([dest('a'), dest('t', { service: 'other', orientation: 'portrait' })], f60));
 const handed = Object.fromEntries(plan60.outputs.map((o) => [o.id, (o.videoBitrate ?? 0) / 1000]));
 check('the panel opens at 1080p60, and the encoder is handed 14 Mb/s for it, the portrait encode its own rate',
@@ -367,7 +368,7 @@ try {
     req?.outputs.map(o => `${o.id} ${o.meta.width}x${o.meta.height}`).join(', '));
   const rateSaid = await page.getByTestId('live-rate').textContent().catch(() => '');
   check('at 60 fps and the rate the panel says: Twitch\'s 6 Mb/s on the wide encode, Instagram\'s 4 on the tall',
-    req?.outputs.every(o => o.meta.fps === 60) && req.outputs.map(o => o.meta.videoBitrate).join() === '6000000,4000000' && /Twitch/.test(rateSaid) && /Instagram/.test(rateSaid),
+    req?.outputs.every(o => o.meta.fps === 60) && req.outputs.map(o => o.meta.videoBitrate).join() === '6000000,4000000' && /1080p60 at 6\.0 Mb\/s, Twitch/.test(rateSaid) && /portrait at 4\.0 Mb\/s, Instagram/.test(rateSaid),
     `${req?.outputs.map(o => `${o.id} ${o.meta.fps} fps ${o.meta.videoBitrate}`).join(', ')}; "${rateSaid}"`);
   // Waited for, not read at once: the encoders hand their configuration over
   // with their first output, which can land after the start has been
@@ -437,6 +438,18 @@ try {
   check('a link that fell behind at 3 Mb/s warns that Go live\'s three will not fit', up2.level === 'short', `"${up2.text}"`);
   const fitted = await page.getByTestId('live-rate').evaluate(e => ({ kbps: Number(e.dataset.kbps), text: e.textContent }));
   check('and the next Go live is fitted to it, at the floor, and says so', fitted.kbps === 2000 && /to fit/.test(fitted.text), `${fitted.kbps} kb/s: "${fitted.text}"`);
+  // What Go hands the encoder, not only what the line says (the
+  // check-skeptic: the line and the press compute the rate apart, so a press
+  // that dropped the measured upload would leave the line green). The next
+  // Test, to its one YouTube destination: full rate before the ceiling was
+  // met, fitted under 3 Mb/s with the headroom after (3000 / 1.2 - 160).
+  await page.getByTestId('live-test').click();
+  await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'live');
+  const treq2 = await page.evaluate(() => window.__liveStub.calls.start[2]);
+  await page.getByTestId('live-stop').click();
+  await until(page, () => document.querySelector('[data-testid="live-show"]')?.getAttribute('data-phase') === 'stopped');
+  const handedBefore = treq?.outputs.map(o => o.meta.videoBitrate).join(), handedAfter = treq2?.outputs.map(o => o.meta.videoBitrate).join();
+  check('and Go hands the encoder the fitted rate: Test at 14 Mb/s before the ceiling, 2.34 after', handedBefore === '14000000' && handedAfter === '2340000', `before ${handedBefore}, after ${handedAfter}`);
 
   await page.screenshot({ path: 'scratch/liveshow-panel.png' }).catch(() => {});
   await remote.context().close();

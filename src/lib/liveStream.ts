@@ -409,7 +409,7 @@ export class LiveEncoder {
     for (const [i, o] of specs.entries()) {
       if (ids.has(o.id)) throw new Error(`two outputs named "${o.id}"`);
       ids.add(o.id);
-      // The stream's own rate (liveRate.ts, 37x-4h), not Record's: a stream is
+      // The stream's own rate (liveRate.ts, 37x-4h), not the song film's: a stream is
       // compressed again by every platform, and its first pass is all the
       // detail the second has to work from.
       const videoBitrate = o.videoBitrate ?? (i === 0 ? opts.videoBitrate : undefined) ?? liveVideoBitrate(o.width, o.height, fps);

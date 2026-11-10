@@ -103,7 +103,7 @@ line (37x-4h, `src/lib/liveRate.ts`) says each encode's rate: `pixels × √fps`
 1080p60, 9.9 at 1080p30, 6.2 at 720p60; capped at the strictest platform on that encode
 (Twitch 6, Kick 8, Facebook 9, X 9, Instagram 4, TikTok 6 Mb/s, from their pages on
 2026-11-10); and fitted under the last stream's measured ceiling, kept up to 12 hours.
-Record keeps render.ts's own rate. The panel, the
+The song film keeps render.ts's own rate and Record its presets. The panel, the
 console below and the phone remote's Stop act on one stream (`src/lib/liveShow.ts`); the
 phone can stop a stream and never start one. `npm run liveshow` drives it.
 

@@ -11339,7 +11339,7 @@ model cannot reach one, the PR says what it reached and asks.
   - **37x-4h. The stream looked softer and flatter than the app (shipped 2026-11-10).**
     Found in the second private rehearsal: the owner asked why YouTube's picture looked
     different from the app beside it. The colours matched (both sRGB); the bits did not.
-    The stream took Record's rate (render.ts's `videoBitrate`, 0.1 bit a pixel a frame:
+    The stream took the song film's rate (render.ts's `videoBitrate`, 0.1 bit a pixel a frame:
     6.2 Mb/s at 1080p30; about 6.2 Mb/s steady on the encoder for 42 minutes), and the
     panel opened at 30 fps while the plate is drawn at 60. YouTube then compresses again
     for every viewer, from what our pass left. Now the stream has its own rate
@@ -11361,7 +11361,7 @@ model cannot reach one, the PR says what it reached and asks.
     lines: the hand-worked rates, the panel's 1080p60 at 14 Mb/s, each platform's ceiling,
     the fit to a ceiling and its floor, the ceiling kept and dropped; in the panel, Go
     live hands the encoder 60 fps at Twitch's 6 and Instagram's 4 Mb/s and says so, then
-    fits to a 3 Mb/s ceiling at the 2 Mb/s floor. Record's rate is unchanged.
+    fits to a 3 Mb/s ceiling at the 2 Mb/s floor. The song film's and Record's rates are unchanged (Record already offers 60 fps at 12 Mb/s).
 
 #### 37x-4d-7. The moving line read a looping bar on two frames
 

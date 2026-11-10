@@ -546,6 +546,12 @@ rest is routine and the owner's calls.
       until the next keyframe. Lower the encoder's rate on air (`VideoEncoder.configure`
       with a new bitrate) when a destination is a second behind on the server's count,
       and raise it back when it keeps up.
+    - *37x-4h-4. The 2 Mb/s floor is too low for 1080p60.* Fitted to a short link the
+      encode can drop to 2 Mb/s at 1920x1080 60 fps; on the rate check's moving picture
+      openh264 asked for 2 Mb/s made 4.26 (the check-skeptic's run), past the link it was
+      fitted to. Below about a third of the size's rate, step the encode down to 720p (or
+      30 fps) instead of starving it; measure the plate's own floor first, which is
+      smoother than the check's picture.
     - *37x-4h-3. Owed on the Mac.* The rate lines on the Mac shard (VideoToolbox's CBR,
       not openh264's) on the first run; a film of the stream before and after on YouTube;
       the first 1080p60 stream needs about 17 Mb/s of upload for one destination, so its

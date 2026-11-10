@@ -6,7 +6,7 @@
 // (37x-4c).
 import './lab-entry.ts';
 import { liveVideoConfig, liveVideoBitrate } from '../src/lib/liveRate.ts';
-import { LiveEncoder, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
+import { LiveEncoder, chooseAcceleration, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
 
 
 type LabApi = {
@@ -392,11 +392,22 @@ async function codecDelay(codec: string, sampleRate: number, channels: number): 
  * every macroblock has something to say, but nothing like white noise, which
  * no encoder can hold at any sane rate. The timestamps are the stream's
  * (i / fps), so rate control sees the frame rate it was told, however fast
- * the frames are fed.
+ * the frames are fed. The acceleration hint is the one the stream itself
+ * takes (`chooseAcceleration`, which picks the software encoder where the
+ * default cannot hold the rate, as on GitHub's Mac VM), so the line measures
+ * the encoder the stream would use; and a probe that has not finished in
+ * a minute stops and says so, so a slow runner fails this line by name and
+ * not the shard by its clock. `constant` is what the browser says it will
+ * run (isConfigSupported echoes the mode back): an encoder in VBR can land
+ * on the average rate too, so the average alone does not say CBR.
  */
-async function rateProbe(width: number, height: number, fps: number, seconds: number, bitrate?: number): Promise<{ asked: number; madeKbps: number; frames: number; bytes: number; keyframes: number; firstSecondKbps: number; restKbps: number; error: string | null }> {
+async function rateProbe(width: number, height: number, fps: number, seconds: number, bitrate?: number): Promise<{ asked: number; madeKbps: number; frames: number; bytes: number; keyframes: number; firstSecondKbps: number; restKbps: number; acceleration: string; mode: string | null; ms: number; error: string | null }> {
   const asked = bitrate ?? liveVideoBitrate(width, height, fps);
-  const out = { asked, madeKbps: 0, frames: 0, bytes: 0, keyframes: 0, firstSecondKbps: 0, restKbps: 0, error: null as string | null };
+  const t0 = performance.now();
+  const { acceleration } = await chooseAcceleration(width, height, fps);
+  const cfg = liveVideoConfig(width, height, fps, asked, acceleration);
+  const support = await VideoEncoder.isConfigSupported(cfg).catch(() => null);
+  const out = { asked, madeKbps: 0, frames: 0, bytes: 0, keyframes: 0, firstSecondKbps: 0, restKbps: 0, acceleration: String(acceleration), mode: (support?.config?.bitrateMode as string | undefined) ?? null, ms: 0, error: null as string | null };
   // Three planes of low-passed noise, each drawn once at full size with a
   // margin to slide in: the frames are sums of them at moving offsets.
   const M = 256, pw = width + M, ph = height + M;
@@ -420,7 +431,7 @@ async function rateProbe(width: number, height: number, fps: number, seconds: nu
     error: (e) => { out.error = String(e?.message ?? e); },
   });
   try {
-    enc.configure(liveVideoConfig(width, height, fps, asked));
+    enc.configure(cfg);
     for (let i = 0; i < n && !out.error; i++) {
       // Each plane slides its own way and the first two cross-fade, so no one
       // motion vector predicts a block: every pixel changes a little, as dye does.
@@ -440,10 +451,12 @@ async function rateProbe(width: number, height: number, fps: number, seconds: nu
       enc.encode(frame, { keyFrame: i % Math.round(2 * fps) === 0 });
       frame.close();
       while (enc.encodeQueueSize > 4) await new Promise((r) => setTimeout(r, 1));
+      if (performance.now() - t0 > 60_000) { out.error = `not done in a minute: ${i + 1} of ${n} frames under ${acceleration}`; break; }
     }
     await enc.flush();
   } catch (e) { out.error ??= String((e as Error)?.message ?? e); }
   if (enc.state !== 'closed') enc.close();
+  out.ms = Math.round(performance.now() - t0);
   out.frames = sizes.length;
   out.bytes = sizes.reduce((k, s) => k + s.bytes, 0);
   out.madeKbps = out.bytes * 8 / seconds / 1000;

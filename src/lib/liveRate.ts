@@ -6,8 +6,8 @@
  * What was reported (2026-11-10, the private rehearsal): the stream on
  * YouTube looked softer and flatter than the app beside it. The colours were
  * the same (the canvas is sRGB and so is the stream); the bits were not. The
- * stream took its rate from render.ts's `videoBitrate`, the rate Record's
- * films use: 0.1 bit a pixel a frame, 6.2 Mb/s at 1080p30, and the panel
+ * stream took its rate from render.ts's `videoBitrate`, the rate the song
+ * film renders use: 0.1 bit a pixel a frame, 6.2 Mb/s at 1080p30, and the panel
  * streamed 30 frames a second while the app draws 60. About 790 kB/s went
  * up to YouTube. A film is written once and kept; a stream is compressed by
  * us in real time with no second pass, then decoded and compressed again by
@@ -54,8 +54,9 @@
  * soften every show after it on a wired link. Turning the
  * rate down while on air, when the link sags mid-show, is 37x-4h-2.
  *
- * Record keeps render.ts's rate: a file is not recompressed by a live
- * ladder, and its size is the owner's disk.
+ * The song film keeps render.ts's rate, and Record's Plate video its own
+ * presets (12 Mb/s Standard, 60 fps by default): a file is not
+ * recompressed by a live ladder, and its size is the owner's disk.
  */
 import { avcCodec } from './render';
 import type { LiveFormat, LiveServiceId, LiveOrientation, LiveUpload } from './liveShow';

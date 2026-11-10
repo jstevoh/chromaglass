@@ -459,13 +459,20 @@ try {
   // the same size, so a rate stuck at one value fails one of them. Over 3
   // seconds by the stream's timestamps; within -15% / +10%: CBR lands within
   // a few percent (98% here), and an encoder at half or double is a
-  // stream that is not what the platform was told.
+  // stream that is not what the platform was told. Each in constant mode
+  // as the browser echoes it (a VBR encoder can hit the average too: the
+  // check-skeptic's control, 13,674 kb/s in VBR). Then the same picture at
+  // 40 Mb/s, printed: on openh264 it makes 39.7, so a red line on another
+  // encoder (the Mac's) says whether the encoder undershot or the picture
+  // ran out of things to say.
   for (const [label, bitrate] of [['the stream\'s own rate', undefined], ['Twitch\'s ceiling', 6_000_000]]) {
     const r = await page.evaluate(([b]) => window.liveLab.rateProbe(1920, 1080, 60, 3, b), [bitrate]);
     const askedKbps = r.asked / 1000, ratio = r.madeKbps / askedKbps;
-    check(`the encoder makes the rate it is asked for at 1080p60, ${label}`, !r.error && r.frames >= 170 && (bitrate !== undefined || askedKbps >= 13000) && ratio >= 0.85 && ratio <= 1.1 && r.restKbps >= askedKbps * 0.85,
-      r.error ?? `${fmt(r.madeKbps)} kb/s made (${fmt(r.restKbps)} after the first second) of ${fmt(askedKbps)} asked, ${fmt(ratio * 100)}%, ${r.frames} frames, ${r.keyframes} key`);
+    check(`the encoder makes the rate it is asked for at 1080p60, ${label}`, !r.error && r.mode === 'constant' && r.frames >= 170 && (bitrate !== undefined || askedKbps >= 13000) && ratio >= 0.85 && ratio <= 1.1 && r.restKbps >= askedKbps * 0.85,
+      r.error ?? `${fmt(r.madeKbps)} kb/s made (${fmt(r.restKbps)} after the first second) of ${fmt(askedKbps)} asked, ${fmt(ratio * 100)}%, ${r.frames} frames, ${r.keyframes} key, ${r.mode ?? 'no'} mode, ${r.acceleration}, ${fmt(r.ms / 1000)} s`);
   }
+  const roomy = await page.evaluate(() => window.liveLab.rateProbe(1920, 1080, 60, 3, 40_000_000));
+  console.log(`  rate headroom: the probe's picture at 40,000 kb/s asked made ${fmt(roomy.madeKbps)} (${roomy.acceleration}${roomy.error ? `, ${roomy.error}` : ''})`);
 
   // A bad key.
   const bad = new LiveClient({ url: listener.url, key: 'wrong-key', meta: {} });

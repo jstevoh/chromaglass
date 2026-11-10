@@ -149,7 +149,7 @@ export interface LiveFormat { height: 720 | 1080; fps: 30 | 60 }
 export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 60 };
 export function loadFormat(): LiveFormat {
   const f = read<Partial<LiveFormat>>(FORMAT_KEY);
-  return { height: f?.height === 720 ? 720 : 1080, fps: f?.fps === 30 ? 30 : 60 };
+  return { height: f?.height === 720 ? 720 : f?.height === 1080 ? 1080 : DEFAULT_FORMAT.height, fps: f?.fps === 30 ? 30 : f?.fps === 60 ? 60 : DEFAULT_FORMAT.fps };
 }
 export const saveFormat = (f: LiveFormat) => write(FORMAT_KEY, f);
 
