@@ -123,6 +123,10 @@ function inkCells(mask: Float32Array, n: number): [number, number, number, numbe
   return x1 < 0 ? null : [x0, y0, x1, y1];
 }
 
+/** A mask's extent and an n × n canvas to draw one on, for the melted logo's picture (`logoMelt.ts`, PLAN 37x-11). */
+export const inkBox = inkCells;
+export const inkCanvas = (n: number): Ctx | null => canvasOf(n)?.g ?? null;
+
 /**
  * Rows of words rasterised once into a mask (`inkTitleMask`): coverage 0..1, n × n, row 0
  * at the plate's bottom as the solver's grid has it. `size` 0..1 is small

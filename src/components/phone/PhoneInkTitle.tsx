@@ -8,16 +8,19 @@ import type { VisualizerSettings } from '../../types';
  * beside it while it is on, since how fast a title goes is the one thing
  * about it a performer changes mid-set. Shared by the phone's own layout
  * (the More sheet) and the remote's Controls during a live set, where the
- * Live Show is run from (CLAUDE.md: the phone shares, never forks).
+ * Live Show is run from (CLAUDE.md: the phone shares, never forks). Under it,
+ * the Logo melt switch (`logoMelt`, PLAN 37x-11): the other ink the show
+ * pours, the logo at the start of a stream or a recording.
  */
 export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 'phone-ink-title' }: {
-  settings: Partial<Pick<VisualizerSettings, 'inkTitle' | 'inkTitleSweep'>> | null | undefined;
+  settings: Partial<Pick<VisualizerSettings, 'inkTitle' | 'inkTitleSweep' | 'logoMelt'>> | null | undefined;
   onSetting: (patch: Partial<VisualizerSettings>) => void;
   disabled?: boolean;
   testId?: string;
 }) {
   const on = !!settings?.inkTitle;
   const sweep = settings?.inkTitleSweep ?? 0.5;
+  const melt = !!settings?.logoMelt;
   return (
     <div className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/5 p-4" data-testid={testId}>
       <button
@@ -53,6 +56,22 @@ export function PhoneInkTitle({ settings, onSetting, disabled = false, testId = 
           <span className="w-9 text-right font-mono">{Math.round(sweep * 100)}</span>
         </label>
       )}
+      {/* The logo melted at the start of a film or stream (PLAN 37x-11): the desk's "Melt the logo at the start". */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={melt}
+        onClick={() => onSetting({ logoMelt: !melt })}
+        disabled={disabled}
+        data-testid={`${testId}-logo`}
+        className="flex min-h-11 w-full items-center justify-between gap-3 text-left disabled:opacity-30"
+      >
+        <span className="flex flex-col">
+          <span className="text-[13px] font-semibold text-text">Logo melt</span>
+          <span className="text-[12px] text-dim">The logo poured as ink when the stream or a recording starts, then melted away</span>
+        </span>
+        <SwitchPill on={melt} />
+      </button>
     </div>
   );
 }
