@@ -675,7 +675,7 @@
     {
       "name": "Three sound builds, their checks written first",
       "shard": "logic",
-      "run": "npm run soundowed -- --owed=voices",
+      "run": "npm run soundowed",
       "why": [
         "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
         "notes as voices placed by Melody Walk's scale with an attack, a release",

@@ -2591,3 +2591,26 @@ square or a halo around it, the plate around it clearing or dimming.
    bottom-left corner.
 3. Bad: letters lost on a bright plate, a card cut off at the edge on the portrait stream, a
    card over the desk's controls, a second card stacked on the first.
+
+## 121. MIDI notes as voices: a sequencer playing a chord (PLAN 24.3)
+
+`npm run soundowed` (`voices`) holds the placement on Melody Walk's line, the velocity sizing,
+the attack/release envelope, the four-voice cap, the `notes` patch-bay source and the channel
+learn; only a real sequencer on the Mac can show how a played chord lands and pours at 60 fps.
+
+1. Connect a MIDI keyboard or hardware/iPad sequencer. Open the MIDI panel (or Settings →
+   MIDI & Controllers → **Learn channel as notes**), press any note on the sequencer's channel:
+   the channel appears under **Notes as voices** with Tool (`Drop` / `Streak`), Liquid,
+   Attack, Release and Cap (4).
+2. Play a low-to-high scale of short notes: each note-on lets go of one real pipette drop
+   across the plate from left to right along the look's Melody Walk line, softer notes smaller
+   and harder notes fuller.
+3. Play and hold a three-note chord, then add a fourth and a fifth held note: the chord lands
+   as three separate drops at once, ordered across the plate by pitch, pouring while held; the
+   fifth held note releases the oldest of the first four so the plate does not flood.
+4. Raise Attack to 0.3 s and Release to 0.5 s: a held note swells in and trails off after
+   release. In the Patch Bay, add a cord with Source **Notes** (`Velocity`, `Pitch` or `Held`)
+   and check the target follows the played notes.
+5. Bad: a note firing a button instead of laying a drop, chord notes landing on top of each
+   other instead of spread by pitch, a stuck voice after note-off, or any look opening with a
+   voices binding before one is learned.

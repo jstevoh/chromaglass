@@ -27,8 +27,8 @@ check written first and built by Antigravity. None moves the whole frame by defa
 (the owner's rule), and every reading is a fast one (the owner's rule for sound patches).
 
 1. ~~**30a**, below: shape each sound cord.~~ (Shipped; `npm run soundcords`.)
-2. **14t-pc**: Program Change picks a look or a set-list item.
-3. **24.3**, moved up: notes as voices, with an envelope per note and notes as a source.
+2. ~~**14t-pc**: Program Change picks a look or a set-list item.~~ (Shipped; `npm run soundowed`.)
+3. ~~**24.3**, moved up: notes as voices, with an envelope per note and notes as a source.~~ (Shipped; `npm run soundowed`.)
 4. **13.5-link** before **13.5-osc**: Link first.
 5. ~~**30b**, below: LFOs and envelopes you set.~~ (Shipped; `npm run soundowed`, `30b-loop` open.)
 6. **13.4-ipad**: playing from an iPad in AUM, written up and tried once.

@@ -56,6 +56,7 @@ import { SoundLearn } from '../lib/soundLearn';
 import { SongShape, type SongEvent } from '../lib/songShape';
 import { HitSource, beatAt } from '../lib/hitSource';
 import { MelodyWalk, melodyLine, type MelodyDrop, type MelodyLine } from '../lib/melodyWalk';
+import { makeNoteVoices, readNoteFeature, resetNoteVoices, type VoiceDrop, type VoiceTool } from '../lib/noteVoices';
 import { BarGrid, Accent, tellBar } from '../lib/barGrid';
 import { kickPress, kickDepth, bassPressFor, bassBoostGain, bassRouteValue } from '../lib/squish';
 import { levels01, musicHands } from '../lib/soundLevels';
@@ -76,6 +77,7 @@ import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
 import { stepPlateBubbles } from '../sim/speciesPoll';
+import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
 interface LiquidVisualizerProps {
@@ -472,16 +474,20 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
    * under the look's fill as every music pour is (`room`, the regulator of
    * PLAN 28d-A); the liquid has its own headroom (pourLiquid).
    */
-  const layMelodyDrop = (fluid: FluidSimulation, layer: number, d: MelodyDrop, line: MelodyLine, gain: number, room: number) => {
+  const layMelodyDrop = (fluid: FluidSimulation, layer: number, d: MelodyDrop, line: MelodyLine, gain: number, room: number, liquid?: string, tool?: VoiceTool) => {
     const x = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.x * GRID_SIZE)));
     const y = Math.max(1, Math.min(GRID_SIZE - 2, Math.round(d.y * GRID_SIZE)));
     const vol = gain * (0.3 + 0.7 * d.strength * d.strength);
     // The pitch walks the line's dyes, low to high; a line with none walks the look's working set.
     const dyes = line.dyes && line.dyes.length > 0 ? line.dyes : harmonyOf(layer);
     const c = harmonyCycle(dyes, d.along * (dyes.length - 1));
-    if (room > 0.001) fluid.autoInject('drop', x, y, 4.5 * vol * room, c.r, c.g, c.b, 0.5);
+    if (room > 0.001) {
+      if (!tool || tool === 'dropper') fluid.autoInject('drop', x, y, 4.5 * vol * room, c.r, c.g, c.b, 0.5);
+      else fluid.autoInject(tool, x, y, 4.5 * vol * room, c.r, c.g, c.b, 0.5);
+    }
     fluid.addTemp(x, y, 0.5 * vol);
-    if (line.liquid) pourLiquid(fluid, line.liquid, x, y, vol);
+    if (liquid) pourLiquid(fluid, liquid, x, y, vol);
+    else if (line.liquid) pourLiquid(fluid, line.liquid, x, y, vol);
     else doseLiquid(fluid, liquidsOf(layer), x, y, vol);
   };
   /** Pour into an area: its own liquid while the bottles are the look's, else one of the bottles picked. */
@@ -937,6 +943,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   const melodyWalkRef = useRef(new MelodyWalk());
   const melodyQueueRef = useRef<MelodyDrop[]>([]);
   const melodyLineRef = useRef<MelodyLine>(melodyLine(null));
+  const noteVoicesRef = useRef(makeNoteVoices());
+  const voiceDropsRef = useRef<VoiceDrop[]>([]);
   const songEventsRef = useRef<(SongEvent & { seq: number })[]>([]);
   const songSeqRef = useRef(0);
   const songClockRef = useRef(0);
@@ -1896,6 +1904,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     },
     clearMark: () => { markRef.current = null; },
     fireEnvelopes: (velocity = 1, source) => modRef.current.strike(velocity, source),
+    noteVoice: (e, target) => handleNoteVoiceEvent(noteVoicesRef.current, voiceDropsRef.current, e, target, melodyLineRef.current, showNow() * 0.001),
     filmVideoEl: () => (filmRef.current.kind === 'none' ? null : filmRef.current.video),
     setHarmonyLock: (indices: number[] | null) => {
       harmonyLockRef.current = indices;
@@ -2289,6 +2298,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         sound: currentAudioData,
         shape: modRef.current,
         hits: hitSourceRef.current,
+        notes: { value: (f) => readNoteFeature(noteVoicesRef.current, f) },
         roomImpact: settingsRef.current.sceneImpact ?? 0,
         filmImpact: settingsRef.current.filmImpact ?? 0,
         soundImpact: settingsRef.current.soundImpact ?? 1,
@@ -2575,13 +2585,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             Melody Walk up mid-song finds its armed note as it is; it queues drops only while the dial is up, and only a few (a
             plate that stalls for a second does not catch up with a flood).
           */
-          {
-            const dropsNow = melodyWalkRef.current.update(heard, melodyLineRef.current);
-            if ((currentSettings.melodyWalk ?? 0) > 0) {
-              for (const d of dropsNow) melodyQueueRef.current.push(d);
-              if (melodyQueueRef.current.length > 4) melodyQueueRef.current.splice(0, melodyQueueRef.current.length - 4);
-            } else melodyQueueRef.current.length = 0;
-          }
+          queueMelodyDrops(melodyWalkRef.current.update(heard, melodyLineRef.current), (currentSettings.melodyWalk ?? 0) > 0, melodyQueueRef.current);
           for (const e of songEvents) {
             songEventsRef.current.push({ ...e, seq: ++songSeqRef.current });
             if (songEventsRef.current.length > 16) songEventsRef.current.shift();
@@ -4333,24 +4337,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 hands.lay(sink, GRID_SIZE, simStepS, (a, k) => PALETTE_RGB[areaDyeOf(activeLayerRef.current, a, 0, k)], fill);
               }
             }
-            /*
-              The melody's drops (lib/melodyWalk.ts), on the plate the music
-              plays, on the first running step after the walk let them go. The
-              queue is emptied whatever happens here, so a stopped or
-              draining plate does not hold a flood of notes for the moment it
-              runs again.
-            */
-            if (melodyQueueRef.current.length > 0) {
-              const drops = melodyQueueRef.current.splice(0);
-              const mf = fluidsRef.current[activeLayerRef.current];
-              const gain = Math.max(0, Math.min(2, currentSettings.melodyWalk ?? 0));
-              if (mf && gain > 0 && isActiveRef.current && drainFrameRef.current === 0) {
-                const target = dyeLookTarget(mf.seedMean, currentSettings.dyeBudget ?? 0.85, mf.seedBudget);
-                const clearPhase = mf.seedMean === 0 && (currentSettings.phaseAmount ?? 0) > 0.002;
-                const room = clearPhase ? 0 : Math.max(0, Math.min(1, (1.0 - mf.meanDensity / Math.max(0.06, target)) * 2.5));
-                for (const d of drops) layMelodyDrop(mf, activeLayerRef.current, d, melodyLineRef.current, gain, room);
-              }
-            }
+            stepMelodyAndVoices(
+              fluidsRef.current[activeLayerRef.current], currentSettings,
+              isActiveRef.current && drainFrameRef.current === 0,
+              melodyQueueRef.current, noteVoicesRef.current, voiceDropsRef.current,
+              showNow() * 0.001, simStepS,
+              (mf, d, gain, room, liq, tool) => layMelodyDrop(mf, activeLayerRef.current, d, melodyLineRef.current, gain, room, liq, tool),
+            );
             /*
               The bass's hand on the glass, on the plate the music plays (the
               active one), every running step: let up on every other plate,
@@ -5456,6 +5449,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       // The bar too, for the same reason: its beats are on the old clock.
       barGridRef.current.reset();
       accentRef.current.reset();
+      resetNoteVoices(noteVoicesRef.current);
+      voiceDropsRef.current.length = 0;
       // And the events it heard go with it: they are stamped on the old clock,
       // and a poll after a render would otherwise read the film's drops as
       // the song's.

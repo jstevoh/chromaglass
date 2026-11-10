@@ -202,8 +202,8 @@ re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), ~~**25i**
 colour that answers the music~~ (shipped; ~~**25i-6** its three looks fixed after filming~~, shipped), then **25j** a lamp under each area (D, M, with
-14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), ~~**14t-pc** Program Change (S)~~ (shipped; `npm run soundowed`), **24.3** notes as voices
-with 30's envelope (M), ~~**30b** LFOs and envelopes you set~~ (shipped; `npm run soundowed`, `30b-loop` open); from §31 (Continuum,
+14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), ~~**14t-pc** Program Change (S)~~ (shipped; `npm run soundowed`), ~~**24.3** notes as voices
+with 30's envelope (M)~~ (shipped; `npm run soundowed`), ~~**30b** LFOs and envelopes you set~~ (shipped; `npm run soundowed`, `30b-loop` open); from §31 (Continuum,
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
 Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back** (S);
@@ -280,7 +280,7 @@ style (§31).
   Art packs (§45): ~~**45a**~~ the moiré pack's sheets (2026-11-07), ~~**45a-11**~~ Moiré Waves (2026-11-08), ~~**45a-2**~~ selling it to Home
   (2026-11-07), then **45a-3** a hand on the sheet, **45a-10** Song Groove's missing fringes.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
-- **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), **24.3**, then **24.1b** (after
+- **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), ~~**24.3**~~ (shipped; `npm run soundowed`), then **24.1b** (after
   13.1-sign), then **24.4**.
 - **7.7** Marketing (§37), tied to the store going live: before any link is posted, the share
   card (34a-5) and the hero (34a-2); then **37a** *(owner)*, **37b**, **37c**, ~~**37k**~~ (`/press`, 2026-11-01), the
