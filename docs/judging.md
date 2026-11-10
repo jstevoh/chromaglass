@@ -2569,7 +2569,17 @@ Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about
 at 0.4 (the default) as it always did, at 3 snap there. Music Sync is greyed in Hold and Follow
 until Frame Sway is up; nothing the sound does should move the frame meanwhile.
 
-## 119. Song titles as a 1980s corner caption (PLAN 37x-10j)
+## 119. The logo melts at the start of a film or a stream (PLAN 37x-11)
+
+Turn on Settings → Logo & Titles → **Melt the logo at the start**, then press Record (or
+**Test** in the Live Show panel) on three looks: a still one (Classic), a busy one, and the
+live set's look. The ChromaGlass wordmark should land big across the middle in teal, read
+for two or three seconds, then run and finger apart and melt into the colour within about
+six seconds, leaving its teal in the show. Bad: a logo too faint to read on a bright or a
+dark look, one that smears before it can be read, one that never melts on a still look, a
+square or a halo around it, the plate around it clearing or dimming.
+
+## 120. Song titles as a 1980s corner caption (PLAN 37x-10j)
 
 1. Settings → **Logo & Titles** → **Song titles** on, **As a corner caption** on (the
    default). Play a song the ear names, or have the assistant call `song_title`, on a dark

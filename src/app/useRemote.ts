@@ -30,6 +30,7 @@ import { useInkTitle } from './useInkTitle';
 import { setSongTitleSink } from './songTitle';
 import { parseSongCaption, showSongCaption } from '../lib/songCaption';
 import { mountSongCaptionLayer } from '../components/songCaptionLayer';
+import { useLogoMelt } from './useLogoMelt';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -142,6 +143,8 @@ export function useRemote({
     const unmount = mountSongCaptionLayer();
     return () => { setSongTitleSink(null); unmount(); };
   }, [wallRef]);
+  // The logo poured and melted as a film starts (PLAN 37x-11): the stream on air, or a Record take.
+  useLogoMelt(wallRef, { live: liveShow.phase === 'live', recording: recorder.recording }, !!settings.logoMelt);
   const liveKey = onAir(liveShow)
     ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
     : '';

@@ -249,6 +249,9 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
             letters up. Sweep is how hard: low and the title drifts, readable, for many seconds; high and it is gone in two.
             The dye stays on the plate as colour.
           </Info>
+          {/* The logo melted at the start of a film (PLAN 37x-11, lib/logoMelt.ts): the same ink and rinse as a title. */}
+          <Toggle label="Melt the logo at the start" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
+            title="When the Live Show goes on air or a recording starts, the ChromaGlass logo is poured big across the plate as ink, then melts into the show" />
         </div>
       </section>
       )}

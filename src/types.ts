@@ -340,6 +340,14 @@ export interface VisualizerSettings {
     them. Titles themselves stay off by default, so no plate changes.
   */
   titleCaption: boolean;
+  /*
+    The logo melted at the start of a film or a stream (PLAN 37x-11,
+    lib/logoMelt.ts): when the Live Show goes on air or the Record button
+    starts a take, the ChromaGlass wordmark is poured big across the plate as
+    thick ink, held for a couple of seconds, then rinsed through and stirred
+    until it melts into the show's first colour. Off keeps today's films.
+  */
+  logoMelt: boolean;
   /** How much the beat clock runs ahead of the microphone: once it has locked onto the tempo, kicks fire from the clock, a little early, instead of waiting for the onset to be heard (0 = detection only). */
   beatPrediction: number;
   /** How far ahead of the heard onset a predicted kick fires, in ms — the microphone pipeline's latency plus any anticipation wanted. */
@@ -1009,6 +1017,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
   titleCaption: true,
+  logoMelt: false,
   beatPrediction: 0.7,
   beatLead: 80,
   /*

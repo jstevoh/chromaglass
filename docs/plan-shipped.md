@@ -4873,6 +4873,61 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   stencil and 3×3 bounds remain, now done once rather than three times.
   `npm run slump` (14/14) and `npm run grating` (24/24) passed on the same Mac.
 
+#### 18m-5c. The grid filter still reshapes a slumping drop's edge (shipped 2026-11-08)
+
+- **Reported:** since the glass gap became a real 2 mm (38r, #655), the glycerine drop at
+  256² barely slumps on its own: its 2% front goes `3.94 → 4.13 mm` in 20 s with `dampGrid`
+  off, but `3.94 → 4.50 mm` (`+0.360 mm`) with it on, and its half-peak contour comes in
+  `2.92 → 2.79 mm` (`-0.136 mm`). In the 6 mm gap before #655, the filter moved the 2% front
+  `0.00 mm`, the 5% contour out `0.18 mm` and the half-peak contour in `0.22 mm`, the same at
+  Grid Damp `0.05` and `0.5`.
+- **What the rim slice showed** (slicing the glycerine drop's rim from the centre `(128, 128)`
+  at `t = 2 s` and `t = 20 s`, filter off vs on, and decomposing one filter step on the bare
+  field into `curv = u`, `limit = c − (here + u)` and `return = final − c`):
+  - Before the fix (`main`, `1a1c748d`), at `t = 20 s` the bare 2% threshold (`0.1098`) sits
+    inside `r = 5.00 cells` (`3.91 mm`), with `(5, 0) = 0.0643` and `(5, 1) = 0.0197` below
+    2% and only `(4, 2) = 0.1561` (`r = 4.47 cells`, `3.49 mm`) and `(4, 3)` (`r = 5.00`)
+    above it (`front = 4.135 mm`). With the filter on, `(5, 0)` climbed `0.0643 → 0.1107`
+    (`Δ = +0.0464`, `[curv=+2.26e-4, limit=-2.26e-4]`) and `(5, 1)` climbed `0.0197 → 0.1108`
+    (`Δ = +0.0911`, `[curv=+5.72e-5, return=+1.27e-7]`), both crossing `0.1095` (`r = 5.10
+    cells`, pushing the 95th-percentile 2% front to `4.495 mm`, `+0.360 mm`). At `(5, 1)`,
+    once the slump raised `here` to `0.0197` between `nE = 0` and `nW = 1.0220`, the one-sided
+    foot gate `6.0 * (here − mn) > mx − here` opened `hi` to `nW` so the positive `curv` lobe
+    (`k_{±1} = -4`) passed unclamped (`limit = 0`). Meanwhile, on the inner shoulder `(2, 2)`
+    (`r = 2.83 cells`, `2.21 mm`, right at the half-peak contour `2.745`), `curv = -1.53e-4`
+    eroded `(2, 2)` from `2.8107` to `2.6997` (`Δ = -0.1110`, pulling the half-peak contour in
+    `-0.136 mm`) because the smooth axial dome cells `(1, 0)` and `(2, 0)` had large room `w`
+    and absorbed the 7×7 returned excess (`(2, 0)` grew `3.9644 → 4.0606`, `Δ = +0.0963`),
+    leaving `(2, 2)` with only `return = +9.39e-5` against `curv = -1.53e-4`.
+- **Why 1D difference gates fail on `pressed`:** gating on 1D second differences `δx²f`, `δy²f`
+  is blinded by the dome's own radial curvature (`pressed` `94%–98%` vs `< 68%`), and gating
+  on 1D fourth differences `δx⁴f`, `δy⁴f` is blinded by 1D front steps (`pressed` `72%–75%`).
+  A 1D profile `f(x) + g(y)` or a radially symmetric dome `a − b(x² + y²)` is separable, so
+  its cross second difference `m = δx²δy²f` vanishes identically inside the dome and on 1D
+  fronts while seeing every 2D wave `cos(kx x + ky y)` with factor `4(1 − cos kx)(1 − cos ky)`.
+- **What changed** (`src/gpu/wgsl/fluid/gridFilter.ts`): inside the existing 5×5 stencil loop
+  (with zero extra texture loads), `dampGridCurv`, `dampGridLimit` and `dampGrid` accumulate
+  the 5 row and 5 column second differences `r2[0..4]`, `c2[0..4]` (`k2 = [0, 1, -2, 1, 0]`)
+  to form `m = δx²δy²f` at the cell (`m0`) and its four axial neighbours (`mW, mE, mS, mN`),
+  and hold `[lo, hi]` to `here` (`lo = select(here, lo, alt); hi = select(here, hi, alt);`,
+  `alt = ax & ay`) unless `m` oscillates along both X and Y — either changing sign to an axial
+  neighbour (`mW * m0 < 0 | mE * m0 < 0`) or having both axial neighbours below `m0 / 2`
+  (`(2*mW − m0)*m0 < 0 & (2*mE − m0)*m0 < 0`, which holds at wave crests whenever `cos k < 1/2`,
+  i.e. `k in (π/3, π]`, covering `grating`'s `near` and `far` wave packets as well as `(π, π)`).
+  At the drop's rim `(5, 0)` and `(5, 1)`, `m` does not oscillate along the front (`alt = false`),
+  so `lo = hi = here` clamps `c = here` (`limit = -curv`) and sets `w = 0`: `(5, 0)` stays at
+  `0.0488` and `(5, 1)` at `0.0625` (both below the `0.1094` 2% contour), while inside the dome
+  `(1, 0)` and `(2, 0)` have `w = 0` so `(2, 2)` gets `return = +1.51e-4` against
+  `curv = -1.56e-4` and holds `2.7574 > 2.7355` above the half-peak contour.
+- **Measured:** `npm run slump` (no `--owed`, removed `-- --owed=front` from `scripts/checks.json`),
+  15/15 passed: check 14 reads `2 s: dye -0.0000%`, `20 s: dye +0.0001%`, `156 of 65536 cells
+  not the bare run's at 20 s`; check 14b reads `2 s: front +0.000 mm of the bare run's (at 5%
+  of the peak +0.000 mm, half the peak 0.000 mm, printed only); 20 s: front +0.000 mm of the
+  bare run's (at 5% of the peak +0.000 mm, half the peak 0.000 mm, printed only)`.
+  `npm run grating`: 24/24 ok (`1 step 94.6%`, `60 steps 4.3%`, `faint 4.3%`, `near 29.7%`,
+  `far 6.9%`, `pressed 66.8% < 68%`, `lines/rows 0.000%`, `disc ring 0.001%`, `halo 0.0%`,
+  `cons +1.21 ppm/s`).
+
 ### 19aa-3. The API scripts never print the token
 
 **Shipped** 2026-10-19. A transient 502 from the Actions API stopped `npm run flakes` on
@@ -5086,6 +5141,15 @@ lays the app's own seed and prints it in the lab: on main 71% of the plate absor
 three channels, the view 57% black, 37% red, 0% white, yellow and blue, 16 dots, mean
 3.69; now 0.1%, 9.9% black, 57% white, red 12.8%, yellow 6.8%, blue 9.8%, 254 dots, mean
 0.115. The phone lays the same seed (it is the plate, not a control).
+
+**Shipped (21b): the back plate is outlined from its own dye.** The Ben-Day print's pen
+line (`benDayEdge`, moved to `src/gpu/wgsl/plateBenDay.ts` beside `plate.ts`) was called
+on `layer0` only, so a second plate's pools printed in flat inks and dots without a black
+outline. It now runs on `layer1` at `fuv1` with `layer1`'s own screen-pixel step, dish
+mask and mixer level (`U.mixLevel.z`), combined with the front plate's line by `max`.
+`npm run benday` line 8 (`--owed=back` removed from `scripts/checks.json`): on main the
+front pool was ringed in black on 180 of 180 rays and the back plate's rotated pool on 0;
+now both are ringed on 180 of 180 rays, and lines 1 to 7 on a single plate are unchanged.
 
 ### 19ai-8. App() into its domains' hooks
 
@@ -11218,6 +11282,35 @@ model cannot reach one, the PR says what it reached and asks.
     0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
     link for seconds (37x-4c's item).
 
+#### 37x-4g. Sound and picture judged on one clock dropped a healthy stream
+
+  - **37x-4g. Sound and picture judged on one clock dropped a healthy stream (shipped
+    2026-11-09).** Found in the private rehearsal on the Mac app 1.3.1257: six minutes
+    Excellent on YouTube, then the upload fell from about 7 Mbps to under 1 and Studio said
+    "No data"; a restart held for fifteen seconds, then eighteen minutes stuck. The uplink
+    measured 592 Mbps. The readout that decides to drop video (37x-4c) took the newest
+    timestamp written on *either* track and subtracted the timestamp of the last packet
+    delivered on *either* track. With sound and picture apart by more than the 2 s bound,
+    any brief wait on a WAN (a keyframe pending a few milliseconds) read as more than 2 s
+    behind, and the client dropped video to the next keyframe, again and again: keyframes
+    and sound only, the rehearsal's picture. On loopback nothing waits, so it never showed
+    here. Now each track is judged on its own clock: how far the newest packet written on
+    a track is ahead of that track's oldest packet still waiting. A first draft used the
+    track's last *delivered* timestamp; it went stale across a drop, so the keyframe that
+    ended one drop started the next (five runs for one backlog). `npm run livedrop`'s seven
+    new lines, a scripted client with sound 3 s behind, in step and 3 s ahead on a link
+    that waits briefly around each keyframe: before, with no backlog at all, 593 frames
+    dropped in 8 runs with sound 3 s behind (the same on a server's fresh acknowledgements)
+    and 120 in 3 runs with it 3 s ahead, and after a real 3.5 s backlog 594 in 7 runs with
+    no frame in the last second; after, none dropped without a backlog at every skew, and
+    one run of 89 frames (90 worked from the bound and the keyframes) with 31 in the last
+    second after it. (The in-step rows' 59 frames before the first keyframe were the old
+    readout comparing against a delivered timestamp of zero, not the skew.) The readout now shows the skew (`avSkewSeconds`, "sound X s late" past half
+    a second) and the audio encoder's queue (`audioQueue`), the numbers the next rehearsal
+    needs to say where the skew comes from (37x-4g-1). A fifteen-minute local run under
+    load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
+    skew's source on the owner's Mac is not yet reproduced here.
+
 #### 37x-4d-7. The moving line read a looping bar on two frames
 
   - **37x-4d-7. The moving line read a looping bar on two frames (shipped 2026-11-09).**
@@ -12290,6 +12383,38 @@ the lab's solver): under a lively flow (eddies an eighth of the plate across) th
 gone 1.5 s after the rinse came in; on a still plate 0.952 at landing, gone in 1 s at the
 dial's top, 0.947 at 6 s at 0.01; every arm kept 96% or more of its dye; the pad's share
 under the box 0.70. 37x-10e (the thin-gap arms the check owed) ships as these arms.
+
+## 37x-11. The logo melts at the start of a film or a stream (2026-11-10)
+
+**What was asked.** The owner, 2026-11-10: "dump a big chromaglass logo at the beginning
+of our videos and let it melt away before the beginning of the show".
+
+**Why not the obvious thing.** The mark (`markMix`) is a picture over the finished frame;
+drawn big and faded out under a ripple it would look like a melt and be a fade, which the
+plate's rule (physics writes, rendering reads) does not allow. So the logo is dye.
+
+**What changed.** `src/lib/logoMelt.ts` rasterises the intro's wordmark
+(`public/intro-name.svg`) from its alpha into a mask at the solver's grid, three fifths of
+the plate across and turned against the plate's own turn. `queueInkTitle` takes
+`{ logo }` and pours it through a second run inside the title's (`InkTitleRun.logo`, at
+its own fixed sweep), so the frame loop still makes one call and a film's logo and its
+first title card each keep their own box and wash; `LiquidVisualizer.tsx` (427 KB) only
+hands its options through, so it did not grow. On the thin gap the logo lands as the
+title's thick ink on its clear pad (37x-10g), holds against the look's flow, and the rinse
+fingers through the pad while the wash's eddies mix it in: it melts, and its dye stays as
+colour. `app/useLogoMelt.ts` pours it when the Live Show's phase goes `live` or the
+recorder starts, with `logoMelt` on (default off, one of the show's keys). Desk: Settings
+→ Logo & Titles. Phone: the Logo melt switch under Title (the More sheet and the remote's
+Controls).
+
+**Measured** (`npm run logomelt`, SwiftShader, 2026-11-10, thin gap under the lively flow
+inktitle's thin arms use): the logo reads 0.959 at 0.5 s, 0.920 at 1 s, 0.835 at 2 s and
+0.787 at 3 s, 0.331 at 4 s, and is gone (0.3 or worse) at 4.5 s; 96% of its dye (569 of
+591) is still on the plate at 7 s (95% at 12 s on a longer arm; the check runs 7 s, since
+CI's lab4 was cancelled at its 25-minute bound six minutes into a 12 s one, and sits in lab5); the species' share under it after the pour is 0.70
+(the pad). 8/8. A first width of four fifths of the plate put the C and the last s past
+the frame's edges in the lab's render (the frame is the square inside the dish's circle),
+so it is three fifths.
 
 ## 14c-4k, 14c-governor, 14b-120, 14c-readout, H2c-10. Wave 4 ladder, wall pacing, readout and grid32 (2026-11-07)
 

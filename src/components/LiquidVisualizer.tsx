@@ -1576,7 +1576,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       }
     },
     // A title as ink at the solver's grid, swept away by the wash (PLAN 37x-10, lib/inkTitleRun.ts).
-    pourText: (rows, opts = {}) => queueInkTitle(inkTitleRef.current, rows, opts.colour),
+    pourText: (rows, opts) => queueInkTitle(inkTitleRef.current, rows, opts),
     kicks: () => kickCountRef.current,
     songShape: () => ({ now: { ...songShapeRef.current.now }, bar: { ...barGridRef.current.now }, events: songEventsRef.current.slice() }),
     // Off the closeup the camera is not running, and the centre it last had is

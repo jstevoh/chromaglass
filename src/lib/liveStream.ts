@@ -83,6 +83,8 @@ export interface LiveStartRequest { outputs: { id: string; meta: LiveMeta }[]; d
 export interface LiveDestinationHealth {
   name: string; output: string; phase: string; error: string | null; status: string[];
   kbps: number; secondsBehind: number; bytesBehind: number; measuredAt: 'server' | 'socket' | null; dropping: boolean;
+  /** The newest audio timestamp sent less the newest video one, in seconds (null until both): audio stamped or encoded seconds off its video (37x-4g). */
+  avSkewSeconds: number | null;
   videoFrames: number; videoDropped: number; dropRuns: number; audioPackets: number; bytesSent: number; joinSkipped: number;
   acks: number; pings: number; serverAcks: number; reconnects: number; retryInMs: number | null; seconds: number;
 }
@@ -170,6 +172,8 @@ export interface LiveState {
   acceleration: LiveAcceleration | null;
   probes: LiveProbe[];
   encodeQueue: number;
+  /** Packets waiting in the audio encoder: it is fed every chunk and never skips, so a count that climbs is audio falling behind its video (37x-4g). */
+  audioQueue: number;
   outputs: LiveOutputState[];
   transport: LiveTransportState | null;
 }
@@ -433,6 +437,7 @@ export class LiveEncoder {
       acceleration: this.acceleration,
       probes: this.probes,
       encodeQueue: first.encoder?.encodeQueueSize ?? 0,
+      audioQueue: this.audio?.encodeQueueSize ?? 0,
       outputs: this.outs.map((o) => ({ ...o.spec, ...o.counts, encodeQueue: o.encoder?.encodeQueueSize ?? 0 })),
       transport: this.transportState,
     };

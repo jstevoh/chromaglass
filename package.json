@@ -322,6 +322,7 @@
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
     "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",
+    "logomelt": "PW_WEBGPU=1 node scripts/logomelt.mjs",
     "presskit": "node scripts/presskit.mjs",
     "loopseam": "node --experimental-strip-types scripts/loopseam.mjs"
   },
