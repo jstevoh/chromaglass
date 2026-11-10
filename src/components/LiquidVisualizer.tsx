@@ -49,7 +49,8 @@ import { BeadField, beadPopulation } from '../lib/beads';
 import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
-import { AreaHands, type AreaSink } from '../lib/areaCords';
+import { AreaHands, musicDyeIn, type AreaSink } from '../lib/areaCords';
+import { throwKickBloom } from '../lib/kickBloom';
 import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
@@ -461,7 +462,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     const at = pointInArea(area, GRID_SIZE, DICE.lay, 0.7);
     const rx = Math.floor(at.x), ry = Math.floor(at.y);
     const color = areaColor(layer, area);
-    fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5);
+    fluid.autoInject(DICE.lay.pick(styles) ?? 'drop', rx, ry, 8.0, color.r, color.g, color.b, 0.5, false, musicDyeIn(area));
     fluid.addTemp(rx, ry, 1.2);
     doseArea(fluid, layer, area, rx, ry, 0.8);
   };
@@ -3672,7 +3673,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   // an even scatter of identical drops is the flatness this
                   // is here to break.
                   if (evolveDt > 0.001) {
-                    af.autoInject(style, rx, ry, (1.5 + energy * 4) * evolveDt, color.r, color.g, color.b, energy);
+                    af.autoInject(style, rx, ry, (1.5 + energy * 4) * evolveDt, color.r, color.g, color.b, energy, false, musicDyeIn(area));
                   }
                   af.addTemp(rx, ry, 0.3 + energy * 1.5);
                   // A hand reaching for the dropper reaches for whatever is on
@@ -4118,7 +4119,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                   if (densityMod > 0.005) {
                     const pc = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime) : audioCol;
                     const st = contStyle();
-                    if (pourDt > 0.001) activeFluid.autoInject(st, bassX, bassY, densityMod * 0.025 * autoAmp * pourDt, pc.r, pc.g, pc.b, densityMod);
+                    if (pourDt > 0.001) activeFluid.autoInject(st, bassX, bassY, densityMod * 0.025 * autoAmp * pourDt, pc.r, pc.g, pc.b, densityMod, false, musicDyeIn(bassArea));
                     activeFluid.addTemp(bassX, bassY, densityMod * 0.018 * autoAmp);
                   }
 
@@ -4176,43 +4177,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
                     const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
-                    /*
-                      Not a ring. The owner, 2026-10-21: the pulse should be more
-                      random, not in a circle. The droplets sat on one circle at
-                      even angles (a jitter of 0.45 rad) and at 0.9 to 1.2 of one
-                      radius, so every kick drew the same wreath. Now two or three
-                      lobes at random angles gather most of the droplets, a fifth
-                      land anywhere, their distance runs from a third of the
-                      radius to past it, their sizes from a third to one and a
-                      half of a mean droplet, and the whole burst is centred off
-                      the bass spot by up to a third of the radius. Each is pushed
-                      outward from that centre with a wide swirl and its own
-                      speed, so the dye breaks into clumps and streaks rather
-                      than expanding as a ring. Fewer on average (5 to 11 against
-                      6 to 12), the sizes averaging about what they did, so the
-                      dye a kick lays is about what it was.
-                    */
-                    const drops = 5 + DICE.music.int(7);
-                    const lobes = 2 + DICE.music.int(2);
-                    const lobeAt: number[] = [];
-                    for (let l = 0; l < lobes; l++) lobeAt.push(DICE.music.angle());
-                    const bx0 = bassX + (DICE.music.float() - 0.5) * ringR * 0.66;
-                    const by0 = bassY + (DICE.music.float() - 0.5) * ringR * 0.66;
-                    for (let d = 0; d < drops; d++) {
-                      const wild = DICE.music.float() < 0.2;
-                      const a = wild ? DICE.music.angle() : lobeAt[d % lobes] + (DICE.music.float() - 0.5) * 1.4;
-                      const rad = ringR * (0.35 + 0.95 * DICE.music.float());
-                      const rx2 = Math.floor(bx0 + Math.cos(a) * rad);
-                      const ry2 = Math.floor(by0 + Math.sin(a) * rad);
-                      if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * boostGain * (0.33 + 1.17 * DICE.music.float()) * autoAmp * pourDt * bloomGain;
-                        if (dropStr > 0.001) activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
-                        // Outward from the burst's own centre, with a wide swirl and a speed of its own
-                        const swirl = 0.9 * (DICE.music.float() - 0.5);
-                        const speed = (0.1 + 0.3 * DICE.music.float()) * bass01 * boostGain * bloomGain;
-                        activeFluid.addVelocity(rx2, ry2, (Math.cos(a) - Math.sin(a) * swirl) * speed, (Math.sin(a) + Math.cos(a) * swirl) * speed);
-                      }
-                    }
+                    // Not a ring: clumps at random angles (lib/kickBloom.ts has why). No dye on a reagent (musicDyeIn).
+                    throwKickBloom(activeFluid, DICE.music, GRID_SIZE, bassX, bassY, ringR, ringCol, bass01 * boostGain, autoAmp * pourDt * bloomGain * musicDyeIn(bassArea), bloomGain);
                     // The beat dose: lands organically around the active area
                     {
                       const da = DICE.music.angle();
@@ -4239,7 +4205,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const my = Math.floor(midAt.y + (noise2D(47.1, time * 0.25) * 0.7 + Math.sin(time * 0.55) * 0.3) * orbitR);
                     if (mx > 0 && mx < GRID_SIZE - 1 && my > 0 && my < GRID_SIZE - 1) {
                       const st = contStyle();
-                      if (pourDt > 0.001) activeFluid.autoInject(st, mx, my, mid01 * 0.06 * autoAmp * pourDt, midCol.r, midCol.g, midCol.b, mid01);
+                      if (pourDt > 0.001) activeFluid.autoInject(st, mx, my, mid01 * 0.06 * autoAmp * pourDt, midCol.r, midCol.g, midCol.b, mid01, false, musicDyeIn(midArea));
                       activeFluid.addTemp(mx, my, mid01 * 0.025 * autoAmp);
                     }
                   }
@@ -4273,7 +4239,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                           for (let ddy = -1; ddy <= 1; ddy++) {
                             for (let ddx = -1; ddx <= 1; ddx++) {
                               const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                              activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w,
+                              activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 0.12 * autoAmp * pourDt * w * musicDyeIn(trebleArea),
                                 sparkCol.r, sparkCol.g, sparkCol.b);
                             }
                           }
@@ -4282,7 +4248,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                         for (let ddy = -1; ddy <= 1; ddy++) {
                           for (let ddx = -1; ddx <= 1; ddx++) {
                             const w = ddx === 0 && ddy === 0 ? 1.0 : 0.45;
-                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 1.1 * w,
+                            activeFluid.addDensity(sx + ddx, sy + ddy, treble01 * 1.1 * w * musicDyeIn(trebleArea),
                               sparkCol.r * 0.5 + 0.5, sparkCol.g * 0.5 + 0.5, sparkCol.b * 0.5 + 0.5);
                           }
                         }
@@ -4305,7 +4271,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ex = Math.floor(swellAt.x + (noise2D(time * 0.18, 71.9) * 0.7 + Math.cos(time * 0.32) * 0.3) * swellR);
                     const ey = Math.floor(swellAt.y + (noise2D(88.4, time * 0.18) * 0.7 + Math.sin(time * 0.27) * 0.3) * swellR);
                     const st = contStyle();
-                    if (pourDt > 0.001) activeFluid.autoInject(st, ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01);
+                    if (pourDt > 0.001) activeFluid.autoInject(st, ex, ey, energy01 * 0.06 * autoAmp * pourDt, swellCol.r, swellCol.g, swellCol.b, energy01, false, musicDyeIn(swellArea));
                   }
                 }
               }
