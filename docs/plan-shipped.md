@@ -4382,6 +4382,10 @@ of a third round, and one escape puts its class back on review before merge for 
 Measured: see #701, which quotes the stubbed-`gh`
 cases, `npm run actionlint` and `npm run reach`.
 
+**19al-6 shipped** 2026-11-10 (seen, no code): the first live run labelled five
+Antigravity PRs on 2026-11-09 between 05:35Z and 09:16Z, each with its `READY` line
+naming the head, and each head's checks were green when the label went on.
+
 ### 20b. A clear film that tears (the thin-film equation)
 
 **Shipped (#259), behind Clear Film (`clearFilm`), 0 in every look; judging §34.**
