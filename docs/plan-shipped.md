@@ -11334,6 +11334,35 @@ model cannot reach one, the PR says what it reached and asks.
     load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
     skew's source on the owner's Mac is not yet reproduced here.
 
+#### 37x-4h. The stream looked softer and flatter than the app
+
+  - **37x-4h. The stream looked softer and flatter than the app (shipped 2026-11-10).**
+    Found in the second private rehearsal: the owner asked why YouTube's picture looked
+    different from the app beside it. The colours matched (both sRGB); the bits did not.
+    The stream took Record's rate (render.ts's `videoBitrate`, 0.1 bit a pixel a frame:
+    6.2 Mb/s at 1080p30; about 6.2 Mb/s steady on the encoder for 42 minutes), and the
+    panel opened at 30 fps while the plate is drawn at 60. YouTube then compresses again
+    for every viewer, from what our pass left. Now the stream has its own rate
+    (`src/lib/liveRate.ts`): `pixels × √fps × K`, 14 Mb/s at 1080p60, 9.9 at 1080p30, 6.2
+    at 720p60 (a P-frame pays for the change between frames, which halves when the frames
+    double, so a doubled frame rate asks about √2 more bits, not 2×); capped at the
+    strictest platform on the shared encode (Twitch 6, Kick 8, Facebook and X 9,
+    Instagram 4, TikTok 6 Mb/s); fitted under the last stream's measured ceiling with the
+    20% headroom, the ceiling kept up to 12 hours so fitted streams do not swing back to
+    full rate. The panel opens at 1080p60 (a saved 30 stays 30) and says the picture's
+    rate and what limits it. One configuration (`liveVideoConfig`) for the encoder, its
+    probe and the check. `npm run live`'s two new lines encode 3 s of a picture that
+    changes everywhere (three noise planes sliding and cross-fading; the encoder makes
+    30 Mb/s on it when asked for 30, so it is the rate control being measured) at
+    1920x1080 and 60 fps: 13,744 kb/s made of 14,000 asked (98%), and 6,000 asked lands
+    near 6,000; the old rule's 6,221 at 1080p30 made 6,124. On the lab's plate the stream
+    carried 41 kb/s of 1,500 asked: a near-still picture any non-padding CBR encoder
+    undershoots, so that number is printed, not judged. `npm run liveshow`'s five new
+    lines: the hand-worked rates, the panel's 1080p60 at 14 Mb/s, each platform's ceiling,
+    the fit to a ceiling and its floor, the ceiling kept and dropped; in the panel, Go
+    live hands the encoder 60 fps at Twitch's 6 and Instagram's 4 Mb/s and says so, then
+    fits to a 3 Mb/s ceiling at the 2 Mb/s floor. Record's rate is unchanged.
+
 #### 37x-4d-7. The moving line read a looping bar on two frames
 
   - **37x-4d-7. The moving line read a looping bar on two frames (shipped 2026-11-09).**

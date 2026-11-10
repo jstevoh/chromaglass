@@ -98,7 +98,12 @@ its shape and its key; the key goes to the keychain store and the panel shows on
 kept. "For tests" marks the unlisted broadcast Test streams to; Go live streams to every
 destination that is on and not for tests, after a second press that names them. The upload
 line compares what the destinations will push (each one its own copy of its encode, plus
-160 kbps of sound, with 20% headroom) against what the last stream measured. The panel, the
+160 kbps of sound, with 20% headroom) against what the last stream measured. The picture
+line (37x-4h, `src/lib/liveRate.ts`) says each encode's rate: `pixels × √fps`, 14 Mb/s at
+1080p60, 9.9 at 1080p30, 6.2 at 720p60; capped at the strictest platform on that encode
+(Twitch 6, Kick 8, Facebook 9, X 9, Instagram 4, TikTok 6 Mb/s, from their pages on
+2026-11-10); and fitted under the last stream's measured ceiling, kept up to 12 hours.
+Record keeps render.ts's own rate. The panel, the
 console below and the phone remote's Stop act on one stream (`src/lib/liveShow.ts`); the
 phone can stop a stream and never start one. `npm run liveshow` drives it.
 
@@ -130,8 +135,8 @@ RTMPS from the main process; `desktop/keys.js` keeps the keys (Electron's `safeS
 through the login Keychain; a key is named by the page and never read by it); `npm run live`
 measures the stream against a local RTMP server (`scripts/rtmpListener.mjs`, which also runs
 by hand: `node scripts/rtmpListener.mjs --port 1935 --out scratch/stream.flv` records a stream
-from the app or from OBS as a `.flv`). Pro only. What the stream is: 1080p by default at the
-frame rate asked, H.264 High with a keyframe every two seconds, AAC at 160 kbps; the panel and the phone's Stop are 37x-4d.
+from the app or from OBS as a `.flv`). Pro only. What the stream is: 1080p60 by default (37x-4h),
+H.264 High at constant bitrate with a keyframe every two seconds, AAC at 160 kbps; the panel and the phone's Stop are 37x-4d.
 
 Several destinations (37x-4c): the landscape encode is made once and its packets written to
 every landscape destination's socket; a portrait destination adds one more encode, 720x1280

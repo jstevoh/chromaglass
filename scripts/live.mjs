@@ -55,6 +55,10 @@
  *                block and one codec frame (10 ms + 21 ms for AAC, 20 for
  *                Opus): the two clocks agree, whatever the machine's stalls
  *                did to the frame rate around a flash
+ *   the rate     the encoder, through the stream's own configuration at
+ *                1920x1080 and 60 fps, makes the rate it is asked for on a
+ *                moving picture: the stream's own (14 Mb/s) and Twitch's
+ *                ceiling (6), each within -15% / +10% (37x-4h)
  *   bookkeeping  the client answered the server's ping and acknowledged its
  *                bytes when asked, and its own counts match the server's
  *   a bad key    a stream whose key the server refuses fails with the
@@ -230,6 +234,13 @@ try {
   const rate = enoughVideo ? (s.video.frames - 1) / videoSpan : 0;
   const vGaps = videoTags.slice(1).map((t, i) => t.timestamp - videoTags[i].timestamp);
   check('frames at the stream\'s rate', enoughVideo && rate >= FPS * 0.8 && rate <= FPS * 1.05, `${fmt(rate)} fps over ${fmt(videoSpan)} s (${s.video.frames} frames; the page skipped ${live.skipped})`);
+  // What the stream's video carried against what it asked (37x-4h), printed
+  // and not judged: the lab's plate redraws a few times in ten seconds on
+  // software WebGPU, and a CBR encoder that does not pad leaves a near-still
+  // picture far under its rate (64 kb/s of 1500, first run). The encoder's
+  // rate is judged on a moving picture below ("the encoder makes the rate").
+  const videoBytes = videoTags.reduce((n, t) => n + t.body.length, 0);
+  console.log(`  rate: ${fmt(enoughVideo && videoSpan > 0 ? videoBytes * 8 / videoSpan / 1000 : 0)} kb/s of video arrived against ${Number(m.videodatarate) || 0} asked, on the lab's plate`);
   check('every frame later than the one before', enoughVideo && vGaps.every((g) => g > 0), `smallest gap ${fmt(Math.min(...vGaps))} ms`);
   // The distribution, not the worst moment: the stream is on its clock when
   // the typical gap is a frame and nearly every gap is within two; a shared
@@ -432,6 +443,28 @@ try {
       : before.length > 0 && after.length > 0 && before.filter(loud).length >= 0.9 * before.length && after.every(quiet);
     check(`${kind}: the audio track decodes, ${kind === 'no source' ? 'silence throughout' : 'the tone until it was switched off, silence after'}`, whole && heard,
       dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; ${kind === 'no source' ? `loudest ${fmt(Math.max(...lv.map((l) => l.rms)), 4)}` : `before ${before.filter(loud).length}/${before.length} loud, after ${after.filter(quiet).length}/${after.length} quiet`}`);
+  }
+
+  // The rate (37x-4h). The owner saw the stream softer than the app, and
+  // the stream's picture is what its rate lets through: 6.2 Mb/s at 1080p30
+  // before this, 14 Mb/s at 1080p60 now. A rate set is only a promise (an
+  // encoder that ignored it, took a VBR hint, or met a cap of its own would
+  // still pass every line above), so this measures what the encoder makes
+  // through the stream's own configuration (liveVideoConfig), at the size
+  // the show streams, on a picture that moves everywhere as the show's does
+  // (live-entry.ts's rateProbe: on it the encoder makes 30 Mb/s when asked
+  // for 30, so the picture has more to say than the rates asked and what
+  // comes out is the encoder's rate control, not the picture's limit).
+  // Two rates: the stream's own at 1080p60, and Twitch's 6 Mb/s ceiling on
+  // the same size, so a rate stuck at one value fails one of them. Over 3
+  // seconds by the stream's timestamps; within -15% / +10%: CBR lands within
+  // a few percent (98% here), and an encoder at half or double is a
+  // stream that is not what the platform was told.
+  for (const [label, bitrate] of [['the stream\'s own rate', undefined], ['Twitch\'s ceiling', 6_000_000]]) {
+    const r = await page.evaluate(([b]) => window.liveLab.rateProbe(1920, 1080, 60, 3, b), [bitrate]);
+    const askedKbps = r.asked / 1000, ratio = r.madeKbps / askedKbps;
+    check(`the encoder makes the rate it is asked for at 1080p60, ${label}`, !r.error && r.frames >= 170 && (bitrate !== undefined || askedKbps >= 13000) && ratio >= 0.85 && ratio <= 1.1 && r.restKbps >= askedKbps * 0.85,
+      r.error ?? `${fmt(r.madeKbps)} kb/s made (${fmt(r.restKbps)} after the first second) of ${fmt(askedKbps)} asked, ${fmt(ratio * 100)}%, ${r.frames} frames, ${r.keyframes} key`);
   }
 
   // A bad key.

@@ -58,7 +58,7 @@
  * stream key never passes through here: the app's transport is given the
  * key's name and the main process looks it up (desktop/keys.js).
  */
-import { avcCodec, videoBitrate as bitrateFor } from './render';
+import { liveVideoBitrate, liveVideoConfig } from './liveRate';
 import { silenceChunk, SILENCE_CHANNELS, SILENCE_RATE, SILENCE_STEP_MS } from './liveSilence';
 import { fitChunk, fitMatches, makeAudioFit, switchedOffsetUs, SWITCH_FLOOR_US, SWITCH_SLACK_US, type AudioFit } from './liveAudioSwitch';
 import { listenLiveFrames, type LiveFrameKind } from './liveFrame';
@@ -222,8 +222,7 @@ export async function liveAudioCodec(sampleRate: number, channels: number, bitra
 export async function probeVideoEncoder(width: number, height: number, fps: number, acceleration: LiveAcceleration, frames = 24, source: 'canvas' | 'buffer' = 'canvas'): Promise<LiveProbe> {
   const out: LiveProbe = { acceleration, source, supported: false, outputs: 0, firstOutMs: null, msAFrame: null, makeMs: 0, error: null };
   if (!liveSupport()) { out.error = 'no WebCodecs'; return out; }
-  const codec = avcCodec(width, height, fps);
-  const cfg = { codec, width, height, framerate: fps, bitrate: bitrateFor(codec, width, height, fps), bitrateMode: 'constant', latencyMode: 'realtime', hardwareAcceleration: acceleration, avc: { format: 'avc' } } as VideoEncoderConfig;
+  const cfg = liveVideoConfig(width, height, fps, liveVideoBitrate(width, height, fps), acceleration);
   let enc: VideoEncoder | null = null;
   try {
     const s = await VideoEncoder.isConfigSupported(cfg);
@@ -410,11 +409,13 @@ export class LiveEncoder {
     for (const [i, o] of specs.entries()) {
       if (ids.has(o.id)) throw new Error(`two outputs named "${o.id}"`);
       ids.add(o.id);
-      const codec = avcCodec(o.width, o.height, fps);
-      const videoBitrate = o.videoBitrate ?? (i === 0 ? opts.videoBitrate : undefined) ?? bitrateFor(codec, o.width, o.height, fps);
+      // The stream's own rate (liveRate.ts, 37x-4h), not Record's: a stream is
+      // compressed again by every platform, and its first pass is all the
+      // detail the second has to work from.
+      const videoBitrate = o.videoBitrate ?? (i === 0 ? opts.videoBitrate : undefined) ?? liveVideoBitrate(o.width, o.height, fps);
       this.outs.push({
         spec: { id: o.id, width: o.width, height: o.height, fit: o.fit ?? 'cover', videoBitrate },
-        cfg: { codec, width: o.width, height: o.height, framerate: fps, bitrate: videoBitrate, bitrateMode: 'constant', latencyMode: 'realtime', avc: { format: 'avc' } } as VideoEncoderConfig,
+        cfg: liveVideoConfig(o.width, o.height, fps, videoBitrate),
         encoder: null, lastKeyBucket: -1, described: false, counts: { frames: 0, skipped: 0, keyframes: 0 }, stage: null, stageCtx: null,
       });
     }
@@ -897,7 +898,7 @@ export interface LiveConsoleOptions {
   width?: number;
   height?: number;
   /** The portrait encode's size, made only when a destination is portrait: 720x1280 unless said (Instagram's and TikTok's). */
-  portrait?: { width?: number; height?: number; fit?: 'cover' | 'contain' };
+  portrait?: { width?: number; height?: number; fit?: 'cover' | 'contain'; videoBitrate?: number };
   fps?: number;
   videoBitrate?: number;
   audioBitrate?: number;
@@ -918,7 +919,7 @@ export function liveConsolePlan(o: LiveConsoleOptions): { outputs: LiveOutputSpe
   if (landscape) outputs.push({ id: 'landscape', width, height, videoBitrate: o.videoBitrate });
   if (portrait) {
     const pw = o.portrait?.width ?? 720, ph = o.portrait?.height ?? Math.round(pw * 16 / 9);
-    outputs.push({ id: 'portrait', width: pw, height: ph, fit: o.portrait?.fit ?? 'cover' });
+    outputs.push({ id: 'portrait', width: pw, height: ph, fit: o.portrait?.fit ?? 'cover', videoBitrate: o.portrait?.videoBitrate });
   }
   const destinations = asked.map((d) => ({ name: d.name ?? d.keyName, url: d.url, keyName: d.keyName, key: d.key, output: d.orientation === 'portrait' ? 'portrait' : 'landscape' }));
   return { outputs, destinations };
