@@ -2164,7 +2164,7 @@
     {
       "name": "A drop slumps under its own weight",
       "shard": "tools",
-      "run": "npm run slump -- --owed=front",
+      "run": "npm run slump",
       "why": [
         "A drop of ink on a level plate slumps out along the lower glass as a",
         "viscous gravity current, its front where Huppert's law puts it (PLAN 18m).",
