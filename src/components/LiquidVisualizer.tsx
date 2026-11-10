@@ -50,6 +50,7 @@ import { ChemistryField, TURING_PRODUCT, turingInk } from '../lib/chemistry';
 import { SCENE_LATTICE, type SceneReading } from '../lib/sceneSense';
 import { PatchBay, cordReading, type PatchContext } from '../lib/sceneMap';
 import { AreaHands, type AreaSink } from '../lib/areaCords';
+import { throwKickBloom } from '../lib/kickBloom';
 import { BackLook } from '../lib/backLook';
 import { type SoundBinding } from '../lib/midi';
 import { SoundLearn } from '../lib/soundLearn';
@@ -4172,43 +4173,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                     const ringCol = bassArea ? areaCycle(activeLayerRef.current, bassArea, areaTime + 1.0) : colFor(2.0);
                     // In an area the ring is the area's size: a third of it out on a soft kick, most of it on a hard one.
                     const ringR = bassArea ? bassArea.r * GRID_SIZE * (0.35 + bass01 * 0.5) : (10 + bass01 * 14) * GRID_SCALE;
-                    /*
-                      Not a ring. The owner, 2026-10-21: the pulse should be more
-                      random, not in a circle. The droplets sat on one circle at
-                      even angles (a jitter of 0.45 rad) and at 0.9 to 1.2 of one
-                      radius, so every kick drew the same wreath. Now two or three
-                      lobes at random angles gather most of the droplets, a fifth
-                      land anywhere, their distance runs from a third of the
-                      radius to past it, their sizes from a third to one and a
-                      half of a mean droplet, and the whole burst is centred off
-                      the bass spot by up to a third of the radius. Each is pushed
-                      outward from that centre with a wide swirl and its own
-                      speed, so the dye breaks into clumps and streaks rather
-                      than expanding as a ring. Fewer on average (5 to 11 against
-                      6 to 12), the sizes averaging about what they did, so the
-                      dye a kick lays is about what it was.
-                    */
-                    const drops = 5 + DICE.music.int(7);
-                    const lobes = 2 + DICE.music.int(2);
-                    const lobeAt: number[] = [];
-                    for (let l = 0; l < lobes; l++) lobeAt.push(DICE.music.angle());
-                    const bx0 = bassX + (DICE.music.float() - 0.5) * ringR * 0.66;
-                    const by0 = bassY + (DICE.music.float() - 0.5) * ringR * 0.66;
-                    for (let d = 0; d < drops; d++) {
-                      const wild = DICE.music.float() < 0.2;
-                      const a = wild ? DICE.music.angle() : lobeAt[d % lobes] + (DICE.music.float() - 0.5) * 1.4;
-                      const rad = ringR * (0.35 + 0.95 * DICE.music.float());
-                      const rx2 = Math.floor(bx0 + Math.cos(a) * rad);
-                      const ry2 = Math.floor(by0 + Math.sin(a) * rad);
-                      if (rx2 > 1 && rx2 < GRID_SIZE - 2 && ry2 > 1 && ry2 < GRID_SIZE - 2) {
-                        const dropStr = bass01 * boostGain * (0.33 + 1.17 * DICE.music.float()) * autoAmp * pourDt * bloomGain;
-                        if (dropStr > 0.001) activeFluid.addDensity(rx2, ry2, dropStr, ringCol.r, ringCol.g, ringCol.b);
-                        // Outward from the burst's own centre, with a wide swirl and a speed of its own
-                        const swirl = 0.9 * (DICE.music.float() - 0.5);
-                        const speed = (0.1 + 0.3 * DICE.music.float()) * bass01 * boostGain * bloomGain;
-                        activeFluid.addVelocity(rx2, ry2, (Math.cos(a) - Math.sin(a) * swirl) * speed, (Math.sin(a) + Math.cos(a) * swirl) * speed);
-                      }
-                    }
+                    // Not a ring: clumps at random angles (lib/kickBloom.ts has why).
+                    throwKickBloom(activeFluid, DICE.music, GRID_SIZE, bassX, bassY, ringR, ringCol, bass01 * boostGain, autoAmp * pourDt * bloomGain, bloomGain);
                     // The beat dose: lands organically around the active area
                     {
                       const da = DICE.music.angle();
