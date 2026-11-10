@@ -148,6 +148,8 @@ const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => ({
   category: s.category,
   kind: s.id === 'mixer' ? 'mixer' : WHOLE.has(s.id) || !PINNABLE.some(p => p.section === s.id) ? 'section' : 'knobs',
   deckWidth: WIDE[s.id] ?? 266,
+  // Sound holds the player and the drone since PLAN 35c-7: the column they had as Music & Drone.
+  ...(s.id === 'audio-input' && { columnWidth: 340 }),
 }));
 
 export const PANELS: PanelSpec[] = [...OWN, ...FROM_SECTIONS];

@@ -114,7 +114,7 @@ export function SoundPanel({
           <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
-        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @4xl:grid-cols-6">
           {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
