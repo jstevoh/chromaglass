@@ -310,7 +310,7 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   line prints what the window says of itself (mirror hooked, its own `paints` over the window,
   stage and source sizes, dark). Next: read that on the next red, then fix the side it names.
   The bar stays.
-- **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6` (docs/plan-shipped.md, 19k-17).
+- **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
   deploys 668 and 669 the job was cancelled at 20:20 with every check it reached green (668 also

@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1419,7 +1419,7 @@
     },
     {
       "name": "A song's title painted as ink, then swept away",
-      "shard": "lab3",
+      "shard": "lab7",
       "run": "npm run inktitle",
       "timeout": 9,
       "why": [
@@ -1435,7 +1435,9 @@
         "title, the phone has the switch). --owed: each line is excused only in main's",
         "state and printed as owed until the PR that builds it takes its id out. On",
         "main it opens no browser; built, the lab steps 1,200 times, about six minutes",
-        "on SwiftShader, beside soapbreak in lab3."
+        "on SwiftShader, beside soapbreak in lab3. In lab7 since 19k-17: on the slow tier",
+        "lab3 reached it at 17:50 of its 25 (soap 8:14, soapbreak 4:35) and was cancelled",
+        "in it on two pull requests' runs and a re-run on 2026-11-10."
       ]
     },
     {

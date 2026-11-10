@@ -4018,11 +4018,13 @@ three more). On 2026-11-10 H2c-labels (its title matches the hunt's `H2c-`) came
 back from merging main with `lab5` cancelled at the limit, inside `inktitle --thin`,
 on its first run and again on the re-run. Neither tree touches the title, so the
 same would happen to every 46x, H2c- or 14aa/14ab PR. Those two checks now
-have a part of their own, `lab6`, and samelook has `lab5` to itself again. No
-check, bar or bound changed. Still close to the limit on the slow tier: `lab2`
-(21:14 on main's deploy that day, cancelled at 25 on 24.3's PR) and `lab3`
-(14:29 there, cancelled on both PRs that day, in `inktitle` and `soap`). The next
-check added to either goes to a new part.
+have a part of their own, `lab6`, and samelook has `lab5` to itself again. The
+same day `lab3` hit the limit on the slow tier on both PRs' runs and on a re-run:
+`soap` (8:14) and `soapbreak` (4:35) brought it to `inktitle` at 17:50, and
+`inktitle` takes seven to ten minutes there. So `inktitle` moved to `lab7`, which
+leaves lab3 at about 17 minutes. No check, bar or bound changed. `lab2` is still
+close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
+first run, green on its re-run), so the next check for it goes to a new part.
 
 ### 19r. Smaller, for the same pass: the open shard evened
 
