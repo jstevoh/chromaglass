@@ -437,6 +437,25 @@ export function createAssistantGuard(send, now = Date.now) {
         return { ok: true };
       }
 
+      /*
+        A song's credit as the corner caption (PLAN 37x-10j): what a set
+        played from files wants at each track's start, now that the owner
+        found the poured title hard to read. Play, paced as a setting change,
+        like the poured words above; only the four strings go on, each held
+        short here, and the page reads them as untrusted again
+        (src/lib/songCaption.ts `parseSongCaption`).
+      */
+      if (type === 'song-title') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const str = (v) => (typeof v === 'string' ? v.slice(0, 200) : '');
+        const title = str(message.title).trim();
+        if (!title) return refuse('a song title needs the title');
+        count('patch', mode, t);
+        send({ type: 'song-title', title, artist: str(message.artist), album: str(message.album), label: str(message.label) });
+        return { ok: true };
+      }
+
       if (GESTURES.has(type)) {
         const why = needs(mode, 'play') ?? paced('gesture', mode, t);
         if (why) return refuse(why);

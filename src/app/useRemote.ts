@@ -27,6 +27,9 @@ import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
 import { takePourText } from '../lib/pourText';
 import { useInkTitle } from './useInkTitle';
+import { setSongTitleSink } from './songTitle';
+import { parseSongCaption, showSongCaption } from '../lib/songCaption';
+import { mountSongCaptionLayer } from '../components/songCaptionLayer';
 import { useLogoMelt } from './useLogoMelt';
 
 /**
@@ -123,6 +126,23 @@ export function useRemote({
     reaches the plate in a set, so the two are read in one place.
   */
   useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
+  /*
+    How a title goes up, wherever it came from (app/songTitle.ts, 37x-10j):
+    the corner caption unless `titleCaption` is off, then the ink as before.
+    The setting is read through a ref when the title is due, so turning it
+    over mid-song does not put a second title up. The caption's screen layer
+    lives as long as this hook does; the stream draws its own copy.
+  */
+  const titleCaptionRef = useRef(settings.titleCaption);
+  titleCaptionRef.current = settings.titleCaption;
+  useEffect(() => {
+    setSongTitleSink((card, ink) => {
+      if (titleCaptionRef.current !== false) showSongCaption(card);
+      else wallRef.current?.pourText(ink.rows, ink.colour ? { colour: ink.colour } : undefined);
+    });
+    const unmount = mountSongCaptionLayer();
+    return () => { setSongTitleSink(null); unmount(); };
+  }, [wallRef]);
   // The logo poured and melted as a film starts (PLAN 37x-11): the stream on air, or a Record take.
   useLogoMelt(wallRef, { live: liveShow.phase === 'live', recording: recorder.recording }, !!settings.logoMelt);
   const liveKey = onAir(liveShow)
@@ -293,6 +313,20 @@ export function useRemote({
           if (!pour) break;
           lastPourTextRef.current = t;
           wallRef.current?.pourText(pour.rows, { colour: pour.colour });
+          break;
+        }
+        /*
+          A song's credit as the corner caption (PLAN 37x-10j): artist, title,
+          album and label from the phone, the show server's conductor or the
+          assistant, for a set the ear cannot name (files played on the Mac).
+          Read as untrusted (lib/songCaption.ts `parseSongCaption`); a new
+          card replaces the last, so a double send shows one card. Always the
+          caption, whatever `titleCaption` says: words poured as ink have
+          their own message, `pour-text`, above.
+        */
+        case 'song-title': {
+          const card = parseSongCaption(message);
+          if (card) showSongCaption(card);
           break;
         }
         case 'dye': {

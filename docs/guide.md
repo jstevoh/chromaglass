@@ -192,10 +192,20 @@ Resolume's OSC output speaks Resolume's own addresses (`/composition/layers/1/vi
 
 Send a number from 0 to 1: the server hands the number to the setting as it is. The settings that already run 0 to 1 take a Resolume slider one to one: Sound Drive (`audioImpact`), Dimmer (`dimmer`), Bloom (`bloom`) and Turbulence (`turbulenceScale`). Plate Rock (`plateRock`) and Evolve Speed (`automateRate`) run on to 3 now, so a Resolume slider rides them one to one up to their old top of 1 and never reaches the extreme third. A setting with another range gets the 0 to 1 number unscaled and clamped to its own range: Speed (`globalSpeed`, 0 to 0.3) reaches its top 30% of the way along the slider, and Macro Zoom (`macroZoom`, 1 to 16) stays at 1. Put those on MIDI learn until the server can scale another program's ranges (PLAN 34a-7i). None of this has been tried in Resolume itself yet: `docs/judging.md` §93 is the owner's sitting with it.
 
-## Song titles painted as ink
+## Song titles
 
-**Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone, in
-the More sheet and on the remote's Controls) pours each new song's title and artist
+**Settings → Logo & Titles → Song titles** (and **Title** on the phone, in the More
+sheet and on the remote's Controls) puts each new song's credit up when the song is
+named, and a song show's **Pour the title** does the same. By default it is a corner
+caption, the card a music channel put over a video in the early 1980s: white letters
+low in the left corner, the artist, the song in quotation marks, the album and the
+label, up for seven seconds and gone. It is laid over the picture, on the screen and
+burned into the live stream; the plate under it is untouched. For a set the show
+cannot name, anything joined to the show server can send a `song-title` message (the
+assistant's `song_title` tool) with the artist, title, album and label as each track
+starts. Not yet on the projector window, a cast or a recording (PLAN 37x-10k).
+
+**As a corner caption** off (the phone's **Ink**) pours the title and artist
 onto the plate as ink when the song is named, then washes it away. The ink is dye
 in the liquid itself, poured at the plate's full resolution, so it is on the wall,
 in a live stream and in every recording at once; nothing is drawn over the picture.

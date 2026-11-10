@@ -649,7 +649,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
   { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
   // The song's title as ink (PLAN 37x-10): how fast the wash takes one, on a knob, ridden in a set;
-  // its size and where it lands. The switch is the desk's and the phone's (a boolean, not a fader).
+  // its size and where it lands. The switch, and `titleCaption` (caption or ink, 37x-10j), are the desk's and the phone's (booleans, not faders).
   { key: 'inkTitleSweep',   label: 'Title Sweep',      min: 0, max: 1 },
   { key: 'inkTitleSize',    label: 'Title Size',       min: 0, max: 1 },
   { key: 'inkTitleY',       label: 'Title Height',     min: 0, max: 1 },

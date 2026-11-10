@@ -4008,6 +4008,24 @@ error object (`{"message":"rate limited"}`) gave an empty answer, which reads as
 it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
+**19k-17 shipped** 2026-11-10.
+**`lab5` past its 25 minutes on every speed-hunt PR.**
+`samelook` was given `lab5` as a part of its own because it runs about eleven
+minutes (15:18 on the slow tier) when a PR's title or label asks for it and prints
+"not asked" otherwise. #778 moved `inktitle -- --thin` there and #780 moved
+`logomelt`, both relying on samelook being not asked (seven to fourteen minutes and
+three more). On 2026-11-10 H2c-labels (its title matches the hunt's `H2c-`) came
+back from merging main with `lab5` cancelled at the limit, inside `inktitle --thin`,
+on its first run and again on the re-run. Neither tree touches the title, so the
+same would happen to every 46x, H2c- or 14aa/14ab PR. Those two checks now
+have a part of their own, `lab6`, and samelook has `lab5` to itself again. The
+same day `lab3` hit the limit on the slow tier on both PRs' runs and on a re-run:
+`soap` (8:14) and `soapbreak` (4:35) brought it to `inktitle` at 17:50, and
+`inktitle` takes seven to ten minutes there. So `inktitle` moved to `lab7`, which
+leaves lab3 at about 17 minutes. No check, bar or bound changed. `lab2` is still
+close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
+first run, green on its re-run), so the next check for it goes to a new part.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
@@ -4381,6 +4399,10 @@ of a third round, and one escape puts its class back on review before merge for 
 
 Measured: see #701, which quotes the stubbed-`gh`
 cases, `npm run actionlint` and `npm run reach`.
+
+**19al-6 shipped** 2026-11-10 (seen, no code): the first live run labelled five
+Antigravity PRs on 2026-11-09 between 05:35Z and 09:16Z, each with its `READY` line
+naming the head, and each head's checks were green when the label went on.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
@@ -5408,7 +5430,7 @@ Asked in PLAN §24 (`24.3`, widened in §30 and VS 2's chords placed, with `24.3
 - **Voice state (`src/lib/noteVoices.ts`).** Plain functions over one pre-allocated state (`makeNoteVoices`, `voiceOn`, `voiceOff`, `voicePour`, `noteSource`, `VOICE_DEFAULTS = { attack: 0, release: 0, cap: 4 }`), with no per-note allocation in the frame. `voiceOn` maps `pitch & 0x7f` through `melodyPlace`, dye class `((pitch % 12) + 12) % 12 / 12`, and velocity into volume `0.35 + 0.65 * (vel / 127)`. When a channel's held voices reach `cap`, the oldest held slot is released at `now` (`releasedAt = now`, `levelAtRelease = slotPourAt(oldest, now)`) before the new voice takes a slot. `voicePour(state, now)` advances each active slot's attack (`(now - startedAt) / attack`) and release (`levelAtRelease * (1 - (now - releasedAt) / release)`), freeing finished slots, and `noteSource(state, now, channel?)` reports `{ velocity, pitch, held }` across active voices.
 - **Channel-wide MIDI binding (`src/lib/midi.ts`).** `MidiTarget` gains `{ kind: 'voices'; tool?: VoiceTool; liquid?: string; attack?: number; release?: number; cap?: number; area?: number }`. Learning a `voices` target from any note stores a binding on that channel, and `liveBindings` answers it for every note (`0..127`) on that channel while leaving other channels and CCs untouched; `parseMidiMap` preserves and clamps its fields.
 - **Solver path & Patch Bay (`src/sim/noteVoicesStep.ts`, `src/components/LiquidVisualizer.tsx`, `src/hooks/useMidi.ts`, `src/components/MidiPanel.tsx`, `src/components/settings/MidiSection.tsx`).** Note-on drops queue onto the visualizer handle and lay through `layMelodyDrop` (real pipette drops in the solver, never a shader stamp), while held voices pour each simulation step at their `voicePour` level. `'notes'` (`velocity`, `pitch`, `held`) is added to the Patch Bay's sources (`src/types.ts`, `src/lib/sceneMap.ts`, `src/components/settings/patchLists.ts`). Both the desk's MIDI panel and the phone's MIDI section offer learning a channel as Notes as voices and editing its tool, liquid, attack, release, and voice cap.
-- **Checked by** `npm run soundowed` (`id: voices`, 9/9 checks passed; 14/14 checks passed with `--owed=lfo`); owed judging in `docs/judging.md` §120 (a sequencer playing a chord on the owner's Mac).
+- **Checked by** `npm run soundowed` (`id: voices`, 9/9 checks passed; 14/14 checks passed with `--owed=lfo`); owed judging in `docs/judging.md` §121 (a sequencer playing a chord on the owner's Mac).
 
 ## 25. Areas of interest: several places on one plate
 
@@ -11292,6 +11314,35 @@ model cannot reach one, the PR says what it reached and asks.
     0.02 s after. On YouTube the readout is therefore the socket's, blind to a slow
     link for seconds (37x-4c's item).
 
+#### 37x-4g. Sound and picture judged on one clock dropped a healthy stream
+
+  - **37x-4g. Sound and picture judged on one clock dropped a healthy stream (shipped
+    2026-11-09).** Found in the private rehearsal on the Mac app 1.3.1257: six minutes
+    Excellent on YouTube, then the upload fell from about 7 Mbps to under 1 and Studio said
+    "No data"; a restart held for fifteen seconds, then eighteen minutes stuck. The uplink
+    measured 592 Mbps. The readout that decides to drop video (37x-4c) took the newest
+    timestamp written on *either* track and subtracted the timestamp of the last packet
+    delivered on *either* track. With sound and picture apart by more than the 2 s bound,
+    any brief wait on a WAN (a keyframe pending a few milliseconds) read as more than 2 s
+    behind, and the client dropped video to the next keyframe, again and again: keyframes
+    and sound only, the rehearsal's picture. On loopback nothing waits, so it never showed
+    here. Now each track is judged on its own clock: how far the newest packet written on
+    a track is ahead of that track's oldest packet still waiting. A first draft used the
+    track's last *delivered* timestamp; it went stale across a drop, so the keyframe that
+    ended one drop started the next (five runs for one backlog). `npm run livedrop`'s seven
+    new lines, a scripted client with sound 3 s behind, in step and 3 s ahead on a link
+    that waits briefly around each keyframe: before, with no backlog at all, 593 frames
+    dropped in 8 runs with sound 3 s behind (the same on a server's fresh acknowledgements)
+    and 120 in 3 runs with it 3 s ahead, and after a real 3.5 s backlog 594 in 7 runs with
+    no frame in the last second; after, none dropped without a backlog at every skew, and
+    one run of 89 frames (90 worked from the bound and the keyframes) with 31 in the last
+    second after it. (The in-step rows' 59 frames before the first keyframe were the old
+    readout comparing against a delivered timestamp of zero, not the skew.) The readout now shows the skew (`avSkewSeconds`, "sound X s late" past half
+    a second) and the audio encoder's queue (`audioQueue`), the numbers the next rehearsal
+    needs to say where the skew comes from (37x-4g-1). A fifteen-minute local run under
+    load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
+    skew's source on the owner's Mac is not yet reproduced here.
+
 #### 37x-4d-7. The moving line read a looping bar on two frames
 
   - **37x-4d-7. The moving line read a looping bar on two frames (shipped 2026-11-09).**
@@ -12605,3 +12656,31 @@ cancelled one). A quarantined flake (19ak-1) is a warning only on a pull request
 deploy holds every line to its bar, so a quarantined line red on two deploys running
 holds main like any check. That is the rule as adopted; 19am-3 is where a line-level
 hold could choose otherwise.
+
+## 37x-10j. Song titles as a corner caption, like a 1980s music channel (2026-11-10)
+
+**What was wrong.** The owner judged 37x-10g's thick-ink titles on the Mac's film "not
+very readable honestly" and asked for titles that "just show up like MTV used to have them
+in the bottom left corner and then fade away. Simple ui overlay", then "as much like 1980s
+MTV as possible". Ink in a moving liquid is the wrong medium for words a viewer must read
+in a few seconds.
+
+**What changed.** `lib/songCaption.ts` holds the card: artist, the song in quotation
+marks, album, label, white "Helvetica Neue" at a twenty-fourth of the picture's height,
+left-aligned in the title-safe corner, a black drop shadow under the white, up in 200 ms,
+held 7 s, out in 450 ms. The screen draws it on a window-sized canvas layer
+(`components/songCaptionLayer.ts`, mounted by useRemote because App.tsx may not grow);
+the live stream's encoder draws it on each output's staging canvas after the plate
+(`lib/liveStream.ts` `stage`), so YouTube receives it and the portrait encode has it in
+its own corner. `app/songTitle.ts` chooses caption or ink by the new `titleCaption`
+setting (default the caption) for the ear's titles and a song show's title; a new
+`song-title` message (phone, show server, the assistant's `song_title` MCP tool) always
+shows the caption. Desk: Logo & Titles → As a corner caption. Phone: Caption / Ink under
+the Title switch.
+
+**What it measured.** `npm run caption`: the card's lines and fade; on a dark 1280x720
+plate 3.7% of the bottom-left box white and the other corners untouched; on bright cream
+a blurred shadow alone left 0.0% of the box near-black round the letters (white on cream,
+unreadable), the drop shadow 2.1%; streamed and decoded, the landscape's bottom-left box
+0.0% white before the card, at least 2.0% while it is up, 0.0% after, the top-right
+never touched, and the portrait at least 5.3% in its own corner.

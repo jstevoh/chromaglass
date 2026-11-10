@@ -44,6 +44,7 @@ comments, which moved with it.
 | `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it) |
 | `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
+| `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption, or ink when `titleCaption` is off); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film |
 | `useControllers` | MIDI, the gamepad, the projector window |
 | `useCommandPalette` | the palette's commands and the keyboard |

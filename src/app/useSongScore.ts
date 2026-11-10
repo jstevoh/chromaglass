@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import { type SongAction, type SongLook, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId, pourGesture } from '../lib/songShows';
 import { setSongCueSink } from './songCue';
+import { showSongTitle } from './songTitle';
 import { unhandled } from '../lib/unhandled';
 import { useSongShows } from '../hooks/useSongShows';
 import { PRESETS } from '../presets';
@@ -82,7 +83,8 @@ export function useSongScore({
       case 'set': glideSetting(a.key, a.value, a.over); break;
       // In an ink that reads against the plate as it is: a title poured into a
       // full, bright plate in the look's own dye does not show.
-      case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
+      // The corner caption by default, or this ink when the show is set to pour it (app/songTitle.ts, 37x-10j).
+      case 'title': showSongTitle(show.song, { rows: titleRows(show.song), colour: 'contrast' }); break;
       case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
       // A drop of this dye, as a pad's Drop lays it (lib/songShows.ts pourGesture).
       case 'pour': v?.applyGesture(pourGesture(a, (x, y) => v.wallToPlate(x, y, 0, true))); break;
