@@ -4008,6 +4008,22 @@ error object (`{"message":"rate limited"}`) gave an empty answer, which reads as
 it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
+**19k-17 shipped** 2026-11-10.
+**`lab5` past its 25 minutes on every speed-hunt PR.**
+`samelook` was given `lab5` as a part of its own because it runs about eleven
+minutes (15:18 on the slow tier) when a PR's title or label asks for it and prints
+"not asked" otherwise. #778 moved `inktitle -- --thin` there and #780 moved
+`logomelt`, both relying on samelook being not asked (seven to fourteen minutes and
+three more). On 2026-11-10 H2c-labels (its title matches the hunt's `H2c-`) came
+back from merging main with `lab5` cancelled at the limit, inside `inktitle --thin`,
+on its first run and again on the re-run. Neither tree touches the title, so the
+same would happen to every 46x, H2c- or 14aa/14ab PR. Those two checks now
+have a part of their own, `lab6`, and samelook has `lab5` to itself again. No
+check, bar or bound changed. Still close to the limit on the slow tier: `lab2`
+(21:14 on main's deploy that day, cancelled at 25 on 24.3's PR) and `lab3`
+(14:29 there, cancelled on both PRs that day, in `inktitle` and `soap`). The next
+check added to either goes to a new part.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
