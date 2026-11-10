@@ -1458,6 +1458,23 @@
       ]
     },
     {
+      "name": "The logo poured at a film's start melts into the plate",
+      "shard": "lab4",
+      "run": "npm run logomelt",
+      "timeout": 12,
+      "why": [
+        "PLAN 37x-11 (scripts/logomelt.mjs): with the Logo melt switch on, the stream going",
+        "live or a Record take pours the intro's wordmark as the title's thick ink. On the",
+        "lab's thin gap under a lively flow, through the app's own queueInkTitle and",
+        "stepInkTitle: it lands at 0.8 or better through pourInk, still reads 0.7 at 2 s,",
+        "is melted to 0.3 or worse by 12 s, keeps 90% of its dye (melted by the liquid,",
+        "never faded), and lies on a pad. Without a browser: off by default and the show's",
+        "key, the cue's edges, and the wiring (no shader names the logo). About 12 s of",
+        "plate, five minutes on SwiftShader's fast tier: in lab4, which has the room since",
+        "inktitle --thin moved to lab5 (#778)."
+      ]
+    },
+    {
       "name": "A bubble's middle is the plate",
       "shard": "lab2",
       "run": "npm run bubblelook",

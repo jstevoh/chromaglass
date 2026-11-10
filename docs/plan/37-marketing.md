@@ -620,6 +620,27 @@ rest is routine and the owner's calls.
       When 37x-10's `pourInk` and wash land, a `pour-text` message goes through them
       (rows as its two lines, the colour as `inkTitleColor`), and the live conductor's
       cue at 0 s of each track gets the sweep the owner asked for.
+- **37x-11. The logo melts at the start of a film or a stream.** *(shipped 2026-11-10.)*
+  With Logo & Titles → *Melt the logo at the start* (or the phone's Logo melt) on, the Live
+  Show going live or a Record take starting pours the intro's ChromaGlass wordmark across
+  three fifths of the plate as the title's thick ink (37x-10g), and the rinse and wash melt
+  it into the show's first colour. `npm run logomelt`; story in `docs/plan-shipped.md`
+  §37x-11. Found building it:
+  - **37x-11a. Song films (the offline render) open on it too.** *(S.)* The render
+    (`app/useSongRendering.ts`) steps the show on its own clock from a seed and is not a
+    Record take, so it does not melt the logo; pour it on the render's first step, inside
+    the seed's determinism (`npm run render-app` hashes frames twice).
+  - **37x-11b. A band's own mark melts instead.** *(S.)* Home and Pro can load their own
+    logo (`loadMark`); the melt pours the ChromaGlass wordmark whatever is loaded. Pour the
+    loaded mark when there is one, from its alpha, as `logoMeltMask` already takes any
+    picture.
+  - **37x-11c. The first song waits for the melt.** *(S.)* The logo is melted by about
+    4.5 s on a lively look; a live album set that starts its first track at Go plays over
+    it. The album conductor (37x-3) could start the first track when the logo has gone.
+  - **37x-11d. Two inks for the two words.** *(S.)* The wordmark is "Chroma" in teal and
+    "Glass" in white; a dye is an absorbance, so white is no dye, and the logo pours in
+    one teal. "Glass" could pour as a pale tint of the look's own dye beside it.
+  - *Owed:* the owner judges it on the Mac's film (docs/judging.md §119).
 
 ## Who does what
 

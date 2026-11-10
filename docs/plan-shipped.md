@@ -12291,6 +12291,37 @@ gone 1.5 s after the rinse came in; on a still plate 0.952 at landing, gone in 1
 dial's top, 0.947 at 6 s at 0.01; every arm kept 96% or more of its dye; the pad's share
 under the box 0.70. 37x-10e (the thin-gap arms the check owed) ships as these arms.
 
+## 37x-11. The logo melts at the start of a film or a stream (2026-11-10)
+
+**What was asked.** The owner, 2026-11-10: "dump a big chromaglass logo at the beginning
+of our videos and let it melt away before the beginning of the show".
+
+**Why not the obvious thing.** The mark (`markMix`) is a picture over the finished frame;
+drawn big and faded out under a ripple it would look like a melt and be a fade, which the
+plate's rule (physics writes, rendering reads) does not allow. So the logo is dye.
+
+**What changed.** `src/lib/logoMelt.ts` rasterises the intro's wordmark
+(`public/intro-name.svg`) from its alpha into a mask at the solver's grid, three fifths of
+the plate across and turned against the plate's own turn. `queueInkTitle` takes
+`{ logo }` and pours it through a second run inside the title's (`InkTitleRun.logo`, at
+its own fixed sweep), so the frame loop still makes one call and a film's logo and its
+first title card each keep their own box and wash; `LiquidVisualizer.tsx` (427 KB) only
+hands its options through, so it did not grow. On the thin gap the logo lands as the
+title's thick ink on its clear pad (37x-10g), holds against the look's flow, and the rinse
+fingers through the pad while the wash's eddies mix it in: it melts, and its dye stays as
+colour. `app/useLogoMelt.ts` pours it when the Live Show's phase goes `live` or the
+recorder starts, with `logoMelt` on (default off, one of the show's keys). Desk: Settings
+→ Logo & Titles. Phone: the Logo melt switch under Title (the More sheet and the remote's
+Controls).
+
+**Measured** (`npm run logomelt`, SwiftShader, 2026-11-10, thin gap under the lively flow
+inktitle's thin arms use): the logo reads 0.959 at 0.5 s, 0.920 at 1 s, 0.835 at 2 s and
+0.787 at 3 s, 0.331 at 4 s, and is gone (0.3 or worse) at 4.5 s; 95% of its dye (559 of
+591) is still on the plate at 12 s; the species' share under it after the pour is 0.70
+(the pad). 8/8. A first width of four fifths of the plate put the C and the last s past
+the frame's edges in the lab's render (the frame is the square inside the dish's circle),
+so it is three fifths.
+
 ## 14c-4k, 14c-governor, 14b-120, 14c-readout, H2c-10. Wave 4 ladder, wall pacing, readout and grid32 (2026-11-07)
 
 Five Wave 4 items checked by `scripts/rungs-owed.mjs` (`npm run rungs`). **14c-4k**

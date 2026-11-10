@@ -27,6 +27,7 @@ import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
 import { takePourText } from '../lib/pourText';
 import { useInkTitle } from './useInkTitle';
+import { useLogoMelt } from './useLogoMelt';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -122,6 +123,8 @@ export function useRemote({
     reaches the plate in a set, so the two are read in one place.
   */
   useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
+  // The logo poured and melted as a film starts (PLAN 37x-11): the stream on air, or a Record take.
+  useLogoMelt(wallRef, { live: liveShow.phase === 'live', recording: recorder.recording }, !!settings.logoMelt);
   const liveKey = onAir(liveShow)
     ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
     : '';
