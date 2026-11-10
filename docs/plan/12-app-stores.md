@@ -93,7 +93,7 @@ forms and a 15 % cut.
    as the LLC (12-play-org).* Still owed on Apple's side when the work starts: the
    App Store Connect record for `app.chromaglass`, and an App Store Connect API key
    as a secret in one of main's environments so CI can upload to TestFlight.
-3. **The Android shell** (one PR): a Bubblewrap project, `assetlinks.json` in
+3. **The Android shell** (one PR; *replaced by 12-ctl-3, 2026-11-09: a Capacitor app, since a TWA cannot be the Mac's controller*): a Bubblewrap project, `assetlinks.json` in
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
    The upload key stays with the owner, never in the repo. Then the closed test
@@ -184,6 +184,48 @@ feature ships its phone version is what keeps them whole.
   MadMapper, TouchDesigner) sell direct. Reopen only if Home's sales show buyers
   who would have found it in the store, and then as Home alone.
 
+**12-ctl: the phone apps are the show's controller (asked 2026-11-08).** The owner: "shouldn't
+we have 2 apps on each platform? tv apps to just show the visuals, and android and ios apps to
+control the show?", then "lets get antigravity to build those apps". So on each store a TV app
+(12-tv, it only shows the plate) and a phone app, which is one app doing both things the iPhone
+shell already does: it plays the show itself (a pocket plate), and it is the Mac app's
+controller, with the dials, the songs and the looks. Draw, the dials, the sequencer and the looks
+are on the remote now (4a, `npm run applink`); what the controller lacks is written first as
+`npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
+builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
+
+- **12-ctl-1** (M, Antigravity): **the songs on the phone.** The Perform desk's set list (its cue
+  list, `lib/setList.ts`) and the song shows (`lib/songShows.ts`) reach the remote in
+  `RemoteState.setList` and `RemoteState.songs`, on a Songs screen one tap from Draw and from
+  Controls: an item tapped is armed for the next Go, a song show run or stopped, Follow songs
+  turned over. The laptop's half sends them from what it has saved and acts on `cue-set-item`,
+  `song-run`, `song-stop`, `song-follow` with the functions the desk's rows call. *Measure:*
+  `controller` lines `setlist`, `songs`, `display`.
+- **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
+  which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
+  Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is
+  refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
+  camera (it opens the show server's own remote in the browser) and the app. *Measure:*
+  `controller` line `scan`.
+- **12-ctl-3** (M, Antigravity): **the Android app, as Capacitor, not a TWA.** Step 3 planned a
+  Trusted Web Activity: the hosted https site in Chrome, which cannot open a plain `ws://` socket
+  to the Mac on the LAN (mixed content; 12-play-org's open question), so it could never be the
+  controller. The Android app is therefore the iPhone's shell on Android: `npx cap add android`
+  beside `ios/`, the same bundled build and app id `app.chromaglass`, the microphone and camera,
+  cleartext and mixed content allowed for the LAN, and a CI workflow that builds an unsigned debug
+  APK (no secrets). What it gives up is the TWA's every-deploy-reaches-the-app; a release builds a
+  new bundle (12-ctl-ship). Android's WebView has WebGPU on fewer phones than Chrome does, so when
+  the plate cannot start in the app it says so, offers the Laptop remote, and opens the show in
+  Chrome. Step 1's Android smoke test still stands for Chrome. *Measure:* `controller` lines
+  `android`, `nogpu`, and the workflow green.
+- **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
+  Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
+  when 12-tv-2's advert is on main.
+- **12-ctl-ship** (Claude): the Android bundle signed through Play App Signing (the upload key
+  stays with the owner, the CI secret is Claude's to wire), an upload job to the Play closed test
+  from main, and the iPhone's half is 12-ship. Sign-in, in-app account deletion (5.1.1(v)), the
+  licence Worker and anything that touches a key are Claude's, never in an Antigravity brief.
+
 **12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
 owner asked whether a Google TV / Android TV app should play the plate on a big
 screen at home, unlocked by Home and Pro. What decides it is the TV's GPU, not the
@@ -237,7 +279,50 @@ low-latency HLS that `AVPlayer` plays natively (a second or two of lag, fine for
 evening) or the app carries a community WebRTC build. Store rules: a free app that
 only opens what an account bought on the web, with no buy button or price, should
 fit guideline 3.1.3(f) (free stand-alone companion), unchecked with Apple. Needs the
-App Store Connect record from 12-ship. Size: M, after route 2's first PR.
+App Store Connect record from 12-ship. Size: M, after route 2's first PR, and
+after 12-tv-hls (below).
+
+**12-tv-1: the stream and the `/tv` page (shipped, PR 1 of route 2; story in
+`docs/plan-shipped.md` §12-tv-1).** The show's page sends the wall's canvas to a
+TV on the network as WebRTC video, signalled through the show server's relay
+(`src/lib/tvFeed.ts`, `server/remote-server.js`'s `tv` role); `/tv?key=…` plays it
+with no GPU (`src/components/TvDisplay.tsx`), films while the show is off; Home or
+Pro on the laptop, three TVs at most; `npm run tv`.
+
+What route 2 still needs, found while building 12-tv-1:
+
+- **12-tv-2: the Android TV shell and the Play listing (M, next).** A WebView app
+  that finds the Mac by itself and opens its `/tv`. Finding it: the Mac app
+  advertises the show server over Bonjour (`_chromaglass._tcp`, a small mDNS
+  responder in `desktop/main.js`; nothing advertises it today) and the shell
+  looks with Android's NSD. Pairing without typing the show key on a remote: the
+  TV shows four digits, the Mac's cast menu shows "a TV wants to join: 4821
+  [Allow]", and Allow hands that TV a key of its own (a relay change: a `tv`
+  hello with no key waits in a pending list the display can admit). D-pad: the
+  page has no controls today; the shell's own screens (pick a Mac, sign in) are
+  focusable. WebView settings: autoplay without a gesture, keep the screen on.
+  Listing under 12-play-org, the Android TV banner (320 x 180), no price in it.
+- **12-tv-signin: films with the Mac off, and the TV-code sign-in (M).** Today
+  `/tv` plays films only while the Mac's show server answers. With the Mac off,
+  the shell opens the site's `/tv`, which shows a code and a QR; the phone signs
+  in (a device-code flow: the licence Worker issues the code, the phone's signed-in
+  page claims it, the TV polls and gets a short-lived token naming the tier) and
+  the TV plays the long rendered films (§6) for Home and Pro. Licence Worker and
+  auth: gets one Claude review before merge.
+- **12-tv-hls: low-latency HLS beside WebRTC, for Apple TV (M, before
+  12-tv-apple).** `AVPlayer` plays HLS natively and tvOS has no official
+  libwebrtc. The Mac app's Live Show encoder (`lib/liveStream.ts`) already makes
+  H.264 packets; the show server would cut them into fMP4 parts and serve an
+  `.m3u8` on the LAN. A second or two of lag, fine at home.
+- **12-tv-flat: the TV gets the plate without the wall's geometry (S).** The TV
+  is sent `#liquid-canvas`, the wall as the projector has it, keystone and corner
+  pin included; at home with no projector that is the plate as it is, but a rig
+  that also feeds a projector sends its warp to the TV too. The Live Show's
+  `stack` frames (37x-4d-1) are the flat picture to send instead.
+- **12-tv-sound: the music on the TV's speakers (S, if asked).** The TV is sent
+  no sound: the music plays where the Mac plays it. Sending the show's audio as a
+  second track would keep it in step with the picture (WebRTC syncs the two),
+  for a Mac whose music should come out of the TV.
 
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`

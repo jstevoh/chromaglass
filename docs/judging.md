@@ -2445,7 +2445,141 @@ only the wall can say whether the seven looks read as the real transparencies do
    not move with the oil, a look too dark to play on, the closeup showing no sheets (known,
    45a-5).
 
-## 112. MIDI notes as voices: a sequencer playing a chord (PLAN 24.3)
+## 112. Saffron Lace beside the owner's lace still (PLAN 28l)
+
+The look menu (or the phone's Looks sheet) → **Saffron Lace**. Beside the still the owner
+sent on 2026-11-07 (yellow lace, lavender, cobalt, coral):
+
+1. Within a few seconds the yellow film tears into lace by itself, and keeps breaking: veins
+   bead into rows of drops (the spatter).
+2. The lace reads yellow, not amber or brown, over the white and over the lavender wash.
+3. The holes show the pools' colours: lilac on the right, cobalt and icy blue on the left,
+   coral low in the middle.
+4. A kick opens the lace a little (the press); the cobalt pool's soap opens fresh holes on
+   the bass; the coral pool's oil thickens the film where it lands.
+5. Bad: a flat yellow sheet that never tears, lace that is all rings (28l-3), or the pools
+   so deep under the film that they read navy, red or brown.
+
+## 113. Sign in with Apple (PLAN 23.15)
+
+On the live site, signed out, in a private window:
+
+1. Play free. Three buttons: Continue with Google, Continue with Apple, Continue with email.
+2. Continue with Apple: Apple's sheet opens, asks for your name and email (try *Hide My Email* once), and the
+   plate starts. Profile & Store says "Signs in with Apple", and with the hidden address it adds the note that a
+   licence bought under your own email shows up when you sign in with that email.
+3. Sign out, then Continue with Apple again: straight in, no second account in Firebase's Users list.
+4. An address that already has a Google account, shared with your Apple ID: Apple says the email already has an
+   account; sign in with Google and Firebase's Users list shows that one account with both Google and Apple.
+5. The Mac app signed out: Continue with Apple in your browser opens the browser's sign-in, and the app opens the
+   show by itself once you finish there.
+6. A phone: the same three buttons fit, and Apple's sheet comes back to the show.
+
+Bad: a second account for the same person, an error saying the provider is not enabled, or the Mac app's window
+stuck on "Finish in your browser" after the browser signed in.
+
+## 114. Song titles painted as ink, then swept away (PLAN 37x-10)
+
+The lab measures a still plate; how a look's own flow treats a title is taste, and only the
+Mac's film shows the letters at the solver's full grid.
+
+1. Settings → **Logo & Titles** → **Song titles as ink** on. Play a song the ear names (or
+   pour words from the phone remote's **Pour words**), on two or three looks: a calm one
+   (Classic), a busy one, and a dark one.
+2. The title should land as crisp ink in the look's first colour, readable for about three
+   seconds at the default **Title Sweep**, then drift and break up into the show's own
+   colour by about ten. **Title Sweep** at the top: gone in a second or two. Near the bottom:
+   it drifts, readable, for many seconds.
+3. **Title Size** small to the plate's width, a long title shrinking to fit; **Title Height**
+   moves it up and down; the phone's **Title** switch turns it on and off.
+4. Bad: soft or blocky letters (poured at the wrong grid), a title that fades rather than
+   moves, a wash that shakes the whole plate, a busy look that tears the title apart before
+   it can be read.
+5. Since 37x-10g the ink is made up thick, on a clear pad under the letters, and the wash
+   rinses it with clear liquid. On a busy look (the private rehearsal's album looks) the
+   title should now sit, sliding and turning slowly, for two or three seconds while the
+   colour moves round it, then burst into branching fingers where the rinse goes in and
+   mix into the show. Bad: a visible box or rim round the title (the pad is meant to be
+   clear), a title that never leaves, a rinse that pushes the whole plate's colour out over
+   the rim.
+
+## 115. Heat from the lamp, and blocking the fan's air by hand (PLAN 36e-2)
+
+`npm run boilgpu` (54/54 on Metal) holds the GPU dish solver to the CPU reference (`npm run boil`,
+38/38), and `npm run plateboil` (8/8 on `zero`, 6/6 on `boil`) holds the live plate's boil at
+1/60 s steps; only the Mac and phone at 60 fps show how the **Heat** dial and a held finger feel
+on a live look.
+
+1. Settings → Lamp & Light → **Heat** (also Perform desk, MIDI, the remote and the phone's Looks
+   sheet). Default is 0, so every look opens as before.
+2. On a look with dye over the lamp (Fillmore East, 1969 or Lava Lamp), raise **Heat** to 0.7:
+   where the lamp's hot spot and dark dye sit, the dish warms; with Gravity up (a tilted plate),
+   warm plumes rise by Kell buoyancy without hitting the old 50-unit ceiling.
+3. Press and hold a finger or pointer still on the dish over the warm spot (on the desk pad, iPad
+   or phone): blocking the cooling air drops $h$ from $50$ to $10\,\text{W/(m}^2\text{K)}$ under
+   the hand, nucleating a vapour pocket that pushes the surrounding liquid out and shades as an
+   air pocket; lift the hand and the fan's air condenses the vapour back down.
+4. Bad: any look changing with **Heat** at 0, Evolve turning **Heat** on by itself, or vapour
+   failing to condense after the hand lifts or **Heat** returns to 0.
+
+## 116. Listen in the Songs panel (PLAN 28h-8)
+
+`npm run listen` holds the design (cues firing on each chorus through the real scheduler,
+stages where the sequencer lays them, louder sections fuller against the song's own range)
+and the flow on a known song; only a record playing in the room can say whether it names
+the song and whether the show it designs plays well.
+
+1. Sequence tab, Songs panel: with the Mac's speakers playing a record and nothing chosen as
+   the source, press **Listen**. The microphone comes on and, within a few tries, the song
+   is added and opened with its title, artist and length.
+2. Let the song play to its end (or the next song). The line should say what was designed;
+   the song's actions list the title, a burst on every chorus, new dyes for the bridge and
+   the last chorus, and the drain; Stage sequences lists "<title> (Listen)".
+3. Play the song again: the stages should open up on each chorus and settle in the verses,
+   the bridge go in close and come back out, the cues land on their sections.
+4. Press **Listen** again on a song a minute in (a song not heard before): on its second
+   play the stages should still change on the song's sections, an *Unheard* stage covering
+   the start it missed (28h-9 moved the map to the song's own seconds).
+5. Bad: a burst a few seconds before its chorus on every play (the map's offset, 28h-9, on
+   a song first heard after this fix), a look change when the song is added, the plate left
+   in close after the bridge.
+
+## 117. Song titles poured as ink from the phone (PLAN 37x-10c)
+
+`npm run assistant` and `npm run remotemix` hold the message: what the phone's box and the
+assistant send, what the guard lets through, and how the rows are laid out. Only the wall
+can say whether the words read when they land and how a look's own flow carries them off.
+
+1. Open the show on the Mac with the phone remote linked, and play a song from a file.
+2. On the phone, Controls → **Pour words**: type `Song name - Artist` and press **Pour**.
+   The name should land in capitals across the middle of the plate with the artist under
+   it, dark on a bright plate and the look's brightest dye on a dark one.
+3. Watch it on three looks: a still one (Classic), a busy one, and the look the live set
+   uses. The words should read for a few seconds, then smear and drift into the colour.
+4. Bad: letters too small to read from across a room, words that never break up on a still
+   look (37x-10d's wash is the fix, not a fade), a pour that clears or dims the plate around
+   the words, a second pour inside 1.5 s landing on top of the first.
+
+## 118. The closeup camera answers your hand (PLAN 27d)
+
+Zoom in past 2x on Classic with the camera on Hold and pan with the arrow keys: a tap moves a
+quarter of the frame, Shift a whole frame, a held key a slow drift; it should feel like a heavy
+rig on a slider, never a lurch. Then move Chase Speed from 0 to 3 while pressing an arrow or
+Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about three seconds,
+at 0.4 (the default) as it always did, at 3 snap there. Music Sync is greyed in Hold and Follow
+until Frame Sway is up; nothing the sound does should move the frame meanwhile.
+
+## 119. The logo melts at the start of a film or a stream (PLAN 37x-11)
+
+Turn on Settings → Logo & Titles → **Melt the logo at the start**, then press Record (or
+**Test** in the Live Show panel) on three looks: a still one (Classic), a busy one, and the
+live set's look. The ChromaGlass wordmark should land big across the middle in teal, read
+for two or three seconds, then run and finger apart and melt into the colour within about
+six seconds, leaving its teal in the show. Bad: a logo too faint to read on a bright or a
+dark look, one that smears before it can be read, one that never melts on a still look, a
+square or a halo around it, the plate around it clearing or dimming.
+
+## 120. MIDI notes as voices: a sequencer playing a chord (PLAN 24.3)
 
 `npm run soundowed` (`voices`) holds the placement on Melody Walk's line, the velocity sizing,
 the attack/release envelope, the four-voice cap, the `notes` patch-bay source and the channel

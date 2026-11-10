@@ -110,6 +110,8 @@ export function luckyLook(
     // the plate, and which ground it is seen on is that look's choice.
     // Clear Film (PLAN §20b) is kept as the lamp is: it is liquid on the
     // dish, and a roll that drew it off would fill the lace back in.
+    // The projector lamp's heat (PLAN 36e-2) is played by hand with a hold on the glass, not rolled.
+    heat: 0,
     sensitivity: rand() * 0.8 + 0.2,
     /*
       1 to 2, not 0.5 to 2. No preset sets this — it is an ear setting, so

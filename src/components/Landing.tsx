@@ -3,6 +3,26 @@ import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } fr
 import { introOut } from '../lib/intro';
 import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
+/*
+ * The channel the looks are filmed for (PLAN 34a-8). The owner asked, on
+ * 2026-11-08, for the homepage to point at it: six films went public that day,
+ * each a look played to a 1920s record, and a visitor deciding whether to press
+ * Play free learns more from a minute of the plate moving to music than from
+ * any still on this page. The handle, not a channel id, so the link reads as
+ * what it is if someone copies it. It sits in the header, beside Sign in, so a
+ * phone sees it on the first screen without scrolling past the looks, and again
+ * under the looks, where someone who liked the stills wants to see them move.
+ */
+const YOUTUBE_CHANNEL_URL = 'https://www.youtube.com/@Chromaglassart';
+
+/** YouTube's play mark, drawn small: recognisable at 18 px without loading their asset. */
+const YouTubeMark: React.FC<{ className?: string }> = ({ className }) => (
+  <svg viewBox="0 0 24 17" aria-hidden="true" className={className}>
+    <rect width="24" height="17" rx="4.5" fill="#ff0033" />
+    <path d="M9.6 4.9v7.2l6.2-3.6z" fill="#fff" />
+  </svg>
+);
+
 /**
  * The page a first visit meets before the sign-in (PLAN.md 34a).
  *
@@ -191,14 +211,27 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             <img src="/favicon.svg" alt="" aria-hidden="true" className="h-7 w-7" />
             <span className="text-[15px] font-semibold tracking-wide">ChromaGlass</span>
           </div>
-          <button
-            type="button"
-            data-cg-landing-signin=""
-            onClick={onPlay}
-            className="min-h-[44px] rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
-          >
-            Sign in
-          </button>
+          <div className="flex items-center gap-1">
+            <a
+              href={YOUTUBE_CHANNEL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-cg-landing-youtube=""
+              aria-label="ChromaGlass on YouTube"
+              className="flex min-h-[44px] items-center gap-2 rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
+            >
+              <YouTubeMark className="h-[14px] w-[20px] shrink-0" />
+              YouTube
+            </a>
+            <button
+              type="button"
+              data-cg-landing-signin=""
+              onClick={onPlay}
+              className="min-h-[44px] rounded-md px-3 text-[14px] text-text-2 transition-colors hover:text-text"
+            >
+              Sign in
+            </button>
+          </div>
         </header>
 
         <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col justify-end px-4 pb-[max(32px,env(safe-area-inset-bottom))] pt-16 sm:px-8 sm:pb-16">
@@ -217,7 +250,7 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </a>
           </div>
           <p className="mt-4 text-[13px] leading-relaxed text-muted">
-            Free in your browser for good, nothing to install. You sign in once with Google, an emailed link or a password.
+            Free in your browser for good, nothing to install. You sign in once with Google, Apple, an emailed link or a password.
           </p>
           <p className="mt-1 font-mono text-[12px] text-dim">
             Home $35 · Pro $199 · pay once, no subscription
@@ -251,6 +284,15 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             </li>
           ))}
         </ul>
+        <a
+          href={YOUTUBE_CHANNEL_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 inline-flex min-h-[44px] items-center gap-2.5 text-[15px] text-text-2 underline-offset-4 transition-colors hover:text-text hover:underline"
+        >
+          <YouTubeMark className="h-[17px] w-[24px] shrink-0" />
+          Watch the looks move to 1920s records on our YouTube channel
+        </a>
       </section>
 
       {/* How it works */}
@@ -392,6 +434,8 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
             <a href="/terms.html" className="underline underline-offset-2 hover:text-text-2">Terms</a>
             {' · '}
             <a href="/privacy.html" className="underline underline-offset-2 hover:text-text-2">Privacy</a>
+            {' · '}
+            <a href={YOUTUBE_CHANNEL_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-text-2">YouTube</a>
           </p>
         </footer>
       </section>

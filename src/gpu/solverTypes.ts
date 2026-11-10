@@ -191,6 +191,10 @@ export interface GpuStepParams {
   time: number;
   /** Master dimmer / lamp brightness (0 blackout to 1 full brightness), scaling lamp heat (PLAN 18f). */
   dimmer?: number;
+  /** Lamp Heat dial (0..1, default 0): two-band lamp irradiance and two-phase boil model (PLAN §36e-2). */
+  heat?: number;
+  /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
+  boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
    * The lasting current (see `stepCurrent`). Everything here is per second in
    * solver velocity units, except `currentDamp` (per step) and `maxCurrent`.
@@ -356,6 +360,18 @@ export interface PlateSolver {
    * (lib/videoFlow.ts). False when it poured nothing.
    */
   pourVideo?(src: HTMLVideoElement | HTMLCanvasElement | ImageBitmap, fresh: boolean): boolean;
+  /**
+   * A title poured as ink (PLAN 37x-10, lib/inkTitle.ts): `mask` n × n of
+   * coverage 0..1, row 0 at the plate's bottom, sampled onto the solver's own
+   * grid (area taps, as the video pour samples its frame) and added to the
+   * dye as `density` of the ink `rgb` (absorbances) where the coverage is 1.
+   * Optional: without it the app lays the mask through the CPU's arrays at
+   * the logical grid. False when nothing was poured. `carrier` (PLAN
+   * 37x-10g): on a thin gap, the liquid the ink is made up in, laid into the
+   * species field under the same mask (`share` of the column at coverage 1,
+   * its ln(ν/ν_water) and refractive index), so thick ink holds its letters.
+   */
+  pourInk?(mask: Float32Array, n: number, rgb: readonly number[], density: number, carrier?: { share: number; lnNu: number; index: number }): boolean;
   step(p: GpuStepParams, deltasApplied: boolean): void;
   /**
    * `hands`, when a hand is in the liquid on a thin gap: L²×4 of (Σ χ·U, Σ χ, 0),

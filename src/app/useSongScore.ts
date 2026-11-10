@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
-import { type SongAction, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId, pourGesture } from '../lib/songShows';
+import { type SongAction, type SongLook, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId, pourGesture } from '../lib/songShows';
 import { setSongCueSink } from './songCue';
 import { unhandled } from '../lib/unhandled';
 import { useSongShows } from '../hooks/useSongShows';
@@ -37,6 +37,19 @@ interface SongScoreDeps {
   pinnedPresetId: string | null;
   userPresets: ReturnType<typeof useUserPresets>;
   tempoLabel: { source: string | null; bpm: number; taps: number; };
+}
+
+/**
+ * The look playing, as a song's show names one: a saved look, or a built-in
+ * (Classic when neither is known). A show made for the song playing (a cue
+ * pinned on the score, a song Listen named) takes the look that is up, so
+ * that starting it changes nothing on the plate.
+ */
+export function lookPlaying(activePresetId: string | null, pinnedPresetId: string | null, saved: readonly { id: string; name: string }[]): SongLook {
+  const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
+  const mine = saved.find(u => u.id === lookId);
+  const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
+  return mine ? { kind: 'saved', id: mine.id, name: mine.name } : { kind: 'preset', id: preset?.id ?? 'classic', name: preset?.name };
 }
 
 /** How many actions the owner's assistant may add to one song's show (PLAN 44f). */
@@ -114,10 +127,7 @@ export function useSongScore({
     const shows = songShowsRef.current;
     const existing = showFor(shows, currentSong);
     if (existing) { setSongShows(shows.map(s => (s.id === existing.id ? { ...s, actions: [...s.actions, action] } : s))); return; }
-    const lookId = activePresetId ?? pinnedPresetId ?? 'classic';
-    const saved = userPresets.presets.find(u => u.id === lookId);
-    const preset = PRESETS.find(q => q.id === lookId) ?? PRESETS.find(q => q.id === 'classic');
-    const look = saved ? { kind: 'saved' as const, id: saved.id, name: saved.name } : { kind: 'preset' as const, id: preset?.id ?? 'classic', name: preset?.name };
+    const look = lookPlaying(activePresetId, pinnedPresetId, userPresets.presets);
     const id = newId('song');
     songRuntimeRef.current.keepLook(id);
     setSongShows([...shows, { id, song: currentSong, look, actions: [action] }]);

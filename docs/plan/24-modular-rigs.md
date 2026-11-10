@@ -74,7 +74,7 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
   and scale (`melodyPlace`), sizing the drop by velocity through `layMelodyDrop`, pouring
   held notes with attack and release envelopes (`voicePour`), capping held voices per
   channel (default 4, oldest released), and exposing `notes` (`velocity`, `pitch`, `held`)
-  as a patch-bay source; `npm run soundowed`, owed judging §112.) Story in
+  as a patch-bay source; `npm run soundowed`, owed judging §120.) Story in
   `docs/plan-shipped.md` §24.
   ~~*The melody walks across the plate (24.3-place, direction B of the owner's 2026-10-24
   exploration; after 25h).*~~ (shipped: each note the microphone hears lets go of one drop,

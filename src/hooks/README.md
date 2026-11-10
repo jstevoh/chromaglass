@@ -6,7 +6,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 - `useAudioAnalyzer.ts`: `useAudioAnalyzer`, `AudioData`, `Ear`: the show's ear.
 - `useMidi.ts` (37 KB, grep it): `useMidi`, `MidiHost` (`playSetItem`), `MidiDevice`, controller maps, clock and timecode.
-- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms).
+- `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms). `listenNow()` asks the song ID to try at once, and `state.heardMap` keeps the map a first listen made after its song ends (Listen, PLAN 28h-8).
 - `useShowSequencer.ts`: transport over a `ShowSequence`'s stages.
 - `useProjector.ts`: `useProjector`, `pickProjector`, `ProjectorMode`.
 
@@ -29,7 +29,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useMidiTouch.ts`: flash on a controller touch.
 - `usePreviewFrame.ts`: where the plate is painted.
 - `useRecorder.ts`: record the canvas.
-- `useRemoteLink.ts`: laptop side of the phone remote.
+- `useRemoteLink.ts`: laptop side of the phone remote; also a network display's, and a TV's at home (role `tv`, PLAN 12-tv).
 - `useSceneCamera.ts`: the room camera.
 - `useSongChange.ts`: a new song, on a beat.
 - `useSongRender.ts`: render a song.
@@ -39,4 +39,4 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 ## Checks
 
-`npm run lint` always. Sound (`useAudioAnalyzer`): `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. `useCastSession`, `useProjector`: `desktop`. `useRemoteLink`: `applink`, `remotemix`, `phonelink`. `useDeviceTilt`: `phone`, `layout`. `useDeskLayout`: `panel`, `desk`.
+`npm run lint` always. Sound (`useAudioAnalyzer`): `shelf`, `music`, `ears`, `renders`, `kicks`, `clicks`. `useCastSession`, `useProjector`: `desktop`. `useRemoteLink`: `applink`, `remotemix`, `phonelink`, `tv`. `useDeviceTilt`: `phone`, `layout`. `useDeskLayout`: `panel`, `desk`.

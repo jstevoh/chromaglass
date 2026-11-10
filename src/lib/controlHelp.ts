@@ -77,6 +77,7 @@ export const CONTROL_HELP: Record<string, string> = {
   lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
   secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
+  heat: 'The projector lamp\'s heat in the dish: hold a finger on the glass to block the fan\'s air and boil the spot.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
   lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
   transmission: 'How light passes through the dye: thin pale, thick deep. Zero is a flat glow.',
@@ -208,6 +209,9 @@ export const CONTROL_HELP: Record<string, string> = {
   // Logo
   markMix: 'How opaque the logo or title is over the finished frame. Zero takes it off.',
   markScale: 'How wide the logo is, as a share of the frame.',
+  inkTitleSize: 'How big the title is, from a small credit to the width of the plate. A long title shrinks to fit.',
+  inkTitleY: 'Where the title lands, from the bottom of the plate to the top.',
+  inkTitleSweep: 'How hard the wash takes the title away: low and it drifts, readable, for many seconds; high and it is gone in two.',
   markX: 'Where the logo\'s centre sits across the frame.',
   markY: 'Where the logo\'s centre sits up the frame.',
 
