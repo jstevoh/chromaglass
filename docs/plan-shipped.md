@@ -12316,8 +12316,9 @@ Controls).
 
 **Measured** (`npm run logomelt`, SwiftShader, 2026-11-10, thin gap under the lively flow
 inktitle's thin arms use): the logo reads 0.959 at 0.5 s, 0.920 at 1 s, 0.835 at 2 s and
-0.787 at 3 s, 0.331 at 4 s, and is gone (0.3 or worse) at 4.5 s; 95% of its dye (559 of
-591) is still on the plate at 12 s; the species' share under it after the pour is 0.70
+0.787 at 3 s, 0.331 at 4 s, and is gone (0.3 or worse) at 4.5 s; 96% of its dye (569 of
+591) is still on the plate at 7 s (95% at 12 s on a longer arm; the check runs 7 s, since
+CI's lab4 was cancelled at its 25-minute bound six minutes into a 12 s one, and sits in lab5); the species' share under it after the pour is 0.70
 (the pad). 8/8. A first width of four fifths of the plate put the C and the last s past
 the frame's edges in the lab's render (the frame is the square inside the dish's circle),
 so it is three fifths.

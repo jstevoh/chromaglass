@@ -21,9 +21,9 @@
  *   holds   still readable at 2 s (0.7 or better) under the look's flow,
  *           since a logo smeared before anyone sees it is no logo: this is
  *           what the thick ink's pad is for;
- *   melts   gone into the plate (0.3 or worse) by 12 s, the few seconds
+ *   melts   gone into the plate (0.3 or worse) by 7 s, the few seconds
  *           before a show starts;
- *   kept    90% or more of the dye added is still on the plate at 12 s, so
+ *   kept    90% or more of the dye added is still on the plate at 7 s, so
  *           it left by flowing and mixing, not by being taken away (a fade
  *           would read as gone with its dye gone with it);
  *   padded  the logo lies on a pad of thick liquid (the species field's share
@@ -36,7 +36,9 @@
  * Show's phase and the recorder, the desk's switch and the phone's, and no
  * shader under src/gpu/wgsl/ that names the logo: rendering never draws it).
  *
- * About 12 s of plate at 60 steps a second: a few minutes on SwiftShader.
+ * About 7 s of plate at 60 steps a second: three minutes on SwiftShader's
+ * fast tier. Not 12 as first written: on CI's slow tier lab4 was cancelled at
+ * its 25-minute bound six minutes into a 12 s arm (#780's first run).
  */
 import { build } from 'esbuild';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -196,7 +198,7 @@ const READ = 0.8, HOLD = 0.7, GONE = 0.3, KEPT = 0.9, PAD = 0.3;
         if (s % 30 === 0) reads.push({ t: s * SEC, r: await read() });
       }
       return { cpu, poured: !!run.logo && run.logo.pending === null, thinBefore, thinAfter: lab.thinLive(), before, cover: cover * (L / N) ** 2, reads, after: await total(), padShare };
-    }, { svg, seconds: 12, lively: 10, thickness: DEFAULT_SETTINGS.gapThickness ?? 0.45 });
+    }, { svg, seconds: 7, lively: 10, thickness: DEFAULT_SETTINGS.gapThickness ?? 0.45 });
 
     const at = (t) => r.reads.find((x) => Math.abs(x.t - t) < 1e-6)?.r ?? NaN;
     const goneBy = r.reads.find((x) => x.r <= GONE)?.t ?? null;
@@ -206,10 +208,10 @@ const READ = 0.8, HOLD = 0.7, GONE = 0.3, KEPT = 0.9, PAD = 0.3;
     check(`the logo lands readable in the dye (${READ} or better at 0.5 s), poured by the solver's pourInk`, at(0.5) >= READ && !r.cpu && r.poured,
       `${f3(at(0.5))}${r.cpu ? '; it went through the CPU\'s arrays' : ''}${r.poured ? '' : '; it was never poured'}`);
     check(`under a lively look's flow it still reads at 2 s (${HOLD} or better)`, at(2) >= HOLD, `${f3(at(2))}; each second: ${trace}`);
-    check(`it melts into the plate by 12 s (${GONE} or worse)`, goneBy !== null, goneBy !== null ? `gone at ${goneBy.toFixed(1)} s` : `still ${f3(at(12))} at 12 s`);
+    check(`it melts into the plate by 7 s (${GONE} or worse)`, goneBy !== null, goneBy !== null ? `gone at ${goneBy.toFixed(1)} s` : `still ${f3(at(7))} at 7 s`);
     const rose = r.after - r.before, kept = rose / Math.max(1e-6, r.cover);
     check(`its dye stays on the plate: melted by the liquid, not faded (${Math.round(KEPT * 100)}% or more of what it poured)`, kept >= KEPT,
-      `${rose.toFixed(1)} on the plate at 12 s of ${r.cover.toFixed(1)} poured (${(kept * 100).toFixed(0)}%)`);
+      `${rose.toFixed(1)} on the plate at 7 s of ${r.cover.toFixed(1)} poured (${(kept * 100).toFixed(0)}%)`);
     check(`it lies on a pad of thick liquid (the species' share under it above ${PAD})`, (r.padShare ?? 0) > PAD, `${f3(r.padShare ?? NaN)}`);
   } finally {
     await close();
