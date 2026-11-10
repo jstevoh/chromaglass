@@ -1234,7 +1234,7 @@
     {
       "name": "GPU timings land on the pass that took them",
       "shard": "logic",
-      "run": "npm run timelabels -- --owed=labels",
+      "run": "npm run timelabels",
       "why": [
         "H2c-labels (scripts/timelabels.mjs): the real GpuProfiler on a stand-in GPU",
         "whose mappings land 0 to 3 frames late, and once with the ring full, a",
