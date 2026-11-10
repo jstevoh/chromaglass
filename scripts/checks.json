@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1111,6 +1111,21 @@
       ]
     },
     {
+      "name": "A song's credit in the corner, on the screen and in the stream",
+      "shard": "browser",
+      "run": "npm run caption",
+      "why": [
+        "PLAN 37x-10j: the owner found the poured-ink titles hard to read and asked for a",
+        "1980s music channel's corner caption. In Chromium: the card's lines (artist, the",
+        "song in quotes, album, label) and its fade; drawn on a dark plate, white only in",
+        "the bottom-left corner; on bright cream, a dark drop shadow round the letters (a",
+        "blurred shadow alone left none); streamed through the app's LiveEncoder and",
+        "decoded, the card in the landscape's and the portrait's own bottom-left only",
+        "while it is up; and the wiring (the screen's layer, song-title, the song show's",
+        "and the ear's titles, the MCP, the assistant, the phone). About ten seconds."
+      ]
+    },
+    {
       "name": "The live stream",
       "shard": "lab",
       "run": "npm run live",
@@ -1419,7 +1434,7 @@
     },
     {
       "name": "A song's title painted as ink, then swept away",
-      "shard": "lab3",
+      "shard": "lab7",
       "run": "npm run inktitle",
       "timeout": 9,
       "why": [
@@ -1435,12 +1450,14 @@
         "title, the phone has the switch). --owed: each line is excused only in main's",
         "state and printed as owed until the PR that builds it takes its id out. On",
         "main it opens no browser; built, the lab steps 1,200 times, about six minutes",
-        "on SwiftShader, beside soapbreak in lab3."
+        "on SwiftShader, beside soapbreak in lab3. In lab7 since 19k-17: on the slow tier",
+        "lab3 reached it at 17:50 of its 25 (soap 8:14, soapbreak 4:35) and was cancelled",
+        "in it on two pull requests' runs and a re-run on 2026-11-10."
       ]
     },
     {
       "name": "A song's title stays readable on a busy look's thin gap, then is rinsed away",
-      "shard": "lab5",
+      "shard": "lab6",
       "run": "npm run inktitle -- --thin",
       "timeout": 16,
       "why": [
@@ -1454,12 +1471,15 @@
         "it at 0.7 at 6 s at 0.01; every arm keeps 90% of its dye; the pad is there. About",
         "21 s of plate, seven minutes on SwiftShader's fast runner tier and about fourteen on",
         "the slow one: in lab5, whose samelook says \"not asked\" off the speed hunt's PRs,",
-        "since lab4 with it was cancelled at the 25-minute limit on the slow tier (#778)."
+        "since lab4 with it was cancelled at the 25-minute limit on the slow tier (#778).",
+        "Then lab6, with logomelt: on a pull request the speed hunt's title asks samelook",
+        "for (H2c-labels, 2026-11-10), samelook ran 15:18 and this check was cancelled at",
+        "the limit seven minutes in, twice, on a tree it never touched (PLAN 19k-17)."
       ]
     },
     {
       "name": "The logo poured at a film's start melts into the plate",
-      "shard": "lab5",
+      "shard": "lab6",
       "run": "npm run logomelt",
       "timeout": 10,
       "why": [
@@ -1472,7 +1492,7 @@
         "key, the cue's edges, and the wiring (no shader names the logo). About 7 s of",
         "plate, three minutes on SwiftShader's fast tier. In lab5 (11 minutes when samelook",
         "is not asked): lab4 was cancelled at its 25-minute bound six minutes into this",
-        "check's first, 12 s arm (#780)."
+        "check's first, 12 s arm (#780). In lab6 with the thin-gap title since 19k-17."
       ]
     },
     {

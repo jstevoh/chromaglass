@@ -50,8 +50,8 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   // flatten the scenes the sequence is playing.
   'pacing', 'songFollow',
   'markMix', 'markX', 'markY', 'markScale',
-  // The song's title as ink (PLAN 37x-10): the show's, like the logo; no look sets it.
-  'inkTitle', 'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
+  // The song's title, as ink (PLAN 37x-10) or the corner caption (37x-10j): the show's, like the logo; no look sets it.
+  'inkTitle', 'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep', 'titleCaption',
   // The logo melted at the start of a film (PLAN 37x-11): the show's too.
   'logoMelt',
   'filmMix', 'filmKey',

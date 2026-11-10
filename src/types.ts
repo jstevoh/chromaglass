@@ -329,6 +329,17 @@ export interface VisualizerSettings {
   inkTitleSize: number;
   inkTitleY: number;
   inkTitleSweep: number;
+  /**
+    How a song's title goes up (PLAN 37x-10j, app/songTitle.ts): true, the
+    default, is the corner caption of a 1980s music channel (artist, the
+    song in quotes, album, label; lib/songCaption.ts), on the screen and
+    burned into the live stream; false pours it as ink, as 37x-10 did. It
+    chooses for the ear's titles (`inkTitle`) and a song show's Pour the title.
+    The default is the caption on the owner's word (2026-11-10, "simple ui
+    overlay"), not today's ink: a saved show with titles on now captions
+    them. Titles themselves stay off by default, so no plate changes.
+  */
+  titleCaption: boolean;
   /*
     The logo melted at the start of a film or a stream (PLAN 37x-11,
     lib/logoMelt.ts): when the Live Show goes on air or the Record button
@@ -1005,6 +1016,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleSize: 0.5,
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
+  titleCaption: true,
   logoMelt: false,
   beatPrediction: 0.7,
   beatLead: 80,

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — song titles as a 1980s corner caption (PLAN 37x-10j)
+
+- Song titles now go up by default as a corner caption, the card a music channel put over a
+  video in the early 1980s: the artist, the song in quotes, the album and the label, white in
+  the bottom-left corner for seven seconds. It shows on the screen and is burned into the live
+  stream, portrait encode included. **Settings → Logo & Titles → As a corner caption** (the
+  phone's **Caption / Ink**) switches back to poured ink. A new `song-title` message (the
+  assistant's `song_title` tool) puts a credit up for a set the ear cannot name.
+
 ### Added — song titles painted as ink, then swept away (PLAN 37x-10)
 
 - **Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone): when a new
