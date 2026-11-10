@@ -4022,7 +4022,8 @@ have a part of their own, `lab6`, and samelook has `lab5` to itself again. The
 same day `lab3` hit the limit on the slow tier on both PRs' runs and on a re-run:
 `soap` (8:14) and `soapbreak` (4:35) brought it to `inktitle` at 17:50, and
 `inktitle` takes seven to ten minutes there. So `inktitle` moved to `lab7`, which
-leaves lab3 at about 17 minutes. No check, bar or bound changed. `lab2` is still
+leaves lab3 at about 17 minutes. Its own bound then stopped it at 9:00 on the slow
+tier (H2c-labels' next run), so the bound is 14 minutes, as the thin arms' is 16. No check, bar or bound changed. `lab2` is still
 close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
 first run, green on its re-run), so the next check for it goes to a new part.
 
