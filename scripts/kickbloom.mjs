@@ -26,12 +26,20 @@
  *     colour is the chemistry's. The cords were made so in 25i; the loop's
  *     own hands were not, and every kick threw 5 to 11 droplets of the area's
  *     dye on the gel, which stands still and kept them, so they piled into
- *     the clusters the owner saw on the live stream (2026-11-10). Two
- *     halves: (a) `musicDyeIn` is 0 for every reagent area a look ships and
- *     1 for every other; (b) in the loop, every pour of an area's colour
- *     (each variable read off `areaCycle` or `areaColor`, and the bloom's
- *     call) carries `musicDyeIn` of that same area, so a pour added later
- *     without it, or with another area's, is red here.
+ *     the clusters the owner saw on the live stream (2026-11-10). Three
+ *     parts: (a) `musicDyeIn` is 0 for every reagent area a look ships,
+ *     the five the report names among them, and 1 for every other; (b) the
+ *     pour honours it: `autoInject` with no colour lays none in any of the
+ *     five styles Inject Style can pick (only the drop did, so a spray or a
+ *     pour of reagent was still coloured); (c) in the loop, every area colour
+ *     (`areaCycle`, `areaColor`) is read into a const, every use of that
+ *     const is inside a pour (`autoInject`, `addDensity`, `throwKickBloom`),
+ *     and each pour carries `musicDyeIn` of the same area in the argument
+ *     that lays the colour (autoInject's `dye`, the factor on addDensity's
+ *     amount, the bloom's dye gain). The check's own controls, each red: the
+ *     old autoInject; the gate moved to the energy argument; an ungated pour
+ *     of a colour read without a ternary; a colour destructured; an ungated
+ *     pour of the bloom's colour beside the bloom; the gate of another area.
  */
 import { readFileSync } from 'node:fs';
 import { throwKickBloom } from '../src/lib/kickBloom.ts';
@@ -93,53 +101,106 @@ function kick(seed, dyeGain, pushGain, hit = 0.8) {
     gapRatio += big / (2 * Math.PI / n); kicks++;
   }
   gapRatio /= kicks;
-  check('the droplets are clumps at random angles, not evenly round one circle (largest gap over 2x an even ring\'s)',
-    gapRatio > 2 && bloomSrc.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(bloomSrc),
+  check('the droplets are clumps at random angles, not evenly round one circle (largest gap over 2.3x an even ring\'s)',
+    gapRatio > 2.3 && bloomSrc.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(bloomSrc),
     `largest gap ${gapRatio.toFixed(2)}x an even ring's, over ${kicks} kicks`);
-  check('5 to 11 droplets a kick', fewest >= 5 && most <= 11, `${fewest} to ${most}`);
+  check('5 to 11 droplets a kick, both ends reached', fewest === 5 && most === 11, `${fewest} to ${most}`);
 }
 
 // ── 3. A touch on a reagent lays no dye ──
 {
+  // (a) Which areas: every reagent area 0, every other 1, and the ones the owner's report names among the 0s.
   const wrong = [];
-  let reagents = 0, others = 0;
+  const zero = new Set();
+  let others = 0;
   for (const [id, areas] of Object.entries(PRESET_AREAS)) {
     areas.forEach((a, i) => {
       const want = reagentArea(a) ? 0 : 1;
-      if (want === 0) reagents++; else others++;
+      if (want === 0) zero.add(`${id}:${i}`); else others++;
       if (musicDyeIn(a) !== want) wrong.push(`${id} area ${i} (${a.liquid}) ${musicDyeIn(a)}`);
     });
   }
-  const clock = PRESET_AREAS['chemical-clock'] ?? [];
-  check('the music lays no dye in a reagent area and all of it in any other',
-    wrong.length === 0 && musicDyeIn(null) === 1 && reagents >= 5 && others > reagents
-      && clock.length === 3 && clock.every(a => musicDyeIn(a) === 0),
-    wrong.length ? wrong.join('; ') : `${reagents} reagent areas (Chemical Clock's 3 among them), ${others} others`);
+  const named = ['chemical-clock:0', 'chemical-clock:1', 'chemical-clock:2', 'red-cabbage:0', 'red-cabbage:1'];
+  const missing = named.filter(k => !zero.has(k));
+  check('the music lays no dye in a reagent area (Chemical Clock\'s three places, Red Cabbage\'s two wells) and all of it in any other',
+    wrong.length === 0 && missing.length === 0 && musicDyeIn(null) === 1 && others > zero.size,
+    wrong.length || missing.length ? [...wrong, ...missing.map(k => `${k} not a reagent`)].join('; ') : `${zero.size} reagent areas, ${others} others`);
 
-  // Every variable the loop reads an area's colour into, with the area it read and the line it is read on.
-  const lineOf = (i) => vis.slice(0, i).split('\n').length - 1;
-  const colourVars = [...vis.matchAll(/const (\w+) = (\w+) \? (?:areaCycle\([^,]+, (\w+)|areaColor\([^,]+, (\w+))/g)]
-    .map(m => ({ v: m[1], area: m[3] ?? m[4], from: lineOf(m.index) }));
-  const pourIntoArea = vis.match(/const color = areaColor\(layer, area\);\n\s*(.+)\n/);
+  // (b) The share of colour is honoured by the pour itself, in every style it can take (Inject Style picks it).
+  // The CPU plate, on node: the GPU's usage flags are named at its import, so give it their values first.
+  globalThis.GPUTextureUsage ??= { COPY_SRC: 1, COPY_DST: 2, TEXTURE_BINDING: 4, STORAGE_BINDING: 8, RENDER_ATTACHMENT: 16 };
+  globalThis.GPUBufferUsage ??= { MAP_READ: 1, MAP_WRITE: 2, COPY_SRC: 4, COPY_DST: 8, INDEX: 16, VERTEX: 32, UNIFORM: 64, STORAGE: 128, INDIRECT: 256, QUERY_RESOLVE: 512 };
+  globalThis.GPUMapMode ??= { READ: 1, WRITE: 2 };
+  globalThis.GPUShaderStage ??= { VERTEX: 1, FRAGMENT: 2, COMPUTE: 4 };
+  const { FluidSimulation } = await import('../src/sim/fluidSimulation.ts');
+  const laid = {};
+  for (const style of ['drop', 'spray', 'splatter', 'pour', 'streak']) {
+    const sim = new FluidSimulation(128, 0, 0, 0.1);
+    let sum = 0, full = 0;
+    const add = sim.addDensity.bind(sim);
+    sim.addDensity = (x, y, a, ...rest) => { sum += a; return add(x, y, a, ...rest); };
+    sim.autoInject(style, 64, 64, 5, 1, 0.5, 0.2, 0.6, false, 1); full = sum; sum = 0;
+    sim.autoInject(style, 64, 64, 5, 1, 0.5, 0.2, 0.6, false, 0);
+    laid[style] = [full, sum];
+  }
+  check('a pour with no colour in it lays no dye in any style (drop, spray, splatter, pour, streak)',
+    Object.values(laid).every(([f, z]) => f > 0 && z === 0),
+    Object.entries(laid).map(([k, [f, z]]) => `${k} ${f.toFixed(1)} -> ${z.toFixed(1)}`).join(', '));
+
+  // (c) In the loop: every area colour read, every use of it, and the gate in the argument that lays it.
   const misses = [];
-  let pours = 0;
-  const lines = vis.split('\n');
-  for (const { v, area, from } of colourVars) {
-    // Its uses in the block that read it (the next 50 lines): a `color` elsewhere is another pour's.
-    for (let i = from + 1; i < from + 50; i++) {
-      if (!lines[i].includes(`${v}.r`)) continue;
-      // The call, with the line or two it opens on when its colour is wrapped onto a line of its own.
-      const call = lines.slice(i - 2, i + 1).join(' ');
-      pours++;
-      if (!call.includes(`musicDyeIn(${area})`)) misses.push(`${v}: ${lines[i].trim().slice(0, 90)}`);
+  const closeOf = (i) => { let depth = 0; for (let j = i; j < vis.length; j++) { if (vis[j] === '(') depth++; else if (vis[j] === ')' && --depth === 0) return j; } return -1; };
+  const argsOf = (open, close) => {
+    const out = []; let depth = 0, from = open + 1;
+    for (let j = open + 1; j < close; j++) {
+      const c = vis[j];
+      if (c === '(' || c === '[' || c === '{') depth++; else if (c === ')' || c === ']' || c === '}') depth--;
+      else if (c === ',' && depth === 0) { out.push(vis.slice(from, j).trim()); from = j + 1; }
+    }
+    out.push(vis.slice(from, close).trim());
+    return out;
+  };
+  // The calls that lay colour, and which argument carries the share for each.
+  const LAYERS = { autoInject: (g) => g[9] ?? '', addDensity: (g) => g[2] ?? '', throwKickBloom: (g) => g[8] ?? '' };
+  const callAround = (at) => {
+    let best = null;
+    for (const name of Object.keys(LAYERS)) {
+      for (let k = vis.lastIndexOf(`${name}(`, at); k >= 0 && at - k < 600; k = vis.lastIndexOf(`${name}(`, k - 1)) {
+        const open = k + name.length, close = closeOf(open);
+        if (close > at && (!best || k > best.k)) { best = { k, name, open, close }; break; }
+      }
+    }
+    return best;
+  };
+  const uses = [...vis.matchAll(/area(Cycle|Color)\(/g)].filter(m => !/const area(Cycle|Color) = \($/.test(vis.slice(m.index - 6, m.index + 11)) && !vis.slice(m.index - 6, m.index).endsWith('const '));
+  const calls = new Map();
+  let reads = 0;
+  for (const m of uses) {
+    const lineStart = vis.lastIndexOf('\n', m.index) + 1;
+    const line = vis.slice(lineStart, vis.indexOf('\n', m.index));
+    const d = line.match(/const (\w+) = (?:\w+ \? )?area(?:Cycle|Color)\([^,]+, (\w+)/);
+    if (!d) { misses.push(`an area colour not read into a const: ${line.trim().slice(0, 80)}`); continue; }
+    reads++;
+    const [, v, area] = d;
+    const declEnd = lineStart + line.length;
+    const redecl = vis.indexOf(`const ${v} = `, declEnd);
+    const end = Math.min(redecl < 0 ? vis.length : redecl, vis.split('\n').slice(0, vis.slice(0, declEnd).split('\n').length + 60).join('\n').length);
+    const re = new RegExp(`\\b${v}\\b`, 'g');
+    re.lastIndex = declEnd;
+    for (let u = re.exec(vis); u && u.index < end; u = re.exec(vis)) {
+      const call = callAround(u.index);
+      if (!call) { misses.push(`${v} used outside a pour: ${vis.slice(u.index - 30, u.index + 30).replace(/\s+/g, ' ')}`); continue; }
+      calls.set(call.k, { ...call, v, area });
     }
   }
-  if (!pourIntoArea || !pourIntoArea[1].includes('musicDyeIn(area)')) misses.push(`pourIntoArea: ${pourIntoArea?.[1]?.trim().slice(0, 90)}`);
-  const bloomCall = vis.match(/throwKickBloom\(activeFluid[^;]*\);/)?.[0] ?? '';
-  if (!/ringCol, [^;]*musicDyeIn\(bassArea\), bloomGain\)/.test(bloomCall)) misses.push(`bloom: ${bloomCall.slice(0, 120)}`);
-  check('every pour of an area\'s colour in the frame loop carries musicDyeIn of that area',
-    colourVars.length >= 6 && pours >= 6 && misses.length === 0,
-    misses.length ? misses.join(' | ') : `${colourVars.length} colours, ${pours + 2} pours`);
+  for (const { name, open, close, v, area } of calls.values()) {
+    const share = LAYERS[name](argsOf(open, close));
+    const ok = name === 'autoInject' ? share === `musicDyeIn(${area})` : new RegExp(`\\* musicDyeIn\\(${area}\\)$`).test(share);
+    if (!ok) misses.push(`${name} of ${v}: the share is '${share.slice(0, 60)}'`);
+  }
+  check('every pour of an area\'s colour in the frame loop carries musicDyeIn of that area, in the argument that lays the colour',
+    reads >= 7 && calls.size >= 8 && misses.length === 0,
+    misses.length ? misses.join(' | ') : `${reads} colours read, ${calls.size} pours`);
 }
 
 const failed = checks.filter(c => !c.ok);
