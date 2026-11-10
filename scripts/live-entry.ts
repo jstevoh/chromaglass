@@ -5,7 +5,8 @@
 // a landscape encode to two destinations and a portrait one to a third
 // (37x-4c).
 import './lab-entry.ts';
-import { LiveEncoder, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
+import { liveVideoConfig, liveVideoBitrate } from '../src/lib/liveRate.ts';
+import { LiveEncoder, chooseAcceleration, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
 
 
 type LabApi = {
@@ -376,4 +377,92 @@ async function codecDelay(codec: string, sampleRate: number, channels: number): 
   return best > 0.5 ? bestLag : null;
 }
 
-(window as unknown as { liveLab: typeof api }).liveLab = api;
+/**
+ * The rate the live encoder makes (37x-4h): `seconds` of a moving picture
+ * at a size and frame rate, through the stream's own configuration
+ * (liveVideoConfig) at the stream's own rate for that size unless one is
+ * given, and the bytes that come out. Not the lab's plate: on software WebGPU
+ * it redraws a few times in ten seconds, a near-still picture that any CBR
+ * encoder that does not pad leaves far under its rate (64 kb/s of 1500 asked,
+ * measured on the first try), and the line would have measured the plate,
+ * not the encoder. The show's picture changes everywhere a little every
+ * frame, with detail at every scale; so does this one: three planes of
+ * low-passed noise at three scales, each sliding its own way, two of them
+ * cross-faded on a slow sine, so no one motion vector predicts a block and
+ * every macroblock has something to say, but nothing like white noise, which
+ * no encoder can hold at any sane rate. The timestamps are the stream's
+ * (i / fps), so rate control sees the frame rate it was told, however fast
+ * the frames are fed. The acceleration hint is the one the stream itself
+ * takes (`chooseAcceleration`, which picks the software encoder where the
+ * default cannot hold the rate, as on GitHub's Mac VM), so the line measures
+ * the encoder the stream would use; and a probe that has not finished in
+ * a minute stops and says so, so a slow runner fails this line by name and
+ * not the shard by its clock. `constant` is what the browser says it will
+ * run (isConfigSupported echoes the mode back): an encoder in VBR can land
+ * on the average rate too, so the average alone does not say CBR.
+ */
+async function rateProbe(width: number, height: number, fps: number, seconds: number, bitrate?: number): Promise<{ asked: number; madeKbps: number; frames: number; bytes: number; keyframes: number; firstSecondKbps: number; restKbps: number; acceleration: string; mode: string | null; ms: number; error: string | null }> {
+  const asked = bitrate ?? liveVideoBitrate(width, height, fps);
+  const t0 = performance.now();
+  const { acceleration } = await chooseAcceleration(width, height, fps);
+  const cfg = liveVideoConfig(width, height, fps, asked, acceleration);
+  const support = await VideoEncoder.isConfigSupported(cfg).catch(() => null);
+  const out = { asked, madeKbps: 0, frames: 0, bytes: 0, keyframes: 0, firstSecondKbps: 0, restKbps: 0, acceleration: String(acceleration), mode: (support?.config?.bitrateMode as string | undefined) ?? null, ms: 0, error: null as string | null };
+  // Three planes of low-passed noise, each drawn once at full size with a
+  // margin to slide in: the frames are sums of them at moving offsets.
+  const M = 256, pw = width + M, ph = height + M;
+  const plane = (seed: number, cell: number) => {
+    const gw = Math.ceil(pw / cell) + 2, g = new Float32Array(gw * (Math.ceil(ph / cell) + 2));
+    let x = seed >>> 0;
+    for (let i = 0; i < g.length; i++) { x = (x * 1664525 + 1013904223) >>> 0; g[i] = x / 4294967296; }
+    const out = new Uint8Array(pw * ph);
+    for (let y = 0; y < ph; y++) for (let xx = 0; xx < pw; xx++) {
+      const u = xx / cell, v = y / cell, i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j, k = j * gw + i;
+      out[y * pw + xx] = 255 * ((g[k] * (1 - fu) + g[k + 1] * fu) * (1 - fv) + (g[k + gw] * (1 - fu) + g[k + gw + 1] * fu) * fv);
+    }
+    return out;
+  };
+  const [pa, pb, pc] = [plane(7, 9), plane(11, 31), plane(13, 5)];
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const n = Math.round(seconds * fps);
+  const sizes: { ts: number; bytes: number }[] = [];
+  const enc = new VideoEncoder({
+    output: (c) => { sizes.push({ ts: c.timestamp, bytes: c.byteLength }); if (c.type === 'key') out.keyframes++; },
+    error: (e) => { out.error = String(e?.message ?? e); },
+  });
+  try {
+    enc.configure(cfg);
+    for (let i = 0; i < n && !out.error; i++) {
+      // Each plane slides its own way and the first two cross-fade, so no one
+      // motion vector predicts a block: every pixel changes a little, as dye does.
+      const t = i / fps, w = Math.round(128 + 127 * Math.sin(t * 1.7));
+      const oa = (Math.floor(t * 37) % M) * pw + (Math.floor(t * 53) % M);
+      const ob = (Math.floor(t * 23) % M) * pw + (M - 1 - (Math.floor(t * 41) % M));
+      const oc = (M - 1 - (Math.floor(t * 29) % M)) * pw + (Math.floor(t * 17) % M);
+      for (let y = 0, p = 0; y < height; y++) {
+        const row = y * pw;
+        for (let x = 0; x < width; x++, p += 4) {
+          const m = (pa[oa + row + x] * (255 - w) + pb[ob + row + x] * w) >> 8, c = pc[oc + row + x];
+          rgba[p] = m; rgba[p + 1] = (m * 7 + c) >> 3; rgba[p + 2] = 255 - ((m * 4) / 5); rgba[p + 3] = 255;
+        }
+      }
+      const frame = new VideoFrame(rgba, { format: 'RGBA', codedWidth: width, codedHeight: height, timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      // A keyframe every two seconds, as LiveEncoder asks for one.
+      enc.encode(frame, { keyFrame: i % Math.round(2 * fps) === 0 });
+      frame.close();
+      while (enc.encodeQueueSize > 4) await new Promise((r) => setTimeout(r, 1));
+      if (performance.now() - t0 > 60_000) { out.error = `not done in a minute: ${i + 1} of ${n} frames under ${acceleration}`; break; }
+    }
+    await enc.flush();
+  } catch (e) { out.error ??= String((e as Error)?.message ?? e); }
+  if (enc.state !== 'closed') enc.close();
+  out.ms = Math.round(performance.now() - t0);
+  out.frames = sizes.length;
+  out.bytes = sizes.reduce((k, s) => k + s.bytes, 0);
+  out.madeKbps = out.bytes * 8 / seconds / 1000;
+  const first = sizes.filter((s) => s.ts < 1e6).reduce((k, s) => k + s.bytes, 0);
+  out.firstSecondKbps = first * 8 / 1000;
+  out.restKbps = seconds > 1 ? (out.bytes - first) * 8 / (seconds - 1) / 1000 : 0;
+  return out;
+}
+(window as unknown as { liveLab: typeof api & { rateProbe: typeof rateProbe } }).liveLab = { ...api, rateProbe };
