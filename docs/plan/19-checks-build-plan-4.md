@@ -22,9 +22,30 @@ closed unmerged by an idle-draft sweep and rebuilt on 2026-11-07's `main`.
   and merge timestamps on each Antigravity PR: green → review, review → fix, fix →
   merge. The daily scorecard reads open → merge today; split, it would show which hop to
   fix next.
-- **19al-6. Open: the first live label.** `ready.yml` was proven against a stubbed `gh`;
-  the first Antigravity PR to go green after the merge is its first real run. Confirm
-  the label and the `READY` line appear, and that a push takes the label off.
+- **19al-6. Shipped:** the first live labels. `ready.yml` labelled five Antigravity PRs
+  on their own green heads on 2026-11-09 between 05:35Z and 09:16Z, each with its
+  `READY #N <item> head <sha>` line (docs/plan-shipped.md, 19al).
+- **19al-7. Open: nothing merges a ready PR by itself.** Found 2026-11-10: those five
+  sat labelled and green for a day, unmerged. Three causes, all in the hop after the
+  label. (1) `ready.yml` only labels and comments, by design: the merge was the
+  reviewing Claude session's, on its own `PASS` (19al-2). The owner's speed rule of
+  2026-11-08 dropped that review for Antigravity's PRs (all but payments, sign-in,
+  security and the licence Worker) but nothing took its place as the step that merges.
+  (2) Nothing wakes a Claude session on the label: no session subscribes to
+  Antigravity's PRs (19al-4 is still open), and the start-of-session queue check in
+  `CLAUDE.md` runs only when some session happens to start for something else.
+  (3) Antigravity does not merge PRs marked `review-owed`, every one of these still
+  said `Review owed: before-merge` from its prompt, and Antigravity was out of credit
+  from 06:29Z that day anyway. The obvious fix, enabling auto-merge when the label goes
+  on, would have shipped a false claim: one of the five (3.1, P7-cpu) was green
+  because it changed only `PLAN.md`, marking the CPU stepping deleted with the code
+  untouched and its own body saying "in progress". So the fix is: `ready.yml` labels
+  `ready-to-merge` (and turns on squash auto-merge, pinned to the head) only when the
+  handoff block says `Left: none`, `Done:` is not "in progress", the PR touches more
+  than the plan when its plan diff marks an item shipped, and no file is under the
+  payments, sign-in or Worker paths; anything else keeps `ready-for-review` for a
+  Claude session. Check: a stubbed-`gh` harness over the five PRs of 2026-11-09 (four
+  merge, P7-cpu stays) in `scripts/checks.json`.
 
 ## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
 

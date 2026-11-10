@@ -4008,6 +4008,24 @@ error object (`{"message":"rate limited"}`) gave an empty answer, which reads as
 it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
+**19k-17 shipped** 2026-11-10.
+**`lab5` past its 25 minutes on every speed-hunt PR.**
+`samelook` was given `lab5` as a part of its own because it runs about eleven
+minutes (15:18 on the slow tier) when a PR's title or label asks for it and prints
+"not asked" otherwise. #778 moved `inktitle -- --thin` there and #780 moved
+`logomelt`, both relying on samelook being not asked (seven to fourteen minutes and
+three more). On 2026-11-10 H2c-labels (its title matches the hunt's `H2c-`) came
+back from merging main with `lab5` cancelled at the limit, inside `inktitle --thin`,
+on its first run and again on the re-run. Neither tree touches the title, so the
+same would happen to every 46x, H2c- or 14aa/14ab PR. Those two checks now
+have a part of their own, `lab6`, and samelook has `lab5` to itself again. The
+same day `lab3` hit the limit on the slow tier on both PRs' runs and on a re-run:
+`soap` (8:14) and `soapbreak` (4:35) brought it to `inktitle` at 17:50, and
+`inktitle` takes seven to ten minutes there. So `inktitle` moved to `lab7`, which
+leaves lab3 at about 17 minutes. No check, bar or bound changed. `lab2` is still
+close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
+first run, green on its re-run), so the next check for it goes to a new part.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
@@ -4381,6 +4399,10 @@ of a third round, and one escape puts its class back on review before merge for 
 
 Measured: see #701, which quotes the stubbed-`gh`
 cases, `npm run actionlint` and `npm run reach`.
+
+**19al-6 shipped** 2026-11-10 (seen, no code): the first live run labelled five
+Antigravity PRs on 2026-11-09 between 05:35Z and 09:16Z, each with its `READY` line
+naming the head, and each head's checks were green when the label went on.
 
 ### 20b. A clear film that tears (the thin-film equation)
 
