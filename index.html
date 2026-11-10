@@ -21,10 +21,11 @@
       first frame, over the black the opening's compiles leave. Styled here,
       not in the app's CSS, because it has to paint before any of the app has
       arrived. The remote and a cast are not shows: no intro, decided before
-      the first paint so it never flashes there.
+      the first paint so it never flashes there. Nor is a TV at home (/tv,
+      PLAN 12-tv), which plays the show's picture and not the show.
     -->
     <script>
-      if (/[?&](remote|cast)(=|&|$)/.test(location.search)) document.documentElement.classList.add('cg-no-intro');
+      if (/[?&](remote|cast)(=|&|$)/.test(location.search) || /^\/tv\/?$/.test(location.pathname)) document.documentElement.classList.add('cg-no-intro');
     </script>
     <!--
       One address (PLAN.md 23.16). The owner asked, 2026-10-24, for
@@ -235,7 +236,7 @@
       milliseconds. CastDisplay.tsx says why; `npm run showcursor` holds it.
     -->
     <style>html.show-screen, html.show-screen * { cursor: none !important; }</style>
-    <script>if (/[?&]cast(=|&|$)/.test(location.search)) document.documentElement.classList.add('show-screen');</script>
+    <script>if (/[?&]cast(=|&|$)/.test(location.search) || /^\/tv\/?$/.test(location.pathname)) document.documentElement.classList.add('show-screen');</script>
   </head>
   <body>
     <div id="root"></div>

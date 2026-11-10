@@ -119,6 +119,8 @@ export const FRAME_MOTION: ReadonlySet<string> = new Set([
 const EVOLVE_OWN = new Set(['hueJourney', 'surge', 'tiltDirection', 'cometAngle']);
 const NOT_THE_LOOK = new Set([
   'markMix', 'markScale', 'markX', 'markY',
+  // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
+  'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
   'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
   // How far the music moves the frame (lib/plateRock.ts): a wander would
@@ -148,6 +150,8 @@ const NOT_THE_LOOK = new Set([
   // ones written for it. A wander would switch the notes on in a look that
   // has no line for them, and walk the two that do off their size.
   'melodyWalk',
+  // The projector lamp's heat (PLAN 36e-2): played by hand with a hold on the glass, not drifted by Evolve.
+  'heat',
   // Evolve moves the camera's aim itself, as a camera move (App.tsx).
   'macroAimX', 'macroAimY',
   /*

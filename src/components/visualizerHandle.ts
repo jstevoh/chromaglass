@@ -4,6 +4,7 @@
 import type { QualityGovernor } from '../lib/governor';
 import type { VisualizerSettings } from '../types';
 import type { PaceSample } from '../lib/scenePacing';
+import type { LogoArt } from '../lib/logoMelt';
 import type { SongEvent, SongShapeState } from '../lib/songShape';
 import type { BarNow } from '../lib/barGrid';
 import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
@@ -17,12 +18,16 @@ export interface LiquidVisualizerHandle {
   pourVideo: (video: HTMLVideoElement) => void;
   stopPourVideo: () => void;
   /**
-   * Pour words into the lead plate: each row drawn at the biggest size its
-   * share of the box allows, in `colour` (default: the look's brightest dye;
-   * 'contrast' picks an ink that reads against the plate as it is), level on
-   * the frame whatever angle the plate is turned to.
+   * Pour words into the lead plate as ink at the solver's grid, then sweep
+   * them away with the wash (PLAN 37x-10, lib/inkTitleRun.ts): each row's
+   * height by its weight, at the Title size and height, in `colour` ('' the
+   * look's first dye, a '#rrggbb', 'contrast' an ink that reads against the
+   * plate as it is; left out, the Title colour setting), level on the frame
+   * whatever angle the plate is turned to. With `logo`, a picture is poured
+   * instead of the rows and melted by the same thick ink and rinse (the logo
+   * at the start of a film or stream, PLAN 37x-11, lib/logoMelt.ts).
    */
-  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; columns?: [number, number] }) => void;
+  pourText: (rows: { text: string; weight?: number }[], opts?: { colour?: string | 'contrast'; logo?: LogoArt }) => void;
   /** Kicks heard (or predicted) since the plate started: a count to take differences of. */
   kicks: () => number;
   /**

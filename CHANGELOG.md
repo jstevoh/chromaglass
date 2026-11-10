@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — song titles painted as ink, then swept away (PLAN 37x-10)
+
+- **Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone): when a new
+  song is named, its title and artist are poured into the liquid as ink at the plate's full
+  resolution, then a wash (a drift and eddies, a real flow) breaks the letters up. Title ink,
+  Size, Height and Sweep set it. Song-show title cards and words poured from the phone, the
+  show server or the assistant go through the same ink and wash.
+
+### Added — Heat from the lamp, and boiling under a held hand (PLAN 36e-2)
+
+- **Heat** (`heat`, Settings → Lamp & Light, Perform desk, MIDI, the remote and the phone's Looks
+  sheet; 0 by default and held out of Evolve and Lucky): the projector lamp's thermal flux on the
+  dish in $\text{W/m}^2$ across its visible (dye-absorbed) and infrared (water-absorbed) bands,
+  with two-face radiation, sideways conduction, Kell water-density buoyancy without the old
+  `clamp(temp, 0, 50)` ceiling, thermal expansion and vapour volume sources in the thin gap's
+  projection, and cavity nucleation into vapour pockets shaded as air (`src/gpu/lampBoil.ts`,
+  `src/gpu/wgsl/lampBoil.ts`, `npm run boilgpu`). Holding a pointer or finger on the dish blocks
+  the cooling fan's air under the hand ($h = 50 \to 10\,\text{W/(m}^2\text{K)}$) so the spot boils
+  while held and condenses when released.
+
 ### Added — LFOs and envelopes you set (PLAN 30b)
 
 - In **Settings → Patches** (on the desk and the phone, and learnable over MIDI), each of the four LFOs (`lfo1`..`lfo4`) now sets its bar rate (`¼` to `16` bars), waveform shape (`sine`, `triangle`, `ramp`, `stepped`, or `smoothed random` gliding by cosine each period) and optional restart trigger (`free`, `kick`, `snare`, `note`, `pad`); each of the two envelopes (`env1`, `env2`) sets its attack (`1 ms`–`1 s`), decay (`20 ms`–`4 s`) and trigger source (`any`, `kick`, `snare`, `note`, `pad`). Today's fixed rates and shapes remain the defaults sample for sample (`npm run soundowed`, `npm run shapes`).

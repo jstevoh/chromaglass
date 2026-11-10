@@ -93,6 +93,16 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // The show starts its sound when it opens, not on the first click.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+/*
+  A TV at home plays the plate over WebRTC (PLAN 12-tv, src/lib/tvFeed.ts).
+  Chromium hides a page's network address behind a random mDNS name unless it
+  has the camera, and a TV finds that name only by multicast, which plenty of
+  home routers and mesh Wi-Fi drop: the TV then never connects, with nothing to
+  say why. The app is the show's own machine and its address is no secret on
+  its own network (the phone remote's address already prints it), so it offers
+  the real one. The TV's side is untouched; one real address is all ICE needs.
+*/
+app.commandLine.appendSwitch('disable-features', 'WebRtcHideLocalIpsWithMdns');
 // macOS ScreenCaptureKit system-audio loopback (PLAN.md §23.8): lets the app
 // hear whatever the Mac plays with no tab picker.
 if (process.platform === 'darwin') {
@@ -531,7 +541,7 @@ function showDetails() {
     `Show key: ${show.key}`,
     '',
     ...(hosts.length
-      ? hosts.flatMap((h) => [`Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`, `Network display: http://${h}:${show.port}/?cast=true&key=${show.key}`])
+      ? hosts.flatMap((h) => [`Phone remote: http://${h}:${show.port}/?remote=1&key=${show.key}`, `Network display: http://${h}:${show.port}/?cast=true&key=${show.key}`, `TV at home: http://${h}:${show.port}/tv?key=${show.key}`])
       : ['No network: the phone remote and network displays need the laptop on Wi-Fi or Ethernet.']),
     '',
     show.oscMode === 'off'

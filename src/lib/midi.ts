@@ -546,6 +546,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The ground the dye is seen on (PLAN 18b): a fader fades a look from dye
   // as light on black to the lamp shining through it.
   { key: 'lampGround',      label: 'Lamp Ground',      min: 0, max: 1 },
+  { key: 'heat',            label: 'Heat',             min: 0, max: 1 },
   { key: 'iridescence',     label: 'Iridescence',      min: 0, max: 1 },
   { key: 'camera',          label: 'Lens',             min: 0, max: 1 },
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
@@ -635,6 +636,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // and the bottom of the travel is a whisper of a glass.
   { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
   { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
+  // The song's title as ink (PLAN 37x-10): how fast the wash takes one, on a knob, ridden in a set;
+  // its size and where it lands. The switch is the desk's and the phone's (a boolean, not a fader).
+  { key: 'inkTitleSweep',   label: 'Title Sweep',      min: 0, max: 1 },
+  { key: 'inkTitleSize',    label: 'Title Size',       min: 0, max: 1 },
+  { key: 'inkTitleY',       label: 'Title Height',     min: 0, max: 1 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.

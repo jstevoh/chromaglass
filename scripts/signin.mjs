@@ -622,7 +622,18 @@ try {
       const packBad = pack.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
         || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
       const card = document.querySelector('[data-cg-landing-moire]');
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad, pack: pack.length, packBad, card: !!card };
+      // The YouTube channel link in the header (PLAN 34a-8): on the first
+      // screen at every size, not pushed off a phone's width by Sign in beside
+      // it, a thumb's height, and the channel's own handle in a new tab, so a
+      // visitor who goes to watch still has the page to come back to.
+      const yt = document.querySelector('[data-cg-landing-youtube]');
+      const y = yt?.getBoundingClientRect();
+      const ytBad = !yt ? 'missing'
+        : yt.getAttribute('href') !== 'https://www.youtube.com/@Chromaglassart' ? `href ${yt.getAttribute('href')}`
+        : yt.target !== '_blank' || !/noopener/.test(yt.rel) ? 'not a new tab'
+        : y.height < 44 ? `${Math.round(y.height)} px tall`
+        : y.left < -0.5 || y.right > W + 0.5 || y.bottom > innerHeight || y.top < 0 ? 'off the first screen' : '';
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad, pack: pack.length, packBad, card: !!card, ytBad };
     }) : null;
     let pics = -1;
     if (f?.card) {
@@ -633,11 +644,11 @@ try {
         return imgs.filter((i) => i.naturalWidth >= 960).length;
       });
     }
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0 && f.pack === 1 && f.packBad === 0 && pics === 4;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong; moiré card ${f.card ? `${f.pack} Buy, ${f.packBad} wrong, ${pics} pictures at 960 px` : 'missing'}` : 'landing page not drawn'}`);
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0 && f.pack === 1 && f.packBad === 0 && pics === 4 && !f.ytBad;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong; moiré card ${f.card ? `${f.pack} Buy, ${f.packBad} wrong, ${pics} pictures at 960 px` : 'missing'}; YouTube link ${f.ytBad || 'ok'}` : 'landing page not drawn'}`);
     await c.close();
   }
-  check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
+  check('11b. the landing page fits a laptop and a phone, upright and on its side, the YouTube link on its first screen', sizes.every((s) => s.landOk), landFit.join('; '));
 
   const sheet = {};
   const lit = {};

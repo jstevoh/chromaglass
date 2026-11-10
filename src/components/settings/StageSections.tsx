@@ -195,6 +195,53 @@ export const MarkSection = ({ c }: { c: SectionCtx }) => {
           want; the plate shows through wherever the file is transparent. It sits under nothing, including the house
           dimmer, so a blackout leaves the mark on the wall. Its own opacity is the control for taking it off.
         </Info>
+        {/*
+          The song's title painted as ink (PLAN 37x-10, lib/inkTitle.ts): the
+          other kind of title, and the opposite of the mark above. The mark
+          sits over the frame and stays; this is poured into the liquid when a
+          song starts and the wash carries it off. Here beside the logo
+          because both are what the wall says about the show, and in Play's
+          Live Show set by the phone's Title switch too.
+        */}
+        <div className="mt-5 flex flex-col gap-3 border-t border-white/[0.07] pt-4" data-testid="ink-title">
+          <Toggle label="Song titles as ink" on={!!settings.inkTitle} onChange={(v) => onUpdate({ inkTitle: v })} testId="ink-title-switch"
+            title="When a new song is named, its title and artist are poured onto the plate as ink, then washed away" />
+          <div className="flex items-center gap-2">
+            <span className="flex-1 text-[13px] font-medium text-text">Title ink</span>
+            <button
+              type="button"
+              onClick={() => onUpdate({ inkTitleColor: '' })}
+              aria-pressed={!settings.inkTitleColor}
+              className={`rounded-lg border px-3 py-1.5 text-[12px] font-medium ${!settings.inkTitleColor ? LIT : 'border-white/15 bg-white/5 hover:bg-white/10'}`}
+              data-testid="ink-title-palette"
+            >
+              The look&apos;s
+            </button>
+            <input
+              type="color"
+              value={settings.inkTitleColor || '#101014'}
+              onChange={(e) => onUpdate({ inkTitleColor: e.target.value })}
+              aria-label="Title ink colour"
+              className="h-8 w-10 cursor-pointer rounded border-none bg-transparent p-0"
+              data-testid="ink-title-colour"
+            />
+          </div>
+          <Slider label="Title Size" value={settings.inkTitleSize ?? 0.5} min={0} max={1} step={0.01}
+            onChange={(v: number) => onUpdate({ inkTitleSize: v })} settingKey="inkTitleSize" />
+          <Slider label="Title Height" value={settings.inkTitleY ?? 0.5} min={0} max={1} step={0.01}
+            onChange={(v: number) => onUpdate({ inkTitleY: v })} settingKey="inkTitleY" />
+          <Slider label="Title Sweep" value={settings.inkTitleSweep ?? 0.5} min={0} max={1} step={0.01}
+            onChange={(v: number) => onUpdate({ inkTitleSweep: v })} settingKey="inkTitleSweep" />
+          <Info>
+            Poured into the liquid as dye at the plate&apos;s full resolution, so it is on the wall, in the stream and in every
+            recording, and the wash that takes it away is a real flow: a drift across the plate and eddies that break the
+            letters up. Sweep is how hard: low and the title drifts, readable, for many seconds; high and it is gone in two.
+            The dye stays on the plate as colour.
+          </Info>
+          {/* The logo melted at the start of a film (PLAN 37x-11, lib/logoMelt.ts): the same ink and rinse as a title. */}
+          <Toggle label="Melt the logo at the start" on={!!settings.logoMelt} onChange={(v) => onUpdate({ logoMelt: v })} testId="logo-melt-switch"
+            title="When the Live Show goes on air or a recording starts, the ChromaGlass logo is poured big across the plate as ink, then melts into the show" />
+        </div>
       </section>
       )}
     </>

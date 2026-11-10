@@ -312,6 +312,18 @@ export async function startSavedLive(test: boolean): Promise<LiveState> {
   return startLive({ ...liveOptionsFor(to, loadFormat()), test });
 }
 
+/**
+ * The show's sound source changed (PLAN.md 37x-4f-2): the stream on air, if
+ * there is one, moves to it without stopping (`LiveEncoder.setAudio`). Called
+ * by useAudioAnalyzer whenever its stream changes, whoever changed the
+ * source: the desk, the phone remote, the assistant. Before 37x-4f-2 the
+ * encoder took the sound once at Go, so a song started after Go streamed as
+ * silence until the next start.
+ */
+export function setLiveAudio(stream: MediaStream | null): void {
+  current?.setAudio(stream);
+}
+
 export async function stopLive(): Promise<LiveState | null> {
   if (!current) return null;
   const s = await current.stop();

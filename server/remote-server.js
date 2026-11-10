@@ -152,6 +152,11 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json; charset=utf-8',
+  // The films a TV plays while the show is off (PLAN 12-tv) and the cartoons
+  // the Film source pours: a TV's WebView is stricter about a video sent as
+  // octet-stream than a desktop browser, which sniffs it.
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
 };
 
 if (!existsSync(DIST)) {
@@ -402,7 +407,27 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show']);
+
+// ── TVs at home (PLAN 12-tv) ───────────────────────────────────────────
+// A TV plays the display's plate as a WebRTC video (src/lib/tvFeed.ts); the
+// relay only carries the handshake. Each TV gets an id, so the display can
+// answer it alone, and is paired with one display: the laptop's page that was
+// here when it joined (or the next to arrive), so two of the laptop's tabs do
+// not both make it an offer. When that display goes, the TV moves to another
+// if there is one, and otherwise hears that the show is gone, and plays films.
+const tvIds = new WeakMap();
+const tvDisplay = new WeakMap();
+let tvSeq = 0;
+const sendTo = (client, message) => { if (client.readyState === 1) client.send(JSON.stringify(message)); };
+const clientsOf = (role, except) => [...wss.clients].filter(c => c !== except && c.readyState === 1 && roles.get(c) === role);
+/** Pair a TV with a display (the newest, which is the laptop's page as it is now), or tell it there is none. */
+const pairTv = (tv, except) => {
+  const display = clientsOf('display', except).at(-1) ?? null;
+  tvDisplay.set(tv, display);
+  sendTo(tv, { type: 'tv-show', here: display !== null });
+  if (display) sendTo(display, { type: 'tv-join', id: tvIds.get(tv) });
+};
 
 // ── The assistant (PLAN 44b) ───────────────────────────────────────────
 // The owner's own AI assistant, joined from this Mac (`mcp/chromaglass-mcp.js`).
@@ -458,7 +483,7 @@ wss.on('connection', (socket, req) => {
     if (message.type === 'hello') {
       // One hello a socket: a second would be a free guess past the lock.
       if (roles.get(socket) !== 'unknown') return;
-      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : message.role === 'assistant' ? 'assistant' : 'controller';
+      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : message.role === 'assistant' ? 'assistant' : message.role === 'tv' ? 'tv' : 'controller';
       // Only from this Mac, and only while the owner's switch is on. Not a
       // guess at the key, so it never counts towards a lockout.
       const notHere = role === 'assistant' && !laptop ? 'not-laptop' : role === 'assistant' && assistantMode() === 'off' ? 'off' : null;
@@ -506,6 +531,10 @@ wss.on('connection', (socket, req) => {
         broadcastTo('display', JSON.stringify({ type: 'request-cast' }));
         broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
       }
+      if (role === 'tv') {
+        tvIds.set(socket, `tv${++tvSeq}`);
+        pairTv(socket);
+      }
       if (role === 'assistant') {
         socket.send(JSON.stringify({ type: 'assistant-mode', mode: assistantMode() }));
         broadcastTo('display', JSON.stringify({ type: 'request-state' }));
@@ -520,6 +549,9 @@ wss.on('connection', (socket, req) => {
           // And OSC out's state, which offers its switch the same way.
           socket.send(oscOutMessage());
         }
+        // TVs waiting with no show (the laptop's page reloaded, or the app
+        // just opened) are this display's now.
+        for (const tv of clientsOf('tv')) if (!tvDisplay.get(tv) || tvDisplay.get(tv).readyState !== 1) pairTv(tv);
       }
       return;
     }
@@ -527,6 +559,22 @@ wss.on('connection', (socket, req) => {
     const from = roles.get(socket);
     // Nothing is relayed for a socket that never said hello with the key.
     if (from === 'unknown' || RELAY_ONLY.has(message.type)) return;
+    // A TV's handshake: display → the one TV it names, TV → its own display
+    // with its id added. A TV says nothing else: it only watches, and a
+    // patch from it must never reach the show as a phone's would.
+    if (message.type === 'tv-signal' && (from === 'display' || from === 'tv')) {
+      const signal = message.signal;
+      if (!signal || typeof signal !== 'object' || typeof signal.kind !== 'string') return;
+      if (from === 'display') {
+        const tv = clientsOf('tv').find(c => tvIds.get(c) === message.to && tvDisplay.get(c) === socket);
+        if (tv) sendTo(tv, { type: 'tv-signal', signal });
+      } else {
+        const display = tvDisplay.get(socket);
+        if (display) sendTo(display, { type: 'tv-signal', from: tvIds.get(socket), signal });
+      }
+      return;
+    }
+    if (from === 'tv') return;
     // The assistant's every message goes through the guard, and only what it
     // passes reaches the display. A picture request is looking, not touching,
     // so any mode on may ask.
@@ -621,6 +669,12 @@ wss.on('connection', (socket, req) => {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
     }
+    if (role === 'tv') {
+      const display = tvDisplay.get(socket);
+      if (display) sendTo(display, { type: 'tv-leave', id: tvIds.get(socket) });
+    }
+    // A display gone: its TVs move to another, or hear the show is off.
+    if (role === 'display') for (const tv of clientsOf('tv')) if (tvDisplay.get(tv) === socket) pairTv(tv, socket);
     // The last assistant gone: nothing it started keeps gliding.
     if (role === 'assistant' && ![...wss.clients].some(c => c !== socket && roles.get(c) === 'assistant')) guard.stop();
   });
@@ -890,6 +944,7 @@ server.listen(PORT, '0.0.0.0', () => {
     for (const host of hosts) {
       console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1&key=${SHOW_KEY}`);
       console.log(`  Network display:    http://${host}:${PORT}/?cast=true&key=${SHOW_KEY}`);
+      console.log(`  TV at home:         http://${host}:${PORT}/tv?key=${SHOW_KEY}`);
     }
   }
   console.log('\n  Same Wi-Fi: use the addresses above. Across buildings, other access points');

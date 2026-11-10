@@ -176,6 +176,8 @@ export class WebGPUFluid extends FluidCover {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
+      ['inkSpecies', [RGBA32], false],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       /*
@@ -307,6 +309,8 @@ export class WebGPUFluid extends FluidCover {
     // opening's first twenty seconds on the Mac: built behind, and `npm run
     // startup` gives each look's opening seconds as well as steps to say so.
     for (const name of ['splatDeltas', 'pourImage']) add(`${name}:${RGBA32}`, splatKernel(name, RGBA32), false);
+    // A song's title poured as ink (PLAN 37x-10), only for a show with titles on.
+    add(`pourInk:${RGBA32}`, splatKernel('pourInk', RGBA32), false);
     // The video pour's (PLAN 14ab-2), only for a show that pours a video.
     add('videoSample:rgba8unorm', splatKernel('videoSample', 'rgba8unorm'), false);
     add(`videoFlow:${RGBA32}`, splatKernel('videoFlow', RGBA32), false);
@@ -505,6 +509,7 @@ export class WebGPUFluid extends FluidCover {
       under a bubble that had already popped.
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.stepPlateBoil(enc, p);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     /*
       And on the step after the last bubble goes: its hole is a sink in the
@@ -1659,7 +1664,7 @@ export class WebGPUFluid extends FluidCover {
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], none);
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], this.boilLive ? this.arg('decay boil', [1, 0, 0, 0]) : none);
       this.vel.swap();
     });
 

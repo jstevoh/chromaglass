@@ -50,6 +50,10 @@ export const RIG_KEYS: ReadonlySet<keyof VisualizerSettings> = new Set<keyof Vis
   // flatten the scenes the sequence is playing.
   'pacing', 'songFollow',
   'markMix', 'markX', 'markY', 'markScale',
+  // The song's title as ink (PLAN 37x-10): the show's, like the logo; no look sets it.
+  'inkTitle', 'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
+  // The logo melted at the start of a film (PLAN 37x-11): the show's too.
+  'logoMelt',
   'filmMix', 'filmKey',
   // The mixer (lib/mixer.ts) is the operator's desk, like the logo and the
   // film's own mix: the order of the stack and each source's grade stay put
