@@ -294,10 +294,9 @@ export function createAssistantGuard(send, now = Date.now) {
       settings = { ...next };
       show = {
         activePresetId: state.activePresetId ?? null, cuedPresetId: state.cuedPresetId ?? null, blackout: state.blackout === true,
-        // The live stream (PLAN 44j): whether it is on air, and the names of
-        // the saved destinations, so a start to a name that is not one is
-        // refused here with the list, where the assistant hears why.
-        onAir: state.live != null,
+        // The names of the live stream's saved destinations (PLAN 44j), so a
+        // start to a name that is not one is refused here with the list,
+        // where the assistant hears why.
         destinations: Array.isArray(state.liveSetup?.destinations) ? state.liveSetup.destinations.map((d) => ({ name: String(d?.name ?? ''), test: d?.test === true })) : null,
       };
     },
@@ -407,13 +406,7 @@ export function createAssistantGuard(send, now = Date.now) {
           if (action === 'blackout-toggle') remember({ kind: 'action', action, after: !show.blackout });
           // The stream has its own message, which the relay takes from no one
           // but this guard: a phone may end a stream and never start one.
-          if (going) {
-            send({ type: 'assistant-live', test: action === 'live-test', ...(names ? { names } : {}) });
-            // On air from here, not from the display's next state, which comes
-            // only once the encoder has started: a sound change in between
-            // would end the new stream's track as surely as one a minute in.
-            show.onAir = true;
-          }
+          if (going) send({ type: 'assistant-live', test: action === 'live-test', ...(names ? { names } : {}) });
           else send({ type: 'action', action });
           return { ok: true };
         }
@@ -458,18 +451,19 @@ export function createAssistantGuard(send, now = Date.now) {
         is held, so nothing but rows and a colour goes on.
       */
       /*
-        The sound source (PLAN 44j): the room's, so Full only, and never on
-        air. The stream's sound is the source it started with (the encoder
-        takes the track once, lib/liveStream.ts); a source changed on air
-        ends that track, and since 37x-4f the stream carries silence from
-        there to the end. Refused here, where the assistant hears why, rather
-        than left for the audience to find.
+        The sound source (PLAN 44j): the room's, so Full only. On air too
+        (PLAN 44j-2, the owner 2026-11-10: "I shouldn't have to click the
+        system audio ever"). 44j refused it on air, because the encoder then
+        took the sound once at Go and a change left the stream silent; since
+        37x-4f-2 the stream moves to the new source without stopping
+        (lib/liveShow.ts `setLiveAudio`, called whenever the show's stream
+        changes, whoever changed it), so the refusal only stood between the
+        assistant and a stream it was asked to run.
       */
       if (type === 'assistant-sound') {
         const why = needs(mode, 'full') ?? paced('patch', mode, t);
         if (why) return refuse(why);
         if (!SOUND_SOURCES.has(message.source)) return refuse(`no such source: ${String(message.source)} (${[...SOUND_SOURCES].join(', ')})`);
-        if (show.onAir) return refuse('the stream is on air, and its sound is the source it started with: a change now would leave the stream silent. Stop the stream first, or set the source before going live');
         count('patch', mode, t);
         send({ type: 'assistant-sound', source: message.source });
         return { ok: true };

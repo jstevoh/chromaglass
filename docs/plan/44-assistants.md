@@ -182,14 +182,11 @@ through cords and preset patches, and the plate shader is untouched.
   the assistant asks `upload_status` after. MCP's progress notifications would let a
   client show a bar instead; Claude's apps did not all show them when checked. Pass: a
   `youtube` line where a client that sends a `progressToken` receives rising progress.
-- **44j.** The live stream and the sound from the assistant: the saved destinations read and picked by name (`go_live`), each destination's health on air, and the sound source read and set (`set_sound_source`, Full, refused on air): **shipped** (`npm run assistant`; story in `docs/plan-shipped.md` §44).
-- **44j-2. A sound source changed on air follows into the stream.** *(M, Claude: the
-  encoder.)* The stream takes the source's track once, at its start
-  (`lib/liveStream.ts`), so a change on air ends the stream's sound (silence since
-  37x-4f) and the guard refuses it. A performer at the desk can still do it by hand
-  and silence the stream. The real fix hands the encoder the new track on the same
-  clock, as the silence already joins from the last sample; then the guard's refusal
-  goes. Check: `npm run live` with a source switched on air, sound before and after.
+- **44j.** The live stream and the sound from the assistant: the saved destinations read and picked by name (`go_live`), each destination's health on air, and the sound source read and set (`set_sound_source`, Full; on air too since 44j-2): **shipped** (`npm run assistant`; story in `docs/plan-shipped.md` §44).
+- ~~**44j-2. A sound source changed on air follows into the stream.**~~ **Shipped**: the
+  encoder half in 37x-4f-2 (`npm run live`, "source opened on air"), the guard's refusal
+  lifted 2026-11-10 with 35c-7 (`npm run assistant` line `sound-air`), so the assistant
+  runs a stream with no click from the owner. Story in `docs/plan-shipped.md` §44.
 - **44j-3. The assistant's sound source on the Mac.** *(Owner's eyes, a minute.)*
   `system` asks macOS for screen-and-sound capture the first time; from the
   assistant there is no click to answer a prompt with. Try it once on the Mac before

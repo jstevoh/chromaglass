@@ -40,6 +40,23 @@ export const AUDIO_INPUT_KEY = 'chromaglass-audio-input';
 export const AUDIO_SOURCE_KEY = 'chromaglass-audio-source';
 
 /**
+ * The Mac app's kept System audio (PLAN 14y-2), in `localStorage`, so it
+ * outlives the app: '1' while System audio is the source, gone otherwise.
+ *
+ * 14y opens every launch on Off, because a Mic or a Band that came back by
+ * itself was a device opened, or a band playing, that nobody asked for. The
+ * owner, 2026-11-10, after the Mac app came back from an update on Off in
+ * the middle of a stream rehearsal: "I shouldn't have to click the system
+ * audio ever." System audio in the Mac app asks for nothing at open (macOS
+ * asks once, the first time, and remembers), plays nothing and is what a
+ * live stream is run with, so it alone is kept across launches, and only in
+ * the Mac app: in a browser it is a tab picker, which may never open itself.
+ * Its own key, not AUDIO_SOURCE_KEY's: a pick an older version left in
+ * `localStorage` under that one must still not come back (`npm run opensource`).
+ */
+export const MAC_SYSTEM_AUDIO_KEY = 'chromaglass-mac-system-audio';
+
+/**
  * The room camera lives outside the settings: a preset carries how hard the
  * room drives the plate, never whether a camera is switched on or which one.
  * Loading someone else's look should not open your camera.

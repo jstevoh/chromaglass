@@ -22,6 +22,9 @@
  *     reload of the tab, which a gig can do without losing its input
  *   - an old pick left in `localStorage` by a version that kept it there is not
  *     brought back, and a new tab (a relaunched app) opens on Off again
+ *   - except the Mac app's System audio (PLAN 14y-2, 2026-11-10), which a
+ *     relaunch keeps; a Band picked after it is not, and a browser never
+ *     brings it back
  *
  * Before 14y the first of the click checks read a level a few seconds after the
  * click and the stored-pick check found the Band already playing.
@@ -77,10 +80,11 @@ const shown = async (screen, page) => {
     return lit;
   }
   await page.getByTestId('dot-sound').click();
-  // Settings' Sound section says what is listening (the choosing is in the Sound sheet: PLAN 35c-3).
-  const state = page.getByTestId('audio-source-state');
-  await state.waitFor({ state: 'visible' });
-  return ({ none: 'off', microphone: 'mic', system: 'system', simulated: 'band' })[await state.getAttribute('data-source')] ?? 'nothing selected';
+  // Settings' Sound section, whose top is the sources (PLAN 35c-7): the one tile that reads as chosen.
+  await page.getByTestId('sound-source-none').first().waitFor({ state: 'visible' });
+  const lit = await page.locator('[data-testid^="sound-source-"][aria-pressed="true"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')));
+  if (lit.length !== 1) return `${lit.length} tiles lit`;
+  return ({ none: 'off', microphone: 'mic', system: 'system', simulated: 'band', file: 'file', drone: 'drone' })[lit[0].replace('sound-source-', '')] ?? 'nothing selected';
 };
 
 /** Close what `shown` opened, so the plate is clickable again. */
@@ -97,8 +101,7 @@ const pickBand = async (screen, page) => {
     await page.getByTestId('phone-sound-band').first().tap();
   } else {
     await page.getByTestId('dot-sound').click();
-    await page.getByTestId('audio-source-open').click();
-    await page.getByTestId('sound-source-simulated').click();
+    await page.getByTestId('sound-source-simulated').first().click();
   }
   await page.waitForTimeout(300);
 };
@@ -167,6 +170,40 @@ try {
     const old = await open('classic', () => { try { localStorage.setItem('chromaglass-audio-source', 'simulated'); } catch { /* private window */ } });
     const fresh = await shown(screen, old);
     check(`${screen.name}: a new tab opens on Off, an old stored pick not brought back`, fresh === 'off', `reads ${fresh}`);
+    await old.close();
+
+    /*
+      The Mac app's System audio (PLAN 14y-2, the owner 2026-11-10: "I
+      shouldn't have to click the system audio ever"): kept across a relaunch
+      or an update, where every other source still opens on Off. The Mac app
+      is this page with its bridge (desktop/preload.cjs), so the bridge is
+      stood in for: what `isDesktopApp` and the System audio source read.
+      A new tab in the same browser is a relaunched app: `localStorage` kept,
+      the session gone. The tap's own sound is `npm run desktop`'s.
+    */
+    if (!screen.touch) {
+      const mac = () => { window.__CHROMAGLASS_NATIVE__ = { shell: 'desktop', platform: 'darwin', onSystemAudioPcm: () => () => {} }; };
+      const m1 = await open('classic', mac);
+      await m1.getByTestId('dot-sound').click();
+      await m1.getByTestId('sound-source-system').first().click();
+      await m1.waitForTimeout(500);
+      const keptKey = await m1.evaluate(() => localStorage.getItem('chromaglass-mac-system-audio'));
+      await m1.close();
+      const m2 = await open('classic', mac);
+      const back = await shown(screen, m2);
+      check('laptop, in the Mac app: System audio comes back in a relaunched app', back === 'system' && keptKey === '1', `reads ${back}, kept ${keptKey}`);
+      await away(screen, m2);
+      await pickBand(screen, m2);
+      await m2.close();
+      const m3 = await open('classic', mac);
+      const band = await shown(screen, m3);
+      check('laptop, in the Mac app: a Band picked after it is not kept, so the relaunch opens on Off', band === 'off', `reads ${band}`);
+      await m3.close();
+      const web = await open('classic', () => { try { localStorage.setItem('chromaglass-mac-system-audio', '1'); } catch { /* private window */ } });
+      const inBrowser = await shown(screen, web);
+      check('laptop, in a browser: the Mac app\'s kept System audio never comes back (it would be a tab picker)', inBrowser === 'off', `reads ${inBrowser}`);
+      await web.close();
+    }
     await context.close();
   }
 } catch (err) {

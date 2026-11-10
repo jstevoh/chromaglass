@@ -499,7 +499,8 @@ async function scenario(serverDir, port, { full = true } = {}) {
     t = Date.now();
     const sndAir = await mcp.call('set_sound_source', { source: 'microphone' });
     await sleep(150);
-    check('sound-air', 'the sound source is refused while the stream is on air, and nothing reaches the display', !sndAir.ok && /on air/.test(sndAir.text) && display.since(t, 'assistant-sound').length === 0, sndAir.text.slice(0, 120));
+    // On air too since 44j-2 (the owner 2026-11-10): the stream follows a source change (37x-4f-2, lib/liveShow.ts setLiveAudio).
+    check('sound-air', 'on air, a sound source still reaches the display, so the assistant runs a stream with no click (the stream follows it)', sndAir.ok && display.since(t, 'assistant-sound').some((m) => m.source === 'microphone'), sndAir.text.slice(0, 120));
     await sleep(300);
     await mcp.call('show_action', { action: 'live-stop' });
     await sleep(400);
@@ -525,9 +526,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await sleep(300);
     t = Date.now();
     const goNamed = await mcp.call('go_live', { destinations: ['twitch '] });
-    const sndRace = await mcp.call('set_sound_source', { source: 'microphone' });
     await sleep(300);
-    check('sound-race', 'a sound change sent before the display reports the new stream on air is refused too', !sndRace.ok && /on air/.test(sndRace.text) && display.since(t, 'assistant-sound').length === 0, sndRace.text.slice(0, 120));
     const lvNamed = display.since(t, 'assistant-live');
     check('live-names', 'go_live with names reaches the display with just those names, and not as a test', goNamed.ok && lvNamed.length === 1 && lvNamed[0].test === false && JSON.stringify(lvNamed[0].names) === '["twitch"]', `${goNamed.text} | ${JSON.stringify(lvNamed)}`.slice(0, 160));
     await sleep(300);
@@ -584,11 +583,10 @@ const MUTANTS = [
   { rule: 'pour-blank', file: 'assistant.js', find: "if (rows.length === 0) return refuse('pour text needs rows with words in them');", replace: '' },
   { rule: 'phone-pour', file: 'remote-server.js', find: "const ASSISTANT_ONLY = new Set(['cue-look',", replace: "const ASSISTANT_ONLY = new Set(['pour-text', 'cue-look'," },
   { rule: 'song-kick', file: 'assistant.js', find: "if (mode !== 'full' && when.at === 'kick'", replace: "if (false && when.at === 'kick'" },
-  { rule: 'sound-air', file: 'assistant.js', find: 'if (show.onAir) return refuse(', replace: 'if (false) return refuse(' },
+  { rule: 'sound-air', file: 'assistant.js', find: "count('patch', mode, t);\n        send({ type: 'assistant-sound'", replace: "if (show.destinations) return refuse('the stream is on air');\n        count('patch', mode, t);\n        send({ type: 'assistant-sound'" },
   { rule: 'sound-source', file: 'assistant.js', find: 'if (!SOUND_SOURCES.has(message.source)) return refuse(', replace: 'if (false) return refuse(' },
   { rule: 'live-unknown', file: 'assistant.js', find: 'if (unknown.length) return `no saved', replace: 'if (false) return `no saved' },
   { rule: 'live-none', file: 'assistant.js', find: '!Array.isArray(raw) || raw.length === 0 ||', replace: '!Array.isArray(raw) ||' },
-  { rule: 'sound-race', file: 'assistant.js', find: 'show.onAir = true;', replace: '' },
   { rule: 'live-names', file: 'assistant.js', find: '...(names ? { names } : {})', replace: '' },
   { rule: 'phone-live', file: 'remote-server.js', find: "'assistant-live', 'assistant-sound',", replace: "'assistant-live'," },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },

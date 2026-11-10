@@ -331,6 +331,7 @@ export function setLiveAudio(stream: MediaStream | null): void {
   current?.setAudio(stream);
 }
 
+/**
  * Which saved destinations a start streams to (PLAN 44j). Without names:
  * what the panel's Go (on, not for tests) or Test (for tests) would take,
  * with a kept key. With names, from the owner's assistant ("go live to

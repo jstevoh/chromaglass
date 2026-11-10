@@ -7356,6 +7356,34 @@ scrollbar hidden. The Macro panel had given its zoom to the Rides and sat off th
   Drain. `npm run layout`: every ride shows whole, Macro Zoom among them, at 1440×900 (3 of 8
   before) and 1512×860 (2 of 8 before).
 
+
+### 35c-7. One page for sound (shipped 2026-11-10)
+
+The owner: "I also don't understand why there are two sound settings pages - can we put
+these all together and simplify things?" There were two. The Sound sheet (drawn on Setup
+as the Music & Drone panel) held where the sound comes from, the shelf, the player, the
+drone and Ambient TV mode; Settings → Sound held how hard the sound drives the plate,
+the device, the calibration, the beat, the tempo and the songs. Setup put both side by
+side, and each sent you to the other for half a job: the sheet's Mic said which device
+and sent you to Settings to change it, Settings said which source and sent you to the
+sheet to change it (35c-3 and 35c-5 made each one home, which left the halves apart).
+
+Now the sheet is the top of Settings → Sound (`SoundPanel` drawn by `SoundSection`
+through `soundSources`), read from the top: the sources, the Input picker under the Mic
+while it is the source, the shelf, the player and the drone, then "How it drives the
+plate" (Sound Drive, Sound Impact, Sensitivity, Bass Boost), then the room, the beat,
+the tempo and the songs. The sheet, its `showSound` state and the `player` panel are
+gone; `player` is in `MERGED_SECTIONS`, so a saved layout with Music & Drone opens Sound
+in its place, once. Setup ships with Sound alone in that column, 340 wide (the player's
+width). Every door that opened the sheet (the Mic dot, the palette) opens the section.
+The phone had one Sound sheet already; its desk tabs draw the merged section.
+
+Checks changed with it, each asking the new shape: `panel` (the section draws the
+sources at its top; no state row or link), `panelOneHome` (one Input select, drawn
+under the Mic; no sheet, panel or link), `desklayout` (Setup with Sound once; a saved
+Music & Drone becomes Sound), `layout` (34 panels, was 35), `shelf` (the shelf in the
+Sound panel), `opensource`, `qa` and `kickbubbles` (the source read and picked in the
+section).
 ### 35d. Colour and keys (shipped 2026-10-25)
 
 The owner, drawn to teenage engineering's hardware, chose all three of twelve playful twists in order; this
@@ -8029,6 +8057,22 @@ Mic or Band pick came back on every launch from `localStorage`.
   the Sound panel and on the phone. `?kiosk=1`, a box with nobody to click, still starts
   the band on its own. The phone is the same App state, so it opens on Off too.
 
+
+#### 14y-2. The Mac app keeps System audio (shipped 2026-11-10)
+
+The owner, after the Mac app came back from an update on Off in the middle of a stream
+rehearsal: "I shouldn't have to click the system audio ever." The cause was 14y itself:
+the source is kept in `sessionStorage`, which a relaunched Electron app does not have, on
+purpose, so that a Mic or a Band never comes back on its own. System audio in the Mac
+app is different on each count 14y was about: it opens no device the room can hear, it
+plays nothing, and macOS asks for it once and then remembers. So it alone is kept, in
+`localStorage` under its own key (`MAC_SYSTEM_AUDIO_KEY`, `src/app/shared.ts`), and
+only in the Mac app: in a browser it is a tab picker, which must never open itself.
+Picking any other source removes it. `npm run opensource`, three new lines with the
+Mac app's bridge stood in: System audio comes back in a new tab (a relaunched app), a
+Band picked after it does not, and a browser never brings the kept key back. With the
+restore taken out the first is red (`reads off, kept 1`). The owner was asked whether
+every source should be kept in the Mac app instead.
 #### 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 
 The owner: "things are a little jittery sometimes"; make sure the GPU is used across
@@ -12517,6 +12561,19 @@ sends, not from the display's next word a second later. Check: `npm run assistan
 source, unknown name, no names, names dropped, a phone's sound), and the guard's,
 the tool's and the page's source lists compared.
 
+
+### 44j-2. On air too (2026-11-10)
+
+The owner, in a stream rehearsal: "I shouldn't have to click the system audio ever. You
+should be able to do it." The rehearsal found the Mac app back on Off after an update and
+nothing the assistant could reach to set it. `set_sound_source` was built (44j) but
+refused on air, since then the encoder took the sound once at Go and a change left the
+stream silent. 37x-4f-2 made the stream follow a change of source (`setLiveAudio`), so
+the refusal only stood between the assistant and the stream it was asked to run: it
+went, with the guard's on-air bookkeeping that existed only for it (the "sound-race"
+line and mutant with it). `npm run assistant`: the `sound-air` line now asks that a
+source set on air reaches the display, and its mutant puts a refusal back. The tool's
+text says macOS asks once for Screen & System Audio Recording the first time (44j-3).
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,

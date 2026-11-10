@@ -52,16 +52,6 @@ export function useSoundState() {
   const playTrackRef = useRef<(t: Track) => void>(() => {});
   const [musicLoop, setMusicLoop] = useState(true);
   const [libraryOpen, setLibraryOpen] = useState(false);
-  /*
-    Sound is a tab, because the strip it used to live in could not be found.
-
-    The audio sources were gated on `showControls && !showSettings && !deskUp`:
-    they hid when Settings opened, and hid again whenever either desk was up,
-    which is where the work happens. A shelf of music shipped into that strip
-    and the owner reported not being able to see any of it, which is the right
-    outcome for a control nobody can reach.
-  */
-  const [showSound, setShowSound] = useState(false);
   const droneRef = useRef<Drone | null>(null);
   const [droneParams, setDroneParams] = useState<DroneParams>(DRONE_DEFAULTS);
   /** Whether the plate's instrument is sounding: it can be stopped without choosing another source. */
@@ -86,7 +76,7 @@ export function useSoundState() {
   return {
     audioSource, setAudioSource, audioSourceRef, audioInputId, setAudioInputId, audioInputs,
     refreshAudioInputs, musicFile, setMusicFile, playTrackRef, musicLoop, setMusicLoop, libraryOpen,
-    setLibraryOpen, showSound, setShowSound, droneRef, droneParams, setDroneParams, droneRunning,
+    setLibraryOpen, droneRef, droneParams, setDroneParams, droneRunning,
     setDroneRunning, stopDrone, musicPlaying, setMusicPlaying, musicTime, setMusicTime, musicElRef,
     musicInputRef, musicCtxRef,
   };
