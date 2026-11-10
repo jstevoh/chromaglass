@@ -5,6 +5,7 @@ import type { Track } from '../lib/musicLibrary';
 import { isDesktopApp } from '../lib/platform';
 import { startSystemTap, type SystemTap } from '../lib/systemTap';
 import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY } from './shared';
+import { publishSound, setSoundDoor } from './soundNow';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
 function rememberedSource(): AudioSource {
@@ -246,6 +247,15 @@ export function useSoundSource({
   }, [audioStream, refreshAudioInputs]);
   const handleSourceChangeRef = useRef(handleSourceChange);
   handleSourceChangeRef.current = handleSourceChange;
+  // What the show hears, for the remote link to report, and the door the
+  // owner's assistant changes it through (app/soundNow.ts, PLAN 44j): the
+  // same door the Sound panel's buttons use, so nothing about a change made
+  // from there differs from one made by hand.
+  useEffect(() => { publishSound({ source: audioSource, file: audioSource === 'file' ? musicFile?.name ?? null : null }); }, [audioSource, musicFile?.name]);
+  useEffect(() => {
+    setSoundDoor((s) => { void handleSourceChangeRef.current(s); });
+    return () => setSoundDoor(null);
+  }, []);
   /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
   const toggleDrone = useCallback(() => {
     if (droneRef.current) {

@@ -121,10 +121,22 @@ async function startShow(serverDir, port, dir) {
 function standInDisplay(port, displayKey) {
   const settings = { ...SETTINGS };
   const look = { on: 'calm', cued: null };
+  /* The Live Show as the app's display reports it (PLAN 44j): the panel's
+     saved destinations by name (an address and a key never leave the page,
+     so none is here to leak), what the show hears, and the stream once a
+     start reaches it, with each destination's health. */
+  const stream = {
+    live: null, sound: { source: 'none', file: null },
+    setup: { destinations: [
+      { name: 'YouTube', service: 'youtube', orientation: 'landscape', on: true, test: false, keyKept: true, urlValid: true },
+      { name: 'Twitch', service: 'twitch', orientation: 'landscape', on: false, test: false, keyKept: true, urlValid: true },
+      { name: 'Test server', service: 'other', orientation: 'landscape', on: true, test: true, keyKept: true, urlValid: true },
+    ], format: { height: 1080, fps: 30 }, last: null },
+  };
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -140,6 +152,18 @@ function standInDisplay(port, displayKey) {
     if (m.type === 'cue') { look.cued = m.presetId; sendState(); }
     if (m.type === 'cue-look') { look.cued = m.base ?? look.on; sendState(); }
     if (m.type === 'action' && m.action === 'go' && look.cued) { look.on = look.cued; look.cued = null; sendState(); }
+    if (m.type === 'assistant-live') {
+      const names = m.names ?? stream.setup.destinations.filter((d) => d.on && d.test === m.test).map((d) => d.name);
+      // On air a second later, as the app's display reports it only once
+      // the keys are read and the encoder has started, so a guard that
+      // waited for the display's word would be caught in that second.
+      setTimeout(() => {
+        stream.live = { test: m.test, seconds: 0, names, trouble: false, skipped: 0, destinations: names.map((name) => ({ name, phase: 'live', kbps: 6200, secondsBehind: 0.1, dropping: false, reconnects: 0, error: null })) };
+        sendState();
+      }, 1000);
+    }
+    if (m.type === 'action' && m.action === 'live-stop') { stream.live = null; sendState(); }
+    if (m.type === 'assistant-sound') { stream.sound = { source: m.source, file: null }; sendState(); }
     if (m.type === 'pad-picture') ws.send(JSON.stringify({ type: 'picture', src: PICTURE, w: 1, h: 1, aspect: 1, seq: 1 }));
     // A still, as the app's PadPictureSender answers one: as wide as asked
     // (its own cap is PAD_STILL_MAX_WIDTH, checked on the page's code below),
@@ -227,7 +251,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -335,8 +359,9 @@ async function scenario(serverDir, port, { full = true } = {}) {
     phone.ws.send(JSON.stringify({ type: 'cue-look', name: 'x', base: null, settings: {} }));
     phone.ws.send(JSON.stringify({ type: 'song-action', when: { at: 'start' }, what: { do: 'clear' } }));
     phone.ws.send(JSON.stringify({ type: 'assistant-still', width: 1280 }));
+    phone.ws.send(JSON.stringify({ type: 'assistant-sound', source: 'microphone' }));
     await sleep(200);
-    check('phone-live', 'a phone\'s assistant-live, cue-look, song-action and still never reach the display', display.since(t).every((m) => !['assistant-live', 'cue-look', 'song-action', 'assistant-still'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
+    check('phone-live', 'a phone\'s assistant-live, cue-look, song-action, still and sound source never reach the display', display.since(t).every((m) => !['assistant-live', 'cue-look', 'song-action', 'assistant-still', 'assistant-sound'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
     // But a phone pours words: the remote's text box (37x-10c) is a hand at the plate.
     t = Date.now();
     phone.ws.send(JSON.stringify({ type: 'pour-text', rows: [{ text: 'SONG', weight: 1.25 }], colour: 'contrast' }));
@@ -412,6 +437,12 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const bo = await mcp.call('show_action', { action: 'blackout-toggle' });
     await sleep(150);
     check('fullonly', 'Full\'s actions are refused in Play', !bo.ok && display.since(t, 'action').length === 0, bo.text.slice(0, 100));
+    await sleep(300);
+    t = Date.now();
+    const sndPlay = await mcp.call('set_sound_source', { source: 'microphone' });
+    const goPlay = await mcp.call('go_live', { destinations: ['YouTube'] });
+    await sleep(150);
+    check('fullonly', 'the sound source and go_live are refused in Play, for want of Full', !sndPlay.ok && !goPlay.ok && /Full mode is needed/.test(sndPlay.text) && /Full mode is needed/.test(goPlay.text) && display.since(t).every((m) => !['assistant-sound', 'assistant-live'].includes(m.type)), `${sndPlay.text} | ${goPlay.text}`.slice(0, 140));
 
     // Ten deep.
     await sleep(1100);
@@ -455,6 +486,52 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await sleep(200);
     const hFull = await mcp.call('set', { settings: { stockWeave: 0.1 } });
     check('hand', 'in Full the hand still wins', !hFull.ok && /hand wins/.test(hFull.text), hFull.text.slice(0, 100));
+
+    // The Live Show and the sound (PLAN 44j). On air now, from live-start above.
+    await sleep(1100);
+    const lvSt = await mcp.call('show_state');
+    let lvSj = null;
+    try { lvSj = JSON.parse(lvSt.text.slice(lvSt.text.indexOf('{'))); } catch { /* the line below says so */ }
+    check('-', 'show_state reads the saved destinations, what the show hears, and each destination\'s health on air',
+      lvSj?.liveSetup?.destinations?.map((d) => d.name).join(',') === 'YouTube,Twitch,Test server' && lvSj.liveSetup.destinations[0].keyKept === true
+      && lvSj?.sound?.source === 'none' && lvSj?.live?.destinations?.[0]?.kbps === 6200 && lvSj.live.destinations[0].name === 'YouTube',
+      lvSt.text.slice(0, 200).replace(/\s+/g, ' '));
+    t = Date.now();
+    const sndAir = await mcp.call('set_sound_source', { source: 'microphone' });
+    await sleep(150);
+    check('sound-air', 'the sound source is refused while the stream is on air, and nothing reaches the display', !sndAir.ok && /on air/.test(sndAir.text) && display.since(t, 'assistant-sound').length === 0, sndAir.text.slice(0, 120));
+    await sleep(300);
+    await mcp.call('show_action', { action: 'live-stop' });
+    await sleep(400);
+    t = Date.now();
+    const sndBad = await mcp.call('set_sound_source', { source: 'file' });
+    await sleep(300);
+    const snd = await mcp.call('set_sound_source', { source: 'system' });
+    await sleep(300);
+    const lvSt2 = await mcp.call('show_state');
+    check('sound-source', 'a source the assistant may not pick is refused, and nothing reaches the display', !sndBad.ok && /no such source/.test(sndBad.text) && !display.since(t, 'assistant-sound').some((m) => m.source === 'file'), sndBad.text.slice(0, 120));
+    check('-', 'off air, a sound source reaches the display as its own message and show_state reads it back', snd.ok && display.since(t, 'assistant-sound').some((m) => m.source === 'system') && /"source": "system"/.test(lvSt2.text), `${snd.text} | ${lvSt2.text.match(/"sound"[^}]*}/)?.[0] ?? 'no sound'}`.slice(0, 160));
+    await sleep(300);
+    t = Date.now();
+    const goNowhere = await mcp.call('go_live', { destinations: ['Nowhere'] });
+    await sleep(300);
+    const goTestByName = await mcp.call('go_live', { destinations: ['YouTube'], test: true });
+    await sleep(300);
+    const goNone = await mcp.call('go_live', { destinations: [] });
+    await sleep(150);
+    check('live-unknown', 'go_live to a name that is not a saved destination of that kind is refused with the saved list, and nothing reaches the display',
+      !goNowhere.ok && /YouTube, Twitch\)/.test(goNowhere.text) && !goTestByName.ok && /Test server\)/.test(goTestByName.text) && display.since(t, 'assistant-live').length === 0, `${goNowhere.text} | ${goTestByName.text}`.slice(0, 200));
+    check('live-none', 'go_live naming no destinations at all is refused, never read as the panel\'s choice', !goNone.ok && /destinations/.test(goNone.text) && display.since(t, 'assistant-live').length === 0, goNone.text.slice(0, 120));
+    await sleep(300);
+    t = Date.now();
+    const goNamed = await mcp.call('go_live', { destinations: ['twitch '] });
+    const sndRace = await mcp.call('set_sound_source', { source: 'microphone' });
+    await sleep(300);
+    check('sound-race', 'a sound change sent before the display reports the new stream on air is refused too', !sndRace.ok && /on air/.test(sndRace.text) && display.since(t, 'assistant-sound').length === 0, sndRace.text.slice(0, 120));
+    const lvNamed = display.since(t, 'assistant-live');
+    check('live-names', 'go_live with names reaches the display with just those names, and not as a test', goNamed.ok && lvNamed.length === 1 && lvNamed[0].test === false && JSON.stringify(lvNamed[0].names) === '["twitch"]', `${goNamed.text} | ${JSON.stringify(lvNamed)}`.slice(0, 160));
+    await sleep(300);
+    await mcp.call('show_action', { action: 'live-stop' });
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -507,6 +584,13 @@ const MUTANTS = [
   { rule: 'pour-blank', file: 'assistant.js', find: "if (rows.length === 0) return refuse('pour text needs rows with words in them');", replace: '' },
   { rule: 'phone-pour', file: 'remote-server.js', find: "const ASSISTANT_ONLY = new Set(['cue-look',", replace: "const ASSISTANT_ONLY = new Set(['pour-text', 'cue-look'," },
   { rule: 'song-kick', file: 'assistant.js', find: "if (mode !== 'full' && when.at === 'kick'", replace: "if (false && when.at === 'kick'" },
+  { rule: 'sound-air', file: 'assistant.js', find: 'if (show.onAir) return refuse(', replace: 'if (false) return refuse(' },
+  { rule: 'sound-source', file: 'assistant.js', find: 'if (!SOUND_SOURCES.has(message.source)) return refuse(', replace: 'if (false) return refuse(' },
+  { rule: 'live-unknown', file: 'assistant.js', find: 'if (unknown.length) return `no saved', replace: 'if (false) return `no saved' },
+  { rule: 'live-none', file: 'assistant.js', find: '!Array.isArray(raw) || raw.length === 0 ||', replace: '!Array.isArray(raw) ||' },
+  { rule: 'sound-race', file: 'assistant.js', find: 'show.onAir = true;', replace: '' },
+  { rule: 'live-names', file: 'assistant.js', find: '...(names ? { names } : {})', replace: '' },
+  { rule: 'phone-live', file: 'remote-server.js', find: "'assistant-live', 'assistant-sound',", replace: "'assistant-live'," },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -528,7 +612,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -600,6 +684,45 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const at = (now, last) => page.takePourText(msg, now, last) !== null;
   say(g === 1500 && at(0, -Infinity) && !at(1000, 0) && !at(g - 1, 0) && at(g, 0) && at(1600, 0) && page.takePourText({ rows: [{ text: ' ' }] }, 5000, 0) === null,
     `the display takes a pour, refuses one inside ${g} ms of the last, takes one after, and pours nothing for blank rows`);
+}
+
+/* The page's own half of going live (44j): which saved destinations a start
+   takes, on the real pickSaved, and what the setup readout carries. */
+{
+  const d = (id, name, on, test, url = 'rtmps://a.example/live2') => ({ id, service: 'other', name, url, orientation: 'landscape', on, test });
+  const list = [d('yt', 'YouTube', true, false), d('tw', 'Twitch', false, false), d('fb', 'Facebook', true, false), d('ts', 'Test server', true, true), d('bad', 'Broken', true, false, 'not a url')];
+  const kept = new Set(['live-yt', 'live-tw', 'live-ts']);
+  const names = (r) => ('to' in r ? r.to.map((x) => x.name).join(',') : `error: ${r.error}`);
+  const plain = page.pickSaved(list, kept, false), test = page.pickSaved(list, kept, true);
+  say(names(plain) === 'YouTube' && names(test) === 'Test server',
+    `with no names a start takes what the panel's Go or Test would, with a kept key (go ${names(plain)}; test ${names(test)})`);
+  const byName = page.pickSaved(list, kept, false, [' twitch', 'YOUTUBE', 'youtube']);
+  say(names(byName) === 'Twitch,YouTube', `with names, just those, in any case, once each, a destination switched off in the panel included (${names(byName)})`);
+  const unknown = page.pickSaved(list, kept, false, ['YouTube', 'Test server']), keyless = page.pickSaved(list, kept, false, ['Facebook']);
+  say('error' in unknown && /Test server/.test(unknown.error) && /saved: YouTube, Twitch, Facebook\)$/.test(unknown.error) && 'error' in page.pickSaved(list, kept, false, []) && 'error' in keyless && /Facebook" has no stream key/.test(keyless.error),
+    `a name not saved as that kind, or one with no key kept, is an error that says which, never a quiet drop (${'error' in unknown ? unknown.error : '-'} | ${'error' in keyless ? keyless.error : '-'})`);
+  const idle = { phase: 'idle', test: false, error: null, seconds: 0, names: [], destinations: [], frames: 0, skipped: 0 };
+  const setup = page.setupOf(list, kept, { height: 1080, fps: 30 }, { ...idle, phase: 'failed', error: 'refused', seconds: 3 }, null);
+  const text = JSON.stringify(setup);
+  say(setup.destinations.length === 5 && setup.destinations[0].keyKept && !setup.destinations[2].keyKept && !setup.destinations[4].urlValid && !/rtmps|example|live-yt/.test(text) && setup.last?.error === 'refused'
+    && page.setupOf(list, kept, { height: 1080, fps: 30 }, idle, 'no key').last?.error === 'no key' && page.setupOf(list, kept, { height: 1080, fps: 30 }, { ...idle, phase: 'live' }, 'old').last === null,
+    `the setup readout names each destination and whether its key is kept, carries no address or key name, and says how the last start or stream ended (${text.slice(0, 140)})`);
+}
+
+/* The page's own sound door (44j), on the real soundNow: the sources it takes
+   are the guard's and the tool's, and it changes nothing it was not handed. */
+{
+  const guardSources = [...(await import(join(ROOT, 'server', 'assistant.js'))).SOUND_SOURCES].sort().join(',');
+  const toolSources = [...readFileSync(join(ROOT, 'mcp', 'chromaglass-mcp.js'), 'utf8').matchAll(/name: 'set_sound_source'[^\n]*?enum: \[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1]).sort().join(','))[0];
+  const pageSources = [...page.ASSISTANT_SOURCES].sort().join(',');
+  say(guardSources === pageSources && toolSources === pageSources, `the guard's, the tool's and the page's sound sources are one list (guard ${guardSources}; tool ${toolSources}; page ${pageSources})`);
+  const noDoor = page.askSound('microphone');
+  const asked = [];
+  page.setSoundDoor((s) => asked.push(s));
+  const bad = page.askSound('file'), good = page.askSound('system');
+  page.setSoundDoor(null);
+  say(/not running/.test(noDoor ?? '') && /no such source/.test(bad ?? '') && good === null && asked.join(',') === 'system',
+    `the page's door changes the source it is handed, refuses one it may not pick, and says so with no sound running (${noDoor} | ${bad} | ${good} | ${asked.join(',')})`);
 }
 
 // The edges of the code.

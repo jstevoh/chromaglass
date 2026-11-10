@@ -130,6 +130,7 @@ export function loadDestinations(): LiveDestination[] {
 }
 export function saveDestinations(list: LiveDestination[]): void {
   write(DESTINATIONS_KEY, list.map(cleanDestination).filter(Boolean));
+  void refreshLiveSetup();
 }
 /*
   A name for a destination's key in the store, not a draw of the show: from the
@@ -231,7 +232,12 @@ let snap: LiveShowState = IDLE;
 const listeners = new Set<() => void>();
 export const liveShowState = () => snap;
 export function subscribeLiveShow(fn: () => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }
-function publish(next: LiveShowState) { snap = next; for (const l of listeners) l(); }
+function publish(next: LiveShowState) {
+  const turned = next.phase !== snap.phase;
+  snap = next;
+  for (const l of listeners) l();
+  if (turned) { if (onAir(next)) lastRefusal = null; void refreshLiveSetup(); }
+}
 export const useLiveShow = () => useSyncExternalStore(subscribeLiveShow, liveShowState, liveShowState);
 export const onAir = (s: LiveShowState) => s.phase === 'live' || s.phase === 'starting';
 
@@ -303,13 +309,14 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
  * press-twice arming is the desk's guard against a slip of the hand; the
  * assistant's is the owner's switch, which has to say Full.
  */
-export async function startSavedLive(test: boolean): Promise<LiveState> {
+export async function startSavedLive(test: boolean, only?: string[]): Promise<LiveState> {
   const native = nativeLive();
   if (!native) throw new Error('the live show streams from the Mac app');
   const kept = new Set((await native.keys.list()).map((k) => k.name));
-  const to = chosenFor(loadDestinations(), test).filter((d) => kept.has(keyNameFor(d)));
-  if (to.length === 0) throw new Error(test ? 'no test destination with a kept key' : 'no live destination with a kept key');
-  return startLive({ ...liveOptionsFor(to, loadFormat()), test });
+  const picked = pickSaved(loadDestinations(), kept, test, only);
+  if ('error' in picked) { lastRefusal = picked.error; void refreshLiveSetup(); throw new Error(picked.error); }
+  lastRefusal = null;
+  return startLive({ ...liveOptionsFor(picked.to, loadFormat()), test });
 }
 
 /**
@@ -323,6 +330,86 @@ export async function startSavedLive(test: boolean): Promise<LiveState> {
 export function setLiveAudio(stream: MediaStream | null): void {
   current?.setAudio(stream);
 }
+
+ * Which saved destinations a start streams to (PLAN 44j). Without names:
+ * what the panel's Go (on, not for tests) or Test (for tests) would take,
+ * with a kept key. With names, from the owner's assistant ("go live to
+ * YouTube only"): just those, matched by name in any case, from the same
+ * kind (live or test), on or off in the panel, since naming one is the
+ * choice the panel's switch otherwise makes. A name that matches nothing,
+ * or a destination with no kept key, is an error that says which, never a
+ * quiet drop: a stream that went to two places when three were asked is the
+ * failure the owner would only find from the audience.
+ */
+export function pickSaved(list: LiveDestination[], kept: Set<string>, test: boolean, only?: string[]): { to: LiveDestination[] } | { error: string } {
+  if (only && only.length === 0) return { error: 'no destinations named: name at least one, or none at all for the panel\'s choice' };
+  if (!only) {
+    const to = chosenFor(list, test).filter((d) => kept.has(keyNameFor(d)));
+    return to.length ? { to } : { error: test ? 'no test destination with a kept key' : 'no live destination with a kept key' };
+  }
+  const kind = list.filter((d) => d.test === test && validUrl(d.url));
+  const to: LiveDestination[] = [];
+  for (const raw of only) {
+    const name = raw.trim().toLowerCase();
+    const d = kind.find((x) => x.name.trim().toLowerCase() === name);
+    if (!d) return { error: `no saved ${test ? 'test' : 'live'} destination named "${raw.trim()}" (saved: ${kind.map((x) => x.name).join(', ') || 'none'})` };
+    if (!kept.has(keyNameFor(d))) return { error: `"${d.name}" has no stream key kept: paste it in the Live Show panel` };
+    if (!to.includes(d)) to.push(d);
+  }
+  return { to };
+}
+
+// --- The setup, as the owner's assistant reads it (PLAN 44j) -----------------------
+
+/** One saved destination, without its address or key: those never leave the panel. */
+export interface LiveSetupDestination { name: string; service: LiveServiceId; orientation: LiveOrientation; on: boolean; test: boolean; keyKept: boolean; urlValid: boolean }
+export interface LiveSetup {
+  destinations: LiveSetupDestination[];
+  format: LiveFormat;
+  /** How the last stream ended, or why the last start was refused, while not on air. */
+  last: { phase: LiveState['phase']; error: string | null; seconds: number } | null;
+}
+/** What the setup reads from what is saved: exported for the check. */
+export function setupOf(list: LiveDestination[], kept: Set<string>, format: LiveFormat, now: LiveShowState, refusal: string | null): LiveSetup {
+  const ended = now.phase === 'stopped' || now.phase === 'failed';
+  return {
+    destinations: list.map((d) => ({ name: d.name, service: d.service, orientation: d.orientation, on: d.on, test: d.test, keyKept: kept.has(keyNameFor(d)), urlValid: validUrl(d.url) })),
+    format,
+    last: refusal && !onAir(now) ? { phase: 'failed', error: refusal, seconds: 0 } : ended ? { phase: now.phase, error: now.error, seconds: now.seconds } : null,
+  };
+}
+
+/*
+  Read every few seconds while the show's remote link is mounted, rather than
+  pushed from each writer: the keys are kept by the Mac app's main process
+  (desktop/keys.js), set from the panel straight through the bridge, so no
+  one place in the page sees every change. A list of names over IPC every
+  5 s costs nothing a show would notice, and the readout is at most that late.
+*/
+const SETUP_EVERY_MS = 5000;
+let setupSnap: LiveSetup | null = null;
+let setupKey = '';
+let lastRefusal: string | null = null;
+const setupListeners = new Set<() => void>();
+export async function refreshLiveSetup(): Promise<void> {
+  const native = nativeLive();
+  if (!native) return;
+  let kept: Set<string>;
+  try { kept = new Set((await native.keys.list()).map((k) => k.name)); } catch { return; }
+  const next = setupOf(loadDestinations(), kept, loadFormat(), snap, lastRefusal);
+  const key = JSON.stringify(next);
+  if (key === setupKey) return;
+  setupKey = key; setupSnap = next;
+  for (const l of setupListeners) l();
+}
+function subscribeLiveSetup(fn: () => void): () => void {
+  setupListeners.add(fn);
+  void refreshLiveSetup();
+  const timer = setInterval(() => { void refreshLiveSetup(); }, SETUP_EVERY_MS);
+  return () => { setupListeners.delete(fn); clearInterval(timer); };
+}
+/** The saved setup, or null outside the Mac app (no bridge, nothing saved to stream with). */
+export const useLiveSetup = () => useSyncExternalStore(subscribeLiveSetup, () => setupSnap, () => setupSnap);
 
 export async function stopLive(): Promise<LiveState | null> {
   if (!current) return null;
