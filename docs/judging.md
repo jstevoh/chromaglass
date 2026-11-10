@@ -2568,3 +2568,13 @@ rig on a slider, never a lurch. Then move Chase Speed from 0 to 3 while pressing
 Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about three seconds,
 at 0.4 (the default) as it always did, at 3 snap there. Music Sync is greyed in Hold and Follow
 until Frame Sway is up; nothing the sound does should move the frame meanwhile.
+
+## 119. The logo melts at the start of a film or a stream (PLAN 37x-11)
+
+Turn on Settings → Logo & Titles → **Melt the logo at the start**, then press Record (or
+**Test** in the Live Show panel) on three looks: a still one (Classic), a busy one, and the
+live set's look. The ChromaGlass wordmark should land big across the middle in teal, read
+for two or three seconds, then run and finger apart and melt into the colour within about
+six seconds, leaving its teal in the show. Bad: a logo too faint to read on a bright or a
+dark look, one that smears before it can be read, one that never melts on a still look, a
+square or a halo around it, the plate around it clearing or dimming.
