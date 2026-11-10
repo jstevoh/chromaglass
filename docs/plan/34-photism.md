@@ -82,7 +82,8 @@ a grid of generic stock thumbnails: ours are the plate itself.
     countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
     is a Great 78 transfer of the original disc, published in the US before 1926, so each is
     disputed as public domain with the credit lines and `public/landing/films/SOURCES.md`;
-    the owner files the disputes. Until one is won, a visitor in a blocked country who opens
+    all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
+    about 30 days). Until one is won, a visitor in a blocked country who opens
     that card gets YouTube's own notice in the player, not the film.
   - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
     as each year's recordings enter the public domain (1926's on 1 January 2027).
@@ -148,6 +149,12 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
+- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
+  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
+  - **34a-8a. The films themselves on the page.** *Shipped with 34a-6 (PR #729): the row
+    "Six records from the 1920s" sits under the looks, and each card opens its film from the
+    channel on the page itself.*
+
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

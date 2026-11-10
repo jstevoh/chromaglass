@@ -69,7 +69,7 @@ const FILM_IDS = SITE_FILMS.map((f) => f.id);
   };
   const sources = existsSync('public/landing/films/SOURCES.md') ? readFileSync('public/landing/films/SOURCES.md', 'utf8') : '';
   const section = landing.slice(landing.indexOf('id="films"'), landing.indexOf('</section>', landing.indexOf('id="films"')));
-  const misnamed = SITE_FILMS.filter((f) => PRESETS.find((p) => p.id === f.look)?.name !== f.lookName).map((f) => `${f.id} (${f.look} is "${PRESETS.find((p) => p.id === f.look)?.name ?? 'no preset'}", the card says "${f.lookName}")`);
+  const misnamed = SITE_FILMS.filter((f) => PRESETS.find((p) => p.id === f.look)?.name !== f.lookName).map((f) => `${f.id} (${f.look} is "${PRESETS.find((p) => p.id === f.look)?.name ?? 'missing from the presets'}", the card says "${f.lookName}")`);
   check('1. the page shows the films row, and each film\'s look is a preset under the name its card gives it',
     section.includes('<SiteFilms') && SITE_FILMS.length >= 3 && new Set(FILM_IDS).size === FILM_IDS.length && !misnamed.length,
     `${SITE_FILMS.length} films${section.includes('<SiteFilms') ? '' : ', no <SiteFilms /> in section#films'}${misnamed.length ? '; ' + misnamed.join('; ') : ''}`);

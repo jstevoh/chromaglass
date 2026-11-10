@@ -204,3 +204,24 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     goes (the dye per drop against its laid colour, the angle of its absorbance) and find
     whether it is the partition's hand-over at a held film (bodyPartition) or the edge's
     width; never by thinning the dyes further.
+- **28l. Saffron Lace: yellow lace over lavender, cobalt and coral** (the owner, 2026-11-07,
+  from a still of another show: yellow veins and cells of lace, fine spatter, a lavender
+  wash, cobalt and coral; "can we create a preset that looks like this?"). Built on Clear
+  Film (§20b) and Film Dye (20b-13): the lace is a dyed oil film dewetting, not a drawing.
+  - ~~**28l-1. The look**~~ (**shipped**, this PR): `saffron-lace`, the film at 0.3 of the
+    gap dyed yellow at 0.35, on the lamp, with three thin pools (lib/plateAreas.ts): a wide
+    lavender wash, cobalt with icy blue where the bass pours soap, coral where the treble
+    pours oil. Lab render beside the still in the PR. Judging §112.
+  - **28l-2. The lavender cannot be the ground.** Yellow over lavender is amber by
+    subtraction, so the look lays its lavender as a thin pool on the lamp's white, and its
+    holes elsewhere show white where the still shows lilac everywhere. The still's veins
+    read yellow over lilac because the oil fills the gap and pushes the water out from under
+    it; the plate does that (gapScale × (1 − film)) but a film at 0.3 of the gap displaces
+    only that much. Measure, on the Mac, the lace's colour over the wash against its colour
+    over white; if the film's thickness does not displace enough water, the fix is in the
+    film's thickness (20c, a viscous film), never a paint of the wash.
+  - **28l-3. The lace's pattern is a labyrinth of rings at first** (lab, 256² film grid, 5 to
+    15 s): holes open as concentric rings around the first ones before they join into
+    cells, where the still is cells and veins from the start. Look at it on the Mac at the
+    app's grid before changing anything; if it holds there, seed the tear with fewer, larger
+    dust motes (the dust's own scale in wgsl/film.ts), which is what a dirty dish does.

@@ -87,6 +87,7 @@
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
 import { _electron as electron } from 'playwright';
+import { untilMacDeployDone } from './macdeploy.mjs';
 import { spawn as launchProcess, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -258,6 +259,9 @@ const env = {
 };
 delete env.SHOW_KEY;   // the app's own key, the one it keeps, is what is checked
 
+// The app draws the plate on the Mac's GPU as a harness's browser does: a
+// deploy's shard holding the owner's Mac goes first (PLAN.md 19ah-9a).
+await untilMacDeployDone('npm run desktop');
 const electronApp = await electron.launch({
   executablePath: app.executablePath,
   args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])],
@@ -434,7 +438,7 @@ try {
     with. The key store is Electron's safeStorage: on a Mac it encrypts
     through the login Keychain; on a Linux box with no keyring it refuses,
     and the repo's app (never the packed one) takes the key itself, as the
-    check does here. With no sound source open the stream is video only.
+    check does here. With no sound source open the stream carries a silent audio track (37x-4f).
     Since 37x-4c the page streams to two destinations at once, a landscape
     and a portrait one, which is two encodes and two sockets through the
     same IPC: both must arrive, each at its own size.

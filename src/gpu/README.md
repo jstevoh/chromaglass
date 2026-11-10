@@ -7,7 +7,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `stage.ts`: `WebGPUStage`: canvas, device, frame.
 - `fluid.ts` (99 KB, grep it): `WebGPUFluid`, the solver's `step` and the pipelines built ahead. The rest of the class is in `fluid/`, and the map is in this file's header; `fluid/README.md` has the order.
 - `plate.ts`: `WebGPUPlate`; `plateUniforms.ts`: `fillPlateUniforms`, settings to uniforms.
-- `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (including `speciesShare` and `speciesSnapshot`).
+- `solverTypes.ts`: `GpuStepParams` (a step's inputs), `PlateSolver` (including `speciesShare` and `speciesSnapshot`, and `pourInk`, a title's mask added to the dye at the solver's own grid, PLAN 37x-10, with an optional `carrier` laid into the species field under it, the thick ink's pad, PLAN 37x-10g).
 - `kit.ts` (47 KB, grep it): `PipelineCache`, `PingPong`, `Disposer`, `bindGroup`, `ReadbackRing`, `GpuProfiler`.
 
 ## Contracts
@@ -36,10 +36,10 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
 - `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.
 - `selftest.ts`: kit tests, `?debug`.
-- `slosh.ts`, `soapFilm.ts`, `standing.ts`: slosh dish, soap film, ferrofluid domes.
+- `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `standing.ts`: slosh dish, soap film, lamp-boiling dish, ferrofluid domes.
 - `splats.ts`: a frame's pours as GPU records.
 - `uniforms.ts`: `layOut`, `wgslStruct`, `UniformPack`.
 
 ## Checks
 
-`npm run quick`; by hand `lint`, `wgsl`, `physics`, `maze`, `spikes`, `disc`, `straw`, `derive`. `output.ts`: `map`, `beams`, `wallpattern`. Per-frame calls: `framegroups`, `framereads`, `frameuploads`. `slosh.ts`, `soapFilm.ts`, `particles.ts`: `sloshgpu`, `soapgpu`, `particles`. `standing.ts`: `standing`. A changed constant: `checkguard`.
+`npm run quick`; by hand `lint`, `wgsl`, `physics`, `maze`, `spikes`, `disc`, `straw`, `derive`. `output.ts`: `map`, `beams`, `wallpattern`. Per-frame calls: `framegroups`, `framereads`, `frameuploads`. `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `particles.ts`: `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. `standing.ts`: `standing`. A changed constant: `checkguard`.

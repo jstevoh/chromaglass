@@ -75,6 +75,9 @@ import { MIX_FADE_KEYS } from './mixer.ts';
   a patch or LFO must not flip it mid-song.
 */
 const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'layerCount', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+  'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
+  'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
+  'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
   'clearFilmDye',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
@@ -121,7 +124,7 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
 export const PER_LAYER: ReadonlySet<string> = new Set([
   'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
   'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
-  'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heatDecay',
+  'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heat', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
   // press on them lifts. Each layer is a separate dish.
   'plateCurve', 'plateSpring', 'depthDrag',

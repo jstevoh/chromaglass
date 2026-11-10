@@ -14,6 +14,7 @@ import { type FluidSimulation } from './fluidSimulation';
 import { GRID_SCALE, GRID_SIZE } from './constants';
 import { DICE } from './dice';
 import { fluidSink, type AreaSink } from '../lib/areaCords';
+import { showNow } from '../lib/showClock';
 
 /** Seconds a track must survive before it is allowed to touch the plate. */
 export const HAND_SETTLE = 0.25;
@@ -250,4 +251,71 @@ export function stirAlongMove(fluid: Pick<FluidSimulation, 'applySquish' | 'addV
   fluid.applySquish(x, y, 8, 0.005);
   // A touch passes no move (its handler never stirred): no stir, and no row marked for nothing.
   if (dx || dy) fluid.addVelocity(x, y, dx * 5, dy * 5);
+}
+
+/** Remote pad hands held on the glass (0–1), blocking the projector's air while held (PLAN 36e-2). */
+export type RemoteHoldMap = Map<string, { layer: number; x: number; y: number; at: number }>;
+
+export function recordRemoteHold(map: RemoteHoldMap, layer: number, id: number | undefined, x: number | undefined, y: number | undefined): void {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  const holdId = `${layer}:${Number.isFinite(id) ? id : 0}`;
+  map.set(holdId, {
+    layer,
+    x: Math.max(0, Math.min(1, x as number)),
+    y: Math.max(0, Math.min(1, y as number)),
+    at: showNow(),
+  });
+}
+
+const BOIL_HOLD_POOL: { x: number; y: number }[][] = [];
+
+function writeBoilHold(
+  holds: { x: number; y: number }[],
+  pool: { x: number; y: number }[],
+  idx: number,
+  x: number,
+  y: number,
+): void {
+  let slot = pool[idx];
+  if (!slot) {
+    slot = { x, y };
+    pool[idx] = slot;
+  } else {
+    slot.x = x;
+    slot.y = y;
+  }
+  holds[idx] = slot;
+}
+
+export function syncBoilHolds(
+  fluids: (FluidSimulation | undefined)[],
+  activeLayer: number,
+  drainFrame: number,
+  hands: { hand: { x: number; y: number } }[],
+  remoteHolds: RemoteHoldMap,
+): void {
+  const holdNow = showNow();
+  for (let li = 0; li < fluids.length; li++) {
+    const fl = fluids[li];
+    if (!fl) continue;
+    let pool = BOIL_HOLD_POOL[li];
+    if (!pool) {
+      pool = [];
+      BOIL_HOLD_POOL[li] = pool;
+    }
+    const holds = fl.boilHolds;
+    let count = 0;
+    if (li === activeLayer && drainFrame === 0) {
+      for (const { hand } of hands) {
+        if (hand.x > 0 && hand.x < GRID_SIZE - 1 && hand.y > 0 && hand.y < GRID_SIZE - 1) {
+          writeBoilHold(holds, pool, count++, (hand.x + 0.5) / GRID_SIZE, (hand.y + 0.5) / GRID_SIZE);
+        }
+      }
+    }
+    for (const [hid, h] of remoteHolds) {
+      if (holdNow - h.at >= 250) { remoteHolds.delete(hid); continue; }
+      if (h.layer === li && drainFrame === 0) writeBoilHold(holds, pool, count++, h.x, h.y);
+    }
+    holds.length = count;
+  }
 }

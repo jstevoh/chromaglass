@@ -5,13 +5,14 @@ import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { followLine } from './lib/followedPlace';
 import { songCueFrom } from './lib/scenePacing';
-import { holdWhereItIs, shotLabel } from './lib/macroCamera';
+import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
 import { SettingsPanel } from './components/SettingsPanel';
 import { resolveSection } from './lib/settingsMap';
 import { GuidePanel } from './components/GuidePanel';
 import { CueBar } from './components/CueBar';
 import { Info } from './components/Info';
+import { CastNetworkItems } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
@@ -145,6 +146,8 @@ import { useRowFades } from './app/useRowFades';
 import { useRemote, type OscOutHear } from './app/useRemote';
 import { useShowFeed } from './app/useShowFeed';
 import { useSongScore } from './app/useSongScore';
+import { useSongSequences } from './app/useSongSequences';
+import { useListen } from './app/useListen';
 import { useSongRendering } from './app/useSongRendering';
 import { useControllers } from './app/useControllers';
 import { useCommandPalette } from './app/useCommandPalette';
@@ -1590,46 +1593,8 @@ export default function App() {
     },
   });
   sequencerRef.current = sequencer;
-  // ── Files made for a song ───────────────────────────────────────
-  // When a song is identified, a sequence made for it starts at the right
-  // point in it and a preset made for it is applied; when the song ends or
-  // another takes its place, a song-bound sequence stops.
-  const songBoundRef = useRef<string | null>(null);   // the sequence running for the current song
-  const lastSongKey = useRef<string | null>(null);
-  useEffect(() => {
-    const key = musicIntel.state.track ? `${musicIntel.state.track.isrc}|${musicIntel.state.track.title}|${musicIntel.state.track.artist}` : null;
-    if (key === lastSongKey.current) return;
-    lastSongKey.current = key;
-    const song = currentSong;
-    const running = sequencer.status.sequenceId;
-    if (songBoundRef.current && (running === songBoundRef.current) && !sameSong(sequencer.sequences.find(q => q.id === running)?.song, song)) {
-      sequencer.stop();
-      songBoundRef.current = null;
-    }
-    if (!song) return;
-    // A set item made for this song goes up on its own, at its own fade.
-    const setHit = setListRef.current.items.find(i => sameSong(i.song, song));
-    const setLook = setHit ? lookOfItem(setHit) : null;
-    if (setLook) { sendLook(setLook, setLook.fade ?? fadeSeconds); return; }
-    const seq = sequencer.sequences.find(q => sameSong(q.song, song));
-    if (seq) {
-      sequencer.startAt(seq.id, musicIntel.state.positionSec);
-      songBoundRef.current = seq.id;
-      return;
-    }
-    const up = userPresets.presets.find(p => sameSong(p.song, song));
-    if (up) applyUserPreset(up);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.state.track, currentSong]);
-  // The song ran out: stop its sequence rather than looping into the next song.
-  useEffect(() => {
-    const id = songBoundRef.current;
-    if (!id || sequencer.status.sequenceId !== id) return;
-    const seq = sequencer.sequences.find(q => q.id === id);
-    const dur = seq?.song?.durationSec;
-    if (dur && musicIntel.state.positionSec > dur + 2) { sequencer.stop(); songBoundRef.current = null; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [musicIntel.state.positionSec]);
+  // ── Files made for a song (app/useSongSequences.ts) ─────────────
+  const { startSongSequence } = useSongSequences({ musicIntel, currentSong, sequencer, setListRef, lookOfItem, sendLook, fadeSeconds, userPresets, applyUserPreset });
 
   const {
     addingToSet, setAddingToSet, addToSet, importToSet, onSetAction, onItemAction,
@@ -1761,8 +1726,7 @@ export default function App() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'b' || e.key === 'B') toggleBlackout();
       if (e.key === '?') setShowHelp(h => !h);
-      if (e.key === '+' || e.key === '=') zoomMacro(1);
-      if (e.key === '-' || e.key === '_') zoomMacro(-1);
+      macroKey(e, settingsRef.current, visualizerRef.current, zoomMacro, aimMacro);
       // The tool in hand's Amount, a step at a time, at any width.
       if (e.key === '[' || e.key === ']') {
         const tool = activeToolRef.current;
@@ -1785,7 +1749,7 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: false });
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('wheel', onWheel); };
-  }, [toggleBlackout, zoomMacro]);
+  }, [toggleBlackout, zoomMacro, aimMacro]);
   // ── One vocabulary of commands for every hand ───────────────────
   // The phone, a MIDI button, a gamepad face button and a keyboard all fire
   // the same actions; the presets they cue come from the same list.
@@ -1944,7 +1908,7 @@ export default function App() {
 
   const oscOutHearRef = useRef<OscOutHear | null>(null);
   const {
-    remoteLink,
+    remoteLink, tvCount,
   } = useRemote({
     settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
@@ -1962,6 +1926,10 @@ export default function App() {
     wallRef, goLookNow, runActionRef, setSettings, glideSetting, songShows, followSongs, designing,
     renderHold, musicIntel, isActive, currentSong, songShowsRef, setSongShows, activePresetId,
     pinnedPresetId, userPresets, tempoLabel,
+  });
+  const listen = useListen({
+    musicIntel, audioSource, handleSourceChange, musicEnabled: musicSettings.enabled, updateMusicSettings, followSongs, setFollowSongs,
+    songShowsRef, setSongShows, songRuntimeRef, sequencer, startSongSequence, activePresetId, pinnedPresetId, userPresets,
   });
 
   // ── Render this song (PLAN.md §6) ───────────────────────────────
@@ -2144,6 +2112,7 @@ export default function App() {
       currentSong={currentSong}
       follow={followSongs}
       onFollow={setFollowSongs}
+      listen={listen}
       status={songRuntime.status}
       onRun={songRuntime.start}
       onStop={songRuntime.stop}
@@ -3620,33 +3589,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="px-3 py-2.5 rounded-lg" data-testid="cast-network">
-                  <div className="text-xs font-semibold">Network display{mirrorCount > 0 ? ` · ${mirrorCount} connected` : ''}</div>
-                  {relay ? (
-                    <>
-                      <div className="text-[11px] opacity-50 leading-snug mt-0.5">Any browser on the same Wi-Fi:</div>
-                      {(relay.hosts.length ? relay.hosts : [window.location.hostname]).map((h) => (
-                        <div key={h} className="font-mono text-[11px] text-white/80 select-all mt-1">http://{h}:{relay.port}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                      ))}
-                      {!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname) && !relay.hosts.includes(window.location.hostname) && (
-                        <div className="font-mono text-[11px] text-white/80 select-all mt-1">{window.location.origin}/?cast=true{relay.key ? `&key=${relay.key}` : ''}</div>
-                      )}
-                      <div className="mt-2">
-                        <Info label="">
-                          Open one of these on a projector, a TV or a tablet and it shows the
-                          show. Across buildings or other access points: run{' '}
-                          <span className="font-mono">npm run tunnel</span> and use the https
-                          address it prints, with the same{' '}
-                          <span className="font-mono">?cast=true&amp;key=…</span>.
-                        </Info>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-[11px] opacity-50 leading-snug mt-0.5">
-                      Needs the show server: run <span className="font-mono">npm run remote</span>.
-                    </div>
-                  )}
-                </div>
+                <CastNetworkItems relay={relay} mirrorCount={mirrorCount} tvCount={tvCount} />
 
                 <div className="flex items-start gap-1">
                   <button

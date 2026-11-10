@@ -1,9 +1,11 @@
-import { useMemo, useRef, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, useRef, useEffect, useState, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import { type RemoteState, parseRemoteGesture, type RemoteMessage } from '../lib/remoteProtocol';
 import { isUserPresetId } from '../lib/userPresets';
 import type { VisualizerSettings, LiquidType } from '../types';
 import { sanitizePatch } from '../lib/sanitizeSettings';
 import { PadPictureSender, setPadPictureSender } from '../lib/padPicture';
+import { TvFeedSender, setTvFeedSender } from '../lib/tvFeed';
+import { canUseHomeFeature } from '../lib/tierGates';
 import { useRemoteLink } from '../hooks/useRemoteLink';
 import type { MixSource } from '../lib/mixer';
 import { unhandled } from '../lib/unhandled';
@@ -23,6 +25,8 @@ import { useLiveShow, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
+import { takePourText } from '../lib/pourText';
+import { useInkTitle } from './useInkTitle';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -110,6 +114,14 @@ export function useRemote({
     state between those seconds.
   */
   const liveShow = useLiveShow();
+  /*
+    The Live Show's titles (PLAN 37x-10): when the identified song changes
+    and the Title switch is on (the phone's, beside the controls below, or
+    the desk's Logo & Titles), its name is poured as ink and the wash takes
+    it. Here beside the remote's `pour-text` message, the other way a title
+    reaches the plate in a set, so the two are read in one place.
+  */
+  useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
   const liveKey = onAir(liveShow)
     ? JSON.stringify({ test: liveShow.test, seconds: liveShow.seconds, names: liveShow.names, trouble: liveShow.destinations.some(d => d.dropping || d.phase !== 'live') })
     : '';
@@ -186,6 +198,9 @@ export function useRemote({
     return { x: p.x, y: p.y, dx: dx * Math.cos(a) - dy * Math.sin(a), dy: dx * Math.sin(a) + dy * Math.cos(a) };
   };
   const padPictureRef = useRef<PadPictureSender | null>(null);
+  // TVs at home showing the plate (PLAN 12-tv), and how many, for the cast menu.
+  const tvFeedRef = useRef<TvFeedSender | null>(null);
+  const [tvCount, setTvCount] = useState(0);
   const linkAskedRef = useRef(-Infinity);
   /*
     Live's play and stop, when the operator asked for them (PLAN.md
@@ -199,6 +214,7 @@ export function useRemote({
   const linkPausedRef = useRef(false);
   const linkPausedIdRef = useRef<string | null>(null);
   const remoteLinkRef = useRef<((m: RemoteMessage) => void) | null>(null);
+  const lastPourTextRef = useRef(-Infinity);
 
   const remoteLink = useRemoteLink({
     role: 'display',
@@ -214,6 +230,17 @@ export function useRemote({
         case 'request-cast':
           relaySendRef.current?.({ type: 'cast', message: { type: 'state', state: castState } });
           break;
+        case 'tv-join':
+          void tvFeedRef.current?.join(message.id);
+          break;
+        case 'tv-leave':
+          tvFeedRef.current?.leave(message.id);
+          break;
+        case 'tv-signal':
+          if (message.from) void tvFeedRef.current?.signal(message.from, message.signal);
+          break;
+        case 'tv-show':
+          break;   // the relay's word to a TV, never a display's
         case 'patch':
           queuePatch(message.settings);
           break;
@@ -248,6 +275,21 @@ export function useRemote({
           }
           const why = a ? addSongCue(a.when, a.what) : 'not a song action this build knows';
           if (why) console.info(`[assistant] song action not added: ${why}`);
+          break;
+        }
+        /*
+          Words poured as ink (PLAN 37x-10c): a song's name at the top of a
+          track, from the phone's text box or the relay's guard. Read as
+          untrusted whoever sent it, and one pour per POUR_TEXT_GAP_MS at
+          most (lib/pourText.ts `takePourText`), since a pour adds dye and a double tap
+          would stack the same words into a blot.
+        */
+        case 'pour-text': {
+          const t = performance.now();
+          const pour = takePourText(message, t, lastPourTextRef.current);
+          if (!pour) break;
+          lastPourTextRef.current = t;
+          wallRef.current?.pourText(pour.rows, { colour: pour.colour });
           break;
         }
         case 'dye': {
@@ -414,6 +456,21 @@ export function useRemote({
     setPadPictureSender(sender);
     return () => { if (padPictureRef.current === sender) padPictureRef.current = null; setPadPictureSender(null); };
   }, [remoteSend]);
+  // And the TVs': one sender while the link is up, fed by the same frame task.
+  // Home or Pro is asked at each TV's join, not here, so a licence that lands
+  // after the page opened lets the next TV in without a reload.
+  useEffect(() => {
+    const sender = new TvFeedSender(remoteSend, canUseHomeFeature);
+    sender.onCount = setTvCount;
+    tvFeedRef.current = sender;
+    setTvFeedSender(sender);
+    return () => {
+      sender.close();
+      if (tvFeedRef.current === sender) tvFeedRef.current = null;
+      setTvFeedSender(null);
+      setTvCount(0);
+    };
+  }, [remoteSend]);
   // The desk's Link switch goes to the show server over this link.
   useEffect(() => {
     const t = tempoRef.current;
@@ -424,5 +481,6 @@ export function useRemote({
 
   return {
     remoteLink,
+    tvCount,
   };
 }

@@ -77,6 +77,7 @@ export const CONTROL_HELP: Record<string, string> = {
   lampHotspot: 'The projector\'s lamp lever: at 0 the plate is lit evenly; off its mark the lens clips the corners, a hot spot with a coloured edge.',
   secondLamp: 'A second, cooler bulb beside the first: its light adds to one side of the hot spot.',
   lampGround: 'What the dye is seen on. Zero paints it as light on black, one has the lamp shining up through it.',
+  heat: 'The projector lamp\'s heat in the dish: hold a finger on the glass to block the fan\'s air and boil the spot.',
   iridescence: 'Thin-film rainbow colour running round the rims of bubbles.',
   lampWarmth: 'The lamp\'s colour: neutral 6500 K down to a 3200 K halogen, with a soft vignette. Warmer is dimmer; lift Exposure.',
   transmission: 'How light passes through the dye: thin pale, thick deep. Zero is a flat glow.',
@@ -208,6 +209,9 @@ export const CONTROL_HELP: Record<string, string> = {
   // Logo
   markMix: 'How opaque the logo or title is over the finished frame. Zero takes it off.',
   markScale: 'How wide the logo is, as a share of the frame.',
+  inkTitleSize: 'How big the title is, from a small credit to the width of the plate. A long title shrinks to fit.',
+  inkTitleY: 'Where the title lands, from the bottom of the plate to the top.',
+  inkTitleSweep: 'How hard the wash takes the title away: low and it drifts, readable, for many seconds; high and it is gone in two.',
   markX: 'Where the logo\'s centre sits across the frame.',
   markY: 'Where the logo\'s centre sits up the frame.',
 
@@ -228,6 +232,24 @@ export const CONTROL_HELP: Record<string, string> = {
   cometSpeed: 'A steady pull on the heavy dye, as a tilt or a wind would give, so it trails into comets.',
   cometAngle: 'The direction of that pull, in degrees.',
   gooeyEffect: 'Blends blobs together like metaballs, so two that touch fuse.',
+  lfo1Bars: 'How many bars LFO 1 takes to complete one cycle against the tempo.',
+  lfo1Shape: 'The waveform LFO 1 traces across its cycle.',
+  lfo1Restart: 'What restarts LFO 1 at the beginning of its cycle when heard or struck.',
+  lfo2Bars: 'How many bars LFO 2 takes to complete one cycle against the tempo.',
+  lfo2Shape: 'The waveform LFO 2 traces across its cycle.',
+  lfo2Restart: 'What restarts LFO 2 at the beginning of its cycle when heard or struck.',
+  lfo3Bars: 'How many bars LFO 3 takes to complete one cycle against the tempo.',
+  lfo3Shape: 'The waveform LFO 3 traces across its cycle.',
+  lfo3Restart: 'What restarts LFO 3 at the beginning of its cycle when heard or struck.',
+  lfo4Bars: 'How many bars LFO 4 takes to complete one cycle against the tempo.',
+  lfo4Shape: 'The waveform LFO 4 traces across its cycle.',
+  lfo4Restart: 'What restarts LFO 4 at the beginning of its cycle when heard or struck.',
+  env1Attack: 'How long Envelope 1 takes to rise to its peak once triggered.',
+  env1Decay: 'How long Envelope 1 takes to fall back after reaching its peak.',
+  env1On: 'Which drum hit or MIDI strike fires Envelope 1.',
+  env2Attack: 'How long Envelope 2 takes to rise to its peak once triggered.',
+  env2Decay: 'How long Envelope 2 takes to fall back after reaching its peak.',
+  env2On: 'Which drum hit or MIDI strike fires Envelope 2.',
 };
 
 const GRADE_HELP: Record<MixGrade, (n: string) => string> = {

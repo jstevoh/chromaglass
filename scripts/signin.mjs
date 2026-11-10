@@ -31,9 +31,9 @@
  *      ENTRY_GROWTH_MAX bytes gzipped: the SDK is fetched beside the app, not
  *      in front of the intro
  *   3. a first visit sees the sign-in, and the plate does not start behind it
- *   4. it offers Google and an emailed link, and not Apple (the owner,
- *      2026-10-24: no Apple sign-in for now), and the Google button asks the
- *      emulator for Google
+ *   4. it offers Google, Apple and an emailed link (Apple back on, the owner
+ *      2026-11-08; PLAN 23.15), the Google button asks the emulator for
+ *      Google, and the Apple button asks for Apple with the email scope
  *   5. the emailed link signs in and the plate starts
  *   6. a returning visit goes straight to the plate: the sign-in is never
  *      drawn, not even for a frame
@@ -389,11 +389,10 @@ async function signInByEmail(page, origin) {
   return { sent, link, back, up: back && await waitFor(() => appUp(page), BOOT_MS) };
 }
 /** Everything on the sign-in inside the screen's width, each button a thumb's height. */
-// The sign-in's buttons: Google and the emailed link. It was three with Apple,
-// which the owner took off for now (2026-10-24; line 4 fails if it comes back
-// without this changing too). 11 and 15 count up to this, so a form missing
-// one of the two still fails them.
-const PROVIDER_BUTTONS = 2;
+// The sign-in's buttons: Google, Apple and the emailed link. Apple was off from
+// 2026-10-24 to 2026-11-08 (the owner; PLAN 23.10d, 23.15), when this was two.
+// 11 and 15 count up to this, so a form missing one of the three still fails them.
+const PROVIDER_BUTTONS = 3;
 
 const fits = (page) => page.evaluate(() => {
   const W = innerWidth, H = innerHeight;
@@ -458,10 +457,13 @@ try {
 
   const providers = await page.evaluate(() => [...document.querySelectorAll('[data-cg-signin-provider]')].map((b) => b.getAttribute('data-cg-signin-provider')));
   const asksFor = {};
-  // Apple is held off (SignInScreen.tsx, APPLE_SIGN_IN; the owner, 2026-10-24),
-  // so only Google is pressed, and the line below fails if an Apple button is
-  // drawn at all: a sign-in that cannot complete is worse than none.
-  for (const id of ['google.com']) {
+  // Both providers are pressed. Apple's must also ask for the email scope:
+  // the licence is kept under the account's email (`keys:<email>`), so an
+  // Apple account made without it could never hold one. Firebase writes the
+  // provider's scopes into the handler address it opens (`scopes=email,name`),
+  // which is what is read here.
+  const scopesOf = {};
+  for (const id of ['google.com', 'apple.com']) {
     // A popup or a redirect: either is Firebase's way of sending the browser to the provider.
     const popup = ctx.waitForEvent('page', { timeout: 10_000 }).catch(() => null);
     const nav = page.waitForURL((u) => u.toString().includes(`providerId=${encodeURIComponent(id)}`) || u.toString().includes(`providerId=${id}`), { timeout: 10_000 }).then(() => page.url(), () => null);
@@ -475,9 +477,10 @@ try {
       return u;
     }), nav]);
     asksFor[id] = !!p && p.startsWith(`${EMU}/emulator/auth/handler`) && p.includes('apiKey=demo-key') && p.includes(id);
+    scopesOf[id] = p ? (new URL(p).searchParams.get('scopes') || '') : '';
     if (!page.url().startsWith(ORIGIN)) { await page.goto(ON); await waitFor(() => signinOpen(page), 30_000); }
   }
-  check('4. Google and an emailed link are offered, Apple is not, and Google goes to its provider', ['google.com', 'email'].every((p) => providers.includes(p)) && !providers.includes('apple.com') && asksFor['google.com'], `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}`);
+  check('4. Google, Apple and an emailed link are offered; Google and Apple each go to their provider, Apple asking for the email', ['google.com', 'apple.com', 'email'].every((p) => providers.includes(p)) && asksFor['google.com'] && asksFor['apple.com'] && scopesOf['apple.com'].split(',').includes('email'), `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}, Apple's scopes "${scopesOf['apple.com']}"`);
 
   const first = await signInByEmail(page, ORIGIN);
   check('5. the emailed link signs in, lands on the page the visitor was on, and the plate starts', first.sent && first.back && first.up, `sent ${first.sent}, link ${first.link ? (first.back ? 'back to the same page' : 'to this site but not the same page') : 'none'}, plate ${first.up}`);
@@ -612,13 +615,40 @@ try {
       const buys = [...document.querySelectorAll('[data-cg-landing-buy]')];
       const buyBad = buys.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
         || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad };
+      // The moiré pack's card under them (PLAN 45a-2): its own Buy, held to the same rules, and
+      // its four pictures each loaded from a file that exists (a lazy image is asked for here by
+      // scrolling the card into view, and naturalWidth is 0 for a file that 404s).
+      const pack = [...document.querySelectorAll('[data-cg-landing-pack]')];
+      const packBad = pack.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
+        || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
+      const card = document.querySelector('[data-cg-landing-moire]');
+      // The YouTube channel link in the header (PLAN 34a-8): on the first
+      // screen at every size, not pushed off a phone's width by Sign in beside
+      // it, a thumb's height, and the channel's own handle in a new tab, so a
+      // visitor who goes to watch still has the page to come back to.
+      const yt = document.querySelector('[data-cg-landing-youtube]');
+      const y = yt?.getBoundingClientRect();
+      const ytBad = !yt ? 'missing'
+        : yt.getAttribute('href') !== 'https://www.youtube.com/@Chromaglassart' ? `href ${yt.getAttribute('href')}`
+        : yt.target !== '_blank' || !/noopener/.test(yt.rel) ? 'not a new tab'
+        : y.height < 44 ? `${Math.round(y.height)} px tall`
+        : y.left < -0.5 || y.right > W + 0.5 || y.bottom > innerHeight || y.top < 0 ? 'off the first screen' : '';
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad, pack: pack.length, packBad, card: !!card, ytBad };
     }) : null;
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong` : 'landing page not drawn'}`);
+    let pics = -1;
+    if (f?.card) {
+      pics = await p.evaluate(async () => {
+        const imgs = [...document.querySelectorAll('[data-cg-landing-moire] img')];
+        imgs.forEach((i) => { i.loading = 'eager'; });
+        await Promise.all(imgs.map((i) => (i.complete ? null : new Promise((ok) => { i.onload = i.onerror = ok; }))));
+        return imgs.filter((i) => i.naturalWidth >= 960).length;
+      });
+    }
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0 && f.pack === 1 && f.packBad === 0 && pics === 4 && !f.ytBad;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong; moiré card ${f.card ? `${f.pack} Buy, ${f.packBad} wrong, ${pics} pictures at 960 px` : 'missing'}; YouTube link ${f.ytBad || 'ok'}` : 'landing page not drawn'}`);
     await c.close();
   }
-  check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
+  check('11b. the landing page fits a laptop and a phone, upright and on its side, the YouTube link on its first screen', sizes.every((s) => s.landOk), landFit.join('; '));
 
   const sheet = {};
   const lit = {};

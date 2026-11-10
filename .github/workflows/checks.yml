@@ -140,12 +140,15 @@ jobs:
   # ones that want Chromium, in two (`browser` and `browser2`, about
   # fourteen and eleven: the site's pages and desks, then the remote, the
   # show's wires and the sound in the app), and the lab on the CPU
-  # rasteriser, in four (`lab`, `lab2`, `lab3` and `lab4`: Chromium, then the
+  # rasteriser, in five (`lab` to `lab5`: Chromium, then the
   # frame's passes and the GPU dishes on the first, `lampzero` drawing every
-  # look in two labs on the second, the soap's two checks on the third, and
-  # `holeline` building three labs on the fourth). Every
+  # look in two labs on the second, the soap's two checks on the third,
+  # `holeline` building three labs on the fourth, and on the fifth `samelook`,
+  # two trees' labs side by side, which runs only on a pull request of the
+  # speed hunt's and says "not asked" on any other, PLAN.md 46-0, and the ink
+  # title's thin-gap arms, about fourteen minutes on the slow tier, PLAN 37x-10g). Every
   # check runs whatever failed before it in its part. GitHub's ubuntu runners
-  # are not the queue the Mac's are, so eight at once cost the queue nothing.
+  # are not the queue the Mac's are, so nine at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -291,10 +294,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -303,7 +306,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -321,7 +324,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0
@@ -480,9 +483,14 @@ jobs:
       # watchdog moves the deploy to GitHub's Macs (scripts/macbusy.sh,
       # PLAN.md 19ah-9). Its name is what the watchdog reads: keep the two
       # the same (FREE_STEP in scripts/macwatch.mjs).
+      # From its first line it also marks the Mac held for this shard
+      # (~/.chromaglass-runner/deploy-<runner>.json), and harnesses a session
+      # or a build queue starts meanwhile wait for it (PLAN.md 19ah-9a).
       - name: The owner's Mac is free of other work
         if: ${{ runner.environment == 'self-hosted' }}
         timeout-minutes: 4
+        env:
+          SHARD: ${{ matrix.shard }}
         run: bash scripts/macbusy.sh 120
       - uses: actions/setup-node@v5
         with:
@@ -529,6 +537,18 @@ jobs:
         env:
           CHECKS_ONLY: ${{ needs.reach.outputs.maconly }}
         run: node scripts/checks.mjs --ci ${{ matrix.shard }}
+      # Last on the owner's Mac, whatever happened above, a cancel included:
+      # marks this shard's hold on the Mac ended (harnesses wait two minutes
+      # more, for the next shard), and fails if a look between the checks
+      # found other work drawing with the GPU (scripts/checks.mjs stopped the
+      # shard), which the watchdog reads as it reads the first step's failure
+      # (STAYED_STEP in scripts/macwatch.mjs; keep the names the same).
+      - name: The owner's Mac stayed free of other work
+        if: ${{ always() && runner.environment == 'self-hosted' }}
+        timeout-minutes: 1
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: bash scripts/macbusy.sh --end
 
   # The one name the rest of the repository knows this stage by.
   # Green when every shard is, or when the change reached no Mac shard and

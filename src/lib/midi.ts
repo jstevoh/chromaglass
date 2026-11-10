@@ -299,6 +299,9 @@ export const isMapping = (b: SoundBinding): boolean => b.target.kind === 'settin
 // Nor Clear Film, which pours over the whole dish: the same list again.
 // Nor Two Projectors, which switches the rig between one lamp and two.
 const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeImpact', 'pacing', 'songFollow', 'thinGap', 'clearFilm', 'twoProjectors',
+  'lfo1Bars', 'lfo1Shape', 'lfo1Restart', 'lfo2Bars', 'lfo2Shape', 'lfo2Restart',
+  'lfo3Bars', 'lfo3Shape', 'lfo3Restart', 'lfo4Bars', 'lfo4Shape', 'lfo4Restart',
+  'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // Its dye (PLAN 20b-13), dissolved in the oil: a hand's, not the beat's (sceneMap NOT_A_TARGET).
   'clearFilmDye',
   // Frame Sway is a hand's alone (the owner, 2026-10-11): a kick routed to it would slide the whole frame on the beat (lib/plateRock.ts).
@@ -543,6 +546,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The ground the dye is seen on (PLAN 18b): a fader fades a look from dye
   // as light on black to the lamp shining through it.
   { key: 'lampGround',      label: 'Lamp Ground',      min: 0, max: 1 },
+  { key: 'heat',            label: 'Heat',             min: 0, max: 1 },
   { key: 'iridescence',     label: 'Iridescence',      min: 0, max: 1 },
   { key: 'camera',          label: 'Lens',             min: 0, max: 1 },
   { key: 'focus',           label: 'Focus',            min: 0, max: 1 },
@@ -632,6 +636,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // and the bottom of the travel is a whisper of a glass.
   { key: 'liquidMl',        label: 'Liquid',           min: 9, max: 150 },
   { key: 'coverWeight',     label: 'Cover Weight',     min: 0, max: 1000, curve: 2 },
+  // The song's title as ink (PLAN 37x-10): how fast the wash takes one, on a knob, ridden in a set;
+  // its size and where it lands. The switch is the desk's and the phone's (a boolean, not a fader).
+  { key: 'inkTitleSweep',   label: 'Title Sweep',      min: 0, max: 1 },
+  { key: 'inkTitleSize',    label: 'Title Size',       min: 0, max: 1 },
+  { key: 'inkTitleY',       label: 'Title Height',     min: 0, max: 1 },
   // How much a running sequence plays its stages as scenes (lib/scenePacing.ts).
   // A knob because a set breathes: flat for the opener, deeper as the night
   // goes on, back to 0 to hand the plate to the hands.
@@ -646,6 +655,26 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'spinRpm',         label: 'Spin Rate',        min: -45, max: 45 },
   { key: 'spinAuto',        label: 'Auto Spin',        min: 0, max: 2, step: 1 },
   { key: 'spinBeats',       label: 'Beats a Turn',     min: 1, max: 64, step: 1 },
+  // The modulators (PLAN 30b): each LFO's bars, shape and restart trigger, and
+  // each envelope's attack, decay and trigger source.
+  { key: 'lfo1Bars',        label: 'LFO 1 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo1Shape',       label: 'LFO 1 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo1Restart',     label: 'LFO 1 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'lfo2Bars',        label: 'LFO 2 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo2Shape',       label: 'LFO 2 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo2Restart',     label: 'LFO 2 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'lfo3Bars',        label: 'LFO 3 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo3Shape',       label: 'LFO 3 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo3Restart',     label: 'LFO 3 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'lfo4Bars',        label: 'LFO 4 Rate',       min: 0.25, max: 16, step: 0.25 },
+  { key: 'lfo4Shape',       label: 'LFO 4 Shape',      min: 0, max: 4, step: 1 },
+  { key: 'lfo4Restart',     label: 'LFO 4 Restart',    min: 0, max: 4, step: 1 },
+  { key: 'env1Attack',      label: 'Envelope 1 Attack', min: 0.001, max: 1 },
+  { key: 'env1Decay',       label: 'Envelope 1 Decay',  min: 0.02, max: 4 },
+  { key: 'env1On',          label: 'Envelope 1 Trigger', min: 0, max: 4, step: 1 },
+  { key: 'env2Attack',      label: 'Envelope 2 Attack', min: 0.001, max: 1 },
+  { key: 'env2Decay',       label: 'Envelope 2 Decay',  min: 0.02, max: 4 },
+  { key: 'env2On',          label: 'Envelope 2 Trigger', min: 0, max: 4, step: 1 },
   /*
     The mixer (lib/mixer.ts): each source's level and its four grade controls.
     Learnable because they are what a video mixer's channel strip is, and a

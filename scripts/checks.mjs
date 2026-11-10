@@ -61,6 +61,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { stayedFree } from './macdeploy.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MANIFEST = process.env.CHECKS_MANIFEST || path.join(ROOT, 'scripts/checks.json');
@@ -557,7 +558,18 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     }
   }
   const results = [];
+  /*
+    On the owner's Mac, a look for other work before each check and after
+    the last (PLAN.md 19ah-9a, scripts/macdeploy.mjs): work begun mid-shard
+    shares the GPU the timing lines read. Gone within two minutes, the shard
+    goes on; still there, or there at all after a red check, it stops here,
+    and its last step hands the deploy to GitHub's Macs. GitHub's own Macs
+    answer true at once.
+  */
+  const lookAgain = () => stayedFree(results.length > 0 && !results.at(-1).r.ok && !results.at(-1).q);
+  let stopped = false;
   for (const c of list) {
+    if (!lookAgain()) { stopped = true; break; }
     console.log(`::group::Run ${c.run}`);
     const r = await runOne(c);
     console.log('::endgroup::');
@@ -576,6 +588,11 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
       console.log(`::error title=${escProp(c.name)}::${escData([`${c.run}: ${how}`, ...r.fails].join('\n'))}`);
     }
   }
+  if (!stopped && results.length && !lookAgain()) stopped = true;
+  if (stopped) {
+    const left = list.filter((c) => !results.some((x) => x.c === c));
+    console.log(`::error title=${escProp(`${shard}: stopped, the owner's Mac busy`)}::${escData(`Other work drew with the owner's Mac's GPU mid-shard; the watchdog runs this deploy again on GitHub's Macs (PLAN.md 19ah-9a).${left.length ? ` Not run here: ${left.map((c) => c.name).join('; ')}` : ''}`)}`);
+  }
   const red = results.filter(({ r, q }) => !r.ok && !q);
   const held = results.filter(({ r, q }) => !r.ok && q);
   const total = results.reduce((s, { r }) => s + r.secs, 0);
@@ -586,7 +603,7 @@ export async function runShard(shard, manifest = loadManifest(), only = process.
     const rows = results.map(({ c, r, q }) => `| ${r.ok ? '✓' : q ? '⚠' : '✗'} | ${c.name.replace(/\|/g, '\\|')} | \`${c.run.replace(/\|/g, '\\|').replace(/`/g, "'")}\` | ${Math.round(r.secs)} |`);
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, [`### ${shard}: ${results.length - red.length - held.length} of ${results.length} green${held.length ? `, ${held.length} red on quarantined lines only` : ''}, ${fmtSecs(total)}${room ? ' ⚠ past its room line (PLAN.md 19k-13)' : ''}`, '', '| | check | command | s |', '|---|---|---|---:|', ...rows, ''].join('\n') + '\n');
   }
-  return red.length ? 1 : 0;
+  return red.length || stopped ? 1 : 0;
 }
 
 /*

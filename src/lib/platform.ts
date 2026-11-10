@@ -288,6 +288,8 @@ const STAGE_1024_MAX_PX = 1920 * 1200;
 
 /** A stage's pixel rungs: all of it, three quarters, half (linear, so 100 %, 56 % and 25 % of the pixels). */
 const STAGE_SHARES = [1, 0.75, 0.5];
+/** The largest canvas a stage opens on (2880×1620, the 0.75 share of 3840×2160, 4.67 Mpx; PLAN 14c-4k). */
+const STAGE_OPEN_MAX_PX = 2880 * 1620;
 
 /**
  * The quality ladder while a projector is mirroring the canvas (PLAN.md §14c).
@@ -347,12 +349,14 @@ function stageLadder(
   const grids = fits.length ? fits : [all[all.length - 1]];
   const open = grids.find((g) => g <= wanted) ?? grids[grids.length - 1];
   const least = STAGE_SHARES[STAGE_SHARES.length - 1];
+  const stagePx = stage.width * stage.height;
+  const openShare = STAGE_SHARES.find((dpr) => stagePx * dpr * dpr <= STAGE_OPEN_MAX_PX) ?? least;
   const rungs: QualityRung[] = [
     ...grids.filter((g) => g > open).map((grid) => ({ grid, dpr: 1 })),
     ...STAGE_SHARES.map((dpr) => ({ grid: open, dpr })),
     ...grids.filter((g) => g < open).map((grid) => ({ grid, dpr: least })),
   ];
-  return { rungs, start: rungs.findIndex((r) => r.grid === open && r.dpr === 1) };
+  return { rungs, start: rungs.findIndex((r) => r.grid === open && r.dpr === openShare) };
 }
 
 /**

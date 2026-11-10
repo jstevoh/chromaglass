@@ -65,12 +65,14 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { isGpuEngine } from './frame.mjs';
 import { AUTOPLAY, untilRunning } from './recorder.mjs';
 import { SITE_FILMS, LOOP_SECONDS, LOOP_BLEND_S, FADE_IN_S, FADE_OUT_S, PUBLIC_DOMAIN, creditLines } from '../src/lib/siteFilms.ts';
 
-const PORT = Number(process.env.SITEFILMS_PORT ?? 4361);
+// Asked of ports.mjs, so it moves with its runner's block and never meets
+// another harness's preview (4361 was stutter's).
+const PORT = port(4362, 'SITEFILMS_PORT');
 const OUT = path.resolve(process.env.SITEFILMS_OUT ?? 'scratch/sitefilms');
 const DIST = path.resolve('dist-sitefilms');
 const [W, H] = (process.env.SITEFILMS_SIZE ?? '1920x1080').split('x').map(Number);

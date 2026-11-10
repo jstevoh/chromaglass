@@ -12,9 +12,11 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32 } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32 } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
+import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
+import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
 
 /**
  * How much of the plate the air's cover has to change in a step (a bubble of
@@ -277,6 +279,112 @@ export class FluidPasses extends FluidFields {
     this.slosh.step(enc, p.magnetSeconds ?? 1 / 60, drive.ax, drive.ay, drive.nu, drive.presses, oil, this.sloshLevel, this.profiler.pass('slosh'));
     this.sloshLevel = false;
     this.sloshTex = this.slosh.flow;
+  }
+
+  /**
+   * Step the plate's thermal and two-phase boil model (PLAN §36e-2, PLATE_BOIL_WGSL)
+   * when the Heat dial is up or cooling down after it was turned off. At Heat = 0
+   * (every look's default), nothing here allocates or runs. Runs before `air.splat`
+   * so the step's steam coverage is merged in the single `air.splat` render pass.
+   */
+  protected stepPlateBoil(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    const heat = Math.max(0, Math.min(1, Number.isFinite(p.heat) ? (p.heat as number) : 0));
+    const seconds = Math.max(0, Math.min(0.1, p.magnetSeconds ?? 1 / 60));
+    if (heat > 1e-4) this.boilTail = 30;
+    else if (this.boilTail > 0) this.boilTail = Math.max(0, this.boilTail - seconds);
+    const want = heat > 1e-4 || this.boilTail > 0;
+    if (!want) {
+      if (this.boilLive) {
+        this.boilLive = false;
+        this.air?.setBoilAlpha(null);
+      }
+      return;
+    }
+
+    const disp = stepDisplacement(p.dt, p.advection, this.N);
+    const thin = this.thinLive;
+
+    if (!this.boilAlpha) {
+      this.boilAlpha = new PingPong(this.device, this.disposer, [this.N, this.N], RG32, 'boil alpha');
+      this.boilFresh = true;
+      const { dTnuc } = seedBoilSites({ n: this.N, width: PLATE_METRES });
+      this.boilSites = this.disposer.track(this.device.createBuffer({
+        label: 'boil sites',
+        size: dTnuc.byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      }));
+      this.device.queue.writeBuffer(this.boilSites, 0, dTnuc.buffer, dTnuc.byteOffset, dTnuc.byteLength);
+      this.boilUni = this.disposer.track(this.device.createBuffer({
+        label: 'boil uniforms',
+        size: 112,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      }));
+    }
+    this.ensureThinGap();
+    const pipe = this.pipelines.computePipeline('plateBoilStep', PLATE_BOIL_WGSL);
+    if (!pipe) return;
+
+    const upright = Math.max(0, Math.min(1, p.plateUpright ?? 0));
+    const gx = p.gravityX ?? 0, gy = p.gravityY ?? -1;
+    const gl = Math.hypot(gx, gy) || 1;
+    const upX = -upright * gx / gl;
+    const upY = -upright * gy / gl;
+    const holds = p.boilHolds;
+    const holdCount = holds ? Math.min(4, holds.length) : 0;
+
+    const f32 = this.boilUniF;
+    const u32 = this.boilUniU;
+    f32[0] = this.N;
+    f32[1] = seconds;
+    f32[2] = disp;
+    f32[3] = heat;
+    f32[4] = Math.max(0, Math.min(1, p.dimmer ?? 1));
+    f32[5] = REST_GAP;
+    f32[6] = REST_GAP_METRES;
+    f32[7] = PLATE_METRES;
+    f32[8] = upX;
+    f32[9] = upY;
+    u32[10] = holdCount;
+    u32[11] = (thin ? 1 : 0) | (this.boilFresh ? 2 : 0);
+    this.boilFresh = false;
+    for (let i = 0; i < 4; i++) {
+      const h = i < holdCount ? holds![i] : null;
+      f32[12 + i * 4] = h ? h.x : 0;
+      f32[12 + i * 4 + 1] = h ? h.y : 0;
+      f32[12 + i * 4 + 2] = h ? (h.radius ?? HAND_RADIUS) : 0;
+      f32[12 + i * 4 + 3] = 0;
+    }
+    this.device.queue.writeBuffer(this.boilUni!, 0, this.boilUniData);
+
+    const key = `plateBoilStep:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${this.boilAlpha.read.label}`;
+    let group = this.groups.get(key);
+    if (!group) {
+      group = bindGroup(this.device, pipe, [
+        this.boilUni!,
+        this.vel.read,
+        this.velForced,
+        this.dye.read,
+        this.squeeze.read,
+        this.boilAlpha.read,
+        this.boilSites!,
+        this.vel.write,
+        this.boilAlpha.write,
+        this.hsPour!,
+      ]);
+      this.groups.set(key, group);
+    }
+
+    const pass = enc.beginComputePass({ label: 'boil', timestampWrites: this.profiler.pass('boil') });
+    pass.setPipeline(pipe);
+    pass.setBindGroup(0, group);
+    const w = Math.ceil(this.N / 8);
+    pass.dispatchWorkgroups(w, w);
+    pass.end();
+
+    this.vel.swap();
+    this.boilAlpha.swap();
+    this.boilLive = true;
+    this.air?.setBoilAlpha(this.boilAlpha.read);
   }
 
   /**
@@ -808,7 +916,7 @@ export class FluidPasses extends FluidFields {
 
   /** The lasting current: forces, then its own projection, on the M grid. */
   protected stepCurrent(pass: GPUComputePassEncoder): void {
-    const m = this.arg('current grid', [0, this.M, 0, 0]);
+    const m = this.arg('current grid', [0, this.M, this.boilLive ? 1 : 0, 0]);
     this.run(pass, 'currentForces', this.cur.write, [this.cur.read, this.vel.read, this.dye.read], m, this.M);
     this.cur.swap();
     this.run(pass, 'curDivergence', this.curDiv, [this.cur.read], m, this.M);
