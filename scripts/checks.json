@@ -687,7 +687,7 @@
     {
       "name": "Three sound builds, their checks written first",
       "shard": "logic",
-      "run": "npm run soundowed -- --owed=voices",
+      "run": "npm run soundowed",
       "why": [
         "Program Change reaching a look or a set-list item (PLAN 14t-pc), MIDI",
         "notes as voices placed by Melody Walk's scale with an attack, a release",
@@ -1448,7 +1448,7 @@
       "name": "A song's title painted as ink, then swept away",
       "shard": "lab7",
       "run": "npm run inktitle",
-      "timeout": 9,
+      "timeout": 14,
       "why": [
         "The Live Show's ink titles (PLAN 37x-10, scripts/inktitle.mjs), written ahead",
         "of their build: the cue (one title a song, the switch, 40 characters), the",
@@ -1464,7 +1464,11 @@
         "main it opens no browser; built, the lab steps 1,200 times, about six minutes",
         "on SwiftShader, beside soapbreak in lab3. In lab7 since 19k-17: on the slow tier",
         "lab3 reached it at 17:50 of its 25 (soap 8:14, soapbreak 4:35) and was cancelled",
-        "in it on two pull requests' runs and a re-run on 2026-11-10."
+        "in it on two pull requests' runs and a re-run on 2026-11-10. Its bound is 14",
+        "minutes, not 9: in lab7 it ran about 7 on a fast runner (#781) and was stopped at",
+        "9:00 on the slow one (H2c-labels the same day), where every lab script runs about",
+        "twice as long as on the fast one (soap 8:14 against 4:09). A bound on wall time,",
+        "not on anything the check measures."
       ]
     },
     {

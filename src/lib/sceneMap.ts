@@ -173,6 +173,8 @@ export interface PatchContext {
    * the same master, Sound Impact.
    */
   hits?: HitSource | null;
+  /** MIDI notes as voices (`noteVoices.ts`): velocity, pitch and held in 0..1. */
+  notes?: { value: (feature: string) => number } | null;
   /** Master depth per source, so a whole source can be pulled down on a fader. */
   roomImpact: number;
   filmImpact: number;
@@ -252,6 +254,10 @@ function liveValue(
     // A note is a name (hitSource.ts noteClass): Sound Impact at zero still
     // silences it, but turned half down it would read as another note.
     return { value: ctx.hits.value(feature), impact: isClassFeature(feature) ? 1 : ctx.soundImpact };
+  }
+  if (source === 'notes') {
+    if (!ctx.notes) return null;
+    return { value: ctx.notes.value(feature), impact: 1 };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".
