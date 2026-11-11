@@ -364,7 +364,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     warmed body of it lifts more than the warmed water beside it, which is
     what turns a lamp's wax from heavy to light.
   */
-  let rho = wax - S.meanD + S.oilRho * oil;
+  let rho = wax - S.meanD + oilWeightAt(v.z) * oil;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z * (1.0 + S.oilExpand * oil));
   var heat = v.z;
   if (A.a.z > 0.0) {
@@ -386,9 +386,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       liquid under it, where a lamp's wax lies in a pool on the bottom and
       leaves it in bodies.
     */
+    /*
+      An oil heavier than the water (S.oilRho above 0) is the wax, and then
+      the dye is only the colour: in the water it is what the bodies have
+      lost, and warmed in the dye's band it made a hot pool of water under
+      the wax that held the risen bodies up for good (the lab at 60 s: the
+      water below a quarter of the plate's height at 12 of the heat's units
+      against 2.9 in the wax and 1.8 in the water above). And the oil is
+      warmed as a body (from a quarter to three quarters full), not as the
+      faint haze Cahn–Hilliard leaves in the water, which on the warm floor
+      was a heater of its own.
+    */
     let down = dot(uvOf(id) - vec2f(0.5), normalize(A.b.xy));
-    heat += A.a.z * max(smoothstep(A.a.w - 0.08, A.a.w, down) * clamp(wax * 2.0, 0.0, 1.0) * (1.0 - oil),
-                        smoothstep(0.4, 0.45, down) * oil);
+    let dyeWax = select(clamp(wax * 2.0, 0.0, 1.0), 0.0, S.oilRho > 0.0);
+    heat += A.a.z * max(smoothstep(A.a.w - 0.08, A.a.w, down) * dyeWax * (1.0 - oil),
+                        smoothstep(0.28, 0.34, down) * (1.0 - smoothstep(0.42, 0.46, down)) * smoothstep(0.25, 0.75, oil));
   }
   v = vec4f(v.xy + capillary + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));

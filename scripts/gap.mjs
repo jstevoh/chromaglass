@@ -333,8 +333,8 @@ const rk4 = (h0, P, sig, mu, t) => {
   // The solver lays the cover's gap: the uniform is packed from the ledger, and the gap kernels read it.
   const fluid = readFileSync('src/gpu/fluid.ts', 'utf8'), cover = readFileSync('src/gpu/fluid/cover.ts', 'utf8'), shared = readFileSync('src/gpu/wgsl/fluid/shared.ts', 'utf8');
   const packed = /f\[51\] = this\.coverGap;/.test(fluid) && /this\.coverAdvance\(p\);\n\s*this\.writeSim\(p, disp\);/.test(fluid);
-  // Nothing but comments between lampHeat (50) and cover, so the field is slot 51. The oil's weight and expansion follow it (52, 53; PLAN 27f-9c), so cover is no longer the last field: they are asked for after it, a comment between.
-  const field = /lampHeat: f32,\n(\s*\/\/[^\n]*\n)*\s*cover: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*oilRho: f32,\n\s*oilExpand: f32,\n\};/.test(shared);
+  // Nothing but comments between lampHeat (50) and cover, so the field is slot 51. The oil's weight, expansion and melt follow it (52 to 55; PLAN 27f-9c), so cover is no longer the last field: they are asked for after it, a comment between.
+  const field = /lampHeat: f32,\n(\s*\/\/[^\n]*\n)*\s*cover: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*oilRho: f32,\n\s*oilExpand: f32,\n\s*\/\*[\s\S]*?\*\/\n\s*oilMelt: f32,\n\s*oilMeltW: f32,\n\};/.test(shared);
   const metres = /this\.coverGap = h \/ DISH_GAP_FIELD_METRES;/.test(cover) && /\[this\.lastCurve, p\.plateCurve, this\.coverLaid, this\.coverGap\]/.test(cover)
     && /else if \(this\.lastCurve !== p\.plateCurve \|\| this\.coverGap !== this\.coverLaid\)/.test(cover) && /\n\s*this\.coverLaid = this\.coverGap;/.test(cover);
   check('the solver packs the cover\'s gap (gap units, h over the metres in a unit) as S.cover at 51, before the step\'s kernels, and a cover that moves shifts the field',

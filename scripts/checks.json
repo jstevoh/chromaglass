@@ -1445,6 +1445,21 @@
       ]
     },
     {
+      "name": "Lava Lamp's wax holds together and the lamp lifts it",
+      "shard": "lab4",
+      "run": "npm run lavawax",
+      "timeout": 15,
+      "why": [
+        "Lava Lamp's wax was dye, and dye mixes: sealed in its bottle it filmed red",
+        "wall to wall (PLAN 27f-9c). Now it is the oil with a weight of its own (Oil",
+        "Weight) and a melt. On the look's settings and the app's lay: laid as dye it",
+        "leaves 12% of the dish a thin wash against the oil's 5%; as oil 85% of the dish",
+        "stays clear with 84% of the colour in the bodies; the cold top body sinks (7% stays,",
+        "an oil at Oil Weight -1 keeps all of it); the lamp holds the wax off the floor (2%",
+        "below 0.15 of the height, 76% with no heat). About ten minutes on SwiftShader."
+      ]
+    },
+    {
       "name": "A standing plate is a sealed bottle",
       "shard": "lab7",
       "run": "npm run sealed",

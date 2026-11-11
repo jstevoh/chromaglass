@@ -200,16 +200,31 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       20 s where the wax lies on the bottom rim. A press on a standing plate is still an open
       edge for the glass. The full answer is a closed rim for the weight's part of the gap's
       own solve.
-    - **27f-9c, open. Lava Lamp's wax is dye, and dye mixes.** Filmed on the Mac sealed
-      (2026-11-11): the wax stays, but the plate is red wall to wall (mean brightness 0.23
-      against 0.50 when it drained, Dye Budget 0.35 the same as 0.65), the warmed band sits in
-      the upper half with cooled fingers falling from it, and there are no separate blobs or
-      clear liquid. Real lamp wax is immiscible: a heavy phase with a surface tension, which
-      breaks into blobs, pools at the bottom, swells and lifts as one body. The engine's
-      immiscible phase is the oil (Oil Bodies' Cahn–Hilliard mix); the lamp wants that phase
-      heavier than the liquid when cold and lighter when warm (its own density in `mixForce`'s
-      `rho`, the heat carried in it), on the seal. Then the look's heat lift against its
-      weight: today the warmed liquid lifts several times what the wax weighs.
+    - **27f-9c. Lava Lamp's wax is a liquid of its own (shipped 2026-11-11; story in
+      docs/plan-shipped.md §27f-9c).** The wax is the oil, heavy cold (Oil Weight, a new
+      setting) and lighter warm (OIL_EXPAND, WAX_MELT), its colour kept in it (Oil Bodies);
+      the lamp warms it as a body off the rim. `npm run lavawax`.
+    - **27f-9d, open (a shortcut named).** Any oil heavier than the water is taken to be a
+      lamp's wax and melts at WAX_MELT. A heavy oil that does not melt (a dense silicone, a
+      chlorinated solvent) wants its own switch, or the melt as a property of the poured
+      liquid (§38e's bottles).
+    - **27f-9e, open. The wax settles over the lamp instead of cycling.** In the lab (128²,
+      SwiftShader, 64 s) the wax pools, lifts off the floor and splits into bodies, but it
+      hangs as a low sheet at the top of the lamp's band rather than rising to the top and
+      coming down: wax sinking into the band is melted at its top edge and lifted again, a
+      stable balance, at any Heat Decay from 0.99 to 0.999 and with or without the melt. A
+      real lamp breaks it with heat it stores and the floor it is heated through: a blob
+      leaves the hot glass with heat to spare and is not warmed again until it is back on
+      it, and paraffin freezes a few kelvin below where it melts. Wanted: the lamp's heat
+      laid through the floor's contact only (which the round dish's open rim does not
+      give: heated at the rim, the wax churned into a haze), or the melt's hysteresis as a
+      state the wax carries. Tune first on the Mac's GPU, where a minute runs in seconds.
+    - **27f-9f, open. The wax's colour leaks into the liquid over a minute.** In the lab the
+      clear share of the dish falls from about 85% to 60–67% between 30 and 64 s, a pink
+      wash rising from under the wax: Oil Bodies' hand-over where the warmed wax's edge
+      churns, and the dye's own creep past an oil edge (bodyPartition's E). With the dye
+      weighing (Dye Weight 0.7) that wash also lies heavy under the wax. The colour should
+      stay in the wax as an oil-soluble dye does.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).

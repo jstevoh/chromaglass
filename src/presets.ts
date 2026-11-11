@@ -2127,7 +2127,14 @@ export const PRESETS: Preset[] = [
       oilWeight: 0.6,
       plateUpright: 1,
       solutalBuoyancy: 0.7,
-      doubleDiffusion: 0.5,
+      /*
+        Heat spreads at water's own rate (PLAN 27f-9c). 0.5 made it fifty times
+        faster for salt fingers in the dye-wax: with the wax a body, the heat
+        leaked out of every risen body into a warm pool of water under the wax
+        that held it up (the lab, 40 s: 5.3 of the heat's units in the water
+        under the bodies, 2.6 in the wax).
+      */
+      doubleDiffusion: 0,
       tiltDirection: 180,
       heatDecay: 0.995,
       lampGround: 1,
@@ -2150,7 +2157,12 @@ export const PRESETS: Preset[] = [
       */
       centerGravity: 0,
       diffusionRate: 0,
-      buoyancy: 0.42,
+      /*
+        The liquid's own heat lift (the lasting current's) kept small: a lamp
+        runs on the wax swelling (OIL_EXPAND) and melting (WAX_MELT), and at
+        0.42 the warmed water lifted the wax off the floor as a sheet over it.
+      */
+      buoyancy: 0.1,
       advection: 0.48,
       damping: 0.988,
       automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)

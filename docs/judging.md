@@ -2629,3 +2629,18 @@ kick and the wells still turn.
    where the fronts meet, with no painted pink or green spots on the kicks.
 3. Bad: Chemical Clock going flat or pale over a long set (its seed's pools now only fade,
    25i-11), or no ring on the kicks.
+
+## 123. Lava Lamp's wax as blobs in a clear liquid (PLAN 27f-9c)
+
+The wax is a liquid of its own now (the oil, heavy cold, melting light at the lamp), not a heavy
+dye. Filmed on the owner's Mac before and after.
+
+1. Lava Lamp for a minute: separate crimson bodies of wax in a clear, lamp-lit liquid, never a
+   red wash over the whole plate (the 2026-11-11 film of the sealed plate).
+2. The wax pools low, is lifted off the floor by the lamp and breaks into bodies that move.
+3. Known short of a real lamp (27f-9e): the wax settles as a low sheet over the lamp instead of
+   rising to the top and coming down, and over a minute some of its colour leaks into the
+   liquid as a pale pink (27f-9f). Bad beyond that: the wax gone to a haze, blobs stuck to the
+   rim, or a plate that does not move.
+4. Settings → Oil & Soap → Oil Weight on Oil & Water with Gravity up: left, the oil floats up the
+   standing plate; right, it sinks.

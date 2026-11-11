@@ -203,7 +203,7 @@ export function splodascopeCell(x: number, y: number, n: number, discs: readonly
   y = 0 (the lamp's Gravity points down the screen, tiltDirection 180).
 */
 export const LAVA_BODIES: readonly OilBody[] = [
-  { x: 0.5, y: 0.13, r: 0.13, dye: 1 },
+  { x: 0.5, y: 0.2, r: 0.11, dye: 1 },
   { x: 0.4, y: 0.36, r: 0.06, dye: 1 },
   { x: 0.61, y: 0.58, r: 0.055, dye: 1 },
   { x: 0.47, y: 0.8, r: 0.05, dye: 1 },
