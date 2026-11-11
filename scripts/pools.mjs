@@ -154,7 +154,7 @@ try {
   const runs = [ships, stirred, frozen];
   check('each run is the GPU solver, kept all the minute, its readbacks landing',
     runs.every(r => r.gpuHeld && r.readbacks >= SECONDS * 10),
-    runs.map(r => `${r.name} ${r.gpuHeld ? 'gpu' : 'NO GPU'} ${r.readbacks} readbacks`).join('; '));
+    runs.map(r => `${r.name} ${r.gpuHeld ? 'gpu' : 'lost its solver'} ${r.readbacks} readbacks`).join('; '));
   check(`each run stepped at least ${STEPS} times (the governed thirty a second, at least)`,
     runs.every(r => r.steps >= STEPS), runs.map(r => `${r.name} ${r.steps}`).join('; '));
   check('each run kept the Turbulence it was given to the end', runs.every(r => r.turbHeld),
