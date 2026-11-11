@@ -14,7 +14,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 - Imports only each other, `node:*` and `ws`; never `src/`.
 - The browser side mirrors the wire: `lib/remoteProtocol.ts` (relay), `lib/licenseKey.ts` (keys), `lib/cloudSync.ts` (sync), `lib/crashLog.ts` (reports), `lib/feedback.ts` (feedback), `lib/fingerprint.ts` (song ID).
-- `desktop/main.js` starts `remote-server.js` and imports `server-license.js` in its own process.
+- `desktop/main.js` starts `remote-server.js` and imports `server-license.js` in its own process. The packed app carries only the server files named in `desktop/electron-builder.config.cjs` (`server` filter): a new file the show server imports goes on that list, or the app will not start (`signin-handoff.js` and `laptop.js` were missed once; the Mac app job caught it).
 - Workers deploy with wrangler: `wrangler.toml` (song ID), `wrangler.report.toml` (reports), `wrangler.feedback.toml` (feedback, with its D1 database). Secrets live in the Worker's environment, never here.
 
 ## Files
