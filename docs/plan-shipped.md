@@ -4008,6 +4008,21 @@ error object (`{"message":"rate limited"}`) gave an empty answer, which reads as
 it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
+**19k-16 shipped** 2026-11-11.
+**`draftwall --frames` read 0 painted frames on the Mac.** "The projector window is painted
+from the wall's canvas" counts the frames the projector paints over 8 s. It was red on #734
+(2026-11-08) and then three times in a row on #798's tree (two PR runs and main's deploy),
+each time with the mirror hooked, the window not dark, `paints:0` and the show's canvas at
+1920x1080 where a green run reads 672x378. A tally of 54 Mac runs found the same picture on
+5, four of them on trees without #798, so it was not that PR. The wall was opened a fixed
+1500 ms after the show loaded, about 2.8 s in, while a cold Mac opening takes 13.5 to 14.8 s
+to build its pipelines and take its first step. Until that step the projector's rAF asks for
+frames the show cannot draw (19k-16a), and the canvas already carries the projector's size;
+on a slow opening the 8 s count ended before the show's first frame. The line now waits for
+the show's first step (`waitForShow`, as every app check does) before it opens the wall,
+under `--frames` only; without frames there is no step to wait for and it keeps its 1500 ms.
+The bar (frames painted from either canvas) is unchanged.
+
 **19k-17 shipped** 2026-11-10.
 **`lab5` past its 25 minutes on every speed-hunt PR.**
 `samelook` was given `lab5` as a part of its own because it runs about eleven
