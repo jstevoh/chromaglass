@@ -302,6 +302,19 @@ written first. Line numbers are as read on main at d07ac31.
     for one more gather a pixel while bubbles are on (perf §46 to measure it on the Mac).
     *Measure:* `npm run bubbleround` with a line for the pair at one cell apart, the dye
     between them read against the dye round them.
+    Tried building 38h-17 (2026-11-11), both kept out: (a) the main decode moved past the
+    ramp (`fuv0` taken radially out to the hole's end) drew radial streaks in the liquid
+    between two bubbles a few cells apart, where each pixel's nearest bubble flips and the
+    stretched read lands in the other's hole; it wants the pair's own rule. (b) The camera's
+    read inside the rim taken as the liquid round it put `npm run airlens`'s closeup line at
+    0.50 (as clear air it was 2.09; the field's hole gives about 1): the wall's light then
+    crosses the liquid twice (`airColumn` adds it above and below), so the line's re-derivation
+    from a traced ray comes first. The owner's "dark-cored holes with serrated rims" in Macro
+    Bead's closeup are this item: the ring between a bubble's dark core and its round rim is
+    that inside read, its edge the grid's at a dozen screen pixels a texel.
+  - ~~**38h-17**~~ *shipped 2026-11-11.* The oil beads' rings read at the screen's resolution
+    from their list, not the 512² eight-bit mask (`wgsl/beadShape.ts`). `npm run beadround`.
+    Story in `docs/plan-shipped.md` §38.
   - ~~**38h-4**~~ *shipped 2026-10-31.* The back plate's lamp takes the pigment's grain as
     dye, T^grain (`lampGrain1`), as the front's does. `npm run grainedge` line 4. Story in
     `docs/plan-shipped.md` §38.

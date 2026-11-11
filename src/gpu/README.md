@@ -20,6 +20,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 
 ## Files
 
+- `beadMask.ts`: the beads' mask drawn on the GPU from the list (14ab-6), and `rings`, that list's buffers for the plate to read the rings at the screen's resolution (PLAN 38h-17; null for drops or once a picture stands in).
 - `air.ts`: bubbles as a field the solver carries, and `geo` (type `AirGeo`), the list as the field was last stamped from it, which the plate draws each bubble's outline from (PLAN 38h-15; the solver's `fields.airGeo`, the plate's `draw` fields).
 - `camera.ts`: refraction, depth of field, bloom, grain.
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.

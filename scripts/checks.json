@@ -1072,6 +1072,20 @@
       ]
     },
     {
+      "name": "A bead's outline is round at the screen's resolution",
+      "shard": "lab9",
+      "run": "npm run beadround",
+      "why": [
+        "The owner, 2026-11-11: 'Fix the small bubbles as well' (PLAN 38h-17,",
+        "scripts/beadround.mjs). The small scalloped balls in Macro Bead were the",
+        "oil beads, read from a 512-square eight-bit mask; the plate now evaluates",
+        "the rings at the point drawn from the bead list. Reads each bead's rim",
+        "along 96 rays in the projector and the closeup, and on a lab made to read",
+        "the mask as before, which must fail the same bar. Two labs of two",
+        "plates on SwiftShader: beside bubbleround in lab9."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",

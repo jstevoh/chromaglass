@@ -32,6 +32,7 @@ import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
+import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
@@ -1710,22 +1711,8 @@ fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
   return DROP_HALF_GAP * select(1.0, clamp(g / 0.03, 0.3, 3.0), g > 0.001);
 }
-fn beadWide() -> bool {
-  let d = textureDimensions(beadTex);
-  return d.x > d.y;
-}
-/** Plate uv to the mask's own. Wide, the read is kept off the seam, where a
-    bilinear tap would pick up the colour half's first column as a drop. */
-fn beadAt(uv: vec2f) -> vec4f {
-  if (!beadWide()) { return tex2(beadTex, uv); }
-  let w = f32(textureDimensions(beadTex).x);
-  return tex2(beadTex, vec2f(clamp(uv.x * 0.5, 0.5 / w, 0.5 - 1.0 / w), uv.y));
-}
-/** The drop's colour at uv, as seen lit; only a wide mask has one. */
-fn beadColour(uv: vec2f) -> vec3f {
-  let w = f32(textureDimensions(beadTex).x);
-  return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
-}
+// The beads, read at the screen's resolution where a list is bound (38h-17).
+${BEAD_SHAPE_WGSL}
 /** How much of a drop of radius R (plate uv) is flat on top, for half the
     gap rho: none for a ball (R under rho), and all but its half-round edge,
     rho wide, for a pancake. */
