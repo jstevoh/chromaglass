@@ -773,6 +773,38 @@ feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates
 electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
 available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).
 
+### 13-update-auto. Install Updates Automatically, on or off (2026-11-11)
+
+Asked by the owner on 2026-11-11: "can we have turn on/off auto updates? so people aren't
+surprised by an update?" A signed app had downloaded each release by itself and installed
+it on the next quit, so a performer who quit after soundcheck could open a different
+version than the one they rehearsed with. Nothing ever installed mid-set (only a quit or
+a click did), but nothing stopped a 150 MB download in the background while the show was
+live either.
+
+- **The switch** (`desktop/updates.js`): *ChromaGlass → Install Updates Automatically*, a
+  tick under the update item, and the same switch in Profile & Store's Mac app card
+  (`MacAppCard.tsx`, the preload's `updates.setAuto`); kept in `show.json` as `autoUpdate`,
+  on unless switched off, so every copy keeps the behaviour it had. Off, the app still
+  looks every six hours and says once that a version is available; the menu and the card
+  offer *Install ChromaGlass <version>…*, which downloads it, and it installs on the next
+  quit or at once with *Restart to Update*. An ad hoc copy, which never installs in place,
+  has no switch.
+- **Why `autoInstallOnAppQuit` follows the click too.** electron-updater's MacUpdater hands
+  the downloaded zip to Squirrel.Mac only when it is true; with it false the zip sits on
+  disk and Restart to Update would never come (and `quitAndInstall` then quits whenever
+  Squirrel finishes, minutes after the click). So it is on with the switch and for a
+  version the performer asked for; one switched off mid-download is offered as Install,
+  and the click hands the same zip over. A version Squirrel already has installs on quit
+  whatever the switch says, and the state says so (`ready`).
+- **Never in the middle of a show** (`busy()` in main.js: the projector window open, or a
+  live stream starting or on air): nothing downloads by itself (`autoDownload` is set at
+  each check) and the look comes again in ten minutes (`BUSY_RETRY_MS`), not six hours;
+  *Restart to Update* clicked during one asks first (Restart Now / Later); the owner's
+  assistant's install is refused with the reason.
+- **Checked** by `npm run updates`: 127 lines (30 new), the updater on stand-ins and the
+  relay's rules on the real updater. 13-update-auto-a (a recording as a show) found.
+
 ### 14a. The show goes deaf when its window is hidden
 
 **Read in the code.** The sound analysis runs only on the show window's animation
@@ -13245,3 +13277,18 @@ a blurred shadow alone left 0.0% of the box near-black round the letters (white 
 unreadable), the drop shadow 2.1%; streamed and decoded, the landscape's bottom-left box
 0.0% white before the card, at least 2.0% while it is up, 0.0% after, the top-right
 never touched, and the portrait at least 5.3% in its own corner.
+
+
+## 44k-18. The Mac app's updates from the assistant (2026-11-11)
+
+Built with 13-update-auto, on the coordinator's word that the switch be "exposed to
+Claude's app control too". `app_updates` (status in any mode; auto, check and install in
+Full) is the one assistant call that never reaches the display: the updater is the Mac
+app's main process's, so main.js hands the show server its doors (`setAppUpdates` with
+desktop/updates.js's `updatesHook`), and the relay answers from them at once
+(`server/assistantUpdates.js`), the updater's state in the answer. A show run from a
+terminal has no updater and says so. install never restarts the app mid-show: the
+updater's `install()` refuses while the show is on the projector or live. A phone's
+`assistant-updates` is dropped (`ASSISTANT_ONLY`). Checked by `npm run updates` (the rules
+on the real updater) and `npm run assistant` (`updates-full`, `phone-updates`, each with
+its mutant).

@@ -97,10 +97,20 @@ newer version:
   ChromaGlass <version>…* (or the button in Profile & Store) opens the new download;
   drag it over the old one in Applications.
 
-Either way it never restarts, opens a window or asks anything by itself during a
-show: one notification on the laptop at most, and none while a projector window is
-open. *ChromaGlass → Check for Updates…* looks now. `CHROMAGLASS_NO_UPDATES=1`
-switches it off.
+**Install Updates Automatically** (*ChromaGlass* menu, and the switch in Profile &
+Store's Mac app card; on unless switched off, kept in `show.json` as `autoUpdate`).
+Off, the app still looks and says once that a version is available, and downloads
+nothing until the performer picks *Install ChromaGlass <version>…*; that download then
+installs on the next quit, or at once with *Restart to Update*. A version macOS has
+already taken installs on quit whatever the switch says (Squirrel.Mac does that
+itself), and the menu says *Restart to Update* for it.
+
+Never in the middle of a show: while the show is on the projector or live, nothing
+downloads by itself (it looks again ten minutes later), *Restart to Update* asks
+first, and the owner's assistant's install is refused. Either way it never restarts,
+opens a window or asks anything by itself: one notification on the laptop at most,
+and none while a projector window is open. *ChromaGlass → Check for Updates…* looks
+now. `CHROMAGLASS_NO_UPDATES=1` switches it off.
 
 ## First launch
 

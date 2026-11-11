@@ -44,6 +44,10 @@ export interface DesktopUpdateState {
   status: 'off' | 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error';
   current: string;
   signed: boolean;
+  /** Install Updates Automatically (13-update-auto); missing from an app one release older, which is always on. */
+  auto?: boolean;
+  /** An 'available' version installs in place (Install downloads it) rather than from the .dmg in the browser. */
+  inPlace?: boolean;
   version: string | null;
   url: string | null;
   percent: number;
@@ -53,6 +57,8 @@ export interface DesktopUpdateState {
 export interface DesktopUpdates {
   state: () => Promise<DesktopUpdateState>;
   act: () => Promise<DesktopUpdateState>;
+  /** Missing from an app one release older (desktop/preload.cjs), which has no switch. */
+  setAuto?: (on: boolean) => Promise<DesktopUpdateState>;
   onChange: (fn: (s: DesktopUpdateState) => void) => () => void;
 }
 
@@ -88,13 +94,17 @@ export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState
     const current = s?.current ?? '';
     if (!s) return { kind: 'in-app', current, line: '…', button: null };
     if (s.status === 'off') return { kind: 'in-app', current, line: 'Updates are off in this copy.', button: null };
+    const auto = s.auto !== false;
+    if (s.status === 'available' && s.inPlace) {
+      return { kind: 'in-app', current, line: auto ? `ChromaGlass ${s.version} is available. It downloads by itself after the show.` : `ChromaGlass ${s.version} is available. Nothing installs until you choose.`, button: `Install ${s.version}` };
+    }
     if (s.status === 'available') return { kind: 'in-app', current, line: `ChromaGlass ${s.version} is out.`, button: `Download ${s.version}` };
     if (s.status === 'downloading') return { kind: 'in-app', current, line: `Downloading ${s.version} (${s.percent}%). It installs when you quit.`, button: null };
     if (s.status === 'ready') return { kind: 'in-app', current, line: `${s.version} is ready. It installs when you quit.`, button: 'Restart to Update' };
     if (s.status === 'checking') return { kind: 'in-app', current, line: 'Checking for updates…', button: null };
     if (s.status === 'none') return { kind: 'in-app', current, line: 'This is the newest version.', button: 'Check for Updates' };
     if (s.status === 'error') return { kind: 'in-app', current, line: 'Could not reach the releases just now.', button: 'Check for Updates' };
-    return { kind: 'in-app', current, line: 'It looks for new versions by itself.', button: 'Check for Updates' };
+    return { kind: 'in-app', current, line: auto ? 'It looks for new versions and installs them when you quit.' : 'It looks for new versions and asks before installing.', button: 'Check for Updates' };
   }
   if (!(MAC_APP_TIERS as ReadonlyArray<string>).includes(tier)) return { kind: 'with-a-licence' };
   return mac ? { kind: 'download', href: MAC_DOWNLOAD_URL } : { kind: 'on-a-mac' };

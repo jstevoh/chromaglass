@@ -32,7 +32,7 @@ import { createServer } from 'node:net';
 import { networkInterfaces } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { startUpdates, updateMenuItem, updatesOff } from './updates.js';
+import { autoMenuItem, startUpdates, updateMenuItem, updatesHook, updatesOff } from './updates.js';
 import { wireLive } from './liveSession.js';
 import { makeKeyStore } from './keys.js';
 
@@ -568,6 +568,24 @@ function showDetails() {
   that from its own signature without asking macOS.
 */
 let updates = null;
+/** The live stream's session holder (wireLive, below): whether the show is on air, for the updater. */
+let live = null;
+/**
+ * Why a show is on, for the updater (updates.js `busy`): the projector window
+ * open (any window beside the show's), or a live stream starting or on air.
+ * Null when neither, and only then may it download by itself or restart
+ * without asking.
+ */
+function showBusy() {
+  if (BrowserWindow.getAllWindows().length > 1) return 'the show is on the projector';
+  const phase = live?.current()?.phase;
+  if (phase === 'live' || phase === 'starting') return 'the show is live';
+  return null;
+}
+/** Install Updates Automatically, as kept in show.json: on unless it was switched off (13-update-auto). */
+function savedAutoUpdate() {
+  try { return readShowFile().autoUpdate !== false; } catch { return true; }
+}
 function packedFlags() {
   try { return JSON.parse(readFileSync(join(app.getAppPath(), 'package.json'), 'utf8')).chromaglass ?? {}; } catch { return {}; }
 }
@@ -579,6 +597,10 @@ function startUpdater() {
     // Squirrel.Mac itself, so Restart to Update waits until macOS has the update (updates.js).
     nativeUpdater: off || process.platform !== 'darwin' ? null : nativeAutoUpdater,
     off,
+    auto: savedAutoUpdate(),
+    save: (on) => writeShowFile({ autoUpdate: !!on }),
+    busy: showBusy,
+    confirm: ({ message, detail, ok, cancel }) => dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message, detail, buttons: [ok, cancel], defaultId: 1, cancelId: 1 }).then((r) => r.response === 0),
     version: app.getVersion(),
     signed: !!packedFlags().signed,
     feed,
@@ -597,7 +619,9 @@ function startUpdater() {
   globalThis.__chromaglassUpdate = { ...updates.state };
   // The profile sheet asks what was found, and its button does what the menu item does.
   ipcMain.handle('chromaglass:update-state', () => ({ ...updates.state, history: undefined }));
-  ipcMain.handle('chromaglass:update-act', () => { updates.act(); return { ...updates.state, history: undefined }; });
+  ipcMain.handle('chromaglass:update-act', async () => { await updates.act(); return { ...updates.state, history: undefined }; });
+  // The profile sheet's Install Updates Automatically, the same switch as the menu's.
+  ipcMain.handle('chromaglass:update-auto', (_e, on) => { updates.setAuto(on === true); return { ...updates.state, history: undefined }; });
 }
 
 /** The menu's OSC choice: kept, then applied to the running server without a restart. */
@@ -666,11 +690,13 @@ function buildMenu() {
   ];
   // What the updater found goes under the app's name, where a Mac app keeps
   // Check for Updates…, and is rebuilt each time that changes (updates.js).
+  // Install Updates Automatically sits under it, a tick (13-update-auto).
   const item = updates ? updateMenuItem(updates.state) : null;
+  const autoItem = updates ? autoMenuItem(updates.state) : null;
   if (item) {
-    const entry = { ...item, click: () => updates?.act() };
-    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, entry, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
-    else template.push({ label: 'Help', submenu: [entry] });
+    const entries = [{ ...item, click: () => { void updates?.act(); } }, ...(autoItem ? [{ ...autoItem, click: (m) => updates?.setAuto(m.checked) }] : [])];
+    if (isMac) template[0] = { label: app.name, submenu: [{ role: 'about' }, ...entries, { type: 'separator' }, { role: 'services' }, { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] };
+    else template.push({ label: 'Help', submenu: entries });
   }
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -739,7 +765,7 @@ async function start() {
   // RTMPS (live.js), and the stream keys stay in the keychain store (keys.js),
   // where a packed app alone can read them. Headless until the panel (37x-4d):
   // the page's `window.__cgLive` drives it from the console and the check.
-  wireLive(ipcMain, {
+  live = wireLive(ipcMain, {
     keys: makeKeyStore({ file: join(app.getPath('userData'), 'live-keys.json'), safeStorage }),
     isPackaged: app.isPackaged,
     send: (channel, payload) => { if (showWindow && !showWindow.isDestroyed()) showWindow.webContents.send(channel, payload); },
@@ -775,6 +801,8 @@ async function start() {
     enforced: initialStatus.enforced,
   };
   showServer = await import(pathToFileURL(SERVER).href);
+  // The updater, for the owner's assistant (PLAN 44k-18): its state and its doors; the server judges the mode.
+  if (updates) showServer.setAppUpdates?.(updatesHook(updates));
   // The tick set in place, not the menu rebuilt: a rebuild closes a menu the
   // operator has open, and below Pro the page asks again every few seconds.
   showServer.onLinkChange?.((on) => {

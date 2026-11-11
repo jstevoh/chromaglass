@@ -34,6 +34,7 @@ import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from './signin-handoff.js';
 import { LOOPBACK, isLaptop } from './laptop.js';
 import { createAssistantGuard, readAssistantMode } from './assistant.js';
 import { serveMusicFile } from './assistantMusic.js';
+import { updatesCall } from './assistantUpdates.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -432,8 +433,11 @@ const pairTv = (tv, except) => {
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-record', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
+const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
+/** The Mac app's updater, when main.js hands it over (PLAN 44k-18); null in a show run from a terminal. */
+let appUpdates = null;
+export function setAppUpdates(hook) { appUpdates = hook && typeof hook.state === 'function' ? hook : null; }
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
@@ -590,6 +594,9 @@ wss.on('connection', (socket, req) => {
         assistantWantsStill = Date.now();
         broadcastTo('display', JSON.stringify({ type: 'assistant-still', width: Number(message.width) || 1280 }));
         reply = { ok: true };
+      } else if (message.type === 'assistant-updates') {
+        // The Mac app's updates (PLAN 44k-18): the main process's, answered here and never sent to the display.
+        reply = updatesCall(message, assistantMode(), appUpdates);
       } else {
         // The guard hands the display the number its answer comes back under
         // (PLAN 44f-4): one of the relay's own, since each assistant numbers
