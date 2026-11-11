@@ -1,6 +1,8 @@
-import React, { useRef, useCallback, useState, type RefObject } from 'react';
+import React, { useRef, useCallback, useState, useEffect, type RefObject } from 'react';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import { uprightPicture } from '../lib/videoFlow';
+import { CARTOON_BY_ID } from '../lib/cartoons';
+import { publishMedia, setMediaDoor, videoOpens } from './mediaNow';
 
 /**
  * Pouring a picture or a film into the dish: an image laid as dye, a video
@@ -17,21 +19,27 @@ export function usePour({
 }: PourDeps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  /** A picture laid as dye from an address: null once laid, else why not (the assistant's answer, PLAN 44k-13). */
+  const pourImageFrom = useCallback((src: string) => new Promise<string | null>((done) => {
+    if (!visualizerRef.current) { done('the plate is not running'); return; }
     const img = new Image();
     img.onload = () => {
       // Its pixels turned over for the plate, whose rows count up (PLAN 14ab-13).
       const imageData = uprightPicture(img, img.width, img.height);
-      if (!imageData) return;
-      visualizerRef.current?.injectImage(imageData);
-      URL.revokeObjectURL(img.src);
+      if (imageData) visualizerRef.current?.injectImage(imageData);
+      done(imageData ? null : 'that picture could not be read');
     };
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => done('that file would not open as a picture');
+    img.src = src;
+  }), []);
+  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    void pourImageFrom(url).then(() => URL.revokeObjectURL(url));
     // Reset so the same file can be re-selected
     e.target.value = '';
-  }, []);
+  }, [pourImageFrom]);
 
   const videoInputRef = useRef<HTMLInputElement>(null);
   const videoPlayerRef = useRef<HTMLVideoElement>(null);
@@ -80,6 +88,27 @@ export function usePour({
     if (file) pourFile(file);
     e.target.value = '';
   }, [pourFile]);
+
+  /*
+    The assistant's door and copy (app/mediaNow.ts): the Pour panel's own
+    calls, a cartoon poured as the shelf pours one. All are stable
+    callbacks, so the door is set once.
+  */
+  useEffect(() => {
+    setMediaDoor('pour', {
+      image: pourImageFrom,
+      video: async (url, name) => {
+        if (!videoPlayerRef.current || !visualizerRef.current) return 'the plate is not running';
+        const why = await videoOpens(url);
+        if (!why) { pourVideoFrom(url, false); setPouringCartoon(null); setPourName(name); }
+        return why;
+      },
+      cartoon: (id) => { const c = CARTOON_BY_ID.get(id); if (!c) return; pourVideoFrom(c.src, false); setPouringCartoon(id); setPourName(c.title); },
+      stop: stopPour,
+    });
+    return () => setMediaDoor('pour', null);
+  }, [pourImageFrom, pourVideoFrom, stopPour]);
+  useEffect(() => { publishMedia({ pour: { playing: isVideoPlaying, name: pourName, cartoon: pouringCartoon } }); }, [isVideoPlaying, pourName, pouringCartoon]);
 
   return {
     fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying, pouringCartoon,

@@ -58,6 +58,7 @@ import { EAR_MUTANTS, earFullLines, earPageLines, earPlayLines, standInEar } fro
 import { RECORD_MUTANTS, recordFullLines, recordPageLines, recordPlayLines, standInRecord } from './assistant-record.mjs';
 import { UPDATES_MUTANTS, updatesFullLines, updatesPlayLines } from './assistant-updates.mjs';
 import { SOUND_MUTANTS, soundFullLines, soundPageLines, standInSound } from './assistant-sound.mjs';
+import { MEDIA_MUTANTS, mediaDir, mediaFullLines, mediaPageLines, mediaPlayLines, standInMedia } from './assistant-media.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -108,7 +109,7 @@ async function startShow(serverDir, port, dir) {
   // The file is the switch here, so a CHROMAGLASS_ASSISTANT in the caller's
   // environment (which would win over it) is left out.
   mkdirSync(join(dir, 'dist'), { recursive: true });
-  const env = { ...process.env, REMOTE_DIST: join(dir, 'dist'), PORT: String(port), SHOW_KEY, SHOW_KEY_FILE: join(dir, 'key'), OSC_PORT: '0', CHROMAGLASS_ASSISTANT_FILE: modeFile, CHROMAGLASS_MUSIC_DIR: musicDir(dir) };
+  const env = { ...process.env, REMOTE_DIST: join(dir, 'dist'), PORT: String(port), SHOW_KEY, SHOW_KEY_FILE: join(dir, 'key'), OSC_PORT: '0', CHROMAGLASS_ASSISTANT_FILE: modeFile, CHROMAGLASS_MUSIC_DIR: musicDir(dir), CHROMAGLASS_MEDIA_DIR: mediaDir(dir) };
   delete env.CHROMAGLASS_ASSISTANT;
   const proc = spawn(process.execPath, [join(serverDir, 'remote-server.js')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
@@ -167,11 +168,11 @@ function standInDisplay(port, displayKey) {
   const songs = { follow: true, running: null, current: 'show-a' };
   const player = standInPlayer();
   const ear = standInEar();
-  const rec = standInRecord(), snd = standInSound();
+  const rec = standInRecord(), snd = standInSound(), med = standInMedia();
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: snd.state(), bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state(), ear: ear.state(), record: rec.state() } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: snd.state(), bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state(), ear: ear.state(), record: rec.state(), media: med.state() } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -228,6 +229,7 @@ function standInDisplay(port, displayKey) {
     if (m.type === 'assistant-ear') ear.onMessage(m, answer, sendState);
     if (m.type === 'assistant-record') rec.onMessage(m, answer, sendState);
     if (m.type === 'assistant-sound') snd.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-media') med.onMessage(m, answer, sendState);
     if (m.type === 'assistant-songs') {
       const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
       if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
@@ -327,7 +329,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music', 'calibrate', 'song_detection', 'listen', 'record_options', 'take', 'app_updates'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music', 'calibrate', 'song_detection', 'listen', 'record_options', 'take', 'app_updates', 'film', 'pour_file', 'room_camera', 'mark'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -581,6 +583,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await earPlayLines({ mcp, display, check });
     await recordPlayLines({ mcp, display, check });
     await updatesPlayLines({ mcp, display, check });
+    await mediaPlayLines({ mcp, display, check });
 
     // Ten deep.
     await sleep(1100);
@@ -834,6 +837,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await recordFullLines({ mcp, display, check, phone });
     await updatesFullLines({ mcp, display, check, phone });
     await soundFullLines({ mcp, display, check });
+    await mediaFullLines({ mcp, display, check, phone, port, dir });
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -918,6 +922,7 @@ const MUTANTS = [
   ...RECORD_MUTANTS,
   ...UPDATES_MUTANTS,
   ...SOUND_MUTANTS,
+  ...MEDIA_MUTANTS,
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -939,7 +944,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -1058,6 +1063,7 @@ musicPageLines(page, say);
 earPageLines(page, say);
 recordPageLines(page, say);
 await soundPageLines(page, say);
+await mediaPageLines(page, say);
 say((await import(join(ROOT, 'server', 'assistantMusic.js'))).MUSIC_PATH === page.ASSISTANT_MUSIC_PATH, `the page takes a file at the show server's own address (${page.ASSISTANT_MUSIC_PATH})`);
 
 /* The page's own tempo door (44k-7), on the real tempoNow: it takes the
