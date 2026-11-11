@@ -1198,13 +1198,13 @@ export class WebGPUFluid extends FluidCover {
         this.chem.swap();
       }
     });
+    // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
+    stage('carry heat', (pass) => this.carryHeat(pass, disp), thin);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Isotropic Jacobi diffusion used to take
-      about 8a/(1+8a) of it a step. With physical molecular diffusion
-      Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
-      nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
-      elevated diffusion, keeping high-frequency grid modes smoothly damped.
+      GRID_DAMP a step in every look. Jacobi diffusion took 8a/(1+8a) of it a
+      step; at molecular diffusion (dm ≈ 0) gridDiff is ~0, so the damping
+      runs at full GRID_DAMP in every look.
     */
     const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);

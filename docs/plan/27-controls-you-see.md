@@ -225,6 +225,14 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       dish's open rim does not give: heated at the rim, the wax churned into a haze), or a
       melt's hysteresis as a state the wax carries (27f-9d). Tune first on the Mac's GPU,
       where a minute runs in seconds, then give `npm run lavawax` a line for the cycle.
+      *Found 2026-11-11 (38f-1):* the balance was the heat staying where the lamp laid it (a
+      thin gap did not carry it), so a warmed body rose out of its own heat. With the heat
+      carried, the same lab at 192² for 16 s: the wax goes up in plumes with mushroom caps by
+      four seconds and gathers at the top (its centre of mass 0.75 of the height at 16 s
+      against 0.24 without), and it does not come down: it cools only at Heat Decay's 0.995,
+      a time constant of about 50 s on the lab's clock and longer on the look's (38f's second
+      finding). What is left is the cool top of a real lamp: the heat going out through the
+      upper glass in seconds (38f's cooling, from lampBoil's losses), then the cycle's line.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
@@ -236,6 +244,23 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       oil-soluble dye does. With the dye weighing (Dye Weight 0.7) that wash also lies heavy
       under the wax. At six seconds the dish is no clearer than with the wax laid as dye (both
       about 80%): the difference is a minute's, the Mac's film.
+      *With the heat carried (38f-1, 2026-11-11), 192², 16 s:* the wax rises, and the colour
+      left behind is now the trails of the rising plumes: the share of it in the bodies 36%
+      at 16 s against 80% with the wax lying still on the floor, the haze (cells a tenth to a
+      half oil) about 3,500 against 2,400, the dish 67% clear against 80%; at 256² the same
+      (30% against 74%, haze 7,600 against 5,300). Split at 128², 6 s: of the colour outside
+      the bodies, 3,827 units are the oil's own colour in haze cells and 202 the water's, so
+      Oil Bodies keeps the colour with the oil and it is the oil itself that goes to haze
+      (mean 0.15 oil, inside the double well's metastable band below its 0.21 spinodal): the
+      rising plume's trailing edge, smeared by the carry faster than Cahn–Hilliard sharpens
+      it. So the haze's own fix comes with the carry: a free energy whose spinodal sits near
+      the binodals (a deep quench, Flory–Huggins at large χ, or the double obstacle), or the
+      ferrofluid's PHASE_COMPRESS on the mix's carry, named as the carry's correction.
+      `npm run lavawax` line 1 is red with the carry alone (60% clear, needs 70%).
+      *Fixed with it (38f-2):* the deep quench above, shipped with the carry; the same lab
+      at 6 s, 192²: haze 1,474 cells, colour in the bodies 72%, 83% clear (`lavawax` 4/4).
+      What is left of 27f-9f is the Mac's minute: whether the plumes still strip colour
+      over a long take, which the film after this PR shows.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).

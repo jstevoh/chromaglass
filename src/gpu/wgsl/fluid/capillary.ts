@@ -11,6 +11,7 @@
 import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
 import { RIM_SIDE } from './oil';
+import { OIL_SPINODAL, OIL_WELL } from '../../fluid/constants';
 
 /*
   How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
@@ -155,13 +156,37 @@ export const CAPILLARY_KERNELS: Record<string, string> = {
   /*
     Oil and water: the Cahn–Hilliard chemical potential.
 
-    μ = f′(c) − κ∇²c, with f(c) = c²(1 − c)², the double well whose two floors
-    are pure water and pure oil. The first term drives a mixed cell toward
-    one or the other; the second charges for every bit of boundary, which is
-    what surface tension *is*: a blob rounds up because a circle is the
-    shortest boundary for its area, and a thin thread breaks into drops for
-    the same reason (Rayleigh–Plateau). Neither is drawn; both fall out.
-    Stored in the mix's alpha for the update and the force to read.
+    μ = f′(c) − κ∇²c, with f a double well whose two floors are pure water
+    and pure oil. The first term drives a mixed cell toward one or the
+    other; the second charges for every bit of boundary, which is what
+    surface tension *is*: a blob rounds up because a circle is the shortest
+    boundary for its area, and a thin thread breaks into drops for the same
+    reason (Rayleigh–Plateau). Neither is drawn; both fall out. Stored in
+    the mix's alpha for the update and the force to read.
+
+    **The well is a deep quench** (PLAN 38f-2). It was c²(1 − c)², whose
+    spinodal (where f″ turns negative and a mixture comes apart by itself)
+    sits at 0.21 from either side: a cell under a fifth oil was metastable,
+    and with nothing to nucleate it, it stayed so. Once the heat rode the
+    flow (38f-1) the Lava Lamp's wax rose in plumes, and the carry spread
+    each plume's trailing edge into cells about 0.15 oil that never came
+    back: at 192², 6 s, 4,370 cells of haze, half the oil and its colour in
+    them, the dish 67% clear. Real wax and water are not like that. They
+    mix to parts per million (the regular solution at large χ, Flory–
+    Huggins' deep quench), so their spinodal lies within a few per cent of
+    the pure liquids and a smear of one in the other is unstable at any
+    share: it comes apart into drops, which ripen into the bodies.
+
+    So f′ is that shape, laid in two lines a side: from each pure liquid a
+    steep wall, f′ = (OIL_WELL / OIL_SPINODAL)·y for y (the share of the
+    other liquid) up to OIL_SPINODAL, then down in a straight line to 0 at
+    half full, a curvature of −1 there, the old well's own at the middle,
+    so an edge keeps the width it had. The capillary force does not read μ
+    (it is σκ∇c̃, mixForce), so the tension a body shows is unchanged; what
+    changes is that the mixture now has nowhere to rest between the two.
+    The same lab: haze 1,474 cells, 72% of the colour in the bodies against
+    42%, the dish 83% clear. Past the pure liquids the wall goes on, so an
+    overshoot is pulled back as before.
 
     And, with Film Hold (A.a.x), the water film between two bodies of oil
     pushes back as it thins: FILM_WGSL says what that is and why.
@@ -182,7 +207,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let m = textureLoad(src, p, 0);
   let c = m.r;
   let lap = ccN(p, vec2i(1, 0), n, c) + ccN(p, vec2i(-1, 0), n, c) + ccN(p, vec2i(0, 1), n, c) + ccN(p, vec2i(0, -1), n, c) - 4.0 * c;
-  var mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
+  // The deep quench's slope (above): y the share of the other liquid, the wall then the slope to half full.
+  let y = min(c, 1.0 - c);
+  let well = select((${(OIL_WELL / OIL_SPINODAL).toFixed(4)}) * y, ${OIL_WELL.toFixed(4)} * (0.5 - y) / ${(0.5 - OIL_SPINODAL).toFixed(4)}, y > ${OIL_SPINODAL.toFixed(4)});
+  var mu = select(well, -well, c > 0.5) - lap;
   // In the water only: an edge cell on the oil's side sees its own oil
   // both ways along the edge's tangent, and is not in a film.
   if (A.a.x > 0.0) { mu += A.a.x * filmSqueeze(p, n) * (1.0 - smoothstep(0.15, 0.5, c)); }

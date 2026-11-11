@@ -239,6 +239,62 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
 }`,
 
+  /*
+    The lamp's heat carried with the liquid on a thin gap (PLAN 38f). The
+    temperature lives in the velocity's z, and a thin gap never self-advects
+    the velocity (its inertia is the drag time, wgsl/thinGap.ts), so until
+    this the heat stayed in the cell the lamp laid it in while the flow it
+    drove moved the liquid out from under it: a warmed body of Lava Lamp's
+    wax rose out of its heat into cold cells, was heavy again at once, and
+    the lamp's band held the wax as a sheet at its top edge (27f-9e), eroding
+    into the haze below it (27f-9f).
+
+    Heat is an amount carried as the colour is, through the thin solve's own
+    faces in the colour's substeps (carrySubsteps, bodyAdvect): the column's
+    heat h·T, beside the column's liquid h itself through the very same
+    fluxes, and the temperature is the one over the other afterwards. That
+    ratio is what mixing two parcels of liquid gives (the mean weighted by
+    how much of each), and it holds a uniform temperature exactly whatever
+    the gap does in the step (a press, a pour, air arriving): the limited
+    upwind flux is linear in what it carries, slope and all, so a field that
+    is T times the liquid everywhere moves as T times the liquid's flux.
+    Dividing by the gap itself instead would count each press twice, since
+    the gap moved before the solve and the faces carry the liquid it
+    displaced. The heat is split into its warm and cold parts (x, y), as
+    the carry keeps every amount at zero or more and a hand or a boil may
+    take a cell below zero. A.a.x is the rest gap.
+  */
+  heatPack: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var sq: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let h = max(textureLoad(sq, p, 0).r, 0.004) / A.a.x;
+  var t = textureLoad(vel, p, 0).z;
+  if (!finite1(t)) { t = 0.0; }
+  textureStore(dst, p, vec4f(h * max(t, 0.0), h * max(-t, 0.0), h, 0.0));
+}`,
+
+  /*
+    And back into the velocity's z: the heat over the liquid that carried
+    it. A cell the carry all but emptied (an air core, the grid's wall)
+    keeps the temperature it had.
+  */
+  heatUnpack: `${HEAD}
+@group(0) @binding(2) var vel: texture_2d<f32>;
+@group(0) @binding(3) var heat: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let v = textureLoad(vel, p, 0);
+  let c = textureLoad(heat, p, 0);
+  let t = (c.x - c.y) / max(c.z, 1e-6);
+  textureStore(dst, p, vec4f(v.xy, select(v.z, t, c.z > 1e-3 && finite1(t)), v.w));
+}`,
+
   // The drain's inward spiral. A.a.x is the pull, A.a.y how far through it is.
   drainVel: `${HEAD}
 @group(0) @binding(2) var dst: texture_storage_2d<rgba16float, write>;

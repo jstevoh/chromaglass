@@ -84,7 +84,7 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin', 'heatPack', 'heatUnpack'];
 /** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
 export const AIR_DISP_LEAST = 1e-5;
 /*
@@ -270,6 +270,26 @@ export const LAMP_HEAT = 6;
 export const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 export const CH_SUBSTEPS = 4;
+/*
+  Where the oil's mixture stops being able to sit still (its spinodal), as a
+  share of oil from either pure liquid: the deep quench of mixMu's free
+  energy (wgsl/fluid/capillary.ts, PLAN 38f-2). The old quartic double well
+  put it at 0.21, so a smear of oil under a fifth full was stable for ever: a
+  rising wax plume's trailing edge, once the carry had spread it, stayed a
+  coloured haze. Wax and water mix to parts per million, so their spinodal
+  lies within a few per cent of the pure liquids; 0.05 is as near as the
+  explicit step allows (the wall's curvature, OIL_WELL / OIL_SPINODAL, sets
+  its limit: below).
+*/
+export const OIL_SPINODAL = 0.05;
+/*
+  The free energy's slope at the spinodal (its peak), set so the curvature
+  between the two spinodals is −1, the old quartic's at half full: the edge's
+  width is what it was. The wall's curvature is then OIL_WELL / OIL_SPINODAL =
+  9, and the explicit Cahn–Hilliard step on this stencil holds while
+  M·dt·(64 + 8 × 9) < 2, M·dt < 0.0147, over the 0.012 the mix stage runs.
+*/
+export const OIL_WELL = 0.5 - OIL_SPINODAL;
 /*
   Film Hold at 1, as a chemical potential: what the water in a film one
   cell thick costs the oil, against the double well's own height (1/16)
