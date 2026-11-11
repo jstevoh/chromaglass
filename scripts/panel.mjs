@@ -1026,12 +1026,7 @@ for (const [dot, handler] of [['sound', 'onSound'], ['video', 'onVideo'], ['midi
     || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));
 }
 // And the place the mic dot opens has to be able to change the mic.
-check('and the Sound section names the source and leads to the sheet that chooses it, with the device beside',
-  panel.includes('data-testid="audio-source-state"') && panel.includes('data-testid="audio-source-open"')
-  && panel.includes('data-testid="audio-input"'));
-// One home each (PLAN 35c-3): the switch is drawn once, not in the section and the sheet both.
-check('and the source is chosen in the Sound sheet alone',
-  !panel.includes('testId="audio-source"') && readFileSync(join(root, 'src/components/SoundPanel.tsx'), 'utf8').includes('sound-source-${s.id}'));
+// The section it opens draws the sources and the device (PLAN 35c-7): asked in panelOneHome.mjs.
 check('and the sections the dots aim at exist',
   ['audio-input', 'projectors'].every(id => SECTION_BY_ID.has(id)));
 

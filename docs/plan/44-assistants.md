@@ -182,6 +182,31 @@ through cords and preset patches, and the plate shader is untouched.
   the assistant asks `upload_status` after. MCP's progress notifications would let a
   client show a bar instead; Claude's apps did not all show them when checked. Pass: a
   `youtube` line where a client that sends a `progressToken` receives rising progress.
+- **44j.** The live stream and the sound from the assistant: the saved destinations read and picked by name (`go_live`), each destination's health on air, and the sound source read and set (`set_sound_source`, Full; on air too since 44j-2): **shipped** (`npm run assistant`; story in `docs/plan-shipped.md` §44).
+- ~~**44j-2. A sound source changed on air follows into the stream.**~~ **Shipped**: the
+  encoder half in 37x-4f-2 (`npm run live`, "source opened on air"), the guard's refusal
+  lifted 2026-11-10 with 35c-7 (`npm run assistant` line `sound-air`), so the assistant
+  runs a stream with no click from the owner. Story in `docs/plan-shipped.md` §44.
+- **44j-3. The assistant's sound source on the Mac.** *(Owner's eyes, a minute.)*
+  `system` asks macOS for screen-and-sound capture the first time; from the
+  assistant there is no click to answer a prompt with. Try it once on the Mac before
+  a set, and if a prompt appears, answer it by hand once.
+- **44k. Everything at the desk, from the assistant.** *(L. The owner asked
+  2026-11-09: "a complete ability to control everything in ChromaGlass from
+  Claude".)* Today the assistant reaches the look settings (`set`), the room's
+  (Full), the library's looks, the sequencer's transport, the desk's actions, pours
+  and gestures, song actions, poured words, the live stream and the sound source.
+  First an audit, every panel and setting of the Perform and Design desks against
+  the tools, written here as a table (what, the tool that reaches it or "none", the
+  mode it belongs in), then the gaps covered in a few PRs, the bulk in Antigravity's
+  lane against `npm run assistant` lines Claude writes first. Known gaps before the
+  audit: the music player (open a file or a library track, play, pause, seek, the
+  shelf); the microphone's input device; the Mixer's row fades (in the guard's Full
+  list, not in `show_action`'s); reading and editing song shows and set lists, not
+  only adding to the one playing; the liquids on the bench (the `liquid` message);
+  saving a made look (44c-2); recording's options; the Title switch and the logo;
+  OSC, Syphon and MIDI on and off; the projector's mapping. Each new door keeps the
+  rails: the hand wins, Undo, the pace, Full for the room.
 - **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
   lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
   ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
@@ -198,5 +223,5 @@ through cords and preset patches, and the plate shader is untouched.
 
 ## Order
 
-44h next, in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
+44k next (the owner asked 2026-11-09: the audit, then the gaps), then 44h, each in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
 are wanted.

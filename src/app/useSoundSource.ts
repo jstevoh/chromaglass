@@ -4,7 +4,8 @@ import { startSimulatedMusic, type SimulatedMusic } from '../lib/simulatedMusic'
 import type { Track } from '../lib/musicLibrary';
 import { isDesktopApp } from '../lib/platform';
 import { startSystemTap, type SystemTap } from '../lib/systemTap';
-import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY } from './shared';
+import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY, MAC_SYSTEM_AUDIO_KEY } from './shared';
+import { publishSound, setSoundDoor } from './soundNow';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
 function rememberedSource(): AudioSource {
@@ -12,6 +13,8 @@ function rememberedSource(): AudioSource {
     const raw = sessionStorage.getItem(AUDIO_SOURCE_KEY);
     // 'file' needs a file nobody has chosen yet, and 'system' opens a picker in a browser (never in the Mac app).
     if (raw === 'microphone' || raw === 'simulated' || (raw === 'system' && isDesktopApp())) return raw;
+    // A relaunched Mac app (an update, a quit) has no session left; its System audio is kept apart (MAC_SYSTEM_AUDIO_KEY).
+    if (raw === null && isDesktopApp() && localStorage.getItem(MAC_SYSTEM_AUDIO_KEY) === '1') return 'system';
   } catch { /* private */ }
   return 'none';
 }
@@ -115,7 +118,13 @@ export function useSoundSource({
     stopDrone();
 
     setAudioSource(source);
-    try { sessionStorage.setItem(AUDIO_SOURCE_KEY, source); } catch { /* private */ }
+    try {
+      sessionStorage.setItem(AUDIO_SOURCE_KEY, source);
+      if (isDesktopApp()) {
+        if (source === 'system') localStorage.setItem(MAC_SYSTEM_AUDIO_KEY, '1');
+        else localStorage.removeItem(MAC_SYSTEM_AUDIO_KEY);
+      }
+    } catch { /* private */ }
     if (source !== 'file' && musicElRef.current && !musicElRef.current.paused) musicElRef.current.pause();
     if (source === 'none') return;
     if (source === 'file') {
@@ -246,6 +255,15 @@ export function useSoundSource({
   }, [audioStream, refreshAudioInputs]);
   const handleSourceChangeRef = useRef(handleSourceChange);
   handleSourceChangeRef.current = handleSourceChange;
+  // What the show hears, for the remote link to report, and the door the
+  // owner's assistant changes it through (app/soundNow.ts, PLAN 44j): the
+  // same door the Sound panel's buttons use, so nothing about a change made
+  // from there differs from one made by hand.
+  useEffect(() => { publishSound({ source: audioSource, file: audioSource === 'file' ? musicFile?.name ?? null : null }); }, [audioSource, musicFile?.name]);
+  useEffect(() => {
+    setSoundDoor((s) => { void handleSourceChangeRef.current(s); });
+    return () => setSoundDoor(null);
+  }, []);
   /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
   const toggleDrone = useCallback(() => {
     if (droneRef.current) {
