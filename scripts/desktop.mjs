@@ -1109,9 +1109,9 @@ try {
     await sleep(3000);
     const said = await page.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
     const plate = await page.locator('#liquid-canvas').count().catch(() => 0);
-    const native = await page.evaluate(() => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function' })).catch(() => null);
-    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
-      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser` : 'unread'}`);
+    const native = await page.evaluate(async () => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function', front: typeof window.__CHROMAGLASS_NATIVE__?.bringToFront === 'function' ? await window.__CHROMAGLASS_NATIVE__.bringToFront().catch(() => 'threw') : 'none' })).catch(() => null);
+    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate, and its window can bring itself forward (23.17f-3)`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser && native.front === true,
+      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser, brought to the front ${native.front}` : 'unread'}`);
     if (process.env.VITE_MAC_APP !== '1') {
       skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
     } else {

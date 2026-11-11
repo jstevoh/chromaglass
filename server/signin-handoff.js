@@ -36,6 +36,15 @@
  *   and it expires after two minutes either way. A Google ID token lives for an
  *   hour, so the window has long enough and a leftover is useless soon after.
  * - At most a few wait at once, so a loop posting codes cannot grow the map.
+ *
+ * The browser tab asks whether its sign-in was taken (`?h=…&status=1`), and
+ * only that: yes or no, never the credential. The owner, 2026-11-11, on the
+ * hand-off: "it shouldn't go to the chromaglass play page after logging in, it
+ * should just close the login window and go back to the app". The tab can say
+ * "done" and close itself only once it knows the window has the sign-in; until
+ * this, it could only say "go back to the app" and hope. A taken code is
+ * remembered (the code alone, no credential) for as long as a credential would
+ * have waited, so the answer is there when the tab asks a moment later.
  */
 
 import { fromAnotherSite, saysJson } from './server-license.js';
@@ -97,10 +106,13 @@ function cleanCredential(c) {
 export function createSignInHandoff({ now = () => Date.now() } = {}) {
   /** code → { credential, at } */
   const waiting = new Map();
+  /** code → when the window took it: no credential, only that it went. */
+  const taken = new Map();
 
   const prune = () => {
     const t = now();
     for (const [code, v] of waiting) if (t - v.at > HANDOFF_TTL_MS) waiting.delete(code);
+    for (const [code, at] of taken) if (t - at > HANDOFF_TTL_MS) taken.delete(code);
   };
 
   async function handleRequest(req, res, url, isLaptopReq) {
@@ -120,6 +132,7 @@ export function createSignInHandoff({ now = () => Date.now() } = {}) {
       const credential = cleanCredential(body?.credential);
       if (!CODE.test(code) || !credential) return send(res, 400, { ok: false, error: 'bad-handoff' });
       waiting.delete(code);
+      taken.delete(code);
       while (waiting.size >= MAX_WAITING) waiting.delete(waiting.keys().next().value);
       waiting.set(code, { credential, at: now() });
       return send(res, 200, { ok: true });
@@ -128,9 +141,14 @@ export function createSignInHandoff({ now = () => Date.now() } = {}) {
     if (req.method === 'GET') {
       const code = url.searchParams.get('h') ?? '';
       if (!CODE.test(code)) return send(res, 400, { error: 'bad-code' });
+      // The tab's question, which never takes or shows the credential.
+      if (url.searchParams.get('status') === '1') return send(res, 200, { taken: taken.has(code), waiting: waiting.has(code) });
       const v = waiting.get(code);
       if (!v) return send(res, 200, { pending: true });
       waiting.delete(code);
+      taken.delete(code);
+      while (taken.size >= MAX_WAITING) taken.delete(taken.keys().next().value);
+      taken.set(code, now());
       return send(res, 200, { credential: v.credential });
     }
 

@@ -75,6 +75,9 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   // A sign-in that must finish in the real browser (PLAN.md 23.17d): main.js
   // opens only this app's own address.
   openInBrowser: (url) => ipcRenderer.invoke('chromaglass:open-browser', String(url)),
+  // And back again: the window comes to the front when the sign-in it sent to
+  // the browser comes back (PLAN.md 23.17f-3; lib/macApp.ts bringAppToFront).
+  bringToFront: () => ipcRenderer.invoke('chromaglass:bring-to-front'),
   // The laptop's "Make it full screen" for the projector window this show
   // opened (main.js `fillProjector`): no gesture needed from this side.
   fillProjector: () => ipcRenderer.invoke('chromaglass:fill-projector'),
