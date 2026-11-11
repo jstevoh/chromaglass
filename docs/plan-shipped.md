@@ -6400,6 +6400,27 @@ What shipped in #473:
 - **Patch bay hit targets on the desk (`src/components/SettingsPanel.tsx`):** Now that `classic` and `jellyfish-bloom` carry `sceneMappings`, the `patches` deck panel renders their patch cards on load; `Remove mapping` (`h-6 w-6`), `Depth` (`set-range`), `patch-gate-on` (`h-6 w-6`) and the gate sliders (`set-range`) meet the desk's 24 px minimum hit-target rule (`npm run layout`, `npm run qa`).
 - **Still open in `PLAN.md` (`28i-3` film measure, `28i-3b`, `28f-2`):** A fresh showreel (28f-2) and a main-vs-head film on the same looks (seed 1, band in a box) are still owed, and 27 of the 28 changed looks still miss one or more of the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in [−0.13, 0.22]`); all 28 per-look numbers are recorded under `28i-3b` in `PLAN.md`.
 
+### 28i-7c. Velvet Underground's pools stay pools (asked 2026-11-11)
+
+Filmed with every look (28i-7): the frame was the violet ground with one ultramarine lobe
+and a fleck of red where the seed lays three pools, 83% near black, and more dye, more
+exposure, a brighter lamp and the screen blend left it as it was. A probe in the app on the
+owner's Mac (Metal, seed 1, five runs, each turning suspects off) found the dye was never
+lost: the dish held 0.43 to 0.42 of mean dye, while the magenta glycerine kept 38% of its
+dye over 90 s, the soap 71%, the syrup 86%, and the dye outside the three areas went from
+0.001 to 0.117 of the plate. The regulator, the music (band on or off), the hands, the rock,
+the plate pressure, the smear, the drip, the vibration, the air, the surge, the lamp's heat
+(dimmer 0), the buoyancy, the polarity, the carrier's viscosity and the cover glass each
+changed the minute by a point or two at most, and all of them off at once still drained;
+only Advection 0 stopped it, so the flow was the solver's own. It was Turbulence: the look
+never named it and ran the default 0.5, curl noise added to the flow everywhere every step
+(`forcesB`), the plate's speed 0.43 against 0.14 without it. With it at 0 the pools kept
+97/96/95% over 90 s (98.3/96.7/96.0% at 60 s against 67.2/75.5/90.9%), the band's run the
+same. `npm run pools` (Mac, `open` shard) holds the minute at 85% a pool, runs the old stir
+as its control (which must drain one), and asks that the plate still moves. Found along the
+way: 28i-7f (thirteen looks still inherit the noise stir) and 28i-7g (with the motor off
+too, a smaller out-flow remains).
+
 ## 28j. Changing looks without a jump
 
 ### 28j-1. The patch list and the ferrofluid ring cross over, not cut (this PR)
