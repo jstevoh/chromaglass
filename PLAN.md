@@ -261,9 +261,11 @@ style (§31).
   dish, **42g** moiré, **42c** the triple plate, **42h** diffraction; **42i** the owner's call.
 - **6.12** The closeup as a macro photographer films liquid (§47, asked 2026-11-11), each its own
   thread: **47a-1** the particles and the dye's edge at screen scale in the closeup, **47b** dark-field
-  and Rheinberg lighting, **47c** blacklight (fluorescent dyes under a UV lamp), **47d** depth of
+  and Rheinberg lighting, **47j** caustics (most of the picture in the films watched over
+  time), **47c** blacklight (fluorescent dyes under a UV lamp), **47d** depth of
   field from the gap's depth (built under 38q), **47a** the fine window, **47e** sparkle, **47f** the
-  stir bar; **47g**, **47h**, **47i** when wanted; **47m** the owner's reference kit.
+  stir bar; **47g**, **47h**, **47i** when wanted; **47m** the owner's reference kit; **47w** the
+  watch tool's unmerged download.
 
 ### Wave 7. Reach
 
@@ -377,7 +379,7 @@ Where each batch stands, as of 2026-09-27:
 | 43 | Visuals for a musician's release | Asked 2026-11-07 after the revenue research: a Spotify Canvas loop, a YouTube visualizer and vertical cuts from one render, self-serve in the app or done for the musician; the owner picked the Release kit in Home, then a done-for-you test (43-0, 2026-11-07); portrait renders (43a), a seamless loop (43b, its check `loopseam` written and owed) and the release kit (43c) next; nothing built yet |
 | 44 | A person's AI assistant plays the show | Asked 2026-11-07; the owner's answer: **for the owner's own use, not sold or promoted**. **44b, 44c, 44d, 44g shipped** (`npm run assistant`): the show server's `assistant` role behind a switch only the owner sets, Suggest / Play / Full (Full: everything, the live stream included), glides, Undo ten deep, the hand winning; a local MCP server (`mcp/`) with a show guide, the owner's notes and a picture of the plate. **44c-4** (a 1280 still for the assistant) and **44f** (a pour as a song action, `add_song_action`, the song show's clock read every frame) **shipped** (`npm run assistant`, `npm run songs`). **44i**, the owner's YouTube channel from the assistant (a second local MCP server, uploads that resume), **shipped** (`npm run youtube`), 44i-1 waiting on the owner's Google setup, 44i-2 (publish it for others) the owner's call. **44j** (the live stream's destinations and health, and the sound source, from the assistant) **shipped** (`npm run assistant`). 44k (everything at the desk from the assistant): **the audit done 2026-11-11**, its table in the section, the gaps 44k-1 to 44k-17 open (44k-17, the desk's layout, on the owner's word 2026-11-11), 44k-1 (the Mac's assistant on the current server) first; **44k-4, 44k-6, 44k-7, 44k-8** (the Mixer's takes, the bench, Finger and flick, the tempo and Link, choosing the sequence) **shipped** 2026-11-11 (`npm run assistant`), 44k-7a found; 44h, control over the internet, next; 44a and the menu parked while private; 44c-2, 44c-3, 44d-2 to 44d-4, 44f-2 to 44f-4, 44j-3 open; **44j-2** (a source set on air, the stream following it) **shipped** 2026-11-10 |
 | 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), seven looks; **45a shipped** (`npm run moire`), **45a-11** Moiré Waves shipped, **45a-2** sells it to Home ($15 once, Pro includes it), the Waves clip on the site 45a-12, **45a-13** shipped (random looks weigh the pack as one choice, owned only; Randomise takes the sheets off, and with the pack lays a pair one roll in sixteen, 45a-14). |
-| 47 | The closeup as a macro photographer films liquid | Asked 2026-11-11 from a macro artist's site: the closeup magnifies a coarse grid where a macro camera films a small dish finely, so a fine window with the dye finer than the flow (47a, first its cheap half 47a-1), dark-field and Rheinberg lighting (47b), fluorescent dyes under a UV lamp (47c), depth of field from the gap's depth (47d), microbubble and mica sparkle (47e), a stir bar's vortex (47f), Marangoni drops on a thin layer (47g, the owner's call), time-lapse (47h), point lights through the beads (47i), and a reference kit (47m), all proposed |
+| 47 | The closeup as a macro photographer films liquid | Asked 2026-11-11 from a macro artist's site: the closeup magnifies a coarse grid where a macro camera films a small dish finely, so a fine window with the dye finer than the flow (47a, first its cheap half 47a-1), dark-field and Rheinberg lighting (47b), caustics past the linear shadowgraph (47j), fluorescent dyes under a UV lamp (47c), depth of field from the gap's depth (47d), microbubble and mica sparkle (47e), a stir bar's vortex (47f), Marangoni drops on a thin layer (47g, the owner's call), time-lapse (47h), point lights through the beads (47i), and a reference kit (47m), all proposed |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before
@@ -448,7 +450,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 13 |
 | 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 4 |
 | 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46a-46e builds to Antigravity after its queue | 7 |
-| 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 14 |
+| 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 19 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 
 ## Not doing

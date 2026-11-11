@@ -9,8 +9,9 @@ particular piece: no item reproduces one of the artist's films or images.
 
 **What was read.** The site's project pages (the text on each), the Microlab page's eleven
 films by their own descriptions and their poster frames (Vimeo's public oEmbed), and two
-press features. The films themselves were not played: the cloud session cannot fetch
-Vimeo's video files. What the descriptions say, in their own words: "Micro chemical
+press features. The Microlab films themselves were not played: Vimeo refuses a cloud
+address, and on the owner's Mac a headless browser met its bot check, which we do not get
+round; the route is the owner's own screen recording (`scratch/davy/` on the Mac). What the descriptions say, in their own words: "Micro chemical
 reaction in a 3x3 inch Petri dish [6144 x 3456 30fps]"; "filmed under UV lights using
 fluorescent materials"; "All macro effects have been filmed with a canon 5D Mark 3 and a
 100mm macro lens"; "blending acrylic paints in a 90mm Petri dish", time-lapsed over five to
@@ -19,6 +20,22 @@ Voronoi patterns form before the material solidifies"; "inks and dyes are used t
 water currents as they pass through a vortex"; "glass and light"; reactions "often no larger
 than a few inches in diameter". The press: "completely analog, created by the reactions of
 chemicals in water", oil-rich liquids mixed with household chemicals.
+
+**Watched over time (2026-11-11, `npm run watch` on the owner's Mac).** Two of the
+artist's films that are on YouTube: the official visualiser for a Max Richter piece (3:52)
+and *Biolume* (3:50, a third party's upload under the artist's name). Read over each whole
+film: near black 30 % and 46 %, motion median 4.7 and 2.7 (90th percentile 17.1 and 9.6),
+3.4 and 3.1 swells a minute, calm 53 % and 52 %, two hues a frame, 10.4 and 7.6 cuts a
+minute. Both are edited, so the swells are mostly the edit; inside an uncut shot, sampled 8
+times a second, the motion is very even (median 1.1 to 8.5 by shot, the 90th percentile
+barely above the median in three shots of four). So each shot is one slow, continuous
+process, and the variety comes from cutting between processes. What the frames show:
+in the visualiser's long shot (from 1:49) **almost the whole picture is a caustic network**,
+bright lines of focused light on black that drift and re-form, not dye colour at all (47j);
+in *Biolume*, under UV, a film that opens dark holes with rims as it thins, a polygonal mesh
+like a dewetting film, closely packed cells with thin walls and radial streaks inside them
+(Marangoni flow, 47g), and a second, orange fluorescent colour growing in the cells' cores
+(47c). Sheets and timelines: `~/chromaglass/scratch/davy/` on the owner's Mac.
 
 **What the poster frames show, across the eleven.** A black ground everywhere, with the
 liquid as the only light. Structure at every scale at once: a front a few millimetres
@@ -68,6 +85,29 @@ cell's pitch gone (`macroview` gains both lines). Frame cost held by `npm run st
   Draw H1's particles as screen-sized discs when `macroMode` is on, and cut the dye's edge
   by its interpolated level set rather than its cells (with 38h-9, which names the same
   grain). Closes the serrated edge in the photograph cheaply before 47a's window.
+
+## 47j. Caustics: the light focused into a network by a rippled or mixing layer (M)
+
+*Seen:* in a whole long shot, the picture is bright lines of focused light on black that
+drift and re-form, like sunlight on a pool floor. *Physics:* a layer whose optical path
+varies (a rippled surface, or two liquids of different index mixing) bends the light by the
+gradient of the optical path; at a distance z past it the light lands where the ray map
+x → x + z·∇OPL sends it, and the intensity is the source's divided by the map's Jacobian,
+I = I₀ / |det(I + z·∇∇OPL)|. Where the determinant passes through zero the rays cross and
+the light piles up into caustic lines (folds and cusps), bright and sharp, with dark
+between. *Today:* the shadowgraph (38h-3, `defocusShadow` in `plateTransmit.ts`) is the
+linear term, ΔI/I ≈ −Δz·∇²OPL/OPL: right only while z is short of the first crossing, so it
+draws Becke doublets at edges and can never make the network; no file in the plan or the
+code says "caustic". *Build:* past the linear range, take the intensity from the Jacobian of
+the ray map (the Hessian of OPL, which the derive pass's Laplacian already half computes),
+clamped at the folds by the source's angular size (a lamp is not a point, which sets how
+thin and bright a caustic line can be) and by diffraction; on the projected plate and in
+the closeup (with 47b's dark field, the network is the whole picture). The defocus that
+reaches it is the projector's focus and the closeup's Focus dial (47d). *Shortcut, named
+if taken:* a single bounce through the column's summed OPL rather than layer by layer.
+*Measure:* in the lab, a sinusoidal OPL of known amplitude and period forms its first
+caustic at z = 1/(k²·A) within 5 %, the light is conserved over a period within 2 %, and at
+Δz below the first crossing the result matches today's linear shadowgraph within 1 level.
 
 ## 47b. Dark-field and Rheinberg lighting for the closeup (S–M)
 
@@ -192,9 +232,20 @@ a full-frame camera with a 100 mm macro lens, later a 6K cinema camera, UV light
 fluorescent materials, 3 inch and 90 mm Petri dishes, acrylic paints, inks and dyes, glass.
 Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 
+## 47w. Found doing this: the watch tool keeps the audio and stops (S)
+
+On a YouTube download the watch tool's URL path left the video and audio as two files,
+unmerged, then picked the audio file and stopped (found 2026-11-11 on the owner's Mac; they
+were merged by hand to go on; the cause was not found). Make `scripts/watch.mjs` ask yt-dlp
+for a merged file (or merge the pair with ffmpeg itself) and refuse a file with no video
+stream with a message that says so. *Measure:* `npm run watch -- --selftest` plus a line
+that hands it an audio-only file and reads the refusal.
+
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
-its size), 47c, 47d (with 38q), 47a, 47e, 47f; 47g, 47h and 47i when wanted. Each its own
-thread and PR.
+its size) and 47j (caustics, which the films watched over time showed to be most of the
+picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f; 47g,
+47h and 47i when wanted; 47w whenever the watch tool is next touched. Each its own thread
+and PR.
