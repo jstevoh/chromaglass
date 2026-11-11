@@ -23,6 +23,7 @@ import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
 import { useLiveShow, useLiveSetup, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { useSoundNow, askSound } from './soundNow';
+import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
@@ -66,7 +67,7 @@ interface RemoteDeps {
   setCued: Dispatch<SetStateAction<ArmedLook | null>>;
   updateLiquidColor: (id: string, color: string) => void;
   selectedLiquidId: string;
-  liquidTypesRef: RefObject<LiquidType[]>;
+  liquidTypes: LiquidType[];
   setSelectedLiquidId: Dispatch<SetStateAction<string>>;
   setIsActive: Dispatch<SetStateAction<boolean>>;
   setSeedCount: Dispatch<SetStateAction<number>>;
@@ -101,7 +102,7 @@ export function useRemote({
   settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
   allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
   updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
-  cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypesRef, setSelectedLiquidId,
+  cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypes, setSelectedLiquidId,
   setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
   hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording, togglePerformance,
   goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName, runActionRef, runAction,
@@ -161,6 +162,11 @@ export function useRemote({
   // address or a key.
   const liveSetup = useLiveSetup();
   const sound = useSoundNow();
+  const tempo = useTempoNow();
+  // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
+  const bench = useMemo<RemoteState['bench']>(() => ({
+    bottles: liquidTypes.map(l => ({ id: l.id, name: l.name, color: l.color })), inHand: selectedLiquidId,
+  }), [liquidTypes, selectedLiquidId]);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -175,6 +181,8 @@ export function useRemote({
       stageName: sequencer.status.stageName,
       progress: Math.round(sequencer.status.progress * 100) / 100,
       stages: sequencer.status.stages.map(st => ({ name: st.name, seconds: st.seconds })),
+      sequences: sequencer.sequences.map(q => ({ id: q.id, name: q.name, stages: q.stages.length })),
+      selectedId: sequencer.selectedId,
     },
     presets: allPresets.map(p => ({ id: p.id, name: p.name, macro: !!p.settings.macroMode, user: isUserPresetId(p.id) })),
     blackout,
@@ -188,7 +196,9 @@ export function useRemote({
     live,
     liveSetup,
     sound,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound]);
+    bench,
+    tempo,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -309,6 +319,26 @@ export function useRemote({
         case 'assistant-still':
           padPictureRef.current?.wantStill(message.width);
           break;
+        // The tempo, Link and the Sequence (PLAN 44k-7, 44k-8), through the
+        // desk's own callbacks: what a typed bpm, the Link switch or the
+        // Sequence panel's picker does, the assistant's call does.
+        case 'assistant-tempo': case 'assistant-link': {
+          const why = message.type === 'assistant-tempo' ? askTempo(message) : askLink(message);
+          if (why) console.warn(`The assistant's tempo: ${why}`);
+          break;
+        }
+        // One or the other in a message: a stage straight after a choice
+        // would be read against the choice before it, since the choice lands
+        // on the next render. The guard sends them apart. A stage only moves
+        // a run: with none, goTo would start the sequence without holding the
+        // performer's Pacing (useShowSequencer's holdPacing), and stop would
+        // then have nothing to give back.
+        case 'assistant-seq':
+          if (typeof message.select === 'string') {
+            if (sequencer.sequences.some(q => q.id === message.select)) sequencer.setSelectedId(message.select);
+            else console.warn(`The assistant's sequence: no sequence ${message.select}`);
+          } else if (typeof message.stage === 'number' && Number.isInteger(message.stage) && sequencer.status.sequenceId) sequencer.goTo(message.stage);
+          break;
         case 'song-action': {
           let a = parseSongAction(message);
           // A set is clamped as a patch is, and dropped if it names no setting.
@@ -359,7 +389,7 @@ export function useRemote({
         case 'liquid':
           // Only a bottle that is actually on the bench: the pad may be a
           // newer build than the display, or the other way round.
-          if (liquidTypesRef.current.some(l => l.id === message.id)) {
+          if (liquidTypes.some(l => l.id === message.id)) {
             setSelectedLiquidId(message.id);
           }
           break;

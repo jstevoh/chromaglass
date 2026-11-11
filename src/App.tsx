@@ -1913,7 +1913,7 @@ export default function App() {
     settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel, sequencer,
     allPresets, blackout, recorder, cued, fadeSeconds, filmSource, markLoaded, rowFading,
     updateSettings, wallRef, setMirrorCount, setPhoneCount, relaySendRef, castState, cuePreset,
-    cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypesRef, setSelectedLiquidId,
+    cueLook, setCued, updateLiquidColor, selectedLiquidId, liquidTypes, setSelectedLiquidId,
     setIsActive, setSeedCount, setClearTrigger, setDrainTrigger, triggerLucky, setIsAutomated,
     hideOverlays, setOverlaysVisible, stepPreset, toggleBlackout, toggleRecording,
     togglePerformance, goLook, revertLook, fadeRow, selectedLiquid, phone, pinnedLookName,
