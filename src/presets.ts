@@ -2101,21 +2101,30 @@ export const PRESETS: Preset[] = [
   {
     id: 'lava-lamp',
     name: 'Lava Lamp',
-    description: 'The plate stood upright over a warm lamp: coloured wax heavier than the liquid round it sinks in mushroom-headed plumes, is warmed where it pools at the bottom, and rises again.',
+    description: 'The plate stood upright over a warm lamp: blobs of coloured wax that never mix with the clear liquid round them pool at the bottom, swell lighter as the lamp warms them, rise, cool and sink again.',
     settings: {
       /*
         A look for physics that shipped with no look to show it (PLAN.md 28a).
-        Stand the plate up (Plate Upright) and gravity acts in it; give the
-        dye weight (Dye Weight, solutalBuoyancy) and a band of it over clear
-        liquid is a Rayleigh–Taylor instability: it falls in fingers that roll
-        up into mushroom heads, the lab's 192² plate after 400 steps showing
-        a dozen of them from two rows of drops. The solver keeps a lamp under
-        the plate where it leaves the frame (LAMP_HEAT in gpu/fluid.ts), so
-        what pools there is warmed, rises, cools and sinks again: the cycle a
-        lava lamp runs on, rather than a dish that settles. Heat diffusing
-        faster than the dye (doubleDiffusion, as heat does in water) narrows
-        the plumes toward salt fingers. Lit from behind like the real lamp.
+        Stand the plate up (Plate Upright) and gravity acts in it. The solver
+        keeps a lamp under the plate where it leaves the frame (LAMP_HEAT in
+        gpu/fluid.ts), so what pools there is warmed, rises, cools and sinks
+        again: the cycle a lava lamp runs on, rather than a dish that settles.
+        Lit from behind like the real lamp.
+
+        The wax is a liquid of its own (PLAN 27f-9c): the oil (Oil Tension,
+        Cahn–Hilliard, so it holds itself in bodies and the liquid round it
+        stays clear), its colour in it alone (Oil Bodies), heavier than the
+        liquid cold (Oil Weight) and lighter warm, because an oil swells with
+        heat two to three times what water does (OIL_EXPAND). It was dye with
+        a weight (Dye Weight) before, and dye mixes: sealed in its bottle
+        (27f-9) it filmed red wall to wall with no blob in it. Dye Weight
+        stays at 0.7 for the colour a hand pours, and weighs the wax's own
+        dye a little too. Laid as a pool on the warm glass and three bodies
+        on their way (lib/oilLay.ts, LAVA_BODIES).
       */
+      oilTension: 0.9,
+      oilBodies: 1,
+      oilWeight: 0.6,
       plateUpright: 1,
       solutalBuoyancy: 0.7,
       doubleDiffusion: 0.5,

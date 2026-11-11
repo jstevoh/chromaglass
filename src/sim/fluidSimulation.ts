@@ -22,7 +22,7 @@ import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, layLavaLamp } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -2052,25 +2052,9 @@ export class FluidSimulation {
       }
 
       case 'lava-lamp': {
-        // Translucent wax plumes (seedMean ~0.52 so Beer-Lambert transmission stays
-        // bright at 8 s without opaque blackout) with warm rising lower blobs and
-        // sinking upper blobs so convection is already underway by 8 s and sustains
-        // >=0.02 motion through 40 s at luma <=0.60 (PLAN 28i-2).
-        const blobs: [number, number, number, number, number, number][] = [
-          [0.50, 0.66, 14, 0, 14, -0.10],
-          [0.34, 0.62, 13, 1, 12, -0.08],
-          [0.66, 0.60, 13, 2, 12, -0.08],
-          [0.48, 0.46, 13, 0,  6, -0.05],
-          [0.34, 0.36, 12, 1,  0,  0.08],
-          [0.66, 0.36, 12, 2,  0,  0.08],
-        ];
-        for (const [fx, fy, rad, ci, heat, vy] of blobs) {
-          const c = col(ci);
-          const x = fx * S, y = fy * S;
-          this.splatBlob(x, y, rad, 1.15, c.r, c.g, c.b);
-          if (heat > 0) this.addTemp(Math.floor(x), Math.floor(y), heat);
-          this.addVelocity(Math.floor(x), Math.floor(y), 0, vy);
-        }
+        // The wax as a liquid of its own, a pool and three bodies (PLAN 27f-9c; src/lib/oilLay.ts says why).
+        const c = col(0);
+        layLavaLamp(S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }), (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
         break;
       }
 
@@ -3372,6 +3356,8 @@ export class FluidSimulation {
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
+      // The oil's weight against the water (PLAN 27f-9c): −0.05, the mineral oil's lightness, where a look leaves it out.
+      oilWeight: Math.max(-1, Math.min(1, Number.isFinite(settings.oilWeight) ? settings.oilWeight : -0.05)),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),
       soapBreakdown: c01(settings.soapBreakdown),

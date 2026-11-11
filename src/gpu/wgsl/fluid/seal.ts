@@ -68,7 +68,8 @@ export const SEAL_KERNELS: Record<string, string> = {
     The right-hand side of −∇²Ψ_a = ∂w/∂a on the lift's grid (m on a side),
     as hsLiftSource writes it for the oil (h·(w₊ − w₋)/2, h = 1/m), w the
     weight mixForce laid on an open plate: A.a.y × (the dye over the dish's
-    mean, less the oil's lightness) − A.a.z × the heat, each coarse cell the
+    mean, and the oil's own weight, S.oilRho) − A.a.z × the heat (more in
+    the oil, which swells with it: S.oilExpand, PLAN 27f-9c), each coarse cell the
     mean of the solver's cells under it, and less the heat lift the lasting
     current carried on an open plate (currentForces: S.up·curBuoy·T, the heat
     clamped to 0..50 and the speed capped at maxCurrent, as there), written in
@@ -92,9 +93,10 @@ fn coarse(q: vec2i, m: i32) -> f32 {
   var s = 0.0;
   for (var j = lo.y; j < hi.y; j++) { for (var i = lo.x; i < hi.x; i++) {
     let c = vec2i(i, j);
-    let rho = textureLoad(dye, c, 0).a - S.meanD - 0.15 * textureLoad(mixT, c, 0).r;
+    let oil = textureLoad(mixT, c, 0).r;
+    let rho = textureLoad(dye, c, 0).a - S.meanD + S.oilRho * oil;
     let t = textureLoad(vel, c, 0).z;
-    s += A.a.y * rho - A.a.z * t - A.b.y * min(A.a.w * clamp(t, 0.0, 50.0), A.b.x);
+    s += A.a.y * rho - A.a.z * t * (1.0 + S.oilExpand * oil) - A.b.y * min(A.a.w * clamp(t, 0.0, 50.0), A.b.x);
   } }
   let w = s / f32((hi.x - lo.x) * (hi.y - lo.y));
   return select(0.0, w, finite1(w));

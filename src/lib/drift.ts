@@ -135,6 +135,11 @@ const NOT_THE_LOOK = new Set([
   // tear a look's crowd of drops into a few blobs for good, and up adds
   // nothing to a look without one. The look's own number, held.
   'filmHold',
+  // Oil Weight (PLAN 27f-9c): a lava lamp's wax runs its cycle only while it
+  // is heavier than the liquid cold and lighter warm; a wander would float it
+  // to the top of the bottle or sink it for good with nobody touching it. The
+  // look's own number, held.
+  'oilWeight',
   // Soap Breakdown (PLAN 38c-3): 0 is conservation, and turning it up lets
   // soap clear off the plate at a chosen half-life; Evolve must not start a
   // loss by itself.

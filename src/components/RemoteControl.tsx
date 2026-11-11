@@ -823,6 +823,10 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* And Oil Weight, how heavy that oil is: a lava lamp's wax on a standing plate (PLAN 27f-9c). */}
+          {(settings?.oilTension ?? 0) > 0.001 && (
+            <Slider label="Oil Weight" field="oilWeight" step={0.05} format={(v) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2))} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
             <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />

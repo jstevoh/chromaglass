@@ -189,3 +189,49 @@ export function splodascopeCell(x: number, y: number, n: number, discs: readonly
   const inDish = Math.hypot(x - 0.5, y - 0.5) < SPLOD_REACH + 0.03;
   return { oil, disc, water: inDish ? SPLOD_WASH * (1 - oil) : 0, dye: disc >= 0 ? SPLOD_BODY_DYE * oil : 0 };
 }
+
+/*
+  Lava Lamp's wax (PLAN 27f-9c): a pool of it on the warm glass at the
+  bottom of the standing plate, and three bodies on their way, as a lamp
+  that has been on a while shows it. The wax is the oil (Oil Weight above
+  the water's, so it sinks cold) and its colour is in it and nowhere else;
+  the liquid round it is clear, lit by the lamp behind (the look's LED
+  colour), as a real lamp's coloured liquid is. Laid where the look lays it
+  and nowhere random, so the lab (`npm run lavawax`) lays exactly the app's:
+  the pool a quarter of the plate across in the bottom of the round dish, a
+  body rising off it, one high up cooling and one falling between. Down is
+  y = 0 (the lamp's Gravity points down the screen, tiltDirection 180).
+*/
+export const LAVA_BODIES: readonly OilBody[] = [
+  { x: 0.5, y: 0.13, r: 0.13, dye: 1 },
+  { x: 0.4, y: 0.36, r: 0.06, dye: 1 },
+  { x: 0.61, y: 0.58, r: 0.055, dye: 1 },
+  { x: 0.47, y: 0.8, r: 0.05, dye: 1 },
+];
+/** How much dye the wax is laid with, flat through its oil: Clock Glass's body dye, which reads as a deep translucent colour on the lamp. */
+export const LAVA_DYE = BODY_DYE;
+
+/** One cell of Lava Lamp's lay: the wax's oil (flat to its edge, a cell of antialiasing) and its dye; nothing in the liquid round it. */
+export function lavaLampCell(x: number, y: number, n: number): { oil: number; dye: number } {
+  let oil = 0;
+  for (const b of LAVA_BODIES) oil = Math.max(oil, Math.max(0, Math.min(1, (b.r - Math.hypot(x - b.x, y - b.y)) * n + 0.5)));
+  return { oil, dye: LAVA_DYE * oil };
+}
+
+/**
+ * Lay Lava Lamp's wax on a plate `n` cells across, as seedPreset does: each
+ * body's oil (`oil`, plate units, as addMix lays it) and its dye in every
+ * cell it covers (`dye`, cell indices). The wax was laid as dye before, and
+ * dye is one liquid with the water: the sealed plate filmed red wall to wall
+ * with no blob in it (the Mac, 2026-11-11). The oil goes in only where the
+ * solver is there to take it; before it is, the colour still lands, as spots
+ * of dye. One wax, the look's first dye: a lamp's wax is one colour, and a
+ * hand's pour adds the others.
+ */
+export function layLavaLamp(n: number, oil: (x: number, y: number, r: number) => void, dye: (x: number, y: number, amount: number) => void): void {
+  for (const b of LAVA_BODIES) oil(b.x, b.y, b.r);
+  for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
+    const cell = lavaLampCell((x + 0.5) / n, (y + 0.5) / n, n);
+    if (cell.dye > 0) dye(x, y, cell.dye);
+  }
+}
