@@ -4042,6 +4042,17 @@ tier (H2c-labels' next run), so the bound is 14 minutes, as the thin arms' is 16
 close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
 first run, green on its re-run), so the next check for it goes to a new part.
 
+**19k-18 shipped** 2026-11-11.
+**`lab2` past its 25 minutes on #802's deploy.**
+19k-17 left `lab2` close to the limit. On 2026-11-11 the deploy of #802 (44k-11, which
+touches no check in it) ran `lab2` for 25:06 and, on the one re-run, 25:17, each cancelled
+at the limit inside its last check with every check before it green; the same twelve
+checks ran 19:13 on #802's own run an hour before. The per-check times scale together
+(`lampzero` 2:41 to 3:55, `moire` 4:28 to 6:23, `signin` 2:46 to 3:10), so it was the slow
+runner tier, as in 19k-11 and 19k-17, not a check grown slow. The moiré sheets' check,
+the largest piece after `lampzero`, has a part of its own, `lab9`, which leaves `lab2` at
+about 19 minutes on the slow tier. No check, bar or bound changed.
+
 ### 19r. Smaller, for the same pass: the open shard evened
 
 **Shipped** (the open shard's half). The open shard had gathered eight checks since #239
