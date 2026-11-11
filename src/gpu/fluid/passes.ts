@@ -421,12 +421,10 @@ export class FluidPasses extends FluidFields {
    * 6/6 → 2/6, the held hand's spot stalling at 52 °C and then cooling
    * 0.93 K/s at 1/60 s steps. One owner for the heat while the boil is on.
    *
-   * Carried in float32, not the velocity's half-float: every substep of the
-   * carry writes its field, and on Metal a half-float h·T lost 3.2% of a
-   * sinking blob's heat in 90 steps (`npm run heat` line 9, 96.8% kept,
-   * against 99.9% on SwiftShader), the round to sixteen bits repeated in
-   * each substep. In float32 the one rounding left is the z's own, once a
-   * step, as before the carry.
+   * Carried in float32, not the velocity's half-float, so the carry's
+   * substeps round nothing and the one rounding left is the z's own, once a
+   * step, which heatUnpack does to the nearest half-float itself (why: there;
+   * Metal's store lost 3.2% of a sinking blob's heat in 90 steps).
    */
   protected carryHeat(pass: GPUComputePassEncoder, disp: number, argsAt?: GPUBuffer[]): void {
     const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], RGBA32, 'heat carried');

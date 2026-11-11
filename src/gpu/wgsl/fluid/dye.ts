@@ -281,18 +281,37 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     And back into the velocity's z: the heat over the liquid that carried
     it. A cell the carry all but emptied (an air core, the grid's wall)
     keeps the temperature it had.
+
+    Rounded to the nearest half-float here, not by the store. The ratio is
+    the temperature to a float32's precision, a hair either side of it even
+    where nothing moved, and the store's own conversion to sixteen bits is
+    the hardware's: on the Mac's Metal it lost 3.2% of a sinking blob's heat
+    in 90 steps (\`npm run heat\` line 9, 96.8% kept, the same in half-float
+    and float32 carries) where SwiftShader lost 0.1%, a bias of under one
+    step of the half-float a step, always down, which is what a conversion
+    toward zero does. So the nearest half-float is picked in float32 and the
+    store is handed a value it holds exactly: a cell the carry did not change
+    keeps its z bit for bit, and one it did is off by half a step at most,
+    either way.
   */
   heatUnpack: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var heat: texture_2d<f32>;
 @group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+fn nearestHalf(t: f32) -> f32 {
+  var r = quantizeToF16(t);
+  let ulp = exp2(floor(log2(max(abs(r), 6.1e-5))) - 10.0);
+  let e = t - r;
+  if (abs(e) > 0.5 * ulp) { r += sign(e) * ulp; }
+  return r;
+}
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let v = textureLoad(vel, p, 0);
   let c = textureLoad(heat, p, 0);
   let t = (c.x - c.y) / max(c.z, 1e-6);
-  textureStore(dst, p, vec4f(v.xy, select(v.z, t, c.z > 1e-3 && finite1(t)), v.w));
+  textureStore(dst, p, vec4f(v.xy, select(v.z, nearestHalf(t), c.z > 1e-3 && finite1(t)), v.w));
 }`,
 
   // The drain's inward spiral. A.a.x is the pull, A.a.y how far through it is.
