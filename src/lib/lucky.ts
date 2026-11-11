@@ -106,6 +106,23 @@ export function luckyLook(
     turingInk: 0,
     // And its drift (PLAN 26d-6) goes with it for the same reason: it is the print's.
     turingDrift: 0,
+    /*
+      The moiré pack's sheets (PLAN 45a) come off, as the comic print does.
+
+      A roll keeps everything it does not name, and it named nothing of the
+      sheets', so once a moiré look had been on the plate (opened on, shuffled
+      to on the phone, brought by a new song) every Randomise after it was a
+      new liquid seen through the same two sheets. The owner's report of
+      2026-11-11, "the randomize button picks the moiré patterns way too
+      frequently", is that: not a roll choosing them, a roll never taking them
+      away. The sheets are a look's choice, made by hand for that look's lamp
+      (the pack's looks set Lamp Ground 1, because a sheet over a dark LED
+      ring draws black), and a rolled lamp and LED ring under them is the trap
+      45a found. Taking the ink off leaves the designs and the turn where they
+      were, so a hand that turns the Moiré Sheets fader up gets the same pair
+      back. And a copy without the pack can never keep sheets this way.
+    */
+    moireAmount: 0,
     // Lamp Ground (PLAN 18b) is kept: a roll is a variation on the look on
     // the plate, and which ground it is seen on is that look's choice.
     // Clear Film (PLAN §20b) is kept as the lamp is: it is liquid on the

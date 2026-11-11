@@ -12668,6 +12668,23 @@ card is there, its Buy is a live checkout link at least 44 px tall opening a new
 four pictures load at 960 px wide.
 
 
+## 45a-13. Random looks land on moiré one pick in sixteen, not one in five (2026-11-11)
+
+The owner: "the randomize button picks the moiré patterns way too frequently". Two causes.
+Randomise (`luckyLook`, lib/lucky.ts) keeps every setting it does not name, and it named none
+of the sheets', so after one moiré look every roll was a new liquid under the same two sheets:
+350 of 350 rolls from a moiré look kept them. It now sets `moireAmount: 0` (the designs and
+turn stay, so the fader brings the same pair back), as it does the comic print: 0 of 350. And
+the three look pickers (the phone's Surprise me, a new song in "New preset" mode, the opening
+look) drew evenly from the 38 non-closeup looks, of which the pack's 7 are one idea over 7
+house liquids: moiré on 18.9% of picks, on copies without the pack too. They now go through
+`pickLook` (lib/lookPick.ts; `randomLook` in app/shared.ts): a house look weighs 1, a pack
+weighs `PACK_WEIGHT` = 2 looks in all (5.8% of 20,000 picks), a pack this copy lacks weighs
+nothing (`isPackLocked`; 0 of 20,000), the opening look is never a pack's (the licence is not
+read yet), and a pick never lands on the liquid on the plate or one of the last six picked (a
+pack look counts as its house look's liquid; 0 repeats, all 31 house looks within 200 picks).
+Checks: `npm run panel` (scripts/panelRandomLooks.mjs). Open: 45a-14.
+
 ## H2c-labels. Timestamp labels kept with their ring slot (2026-11-08)
 
 `GpuProfiler` (`src/gpu/kit.ts`) handed out timestamp slots as a frame encoded, resolved
