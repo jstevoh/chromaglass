@@ -705,7 +705,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       surge: 0.35,
       layerCount: 1,
-      blendMode: 'screen',       // 28i-7: overlay on a near-black ground is twice the product, so the pools stayed dark
+      blendMode: 'overlay',
       gooeyEffect: 0.55,
       rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
       // Flat: a concave dish slid all three pools into one in the middle. The
@@ -736,8 +736,8 @@ export const PRESETS: Preset[] = [
       glossiness: 0.35,
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
-      exposure: 0.95,
-      dyeBudget: 0.55,          // violet between the pools: at 0.85 they ran into one wash, at 0.42 barely read (28i-7)
+      exposure: 0.78,
+      dyeBudget: 0.42,          // dark violet between the pools: at the default 0.85 they ran into one wash
       /*
         Each pool hears its own instrument (PLAN 25h, lib/areaCords.ts). The
         kick warms and stirs the soap well (area 1): a heat source under it
@@ -1053,7 +1053,7 @@ export const PRESETS: Preset[] = [
       advection: 0.65,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.32,        // 28i-7: more pours of ink
+      automateRate: 0.22,
       platePressure: 0.55,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -1065,12 +1065,12 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.7,
       turbulenceScale: 0.55,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.45,  // 28i-7: was 0.6; a lower tension spreads the same ink flatter and wider over the white
+      blobSurfaceTension: 0.6,
       boundaryContrast: 0.9,
       saturationBoost: 1.6,
       glossiness: 0.0,
       postBlurRadius: 0.0,
-      dyeBudget: 1.2,            // 28i-7: at 1.1 the lamp's white took the frame (1% near black); more ink, at the dial's top
+      dyeBudget: 1.1,
       edgeRelief: 0.0,
       bubbles: 0.07,
       plateRock: 0.5,
@@ -1413,7 +1413,7 @@ export const PRESETS: Preset[] = [
       advection: 0.5,
       damping: 0.985,
       heatDecay: 0.995,
-      automateRate: 0.28,          // 28i-7: twice the drops of food colouring (at 0.14 the milk stayed white)
+      automateRate: 0.14,          // a drop of soap and food colouring now and then keeps the marbling rich
       platePressure: 0.15,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -1427,11 +1427,11 @@ export const PRESETS: Preset[] = [
       turbulenceDetail: 2,
       blobSurfaceTension: 0.7,
       boundaryContrast: 0.55,      // a bright line where a colour front meets the ground
-      saturationBoost: 1.7,
-      exposure: 0.64,              // 28i-2, 28i-7: tames the white milk ground (3% near black at 0.72)
+      saturationBoost: 1.55,
+      exposure: 0.72,              // 28i-2: tames the white milk ground so the food colouring holds luma <= 0.6
       glossiness: 0.05,
       postBlurRadius: 0.1,
-      dyeBudget: 1.2,              // 28i-7: more food colouring on the milk (the dial's top)
+      dyeBudget: 1.1,
       edgeRelief: 0.3,
       bubbles: 0.0,
       plateRock: 0.1,

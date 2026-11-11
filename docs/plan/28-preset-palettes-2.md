@@ -146,16 +146,13 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     Cyberpunk on one neon arc with less dye (lime and orange summed it to grey-teal on the
     additive blend), Acid Trip's bodies kept apart (centre pull 0.6 merged them into one
     amber blob, Solar Flare's look), Bass Drop's three wells given the dye to show three
-    colours, Velvet Underground's lamp and dye lifted, Milk Marbling with more colour on
-    the milk, Soap Film warmer and fuller (until 28i-4), Splodascope's water pale blue
-    (under cobalt every drop read green), Poster 1969 with more ink on the lamp's white,
-    Microscopic Chaos with an amber counterstain, Aurora's violet and pink top edge in the
+    colours, Soap Film warmer and fuller (until 28i-4), Splodascope's water pale blue
+    (under cobalt every drop read green), Microscopic Chaos with an amber counterstain, Aurora's violet and pink top edge in the
     window, Galaxy with a gold arm and a gold core (it read as Jellyfish Bloom), Lacing
     Run on the amber-over-crimson its description names, Ferro Paint on warm neighbours
     (amber over teal was brown-green), Macro Bead's sea-green ground and smaller bodies,
     Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (a thinner film
-    tiled Saffron's lace as coarsely, so finer lace stays 28l-3's), Velvet Underground on
-    the screen blend (overlay on its near-black ground kept the pools dark), and Moiré Waves and Moiré Ripple given dyes of their own
+    tiled Saffron's lace as coarsely, so finer lace stays 28l-3's), and Moiré Waves and Moiré Ripple given dyes of their own
     (a pack look's own contract now wins over its house look's, and the seed lays it).
     Left alone: Chemical Clock (the owner loves it), the keeps, Lava Lamp (sealed bottle,
     its own thread) and Lumia (28i-5).
@@ -163,6 +160,18 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       minute and almost none change colour with the song; motion half-life 0.3 s against
       2 to 7 s in real shows. This PR fixes what each look shows, not how it breathes: that
       is 28i-3b's film bar, still open.
+    - **28i-7c, open. Velvet Underground's pools drain, and settings do not bring them
+      back.** 83% near black at the 5th percentile on both passes (more dye and exposure,
+      a brighter lamp, then the screen blend for overlay): the frame is the violet ground
+      with one ultramarine lobe and a fleck of red, where the seed lays three pools. Find
+      where the pools' dye goes (the areas' pours against the regulator and the rim)
+      before touching a number; it matters more now Lumia retires into it (28i-5, #792).
+    - **28i-7d, open. Poster, 1969 and Milk Marbling stay white.** More ink (dyeBudget to
+      the dial's top, more pours, a lower tension) and, for the milk, lower exposure and
+      twice the drops left both frames as they were (Poster 2% near black, Milk 3%): the
+      white is the lamp through clear glass and the milk itself, not a shortage the
+      automation fills. The owner's call whether either should leave the lamp, then a
+      look at what holds the coverage.
     - **28i-7b, open. Splodascope's oil is filtered by the water it displaced.** In a thin
       cell an oil drop pushes the water out of the gap, so a drop's colour should not pass
       through the water's dye; the plate multiplies the two, so a cobalt water turned every
