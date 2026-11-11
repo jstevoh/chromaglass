@@ -6416,7 +6416,9 @@ only Advection 0 stopped it, so the flow was the solver's own. It was Turbulence
 never named it and ran the default 0.5, curl noise added to the flow everywhere every step
 (`forcesB`), the plate's speed 0.43 against 0.14 without it. With it at 0 the pools kept
 97/96/95% over 90 s (98.3/96.7/96.0% at 60 s against 67.2/75.5/90.9%), the band's run the
-same. `npm run pools` (Mac, `open` shard) holds the minute at 85% a pool, runs the old stir
+same. `npm run pools` (Mac, `open` shard) holds the minute at 85% a pool from the moment the
+dish has settled (on GitHub's macOS runner the regulator was still trimming the seed when a
+fixed-time minute began, and took a fifth of every pool with the dish: 28i-7h), runs the old stir
 as its control (which must drain one), and asks that the plate still moves. Found along the
 way: 28i-7f (thirteen looks still inherit the noise stir) and 28i-7g (with the motor off
 too, a smaller out-flow remains).

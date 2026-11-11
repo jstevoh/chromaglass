@@ -82,6 +82,24 @@ const STEPS = 0.8 * 30 * SECONDS;
   ships and 70.9% with the old stir. 1.5x sits between with a quarter of room.
 */
 const MOVES = 1.5;
+/*
+  When the minute begins: once the dish has stopped being trimmed, not at a
+  fixed time after the page loads. The regulator holds a seeded look's dish at
+  a level (`decayDye`, a uniform multiply on every cell, PLAN 18g), and a plate
+  whose solver started late is still being brought down to it. On GitHub's
+  macOS runner (run 43077698169, pipelines built 13 s in) the first run's minute
+  began at 0.530 of mean dye and ended at 0.424, every pool losing what the dish
+  lost (79.9 / 78.9 / 78.2% of their dye against the dish's 80.0%), while the
+  next two runs began at 0.447 and 0.438 and all three ended at 0.423; the
+  owner's Mac reads 0.43 → 0.42. So each run waits until the dish's mean falls
+  by less than SETTLE over five seconds, for at most SETTLE_MAX seconds, and a
+  run that never settles is red rather than judged mid-trim. Not a share of
+  the dish instead: the pools hold nine tenths of the dish's dye, so a share
+  divides most of a real drain away (review of this check). Why a slow start
+  lays the seed above the level it is held to is PLAN 28i-7h.
+*/
+const SETTLE = 0.005;
+const SETTLE_MAX = 75;
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -128,6 +146,14 @@ const run = async (name, over) => {
         dyeFormat: f.gpu?.dyeFormat ?? null, spin: [f.dishSpin, f.liquidSpin],
         gpu: !!f.gpu, readbacks: f.readbacks, steps: f.stepIndex, turb: f.lastSettings?.turbulenceScale, engine: d.engine };
     }, [AREAS, keep]);
+    const dishes = [];
+    let settled = null;
+    for (let t = 0; t < SETTLE_MAX; t++) {
+      dishes.push((await read(false)).dish);
+      const n = dishes.length;
+      if (n > 5 && (dishes[n - 6] - dishes[n - 1]) / Math.max(1e-9, dishes[n - 1]) < SETTLE) { settled = t; break; }
+      await page.waitForTimeout(1000);
+    }
     const first = await read(true);
     let turbHeld = first.turb === over.turbulenceScale, gpuHeld = first.gpu;
     for (let t = 0; t < SECONDS; t += 5) {
@@ -141,9 +167,10 @@ const run = async (name, over) => {
     const r = {
       name, engine: first.engine, kept: last.inA.map((v, k) => v / Math.max(1e-9, first.inA[k])),
       laid: first.meanA, outside: first.meanOut, moved: moved / Math.max(1e-9, laid),
-      steps: last.steps - first.steps, readbacks: last.readbacks - first.readbacks, gpuHeld, turbHeld, turb: last.turb,
+      settled, settleFrom: dishes[0], steps: last.steps - first.steps, readbacks: last.readbacks - first.readbacks, gpuHeld, turbHeld, turb: last.turb,
     };
     // What a reader of a red run needs first: where the dye went (the dish, or between the pools), the dye's texture, and the dish's spin.
+    console.log(`     ${name}: ${settled === null ? `the dish never settled in ${SETTLE_MAX} s` : `the dish settled after ${settled} s`} (${dishes[0].toFixed(4)} → ${dishes[dishes.length - 1].toFixed(4)})`);
     console.log(`     ${name}: dish ${first.dish.toFixed(4)} → ${last.dish.toFixed(4)}, between the pools ${first.meanOut.toFixed(4)} → ${last.meanOut.toFixed(4)}, dye ${last.dyeFormat}, spin (dish, liquid) ${last.spin.map(v => (+v || 0).toFixed(3)).join(', ')}`);
     console.log(`     ${name}: ${r.kept.map(v => (v * 100).toFixed(1) + '%').join(' / ')} kept over ${SECONDS} s, moved ${(r.moved * 100).toFixed(1)}%, ${r.steps} steps, ${r.readbacks} readbacks, Turbulence ${r.turb}, ${r.engine}`);
     return r;
@@ -161,6 +188,9 @@ try {
     runs.map(r => `${r.name} ${r.gpuHeld ? 'gpu' : 'lost its solver'} ${r.readbacks} readbacks`).join('; '));
   check(`each run stepped at least ${STEPS} times (the governed thirty a second, at least)`,
     runs.every(r => r.steps >= STEPS), runs.map(r => `${r.name} ${r.steps}`).join('; '));
+  check(`each run's minute began once the dish had settled (its mean falling under ${SETTLE * 100}% in 5 s, within ${SETTLE_MAX} s)`,
+    runs.every(r => r.settled !== null),
+    runs.map(r => `${r.name} ${r.settled === null ? 'never' : r.settled + ' s'} from ${r.settleFrom.toFixed(4)}`).join('; '));
   check('each run kept the Turbulence it was given to the end', runs.every(r => r.turbHeld),
     runs.map(r => `${r.name} ${r.turb}`).join('; '));
   check('the plate laid three pools on a dark ground (each area ten times the dye between them)',

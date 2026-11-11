@@ -180,6 +180,17 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       way of the show; find which force it is (the soap's Marangoni pull at the well's
       edge, or the liquids' own viscosity contrast in the gap) before a look with still
       pools and no motor is built on it.
+    - **28i-7h, open. On a slow start the regulator trims Velvet's opening seed by a fifth.**
+      On GitHub's macOS runner (run 43077698169, `npm run pools`) the first run's dish read
+      0.530 of mean dye when its minute began and 0.424 when it ended, every pool losing
+      what the dish lost; the next two runs began at 0.447 and 0.438 and all three ended at
+      0.423, while the owner's Mac reads 0.43 → 0.42. So where the solver starts late (its
+      pipelines built 13 s in there) the plate shows its seed above the level the regulator
+      holds it to and then dims for most of a minute. Find why the seed lays above its own
+      target (`seedMean` is read from `dishSum` straight after the splats; the regulator's
+      `meanDensity` from the rim-masked readback) and lay it at the level it is held to,
+      rather than trimming it in front of an audience. `npm run pools` now begins its
+      minute once the dish has settled, so this is not in its way.
     - **28i-7d, open. Poster, 1969 and Milk Marbling stay white.** More ink (dyeBudget to
       the dial's top, more pours, a lower tension) and, for the milk, lower exposure and
       twice the drops left both frames as they were (Poster 2% near black, Milk 3%): the
