@@ -3237,7 +3237,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // tenth of the wetting film's hue, as the projector's (38h-7: it was a
       // mix, by eye, toward a dimmed tint that left a bubble's middle darker
       // than the liquid round it, which a pocket of air never is).
-      var c = airSeen(lensUv, bub, bgColor) * mix(vec3f(1.0), tint, 0.1 * k1);
+      var c = onGround(bgColor, airLiquid(lensUv, bub), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
 
       // The film: interference colour, strongest at a glancing angle (the
       // rim), as thick as the pocket's own speed laid it (Bretherton,

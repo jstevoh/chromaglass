@@ -138,25 +138,31 @@ fn airHere(fuv: vec2f, looks: vec4f, airC: vec4f, spx: f32, dropCam: f32) -> Air
 }
 
 /*
-  The ground seen through the liquid at uv, with the bubble's hole as sharp
-  as the bubble. The solver takes the dye out where the field says air, on
-  its grid, and a grid's hole has a grid's edge: a ramp a texel and a half
-  inside the rim and, through the plate's bicubic reads, a texel or two
-  outside it. The camera sees the liquid round a bubble through its wall
-  (closeupDepth.ts), at the point the wall's lens lands on, and there it was
-  an annulus of thinned dye with the grid's stair-stepped edge just inside
-  every rim. So a point inside the rim is air, no liquid at all, and one in
-  the ramp past it reads the liquid radially out where the grid's hole ends
-  (AIR_HOLE texels past the rim): the liquid at a meniscus is the liquid
-  round it. Air no list laid (rim 0) reads the field's hole as it is.
+  The liquid at uv for the camera's wall, with the grid's hole kept inside
+  the bubble. The solver takes the dye out where the field says air, on its
+  grid, and a grid's hole has a grid's edge: a ramp a texel and a half inside
+  the rim and, through the plate's bicubic reads, a texel or two outside it.
+  The camera sees the liquid round a bubble through its wall (closeupDepth.ts),
+  at the point the wall's lens lands on, and where that landed in the ramp
+  outside the rim it read thinned dye with the grid's stair-stepped edge. The
+  liquid at a meniscus is the liquid round it, so a read that lands in the
+  ramp past the rim is taken radially out to where the grid's hole ends
+  (AIR_HOLE texels past the rim).
+
+  Inside the rim the field's own hole is read, as it was: a ray the wall bends
+  outward by less than a small ball's radius lands there, and what it finds
+  under a ball is the liquid the 2D solver took out of its footprint, which
+  airColumn puts back only in part (npm run airlens holds the camera's
+  through-the-wall light to the liquid round it). A sharp hole there is the
+  rest of 38h-16, with that line re-derived for a ray traced through a ball.
+  Air no list laid (rim 0) reads the field's hole as it is.
 */
 const AIR_HOLE: f32 = 2.0;
-fn airSeen(uv: vec2f, h: AirHere, bg: vec3f) -> vec3f {
+fn airLiquid(uv: vec2f, h: AirHere) -> vec4f {
   let off = uv - h.centre;
   let r = length(off);
-  if (h.rim > 0.0 && r < h.rim) { return onGround(bg, vec4f(0.0), vec3f(1.0)); }
   let reach = h.rim + AIR_HOLE / f32(textureDimensions(air0).x);
-  let at = select(uv, h.centre + off / max(r, 1e-6) * reach, h.rim > 0.0 && r < reach);
-  return onGround(bg, decodeFluid(layer0, at, 0.0, false), dyeThrough);
+  let at = select(uv, h.centre + off / max(r, 1e-6) * reach, h.rim > 0.0 && r >= h.rim && r < reach);
+  return decodeFluid(layer0, at, 0.0, false);
 }
 `;

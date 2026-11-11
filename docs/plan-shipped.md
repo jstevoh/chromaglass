@@ -11965,9 +11965,9 @@ model cannot reach one, the PR says what it reached and asks.
     own encoder (`WebGPUAir.geo`), and the plate draws the rim from the disc, its exact
     radius and fingers, one screen pixel wide in both views (`airHere`). Where the gathered
     texels name two bubbles the one the point is most inside wins, so neighbours keep their
-    own rims. The camera's view through a bubble's wall read the liquid inside the grid's
-    hole, an annulus of thinned dye with a stair-stepped edge inside every rim: it now reads
-    no liquid inside the rim and the liquid past the hole outside it (`airSeen`).
+    own rims. The camera's view through a bubble's wall, where its lens lands in the grid's
+    ramp just outside the rim, now reads the liquid past the hole (`airLiquid`); inside the
+    rim it still reads the field's hole (38h-16).
     `npm run bubbleround` (new, lab9): rim radius along 96 rays, 1.5 to 6 cells at about 11
     px a cell, spread 0.35 to 0.42 px (the field's drawing 3.2 to 3.5, and a 1.5 cell bubble
     too faint to have a rim), at the laid radius within 0.41 px (the field's 3.7 to 4.6 px

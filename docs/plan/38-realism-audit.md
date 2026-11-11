@@ -286,7 +286,13 @@ written first. Line numbers are as read on main at d07ac31.
     38h-15. The solver cuts the dye out under a bubble on its grid, so the dye the plate
     decodes is thinned over a texel and a half inside each rim and, through the bicubic
     read, a texel or two outside it. 38h-15 draws the rim from the disc and the camera's
-    view through the wall reads past that ramp (`airSeen`), but the projector's band is
+    view through the wall reads past the ramp outside the rim (`airLiquid`). Inside the rim
+    the camera still reads the field's thinned hole, and `npm run airlens`'s closeup line
+    (the camera's light through a small ball's wall 0.85 to 1.05 of the liquid round it)
+    leans on that: read as clear air, with `airColumn` putting back the liquid above and
+    below, it is 2.09, so that line wants re-deriving from a ray traced through a ball
+    (two refractions, where `2ρ·tan(turn)` lands short of the rim) before the hole is made
+    sharp there. And the projector's band is
     `outColor` times a tenth, and `outColor` is the main decode at the pixel: on the dark
     ground a dim ring of thinned dye inside every band, its inner edge the grid's; between
     two bubbles closer than about two cells the grid leaves no dye at all, where the liquid
