@@ -364,7 +364,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     warmed body of it lifts more than the warmed water beside it, which is
     what turns a lamp's wax from heavy to light.
   */
-  let rho = wax - S.meanD + oilWeightAt(v.z) * oil;
+  let rho = wax - S.meanD + S.oilRho * oil;
   let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z * (1.0 + S.oilExpand * oil));
   var heat = v.z;
   if (A.a.z > 0.0) {

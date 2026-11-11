@@ -2159,7 +2159,7 @@ export const PRESETS: Preset[] = [
       diffusionRate: 0,
       /*
         The liquid's own heat lift (the lasting current's) kept small: a lamp
-        runs on the wax swelling (OIL_EXPAND) and melting (WAX_MELT), and at
+        runs on the wax swelling (OIL_EXPAND), and at
         0.42 the warmed water lifted the wax off the floor as a sheet over it.
       */
       buoyancy: 0.1,
@@ -2175,7 +2175,17 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
-      turbulenceScale: 0.42,
+      /*
+        No stirring (it was 0.42, which with no music is 0.51 of the hand's
+        speed, PLAN 27c): a lamp is not stirred, its liquid moves by the wax's
+        weight and the lamp's heat alone, and the stir tore the wax apart.
+        Measured in the lab on this look (npm run lavawax's step): after six
+        seconds at 0.42, 1545 of the 2465 the oil was laid with were left
+        inside the rim's ring, against 2196 unstirred (the rest of that is the
+        pool lying out along the curved floor); over the whole plate, at 0.1
+        4% of the oil was gone as oil in fourteen seconds, at 0 none of it.
+      */
+      turbulenceScale: 0,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,

@@ -214,30 +214,17 @@ export const OIL_RHO = 3;
 export const OIL_WEIGHT_DEFAULT = -0.05;
 export const OIL_EXPAND = 2;
 /*
-  A lamp's wax melts (PLAN 27f-9c): where it softens, in the heat's units, and
-  over how wide a span (oilWeightAt in wgsl/fluid/shared.ts). Paraffin grows
-  10 to 15% in volume on melting against about 1.5% for twenty kelvin of a
-  liquid's expansion, so a lamp runs on the melt: its wax is formulated to
-  soften at the lamp's heat, lies heavy on the warm floor until it does, then
-  is suddenly lighter than the liquid and goes up a long way before it has
-  cooled back through the melt and comes down. With the swelling alone
-  (OIL_EXPAND), measured in the lab (128², Lava Lamp's settings, every lamp
-  band tried), the wax was light as soon as it was barely warm, lifted to
-  the top of the lamp's band and hung there as a sheet, at any Heat Decay
-  from 0.99 to 0.999.
-
-  WAX_MELT is set under the swelling's own crossover (Lava Lamp's wax at Oil
-  Weight 0.6 is light by the swelling alone at about 2.8), so the wax stays
-  heavy until it melts. The lamp lays 6 of the heat's units a second into
-  wax on its band (LAMP_HEAT), so a body on the floor melts in about a third
-  of a second once it is there, and at Heat Decay 0.995 a risen body cools
-  back through the melt in about two seconds.
-
-  Taken for any oil heavier than the water (the only heavy oil a light show
-  pours is a lamp's wax); a heavy oil that does not melt is PLAN 27f-9d.
+  No melt. A first cut gave a heavier oil a melt too (WAX_MELT, 2 of the
+  heat's units over ±0.5, the weight turned from heavy to as light across
+  it): paraffin grows 10 to 15% in volume on melting, which is what a real
+  lamp runs on. Measured on Lava Lamp's own step (`npm run lavawax`'s, against
+  a lab built without it), it changed nothing the plate does: the wax's centre of
+  mass at six seconds 0.24 of the height with it, 0.23 without, against 0.13
+  with no heat. The wax settles over the lamp where its warmth and swelling
+  balance its weight, and the melt's turn did not move that balance. So it
+  went (its two Sim slots are padding now, SIM_FLOATS); a lamp that cycles is PLAN 27f-9e, and a melt that does
+  something comes back with it, measured.
 */
-export const WAX_MELT = 2;
-export const WAX_MELT_WIDTH = 0.5;
 /** The oil's density over the water's in dye units, from Oil Weight (−1..1; left out, the mineral oil's −0.15). */
 export function oilRhoOf(weight: number | undefined): number {
   const w = Number.isFinite(weight) ? Math.max(-1, Math.min(1, weight as number)) : OIL_WEIGHT_DEFAULT;
@@ -829,4 +816,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight, expansion, melt and melt's width at 52..55 (PLAN 27f-9c)
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), 54..55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks

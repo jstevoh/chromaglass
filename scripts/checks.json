@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1446,17 +1446,18 @@
     },
     {
       "name": "Lava Lamp's wax holds together and the lamp lifts it",
-      "shard": "lab4",
+      "shard": "lab8",
       "run": "npm run lavawax",
-      "timeout": 15,
+      "timeout": 22,
       "why": [
         "Lava Lamp's wax was dye, and dye mixes: sealed in its bottle it filmed red",
         "wall to wall (PLAN 27f-9c). Now it is the oil with a weight of its own (Oil",
-        "Weight) and a melt. On the look's settings and the app's lay: laid as dye it",
-        "leaves 12% of the dish a thin wash against the oil's 5%; as oil 85% of the dish",
-        "stays clear with 84% of the colour in the bodies; the cold top body sinks (7% stays,",
-        "an oil at Oil Weight -1 keeps all of it); the lamp holds the wax off the floor (2%",
-        "below 0.15 of the height, 76% with no heat). About ten minutes on SwiftShader."
+        "Weight) and a melt. On the look's settings, its own step and the app's lay, each",
+        "line against a run that takes away the one thing it names: laid as dye (the wash),",
+        "Oil Bodies off (the colour in the bodies), Oil Weight 0 (the cold top body sinks),",
+        "no heat and a lab built without the melt (the lamp lifts the wax's centre of mass).",
+        "About ten minutes on SwiftShader, so about twenty on the slow tier: a part of its",
+        "own, lab8, since lab4 already runs about eleven there."
       ]
     },
     {

@@ -95,7 +95,7 @@ fn coarse(q: vec2i, m: i32) -> f32 {
     let c = vec2i(i, j);
     let oil = textureLoad(mixT, c, 0).r;
     let t = textureLoad(vel, c, 0).z;
-    let rho = textureLoad(dye, c, 0).a - S.meanD + oilWeightAt(t) * oil;
+    let rho = textureLoad(dye, c, 0).a - S.meanD + S.oilRho * oil;
     s += A.a.y * rho - A.a.z * t * (1.0 + S.oilExpand * oil) - A.b.y * min(A.a.w * clamp(t, 0.0, 50.0), A.b.x);
   } }
   let w = s / f32((hi.x - lo.x) * (hi.y - lo.y));

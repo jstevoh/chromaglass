@@ -85,12 +85,6 @@ struct Sim {
   */
   oilRho: f32,
   oilExpand: f32,
-  /*
-    Where a heavy oil (a lamp's wax) melts, in the heat's units, and how
-    wide the softening is: 0 for an oil that does not (oilWeightAt).
-  */
-  oilMelt: f32,
-  oilMeltW: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 
@@ -101,18 +95,6 @@ struct Args {
 };
 @group(0) @binding(1) var<uniform> A: Args;
 
-/*
-  The oil's weight against the water at heat t, in the dye's units (PLAN
-  27f-9c): S.oilRho, and for a wax (S.oilMelt above 0) the melt's swelling
-  on top of it. Paraffin grows by 10 to 15% in volume as it melts, against
-  about 1.5% for twenty kelvin of a liquid's expansion, so it is the melt
-  that turns a lamp's wax from heavier than the liquid to lighter: across
-  the softening the wax goes from S.oilRho heavier to as much lighter.
-*/
-fn oilWeightAt(t: f32) -> f32 {
-  if (S.oilMelt <= 0.0) { return S.oilRho; }
-  return S.oilRho * (1.0 - 2.0 * smoothstep(S.oilMelt - S.oilMeltW, S.oilMelt + S.oilMeltW, t));
-}
 fn uvOf(id: vec3u) -> vec2f { return (vec2f(id.xy) + 0.5) / S.n; }
 fn inGrid(id: vec3u) -> bool { return id.x < u32(S.n) && id.y < u32(S.n); }
 fn clampP(p: vec2i, n: f32) -> vec2i { return clamp(p, vec2i(0), vec2i(i32(n) - 1)); }

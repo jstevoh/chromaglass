@@ -140,7 +140,7 @@ jobs:
   # ones that want Chromium, in two (`browser` and `browser2`, about
   # fourteen and eleven: the site's pages and desks, then the remote, the
   # show's wires and the sound in the app), and the lab on the CPU
-  # rasteriser, in seven (`lab` to `lab7`: Chromium, then the
+  # rasteriser, in eight (`lab` to `lab8`: Chromium, then the
   # frame's passes and the GPU dishes on the first, `lampzero` drawing every
   # look in two labs on the second, the soap's two checks on the third,
   # `holeline` building three labs on the fourth, and on the fifth `samelook`,
@@ -151,7 +151,10 @@ jobs:
   # until a hunt PR's samelook (15:18) and they passed the 25-minute limit
   # together; and on the seventh the ink title's own check, which left the
   # third when the soap's two and it passed the limit on the slow tier, PLAN
-  # 19k-17). Every
+  # 19k-17; and on the eighth Lava Lamp's wax, six runs of the look and a
+  # second lab built without the melt, about ten minutes on one runner and
+  # so twenty on the slow tier, which no other part had room for, PLAN
+  # 27f-9c). Every
   # check runs whatever failed before it in its part. GitHub's ubuntu runners
   # are not the queue the Mac's are, so nine at once cost the queue nothing.
   #
@@ -299,10 +302,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -311,7 +314,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -329,7 +332,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0
