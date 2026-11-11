@@ -630,6 +630,8 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // edges and the bodies bleed into the water they sit in.
   { key: 'oilBodies',       label: 'Oil Bodies',       min: 0, max: 1 },
   { key: 'filmHold',        label: 'Film Hold',        min: 0, max: 1 },
+  // The oil's weight (PLAN 27f-9c): a fader sinks a floating oil to the bottom of a standing plate and lifts it again.
+  { key: 'oilWeight',       label: 'Oil Weight',       min: -1, max: 1 },
   { key: 'soapBreakdown',   label: 'Soap Breakdown',   min: 0, max: 1 },
   // The clear film (PLAN §20b): a fader pours clear oil over the dish and
   // draws it off again, and its first lift lays the film that tears.

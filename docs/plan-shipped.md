@@ -6139,6 +6139,46 @@ The seal's three kernels are waited for at opening where the look opens on a sta
 (`Opening.sealed`, gpu/opening.ts) and built behind the show otherwise: the Mac's `npm run startup`
 found Lava Lamp asking for them in its first steps with no list naming them.
 
+### 27f-9c. Lava Lamp's wax is a liquid of its own (2026-11-11)
+
+Sealed in its bottle (27f-9), Lava Lamp's wax stayed in the plate, but the Mac filmed the plate
+red wall to wall with no blob in it: the wax was dye with a weight (Dye Weight), and dye is one
+liquid with the water. A lamp's wax is an immiscible liquid that holds itself in bodies by its
+surface tension, a few per cent heavier than the liquid cold, and lighter once the lamp has
+warmed it.
+
+The engine's immiscible phase is the oil (Oil Tension's Cahn–Hilliard mix; Oil Bodies keeps a
+colour in it), whose weight was fixed at the mineral oil's lightness, 0.15 of a unit of dye. Now
+a setting, **Oil Weight** (−1..1, OIL_RHO 3 dye units at full; the default −0.05 is that 0.15, so
+every oil look keeps it), and a piece of physics every oil has on a standing plate: it swells
+with heat more than water (OIL_EXPAND 2: paraffin about 7.6e-4 per kelvin against water's
+2.1e-4). `mixForce` and `sealSource` weigh the oil with both (Sim slots 52–53); the oil's lift
+up a rocked plate and the centrifuge's lightness take its sign. The lamp warms the wax as a
+body (cells a quarter to three quarters oil and up) in a band clear of the rim (heated at the
+rim, where the seal's circulation is held at zero, the wax churned into a haze), and where the
+wax is the oil the dye is only colour and is not warmed. Lava Lamp lays a pool and three bodies
+of wax as oil (`lib/oilLay.ts`, `LAVA_BODIES`), has Oil Tension 0.9, Oil Bodies 1, Oil Weight
+0.6, heat spreading at water's own rate (doubleDiffusion 0: at 0.5 the heat leaked out of the
+wax into a warm pool that held it up), Buoyancy 0.1 (at 0.42 the warmed water lifted the wax off
+the floor as a sheet) and no stirring (Turbulence 0.42, half the hand's speed, tore the wax into
+the liquid: inside the rim 1545 of 2465 of the oil left after six seconds against 2196 still).
+
+A melt went in and came out again: a heavy oil heavy below 2 of the heat's units and as light
+above, which is what a real lamp runs on. On the look's own step, measured with a lab built
+without it, it changed nothing (the wax's centre of mass at six seconds 0.24 of the height with
+it, 0.23 without), so it went (27f-9d).
+
+`npm run lavawax` (Measure, a part of its own, `lab8`, about ten minutes on SwiftShader), on the
+look's settings, its own step and the app's lay, six seconds, every line against a run that takes
+away the one thing it names: 77% of the dish clear, with 68% of the colour inside the bodies
+against 57% with Oil Bodies off; the cold top body sinks (9% of the oil laid above 0.7 of the
+height stays over the first three seconds, 32% at Oil Weight 0); the lamp holds the wax up (its
+centre of mass 0.23 of the height against 0.13 with no heat and 0.21 with the swelling taken
+out). Its first draft measured on the lab's step rather than the look's and could pass on the
+lay alone; the check skeptic's review is why each line has its control. Left open: the wax
+settles over the lamp as a low sheet instead of cycling (27f-9e), a quarter of its colour
+leaves it in its first seconds (27f-9f), and a melt that does something (27f-9d).
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)

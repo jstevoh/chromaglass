@@ -356,19 +356,51 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let wax = textureLoad(dye, p, 0).a;
   let oil = textureLoad(mix, p, 0).r;
-  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
-  let rho = wax - S.meanD - 0.15 * oil;
-  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
+  /*
+    The oil's own weight (Oil Weight, S.oilRho: −0.15 the mineral oil that
+    floats up a standing plate, PLAN §18f; heavier than the water for a lava
+    lamp's wax, PLAN 27f-9c), and its heat lift beyond the water's: an oil
+    swells with heat two or three times what water does (OIL_EXPAND), so a
+    warmed body of it lifts more than the warmed water beside it, which is
+    what turns a lamp's wax from heavy to light.
+  */
+  let rho = wax - S.meanD + S.oilRho * oil;
+  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z * (1.0 + S.oilExpand * oil));
   var heat = v.z;
   if (A.a.z > 0.0) {
     /*
-      Into the dye, not the water round it. Warming everything in the band
+      Into the wax, not the water round it. Warming everything in the band
       alike lifts nothing: the wax is still the heaviest thing there, and a
       force the same everywhere is a pressure. The wax is what swells with
       heat in a lava lamp, so that is where the lamp's heat goes.
+
+      Where the wax is dye it has no body to lie anywhere, so its heat is laid
+      in the band just past the view (A.a.w), where a dye spreads out of
+      sight. Where it is a liquid of its own (the oil, PLAN 27f-9c) its body
+      lies on the glass at the bottom of the bottle, and the lamp warms it
+      there, through that floor: the last tenth of the plate's half-width
+      inside the rim. Laid in the same band as the dye's, the lab's wax
+      (128², Lava Lamp's settings) never reached the floor: a cooled body
+      sank to the band's top edge, warmed within half a second and lifted
+      again, and the wax hung as a layer a third of the way up with clear
+      liquid under it, where a lamp's wax lies in a pool on the bottom and
+      leaves it in bodies.
+    */
+    /*
+      An oil heavier than the water (S.oilRho above 0) is the wax, and then
+      the dye is only the colour: in the water it is what the bodies have
+      lost, and warmed in the dye's band it made a hot pool of water under
+      the wax that held the risen bodies up for good (the lab at 60 s: the
+      water below a quarter of the plate's height at 12 of the heat's units
+      against 2.9 in the wax and 1.8 in the water above). And the oil is
+      warmed as a body (from a quarter to three quarters full), not as the
+      faint haze Cahn–Hilliard leaves in the water, which on the warm floor
+      was a heater of its own.
     */
     let down = dot(uvOf(id) - vec2f(0.5), normalize(A.b.xy));
-    heat += A.a.z * smoothstep(A.a.w - 0.08, A.a.w, down) * clamp(wax * 2.0, 0.0, 1.0);
+    let dyeWax = select(clamp(wax * 2.0, 0.0, 1.0), 0.0, S.oilRho > 0.0);
+    heat += A.a.z * max(smoothstep(A.a.w - 0.08, A.a.w, down) * dyeWax * (1.0 - oil),
+                        smoothstep(0.28, 0.34, down) * (1.0 - smoothstep(0.42, 0.46, down)) * smoothstep(0.25, 0.75, oil));
   }
   v = vec4f(v.xy + capillary + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));

@@ -168,6 +168,78 @@ export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
 export const OIL_CELLS = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
+/*
+  The oil's own weight against the water, cold, and how much more than the
+  water it swells when warmed (PLAN 27f-9c, Oil Weight; mixForce and
+  sealSource lay both).
+
+  What was reported (the Mac film of Lava Lamp sealed, 2026-11-11): the
+  wax stayed in the plate but the plate was red wall to wall, with no
+  separate blobs and no clear liquid. The wax was dye, and dye is one liquid
+  with the water: it mixes. A real lamp's wax is an immiscible liquid (a
+  paraffin blend, a few per cent heavier than the liquid round it cold) that
+  holds itself in bodies by its surface tension, and it rises because it
+  swells with heat more than the liquid does, so it is lighter warm. The
+  engine's immiscible phase is the oil (Oil Tension's Cahn–Hilliard mix), and
+  until now its weight was fixed at "lighter than the water" (the mineral
+  oil of a light show's dish): 0.15 of a unit of dye, the number mixForce
+  carried since PLAN §18f.
+
+  OIL_RHO is the oil's density over the water's at full Oil Weight in the
+  dye's units (the units Dye Weight lays: a unit of dye is a heavy ink), so
+  the dial's −1..1 runs from 3 units lighter to 3 heavier, and
+  OIL_WEIGHT_DEFAULT, −0.05, is the 0.15 lightness every oil look had, so
+  they keep it. The scale is the heat's, not the mineral oil's: the lamp
+  warms the wax on the bottom glass to about 15 of the heat's units, and the
+  heat lifts a cell HEAT_LIFT/DYE_WEIGHT = half a unit of dye per unit of
+  heat (three halves in the oil), so a wax that is to sink once it has
+  cooled to a fifth of that and still lift off the lamp weighs one to two
+  units cold. Measured in the lab (128², Lava Lamp's settings): at 0.24
+  (the first scale's 0.8) the risen wax cooled to the bath's heat, about 1,
+  where its weight and its swelling all but cancelled, and it hung in the
+  upper half for good (the oil's centroid 0.28 → 0.58 of the plate's height
+  in 48 s and never back). The far ends are past any real oil, as the dials'
+  rule asks (PLAN 27h).
+
+  OIL_EXPAND is the oil's heat lift beyond the water's, per unit of oil: the
+  heat lifts a cell by HEAT_LIFT × T × (1 + OIL_EXPAND × c). Paraffin's
+  volumetric expansion is about 7.6e-4 per kelvin and water's 2.1e-4 at 20 °C
+  (4.6e-4 at 50 °C, CRC Handbook), so the oil swells two to three and a half
+  times what the water does: 2 is the low end, a warm lamp's. Every oil has
+  it, light or heavy, and it acts only where a heat and a gravity in the
+  plate meet (a standing plate with its lamp), which no oil look stood on
+  before this.
+*/
+export const OIL_RHO = 3;
+export const OIL_WEIGHT_DEFAULT = -0.05;
+export const OIL_EXPAND = 2;
+/*
+  No melt. A first cut gave a heavier oil a melt too (WAX_MELT, 2 of the
+  heat's units over ±0.5, the weight turned from heavy to as light across
+  it): paraffin grows 10 to 15% in volume on melting, which is what a real
+  lamp runs on. Measured on Lava Lamp's own step (`npm run lavawax`'s, against
+  a lab built without it), it changed nothing the plate does: the wax's centre of
+  mass at six seconds 0.24 of the height with it, 0.23 without, against 0.13
+  with no heat. The wax settles over the lamp where its warmth and swelling
+  balance its weight, and the melt's turn did not move that balance. So it
+  went (its two Sim slots are padding now, SIM_FLOATS); a lamp that cycles is PLAN 27f-9e, and a melt that does
+  something comes back with it, measured.
+*/
+/** The oil's density over the water's in dye units, from Oil Weight (−1..1; left out, the mineral oil's −0.15). */
+export function oilRhoOf(weight: number | undefined): number {
+  const w = Number.isFinite(weight) ? Math.max(-1, Math.min(1, weight as number)) : OIL_WEIGHT_DEFAULT;
+  return OIL_RHO * w;
+}
+/**
+ * The oil's lightness as a share of the mineral oil's, for the passes that
+ * carry a lightness of their own in real units (the oil's lift up a rocked
+ * plate, OIL_LIFT; the centrifuge, SPIN_OIL_LIGHT): 1 at the default, 0 for
+ * an oil as heavy as the water, below zero for one heavier (it then falls
+ * down the rocked plate and goes out to the rim of a turning dish).
+ */
+export function oilLightnessOf(weight: number | undefined): number {
+  return -oilRhoOf(weight) / (OIL_RHO * -OIL_WEIGHT_DEFAULT);
+}
 /**
  * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
  * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
@@ -744,4 +816,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, heat at 52 (padded to 56 for vec4f alignment)
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), 54..55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks

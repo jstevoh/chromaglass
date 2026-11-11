@@ -17,7 +17,7 @@ The WebGPU solver's class, split by what its members do (PLAN 19ai-7). Each file
 
 ## Contracts
 
-- The members were moved, not rewritten; a member another file reaches is `protected` where it was `private`.
+- The members were moved, not rewritten; `OIL_RHO`, `OIL_EXPAND` and `oilRhoOf`/`oilLightnessOf`, the oil's own weight and swelling from Oil Weight, PLAN 27f-9c; a member another file reaches is `protected` where it was `private`.
 - Each class extends only the one below it, and nothing here imports `../fluid.ts`, which re-exports the constants it used to hold.
 - A few checks read these files as text (`plate`, `turing` read the shaders, `slosh` reads `constants.ts`); a move carries their paths with it.
 

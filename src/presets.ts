@@ -2101,24 +2101,40 @@ export const PRESETS: Preset[] = [
   {
     id: 'lava-lamp',
     name: 'Lava Lamp',
-    description: 'The plate stood upright over a warm lamp: coloured wax heavier than the liquid round it sinks in mushroom-headed plumes, is warmed where it pools at the bottom, and rises again.',
+    description: 'The plate stood upright over a warm lamp: blobs of coloured wax that never mix with the clear liquid round them pool at the bottom, swell lighter as the lamp warms them, rise, cool and sink again.',
     settings: {
       /*
         A look for physics that shipped with no look to show it (PLAN.md 28a).
-        Stand the plate up (Plate Upright) and gravity acts in it; give the
-        dye weight (Dye Weight, solutalBuoyancy) and a band of it over clear
-        liquid is a Rayleigh–Taylor instability: it falls in fingers that roll
-        up into mushroom heads, the lab's 192² plate after 400 steps showing
-        a dozen of them from two rows of drops. The solver keeps a lamp under
-        the plate where it leaves the frame (LAMP_HEAT in gpu/fluid.ts), so
-        what pools there is warmed, rises, cools and sinks again: the cycle a
-        lava lamp runs on, rather than a dish that settles. Heat diffusing
-        faster than the dye (doubleDiffusion, as heat does in water) narrows
-        the plumes toward salt fingers. Lit from behind like the real lamp.
+        Stand the plate up (Plate Upright) and gravity acts in it. The solver
+        keeps a lamp under the plate where it leaves the frame (LAMP_HEAT in
+        gpu/fluid.ts), so what pools there is warmed, rises, cools and sinks
+        again: the cycle a lava lamp runs on, rather than a dish that settles.
+        Lit from behind like the real lamp.
+
+        The wax is a liquid of its own (PLAN 27f-9c): the oil (Oil Tension,
+        Cahn–Hilliard, so it holds itself in bodies and the liquid round it
+        stays clear), its colour in it alone (Oil Bodies), heavier than the
+        liquid cold (Oil Weight) and lighter warm, because an oil swells with
+        heat two to three times what water does (OIL_EXPAND). It was dye with
+        a weight (Dye Weight) before, and dye mixes: sealed in its bottle
+        (27f-9) it filmed red wall to wall with no blob in it. Dye Weight
+        stays at 0.7 for the colour a hand pours, and weighs the wax's own
+        dye a little too. Laid as a pool on the warm glass and three bodies
+        on their way (lib/oilLay.ts, LAVA_BODIES).
       */
+      oilTension: 0.9,
+      oilBodies: 1,
+      oilWeight: 0.6,
       plateUpright: 1,
       solutalBuoyancy: 0.7,
-      doubleDiffusion: 0.5,
+      /*
+        Heat spreads at water's own rate (PLAN 27f-9c). 0.5 made it fifty times
+        faster for salt fingers in the dye-wax: with the wax a body, the heat
+        leaked out of every risen body into a warm pool of water under the wax
+        that held it up (the lab, 40 s: 5.3 of the heat's units in the water
+        under the bodies, 2.6 in the wax).
+      */
+      doubleDiffusion: 0,
       tiltDirection: 180,
       heatDecay: 0.995,
       lampGround: 1,
@@ -2141,7 +2157,12 @@ export const PRESETS: Preset[] = [
       */
       centerGravity: 0,
       diffusionRate: 0,
-      buoyancy: 0.42,
+      /*
+        The liquid's own heat lift (the lasting current's) kept small: a lamp
+        runs on the wax swelling (OIL_EXPAND), and at
+        0.42 the warmed water lifted the wax off the floor as a sheet over it.
+      */
+      buoyancy: 0.1,
       advection: 0.48,
       damping: 0.988,
       automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
@@ -2154,7 +2175,17 @@ export const PRESETS: Preset[] = [
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
       audioImpact: 0.55,
-      turbulenceScale: 0.42,
+      /*
+        No stirring (it was 0.42, which with no music is 0.51 of the hand's
+        speed, PLAN 27c): a lamp is not stirred, its liquid moves by the wax's
+        weight and the lamp's heat alone, and the stir tore the wax apart.
+        Measured in the lab on this look (npm run lavawax's step): after six
+        seconds at 0.42, 1545 of the 2465 the oil was laid with were left
+        inside the rim's ring, against 2196 unstirred (the rest of that is the
+        pool lying out along the curved floor); over the whole plate, at 0.1
+        4% of the oil was gone as oil in fourteen seconds, at 0 none of it.
+      */
+      turbulenceScale: 0,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,

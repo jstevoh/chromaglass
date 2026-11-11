@@ -200,16 +200,42 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       20 s where the wax lies on the bottom rim. A press on a standing plate is still an open
       edge for the glass. The full answer is a closed rim for the weight's part of the gap's
       own solve.
-    - **27f-9c, open. Lava Lamp's wax is dye, and dye mixes.** Filmed on the Mac sealed
-      (2026-11-11): the wax stays, but the plate is red wall to wall (mean brightness 0.23
-      against 0.50 when it drained, Dye Budget 0.35 the same as 0.65), the warmed band sits in
-      the upper half with cooled fingers falling from it, and there are no separate blobs or
-      clear liquid. Real lamp wax is immiscible: a heavy phase with a surface tension, which
-      breaks into blobs, pools at the bottom, swells and lifts as one body. The engine's
-      immiscible phase is the oil (Oil Bodies' Cahn–Hilliard mix); the lamp wants that phase
-      heavier than the liquid when cold and lighter when warm (its own density in `mixForce`'s
-      `rho`, the heat carried in it), on the seal. Then the look's heat lift against its
-      weight: today the warmed liquid lifts several times what the wax weighs.
+    - **27f-9c. Lava Lamp's wax is a liquid of its own (shipped 2026-11-11; story in
+      docs/plan-shipped.md §27f-9c).** The wax is the oil, heavy cold (Oil Weight, a new
+      setting) and swelling lighter warm (OIL_EXPAND), its colour kept in it (Oil Bodies);
+      the lamp warms it as a body off the rim; the look no longer stirs itself.
+      `npm run lavawax`.
+    - **27f-9d, open. A melt that does something.** A first cut gave a heavy oil a melt
+      (heavy below 2 of the heat's units, as light above), which is what a real lamp runs on
+      (paraffin grows 10–15% in volume as it melts). On the look's own step it changed
+      nothing (the wax's centre of mass 0.24 of the height with it, 0.23 without), because
+      the wax settles over the lamp's band where the swelling balances its weight and is never
+      warmed through the melt; it went. It comes back with 27f-9e, as a property of the
+      poured liquid (§38e's bottles) rather than of any heavy oil, with a line in
+      `npm run lavawax` that fails without it.
+    - **27f-9e, open. The wax settles over the lamp instead of cycling.** In the lab (128²,
+      SwiftShader) the cold wax sinks and the lamp holds it up off the floor (its centre of
+      mass 0.23 of the height at six seconds against 0.13 with no heat), but it hangs as a low
+      sheet at the top of the lamp's band rather than rising to the top and coming down: wax
+      sinking into the band is warmed at its top edge and lifted again, a stable balance, at
+      any Heat Decay from 0.99 to 0.999. A real lamp breaks it with heat it stores and the
+      floor it is heated through: a blob leaves the hot glass with heat to spare and is not
+      warmed again until it is back on it, and paraffin freezes a few kelvin below where it
+      melts. Wanted: the lamp's heat laid through the floor's contact only (which the round
+      dish's open rim does not give: heated at the rim, the wax churned into a haze), or a
+      melt's hysteresis as a state the wax carries (27f-9d). Tune first on the Mac's GPU,
+      where a minute runs in seconds, then give `npm run lavawax` a line for the cycle.
+    - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
+      look's own step the share of the colour inside the bodies falls from 97% to 84% in the
+      first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
+      of the dish by two seconds and then holds. Clock Glass and the Splodascope lay their
+      colour the same way (BODY_DYE times each cell's oil, landed by bodyLand), so the first
+      suspect is the standing plate: the bodies laid high fall through the liquid at once,
+      and Oil Bodies' evening-out across a moving edge, and the dye's creep past it
+      (bodyPartition's E), leave colour behind. The colour should stay in the wax as an
+      oil-soluble dye does. With the dye weighing (Dye Weight 0.7) that wash also lies heavy
+      under the wax. At six seconds the dish is no clearer than with the wax laid as dye (both
+      about 80%): the difference is a minute's, the Mac's film.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).

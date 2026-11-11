@@ -12,7 +12,7 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32 } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32 } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -616,7 +616,7 @@ export class FluidPasses extends FluidFields {
       mixOn ? this.mix!.read : this.blank('rgba'),
       this.phaseLive ? this.phase.read : this.blank('r'),
     ], this.arg('swirl', [p.spinDish ?? 0, 1 / tau, spin * spin, thin ? -1 : Math.max(0, p.magnetSeconds ?? 1 / 60),
-      Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT]), this.M);
+      Math.max(1e-7, p.spinNu ?? 1e-6), OIL_NU, Math.max(0, p.spinDyeWeight ?? 0), SPIN_OIL_LIGHT * oilLightnessOf(p.oilWeight)]), this.M);
     this.swirl.swap();
     /*
       A thin gap stops here, at one dispatch where it was thirteen (PLAN 22k).

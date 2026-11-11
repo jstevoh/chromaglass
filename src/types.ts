@@ -529,6 +529,16 @@ export interface VisualizerSettings {
     two drops merge the moment their edges meet.
   */
   filmHold: number;
+  /**
+    Oil Weight (PLAN 27f-9c): the oil's density against the water when cold,
+    −1 to 1. Below 0 it is lighter and floats up a standing plate (−0.05 is
+    the light mineral oil every oil look had); above 0 it is heavier and
+    sinks, as a lava lamp's wax does. Every oil swells with heat more than
+    water, so a warmed body of heavy oil turns light and rises
+    (gpu/fluid/constants.ts OIL_RHO, OIL_EXPAND). Needs Oil Tension, and a
+    standing plate (Gravity) for the weight to act.
+  */
+  oilWeight: number;
   /** Marangoni flow: soap lowers the surface tension and the surface streams away from it, carrying the dye (the milk-and-soap burst). */
   surfactantFlow: number;
   /**
@@ -1079,6 +1089,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   oilTension: 0,
   oilBodies: 0,             // off: one dye across oil and water, as every look had it
   filmHold: 0,              // off: drops merge the moment they touch, as every look had it
+  oilWeight: -0.05,         // the light mineral oil every oil look had: it floats up a standing plate
   surfactantFlow: 0,
   soapBreakdown: 0,         // off: all soap kept on the plate, as in a closed dish (PLAN 38c-3)
   clearFilm: 0,             // no film: the owner judges the lace before any look lays one (judging.md)

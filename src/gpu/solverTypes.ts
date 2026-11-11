@@ -96,6 +96,8 @@ export interface GpuStepParams {
   /** Surface tension between oil and water (Cahn–Hilliard + capillary force). */
   oilTension?: number;
   /** Oil Bodies: the oil and the water each keep their own colour (see bodyPartition). */
+  /** Oil Weight, −1..1: the oil's density against the water cold (constants.ts OIL_RHO; left out, −0.05, the mineral oil's lightness). PLAN 27f-9c. */
+  oilWeight?: number;
   oilBodies?: number;
   /** Film Hold: the water film between two drops of oil pushes back as it thins, so drops crowd without merging (FILM_WGSL). */
   filmHold?: number;

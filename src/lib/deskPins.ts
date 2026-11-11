@@ -172,6 +172,7 @@ const SECTION_OF: Record<string, string> = {
   phaseDisplace: 'ferro',
   oilBodies: 'oil',
   filmHold: 'oil',
+  oilWeight: 'oil',
   soapBreakdown: 'oil',
   clearFilm: 'oil',
   clearFilmDye: 'oil',

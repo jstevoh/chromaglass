@@ -4,7 +4,7 @@ The solver's WGSL kernels, one file a pass (PLAN 19ai-6). Each file exports a ta
 
 ## Files, roughly in the order a step meets them
 
-- `shared.ts` (19 KB): what every kernel is built from: the Sim and Args buffers (`SIM_STRUCT`), `NOISE_WGSL`, `HEAD`, `W`, the thin gap's faces (`THIN_FACE`), the magnet's energy.
+- `shared.ts` (19 KB): what every kernel is built from: the Sim and Args buffers (`SIM_STRUCT`, whose last two slots are the oil's weight and swelling, PLAN 27f-9c), `NOISE_WGSL`, `HEAD`, `W`, the thin gap's faces (`THIN_FACE`), the magnet's energy.
 - `splats.ts`: a hand's or a pour's dye and velocity deltas, and the splats of the oil and the poured liquids.
 - `gap.ts`: the gap between the glasses and the squeeze film of a press.
 - `forces.ts`: the liquids' forces, the current, the turntable's swirl, confinement, the slosh.
