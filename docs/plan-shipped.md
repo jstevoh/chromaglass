@@ -12971,6 +12971,36 @@ phone (`phone-set`) and an `assistant-answer` from anyone but the display
 (`answer-phone`). `npm run assistant`: nineteen new lines (three on the page's own
 doors), fourteen new mutants.
 
+## 12-ctl-1. The songs on the phone (2026-11-11)
+
+The owner asked for the phone apps to be the Mac app's controller (12-ctl). Draw, the
+dials, the sequencer and the looks were already on the remote; what a performer reaches
+for between songs, the next item of the set and the song's show, was only on the
+Perform desk. This is the first of three pieces, built against `npm run controller`,
+which was written first with these lines owed.
+
+The laptop sends two new parts of `RemoteState` (`lib/remoteProtocol.ts`): `setList`
+(the set's name, its items by id and name, the live item and the one armed for the
+next Go) and `songs` (the saved song shows by id and title, the one running, and
+Follow songs). It acts on four new messages with the same calls the desk's rows make:
+`cue-set-item` arms an item through `setNow.armSetItem` (by id, not by index, so a set
+reordered on the laptop while the phone's list is a frame old never arms the wrong
+song), `song-run` and `song-stop` go through `askSongs`, `song-follow` turns the switch.
+`setNow` gained the live item so the phone can mark it. The relay passes the four on
+to the display like any other controller message.
+
+The phone's Songs screen (`components/RemoteSongs.tsx`) opens from a Songs button on
+Draw and a "Set list & songs" row on Controls, and goes back to where it came from.
+Rows are a thumb high and the names wrap. Every mark on it (Live, Next, the running
+show, the switch) is read back from the laptop rather than set by the tap, so a tap
+the laptop refused never shows a cue the Go will not play. On an iPad the two lists
+sit side by side.
+
+Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setlist`,
+`songs` and `display` lines now passing (an item tapped arms its look on the laptop,
+`cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
+the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,

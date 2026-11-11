@@ -192,6 +192,21 @@ export interface RemoteState {
    */
   ear?: { detector: boolean; room: { calibrating: boolean; floorDb: number; peakDb: number } | null; listen: { phase: string; song: { title: string; artist: string } | null; line: string } };
   /**
+   * The set list as the phone controller shows it (PLAN 12-ctl-1): the desk's
+   * cue list in its order, each item by its id and the name the desk shows,
+   * the item on stage and the item armed, both from the desk, never from the
+   * phone's own tap. Beside `set`, which is the assistant's numbered reading
+   * of the same list (PLAN 44k-5a folds the two together).
+   */
+  setList?: { name: string; items: { id: string; name: string }[]; liveId: string | null; cuedId: string | null };
+  /**
+   * The song shows as the phone controller shows them (PLAN 12-ctl-1): each by
+   * id and its song's title, the one running, and the Songs panel's Follow
+   * songs switch (not the `songFollow` dial). Beside `songShows`, the
+   * assistant's reading.
+   */
+  songs?: { shows: { id: string; title: string }[]; runningId: string | null; follow: boolean };
+  /**
    * Recording's options and the kept Takes (PLAN 44k-11, app/recordNow.ts):
    * what Record makes, the Plate video's quality, fps, container and sound,
    * the containers this browser's encoder writes, the last video, and the
@@ -290,6 +305,15 @@ export type RemoteMessage =
   | { type: 'state'; state: RemoteState }
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
+  /**
+   * The phone controller's Songs screen (PLAN 12-ctl-1), controller → display:
+   * arm a set item for the next Go, as tapping its row on the desk does; run
+   * or stop a song's show; the Songs panel's Follow songs switch.
+   */
+  | { type: 'cue-set-item'; id: string }
+  | { type: 'song-run'; id: string }
+  | { type: 'song-stop' }
+  | { type: 'song-follow'; on: boolean }
   /**
    * The owner's assistant (PLAN 44b–44d; the relay's guard is
    * `server/assistant.js`, the program the assistant talks to

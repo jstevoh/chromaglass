@@ -31,7 +31,8 @@ export interface SongsNow {
   follow: boolean;
   running: { showId: string; song: string | null; manual: boolean } | null;
   current: string | null;
-  shows: { id: string; song: string; actions: number }[];
+  /** `song` is the label (title — artist); `title` the song's own title, as the phone lists it. */
+  shows: { id: string; song: string; title: string; actions: number }[];
 }
 
 /** `useSongScore`'s half. Each says why not, or null when done. */
@@ -81,7 +82,7 @@ export function setSongsDoor(d: SongsDoor | null): void { door = d; }
 export function setFollowDoor(d: ((on: boolean) => void) | null): void { followDoor = d; }
 
 /** The brief a show is listed by. */
-export const showBrief = (s: SongShow) => ({ id: s.id, song: songLabel(s.song), actions: s.actions.length });
+export const showBrief = (s: SongShow) => ({ id: s.id, song: songLabel(s.song), title: s.song.title, actions: s.actions.length });
 
 /** A show by its id, or by its song as the state lists it (any case); with none named, the show of the song playing. */
 function findShow(shows: SongShow[], named: unknown, current: string | null): SongShow | string {
