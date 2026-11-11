@@ -155,7 +155,7 @@ looks and Clock Glass are the "Clock glass and ferro looks" work's.
     its colours are the ferroin's red and blue and the gel's own. Either the seed lays them as a
     second indicator in the gel (one a real chemistry draws, as Red Cabbage's 25i-7 asks of its
     painted zones), or the look keeps them as a print under the dish and they fade as a print
-    does. Film a full set on the Mac (judging §121) before choosing; measure the 28i-2 hue count.
+    does. Film a full set on the Mac (judging §122) before choosing; measure the 28i-2 hue count.
 - **25j. A lamp under each area** (direction D, 2026-10-24; after 25i). Each area sits over
   its own lamp whose brightness and warmth follow its band, and a gel can turn a step on a
   hit, as the old shows ran several projectors and colour wheels. Since 18f the plate's
