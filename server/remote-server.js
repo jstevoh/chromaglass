@@ -30,6 +30,7 @@ import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, read
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
+import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from './signin-handoff.js';
 import { createAssistantGuard, readAssistantMode } from './assistant.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -172,6 +173,8 @@ const lanAddresses = () =>
 
 const handleAccountShows = createAccountShowsHandler();
 const licenseManager = createServerLicenseManager();
+// The Mac app's Google or Apple sign-in, carried from the browser to its window (PLAN.md 23.17f).
+const signInHandoff = createSignInHandoff();
 
 /*
   OSC and Art-Net are Pro (PLAN.md §23's table, the Pro page, the Settings
@@ -218,6 +221,10 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname === ACCOUNT_SHOWS_PATH) {
     void handleAccountShows(req, res, url);
+    return;
+  }
+  if (url.pathname === SIGNIN_HANDOFF_PATH) {
+    void signInHandoff.handleRequest(req, res, url, isLaptop(req));
     return;
   }
   if (

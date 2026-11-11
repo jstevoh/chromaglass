@@ -4,7 +4,7 @@ import './index.css';
 import { install as installCrashLog, record as crashRecord } from './lib/crashLog';
 import { isPhoneApp } from './lib/appLink';
 import { SHOW_PATH, isLandingAddress } from './lib/showPath';
-import { macAppLicensed } from './lib/macApp';
+import { macAppLicensed, handoffFromUrl } from './lib/macApp';
 import { requestGpuEarly } from './gpu/device';
 import { installIntro, introOut } from './lib/intro';
 import { installTitleTips } from './lib/titleTips';
@@ -291,8 +291,12 @@ const orSignIn = () => (hasValidLicenseSync() || isSignedInCached() ? 'app' : 's
  * shell verified at launch is read here, synchronously.
  */
 function PaidGate() {
+  // The browser tab the app's window sent a sign-in to always meets the gate,
+  // which asks for that sign-in (PLAN.md 23.17f). Once one hand-off had left a
+  // key in this browser's storage, the next tab opened a whole second show here
+  // instead, and the window waited for a sign-in nobody was asked for.
   const [phase, setPhase] = useState<'app' | 'verifying-license' | 'gate'>(() =>
-    macAppLicensed() ? 'app' : hasStoredLicenseCandidateSync() ? 'verifying-license' : 'gate');
+    handoffFromUrl() ? 'gate' : macAppLicensed() ? 'app' : hasStoredLicenseCandidateSync() ? 'verifying-license' : 'gate');
   // A key in this browser's storage is checked against its signature before
   // anything is drawn, so a licensed start shows the loading screen for that
   // moment and never the gate (`npm run tiers` 7).

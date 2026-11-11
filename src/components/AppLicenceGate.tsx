@@ -50,9 +50,10 @@ import {
   CHECKOUT_HOME_URL,
   CHECKOUT_PRO_URL,
   buildCheckoutUrl,
+  getActiveLicenseInfo,
 } from '../lib/tierGates';
 import { isDesktopApp } from '../lib/platform';
-import { MAC_SIGN_IN_PARAM, macAppLicensed } from '../lib/macApp';
+import { MAC_SIGN_IN_PARAM, handoffFromUrl, macAppLicensed } from '../lib/macApp';
 
 const ACCOUNTS = Boolean(import.meta.env.VITE_FIREBASE_API_KEY);
 // The variable itself, not ACCOUNTS: only that is folded at build time, so a
@@ -68,6 +69,8 @@ const LazySignInForm = import.meta.env.VITE_FIREBASE_API_KEY
  */
 const firebase = () =>
   import.meta.env.VITE_FIREBASE_API_KEY ? import('../lib/firebaseAuth').catch(() => null) : Promise.resolve(null);
+
+const TIER_LABEL: Record<string, string> = { home: 'Home', pro: 'Pro' };
 
 /** How often the screen asks the app's server whether a key has arrived from the browser. */
 const WATCH_MS = 2_500;
@@ -116,13 +119,28 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opened = useRef(false);
+  // The browser tab the app's window sent a Google or Apple sign-in to, with
+  // the window's one-time code (PLAN.md 23.17f). The person pressed a sign-in
+  // button, so the tab asks for that sign-in even when the Mac already holds a
+  // key: before, it saw the key, said "Your licence is on this Mac now" and
+  // never signed anyone in, while the window waited for good. It does say the
+  // key was found (the owner, 2026-11-10: "perhaps we acknowledge that a
+  // license key was detected?").
+  const [handoff] = useState(() => handoffFromUrl());
+  const handedOver = useRef(false);
+  const [keyFound, setKeyFound] = useState<string | null>(null);
 
   const open = useCallback(() => {
     if (opened.current) return;
+    if (handoff && !handedOver.current) {
+      setKeyFound(TIER_LABEL[getActiveLicenseInfo().tier] ?? 'ChromaGlass');
+      setStep('signin');
+      return;
+    }
     opened.current = true;
     if (handedOff()) setStep('done');
     else onUnlocked();
-  }, [onUnlocked]);
+  }, [onUnlocked, handoff]);
 
   // The screen stays as it is while it asks again (the buy screen asks every
   // twenty seconds), and its buttons say they are asking.
@@ -132,8 +150,9 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
     const next = await look().catch((): Step => 'offline');
     setAsking(false);
     if (next === 'open') open();
-    else setStep(next);
-  }, [open]);
+    // The browser tab a sign-in was sent to signs in first, whatever it finds.
+    else setStep(handoff && !handedOver.current ? 'signin' : next);
+  }, [open, handoff]);
 
   useEffect(() => {
     void check();
@@ -214,7 +233,9 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
         <div className="mb-3 text-center">
           <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
           <p className="mt-0.5 text-xs text-neutral-400">
-            {step === 'done'
+            {handoff && step === 'signin'
+              ? 'Sign in to the ChromaGlass app on this Mac'
+              : step === 'done'
               ? 'Signed in'
               : step === 'buy'
                 ? 'The app comes with ChromaGlass Home or Pro'
@@ -225,14 +246,27 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
         {step === 'checking' && <p className="py-4 text-center text-xs text-neutral-400">Checking your licence…</p>}
 
         {step === 'done' && (
-          <p data-cg-app-licence-done="" className="text-center text-sm leading-snug text-neutral-200">
-            Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.
+          <p data-cg-app-licence-done={handoff ? 'signed-in' : 'licence'} className="text-center text-sm leading-snug text-neutral-200">
+            {handoff
+              ? "You're signed in. Go back to the ChromaGlass app: it signs in and opens by itself. You can close this tab."
+              : 'Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.'}
+          </p>
+        )}
+
+        {step === 'signin' && keyFound && (
+          <p data-cg-app-licence-found={keyFound} className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-center text-xs leading-snug text-emerald-100">
+            Your {keyFound} licence is already on this Mac. Sign in to bring your account to the app too: your saved looks and running shows.
           </p>
         )}
 
         {step === 'signin' && LazySignInForm && (
           <Suspense fallback={<p className="py-4 text-center text-xs text-neutral-400">Loading…</p>}>
-            <LazySignInForm onSignedIn={() => { void check(); }} />
+            <LazySignInForm
+              onSignedIn={() => {
+                handedOver.current = true;
+                void check();
+              }}
+            />
           </Suspense>
         )}
 
@@ -303,7 +337,7 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
           </p>
         )}
 
-        {step !== 'done' && step !== 'checking' && (
+        {step !== 'done' && step !== 'checking' && !keyFound && (
           <div className="mt-3">
             {!keyOpen ? (
               <button type="button" onClick={() => setKeyOpen(true)} className="w-full text-center text-[11px] text-neutral-400 underline-offset-2 hover:underline">

@@ -29,9 +29,10 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `feedback-schema.sql`: the feedback table, run once against D1.
 - `firebase-token.js`: `verifyFirebaseToken` (the shows and feedback Workers): `{ uid, aud, email, emailVerified }`, `emailVerified` added for feedback.
 - `license-packs.js`: art packs sold on top of Home (`PACK_PRODUCTS`, `packForProduct`, `packFields`, `addPack`, `removePack`): a pack order signs the Home key again with the pack.
-- `server-license.js`: local key storage for show server and Mac app; `currentStatus()` carries the key's `packs`.
+- `server-license.js`: local key storage for show server and Mac app; `currentStatus()` carries the key's `packs`. Also exports `fromAnotherSite(req)` and `saysJson(req)`, the loopback routes' guards.
+- `signin-handoff.js`: `createSignInHandoff()`, `SIGNIN_HANDOFF_PATH` (`/signin-handoff`): the Mac app's Google or Apple sign-in carried from the browser to its window (PLAN 23.17f): a credential filed under the window's one-time code, in memory, taken once, two minutes at most, laptop and same-origin only. Mounted by `remote-server.js`.
 - `license-key.js`, `license-worker.js`, `remote-server.js`, `report-worker.js`: above.
 
 ## Checks
 
-Every file must pass `node --check` (Measure's "The scripts parse"). `npm run report-worker`, `feedback-worker`, `license-worker`, `fingerprint-worker`, `cloudsync`, `accountlink`, `signin`, `tiers`, `showkey`, `assistant` (the assistant role and guard), `lights` (Art-Net), `link` (Ableton Link), `oscout` (OSC out). The relay: `applink`, `remotemix`, `phonelink`, `draw`, `drawwall`, `tv`. The Mac app: `desktop`.
+Every file must pass `node --check` (Measure's "The scripts parse"). `npm run report-worker`, `feedback-worker`, `license-worker`, `fingerprint-worker`, `cloudsync`, `accountlink`, `signin` (25: the sign-in hand-off), `tiers`, `showkey`, `assistant` (the assistant role and guard), `lights` (Art-Net), `link` (Ableton Link), `oscout` (OSC out). The relay: `applink`, `remotemix`, `phonelink`, `draw`, `drawwall`, `tv`. The Mac app: `desktop`.
