@@ -110,6 +110,8 @@ const FULL_ACTIONS = new Set([
   'mix-fade-film', 'mix-fade-mark',
 ]);
 const RANK = { off: 0, suggest: 1, play: 2, full: 3 };
+/** The sources the assistant may pick (app/soundNow.ts's ASSISTANT_SOURCES): a file needs the player's own choice of file. */
+export const SOUND_SOURCES = new Set(['none', 'microphone', 'system', 'simulated', 'drone']);
 
 /**
  * The owner's switch. `CHROMAGLASS_ASSISTANT` (off, suggest, play or full)
@@ -262,6 +264,20 @@ export function createAssistantGuard(send, now = Date.now) {
   */
   const lookStarted = (t, id) => { lastLook = t; quietUntil = t + fadeSeconds * 1000 + ECHO_MS; remember({ kind: 'go', id }); };
 
+  /** A start's named destinations: none (the panel's choice), the names, or why not. */
+  function liveNames(raw, test) {
+    if (raw === undefined || raw === null) return null;
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > 8 || raw.some((n) => typeof n !== 'string' || !n.trim() || n.length > 60)) {
+      return 'destinations: a list of up to eight saved destinations\' names (show_state\'s liveSetup)';
+    }
+    if (show.destinations) {
+      const kind = show.destinations.filter((d) => d.test === test).map((d) => d.name);
+      const unknown = raw.filter((n) => !kind.some((k) => k.trim().toLowerCase() === n.trim().toLowerCase()));
+      if (unknown.length) return `no saved ${test ? 'test' : 'live'} destination named ${unknown.map((n) => `"${n}"`).join(', ')} (saved: ${kind.join(', ') || 'none'})`;
+    }
+    return raw.map((n) => n.trim());
+  }
+
   return {
     /** The display's snapshot: what the plate is set to, and what the performer moved since. */
     onDisplayState(state) {
@@ -276,7 +292,13 @@ export function createAssistantGuard(send, now = Date.now) {
         }
       }
       settings = { ...next };
-      show = { activePresetId: state.activePresetId ?? null, cuedPresetId: state.cuedPresetId ?? null, blackout: state.blackout === true };
+      show = {
+        activePresetId: state.activePresetId ?? null, cuedPresetId: state.cuedPresetId ?? null, blackout: state.blackout === true,
+        // The names of the live stream's saved destinations (PLAN 44j), so a
+        // start to a name that is not one is refused here with the list,
+        // where the assistant hears why.
+        destinations: Array.isArray(state.liveSetup?.destinations) ? state.liveSetup.destinations.map((d) => ({ name: String(d?.name ?? ''), test: d?.test === true })) : null,
+      };
     },
 
     /** A phone's, OSC's or Art-Net's message on its way to the display: a patch is the hand. */
@@ -377,11 +399,14 @@ export function createAssistantGuard(send, now = Date.now) {
           if (why) return refuse(why);
           const pace = paced('patch', mode, t);
           if (pace) return refuse(pace);
+          const going = action === 'live-start' || action === 'live-test';
+          const names = going ? liveNames(message.destinations, action === 'live-test') : null;
+          if (typeof names === 'string') return refuse(names);
           count('patch', mode, t);
           if (action === 'blackout-toggle') remember({ kind: 'action', action, after: !show.blackout });
           // The stream has its own message, which the relay takes from no one
           // but this guard: a phone may end a stream and never start one.
-          if (action === 'live-start' || action === 'live-test') send({ type: 'assistant-live', test: action === 'live-test' });
+          if (going) send({ type: 'assistant-live', test: action === 'live-test', ...(names ? { names } : {}) });
           else send({ type: 'action', action });
           return { ok: true };
         }
@@ -425,6 +450,25 @@ export function createAssistantGuard(send, now = Date.now) {
         caps them (src/lib/pourText.ts `parsePourText`); here only the shape
         is held, so nothing but rows and a colour goes on.
       */
+      /*
+        The sound source (PLAN 44j): the room's, so Full only. On air too
+        (PLAN 44j-2, the owner 2026-11-10: "I shouldn't have to click the
+        system audio ever"). 44j refused it on air, because the encoder then
+        took the sound once at Go and a change left the stream silent; since
+        37x-4f-2 the stream moves to the new source without stopping
+        (lib/liveShow.ts `setLiveAudio`, called whenever the show's stream
+        changes, whoever changed it), so the refusal only stood between the
+        assistant and a stream it was asked to run.
+      */
+      if (type === 'assistant-sound') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (!SOUND_SOURCES.has(message.source)) return refuse(`no such source: ${String(message.source)} (${[...SOUND_SOURCES].join(', ')})`);
+        count('patch', mode, t);
+        send({ type: 'assistant-sound', source: message.source });
+        return { ok: true };
+      }
+
       if (type === 'pour-text') {
         const why = needs(mode, 'play') ?? paced('patch', mode, t);
         if (why) return refuse(why);

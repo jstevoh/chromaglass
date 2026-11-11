@@ -55,12 +55,13 @@ const L = (x: Partial<DeskLayout> & Pick<DeskLayout, 'plateMode'>): DeskLayout =
   Sequence is Live too: a sequence that is played from it has to reach the
   plate, and Preview holds the sequencer off.
 
-  Setup is Load-in with the Sound screen's player and drone in it.
+  Setup is Load-in. It had the Sound screen's player and drone as a panel of
+  their own beside Sound; they are the top of Sound now (PLAN 35c-7).
 */
 export const DEFAULT_TABS: readonly DeskTab[] = Object.freeze([
   { id: 'perform', name: 'Perform', layout: L({ left: ['cues'], right: ['bottles', 'rides'], deck: ['dyes', 'tools', 'recipe', 'physics', 'squish', 'camera', 'macro', 'patches'], plateMode: 'live' }) },
   { id: 'sequence', name: 'Sequence', layout: L({ left: ['cues'], right: ['songs', 'sequences'], deck: ['score'], plateMode: 'live' }) },
-  { id: 'setup', name: 'Setup', layout: L({ left: ['midi', 'audio-input', 'player'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' }) },
+  { id: 'setup', name: 'Setup', layout: L({ left: ['midi', 'audio-input'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' }) },
 ]);
 const DEFAULT_BY_ID = new Map(DEFAULT_TABS.map(t => [t.id, t]));
 

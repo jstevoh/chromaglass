@@ -15,6 +15,7 @@
 
 import type { VisualizerSettings } from '../types';
 import type { CastMessage } from './castProtocol';
+import type { LiveSetup } from './liveShow';
 import { isPhoneApp, relayFromUrl, relaySocketUrl } from './appLink';
 
 /** WebSocket path the relay listens on. */
@@ -123,7 +124,26 @@ export interface RemoteState {
    * can say so and stop it: a test or the real thing, for how long, to
    * where, and whether a destination is dropping frames or retrying.
    */
-  live?: { test: boolean; seconds: number; names: string[]; trouble: boolean } | null;
+  live?: {
+    test: boolean; seconds: number; names: string[]; trouble: boolean;
+    /**
+     * Each destination's health and the frames the encoder could not take
+     * (PLAN 44j), for the owner's assistant to read a stream by: what the
+     * Live Show panel shows, without an address or a key. Optional, since a
+     * display one build older sends only the four above.
+     */
+    destinations?: { name: string; phase: string; kbps: number; secondsBehind: number; dropping: boolean; reconnects: number; error: string | null }[];
+    skipped?: number;
+  } | null;
+  /**
+   * What can be streamed to before going live (PLAN 44j): the Live Show
+   * panel's saved destinations by name, service and whether a key is kept,
+   * never the address or the key, and how the last stream ended. Null
+   * outside the Mac app.
+   */
+  liveSetup?: LiveSetup | null;
+  /** What the show hears (PLAN 44j): the sound source, and the file's name when it is one. */
+  sound?: { source: 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone'; file: string | null };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -221,12 +241,15 @@ export type RemoteMessage =
    * `cue-look`: arm a look the assistant made, a base from the library with
    * its own settings over it (`lib/assistantLook.ts`), for the performer's Go.
    * `assistant-live`: start the live stream to the saved destinations, or the
-   * test ones; Full mode only. The rest pass between the relay and the
+   * test ones, or only those `names` names (44j); Full mode only.
+   * `assistant-sound`: change the sound source (44j), Full mode and never on
+   * air, since the stream's sound is the source it started with. The rest pass between the relay and the
    * assistant and never reach the display: the switch's mode, the guard's
    * answer to a numbered message, and Undo.
    */
   | { type: 'cue-look'; name: string; base: string | null; settings: Partial<VisualizerSettings> }
-  | { type: 'assistant-live'; test: boolean }
+  | { type: 'assistant-live'; test: boolean; names?: string[] }
+  | { type: 'assistant-sound'; source: 'none' | 'microphone' | 'system' | 'simulated' | 'drone' }
   | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
   | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
   | { type: 'assistant-undo' }

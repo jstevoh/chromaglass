@@ -43,6 +43,7 @@ comments, which moved with it.
 | `useSongSequences` | the set item, sequence or preset made for a song, up when it is identified; a song's sequence stopped at its end (moved out of App for 28h-8) |
 | `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it) |
 | `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
+| `soundNow.ts` (not a hook) | what the show hears, for the remote link to report (`useSoundNow`, `publishSound`), and the door the owner's assistant changes it through (`askSound`, `setSoundDoor`, `ASSISTANT_SOURCES`), set by `useSoundSource` (PLAN 44j) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption, or ink when `titleCaption` is off); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film |
@@ -53,5 +54,6 @@ comments, which moved with it.
 
 `shared.ts` holds what App and several hooks read: the look the page opens on, `randomLook` (the phone's Surprise me and a new song's look, through `pickLook`, PLAN 45a-13), the shapes
 of an armed look and the wall's look, and the keys the sound and the room camera are kept
-under. A check that reads App's source as text reads App and these together
+under (`MAC_SYSTEM_AUDIO_KEY` since PLAN 14y-2: the Mac app's System audio, kept across a
+relaunch). A check that reads App's source as text reads App and these together
 (`scripts/appSource.mjs`). What has not moved yet, and why, is PLAN 19ai-8a.

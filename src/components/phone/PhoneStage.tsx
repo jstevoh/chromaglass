@@ -97,7 +97,7 @@ type SheetName = 'dye' | 'looks' | 'sound' | 'play' | 'mix' | 'more' | 'tabs' | 
  * The desk's tabs on the phone (lib/deskTabs.ts): the same tabs, renamed,
  * reordered, added and taken away the same way, each tab's panels stacked in
  * one sheet. A settings section or one of the screens (Songs, Sequences,
- * Music & Drone) is drawn in it whole; the desk's own panels (the bottles,
+ * Sound with its player and drone) is drawn in it whole; the desk's own panels (the bottles,
  * the set list, the rides) were built for a mouse, and the phone has its own
  * of each, so their card opens that sheet instead.
  */

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ComponentProps, type ReactNode } from 'react';
 import { useAudioAnalyzer, type AudioData } from './hooks/useAudioAnalyzer';
 import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
@@ -231,7 +231,7 @@ export default function App() {
   const {
     audioSource, setAudioSource, audioSourceRef, audioInputId, setAudioInputId, audioInputs,
     refreshAudioInputs, musicFile, setMusicFile, playTrackRef, musicLoop, setMusicLoop, libraryOpen,
-    setLibraryOpen, showSound, setShowSound, droneRef, droneParams, setDroneParams, droneRunning,
+    setLibraryOpen, droneRef, droneParams, setDroneParams, droneRunning,
     setDroneRunning, stopDrone, musicPlaying, setMusicPlaying, musicTime, setMusicTime, musicElRef,
     musicInputRef, musicCtxRef,
   } = useSoundState();
@@ -2068,18 +2068,15 @@ export default function App() {
     control cannot be wired one way in the sheet and another on the desk.
   */
   /*
-    The three screens that were behind the Sequence and Sound chips, each
-    drawn either as the sheet it was (from a status dot, the palette or a
-    link inside another sheet) or, embedded, as a panel on any tab
-    (lib/deskLayout.ts: songs, sequences, player).
+    The screens that were behind the Sequence and Sound chips: songs and
+    sequences, each a sheet or a desk panel (lib/deskLayout.ts), and the
+    sound's sources, player and drone, the top of Settings → Sound (35c-7).
   */
-  const soundScreen = (embed: boolean) => (
+  const soundScreen = (inputPicker: ReactNode) => (
     <SoundPanel
       source={audioSource}
       onSource={(x) => { void handleSourceChange(x); }}
-      inputs={audioInputs}
-      inputId={audioInputId}
-      onPickMic={deskOpen.sound}
+      inputPicker={inputPicker}
       playing={musicPlaying}
       time={musicTime}
       loop={musicLoop}
@@ -2097,8 +2094,6 @@ export default function App() {
       onAmbientMode={setAmbientMode}
       readLevel={readLevel}
       deaf={earDeaf}
-      embed={embed}
-      onClose={() => setShowSound(false)}
     />
   );
   const songsScreen = (embed: boolean) => (
@@ -2199,7 +2194,7 @@ export default function App() {
       pins={{ perform: rideKeys, design: recipeKeys, onPin: pinSetting }}
       midi={midi}
       onOpenMidi={() => { setShowSettings(false); setShowMidi(true); setShowSequencer(false); }}
-      onOpenSound={() => { setShowSettings(false); setShowSound(true); setShowSongs(false); setShowMidi(false); }}
+      soundSources={soundScreen}
       sceneOn={sceneOn}
       onSceneToggle={toggleScene}
       sceneState={scene.state}
@@ -2227,8 +2222,8 @@ export default function App() {
       {...over}
     />
   );
-  // A section as a panel; with Music & Drone out, Sound has no way there (35c-5).
-  const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {}, ...(whereIs(deskLayout, 'player') && { onOpenSound: undefined }) });
+  // A section as a panel.
+  const sectionPanel = (id: string) => settingsPanel({ embed: id, focusSection: null, onGoTo: openSettingsAt, onClose: () => {} });
 
   const evolveAt = travelOfKey('automateRate', settings.automateRate);
   return (
@@ -3126,7 +3121,7 @@ export default function App() {
               panels: openPanels(deskLayout),
               onAdd: (id) => onDeskLayout(l => openPanel(l, id, 'deck')),
               onRemove: (id) => onDeskLayout(l => closePanel(l, id)),
-              render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true) : id === 'player' ? soundScreen(true)
+              render: (id) => (id === 'songs' ? songsScreen(true) : id === 'sequences' ? sequencesScreen(true)
                 : isSectionPanel(id) && id !== 'mixer' ? sectionPanel(id) : null),
             }}
             // Mid-fade the settings are between two looks and match neither,
@@ -3371,11 +3366,6 @@ export default function App() {
 
       {/* ── Songs ──────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showSound && (
-          <PanelGuard name="Sound" onClose={() => setShowSound(false)}>
-          {soundScreen(false)}
-          </PanelGuard>
-        )}
         {showSongs && (
           <PanelGuard name="Songs" onClose={() => setShowSongs(false)}>
           {songsScreen(false)}
@@ -3652,9 +3642,9 @@ export default function App() {
           bare={!overlaysVisible}
           tabs={deskTabs.tabs}
           tab={deskTab}
-          onTab={(id) => { setShowSound(false); setShowSongs(false); setShowSequencer(false); setDeskTab(id); }}
+          onTab={(id) => { setShowSongs(false); setShowSequencer(false); setDeskTab(id); }}
           onTabEdit={deskTabs.edit}
-          screens={{ songs: songsScreen(true), sequences: sequencesScreen(true), player: soundScreen(true) }}
+          screens={{ songs: songsScreen(true), sequences: sequencesScreen(true) }}
           layout={deskLayout}
           onLayout={onDeskLayout}
           onResetLayout={onDeskReset}

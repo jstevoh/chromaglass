@@ -256,6 +256,11 @@ name; `npm run phone` for two fingers; a load with storage blocked in `npm run p
 - **Judged by the owner:** a landing visitor no longer meets a plate moving to music
   before choosing anything (14y reverses that first-visit choice at the owner's word); if
   the landing page (34a) wants a moving demo it should be a filmed clip, not the live band.
+- ~~**14y-2** The Mac app keeps System audio across a relaunch or an update.~~ **Shipped**
+  2026-11-10 (the owner: "I shouldn't have to click the system audio ever"). Only System audio,
+  only in the Mac app; every other source still opens on Off. `npm run opensource` (3 new lines).
+  Story in `docs/plan-shipped.md` §14y-2. The owner was asked on a card whether every source
+  should be kept instead; the default (System audio only) shipped while that waits.
 
 ## 14aa. The plate stutters in bursts on a machine with room to spare (shipped, asked 2026-10-24)
 

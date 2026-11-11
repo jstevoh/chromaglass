@@ -31,23 +31,36 @@ export function oneHome({ check, root, panel, header, deskSrc, deskPanelsSrc }) 
     && !/'rotation'/.test(panel) && /goTo\('spin', 'sound'\)/.test(panel));
   // The sheet is not handed the device's setter at all, so no control of its can pick one.
   const sheetProps = readFileSync(join(root, 'src/App.tsx'), 'utf8').match(/<SoundPanel[\s\S]*?\/>/)?.[0] ?? '';
-  check('the microphone is picked in Settings\' Input, and the Sound sheet says which and leads there',
+  // Since PLAN 35c-7 the sources draw the section's own picker under the Mic: still one select, the section's.
+  check('the microphone is picked in Sound\'s one Input, drawn under the Mic, and the sources draw no picker of their own',
     /data-testid="audio-input"/.test(panel) && /onAudioInput=\{chooseAudioInput\}/.test(readFileSync(join(root, 'src/App.tsx'), 'utf8'))
-    && sheetProps.includes('inputId=') && !/chooseAudioInput|onInput/.test(sheetProps)
-    && !/value=\{inputId\}|sound-input-picker/.test(soundSheet)
-    && /data-testid="sound-input-open"/.test(soundSheet) && /onPickMic\(\)/.test(soundSheet));
+    && sheetProps.includes('inputPicker=') && !/chooseAudioInput|onInput|inputId=/.test(sheetProps)
+    && !/value=\{inputId\}|sound-input-picker|onAudioInput/.test(soundSheet)
+    && /source === 'microphone' && inputPicker/.test(soundSheet) && (panel.match(/data-testid="audio-input"/g) ?? []).length === 1);
   /*
-    And two that were one thing named twice or opened twice. Sound's Change in
-    Sound… opens the Sound sheet, which on Setup is already out as the Music &
-    Drone panel; a section drawn as a panel is handed no way there while that
-    panel is on the tab (the Settings sheet keeps it, which qa and opensource
-    drive). The Cues panel's Save keeps the set, the plate bar's the look.
+    One page for sound (PLAN 35c-7, the owner 2026-11-10: "I don't understand
+    why there are two sound settings pages"). The Sound sheet, drawn on Setup
+    as the Music & Drone panel beside Sound, is the top of Sound now: no sheet
+    to open, no panel of its own (a saved layout's is Sound, by
+    MERGED_SECTIONS), and neither half sends you to the other. Asked from both
+    ends, so a sheet or panel put back is red, and so is the merge taken away.
+    The Cues panel's Save keeps the set, the plate bar's the look.
   */
   const app = readFileSync(join(root, 'src/App.tsx'), 'utf8');
-  check('a section on a tab with Music & Drone out draws no Change in Sound…, the sheet keeps it',
-    /const sectionPanel = [^\n]*whereIs\(deskLayout, 'player'\) && \{ onOpenSound: undefined \}/.test(app)
-    && (app.match(/settingsPanel\(\{ embed: id/g) ?? []).length === 1 && /onOpenSound=\{\(\) => \{/.test(app)
-    && /\{onOpenSound && \(/.test(panel));
+  const layoutSrc = readFileSync(join(root, 'src/lib/deskLayout.ts'), 'utf8');
+  const mapSrc = readFileSync(join(root, 'src/lib/settingsMap.ts'), 'utf8');
+  check('sound is one page: no Sound sheet, no Music & Drone panel (its id lands on Sound), no Change in Sound… or Change… between halves',
+    !/showSound|setShowSound|<Sheet/.test(app.match(/const soundScreen[\s\S]*?\n {2}\);/)?.[0] ?? 'missing') && !/showSound/.test(app)
+    && !/id: 'player'/.test(layoutSrc) && /\n {2}player: 'audio-input',/.test(mapSrc)
+    && !/onOpenSound|Change in Sound|sound-input-open|onPickMic/.test(app + panel + soundSheet));
+  // One page for sound (PLAN 35c-7): the sources are the top of the Sound section the dot opens, the device under the Mic.
+  check('and the Sound section draws where the sound comes from at its top, with the device under the Mic',
+    panel.includes('{soundSources ? soundSources(inputPicker) : inputPicker}') && panel.includes('data-testid="audio-input"')
+    && /soundSources=\{soundScreen\}/.test(app));
+  // One home each (PLAN 35c-3): the switch is drawn once; since 35c-7 there is no sheet or state row to draw a second.
+  check('and the source is chosen by the Sound section\'s own tiles alone',
+    !panel.includes('testId="audio-source"') && !panel.includes('audio-source-state') && !panel.includes('audio-source-open')
+    && readFileSync(join(root, 'src/components/SoundPanel.tsx'), 'utf8').includes('sound-source-${s.id}'));
   check('the set\'s Save says it is the set\'s, the plate bar\'s Save is the look\'s',
     /saved \? 'Saved' : 'Save set'/.test(deskPanelsSrc) && !/saved \? 'Saved' : 'Save'\}/.test(deskPanelsSrc));
 }
