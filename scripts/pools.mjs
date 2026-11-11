@@ -30,9 +30,19 @@
  *      a still one twice. If the stir stops draining for some other reason
  *      the control goes red and the check says so, rather than passing on
  *      a bar nothing tests;
- *   3. and the look's plate still moves: the flow inside the areas is not
- *      nothing (a frozen plate, Advection 0, keeps every pool and is not
- *      the fix).
+ *   3. and the look's plate still moves: the dye inside the areas is
+ *      rearranged at least twice as much (cell by cell, |d − d₀| over d₀) as
+ *      on the same plate frozen (Advection 0), the second control. A frozen
+ *      plate keeps every pool and is not the fix; the flow's speed cannot
+ *      tell it, since Advection scales how far the dye is carried and not
+ *      the velocity (stepDisplacement), so the frozen plate is run and read.
+ *
+ * Each run waits for the GPU solver and must keep it (`fluids[0].gpu`, and
+ * readbacks landing all the minute: `readDensity` falls back to the CPU's
+ * frozen copy if the solver is dropped, which would read as every pool
+ * kept), must step about as often as the Mac does, and must still carry the
+ * Turbulence it was given when it ends (a look change or a ride hands the
+ * plate a new settings object, which would end the override).
  *
  * Read from the plate's own readback (`fluids[0].readDensity`), in the
  * dish's frame, which is the areas' frame (the motor turns the picture, not
@@ -40,27 +50,25 @@
  * band's runs read the same to the third decimal.
  */
 import { chromium } from 'playwright';
-import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
-import { installFrameReader, engineQuery, isGpuEngine } from './frame.mjs';
+import { launchChromium, port, untilServing } from './chromium.mjs';
+import { installFrameReader, engineQuery, waitForEngine } from './frame.mjs';
+import { plateAreas } from '../src/lib/plateAreas';
 
 const LOOK = 'velvet-underground';
-// Velvet's areas, as lib/plateAreas.ts lays them (x, y, r in the dish's units).
-const AREAS = [
-  { x: 0.26, y: 0.34, r: 0.15 },
-  { x: 0.73, y: 0.42, r: 0.14 },
-  { x: 0.47, y: 0.73, r: 0.14 },
-];
+const AREAS = plateAreas(LOOK).map(({ x, y, r }) => ({ x, y, r }));
 const SECONDS = 60;
 /*
-  The bar. Off the stir the pools kept 0.974 / 0.959 / 0.947 over 90 s and
-  0.982 / 0.967 / 0.960 at 60 s; with it 0.679 / 0.756 / 0.909 at 60 s on
-  the same Mac. 0.85 sits under the first with room for a runner's noise and
-  over the stirred glycerine and soap by ten points.
+  The bar. Off the stir the pools kept 98.3 / 96.7 / 96.0% over 60 s (98.4 /
+  95.4 / 94.3% on this check's first Mac run); with it 67.2 / 75.5 / 90.9%
+  (71.6 / 79.3 / 92.6%). 0.85 sits under the first with room for a runner's
+  noise and over the stirred glycerine and soap by ten points. The stirred
+  syrup stays over it (it is the pool the stir moves least), so the control
+  asks only that some pool drains.
 */
 const KEEP = 0.85;
-// The flow inside the areas, in the solver's velocity units: 0.14 across the plate with the stir off, 0.43 with it.
-const MOVING = 0.02;
+// Steps a run must make: four fifths of sixty a second. Fewer, and a slow runner reads as a plate that kept its pools.
+const STEPS = 0.8 * 60 * SECONDS;
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -71,55 +79,81 @@ const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PO
 const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
 process.on('exit', stop);
 for (const s of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(s, () => { stop(); process.exit(130); });
-await new Promise(r => setTimeout(r, 2500));
+await untilServing(PORT, { child: server });
 
 const browser = await launchChromium(chromium);
-const run = async (over) => {
+const run = async (name, over) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   try {
     const page = await context.newPage();
     await installFrameReader(page);
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${LOOK}&seed=1${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(9000);
+    await waitForEngine(page);
+    // The GPU solver itself, not its label (a label reads WebGPU while it is still starting).
+    for (let t = 0; t < 60; t++) {
+      if (await page.evaluate(() => !!window.chromaglassDebug?.().fluids?.[0]?.gpu && window.chromaglassDebug().fluids[0].readbacks > 0)) break;
+      await page.waitForTimeout(500);
+    }
     await page.evaluate((o) => Object.assign(window.chromaglassDebug().settings, o), over);
-    const read = () => page.evaluate((areas) => {
+    const read = (keep) => page.evaluate(([areas, keep]) => {
       const d = window.chromaglassDebug(), f = d.fluids[0];
-      const a = f.readDensity, S = f.size, vx = f.readVx, vy = f.readVy;
-      const inA = areas.map(() => 0); let speed = 0, n = 0;
+      const a = f.readDensity, S = f.size;
+      const inA = areas.map(() => 0), cellsA = areas.map(() => 0); let out = 0, cellsOut = 0;
+      const pick = keep ? [] : null;
       for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
         const u = (i + 0.5) / S, v = (j + 0.5) / S;
+        if (Math.hypot(u - 0.5, v - 0.5) >= 0.5) continue;
         const k = areas.findIndex(r => Math.hypot(u - r.x, v - r.y) < r.r * 1.3);
-        if (k < 0) continue;
-        inA[k] += a[i + j * S];
-        speed += Math.hypot(vx[i + j * S] || 0, vy[i + j * S] || 0); n++;
+        const x = a[i + j * S];
+        if (k < 0) { out += x; cellsOut++; continue; }
+        inA[k] += x; cellsA[k]++;
+        if (pick) pick.push(x);
       }
-      return { inA, speed: speed / Math.max(1, n), engine: d.engine, steps: f.stepIndex };
-    }, AREAS);
-    const first = await read();
-    let speed = 0;
-    for (let t = 0; t < SECONDS; t += 5) { await page.waitForTimeout(5000); speed += (await read()).speed; }
-    const last = await read();
-    return { engine: first.engine, kept: last.inA.map((v, k) => v / Math.max(1e-9, first.inA[k])), laid: first.inA, speed: speed / (SECONDS / 5), steps: last.steps - first.steps };
+      return { inA, meanA: inA.map((v, k) => v / Math.max(1, cellsA[k])), meanOut: out / Math.max(1, cellsOut), cells: pick,
+        gpu: !!f.gpu, readbacks: f.readbacks, steps: f.stepIndex, turb: f.lastSettings?.turbulenceScale, engine: d.engine };
+    }, [AREAS, keep]);
+    const first = await read(true);
+    let turbHeld = first.turb === over.turbulenceScale, gpuHeld = first.gpu;
+    for (let t = 0; t < SECONDS; t += 5) {
+      await page.waitForTimeout(5000);
+      const r = await read(false);
+      turbHeld &&= r.turb === over.turbulenceScale; gpuHeld &&= r.gpu;
+    }
+    const last = await read(true);
+    let moved = 0, laid = 0;
+    for (let i = 0; i < first.cells.length; i++) { moved += Math.abs(last.cells[i] - first.cells[i]); laid += first.cells[i]; }
+    const r = {
+      name, engine: first.engine, kept: last.inA.map((v, k) => v / Math.max(1e-9, first.inA[k])),
+      laid: first.meanA, outside: first.meanOut, moved: moved / Math.max(1e-9, laid),
+      steps: last.steps - first.steps, readbacks: last.readbacks - first.readbacks, gpuHeld, turbHeld, turb: last.turb,
+    };
+    console.log(`     ${name}: ${r.kept.map(v => (v * 100).toFixed(1) + '%').join(' / ')} kept over ${SECONDS} s, moved ${(r.moved * 100).toFixed(1)}%, ${r.steps} steps, ${r.readbacks} readbacks, Turbulence ${r.turb}, ${r.engine}`);
+    return r;
   } finally { await context.close(); }
 };
 
 try {
-  const ships = await run({});
-  if (!isGpuEngine(ships.engine)) {
-    console.log(` skip  the plate ran on ${ships.engine || 'no engine'}: this needs the app's GPU solver (the Mac's WebGPU shards)`);
-    process.exit(0);
-  }
-  const stirred = await run({ turbulenceScale: 0.5 });
+  const ships = await run('as it ships', { turbulenceScale: 0 });
+  const stirred = await run('the old stir', { turbulenceScale: 0.5 });
+  const frozen = await run('frozen (Advection 0)', { turbulenceScale: 0, advection: 0 });
   const fmt = (r) => r.kept.map(v => (v * 100).toFixed(1) + '%').join(' / ');
-  console.log(`     as it ships: ${fmt(ships)} kept over ${SECONDS} s (${ships.steps} steps), flow in the areas ${ships.speed.toFixed(3)}`);
-  console.log(`     the old stir (Turbulence 0.5): ${fmt(stirred)} (${stirred.steps} steps), flow ${stirred.speed.toFixed(3)}`);
-  check('the plate laid three pools to keep', ships.laid.every(v => v > 1) && stirred.laid.every(v => v > 1),
-    `dye in the areas at the start ${ships.laid.map(v => v.toFixed(0)).join(' / ')}`);
+  const runs = [ships, stirred, frozen];
+  check('each run is the GPU solver, kept all the minute, its readbacks landing',
+    runs.every(r => r.gpuHeld && r.readbacks >= SECONDS * 10),
+    runs.map(r => `${r.name} ${r.gpuHeld ? 'gpu' : 'NO GPU'} ${r.readbacks} readbacks`).join('; '));
+  check(`each run stepped at least ${STEPS} times (about the Mac's sixty a second)`,
+    runs.every(r => r.steps >= STEPS), runs.map(r => `${r.name} ${r.steps}`).join('; '));
+  check('each run kept the Turbulence it was given to the end', runs.every(r => r.turbHeld),
+    runs.map(r => `${r.name} ${r.turb}`).join('; '));
+  check('the plate laid three pools on a dark ground (each area ten times the dye between them)',
+    runs.every(r => r.laid.every(m => m > 10 * r.outside && m > 0.05)),
+    `${ships.laid.map(v => v.toFixed(3)).join(' / ')} against ${ships.outside.toFixed(4)} between`);
   check(`each of Velvet Underground's pools keeps at least ${KEEP * 100}% of its dye over a minute`,
     ships.kept.every(v => v >= KEEP), fmt(ships));
   check('and the old stir does not (the control: this check can tell a draining pool)',
     stirred.kept.some(v => v < KEEP), fmt(stirred));
-  check('and the plate still moves (a frozen plate keeps every pool and is not the fix)',
-    ships.speed > MOVING && ships.steps > SECONDS * 10, `flow ${ships.speed.toFixed(3)} over ${MOVING}, ${ships.steps} steps`);
+  check('and the plate still moves: its pools rearranged at least twice as much as frozen (the second control)',
+    ships.moved > 2 * frozen.moved, `${(ships.moved * 100).toFixed(1)}% against ${(frozen.moved * 100).toFixed(1)}% with Advection 0`);
 } finally { await browser.close(); stop(); }
 process.exit(checks.some(c => !c.ok) ? 1 : 0);

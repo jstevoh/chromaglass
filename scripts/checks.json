@@ -2824,12 +2824,13 @@
       "name": "Velvet Underground's pools stay pools",
       "shard": "open",
       "run": "npm run pools",
-      "timeout": 6,
+      "timeout": 8,
       "why": [
         "PLAN 28i-7c (scripts/pools.mjs): the look's three areas each keep 85% of",
         "their dye over a minute of show in the app on Metal; the same look with",
         "the old curl-noise stir (Turbulence 0.5) must drain one, as the control;",
-        "and the plate must still move. Needs the app's GPU solver: a Mac shard."
+        "and the pools must rearrange twice as much as the plate frozen (Advection",
+        "0). Needs the app's GPU solver: a Mac shard, three runs of about 75 s."
       ]
     },
     {
