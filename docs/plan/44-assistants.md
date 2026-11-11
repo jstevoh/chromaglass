@@ -251,7 +251,8 @@ through cords and preset patches, and the plate shader is untouched.
   yet. Repoint it at the checkout the Mac app is built from (or ship the server
   inside the app, so a release carries it), and cut the Mac release that carries
   #785 (the sound on air). Pass: the Mac lists 24 tools, and `show_state` answers
-  with the app open.
+  with the app open. The repointing half done 2026-11-11 (the Mac lists 24 since,
+  seen the same evening); the release with #785 still owed.
 - **44k-2. The music player.** *(M, AG lane.)* `play_track` (a library track by name,
   or a file by its path on the Mac), `music` (play, pause, seek to seconds, loop,
   close), and `show_state`'s `player` (what is loaded, where it is, its length,
