@@ -153,7 +153,7 @@ import { useControllers } from './app/useControllers';
 import { useCommandPalette } from './app/useCommandPalette';
 import { useCheckHooks } from './app/useCheckHooks';
 import { useCrashState } from './app/useCrashState';
-import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings } from './app/shared';
+import { SCENE_ON_KEY, ArmedLook, OPENING_LOOK, MUSIC_SETTINGS_KEY, loadMusicSettings, randomLook } from './app/shared';
 
 const hasAccountOrLicenseUI =
   Boolean(import.meta.env.VITE_FIREBASE_API_KEY) ||
@@ -3135,10 +3135,7 @@ export default function App() {
             // A look from the phone crossfades in, as Go does on the desk: a
             // thumb in front of a room should never cut the plate to clean glass.
             onLook={(id) => goLookNow(id)}
-            onRandomLook={() => {
-              const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
-              if (pool.length) goLookNow(stream('phone.look').pick(pool).id);
-            }}
+            onRandomLook={() => { const next = randomLook(activePresetId, stream('phone.look').float); if (next) goLookNow(next.id); }}
             onRevert={previousLook.current ? revertLook : null}
             onSaveLook={(name) => saveCurrentPreset(name, '', false)}
             saveSuggestion={docId ? `${docName} 2` : pinnedLookName ? `${pinnedLookName} (mine)` : 'My look'}

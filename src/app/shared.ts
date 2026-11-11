@@ -1,6 +1,8 @@
 import { type MusicSettings, DEFAULT_MUSIC_SETTINGS } from '../lib/musicTypes';
 import { findPreset, PRESETS } from '../presets';
 import { stream } from '../lib/rng';
+import { pickLook } from '../lib/lookPick';
+import { isPackLocked } from '../lib/tierGates';
 import type { VisualizerSettings } from '../types';
 
 /**
@@ -85,9 +87,20 @@ export const OPENING_LOOK: string = (() => {
     const named = asked ? findPreset(asked) : undefined;
     if (named) return named.id;
   } catch { /* no window: the default below */ }
-  const pool = PRESETS.filter(p => !p.settings.macroMode);
-  return pool.length ? stream('show.opening').pick(pool).id : 'classic';
+  // Never an art pack's look (lib/lookPick.ts): the licence that says whether
+  // this copy has the pack is not read yet when the first look is chosen, and
+  // a first impression is the liquid, not the sheets laid on it.
+  return pickLook(PRESETS, stream('show.opening').float, { locked: (pack) => !!pack })?.id ?? 'classic';
 })();
+
+/**
+ * A random shipped look, as the phone's Surprise me and a new song in "New
+ * preset" mode pick one: weighted so an art pack counts as one choice, not as
+ * each of its looks, never a pack this copy does not have, and not the liquid
+ * now on the plate or one picked lately (lib/lookPick.ts, PLAN 45a-13).
+ */
+export const randomLook = (currentId: string | null, rand: () => number) =>
+  pickLook(PRESETS, rand, { currentId, locked: isPackLocked });
 
 /**
  * What the wall shows while the desk builds on a copy (PLAN.md 8b): the look

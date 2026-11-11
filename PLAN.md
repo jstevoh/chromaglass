@@ -201,15 +201,9 @@ bar grid together); **14e** (M, output latency and one lead per source); **10.2-
 re-read 2026-10-24): the owner's 2026-10-24 ask for parts of the plate answering the
 music, explored as four directions the same day and all four taken, in this order:
 ~~**25h** areas that listen for themselves~~ (shipped), ~~**24.3-place** the melody walks across the plate~~ (shipped), ~~**25i**
-<<<<<<< HEAD
 colour that answers the music~~ (shipped; ~~**25i-6** its three looks fixed after filming~~, shipped; ~~**25i-10** no dye on a reagent from the loop's hands~~, shipped), then **25j** a lamp under each area (D, M, with
-14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), ~~**14t-pc** Program Change (S)~~ (shipped; `npm run soundowed`), **24.3** notes as voices
-with 30's envelope (M), ~~**30b** LFOs and envelopes you set~~ (shipped; `npm run soundowed`, `30b-loop` open); from §31 (Continuum,
-=======
-colour that answers the music~~ (shipped; ~~**25i-6** its three looks fixed after filming~~, shipped), then **25j** a lamp under each area (D, M, with
 14r read per area); then ~~**30a**'s rest, shaped sound cords~~ (shipped; `npm run soundcords`), ~~**14t-pc** Program Change (S)~~ (shipped; `npm run soundowed`), ~~**24.3** notes as voices
 with 30's envelope (M)~~ (shipped; `npm run soundowed`), ~~**30b** LFOs and envelopes you set~~ (shipped; `npm run soundowed`, `30b-loop` open); from §31 (Continuum,
->>>>>>> origin/main
 2026-10-11): **31c** a cord that reads where in its band, and a delay (S, with 30a).
 
 Lane B: **10-go** Go on the music and a T-bar (M); **5-looklink** (S); **11-back** (S);
@@ -284,7 +278,7 @@ style (§31).
   **23.1** *(owner)*, **23.2**, **23.3** (after 14o), **23.4**, **23.5**, **23.6**, **23.8**, then
   **23.7**.
   Art packs (§45): ~~**45a**~~ the moiré pack's sheets (2026-11-07), ~~**45a-11**~~ Moiré Waves (2026-11-08), ~~**45a-2**~~ selling it to Home
-  (2026-11-07), then **45a-3** a hand on the sheet, **45a-10** Song Groove's missing fringes.
+  (2026-11-07), ~~**45a-13**~~ random looks weigh the pack as one choice, ~~**45a-14**~~ Randomise lays sheets now and then (2026-11-11), then **45a-3** a hand on the sheet, **45a-10** Song Groove's missing fringes.
   The slide plan: **RM-S4**, then **RM-S135** after 6.2's heat.
 - **7.6** Modular rigs (§24): **24.1a** (after 1.5 and 1.6), ~~**24.3**~~ (shipped; `npm run soundowed`), then **24.1b** (after
   13.1-sign), then **24.4**.
@@ -377,7 +371,7 @@ Where each batch stands, as of 2026-09-27:
 | 42 | What Liquid Light Lab's tutorials and gear showed | Asked 2026-11-07 from a working show's tutorials and shop: the glass pair as the instrument (Fast and Slow glass from real radii, 42a), the top glass turned by hand (42b), a triple plate (42c), an open dish for blow plates (42d), the classic mixture's numbers (42e), the RGB turntable's patterns (42f), moiré (42g), diffraction (42h), a ripple wheel (42i, the owner's call), all proposed; the videos themselves wait on the owner's Mac (42m) |
 | 43 | Visuals for a musician's release | Asked 2026-11-07 after the revenue research: a Spotify Canvas loop, a YouTube visualizer and vertical cuts from one render, self-serve in the app or done for the musician; the owner picked the Release kit in Home, then a done-for-you test (43-0, 2026-11-07); portrait renders (43a), a seamless loop (43b, its check `loopseam` written and owed) and the release kit (43c) next; nothing built yet |
 | 44 | A person's AI assistant plays the show | Asked 2026-11-07; the owner's answer: **for the owner's own use, not sold or promoted**. **44b, 44c, 44d, 44g shipped** (`npm run assistant`): the show server's `assistant` role behind a switch only the owner sets, Suggest / Play / Full (Full: everything, the live stream included), glides, Undo ten deep, the hand winning; a local MCP server (`mcp/`) with a show guide, the owner's notes and a picture of the plate. **44c-4** (a 1280 still for the assistant) and **44f** (a pour as a song action, `add_song_action`, the song show's clock read every frame) **shipped** (`npm run assistant`, `npm run songs`). **44i**, the owner's YouTube channel from the assistant (a second local MCP server, uploads that resume), **shipped** (`npm run youtube`), 44i-1 waiting on the owner's Google setup, 44i-2 (publish it for others) the owner's call. **44j** (the live stream's destinations and health, and the sound source, from the assistant) **shipped** (`npm run assistant`). 44k (everything at the desk from the assistant): **the audit done 2026-11-11**, its table in the section, the gaps 44k-1 to 44k-17 open (44k-17, the desk's layout, on the owner's word 2026-11-11), 44k-1 (the Mac's assistant on the current server) first; **44k-4, 44k-6, 44k-7, 44k-8** (the Mixer's takes, the bench, Finger and flick, the tempo and Link, choosing the sequence) **shipped** 2026-11-11 (`npm run assistant`), 44k-7a found; 44h, control over the internet, next; 44a and the menu parked while private; 44c-2, 44c-3, 44d-2 to 44d-4, 44f-2 to 44f-4, 44j-3 open; **44j-2** (a source set on air, the stream following it) **shipped** 2026-11-10 |
-| 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), seven looks; **45a shipped** (`npm run moire`), **45a-11** Moiré Waves shipped, **45a-2** sells it to Home ($15 once, Pro includes it), the Waves clip on the site 45a-12. |
+| 45 | The moiré pack | Asked 2026-11-03 from a shop's moiré transparency sets: two printed sheets on the stage as real optics (the product of two gratings, the lens's defocus, the lower sheet bent by the liquid), ten designs (four film cannot print), seven looks; **45a shipped** (`npm run moire`), **45a-11** Moiré Waves shipped, **45a-2** sells it to Home ($15 once, Pro includes it), the Waves clip on the site 45a-12, **45a-13** shipped (random looks weigh the pack as one choice, owned only; Randomise takes the sheets off, and with the pack lays a pair one roll in sixteen, 45a-14). |
 
 Also landed or in flight around these batches: the macro closeup's cells ride the paint
 and stop shaking at 6x (#165, `npm run cellride`); the show's pipelines are built before

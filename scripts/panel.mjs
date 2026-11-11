@@ -40,6 +40,7 @@ import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/li
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
 import { luckyLook } from '../src/lib/lucky.ts';
+import { randomLooks } from './panelRandomLooks.mjs';
 import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
@@ -1151,19 +1152,7 @@ check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app
 // not be true of an empty plate somebody had since painted.
 check('and only one thing decides that', !/const lookEdited =/.test(app));
 
-/*
-  The opening look is drawn from the show's seeded stream now (lib/rng.ts,
-  `npm run seed`), not from Math.random, so a render opens on the look it
-  opened on before. What this held — that a visitor does not arrive on the
-  same look every time — is held the same way, with one more link: the pick
-  is from the pool, and the seed it is keyed on is drawn fresh each load
-  (crypto) unless ?seed= fixes it.
-*/
-const rngSource = readFileSync(join(root, 'src/lib/rng.ts'), 'utf8');
-check('the opening look is not always the same one',
-  /export const OPENING_LOOK/.test(app) && /stream\('show\.opening'\)\.pick\(pool\)/.test(app)
-    && /current = asked \?\? drawStartupSeed\(\)/.test(rngSource) && /getRandomValues\(new Uint32Array\(1\)\)/.test(rngSource));
-check('and can be pinned so a harness is not random', /get\('look'\)/.test(app));
+// The opening look's checks are in panelRandomLooks.mjs (PLAN 45a-13).
 
 // ── The mirror rig ──────────────────────────────────────────────────
 /*
@@ -2103,6 +2092,8 @@ check('and neither starts over the limit',
     !/setInterval|requestAnimationFrame/.test(ui.slice(ui.indexOf('export function SlideTray'))) &&
     /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.cg-tray \{ transform: none !important; transition: none; \}/.test(css) && /\.cg-tray \{ transition: transform 160ms/.test(css));
 }
+
+randomLooks({ check });
 
 // ── Result ──────────────────────────────────────────────────────────
 const failed = checks.filter(c => !c.ok);
