@@ -10,7 +10,7 @@ comments, which moved with it.
 | Hook | What it holds |
 |---|---|
 | `useOutput` | the projector's geometry and grade, the wall's test card |
-| `useTempo` | the beat clock's tempo source and the label the desk shows |
+| `useTempo` | the beat clock's tempo source and the label the desk shows; publishes both to `tempoNow.ts` for the assistant |
 | `useAmbientMode` | Ambient TV mode's switch |
 | `useSoundState` | what the show listens to, as state |
 | `useSongLine` | the song's shape, the bar and the heard tempo, for the status lines |
@@ -44,6 +44,7 @@ comments, which moved with it.
 | `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it) |
 | `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
 | `soundNow.ts` (not a hook) | what the show hears, for the remote link to report (`useSoundNow`, `publishSound`), and the door the owner's assistant changes it through (`askSound`, `setSoundDoor`, `ASSISTANT_SOURCES`), set by `useSoundSource` (PLAN 44j) |
+| `tempoNow.ts` (not a hook) | the beat clock's tempo and Link, for the remote link to report (`useTempoNow`, `publishTempo`), and the door the owner's assistant sets them through (`askTempo`, `askLink`, `setTempoDoor`, `TEMPO_MIN_BPM`, `TEMPO_MAX_BPM`), set by `useTempo` (PLAN 44k-7) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption, or ink when `titleCaption` is off); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film |

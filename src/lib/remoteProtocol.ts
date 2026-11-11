@@ -83,6 +83,13 @@ export interface RemoteSequencer {
   /** 0..1 through the current stage. */
   progress: number;
   stages: { name: string; seconds: number }[];
+  /**
+   * Every sequence there is to choose from, and the one chosen (PLAN 44k-8),
+   * for the owner's assistant to pick one by name. Optional, since a display
+   * one build older sends only the transport above.
+   */
+  sequences?: { id: string; name: string; stages: number }[];
+  selectedId?: string | null;
 }
 
 /** What the phone shows: mirrored from the display, never guessed. */
@@ -144,6 +151,14 @@ export interface RemoteState {
   liveSetup?: LiveSetup | null;
   /** What the show hears (PLAN 44j): the sound source, and the file's name when it is one. */
   sound?: { source: 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone'; file: string | null };
+  /**
+   * The bottles on the bench, by id, name and the colour each pours, and the
+   * one in hand (PLAN 44k-6), so the owner's assistant picks a bottle that is
+   * there rather than guessing one this bench never had.
+   */
+  bench?: { bottles: { id: string; name: string; color: string }[]; inHand: string };
+  /** The beat clock's tempo, where it comes from, and Ableton Link (PLAN 44k-7, app/tempoNow.ts). */
+  tempo?: { bpm: number; source: string | null; link: { available: boolean; on: boolean; peers: number; follows: boolean } };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -262,6 +277,17 @@ export type RemoteMessage =
    */
   | { type: 'assistant-still'; width: number }
   | { type: 'song-action'; when: unknown; what: unknown }
+  /**
+   * The owner's assistant (PLAN 44k-7, 44k-8), relayed only from the guard.
+   * The tempo: a typed bpm (60 to 200, the beat clock's range), a tap, or
+   * back to the ear; Link on or off and whether Live's transport moves the
+   * Sequence (Full). The Sequence: choose one by its id (as the state's
+   * `sequencer.sequences` lists them), or go to a stage by its number from
+   * 0, one or the other in a message.
+   */
+  | { type: 'assistant-tempo'; do: 'bpm' | 'tap' | 'heard'; bpm?: number }
+  | { type: 'assistant-link'; on?: boolean; transport?: boolean }
+  | { type: 'assistant-seq'; select?: string; stage?: number }
   | { type: 'preset'; presetId: string }
   /**
    * Words poured onto the plate as dye, which the flow then carries off

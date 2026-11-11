@@ -133,10 +133,18 @@ function standInDisplay(port, displayKey) {
       { name: 'Test server', service: 'other', orientation: 'landscape', on: true, test: true, keyKept: true, urlValid: true },
     ], format: { height: 1080, fps: 30 }, last: null },
   };
+  /* The bench, the tempo and the Sequence as the app's display reports them
+     (PLAN 44k-6 to 44k-8): the bottles by id, name and colour, the beat
+     clock's bpm and source, and the sequences to choose from. */
+  // Ids that are not the names lower-cased, so a guard that sent on the
+  // name the assistant typed, not the id it stands for, is caught.
+  const bench = { bottles: [{ id: 'b-oil', name: 'Oil', color: '#ffcc00' }, { id: 'b-milk', name: 'Milk', color: '#ffffff' }, { id: 'b-ink', name: 'Ink', color: '#2244ff' }], inHand: 'b-oil' };
+  const tempo = { bpm: 0, source: null, link: { available: true, on: false, peers: 0, follows: false } };
+  const seq = { name: null, running: false, stageIndex: 0, stageName: null, progress: 0, stages: [], sequences: [{ id: 'seq-1', name: 'Slow build', stages: 3 }, { id: 'seq-2', name: 'Peak', stages: 5 }], selectedId: 'seq-1' };
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq } } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -164,6 +172,14 @@ function standInDisplay(port, displayKey) {
     }
     if (m.type === 'action' && m.action === 'live-stop') { stream.live = null; sendState(); }
     if (m.type === 'assistant-sound') { stream.sound = { source: m.source, file: null }; sendState(); }
+    if (m.type === 'liquid' && bench.bottles.some((b) => b.id === m.id)) { bench.inHand = m.id; sendState(); }
+    if (m.type === 'assistant-tempo') { if (m.do === 'bpm') { tempo.bpm = m.bpm; tempo.source = 'manual'; } if (m.do === 'heard') { tempo.bpm = 120; tempo.source = null; tempo.link.on = false; } sendState(); }
+    // Link on leads the tempo, as lib/tempo.ts's source does once a session answers.
+    if (m.type === 'assistant-link') { if (typeof m.on === 'boolean') { tempo.link.on = m.on; tempo.source = m.on ? 'link' : null; } if (typeof m.transport === 'boolean') tempo.link.follows = m.transport; sendState(); }
+    if (m.type === 'assistant-seq' && typeof m.select === 'string') { seq.selectedId = m.select; sendState(); }
+    // Play starts the chosen sequence (useShowSequencer's play); a run is a name and its stages.
+    if (m.type === 'action' && m.action === 'seq-play') { const q = seq.sequences.find((x) => x.id === seq.selectedId); Object.assign(seq, { name: q.name, running: true, stages: Array.from({ length: q.stages }, (_, i) => ({ name: `S${i + 1}`, seconds: 30 })) }); sendState(); }
+    if (m.type === 'action' && m.action === 'seq-stop') { Object.assign(seq, { name: null, running: false, stages: [] }); sendState(); }
     if (m.type === 'pad-picture') ws.send(JSON.stringify({ type: 'picture', src: PICTURE, w: 1, h: 1, aspect: 1, seq: 1 }));
     // A still, as the app's PadPictureSender answers one: as wide as asked
     // (its own cap is PAD_STILL_MAX_WIDTH, checked on the page's code below),
@@ -251,7 +267,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -302,6 +318,16 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await sleep(200);
     const leaked = display.since(t).filter((m) => m.type !== 'request-state');
     check('suggest', 'Suggest refuses Go, a setting, a pour, a song action and poured words, and nothing reaches the display', !sGo.ok && !sSet.ok && !sPour.ok && !sSong.ok && !sWords.ok && leaked.length === 0, `${sGo.text} | ${sSet.text} | ${sSong.text} | ${sWords.text} | ${leaked.map((m) => m.type).join(',')}`.slice(0, 200));
+
+    await sleep(1100);
+    t = Date.now();
+    const sBench = await Promise.all([
+      mcp.call('bottle', { bottle: 'Milk' }), mcp.call('finger', { x: 0.4, y: 0.5, dx: 0.1, dy: 0 }), mcp.call('flick', { direction: 'clockwise' }),
+      mcp.call('tempo', { command: 'bpm', bpm: 120 }), mcp.call('sequencer', { command: 'select', name: 'Peak' }),
+    ]);
+    await sleep(400);
+    const leakedBench = display.since(t).filter((m) => m.type !== 'request-state');
+    check('suggest', 'Suggest refuses a bottle, a finger, a flick, a tempo and a sequence\'s choice, and nothing reaches the display (44k-6 to 44k-8)', sBench.every((r) => !r.ok && /Play mode is needed/.test(r.text)) && leakedBench.length === 0, `${sBench.map((r) => r.text.slice(0, 40)).join(' | ')} | ${leakedBench.map((m) => m.type).join(',')}`.slice(0, 220));
 
     check('pour-suggest', 'Suggest refuses poured words on their own rule, and none reach the display', !sWords.ok && /Play/.test(sWords.text) && display.since(t, 'pour-text').length === 0, sWords.text.slice(0, 100));
 
@@ -360,7 +386,11 @@ async function scenario(serverDir, port, { full = true } = {}) {
     phone.ws.send(JSON.stringify({ type: 'song-action', when: { at: 'start' }, what: { do: 'clear' } }));
     phone.ws.send(JSON.stringify({ type: 'assistant-still', width: 1280 }));
     phone.ws.send(JSON.stringify({ type: 'assistant-sound', source: 'microphone' }));
+    phone.ws.send(JSON.stringify({ type: 'assistant-tempo', do: 'bpm', bpm: 90 }));
+    phone.ws.send(JSON.stringify({ type: 'assistant-link', on: true }));
+    phone.ws.send(JSON.stringify({ type: 'assistant-seq', select: 'peak' }));
     await sleep(200);
+    check('phone-tempo', 'a phone\'s assistant-tempo, assistant-link and assistant-seq never reach the display (the phone has its own Tempo block and Sequence picker)', display.since(t).every((m) => !['assistant-tempo', 'assistant-link', 'assistant-seq'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
     check('phone-live', 'a phone\'s assistant-live, cue-look, song-action, still and sound source never reach the display', display.since(t).every((m) => !['assistant-live', 'cue-look', 'song-action', 'assistant-still', 'assistant-sound'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
     // But a phone pours words: the remote's text box (37x-10c) is a hand at the plate.
     t = Date.now();
@@ -464,6 +494,82 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('depth', 'ten Undos, and no eleventh', undos === 10 && /nothing to undo/.test(last), `${undos} undos; then: ${last.slice(0, 60)}`);
     check('echo', 'the assistant\'s own glides are never read as the performer\'s hand', !lines.some((l) => l.rule === 'depth' && /hand wins/.test(l.detail)), '');
 
+    /*
+      The bench, the hand's last two gestures, the tempo and the Sequence
+      (PLAN 44k-4 to 44k-8). What is read is what reaches the stand-in
+      display: the message the app's useRemote runs, with the id the bench
+      or the sequence list has, never the name the assistant typed.
+    */
+    await sleep(1100);
+    t = Date.now();
+    const bMilk = await mcp.call('bottle', { bottle: 'milk ' });
+    const bBad = await mcp.call('bottle', { bottle: 'Mercury' });
+    await sleep(200);
+    const liq = display.since(t, 'liquid');
+    const bSt = await mcp.call('show_state');
+    check('-', 'a bottle by name reaches the display as the bench\'s id, and show_state\'s bench reads it in hand', bMilk.ok && liq.length === 1 && liq[0].id === 'b-milk' && /"inHand": "b-milk"/.test(bSt.text) && /"name": "Ink"/.test(bSt.text), `${bMilk.text} | ${JSON.stringify(liq)}`.slice(0, 160));
+    check('bottle-bench', 'a bottle not on the bench is refused with the bench\'s list, and nothing reaches the display', !bBad.ok && /Oil, Milk, Ink\)/.test(bBad.text) && !liq.some((m) => m.id !== 'b-milk'), bBad.text.slice(0, 140));
+    t = Date.now();
+    const fing = await mcp.call('finger', { x: 0.4, y: 0.5, dx: 0.1, dy: 0, amount: 0.7 });
+    await sleep(200);
+    const strokes = display.since(t, 'finger');
+    check('-', 'a finger reaches the display as a stroke of five steps along its line, each on the wall with its direction', fing.ok && strokes.length === 5 && strokes.every((m, i) => m.wall === true && Math.abs(m.dx - 0.02) < 1e-9 && m.dy === 0 && m.amount === 0.7 && (i === 0 || m.x > strokes[i - 1].x)) && Math.abs(strokes[4].x - 0.5) < 1e-9, `${fing.text} | ${JSON.stringify(strokes.map((m) => [m.x, m.dx]))}`.slice(0, 160));
+    await sleep(1100);
+    t = Date.now();
+    const flk = await mcp.call('flick', { direction: 'clockwise' });
+    await sleep(200);
+    const spinsAt = display.received.filter((r) => r.t >= t && r.m.type === 'spin');
+    const spins = spinsAt.map((r) => r.m);
+    const turn = spins.map((m) => Math.atan2(m.y - 0.5, m.x - 0.5));
+    check('-', 'a flick reaches the display as one finger going round the middle, clockwise as the picture shows it', flk.ok && spins.length === 6 && spins.every((m) => m.wall === true && m.id === spins[0].id) && turn.every((a, i) => i === 0 || a < turn[i - 1]), `${flk.text} | ${turn.map((a) => a.toFixed(2)).join(' ')}`.slice(0, 160));
+    // How hard is how fast: the display's Spin takes the dish's turn from the
+    // finger's angle over time and reads no amount, so a soft flick is the same
+    // arc drawn slower. Read from when the steps reached the display.
+    await sleep(1100);
+    t = Date.now();
+    const soft = await mcp.call('flick', { direction: 'clockwise', amount: 0.2 });
+    await sleep(200);
+    const softAt = display.received.filter((r) => r.t >= t && r.m.type === 'spin');
+    const span = (rs) => (rs.length ? rs.at(-1).t - rs[0].t : 0);
+    check('-', 'a soft flick draws the same arc over at least twice as long as the default one', soft.ok && softAt.length === 6 && span(softAt) >= 2 * span(spinsAt) && span(spinsAt) > 100, `default ${span(spinsAt)} ms, soft ${span(softAt)} ms`);
+    await sleep(1100);
+    t = Date.now();
+    const tBpm = await mcp.call('tempo', { command: 'bpm', bpm: 128 });
+    await sleep(300);
+    const tFast = await mcp.call('tempo', { command: 'bpm', bpm: 400 });
+    await sleep(300);
+    const tSt = await mcp.call('show_state');
+    const tHeard = await mcp.call('tempo', { command: 'heard' });
+    await sleep(300);
+    const tMsgs = display.since(t, 'assistant-tempo');
+    check('-', 'a typed bpm reaches the display as the tempo\'s own message, show_state reads it back, and heard gives it back to the ear', tBpm.ok && tHeard.ok && tMsgs.length === 2 && tMsgs[0].do === 'bpm' && tMsgs[0].bpm === 128 && tMsgs[1].do === 'heard' && /"bpm": 128/.test(tSt.text) && /"source": "manual"/.test(tSt.text), `${tBpm.text} | ${JSON.stringify(tMsgs)}`.slice(0, 160));
+    check('tempo-range', 'a bpm past the beat clock\'s range is refused with the range, and none reaches the display', !tFast.ok && /60 to 200/.test(tFast.text) && !tMsgs.some((m) => m.bpm === 400), tFast.text.slice(0, 120));
+    t = Date.now();
+    const lPlay = await mcp.call('link', { on: true });
+    const mPlay = await mcp.call('show_action', { action: 'mix-fade-gel' });
+    await sleep(200);
+    check('fullonly', 'Link and the Mixer\'s row takes are refused in Play, for want of Full', !lPlay.ok && !mPlay.ok && /Full mode is needed/.test(lPlay.text) && /Full mode is needed/.test(mPlay.text) && display.since(t).every((m) => m.type !== 'assistant-link' && m.type !== 'action'), `${lPlay.text} | ${mPlay.text}`.slice(0, 140));
+    await sleep(1100);
+    t = Date.now();
+    const qPick = await mcp.call('sequencer', { command: 'select', name: 'PEAK' });
+    await sleep(300);
+    const qBad = await mcp.call('sequencer', { command: 'select', name: 'Nope' });
+    await sleep(300);
+    const qIdle = await mcp.call('sequencer', { command: 'stage', stage: 2 });
+    await sleep(300);
+    await mcp.call('sequencer', { command: 'play' });
+    await sleep(300);
+    const qStage = await mcp.call('sequencer', { command: 'stage', stage: 2 });
+    await sleep(300);
+    const qFar = await mcp.call('sequencer', { command: 'stage', stage: 9 });
+    await sleep(200);
+    const qMsgs = display.since(t, 'assistant-seq');
+    check('-', 'a sequence chosen by name reaches the display as its id, and a stage of the run by its number from 1 as its index', qPick.ok && qStage.ok && qMsgs.length === 2 && qMsgs[0].select === 'seq-2' && qMsgs[1].stage === 1 && qMsgs[1].select === undefined, `${qPick.text} | ${qStage.text} | ${JSON.stringify(qMsgs)}`.slice(0, 180));
+    check('seq-unknown', 'a sequence that is not there is refused with the list, and nothing reaches the display', !qBad.ok && /Slow build, Peak\)/.test(qBad.text) && !qMsgs.some((m) => m.select === 'Nope'), qBad.text.slice(0, 120));
+    check('seq-run', 'a stage with no sequence running or paused is refused (it would start the show without the performer\'s Pacing held), and nothing reaches the display', !qIdle.ok && /no sequence is running/.test(qIdle.text) && qMsgs.filter((m) => 'stage' in m).length <= 1, qIdle.text.slice(0, 120));
+    check('seq-stage', 'a stage past the running sequence\'s last is refused with how many it has, and nothing reaches the display', !qFar.ok && /5 stages/.test(qFar.text) && !qMsgs.some((m) => m.stage === 8), qFar.text.slice(0, 120));
+    await mcp.call('sequencer', { command: 'stop' });
+
     if (full) {
       const wait = handT + 10_400 - Date.now();
       if (wait > 0) await sleep(wait);
@@ -486,6 +592,20 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await sleep(200);
     const hFull = await mcp.call('set', { settings: { stockWeave: 0.1 } });
     check('hand', 'in Full the hand still wins', !hFull.ok && /hand wins/.test(hFull.text), hFull.text.slice(0, 100));
+    await sleep(300);
+    t = Date.now();
+    const mFull = await mcp.call('show_action', { action: 'mix-fade-gel' });
+    const lFull = await mcp.call('link', { on: true, transport: true });
+    await sleep(300);
+    const lSt = await mcp.call('show_state');
+    check('-', 'Full: a Mixer row take reaches the display as its action (44k-4), and Link on with its transport as Link\'s own message', mFull.ok && lFull.ok
+      && display.since(t, 'action').some((m) => m.action === 'mix-fade-gel')
+      && display.since(t, 'assistant-link').some((m) => m.on === true && m.transport === true) && /"follows": true/.test(lSt.text), `${mFull.text} | ${lFull.text}`.slice(0, 160));
+    t = Date.now();
+    const tLinked = await mcp.call('tempo', { command: 'bpm', bpm: 100 });
+    await sleep(200);
+    check('tempo-link', 'while Link leads the tempo a typed bpm is refused, never reported as the clock\'s, and none reaches the display', !tLinked.ok && /Link leads/.test(tLinked.text) && display.since(t, 'assistant-tempo').length === 0, tLinked.text.slice(0, 120));
+    await mcp.call('link', { on: false });
 
     // The Live Show and the sound (PLAN 44j). On air now, from live-start above.
     await sleep(1100);
@@ -589,6 +709,13 @@ const MUTANTS = [
   { rule: 'live-none', file: 'assistant.js', find: '!Array.isArray(raw) || raw.length === 0 ||', replace: '!Array.isArray(raw) ||' },
   { rule: 'live-names', file: 'assistant.js', find: '...(names ? { names } : {})', replace: '' },
   { rule: 'phone-live', file: 'remote-server.js', find: "'assistant-live', 'assistant-sound',", replace: "'assistant-live'," },
+  { rule: 'bottle-bench', file: 'assistant.js', find: 'if (!hit) return refuse(`no bottle', replace: 'if (false) return refuse(`no bottle' },
+  { rule: 'tempo-range', file: 'assistant.js', find: "message.do === 'bpm' && !(Number.isFinite(bpm) && bpm >= TEMPO_MIN_BPM && bpm <= TEMPO_MAX_BPM)", replace: 'false' },
+  { rule: 'seq-unknown', file: 'assistant.js', find: 'if (!hit) return refuse(`no sequence', replace: 'if (false) return refuse(`no sequence' },
+  { rule: 'seq-stage', file: 'assistant.js', find: 'if (n !== null && message.stage >= n)', replace: 'if (false)' },
+  { rule: 'seq-run', file: 'assistant.js', find: "if (n === null && !show.legacySeq) return refuse(", replace: 'if (false) return refuse(' },
+  { rule: 'tempo-link', file: 'assistant.js', find: "if (message.do !== 'heard' && show.tempoSource === 'link')", replace: 'if (false)' },
+  { rule: 'phone-tempo', file: 'remote-server.js', find: "'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq']", replace: "'song-action']" },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -610,7 +737,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -721,6 +848,27 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   page.setSoundDoor(null);
   say(/not running/.test(noDoor ?? '') && /no such source/.test(bad ?? '') && good === null && asked.join(',') === 'system',
     `the page's door changes the source it is handed, refuses one it may not pick, and says so with no sound running (${noDoor} | ${bad} | ${good} | ${asked.join(',')})`);
+}
+
+/* The page's own tempo door (44k-7), on the real tempoNow: it takes the
+   guard's range, and changes nothing it was not handed. Then the tool's
+   show_action list against the guard's Full actions (44k-4): an action the
+   guard allows that no tool can send is a door the assistant never finds. */
+{
+  const guard = await import(join(ROOT, 'server', 'assistant.js'));
+  say(guard.TEMPO_MIN_BPM === page.TEMPO_MIN_BPM && guard.TEMPO_MAX_BPM === page.TEMPO_MAX_BPM, `the guard's and the page's bpm range are one (guard ${guard.TEMPO_MIN_BPM}-${guard.TEMPO_MAX_BPM}; page ${page.TEMPO_MIN_BPM}-${page.TEMPO_MAX_BPM})`);
+  const noDoor = page.askTempo({ do: 'bpm', bpm: 120 });
+  const asked = [];
+  page.setTempoDoor({ bpm: (b) => asked.push(`bpm ${b}`), tap: () => asked.push('tap'), heard: () => asked.push('heard'), link: (on) => asked.push(`link ${on}`), transport: (on) => asked.push(`transport ${on}`) });
+  const r = [page.askTempo({ do: 'bpm', bpm: 128 }), page.askTempo({ do: 'bpm', bpm: 400 }), page.askTempo({ do: 'heard' }), page.askTempo({ do: 'swing' }), page.askLink({ on: true }), page.askLink({})];
+  page.setTempoDoor(null);
+  say(/not running/.test(noDoor ?? '') && r[0] === null && /60 to 200/.test(r[1] ?? '') && r[2] === null && /not a tempo/.test(r[3] ?? '') && r[4] === null && /link/.test(r[5] ?? '') && asked.join(',') === 'bpm 128,heard,link true',
+    `the page's tempo door sets what it is handed, refuses a bpm past its range and a word it does not know, and says so with no tempo running (${asked.join(',')} | ${r.map((x) => x ?? 'ok').join(' | ')})`);
+  const mcpSrc = readFileSync(join(ROOT, 'mcp', 'chromaglass-mcp.js'), 'utf8');
+  const listed = new Set((/name: 'show_action'[^\n]*?enum: \[([^\]]*)\]/.exec(mcpSrc)?.[1] ?? '').match(/'[a-z-]+'/g)?.map((x) => x.slice(1, -1)) ?? []);
+  if (/\.\.\.MIX_ROWS\.map/.test(/name: 'show_action'[^\n]*/.exec(mcpSrc)?.[0] ?? '')) for (const row of /const MIX_ROWS = \[([^\]]*)\]/.exec(mcpSrc)?.[1].match(/'[a-z]+'/g) ?? []) listed.add(`mix-fade-${row.slice(1, -1)}`);
+  const missing = [...guard.FULL_ACTIONS].filter((a) => !listed.has(a));
+  say(missing.length === 0 && guard.FULL_ACTIONS.size > 20, `show_action offers every action the guard allows in Full (${guard.FULL_ACTIONS.size} actions; missing: ${missing.join(', ') || 'none'})`);
 }
 
 // The edges of the code.

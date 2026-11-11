@@ -268,10 +268,9 @@ through cords and preset patches, and the plate shader is untouched.
   back plate's three (Full). The door: `useLookFades`' `cueAny`, `goLookNow`,
   `goBackPlate`, `setFadeSeconds`. Pass: lines for each at the stand-in, a number past
   the list refused with the list's length.
-- **44k-4. The Mixer's row takes in `show_action`.** *(S, Claude, can ride 44k-3's
-  PR.)* The guard's Full list has `mix-fade-led` to `mix-fade-mark` and `useRemote`
-  runs them; only the MCP's enum leaves them out. Pass: an `npm run assistant` line
-  that the tool sends `mix-fade-gel` in Full and is refused in Play.
+- ~~**44k-4. The Mixer's row takes in `show_action`.**~~ **Shipped** 2026-11-11: the
+  seven `mix-fade-*` in the tool's list, and a line that the list covers every Full
+  action the guard allows (`npm run assistant`). Story in `docs/plan-shipped.md` §44.
 - **44k-5. Song shows, read and edited.** *(M, AG lane.)* `song_show` (read the
   playing song's show or a named one: its looks, its actions with ids, Follow songs),
   `remove_song_action` (by id, Full; a Play assistant takes out only its own),
@@ -279,20 +278,19 @@ through cords and preset patches, and the plate shader is untouched.
   closing 44f-4's silence with the display's answer. The door: `useShowLibrary`'s
   `setSongShows` and `useSongScore`'s runtime and nudges. Pass: lines for each, and a
   removal of the owner's own action refused in Play.
-- **44k-6. The bench and the last two gestures.** *(S, AG lane.)* `show_state`'s
-  `bench` (each bottle's id, name and colour, the one in hand), a `bottle` tool that
-  sends `liquid`, and `finger` and `flick` tools for the guard's `finger` and `spin`.
-  Pass: lines that each tool's message reaches the stand-in in Play and is refused in
-  Suggest, and a bottle not on the bench refused with the bench's list.
-- **44k-7. The tempo and Link.** *(S, AG lane.)* `tempo` (tap, bpm, heard) and `link`
-  (on, off, transport), `show_state`'s `tempo` (bpm, its source). The door:
-  `useTempo`'s `tapTempo`, `setTempoBpm`, `clearTempo`, `setLinkOn`,
-  `setLinkTransport`. A typed bpm is the useful one for an assistant (it cannot tap
-  in time); a tap is there for a person's habits. Pass: lines for each, a bpm outside
-  the desk's own range refused.
-- **44k-8. Which sequence.** *(S, AG lane.)* `sequencer` gains `select` (by name, as
-  `show_state` lists them) and `stage` (go to stage N). Editing a sequence's stages
-  and binding one to a song are 44k-16's. Pass: lines for both.
+- ~~**44k-6. The bench and the last two gestures.**~~ **Shipped** 2026-11-11:
+  `show_state`'s `bench`, `bottle`, `finger` (a stroke of five steps) and `flick` (one
+  finger a third of the way round), Play (`npm run assistant`, `bottle-bench`).
+- ~~**44k-7. The tempo and Link.**~~ **Shipped** 2026-11-11: `tempo` (bpm 60 to 200,
+  heard, tap) in Play, `link` (on, transport) in Full, `show_state`'s `tempo`, through
+  `app/tempoNow.ts` (`npm run assistant`, `tempo-range`, `phone-tempo`).
+- ~~**44k-8. Which sequence.**~~ **Shipped** 2026-11-11: `sequencer` `select` (by name)
+  and `stage` (from 1), `show_state` lists the sequences (`npm run assistant`,
+  `seq-unknown`, `seq-stage`).
+- **44k-7a. Undo of a tempo and a sequence's choice.** *(S, found building 44k-7.)*
+  The assistant's Undo walks back settings, a Go and the blackout; a typed bpm, Link
+  and a sequence chosen are not on its list, so the tools say Undo leaves them. Put
+  them on it (the bpm and source before, the sequence before) if the owner wants it.
 - **44k-9.** Saving a made look: 44c-2 above, now at rank 9.
 - **44k-10. Calibrate, the song detector and Listen.** *(S, AG lane.)* `calibrate`
   (the Sound panel's press), `song_detection` (on, off), `listen` (start, cancel).

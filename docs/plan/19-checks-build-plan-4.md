@@ -75,3 +75,19 @@ landed on a red main.
   and the early stop on saved runs, but not the HTTP reading itself (paging, the re-run
   attempt lookup, the GraphQL read of each PR's status). A recorded set of responses
   played through a stub `fetch` would cover it.
+
+## 19an. Conflict markers reached main and nothing stopped them (2026-11-11)
+
+A squash merge on 2026-11-10 (25i-10) landed `<<<<<<< HEAD` / `=======` / `>>>>>>>` blocks
+in `docs/judging.md` and `PLAN.md`: both sides had added a judging section numbered 121 and
+a running-order row. No check reads a file for markers, so CI was green and the deploy
+published a site built from a tree that still had them (Markdown only, so nothing broke at
+runtime; in a `.ts` file `lint` would have caught it). The judging block was resolved by
+hand, keeping both sections (24.3 stays §121, Chemical Clock's 25i-10 becomes §122, and
+25i-11's reference follows it).
+
+- **19an-1. Open: a check that fails on a committed conflict marker.** A `Measure` line that
+  greps every tracked text file for a line that is exactly `<<<<<<< `-prefixed, `=======` or
+  `>>>>>>> `-prefixed (the three together, so a Markdown rule of `=======` alone is not
+  caught), with a self-test that plants a block and goes red. An entry in
+  `scripts/checks.json`, not a step in `checks.yml`.

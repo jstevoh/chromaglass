@@ -102,7 +102,7 @@ const SONG_PLAY = new Set(['pour', 'burst', 'dyes', 'zoom', 'kaleidoscope', 'loo
 const SONG_KICKS_MIN = 2;
 const SONG_WHEN = new Set(['start', 'time', 'section', 'kick', 'before-end']);
 /** Full only: what a person at the desk can do that a Play assistant cannot. */
-const FULL_ACTIONS = new Set([
+export const FULL_ACTIONS = new Set([
   'play', 'pause', 'seed', 'clear', 'drain', 'lucky', 'automate-on', 'automate-off',
   'overlays-off', 'overlays-on', 'preset-next', 'preset-prev', 'blackout-toggle',
   'record-toggle', 'live-start', 'live-test', 'live-stop', 'performance-toggle', 'back',
@@ -110,6 +110,10 @@ const FULL_ACTIONS = new Set([
   'mix-fade-film', 'mix-fade-mark',
 ]);
 const RANK = { off: 0, suggest: 1, play: 2, full: 3 };
+/** A typed bpm's range: the beat clock's own (app/tempoNow.ts `TEMPO_MIN_BPM`, `TEMPO_MAX_BPM`; `npm run assistant` holds the two the same). */
+export const TEMPO_MIN_BPM = 60;
+export const TEMPO_MAX_BPM = 200;
+const TEMPO_DO = new Set(['bpm', 'tap', 'heard']);
 /** The sources the assistant may pick (app/soundNow.ts's ASSISTANT_SOURCES): a file needs the player's own choice of file. */
 export const SOUND_SOURCES = new Set(['none', 'microphone', 'system', 'simulated', 'drone']);
 
@@ -298,6 +302,19 @@ export function createAssistantGuard(send, now = Date.now) {
         // start to a name that is not one is refused here with the list,
         // where the assistant hears why.
         destinations: Array.isArray(state.liveSetup?.destinations) ? state.liveSetup.destinations.map((d) => ({ name: String(d?.name ?? ''), test: d?.test === true })) : null,
+        // The bench and the sequences (PLAN 44k-6, 44k-8), so a bottle or a
+        // sequence that is not there is refused here with the list. Null from
+        // a display one build older, which then judges them itself.
+        bottles: Array.isArray(state.bench?.bottles) ? state.bench.bottles.map((b) => ({ id: String(b?.id ?? ''), name: String(b?.name ?? '') })) : null,
+        sequences: Array.isArray(state.sequencer?.sequences) ? state.sequencer.sequences.map((q) => ({ id: String(q?.id ?? ''), name: String(q?.name ?? ''), stages: Number(q?.stages) || 0 })) : null,
+        sequenceId: typeof state.sequencer?.selectedId === 'string' ? state.sequencer.selectedId : null,
+        // A run, playing or paused, and how many stages its sequence has: a
+        // stage is a stage of the run (useShowSequencer's goTo), never of
+        // the one chosen since, and with no run a stage would start the show
+        // without the performer's Pacing held, so it is refused.
+        run: typeof state.sequencer?.name === 'string' && Array.isArray(state.sequencer.stages) ? state.sequencer.stages.length : null,
+        legacySeq: !state.sequencer || !('sequences' in state.sequencer),
+        tempoSource: typeof state.tempo?.source === 'string' ? state.tempo.source : null,
       };
     },
 
@@ -469,6 +486,65 @@ export function createAssistantGuard(send, now = Date.now) {
         return { ok: true };
       }
 
+      /*
+        The tempo (PLAN 44k-7): what the desk's Tempo block does, in Play,
+        paced as a setting is, since a new tempo moves everything on the
+        beat at once. A bpm outside the beat clock's range is refused, not
+        folded into it as the clock would, so the assistant hears that its
+        number was not the one used. Link is Full: it joins the room's
+        network session, other people's machines included.
+      */
+      if (type === 'assistant-tempo') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (!TEMPO_DO.has(message.do)) return refuse(`tempo: bpm, tap or heard, not ${String(message.do)}`);
+        const bpm = Number(message.bpm);
+        if (message.do === 'bpm' && !(Number.isFinite(bpm) && bpm >= TEMPO_MIN_BPM && bpm <= TEMPO_MAX_BPM)) return refuse(`a bpm from ${TEMPO_MIN_BPM} to ${TEMPO_MAX_BPM} (the beat clock's range), not ${String(message.bpm)}`);
+        // While Link leads, the beat clock reads Link's tempo and a typed one
+        // would be kept underneath, unheard (lib/tempo.ts `bpm`, `active`):
+        // refused, so the assistant does not report a tempo the clock is not at.
+        if (message.do !== 'heard' && show.tempoSource === 'link') return refuse('Ableton Link leads the tempo now: switch link off first (Full), or set the tempo in Live');
+        count('patch', mode, t);
+        send(message.do === 'bpm' ? { type: 'assistant-tempo', do: 'bpm', bpm } : { type: 'assistant-tempo', do: message.do });
+        return { ok: true };
+      }
+      if (type === 'assistant-link') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const on = typeof message.on === 'boolean' ? message.on : undefined;
+        const transport = typeof message.transport === 'boolean' ? message.transport : undefined;
+        if (on === undefined && transport === undefined) return refuse('link: on, transport, or both, as true or false');
+        count('patch', mode, t);
+        send({ type: 'assistant-link', ...(on === undefined ? {} : { on }), ...(transport === undefined ? {} : { transport }) });
+        return { ok: true };
+      }
+
+      /*
+        The Sequence (PLAN 44k-8): choose one by name or id, as show_state
+        lists them, or go to a stage by its number. Play, paced as a
+        setting, since a stage is a look change on its own clock.
+      */
+      if (type === 'assistant-seq') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (typeof message.select === 'string') {
+          const want = message.select.trim().toLowerCase();
+          const hit = show.sequences ? show.sequences.find((q) => q.id === message.select || q.name.trim().toLowerCase() === want) : { id: message.select };
+          if (!hit) return refuse(`no sequence named "${message.select}" (there are: ${show.sequences.map((q) => q.name).join(', ') || 'none'})`);
+          count('patch', mode, t);
+          send({ type: 'assistant-seq', select: hit.id });
+          return { ok: true };
+        }
+        if (!Number.isInteger(message.stage)) return refuse('sequence: select a sequence, or a stage by its number');
+        if (message.stage < 0) return refuse('a stage by its number, from 1');
+        const n = show.run;
+        if (n === null && !show.legacySeq) return refuse('no sequence is running or paused: sequencer play first, then a stage');
+        if (n !== null && message.stage >= n) return refuse(`stage ${message.stage + 1} of a sequence with ${n} stage${n === 1 ? '' : 's'}`);
+        count('patch', mode, t);
+        send({ type: 'assistant-seq', stage: message.stage });
+        return { ok: true };
+      }
+
       if (type === 'pour-text') {
         const why = needs(mode, 'play') ?? paced('patch', mode, t);
         if (why) return refuse(why);
@@ -503,8 +579,23 @@ export function createAssistantGuard(send, now = Date.now) {
       if (GESTURES.has(type)) {
         const why = needs(mode, 'play') ?? paced('gesture', mode, t);
         if (why) return refuse(why);
+        // A bottle by id or name, as show_state's bench lists them (PLAN 44k-6):
+        // one this bench does not have is refused with the bench's list, where
+        // the display would only drop it in silence.
+        // Named `bottle` on the way in, since every message from the assistant
+        // carries its own `id` (the number its answer comes back under).
+        if (type === 'liquid') {
+          const want = String(message.bottle ?? '').trim().toLowerCase();
+          const hit = show.bottles ? show.bottles.find((b) => b.id === message.bottle || b.name.trim().toLowerCase() === want) : { id: String(message.bottle ?? '') };
+          if (!hit) return refuse(`no bottle "${String(message.bottle)}" on the bench (there are: ${show.bottles.map((b) => b.name).join(', ')})`);
+          count('gesture', mode, t);
+          send({ type: 'liquid', id: hit.id });
+          return { ok: true };
+        }
         count('gesture', mode, t);
-        send(message);
+        // A spin's `id` is the finger (two ids are two hands), so the
+        // assistant's finger comes in as `hand`, not as its answer's number.
+        send(type === 'spin' ? { ...message, id: Number.isInteger(message.hand) ? message.hand : 0 } : message);
         return { ok: true };
       }
 
