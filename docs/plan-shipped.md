@@ -6120,6 +6120,9 @@ the seal) and made line 4 see a dropped lift. Lava Lamp's
 Centre Gravity is 0. Filmed on the Mac (one take, 60 s): main drained to pale tan with red specks by 45 s; sealed, the wax stays the whole minute, but the plate is red wall to wall with no blobs (27f-9c; Dye Budget 0.35 was tried and read the same). Left open: 27f-9c (the wax as an immiscible phase), 27f-9a (Plate Rock's and Rain Drip's weight on a standing plate)
 and 27f-9b (the circulation is the even gap's, so where the mobility varies the gap's solve
 takes the rest through the open rim: 1.3% in 20 s where the wax lies on the bottom rim).
+The seal's three kernels are waited for at opening where the look opens on a standing thin gap
+(`Opening.sealed`, gpu/opening.ts) and built behind the show otherwise: the Mac's `npm run startup`
+found Lava Lamp asking for them in its first steps with no list naming them.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 

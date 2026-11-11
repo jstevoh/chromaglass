@@ -112,6 +112,17 @@ export interface Opening {
    * on the control mid-show, never an opening, so it stays behind the show.
    */
   film: boolean;
+  /**
+   * The sealed bottle (PLAN 27f-9): a thin gap stood up (Plate Upright above
+   * nought) takes its weight as the closed cell's circulation from the first
+   * step (sealSource, hsLiftRelax, sealFlow), where every other look builds
+   * them behind the show with the oil's lift. Added with the seal: `npm run
+   * startup` on the Mac found Lava Lamp asking for all three in its first
+   * steps with no list naming them. Until they are built the plate takes its
+   * weight on the open rim, so nothing was compiled on a frame, but the look
+   * opened on the leak the seal is there to stop.
+   */
+  sealed: boolean;
 }
 
 /**
@@ -165,5 +176,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     slosh: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5
       && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
     film: (s.clearFilm ?? 0) > 0.001,
+    sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
   };
 }
