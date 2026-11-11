@@ -1064,7 +1064,7 @@ try {
       licKV.clear();
       await fileProKey(E);
       const appCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-      await appCtx.addInitScript(LICENSE_PUBLIC_INIT + "window.__CHROMAGLASS_NATIVE__ = Object.assign(window.__CHROMAGLASS_NATIVE__ || {}, { shell: 'desktop', openInBrowser: (u) => { window.__cgOpened = u; } });");
+      await appCtx.addInitScript(LICENSE_PUBLIC_INIT + "window.__CHROMAGLASS_NATIVE__ = Object.assign(window.__CHROMAGLASS_NATIVE__ || {}, { shell: 'desktop', openInBrowser: (u) => { window.__cgOpened = u; }, bringToFront: () => { window.__cgFront = (window.__cgFront || 0) + 1; return Promise.resolve(true); } });");
       const a = await appCtx.newPage();
       await a.goto(SHOW + '&requireSignIn=1');
       const doorAt = (p) => p.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
@@ -1091,10 +1091,14 @@ try {
       const brCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
       await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };' +
         `try { localStorage.setItem('chromaglass:license-key', ${JSON.stringify(heldKey)}); } catch {}`);
-      let browserDone = null, keyFound = null;
+      let browserDone = null, keyFound = null, took = null, tabClosed = false;
       if (openedUrl) {
+        // Opened as the Mac opens it (`shell.openExternal`): a tab with one page
+        // of history, which a browser lets close itself. newPage then goto
+        // keeps Playwright's about:blank behind it, a tab no page may close.
         const b = await brCtx.newPage();
-        await b.goto(openedUrl);
+        await b.evaluate((u) => location.replace(u), openedUrl);
+        await b.waitForURL(openedUrl).catch(() => {});
         keyFound = await b.waitForSelector('[data-cg-app-licence-found]', { timeout: 30_000 }).then((el) => el.getAttribute('data-cg-app-licence-found'), () => null);
         if (await b.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 30_000 }).then(() => true, () => false)) {
           const popup = answerGoogle(brCtx, E);
@@ -1102,12 +1106,21 @@ try {
           await popup;
           await waitFor(async () => (await b.evaluate(() => document.querySelector('[data-cg-app-licence-done]')?.getAttribute('data-cg-app-licence-done')).catch(() => null)) != null, 45_000);
           browserDone = await b.evaluate(() => document.querySelector('[data-cg-app-licence-done]')?.getAttribute('data-cg-app-licence-done') ?? null).catch(() => null);
+          // And then it does not stay up over the app (PLAN.md 23.17f-3; the
+          // owner, 2026-11-11: "it should just close the login window and go
+          // back to the app"): it waits for the window to take the sign-in,
+          // says so, and closes itself. Before, it said "go back to the app"
+          // and stayed, and nothing told it whether the app had it.
+          const tookAt = async () => b.evaluate(() => document.querySelector('[data-cg-app-took]')?.getAttribute('data-cg-app-took') ?? null).catch(() => null);
+          await waitFor(async () => { if (b.isClosed()) return true; const t = await tookAt(); if (t) took = t; return t === 'yes' || t === 'no'; }, 45_000);
+          tabClosed = await waitFor(() => b.isClosed(), 10_000);
         }
       }
 
       // The window: the door gone on the account's Pro key, and its sheet naming the account.
       const doorGone = await waitFor(async () => (await doorAt(a)) === null, 30_000);
       const up = doorGone && await waitFor(() => appUp(a), BOOT_MS);
+      const front = await a.evaluate(() => window.__cgFront ?? 0).catch(() => 0);
       let named = false;
       if (up) {
         await a.click('[data-cg-account-open]').catch(() => {});
@@ -1135,9 +1148,70 @@ try {
         req.on('error', () => ok(0));
         req.end();
       });
-      check('25. a Google sign-in from the Mac app: the button keeps its name, the browser tab says the Mac\'s key was found and signs in, and the app\'s window signs in as the same account (its sheet names it), the code spent and the route closed to other sites and names',
-        signinShown && label.trim() === 'Continue with Google' && waiting === 'waiting' && !!code && keyFound === 'Pro' && browserDone === 'signed-in' && up && named && spent && crossSite === 403 && crossPost === 403 && rebound === 403 && wired,
-        `sign-in ${signinShown}, button "${label.trim()}", window ${waiting ?? 'no waiting line'}, code ${code ? 'in the address' : 'none'}, tab says ${keyFound ? `the ${keyFound} key was found` : 'nothing of the key'}, browser ${browserDone ?? 'never finished'}, show ${up}, sheet names the account ${named}, spent ${spent}, cross-site GET ${crossSite} POST ${crossPost}, rebound ${rebound}, show server wired ${wired}`);
+      check('25. a Google sign-in from the Mac app: the button keeps its name, the browser tab says the Mac\'s key was found, signs in, sees the app take it and closes itself, and the app\'s window comes forward and signs in as the same account (its sheet names it), the code spent and the route closed to other sites and names',
+        signinShown && label.trim() === 'Continue with Google' && waiting === 'waiting' && !!code && keyFound === 'Pro' && browserDone === 'signed-in' && took === 'yes' && tabClosed && front >= 1 && up && named && spent && crossSite === 403 && crossPost === 403 && rebound === 403 && wired,
+        `sign-in ${signinShown}, button "${label.trim()}", window ${waiting ?? 'no waiting line'}, code ${code ? 'in the address' : 'none'}, tab says ${keyFound ? `the ${keyFound} key was found` : 'nothing of the key'}, browser ${browserDone ?? 'never finished'}, the app took it ${took ?? 'unsaid'}, tab ${tabClosed ? 'closed itself' : 'stayed open'}, window brought forward ${front}×, show ${up}, sheet names the account ${named}, spent ${spent}, cross-site GET ${crossSite} POST ${crossPost}, rebound ${rebound}, show server wired ${wired}`);
+      await brCtx.close();
+      await appCtx.close();
+    }
+
+    // ── 25b: the same from a licensed Mac, from the Account sheet ─────────
+    // The owner's own case (2026-11-11: "sign in from my local app is weird -
+    // it asks me to continue on the webpage. It then never actually logs into
+    // the app"): the Mac holds a Pro key, so the show is up, signed out, and
+    // the sign-in is the Account sheet's. 25 starts at the door instead. The
+    // window's wait must outlive nothing here, but the sheet's form is the one
+    // pressed, and the tab must still close itself once the window has it.
+    {
+      const E = 'mac-sheet@example.com';
+      await deleteAccount(E);
+      licKV.clear();
+      await fileProKey(E);
+      const key = await signLicenseKey({ id: 'check-pro-2', tier: 'pro', email: E, issuedAt: Date.now() }, licEnv.LICENSE_PRIVATE_KEY);
+      const held = `try { localStorage.setItem('chromaglass:license-key', ${JSON.stringify(key)}); } catch {}`;
+      const appCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await appCtx.addInitScript(LICENSE_PUBLIC_INIT + held + "window.__CHROMAGLASS_NATIVE__ = Object.assign(window.__CHROMAGLASS_NATIVE__ || {}, { shell: 'desktop', openInBrowser: (u) => { window.__cgOpened = u; }, bringToFront: () => { window.__cgFront = (window.__cgFront || 0) + 1; return Promise.resolve(true); } });");
+      const a = await appCtx.newPage();
+      await a.goto(SHOW + '&requireSignIn=1');
+      const showUp = await waitFor(() => appUp(a), BOOT_MS);
+      await a.click('[data-cg-account-open]', { timeout: 10_000 }).catch(() => {});
+      const statusOf = () => a.evaluate(() => {
+        const st = document.querySelector('[data-cg-account-status]');
+        return st ? `${st.getAttribute('data-cg-account-status')}|${st.textContent ?? ''}` : null;
+      }).catch(() => null);
+      const outFirst = (await waitFor(async () => (await statusOf())?.startsWith('signed-out'), 20_000)) === true;
+      const offered = await a.waitForSelector('[data-cg-account] [data-cg-signin-provider="google.com"]', { timeout: 20_000 }).then(() => true, () => false);
+      if (offered) await a.click('[data-cg-account] [data-cg-signin-provider="google.com"]').catch(() => {});
+      const openedUrl = await waitFor(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null), 5000).then(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null));
+      const brCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };' + held);
+      let took = null, tabClosed = false, tabShow = false;
+      if (openedUrl) {
+        // Opened as the Mac opens it (`shell.openExternal`): a tab with one page
+        // of history, which a browser lets close itself. newPage then goto
+        // keeps Playwright's about:blank behind it, a tab no page may close.
+        const b = await brCtx.newPage();
+        await b.evaluate((u) => location.replace(u), openedUrl);
+        await b.waitForURL(openedUrl).catch(() => {});
+        if (await b.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 30_000 }).then(() => true, () => false)) {
+          const popup = answerGoogle(brCtx, E);
+          await b.click('[data-cg-signin-provider="google.com"]');
+          await popup;
+          await waitFor(async () => {
+            if (b.isClosed()) return true;
+            if (await appUp(b)) tabShow = true;
+            const t = await b.evaluate(() => document.querySelector('[data-cg-app-took]')?.getAttribute('data-cg-app-took') ?? null).catch(() => null);
+            if (t) took = t;
+            return t === 'yes' || t === 'no';
+          }, 45_000);
+          tabClosed = await waitFor(() => b.isClosed(), 10_000);
+        }
+      }
+      const inAfter = await waitFor(async () => { const st = await statusOf(); return !!st && st.startsWith('signed-in') && st.includes(E); }, 20_000);
+      const front = await a.evaluate(() => window.__cgFront ?? 0).catch(() => 0);
+      check('25b. on a Mac already holding a Pro key, Continue with Google in the Account sheet: the browser tab signs in without opening a show, sees the app take it and closes itself, and the window comes forward with the sheet naming the account',
+        showUp && outFirst && offered && !!openedUrl && !tabShow && took === 'yes' && tabClosed && front >= 1 && inAfter,
+        `show ${showUp}, sheet signed out first ${outFirst}, Google offered ${offered}, browser ${openedUrl ? 'opened with a code' : 'never opened'}, tab ${tabShow ? 'OPENED A SHOW' : 'no show'}, the app took it ${took ?? 'unsaid'}, tab ${tabClosed ? 'closed itself' : 'stayed open'}, window forward ${front}×, sheet names the account ${inAfter}`);
       await brCtx.close();
       await appCtx.close();
     }
