@@ -23,7 +23,6 @@ import type { TempoSource } from '../lib/tempo';
 import type { useShowSequencer } from '../hooks/useShowSequencer';
 import { useLiveShow, useLiveSetup, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { useSoundNow, askSound } from './soundNow';
-import { usePlayerNow, askMusic } from './musicNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
@@ -166,7 +165,6 @@ export function useRemote({
   // address or a key.
   const liveSetup = useLiveSetup();
   const sound = useSoundNow();
-  const player = usePlayerNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -221,8 +219,7 @@ export function useRemote({
     tempo,
     set,
     songShows: songs,
-    player,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player]);
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -394,12 +391,6 @@ export function useRemote({
         case 'assistant-songs':
           answer(message.answer, askSongs(message));
           break;
-        // The music player (PLAN 44k-2, app/musicNow.ts), answered as the set list is.
-        case 'assistant-music': {
-          const why = askMusic(message);
-          answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
-          break;
-        }
         /*
           Words poured as ink (PLAN 37x-10c): a song's name at the top of a
           track, from the phone's text box or the relay's guard. Read as

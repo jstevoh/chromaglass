@@ -175,15 +175,6 @@ export interface RemoteState {
    * PLAN 12-ctl), with another shape (PLAN 44k-5a folds the two together).
    */
   songShows?: { follow: boolean; running: { showId: string; song: string | null; manual: boolean } | null; current: string | null; shows: { id: string; song: string; actions: number }[] };
-  /**
-   * The music player (PLAN 44k-2, app/musicNow.ts): what is loaded (a shelf
-   * track's title or a file's name), its length, playing or not, the loop,
-   * and the shelf. `at` is where it was at `atTime` (epoch ms), taken on a
-   * play, pause, seek or new file and not on the clock's every tick, so the
-   * state is not re-sent to every phone four times a second; the reader
-   * carries it forward while it plays.
-   */
-  player?: { name: string | null; kind: 'track' | 'file' | null; artist: string | null; length: number; at: number; atTime: number; playing: boolean; loop: boolean; library: { title: string; artist: string; seconds: number }[] };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -321,13 +312,6 @@ export type RemoteMessage =
    */
   | { type: 'assistant-set'; do: string; item?: number; look?: string; seconds?: number; answer?: number }
   | { type: 'assistant-songs'; do: string; show?: string | null; actionId?: string; to?: string; seconds?: number; on?: boolean; answer?: number }
-  /**
-   * The music player from the owner's assistant (PLAN 44k-2), relayed only
-   * from the guard, with `answer`: a shelf track by its title, a file as the
-   * show server's own address for it (`url`, server/assistantMusic.js; the
-   * path itself never reaches the page), play, pause, seek, loop, close.
-   */
-  | { type: 'assistant-music'; do: string; track?: string; url?: string; name?: string; seconds?: number; on?: boolean; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }

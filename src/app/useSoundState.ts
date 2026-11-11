@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Track } from '../lib/musicLibrary';
 import { type Drone, type DroneParams, DRONE_DEFAULTS } from '../lib/plateDrone';
 import { type AudioSource, AUDIO_INPUT_KEY } from './shared';
-import { usePlayerReport } from './musicNow';
 
 /**
  * What the show listens to, as state: the source, the input it opens, the
@@ -73,8 +72,6 @@ export function useSoundState() {
   const musicElRef = useRef<HTMLAudioElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const musicCtxRef = useRef<{ ctx: AudioContext; src: MediaElementAudioSourceNode; dest: MediaStreamAudioDestinationNode } | null>(null);
-  // The player as the owner's assistant reads it, and its loop's door (app/musicNow.ts, PLAN 44k-2).
-  usePlayerReport({ el: musicElRef, file: musicFile, playing: musicPlaying, loop: musicLoop, length: musicTime.d, setLoop: setMusicLoop });
 
   return {
     audioSource, setAudioSource, audioSourceRef, audioInputId, setAudioInputId, audioInputs,

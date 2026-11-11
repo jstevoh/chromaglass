@@ -33,7 +33,6 @@ import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_P
 import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from './signin-handoff.js';
 import { LOOPBACK, isLaptop } from './laptop.js';
 import { createAssistantGuard, readAssistantMode } from './assistant.js';
-import { serveMusicFile } from './assistantMusic.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -214,8 +213,6 @@ const server = createServer((req, res) => {
     void signInHandoff.handleRequest(req, res, url, isLaptop(req));
     return;
   }
-  // A music file the owner's assistant named by its path (PLAN 44k-2), to the laptop alone.
-  if (serveMusicFile(req, res, url, isLaptop(req))) return;
   if (
     url.pathname === LICENSE_INFO_PATH ||
     url.pathname === LICENSE_ACTIVATE_PATH ||
@@ -432,7 +429,7 @@ const pairTv = (tv, except) => {
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
+const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));

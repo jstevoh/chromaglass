@@ -53,7 +53,6 @@ import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import WebSocket from 'ws';
 import { port } from './ports.mjs';
-import { MUSIC_MUTANTS, musicDir, musicFullLines, musicPageLines, musicPlayLines, standInPlayer } from './assistant-music.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -104,7 +103,7 @@ async function startShow(serverDir, port, dir) {
   // The file is the switch here, so a CHROMAGLASS_ASSISTANT in the caller's
   // environment (which would win over it) is left out.
   mkdirSync(join(dir, 'dist'), { recursive: true });
-  const env = { ...process.env, REMOTE_DIST: join(dir, 'dist'), PORT: String(port), SHOW_KEY, SHOW_KEY_FILE: join(dir, 'key'), OSC_PORT: '0', CHROMAGLASS_ASSISTANT_FILE: modeFile, CHROMAGLASS_MUSIC_DIR: musicDir(dir) };
+  const env = { ...process.env, REMOTE_DIST: join(dir, 'dist'), PORT: String(port), SHOW_KEY, SHOW_KEY_FILE: join(dir, 'key'), OSC_PORT: '0', CHROMAGLASS_ASSISTANT_FILE: modeFile };
   delete env.CHROMAGLASS_ASSISTANT;
   const proc = spawn(process.execPath, [join(serverDir, 'remote-server.js')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
@@ -161,11 +160,10 @@ function standInDisplay(port, displayKey) {
     ] },
   ];
   const songs = { follow: true, running: null, current: 'show-a' };
-  const player = standInPlayer();
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state() } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) } } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -219,7 +217,6 @@ function standInDisplay(port, displayKey) {
       }
       sendState();
     }
-    if (m.type === 'assistant-music') player.onMessage(m, answer, sendState);
     if (m.type === 'assistant-songs') {
       const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
       if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
@@ -319,7 +316,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -569,7 +566,6 @@ async function scenario(serverDir, port, { full = true } = {}) {
     const goPlay = await mcp.call('go_live', { destinations: ['YouTube'] });
     await sleep(150);
     check('fullonly', 'the sound source and go_live are refused in Play, for want of Full', !sndPlay.ok && !goPlay.ok && /Full mode is needed/.test(sndPlay.text) && /Full mode is needed/.test(goPlay.text) && display.since(t).every((m) => !['assistant-sound', 'assistant-live'].includes(m.type)), `${sndPlay.text} | ${goPlay.text}`.slice(0, 140));
-    await musicPlayLines({ mcp, display, check });
 
     // Ten deep.
     await sleep(1100);
@@ -815,10 +811,6 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await sleep(300);
     await mcp.call('show_action', { action: 'live-stop' });
 
-    // The music player (PLAN 44k-2): scripts/assistant-music.mjs.
-    await sleep(300);
-    await musicFullLines({ mcp, display, check, phone, port, dir });
-
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
     await sleep(1100);
@@ -896,8 +888,7 @@ const MUTANTS = [
   { rule: 'answer-relay', file: 'remote-server.js', find: 'if (to.socket.readyState === 1) to.socket.send(', replace: 'if (false) to.socket.send(' },
   { rule: 'answer-phone', file: 'remote-server.js', find: "if (message.type === 'assistant-answer') {\n      const to = from === 'display' ? answerTo.get(message.answer) : undefined;", replace: "if (message.type === 'assistant-answer') {\n      if (from !== 'display') broadcastTo('assistant', raw);\n      const to = from === 'display' ? answerTo.get(message.answer) : undefined;" },
   { rule: 'answer-own', file: 'remote-server.js', find: 'reply = guard.handle({ ...message, id: n }, assistantMode());', replace: 'reply = guard.handle(message, assistantMode());' },
-  { rule: 'phone-set', file: 'remote-server.js', find: "'assistant-seq', 'assistant-set', 'assistant-songs',", replace: "'assistant-seq'," },
-  ...MUSIC_MUTANTS,
+  { rule: 'phone-set', file: 'remote-server.js', find: "'assistant-seq', 'assistant-set', 'assistant-songs']", replace: "'assistant-seq']" },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -919,7 +910,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -1031,10 +1022,6 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   say(/not running/.test(noDoor ?? '') && /no such source/.test(bad ?? '') && good === null && asked.join(',') === 'system',
     `the page's door changes the source it is handed, refuses one it may not pick, and says so with no sound running (${noDoor} | ${bad} | ${good} | ${asked.join(',')})`);
 }
-
-/* The page's own player door (44k-2), on the real musicNow, and its address the show server's. */
-musicPageLines(page, say);
-say((await import(join(ROOT, 'server', 'assistantMusic.js'))).MUSIC_PATH === page.ASSISTANT_MUSIC_PATH, `the page takes a file at the show server's own address (${page.ASSISTANT_MUSIC_PATH})`);
 
 /* The page's own tempo door (44k-7), on the real tempoNow: it takes the
    guard's range, and changes nothing it was not handed. Then the tool's
