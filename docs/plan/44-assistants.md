@@ -218,9 +218,10 @@ through cords and preset patches, and the plate shader is untouched.
   can read it back. Every door keeps the rails: the hand wins, Undo where a thing
   can be undone, the pace, Full for the room and for anything that changes the
   owner's saved work. Out of the audit on purpose: the account, the store, sign-in
-  and keys (only the accounts code touches them), feedback and the crash report,
-  and the desk's own layout, tabs, pins and panels (they are the screen the person
-  works at, not the show).
+  and keys (only the accounts code touches them), and feedback and the crash report.
+  The desk's own layout was out of the first pass (the screen the person works at,
+  not the show) and is in on the owner's word (2026-11-11, "add in the desk
+  layout"): 44k-17.
 
   | Rank | What, at the desk | The tool today | Mode it belongs in | Item |
   |---|---|---|---|---|
@@ -240,6 +241,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
   | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | none | Play (palette, tool), Full (the rest) | 44k-16 |
+  | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | none (`overlays-off` hides the desk, nothing more) | Play (the tab up), Full (edits) | 44k-17 |
 
 - **44k-1. The Mac's assistant runs the current server.** *(S, Claude on the Mac,
   then the owner's Cmd-Q.)* Found in the audit: the tools the owner's Mac offers
@@ -323,6 +325,18 @@ through cords and preset patches, and the plate shader is untouched.
   and layer in hand (Play); Ambient TV mode; set lists' and sequences' own editing,
   files and binding to songs (Full). Wanted least in a show: build when the owner
   asks for one by name.
+- **44k-17. The desk's layout.** *(M, asked 2026-11-11.)* `show_state`'s `desk` (the
+  tabs by id and name, the one up, each tab's panels and whether each is docked,
+  floating, folded or in its own window); `desk_tab` (put a tab up, Play: the
+  person's screen changes, the plate does not); `desk_tabs` (rename, move, add as a
+  copy, delete, reset, as `useDeskLayout`'s `TabEdit`, Full); `desk_panel` (dock,
+  float, fold, close, open a panel on a tab, Full); `desk_pins` (pin or unpin a
+  setting, the rides' and the recipe's lists, Full). The door: `useDeskTabs` and the
+  pins in `App()`, through a sink, as the others. The desk syncs its tabs with the
+  owner's account (8-tabs-a), so an edit from the assistant travels there too, as a
+  person's would; a delete is Undo's to take back (the tab and its panels as they
+  were). Pass: `npm run assistant` lines for each verb at the stand-in, and a `desk`
+  line that the edited tab survives a reload.
 - **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
   lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
   ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
