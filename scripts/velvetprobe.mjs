@@ -41,6 +41,9 @@ const VARIANTS = {
   calm: { rotationSpeed: 0, plateRock: 0, platePressure: 0, glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0, surge: 0, buoyancy: 0, dimmer: 0, automateRate: 0 },
   noCover: { coverWeight: 0 },
   deep: { liquidMl: 150 },
+  noTurb: { turbulenceScale: 0 },
+  noTurbSpin: { turbulenceScale: 0, rotationSpeed: 0 },
+  noTurbBand: { band: true, turbulenceScale: 0 },
   still: { rotationSpeed: 0, plateRock: 0, platePressure: 0, glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0, surge: 0 },
   // With the simulated band (the film's sound): the music's pours and paddles.
   band: { band: true },
@@ -50,7 +53,7 @@ const VARIANTS = {
   bandNoCords: { band: true, sceneMappings: [] },
 };
 const pick = process.argv.slice(2).filter(a => VARIANTS[a]);
-const run = pick.length ? pick : ['base', 'noSpin', 'noCover', 'deep'];
+const run = pick.length ? pick : ['base', 'noTurb', 'noTurbSpin', 'noTurbBand'];
 const SHOTS = process.env.PROBE_SHOTS || '';
 const SECONDS = Number(process.env.PROBE_SECONDS) || 90;
 const LOOK = process.env.PROBE_LOOK || 'velvet-underground';
