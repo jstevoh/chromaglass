@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { type SetList, loadSetList, starterSet, loadSavedSets, storeSavedSets, saveSetList } from '../lib/setList';
 import { PRESETS } from '../presets';
 import type { Cue } from '../components/desk/deskProps';
 import type { ShowSequence } from '../lib/sequencer';
 import { DEFAULT_FADE_SECONDS } from '../lib/lookFade';
 import type { ArmedLook } from './shared';
+import { publishSet, setCueDoor } from './setNow';
 
 /**
  * The set list and the cue: the working set and the sets kept by name, the
@@ -59,6 +60,15 @@ export function useSetListState() {
   const sequencerRef = useRef<{ startAt: (id: string, positionSec: number) => void; sequences: ShowSequence[] } | null>(null);
   const [fadeSeconds, setFadeSeconds] = useState<number>(DEFAULT_FADE_SECONDS);
   const [fading, setFading] = useState(0);        // 0..1 while a Go is running
+
+  // The owner's assistant reads the set and the fade, and sets the fade and
+  // takes the cue back, through the same state as the desk (app/setNow.ts,
+  // PLAN 44k-3): one owner, here.
+  useEffect(() => { publishSet({ list: setList, armedItem: cued?.item ?? null, fadeSeconds }); }, [setList, cued, fadeSeconds]);
+  useEffect(() => {
+    setCueDoor({ fade: setFadeSeconds, cancel: () => setCued(null) });
+    return () => setCueDoor(null);
+  }, []);
 
   return {
     cued, setCued, cuedRef, setList, setSetList, savedSets, setSavedSets, changeSaved, setListRef,

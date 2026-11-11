@@ -149,15 +149,9 @@ through cords and preset patches, and the plate shader is untouched.
   section's index); it could at two readings a second too, now more often. Pass: each
   reader that fires on an edge reads `positionNow`, with a line in `score`, and a
   `songs` line where a position jittering across an edge fires its action once.
-- **44f-4. The display does not answer a song action.** The guard's yes means it
-  passed the guard; the display can still drop it (no song playing by the time it
-  lands, 24 actions from the assistant already in that song's show, a *what* it does
-  not know, a `set` that names no setting), and says so only in its console. The MCP
-  checks the track first, which covers the usual case. A `song-action-reply` from the
-  display through the relay would close it, and with it a check of the page's own half
-  (`parseSongAction` to `addSongCue` to the pinned cue), which `npm run assistant`
-  stops short of at its stand-in display. Pass: an `npm run assistant` line where the
-  display refuses and the tool says why.
+- ~~**44f-4. The display does not answer a song action.**~~ **Shipped** 2026-11-11 with
+  44k-3 and 44k-5: the display's `assistant-answer`, through the relay to the assistant
+  alone (`npm run assistant`, `song-answer`, `set-answer`, `answer-relay`).
 - **44i.** The owner's YouTube channel from the assistant: a second local MCP server, `mcp/youtube-mcp.js` (upload that resumes, update, thumbnails, playlists; private unless told otherwise): **shipped** (`npm run youtube`; story in `docs/plan-shipped.md` §44). Owed: the owner's one-time Google setup and a first real upload (44i-1).
 - **44i-1. The owner's Google setup and a first real upload.** *(Owner, about ten
   minutes; then Claude on the Mac.)* A Google Cloud project with the YouTube Data API
@@ -261,23 +255,24 @@ through cords and preset patches, and the plate shader is untouched.
   is the Mac app's only (the browser cannot open a path), so the web display says
   so. Full, as the sound source is. Pass: `npm run assistant` lines for each verb at
   the stand-in, a path outside the music folder refused, and a mutant.
-- **44k-3. The set list from the assistant.** *(M, AG lane.)* `show_state`'s `set`
-  (the items, by number and name, which is armed, the fade); `arm_item` (by number,
-  Suggest), `go_now` (Play), `set_fade` (seconds, Play), `cancel_cue` (Suggest),
-  `revert` (Back, already in `show_action`; named here so the tool is found), and the
-  back plate's three (Full). The door: `useLookFades`' `cueAny`, `goLookNow`,
-  `goBackPlate`, `setFadeSeconds`. Pass: lines for each at the stand-in, a number past
-  the list refused with the list's length.
+- ~~**44k-3. The set list from the assistant.**~~ **Shipped** 2026-11-11: `show_state`'s
+  `set`, `set_list` (arm, cancel, go_now, fade, revert) and `back_plate` (Full), through
+  `app/setNow.ts` (`npm run assistant`, `set-past`, `set-fade`, `set-suggest`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-3a. A Go now the display refuses still counts as a look change.** *(S, found
+  building 44k-3.)* The guard starts Go's gap and puts the Go on Undo's list when it
+  passes the call; the display may then refuse it (a look gone from the library), and
+  the next Go waits four seconds for nothing, and an Undo sends a Back for a Go that
+  never happened. Hold the gap and the Undo entry until the display's answer, now that
+  there is one (44f-4).
 - ~~**44k-4. The Mixer's row takes in `show_action`.**~~ **Shipped** 2026-11-11: the
   seven `mix-fade-*` in the tool's list, and a line that the list covers every Full
   action the guard allows (`npm run assistant`). Story in `docs/plan-shipped.md` §44.
-- **44k-5. Song shows, read and edited.** *(M, AG lane.)* `song_show` (read the
-  playing song's show or a named one: its looks, its actions with ids, Follow songs),
-  `remove_song_action` (by id, Full; a Play assistant takes out only its own),
-  `song_show_run` (start, stop), `nudge` (to the next or previous section, Play), and
-  closing 44f-4's silence with the display's answer. The door: `useShowLibrary`'s
-  `setSongShows` and `useSongScore`'s runtime and nudges. Pass: lines for each, and a
-  removal of the owner's own action refused in Play.
+- ~~**44k-5. Song shows, read and edited.**~~ **Shipped** 2026-11-11: `show_state`'s
+  `songs`, `song_show` (read, Suggest), `remove_song_action` (Play: the assistant's own),
+  `song_show_run` (start, stop; follow in Full) and `nudge`, through
+  `app/songShowNow.ts` (`npm run assistant`, `song-mine`, `song-unknown`, `song-stop`,
+  `song-nudge`, `song-follow`).
 - ~~**44k-6. The bench and the last two gestures.**~~ **Shipped** 2026-11-11:
   `show_state`'s `bench`, `bottle`, `finger` (a stroke of five steps) and `flick` (one
   finger a third of the way round), Play (`npm run assistant`, `bottle-bench`).

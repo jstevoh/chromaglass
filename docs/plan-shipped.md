@@ -12685,6 +12685,52 @@ here; the relay drops `assistant-tempo`, `assistant-link` and `assistant-seq` fr
 phone (`phone-tempo`). `npm run assistant`: thirteen new lines, seven new mutants, all
 caught.
 
+## 44k-3, 44k-5, 44f-4. The set list and the song shows from the assistant, and the display's answer (2026-11-11)
+
+The second batch of 44k's gaps, built by Claude (the owner, 2026-11-11). Each is a
+door through the guard to a holder beside `tempoNow.ts` (App.tsx may not grow), so
+the desk's own callbacks do the work.
+
+- 44k-3: `show_state`'s `set` numbers the performer's items from 1 as the desk lists
+  them (name, kind, the look it sends, its own fade, gone or not), with the one armed
+  and the Go's fade. `set_list` arms item N and takes the cue back (Suggest), sends an
+  item or a look now and sets the fade (Play), and names Revert; `back_plate` sends the
+  armed look or a look to the back plate, or lets it follow (Full). An item past the
+  set is refused with its length; a fade off the desk's choices (0, 1, 2, 4, 8) is
+  refused with them, since 3 s would light no segment of the desk's Fade. A Go now is
+  under Go's gap and on Undo's list, except an item that is a sequence (Undo's Back
+  would leave the sequence running). The doors: `app/setNow.ts`, set by `useLookFades`
+  (arm and the Go's) and `useSetListState` (the fade, cancel), which publishes the set.
+- 44k-5: `show_state`'s `songs` lists Follow songs, the show running, the playing
+  song's show and every show in brief; `song_show` reads one whole (each action in
+  words, with its id and `mine` for the assistant's own), and is Suggest rather than
+  the Play first written, since reading changes nothing. `remove_song_action` takes one
+  out (Play: only the assistant's own `asst-` ids, the performer's are refused; Full:
+  any), `song_show_run` starts and stops a show as the Songs panel's Run does, and
+  switches Follow songs (Full), and `nudge` moves the song's clock to the next section,
+  the section's start, back, or by up to 30 s. The doors: `app/songShowNow.ts`, set by
+  `useSongScore` and `useShowLibrary`. The state carries the shows in brief only, so a
+  phone is not sent every action of every show on every change; a read is asked of the
+  display and answered to the assistant alone.
+- 44f-4: the display now answers. A song action, a set list call and a song show call
+  carry `answer`, and the display sends `assistant-answer` (done, or why not, and what
+  a read found), which the relay passes to the assistant only and only from the
+  display. The MCP waits up to 2.5 s for it after the guard's yes (`askDone`), and
+  says "allowed but not confirmed" when a display one build older gives none. So a song
+  action the display does not know, or a Go now of a look the library lacks, comes back
+  with the display's reason rather than as done. Found in review: each assistant numbers
+  its messages from 1, so with two connected a broadcast answer settled the other's
+  call; the relay now hands the guard a number of its own and sends each answer only
+  to the assistant that asked, under its own id (`answer-own`).
+
+Found: a message type with its own `action` field turns `RemoteMessage`'s `action`
+into a discriminant, and `tsc` then narrows the action switch's `message` to never;
+the song show's field is `actionId`. The phone has its own set list and Songs sheet,
+so it gains nothing; the relay drops `assistant-set` and `assistant-songs` from a
+phone (`phone-set`) and an `assistant-answer` from anyone but the display
+(`answer-phone`). `npm run assistant`: nineteen new lines (three on the page's own
+doors), fourteen new mutants.
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,

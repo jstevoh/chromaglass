@@ -22,13 +22,13 @@ comments, which moved with it.
 | `useSceneSource` | the room camera as a sensor |
 | `usePaletteLock` | the palette held across looks |
 | `useLayerReport` | each layer's fill and colour, for the desk in Preview |
-| `useSetListState` | the set list, the armed look, the Go's fade |
+| `useSetListState` | the set list, the armed look, the Go's fade; publishes them to `setNow.ts` for the assistant, and its fade and cancel |
 | `usePhoneLayout` | phone, desks or the narrow overlay; Perform or Design |
 | `useWallLook` | Preview's copy for the wall, and Send to wall |
 | `useBlackout` | blackout and the dimmer's fades |
-| `useLookFades` | Go, Go now, the back plate, Revert |
+| `useLookFades` | Go, Go now, the back plate, Revert; sets `setNow.ts`'s Go door for the assistant |
 | `useTimecode` | MIDI timecode, for the sequence |
-| `useShowLibrary` | songs' shows, action sets, what a cloud sync reloads |
+| `useShowLibrary` | songs' shows, action sets, what a cloud sync reloads; Follow songs for the assistant (`songShowNow.ts`) |
 | `useSetActions` | the set list's own edits and files |
 | `useLucky` | Lucky, and its one ask in Perform |
 | `useSongChangeFades` | a new song, a new look |
@@ -41,10 +41,12 @@ comments, which moved with it.
 | `useLogoMelt` | the wordmark poured and melted when the Live Show goes live or a Record take starts, with Logo melt on (PLAN 37x-11), called by `useRemote` |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
 | `useSongSequences` | the set item, sequence or preset made for a song, up when it is identified; a song's sequence stopped at its end (moved out of App for 28h-8) |
-| `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it) |
+| `useSongScore` | a song's show while it plays, and its score (`lookPlaying`: the look that is up, as a show names it); publishes the shows to `songShowNow.ts` and sets its door for the assistant |
 | `useListen` | Listen in the Songs panel: the song named, added, and its show designed once heard through (PLAN 28h-8) |
 | `soundNow.ts` (not a hook) | what the show hears, for the remote link to report (`useSoundNow`, `publishSound`), and the door the owner's assistant changes it through (`askSound`, `setSoundDoor`, `ASSISTANT_SOURCES`), set by `useSoundSource` (PLAN 44j) |
 | `tempoNow.ts` (not a hook) | the beat clock's tempo and Link, for the remote link to report (`useTempoNow`, `publishTempo`), and the door the owner's assistant sets them through (`askTempo`, `askLink`, `setTempoDoor`, `TEMPO_MIN_BPM`, `TEMPO_MAX_BPM`), set by `useTempo` (PLAN 44k-7) |
+| `setNow.ts` (not a hook) | the set list, the armed item and the fade, for the remote link to report (`useSetNow`, `publishSet`), and the door the owner's assistant arms and Goes through (`askSet`, `setGoDoor`, `setCueDoor`), set by `useLookFades` and `useSetListState` (PLAN 44k-3) |
+| `songShowNow.ts` (not a hook) | the song shows in brief, for the remote link to report (`useSongsNow`, `publishSongs`, `showBrief`), and the door the owner's assistant reads, edits, runs and nudges them through (`askSongs`, `readShow`, `setSongsDoor`, `setFollowDoor`, `ASSISTANT_ACTION_PREFIX`, `SONG_NUDGE_MAX_S`), set by `useSongScore` and `useShowLibrary` (PLAN 44k-5) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
 | `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption, or ink when `titleCaption` is off); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film |
