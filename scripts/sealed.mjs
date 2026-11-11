@@ -27,17 +27,21 @@
  *      too, and this is what tells the two apart. Darcy's inclusion goes at
  *      the same speed in a sealed cell and an open one when the wall is far,
  *      less (a/R)² for the wall.
- *   4. The lamp's heat lift goes round too. With the lamp on (the solver's
- *      LAMP_HEAT where the plate leaves the view) and the Buoyancy dial's heat
- *      lift in the lasting current (Lava Lamp's 0.42 × CUR_BUOY), the wax
- *      pooled at the bottom is warmed and the plate keeps at least 99.5% of its
- *      dye over twelve seconds. With the dye's weight sealed and the current's
- *      heat lift left on the open rim it kept 98.1% at twelve seconds and 92%
- *      at twenty, the warmed wax carried out of the top, so the bar is set
- *      between the two.
- *   5. A flat plate is untouched: lying on the projector (Plate Upright 0)
- *      the dye after a hundred steps is the same to the bit with the seal
- *      held off as with it free, so no other look moves.
+ *   4. The lamp's heat lift goes round too, and still lifts. With the lamp
+ *      on (the solver's LAMP_HEAT where the plate leaves the view) and the
+ *      Buoyancy dial's heat lift (Lava Lamp's 0.42 × CUR_BUOY, under a cap of
+ *      0.3 so it can show), the plate keeps at least 99.5% of its dye over
+ *      ten seconds, and the wax's centroid ends at least 0.015 of the plate
+ *      higher than on the same sealed plate with the dial at 0 (0.026 when
+ *      this was written). writeSim takes the lift out of the current while
+ *      the seal runs, so a seal that dropped it would keep the dye and fail
+ *      the second half; one that left it in the current would lose dye out of
+ *      the top (98.1% at twelve seconds by hand, at the old cap of 0.01).
+ *   Every sealed plate asks for the seal's kernels and waits until they are
+ *   built, and each line holds only if they were (a plate still compiling
+ *   them is the open plate). A flat plate never reaches the seal: the gate is
+ *   `upright > 0.001` in fluid.ts, and with no gravity in the plate there is
+ *   no weight to seal, so there is nothing for a line to compare.
  *   And any GPU validation error fails the run: a pass that never ran would
  *   read as a plate that keeps its dye.
  *
@@ -98,38 +102,23 @@ try {
     // 3: a lone drop in the middle, how fast it falls over a second after a settling second.
     for (const open of [true, false]) {
       const s = await plate(open);
-      if (!open) await sealIn(s);
+      const ready = open ? true : await sealIn(s);
       lab.dye(0.5, 0.6, 0.06, WAX, 1.4); lab.flush();
       await lab.step(60, STAND);
       const a = await measure();
       await lab.step(60, STAND);
-      out[open ? 'dropOpen' : 'dropSealed'] = { a, b: await measure() };
+      out[open ? 'dropOpen' : 'dropSealed'] = { a, b: await measure(), ready: ready && s.sealReady() };
     }
 
-    // 4: the lamp on and the Buoyancy dial's heat lift in the current, twelve seconds.
-    {
-      const LAMP = { ...STAND, gravityReach: 0.3, currentBuoy: 0.42 * 0.3, maxCurrent: 0.01 };
+    // 4: the lamp on, the Buoyancy dial's heat lift at Lava Lamp's and at 0, ten seconds each, sealed.
+    for (const buoy of [0.42 * 0.3, 0]) {
+      const LAMP = { ...STAND, gravityReach: 0.3, currentBuoy: buoy, maxCurrent: 0.3 };
       const s = await plate(false);
-      await sealIn(s);
+      const ready = await sealIn(s);
       row();
       const a = await measure();
-      await lab.step(720, LAMP);
-      out.lamp = { a, b: await measure() };
-    }
-
-    // 5: a flat plate, the seal held off and free, the same dye to the bit.
-    {
-      const FLAT = { ...STAND, plateUpright: 0 };
-      const fields = [];
-      for (const open of [true, false]) {
-        await plate(open);
-        row();
-        await lab.step(100, FLAT);
-        fields.push(await lab.field('dye'));
-      }
-      let diff = 0;
-      for (let k = 0; k < fields[0].length; k++) diff = Math.max(diff, Math.abs(fields[0][k] - fields[1][k]));
-      out.flat = { diff, cells: fields[0].length / 4 };
+      await lab.step(600, LAMP);
+      out[buoy > 0 ? 'lamp' : 'lampStill'] = { a, b: await measure(), ready: ready && s.sealReady() };
     }
     return out;
   });
@@ -149,15 +138,16 @@ check('sealed, the standing plate keeps at least 99.5% of its dye over the same 
 {
   const fallOpen = r.dropOpen.a.y - r.dropOpen.b.y, fallSealed = r.dropSealed.a.y - r.dropSealed.b.y;
   check('the wax still falls: a lone drop where the wall is far falls at at least 85% of its open plate\'s speed',
-    fallOpen > 0.005 && fallSealed >= 0.85 * fallOpen,
-    `${fallSealed.toFixed(4)} of the plate in a second sealed against ${fallOpen.toFixed(4)} open (${pct(fallSealed / Math.max(fallOpen, 1e-9))}); 94% when this was written`);
+    r.dropSealed.ready && fallOpen > 0.005 && fallSealed >= 0.85 * fallOpen,
+    `${r.dropSealed.ready ? '' : 'the seal NOT built; '}${fallSealed.toFixed(4)} of the plate in a second sealed against ${fallOpen.toFixed(4)} open (${pct(fallSealed / Math.max(fallOpen, 1e-9))}); 94% when this was written`);
 }
 // 4.
-check('the lamp\'s heat lift goes round too: lamp on, the Buoyancy dial\'s lift in the current, the plate keeps at least 99.5% over twelve seconds',
-  kept(r.lamp) >= 0.995, `${pct(kept(r.lamp))} kept (${r.lamp.a.amount.toFixed(0)} → ${r.lamp.b.amount.toFixed(0)}); with the current's heat lift on the open rim, 98.1%`);
-// 5.
-check('a flat plate is untouched: Plate Upright 0, the dye after 100 steps the same to the bit with the seal held off',
-  r.flat.diff === 0, `largest difference ${r.flat.diff} over ${r.flat.cells} cells`);
+{
+  const lift = r.lamp.b.y - r.lampStill.b.y;
+  check('the lamp\'s heat lift goes round too, and still lifts: the plate keeps at least 99.5% over ten seconds, the wax ending at least 0.015 higher than with the Buoyancy dial at 0',
+    r.lamp.ready && r.lampStill.ready && kept(r.lamp) >= 0.995 && lift >= 0.015,
+    `${r.lamp.ready && r.lampStill.ready ? '' : 'the seal NOT built; '}${pct(kept(r.lamp))} kept (${r.lamp.a.amount.toFixed(0)} → ${r.lamp.b.amount.toFixed(0)}); centroid ${r.lamp.b.y.toFixed(3)} against ${r.lampStill.b.y.toFixed(3)} with the dial at 0 (${lift >= 0 ? '+' : ''}${lift.toFixed(3)}; 0.026 when this was written)`);
+}
 check('no GPU validation errors', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 
 const failed = checks.filter((c) => !c.ok);

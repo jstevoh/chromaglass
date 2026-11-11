@@ -6112,8 +6112,11 @@ before. A mean added to w moves nothing, so the dish's mean density drops out by
 `npm run sealed` (Measure lab7, about six minutes on SwiftShader): with the seal held off the
 standing plate keeps 68.2% over 8 s; sealed, 100.0%; a lone drop where the wall is far falls at
 95.5% of its open speed (Darcy's inclusion goes the same in a sealed cell when the wall is far);
-lamp on with Lava Lamp's Buoyancy in the current, 100.0% over 12 s (98.1% with the current's
-heat lift left on the open rim, 92% by 20 s); a flat plate the same to the bit. Lava Lamp's
+lamp on with Lava Lamp's Buoyancy, 100.0% over 10 s with the wax's centroid 0.026 of the plate
+higher than with the dial at 0 (by hand, with the current's heat lift left on the open rim:
+98.1% at 12 s, 92% by 20 s). Each sealed line holds only if the seal's kernels were built.
+The check-skeptic pass cut a flat-plate line that could not fail (a flat plate never reaches
+the seal) and made line 4 see a dropped lift. Lava Lamp's
 Centre Gravity is 0. Left open: 27f-9a (Plate Rock's and Rain Drip's weight on a standing plate)
 and 27f-9b (the circulation is the even gap's, so where the mobility varies the gap's solve
 takes the rest through the open rim: 1.3% in 20 s where the wax lies on the bottom rim).
