@@ -1199,7 +1199,7 @@ export class WebGPUFluid extends FluidCover {
       }
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
-    stage('carry heat', (pass) => this.carryHeat(pass, disp), thin);
+    stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
       GRID_DAMP a step in every look. Jacobi diffusion took 8a/(1+8a) of it a
@@ -1466,7 +1466,7 @@ export class WebGPUFluid extends FluidCover {
           m.swap();
         }
         /*
-          M dt under the explicit limit (1/64 for this stencil), in several
+          M dt under the explicit limit (0.0147 with the deep well, OIL_WELL), in several
           substeps: the flow smears the oil's edge every step and the
           separation has to win it back as fast. Surfactant diffuses at its
           own molecular rate and is kept (soapPlan, PLAN 38c); acidity

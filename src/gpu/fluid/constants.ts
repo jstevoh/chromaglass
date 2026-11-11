@@ -292,9 +292,12 @@ export const OIL_SPINODAL = 0.05;
 export const OIL_WELL = 0.5 - OIL_SPINODAL;
 /*
   Film Hold at 1, as a chemical potential: what the water in a film one
-  cell thick costs the oil, against the double well's own height (1/16)
-  and its steepest pull (0.19 at a fifth full). Set in the lab against
-  the packed splodascope plate (npm run filmhold): see there.
+  cell thick costs the oil, against the double well's own height and its
+  steepest pull. Set in the lab against the packed splodascope plate (npm
+  run filmhold) when the well was the quartic (1/16 high, 0.19 at a fifth
+  full); the deep well (OIL_WELL, PLAN 38f-2) is 0.11 high and pulls 0.45
+  at its spinodal, so the hold is now about 1.3 times that pull, not 3, and
+  filmhold still passes 6/6 on it (35 → 29 drops held, no oil made).
 */
 export const FILM_MU = 0.6;
 /*

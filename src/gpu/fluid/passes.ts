@@ -411,12 +411,13 @@ export class FluidPasses extends FluidFields {
    * carried in the colour's substeps (planCarry ran in the advect dye stage
    * before this) and put back in the velocity's z.
    */
-  protected carryHeat(pass: GPUComputePassEncoder, disp: number): void {
+  protected carryHeat(pass: GPUComputePassEncoder, disp: number, argsAt?: GPUBuffer[]): void {
     const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], VEL, 'heat carried');
     const gap = this.arg('heat gap', [REST_GAP, 0, 0, 0]);
     this.hsRun(pass, 'heatPack', `heatPack:${this.vel.read.label}:${h.write.label}:${this.squeeze.read.label}`, gap, [this.vel.read, this.squeeze.read, h.write]);
     h.swap();
-    this.carrySubsteps(pass, 'bodyAdvect', h, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+    // With the colour's air arguments: a bubble pushes the heat out of its core with the liquid.
+    this.carrySubsteps(pass, 'bodyAdvect', h, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), undefined, argsAt);
     this.hsRun(pass, 'heatUnpack', `heatUnpack:${this.vel.read.label}:${h.read.label}`, gap, [this.vel.read, h.read, this.vel.write]);
     this.vel.swap();
   }
