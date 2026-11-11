@@ -261,10 +261,7 @@ export function useSoundSource({
   // same door the Sound panel's buttons use, so nothing about a change made
   // from there differs from one made by hand.
   useEffect(() => { publishSound({ source: audioSource, file: audioSource === 'file' ? musicFile?.name ?? null : null }); }, [audioSource, musicFile?.name]);
-  useEffect(() => {
-    setSoundDoor((s) => { void handleSourceChangeRef.current(s); });
-    return () => setSoundDoor(null);
-  }, []);
+
   /** The instrument's start/stop: stopping keeps it the chosen source, so starting again is one press. */
   const toggleDrone = useCallback(() => {
     if (droneRef.current) {
@@ -281,15 +278,34 @@ export function useSoundSource({
       return next;
     });
   }, []);
-  const chooseAudioInput = useCallback((id: string) => {
+  const keepAudioInput = useCallback((id: string) => {
     setAudioInputId(id);
     audioInputIdRef.current = id;
     try { localStorage.setItem(AUDIO_INPUT_KEY, id); } catch { /* private */ }
+  }, []);
+  const chooseAudioInput = useCallback((id: string) => {
+    keepAudioInput(id);
     // Reopen the microphone on the new input if it is the live source: this
     // render's handler, told the id, so it closes the stream that is live now
     // and opens the one just picked (see audioStreamRef).
     if (audioSourceRef.current === 'microphone') void handleSourceChangeRef.current('microphone', id);
   }, []);
+  // The door (see publishSound above). With a device (PLAN 44k-12, an id
+  // soundNow found by name) the input is kept as the picker keeps it, so the
+  // panel shows it and it is remembered, and the source opens on it (closing
+  // the microphone first if it is the one open, as the picker does). It
+  // settles once the source has opened or failed: getUserMedia refuses an
+  // interface unplugged or held by another app only then, and the source
+  // falls back to none, so the assistant hears that and not "done".
+  useEffect(() => {
+    setSoundDoor(async (s, device) => {
+      if (device !== undefined) keepAudioInput(device);
+      await handleSourceChangeRef.current(s, device);
+      if ((s === 'microphone' || s === 'system') && !audioStreamRef.current) return `the ${s === 'system' ? 'system sound' : 'microphone'} did not open (or a newer choice came first): show_state's sound says what the show hears`;
+      return null;
+    });
+    return () => setSoundDoor(null);
+  }, [keepAudioInput]);
 
   /** What the show hears of the music element. */
   const musicStream = useCallback((el: HTMLAudioElement): MediaStream | null => {

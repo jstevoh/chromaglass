@@ -363,8 +363,13 @@ export function useRemote({
           void startSavedLive(message.test === true, Array.isArray(message.names) ? message.names.filter((n): n is string => typeof n === 'string') : undefined).catch(() => { /* the panel and liveSetup say why */ });
           break;
         case 'assistant-sound': {
-          const why = askSound(message.source);
-          if (why) console.warn(`The assistant's sound source: ${why}`);
+          // With the microphone's input by name since 44k-12, answered once
+          // the source has opened or failed, so an input unplugged since the
+          // guard's copy, or one another app holds, comes back as why.
+          void askSound(message.source, message.device).then((why) => {
+            if (why) console.warn(`The assistant's sound source: ${why}`);
+            answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
+          });
           break;
         }
         // A still for the assistant to judge detail by (PLAN 44c-4), and a

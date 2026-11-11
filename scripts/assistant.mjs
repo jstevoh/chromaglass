@@ -57,6 +57,7 @@ import { MUSIC_MUTANTS, musicDir, musicFullLines, musicPageLines, musicPlayLines
 import { EAR_MUTANTS, earFullLines, earPageLines, earPlayLines, standInEar } from './assistant-ear.mjs';
 import { RECORD_MUTANTS, recordFullLines, recordPageLines, recordPlayLines, standInRecord } from './assistant-record.mjs';
 import { UPDATES_MUTANTS, updatesFullLines, updatesPlayLines } from './assistant-updates.mjs';
+import { SOUND_MUTANTS, soundFullLines, soundPageLines, standInSound } from './assistant-sound.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -130,7 +131,7 @@ function standInDisplay(port, displayKey) {
      so none is here to leak), what the show hears, and the stream once a
      start reaches it, with each destination's health. */
   const stream = {
-    live: null, sound: { source: 'none', file: null },
+    live: null,
     setup: { destinations: [
       { name: 'YouTube', service: 'youtube', orientation: 'landscape', on: true, test: false, keyKept: true, urlValid: true },
       { name: 'Twitch', service: 'twitch', orientation: 'landscape', on: false, test: false, keyKept: true, urlValid: true },
@@ -166,11 +167,11 @@ function standInDisplay(port, displayKey) {
   const songs = { follow: true, running: null, current: 'show-a' };
   const player = standInPlayer();
   const ear = standInEar();
-  const rec = standInRecord();
+  const rec = standInRecord(), snd = standInSound();
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state(), ear: ear.state(), record: rec.state() } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: snd.state(), bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state(), ear: ear.state(), record: rec.state() } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -197,7 +198,6 @@ function standInDisplay(port, displayKey) {
       }, 1000);
     }
     if (m.type === 'action' && m.action === 'live-stop') { stream.live = null; sendState(); }
-    if (m.type === 'assistant-sound') { stream.sound = { source: m.source, file: null }; sendState(); }
     if (m.type === 'liquid' && bench.bottles.some((b) => b.id === m.id)) { bench.inHand = m.id; sendState(); }
     if (m.type === 'assistant-tempo') { if (m.do === 'bpm') { tempo.bpm = m.bpm; tempo.source = 'manual'; } if (m.do === 'heard') { tempo.bpm = 120; tempo.source = null; tempo.link.on = false; } sendState(); }
     // Link on leads the tempo, as lib/tempo.ts's source does once a session answers.
@@ -227,6 +227,7 @@ function standInDisplay(port, displayKey) {
     if (m.type === 'assistant-music') player.onMessage(m, answer, sendState);
     if (m.type === 'assistant-ear') ear.onMessage(m, answer, sendState);
     if (m.type === 'assistant-record') rec.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-sound') snd.onMessage(m, answer, sendState);
     if (m.type === 'assistant-songs') {
       const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
       if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
@@ -832,6 +833,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await earFullLines({ mcp, display, check, phone });
     await recordFullLines({ mcp, display, check, phone });
     await updatesFullLines({ mcp, display, check, phone });
+    await soundFullLines({ mcp, display, check });
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -915,6 +917,7 @@ const MUTANTS = [
   ...EAR_MUTANTS,
   ...RECORD_MUTANTS,
   ...UPDATES_MUTANTS,
+  ...SOUND_MUTANTS,
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -936,7 +939,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -1040,10 +1043,10 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const toolSources = [...readFileSync(join(ROOT, 'mcp', 'chromaglass-mcp.js'), 'utf8').matchAll(/name: 'set_sound_source'[^\n]*?enum: \[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1]).sort().join(','))[0];
   const pageSources = [...page.ASSISTANT_SOURCES].sort().join(',');
   say(guardSources === pageSources && toolSources === pageSources, `the guard's, the tool's and the page's sound sources are one list (guard ${guardSources}; tool ${toolSources}; page ${pageSources})`);
-  const noDoor = page.askSound('microphone');
+  const noDoor = await page.askSound('microphone');
   const asked = [];
   page.setSoundDoor((s) => asked.push(s));
-  const bad = page.askSound('file'), good = page.askSound('system');
+  const bad = await page.askSound('file'), good = await page.askSound('system');
   page.setSoundDoor(null);
   say(/not running/.test(noDoor ?? '') && /no such source/.test(bad ?? '') && good === null && asked.join(',') === 'system',
     `the page's door changes the source it is handed, refuses one it may not pick, and says so with no sound running (${noDoor} | ${bad} | ${good} | ${asked.join(',')})`);
@@ -1054,6 +1057,7 @@ musicPageLines(page, say);
 /* The page's own ear door (44k-10), on the real earNow. */
 earPageLines(page, say);
 recordPageLines(page, say);
+await soundPageLines(page, say);
 say((await import(join(ROOT, 'server', 'assistantMusic.js'))).MUSIC_PATH === page.ASSISTANT_MUSIC_PATH, `the page takes a file at the show server's own address (${page.ASSISTANT_MUSIC_PATH})`);
 
 /* The page's own tempo door (44k-7), on the real tempoNow: it takes the

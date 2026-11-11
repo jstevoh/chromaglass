@@ -44,6 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { musicCall, playerOf } from './assistantMusic.js';
 import { earCall } from './assistantEar.js';
 import { recordCall, recordOf } from './assistantRecord.js';
+import { inputsOf, soundDevice } from './assistantSound.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -346,6 +347,7 @@ export function createAssistantGuard(send, now = Date.now) {
         player: playerOf(state.player),
         // Recording (PLAN 44k-11): the containers the encoder writes and the Takes' ids.
         record: recordOf(state.record),
+        inputs: inputsOf(state.sound),
       };
     },
 
@@ -515,8 +517,11 @@ export function createAssistantGuard(send, now = Date.now) {
         const why = needs(mode, 'full') ?? paced('patch', mode, t);
         if (why) return refuse(why);
         if (!SOUND_SOURCES.has(message.source)) return refuse(`no such source: ${String(message.source)} (${[...SOUND_SOURCES].join(', ')})`);
+        // The microphone's input by name (PLAN 44k-12, assistantSound.js).
+        const dev = message.device === undefined ? {} : soundDevice(message, show.inputs);
+        if (dev.reason) return refuse(dev.reason);
         count('patch', mode, t);
-        send({ type: 'assistant-sound', source: message.source });
+        send({ type: 'assistant-sound', source: message.source, ...(dev.device === undefined ? {} : { device: dev.device }), ...answerOf(message) });
         return { ok: true };
       }
 
