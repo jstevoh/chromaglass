@@ -6346,6 +6346,35 @@ two lines, one over every retired id against the end of its own chain, written o
 check and not taken from `livePresetId`, and one that a chain is followed the whole way.
 With the resolver cut to one hop both are red (`sunny-side-up → nothing (wanted classic)`).
 
+### 28i-5. Lumia retired (→ Velvet Underground)
+
+Judged twice on the Mac (the gallery of 2026-10-19, and the film of 2026-11-11 for the owner's
+"redo all of the presets" ask): a muddy teal fog under a red disc, its three veils seldom
+reading as pools. `lumia` left `PRESETS`, `PRESET_CONTRACTS`, the inject styles, the liquid
+table and `PRESET_AREAS`, and entered `RETIRED_PRESETS` → `velvet-underground`, the look
+nearest in what it was after (slow areas of dye on a dark plate). A saved show, set list
+item, MIDI pad, sequence stage, song cue, remote button or `?look=lumia` link plays Velvet
+Underground through `findPreset`; Randomize and the phone's Looks sheet read `PRESETS`, so
+neither offers it. The built-in Set Journey and Light Show Night stages that named it play
+Velvet Underground. Saved presets keep their own copy of every setting, so a Lumia someone
+saved still looks as it did.
+
+The lamp's Lumia stays: the setting, the Mixer row and mover, its MIDI target, desk pin and
+ride. That is why the item waited on a check change: `plate` 5b read red on any quoted
+retired id in `src/` and `scripts/`, which for `lumia` is some twenty lines that name the
+lamp. For an id that is also a `DEFAULT_SETTINGS` key or a `MIX_SOURCE_INFO` row, 5b now
+counts every quoted line unless it has the lamp's shape (`readsAsLamp` in
+`scripts/lookOrLamp.mjs`: a setting key, a mixer type or call, a settings read, a uniform
+field, another setting or row quoted on the line or beside it; a look's shape wins). The
+first version listed look shapes instead; the check-skeptic pass ran it over every live look
+as if retired and it passed 126 look lines, the rule turned round passes 2 of 450 (a JSON
+example in a comment, and the LED mode named Cyberpunk). Every other retired id keeps the
+old any-occurrence test. With only the table entry added on main's tree, 5b listed the
+look sites this PR rewrote (`plateAreas.ts` 147, `sequencer.ts` 247 and 279,
+`presetPlate.ts` 73, 130 and 207, `phone.mjs` 1012, and `plate.mjs`'s own quiet-looks list)
+and none of the lamp's. `phone`'s one-plate Play-sheet
+pass moved from Lumia to Roy, `plate`'s quiet looks are Velvet Underground and Aurora.
+
 ### 28i-2. Give back the black, make the still ones move (this PR)
 
 Reworked the 21 looks named in PLAN 28i-2 across `src/presets.ts`, `src/presetPlate.ts` and `src/components/LiquidVisualizer.tsx` (`seedPreset`), plus the preset-list cleanups in `src/lib/evolution.ts` (duplicate `jellyfish-bloom` removed from `calm`) and `src/lib/sequencer.ts` (`poster-1969` appears once in `Pace`, with `classic` on stage 1 and `oil-and-water` on stage 5):

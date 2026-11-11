@@ -244,7 +244,7 @@ export function builtInSequences(): ShowSequence[] {
         s('Chemistry bench', 150, { presetId: 'turing-print', transition: 15 }),
         s('Poster, 1969', 150, { presetId: 'poster-1969', transition: 10 }),
         s('Oil & water', 150, { presetId: 'oil-and-water', transition: 12 }),
-        s('Lumia interlude', 120, { presetId: 'lumia', transition: 20 }),
+        s('Velvet interlude', 120, { presetId: 'velvet-underground', transition: 20 }),
       ],
     },
     /*
@@ -276,7 +276,7 @@ export function builtInSequences(): ShowSequence[] {
         s('Poster', 22, { presetId: 'poster-1969', transition: 3, pace: { moments: ['burst', 'dyes'] }, settings: { pacing: 0.75 } }),
         s('Chemistry', 26, { presetId: 'turing-print', transition: 3, settings: { pacing: 0.7 } }),
         s('The dish, pressed', 24, { presetId: 'oil-and-water', transition: 3, paletteSize: 4, paletteLead: 2, pace: { moments: ['burst', 'pour', 'dyes'] }, settings: { pacing: 0.8 } }),
-        s('Lumia, draining away', 30, { presetId: 'lumia', transition: 3, pace: { endDark: true, moments: ['dyes', 'pour', 'drain'] }, settings: { pacing: 0.6 } }),
+        s('Velvet, draining away', 30, { presetId: 'velvet-underground', transition: 3, pace: { endDark: true, moments: ['dyes', 'pour', 'drain'] }, settings: { pacing: 0.6 } }),
       ],
     },
   ];

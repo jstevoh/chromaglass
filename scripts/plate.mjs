@@ -26,7 +26,9 @@ import { PRESETS, RETIRED_PRESETS, findPreset } from '../src/presets.ts';
 import { dyeAbsorbance } from '../src/lib/dye.ts';
 import { PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR } from '../src/presetPlate.ts';
 import { PRESET_AREAS, plateAreas, areaForBand, areaDye, pointInArea, pickArea } from '../src/lib/plateAreas.ts';
-import { DEFAULT_LIQUID_TYPES } from '../src/types.ts';
+import { DEFAULT_LIQUID_TYPES, DEFAULT_SETTINGS } from '../src/types.ts';
+import { MIX_SOURCE_INFO } from '../src/lib/mixer.ts';
+import { readsAsLamp } from './lookOrLamp.mjs';
 import { PALETTE, COLOR_HARMONIES, COLOR_HARMONY_NAMES } from '../src/constants.ts';
 import { BeadField } from '../src/lib/beads.ts';
 import { PIN_RANGE } from '../src/lib/deskPins.ts';
@@ -449,7 +451,7 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
     lo < 0.25 && hi > 0.8, `${lo} to ${hi}`);
 
   // The looks whose whole character is stillness must not be the loud ones.
-  const still = ['lumia', 'velvet-underground', 'aurora-borealis'];
+  const still = ['velvet-underground', 'aurora-borealis'];
   const loud = ['acid-trip', 'microscopic-chaos', 'bass-drop'];
   const surgeOf = (id) => PRESETS.find(p => p.id === id)?.settings.surge ?? -1;
   check('the quiet looks are quieter than the loud ones',
@@ -470,6 +472,18 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
   // And nothing in the app or its checks still asks for one by its old id:
   // the resolver keeps a person's saved show playing, it is not a licence to
   // leave the app's own built-in sequences and mood lists on the old names.
+  /*
+    A retired id can be a word with a second meaning: Lumia (PLAN 28i-5) was
+    a look and is still the lamp's Lumia, a setting and a Mixer row quoted on
+    some twenty lines that are right. For an id that is also a DEFAULT_SETTINGS
+    key or a MIX_SOURCE_INFO row, a quoted line counts unless it has the
+    lamp's shape (`readsAsLamp`, scripts/lookOrLamp.mjs, where the rule and its
+    control are written out). Every id with one meaning keeps the old test, any
+    quoted occurrence, so the reach over the twelve looks retired before it is
+    what it was. Run against main's tree with only the table entry added, this
+    lists the eight look sites the retirement then rewrote and none of the lamp's.
+  */
+  const twoMeanings = new Set([...Object.keys(DEFAULT_SETTINGS), ...Object.keys(MIX_SOURCE_INFO)]);
   const stale = [];
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -480,7 +494,12 @@ const behaviourOf = new Map(DEFAULT_LIQUID_TYPES.map(l => [l.id, l.behaviour]));
       // next free to change (PLAN.md 28c; another PR held it in 28a).
       else if (/\.(ts|tsx|mjs)$/.test(e.name) && !/src\/(presets\.ts|components\/LiquidVisualizer\.tsx|sim\/fluidSimulation\.ts)$/.test(at)) {
         const text = fs.readFileSync(at, 'utf8');
-        for (const id of Object.keys(RETIRED_PRESETS)) if (new RegExp(`['"\`]${id}['"\`]`).test(text)) stale.push(`${at}:${id}`);
+        for (const id of Object.keys(RETIRED_PRESETS)) {
+          const q = new RegExp(`['"\`]${id}['"\`]`);
+          if (!twoMeanings.has(id)) { if (q.test(text)) stale.push(`${at}:${id}`); continue; }
+          const lines = text.split('\n');
+          lines.forEach((line, n) => { if (q.test(line) && !readsAsLamp(lines, n, id, twoMeanings, ids)) stale.push(`${at}:${n + 1}:${id}`); });
+        }
       }
     }
   };
