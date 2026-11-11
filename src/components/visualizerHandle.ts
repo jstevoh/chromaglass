@@ -8,6 +8,7 @@ import type { LogoArt } from '../lib/logoMelt';
 import type { SongEvent, SongShapeState } from '../lib/songShape';
 import type { BarNow } from '../lib/barGrid';
 import type { LookPhase, FrameDigest, VisualizerRender, SongShapeReport } from '../sim/frameTypes';
+import type { MidiEvent, MidiTarget } from '../lib/midi';
 
 export interface LiquidVisualizerHandle {
   /** A song render's hold on the plate; see `VisualizerRender`. Null until the stage is up. */
@@ -171,6 +172,8 @@ export interface LiquidVisualizerHandle {
    * is. `velocity` scales how far they swing, so a hard note hits harder.
    */
   fireEnvelopes: (velocity?: number, source?: 'note' | 'pad') => void;
+  /** Route a MIDI note-on or note-off from a learned `{ kind: 'voices' }` channel to the plate's note voices (PLAN 24.3). */
+  noteVoice?: (e: MidiEvent, target: Extract<MidiTarget, { kind: 'voices' }>) => void;
   /**
    * The element the film is playing in, so it can be read back as a sensor
    * as well as shown through the dye. Null when nothing is loaded.

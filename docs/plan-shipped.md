@@ -4022,7 +4022,8 @@ have a part of their own, `lab6`, and samelook has `lab5` to itself again. The
 same day `lab3` hit the limit on the slow tier on both PRs' runs and on a re-run:
 `soap` (8:14) and `soapbreak` (4:35) brought it to `inktitle` at 17:50, and
 `inktitle` takes seven to ten minutes there. So `inktitle` moved to `lab7`, which
-leaves lab3 at about 17 minutes. No check, bar or bound changed. `lab2` is still
+leaves lab3 at about 17 minutes. Its own bound then stopped it at 9:00 on the slow
+tier (H2c-labels' next run), so the bound is 14 minutes, as the thin arms' is 16. No check, bar or bound changed. `lab2` is still
 close to the limit (21:14 on main's deploy that day, cancelled at 25 on 24.3's
 first run, green on its re-run), so the next check for it goes to a new part.
 
@@ -5422,6 +5423,16 @@ Asked in PLAN Wave 5 lane D, direction B of the owner's 2026-10-24 exploration o
 - **The dial.** `melodyWalk` (0 on every look; Aurora 0.7, Oil & Water 0.8) on the desk (the Show section, beside Kick Bloom), the phone remote, MIDI learn and the help text; held out of Evolve's pool. Laid in `LiquidVisualizer.tsx` (`layMelodyDrop`) with the area cords' step, the dye under the look's fill as every music pour is.
 - **Checked by** `npm run melody` (18 lines, in `scripts/checks.json` on the logic shard): a 15-note scale with a kick on every beat and a snare on the backbeat through the real analyser.
 
+### 24.3. MIDI notes as voices (shipped)
+
+Asked in PLAN §24 (`24.3`, widened in §30 and VS 2's chords placed, with `24.3-place-1` folded in): a sequencer's notes play the plate rather than press a button. A channel learned once from any note on it picks the tool (`dropper` or `streak`) and the liquid; each note-on lets go one real pipette drop placed by pitch on Melody Walk's own line and scale, its size by velocity; a held note pours for as long as it is held, with an attack and a release; a chord lands as several drops at once; each channel has a voice cap (4 by default, the oldest held note gives way); and notes become a patch-bay source (`notes`: `velocity`, `pitch`, `held`).
+
+- **Shared placement (`src/lib/melodyWalk.ts`, `melodyPlace(pitch, line)` — `24.3-place-1`).** Taken out of `MelodyWalk.update` so a MIDI note and a heard note at the same pitch sit on the exact same `{ x, y, along }` along the look's line and circle-of-fifths offset (`npm run melody` 30/30 unchanged).
+- **Voice state (`src/lib/noteVoices.ts`).** Plain functions over one pre-allocated state (`makeNoteVoices`, `voiceOn`, `voiceOff`, `voicePour`, `noteSource`, `VOICE_DEFAULTS = { attack: 0, release: 0, cap: 4 }`), with no per-note allocation in the frame. `voiceOn` maps `pitch & 0x7f` through `melodyPlace`, dye class `((pitch % 12) + 12) % 12 / 12`, and velocity into volume `0.35 + 0.65 * (vel / 127)`. When a channel's held voices reach `cap`, the oldest held slot is released at `now` (`releasedAt = now`, `levelAtRelease = slotPourAt(oldest, now)`) before the new voice takes a slot. `voicePour(state, now)` advances each active slot's attack (`(now - startedAt) / attack`) and release (`levelAtRelease * (1 - (now - releasedAt) / release)`), freeing finished slots, and `noteSource(state, now, channel?)` reports `{ velocity, pitch, held }` across active voices.
+- **Channel-wide MIDI binding (`src/lib/midi.ts`).** `MidiTarget` gains `{ kind: 'voices'; tool?: VoiceTool; liquid?: string; attack?: number; release?: number; cap?: number; area?: number }`. Learning a `voices` target from any note stores a binding on that channel, and `liveBindings` answers it for every note (`0..127`) on that channel while leaving other channels and CCs untouched; `parseMidiMap` preserves and clamps its fields.
+- **Solver path & Patch Bay (`src/sim/noteVoicesStep.ts`, `src/components/LiquidVisualizer.tsx`, `src/hooks/useMidi.ts`, `src/components/MidiPanel.tsx`, `src/components/settings/MidiSection.tsx`).** Note-on drops queue onto the visualizer handle and lay through `layMelodyDrop` (real pipette drops in the solver, never a shader stamp), while held voices pour each simulation step at their `voicePour` level. `'notes'` (`velocity`, `pitch`, `held`) is added to the Patch Bay's sources (`src/types.ts`, `src/lib/sceneMap.ts`, `src/components/settings/patchLists.ts`). Both the desk's MIDI panel and the phone's MIDI section offer learning a channel as Notes as voices and editing its tool, liquid, attack, release, and voice cap.
+- **Checked by** `npm run soundowed` (`id: voices`, 9/9 checks passed; 14/14 checks passed with `--owed=lfo`); owed judging in `docs/judging.md` §121 (a sequencer playing a chord on the owner's Mac).
+
 ## 25. Areas of interest: several places on one plate
 
 **Why a look had one.** Read off the code, every look was built to have a single area
@@ -5612,6 +5623,41 @@ notes), three of 25i's looks misbehaved.
   neither stepped nor drawn. They are gone (nothing a band plays changes a dish's chemistry, and
   `npm run areacords` now holds that no look carries a cord on a reaction's strength); the snare
   drops activator in the third place instead, beside the kick's own touches in turn.
+
+### 25i-10. The loop's own hands still poured dye on a reagent (shipped)
+
+The owner, on the second private rehearsal stream (2026-11-10, Mac app 1.3.1276, Chemical Clock
+for the whole set): "we're still getting these flower like bubble things showing up. I thought we
+fixed that". The frame showed dark green and teal clusters in the upper right, over the gel's
+blue waves, where the clock's second place is (0.7, 0.38), and a larger dark mass at the bottom
+place.
+
+What was fixed before was 25i: an area cord on a reagent area (Chemical Clock's activator,
+Red Cabbage's acid and base) pours a drop of that reagent and no dye. The visualizer's own hands
+on the music were left as they were, and on an area look each lands in an area in that area's
+dye: the kick's bloom (5 to 11 droplets a kick, pushed out in lobes), the bass's pulse in the
+area's middle, the mid's stream, the treble's sparks, the energy's swell and the automation's
+drops. Chemical Clock's three places are all on the bass, so every kick threw a cluster of a
+pool's dye at one of them; the gel stands still (Global Speed 0.024, Thick), so kick after kick
+the clusters piled up there. A real BZ dish touched with a drop of bromous acid gains no colour:
+the ring that runs out is the ferroin turning blue.
+
+`musicDyeIn(area)` (lib/areaCords.ts) is 0 for an area of a reagent and 1 for any other, and
+every one of those pours takes it as the share of its amount that is colour (`autoInject`'s
+`dye`, the bloom's dye gain, the sparks' amount). The hands still land where they did, with the
+same splash, push and drop of the reagent (`doseArea`), so the gel still fires on each kick.
+Red Cabbage's wells had the same fault (painted pink and green over the indicator's). First the
+bloom moved out of the frame loop to lib/kickBloom.ts in a commit of its own (19ai-10), and
+panel.mjs's two text lines on it became `npm run kickbloom`, which runs it on a recording sink.
+
+`npm run kickbloom` (logic shard), 8 lines: the dial scales the dye x2.000 and the push x2.000,
+each alone; a dye gain of 0 lays no dye and the same push; the droplets' largest gap is 2.44x an
+even ring's (the old ring 1.38x); 5 to 11 droplets; `musicDyeIn` is 0 on all 5 reagent areas
+and 1 on the 31 others; `autoInject` with no colour lays none in any of its five styles (only the
+drop honoured its `dye` before, so a spray or pour of reagent was still coloured: the review
+found it); and every area colour in the loop is read into a const used only in pours, each with
+`musicDyeIn` of the same area in the argument that lays the colour (7 colours, 8 pours; on main
+6 miss it, and six planted faults each turn the line red).
 
 ## 26. A reaction that prints: Turing stripes in black and white
 
@@ -11377,6 +11423,35 @@ model cannot reach one, the PR says what it reached and asks.
     load (grid 256, a 33 ms plate) stayed in step within 0.04 s with nothing dropped, so the
     skew's source on the owner's Mac is not yet reproduced here.
 
+#### 37x-4h. The stream looked softer and flatter than the app
+
+  - **37x-4h. The stream looked softer and flatter than the app (shipped 2026-11-10).**
+    Found in the second private rehearsal: the owner asked why YouTube's picture looked
+    different from the app beside it. The colours matched (both sRGB); the bits did not.
+    The stream took the song film's rate (render.ts's `videoBitrate`, 0.1 bit a pixel a frame:
+    6.2 Mb/s at 1080p30; about 6.2 Mb/s steady on the encoder for 42 minutes), and the
+    panel opened at 30 fps while the plate is drawn at 60. YouTube then compresses again
+    for every viewer, from what our pass left. Now the stream has its own rate
+    (`src/lib/liveRate.ts`): `pixels × √fps × K`, 14 Mb/s at 1080p60, 9.9 at 1080p30, 6.2
+    at 720p60 (a P-frame pays for the change between frames, which halves when the frames
+    double, so a doubled frame rate asks about √2 more bits, not 2×); capped at the
+    strictest platform on the shared encode (Twitch 6, Kick 8, Facebook and X 9,
+    Instagram 4, TikTok 6 Mb/s); fitted under the last stream's measured ceiling with the
+    20% headroom, the ceiling kept up to 12 hours so fitted streams do not swing back to
+    full rate. The panel opens at 1080p60 (a saved 30 stays 30) and says the picture's
+    rate and what limits it. One configuration (`liveVideoConfig`) for the encoder, its
+    probe and the check. `npm run live`'s two new lines encode 3 s of a picture that
+    changes everywhere (three noise planes sliding and cross-fading; the encoder makes
+    30 Mb/s on it when asked for 30, so it is the rate control being measured) at
+    1920x1080 and 60 fps: 13,744 kb/s made of 14,000 asked (98%), and 6,000 asked lands
+    near 6,000; the old rule's 6,221 at 1080p30 made 6,124. On the lab's plate the stream
+    carried 41 kb/s of 1,500 asked: a near-still picture any non-padding CBR encoder
+    undershoots, so that number is printed, not judged. `npm run liveshow`'s five new
+    lines: the hand-worked rates, the panel's 1080p60 at 14 Mb/s, each platform's ceiling,
+    the fit to a ceiling and its floor, the ceiling kept and dropped; in the panel, Go
+    live hands the encoder 60 fps at Twitch's 6 and Instagram's 4 Mb/s and says so, then
+    fits to a 3 Mb/s ceiling at the 2 Mb/s floor. The song film's and Record's rates are unchanged (Record already offers 60 fps at 12 Mb/s).
+
 #### 37x-4d-7. The moving line read a looping bar on two frames
 
   - **37x-4d-7. The moving line read a looping bar on two frames (shipped 2026-11-09).**
@@ -12671,6 +12746,31 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+
+## H2c-labels. Timestamp labels kept with their ring slot (2026-11-08)
+
+`GpuProfiler` (`src/gpu/kit.ts`) handed out timestamp slots as a frame encoded, resolved
+them into a `ReadbackRing` slot in `resolveInto`, and in `afterSubmit` set `lastLabels` to
+the labels of the frame just handed to `collect` while reading `ring.latest`, which held a
+copy that had landed one to three frames earlier. When a frame's pass list changed
+(camera, particles, finish, output, a projector's source), every pass after the change
+read its neighbour's timestamps for as long as the ring lagged, and `gpuFrameMs` jumped on
+the frame of the change instead of when the frame that ran the new pass landed.
+
+Now `resolveInto` keeps each copy's label list in `labelsBySeq` under `ring.issued` when
+`ring.copyFrom` succeeds (frames dropped when every ring slot is busy are left untimed),
+and `afterSubmit` reads `ring.latest` against the labels stored for `ring.landed`,
+dropping entries older than `ring.landed`. Keyed by the copy's sequence number rather than
+the slot buffer because `resolveInto` reuses a freed slot at the end of encoding before
+`afterSubmit` folds in the reading that slot just published.
+
+Measured (`npm run timelabels`, five runs with mappings landing 0 to 3 frames after their
+copy and one stalling until the ring fills, camera on at frame 100 and off at frame 110):
+133 → 0 readings off their pass in the 8 frames from each change, `gpuFrameMs` move on a
+change 30.0 % → 0.0 % (bar ≤ 10 %), 2/2 checks passed (`labels` removed from `--owed` in
+`scripts/checks.json`). The flash probe's pixel count has the same fault and remains open
+under 14r.
 
 ## 19am. A check red on two deploys running holds every merge but the fix (2026-11-09)
 

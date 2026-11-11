@@ -243,6 +243,7 @@
     "rimhold": "node scripts/rimhold.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
+    "kickbloom": "esbuild scripts/kickbloom.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/kickbloom.mjs && node node_modules/.cache/kickbloom.mjs",
     "thick": "node scripts/thick.mjs",
     "liquidsgpu": "PW_WEBGPU=1 node scripts/liquidsgpu.mjs",
     "flush": "node scripts/flush.mjs",

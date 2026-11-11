@@ -2601,10 +2601,9 @@ export class FluidSimulation {
   }
 
   /*
-    `dye`, the share of `amount` that is colour: 0 for a clear liquid poured
-    with no dye in it (lib/liquidColour.ts). A drop's impact is its size, not
-    its colour, so a clear drop from a height still splashes; only what it
-    lays is scaled.
+    `dye`, the share of `amount` that is colour, in every style: 0 for a clear
+    liquid (lib/liquidColour.ts) or the music on a reagent (PLAN 25i-10). A
+    clear drop still splashes; only what it lays is scaled.
   */
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1) {
     const S = this.size;
@@ -2623,7 +2622,7 @@ export class FluidSimulation {
             const noise = this.rng.float();
             if (noise > 0.4) continue;
             const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * (1 - noise);
-            this.addDensity(px, py, amount * w, r, g, b);
+            this.addDensity(px, py, amount * dye * w, r, g, b);
           }
         }
         break;
@@ -2643,7 +2642,7 @@ export class FluidSimulation {
               const dd = Math.sqrt(ddx * ddx + ddy * ddy);
               if (dd > dropR) continue;
               const nx = clamp(px + ddx, 1, S - 2), ny = clamp(py + ddy, 1, S - 2);
-              this.addDensity(nx, ny, amount * (1 - dd / dropR) * 0.6, r, g, b);
+              this.addDensity(nx, ny, amount * dye * (1 - dd / dropR) * 0.6, r, g, b);
             }
           }
           this.addVelocity(px, py, Math.cos(a) * (0.3 + energy * 0.5), Math.sin(a) * (0.3 + energy * 0.5));
@@ -2658,7 +2657,7 @@ export class FluidSimulation {
             if (dd > pourR) continue;
             const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
             const w = Math.pow(1 - dd / pourR, 1.5);
-            this.addDensity(nx, ny, amount * 1.3 * w, r, g, b);
+            this.addDensity(nx, ny, amount * dye * 1.3 * w, r, g, b);
             /*
               `outward` is a hand's Pour from anywhere but the mouse, which
               spreads from where it lands as the mouse's does (see the hand
@@ -2681,7 +2680,7 @@ export class FluidSimulation {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
           if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
           const w = 1.0 - Math.abs(t) / len;
-          this.addDensity(sx, sy, amount * 0.35 * w, r, g, b);
+          this.addDensity(sx, sy, amount * dye * 0.35 * w, r, g, b);
           this.addVelocity(sx, sy, dx * 0.2 * w, dy * 0.2 * w);
         }
         break;

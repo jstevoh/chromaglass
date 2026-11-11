@@ -535,6 +535,27 @@ rest is routine and the owner's calls.
     - *37x-4g-2. Did 37x-4c-3's 256 KB window share the bug?* Its listener never recovered
       in `npm run livedrop`; the old readout compared against a delivered timestamp that
       went stale across a drop, the same five-runs trap this fix found. Re-run it on main.
+  - **37x-4h. The stream looked softer and flatter than the app** *(shipped 2026-11-10;
+    story in docs/plan-shipped.md §37x-4h.)*
+    - *37x-4h-1. YouTube held to Twitch's rate when both are on.* One landscape encode
+      feeds every landscape destination, so it goes at the least any takes: YouTube and
+      Twitch together both get 6 Mb/s. A second landscape encode for the uncapped ones
+      costs a second encoder and readback; measure the Mac's headroom at 1080p60 first.
+    - *37x-4h-2. The rate does not follow the link on air.* It is fitted at Go to the last
+      stream's ceiling; a link that sags mid-show falls behind and the session drops video
+      until the next keyframe. Lower the encoder's rate on air (`VideoEncoder.configure`
+      with a new bitrate) when a destination is a second behind on the server's count,
+      and raise it back when it keeps up.
+    - *37x-4h-4. The 2 Mb/s floor is too low for 1080p60.* Fitted to a short link the
+      encode can drop to 2 Mb/s at 1920x1080 60 fps; on the rate check's moving picture
+      openh264 asked for 2 Mb/s made 4.26 (the check-skeptic's run), past the link it was
+      fitted to. Below about a third of the size's rate, step the encode down to 720p (or
+      30 fps) instead of starving it; measure the plate's own floor first, which is
+      smoother than the check's picture.
+    - *37x-4h-3. Owed on the Mac.* The rate lines on the Mac shard (VideoToolbox's CBR,
+      not openh264's) on the first run; a film of the stream before and after on YouTube;
+      the first 1080p60 stream needs about 17 Mb/s of upload for one destination, so its
+      upload line says whether the link held.
   - **37x-4e. YouTube through the API.** *(build, S; with 37s.)* The broadcast made,
     bound and transitioned from the panel with 37s's token, so the owner never pastes a
     YouTube key; Content ID's cut reported in the health readout.
