@@ -12719,6 +12719,45 @@ here; the relay drops `assistant-tempo`, `assistant-link` and `assistant-seq` fr
 phone (`phone-tempo`). `npm run assistant`: thirteen new lines, seven new mutants, all
 caught.
 
+## 44k-2. The music player from the assistant (2026-11-11)
+
+The third batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the sound source is, and paced as a setting.
+
+- `show_state`'s `player`: what is loaded (a shelf track's title, or a file's name),
+  its kind and artist, its length, where it is (`at`, seconds), playing or not, the
+  loop, and the shelf. Where it is goes into the display's state only on a play, a
+  pause, a seek, a new file and the end, with the epoch time it was read (`atTime`),
+  and the MCP carries it forward while it plays: the element's clock moves four times
+  a second, and a state re-sent at that rate goes to every phone for a number only the
+  assistant reads.
+- `play_track`: a shelf track by its title (the exact title in any case, else the one
+  title holding the words; "rain" on a shelf with two is refused with the shelf), or a
+  file by its full path on the Mac. The page cannot open a path, so the show server
+  (`server/assistantMusic.js`) admits it: a sound file by its extension, a real file,
+  inside the music folder (~/Music, or `CHROMAGLASS_MUSIC_DIR`), judged with links and
+  `..` resolved, so a link in the folder that points out, or `~/Music/../.ssh/…`, is
+  outside. Admitted, the file is served at `/assistant-music/<32 hex>`, to the laptop
+  alone and by Range (an audio element seeks by asking for bytes); the page is handed
+  that address and the file's name, never the path, and takes a file at no other
+  address. The last eight addresses are kept.
+- `music`: play, pause, seek (refused past the track's end, with its length), loop,
+  close. The door is the player's own buttons' callbacks (`useSoundSource`'s
+  `playTrack`, `toggleMusic`, `closeMusicFile`, the element's seek, `useSoundState`'s
+  loop), through `app/musicNow.ts`, so music the assistant opened is what the show
+  hears exactly as music opened by hand is. Each call is answered by the display, so a
+  play after a close the state had not caught up with comes back with the display's
+  reason.
+
+The phone has its own player on the Sound sheet, so it gains nothing; the relay drops
+`assistant-music` from a phone (`phone-music`). `npm run assistant`: twelve new lines
+(three on the page's own door and its address), nine new mutants, in
+`scripts/assistant-music.mjs` beside the scenario (which is near the 100 KB line).
+Found: 44k-2a (a file the player cannot decode is answered as done), 44k-2b (more
+music folders). Found too: two older mutants (`bottle-bench`, `seq-unknown`) bring the
+show server down rather than fail a line; harmless to the real code, but the new
+lines fetch from the server, so they treat a failed fetch as a failed line.
+
 ## 44k-3, 44k-5, 44f-4. The set list and the song shows from the assistant, and the display's answer (2026-11-11)
 
 The second batch of 44k's gaps, built by Claude (the owner, 2026-11-11). Each is a

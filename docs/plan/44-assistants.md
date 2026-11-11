@@ -220,7 +220,7 @@ through cords and preset patches, and the plate shader is untouched.
   | Rank | What, at the desk | The tool today | Mode it belongs in | Item |
   |---|---|---|---|---|
   | 1 | The Mac's assistant has the current tools | the Mac runs an old copy: 21 tools, no `go_live`, `set_sound_source`, `song_title` | — | 44k-1 |
-  | 2 | The music player: open a file, a library track, play, pause, seek, loop, close; what is playing and where | none (`set_sound_source` has no file) | Full | 44k-2 |
+  | 2 | The music player: open a file, a library track, play, pause, seek, loop, close; what is playing and where | **shipped** 2026-11-11: `play_track`, `music`, `show_state`'s `player` | Full | 44k-2 |
   | 3 | The set list: read it, arm item N, Go now, the Go's fade time, cancel the cue, Revert, the back plate | `arm_look` by library id and `go` only; no fade, no list | Suggest (arm), Play (Go, fade) | 44k-3 |
   | 4 | The Mixer's row takes (fade a row in or out) | the guard allows `mix-fade-*` in Full; `show_action`'s list leaves them out | Full | 44k-4 |
   | 5 | Song shows: read any song's show, take an action out, start and stop a show, Follow songs, nudge to a section | `add_song_action` on the song playing only | Play (read, nudge), Full (edit) | 44k-5 |
@@ -247,14 +247,22 @@ through cords and preset patches, and the plate shader is untouched.
   #785 (the sound on air). Pass: the Mac lists 24 tools, and `show_state` answers
   with the app open. The repointing half done 2026-11-11 (the Mac lists 24 since,
   seen the same evening); the release with #785 still owed.
-- **44k-2. The music player.** *(M, AG lane.)* `play_track` (a library track by name,
-  or a file by its path on the Mac), `music` (play, pause, seek to seconds, loop,
-  close), and `show_state`'s `player` (what is loaded, where it is, its length,
-  playing or not). The door: `useSoundSource`'s `playTrack`, `playMusicFile`,
-  `toggleMusic`, `closeMusicFile`, through a sink beside `soundNow.ts`. A file path
-  is the Mac app's only (the browser cannot open a path), so the web display says
-  so. Full, as the sound source is. Pass: `npm run assistant` lines for each verb at
-  the stand-in, a path outside the music folder refused, and a mutant.
+- ~~**44k-2. The music player.**~~ **Shipped** 2026-11-11: `show_state`'s `player`,
+  `play_track` (a shelf track by its title, a file in ~/Music by its path) and `music`
+  (play, pause, seek, loop, close), Full, through `app/musicNow.ts` and
+  `server/assistantMusic.js` (`npm run assistant`, `music-full`, `music-folder`,
+  `music-real`, `music-type`, `music-laptop`, `music-length`, `music-answer`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-2a. A file the player cannot decode says so.** *(S, found building 44k-2.)* The
+  display answers a file's `play_track` as done once the player starts loading it; a
+  file the element cannot decode (a damaged MP3, a codec Chromium lacks) then fails in
+  silence, the player keeping the name with no length. Answer after `canplay` or
+  `error`, so the assistant hears that it would not open, and clear the player.
+- **44k-2b. More music folders.** *(S, found building 44k-2.)* A path plays from ~/Music
+  only (`CHROMAGLASS_MUSIC_DIR` changes it, which the Mac app does not set). If the
+  owner keeps songs elsewhere (the films folder, Downloads), let the Sound panel name
+  the folders the assistant may open, read by the show server, never widened by the
+  assistant itself.
 - ~~**44k-3. The set list from the assistant.**~~ **Shipped** 2026-11-11: `show_state`'s
   `set`, `set_list` (arm, cancel, go_now, fade, revert) and `back_plate` (Full), through
   `app/setNow.ts` (`npm run assistant`, `set-past`, `set-fade`, `set-suggest`). Story in
