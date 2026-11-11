@@ -11,6 +11,7 @@ import type { VisualizerSettings } from '../types';
 import type { OutputConfig } from '../lib/outputConfig';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { SongChange } from '../hooks/useSongChange';
+import { publishRoom } from './earNow';
 
 /**
  * Keeping a receiver in step: the cast window, the mirror and the network
@@ -340,6 +341,20 @@ export function useCastFeed({
     if (renderAudio) sendCastAudio(renderAudio);
     else if (!liveAudio) { lastCastAudioRef.current = -Infinity; sendCastAudio(null); }
   }, [feedingCast, renderAudio, liveAudio, sendCastAudio]);
+
+  /*
+    The room's calibration, for the owner's assistant (app/earNow.ts, PLAN
+    44k-10). Here because this is the hook App() hands the ear's reading to,
+    and App() may not grow. The live ear's, never a render's (a render hears
+    a file, not the room), and only when the calibration starts or ends or
+    the ear starts or stops hearing, which is when the copy is taken.
+  */
+  const room = liveAudio?.calibration ?? null;
+  const roomHeard = !!room;
+  const roomCalibrating = room?.calibrating ?? false;
+  const roomRef = useRef(room);
+  roomRef.current = room;
+  useEffect(() => { publishRoom(roomRef.current); }, [roomHeard, roomCalibrating]);
 
   return {
     castState, relaySendRef, markLoaded, loadMark, clearMark,

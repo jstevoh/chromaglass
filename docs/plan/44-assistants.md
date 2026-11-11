@@ -228,7 +228,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 7 | The tempo: tap, a typed bpm, back to heard; Ableton Link and its transport | none | Play (tempo), Full (Link) | 44k-7 |
   | 8 | Sequences: choose which one, go to a stage, bind one to a song | `sequencer` runs the chosen one only | Play (choose, stage), Full (edit) | 44k-8 |
   | 9 | Saving a made look: save as new, save over, delete | none (44c-2) | Play (new), Full (over, delete) | 44k-9 = 44c-2 |
-  | 10 | Calibrate the sound to the room; the song detector on or off; Listen | none (`autoCalibrate` is a setting, the press is not) | Full | 44k-10 |
+  | 10 | Calibrate the sound to the room; the song detector on or off; Listen | **shipped** 2026-11-11: `calibrate`, `song_detection`, `listen`, `show_state`'s `ear` | Full | 44k-10 |
   | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | `record-toggle` only | Full | 44k-11 |
   | 12 | The microphone's input device | none (`set_sound_source microphone` takes the Sound panel's choice) | Full | 44k-12 |
   | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | none | Full | 44k-13 |
@@ -307,9 +307,23 @@ through cords and preset patches, and the plate shader is untouched.
   and a sequence chosen are not on its list, so the tools say Undo leaves them. Put
   them on it (the bpm and source before, the sequence before) if the owner wants it.
 - **44k-9.** Saving a made look: 44c-2 above, now at rank 9.
-- **44k-10. Calibrate, the song detector and Listen.** *(S, AG lane.)* `calibrate`
-  (the Sound panel's press), `song_detection` (on, off), `listen` (start, cancel).
-  Full. Pass: lines for each.
+- ~~**44k-10. Calibrate, the song detector and Listen.**~~ **Shipped** 2026-11-11:
+  `calibrate` (Recalibrate room), `song_detection` (on, off), `listen` (start, cancel,
+  name) and `show_state`'s `ear`, Full, through `app/earNow.ts` and
+  `server/assistantEar.js` (`npm run assistant`, `ear-full`, `ear-auto`, `ear-bool`,
+  `ear-name`, `ear-answer`, `phone-ear`). Story in `docs/plan-shipped.md` §44.
+- **44k-10a. The ear's real doors, in a browser.** *(S, found building 44k-10.)* As
+  44k-2c: `npm run assistant` drives `askEar` with doors built by hand, so a door in
+  `useBench` or `useListen` that never fires, or a `publishRoom` in `useCastFeed` that
+  stops being called, would pass. Add a line to a harness that loads the app with a
+  sound playing: `calibrate`, then the state's `ear.room` calibrating and then done;
+  `song_detection` off, then `ear.detector` false.
+- **44k-10b. The phone's Sound sheet has no Recalibrate, Song Detection or Listen.**
+  *(S, found building 44k-10.)* The desk's Sound panel and Songs panel have all three;
+  the phone layout's Sound sheet (`PhoneStage.tsx`) has none, so a show run on a phone
+  cannot recalibrate the room or name a song by hand. The assistant's tools reach a
+  phone-layout display all the same (the doors are App()'s hooks, not the panels).
+  Give the sheet the three presses, through the same callbacks.
 - **44k-11. Recording's options.** *(S, AG lane.)* `record_options` (makes: video,
   take or both; quality; fps; format; sound in), read back in `show_state`, and
   `take` (replay, stop, delete the last). Full. Pass: lines for each, a format the

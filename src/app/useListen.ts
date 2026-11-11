@@ -12,6 +12,7 @@ import type { useShowSequencer } from '../hooks/useShowSequencer';
 import type { useUserPresets } from '../hooks/useUserPresets';
 import type { SongShowRuntime } from '../hooks/useSongShows';
 import { lookPlaying } from './useSongScore';
+import { publishListen, setDetectorDoor, setListenDoor } from './earNow';
 
 /**
  * Listen, in the Songs panel (PLAN 28h-8, `lib/songDesign.ts`): one press
@@ -131,5 +132,20 @@ export function useListen(d: ListenDeps): ListenControl {
     dRef.current.musicIntel.manualTag(artist.trim(), title.trim());
   }, []);
 
-  return { state, line: listenLine(state, d.musicIntel.state.fingerprintEnabled), showId, start, cancel, tag };
+  const line = listenLine(state, d.musicIntel.state.fingerprintEnabled);
+  /*
+    The detector and Listen for the owner's assistant (app/earNow.ts, PLAN
+    44k-10): the Sound panel's Song Detection switch and this panel's own
+    Listen, Cancel and Name it, set once (the callbacks above never change,
+    and the switch reads this render's through dRef); and what they are now,
+    published when either changes.
+  */
+  useEffect(() => {
+    setDetectorDoor((on) => dRef.current.updateMusicSettings({ enabled: on }));
+    setListenDoor({ start, cancel, tag });
+    return () => { setDetectorDoor(null); setListenDoor(null); };
+  }, [start, cancel, tag]);
+  useEffect(() => { publishListen(d.musicEnabled, state.phase, state.song, line); }, [d.musicEnabled, state.phase, state.song, line]);
+
+  return { state, line, showId, start, cancel, tag };
 }

@@ -24,6 +24,7 @@ import type { useShowSequencer } from '../hooks/useShowSequencer';
 import { useLiveShow, useLiveSetup, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { useSoundNow, askSound } from './soundNow';
 import { usePlayerNow, askMusic } from './musicNow';
+import { useEarNow, askEar } from './earNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
@@ -167,6 +168,7 @@ export function useRemote({
   const liveSetup = useLiveSetup();
   const sound = useSoundNow();
   const player = usePlayerNow();
+  const ear = useEarNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -222,7 +224,8 @@ export function useRemote({
     set,
     songShows: songs,
     player,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player]);
+    ear,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player, ear]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -397,6 +400,12 @@ export function useRemote({
         // The music player (PLAN 44k-2, app/musicNow.ts), answered as the set list is.
         case 'assistant-music': {
           const why = askMusic(message);
+          answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
+          break;
+        }
+        // Calibrate, the song detector and Listen (PLAN 44k-10, app/earNow.ts), the same way.
+        case 'assistant-ear': {
+          const why = askEar(message);
           answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
           break;
         }
