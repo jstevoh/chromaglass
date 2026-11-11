@@ -216,6 +216,13 @@ builds against a red check (briefs in the project files, `antigravity/briefs-202
   stays with the owner, the CI secret is Claude's to wire), an upload job to the Play closed test
   from main, and the iPhone's half is 12-ship. Sign-in, in-app account deletion (5.1.1(v)), the
   licence Worker and anything that touches a key are Claude's, never in an Antigravity brief.
+- **12-ctl-weight** (S, found 2026-11-11 building 12-ctl-3): the phone apps bundle all of
+  `dist/`, so the Android debug APK is 148 MB (`android.yml`'s artifact, 147774968 bytes), and
+  the iPhone app carries the same. Most of it is media the website streams: `dist/video` 81 MB
+  (the cartoons 78 MB), `dist/music` 38 MB, `dist/press` 27 MB. Play's limit for a bundle's base
+  is 200 MB, and a phone used as a remote needs none of it. Leave those folders out of the
+  apps' copy (or serve them from the site when the app plays one) before 12-ctl-ship, and add a
+  size line to `controller` so the bundle cannot grow back unseen.
 
 **12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
 owner asked whether a Google TV / Android TV app should play the plate on a big
