@@ -12873,6 +12873,36 @@ file the player cannot decode is answered as done), 44k-2b (more music folders),
 show server down rather than fail a line; harmless to the real code, but the new
 lines fetch from the server, so they treat a failed fetch as a failed line.
 
+## 44k-12. The microphone's input from the assistant (2026-11-11)
+
+The sixth batch of 44k's gaps, built by Claude. `set_sound_source microphone` opened
+whichever input the Sound panel's picker last held, and nothing the assistant could
+read said which inputs there were. On a stage the input is the whole question (a USB
+interface fed from the sound desk, not the laptop hearing the room), so "listen to the
+Scarlett" had no way through. Full, as the plan's table had it, and paced as a setting.
+
+- `show_state`'s `sound` gains `inputs` (the picker's own names, from `enumerateDevices`)
+  and `input` (the one chosen, null for the default microphone or an input unplugged).
+  Names, not device ids: an id is an opaque string the owner never sees. The ids stay
+  on the page, in `app/soundNow.ts`.
+- `set_sound_source microphone` takes `device`: a name from that list, in any case, or
+  `default`. The guard (`server/assistantSound.js`) refuses a name not listed with the
+  list, and a device with any other source. It sends the display the name as the
+  display lists it; the page finds the id by that name and judges again on its own
+  list (an interface unplugged since the guard's copy), and its answer comes back once
+  the source has opened or failed (getUserMedia refuses an interface gone or held by
+  another app only then, and the source falls back to none): `set_sound_source` now
+  waits for the display's word, as the record and set tools do.
+- The door keeps the input as the picker does (`keepAudioInput`, shared with
+  `chooseAudioInput`), so the choice is remembered and shows in the panel on the desk
+  and in the phone layout's sound sheet (the same picker), then opens the source on it.
+
+`useSoundState` publishes the inputs (it owns them), `useSoundSource` sets the door;
+App() unchanged. `npm run assistant`: seven new lines (one on the page's own door),
+four new mutants, in `scripts/assistant-sound.mjs`. `assistantSound.js` joins the Mac
+app's `server` filter (the packed-app line caught it missing). Found: 44k-12a (are the
+inputs named at launch on the Mac).
+
 ## 44k-11. Recording's options and the Takes from the assistant (2026-11-11)
 
 The fifth batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete

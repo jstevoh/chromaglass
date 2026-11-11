@@ -3,6 +3,7 @@ import type { Track } from '../lib/musicLibrary';
 import { type Drone, type DroneParams, DRONE_DEFAULTS } from '../lib/plateDrone';
 import { type AudioSource, AUDIO_INPUT_KEY } from './shared';
 import { usePlayerReport } from './musicNow';
+import { publishInputs } from './soundNow';
 
 /**
  * What the show listens to, as state: the source, the input it opens, the
@@ -36,6 +37,9 @@ export function useSoundState() {
     navigator.mediaDevices?.addEventListener?.('devicechange', refreshAudioInputs);
     return () => navigator.mediaDevices?.removeEventListener?.('devicechange', refreshAudioInputs);
   }, [refreshAudioInputs]);
+  // The inputs by name and the one chosen, for the remote link to report and
+  // the owner's assistant to pick from (app/soundNow.ts, PLAN 44k-12).
+  useEffect(() => { publishInputs(audioInputs, audioInputId); }, [audioInputs, audioInputId]);
   // ── A music file, played here ──
   // The straightest signal there is: no room, no microphone, no loopback
   // driver. The element plays to the speakers and its stream feeds the show.

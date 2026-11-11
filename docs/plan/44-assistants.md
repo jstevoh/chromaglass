@@ -230,7 +230,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 9 | Saving a made look: save as new, save over, delete | none (44c-2) | Play (new), Full (over, delete) | 44k-9 = 44c-2 |
   | 10 | Calibrate the sound to the room; the song detector on or off; Listen | **shipped** 2026-11-11: `calibrate`, `song_detection`, `listen`, `show_state`'s `ear` | Full | 44k-10 |
   | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | **shipped** 2026-11-11: `record_options`, `take`, `show_state`'s `record` | Full | 44k-11 |
-  | 12 | The microphone's input device | none (`set_sound_source microphone` takes the Sound panel's choice) | Full | 44k-12 |
+  | 12 | The microphone's input device | **shipped** 2026-11-11: `set_sound_source`'s `device`, `show_state`'s `sound.inputs` and `sound.input` | Full | 44k-12 |
   | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | none | Full | 44k-13 |
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
@@ -347,10 +347,20 @@ through cords and preset patches, and the plate shader is untouched.
   video applies to the next one; the tool says "from the next press of Record" every
   time. Better: `show_state`'s `record` carries the options the running video was started
   with, so the assistant can tell the owner what the file being written is.
-- **44k-12. The microphone's input.** *(S, AG lane.)* `show_state`'s `inputs` (the
-  device names) and `set_sound_source microphone` gaining `device` (a name from that
-  list), through `useSoundSource`'s `chooseAudioInput`. Pass: a line where an unknown
-  name is refused with the list.
+- ~~**44k-12. The microphone's input.**~~ **Shipped** 2026-11-11: `show_state`'s
+  `sound.inputs` (the Sound panel's input names) and `sound.input` (the one chosen, null
+  for the default), and `set_sound_source microphone` with `device` (a name in any case,
+  or `default`), through `app/soundNow.ts` and `server/assistantSound.js` (`npm run
+  assistant`, `sound-device`, `sound-device-name`, `sound-device-mic`,
+  `sound-device-answer`). Story in `docs/plan-shipped.md` §44.
+- **44k-12a. Are the inputs named at launch, on the Mac?** *(S, found building 44k-12;
+  needs the Mac.)* A browser names its inputs only once the page has microphone
+  permission (until then `enumerateDevices` gives empty labels, and the list reads
+  "Input 1", "Input 2"); `useSoundState` asks again once the microphone opens. The Mac
+  app holds the permission, but whether its labels are there before the first open
+  is unmeasured. Read `show_state`'s `sound.inputs` on the Mac with the source none
+  after a fresh launch; if they are numbers, open the microphone once at launch for
+  the names (and close it), or say so in the tool.
 - **44k-13. Film, pours and the room.** *(M, AG lane.)* `film` (a file path, a camera
   by name, a window, a cartoon from the shelf, or clear), `pour_file` (an image or a
   film poured into the dish, or stop), `room_camera` (on, off, device), `mark` (load a

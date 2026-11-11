@@ -149,8 +149,8 @@ export interface RemoteState {
    * outside the Mac app.
    */
   liveSetup?: LiveSetup | null;
-  /** What the show hears (PLAN 44j): the sound source, and the file's name when it is one. */
-  sound?: { source: 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone'; file: string | null };
+  /** What the show hears (PLAN 44j): the sound source, and the file's name when it is one; the microphone's inputs by the picker's names, and the one chosen, null for the default (44k-12). */
+  sound?: { source: 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone'; file: string | null; input?: string | null; inputs?: string[] };
   /**
    * The bottles on the bench, by id, name and the colour each pours, and the
    * one in hand (PLAN 44k-6), so the owner's assistant picks a bottle that is
@@ -301,14 +301,16 @@ export type RemoteMessage =
    * its own settings over it (`lib/assistantLook.ts`), for the performer's Go.
    * `assistant-live`: start the live stream to the saved destinations, or the
    * test ones, or only those `names` names (44j); Full mode only.
-   * `assistant-sound`: change the sound source (44j), Full mode and never on
-   * air, since the stream's sound is the source it started with. The rest pass between the relay and the
+   * `assistant-sound`: change the sound source (44j), Full mode, on air too
+   * since 44j-2 (the stream follows it); `device` names the microphone's
+   * input from the state's `sound.inputs`, or `default` (44k-12), and
+   * `answer` is the number the display's answer comes back under. The rest pass between the relay and the
    * assistant and never reach the display: the switch's mode, the guard's
    * answer to a numbered message, and Undo.
    */
   | { type: 'cue-look'; name: string; base: string | null; settings: Partial<VisualizerSettings> }
   | { type: 'assistant-live'; test: boolean; names?: string[] }
-  | { type: 'assistant-sound'; source: 'none' | 'microphone' | 'system' | 'simulated' | 'drone' }
+  | { type: 'assistant-sound'; source: 'none' | 'microphone' | 'system' | 'simulated' | 'drone'; device?: string; answer?: number }
   | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
   | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
   | { type: 'assistant-undo' }
