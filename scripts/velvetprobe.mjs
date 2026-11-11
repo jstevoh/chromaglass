@@ -25,6 +25,14 @@ const VARIANTS = {
   noSmear: { glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0 },
   lamp: { lampGround: 0.06 },
   noDiff: { diffusionRate: 0 },
+  noPress: { platePressure: 0 },
+  noRockOnly: { plateRock: 0 },
+  noGlassSmear: { glassSmear: 0 },
+  noDrip: { rainDrip: 0 },
+  noVib: { vibrationFrequency: 0 },
+  noAir: { airVelocity: 0 },
+  noSurge: { surge: 0 },
+  still: { rotationSpeed: 0, plateRock: 0, platePressure: 0, glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0, surge: 0 },
   // With the simulated band (the film's sound): the music's pours and paddles.
   band: { band: true },
   bandNoAuto: { band: true, automateRate: 0 },
@@ -33,7 +41,8 @@ const VARIANTS = {
   bandNoCords: { band: true, sceneMappings: [] },
 };
 const pick = process.argv.slice(2).filter(a => VARIANTS[a]);
-const run = pick.length ? pick : ['base', 'band', 'bandNoCords', 'bandNoAuto', 'bandLamp', 'bandBudget', 'noAuto', 'noSpin'];
+const run = pick.length ? pick : ['base', 'still', 'noRockOnly', 'noPress', 'noGlassSmear', 'noDrip', 'noVib', 'noAir', 'noSurge'];
+const SHOTS = process.env.PROBE_SHOTS || '';
 const SECONDS = Number(process.env.PROBE_SECONDS) || 90;
 const LOOK = process.env.PROBE_LOOK || 'velvet-underground';
 const AREAS = [
@@ -81,11 +90,12 @@ try {
     for (let t = 0; t <= SECONDS; t += 3) {
       if (t) await page.waitForTimeout(3000);
       rows.push({ t, ...(await read()) });
+      if (SHOTS && (t === 0 || t + 3 > SECONDS)) await page.screenshot({ path: `${SHOTS}/${name}-${t}s.png` }).catch(() => {});
     }
     const r0 = rows[0];
     console.log(`\n== ${name} ${JSON.stringify(VARIANTS[name])} engine ${r0.engine} seedMean ${r0.seedMean?.toFixed(3)} seedBudget ${r0.seedBudget} sparse ${r0.sparse} dt ${r0.dt?.toFixed(4)} thin ${r0.thin}`);
     console.log('   t   area0   area1   area2   outside  dish   mean   steps');
-    for (const r of rows) if (r.t % 15 === 0) console.log(`${String(r.t).padStart(4)}  ${r.inA.map(v => v.toFixed(4)).join('  ')}  ${r.outside.toFixed(4)}  ${r.dish.toFixed(4)} ${(r.mean ?? 0).toFixed(4)} ${r.steps}`);
+    for (const r of rows) if (r.t % 15 === 0 || r.t + 3 > SECONDS) console.log(`${String(r.t).padStart(4)}  ${r.inA.map(v => v.toFixed(4)).join('  ')}  ${r.outside.toFixed(4)}  ${r.dish.toFixed(4)} ${(r.mean ?? 0).toFixed(4)} ${r.steps}`);
     const last = rows[rows.length - 1];
     out[name] = { kept: last.inA.map((v, k) => +(v / Math.max(1e-6, r0.inA[k])).toFixed(3)), outside: [r0.outside, last.outside].map(v => +v.toFixed(4)), dish: [r0.dish, last.dish].map(v => +v.toFixed(4)) };
     await context.close();
