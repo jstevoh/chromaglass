@@ -4008,6 +4008,21 @@ error object (`{"message":"rate limited"}`) gave an empty answer, which reads as
 it now parses first and answers "partial" for either, and for an empty or blank body (jq exits 0 with no output on one; the review found that case). Both selftest cases go red on the old
 function (2 FAIL) and green on the new.
 
+**19k-16 shipped** 2026-11-11.
+**`draftwall --frames` read 0 painted frames on the Mac.** "The projector window is painted
+from the wall's canvas" counts the frames the projector paints over 8 s. It was red on #734
+(2026-11-08) and then three times in a row on #798's tree (two PR runs and main's deploy),
+each time with the mirror hooked, the window not dark, `paints:0` and the show's canvas at
+1920x1080 where a green run reads 672x378. A tally of 54 Mac runs found the same picture on
+5, four of them on trees without #798, so it was not that PR. The wall was opened a fixed
+1500 ms after the show loaded, about 2.8 s in, while a cold Mac opening takes 13.5 to 14.8 s
+to build its pipelines and take its first step. Until that step the projector's rAF asks for
+frames the show cannot draw (19k-16a), and the canvas already carries the projector's size;
+on a slow opening the 8 s count ended before the show's first frame. The line now waits for
+the show's first step (`waitForShow`, as every app check does) before it opens the wall,
+under `--frames` only; without frames there is no step to wait for and it keeps its 1500 ms.
+The bar (frames painted from either canvas) is unchanged.
+
 **19k-17 shipped** 2026-11-10.
 **`lab5` past its 25 minutes on every speed-hunt PR.**
 `samelook` was given `lab5` as a part of its own because it runs about eleven
@@ -12761,6 +12776,51 @@ The phone has its own bench, Tempo block and Sequence picker, so it gains nothin
 here; the relay drops `assistant-tempo`, `assistant-link` and `assistant-seq` from a
 phone (`phone-tempo`). `npm run assistant`: thirteen new lines, seven new mutants, all
 caught.
+
+## 44k-2. The music player from the assistant (2026-11-11)
+
+The third batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the sound source is, and paced as a setting.
+
+- `show_state`'s `player`: what is loaded (a shelf track's title, or a file's name),
+  its kind and artist, its length, where it is (`at`, seconds), playing or not, the
+  loop, and the shelf. Where it is goes into the display's state only on a play, a
+  pause, a seek, a new file and the end, with the epoch time it was read (`atTime`),
+  and the MCP carries it forward while it plays: the element's clock moves four times
+  a second, and a state re-sent at that rate goes to every phone for a number only the
+  assistant reads.
+- `play_track`: a shelf track by its title (the exact title in any case, else the one
+  title holding the words; "rain" on a shelf with two is refused with the shelf), or a
+  file by its full path on the Mac. The page cannot open a path, so the show server
+  (`server/assistantMusic.js`) admits it: a sound file by its extension, a real file,
+  inside the music folder (~/Music, or `CHROMAGLASS_MUSIC_DIR`), judged with links and
+  `..` resolved, so a link in the folder that points out, or `~/Music/../.ssh/…`, is
+  outside. Admitted, the file is served at `/assistant-music/<32 hex>`, to the laptop
+  alone and by Range (an audio element seeks by asking for bytes); the page is handed
+  that address and the file's name, never the path, and takes a file at no other
+  address. The last eight addresses are kept.
+- `music`: play, pause, seek (refused past the track's end, with its length), loop,
+  close. The door is the player's own buttons' callbacks (`useSoundSource`'s
+  `playTrack`, `toggleMusic`, `closeMusicFile`, the element's seek, `useSoundState`'s
+  loop), through `app/musicNow.ts`, so music the assistant opened is what the show
+  hears exactly as music opened by hand is. Each call is answered by the display, so a
+  play after a close the state had not caught up with comes back with the display's
+  reason.
+
+The phone has its own player on the Sound sheet, so it gains nothing; the relay drops
+`assistant-music` from a phone (`phone-music`). `npm run assistant`: fourteen new lines
+(three on the page's own door and its address), eleven new mutants, in
+`scripts/assistant-music.mjs` beside the scenario (which is near the 100 KB line).
+Found in review: a piped read stream was never closed when the audio element dropped a
+Range request (thirty dropped requests held thirty file descriptors), so the route now
+uses `pipeline`; a missing path outside the folder said "no file at" where an existing
+one said "outside it", which let a steered assistant ask whether any file on the Mac
+exists (now both say outside, `music-probe`); the address is judged again as it is
+served (`music-swap`); and the folder is compared in its native case. Found: 44k-2a (a
+file the player cannot decode is answered as done), 44k-2b (more music folders), 44k-2c
+(the page's real door in a browser line). Found too: two older mutants (`bottle-bench`, `seq-unknown`) bring the
+show server down rather than fail a line; harmless to the real code, but the new
+lines fetch from the server, so they treat a failed fetch as a failed line.
 
 ## 44k-3, 44k-5, 44f-4. The set list and the song shows from the assistant, and the display's answer (2026-11-11)
 

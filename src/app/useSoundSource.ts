@@ -6,6 +6,7 @@ import { isDesktopApp } from '../lib/platform';
 import { startSystemTap, type SystemTap } from '../lib/systemTap';
 import { type AudioSource, AUDIO_SOURCE_KEY, AUDIO_INPUT_KEY, MAC_SYSTEM_AUDIO_KEY } from './shared';
 import { publishSound, setSoundDoor } from './soundNow';
+import { setMusicDoor } from './musicNow';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
 function rememberedSource(): AudioSource {
@@ -376,6 +377,27 @@ export function useSoundSource({
     setMusicFile(null);
     if (audioSource === 'file') { setAudioSource('none'); setAudioStream(null); }
   }, [musicFile, audioSource]);
+  /*
+    The player's door for the owner's assistant (app/musicNow.ts, PLAN 44k-2):
+    the buttons' own callbacks, this render's, through a ref, so the door is
+    set once and never calls a stale one. Play is the transport's toggle only
+    when paused, and pause the element's own, so neither flips the other way
+    on a state that ran behind. A file comes as the show server's own address
+    (askMusic takes no other), same-origin, so not a URL of ours to revoke.
+  */
+  const musicVerbsRef = useRef({ startMusic, toggleMusic, playTrack, closeMusicFile });
+  musicVerbsRef.current = { startMusic, toggleMusic, playTrack, closeMusicFile };
+  useEffect(() => {
+    setMusicDoor({
+      track: (t) => musicVerbsRef.current.playTrack(t),
+      file: (url, name) => musicVerbsRef.current.startMusic(url, name, { objectUrl: false }),
+      play: () => { if (musicElRef.current?.paused) musicVerbsRef.current.toggleMusic(); },
+      pause: () => { musicElRef.current?.pause(); },
+      seek: (s) => { const el = musicElRef.current; if (el) el.currentTime = s; },
+      close: () => musicVerbsRef.current.closeMusicFile(),
+    });
+    return () => setMusicDoor(null);
+  }, [musicElRef]);
 
   // What the show listened to last time, brought back without asking for
   // anything. The microphone only reopens where permission is already granted,

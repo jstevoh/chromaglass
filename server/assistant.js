@@ -41,6 +41,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { musicCall, playerOf } from './assistantMusic.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -339,6 +340,8 @@ export function createAssistantGuard(send, now = Date.now) {
         songShows: Array.isArray(state.songShows?.shows) ? state.songShows.shows.map((x) => ({ id: String(x?.id ?? ''), song: String(x?.song ?? '') })) : null,
         songCurrent: typeof state.songShows?.current === 'string' ? state.songShows.current : null,
         songRunning: state.songShows && typeof state.songShows === 'object' ? !!state.songShows.running : null,
+        // The music player (PLAN 44k-2): loaded or not, its length, the shelf's titles.
+        player: playerOf(state.player),
       };
     },
 
@@ -649,6 +652,21 @@ export function createAssistantGuard(send, now = Date.now) {
         }
         if (message.do !== 'read') count('patch', mode, t);
         send({ ...out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      /*
+        The music player (PLAN 44k-2): the sound source's own, so Full, and
+        paced as a setting. The rules, the one place the assistant's words
+        reach this Mac's files included, are assistantMusic.js's.
+      */
+      if (type === 'assistant-music') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = musicCall(message, show.player);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-music', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 
