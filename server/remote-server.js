@@ -30,6 +30,8 @@ import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, read
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
+import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from './signin-handoff.js';
+import { LOOPBACK, isLaptop } from './laptop.js';
 import { createAssistantGuard, readAssistantMode } from './assistant.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
@@ -87,22 +89,7 @@ const digest = (s) => createHash('sha256').update(String(s)).digest();
 /** Compared by digest so the time taken says nothing about how much of a guess was right. */
 const keyIs = (given, key) => timingSafeEqual(digest(given ?? ''), digest(key));
 
-const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
-/**
- * The laptop itself: a request from this machine, not forwarded by the tunnel
- * or a proxy, and addressed to this machine by a local name. The last part is
- * what stops DNS rebinding: a web page anywhere can point its own name at
- * 127.0.0.1 and have the laptop's browser fetch `/remote-info.json` from it,
- * and that request comes from loopback with no forwarding headers. Its Host is
- * the page's name, though, which is how it is told apart. The Mac app loads
- * `http://localhost:<port>` and asks `127.0.0.1` for the key, so both pass.
- */
-const isLaptop = (req) => {
-  if (!LOOPBACK.test(req.socket.remoteAddress ?? '')) return false;
-  if (req.headers['x-forwarded-for'] || req.headers['cf-connecting-ip']) return false;
-  const host = String(req.headers.host ?? '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
-  return host === 'localhost' || host === '::1' || /^127\.\d+\.\d+\.\d+$/.test(host);
-};
+// `LOOPBACK` and `isLaptop`, the laptop itself: server/laptop.js.
 /**
  * Who a request is, for counting wrong keys and sockets. Through the tunnel
  * every request arrives from loopback and the caller is in cf-connecting-ip
@@ -172,6 +159,8 @@ const lanAddresses = () =>
 
 const handleAccountShows = createAccountShowsHandler();
 const licenseManager = createServerLicenseManager();
+// The Mac app's Google or Apple sign-in, carried from the browser to its window (PLAN.md 23.17f).
+const signInHandoff = createSignInHandoff();
 
 /*
   OSC and Art-Net are Pro (PLAN.md §23's table, the Pro page, the Settings
@@ -218,6 +207,10 @@ const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://localhost');
   if (url.pathname === ACCOUNT_SHOWS_PATH) {
     void handleAccountShows(req, res, url);
+    return;
+  }
+  if (url.pathname === SIGNIN_HANDOFF_PATH) {
+    void signInHandoff.handleRequest(req, res, url, isLaptop(req));
     return;
   }
   if (

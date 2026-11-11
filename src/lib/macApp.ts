@@ -110,9 +110,44 @@ export function macAppRow(tier: string, mac: boolean, update: DesktopUpdateState
  */
 export const MAC_SIGN_IN_PARAM = 'macSignIn';
 
-export function openSignInInBrowser(): void {
+/**
+ * The one-time code (`h`) and the provider (`p`) the app's window puts in that
+ * address (PLAN.md 23.17f). The code files the browser's sign-in with the app's
+ * server for this window alone to take (server/signin-handoff.js); the provider
+ * lets the browser tab offer the one button the person already pressed. Before
+ * these, the tab saw the Mac already licensed, said "Your licence is on this
+ * Mac now" and never asked anyone to sign in, while the window waited on
+ * "Finish in your browser…" for good (the owner's screenshot, 2026-11-10).
+ */
+export const MAC_SIGN_IN_CODE_PARAM = 'h';
+export const MAC_SIGN_IN_PROVIDER_PARAM = 'p';
+export type HandoffProvider = 'google.com' | 'apple.com';
+const HANDOFF_CODE = /^[A-Za-z0-9_-]{22,64}$/;
+
+/** A fresh one-time code: 128 random bits, url-safe. */
+export function newHandoffCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/** In the browser tab the app sent a sign-in to: its code and provider, or null anywhere else. */
+export function handoffFromUrl(): { code: string; provider: HandoffProvider | null } | null {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get(MAC_SIGN_IN_PARAM) !== '1') return null;
+    const code = q.get(MAC_SIGN_IN_CODE_PARAM) ?? '';
+    if (!HANDOFF_CODE.test(code)) return null;
+    const p = q.get(MAC_SIGN_IN_PROVIDER_PARAM);
+    return { code, provider: p === 'google.com' || p === 'apple.com' ? p : null };
+  } catch {
+    return null;
+  }
+}
+
+export function openSignInInBrowser(code?: string, provider?: HandoffProvider): void {
   const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { openInBrowser?: (url: string) => void } }).__CHROMAGLASS_NATIVE__;
-  const url = `${window.location.origin}${SHOW_PATH}?${MAC_SIGN_IN_PARAM}=1`;
+  const extra = code ? `&${MAC_SIGN_IN_CODE_PARAM}=${code}${provider ? `&${MAC_SIGN_IN_PROVIDER_PARAM}=${provider}` : ''}` : '';
+  const url = `${window.location.origin}${SHOW_PATH}?${MAC_SIGN_IN_PARAM}=1${extra}`;
   if (native?.openInBrowser) native.openInBrowser(url);
   else window.open(url, '_blank', 'noopener');
 }
