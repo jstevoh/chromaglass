@@ -25,9 +25,10 @@
  * track that was playing still seeks after a few more are opened.
  */
 import { createReadStream, realpathSync, statSync } from 'node:fs';
+import { pipeline } from 'node:stream';
 import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
-import { basename, delimiter, extname, isAbsolute, sep } from 'node:path';
+import { basename, delimiter, extname, isAbsolute, resolve, sep } from 'node:path';
 
 export const MUSIC_PATH = '/assistant-music/';
 /** What the player opens, and the type it is served as. */
@@ -43,24 +44,36 @@ export const musicFolders = (env = process.env) => (env.CHROMAGLASS_MUSIC_DIR ? 
 
 const served = new Map();   // token -> { path, type }
 
+/*
+  The folders' real paths, and whether a path is inside one. realpathSync's
+  native form, because the JS one keeps the casing it is given and macOS's
+  disk does not care, so ~/music/x.mp3 against /Users/…/Music was refused.
+*/
+const real = (p) => { try { return realpathSync.native(p); } catch { return null; } };
+const inside = (p, roots) => roots.some((r) => p.startsWith(r.endsWith(sep) ? r : r + sep));
+
 /** A path the assistant named: its address and name, or why not. */
 export function admitMusicFile(raw, folders = musicFolders()) {
   if (typeof raw !== 'string' || !raw.trim()) return { reason: 'a file by its full path on this Mac' };
   const asked = raw.trim().replace(/^~(?=$|\/)/, homedir());
   if (!isAbsolute(asked)) return { reason: `a full path (beginning / or ~/), not ${raw}` };
-  let real;
-  try { real = realpathSync(asked); } catch { return { reason: `no file at ${raw}` }; }
-  const roots = folders.map((f) => { try { return realpathSync(f); } catch { return null; } }).filter(Boolean);
-  if (!roots.some((r) => real.startsWith(r.endsWith(sep) ? r : r + sep))) return { reason: `the assistant plays files from the music folder only (${folders.join(', ')}), and ${raw} is outside it` };
-  const type = MUSIC_TYPES.get(extname(real).toLowerCase());
-  if (!type) return { reason: `not a sound file the player opens (${[...MUSIC_TYPES.keys()].join(' ')}): ${basename(real)}` };
+  const roots = folders.map(real).filter(Boolean);
+  const outside = { reason: `the assistant plays files from the music folder only (${folders.join(', ')}), and ${raw} is outside it` };
+  // A path that is not there is "outside" unless it would be inside on its
+  // face: otherwise "no file at" against "outside it" tells an assistant
+  // steered by somebody's words whether any file on this Mac exists.
+  const found = real(asked);
+  if (!found) return inside(resolve(asked), folders.map((f) => resolve(f))) || inside(resolve(asked), roots) ? { reason: `no file at ${raw}` } : outside;
+  if (!inside(found, roots)) return outside;
+  const type = MUSIC_TYPES.get(extname(found).toLowerCase());
+  if (!type) return { reason: `not a sound file the player opens (${[...MUSIC_TYPES.keys()].join(' ')}): ${basename(found)}` };
   let file = false;
-  try { file = statSync(real).isFile(); } catch { /* gone since */ }
+  try { file = statSync(found).isFile(); } catch { /* gone since */ }
   if (!file) return { reason: `${raw} is not a file` };
   const token = randomBytes(16).toString('hex');
-  served.set(token, { path: real, type });
+  served.set(token, { path: found, type, folders });
   while (served.size > KEEP) served.delete(served.keys().next().value);
-  return { url: `${MUSIC_PATH}${token}`, name: basename(real, extname(real)) };
+  return { url: `${MUSIC_PATH}${token}`, name: basename(found, extname(found)) };
 }
 
 /** The show server's route: true when the request was this one's (answered, refused or not found). */
@@ -68,8 +81,11 @@ export function serveMusicFile(req, res, url, laptop) {
   if (!url.pathname.startsWith(MUSIC_PATH)) return false;
   if (!laptop) { res.writeHead(403); res.end(); return true; }
   const f = served.get(url.pathname.slice(MUSIC_PATH.length));
+  // Judged again as it is served: a file swapped for a link out of the
+  // folder since it was admitted is not followed.
+  const now = f ? real(f.path) : null;
   let size = -1;
-  try { if (f) size = statSync(f.path).size; } catch { /* gone since */ }
+  try { if (now && inside(now, f.folders.map(real).filter(Boolean))) size = statSync(now).size; } catch { /* gone since */ }
   if (size < 0) { res.writeHead(404); res.end(); return true; }
   let start = 0, end = size - 1, code = 200;
   const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
@@ -83,7 +99,10 @@ export function serveMusicFile(req, res, url, laptop) {
     ...(code === 206 ? { 'Content-Range': `bytes ${start}-${end}/${size}` } : {}),
   });
   if (req.method === 'HEAD' || size === 0) { res.end(); return true; }
-  createReadStream(f.path, { start, end }).on('error', () => res.destroy()).pipe(res);
+  // pipeline, not pipe: an audio element drops its Range request on every
+  // seek, and a piped read stream is then never closed (measured in review:
+  // thirty dropped requests, thirty file descriptors held for good).
+  pipeline(createReadStream(now, { start, end }), res, () => {});
   return true;
 }
 

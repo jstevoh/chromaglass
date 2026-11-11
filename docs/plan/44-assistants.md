@@ -258,6 +258,12 @@ through cords and preset patches, and the plate shader is untouched.
   file the element cannot decode (a damaged MP3, a codec Chromium lacks) then fails in
   silence, the player keeping the name with no length. Answer after `canplay` or
   `error`, so the assistant hears that it would not open, and clear the player.
+- **44k-2c. The player's real door, in a browser.** *(S, found in review of 44k-2.)*
+  `npm run assistant` drives `askMusic` with a door built by hand and the stand-in
+  display, so a door in `useSoundSource` that never starts the file, a pause that does
+  nothing, or a `usePlayerReport` that stops publishing would pass. Add a line to a
+  harness that loads the app: a shelf track through the real door, then the state's
+  `player` loaded and playing, then a pause and `playing: false`.
 - **44k-2b. More music folders.** *(S, found building 44k-2.)* A path plays from ~/Music
   only (`CHROMAGLASS_MUSIC_DIR` changes it, which the Mac app does not set). If the
   owner keeps songs elsewhere (the films folder, Downloads), let the Sound panel name

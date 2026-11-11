@@ -12750,11 +12750,17 @@ control of the show from Claude). Full, as the sound source is, and paced as a s
   reason.
 
 The phone has its own player on the Sound sheet, so it gains nothing; the relay drops
-`assistant-music` from a phone (`phone-music`). `npm run assistant`: twelve new lines
-(three on the page's own door and its address), nine new mutants, in
+`assistant-music` from a phone (`phone-music`). `npm run assistant`: fourteen new lines
+(three on the page's own door and its address), eleven new mutants, in
 `scripts/assistant-music.mjs` beside the scenario (which is near the 100 KB line).
-Found: 44k-2a (a file the player cannot decode is answered as done), 44k-2b (more
-music folders). Found too: two older mutants (`bottle-bench`, `seq-unknown`) bring the
+Found in review: a piped read stream was never closed when the audio element dropped a
+Range request (thirty dropped requests held thirty file descriptors), so the route now
+uses `pipeline`; a missing path outside the folder said "no file at" where an existing
+one said "outside it", which let a steered assistant ask whether any file on the Mac
+exists (now both say outside, `music-probe`); the address is judged again as it is
+served (`music-swap`); and the folder is compared in its native case. Found: 44k-2a (a
+file the player cannot decode is answered as done), 44k-2b (more music folders), 44k-2c
+(the page's real door in a browser line). Found too: two older mutants (`bottle-bench`, `seq-unknown`) bring the
 show server down rather than fail a line; harmless to the real code, but the new
 lines fetch from the server, so they treat a failed fetch as a failed line.
 

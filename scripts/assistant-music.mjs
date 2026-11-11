@@ -14,6 +14,9 @@
  *  - a path outside the music folder, a link inside it that points out, a
  *    `..` out of it, and a file that is not a sound file are refused, and
  *    nothing reaches the display;
+ *  - a missing path outside the folder is refused as an existing one is (no
+ *    probing which files exist), and a file swapped for a link out after it
+ *    was admitted is not served;
  *  - play, pause, seek, loop and close reach it; a seek past the track's end
  *    is refused; show_state's player carries where it is forward while it
  *    plays;
@@ -23,7 +26,7 @@
  *    display.
  * Each rule has its mutant in MUSIC_MUTANTS, run with assistant.mjs's own.
  */
-import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -86,6 +89,7 @@ export async function musicFullLines({ mcp, display, check, phone, port, dir }) 
   mkdirSync(elsewhere, { recursive: true });
   writeFileSync(join(music, 'Tiger Rag.mp3'), BYTES);
   writeFileSync(join(music, 'notes.txt'), 'not music');
+  writeFileSync(join(music, 'Swap.mp3'), BYTES);
   writeFileSync(join(elsewhere, 'secret.mp3'), BYTES);
   symlinkSync(join(elsewhere, 'secret.mp3'), join(music, 'out.mp3'));
   const got = (t) => display.since(t, 'assistant-music');
@@ -119,12 +123,16 @@ export async function musicFullLines({ mcp, display, check, phone, port, dir }) 
   const get = async (path, headers = {}) => { try { return await fetch(base + path, { headers }); } catch { return null; } };
   const whole = HEX.test(url) ? await get(url) : null;
   const part = HEX.test(url) ? await get(url, { Range: 'bytes=10-19' }) : null;
+  const tail = HEX.test(url) ? await get(url, { Range: 'bytes=-5' }) : null;
+  const over = HEX.test(url) ? await get(url, { Range: `bytes=${BYTES.length}-` }) : null;
+  const tailBytes = tail ? Buffer.from(await tail.arrayBuffer()) : null;
   const wholeBytes = whole ? Buffer.from(await whole.arrayBuffer()) : null;
   const partBytes = part ? Buffer.from(await part.arrayBuffer()) : null;
   check('-', 'a file by its path reaches the display as the show server\'s one-off address and its name, never the path, and the address serves its bytes, by Range too',
     tiger.ok && HEX.test(url) && sent.name === 'Tiger Rag' && !JSON.stringify(got(t)).includes(music) && whole?.status === 200 && wholeBytes?.equals(BYTES)
-      && part?.status === 206 && partBytes?.equals(BYTES.subarray(10, 20)) && part.headers.get('content-range') === `bytes 10-19/${BYTES.length}`,
-    `${tiger.text} | ${url} | ${whole?.status} ${part?.status} ${part?.headers.get('content-range')}`.slice(0, 200));
+      && part?.status === 206 && partBytes?.equals(BYTES.subarray(10, 20)) && part.headers.get('content-range') === `bytes 10-19/${BYTES.length}`
+      && tail?.status === 206 && tailBytes?.equals(BYTES.subarray(-5)) && over?.status === 416 && over.headers.get('content-range') === `bytes */${BYTES.length}`,
+    `${tiger.text} | ${url} | ${whole?.status} ${part?.status} ${part?.headers.get('content-range')} ${tail?.status} ${over?.status}`.slice(0, 200));
   const away = HEX.test(url) ? await get(url, { 'X-Forwarded-For': '192.168.1.40' }) : null;
   const made = await get(`/assistant-music/${'0'.repeat(32)}`);
   check('music-laptop', 'the address serves the laptop alone: a forwarded request is refused, and an address the server never gave is not found', away?.status === 403 && made?.status === 404, `${away?.status} ${made?.status}`);
@@ -138,7 +146,22 @@ export async function musicFullLines({ mcp, display, check, phone, port, dir }) 
   const txt = await mcp.call('play_track', { path: join(music, 'notes.txt') });
   await quiet();
   check('music-type', 'a file in the music folder that is not a sound file is refused', !txt.ok && /not a sound file/.test(txt.text), txt.text.slice(0, 140));
+  const gone = await mcp.call('play_track', { path: join(elsewhere, 'nope.mp3') });
+  const goneIn = await mcp.call('play_track', { path: join(music, 'nope.mp3') });
+  check('music-probe', 'a missing file outside the folder is refused as an existing one is, so a refusal never says whether a file exists there; a missing one inside says so',
+    !gone.ok && gone.text.replace(/nope|secret/g, '') === out.text.replace(/nope|secret/g, '') && !goneIn.ok && /no file at/.test(goneIn.text), `${gone.text} | ${goneIn.text}`.slice(0, 200));
   check('-', '…and none of those four reached the display', got(t).length === 0, got(t).map((m) => m.do).join(','));
+
+  // A file swapped for a link out of the folder after it was admitted is not served.
+  t = Date.now();
+  const swap = await mcp.call('play_track', { path: join(music, 'Swap.mp3') });
+  await quiet();
+  const swapUrl = got(t).find((x) => x.do === 'file')?.url ?? '';
+  const before = HEX.test(swapUrl) ? await get(swapUrl) : null;
+  rmSync(join(music, 'Swap.mp3'));
+  symlinkSync(join(elsewhere, 'secret.mp3'), join(music, 'Swap.mp3'));
+  const after = HEX.test(swapUrl) ? await get(swapUrl) : null;
+  check('music-swap', 'the address is judged again as it is served: a file swapped for a link out of the folder is not followed', swap.ok && before?.status === 200 && after?.status === 404, `${swap.text} | ${before?.status} ${after?.status}`.slice(0, 160));
 
   // The transport.
   t = Date.now();
@@ -197,8 +220,10 @@ export const MUSIC_MUTANTS = [
   { rule: 'music-full', file: 'assistant.js', find: "if (type === 'assistant-music') {\n        const why = needs(mode, 'full')", replace: "if (type === 'assistant-music') {\n        const why = needs(mode, 'play')" },
   { rule: 'music-unknown', file: 'assistantMusic.js', find: 'if (!hit) return { reason: `no track', replace: 'if (false) return { reason: `no track' },
   { rule: 'music-laptop', file: 'remote-server.js', find: 'serveMusicFile(req, res, url, isLaptop(req))', replace: 'serveMusicFile(req, res, url, true)' },
-  { rule: 'music-folder', file: 'assistantMusic.js', find: 'if (!roots.some(', replace: 'if (false && !roots.some(' },
-  { rule: 'music-real', file: 'assistantMusic.js', find: 'try { real = realpathSync(asked); }', replace: 'try { real = asked; }' },
+  { rule: 'music-folder', file: 'assistantMusic.js', find: 'if (!inside(found, roots)) return outside;', replace: '' },
+  { rule: 'music-real', file: 'assistantMusic.js', find: 'const found = real(asked);', replace: 'const found = real(asked) && asked;' },
+  { rule: 'music-probe', file: 'assistantMusic.js', find: "? { reason: `no file at ${raw}` } : outside;", replace: "? { reason: `no file at ${raw}` } : { reason: `no file at ${raw}` };" },
+  { rule: 'music-swap', file: 'assistantMusic.js', find: 'if (now && inside(now, f.folders.map(real).filter(Boolean)))', replace: 'if (now)' },
   { rule: 'music-type', file: 'assistantMusic.js', find: 'if (!type) return { reason: `not a sound file', replace: 'if (false) return { reason: `not a sound file' },
   { rule: 'music-length', file: 'assistantMusic.js', find: 'if (player?.length > 0 && s > player.length)', replace: 'if (false)' },
   { rule: 'music-answer', file: 'assistant.js', find: "send({ type: 'assistant-music', ...call.out, ...answerOf(message) });", replace: "send({ type: 'assistant-music', ...call.out });" },
