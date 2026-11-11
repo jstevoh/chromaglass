@@ -11,8 +11,8 @@ The solver's WGSL kernels, one file a pass (PLAN 19ai-6). Each file exports a ta
 - `pressure.ts`: the projection: Jacobi, red-black, the multigrid's levels, the gradient.
 - `carry.ts`: advection, MacCormack, the conserving carries, the substep plan, the glass's drift.
 - `phase.ts`, `phaseForces.ts`, `labyrinth.ts`: the ferrofluid poured and carried; its magnet force, cap and separation; the maze and the Cahn-Hilliard step.
-- `oil.ts`, `capillary.ts`: the oil and its bodies; its chemical potential, rim and film.
-- `dye.ts`: dispersion along the flow, the grain, sharpening, decay and drain.
+- `oil.ts`, `capillary.ts`: the oil and its bodies; its chemical potential (a deep-quench double well, `OIL_SPINODAL` and `OIL_WELL` from `../../fluid/constants.ts`, PLAN 38f-2), rim and film.
+- `dye.ts`: dispersion along the flow, the grain, sharpening, decay and drain, and the heat's pack and unpack round its carry on a thin gap (heatPack, heatUnpack, PLAN 38f-1).
 - `gridFilter.ts`: the passes that take the grid's own pattern out of the dye.
 - `reactions.ts`: the BZ reaction, Liesegang rings, the Gray-Scott print.
 - `seal.ts`: `SEAL_KERNELS`, a standing plate's weight as a sealed bottle's circulation (`sealSource`, `sealFlow`; PLAN 27f-9), relaxed on thinGap's `hsLiftRelax` and its `LIFT_GRID`.

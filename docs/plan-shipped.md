@@ -12329,6 +12329,53 @@ value) by default on every look, and free to ramp up so a long show keeps bursti
   clears `73.8%` of the dye in its radius in $2\text{ s}$ at `1` (`0.0%` at `0`, `99.5%`
   on clean water), with bursts returning from dial `0.87` ($25\text{ s}$ half-life).
 
+## 38f-1. The heat rides the liquid on a thin gap (2026-11-11)
+
+Found reading 38f for its build (2026-10-30), and the root the 27f-9f thread named for Lava
+Lamp's wax that never cycles (27f-9e) and its peach wash (27f-9f). The temperature lives in the
+velocity's z, and a thin gap never self-advects the velocity (its inertia is the drag time), so
+the lamp's heat stayed in the cell it was laid in while the flow it drove moved the liquid out
+from under it. A warmed body of wax rose out of its own heat into cold cells, was heavy again
+at once, and the lamp's band held the wax as a sheet at its top edge.
+
+Now `carryHeat` (fluid/passes.ts) carries it as the colour is carried, through the thin solve's
+faces in the colour's substeps: heatPack lays the column's heat h·T (its warm and cold parts,
+since the carry keeps amounts at zero or more) beside the column's liquid h, both go through the
+same `bodyAdvectSub` fluxes, and heatUnpack puts back the one over the other. The ratio is
+mixing's own mean, and it holds a uniform temperature exactly whatever the gap does in the step;
+dividing by the gap instead would count a press twice, since the gap moved before the solve.
+fluid.ts did not grow (one stage line, a comment shortened).
+
+Measured: `npm run heat` line 9, a warm heavy blob sinking down a standing plate, colour −2.78
+cells and heat −2.75, heat kept 99.9% (with the carry off: heat 0.00). Lava Lamp in the lab
+(`lavalong`, 16 s): at 192² the wax goes up in plumes with mushroom caps and gathers at the top
+(centre of mass 0.75 of the height against 0.24 lying on the floor without the carry); the colour
+the rising plumes strip is 38f-2, below, shipped with it; the cooling that would bring the wax
+down is 27f-9e.
+
+## 38f-2. Wax and water mix like immiscible liquids (2026-11-11)
+
+Found shipping 38f-1: with the heat carried, Lava Lamp's rising plumes left their trailing edges
+as a haze about 0.15 oil, and it never came back (`npm run lavawax` line 1 red, 60% clear against
+70%). The haze was the oil itself, its colour with it (Oil Bodies held), inside the old quartic
+well's metastable band: c²(1 − c)² turns unstable only past 0.21, so a smear under a fifth oil
+could rest for ever with nothing to nucleate it. Real wax and water mix to parts per million, a
+deep quench whose spinodal lies within a few per cent of the pure liquids.
+
+Now mixMu's f′ is that shape (`wgsl/fluid/capillary.ts`): a steep wall from each pure liquid up
+to `OIL_SPINODAL` 0.05, then a straight line to zero at half full with curvature −1, the old
+well's own at the middle, so an edge keeps its width; the wall's curvature 9 keeps the explicit
+step stable (M·dt < 0.0147, the stage runs 0.012). The capillary force reads σκ∇c̃, not μ, so a
+body's tension is unchanged; what changed is that a mixture has nowhere to rest between the two
+liquids. A scratch CH on the same stencil, a r = 3 drop beside a haze patch: the quartic dissolved
+the drop (centre 0.42) and grew the haze; the deep well kept the drop and the haze fell to 40%.
+
+Measured, Lava Lamp in the lab at 6 s (`lavasplit`, quartic against deep): 192², haze 4,370 →
+1,474 cells, colour in the bodies 42% → 72%, dish 67% → 83% clear, centre of mass 0.63 → 0.65;
+256², haze 2,795 cells, colour in the bodies 70%, dish 80% clear, centre 0.62. `npm run lavawax`
+4/4: clear 79%, colour in the bodies 67% (31% Oil Bodies off), centre 0.608 (0.129 no heat,
+0.468 no swelling).
+
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 
 *Asked:* the owner, 2026-10-30: "Put the glass sandwich like it's supposed to be." The rest gap had

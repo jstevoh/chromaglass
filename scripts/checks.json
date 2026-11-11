@@ -2798,7 +2798,8 @@
       "why": [
         "Heat from the lamp (PLAN 18f): dark dye absorbs heat via Beer–Lambert,",
         "warm liquid rises on an upright plate, viscosity falls ~2%/K, oil floats,",
-        "and Newton cooling decays per-second with a tens-of-seconds time constant."
+        "Newton cooling decays per-second with a tens-of-seconds time constant, and on a",
+        "thin gap the heat rides the liquid with its colour (PLAN 38f-1, carryHeat)."
       ]
     },
     {
