@@ -235,6 +235,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
   | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | none | Play (palette, tool), Full (the rest) | 44k-16 |
+  | 18 | The Mac app's updates: Install Updates Automatically, check, install | **shipped** 2026-11-11: `app_updates` (status any mode; auto, check, install Full; install refused mid-show) | Full | 44k-18 |
   | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | none (`overlays-off` hides the desk, nothing more) | Play (the tab up), Full (edits) | 44k-17 |
 
 - **44k-1. The Mac's assistant runs the current server.** *(S, Claude on the Mac,
@@ -347,6 +348,11 @@ through cords and preset patches, and the plate shader is untouched.
   video applies to the next one; the tool says "from the next press of Record" every
   time. Better: `show_state`'s `record` carries the options the running video was started
   with, so the assistant can tell the owner what the file being written is.
+- ~~**44k-18. The Mac app's updates.**~~ **Shipped** 2026-11-11 with 13-update-auto:
+  `app_updates` status, auto, check, install, answered by the show server from the Mac
+  app's updater (`server/assistantUpdates.js`, `setAppUpdates`), never sent to the
+  display (`npm run updates`, `npm run assistant`: `updates-full`, `phone-updates`).
+  Story in `docs/plan-shipped.md` §44.
 - **44k-12. The microphone's input.** *(S, AG lane.)* `show_state`'s `inputs` (the
   device names) and `set_sound_source microphone` gaining `device` (a name from that
   list), through `useSoundSource`'s `chooseAudioInput`. Pass: a line where an unknown

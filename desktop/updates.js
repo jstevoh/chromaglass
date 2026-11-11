@@ -22,6 +22,27 @@
  *              "Download ChromaGlass <version>…", which opens the new .dmg in
  *              the browser, and the owner drags it over the old one
  *
+ * Install Updates Automatically (PLAN.md 13-update-auto; the owner, 2026-11-11:
+ * "can we have turn on/off auto updates? so people aren't surprised by an
+ * update?"). On, as before, and the default, so every copy keeps the behaviour
+ * it had: a signed app downloads a new version by itself and installs it on the
+ * next quit. Off, it still looks, and says once that a version is available,
+ * but downloads nothing until the performer picks Install ChromaGlass <version>…
+ * in the menu or the profile sheet; that download then installs on the next
+ * quit, or at once with Restart to Update, as one the app fetched itself. The
+ * surprise the switch takes away is the one on the next launch: quitting after
+ * a set and opening a different version than the one rehearsed with. A version
+ * macOS has already taken (Squirrel.Mac's own update-downloaded) installs on
+ * quit whatever the switch says, because Squirrel does that itself; the state
+ * says so ('ready'), rather than claiming the switch took it back.
+ *
+ * Never in the middle of a show, in either mode. While the show is on the
+ * projector or live (`busy()`), nothing downloads by itself (a live stream's
+ * upload is the one thing a 150 MB download in the background could hurt), and
+ * the look is tried again ten minutes later rather than six hours; Restart to
+ * Update, clicked while it is, asks first, and the owner's assistant asking for
+ * it is refused (`install()`).
+ *
  * Neither ever restarts the app, opens a window or asks a question on its own.
  * A performer may be twenty minutes into a set when a release lands, with the
  * plate on the wall: the most the app does by itself is one notification on the
@@ -42,6 +63,8 @@ export const DMG = 'ChromaGlass-mac-arm64.dmg';
 export const RECHECK_MS = 6 * 60 * 60 * 1000;
 /** How long after opening it first looks: after the show is on the screen, never in its way. */
 export const FIRST_CHECK_MS = 20_000;
+/** How soon it looks again when a download was held back for a show: soon after the show ends, not six hours later. */
+export const BUSY_RETRY_MS = 10 * 60 * 1000;
 
 /**
  * Whether this app looks for updates at all, and why not when it does not.
@@ -90,17 +113,24 @@ export function downloadUrl(info, feed) {
  * `openExternal(url)`, `quiet()` (true while a projector window is open),
  * `onChange(state)` (rebuild the menu, tell the page), `dialog(opts)` (the
  * answer to a check the performer asked for), `firstCheckMs` (sooner under the
- * check, which serves its own feed), and `setTimer`/`clearTimer`.
+ * check, which serves its own feed), `auto` (Install Updates Automatically, as
+ * saved; anything but false is on), `save(auto)` (keep the switch), `busy()`
+ * (why a show is on, or null), `confirm(opts)` (a yes or no the performer
+ * asked for by clicking, resolving true for yes), and `setTimer`/`clearTimer`.
  *
- * Returns `{ state, check(manual), act(), stop() }`. `state.status` is one of
- * off, idle, checking, none, available, downloading, ready, error; `history`
- * keeps the order they came in, for the check.
+ * Returns `{ state, check(manual), act(), setAuto(on), install(), stop() }`.
+ * `state.status` is one of off, idle, checking, none, available, downloading,
+ * ready, error; `state.auto` is the switch; `state.inPlace` says an
+ * 'available' version installs in place (a click downloads it) rather than
+ * from the .dmg in the browser; `history` keeps the order they came in, for
+ * the check.
  */
 export function startUpdates(deps) {
-  const { autoUpdater, version, signed, feed, notify, openExternal, quiet, onChange, dialog, off } = deps;
+  const { autoUpdater, version, signed, feed, notify, openExternal, quiet, onChange, dialog, off, save, busy, confirm } = deps;
   const setTimer = deps.setTimer ?? setTimeout;
   const clearTimer = deps.clearTimer ?? clearTimeout;
-  const state = { status: off ? 'off' : 'idle', current: version, signed: !!signed, version: null, url: null, percent: 0, error: off ?? null, history: [off ? 'off' : 'idle'] };
+  let auto = deps.auto !== false;
+  const state = { status: off ? 'off' : 'idle', current: version, signed: !!signed, auto, inPlace: false, version: null, url: null, percent: 0, error: off ?? null, history: [off ? 'off' : 'idle'] };
   const told = new Set();
   let manual = false;
   let timer = null;
@@ -128,10 +158,26 @@ export function startUpdates(deps) {
     dialog?.({ message, detail });
   };
 
-  if (off) return { state, check: async () => { dialog?.({ message: 'Updates are off', detail: `This copy of ChromaGlass does not look for updates: ${off}.` }); }, act: () => {}, stop: () => {} };
+  if (off) {
+    const setAuto = (on) => { auto = !!on; save?.(auto); set({ auto }); };
+    return { state, check: async () => { dialog?.({ message: 'Updates are off', detail: `This copy of ChromaGlass does not look for updates: ${off}.` }); }, act: () => {}, setAuto, install: () => `this copy of ChromaGlass does not look for updates: ${off}`, stop: () => {} };
+  }
 
-  autoUpdater.autoDownload = !!signed;
-  autoUpdater.autoInstallOnAppQuit = !!signed;
+  /*
+    What electron-updater does by itself, from the switch, the show and the
+    performer's own click. autoDownload is read at each check, so it is set
+    just before one: on with the switch, off while a show is on. And
+    autoInstallOnAppQuit is what hands a downloaded zip to Squirrel.Mac at all
+    (MacUpdater.doDownloadUpdate gives it over only when true), so it is on
+    with the switch and for a version the performer asked to install: with it
+    off a zip would sit downloaded and Restart to Update never come.
+  */
+  let asked = false;
+  const apply = () => {
+    autoUpdater.autoDownload = !!signed && auto && !busy?.();
+    autoUpdater.autoInstallOnAppQuit = !!signed && (auto || asked);
+  };
+  apply();
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
   if (feed) autoUpdater.setFeedURL({ provider: 'generic', url: feed });
@@ -155,12 +201,24 @@ export function startUpdates(deps) {
     const next = String(info?.version ?? '');
     const url = downloadUrl(info, feed);
     const same = next === state.version && holding();
-    if (signed) {
-      if (!same) set({ status: 'downloading', version: next, url, percent: 0 });
+    // Downloading by itself now: the switch is on and no show is.
+    if (signed && autoUpdater.autoDownload) {
+      if (!(same && (state.status === 'downloading' || state.status === 'ready'))) set({ status: 'downloading', version: next, url, percent: 0, inPlace: true, error: null });
       answer(`ChromaGlass ${next} is ${state.status === 'ready' ? 'ready' : 'downloading'}`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
       return;
     }
-    if (!same) set({ status: 'available', version: next, url });
+    // Found, and waiting for the performer: the switch is off, or a show is on.
+    if (signed) {
+      if (!same) set({ status: 'available', version: next, url, inPlace: true });
+      if (!auto) tell(`available:${next}`, `ChromaGlass ${next} is available`, 'Install it from the ChromaGlass menu when you are ready. Nothing installs until you do.');
+      // Held for a show with the switch on: looked at again soon after it ends.
+      else soon();
+      answer(`ChromaGlass ${next} is available`, auto
+        ? `You have ${version}. It downloads by itself once the show is off the projector and not live, or now with Install ChromaGlass ${next}… in the ChromaGlass menu.`
+        : `You have ${version}. Install ChromaGlass ${next}… in the ChromaGlass menu downloads it; it then installs when you quit ChromaGlass, or at once with Restart to Update.`);
+      return;
+    }
+    if (!same) set({ status: 'available', version: next, url, inPlace: false });
     tell(`available:${next}`, `ChromaGlass ${next} is out`, 'Download it from the ChromaGlass menu, then drag it into Applications over this one.');
     answer(`ChromaGlass ${next} is out`, `You have ${version}. Download ChromaGlass ${next}… in the ChromaGlass menu opens the new download in your browser.`);
   });
@@ -187,6 +245,17 @@ export function startUpdates(deps) {
   };
   autoUpdater.on('update-downloaded', (info) => {
     if (info?.version) state.version = String(info.version);
+    /*
+      The switch went off while it downloaded, and nobody asked for this one:
+      the zip is on disk, but Squirrel was never handed it (above), so there
+      is nothing to restart into. It is offered as Install, as a version found
+      with the switch off is; the click hands the same zip over (electron-
+      updater keeps it, and a second downloadUpdate finds it there).
+    */
+    if (nativeUpdater && !autoUpdater.autoInstallOnAppQuit) {
+      set({ status: 'available', inPlace: true, percent: 0 });
+      return;
+    }
     fetched = true;
     ready();
   });
@@ -196,7 +265,7 @@ export function startUpdates(deps) {
     const error = String(err?.message ?? err).split('\n')[0].slice(0, 200);
     // A download that failed falls back to the download in the browser, which
     // always works; anything else found stays as it was (above).
-    if (state.status === 'downloading' && state.url) set({ status: 'available', error });
+    if (state.status === 'downloading' && state.url) set({ status: 'available', inPlace: false, error });
     else if (holding()) set({ error });
     // Offline at a venue is the usual case, and not news. Kept for the menu's
     // own check, which says it, and for the check, which reads it.
@@ -204,8 +273,9 @@ export function startUpdates(deps) {
     answer('Could not check for updates', 'ChromaGlass could not reach its releases. Check the connection and try again from the ChromaGlass menu.');
   });
 
-  const check = async (asked = false) => {
-    manual = asked;
+  const check = async (byHand = false) => {
+    manual = byHand;
+    apply();
     try {
       await autoUpdater.checkForUpdates();
     } catch (err) {
@@ -216,29 +286,112 @@ export function startUpdates(deps) {
     }
   };
 
-  const loop = () => { timer = setTimer(() => { void check(false).finally(loop); }, RECHECK_MS); };
-  timer = setTimer(() => { void check(false).finally(loop); }, deps.firstCheckMs ?? FIRST_CHECK_MS);
+  // The next look: six hours on, or sooner when a download waits on a show.
+  let after = RECHECK_MS;
+  const arm = (ms) => { if (timer) clearTimer(timer); timer = setTimer(() => { timer = null; after = RECHECK_MS; void check(false).finally(() => { if (!timer) arm(after); }); }, ms); };
+  function soon() {
+    after = BUSY_RETRY_MS;
+    if (timer) arm(BUSY_RETRY_MS);
+  }
+  arm(deps.firstCheckMs ?? FIRST_CHECK_MS);
 
-  /** The one thing the menu item or the profile sheet's button does, which is only ever a click. */
-  let installing = false;
-  const act = () => {
-    if (state.status === 'available' && state.url) void openExternal?.(state.url);
-    else if (state.status === 'ready') {
-      if (installing) return;
-      installing = true;
-      autoUpdater.quitAndInstall(false, true);
-    } else void check(true);
+  /** Fetch the version found, to install in place: the performer's Install, or the switch turned on with one waiting. */
+  const download = () => {
+    apply();
+    set({ status: 'downloading', percent: 0, error: null });
+    // A failure also comes as 'error' (above), which offers the .dmg instead.
+    try { autoUpdater.downloadUpdate()?.catch?.(() => {}); } catch (err) { set({ status: 'available', inPlace: false, error: String(err?.message ?? err).slice(0, 200) }); }
   };
 
-  return { state, check, act, stop: () => { if (timer) clearTimer(timer); timer = null; } };
+  let installing = false;
+  const quit = () => {
+    installing = true;
+    autoUpdater.quitAndInstall(false, true);
+  };
+
+  /**
+   * The one thing the menu item or the profile sheet's button does, which is
+   * only ever a click: Install downloads, Restart to Update restarts, asking
+   * first while a show is on, since a click on the menu bar mid-set can be a
+   * slip and the wall goes dark for the restart.
+   */
+  const act = async () => {
+    if (state.status === 'available' && state.inPlace) { asked = true; download(); return; }
+    if (state.status === 'available' && state.url) { void openExternal?.(state.url); return; }
+    if (state.status === 'ready') {
+      if (installing) return;
+      const why = busy?.();
+      if (why) {
+        const yes = await confirm?.({
+          message: `Restart into ChromaGlass ${state.version} now?`,
+          detail: `${why[0].toUpperCase()}${why.slice(1)}. ChromaGlass closes and opens again, and the wall goes dark while it does. Otherwise it installs when you quit after the show.`,
+          ok: 'Restart Now',
+          cancel: 'Later',
+        });
+        if (!yes || installing || state.status !== 'ready') return;
+      }
+      quit();
+      return;
+    }
+    void check(true);
+  };
+
+  /** Install Updates Automatically, from the menu, the profile sheet or the owner's assistant. */
+  const setAuto = (on) => {
+    auto = !!on;
+    save?.(auto);
+    apply();
+    set({ auto });
+    // On again with a version found and waiting: fetched now, as the switch would have.
+    if (auto && signed && state.status === 'available' && state.inPlace && !busy?.()) download();
+  };
+
+  /**
+   * The owner's assistant's Install (PLAN 44k-18): what a click does, except
+   * that it never restarts in the middle of a show, and never asks the room a
+   * question: it says why not, and the assistant tells the owner. Returns
+   * why not, or null when it is done (the download begun, or the restart).
+   */
+  const install = () => {
+    if (state.status === 'available' && state.inPlace) { asked = true; download(); return null; }
+    if (state.status === 'available') return `this copy cannot replace itself (it is not signed): its .dmg is ${state.url}`;
+    if (state.status === 'downloading') return `ChromaGlass ${state.version} is still downloading (${state.percent}%); it can be installed once it is ready`;
+    if (state.status !== 'ready') return 'no new version is waiting: check first';
+    if (installing) return null;
+    const why = busy?.();
+    if (why) return `${why}, and ChromaGlass never restarts in the middle of a show: ${state.version} installs when ChromaGlass quits after it, or ask again then`;
+    quit();
+    return null;
+  };
+
+  return { state, check, act, setAuto, install, stop: () => { if (timer) clearTimer(timer); timer = null; } };
+}
+
+/**
+ * What the show server hands the owner's assistant (server/assistantUpdates.js
+ * judges the mode): the updater's state as the page sees it, and its doors.
+ */
+export function updatesHook(u) {
+  return {
+    state: () => ({ ...u.state, history: undefined }),
+    setAuto: (on) => u.setAuto(on),
+    check: () => { void u.check(false); },
+    install: () => u.install(),
+  };
 }
 
 /** The menu item for what the updater found: the label says what a click does. */
 export function updateMenuItem(state) {
   if (state.status === 'off') return null;
-  if (state.status === 'available' && state.version) return { label: `Download ChromaGlass ${state.version}…` };
+  if (state.status === 'available' && state.version) return { label: `${state.inPlace ? 'Install' : 'Download'} ChromaGlass ${state.version}…` };
   if (state.status === 'downloading') return { label: `Downloading ChromaGlass ${state.version} (${state.percent}%)`, enabled: false };
   if (state.status === 'ready') return { label: `Restart to Update to ${state.version}` };
   if (state.status === 'checking') return { label: 'Checking for Updates…', enabled: false };
   return { label: 'Check for Updates…' };
+}
+
+/** The menu's switch, under the update item: a tick. An ad hoc copy never installs in place, so it has none. */
+export function autoMenuItem(state) {
+  if (state.status === 'off' || !state.signed) return null;
+  return { id: 'auto-update', label: 'Install Updates Automatically', type: 'checkbox', checked: state.auto !== false };
 }

@@ -56,6 +56,7 @@ import { port } from './ports.mjs';
 import { MUSIC_MUTANTS, musicDir, musicFullLines, musicPageLines, musicPlayLines, standInPlayer } from './assistant-music.mjs';
 import { EAR_MUTANTS, earFullLines, earPageLines, earPlayLines, standInEar } from './assistant-ear.mjs';
 import { RECORD_MUTANTS, recordFullLines, recordPageLines, recordPlayLines, standInRecord } from './assistant-record.mjs';
+import { UPDATES_MUTANTS, updatesFullLines, updatesPlayLines } from './assistant-updates.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -325,7 +326,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music', 'calibrate', 'song_detection', 'listen', 'record_options', 'take'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music', 'calibrate', 'song_detection', 'listen', 'record_options', 'take', 'app_updates'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -578,6 +579,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await musicPlayLines({ mcp, display, check });
     await earPlayLines({ mcp, display, check });
     await recordPlayLines({ mcp, display, check });
+    await updatesPlayLines({ mcp, display, check });
 
     // Ten deep.
     await sleep(1100);
@@ -829,6 +831,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     // Calibrate, the song detector and Listen (PLAN 44k-10): scripts/assistant-ear.mjs.
     await earFullLines({ mcp, display, check, phone });
     await recordFullLines({ mcp, display, check, phone });
+    await updatesFullLines({ mcp, display, check, phone });
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -911,6 +914,7 @@ const MUTANTS = [
   ...MUSIC_MUTANTS,
   ...EAR_MUTANTS,
   ...RECORD_MUTANTS,
+  ...UPDATES_MUTANTS,
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 

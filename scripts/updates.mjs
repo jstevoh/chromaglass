@@ -28,8 +28,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const { startUpdates, updateMenuItem, updatesOff, downloadUrl, RELEASES, DMG, FIRST_CHECK_MS, RECHECK_MS } =
+const { startUpdates, updateMenuItem, autoMenuItem, updatesHook, updatesOff, downloadUrl, RELEASES, DMG, FIRST_CHECK_MS, RECHECK_MS, BUSY_RETRY_MS } =
   await import(pathToFileURL(join(REPO, 'desktop', 'updates.js')).href);
+const { updatesCall } = await import(pathToFileURL(join(REPO, 'server', 'assistantUpdates.js')).href);
 
 const tmp = mkdtempSync(join(tmpdir(), 'cg-updates-'));
 const out = join(tmp, 'macApp.mjs');
@@ -46,16 +47,17 @@ const check = (name, ok, detail = '') => {
 /** electron-updater's autoUpdater, as far as updates.js touches it, recording each call. */
 function fakeUpdater() {
   const u = new EventEmitter();
-  u.calls = { check: 0, install: 0, feed: null };
-  u.checkForUpdates = async () => { u.calls.check++; return null; };
+  u.calls = { check: 0, install: 0, feed: null, download: 0, autoDownloadAtCheck: [] };
+  u.checkForUpdates = async () => { u.calls.check++; u.calls.autoDownloadAtCheck.push(u.autoDownload); return null; };
+  u.downloadUpdate = async () => { u.calls.download++; return []; };
   u.quitAndInstall = () => { u.calls.install++; };
   u.setFeedURL = (f) => { u.calls.feed = f; };
   return u;
 }
 
 /** Everything else: timers held until fired, and every outward call written down. */
-function harness({ signed = false, feed = null, off = null, quiet = false, squirrel = false } = {}) {
-  const h = { timers: [], notes: [], opened: [], dialogs: [], changes: 0, pushed: [], quiet };
+function harness({ signed = false, feed = null, off = null, quiet = false, squirrel = false, auto, busy = null, yes = false } = {}) {
+  const h = { timers: [], notes: [], opened: [], dialogs: [], changes: 0, pushed: [], quiet, busy, saved: [], asked: [], yes };
   h.updater = off ? null : fakeUpdater();
   // Squirrel.Mac (Electron's own autoUpdater), which says when macOS has the update.
   h.native = squirrel ? new EventEmitter() : undefined;
@@ -71,6 +73,10 @@ function harness({ signed = false, feed = null, off = null, quiet = false, squir
     dialog: (d) => h.dialogs.push(d),
     onChange: (st) => { h.changes++; h.pushed.push(st); },
     nativeUpdater: h.native,
+    auto,
+    save: (on) => h.saved.push(on),
+    busy: () => h.busy,
+    confirm: async (d) => { h.asked.push(d); return h.yes; },
     setTimer: (fn, ms) => { const t = { fn, ms }; h.timers.push(t); return t; },
     clearTimer: (t) => { h.timers = h.timers.filter((x) => x !== t); },
   });
@@ -232,6 +238,128 @@ check('with the check\'s feed, an address off the feed gives the feed\'s fixed l
   check('a feed of its own is a generic one', h.updater.calls.feed?.provider === 'generic' && h.updater.calls.feed?.url === 'http://127.0.0.1:9/');
 }
 
+// --- Install Updates Automatically, off (13-update-auto) -------------------------
+// The owner, 2026-11-11: "can we have turn on/off auto updates? so people
+// aren't surprised by an update?" Off, the app looks and says, and nothing
+// downloads or installs until the performer chooses Install.
+{
+  const h = harness({ signed: true, squirrel: true, auto: false });
+  check('auto off: nothing downloads by itself, nothing installs on quit', h.updater.autoDownload === false && h.updater.autoInstallOnAppQuit === false && h.u.state.auto === false);
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('auto off: a new version is available, to install in place, and nothing is fetched', h.u.state.status === 'available' && h.u.state.inPlace === true && h.updater.calls.download === 0, `${h.u.state.status} inPlace ${h.u.state.inPlace}`);
+  check('auto off: one notification says it is available', h.notes.length === 1 && /available/.test(h.notes[0].title), h.notes.map((n) => n.title).join(' | '));
+  check('auto off: the menu offers Install, with the switch unticked beneath it', updateMenuItem(h.u.state)?.label === 'Install ChromaGlass 1.3.99…' && autoMenuItem(h.u.state)?.checked === false, `${updateMenuItem(h.u.state)?.label} / ${autoMenuItem(h.u.state)?.checked}`);
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('auto off: found again six hours on, still not fetched and not news again', h.updater.calls.download === 0 && h.notes.length === 1 && h.updater.calls.autoDownloadAtCheck.every((x) => x === false));
+  await h.u.act();
+  check('auto off: Install downloads it, and only then is Squirrel to be handed it', h.updater.calls.download === 1 && h.u.state.status === 'downloading' && h.updater.autoInstallOnAppQuit === true, `${h.updater.calls.download} ${h.u.state.status} ${h.updater.autoInstallOnAppQuit}`);
+  check('auto off: Install opens no browser', h.opened.length === 0);
+  h.updater.emit('update-downloaded', RELEASE);
+  h.native.emit('update-downloaded');
+  check('auto off: then Restart to Update, and still no restart by itself', h.u.state.status === 'ready' && h.updater.calls.install === 0);
+}
+{
+  const h = harness({ signed: true });
+  check('the switch is on unless it was saved off: today\'s behaviour by default', h.u.state.auto === true && autoMenuItem(h.u.state)?.checked === true);
+  h.u.setAuto(false);
+  check('switched off: kept, and electron-updater told', h.saved.at(-1) === false && h.updater.autoDownload === false && h.updater.autoInstallOnAppQuit === false && h.pushed.at(-1)?.auto === false);
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('switched off: found, not fetched', h.u.state.status === 'available' && h.updater.calls.download === 0);
+  h.u.setAuto(true);
+  check('switched on again with one waiting: fetched now, as the switch would have', h.saved.at(-1) === true && h.updater.calls.download === 1 && h.u.state.status === 'downloading');
+}
+{
+  // Switched off mid-download: the zip arrives, Squirrel was never handed it.
+  const h = harness({ signed: true, squirrel: true });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.u.setAuto(false);
+  h.updater.emit('update-downloaded', RELEASE);
+  check('switched off mid-download: offered as Install, not a Restart that would never come', h.u.state.status === 'available' && h.u.state.inPlace === true && updateMenuItem(h.u.state)?.label === 'Install ChromaGlass 1.3.99…', `${h.u.state.status}`);
+  await h.u.act();
+  h.updater.emit('update-downloaded', RELEASE);
+  h.native.emit('update-downloaded');
+  check('switched off mid-download: Install hands it over, then Restart to Update', h.updater.calls.download === 1 && h.u.state.status === 'ready');
+}
+{
+  const h = harness({ auto: false });
+  check('ad hoc: no switch in the menu (nothing ever installs in place there)', autoMenuItem(h.u.state) === null && h.updater.autoDownload === false);
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('ad hoc, auto off: still the .dmg in the browser', h.u.state.inPlace === false && updateMenuItem(h.u.state)?.label === 'Download ChromaGlass 1.3.99…');
+}
+
+// --- Never in the middle of a show ------------------------------------------------
+{
+  const h = harness({ signed: true, busy: 'the show is live' });
+  await h.fire();
+  check('during a show: the check runs with no download by itself (a live stream\'s upload is not shared)', h.updater.calls.autoDownloadAtCheck.at(-1) === false);
+  h.updater.emit('update-available', RELEASE);
+  check('during a show: found and held, nothing fetched', h.u.state.status === 'available' && h.u.state.inPlace === true && h.updater.calls.download === 0);
+  check('during a show: looked at again ten minutes on, not six hours', h.timers.length === 1 && h.timers[0].ms === BUSY_RETRY_MS, `${h.timers[0]?.ms} ms`);
+  check('during a show, auto on: no notification', h.notes.length === 0);
+  h.busy = null;
+  await h.fire();
+  check('the show over: the next look downloads by itself', h.updater.calls.autoDownloadAtCheck.at(-1) === true);
+  h.updater.emit('update-available', RELEASE);
+  check('the show over: the same version found again now downloads', h.u.state.status === 'downloading', h.u.state.status);
+  check('the show over: back to six hours', h.timers.length === 1 && h.timers[0].ms === RECHECK_MS, `${h.timers[0]?.ms} ms`);
+}
+{
+  const h = harness({ signed: true });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('update-downloaded', RELEASE);
+  h.busy = 'the show is on the projector';
+  await h.u.act();
+  check('Restart to Update clicked during a show: asks first, and Later restarts nothing', h.asked.length === 1 && /projector/.test(h.asked[0].detail) && h.asked[0].ok === 'Restart Now' && h.updater.calls.install === 0);
+  h.yes = true;
+  await h.u.act();
+  check('Restart to Update clicked during a show: Restart Now restarts', h.asked.length === 2 && h.updater.calls.install === 1);
+}
+{
+  const h = harness({ signed: true });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('update-downloaded', RELEASE);
+  h.busy = 'the show is live';
+  const why = h.u.install();
+  check('the assistant\'s install during a show: refused, with why, and no question to the room', /never restarts in the middle of a show/.test(why ?? '') && h.updater.calls.install === 0 && h.asked.length === 0, why);
+  h.busy = null;
+  check('the assistant\'s install after the show: restarts', h.u.install() === null && h.updater.calls.install === 1);
+}
+
+// --- The owner's assistant (PLAN 44k-18): the relay's rules, on the real updater --
+{
+  const h = harness({ signed: true });
+  const hook = updatesHook(h.u);
+  const r1 = updatesCall({ do: 'status' }, 'suggest', hook);
+  check('assistant: status in any mode, with the switch and the version', r1.ok && r1.updates?.auto === true && r1.updates?.current === '1.3.0' && !('history' in (r1.updates ?? {}) && r1.updates.history !== undefined), JSON.stringify(r1).slice(0, 120));
+  const r2 = updatesCall({ do: 'auto', on: false }, 'play', hook);
+  check('assistant: the switch needs Full, and Play changes nothing', !r2.ok && /Full mode is needed/.test(r2.reason) && h.u.state.auto === true && h.saved.length === 0, r2.reason);
+  const r3 = updatesCall({ do: 'auto', on: 'no' }, 'full', hook);
+  check('assistant: the switch takes true or false only', !r3.ok && h.u.state.auto === true, r3.reason);
+  const r4 = updatesCall({ do: 'auto', on: false }, 'full', hook);
+  check('assistant: in Full, auto off is the same switch the menu ticks (kept, and read back)', r4.ok && r4.updates?.auto === false && h.saved.at(-1) === false && autoMenuItem(h.u.state)?.checked === false);
+  const before = h.updater.calls.check;
+  const r5 = updatesCall({ do: 'check' }, 'full', hook);
+  await new Promise((r) => setImmediate(r));
+  check('assistant: check looks now, with no box for the room', r5.ok && h.updater.calls.check === before + 1 && h.dialogs.length === 0);
+  h.updater.emit('update-available', RELEASE);
+  const r6 = updatesCall({ do: 'install' }, 'full', hook);
+  check('assistant: install fetches the available version', r6.ok && h.updater.calls.download === 1 && r6.updates?.status === 'downloading');
+  const r7 = updatesCall({ do: 'install' }, 'full', null);
+  check('assistant: a show not in the Mac app says so', !r7.ok && /not running in it/.test(r7.reason));
+  check('assistant: anything else is refused with the list', !updatesCall({ do: 'downgrade' }, 'full', hook).ok);
+  const relay = readFileSync(join(REPO, 'server', 'remote-server.js'), 'utf8');
+  check('the relay answers assistant-updates itself, and a phone\'s is dropped', /message\.type === 'assistant-updates'\) \{[\s\S]{0,200}updatesCall\(message, assistantMode\(\), appUpdates\)/.test(relay) && /const ASSISTANT_ONLY = new Set\(\[[^\]]*'assistant-updates'/.test(relay));
+  const main = readFileSync(join(REPO, 'desktop', 'main.js'), 'utf8');
+  check('the Mac app hands the show server its updater, and keeps the switch in show.json', /setAppUpdates\?\.\(updatesHook\(updates\)\)/.test(main) && /writeShowFile\(\{ autoUpdate: /.test(main) && /readShowFile\(\)\.autoUpdate !== false/.test(main));
+}
+
 // --- The profile sheet's Mac app row -----------------------------------------
 const MAC = { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15', maxTouchPoints: 0 };
 const IPAD = { ...MAC, maxTouchPoints: 5 };
@@ -249,6 +377,10 @@ check('in the app: an update is a Download button', inApp('available').button ==
 check('in the app: a ready one is Restart to Update', inApp('ready').button === 'Restart to Update');
 check('in the app: downloading has no button', inApp('downloading').button === null && /40%/.test(inApp('downloading').line));
 check('in the app: the version is shown', inApp('none').current === '1.3.0');
+check('in the app, auto off: an update to install in place is an Install button, and says nothing installs until chosen', inApp('available', { signed: true, inPlace: true, auto: false }).button === 'Install 1.3.99' && /until you choose/.test(inApp('available', { signed: true, inPlace: true, auto: false }).line));
+check('in the app, auto off: idle says it asks first', /asks before installing/.test(inApp('idle', { auto: false }).line));
+const card = readFileSync(join(REPO, 'src', 'components', 'MacAppCard.tsx'), 'utf8');
+check('the profile sheet has the switch, the menu\'s own, for a signed copy', /data-cg-mac-update-auto/.test(card) && /updates\.setAuto\?\.\(e\.currentTarget\.checked\)/.test(card) && /state\?\.signed/.test(card));
 // macOS 15 took right-click → Open away for an app it cannot check (the owner's
 // Mac refused 1.3.622, 2026-10-25): the words point at the one way left.
 check('the first-open words name Settings\' Open Anyway, not right-click', /Privacy & Security/.test(MAC_FIRST_OPEN) && /Open Anyway/.test(MAC_FIRST_OPEN) && !/right-click|control-click/i.test(MAC_FIRST_OPEN), MAC_FIRST_OPEN);

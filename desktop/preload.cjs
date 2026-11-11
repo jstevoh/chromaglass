@@ -13,9 +13,9 @@
  *
  * `updates` is the profile sheet's view of what the app's updater found
  * (desktop/updates.js): `state()` asks, `act()` does what the menu item does
- * (open the new download, or restart into the one that has arrived), and
- * `onChange(fn)` hears each change. Only those three calls cross, never
- * ipcRenderer itself.
+ * (open the new download, or restart into the one that has arrived),
+ * `setAuto(on)` is Install Updates Automatically, and `onChange(fn)` hears
+ * each change. Only those four calls cross, never ipcRenderer itself.
  *
  * CommonJS, because a sandboxed preload cannot be an ES module.
  */
@@ -102,6 +102,7 @@ contextBridge.exposeInMainWorld('__CHROMAGLASS_NATIVE__', {
   updates: {
     state: () => ipcRenderer.invoke('chromaglass:update-state'),
     act: () => ipcRenderer.invoke('chromaglass:update-act'),
+    setAuto: (on) => ipcRenderer.invoke('chromaglass:update-auto', on === true),
     onChange: (fn) => {
       const listener = (_e, state) => { try { fn(state); } catch { /* the page's own error */ } };
       ipcRenderer.on('chromaglass:update', listener);
