@@ -2212,14 +2212,7 @@ export const PRESETS: Preset[] = [
       glossiness: 0.15,
       plateRock: 0.25,
       beatSqueeze: 0.0,
-      /*
-        A third of the plate wax, the rest clear (PLAN 27f-9). At 0.65 the
-        regulator topped up what the open rim let out; sealed, nothing leaves,
-        so the plate filled wall to wall red with no clear liquid for a blob to
-        rise through (filmed on the Mac, 2026-11-11). A real lamp is about a
-        quarter to a third wax.
-      */
-      dyeBudget: 0.35,
+      dyeBudget: 0.65,
       bubbles: 0,
       /*
         The pattern for a look's own patches (28f, the owner: "only use things

@@ -6117,7 +6117,7 @@ higher than with the dial at 0 (by hand, with the current's heat lift left on th
 98.1% at 12 s, 92% by 20 s). Each sealed line holds only if the seal's kernels were built.
 The check-skeptic pass cut a flat-plate line that could not fail (a flat plate never reaches
 the seal) and made line 4 see a dropped lift. Lava Lamp's
-Centre Gravity is 0. Left open: 27f-9a (Plate Rock's and Rain Drip's weight on a standing plate)
+Centre Gravity is 0. Filmed on the Mac (one take, 60 s): main drained to pale tan with red specks by 45 s; sealed, the wax stays the whole minute, but the plate is red wall to wall with no blobs (27f-9c; Dye Budget 0.35 was tried and read the same). Left open: 27f-9c (the wax as an immiscible phase), 27f-9a (Plate Rock's and Rain Drip's weight on a standing plate)
 and 27f-9b (the circulation is the even gap's, so where the mobility varies the gap's solve
 takes the rest through the open rim: 1.3% in 20 s where the wax lies on the bottom rim).
 

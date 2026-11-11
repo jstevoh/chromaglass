@@ -200,6 +200,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       20 s where the wax lies on the bottom rim. A press on a standing plate is still an open
       edge for the glass. The full answer is a closed rim for the weight's part of the gap's
       own solve.
+    - **27f-9c, open. Lava Lamp's wax is dye, and dye mixes.** Filmed on the Mac sealed
+      (2026-11-11): the wax stays, but the plate is red wall to wall (mean brightness 0.23
+      against 0.50 when it drained, Dye Budget 0.35 the same as 0.65), the warmed band sits in
+      the upper half with cooled fingers falling from it, and there are no separate blobs or
+      clear liquid. Real lamp wax is immiscible: a heavy phase with a surface tension, which
+      breaks into blobs, pools at the bottom, swells and lifts as one body. The engine's
+      immiscible phase is the oil (Oil Bodies' Cahn–Hilliard mix); the lamp wants that phase
+      heavier than the liquid when cold and lighter when warm (its own density in `mixForce`'s
+      `rho`, the heat carried in it), on the seal. Then the look's heat lift against its
+      weight: today the warmed liquid lifts several times what the wax weighs.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).
