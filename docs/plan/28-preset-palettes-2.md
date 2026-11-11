@@ -150,8 +150,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     (under cobalt every drop read green), Microscopic Chaos with an amber counterstain, Aurora's violet and pink top edge in the
     window, Galaxy with a gold arm and a gold core (it read as Jellyfish Bloom), Lacing
     Run on the amber-over-crimson its description names, Ferro Paint on warm neighbours
-    (amber over teal was brown-green), Macro Bead's sea-green ground and smaller bodies,
-    Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (a thinner film
+    (amber over teal was brown-green), Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (a thinner film
     tiled Saffron's lace as coarsely, so finer lace stays 28l-3's), and Moiré Waves and Moiré Ripple given dyes of their own
     (a pack look's own contract now wins over its house look's, and the seed lays it).
     Left alone: Chemical Clock (the owner loves it), the keeps, Lava Lamp (sealed bottle,
@@ -172,6 +171,11 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       white is the lamp through clear glass and the milk itself, not a shortage the
       automation fills. The owner's call whether either should leave the lamp, then a
       look at what holds the coverage.
+    - **28i-7e, open. Macro Bead is one pink sheet in the closeup.** A sea-green ground
+      (`ledColor` '#0a3a36') and less dye (0.65) showed the ground beside the beads, but
+      took the beads' grain out of proportion: `npm run grainedge` line 2 read body texture
+      0.124 and 0.234 at twice the grain, under the 2x it asks (WebGPU macOS, open shard),
+      so it came out. A second dye under the beads wants a way that keeps the grain's depth.
     - **28i-7b, open. Splodascope's oil is filtered by the water it displaced.** In a thin
       cell an oil drop pushes the water out of the gap, so a drop's colour should not pass
       through the water's dye; the plate multiplies the two, so a cobalt water turned every

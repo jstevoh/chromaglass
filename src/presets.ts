@@ -1122,7 +1122,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#0a3a36',       // 28i-7: the sea-green ground the description names; '#04181a' read black
+      ledColor: '#04181a',
       ledSpeed: 0.0,
       diffusionRate: 0,          // colors stay separate instead of muddying
       buoyancy: 0.35,
@@ -1136,7 +1136,6 @@ export const PRESETS: Preset[] = [
       viscosity: 'thick',
       polarity: 0.98,            // strong immiscibility — hard color boundaries
       evaporationRate: 0.005,
-      dyeBudget: 0.65,           // 28i-7: at 0.85 the closeup saw one pink sheet; smaller bodies, two or three a frame
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
       audioImpact: 0.6,
