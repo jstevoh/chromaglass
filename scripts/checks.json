@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1041,7 +1041,7 @@
     },
     {
       "name": "The moiré sheets are optics, and off is off",
-      "shard": "lab2",
+      "shard": "lab9",
       "run": "npm run moire",
       "why": [
         "The moiré pack's two printed sheets (PLAN 45a), on the real plate",
@@ -1051,8 +1051,9 @@
         "transmissions; a sheet finer than the pixels is flat grey, no false",
         "moiré; the gap defocuses the lines and keeps the fringe; the liquid",
         "bends the lower sheet and not the upper; the spin's clock and the",
-        "Turn are one angle. On SwiftShader beside lampzero, which compares two",
-        "compiled programs the same way and for the same reason."
+        "Turn are one angle. On SwiftShader, comparing two compiled programs as",
+        "lampzero does. In a part of its own, lab9, since 2026-11-11: lab2 with it",
+        "ran past its 25 minutes on the slow tier twice on #802's deploy (PLAN 19k-18)."
       ]
     },
     {

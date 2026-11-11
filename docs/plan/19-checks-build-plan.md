@@ -314,6 +314,7 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   own first (19ai-10). Since 19k-16 no line opens a projector before the show's first step, so the
   fix comes with a check of its own: open the wall while `stepIndex` is 0, then expect no throw from
   `askFrame` and frames painted once the show starts.
+- **19k-18, shipped** (E, S): `lab2` over its 25 minutes on #802's deploy, twice, every check green; the moiré sheets' check moved to a part of its own, `lab9` (docs/plan-shipped.md, 19k-18).
 - **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,
   whose rim and lens checks read 9x the steps) fifth's checks ran 18:45 on its PR, and on main's
