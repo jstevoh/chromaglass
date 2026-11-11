@@ -27,6 +27,7 @@ A check that reads source as text reads App and its hooks through `appSource.mjs
 
 ## Helpers and files that are not checks
 
+- `lookOrLamp.mjs`: `readsAsLamp`, whether a line quoting a retired look's id that is also a setting or Mixer row (Lumia) names the lamp; `plate` 5b's rule (PLAN 28i-5).
 - Shared by several checks: `judge.mjs` (a frame as numbers), `layoutProbe.mjs`, `liquidStandIn.mjs`, `arrangement.mjs` and `band.mjs` (synthesised songs and band), `media-read.mjs` (render containers), `rtmpListener.mjs`, `pagehold.mjs`, `recorder.mjs`.
 - CI and the Mac runner: `deploygate.sh`, `mainhold.mjs` (main held red: the status `hold.yml` posts on every open PR), `macrunner.mjs`, `macrunner-hook.sh`, `macrunner-setup.sh`, `macports.sh`, `macbusy.sh`, `macdeploy.mjs` (a deploy shard's hold on the Mac, which `launchChromium` and `npm run desktop` wait for), `debcache.sh`, `chromiumlibs.mjs`, `checkguard-api.mjs`, `measured.mjs`.
 - Data: `sizes.json` (the size baseline, which only shrinks), `fixtures/`, `brand/`.

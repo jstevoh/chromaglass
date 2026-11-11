@@ -14,16 +14,14 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
   short briefs; this item lists them as they are briefed.
 
-  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia after 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
+  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia in 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
 
   - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
     `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
     named one on its replacement. What it found is **28i-6**.
-  - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
-    lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
-    fails on any quoted retired id in src/, so retiring the look trips it on the layer.
-    5b learns to tell a preset id from a setting key (named under `Check changes:`, its
-    reach unchanged for preset ids), then the look retires.
+  - ~~**28i-5. Retire Lumia**~~ (**shipped**, this PR; story in `docs/plan-shipped.md`
+    28i-5): `lumia` → `velvet-underground` through `RETIRED_PRESETS`; the lamp's Lumia
+    stays. `plate` 5b counts a two-meaning id unless its line has the lamp's shape (`scripts/lookOrLamp.mjs`).
   - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2) **Shipped**: all 21 reworked looks meet their gallery and film bars; Poster's `>= 30 steps/s` is open as **28i-2a** below. Story in `docs/plan-shipped.md` §28i-2 (moved 2026-10-29, 19m-2).
   - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
     (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
@@ -135,7 +133,7 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     `npm run shots` on the Mac for the new set, then the README table~~ (**shipped**, #492:
     `poster-1969`, `oil-and-water`, `macro-bead` and `velvet-underground` shot on the Mac GPU
     at `seed=1`, retired shots deleted, README and guide tables updated); (g) three checks count looks and now sit near their floors: `startup` asks for
-    more than 30 looks (32 ship; 31 after Lumia, 28i-5), and `disc` names its two magnet looks
+    more than 30 looks (31 ship since Lumia retired, 28i-5), and `disc` names its two magnet looks
     where it asked for three.
 
   The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening

@@ -70,7 +70,6 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'velvet-underground': [18, 20, 11, 23, 21, 10],   // ultramarine, magenta, raspberry; then each pool's second: lavender, coral, purple (PLAN 25h)
   'neon-coral-reef':    [21, 2, 17, 0, 16, 7],
   'stardust-collapse':  [17, 21, 20, 7, 16, 2],
-  'lumia':              [10, 7, 1],
   'turing-print':       [16, 17, 20, 8, 2],       // teal, amber, magenta, blue and hot pink pools for the print to carve through
   'poster-1969':        [1, 21, 17, 18, 10],
   'fillmore-wash':      [5, 10, 9],
@@ -127,7 +126,6 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'stardust-collapse':  ['spray', 'splatter'],
   // These three had no entry and were quietly taking the 'drop' default —
   // found by `npm run plate`, which is the whole reason it exists.
-  'lumia':              ['pour'],                 // nothing on this plate arrives suddenly
   'turing-print':       ['drop'],                 // each drop of reagent a place a pattern grows from
   'poster-1969':        ['pour', 'drop'],
   'crowd-plate':        ['drop', 'pour'],
@@ -204,7 +202,6 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   // ── The light-show and photographic looks ────────────────────────
   // Wilfred's plate is nearly clear; what moves it is thickness, not dye.
   // And soap, for the one of its three areas whose veil spreads and opens (lib/plateAreas.ts).
-  'lumia':              ['water', 'glycerine', 'soap'],
   // Boyle put reactions on the platen — cells growing, then carried off.
   // The reagent is what the reaction grows from (26c); water is the dish's own.
   'turing-print':       ['reagent', 'water'],

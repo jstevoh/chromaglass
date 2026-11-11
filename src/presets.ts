@@ -875,63 +875,6 @@ export const PRESETS: Preset[] = [
   // the ones that keep dye *separated* into distinct beads — high polarity,
   // low diffusion, low gooey blur — and fast enough to be worth chasing.
   {
-    id: 'lumia',
-    name: 'Lumia',
-    description: 'Thomas Wilfred\u2019s lumia: slow folded light, and three veils of colour in different parts of a nearly clear plate, two held in glycerine and one that soap spreads thin. No beat \u2014 minutes-long evolutions.',
-    settings: {
-      globalSpeed: 0.00504,
-      surge: 0.12,
-      layerCount: 1,
-      blendMode: 'screen',
-      gooeyEffect: 0.5,
-      rotationSpeed: 0.0084,     // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#05030c',
-      ledSpeed: 0.0,
-      diffusionRate: 0.0002,
-      buoyancy: 0.2,
-      advection: 0.3,
-      damping: 0.99,
-      heatDecay: 0.99,
-      automateRate: 0.03,       // tends its three veils; at 0.008 a drop came every three minutes and the plate stayed empty
-      platePressure: 0.05,
-      glassSmear: 0,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.3,
-      evaporationRate: 0.06,
-      airVelocity: 0.02,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.12,
-      turbulenceScale: 0.12,
-      turbulenceDetail: 2,
-      blobSurfaceTension: 0.7,
-      boundaryContrast: 0.15,
-      saturationBoost: 1.2,
-      dyeBudget: 0.2,          // a nearly clear plate: three veils, in their areas (lib/plateAreas.ts), and dark between (was 0.1, with nothing laid)
-      edgeRelief: 0.3,
-      bubbles: 0,
-      plateRock: 0.1,
-      layerScaleVariety: 0,
-      lumia: 0.9,
-      /*
-        No drum hits: Wilfred's three veils answer harmony and the lead note
-        only, each in its own area on a slow gate (PLAN 25h, 28i-3b). Low
-        harmony warms the left glycerine veil (area 0), mid harmony folds the
-        soap veil (area 1), and the lead note refreshes the lower glycerine
-        veil (area 2).
-      */
-      sceneMappings: [
-        { source: 'bands', feature: 'tonalLow', setting: 'areaHeat', area: 0, depth: 0.35, threshold: 0.3, attack: 0.2, release: 0.8 },
-        { source: 'bands', feature: 'tonalMid', setting: 'areaStir', area: 1, depth: 0.3, threshold: 0.35, attack: 0.15, release: 0.6 },
-        { source: 'bands', feature: 'note', setting: 'areaPour', area: 2, depth: 0.3, threshold: 0.4, attack: 0.1, release: 0.7 },
-      ],
-      audioMappings: { velocity: 'energy', density: 'none', color: 'timbre', rotation: 'none' },
-    }
-  },
-  {
     /*
       PLAN.md 26d. The owner's "Mask Reaction Diff" pack, done as the chemistry
       it imitates: a CIMA dish (Castets, Dulos, Boissonade and De Kepper, 1990)
@@ -2375,6 +2318,12 @@ export const RETIRED_PRESETS: Readonly<Record<string, string>> = {
   'timbre-shifter': 'microscopic-chaos',
   // a wheel of oil and silicone that turned the whole frame, which only FRAME_MOVING_LOOKS may; Clock Glass keeps the oil and water between glass.
   'oil-wheel': 'clock-glass',
+  // Judged on the Mac gallery of 2026-10-19 and again on the Mac film of 2026-11-11
+  // (PLAN.md 28i-5): a muddy teal fog under a red disc, its three veils rarely reading as
+  // pools; Velvet Underground keeps the slow areas of dye on the dark plate that Lumia was
+  // after. The lamp's Lumia (the setting, the Mixer row, its MIDI and desk pins) stays: only
+  // the look retires.
+  'lumia': 'velvet-underground',
 };
 
 /** A retired id's replacement, followed to the end; any other id unchanged. */
