@@ -91,10 +91,20 @@ export function admitFile(raw, { folders, types, at, what, only }) {
   let file = false;
   try { file = statSync(found).isFile(); } catch { /* gone since */ }
   if (!file) return { reason: `${raw} is not a file` };
-  const token = randomBytes(16).toString('hex');
+  /*
+    The same file named again keeps its address (a film looped, then poured,
+    is one file), and when the shelf is full a picture goes before a film or
+    a song: a picture is fetched once and is then dye or a mark, while a
+    film on the plate keeps asking for its bytes by Range, and losing its
+    address would stop it mid-show (found in review: seven poured pictures
+    took the playing film's address).
+  */
   const shelf = served.get(at);
+  const had = [...shelf].find(([, f]) => f.path === found)?.[0];
+  const token = had ?? randomBytes(16).toString('hex');
+  shelf.delete(token);
   shelf.set(token, { path: found, type, folders });
-  while (shelf.size > KEEP) shelf.delete(shelf.keys().next().value);
+  while (shelf.size > KEEP) shelf.delete([...shelf].find(([, f]) => f.type.startsWith('image/'))?.[0] ?? shelf.keys().next().value);
   return { url: `${at}${token}`, name: basename(found, extname(found)), type };
 }
 

@@ -465,7 +465,8 @@ export function useRemote({
         }
         // Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts), answered once a camera or window opened.
         case 'assistant-media':
-          void askMedia(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }));
+          void askMedia(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
           break;
         /*
           Words poured as ink (PLAN 37x-10c): a song's name at the top of a

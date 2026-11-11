@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useState, useEffect, type RefObject } from 
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import { uprightPicture } from '../lib/videoFlow';
 import { CARTOON_BY_ID } from '../lib/cartoons';
-import { publishMedia, setMediaDoor } from './mediaNow';
+import { publishMedia, setMediaDoor, videoOpens } from './mediaNow';
 
 /**
  * Pouring a picture or a film into the dish: an image laid as dye, a video
@@ -21,6 +21,7 @@ export function usePour({
 
   /** A picture laid as dye from an address: null once laid, else why not (the assistant's answer, PLAN 44k-13). */
   const pourImageFrom = useCallback((src: string) => new Promise<string | null>((done) => {
+    if (!visualizerRef.current) { done('the plate is not running'); return; }
     const img = new Image();
     img.onload = () => {
       // Its pixels turned over for the plate, whose rows count up (PLAN 14ab-13).
@@ -96,7 +97,12 @@ export function usePour({
   useEffect(() => {
     setMediaDoor('pour', {
       image: pourImageFrom,
-      video: (url, name) => { pourVideoFrom(url, false); setPouringCartoon(null); setPourName(name); },
+      video: async (url, name) => {
+        if (!videoPlayerRef.current || !visualizerRef.current) return 'the plate is not running';
+        const why = await videoOpens(url);
+        if (!why) { pourVideoFrom(url, false); setPouringCartoon(null); setPourName(name); }
+        return why;
+      },
       cartoon: (id) => { const c = CARTOON_BY_ID.get(id); if (!c) return; pourVideoFrom(c.src, false); setPouringCartoon(id); setPourName(c.title); },
       stop: stopPour,
     });

@@ -45,7 +45,16 @@ export const mediaFolders = (env = process.env) => (env.CHROMAGLASS_MEDIA_DIR
   ? env.CHROMAGLASS_MEDIA_DIR.split(delimiter).filter(Boolean)
   : [`${homedir()}${sep}Movies`, `${homedir()}${sep}Pictures`]);
 
-const admit = (raw, types, what) => admitFile(raw, { folders: mediaFolders(), types, at: MEDIA_PATH, what, only: 'the assistant opens films and pictures from the media folders only' });
+/*
+  Never the Photos library: ~/Pictures holds "Photos Library.photoslibrary",
+  every personal photo the owner has, and an assistant steered by somebody's
+  words could put one up as the mark, which goes to every cast and relay
+  receiver too (found in review). A path through any .photoslibrary is
+  refused before it is looked at.
+*/
+const admit = (raw, types, what) => (typeof raw === 'string' && /\.photoslibrary(\/|$)/i.test(raw)
+  ? { reason: 'the assistant never opens the Photos library: export the picture to ~/Pictures or ~/Movies first' }
+  : admitFile(raw, { folders: mediaFolders(), types, at: MEDIA_PATH, what, only: 'the assistant opens films and pictures from the media folders only' }));
 
 /** The guard's copy of the display's `media`: the cameras' names and the shelf's cartoons. */
 export function mediaOf(m) {

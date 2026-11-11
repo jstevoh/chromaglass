@@ -14,7 +14,10 @@
  *    as the mark, an SVG and a text file everywhere, and a pour says which
  *    kind it is pouring; nothing refused reaches the display;
  *  - a film from the music folder (a folder that is not a media folder) is
- *    refused, as is a link out of the media folder;
+ *    refused, as is a link out of the media folder, and a picture inside a
+ *    Photos library;
+ *  - the film on the plate keeps its address while pictures are poured,
+ *    and the same film named again comes back at the same address;
  *  - a cartoon by its title in any case reaches the display by its shelf id;
  *    one not on the shelf is refused with the shelf;
  *  - a camera by its name in any case reaches the display by the name it
@@ -157,6 +160,27 @@ export async function mediaFullLines({ mcp, display, check, phone, port, dir }) 
       && stop.ok && !again.ok && /pours nothing/.test(again.text) && got(t).filter((m) => m.do === 'pour-stop').length === 2,
     `${pours.map((m) => m.kind)} | ${JSON.stringify(m2?.pour)} | ${stop.text} | ${again.text}`.slice(0, 240));
 
+  // The film keeps its address: named again it is the same one, and nine pictures poured since evict pictures, not it.
+  t = Date.now();
+  for (let i = 0; i < 9; i++) writeFileSync(join(media, `Pic${i}.png`), BYTES);
+  const pics = [];
+  for (let i = 0; i < 9; i++) pics.push(await mcp.call('pour_file', { source: 'file', path: join(media, `Pic${i}.png`) }));
+  const filmAgain = await mcp.call('film', { source: 'file', path: join(media, 'Oil Wheel.mp4') });
+  await sleep(250);
+  const againUrl = got(t).find((m) => m.do === 'film-file')?.url ?? '';
+  const still = HEX.test(url) ? await get(url, { Range: 'bytes=0-3' }) : null;
+  check('media-keep', 'the film on the plate keeps its address: nine pictures poured after it take pictures\' addresses, not its, so it still seeks by Range, and the same film named again comes back at the same address',
+    pics.every((x) => x.ok) && filmAgain.ok && still?.status === 206 && againUrl === url, `${pics.filter((x) => !x.ok).length} refused | ${still?.status} | ${againUrl === url}`);
+
+  // Never the Photos library.
+  const lib = join(media, 'Photos Library.photoslibrary', 'originals');
+  mkdirSync(lib, { recursive: true });
+  writeFileSync(join(lib, 'IMG_0001.png'), BYTES);
+  t = Date.now();
+  const photo = await mcp.call('mark', { path: join(lib, 'IMG_0001.png') });
+  await sleep(150);
+  check('media-photos', 'a picture inside a Photos library, even in a media folder, is refused, and nothing reaches the display', !photo.ok && /Photos library/.test(photo.text) && got(t).length === 0, photo.text.slice(0, 140));
+
   // A cartoon by its title.
   t = Date.now();
   const toon = await mcp.call('film', { source: 'cartoon', cartoon: 'steamboat WILLIE' });
@@ -212,7 +236,7 @@ export async function mediaPageLines(page, say) {
   const none = await page.askMedia({ do: 'film-clear' });
   const did = [];
   page.setMediaDoor('film', { file: async (u, n) => { did.push(['film', u, n]); return null; }, cartoon: async (id) => { did.push(['toon', id]); return null; }, camera: async (id) => { did.push(['cam', id ?? '-']); return id === 'id-b' ? 'the camera would not open (NotReadableError)' : null; }, window: async () => null, clear: () => did.push(['clear']) });
-  page.setMediaDoor('pour', { image: async (u) => { did.push(['image', u]); return null; }, video: (u, n) => did.push(['video', u, n]), cartoon: (id) => did.push(['pourtoon', id]), stop: () => did.push(['stop']) });
+  page.setMediaDoor('pour', { image: async (u) => { did.push(['image', u]); return null; }, video: async (u, n) => { did.push(['video', u, n]); return null; }, cartoon: (id) => did.push(['pourtoon', id]), stop: () => did.push(['stop']) });
   page.setMediaDoor('room', { set: (on, id) => did.push(['room', on, id ?? '-']) });
   page.setMediaDoor('mark', { load: async (u) => { did.push(['mark', u]); return null; }, clear: () => did.push(['unmark']) });
   page.publishCameras([{ id: 'id-a', label: 'FaceTime HD Camera' }, { id: 'id-b', label: 'Cam Link' }]);
@@ -251,6 +275,8 @@ export const MEDIA_MUTANTS = [
   { rule: 'media-cartoon', file: 'assistantMedia.js', find: 'return { cartoon: hit.id };', replace: 'return { cartoon: name.trim() };' },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'if (hit === undefined) return { reason: `no camera', replace: 'if (false) return { reason: `no camera' },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'return { camera: hit };', replace: 'return { camera: name };' },
+  { rule: 'media-keep', file: 'assistantMusic.js', find: "shelf.delete([...shelf].find(([, f]) => f.type.startsWith('image/'))?.[0] ?? shelf.keys().next().value);", replace: 'shelf.delete(shelf.keys().next().value);' },
+  { rule: 'media-photos', file: 'assistantMedia.js', find: '/\\.photoslibrary(\\/|$)/i.test(raw)', replace: 'false' },
   { rule: 'media-answer', file: 'assistant.js', find: "send({ type: 'assistant-media', ...call.out, ...answerOf(message) });", replace: "send({ type: 'assistant-media', ...call.out });" },
   { rule: 'phone-media', file: 'remote-server.js', find: "'assistant-still', 'assistant-media', 'song-action',", replace: "'assistant-still', 'song-action'," },
 ];

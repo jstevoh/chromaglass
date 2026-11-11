@@ -4,7 +4,7 @@ import { cameraChoices, cameraPresent } from '../lib/cameras';
 import { CARTOON_BY_ID } from '../lib/cartoons';
 import type { CartoonShelfProps } from '../components/CartoonShelf';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
-import { cameraName, publishCameras, publishMedia, setMediaDoor } from './mediaNow';
+import { cameraName, publishCameras, publishMedia, setMediaDoor, videoOpens } from './mediaNow';
 
 /** The film's Webcam has a camera of its own, remembered apart from the motion camera's (PLAN 14ad). */
 const FILM_DEVICE_KEY = 'chromaglass-film-camera';
@@ -162,8 +162,13 @@ export function useFilm({
   live.current = hands;
   useEffect(() => {
     setMediaDoor('film', {
-      file: async (url, name) => { await live.current.filmUrlNow(url, name); return null; },
-      cartoon: async (id) => { await live.current.filmCartoonNow(id); return null; },
+      file: async (url, name) => {
+        if (!wallRef.current) return 'the plate is not running';
+        const why = await videoOpens(url);
+        if (!why) await live.current.filmUrlNow(url, name);
+        return why;
+      },
+      cartoon: async (id) => { if (!wallRef.current) return 'the plate is not running'; await live.current.filmCartoonNow(id); return null; },
       camera: async (id) => { if (id !== undefined) live.current.chooseFilmCamera(id); return live.current.startFilmCamera(id); },
       window: () => live.current.startFilmWindow(),
       clear: () => live.current.clearFilm(),

@@ -47,11 +47,12 @@ export interface MediaDoors {
   };
   pour: {
     image(url: string): Promise<string | null>;
-    video(url: string, name: string): void;
+    video(url: string, name: string): Promise<string | null>;
     cartoon(id: string): void;
     stop(): void;
   };
-  room: { set(on: boolean, id?: string): void };
+  /** Settles once the camera has opened or failed (off: at once). */
+  room: { set(on: boolean, id?: string): Promise<string | null> | null | void };
   mark: { load(url: string, name: string): Promise<string | null>; clear(): void };
 }
 
@@ -88,6 +89,25 @@ export function setMediaDoor<K extends keyof MediaDoors>(k: K, d: MediaDoors[K] 
 /** The copy as it stands (`npm run assistant` reads it). */
 export const readMedia = (): MediaNow => now;
 export const useMediaNow = () => useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l); }; }, () => now, () => now);
+
+/**
+ * Whether a served video opens in this browser: null once its first frame
+ * is in, else why not. The extension was the guard's only judge, and a
+ * ProRes .mov or a file gone since answered "done" (found in review), since
+ * the plate's own loaders swallow a failed play().
+ */
+export function videoOpens(url: string, ms = 10000): Promise<string | null> {
+  return new Promise((done) => {
+    const v = document.createElement('video');
+    v.muted = true;
+    v.preload = 'auto';
+    const end = (why: string | null) => { clearTimeout(timer); v.removeAttribute('src'); v.load(); done(why); };
+    const timer = setTimeout(() => end('the film did not start within ten seconds'), ms);
+    v.onloadeddata = () => end(null);
+    v.onerror = () => end(`this browser cannot play that film${v.error?.message ? ` (${v.error.message})` : ''}`);
+    v.src = url;
+  });
+}
 
 const ours = (url: unknown): url is string => typeof url === 'string' && url.startsWith(ASSISTANT_MEDIA_PATH) && /^[0-9a-f]{32}$/.test(url.slice(ASSISTANT_MEDIA_PATH.length));
 const nameOf = (n: unknown, or: string) => (typeof n === 'string' && n.trim() ? n.trim() : or).slice(0, 120);
@@ -128,8 +148,7 @@ export async function askMedia(m: { do?: unknown; url?: unknown; name?: unknown;
     case 'pour-file':
       if (m.kind === 'image') return pour!.image(m.url as string);
       if (m.kind !== 'video') return 'pour: a picture or a film';
-      pour!.video(m.url as string, nameOf(m.name, 'Film'));
-      return null;
+      return pour!.video(m.url as string, nameOf(m.name, 'Film'));
     case 'pour-cartoon': pour!.cartoon(cartoon!.id); return null;
     case 'pour-stop':
       if (!now.pour.name && !now.pour.playing) return 'nothing is pouring';
@@ -137,8 +156,7 @@ export async function askMedia(m: { do?: unknown; url?: unknown; name?: unknown;
       return null;
     case 'room':
       if (typeof m.on !== 'boolean') return 'room_camera: on, as true or false';
-      room!.set(m.on, cam?.id);
-      return null;
+      { const why = await room!.set(m.on, cam?.id); return typeof why === 'string' ? why : null; }
     case 'mark': return mark!.load(m.url as string, nameOf(m.name, 'Mark'));
     case 'mark-clear':
       if (!now.mark) return 'no mark is up';
