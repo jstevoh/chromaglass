@@ -410,6 +410,16 @@ export class FluidPasses extends FluidFields {
    * heatPack in wgsl/fluid/dye.ts says how and why): packed as amounts,
    * carried in the colour's substeps (planCarry ran in the advect dye stage
    * before this) and put back in the velocity's z.
+   *
+   * Not while the plate's own boil runs (fluid.ts skips the stage on
+   * boilLive): the boil carries its temperature itself (boilAdvect, in
+   * float32, weighted by the liquid's heat capacity, wgsl/lampBoil.ts) and
+   * keeps a float32 copy beside the half-float z so a 1/60 s step's heating,
+   * under one half-float step, is not lost. Carried twice, this round trip
+   * moved z off that copy every step, the boil took the half-float again and
+   * lost each step's heat: `npm run plateboil -- --part=boil` on Metal went
+   * 6/6 → 2/6, the held hand's spot stalling at 52 °C and then cooling
+   * 0.93 K/s at 1/60 s steps. One owner for the heat while the boil is on.
    */
   protected carryHeat(pass: GPUComputePassEncoder, disp: number, argsAt?: GPUBuffer[]): void {
     const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], VEL, 'heat carried');

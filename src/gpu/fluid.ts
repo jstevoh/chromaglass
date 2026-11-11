@@ -1199,7 +1199,7 @@ export class WebGPUFluid extends FluidCover {
       }
     });
     // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
-    stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin);
+    stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
       GRID_DAMP a step in every look. Jacobi diffusion took 8a/(1+8a) of it a
