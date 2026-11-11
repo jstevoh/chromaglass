@@ -32,6 +32,13 @@ const VARIANTS = {
   noVib: { vibrationFrequency: 0 },
   noAir: { airVelocity: 0 },
   noSurge: { surge: 0 },
+  noBuoy: { buoyancy: 0 },
+  dark: { dimmer: 0 },
+  noAdv: { advection: 0 },
+  noPolar: { polarity: 0 },
+  noGooey: { gooeyEffect: 0 },
+  thinCarrier: { viscosity: 'normal' },
+  calm: { rotationSpeed: 0, plateRock: 0, platePressure: 0, glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0, surge: 0, buoyancy: 0, dimmer: 0, automateRate: 0 },
   still: { rotationSpeed: 0, plateRock: 0, platePressure: 0, glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0, surge: 0 },
   // With the simulated band (the film's sound): the music's pours and paddles.
   band: { band: true },
@@ -41,7 +48,7 @@ const VARIANTS = {
   bandNoCords: { band: true, sceneMappings: [] },
 };
 const pick = process.argv.slice(2).filter(a => VARIANTS[a]);
-const run = pick.length ? pick : ['base', 'still', 'noRockOnly', 'noPress', 'noGlassSmear', 'noDrip', 'noVib', 'noAir', 'noSurge'];
+const run = pick.length ? pick : ['noAdv', 'calm', 'noBuoy', 'dark', 'noPolar', 'noGooey', 'thinCarrier'];
 const SHOTS = process.env.PROBE_SHOTS || '';
 const SECONDS = Number(process.env.PROBE_SECONDS) || 90;
 const LOOK = process.env.PROBE_LOOK || 'velvet-underground';
