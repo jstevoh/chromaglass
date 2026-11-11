@@ -24,6 +24,9 @@ import type { useShowSequencer } from '../hooks/useShowSequencer';
 import { useLiveShow, useLiveSetup, onAir, stopLive, startSavedLive } from '../lib/liveShow';
 import { useSoundNow, askSound } from './soundNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
+import { useSetNow, askSet } from './setNow';
+import { useSongsNow, askSongs } from './songShowNow';
+import { livePresetId } from '../presets';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
@@ -167,6 +170,22 @@ export function useRemote({
   const bench = useMemo<RemoteState['bench']>(() => ({
     bottles: liquidTypes.map(l => ({ id: l.id, name: l.name, color: l.color })), inHand: selectedLiquidId,
   }), [liquidTypes, selectedLiquidId]);
+  /*
+    The set list, numbered as the desk lists it, and the song shows in brief
+    (PLAN 44k-3, 44k-5), for the owner's assistant. An item's name is the
+    desk's (App's `cues`): its own, else its look's, else its sequence's.
+  */
+  const setNow = useSetNow();
+  const songs = useSongsNow();
+  const set = useMemo<RemoteState['set']>(() => {
+    const items = setNow.list.items.map((item, i) => {
+      const seq = item.kind === 'sequence' ? sequencer.sequences.find(q => q.id === item.ref) : undefined;
+      const look = item.kind === 'sequence' ? undefined : allPresets.find(p => p.id === (isUserPresetId(item.ref) ? item.ref : livePresetId(item.ref)));
+      return { n: i + 1, name: item.name ?? look?.name ?? seq?.name ?? item.ref, kind: item.kind, look: look?.id ?? null, fade: item.fade ?? null, missing: item.kind === 'sequence' ? !seq : !look };
+    });
+    const armed = setNow.armedItem ? setNow.list.items.findIndex(i => i.id === setNow.armedItem) : -1;
+    return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds };
+  }, [setNow, sequencer.sequences, allPresets]);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -198,7 +217,9 @@ export function useRemote({
     sound,
     bench,
     tempo,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo]);
+    set,
+    songShows: songs,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -262,6 +283,10 @@ export function useRemote({
   const linkPausedIdRef = useRef<string | null>(null);
   const remoteLinkRef = useRef<((m: RemoteMessage) => void) | null>(null);
   const lastPourTextRef = useRef(-Infinity);
+  /** The display's word on an assistant's call that carries an `answer` number (PLAN 44f-4, 44k-3, 44k-5). */
+  const answer = (n: unknown, r: { ok: boolean; reason?: string; data?: unknown }) => {
+    if (typeof n === 'number') relaySendRef.current?.({ type: 'assistant-answer', answer: n, ...r });
+  };
 
   const remoteLink = useRemoteLink({
     role: 'display',
@@ -348,8 +373,24 @@ export function useRemote({
           }
           const why = a ? addSongCue(a.when, a.what) : 'not a song action this build knows';
           if (why) console.info(`[assistant] song action not added: ${why}`);
+          answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
           break;
         }
+        /*
+          The set list and the song shows (PLAN 44k-3, 44k-5), through the
+          desk's own callbacks (app/setNow.ts, app/songShowNow.ts). Both
+          answer, through the relay to the assistant alone: the guard said the
+          call was allowed, this says it was done, or why not (the set changed
+          under it, a look gone, no song to nudge), and what a read found.
+        */
+        case 'assistant-set': {
+          const why = askSet(message);
+          answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
+          break;
+        }
+        case 'assistant-songs':
+          answer(message.answer, askSongs(message));
+          break;
         /*
           Words poured as ink (PLAN 37x-10c): a song's name at the top of a
           track, from the phone's text box or the relay's guard. Read as
@@ -525,6 +566,7 @@ export function useRemote({
         case 'assistant-mode':
         case 'assistant-reply':
         case 'assistant-undo':
+        case 'assistant-answer':
           break;
         default: unhandled('a message from the phone', message);
       }

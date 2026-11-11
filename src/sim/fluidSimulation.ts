@@ -1372,7 +1372,7 @@ export class FluidSimulation {
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
-    const harmony = PRESET_CONTRACTS[presetId] || pickHarmony();
+    const harmony = PRESET_CONTRACTS[look] || pickHarmony();
     const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
 
     const dishSum = () => {
@@ -1432,8 +1432,8 @@ export class FluidSimulation {
 
     switch (presetId) {
       case 'galaxy': {
-        // Bright core + compact two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
-        this.splatBlob(cx, cy, 4.2, 3.8, 0.85, 0.92, 1.0);
+        // Gold core (28i-7) + two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
+        this.splatBlob(cx, cy, 4.2, 3.8, 1.0, 0.8, 0.45);
         this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {

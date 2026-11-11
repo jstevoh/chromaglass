@@ -14,16 +14,14 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
   it sells in (PLAN 23: Home includes one pack, Pro all). The reworks go to Antigravity as
   short briefs; this item lists them as they are briefed.
 
-  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia after 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
+  *Judged so far* (the Mac gallery of 2026-10-19 against the 2026-10-11 film): of 41 looks, 10 retire (nine in 28i-1, Lumia in 28i-5), 31 stay, 21 of those reworked; the three shared faults were stillness, lost black and a white ground. Story in `docs/plan-shipped.md` §28i (moved 2026-10-29, 19m-2).
 
   - ~~**28i-1. Retire nine**~~ (Antigravity, batch 1, **shipped** in #408; story in
     `docs/plan-shipped.md` 28i-1): nine ids through `RETIRED_PRESETS`, every check that
     named one on its replacement. What it found is **28i-6**.
-  - **28i-5. Retire Lumia** (→ `velvet-underground`; Claude first). `'lumia'` is also the
-    lamp's Lumia setting and mixer mover (`plateSources.ts`, `mixer.ts`), and `plate` 5b
-    fails on any quoted retired id in src/, so retiring the look trips it on the layer.
-    5b learns to tell a preset id from a setting key (named under `Check changes:`, its
-    reach unchanged for preset ids), then the look retires.
+  - ~~**28i-5. Retire Lumia**~~ (**shipped**, this PR; story in `docs/plan-shipped.md`
+    28i-5): `lumia` → `velvet-underground` through `RETIRED_PRESETS`; the lamp's Lumia
+    stays. `plate` 5b counts a two-meaning id unless its line has the lamp's shape (`scripts/lookOrLamp.mjs`).
   - ~~**28i-2. Give back the black, make the still ones move**~~ (batch 2) **Shipped**: all 21 reworked looks meet their gallery and film bars; Poster's `>= 30 steps/s` is open as **28i-2a** below. Story in `docs/plan-shipped.md` §28i-2 (moved 2026-10-29, 19m-2).
   - **28i-2a, open. Poster, 1969's step rate on a single 384² plate.** Measured over 12 s
     (`squeeze` harness), `poster-1969` on `main` ran `layerCount: 2` (`2 × 384²` thin-gap
@@ -135,8 +133,53 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     `npm run shots` on the Mac for the new set, then the README table~~ (**shipped**, #492:
     `poster-1969`, `oil-and-water`, `macro-bead` and `velvet-underground` shot on the Mac GPU
     at `seed=1`, retired shots deleted, README and guide tables updated); (g) three checks count looks and now sit near their floors: `startup` asks for
-    more than 30 looks (32 ship; 31 after Lumia, 28i-5), and `disc` names its two magnet looks
+    more than 30 looks (31 ship since Lumia retired, 28i-5), and `disc` names its two magnet looks
     where it asked for three.
+
+  - **28i-7. Every look filmed again, and the dull and samey ones retuned** (the owner,
+    2026-11-11: "is it time to redo all of the pre-sets again? make sure they're all really
+    compelling?"). All 41 looks filmed on the Mac (Metal, band, seed 1) from main 440b0638;
+    verdicts on the owner's judging page. **Shipped in this PR** (first pass; afters
+    filmed with `FILM_ONLY` on the branch): Comet River pours again (automateRate was 0),
+    Cyberpunk on one neon arc with less dye (lime and orange summed it to grey-teal on the
+    additive blend), Acid Trip's bodies kept apart (centre pull 0.6 merged them into one
+    amber blob, Solar Flare's look), Bass Drop's three wells given the dye to show three
+    colours, Soap Film warmer and fuller (until 28i-4), Splodascope's water pale blue
+    (under cobalt every drop read green), Microscopic Chaos with an amber counterstain, Aurora's violet and pink top edge in the
+    window, Galaxy with a gold arm and a gold core (it read as Jellyfish Bloom), Lacing
+    Run on the amber-over-crimson its description names, Ferro Paint on warm neighbours
+    (amber over teal was brown-green), Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (a thinner film
+    tiled Saffron's lace as coarsely, so finer lace stays 28l-3's), and Moiré Waves and Moiré Ripple given dyes of their own
+    (a pack look's own contract now wins over its house look's, and the seed lays it).
+    Left alone: Chemical Clock (the owner loves it), the keeps, Lava Lamp (sealed bottle,
+    its own thread) and Lumia (28i-5).
+    - **28i-7a, open. The music still barely swells.** 25 of 40 looks scored 0 swells a
+      minute and almost none change colour with the song; motion half-life 0.3 s against
+      2 to 7 s in real shows. This PR fixes what each look shows, not how it breathes: that
+      is 28i-3b's film bar, still open.
+    - **28i-7c, open. Velvet Underground's pools drain, and settings do not bring them
+      back.** 83% near black at the 5th percentile on both passes (more dye and exposure,
+      a brighter lamp, then the screen blend for overlay): the frame is the violet ground
+      with one ultramarine lobe and a fleck of red, where the seed lays three pools. Find
+      where the pools' dye goes (the areas' pours against the regulator and the rim)
+      before touching a number; it matters more now Lumia retires into it (28i-5, #792).
+    - **28i-7d, open. Poster, 1969 and Milk Marbling stay white.** More ink (dyeBudget to
+      the dial's top, more pours, a lower tension) and, for the milk, lower exposure and
+      twice the drops left both frames as they were (Poster 2% near black, Milk 3%): the
+      white is the lamp through clear glass and the milk itself, not a shortage the
+      automation fills. The owner's call whether either should leave the lamp, then a
+      look at what holds the coverage.
+    - **28i-7e, open. Macro Bead is one pink sheet in the closeup.** A sea-green ground
+      (`ledColor` '#0a3a36') and less dye (0.65) showed the ground beside the beads, but
+      took the beads' grain out of proportion: `npm run grainedge` line 2 read body texture
+      0.124 and 0.234 at twice the grain, under the 2x it asks (WebGPU macOS, open shard),
+      so it came out. A second dye under the beads wants a way that keeps the grain's depth.
+    - **28i-7b, open. Splodascope's oil is filtered by the water it displaced.** In a thin
+      cell an oil drop pushes the water out of the gap, so a drop's colour should not pass
+      through the water's dye; the plate multiplies the two, so a cobalt water turned every
+      drop green. The pale water is the stopgap; the fix is the oil's share taking the water
+      out of the light's path (as `gapScale × (1 − film)` does for Clear Film), then the
+      photograph's cobalt back.
 
   The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
   (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
