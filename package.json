@@ -322,6 +322,7 @@
     "bubbledye": "node scripts/bubbledye.mjs",
     "bubbleair": "node scripts/bubbleair.mjs",
     "bubblelook": "node scripts/bubblelook.mjs",
+    "bubbleround": "node scripts/bubbleround.mjs",
     "soap": "PW_WEBGPU=1 node scripts/soap.mjs",
     "soapbreak": "PW_WEBGPU=1 node scripts/soapbreak.mjs",
     "inktitle": "PW_WEBGPU=1 node scripts/inktitle.mjs",

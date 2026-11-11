@@ -1057,6 +1057,21 @@
       ]
     },
     {
+      "name": "A bubble's outline is round at the screen's resolution",
+      "shard": "lab9",
+      "run": "npm run bubbleround",
+      "why": [
+        "The owner, 2026-11-11: bubbles 'look like a old computer drew them'",
+        "(PLAN 38h-15, scripts/bubbleround.mjs). The plate drew each bubble's",
+        "outline from the air field's coverage, a polygon with a facet per",
+        "texel; now from the bubble's own disc, named by the field. Reads each",
+        "rim's radius along 96 rays on the real plate shader and on a lab built",
+        "with the index taken out (the field's drawing), which must still be a",
+        "polygon, so the bar is one the old outline failed. Two labs of four",
+        "plates on SwiftShader: beside the moiré check in lab9, which ran alone."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",
