@@ -12,7 +12,7 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, RGBA32, VEL } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -421,13 +421,14 @@ export class FluidPasses extends FluidFields {
    * 6/6 → 2/6, the held hand's spot stalling at 52 °C and then cooling
    * 0.93 K/s at 1/60 s steps. One owner for the heat while the boil is on.
    *
-   * Carried in float32, not the velocity's half-float, so the carry's
-   * substeps round nothing and the one rounding left is the z's own, once a
-   * step, which heatUnpack does to the nearest half-float itself (why: there;
-   * Metal's store lost 3.2% of a sinking blob's heat in 90 steps).
+   * Carried in the velocity's half-float, whose carry pipeline is built
+   * before the show opens. A float32 carry was tried for Metal's lost heat
+   * and changed nothing (96.8% kept either way, `npm run heat` line 9) while
+   * its pipeline compiled in the frame; the loss was the store's rounding,
+   * which heatUnpack now does to the nearest half-float itself.
    */
   protected carryHeat(pass: GPUComputePassEncoder, disp: number, argsAt?: GPUBuffer[]): void {
-    const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], RGBA32, 'heat carried');
+    const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], VEL, 'heat carried');
     const gap = this.arg('heat gap', [REST_GAP, 0, 0, 0]);
     this.hsRun(pass, 'heatPack', `heatPack:${this.vel.read.label}:${h.write.label}:${this.squeeze.read.label}`, gap, [this.vel.read, this.squeeze.read, h.write]);
     h.swap();

@@ -267,7 +267,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   heatPack: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var sq: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -286,8 +286,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     the temperature to a float32's precision, a hair either side of it even
     where nothing moved, and the store's own conversion to sixteen bits is
     the hardware's: on the Mac's Metal it lost 3.2% of a sinking blob's heat
-    in 90 steps (\`npm run heat\` line 9, 96.8% kept, the same in half-float
-    and float32 carries) where SwiftShader lost 0.1%, a bias of under one
+    in 90 steps (\`npm run heat\` line 9, 96.8% kept, the same with the carry
+    in half-float or float32) where SwiftShader lost 0.1%, a bias of under one
     step of the half-float a step, always down, which is what a conversion
     toward zero does. So the nearest half-float is picked in float32 and the
     store is handed a value it holds exactly: a cell the carry did not change
