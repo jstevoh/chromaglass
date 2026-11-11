@@ -89,7 +89,5 @@ own. Check: `npm run moire`.
     Needs #691 merged and a Mac session for the file.
   - ~~**45a-13. Random looks land on moiré one pick in sixteen, not one in five**~~
     (**shipped** 2026-11-11, `npm run panel`; story in `docs/plan-shipped.md`).
-  - **45a-14. Randomise could roll the sheets itself.** Randomise now takes the sheets off;
-    on a copy with the pack, a roll could put a pair on now and then, with Lamp Ground 1
-    and a white lamp as the pack's looks have (the dark-LED trap above), at about the
-    pack's weight in the look pickers. Wants the owner's say on how often.
+  - ~~**45a-14. Randomise lays a pair of sheets now and then**~~ (**shipped** 2026-11-11 with
+    45a-13, `npm run panel`; story in `docs/plan-shipped.md`).

@@ -3,7 +3,9 @@ import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pickLook, forgetPicks, liquidOf, RECENT } from '../src/lib/lookPick.ts';
 import { isPackLocked, canUseMoirePack } from '../src/lib/tierGates.ts';
-import { luckyLook } from '../src/lib/lucky.ts';
+import { luckyLook, LUCKY_SHEETS_CHANCE } from '../src/lib/lucky.ts';
+import { MOIRE_LOOKS } from '../src/presetsMoire.ts';
+import { PIN_RANGE } from '../src/lib/deskPins.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
 
@@ -91,6 +93,46 @@ export function randomLooks({ check }) {
   check('Randomise takes the moiré sheets off the look it replaces rather than keeping them under every roll',
     packLooks.every(m => (m.settings.moireAmount ?? 0) > 0) && named === packLooks.length * 50 && kept === 0,
     `${kept} of ${packLooks.length * 50} rolls from a moiré look kept its sheets`);
+
+  /*
+    And now and then a pair of sheets of its own, on a copy with the pack
+    (the owner, 2026-11-11: "for the sheets - now and then is fine"). The
+    share is held to a fixed band, the pair to a whole stage of one of the
+    pack's looks, the lamp to the one sheets are seen by (Lamp Ground 1, no
+    LED ring), every sheet number to the desk's range, and the rest of a
+    seeded roll to what it is without the pack: owning it moves nothing else.
+  */
+  {
+    const ROLLS = 4000;
+    const mul = (seed) => () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const SHEET = new Set(['moireAmount', 'moireSheetA', 'moireSheetB', 'moireAngle', 'moireSpin', 'moireSlide',
+      'moireRatio', 'moireDensity', 'moireGap', 'moireCurl', 'moireFlip', 'lampGround', 'ledPlatform']);
+    const stages = MOIRE_LOOKS.map(m => `${m.settings.moireSheetA}/${m.settings.moireSheetB}/${m.settings.moireDensity}/${m.settings.moireGap}`);
+    let laid = 0, unowned = 0, badLamp = 0, badStage = 0, drift = 0;
+    const out = new Set();
+    for (let i = 0; i < ROLLS; i++) {
+      const owned = luckyLook(DEFAULT_SETTINGS, ['#ff0000'], mul(i * 7919 + 17), true);
+      const not = luckyLook(DEFAULT_SETTINGS, ['#ff0000'], mul(i * 7919 + 17), false);
+      if ((not.moireAmount ?? 0) > 0) unowned++;
+      for (const k of Object.keys(not)) if (!SHEET.has(k) && JSON.stringify(owned[k]) !== JSON.stringify(not[k])) drift++;
+      if (!(owned.moireAmount > 0)) continue;
+      laid++;
+      if (owned.lampGround !== 1 || owned.ledPlatform !== false) badLamp++;
+      if (!stages.includes(`${owned.moireSheetA}/${owned.moireSheetB}/${owned.moireDensity}/${owned.moireGap}`)) badStage++;
+      for (const k of SHEET) {
+        const spec = PIN_RANGE.get(k);
+        if (spec && typeof owned[k] === 'number' && (owned[k] < spec.min || owned[k] > spec.max)) out.add(`${k} ${owned[k]}`);
+      }
+    }
+    const share = laid / ROLLS;
+    check('Randomise lays a pair of moiré sheets now and then on a copy with the pack, and never on one without',
+      LUCKY_SHEETS_CHANCE > 0 && share > 0.04 && share < 0.09 && unowned === 0,
+      `${laid} of ${ROLLS} rolls (${(share * 100).toFixed(1)}%) with the pack, ${unowned} without`);
+    check('and each pair is one of the pack\'s looks\' whole stages, seen by a white lamp on Lamp Ground',
+      laid > 0 && badStage === 0 && badLamp === 0 && out.size === 0,
+      `${badStage} stages no look has, ${badLamp} on the wrong lamp, outside the desk: ${[...out].join(', ') || 'none'}`);
+    check('and owning the pack moves nothing else a seeded roll lands on', drift === 0, `${drift} settings differ over ${ROLLS} paired rolls`);
+  }
 
   const sharedSrc = readFileSync('src/app/shared.ts', 'utf8');
   const fadesSrc = readFileSync('src/app/useSongChangeFades.ts', 'utf8');

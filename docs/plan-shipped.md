@@ -12683,7 +12683,14 @@ weighs `PACK_WEIGHT` = 2 looks in all (5.8% of 20,000 picks), a pack this copy l
 nothing (`isPackLocked`; 0 of 20,000), the opening look is never a pack's (the licence is not
 read yet), and a pick never lands on the liquid on the plate or one of the last six picked (a
 pack look counts as its house look's liquid; 0 repeats, all 31 house looks within 200 picks).
-Checks: `npm run panel` (scripts/panelRandomLooks.mjs). Open: 45a-14.
+Checks: `npm run panel` (scripts/panelRandomLooks.mjs).
+
+45a-14, in the same PR: asked whether Randomise should ever lay sheets itself, the owner said
+"for the sheets - now and then is fine". On a copy with the pack (`canUseMoirePack`, asked by
+`useLucky` and the new-song roll) a roll lays one of the pack looks' whole sheet stages one
+time in sixteen (`LUCKY_SHEETS_CHANCE`; 252 of 4,000 seeded rolls, 6.3%), with Lamp Ground 1
+and the LED ring off, as the pack's looks are lit; 0 without the pack, and owning the pack
+changes no other setting a seeded roll lands on (both draws are taken on every roll).
 
 ## H2c-labels. Timestamp labels kept with their ring slot (2026-11-08)
 

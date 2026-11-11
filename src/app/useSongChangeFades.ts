@@ -5,6 +5,7 @@ import { showFor, type SongShow } from '../lib/songShows';
 import { evolvedLook } from '../lib/lookFade';
 import { luckyLook } from '../lib/lucky';
 import { stream } from '../lib/rng';
+import { canUseMoirePack } from '../lib/tierGates';
 import { randomLook } from './shared';
 import type { Ear } from '../hooks/useAudioAnalyzer';
 import type { MusicIntelResult } from '../hooks/useMusicIntelligence';
@@ -103,7 +104,7 @@ export function useSongChangeFades({
       setPinnedPresetId(null);
       // The song boundary's own stream, not Lucky's default: a Lucky press
       // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float, canUseMoirePack())), songFadeSeconds(songChange.reason));
       return;
     }
     // Which look a song boundary brings is on the plate for the whole song:
