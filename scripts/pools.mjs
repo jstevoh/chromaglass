@@ -123,7 +123,9 @@ const run = async (name, over) => {
         inA[k] += x; cellsA[k]++;
         if (pick) pick.push(x);
       }
-      return { inA, meanA: inA.map((v, k) => v / Math.max(1, cellsA[k])), meanOut: out / Math.max(1, cellsOut), cells: pick,
+      const dish = (inA.reduce((x, y) => x + y, 0) + out) / Math.max(1, cellsA.reduce((x, y) => x + y, 0) + cellsOut);
+      return { inA, meanA: inA.map((v, k) => v / Math.max(1, cellsA[k])), meanOut: out / Math.max(1, cellsOut), cells: pick, dish,
+        dyeFormat: f.gpu?.dyeFormat ?? null, spin: [f.dishSpin, f.liquidSpin],
         gpu: !!f.gpu, readbacks: f.readbacks, steps: f.stepIndex, turb: f.lastSettings?.turbulenceScale, engine: d.engine };
     }, [AREAS, keep]);
     const first = await read(true);
@@ -141,6 +143,8 @@ const run = async (name, over) => {
       laid: first.meanA, outside: first.meanOut, moved: moved / Math.max(1e-9, laid),
       steps: last.steps - first.steps, readbacks: last.readbacks - first.readbacks, gpuHeld, turbHeld, turb: last.turb,
     };
+    // What a reader of a red run needs first: where the dye went (the dish, or between the pools), the dye's texture, and the dish's spin.
+    console.log(`     ${name}: dish ${first.dish.toFixed(4)} → ${last.dish.toFixed(4)}, between the pools ${first.meanOut.toFixed(4)} → ${last.meanOut.toFixed(4)}, dye ${last.dyeFormat}, spin (dish, liquid) ${last.spin.map(v => (+v || 0).toFixed(3)).join(', ')}`);
     console.log(`     ${name}: ${r.kept.map(v => (v * 100).toFixed(1) + '%').join(' / ')} kept over ${SECONDS} s, moved ${(r.moved * 100).toFixed(1)}%, ${r.steps} steps, ${r.readbacks} readbacks, Turbulence ${r.turb}, ${r.engine}`);
     return r;
   } finally { await context.close(); }
