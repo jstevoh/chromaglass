@@ -15,6 +15,7 @@ import { chromium } from 'playwright';
 import { launchChromium, port } from './chromium.mjs';
 import { spawn } from 'node:child_process';
 import { engineQuery, installFrameReader } from './frame.mjs';
+import { withBand } from './recorder.mjs';
 
 const VARIANTS = {
   base: {},
@@ -24,9 +25,15 @@ const VARIANTS = {
   noSmear: { glassSmear: 0, rainDrip: 0, vibrationFrequency: 0, airVelocity: 0 },
   lamp: { lampGround: 0.06 },
   noDiff: { diffusionRate: 0 },
+  // With the simulated band (the film's sound): the music's pours and paddles.
+  band: { band: true },
+  bandNoAuto: { band: true, automateRate: 0 },
+  bandBudget: { band: true, dyeBudget: 1.2 },
+  bandLamp: { band: true, lampGround: 0.06 },
+  bandNoCords: { band: true, sceneMappings: [] },
 };
 const pick = process.argv.slice(2).filter(a => VARIANTS[a]);
-const run = pick.length ? pick : Object.keys(VARIANTS);
+const run = pick.length ? pick : ['base', 'band', 'bandNoCords', 'bandNoAuto', 'bandLamp', 'bandBudget', 'noAuto', 'noSpin'];
 const SECONDS = Number(process.env.PROBE_SECONDS) || 90;
 const LOOK = process.env.PROBE_LOOK || 'velvet-underground';
 const AREAS = [
@@ -50,9 +57,11 @@ try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
     await installFrameReader(page);
+    const { band, ...over } = VARIANTS[name];
+    if (band) await withBand(page);
     await page.goto(`http://localhost:${PORT}/?debug&gpu=mid&tier=local&look=${LOOK}&seed=1${engineQuery()}`, { waitUntil: 'load' });
     await page.waitForTimeout(9000);
-    await page.evaluate((over) => Object.assign(window.chromaglassDebug().settings, over), VARIANTS[name]);
+    await page.evaluate((over) => Object.assign(window.chromaglassDebug().settings, over), over);
     const read = () => page.evaluate((areas) => {
       const d = window.chromaglassDebug(), f = d.fluids[0];
       const a = f.readDensity, S = f.size;
