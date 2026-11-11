@@ -218,6 +218,28 @@ export interface RemoteState {
     takes: { n: number; id: string; title: string | null; artist: string | null; seconds: number; gestures: number; clock: 'song' | 'wall'; date: string }[];
     takeCount: number; replaying: number | null;
   };
+  /**
+   * Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts):
+   * what drives the plate as the film, what pours into the dish, the room
+   * camera on or off and which camera, the mark up or not, the cameras by the
+   * pickers' names, and the cartoon shelf.
+   */
+  media?: MediaNow;
+}
+
+/** What the plate is filmed, poured and marked with, as the display reports it (RemoteState `media`). */
+export interface MediaNow {
+  /** The film: its source, the file's or the cartoon's name, the cartoon's id, the camera's name, and whether that camera was unplugged mid-show. */
+  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; cartoon: string | null; camera: string | null; cameraLost: boolean };
+  /** The film pouring into the dish (a picture, once laid, is dye and not a pour). */
+  pour: { playing: boolean; name: string | null; cartoon: string | null };
+  /** The room camera (the motion camera): on, the camera's name (null: the browser's own pick), and whether last session left it on. */
+  room: { on: boolean; camera: string | null; resume: boolean };
+  /** The mark (the logo card) is up. */
+  mark: boolean;
+  /** The cameras by the pickers' names. */
+  cameras: string[];
+  cartoons: { id: string; title: string; seconds: number }[];
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -377,6 +399,8 @@ export type RemoteMessage =
   | { type: 'assistant-ear'; do: string; on?: boolean; title?: string; artist?: string; answer?: number }
   /** Recording's options and a Take replayed, stopped or deleted, from the owner's assistant (PLAN 44k-11), relayed only from the guard, with `answer`. */
   | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
+  /** Film, pours, the room camera and the mark from the owner's assistant (PLAN 44k-13), relayed only from the guard, with `answer`; a file as the show server's own address for it (`url`, server/assistantMedia.js). */
+  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }

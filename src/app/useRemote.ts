@@ -26,6 +26,7 @@ import { useSoundNow, askSound } from './soundNow';
 import { usePlayerNow, askMusic } from './musicNow';
 import { useEarNow, askEar } from './earNow';
 import { useRecordNow, askRecord } from './recordNow';
+import { useMediaNow, askMedia } from './mediaNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet, armSetItem } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
@@ -171,6 +172,7 @@ export function useRemote({
   const player = usePlayerNow();
   const ear = useEarNow();
   const record = useRecordNow();
+  const media = useMediaNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -247,7 +249,8 @@ export function useRemote({
     player,
     ear,
     record,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record]);
+    media,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -460,6 +463,10 @@ export function useRemote({
           answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
           break;
         }
+        // Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts), answered once a camera or window opened.
+        case 'assistant-media':
+          void askMedia(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }));
+          break;
         /*
           Words poured as ink (PLAN 37x-10c): a song's name at the top of a
           track, from the phone's text box or the relay's guard. Read as

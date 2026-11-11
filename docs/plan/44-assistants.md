@@ -231,7 +231,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 10 | Calibrate the sound to the room; the song detector on or off; Listen | **shipped** 2026-11-11: `calibrate`, `song_detection`, `listen`, `show_state`'s `ear` | Full | 44k-10 |
   | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | **shipped** 2026-11-11: `record_options`, `take`, `show_state`'s `record` | Full | 44k-11 |
   | 12 | The microphone's input device | **shipped** 2026-11-11: `set_sound_source`'s `device`, `show_state`'s `sound.inputs` and `sound.input` | Full | 44k-12 |
-  | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | none | Full | 44k-13 |
+  | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | **shipped** 2026-11-11: `film`, `pour_file`, `room_camera`, `mark`, `show_state`'s `media` | Full | 44k-13 |
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
   | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | none | Play (palette, tool), Full (the rest) | 44k-16 |
@@ -367,11 +367,37 @@ through cords and preset patches, and the plate shader is untouched.
   is unmeasured. Read `show_state`'s `sound.inputs` on the Mac with the source none
   after a fresh launch; if they are numbers, open the microphone once at launch for
   the names (and close it), or say so in the tool.
-- **44k-13. Film, pours and the room.** *(M, AG lane.)* `film` (a file path, a camera
-  by name, a window, a cartoon from the shelf, or clear), `pour_file` (an image or a
-  film poured into the dish, or stop), `room_camera` (on, off, device), `mark` (load a
-  logo or title card by path, or clear). Full; paths the Mac's only, as 44k-2's.
-  Pass: lines for each.
+- ~~**44k-13. Film, pours and the room.**~~ **Shipped** 2026-11-11: `film` (a video
+  file by path, a cartoon, a camera by name, a window, clear), `pour_file` (a picture or
+  a film by path, a cartoon, stop), `room_camera` (on, off, a camera by name) and `mark`
+  (a picture by path, or clear), Full, read back in `show_state`'s `media`, through
+  `app/mediaNow.ts` and `server/assistantMedia.js`; files from `~/Movies` and
+  `~/Pictures` only, served by the show server as the music player's are (`npm run
+  assistant`, `media-full`, `-path`, `-kind`, `-folder`, `-cartoon`, `-camera`,
+  `-answer`, `phone-media`). Story in `docs/plan-shipped.md` §44.
+- **44k-13a. The phone layout has no film file, camera, window, room camera or mark.**
+  *(S, found building 44k-13.)* The phone's More sheet has the cartoon shelf (pour or
+  film a cartoon), so a cartoon the assistant puts on shows lit there; but a film from a
+  file, a camera or a window, the room camera and the mark are the desk's Film, Motion
+  camera and Mixer controls alone. A show run on a phone shows none of them, though the
+  assistant reaches a phone-layout display all the same (the doors are the hooks', not
+  the panels'). Give the sheet a line saying what is filmed and whether the room camera
+  and the mark are on, from `useMediaNow`, and the switches beside it.
+- **44k-13b. The media doors, in a browser.** *(S, found building 44k-13.)* As 44k-11b:
+  `npm run assistant` holds the guard against a stand-in display and the page's
+  `askMedia` against stand-in doors, but no line mounts `useFilm`, `usePour`,
+  `useSceneSource` and `useCastFeed` and watches a real `film file` put the served
+  video on the film, a real `mark` raise the Mixer's mark row, a real `pour_file` lay a
+  picture as dye. A browser line (the app in Chromium; the film and the pour read back
+  through the check hooks) would, and would measure that `loadFilmUrl` answers "done"
+  for a file that will not decode (it does today: its `play()` failure is caught).
+- **44k-13c. The owner's own media folders.** *(S, found building 44k-13.)* The
+  assistant opens films and pictures from `~/Movies` and `~/Pictures`, or the folders
+  `CHROMAGLASS_MEDIA_DIR` names, and the Mac app sets no such variable, so a film kept
+  anywhere else (the owner's filmed takes are in a folder of their own in the home
+  folder) must be moved first. A Settings row in the Mac app, "Folders Claude may open",
+  kept in `show.json` and read by the show server, would let the owner widen it without
+  a terminal.
 - **44k-14. OSC, MIDI and Syphon.** *(M, AG lane; Syphon after its own thread ships
   it.)* `outputs` (OSC out on, off and its target, via `useShowFeed`'s `onOscOut`; OSC
   in's Off, This Mac, Network, which today is only the Mac menu, `desktop/main.js`

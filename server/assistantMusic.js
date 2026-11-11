@@ -23,6 +23,14 @@
  * an audio element seeks by asking for bytes. The page gets the address and
  * the file's name, never the path. The last eight addresses are kept, so a
  * track that was playing still seeks after a few more are opened.
+ *
+ * Films and pictures (PLAN 44k-13) come through the same door: `admitFile`
+ * is the rule above for any kind of file and any folders, and an admitted
+ * film, picture or logo is served under `/assistant-media/` from its own
+ * eight addresses (`MEDIA_PATH`; the rules for what may be filmed, poured or
+ * put up as the mark are `assistantMedia.js`'s). One door and not two, so
+ * the links, the `..`, the probe and the swap are judged by one piece of
+ * code that `npm run assistant`'s music mutants already hold.
  */
 import { createReadStream, realpathSync, statSync } from 'node:fs';
 import { pipeline } from 'node:stream';
@@ -31,6 +39,8 @@ import { homedir } from 'node:os';
 import { basename, delimiter, extname, isAbsolute, resolve, sep } from 'node:path';
 
 export const MUSIC_PATH = '/assistant-music/';
+/** Where a film, a picture or a logo the assistant named is served (assistantMedia.js). */
+export const MEDIA_PATH = '/assistant-media/';
 /** What the player opens, and the type it is served as. */
 export const MUSIC_TYPES = new Map([
   ['.mp3', 'audio/mpeg'], ['.m4a', 'audio/mp4'], ['.aac', 'audio/aac'], ['.wav', 'audio/wav'],
@@ -42,7 +52,8 @@ const KEEP = 8;
 /** The music folders: `CHROMAGLASS_MUSIC_DIR` (several joined by the path delimiter), else ~/Music. */
 export const musicFolders = (env = process.env) => (env.CHROMAGLASS_MUSIC_DIR ? env.CHROMAGLASS_MUSIC_DIR.split(delimiter).filter(Boolean) : [`${homedir()}${sep}Music`]);
 
-const served = new Map();   // token -> { path, type }
+/** Per address: token -> { path, type, folders }, the last KEEP of each kind. */
+const served = new Map([[MUSIC_PATH, new Map()], [MEDIA_PATH, new Map()]]);
 
 /*
   The folders' real paths, and whether a path is inside one. realpathSync's
@@ -54,33 +65,46 @@ const inside = (p, roots) => roots.some((r) => p.startsWith(r.endsWith(sep) ? r 
 
 /** A path the assistant named: its address and name, or why not. */
 export function admitMusicFile(raw, folders = musicFolders()) {
+  return admitFile(raw, { folders, types: MUSIC_TYPES, at: MUSIC_PATH, what: 'a sound file the player opens', only: 'the assistant plays files from the music folder only' });
+}
+
+/**
+ * Any file the assistant names by its path: inside `folders`, of one of
+ * `types` (extension -> served type), a real file. `at` is the address it is
+ * served under, `what` names the kind in a refusal, `only` says which folders.
+ * Returns its address, its name (no extension) and its type, or why not.
+ */
+export function admitFile(raw, { folders, types, at, what, only }) {
   if (typeof raw !== 'string' || !raw.trim()) return { reason: 'a file by its full path on this Mac' };
   const asked = raw.trim().replace(/^~(?=$|\/)/, homedir());
   if (!isAbsolute(asked)) return { reason: `a full path (beginning / or ~/), not ${raw}` };
   const roots = folders.map(real).filter(Boolean);
-  const outside = { reason: `the assistant plays files from the music folder only (${folders.join(', ')}), and ${raw} is outside it` };
+  const outside = { reason: `${only} (${folders.join(', ')}), and ${raw} is outside it` };
   // A path that is not there is "outside" unless it would be inside on its
   // face: otherwise "no file at" against "outside it" tells an assistant
   // steered by somebody's words whether any file on this Mac exists.
   const found = real(asked);
   if (!found) return inside(resolve(asked), folders.map((f) => resolve(f))) || inside(resolve(asked), roots) ? { reason: `no file at ${raw}` } : outside;
   if (!inside(found, roots)) return outside;
-  const type = MUSIC_TYPES.get(extname(found).toLowerCase());
-  if (!type) return { reason: `not a sound file the player opens (${[...MUSIC_TYPES.keys()].join(' ')}): ${basename(found)}` };
+  const type = types.get(extname(found).toLowerCase());
+  if (!type) return { reason: `not ${what} (${[...types.keys()].join(' ')}): ${basename(found)}` };
   let file = false;
   try { file = statSync(found).isFile(); } catch { /* gone since */ }
   if (!file) return { reason: `${raw} is not a file` };
   const token = randomBytes(16).toString('hex');
-  served.set(token, { path: found, type, folders });
-  while (served.size > KEEP) served.delete(served.keys().next().value);
-  return { url: `${MUSIC_PATH}${token}`, name: basename(found, extname(found)) };
+  const shelf = served.get(at);
+  shelf.set(token, { path: found, type, folders });
+  while (shelf.size > KEEP) shelf.delete(shelf.keys().next().value);
+  return { url: `${at}${token}`, name: basename(found, extname(found)), type };
 }
 
 /** The show server's route: true when the request was this one's (answered, refused or not found). */
 export function serveMusicFile(req, res, url, laptop) {
-  if (!url.pathname.startsWith(MUSIC_PATH)) return false;
+  // Both kinds of address: a film seeks by Range as a song does.
+  const at = [MUSIC_PATH, MEDIA_PATH].find((p) => url.pathname.startsWith(p));
+  if (!at) return false;
   if (!laptop) { res.writeHead(403); res.end(); return true; }
-  const f = served.get(url.pathname.slice(MUSIC_PATH.length));
+  const f = served.get(at).get(url.pathname.slice(at.length));
   // Judged again as it is served: a file swapped for a link out of the
   // folder since it was admitted is not followed.
   const now = f ? real(f.path) : null;

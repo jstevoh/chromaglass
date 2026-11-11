@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useSceneCamera } from '../hooks/useSceneCamera';
 import type { VisualizerSettings } from '../types';
 import type { useCameras } from '../hooks/useCameras';
 import { SCENE_ON_KEY } from './shared';
+import { cameraName, publishMedia, setMediaDoor } from './mediaNow';
 
 const SCENE_DEVICE_KEY = 'chromaglass-scene-device';
 
@@ -62,6 +63,18 @@ export function useSceneSource({
     people: settings.scenePeople !== false,
     preview: scenePreviewRef,
   });
+
+  /*
+    The assistant's door and copy (app/mediaNow.ts): a camera chosen as the
+    picker chooses it, then the switch as the Settings switch throws it, so
+    an assistant's "on" counts as asked by hand (the prompt, the light).
+  */
+  useEffect(() => {
+    setMediaDoor('room', { set: (on, id) => { if (id !== undefined) chooseSceneDevice(id); toggleScene(on); } });
+    return () => setMediaDoor('room', null);
+  }, [chooseSceneDevice, toggleScene]);
+  const camKey = cameras.devices.map(d => `${d.deviceId}\n${d.label}`).join('\n');
+  useEffect(() => { publishMedia({ room: { on: sceneOn, camera: cameraName(sceneDeviceId), resume: sceneResume } }); }, [sceneOn, sceneDeviceId, sceneResume, camKey]);
 
   return {
     sceneOn, sceneResume, setSceneResume, sceneDeviceId, scenePreviewRef, toggleScene,

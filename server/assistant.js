@@ -45,6 +45,7 @@ import { musicCall, playerOf } from './assistantMusic.js';
 import { earCall } from './assistantEar.js';
 import { recordCall, recordOf } from './assistantRecord.js';
 import { inputsOf, soundDevice } from './assistantSound.js';
+import { mediaCall, mediaOf } from './assistantMedia.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -348,6 +349,8 @@ export function createAssistantGuard(send, now = Date.now) {
         // Recording (PLAN 44k-11): the containers the encoder writes and the Takes' ids.
         record: recordOf(state.record),
         inputs: inputsOf(state.sound),
+        // Film, pours, the room and the mark (PLAN 44k-13): the cameras' names and the shelf's cartoons.
+        media: mediaOf(state.media),
       };
     },
 
@@ -696,6 +699,16 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-record', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Film, pours, the room camera and the mark (PLAN 44k-13): assistantMedia.js's rules, Full.
+      if (type === 'assistant-media') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = mediaCall(message, show.media);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-media', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

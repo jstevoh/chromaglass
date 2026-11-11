@@ -12,6 +12,7 @@ import type { OutputConfig } from '../lib/outputConfig';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import type { SongChange } from '../hooks/useSongChange';
 import { publishRoom } from './earNow';
+import { publishMedia, setMediaDoor } from './mediaNow';
 
 /**
  * Keeping a receiver in step: the cast window, the mirror and the network
@@ -214,6 +215,33 @@ export function useCastFeed({
     castSend({ type: 'mark', dataUrl: null });
     relaySendRef.current?.({ type: 'cast', message: { type: 'mark', dataUrl: null } });
   }, [castSend]);
+  /*
+    The assistant's door and copy for the mark (app/mediaNow.ts, PLAN
+    44k-13): the picture the show server serves, fetched and handed to
+    loadMark as the file input's would be (so the free tier's word, the
+    cast and the relay all follow), once it decodes as a picture.
+  */
+  const loadMarkRef = useRef(loadMark);
+  loadMarkRef.current = loadMark;
+  const clearMarkRef = useRef(clearMark);
+  clearMarkRef.current = clearMark;
+  useEffect(() => {
+    setMediaDoor('mark', {
+      load: async (url, name) => {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) return `the show server would not hand over that picture (${r.status})`;
+          const blob = await r.blob();
+          (await createImageBitmap(blob)).close();
+          loadMarkRef.current(new File([blob], name, { type: blob.type }));
+          return null;
+        } catch { return 'that file would not open as a picture'; }
+      },
+      clear: () => clearMarkRef.current(),
+    });
+    return () => setMediaDoor('mark', null);
+  }, []);
+  useEffect(() => { publishMedia({ mark: markLoaded }); }, [markLoaded]);
   castReadyRef.current = () => sendCastState(true);
   /*
     A ride between React's renders asks for a send the way a change of state

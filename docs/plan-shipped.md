@@ -12909,6 +12909,47 @@ file the player cannot decode is answered as done), 44k-2b (more music folders),
 show server down rather than fail a line; harmless to the real code, but the new
 lines fetch from the server, so they treat a failed fetch as a failed line.
 
+## 44k-13. Film, pours, the room camera and the mark from the assistant (2026-11-11)
+
+The seventh batch of 44k's gaps, built by Claude. Everything that puts a picture on the
+plate from outside it lived in `App()`'s hooks, not in the settings, so `set` could not
+reach it: the film that drives the plate (a file, a cartoon, a camera, a window), a
+picture or a film poured into the dish, the room camera that stirs it, the mark (the
+logo card). Full, as the plan's table had it, and paced as a setting.
+
+- Four tools: `film` (file by path, cartoon, camera by name, window, clear),
+  `pour_file` (a picture laid once as dye or a film poured frame by frame, by path; a
+  cartoon; stop), `room_camera` (on or off, a camera by name) and `mark` (a picture by
+  path, or clear). `show_state`'s `media` reads each back: the film's source, name,
+  cartoon and camera; what pours; the room camera on, which camera, and whether last
+  session left it on; the mark; the cameras by the pickers' names; the cartoon shelf.
+- A file by its path goes through the music player's door (44k-2), made general:
+  `admitFile` in `server/assistantMusic.js` holds the folder, the links, the `..`, the
+  probe and the swap for any kind of file, and an admitted film or picture is served
+  under `/assistant-media/<token>`, its own eight addresses, to the laptop alone, with
+  Range. The media folders are `~/Movies` and `~/Pictures` (or `CHROMAGLASS_MEDIA_DIR`),
+  not the music folder. Each call takes its kind: a film a video (mp4, m4v, mov, webm),
+  the mark a picture (png, jpg, gif, webp), a pour either. No SVG: a picture served on
+  the page's own origin that can carry a script is not one to hand an assistant.
+- A camera by its name and a cartoon by its title (any case) are judged in
+  `server/assistantMedia.js` on the display's lists and sent on as the display lists
+  them (the shelf's id); the page judges again (`app/mediaNow.ts` `askMedia`) and
+  answers once a camera or a window has opened or failed: `startFilmCamera` and
+  `startFilmWindow` now say why, which the desk's buttons ignore.
+- Each hook sets its own door and publishes its piece of the copy: `useFilm` (the film,
+  the cameras), `usePour` (the pour; `pourImageFrom`, which the file input now shares),
+  `useSceneSource` (the room camera, through `toggleScene`, so the assistant's "on"
+  counts as asked), `useCastFeed` (the mark, fetched and handed to `loadMark` as the
+  file input's, so the free tier's word, the cast and the relay follow). App()
+  unchanged. A cartoon the assistant puts on shows lit on the desk's and the phone
+  layout's shelf (the same state).
+
+`npm run assistant`: ten new lines (one on the page's own door), twelve new mutants,
+in `scripts/assistant-media.mjs`; the music-type mutant follows the refusal's words.
+`assistantMedia.js` joins the Mac app's `server` filter. Found: 44k-13a (the phone
+layout's film, room camera and mark), 44k-13b (the doors in a browser), 44k-13c (the
+owner's own media folders).
+
 ## 44k-12. The microphone's input from the assistant (2026-11-11)
 
 The sixth batch of 44k's gaps, built by Claude. `set_sound_source microphone` opened
