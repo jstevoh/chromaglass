@@ -12,7 +12,7 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32 } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32 } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -739,6 +739,56 @@ export class FluidPasses extends FluidFields {
     // And the rest of the way with the glass's drift.
     this.shiftCarried(pass, field, name === 'mixAdvect' ? 'mix' : 'amount');
     if (also) this.shiftCarried(pass, also);
+  }
+
+  /**
+   * Whether the sealed bottle's kernels are built (PLAN 27f-9): until they
+   * are, a standing plate's weight goes on the open rim as before. The app
+   * builds them behind the show (prepare, LIFT_KERNELS); a plate that stands
+   * up before that, or one prepare never ran for (the lab), asks for them
+   * here once, off the frame, rather than compiling them in it.
+   */
+  protected sealReady(): boolean {
+    let ready = true;
+    for (const name of SEAL_KERNEL_NAMES) {
+      const key = this.pipelineKey(name, 'thin'), code = kernel(name, 'rgba16float');
+      if (this.pipelines.hasCompute(key, code)) continue;
+      ready = false;
+      if (!this.sealAsked) void this.pipelines.prepareCompute(key, code);
+    }
+    if (!ready) this.sealAsked = true;
+    return ready;
+  }
+  private sealAsked = false;
+
+  /**
+   * A standing plate's weight inside a sealed bottle (PLAN 27f-9,
+   * wgsl/fluid/seal.ts has the physics): G·w laid as the closed cell's
+   * circulation, w = `wax` × the dye over its mean (less the oil's
+   * lightness) − `heat` × the heat, the numbers mixForce laid on the open
+   * rim, and the Buoyancy dial's heat lift the lasting current carried
+   * (currentForces' S.up·curBuoy·T, capped at maxCurrent as it was there),
+   * which writeSim takes out of the current while this runs. Without a boil:
+   * the boil's own buoyancy (PLAN 36e-2) stays in the current. Ψ is relaxed
+   * LIFT_SWEEPS sweeps a step from where the last step left it, as the oil's
+   * lift is: the wax changes shape slowly, and short of converged it is still
+   * a circulation with nothing through the wall.
+   */
+  protected sealWeight(pass: GPUComputePassEncoder, p: GpuStepParams, mixTex: GPUTexture, upright: number, gx: number, gy: number, wax: number, heat: number): void {
+    this.ensureThinGap();
+    const m = this.liftN;
+    const lift = this.boilLive ? 0 : upright * Math.max(0, p.currentBuoy ?? 0);
+    this.hsRun(pass, 'sealSource', `sealSource:${this.dye.read.label}:${mixTex.label}:${this.vel.read.label}`,
+      this.arg('seal source', [m, wax, heat, lift, Math.max(0, p.maxCurrent ?? 0.002), 1 / Math.max(upright, 1e-3), 0, 0]),
+      [this.dye.read, mixTex, this.vel.read, this.hsSealSrc!], m * m);
+    const omega = 2 / (1 + Math.sin(Math.PI / m));
+    for (let k = 0; k < LIFT_SWEEPS; k++) {
+      for (const parity of [0, 1]) {
+        this.hsRun(pass, 'hsLiftRelax', `sealRelax:${parity}`, this.arg(`seal relax ${parity}`, [m, parity, omega, 0]), [this.hsSealSrc!, this.hsSealPsi!], m * (m / 2));
+      }
+    }
+    this.hsRun(pass, 'sealFlow', `sealFlow:${this.vel.read.label}`, this.arg('seal flow', [m, gx, gy, 0]), [this.vel.read, this.hsSealPsi!, this.vel.write]);
+    this.vel.swap();
   }
 
   /** A dispatch over textures and buffers in binding order, its group cached under `key`: 2D over the grid, or 1D over `count`. */

@@ -570,7 +570,14 @@ export const ROCK_FALL = 12 * (DISH_GAP_METRES / 0.006) ** 2;
 */
 export const LIFT_MOST = 256;
 export const LIFT_SWEEPS = 8;
-export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
+/*
+  Built behind the show with them: the sealed bottle's source and flow
+  (PLAN 27f-9, wgsl/fluid/seal.ts), which relax on hsLiftRelax with buffers
+  of their own. A standing plate lays its weight on the open rim until they
+  are in (sealReady), as it always did.
+*/
+export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
+export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax', 'sealSource', 'sealFlow'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*

@@ -15,6 +15,7 @@ The solver's WGSL kernels, one file a pass (PLAN 19ai-6). Each file exports a ta
 - `dye.ts`: dispersion along the flow, the grain, sharpening, decay and drain.
 - `gridFilter.ts`: the passes that take the grid's own pattern out of the dye.
 - `reactions.ts`: the BZ reaction, Liesegang rings, the Gray-Scott print.
+- `seal.ts`: `SEAL_KERNELS`, a standing plate's weight as a sealed bottle's circulation (`sealSource`, `sealFlow`; PLAN 27f-9), relaxed on thinGap's `hsLiftRelax` and its `LIFT_GRID`.
 - `fields.ts`: `packView` for the plate, a field boxed to the logical grid, a field cleared.
 
 ## Contracts

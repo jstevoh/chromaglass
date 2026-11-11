@@ -2132,7 +2132,14 @@ export const PRESETS: Preset[] = [
       blendMode: 'screen',
       gooeyEffect: 0.6,
       rotationSpeed: 0,          // a lamp does not turn: down has to stay down the screen
-      centerGravity: 0.32,       // 28i-2: holds the rising wax inside the bottle instead of draining out the open rim
+      /*
+        No pull to the middle (PLAN 27f-9). 28i-2 set Centre Gravity 0.32 to
+        hold the rising wax in from the open rim, a force no lamp has. The
+        plate is a sealed bottle now (wgsl/fluid/seal.ts): the wax goes round
+        inside the glass by its own weight and the lamp's heat, and the pull
+        only bent its plumes toward the middle.
+      */
+      centerGravity: 0,
       diffusionRate: 0,
       buoyancy: 0.42,
       advection: 0.48,
