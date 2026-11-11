@@ -159,6 +159,22 @@ export interface RemoteState {
   bench?: { bottles: { id: string; name: string; color: string }[]; inHand: string };
   /** The beat clock's tempo, where it comes from, and Ableton Link (PLAN 44k-7, app/tempoNow.ts). */
   tempo?: { bpm: number; source: string | null; link: { available: boolean; on: boolean; peers: number; follows: boolean } };
+  /**
+   * The set list (PLAN 44k-3): its items by number from 1, as the desk lists
+   * them, which one is armed and the Go's fade, so the owner's assistant arms
+   * item 3 rather than guessing what "the third" is. `look` is the look an
+   * item sends (null for a sequence), for the guard's Undo.
+   */
+  set?: { name: string; items: { n: number; name: string; kind: string; look: string | null; fade: number | null; missing: boolean }[]; armed: number | null; fadeSeconds: number };
+  /**
+   * The song shows (PLAN 44k-5): Follow songs, the show running and the show
+   * of the song playing, and every show by id and song, without their actions
+   * (the assistant reads one show whole with its own question, so the state a
+   * phone is sent stays small). Not `songs`: that name is the phone
+   * controller's own, already fixed by its check (`scripts/controller.mjs`,
+   * PLAN 12-ctl), with another shape (PLAN 44k-5a folds the two together).
+   */
+  songShows?: { follow: boolean; running: { showId: string; song: string | null; manual: boolean } | null; current: string | null; shows: { id: string; song: string; actions: number }[] };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -276,7 +292,7 @@ export type RemoteMessage =
    * is (lib/songShows.ts `parseSongAction`, app/songCue.ts).
    */
   | { type: 'assistant-still'; width: number }
-  | { type: 'song-action'; when: unknown; what: unknown }
+  | { type: 'song-action'; when: unknown; what: unknown; answer?: number }
   /**
    * The owner's assistant (PLAN 44k-7, 44k-8), relayed only from the guard.
    * The tempo: a typed bpm (60 to 200, the beat clock's range), a tap, or
@@ -288,6 +304,16 @@ export type RemoteMessage =
   | { type: 'assistant-tempo'; do: 'bpm' | 'tap' | 'heard'; bpm?: number }
   | { type: 'assistant-link'; on?: boolean; transport?: boolean }
   | { type: 'assistant-seq'; select?: string; stage?: number }
+  /**
+   * The set list and the song shows from the owner's assistant (PLAN 44k-3,
+   * 44k-5), relayed only from the guard. Each carries `answer`, the number
+   * the display's `assistant-answer` comes back under: the guard can say a
+   * call is allowed, only the display can say it was done (44f-4).
+   */
+  | { type: 'assistant-set'; do: string; item?: number; look?: string; seconds?: number; answer?: number }
+  | { type: 'assistant-songs'; do: string; show?: string | null; actionId?: string; to?: string; seconds?: number; on?: boolean; answer?: number }
+  /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
+  | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
   /**
    * Words poured onto the plate as dye, which the flow then carries off

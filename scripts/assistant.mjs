@@ -141,10 +141,29 @@ function standInDisplay(port, displayKey) {
   const bench = { bottles: [{ id: 'b-oil', name: 'Oil', color: '#ffcc00' }, { id: 'b-milk', name: 'Milk', color: '#ffffff' }, { id: 'b-ink', name: 'Ink', color: '#2244ff' }], inHand: 'b-oil' };
   const tempo = { bpm: 0, source: null, link: { available: true, on: false, peers: 0, follows: false } };
   const seq = { name: null, running: false, stageIndex: 0, stageName: null, progress: 0, stages: [], sequences: [{ id: 'seq-1', name: 'Slow build', stages: 3 }, { id: 'seq-2', name: 'Peak', stages: 5 }], selectedId: 'seq-1' };
+  /* The set list and the song shows as the app's display reports them (PLAN
+     44k-3, 44k-5): items numbered from 1, and the shows in brief, whole only
+     when one is read. The playing song's show has one action the performer
+     programmed and one the assistant added (its id begins asst-). */
+  const setl = { name: 'Friday', items: [
+    { n: 1, name: 'Calm', kind: 'look', look: 'calm', fade: null, missing: false },
+    { n: 2, name: 'Acid trip', kind: 'look', look: 'acid', fade: 4, missing: false },
+    { n: 3, name: 'Slow build', kind: 'sequence', look: null, fade: null, missing: false },
+  ], armed: null, fadeSeconds: 2 };
+  const shows = [
+    { id: 'show-a', song: TRACK, look: { kind: 'preset', id: 'calm', name: 'Calm' }, notes: null, playing: true, running: false, actions: [
+      { id: 'act-1', mine: false, says: 'At every chorus: Burst', when: { at: 'section', section: 'chorus' }, what: { do: 'burst' } },
+      { id: 'asst-1', mine: true, says: 'At 1:00: Next dyes', when: { at: 'time', sec: 60 }, what: { do: 'dyes' } },
+    ] },
+    { id: 'show-b', song: 'Blue Danube', look: { kind: 'preset', id: 'acid', name: 'Acid' }, notes: null, playing: false, running: false, actions: [
+      { id: 'act-2', mine: false, says: 'On the first note: Burst', when: { at: 'start' }, what: { do: 'burst' } },
+    ] },
+  ];
+  const songs = { follow: true, running: null, current: 'show-a' };
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq } } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) } } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -180,6 +199,36 @@ function standInDisplay(port, displayKey) {
     // Play starts the chosen sequence (useShowSequencer's play); a run is a name and its stages.
     if (m.type === 'action' && m.action === 'seq-play') { const q = seq.sequences.find((x) => x.id === seq.selectedId); Object.assign(seq, { name: q.name, running: true, stages: Array.from({ length: q.stages }, (_, i) => ({ name: `S${i + 1}`, seconds: 30 })) }); sendState(); }
     if (m.type === 'action' && m.action === 'seq-stop') { Object.assign(seq, { name: null, running: false, stages: [] }); sendState(); }
+    // The display's word, as useRemote's `answer` sends it (PLAN 44f-4).
+    const answer = (r) => { if (typeof m.answer === 'number') ws.send(JSON.stringify({ type: 'assistant-answer', answer: m.answer, ...r })); };
+    // An item past the list is answered as done: refusing it is the guard's
+    // rule, measured here, and a display that refused it too would hide a
+    // guard that let it through.
+    if (m.type === 'assistant-set') {
+      const it = Number.isInteger(m.item) ? setl.items[m.item] : undefined;
+      if (m.do === 'arm' && it) { setl.armed = m.item + 1; look.cued = it.look ?? 'sequence'; }
+      if (m.do === 'cancel' || m.do === 'back-armed') { setl.armed = null; look.cued = null; }
+      if (m.do === 'fade') setl.fadeSeconds = m.seconds;
+      // A look the library does not have, refused as useLookFades' door refuses one.
+      if (m.do === 'go-now' && m.look === 'gone') answer({ ok: false, reason: 'no look gone in the library' });
+      else {
+        if (m.do === 'go-now') look.on = m.look ?? it?.look ?? look.on;
+        answer({ ok: true });
+      }
+      sendState();
+    }
+    if (m.type === 'assistant-songs') {
+      const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
+      if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
+      if (m.do === 'remove') for (const x of shows) x.actions = x.actions.filter((a) => a.id !== m.actionId);
+      if (m.do === 'start') { const x = find(m.show); songs.running = { showId: x?.id ?? String(m.show), song: x?.song ?? null, manual: true }; }
+      if (m.do === 'stop') songs.running = null;
+      if (m.do === 'follow') songs.follow = m.on;
+      answer({ ok: true });
+      sendState();
+    }
+    // A what this display does not know, dropped as useRemote's parseSongAction drops one, and said so.
+    if (m.type === 'song-action') answer(m.what?.do === 'wobble' ? { ok: false, reason: 'not a song action this build knows' } : { ok: true });
     if (m.type === 'pad-picture') ws.send(JSON.stringify({ type: 'picture', src: PICTURE, w: 1, h: 1, aspect: 1, seq: 1 }));
     // A still, as the app's PadPictureSender answers one: as wide as asked
     // (its own cap is PAD_STILL_MAX_WIDTH, checked on the page's code below),
@@ -267,7 +316,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -331,6 +380,35 @@ async function scenario(serverDir, port, { full = true } = {}) {
 
     check('pour-suggest', 'Suggest refuses poured words on their own rule, and none reach the display', !sWords.ok && /Play/.test(sWords.text) && display.since(t, 'pour-text').length === 0, sWords.text.slice(0, 100));
 
+    /*
+      The set list and the song shows in Suggest (PLAN 44k-3, 44k-5). An
+      item goes to the display by its index from 0 and comes back in
+      show_state by its number from 1, as the performer says it.
+    */
+    await sleep(1100);
+    t = Date.now();
+    const sArm = await mcp.call('set_list', { command: 'arm', item: 2 });
+    await sleep(200);
+    const sArmSt = await mcp.call('show_state');
+    const sFar = await mcp.call('set_list', { command: 'arm', item: 9 });
+    const sCancel = await mcp.call('set_list', { command: 'cancel' });
+    await sleep(200);
+    const sArmed = display.since(t, 'assistant-set');
+    check('-', 'Suggest arms item 2 by its number: the display is sent index 1, and show_state reads item 2 armed', sArm.ok && sArmed[0]?.do === 'arm' && sArmed[0]?.item === 1 && /"armed": 2/.test(sArmSt.text) && /"name": "Acid trip"/.test(sArmSt.text), `${sArm.text} | ${JSON.stringify(sArmed[0])}`.slice(0, 160));
+    check('set-past', 'an item past the set is refused with the set\'s length, and nothing reaches the display', !sFar.ok && /item 9 of a set of 3/.test(sFar.text) && !sArmed.some((m) => m.item === 8), sFar.text.slice(0, 120));
+    check('-', 'Suggest takes the cue back', sCancel.ok && sArmed.some((m) => m.do === 'cancel'), sCancel.text.slice(0, 100));
+    await sleep(1100);
+    t = Date.now();
+    const sNo = await Promise.all([
+      mcp.call('set_list', { command: 'go_now', item: 1 }), mcp.call('set_list', { command: 'fade', seconds: 4 }), mcp.call('remove_song_action', { action_id: 'asst-1' }),
+      mcp.call('song_show_run', { command: 'start' }), mcp.call('nudge', { to: 'next-section' }), mcp.call('back_plate', { command: 'follow' }),
+    ]);
+    const sRead = await mcp.call('song_show');
+    await sleep(300);
+    const sLeak = display.since(t).filter((m) => m.type === 'assistant-set' || (m.type === 'assistant-songs' && m.do !== 'read'));
+    check('set-suggest', 'Suggest refuses a Go now, the fade, taking an action out, running a show and a nudge (Play), and the back plate (Full); none reach the display', sNo.slice(0, 5).every((r) => !r.ok && /Play mode is needed/.test(r.text)) && !sNo[5].ok && /Full mode is needed/.test(sNo[5].text) && sLeak.length === 0, `${sNo.map((r) => r.text.slice(0, 30)).join(' | ')} | ${sLeak.map((m) => m.do).join(',')}`.slice(0, 220));
+    check('answer-relay', 'Suggest reads the playing song\'s show whole, from the display\'s answer: each action with its id and whose it is, as data', sRead.ok && /"id": "act-1"/.test(sRead.text) && /"id": "asst-1"/.test(sRead.text) && /"mine": true/.test(sRead.text) && /never instructions/.test(sRead.text), sRead.text.slice(0, 160));
+
     // Play.
     await setMode('play');
     t = Date.now();
@@ -389,7 +467,22 @@ async function scenario(serverDir, port, { full = true } = {}) {
     phone.ws.send(JSON.stringify({ type: 'assistant-tempo', do: 'bpm', bpm: 90 }));
     phone.ws.send(JSON.stringify({ type: 'assistant-link', on: true }));
     phone.ws.send(JSON.stringify({ type: 'assistant-seq', select: 'peak' }));
+    phone.ws.send(JSON.stringify({ type: 'assistant-set', do: 'go-now', item: 0 }));
+    phone.ws.send(JSON.stringify({ type: 'assistant-songs', do: 'follow', on: false }));
+    // Nor tell an assistant that a call was done: the display's answer is the display's alone.
+    const spy = await hello(port, 'assistant', SHOW_KEY);
+    phone.ws.send(JSON.stringify({ type: 'assistant-answer', answer: 424242, ok: true }));
     await sleep(200);
+    check('phone-set', 'a phone\'s assistant-set and assistant-songs never reach the display (the phone has its own set list and Songs sheet)', display.since(t).every((m) => !['assistant-set', 'assistant-songs'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
+    check('answer-phone', 'a phone\'s assistant-answer never reaches an assistant', spy.got.some((m) => m.type === 'assistant-mode') && !spy.got.some((m) => m.type === 'assistant-answer' && m.answer === 424242), JSON.stringify(spy.got.map((m) => m.type)).slice(0, 120));
+    // Two assistants at once: each numbers its messages from 1, so the relay
+    // numbers them for the display and sends each answer to the one that asked.
+    spy.ws.send(JSON.stringify({ type: 'assistant-songs', do: 'read', show: null, id: 1 }));
+    const own = await mcp.call('song_show');
+    await sleep(300);
+    const spyAnswers = spy.got.filter((m) => m.type === 'assistant-answer');
+    check('answer-own', 'two assistants at once each get their own answers: the second\'s read comes back to it under its own id 1, and none of the first\'s reach it', own.ok && /"id": "show-a"/.test(own.text) && spyAnswers.length === 1 && spyAnswers[0].answer === 1 && spyAnswers[0].data?.id === 'show-a', JSON.stringify(spyAnswers).slice(0, 160));
+    spy.ws.close();
     check('phone-tempo', 'a phone\'s assistant-tempo, assistant-link and assistant-seq never reach the display (the phone has its own Tempo block and Sequence picker)', display.since(t).every((m) => !['assistant-tempo', 'assistant-link', 'assistant-seq'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
     check('phone-live', 'a phone\'s assistant-live, cue-look, song-action, still and sound source never reach the display', display.since(t).every((m) => !['assistant-live', 'cue-look', 'song-action', 'assistant-still', 'assistant-sound'].includes(m.type)), display.since(t).map((m) => m.type).join(','));
     // But a phone pours words: the remote's text box (37x-10c) is a hand at the plate.
@@ -570,6 +663,54 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('seq-stage', 'a stage past the running sequence\'s last is refused with how many it has, and nothing reaches the display', !qFar.ok && /5 stages/.test(qFar.text) && !qMsgs.some((m) => m.stage === 8), qFar.text.slice(0, 120));
     await mcp.call('sequencer', { command: 'stop' });
 
+    /*
+      The set list and the song shows in Play (PLAN 44k-3, 44k-5). A Go now
+      is a look change: past Go's gap since the last, and on Undo's list.
+      What the display cannot do comes back with the display's reason.
+    */
+    await sleep(4100);
+    t = Date.now();
+    const pFade = await mcp.call('set_list', { command: 'fade', seconds: 4 });
+    const pOdd = await mcp.call('set_list', { command: 'fade', seconds: 3 });
+    const pGo = await mcp.call('set_list', { command: 'go_now', item: 2 });
+    await sleep(300);
+    const pUndo = await mcp.call('undo');
+    await sleep(200);
+    const pSet = display.since(t, 'assistant-set');
+    check('-', 'Play sets the Go\'s fade and sends item 2 now (index 1), and Undo takes that Go back with the desk\'s Back', pFade.ok && pGo.ok && pUndo.ok && pSet.some((m) => m.do === 'fade' && m.seconds === 4) && pSet.some((m) => m.do === 'go-now' && m.item === 1) && display.since(t, 'action').some((m) => m.action === 'back'), `${pFade.text} | ${pGo.text} | ${pUndo.text}`.slice(0, 180));
+    check('set-fade', 'a fade not one of the desk\'s choices is refused with the choices, and none reaches the display', !pOdd.ok && /0, 1, 2, 4, 8 seconds/.test(pOdd.text) && !pSet.some((m) => m.seconds === 3), pOdd.text.slice(0, 120));
+    await sleep(4100);
+    const pGone = await mcp.call('set_list', { command: 'go_now', look_id: 'gone' });
+    check('set-answer', 'a Go now the display cannot do comes back with the display\'s reason, never as done', !pGone.ok && /no look gone in the library/.test(pGone.text), pGone.text.slice(0, 120));
+    await sleep(1100);
+    t = Date.now();
+    const pTheirs = await mcp.call('remove_song_action', { action_id: 'act-1' });
+    const pMine = await mcp.call('remove_song_action', { action_id: 'asst-1' });
+    await sleep(200);
+    const pAfter = await mcp.call('song_show');
+    const pNope = await mcp.call('song_show', { show: 'Nope' });
+    const pSongs = display.since(t, 'assistant-songs');
+    check('song-mine', 'in Play an action the performer programmed is refused, and never reaches the display', !pTheirs.ok && /performer's/.test(pTheirs.text) && !pSongs.some((m) => m.actionId === 'act-1'), pTheirs.text.slice(0, 120));
+    check('-', 'in Play the assistant takes out its own action by its id, and the show read again has the performer\'s and not that one', pMine.ok && pSongs.some((m) => m.do === 'remove' && m.actionId === 'asst-1') && pAfter.ok && !/asst-1/.test(pAfter.text) && /act-1/.test(pAfter.text), `${pMine.text} | ${pAfter.text}`.slice(0, 160));
+    check('song-unknown', 'a show that is not there is refused with the list, and nothing reaches the display', !pNope.ok && /there are: .*Blue Danube/.test(pNope.text) && !pSongs.some((m) => m.show === 'Nope'), pNope.text.slice(0, 140));
+    await sleep(4100);
+    t = Date.now();
+    const pStart = await mcp.call('song_show_run', { command: 'start', show: 'blue danube' });
+    await sleep(300);
+    const pStop = await mcp.call('song_show_run', { command: 'stop' });
+    await sleep(300);
+    const pStop2 = await mcp.call('song_show_run', { command: 'stop' });
+    const pNext = await mcp.call('nudge', { to: 'next-section' });
+    await sleep(300);
+    const pFar = await mcp.call('nudge', { seconds: 90 });
+    const pFollow = await mcp.call('song_show_run', { command: 'follow', on: false });
+    await sleep(200);
+    const pRun = display.since(t, 'assistant-songs');
+    check('-', 'Play starts a show named by its song (any case) as the show\'s id, stops it, and nudges to the next section', pStart.ok && pStop.ok && pNext.ok && pRun.some((m) => m.do === 'start' && m.show === 'show-b') && pRun.some((m) => m.do === 'stop') && pRun.some((m) => m.do === 'nudge' && m.to === 'next-section'), `${pStart.text} | ${pStop.text} | ${pNext.text}`.slice(0, 180));
+    check('song-stop', 'a stop with no show running is refused, and none reaches the display', !pStop2.ok && /no song show is running/.test(pStop2.text) && pRun.filter((m) => m.do === 'stop').length === 1, pStop2.text.slice(0, 120));
+    check('song-nudge', 'a nudge past 30 s is refused with the range, and none reaches the display', !pFar.ok && /up to 30/.test(pFar.text) && !pRun.some((m) => m.seconds === 90), pFar.text.slice(0, 120));
+    check('song-follow', 'Follow songs is refused in Play, for want of Full', !pFollow.ok && /Full mode is needed/.test(pFollow.text) && !pRun.some((m) => m.do === 'follow'), pFollow.text.slice(0, 120));
+
     if (full) {
       const wait = handT + 10_400 - Date.now();
       if (wait > 0) await sleep(wait);
@@ -606,6 +747,24 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await sleep(200);
     check('tempo-link', 'while Link leads the tempo a typed bpm is refused, never reported as the clock\'s, and none reaches the display', !tLinked.ok && /Link leads/.test(tLinked.text) && display.since(t, 'assistant-tempo').length === 0, tLinked.text.slice(0, 120));
     await mcp.call('link', { on: false });
+
+    // The back plate, Follow songs and the performer's own actions: Full (PLAN 44k-3, 44k-5).
+    await sleep(300);
+    t = Date.now();
+    await mcp.call('set_list', { command: 'arm', item: 1 });
+    await sleep(200);
+    const fBack = await mcp.call('back_plate', { command: 'armed' });
+    const fLook = await mcp.call('back_plate', { command: 'look', look_id: 'acid', seconds: 2 });
+    const fFollowBack = await mcp.call('back_plate', { command: 'follow' });
+    const fTheirs = await mcp.call('remove_song_action', { action_id: 'act-2' });
+    const fFollow = await mcp.call('song_show_run', { command: 'follow', on: false });
+    const fWobble = await mcp.call('add_song_action', { when: { at: 'start' }, what: { do: 'wobble' } });
+    await sleep(200);
+    const fSet = display.since(t, 'assistant-set'), fSongs = display.since(t, 'assistant-songs');
+    check('-', 'Full sends the armed look, a look and the follow to the back plate, takes out the performer\'s action, and switches Follow songs', fBack.ok && fLook.ok && fFollowBack.ok && fTheirs.ok && fFollow.ok
+      && fSet.some((m) => m.do === 'back-armed') && fSet.some((m) => m.do === 'back-look' && m.look === 'acid' && m.seconds === 2) && fSet.some((m) => m.do === 'back-follow')
+      && fSongs.some((m) => m.do === 'remove' && m.actionId === 'act-2') && fSongs.some((m) => m.do === 'follow' && m.on === false), [fBack, fLook, fFollowBack, fTheirs, fFollow].map((r) => r.text.slice(0, 30)).join(' | '));
+    check('song-answer', 'a song action the display does not know comes back with the display\'s reason, not as added (44f-4)', !fWobble.ok && /not a song action this build knows/.test(fWobble.text), fWobble.text.slice(0, 120));
 
     // The Live Show and the sound (PLAN 44j). On air now, from live-start above.
     await sleep(1100);
@@ -715,7 +874,21 @@ const MUTANTS = [
   { rule: 'seq-stage', file: 'assistant.js', find: 'if (n !== null && message.stage >= n)', replace: 'if (false)' },
   { rule: 'seq-run', file: 'assistant.js', find: "if (n === null && !show.legacySeq) return refuse(", replace: 'if (false) return refuse(' },
   { rule: 'tempo-link', file: 'assistant.js', find: "if (message.do !== 'heard' && show.tempoSource === 'link')", replace: 'if (false)' },
-  { rule: 'phone-tempo', file: 'remote-server.js', find: "'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq']", replace: "'song-action']" },
+  { rule: 'phone-tempo', file: 'remote-server.js', find: "'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq',", replace: "'song-action'," },
+  { rule: 'set-past', file: 'assistant.js', find: 'if (items && message.item >= items.length)', replace: 'if (false)' },
+  { rule: 'set-fade', file: 'assistant.js', find: "if ((seconds !== undefined || message.do === 'fade') && !SET_FADES.includes(seconds))", replace: 'if (false)' },
+  { rule: 'set-suggest', file: 'assistant.js', find: "['go-now', 'play']", replace: "['go-now', 'suggest']" },
+  { rule: 'set-answer', file: 'assistant.js', find: '...(seconds !== undefined ? { seconds } : {}), ...answerOf(message) });', replace: '...(seconds !== undefined ? { seconds } : {}) });' },
+  { rule: 'song-mine', file: 'assistant.js', find: "if (mode !== 'full' && !message.actionId.startsWith(ASSISTANT_ACTION_PREFIX))", replace: 'if (false)' },
+  { rule: 'song-unknown', file: 'assistant.js', find: 'if (!hit) return refuse(`no song show', replace: 'if (false) return refuse(`no song show' },
+  { rule: 'song-stop', file: 'assistant.js', find: "if (message.do === 'stop' && show.songRunning === false)", replace: 'if (false)' },
+  { rule: 'song-nudge', file: 'assistant.js', find: ' && Math.abs(message.seconds) <= SONG_NUDGE_MAX_S', replace: '' },
+  { rule: 'song-follow', file: 'assistant.js', find: "['follow', 'full']", replace: "['follow', 'play']" },
+  { rule: 'song-answer', file: 'assistant.js', find: "send({ type: 'song-action', when, what, ...answerOf(message) });", replace: "send({ type: 'song-action', when, what });" },
+  { rule: 'answer-relay', file: 'remote-server.js', find: 'if (to.socket.readyState === 1) to.socket.send(', replace: 'if (false) to.socket.send(' },
+  { rule: 'answer-phone', file: 'remote-server.js', find: "if (message.type === 'assistant-answer') {\n      const to = from === 'display' ? answerTo.get(message.answer) : undefined;", replace: "if (message.type === 'assistant-answer') {\n      if (from !== 'display') broadcastTo('assistant', raw);\n      const to = from === 'display' ? answerTo.get(message.answer) : undefined;" },
+  { rule: 'answer-own', file: 'remote-server.js', find: 'reply = guard.handle({ ...message, id: n }, assistantMode());', replace: 'reply = guard.handle(message, assistantMode());' },
+  { rule: 'phone-set', file: 'remote-server.js', find: "'assistant-seq', 'assistant-set', 'assistant-songs']", replace: "'assistant-seq']" },
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
@@ -737,7 +910,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -869,6 +1042,56 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   if (/\.\.\.MIX_ROWS\.map/.test(/name: 'show_action'[^\n]*/.exec(mcpSrc)?.[0] ?? '')) for (const row of /const MIX_ROWS = \[([^\]]*)\]/.exec(mcpSrc)?.[1].match(/'[a-z]+'/g) ?? []) listed.add(`mix-fade-${row.slice(1, -1)}`);
   const missing = [...guard.FULL_ACTIONS].filter((a) => !listed.has(a));
   say(missing.length === 0 && guard.FULL_ACTIONS.size > 20, `show_action offers every action the guard allows in Full (${guard.FULL_ACTIONS.size} actions; missing: ${missing.join(', ') || 'none'})`);
+}
+
+/* The page's own set list and song show doors (44k-3, 44k-5), on the real
+   setNow and songShowNow: what each is handed reaches the desk's callback,
+   what the set or the shows no longer have is refused with why (the guard
+   saw an older list), and the guard's numbers are the page's. */
+{
+  const guard = await import(join(ROOT, 'server', 'assistant.js'));
+  const same = (a, b) => JSON.stringify([...a]) === JSON.stringify([...b]);
+  say(same(guard.SET_FADES, page.FADE_CHOICES) && guard.SONG_NUDGE_MAX_S === page.SONG_NUDGE_MAX_S && guard.ASSISTANT_ACTION_PREFIX === page.ASSISTANT_ACTION_PREFIX,
+    `the guard's fades, nudge range and the assistant's action prefix are the page's (guard ${guard.SET_FADES.join('/')}, ${guard.SONG_NUDGE_MAX_S} s, ${guard.ASSISTANT_ACTION_PREFIX}; page ${[...page.FADE_CHOICES].join('/')}, ${page.SONG_NUDGE_MAX_S} s, ${page.ASSISTANT_ACTION_PREFIX})`);
+  // The actions the assistant adds carry the prefix the guard holds Play to:
+  // useSongScore pins them with newId('asst').
+  const scoreSrc = readFileSync(join(ROOT, 'src', 'app', 'useSongScore.ts'), 'utf8');
+  say(/pinRef\.current\(when, what, 'asst'\)/.test(scoreSrc) && page.newId('asst').startsWith(page.ASSISTANT_ACTION_PREFIX), `the assistant's song actions are pinned with ids that begin ${page.ASSISTANT_ACTION_PREFIX} (${page.newId('asst')})`);
+
+  const noSet = page.askSet({ do: 'arm', item: 0 });
+  const did = [];
+  page.publishSet({ list: { name: 'x', items: [{ id: 'i1', kind: 'look', ref: 'calm' }, { id: 'i2', kind: 'look', ref: 'acid' }] }, armedItem: null, fadeSeconds: 2 });
+  page.setGoDoor({
+    arm: (i, sec) => { did.push(`arm ${i} ${sec}`); return null; }, goItem: (i, sec) => { did.push(`go ${i} ${sec}`); return null; },
+    goLook: (id) => (id === 'gone' ? 'no look gone in the library' : (did.push(`look ${id}`), null)), backArmed: () => { did.push('back'); return null; },
+    backLook: (id) => { did.push(`backlook ${id}`); return null; }, backFollow: () => { did.push('follow'); return null; },
+  });
+  page.setCueDoor({ fade: (sec) => did.push(`fade ${sec}`), cancel: () => did.push('cancel') });
+  const r = [page.askSet({ do: 'arm', item: 1, seconds: 0 }), page.askSet({ do: 'arm', item: 5 }), page.askSet({ do: 'go-now', item: 0, seconds: 8 }), page.askSet({ do: 'go-now', item: 0, seconds: 3 }),
+    page.askSet({ do: 'go-now', look: 'gone' }), page.askSet({ do: 'fade', seconds: 4 }), page.askSet({ do: 'fade' }), page.askSet({ do: 'cancel' }), page.askSet({ do: 'shuffle' })];
+  page.setGoDoor(null); page.setCueDoor(null);
+  say(/not running/.test(noSet ?? '') && r[0] === null && /item 6 of a set of 2/.test(r[1] ?? '') && r[2] === null && /0, 1, 2, 4, 8/.test(r[3] ?? '') && /no look gone/.test(r[4] ?? '') && r[5] === null && /fade of/.test(r[6] ?? '') && r[7] === null && /not a set list call/.test(r[8] ?? '')
+    && did.join(',') === 'arm 1 0,go 0 8,fade 4,cancel',
+    `the page's set list door does what it is handed, refuses an item past the set as it is now, a fade off the desk's choices and a word it does not know, passes on the desk's own refusal, and says so with no set running (${did.join(',')} | ${r.map((x) => x ?? 'ok').join(' | ').slice(0, 200)})`);
+
+  const shows = [{ id: 'show-a', song: { title: 'Tiger Rag', artist: 'ODJB' }, look: { kind: 'preset', id: 'calm', name: 'Calm' }, actions: [
+    { id: 'act-1', when: { at: 'section', section: 'chorus' }, what: { do: 'burst' } }, { id: 'asst-1', when: { at: 'time', sec: 60 }, what: { do: 'dyes' } },
+  ] }];
+  const sd = [];
+  const noSongs = page.askSongs({ do: 'read' });
+  page.setSongsDoor({ shows: () => shows, current: () => 'show-a', remove: (id) => sd.push(`remove ${id}`), start: (id) => sd.push(`start ${id}`), stop: () => sd.push('stop'), running: () => false,
+    nudge: (k) => (k === 'next-section' ? 'the song has no map yet' : (sd.push(`nudge ${k}`), null)), nudgeBy: (sec) => { sd.push(`by ${sec}`); return null; }, resetNudge: () => { sd.push('reset'); return null; } });
+  const noFollow = page.askSongs({ do: 'follow', on: false });
+  page.setFollowDoor((on) => sd.push(`follow ${on}`));
+  const q = [page.askSongs({ do: 'read' }), page.askSongs({ do: 'read', show: 'nope' }), page.askSongs({ do: 'remove', actionId: 'asst-9' }), page.askSongs({ do: 'remove', actionId: 'asst-1' }),
+    page.askSongs({ do: 'start', show: 'show-a' }), page.askSongs({ do: 'stop' }), page.askSongs({ do: 'nudge', to: 'next-section' }), page.askSongs({ do: 'nudge', seconds: 40 }),
+    page.askSongs({ do: 'nudge', seconds: -5 }), page.askSongs({ do: 'follow', on: false })];
+  page.setSongsDoor(null); page.setFollowDoor(null);
+  const read = q[0].ok ? q[0].data : null;
+  say(!noSongs.ok && /not running/.test(noSongs.reason) && !noFollow.ok && read?.id === 'show-a' && read.playing === true && read.actions.length === 2 && read.actions[0].mine === false && read.actions[1].mine === true && /Burst/.test(read.actions[0].says)
+    && !q[1].ok && /no song show "nope"/.test(q[1].reason) && !q[2].ok && /no action asst-9/.test(q[2].reason) && q[3].ok && q[4].ok && !q[5].ok && /no song show is running/.test(q[5].reason)
+    && !q[6].ok && /no map/.test(q[6].reason) && !q[7].ok && /up to 30/.test(q[7].reason) && q[8].ok && q[9].ok && sd.join(',') === 'remove asst-1,start show-a,by -5,follow false',
+    `the page's song show door reads a show whole (each action in words, with its id and whose it is), does what it is handed, and refuses what the shows no longer have, a stop with none running, a nudge it cannot make and one past its range (${sd.join(',')} | ${q.map((x) => (x.ok ? 'ok' : x.reason)).join(' | ').slice(0, 220)})`);
 }
 
 // The edges of the code.

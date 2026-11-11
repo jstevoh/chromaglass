@@ -8,6 +8,7 @@ import { SETLIST_KEY, loadSetList, starterSet, SAVED_SETS_KEY, loadSavedSets, ty
 import { PRESETS } from '../presets';
 import type { MusicSettings } from '../lib/musicTypes';
 import { MUSIC_SETTINGS_KEY, loadMusicSettings } from './shared';
+import { setFollowDoor } from './songShowNow';
 
 /**
  * What is kept between shows and synced between machines: each song's show
@@ -73,6 +74,8 @@ export function useShowLibrary({
     },
   });
   useEffect(() => startCloudSync(), []);
+  // The owner's assistant's Follow songs (app/songShowNow.ts, PLAN 44k-5): the Songs panel's own switch.
+  useEffect(() => { setFollowDoor(setFollowSongs); return () => setFollowDoor(null); }, [setFollowSongs]);
 
   return {
     songShows, songShowsRef, setSongShows, actionSets, saveActionSet, deleteActionSet, followSongs,

@@ -429,13 +429,16 @@ const pairTv = (tv, except) => {
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq']);
+const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
 let assistantWantsPicture = -Infinity;
+/** The display's answers still owed: the relay's number for each, to the assistant and the message id that asked (PLAN 44f-4). */
+const answerTo = new Map();
+let answerSeq = 0;
 let assistantWantsStill = -Infinity;
 const assistantWatch = setInterval(() => {
   const mode = readAssistantMode(process.env, ASSISTANT_FILE);
@@ -585,9 +588,29 @@ wss.on('connection', (socket, req) => {
         broadcastTo('display', JSON.stringify({ type: 'assistant-still', width: Number(message.width) || 1280 }));
         reply = { ok: true };
       } else {
-        reply = guard.handle(message, assistantMode());
+        // The guard hands the display the number its answer comes back under
+        // (PLAN 44f-4): one of the relay's own, since each assistant numbers
+        // its messages from 1, and two connected at once would otherwise be
+        // settled by each other's answers.
+        const n = ++answerSeq;
+        if (message.id !== undefined) {
+          answerTo.set(n, { socket, id: message.id, at: Date.now() });
+          if (answerTo.size > 64) for (const [k, v] of answerTo) if (Date.now() - v.at > 10_000) answerTo.delete(k);
+        }
+        reply = guard.handle({ ...message, id: n }, assistantMode());
       }
       if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...reply }));
+      return;
+    }
+    // The display's word on an assistant's call (PLAN 44f-4, 44k-3, 44k-5):
+    // to the assistant alone, and only from the display, so a phone cannot
+    // tell the assistant a call was done that was not.
+    if (message.type === 'assistant-answer') {
+      const to = from === 'display' ? answerTo.get(message.answer) : undefined;
+      if (to) {
+        answerTo.delete(message.answer);
+        if (to.socket.readyState === 1) to.socket.send(JSON.stringify({ ...message, answer: to.id }));
+      }
       return;
     }
     // What only the guard may hand the display: a look the assistant made, and
