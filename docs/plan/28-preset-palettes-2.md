@@ -138,6 +138,37 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     more than 30 looks (32 ship; 31 after Lumia, 28i-5), and `disc` names its two magnet looks
     where it asked for three.
 
+  - **28i-7. Every look filmed again, and the dull and samey ones retuned** (the owner,
+    2026-11-11: "is it time to redo all of the pre-sets again? make sure they're all really
+    compelling?"). All 41 looks filmed on the Mac (Metal, band, seed 1) from main 440b0638;
+    verdicts on the owner's judging page. **Shipped in this PR** (first pass; afters
+    filmed with `FILM_ONLY` on the branch): Comet River pours again (automateRate was 0),
+    Cyberpunk on one neon arc with less dye (lime and orange summed it to grey-teal on the
+    additive blend), Acid Trip's bodies kept apart (centre pull 0.6 merged them into one
+    amber blob, Solar Flare's look), Bass Drop's three wells given the dye to show three
+    colours, Velvet Underground's lamp and dye lifted, Milk Marbling with more colour on
+    the milk, Soap Film warmer and fuller (until 28i-4), Splodascope's water pale blue
+    (under cobalt every drop read green), Poster 1969 with more ink on the lamp's white,
+    Microscopic Chaos with an amber counterstain, Aurora's violet and pink top edge in the
+    window, Galaxy with a gold arm and a gold core (it read as Jellyfish Bloom), Lacing
+    Run on the amber-over-crimson its description names, Ferro Paint on warm neighbours
+    (amber over teal was brown-green), Macro Bead's sea-green ground and smaller bodies,
+    Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (Saffron's film
+    thinner, so it dewets finer), and Moiré Waves and Moiré Ripple given dyes of their own
+    (a pack look's own contract now wins over its house look's, and the seed lays it).
+    Left alone: Chemical Clock (the owner loves it), the keeps, Lava Lamp (sealed bottle,
+    its own thread) and Lumia (28i-5).
+    - **28i-7a, open. The music still barely swells.** 25 of 40 looks scored 0 swells a
+      minute and almost none change colour with the song; motion half-life 0.3 s against
+      2 to 7 s in real shows. This PR fixes what each look shows, not how it breathes: that
+      is 28i-3b's film bar, still open.
+    - **28i-7b, open. Splodascope's oil is filtered by the water it displaced.** In a thin
+      cell an oil drop pushes the water out of the gap, so a drop's colour should not pass
+      through the water's dye; the plate multiplies the two, so a cobalt water turned every
+      drop green. The pale water is the stopgap; the fix is the oil's share taking the water
+      out of the light's path (as `gapScale × (1 − film)` does for Clear Film), then the
+      photograph's cobalt back.
+
   The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
   (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
   Clock Glass, Lava Lamp), proposed as Home's one fixed pack; Fillmore (Acid Trip,

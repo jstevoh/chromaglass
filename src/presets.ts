@@ -115,10 +115,13 @@ export const PRESETS: Preset[] = [
       buoyancy: 0.2,
       advection: 0.45,
       damping: 0.9,
-      automateRate: 0.0,
+      // 28i-7: at 0 nothing poured after the seed, and the river ran to 72% black and one
+      // hue. A pour every few seconds feeds it syrup streaks in the whole family.
+      automateRate: 0.15,
+      dyeBudget: 0.45,
       viscosity: 'thick',
       polarity: 0.8,
-      evaporationRate: 0.008,
+      evaporationRate: 0.006,
       audioImpact: 0.6,
       turbulenceScale: 0.3,
       blobSurfaceTension: 0.4,
@@ -213,7 +216,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0336,
       postBlurRadius: 0.1,
       boundaryContrast: 0.7,
-      beads: 0.35,
+      beads: 0.15,               // 28i-7: at 0.35 grey beads covered the neon
       surge: 0.85,
       layerCount: 2,
       blendMode: 'lighter',
@@ -237,8 +240,10 @@ export const PRESETS: Preset[] = [
       // 28i-2: at 0.05 on treble density the plate dried to 99% black and one
       // blue hue. At 0.005 on bass density with a 0.70 budget, pink, cyan and
       // lime neon stay on screen (95th-pct near black under 60%, ≥3 hues).
-      evaporationRate: 0.005,
-      dyeBudget: 0.7,
+      // 28i-7 (film 2026-11-11): at 0.70 the additive blend summed five neons
+      // to a grey-teal wash, 23% near black. Less dye, and the black between.
+      evaporationRate: 0.007,
+      dyeBudget: 0.5,
       hueJourney: 2,
       saturationBoost: 1.55,
       airVelocity: 0.3,
@@ -276,7 +281,7 @@ export const PRESETS: Preset[] = [
       blendMode: 'exclusion',
       gooeyEffect: 0.3,
       rotationSpeed: 0.421,      // the dish's motor; was 0.1 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.6,
+      centerGravity: 0.2,        // 28i-7: at 0.6 every body slid into one amber blob in the middle
       ledPlatform: true,
       ledMode: 'single',
       ledSpeed: 0.0,
@@ -290,7 +295,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.9,
       rainDrip: 0.4,
       viscosity: 'thin',
-      polarity: 0.5,
+      polarity: 0.75,            // 28i-7: immiscible enough that five colours stay five
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
@@ -301,7 +306,7 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.9,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,  // colours barely hold apart
+      blobSurfaceTension: 0.35,  // 28i-7: was 0.15, and the bodies ran together
       edgeRelief: 0.65,
       bubbles: 0.17,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces
@@ -356,8 +361,10 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
-      evaporationRate: 0.020,
-      dyeBudget: 0.24,
+      // 28i-7 (film 2026-11-11): at 0.24 and 0.020 one blue body was left of
+      // the three wells' colours. Enough for all three, black still between.
+      evaporationRate: 0.012,
+      dyeBudget: 0.38,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
       audioImpact: 0.95,
@@ -436,7 +443,7 @@ export const PRESETS: Preset[] = [
       viscosity: 'thick',
       polarity: 0.15,
       blobSurfaceTension: 0.05,
-      evaporationRate: 0.002,
+      evaporationRate: 0.005,    // 28i-7: a little bright field between the cells
       airVelocity: 0.06,
       vibrationFrequency: 0.02,
       turbulenceScale: 0.22,
@@ -444,7 +451,7 @@ export const PRESETS: Preset[] = [
       cells: 0.0,
       exposure: 0.22,
       saturationBoost: 1.05,
-      dyeBudget: 0.72,
+      dyeBudget: 0.6,
       sceneMappings: [
         // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
         // Kick and snare agitate the slide's cover glass and swirl without drawing sharp beads or bubbles (28i-2, 28i-3b).
@@ -463,7 +470,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'aurora-borealis',
     name: 'Aurora Borealis',
-    description: 'Curtains of jade, lime and lavender ripple across a night sky, slow and hushed.',
+    description: 'Curtains of jade and lime with a lavender and pink top edge ripple across a night sky, slow and hushed.',
     settings: {
       globalSpeed: 0.0105,
       surge: 0.2,
@@ -706,7 +713,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.0,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#220044',
+      ledColor: '#3a0a6e',       // 28i-7: '#220044' left the pools in a dim haze (73% near black)
       ledSpeed: 0.0,
       diffusionRate: 0.00006,
       buoyancy: 0.35,
@@ -729,8 +736,8 @@ export const PRESETS: Preset[] = [
       glossiness: 0.35,
       edgeRelief: 0.45,
       boundaryContrast: 0.5,
-      exposure: 0.78,
-      dyeBudget: 0.42,          // dark violet between the pools: at the default 0.85 they ran into one wash
+      exposure: 0.95,
+      dyeBudget: 0.55,          // violet between the pools: at 0.85 they ran into one wash, at 0.42 barely read (28i-7)
       /*
         Each pool hears its own instrument (PLAN 25h, lib/areaCords.ts). The
         kick warms and stirs the soap well (area 1): a heat source under it
@@ -1058,12 +1065,12 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.7,
       turbulenceScale: 0.55,
       turbulenceDetail: 2,
-      blobSurfaceTension: 0.6,
+      blobSurfaceTension: 0.45,  // 28i-7: was 0.6; a lower tension spreads the same ink flatter and wider over the white
       boundaryContrast: 0.9,
       saturationBoost: 1.6,
       glossiness: 0.0,
       postBlurRadius: 0.0,
-      dyeBudget: 1.1,
+      dyeBudget: 1.2,            // 28i-7: at 1.1 the lamp's white took the frame (1% near black); more ink, at the dial's top
       edgeRelief: 0.0,
       bubbles: 0.07,
       plateRock: 0.5,
@@ -1115,7 +1122,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.15,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#04181a',
+      ledColor: '#0a3a36',       // 28i-7: the sea-green ground the description names; '#04181a' read black
       ledSpeed: 0.0,
       diffusionRate: 0,          // colors stay separate instead of muddying
       buoyancy: 0.35,
@@ -1129,6 +1136,7 @@ export const PRESETS: Preset[] = [
       viscosity: 'thick',
       polarity: 0.98,            // strong immiscibility — hard color boundaries
       evaporationRate: 0.005,
+      dyeBudget: 0.65,           // 28i-7: at 0.85 the closeup saw one pink sheet; smaller bodies, two or three a frame
       airVelocity: 0.08,
       vibrationFrequency: 0.05,
       audioImpact: 0.6,
@@ -1173,15 +1181,15 @@ export const PRESETS: Preset[] = [
       macroCells: 0,
       macroCellScale: 0.6,
       macroLacing: 0,
-      macroDepth: 0.7,
-      macroEdgeDetail: 0.5,
+      macroDepth: 0.5,           // 28i-7: at 0.7 the shallow focus blurred the pools' edges
+      macroEdgeDetail: 0.75,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
       globalSpeed: 0.045,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.2,
-      postBlurRadius: 0.12,
+      gooeyEffect: 0.1,
+      postBlurRadius: 0.04,      // 28i-7: sharper pool edges
       rotationSpeed: 0.18,       // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.75,       // 28i-2: holds the three pools inside the central closeup frame instead of drifting off
       ledPlatform: true,
@@ -1209,7 +1217,7 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.65,
       bubbles: 0.1,
       layerScaleVariety: 0,
-      boundaryContrast: 0.65,
+      boundaryContrast: 0.8,
       saturationBoost: 1.55,
       glossiness: 0.18,
       macroSync: 0.35,
@@ -1419,11 +1427,11 @@ export const PRESETS: Preset[] = [
       turbulenceDetail: 2,
       blobSurfaceTension: 0.7,
       boundaryContrast: 0.55,      // a bright line where a colour front meets the ground
-      saturationBoost: 1.55,
-      exposure: 0.72,              // 28i-2: tames the white milk ground so the food colouring holds luma <= 0.6
+      saturationBoost: 1.7,
+      exposure: 0.64,              // 28i-2, 28i-7: tames the white milk ground (3% near black at 0.72)
       glossiness: 0.05,
       postBlurRadius: 0.1,
-      dyeBudget: 1.1,
+      dyeBudget: 1.2,              // 28i-7: more food colouring on the milk (the dial's top)
       edgeRelief: 0.3,
       bubbles: 0.0,
       plateRock: 0.1,
@@ -1492,7 +1500,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.35,
       glossiness: 0.2,
       postBlurRadius: 0.2,
-      dyeBudget: 0.5,
+      dyeBudget: 0.7,              // 28i-7: warmer and fuller until 28i-4 draws the film's own colours
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
@@ -1886,7 +1894,7 @@ export const PRESETS: Preset[] = [
       plateSpring: 0.35,
       beatSqueeze: 0.0,
       transmission: 0.35,
-      dishVignette: 0.8,
+      dishVignette: 0.35,        // 28i-7: at 0.8 the dish was a small disc in a black frame (72% near black)
       lampHotspot: 0.5,
       /*
         Two bowed clock glasses (PLAN 28i-3b): kicks press the top glass so
@@ -1959,7 +1967,7 @@ export const PRESETS: Preset[] = [
       plateSpring: 0.35,
       beatSqueeze: 0.0,
       transmission: 0.4,
-      dishVignette: 0.6,
+      dishVignette: 0.3,         // 28i-7: a bigger dish
       lampHotspot: 0.45,
       /*
         Fast readings only (the owner's rule): a kick presses the top glass,
@@ -1985,7 +1993,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'ferro-paint',
     name: 'Ferro Paint',
-    description: 'Ferrofluid worked through amber, teal and coral dye under a wandering magnet: black channels and beads between bright cells of colour, wet and glossy, as in Colored I and II.',
+    description: 'Ferrofluid worked through yellow, coral and pink dye under a wandering magnet: black channels and beads between bright cells of colour, wet and glossy, as in Colored I and II.',
     settings: {
       ferroLabyrinth: 0.9,
       globalSpeed: 0.0105,
@@ -2016,7 +2024,7 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.5,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
-      saturationBoost: 1.35,
+      saturationBoost: 1.55,
       dyeBudget: 1.0,
       glossiness: 0.5,
       postBlurRadius: 0.12,
@@ -2040,7 +2048,7 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.3,
       secondLamp: 0.2,
       /*
-        Ferrofluid channels through amber, teal and coral (PLAN 28i-3b): kicks
+        Ferrofluid channels through the warm paints (PLAN 28i-3b): kicks
         drive the labyrinth channels finer, snares branch the fingers along
         the seams, and high overtones crisp the black channel walls.
       */
@@ -2254,7 +2262,9 @@ export const PRESETS: Preset[] = [
         dye out from under it and reads closer to its own yellow.
       */
       lampGround: 1,
-      clearFilm: 0.35,           // 0.3 of the gap: it tears on the dish's dust in a few seconds, a third torn by five (lab)
+      // 28i-7: was 0.35, and tore into coarse tiles. A thinner film dewets at a
+      // shorter wavelength (spinodal λ grows as the thickness squared): finer lace.
+      clearFilm: 0.25,
       clearFilmDye: 0.35,        // at 0.6 its beads, which thicken toward the whole gap, read orange (lab)
       clearFilmDyeColor: '#ffd21a',
       globalSpeed: 0.0126,
@@ -2291,7 +2301,7 @@ export const PRESETS: Preset[] = [
       postBlurRadius: 0.05,
       plateCurve: 0.2,
       transmission: 0.5,
-      dishVignette: 0.5,
+      dishVignette: 0.2,         // 28i-7: a bigger dish
       lampHotspot: 0.35,
       bubbles: 0,
       /*
