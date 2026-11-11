@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ChromaGlass</string>
+    <string name="title_activity_main">ChromaGlass</string>
+    <string name="package_name">app.chromaglass</string>
+    <string name="custom_url_scheme">app.chromaglass</string>
+</resources>

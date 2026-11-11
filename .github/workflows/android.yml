@@ -1,0 +1,69 @@
+name: Android app
+
+# Builds the Android app (PLAN 12-ctl-3) as an unsigned debug APK, so a change
+# that breaks the Gradle project goes red on its PR rather than on the owner's
+# machine, and keeps the APK as the run's artifact: a phone can install it
+# side-loaded to try a change before the Play listing has it. It proves the
+# app compiles and bundles today's build, not how it plays: the plate on a
+# real phone is judged by hand (docs/judging.md).
+#
+# The twin of ios.yml, for the same reasons: its own workflow, not a job in
+# checks.yml, because deploy.yml calls checks.yml and the website should not
+# wait on, or be stopped by, the app's build; and it runs only when something
+# the app is made from changes. No secrets and no upload: signing and the
+# Play upload are 12-ctl-ship, and are not done here.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'android/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/lib/appLink.ts'
+      - 'src/main.tsx'
+      - '.github/workflows/android.yml'
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Android app (debug APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      # Capacitor 8's Gradle plugin needs JDK 21.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      # The SDK's command-line tools and its licences accepted, so Gradle can
+      # fetch the platform the project compiles against (compileSdkVersion in
+      # android/variables.gradle) if the image lacks it.
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - name: Build the site into the app
+        run: npm run build && npx cap sync android
+      - name: Build the app
+        working-directory: android
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chromaglass-android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
