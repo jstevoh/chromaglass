@@ -188,6 +188,18 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
     water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
     when the mix's oil gets its viscosity.
+  - **27f-9. A standing plate is a sealed bottle (shipped 2026-11-11; story in
+    docs/plan-shipped.md §27f-9).** Lava Lamp's wax poured out over the open rim; on a standing
+    plate the weight is now the closed cell's circulation (`wgsl/fluid/seal.ts`). `npm run sealed`.
+    - **27f-9a, open.** Plate Rock's and Rain Drip's weight (hsBody) on a standing plate still
+      go on the open rim: the same circulation with the rock's tilt added to gravity's (the
+      source as curl F of both, one ψ). Lava Lamp rocks at 0.25.
+    - **27f-9b, open (a shortcut named, with 27f-7).** The circulation is the even gap's: where
+      the mobility is not even (a press, glycerine beside water, the wax's own viscosity) the
+      gap's solve takes the rest through its open rim, which is the 1.3% the lamp run loses in
+      20 s where the wax lies on the bottom rim. A press on a standing plate is still an open
+      edge for the glass. The full answer is a closed rim for the weight's part of the gap's
+      own solve.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).

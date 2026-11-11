@@ -391,7 +391,9 @@ export class WebGPUFluid extends FluidCover {
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     const upright = Math.max(0, Math.min(1, fin(p.plateUpright, 0)));
-    f[22] = fin(p.currentDamp, 0.98); f[23] = upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
+    // A sealed bottle's heat lift goes round inside the wall (sealWeight), not in the current, whose solve has an open rim (PLAN 27f-9).
+    const sealsHeat = thin && upright > 0.001 && !this.boilLive && this.sealReady();
+    f[22] = fin(p.currentDamp, 0.98); f[23] = sealsHeat ? 0 : upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
     f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
@@ -766,8 +768,9 @@ export class WebGPUFluid extends FluidCover {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
-        gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
+      // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
+      const sealed = thin && upright > 0.001 && this.sealReady(), wax = buoy * DYE_WEIGHT * perSecond, heatLift = buoy * HEAT_LIFT * perSecond;
+      const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)), gx, gy, sealed ? 0 : wax, sealed ? 0 : heatLift]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
         wgsl/fluid.ts): φ round the ring, from this step's oil, for the
@@ -779,6 +782,7 @@ export class WebGPUFluid extends FluidCover {
       if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
       this.vel.swap();
+      if (sealed) this.sealWeight(pass, p, mix!.read, upright, gx, gy, wax, heatLift);
       // Film Hold's push: the film between two drops holds them apart (mixFilm).
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {

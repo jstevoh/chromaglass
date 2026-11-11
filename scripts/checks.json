@@ -1445,6 +1445,20 @@
       ]
     },
     {
+      "name": "A standing plate is a sealed bottle",
+      "shard": "lab7",
+      "run": "npm run sealed",
+      "timeout": 12,
+      "why": [
+        "Lava Lamp's wax poured out over the plate's open rim (PLAN 27f-9): the",
+        "weight on a standing plate is now the closed cell's circulation. With the",
+        "seal held off the plate keeps 68% of its dye in eight seconds; sealed it",
+        "keeps all of it, a lone drop still falls at 95% of its old speed, the",
+        "lamp's heat lift stays inside too, and a flat plate is the same to the bit.",
+        "About six minutes on SwiftShader, in lab7 beside the ink titles."
+      ]
+    },
+    {
       "name": "A song's title painted as ink, then swept away",
       "shard": "lab7",
       "run": "npm run inktitle",

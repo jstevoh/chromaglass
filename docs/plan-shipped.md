@@ -6081,6 +6081,43 @@ plate), 27f-7 (the lift's circulation is the even gap's; the mix's oil has the w
 viscosity), 18g-6 (a body touching the rim drains through it by its own surface tension, on
 main).
 
+### 27f-9. A standing plate is a sealed bottle (2026-11-11)
+
+Found by the preset retune (2026-11-11): Lava Lamp, filmed on the Mac, showed a flat tan lamp,
+its wax poured in and run straight out over the plate's edge. Since 18a the gap's solve holds the
+rim at the air's pressure, p = 0, which is right for two glasses lying on a projector (a press's
+liquid goes out and comes back). The weight on a standing plate was laid into that solve as a
+body force, F = G·w (Dye Weight, the lamp's heat lift and the oil's lightness in `mixForce`, and
+the Buoyancy dial's heat lift S.up·curBuoy·T in the lasting current, which on a thin gap is laid
+into the solve as a speed too), so nothing held a column of wax up: it fell out of the bottom,
+clear liquid came in at the top, and what the lamp warmed went out of the top. Measured in the
+lab (128², Plate Upright 1, Dye Weight 0.7, seven wax drops a fifth of the way up): 68% of the
+dye left after 8 s and still falling; flat, all of it. 28i-2 had held the wax in with Centre
+Gravity 0.32, a pull to the middle no lamp has.
+
+A lava lamp is a sealed bottle: no flux through its wall, so an even weight is a pressure and
+moves nothing, and an uneven one turns the liquid round in closed loops. Between two glasses at
+an even gap that is the closed dish's Darcy circulation, u = ∇⊥ψ, −∇²ψ = curl F, ψ = 0 at the
+wall, which 27f-5 already lays for the oil's lift. For F = G·w, ψ = G_y Ψ_x − G_x Ψ_y with
+−∇²Ψ_a = ∂w/∂a, so the oil lift's relaxation (`hsLiftRelax`) runs unchanged on buffers of its
+own: `sealSource` (the weight's right-hand side on the lift's grid, the current's heat lift
+capped as the current capped it), eight warm red-black sweeps a step, `sealFlow` (∇⊥ψ into the
+velocity, in the units `mixForce` laid G·w in). On a thin gap with Plate Upright above nothing
+(the Gravity dial, the phone's Tip pad, Lava Lamp), `mixForce` lays no weight of its own and
+`writeSim` takes the heat lift out of the current while the seal runs (not with a boil: 36e-2's
+own buoyancy stays in the current). Until the kernels are built (behind the show with the oil
+lift's, or asked for once off the frame) a standing plate takes its weight on the open rim as
+before. A mean added to w moves nothing, so the dish's mean density drops out by itself.
+
+`npm run sealed` (Measure lab7, about six minutes on SwiftShader): with the seal held off the
+standing plate keeps 68.2% over 8 s; sealed, 100.0%; a lone drop where the wall is far falls at
+95.5% of its open speed (Darcy's inclusion goes the same in a sealed cell when the wall is far);
+lamp on with Lava Lamp's Buoyancy in the current, 100.0% over 12 s (98.1% with the current's
+heat lift left on the open rim, 92% by 20 s); a flat plate the same to the bit. Lava Lamp's
+Centre Gravity is 0. Left open: 27f-9a (Plate Rock's and Rain Drip's weight on a standing plate)
+and 27f-9b (the circulation is the even gap's, so where the mobility varies the gap's solve
+takes the rest through the open rim: 1.3% in 20 s where the wax lies on the bottom rim).
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
