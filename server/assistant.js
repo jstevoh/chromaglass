@@ -43,6 +43,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { musicCall, playerOf } from './assistantMusic.js';
 import { earCall } from './assistantEar.js';
+import { recordCall, recordOf } from './assistantRecord.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -343,6 +344,8 @@ export function createAssistantGuard(send, now = Date.now) {
         songRunning: state.songShows && typeof state.songShows === 'object' ? !!state.songShows.running : null,
         // The music player (PLAN 44k-2): loaded or not, its length, the shelf's titles.
         player: playerOf(state.player),
+        // Recording (PLAN 44k-11): the containers the encoder writes and the Takes' ids.
+        record: recordOf(state.record),
       };
     },
 
@@ -678,6 +681,16 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-ear', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Recording's options and the Takes (PLAN 44k-11): assistantRecord.js's rules, Full.
+      if (type === 'assistant-record') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = recordCall(message, show.record);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-record', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

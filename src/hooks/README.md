@@ -28,7 +28,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useGamepad.ts`: game controller as a hand.
 - `useMidiTouch.ts`: flash on a controller touch.
 - `usePreviewFrame.ts`: where the plate is painted.
-- `useRecorder.ts`: record the canvas.
+- `useRecorder.ts`: record the canvas. `videoFormats(includeAudio)` lists the containers this browser's encoder writes (PLAN 44k-11, for the owner's assistant to be refused one it lacks).
 - `useRemoteLink.ts`: laptop side of the phone remote; also a network display's, and a TV's at home (role `tv`, PLAN 12-tv).
 - `useSceneCamera.ts`: the room camera.
 - `useSongChange.ts`: a new song, on a beat.

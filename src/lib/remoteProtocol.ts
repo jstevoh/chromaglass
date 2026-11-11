@@ -191,6 +191,18 @@ export interface RemoteState {
    * Listen's phase, the song it named and the Songs panel's line for it.
    */
   ear?: { detector: boolean; room: { calibrating: boolean; floorDb: number; peakDb: number } | null; listen: { phase: string; song: { title: string; artist: string } | null; line: string } };
+  /**
+   * Recording's options and the kept Takes (PLAN 44k-11, app/recordNow.ts):
+   * what Record makes, the Plate video's quality, fps, container and sound,
+   * the containers this browser's encoder writes, the last video, and the
+   * newest Takes (numbered from 1, the newest) with the one replaying.
+   */
+  record?: {
+    makes: 'video' | 'take' | 'both'; quality: string; fps: number; format: string; sound: boolean; formats: string[]; videoSupported: boolean;
+    lastVideo: { filename: string; seconds: number; sizeBytes: number } | null;
+    takes: { n: number; id: string; title: string | null; artist: string | null; seconds: number; gestures: number; clock: 'song' | 'wall'; date: string }[];
+    takeCount: number; replaying: number | null;
+  };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -337,6 +349,8 @@ export type RemoteMessage =
   | { type: 'assistant-music'; do: string; track?: string; url?: string; name?: string; seconds?: number; on?: boolean; answer?: number }
   /** Calibrate, the song detector and Listen from the owner's assistant (PLAN 44k-10), relayed only from the guard, with `answer`. */
   | { type: 'assistant-ear'; do: string; on?: boolean; title?: string; artist?: string; answer?: number }
+  /** Recording's options and a Take replayed, stopped or deleted, from the owner's assistant (PLAN 44k-11), relayed only from the guard, with `answer`. */
+  | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }

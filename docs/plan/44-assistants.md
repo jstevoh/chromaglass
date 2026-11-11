@@ -229,7 +229,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 8 | Sequences: choose which one, go to a stage, bind one to a song | `sequencer` runs the chosen one only | Play (choose, stage), Full (edit) | 44k-8 |
   | 9 | Saving a made look: save as new, save over, delete | none (44c-2) | Play (new), Full (over, delete) | 44k-9 = 44c-2 |
   | 10 | Calibrate the sound to the room; the song detector on or off; Listen | **shipped** 2026-11-11: `calibrate`, `song_detection`, `listen`, `show_state`'s `ear` | Full | 44k-10 |
-  | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | `record-toggle` only | Full | 44k-11 |
+  | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | **shipped** 2026-11-11: `record_options`, `take`, `show_state`'s `record` | Full | 44k-11 |
   | 12 | The microphone's input device | none (`set_sound_source microphone` takes the Sound panel's choice) | Full | 44k-12 |
   | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | none | Full | 44k-13 |
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
@@ -324,10 +324,29 @@ through cords and preset patches, and the plate shader is untouched.
   cannot recalibrate the room or name a song by hand. The assistant's tools reach a
   phone-layout display all the same (the doors are App()'s hooks, not the panels).
   Give the sheet the three presses, through the same callbacks.
-- **44k-11. Recording's options.** *(S, AG lane.)* `record_options` (makes: video,
-  take or both; quality; fps; format; sound in), read back in `show_state`, and
-  `take` (replay, stop, delete the last). Full. Pass: lines for each, a format the
-  Mac's encoder lacks refused.
+- ~~**44k-11. Recording's options.**~~ **Shipped** 2026-11-11: `record_options` (makes
+  video, take or both; quality; fps; format; sound), `take` (replay, stop, delete, by its
+  number in the list) and `show_state`'s `record`, Full, through `app/recordNow.ts` and
+  `server/assistantRecord.js` (`npm run assistant`, `record-full`, `record-format`,
+  `record-values`, `record-id`, `record-answer`, `record-past`, `phone-record`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-11a. The phone's Record sheet has no quality, fps, format, sound or Takes.**
+  *(S, found building 44k-11.)* The phone layout's More sheet has Record and Record
+  makes; the desk's Record panel also has the Plate video's quality, frame rate,
+  container and sound, and the kept Takes with Replay and the bin. A show run on a phone
+  can record only at whatever the desk last chose, and cannot replay a Take. The
+  assistant reaches a phone-layout display all the same (the door is useRecording's, not
+  the panel's). Give the sheet the same controls, through the same callbacks.
+- **44k-11b. Recording's real door, in a browser.** *(S, found building 44k-11.)* As
+  44k-10a: `npm run assistant` holds the guard against a stand-in display and the page's
+  `askRecord` against stand-in doors, but no line mounts `useRecording` and watches a real
+  `record_options` light the Record panel's Master, or a real `take replay` re-fire a
+  Take's strokes. A browser line (the app in Chromium, no GPU needed for the panel) would.
+- **44k-11c. Options changed mid-recording say so.** *(S, found building 44k-11.)* The
+  recorder reads its options when it starts, so `record_options` during a running Plate
+  video applies to the next one; the tool says "from the next press of Record" every
+  time. Better: `show_state`'s `record` carries the options the running video was started
+  with, so the assistant can tell the owner what the file being written is.
 - **44k-12. The microphone's input.** *(S, AG lane.)* `show_state`'s `inputs` (the
   device names) and `set_sound_source microphone` gaining `device` (a name from that
   list), through `useSoundSource`'s `chooseAudioInput`. Pass: a line where an unknown
