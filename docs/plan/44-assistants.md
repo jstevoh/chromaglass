@@ -273,6 +273,12 @@ through cords and preset patches, and the plate shader is untouched.
   `song_show_run` (start, stop; follow in Full) and `nudge`, through
   `app/songShowNow.ts` (`npm run assistant`, `song-mine`, `song-unknown`, `song-stop`,
   `song-nudge`, `song-follow`).
+- **44k-5a. One song shows field in the state.** *(S, found building 44k-5.)* The
+  phone controller's owed check (`npm run controller`, PLAN 12-ctl) already fixes
+  `RemoteState.songs` as `{ shows: [{ id, title }], runningId, follow }` for the phone
+  apps' Songs screen, so the assistant's brief went in as `songShows` (with the song's
+  label, the action count and the playing song's show). When 12-ctl's display half
+  ships, give both one field and the assistant's guard and tools read it.
 - ~~**44k-6. The bench and the last two gestures.**~~ **Shipped** 2026-11-11:
   `show_state`'s `bench`, `bottle`, `finger` (a stroke of five steps) and `flick` (one
   finger a third of the way round), Play (`npm run assistant`, `bottle-bench`).

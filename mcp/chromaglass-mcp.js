@@ -288,7 +288,7 @@ async function call(name, a = {}) {
         track: s.trackName ?? null, playing: s.isActive, automated: s.isAutomated, blackout: s.blackout ?? false,
         recordingSeconds: s.recording ?? null, live: s.live ?? null, sequencer: s.sequencer ?? null,
         liveSetup: s.liveSetup ?? null, sound: s.sound ?? null, bench: s.bench ?? null, tempo: s.tempo ?? null,
-        set: s.set ?? null, songs: s.songs ?? null,
+        set: s.set ?? null, songs: s.songShows ?? null,
       });
     }
     case 'list_looks': {

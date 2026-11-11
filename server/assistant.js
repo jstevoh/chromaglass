@@ -336,9 +336,9 @@ export function createAssistantGuard(send, now = Date.now) {
         // past the list or a show that is not there is refused here with the
         // list. Null from a display one build older, which then judges them.
         setItems: Array.isArray(state.set?.items) ? state.set.items.map((i) => ({ look: typeof i?.look === 'string' ? i.look : null, kind: String(i?.kind ?? '') })) : null,
-        songShows: Array.isArray(state.songs?.shows) ? state.songs.shows.map((x) => ({ id: String(x?.id ?? ''), song: String(x?.song ?? '') })) : null,
-        songCurrent: typeof state.songs?.current === 'string' ? state.songs.current : null,
-        songRunning: state.songs && typeof state.songs === 'object' ? !!state.songs.running : null,
+        songShows: Array.isArray(state.songShows?.shows) ? state.songShows.shows.map((x) => ({ id: String(x?.id ?? ''), song: String(x?.song ?? '') })) : null,
+        songCurrent: typeof state.songShows?.current === 'string' ? state.songShows.current : null,
+        songRunning: state.songShows && typeof state.songShows === 'object' ? !!state.songShows.running : null,
       };
     },
 

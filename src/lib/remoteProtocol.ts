@@ -170,9 +170,11 @@ export interface RemoteState {
    * The song shows (PLAN 44k-5): Follow songs, the show running and the show
    * of the song playing, and every show by id and song, without their actions
    * (the assistant reads one show whole with its own question, so the state a
-   * phone is sent stays small).
+   * phone is sent stays small). Not `songs`: that name is the phone
+   * controller's own, already fixed by its check (`scripts/controller.mjs`,
+   * PLAN 12-ctl), with another shape (PLAN 44k-5a folds the two together).
    */
-  songs?: { follow: boolean; running: { showId: string; song: string | null; manual: boolean } | null; current: string | null; shows: { id: string; song: string; actions: number }[] };
+  songShows?: { follow: boolean; running: { showId: string; song: string | null; manual: boolean } | null; current: string | null; shows: { id: string; song: string; actions: number }[] };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */

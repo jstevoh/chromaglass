@@ -218,7 +218,7 @@ export function useRemote({
     bench,
     tempo,
     set,
-    songs,
+    songShows: songs,
   }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
