@@ -35,7 +35,20 @@ bright lines of focused light on black that drift and re-form, not dye colour at
 in *Biolume*, under UV, a film that opens dark holes with rims as it thins, a polygonal mesh
 like a dewetting film, closely packed cells with thin walls and radial streaks inside them
 (Marangoni flow, 47g), and a second, orange fluorescent colour growing in the cells' cores
-(47c). Sheets and timelines: `~/chromaglass/scratch/davy/` on the owner's Mac.
+(47c). Then two more of his on YouTube: *Streams II* (a re-upload, 3:24) and the official
+Mikky Ekko video *Pull Me Down* (3:28, credited to him and a co-director); a third, TR/ST's
+*Iris*, is a song over one still (he made its cover) and was set aside. *Streams II*: near
+black 25 %, motion median 1.35, calm 60 %, takes of about 7.5 s joined by dissolves; it is a
+soap film filmed close, pastel high-order interference bands behind a sharp domed meniscus,
+fine zigzag bands relaxing into a few broad ones over about 6 s and back, almost nothing
+breaking, the whole field turning orange to teal to lilac as the film thins (§32's film,
+seen at the closeup's scale; its thick, washed-out higher orders and the steep zebra where
+the thickness changes fast are what our film needs to reach). *Pull Me Down*: near black
+31 %, motion median 1.77, calm 61 %, very shallow focus (47d); in its longest take a black
+channel of ink pinches into a row of beads in about a second, the beads then throw fine
+tendrils into dark stars and cells with pale droplets drifting between (47k), and the
+motion settles from its peak to a steady low within about 2 s. Sheets and timelines:
+`~/chromaglass/scratch/davy/` on the owner's Mac.
 
 **What the poster frames show, across the eleven.** A black ground everywhere, with the
 liquid as the only light. Structure at every scale at once: a front a few millimetres
@@ -220,6 +233,23 @@ its centre) that inverts what lies behind it. Our beads already invert the plate
 and bubbles image, and which 47d blurs to discs. *Measure:* `droplens`'s inversion lines on a
 point ground.
 
+## 47k. A thread of ink or oil pinches into beads, then throws tendrils (M)
+
+*Seen:* a channel of dark ink pinches into a row of beads in about a second, and each bead
+then spreads fine tendrils into a star. *Physics:* the capillary (Rayleigh-Plateau)
+instability: a liquid thread is unstable to waves longer than its circumference, the
+fastest at about 9 radii, and breaks in a time near sqrt(ρr³/σ) (slower by the viscosity
+ratio, after Tomotika, when one liquid is inside another); between glass plates only a
+thread narrower than the gap can bead, since a strip wider than the gap has no curvature to
+lower. The tendrils are solutal Marangoni spreading from each bead (47g's physics on a small
+scale). *Today:* §20 names the same beading for the lace's ligaments ("the dotted rows");
+nothing says whether a thin thread of oil or ink in the bulk beads at all on our plate.
+*Build:* first measure it: lay a thread of each width in the lab and see whether, how fast
+and at what spacing it breaks; then, if it does not, add the gap-direction curvature to the
+capillary pass so threads narrower than the gap bead at the Rayleigh-Plateau wavelength.
+*Measure:* bead spacing 9.0 r within 15 %, breakup time against the Tomotika rate for the
+two liquids' viscosity ratio, and a strip wider than the gap stays whole.
+
 ## 47m. Gear: a small kit to film real references (owner's call, not code)
 
 The realism rule asks for the real phenomenon before each build; three of the items above
@@ -238,14 +268,19 @@ On a YouTube download the watch tool's URL path left the video and audio as two 
 unmerged, then picked the audio file and stopped (found 2026-11-11 on the owner's Mac; they
 were merged by hand to go on; the cause was not found). Make `scripts/watch.mjs` ask yt-dlp
 for a merged file (or merge the pair with ffmpeg itself) and refuse a file with no video
-stream with a message that says so. *Measure:* `npm run watch -- --selftest` plus a line
-that hands it an audio-only file and reads the refusal.
+stream with a message that says so; on the next download it kept the silent video
+instead, so the pair is not even picked the same way twice. And its cut detector misses
+dissolves: on *Streams II* it read 3.8 cuts a minute where the takes, found by eye, run about
+7 a minute, and its "longest shots" were several takes each. Detect a dissolve as a run of
+frames whose difference stays raised and whose start and end frames differ by a cut's worth.
+*Measure:* `npm run watch -- --selftest` plus a line that hands it an audio-only file and
+reads the refusal, and a synthetic dissolve in the self-test clip that it counts.
 
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
-picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f; 47g,
+picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
 47h and 47i when wanted; 47w whenever the watch tool is next touched. Each its own thread
 and PR.
