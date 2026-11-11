@@ -327,9 +327,50 @@ check('with the check\'s feed, an address off the feed gives the feed\'s fixed l
   h.updater.emit('update-downloaded', RELEASE);
   h.busy = 'the show is live';
   const why = h.u.install();
-  check('the assistant\'s install during a show: refused, with why, and no question to the room', /never restarts in the middle of a show/.test(why ?? '') && h.updater.calls.install === 0 && h.asked.length === 0, why);
+  check('the assistant\'s restart during a show: refused, with why, and no question to the room', /never restarts in the middle of a show/.test(why ?? '') && h.updater.calls.install === 0 && h.asked.length === 0, why);
   h.busy = null;
   check('the assistant\'s install after the show: restarts', h.u.install() === null && h.updater.calls.install === 1);
+}
+
+{
+  // Found with the switch off, during a show: the assistant's Install waits too.
+  const h = harness({ signed: true, auto: false, busy: 'the show is live' });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  const why = h.u.install();
+  check('the assistant\'s install during a show: no download either', /downloads nothing/.test(why ?? '') && h.updater.calls.download === 0, why);
+  h.u.setAuto(true);
+  check('switched on during a show with one waiting: not fetched, looked at again in ten minutes', h.updater.calls.download === 0 && h.timers.length === 1 && h.timers[0].ms === BUSY_RETRY_MS, `${h.updater.calls.download} ${h.timers[0]?.ms}`);
+}
+{
+  // Ready with the switch on, then switched off: found again, it is not news.
+  const h = harness({ signed: true, squirrel: true });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  h.updater.emit('update-downloaded', RELEASE);
+  h.native.emit('update-downloaded');
+  const notes = h.notes.length;
+  h.u.setAuto(false);
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('switched off once ready: a re-check keeps Restart to Update and says nothing new', h.u.state.status === 'ready' && h.notes.length === notes && updateMenuItem(h.u.state)?.label === 'Restart to Update to 1.3.99', `${h.u.state.status}, ${h.notes.length - notes} new`);
+  h.busy = 'the show is on the projector';
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  check('ready during a show: not looked for again every ten minutes', h.timers[0]?.ms === RECHECK_MS, `${h.timers[0]?.ms}`);
+}
+{
+  // An Install clicked for one version does not hand the next one to Squirrel.
+  const h = harness({ signed: true, squirrel: true, auto: false });
+  await h.fire();
+  h.updater.emit('update-available', RELEASE);
+  await h.u.act();
+  h.updater.emit('error', new Error('HttpError: 404'));
+  h.u.setAuto(true);
+  await h.fire();
+  h.updater.emit('update-available', { ...RELEASE, version: '1.3.100' });
+  h.u.setAuto(false);
+  check('a later version switched off mid-download is not installed on quit for an old click', h.updater.autoInstallOnAppQuit === false, String(h.updater.autoInstallOnAppQuit));
 }
 
 // --- The owner's assistant (PLAN 44k-18): the relay's rules, on the real updater --

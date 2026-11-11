@@ -802,7 +802,7 @@ live either.
   each check) and the look comes again in ten minutes (`BUSY_RETRY_MS`), not six hours;
   *Restart to Update* clicked during one asks first (Restart Now / Later); the owner's
   assistant's install is refused with the reason.
-- **Checked** by `npm run updates`: 122 lines (25 new), the updater on stand-ins and the
+- **Checked** by `npm run updates`: 127 lines (30 new), the updater on stand-ins and the
   relay's rules on the real updater. 13-update-auto-a (a recording as a show) found.
 
 ### 14a. The show goes deaf when its window is hidden

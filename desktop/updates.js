@@ -41,7 +41,11 @@
  * upload is the one thing a 150 MB download in the background could hurt), and
  * the look is tried again ten minutes later rather than six hours; Restart to
  * Update, clicked while it is, asks first, and the owner's assistant asking for
- * it is refused (`install()`).
+ * the download or the restart is refused (`install()`). `busy()` is read as a
+ * check starts: a download already under way when the projector opens or the
+ * stream starts carries on (cancelling it needs the check's own cancellation
+ * token, and a show that starts minutes into one is rare); it never installs
+ * until a quit or a click either way.
  *
  * Neither ever restarts the app, opens a window or asks a question on its own.
  * A performer may be twenty minutes into a set when a release lands, with the
@@ -201,10 +205,21 @@ export function startUpdates(deps) {
     const next = String(info?.version ?? '');
     const url = downloadUrl(info, feed);
     const same = next === state.version && holding();
+    // A new version is a new question: an Install clicked for an older one does not carry over.
+    if (!same) asked = false;
+    // Already on its way or in: found again, it changes nothing, whatever the
+    // switch or the show. Without this a re-check with the switch since off
+    // would say "available, nothing installs until you do" of a version
+    // Squirrel already has and installs on quit, and one during a show would
+    // be looked for again every ten minutes.
+    if (signed && same && (state.status === 'downloading' || state.status === 'ready')) {
+      answer(`ChromaGlass ${next} is ${state.status === 'ready' ? 'ready' : 'downloading'}`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
+      return;
+    }
     // Downloading by itself now: the switch is on and no show is.
     if (signed && autoUpdater.autoDownload) {
-      if (!(same && (state.status === 'downloading' || state.status === 'ready'))) set({ status: 'downloading', version: next, url, percent: 0, inPlace: true, error: null });
-      answer(`ChromaGlass ${next} is ${state.status === 'ready' ? 'ready' : 'downloading'}`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
+      set({ status: 'downloading', version: next, url, percent: 0, inPlace: true, error: null });
+      answer(`ChromaGlass ${next} is downloading`, 'It installs the next time you quit ChromaGlass, or now with Restart to Update once it has arrived.');
       return;
     }
     // Found, and waiting for the performer: the switch is off, or a show is on.
@@ -265,7 +280,7 @@ export function startUpdates(deps) {
     const error = String(err?.message ?? err).split('\n')[0].slice(0, 200);
     // A download that failed falls back to the download in the browser, which
     // always works; anything else found stays as it was (above).
-    if (state.status === 'downloading' && state.url) set({ status: 'available', inPlace: false, error });
+    if (state.status === 'downloading' && state.url) { asked = false; set({ status: 'available', inPlace: false, error }); }
     else if (holding()) set({ error });
     // Offline at a venue is the usual case, and not news. Kept for the menu's
     // own check, which says it, and for the check, which reads it.
@@ -343,7 +358,11 @@ export function startUpdates(deps) {
     apply();
     set({ auto });
     // On again with a version found and waiting: fetched now, as the switch would have.
-    if (auto && signed && state.status === 'available' && state.inPlace && !busy?.()) download();
+    // During a show it waits, and is looked at again soon after.
+    if (auto && signed && state.status === 'available' && state.inPlace) {
+      if (busy?.()) soon();
+      else download();
+    }
   };
 
   /**
@@ -353,7 +372,14 @@ export function startUpdates(deps) {
    * why not, or null when it is done (the download begun, or the restart).
    */
   const install = () => {
-    if (state.status === 'available' && state.inPlace) { asked = true; download(); return null; }
+    if (state.status === 'available' && state.inPlace) {
+      // The download too waits for the show: a live stream's upload is not shared with it.
+      const busyNow = busy?.();
+      if (busyNow) return `${busyNow}, and ChromaGlass downloads nothing and never restarts in the middle of a show: ask again after it`;
+      asked = true;
+      download();
+      return null;
+    }
     if (state.status === 'available') return `this copy cannot replace itself (it is not signed): its .dmg is ${state.url}`;
     if (state.status === 'downloading') return `ChromaGlass ${state.version} is still downloading (${state.percent}%); it can be installed once it is ready`;
     if (state.status !== 'ready') return 'no new version is waiting: check first';
