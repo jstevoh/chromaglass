@@ -12649,6 +12649,42 @@ went, with the guard's on-air bookkeeping that existed only for it (the "sound-r
 line and mutant with it). `npm run assistant`: the `sound-air` line now asks that a
 source set on air reaches the display, and its mutant puts a refusal back. The tool's
 text says macOS asks once for Screen & System Audio Recording the first time (44j-3).
+## 44k-4, 44k-6, 44k-7, 44k-8. The Mixer's takes, the bench, the tempo and the Sequence from the assistant (2026-11-11)
+
+The first of 44k's gaps, built by Claude (the owner, 2026-11-11: "lets do this
+building now", with Antigravity out of credits). Each is a door through the guard
+(`server/assistant.js`) to a message `useRemote` runs through the desk's own call.
+
+- 44k-4: the guard allowed the Mixer's row takes in Full and `useRemote` ran them;
+  only `show_action`'s list left them out, so the assistant never knew they were
+  there. Now in the list, with a line that the list covers every action in the
+  guard's `FULL_ACTIONS` (it failed on main with all seven missing).
+- 44k-6: `show_state`'s `bench` (each bottle's id, name and colour, the one in hand);
+  `bottle` (by name or id, refused with the bench's list when not there, where the
+  display would drop it in silence); `finger` drawn as five of the phone's own
+  `finger` messages along the line, and `flick` as six `spin` messages a third of the
+  way round the middle with one hand's id; its amount is how fast the arc is drawn,
+  since the display's Spin reads the finger's angle over time and no amount. Found: every assistant message carries
+  its answer's `id`, which collides with `liquid`'s bottle id and `spin`'s finger id,
+  so the assistant sends `bottle` and `hand` and the guard sends them on as `id`.
+  `useRemote` now takes the bench itself (`liquidTypes`, not its ref) so the state
+  re-sends when a bottle changes; App.tsx shrank by three bytes.
+- 44k-7: `tempo` (a typed bpm, 60 to 200, the beat clock's own range, refused past it
+  rather than folded; heard; a tap) in Play, `link` (on, transport) in Full since it
+  joins other people's machines, and `show_state`'s `tempo`. `useTempo` publishes its
+  label and sets the door in `app/tempoNow.ts`, as `soundNow.ts` does for the sound.
+  While Link leads, a typed bpm is refused: the clock reads Link's tempo and would
+  keep the typed one underneath, unheard (found in review).
+- 44k-8: `sequencer` `select` (by name, any case, refused with the list) and `stage`
+  (from 1, of the run, playing or paused; refused with no run, since `goTo` on a
+  stopped sequencer starts it without holding the performer's Pacing, found in
+  review), and the state lists every sequence and the one chosen.
+
+The phone has its own bench, Tempo block and Sequence picker, so it gains nothing
+here; the relay drops `assistant-tempo`, `assistant-link` and `assistant-seq` from a
+phone (`phone-tempo`). `npm run assistant`: thirteen new lines, seven new mutants, all
+caught.
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,

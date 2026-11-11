@@ -12,7 +12,7 @@ Mac app, and not named on any page a visitor or customer reads.
   (initialize, tools/list, tools/call, ping), Node's own WebSocket (the repo's `ws` on
   Node 20). Finds the show on `127.0.0.1` (`CHROMAGLASS_PORT`, default 3000), takes the
   key from `/remote-info.json`, says hello as `assistant`. Its tools, and the mode each
-  needs, are the `TOOLS` table (`look_at_plate {size: large}` is one 1280 still, PLAN 44c-4; `add_song_action` programs the playing song's show, 44f; `pour_text` pours a song's name as ink, PLAN 37x-10c; `go_live` starts the stream, to named destinations if given, and `set_sound_source` picks what the show hears, both Full, PLAN 44j; `show_state` reads the saved destinations, each one's health on air, and the sound); its guide for the assistant is `GUIDE`. The owner's
+  needs, are the `TOOLS` table (`look_at_plate {size: large}` is one 1280 still, PLAN 44c-4; `add_song_action` programs the playing song's show, 44f; `pour_text` pours a song's name as ink, PLAN 37x-10c; `go_live` starts the stream, to named destinations if given, and `set_sound_source` picks what the show hears, both Full, PLAN 44j; `show_state` reads the saved destinations, each one's health on air, and the sound; `bottle`, `finger` and `flick` are the bench and the hand's last two gestures, `tempo` (Play) and `link` (Full) the beat clock, `sequencer select` and `stage` the Sequence, and `show_action` has the Mixer's row takes, PLAN 44k-4 to 44k-8; `show_state` reads the bench, the tempo and every sequence); its guide for the assistant is `GUIDE`. The owner's
   notes are a file outside the repo (`CHROMAGLASS_ASSISTANT_NOTES`, default
   `~/.chromaglass/assistant-notes.md`).
 
