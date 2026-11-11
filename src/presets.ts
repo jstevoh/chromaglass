@@ -116,9 +116,9 @@ export const PRESETS: Preset[] = [
       advection: 0.45,
       damping: 0.9,
       // 28i-7: at 0 nothing poured after the seed, and the river ran to 72% black and one
-      // hue. A pour every few seconds feeds it syrup streaks in the whole family.
-      automateRate: 0.15,
-      dyeBudget: 0.45,
+      // hue. After pass 1 (0.15) still 73% black: a pour every second or two feeds it syrup streaks in the whole family.
+      automateRate: 0.3,
+      dyeBudget: 0.6,
       viscosity: 'thick',
       polarity: 0.8,
       evaporationRate: 0.006,
@@ -451,7 +451,7 @@ export const PRESETS: Preset[] = [
       cells: 0.0,
       exposure: 0.22,
       saturationBoost: 1.05,
-      dyeBudget: 0.6,
+      dyeBudget: 0.45,           // 28i-7: bright field between the cells
       sceneMappings: [
         // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
         // Kick and snare agitate the slide's cover glass and swirl without drawing sharp beads or bubbles (28i-2, 28i-3b).
@@ -705,7 +705,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0084,
       surge: 0.35,
       layerCount: 1,
-      blendMode: 'overlay',
+      blendMode: 'screen',       // 28i-7: overlay on a near-black ground is twice the product, so the pools stayed dark
       gooeyEffect: 0.55,
       rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
       // Flat: a concave dish slid all three pools into one in the middle. The
@@ -713,7 +713,7 @@ export const PRESETS: Preset[] = [
       centerGravity: 0.0,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#3a0a6e',       // 28i-7: '#220044' left the pools in a dim haze (73% near black)
+      ledColor: '#220044',
       ledSpeed: 0.0,
       diffusionRate: 0.00006,
       buoyancy: 0.35,
@@ -1053,7 +1053,7 @@ export const PRESETS: Preset[] = [
       advection: 0.65,
       damping: 0.985,
       heatDecay: 0.985,
-      automateRate: 0.22,
+      automateRate: 0.32,        // 28i-7: more pours of ink
       platePressure: 0.55,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -1413,7 +1413,7 @@ export const PRESETS: Preset[] = [
       advection: 0.5,
       damping: 0.985,
       heatDecay: 0.995,
-      automateRate: 0.14,          // a drop of soap and food colouring now and then keeps the marbling rich
+      automateRate: 0.28,          // 28i-7: twice the drops of food colouring (at 0.14 the milk stayed white)
       platePressure: 0.15,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -1489,7 +1489,7 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thin',
       polarity: 0.5,
-      evaporationRate: 0.006,      // a film that is always thinning is always about to go
+      evaporationRate: 0.004,      // a film that is always thinning is always about to go (0.006 left 78% black, 28i-7)
       airVelocity: 0.05,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,
@@ -1500,7 +1500,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.35,
       glossiness: 0.2,
       postBlurRadius: 0.2,
-      dyeBudget: 0.7,              // 28i-7: warmer and fuller until 28i-4 draws the film's own colours
+      dyeBudget: 0.9,              // 28i-7: warmer and fuller until 28i-4 draws the film's own colours
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
@@ -2262,9 +2262,7 @@ export const PRESETS: Preset[] = [
         dye out from under it and reads closer to its own yellow.
       */
       lampGround: 1,
-      // 28i-7: was 0.35, and tore into coarse tiles. A thinner film dewets at a
-      // shorter wavelength (spinodal λ grows as the thickness squared): finer lace.
-      clearFilm: 0.25,
+      clearFilm: 0.35,           // 0.3 of the gap: it tears on the dish's dust in a few seconds, a third torn by five (lab); 0.25 tiled as coarsely (28i-7, film), so the fix is 28l-3's
       clearFilmDye: 0.35,        // at 0.6 its beads, which thicken toward the whole gap, read orange (lab)
       clearFilmDyeColor: '#ffd21a',
       globalSpeed: 0.0126,

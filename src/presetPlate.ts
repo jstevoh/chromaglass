@@ -60,9 +60,9 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'comet':              [17, 21, 20, 18, 16, 7],  // amber head, coral, magenta, ultramarine, teal and icy tail (28i-7: one pink hue on black)
   'galaxy':             [7, 17, 18, 21, 20, 8],  // an ice-blue arm and a gold one (the seed's two arms are the first two), ultramarine, coral, magenta; 28i-7: blue-violet wisps read as Jellyfish Bloom
   'cyberpunk':          [2, 20, 10, 18, 7],       // hot pink, magenta, purple, ultramarine, ice: one neon arc (28i-7: lime and orange summed it to grey-teal)
-  'acid-trip':          [18, 20, 2, 21, 17, 6],
+  'acid-trip':          [18, 20, 2, 21, 6, 10],   // no amber: its one amber body was Solar Flare's look (28i-7)
   'bass-drop':          [4, 11, 20, 18, 9, 7],
-  'microscopic-chaos':  [20, 2, 10, 17, 18, 8],  // a counterstain: amber among the violets, as picric acid is in Van Gieson's (28i-7: all purple)
+  'microscopic-chaos':  [20, 2, 17, 0, 10],      // a counterstain: amber and yellow beside the violets, as picric acid is in Van Gieson's (28i-7: all purple)
   'aurora-borealis':    [19, 6, 16, 23, 20],      // oxygen's green low, nitrogen's violet and pink on the top edge; 28i-7: seven dyes kept the violet out of the window
   'solar-flare':        [17, 0, 1, 21, 3, 4],
   'jellyfish-bloom':    [20, 2, 23, 10, 16, 7],

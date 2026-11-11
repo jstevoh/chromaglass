@@ -153,8 +153,9 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     window, Galaxy with a gold arm and a gold core (it read as Jellyfish Bloom), Lacing
     Run on the amber-over-crimson its description names, Ferro Paint on warm neighbours
     (amber over teal was brown-green), Macro Bead's sea-green ground and smaller bodies,
-    Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (Saffron's film
-    thinner, so it dewets finer), and Moiré Waves and Moiré Ripple given dyes of their own
+    Lens Pools sharper, Clock Glass and Saffron Lace in bigger dishes (a thinner film
+    tiled Saffron's lace as coarsely, so finer lace stays 28l-3's), Velvet Underground on
+    the screen blend (overlay on its near-black ground kept the pools dark), and Moiré Waves and Moiré Ripple given dyes of their own
     (a pack look's own contract now wins over its house look's, and the seed lays it).
     Left alone: Chemical Clock (the owner loves it), the keeps, Lava Lamp (sealed bottle,
     its own thread) and Lumia (28i-5).
