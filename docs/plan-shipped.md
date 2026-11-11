@@ -12822,6 +12822,39 @@ file the player cannot decode is answered as done), 44k-2b (more music folders),
 show server down rather than fail a line; harmless to the real code, but the new
 lines fetch from the server, so they treat a failed fetch as a failed line.
 
+## 44k-11. Recording's options and the Takes from the assistant (2026-11-11)
+
+The fifth batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the plan's table had it (a delete cannot be
+undone, and the options change what the owner's next Record writes to disk), and paced
+as a setting.
+
+- `record_options`: the Record panel's options by its own names: what the one Record
+  button makes (`lib/recordChoice.ts`: video, take or both), and the Plate video's
+  quality (master, standard, compact), fps (60 or 30, the panel's two), container
+  (auto, webm, mp4) and sound (`includeAudio`). Any of them, the rest kept; through the
+  panel's own `setRecordChoice` and `recorder.setOptions`, so the choice is saved where
+  the panel's is and lit in it.
+- A container the encoder cannot write is refused with the ones it can. Found while
+  building it: the recorder would not refuse it, since `pickMime` falls back from MP4
+  to WebM without a word, so the assistant would have told the owner MP4 while the
+  file was WebM. The display now reports `formats` (`videoFormats` in
+  `hooks/useRecorder.ts`, the same MIME lists `pickMime` walks).
+- `take`: replay, stop, delete a kept Take by its number in `show_state`'s list (1, the
+  newest). The guard sends the display the Take's id, not the number, so the Take
+  deleted is the one the assistant read even if a new one is kept between its read and
+  its call. A number past the list is refused with the count.
+- `show_state`'s `record`: the options, the containers, the last Plate video, the newest
+  30 Takes (title, artist, seconds, gestures, song or wall clock) and the one replaying.
+  Published only when one of those changes, never with the recording's clock.
+
+The door lives in `app/recordNow.ts`, set by `useRecording` (which holds the choice and
+the recorder, and is handed the Takes), since App() may not grow. The guard's rules are
+`server/assistantRecord.js`, on the Mac app's `server` filter. `npm run assistant`: ten
+new lines (one on the page's own door), eight new mutants, in
+`scripts/assistant-record.mjs`. Found: 44k-11a (the phone's Record sheet), 44k-11b (the
+real door in a browser line), 44k-11c (options changed mid-recording).
+
 ## 44k-10. Calibrate, the song detector and Listen from the assistant (2026-11-11)
 
 The fourth batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete

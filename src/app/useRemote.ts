@@ -25,6 +25,7 @@ import { useLiveShow, useLiveSetup, onAir, stopLive, startSavedLive } from '../l
 import { useSoundNow, askSound } from './soundNow';
 import { usePlayerNow, askMusic } from './musicNow';
 import { useEarNow, askEar } from './earNow';
+import { useRecordNow, askRecord } from './recordNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
@@ -169,6 +170,7 @@ export function useRemote({
   const sound = useSoundNow();
   const player = usePlayerNow();
   const ear = useEarNow();
+  const record = useRecordNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -225,7 +227,8 @@ export function useRemote({
     songShows: songs,
     player,
     ear,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player, ear]);
+    record,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player, ear, record]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -406,6 +409,12 @@ export function useRemote({
         // Calibrate, the song detector and Listen (PLAN 44k-10, app/earNow.ts), the same way.
         case 'assistant-ear': {
           const why = askEar(message);
+          answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
+          break;
+        }
+        // Recording's options and the Takes (PLAN 44k-11, app/recordNow.ts), the same way.
+        case 'assistant-record': {
+          const why = askRecord(message);
           answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
           break;
         }

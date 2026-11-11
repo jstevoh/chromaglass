@@ -432,7 +432,7 @@ const pairTv = (tv, except) => {
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
+const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-live', 'assistant-sound', 'assistant-undo', 'assistant-record', 'assistant-still', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
