@@ -12822,6 +12822,36 @@ file the player cannot decode is answered as done), 44k-2b (more music folders),
 show server down rather than fail a line; harmless to the real code, but the new
 lines fetch from the server, so they treat a failed fetch as a failed line.
 
+## 44k-10. Calibrate, the song detector and Listen from the assistant (2026-11-11)
+
+The fourth batch of 44k's gaps, built by Claude (the owner's goal, 2026-11-09: complete
+control of the show from Claude). Full, as the plan's table had it, and paced as a
+setting.
+
+- `calibrate`: the Sound panel's Recalibrate room (`useBench`'s `calibrateNonce`, which
+  restarts the ear and its room tracker for its three-second listen). Refused by the
+  guard with Auto Calibrate off (the ear does not calibrate then, so the press would
+  restart it for nothing), naming `autoCalibrate`; refused by the display when it hears
+  nothing to calibrate to.
+- `song_detection`: Song Detection on or off (`musicSettings.enabled`), a boolean only.
+- `listen`: start, cancel and name (the Songs panel's Name it, a title and an artist
+  both), `useListen`'s own callbacks; a cancel with Listen idle is the display's refusal.
+- `show_state`'s `ear`: the detector, the room's calibration (`calibrating`, then the
+  floor and peak it found, dBFS rounded; null with Auto Calibrate off or nothing heard)
+  and Listen's phase, the song it named and the panel's own line. The room is copied
+  only when the calibration starts or ends or the ear starts or stops hearing, not per
+  reading (the floor, the peak and `signal` move all the time, and a state re-sent at
+  that rate goes to every phone).
+
+The doors live in `app/earNow.ts`, set by `useBench` (calibrate), `useListen` (detector,
+Listen) and `useCastFeed` (the room's reading, the hook App() hands the ear to), since
+App() may not grow. The guard's rules are `server/assistantEar.js` (`assistant.js` is
+past 40 KB), on the Mac app's `server` filter. The phone layout's display takes the
+tools as the desk's does (the doors are hooks, not panels); its Sound sheet lacking the
+three presses is 44k-10b. `npm run assistant`: fourteen new lines (three on the page's own
+door), six new mutants, in `scripts/assistant-ear.mjs`. Found: 44k-10a (the real doors
+in a browser line), 44k-10b.
+
 ## 44k-3, 44k-5, 44f-4. The set list and the song shows from the assistant, and the display's answer (2026-11-11)
 
 The second batch of 44k's gaps, built by Claude (the owner, 2026-11-11). Each is a

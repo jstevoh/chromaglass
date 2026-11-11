@@ -42,6 +42,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { musicCall, playerOf } from './assistantMusic.js';
+import { earCall } from './assistantEar.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -667,6 +668,16 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-music', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Calibrate, the song detector and Listen (PLAN 44k-10): assistantEar.js's rules, Full.
+      if (type === 'assistant-ear') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = earCall(message, settings);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-ear', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

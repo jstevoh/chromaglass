@@ -184,6 +184,13 @@ export interface RemoteState {
    * carries it forward while it plays.
    */
   player?: { name: string | null; kind: 'track' | 'file' | null; artist: string | null; length: number; at: number; atTime: number; playing: boolean; loop: boolean; library: { title: string; artist: string; seconds: number }[] };
+  /**
+   * The ear's presses (PLAN 44k-10, app/earNow.ts): the song detector on or
+   * off, the room's calibration as it was when it last started or ended
+   * (null with Auto Calibrate off or nothing heard; dBFS, rounded), and
+   * Listen's phase, the song it named and the Songs panel's line for it.
+   */
+  ear?: { detector: boolean; room: { calibrating: boolean; floorDb: number; peakDb: number } | null; listen: { phase: string; song: { title: string; artist: string } | null; line: string } };
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -328,6 +335,8 @@ export type RemoteMessage =
    * path itself never reaches the page), play, pause, seek, loop, close.
    */
   | { type: 'assistant-music'; do: string; track?: string; url?: string; name?: string; seconds?: number; on?: boolean; answer?: number }
+  /** Calibrate, the song detector and Listen from the owner's assistant (PLAN 44k-10), relayed only from the guard, with `answer`. */
+  | { type: 'assistant-ear'; do: string; on?: boolean; title?: string; artist?: string; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
