@@ -57,13 +57,13 @@ export function dyesOnPlate(n: number, journeyOn: boolean): number {
 
 export const PRESET_CONTRACTS: Record<string, number[]> = {
   'classic':            [0, 17, 2, 20, 18, 8],   // yellow, pink, blue, and amber, magenta and ultramarine between them
-  'comet':              [18, 20, 23, 7, 16, 2],
-  'galaxy':             [7, 18, 20, 17, 23, 8],  // ice-blue arms, ultramarine, magenta knots, an amber core's glow; it was six blues and violets, one hue on the wall
-  'cyberpunk':          [2, 20, 6, 16, 1, 18],
-  'acid-trip':          [18, 20, 2, 21, 17, 6],
+  'comet':              [17, 21, 20, 18, 16, 7],  // amber head, coral, magenta, ultramarine, teal and icy tail (28i-7: one pink hue on black)
+  'galaxy':             [7, 17, 18, 21, 20, 8],  // an ice-blue arm and a gold one (the seed's two arms are the first two), ultramarine, coral, magenta; 28i-7: blue-violet wisps read as Jellyfish Bloom
+  'cyberpunk':          [2, 20, 10, 18, 7],       // hot pink, magenta, purple, ultramarine, ice: one neon arc (28i-7: lime and orange summed it to grey-teal)
+  'acid-trip':          [18, 20, 2, 21, 6, 10],   // no amber: its one amber body was Solar Flare's look (28i-7)
   'bass-drop':          [4, 11, 20, 18, 9, 7],
-  'microscopic-chaos':  [20, 2, 10, 23, 18, 8],
-  'aurora-borealis':    [19, 5, 6, 16, 7, 23, 10], // greens through ice to a violet, as the sky has
+  'microscopic-chaos':  [20, 2, 17, 0, 10],      // a counterstain: amber and yellow beside the violets, as picric acid is in Van Gieson's (28i-7: all purple)
+  'aurora-borealis':    [19, 6, 16, 23, 20],      // oxygen's green low, nitrogen's violet and pink on the top edge; 28i-7: seven dyes kept the violet out of the window
   'solar-flare':        [17, 0, 1, 21, 3, 4],
   'jellyfish-bloom':    [20, 2, 23, 10, 16, 7],
   'fractal-dream':      [17, 21, 20, 10, 16, 19],
@@ -83,12 +83,12 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // Ferroin's red and blue fronts turn the plate as the waves sweep across it.
   'chemical-clock':     [16, 20, 19, 8, 3],   // teal, magenta, emerald, ultramarine and red indicator pools under the ferroin waves
   'magnet-garden':      [17, 1, 0],           // one warm family: a bright gold for the dark ferrofluid to stand on
-  'ferro-paint':        [17, 16, 21],         // amber, teal, coral: amber over teal is the references' green
+  'ferro-paint':        [0, 17, 21, 2, 20],   // yellow, amber, coral, hot pink, magenta: neighbours, so no mud (28i-7: amber over teal was brown-green)
   'lava-lamp':          [4, 1, 20, 17, 21, 11],  // the wax: crimson, orange, magenta, amber, coral, raspberry
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
-  'clock-glass':        [10, 3, 17, 9],         // purple water; red, amber and cobalt oil (the seed lays the first as the water)
-  'splodascope':        [9, 0, 6, 3, 2],        // cobalt water; yellow, green, red and hot pink oil, as the owner's photograph (the first is the water; cobalt under yellow is the photograph's green)
+  'clock-glass':        [10, 3, 17, 9, 21, 16], // purple water; red, amber, cobalt, coral and teal oil (the seed lays the first as the water; 28i-7: a second family)
+  'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 28i-7: under cobalt every drop read green)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.
@@ -100,14 +100,18 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   // ground and its own family, so the three read as three.
   'macro-bead':         [16, 17, 20, 1, 18, 2],
   'cell-bloom':         [20, 23, 18, 17],
-  'lace-run':           [17, 16, 2, 18, 0, 20],
+  'lace-run':           [17, 4, 1, 3, 0, 11],     // amber over crimson, as its description: 28i-7, the blues and pinks screened to one lilac sheet
   // Six dyes of six families rather than one: the point of this one is that
   // a person gets a colour of their own.
   'crowd-plate':        [17, 20, 16, 21, 18, 6],
   // The three built on the liquids. Food colouring for the marbling dish,
   // interference hues for the film, and slow deep dyes for the shear.
   'milk-marble':        [0, 17, 2, 20, 8, 16, 6],
-  'soap-film':          [23, 20, 10, 7, 16, 17],
+  'soap-film':          [21, 17, 20, 2, 23, 16], // 28i-7: warmer until 28i-4 (was violet strands on black)
+  // Two moiré looks with dyes of their own (28i-7), so a pair laid on one house
+  // look stops reading as one: Waves goes to the sea, Ripple to a pond.
+  'moire-waves':        [7, 16, 9, 19, 18, 23], // ice, teal, cobalt, jade, ultramarine, lavender
+  'moire-ripple':       [16, 7, 2, 0],          // teal water; ice, hot pink and yellow oil
 };
 
 export const PRESET_INJECT_STYLES: Record<string, string[]> = {
@@ -292,9 +296,15 @@ export const AUTO_DOSE = 0.35;
   Glass's oils and Moiré Ripple's follow.
 */
 const MOIRE_BASE: ReadonlyMap<string, string> = new Map(MOIRE_LOOKS.map(m => [m.id, m.from]));
+/*
+  28i-7: a pack look may name its own dyes above its house look's (the film of
+  2026-11-11 found Star and Waves the same rainbow grid, both Classic's dyes):
+  an entry already in a table is kept, and the seed lays it (seedPreset reads
+  the look's own contract).
+*/
 for (const [id, from] of MOIRE_BASE) {
   for (const table of [PRESET_CONTRACTS, PRESET_INJECT_STYLES, PRESET_LIQUIDS, PRESET_PHASE_POUR] as Record<string, unknown>[]) {
-    if (table[from] !== undefined) table[id] = table[from];
+    if (table[from] !== undefined && table[id] === undefined) table[id] = table[from];
   }
 }
 
