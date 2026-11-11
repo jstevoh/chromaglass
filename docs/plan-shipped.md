@@ -773,6 +773,38 @@ feed); `npm run desktop -- --packaged` 11/11 on the Linux pack, its new "updates
 electron-updater reading a feed the check serves (`1.3.0 → 999.0.0 (idle → checking →
 available)`, the menu's *Download ChromaGlass 999.0.0…*, the page's profile card seeing the same and told it as it happened: `checking → available 999.0.0`).
 
+### 13-update-auto. Install Updates Automatically, on or off (2026-11-11)
+
+Asked by the owner on 2026-11-11: "can we have turn on/off auto updates? so people aren't
+surprised by an update?" A signed app had downloaded each release by itself and installed
+it on the next quit, so a performer who quit after soundcheck could open a different
+version than the one they rehearsed with. Nothing ever installed mid-set (only a quit or
+a click did), but nothing stopped a 150 MB download in the background while the show was
+live either.
+
+- **The switch** (`desktop/updates.js`): *ChromaGlass → Install Updates Automatically*, a
+  tick under the update item, and the same switch in Profile & Store's Mac app card
+  (`MacAppCard.tsx`, the preload's `updates.setAuto`); kept in `show.json` as `autoUpdate`,
+  on unless switched off, so every copy keeps the behaviour it had. Off, the app still
+  looks every six hours and says once that a version is available; the menu and the card
+  offer *Install ChromaGlass <version>…*, which downloads it, and it installs on the next
+  quit or at once with *Restart to Update*. An ad hoc copy, which never installs in place,
+  has no switch.
+- **Why `autoInstallOnAppQuit` follows the click too.** electron-updater's MacUpdater hands
+  the downloaded zip to Squirrel.Mac only when it is true; with it false the zip sits on
+  disk and Restart to Update would never come (and `quitAndInstall` then quits whenever
+  Squirrel finishes, minutes after the click). So it is on with the switch and for a
+  version the performer asked for; one switched off mid-download is offered as Install,
+  and the click hands the same zip over. A version Squirrel already has installs on quit
+  whatever the switch says, and the state says so (`ready`).
+- **Never in the middle of a show** (`busy()` in main.js: the projector window open, or a
+  live stream starting or on air): nothing downloads by itself (`autoDownload` is set at
+  each check) and the look comes again in ten minutes (`BUSY_RETRY_MS`), not six hours;
+  *Restart to Update* clicked during one asks first (Restart Now / Later); the owner's
+  assistant's install is refused with the reason.
+- **Checked** by `npm run updates`: 127 lines (30 new), the updater on stand-ins and the
+  relay's rules on the real updater. 13-update-auto-a (a recording as a show) found.
+
 ### 14a. The show goes deaf when its window is hidden
 
 **Read in the code.** The sound analysis runs only on the show window's animation
@@ -10797,6 +10829,10 @@ over a second (`originGap >= 1000`).
 - **23.17f** (**shipped**, this PR). The owner, 2026-11-10, with a screenshot of 1.3.1276's Account sheet: "this login stuff is fucked. google is no longer there? and the screen is really cluttered and disorganized." The audit found four faults, three of them real breakage. (1) The Google button's mark had two of its four strokes, one drawn off the edge of its box, which left a grey smile; and once pressed in the app its label became "Finish in your browser…" for good, so Google's name was nowhere on the sheet. (2) The browser tab the app sent a sign-in to (`/show?macSignIn=1`) checked the licence first, and on a Mac that already held a key it said "Your licence is on this Mac now" and never asked anyone to sign in, while the window waited. (3) Even when the browser did sign in, only the account's key came back (23.17d's hand-off); the window stayed signed out, so the sheet said "You're not signed in" over a Pro key and cloud sync and running shows never reached the app. (4) Signed out, the sheet showed nothing of the plan, and an active key appeared only as grey placeholder text ("Pro key active") inside an empty box with Activate beside it.
   Now the window makes a one-time code (128 bits) and puts it, with the provider, in the address it opens; the browser tab leads with that provider's button, says when a key is already on the Mac (the owner: "perhaps we acknowledge that a license key was detected?"), signs in, and posts the provider's credential (Google's or Apple's ID token, caught from Firebase's result, `takeProviderCredential`) to the app's server under the code (`server/signin-handoff.js`). The window asks for it every two seconds, at module level so the door opening on the licence cannot cut it off, and signs in with `signInWithCredential`. The server holds it in memory only, two minutes at most, hands it out once, takes only Google or Apple credentials, and answers only the laptop with a loopback Host (no phone on the Wi-Fi, no page that rebinds its name to 127.0.0.1) and only pages of its own origin. The sheet leads with one status row, signed in or not (the account or "Not signed in", the plan, "Pro licence found on this Mac"), drops the newsletter box from its sign-in (the switch is there once signed in), shows an active key as a line with Remove beside it and the paste box only when there is something to paste, and says "Mac" or "browser" for where the key is. The phone's bottom sheet is the same component. *Measured:* `npm run signin` 25 (the app's window and a browser with its own storage; Google answered in the browser; the window's sheet names the account, the code is spent, a cross-site page and a rebound name are refused; fails on the code before, whose address carries no code). Open: 23.17f-1 (Apple on the live project), 23.17f-2 (the emailed link).
 
+#### 23.17f-3. After the web sign-in, the app comes forward and the browser tab closes itself
+
+**After the web sign-in, the app comes forward and the browser tab closes itself.** The owner, 2026-11-11: "sign in from my local app is weird - it asks me to continue on the webpage. It then never actually logs into the app though. if it wants me to use SSO on the web, it shouldn't go to the chromaglass play page after logging in, it should just close the login window and go back to the app." What he described is 1.3.1276 before 23.17f (the tab opened a whole show, the window never signed in); 1.3.1313 carries 23.17f. What 23.17f still left: the tab said "go back to the app" and stayed, without knowing whether the window had the sign-in, and the window signed in behind the browser where nobody saw it. Now the window, as it takes the credential, comes to the front (`bringToFront` in `desktop/preload.cjs`, `chromaglass:bring-to-front` in `desktop/main.js`, only the show's own window may ask); the tab asks the app's server whether the window took it (`/signin-handoff?h=…&status=1`, yes or no, never the credential) and then says done and closes itself (`window.close()`, which a browser allows a tab the system opened with one page of history), or, if the window never took it within 30 s, says the app did not pick it up. *Measured:* `npm run signin` 25 (the tab sees the app take it and closes itself, the window brought forward) and new 25b, the owner's own case: a Mac already holding a Pro key, Continue with Google from the Account sheet; the tab signs in without opening a show, closes itself, and the sheet names the account. Before (main at 3731e2c): 25 and 25b FAIL on "the app took it unsaid, tab stayed open, window forward 0×". `npm run desktop` reads the new bridge call. *Owed:* the release, then the owner's Mac (judging: Continue with Google from the sheet, the app forward, the tab gone).
+
 #### 23.17m. The Mac app's findings from the security audit
 
 - **23.17m. The Mac app's findings from the security audit (2026-10-28), shipped.** (4) OSC has no show key, so anyone on the venue's Wi-Fi could drive the show; the app now opens with it off, and *Show → OSC input* turns it on for this Mac only (127.0.0.1) or from the network (0.0.0.0), live (`setOsc` in `server/remote-server.js`) and kept in `show.json`; `OSC_PORT` in the environment still decides outright, and `OSC_BIND=127.0.0.1` narrows the terminal server. A menu on the laptop with no phone version, on purpose: a phone that could open the show to the network would hand that to whoever holds its key. (7) Electron 44.10.0 and `npm audit fix` in `desktop/` (0 advisories). (9) A packed app quits when launched with `--remote-debugging-port` or `-pipe`, unless Node's inspector is already open (the build whose fuse is open, which the check drives). (10) `/license-info.json`, `/license-activate` and `/license-deactivate` turn away a request that came from another site (`Sec-Fetch-Site`, `Origin`) and a POST that is not JSON. (13) `disable-library-validation` and `allow-unsigned-executable-memory` are out of the entitlements. *Measure:* `npm run tiers` 3b (fails on the old server), `npm run desktop -- --packaged` lines `OSC closed`, `no debugger`, `entitlements`.
@@ -13012,6 +13048,36 @@ phone (`phone-set`) and an `assistant-answer` from anyone but the display
 (`answer-phone`). `npm run assistant`: nineteen new lines (three on the page's own
 doors), fourteen new mutants.
 
+## 12-ctl-1. The songs on the phone (2026-11-11)
+
+The owner asked for the phone apps to be the Mac app's controller (12-ctl). Draw, the
+dials, the sequencer and the looks were already on the remote; what a performer reaches
+for between songs, the next item of the set and the song's show, was only on the
+Perform desk. This is the first of three pieces, built against `npm run controller`,
+which was written first with these lines owed.
+
+The laptop sends two new parts of `RemoteState` (`lib/remoteProtocol.ts`): `setList`
+(the set's name, its items by id and name, the live item and the one armed for the
+next Go) and `songs` (the saved song shows by id and title, the one running, and
+Follow songs). It acts on four new messages with the same calls the desk's rows make:
+`cue-set-item` arms an item through `setNow.armSetItem` (by id, not by index, so a set
+reordered on the laptop while the phone's list is a frame old never arms the wrong
+song), `song-run` and `song-stop` go through `askSongs`, `song-follow` turns the switch.
+`setNow` gained the live item so the phone can mark it. The relay passes the four on
+to the display like any other controller message.
+
+The phone's Songs screen (`components/RemoteSongs.tsx`) opens from a Songs button on
+Draw and a "Set list & songs" row on Controls, and goes back to where it came from.
+Rows are a thumb high and the names wrap. Every mark on it (Live, Next, the running
+show, the switch) is read back from the laptop rather than set by the tap, so a tap
+the laptop refused never shows a cue the Go will not play. On an iPad the two lists
+sit side by side.
+
+Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setlist`,
+`songs` and `display` lines now passing (an item tapped arms its look on the laptop,
+`cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
+the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,
@@ -13241,3 +13307,18 @@ a blurred shadow alone left 0.0% of the box near-black round the letters (white 
 unreadable), the drop shadow 2.1%; streamed and decoded, the landscape's bottom-left box
 0.0% white before the card, at least 2.0% while it is up, 0.0% after, the top-right
 never touched, and the portrait at least 5.3% in its own corner.
+
+
+## 44k-18. The Mac app's updates from the assistant (2026-11-11)
+
+Built with 13-update-auto, on the coordinator's word that the switch be "exposed to
+Claude's app control too". `app_updates` (status in any mode; auto, check and install in
+Full) is the one assistant call that never reaches the display: the updater is the Mac
+app's main process's, so main.js hands the show server its doors (`setAppUpdates` with
+desktop/updates.js's `updatesHook`), and the relay answers from them at once
+(`server/assistantUpdates.js`), the updater's state in the answer. A show run from a
+terminal has no updater and says so. install never restarts the app mid-show: the
+updater's `install()` refuses while the show is on the projector or live. A phone's
+`assistant-updates` is dropped (`ASSISTANT_ONLY`). Checked by `npm run updates` (the rules
+on the real updater) and `npm run assistant` (`updates-full`, `phone-updates`, each with
+its mutant).

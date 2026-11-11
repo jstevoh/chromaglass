@@ -53,7 +53,7 @@ import {
   getActiveLicenseInfo,
 } from '../lib/tierGates';
 import { isDesktopApp } from '../lib/platform';
-import { MAC_SIGN_IN_PARAM, handoffFromUrl, macAppLicensed } from '../lib/macApp';
+import { MAC_SIGN_IN_PARAM, handoffFromUrl, macAppLicensed, waitForAppToTake } from '../lib/macApp';
 
 const ACCOUNTS = Boolean(import.meta.env.VITE_FIREBASE_API_KEY);
 // The variable itself, not ACCOUNTS: only that is folded at build time, so a
@@ -131,6 +131,11 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
   // Whether the sign-in made here reached the app's window (null until one is made).
   const [handedToApp, setHandedToApp] = useState<boolean | null>(null);
   const [keyFound, setKeyFound] = useState<string | null>(null);
+  // Whether the app's window took that sign-in from its server: 'waiting' while
+  // the tab asks, then 'yes' (the tab closes itself) or 'no' (the window was not
+  // watching). The owner, 2026-11-11: after the web sign-in "it should just
+  // close the login window and go back to the app" (PLAN.md 23.17f-3).
+  const [appTook, setAppTook] = useState<'waiting' | 'yes' | 'no' | null>(null);
 
   const open = useCallback(() => {
     if (opened.current) return;
@@ -162,6 +167,20 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
     // sign-out from the buy screen: each is a new answer.
     return onAuthFlagChange(() => { void check(); });
   }, [check]);
+
+  const asked = useRef(false);
+  useEffect(() => {
+    if (step !== 'done' || !handoff || !handedToApp || asked.current) return;
+    asked.current = true;
+    setAppTook('waiting');
+    void waitForAppToTake(handoff.code).then((took) => {
+      setAppTook(took ? 'yes' : 'no');
+      // A tab the system opened (one page in its history, as here: Google's
+      // and Apple's sign-ins are popups) may close itself in Chrome, Firefox
+      // and Safari; where a browser refuses, the line below says it is done.
+      if (took) setTimeout(() => { try { window.close(); } catch { /* the line stays */ } }, 1500);
+    });
+  }, [step, handoff, handedToApp]);
 
   // A sign-in finished in the browser files its key with the app's server,
   // not with this window: ask the server until it has one.
@@ -255,12 +274,20 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
         {step === 'checking' && <p className="py-4 text-center text-xs text-neutral-400">Checking your licence…</p>}
 
         {step === 'done' && (
-          <p data-cg-app-licence-done={!handoff ? 'licence' : handedToApp ? 'signed-in' : 'browser-only'} className="text-center text-sm leading-snug text-neutral-200">
+          <p
+            data-cg-app-licence-done={!handoff ? 'licence' : handedToApp ? 'signed-in' : 'browser-only'}
+            data-cg-app-took={handoff && handedToApp ? appTook ?? 'waiting' : undefined}
+            className="text-center text-sm leading-snug text-neutral-200"
+          >
             {!handoff
               ? 'Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.'
-              : handedToApp
-                ? "You're signed in. Go back to the ChromaGlass app: it signs in and opens by itself. You can close this tab."
-                : "You're signed in here, and your licence is on this Mac. To sign the app's window in too, use your email and password there, or Continue with Google or Apple again. You can close this tab."}
+              : !handedToApp
+                ? "You're signed in here, and your licence is on this Mac. To sign the app's window in too, use your email and password there, or Continue with Google or Apple again. You can close this tab."
+                : appTook === 'yes'
+                  ? 'Done. The ChromaGlass app is signed in and back in front. This tab closes by itself; if it stays, close it.'
+                  : appTook === 'no'
+                    ? "You're signed in here, but the ChromaGlass app didn't pick it up. Is it still open? Press Continue with Google or Apple in the app again."
+                    : "You're signed in. Handing it to the ChromaGlass app…"}
           </p>
         )}
 

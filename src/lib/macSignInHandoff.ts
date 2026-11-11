@@ -15,6 +15,7 @@
  * Imported only from the sign-in's lazy chunk, which carries Firebase anyway.
  */
 import { signInWithHandedCredential } from './firebaseAuth';
+import { bringAppToFront } from './macApp';
 
 const PATH = '/signin-handoff';
 const POLL_MS = 2_000;
@@ -85,6 +86,9 @@ export function startHandoffWatch(code: string): void {
       if (!body?.credential || watch?.code !== code) return;
       clearInterval(w.timer);
       watch = null;
+      // The browser is in front, this window behind it: come forward, so the
+      // person sees the app sign in, or why it could not (PLAN.md 23.17f-3).
+      void bringAppToFront();
       try {
         await signInWithHandedCredential(body.credential);
         tell('signed-in');
