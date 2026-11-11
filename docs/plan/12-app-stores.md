@@ -194,13 +194,10 @@ are on the remote now (4a, `npm run applink`); what the controller lacks is writ
 `npm run controller` (owed lines named below, in Measure's `browser2` part), so Antigravity
 builds against a red check (briefs in the project files, `antigravity/briefs-2026-11-09-phone-apps.md`):
 
-- **12-ctl-1** (M, Antigravity): **the songs on the phone.** The Perform desk's set list (its cue
-  list, `lib/setList.ts`) and the song shows (`lib/songShows.ts`) reach the remote in
-  `RemoteState.setList` and `RemoteState.songs`, on a Songs screen one tap from Draw and from
-  Controls: an item tapped is armed for the next Go, a song show run or stopped, Follow songs
-  turned over. The laptop's half sends them from what it has saved and acts on `cue-set-item`,
-  `song-run`, `song-stop`, `song-follow` with the functions the desk's rows call. *Measure:*
-  `controller` lines `setlist`, `songs`, `display`.
+- **12-ctl-1: the songs on the phone (shipped; story in `docs/plan-shipped.md` §12-ctl-1).**
+  A Songs screen one tap from Draw and from Controls: the laptop's set list (tap to arm an item
+  for the next Go) and its song shows (Run, Stop, Follow songs), sent as `RemoteState.setList`
+  and `RemoteState.songs`; `npm run controller` lines `setlist`, `songs`, `display`.
 - **12-ctl-2** (S, Antigravity): **scan instead of typing.** The Laptop remote form gets Scan,
   which reads the QR code the Phone · iPad panel already draws (8f, `lib/qr.ts`; it says the
   Phone line) with a camera plugin in both shells, and links with it; anything not http(s) is

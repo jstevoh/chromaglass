@@ -1849,7 +1849,7 @@
     {
       "name": "The phone controller apps, owed",
       "shard": "browser2",
-      "run": "npm run controller -- --owed=setlist,songs,display,scan,android,nogpu",
+      "run": "npm run controller -- --owed=scan,android,nogpu",
       "why": [
         "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
         "the iPhone and Android apps as the Mac's controller. The Mac's set list and",

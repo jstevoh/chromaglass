@@ -27,7 +27,7 @@ import { usePlayerNow, askMusic } from './musicNow';
 import { useEarNow, askEar } from './earNow';
 import { useRecordNow, askRecord } from './recordNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
-import { useSetNow, askSet } from './setNow';
+import { useSetNow, askSet, armSetItem } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
 import { livePresetId } from '../presets';
 import { assistantLook } from '../lib/assistantLook';
@@ -192,6 +192,23 @@ export function useRemote({
     const armed = setNow.armedItem ? setNow.list.items.findIndex(i => i.id === setNow.armedItem) : -1;
     return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds };
   }, [setNow, sequencer.sequences, allPresets]);
+  /*
+    The same set and shows as the phone controller lists them (PLAN 12-ctl-1):
+    rows by id with the desk's names, and what is on stage, armed and running
+    as the desk has it, so the phone's marks follow the laptop and never the
+    phone's own tap.
+  */
+  const setList = useMemo<RemoteState['setList']>(() => ({
+    name: setNow.list.name,
+    items: setNow.list.items.map((item, i) => ({ id: item.id, name: set?.items[i]?.name ?? item.ref })),
+    liveId: setNow.liveItem,
+    cuedId: setNow.armedItem,
+  }), [setNow, set]);
+  const songList = useMemo<RemoteState['songs']>(() => ({
+    shows: songs.shows.map(s => ({ id: s.id, title: s.title })),
+    runningId: songs.running?.showId ?? null,
+    follow: songs.follow,
+  }), [songs]);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -224,11 +241,13 @@ export function useRemote({
     bench,
     tempo,
     set,
+    setList,
+    songs: songList,
     songShows: songs,
     player,
     ear,
     record,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player, ear, record]);
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -399,6 +418,24 @@ export function useRemote({
         }
         case 'assistant-songs':
           answer(message.answer, askSongs(message));
+          break;
+        /*
+          The phone controller's Songs screen (PLAN 12-ctl-1), through the same
+          doors: a set row armed by its id, a song's show run or stopped, and
+          the Songs panel's Follow songs switch. The phone gets no answer: it
+          reads the result in the next state, as every other control does.
+        */
+        case 'cue-set-item':
+          if (typeof message.id === 'string') armSetItem(message.id);
+          break;
+        case 'song-run':
+          if (typeof message.id === 'string') askSongs({ do: 'start', show: message.id });
+          break;
+        case 'song-stop':
+          askSongs({ do: 'stop' });
+          break;
+        case 'song-follow':
+          if (typeof message.on === 'boolean') askSongs({ do: 'follow', on: message.on });
           break;
         // The music player (PLAN 44k-2, app/musicNow.ts), answered as the set list is.
         case 'assistant-music': {

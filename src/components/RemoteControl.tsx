@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
+import { ListMusic, Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
@@ -24,6 +24,7 @@ import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
+import { RemoteSongs } from './RemoteSongs';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -236,9 +237,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     mixer) opens as that again after a reload or a lost link (S15), rather
     than on a pad they then have to leave mid-song.
   */
-  const [view, setView] = useState<'draw' | 'controls'>(() => {
-    try { return localStorage.getItem(REMOTE_VIEW_KEY) === 'controls' ? 'controls' : 'draw'; } catch { return 'draw'; }
+  const [view, setView] = useState<'draw' | 'controls' | 'songs'>(() => {
+    try { const v = localStorage.getItem(REMOTE_VIEW_KEY); return v === 'controls' || v === 'songs' ? v : 'draw'; } catch { return 'draw'; }
   });
+  // Where Songs' Back goes: the screen it was opened from (PLAN 12-ctl-1).
+  const [songsFrom, setSongsFrom] = useState<'draw' | 'controls'>('draw');
   useEffect(() => { try { localStorage.setItem(REMOTE_VIEW_KEY, view); } catch { /* private mode */ } }, [view]);
   /*
     Draw's Amount, a multiple of how much a touch lays (1× is today's). The
@@ -395,6 +398,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const openControls = async () => {
     letGo();
     setView('controls');
+    try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
+  };
+  const openSongs = async (from: 'draw' | 'controls') => {
+    letGo();
+    setSongsFrom(from);
+    setView('songs');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
   };
 
@@ -610,6 +619,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         onPadUp={onPadUp}
         action={action}
         onControls={openControls}
+        onSongs={() => openSongs('draw')}
+      />
+    );
+  }
+
+  if (view === 'songs') {
+    return (
+      <RemoteSongs
+        state={state}
+        send={send}
+        connected={connected}
+        onBack={songsFrom === 'controls' ? openControls : openDraw}
+        backLabel={songsFrom === 'controls' ? 'Controls' : 'Draw'}
       />
     );
   }
@@ -700,6 +722,20 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="text-[10px] font-bold uppercase tracking-widest">Auto</span>
             </button>
           </div>
+
+          {/* The set list and the song shows (PLAN 12-ctl-1), their own screen */}
+          <button
+            onClick={() => openSongs('controls')}
+            className="mb-6 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 text-left active:scale-[0.99]"
+            data-testid="remote-to-songs"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+              <ListMusic size={15} /> Set list &amp; songs
+            </span>
+            <span className="truncate pl-3 text-[12px] text-white/45">
+              {state?.songs?.runningId ? state.songs.shows.find(sh => sh.id === state.songs?.runningId)?.title ?? '' : state?.setList?.name ?? ''}
+            </span>
+          </button>
 
           {/* A song's name poured as ink (PLAN 37x-10c), its own file */}
           <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
