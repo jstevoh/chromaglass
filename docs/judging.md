@@ -2592,22 +2592,6 @@ square or a halo around it, the plate around it clearing or dimming.
 3. Bad: letters lost on a bright plate, a card cut off at the edge on the portrait stream, a
    card over the desk's controls, a second card stacked on the first.
 
-<<<<<<< HEAD
-## 121. Chemical Clock without the kick's dye clusters (PLAN 25i-10)
-
-The kick's droplets, the music's streams and the automation's drops no longer pour dye in an
-area whose liquid is a reagent: Chemical Clock's three activator places and Red Cabbage's acid
-and base wells. Each still lands its drop of the reagent, so the gel still fires a ring on each
-kick and the wells still turn.
-
-1. Chemical Clock with a song for five minutes: no dark green or teal clusters building up in
-   the upper left, upper right or bottom places (the clusters on the 2026-11-10 rehearsal
-   stream); a blue ring still runs out from each kick's place.
-2. Red Cabbage: the pink and green in its wells are the indicator's, and fade back to violet
-   where the fronts meet, with no painted pink or green spots on the kicks.
-3. Bad: Chemical Clock going flat or pale over a long set (its seed's pools now only fade,
-   25i-11), or no ring on the kicks.
-=======
 ## 121. MIDI notes as voices: a sequencer playing a chord (PLAN 24.3)
 
 `npm run soundowed` (`voices`) holds the placement on Melody Walk's line, the velocity sizing,
@@ -2630,4 +2614,18 @@ learn; only a real sequencer on the Mac can show how a played chord lands and po
 5. Bad: a note firing a button instead of laying a drop, chord notes landing on top of each
    other instead of spread by pitch, a stuck voice after note-off, or any look opening with a
    voices binding before one is learned.
->>>>>>> origin/main
+
+## 122. Chemical Clock without the kick's dye clusters (PLAN 25i-10)
+
+The kick's droplets, the music's streams and the automation's drops no longer pour dye in an
+area whose liquid is a reagent: Chemical Clock's three activator places and Red Cabbage's acid
+and base wells. Each still lands its drop of the reagent, so the gel still fires a ring on each
+kick and the wells still turn.
+
+1. Chemical Clock with a song for five minutes: no dark green or teal clusters building up in
+   the upper left, upper right or bottom places (the clusters on the 2026-11-10 rehearsal
+   stream); a blue ring still runs out from each kick's place.
+2. Red Cabbage: the pink and green in its wells are the indicator's, and fade back to violet
+   where the fronts meet, with no painted pink or green spots on the kicks.
+3. Bad: Chemical Clock going flat or pale over a long set (its seed's pools now only fade,
+   25i-11), or no ring on the kicks.
