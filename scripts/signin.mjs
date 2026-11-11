@@ -120,6 +120,7 @@ import { gzipSync } from 'node:zlib';
 import licenseWorker from '../server/license-worker.js';
 import { signLicenseKey } from '../server/license-key.js';
 import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from '../server/signin-handoff.js';
+import { isLaptop } from '../server/laptop.js';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -204,10 +205,9 @@ const firebaseChunks = new Set(jsFiles(ON_DIST).filter(hasFirebase).map((f) => '
 // ── the servers ─────────────────────────────────────────────────────────────
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm' };
 // The Mac app's sign-in hand-off (PLAN.md 23.17f), mounted as the show server
-// mounts it, with the show server's own rule for who is the laptop: a loopback
-// socket and a loopback Host.
+// mounts it, with the show server's own rule for who is the laptop
+// (server/laptop.js, imported, not copied).
 const handoff = createSignInHandoff();
-const isLaptop = (req) => /^(127\.|::1$|::ffff:127\.)/.test(req.socket.remoteAddress ?? '') && /^(localhost|127\.\d+\.\d+\.\d+|\[::1\])(:\d+)?$/i.test(String(req.headers.host ?? ''));
 function serve(dist, port) {
   const server = createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -1082,12 +1082,20 @@ try {
       // is the site's, so the browser is told so the way the app's shell tells
       // its window, `requireSignIn` (lib/authFlag.ts), with no `shell`, since
       // it is a browser and not the app.
+      // And the Mac already holds the account's Pro key, which the tab finds
+      // (the app's server hands it over; here the browser's storage holds it):
+      // the case where the tab used to say "Your licence is on this Mac now"
+      // and ask nobody to sign in. It must say the key was found (the owner,
+      // 2026-11-10) and still offer the sign-in.
+      const heldKey = await signLicenseKey({ id: 'check-pro-1', tier: 'pro', email: E, issuedAt: Date.now() }, licEnv.LICENSE_PRIVATE_KEY);
       const brCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-      await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };');
-      let browserDone = null;
+      await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };' +
+        `try { localStorage.setItem('chromaglass:license-key', ${JSON.stringify(heldKey)}); } catch {}`);
+      let browserDone = null, keyFound = null;
       if (openedUrl) {
         const b = await brCtx.newPage();
         await b.goto(openedUrl);
+        keyFound = await b.waitForSelector('[data-cg-app-licence-found]', { timeout: 30_000 }).then((el) => el.getAttribute('data-cg-app-licence-found'), () => null);
         if (await b.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 30_000 }).then(() => true, () => false)) {
           const popup = answerGoogle(brCtx, E);
           await b.click('[data-cg-signin-provider="google.com"]');
@@ -1114,14 +1122,22 @@ try {
       const again = code ? await fetch(`${ORIGIN}signin-handoff?h=${code}`).then((r) => r.json()).catch(() => null) : null;
       const spent = again?.pending === true;
       const crossSite = await fetch(`${ORIGIN}signin-handoff?h=${'x'.repeat(24)}`, { headers: { origin: 'https://example.com', 'sec-fetch-site': 'cross-site' } }).then((r) => r.status).catch(() => 0);
+      // The planting direction too: another site's page posting a credential under a guessed code.
+      const crossPost = await fetch(`${ORIGIN}signin-handoff`, {
+        method: 'POST', headers: { origin: 'https://example.com', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' },
+        body: JSON.stringify({ h: 'y'.repeat(24), credential: { providerId: 'google.com', signInMethod: 'google.com', idToken: 'x' } }),
+      }).then((r) => r.status).catch(() => 0);
+      // The show server hands the route the same rule this check mounts it with.
+      const wired = /signInHandoff\.handleRequest\(req, res, url, isLaptop\(req\)\)/.test(readFileSync('server/remote-server.js', 'utf8'))
+        && /import \{[^}]*\bisLaptop\b[^}]*\} from '\.\/laptop\.js'/.test(readFileSync('server/remote-server.js', 'utf8'));
       const rebound = await new Promise((ok) => {
         const req = httpRequest({ host: '127.0.0.1', port: ON_PORT, path: `/signin-handoff?h=${'x'.repeat(24)}`, headers: { host: `attacker.example:${ON_PORT}` } }, (r) => { r.resume(); ok(r.statusCode); });
         req.on('error', () => ok(0));
         req.end();
       });
-      check('25. a Google sign-in from the Mac app: the button keeps its name, the browser signs in, and the app\'s window signs in as the same account (its sheet names it), the code spent and the route closed to other sites and names',
-        signinShown && label.trim() === 'Continue with Google' && waiting === 'waiting' && !!code && browserDone === 'signed-in' && up && named && spent && crossSite === 403 && rebound === 403,
-        `sign-in ${signinShown}, button "${label.trim()}", window ${waiting ?? 'no waiting line'}, code ${code ? 'in the address' : 'none'}, browser ${browserDone ?? 'never finished'}, show ${up}, sheet names the account ${named}, spent ${spent}, cross-site ${crossSite}, rebound ${rebound}`);
+      check('25. a Google sign-in from the Mac app: the button keeps its name, the browser tab says the Mac\'s key was found and signs in, and the app\'s window signs in as the same account (its sheet names it), the code spent and the route closed to other sites and names',
+        signinShown && label.trim() === 'Continue with Google' && waiting === 'waiting' && !!code && keyFound === 'Pro' && browserDone === 'signed-in' && up && named && spent && crossSite === 403 && crossPost === 403 && rebound === 403 && wired,
+        `sign-in ${signinShown}, button "${label.trim()}", window ${waiting ?? 'no waiting line'}, code ${code ? 'in the address' : 'none'}, tab says ${keyFound ? `the ${keyFound} key was found` : 'nothing of the key'}, browser ${browserDone ?? 'never finished'}, show ${up}, sheet names the account ${named}, spent ${spent}, cross-site GET ${crossSite} POST ${crossPost}, rebound ${rebound}, show server wired ${wired}`);
       await brCtx.close();
       await appCtx.close();
     }

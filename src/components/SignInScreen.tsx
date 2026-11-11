@@ -17,10 +17,16 @@ import { hasEmailSignInLink } from '../lib/authFlag';
 import { getMarketingOptIn, setMarketingOptIn } from '../lib/tierGates';
 import { isDesktopApp } from '../lib/platform';
 import { openSignInInBrowser, newHandoffCode, handoffFromUrl, type HandoffProvider } from '../lib/macApp';
-import { sendHandoff, startHandoffWatch, stopHandoffWatch, onHandoff } from '../lib/macSignInHandoff';
+import { sendHandoff, startHandoffWatch, stopHandoffWatch, onHandoff, currentHandoffCode } from '../lib/macSignInHandoff';
 
 interface SignInScreenProps {
-  onSignedIn: () => void;
+  /**
+   * `handed`: in the browser tab the Mac app sent a sign-in to, whether the
+   * app's server took the credential for the window (true), or this sign-in
+   * had none to give (a password, an emailed link) or the post failed (false).
+   * Undefined everywhere else.
+   */
+  onSignedIn: (handed?: boolean) => void;
   /**
    * The Account sheet's form: no newsletter tick. The sheet has its own switch
    * once signed in, and a consent box between the sign-in and the licence was
@@ -91,8 +97,13 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
     checkPendingRedirect()
       .then(async (user) => {
         if (!user) return;
-        if (handoff) await sendHandoff(handoff.code, takeProviderCredential());
-        if (!cancelled) onSignedIn();
+        const handed = handoff ? await sendHandoff(handoff.code, takeProviderCredential()) : undefined;
+        // Not held back by `cancelled`: signing in fires the auth flag, whose
+        // listeners re-render the parent and can re-run this effect while the
+        // post is in flight, and Firebase hands a redirect's result out once,
+        // so the re-run gets nothing. Skipping here left the Mac app's browser
+        // tab on its sign-in for good after a redirect (the review of this PR).
+        onSignedIn(handed);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -114,9 +125,25 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
       } else if (state === 'failed') {
         setHandoffFailed(true);
         setEmailOpen(true);
+      } else if (state === 'expired') {
+        setInBrowser(null);
+        setError('The browser sign-in took too long, so this window stopped waiting. Press the button again to start over.');
       }
     });
   }, [inApp, onSignedIn]);
+
+  // A sign-in made in this form itself (a password, an emailed link). In the
+  // Mac app's window it ends any wait for the browser, so a sign-in finished
+  // there later cannot switch the window to another account unasked; in the
+  // browser tab the app sent here it hands the window nothing (the review of
+  // this PR).
+  const signedInHere = () => {
+    if (inApp) {
+      stopHandoffWatch();
+      setInBrowser(null);
+    }
+    onSignedIn(handoff ? false : undefined);
+  };
 
   const handleProvider = async (providerId: HandoffProvider) => {
     setError(null);
@@ -126,8 +153,8 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
         // The browser tab the Mac app sent here: give the app's window this
         // sign-in before anything else, since the licence arriving next closes
         // the window's sign-in (PLAN.md 23.17f).
-        if (handoff) await sendHandoff(handoff.code, takeProviderCredential());
-        onSignedIn();
+        const handed = handoff ? await sendHandoff(handoff.code, takeProviderCredential()) : undefined;
+        onSignedIn(handed);
       }
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? '';
@@ -153,7 +180,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
     try {
       if (mode === 'signup') await signUpWithPassword(trimmed, password);
       else await signInWithPassword(trimmed, password);
-      onSignedIn();
+      signedInHere();
     } catch (err: unknown) {
       if ((err as { code?: string })?.code === 'auth/email-already-in-use') setExists(true);
       else setError(authErrorMessage(err));
@@ -166,7 +193,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
     setError(null);
     try {
       await signInWithGoogleAddPassword(email, password);
-      onSignedIn();
+      signedInHere();
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code ?? '';
       if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return;
@@ -200,7 +227,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
       if (isCompletingLink) {
         const res = await completeEmailLinkSignIn(trimmed);
         if (!res.needsEmail) {
-          onSignedIn();
+          signedInHere();
           return;
         }
       } else {
@@ -218,7 +245,7 @@ export const SignInForm: React.FC<SignInScreenProps> = ({ onSignedIn, compact = 
   // the browser files its sign-in under, and watch the app's server for it
   // (PLAN.md 23.17f, lib/macSignInHandoff.ts).
   const sendToBrowser = (providerId: HandoffProvider) => {
-    const code = newHandoffCode();
+    const code = currentHandoffCode() ?? newHandoffCode();
     startHandoffWatch(code);
     openSignInInBrowser(code, providerId);
     setInBrowser(providerId);

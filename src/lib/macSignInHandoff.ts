@@ -37,7 +37,7 @@ export async function sendHandoff(code: string, credential: object | null): Prom
   }
 }
 
-export type HandoffState = 'waiting' | 'signed-in' | 'failed' | 'stopped';
+export type HandoffState = 'waiting' | 'signed-in' | 'failed' | 'stopped' | 'expired';
 type Listener = (state: HandoffState, detail?: string) => void;
 
 let watch: { code: string; timer: ReturnType<typeof setInterval>; until: number } | null = null;
@@ -50,15 +50,32 @@ export function stopHandoffWatch(): void {
   tell('stopped');
 }
 
+/**
+ * The code being watched, while one is. "Open the browser again" and a second
+ * provider reuse it: a fresh code each press dropped the first, and a person
+ * who then finished in the first tab (the one that came up behind the window)
+ * filed a sign-in nobody watched for (the review of this PR).
+ */
+export function currentHandoffCode(): string | null {
+  return watch && Date.now() <= watch.until ? watch.code : null;
+}
+
 /** The window's end: ask the server for this code's sign-in until it comes, or ten minutes pass. */
 export function startHandoffWatch(code: string): void {
+  if (watch?.code === code) {
+    watch.until = Date.now() + WATCH_FOR_MS;
+    tell('waiting');
+    return;
+  }
   if (watch) clearInterval(watch.timer);
   let asking = false;
   const tick = async () => {
     const w = watch;
     if (!w || w.code !== code || asking) return;
     if (Date.now() > w.until) {
-      stopHandoffWatch();
+      clearInterval(w.timer);
+      watch = null;
+      tell('expired');
       return;
     }
     asking = true;

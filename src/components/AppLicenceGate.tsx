@@ -128,6 +128,8 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
   // license key was detected?").
   const [handoff] = useState(() => handoffFromUrl());
   const handedOver = useRef(false);
+  // Whether the sign-in made here reached the app's window (null until one is made).
+  const [handedToApp, setHandedToApp] = useState<boolean | null>(null);
   const [keyFound, setKeyFound] = useState<string | null>(null);
 
   const open = useCallback(() => {
@@ -203,6 +205,13 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
     }
   };
 
+  // Stable, so the form's redirect check does not re-run under it.
+  const onFormSignedIn = useCallback((handed?: boolean) => {
+    handedOver.current = true;
+    setHandedToApp(handed ?? null);
+    void check();
+  }, [check]);
+
   const confirmed = async () => {
     const m = await firebase();
     await m?.refreshAccountVerification().catch(() => false);
@@ -246,10 +255,12 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
         {step === 'checking' && <p className="py-4 text-center text-xs text-neutral-400">Checking your licence…</p>}
 
         {step === 'done' && (
-          <p data-cg-app-licence-done={handoff ? 'signed-in' : 'licence'} className="text-center text-sm leading-snug text-neutral-200">
-            {handoff
-              ? "You're signed in. Go back to the ChromaGlass app: it signs in and opens by itself. You can close this tab."
-              : 'Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.'}
+          <p data-cg-app-licence-done={!handoff ? 'licence' : handedToApp ? 'signed-in' : 'browser-only'} className="text-center text-sm leading-snug text-neutral-200">
+            {!handoff
+              ? 'Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.'
+              : handedToApp
+                ? "You're signed in. Go back to the ChromaGlass app: it signs in and opens by itself. You can close this tab."
+                : "You're signed in here, and your licence is on this Mac. To sign the app's window in too, use your email and password there, or Continue with Google or Apple again. You can close this tab."}
           </p>
         )}
 
@@ -261,12 +272,7 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
 
         {step === 'signin' && LazySignInForm && (
           <Suspense fallback={<p className="py-4 text-center text-xs text-neutral-400">Loading…</p>}>
-            <LazySignInForm
-              onSignedIn={() => {
-                handedOver.current = true;
-                void check();
-              }}
-            />
+            <LazySignInForm onSignedIn={onFormSignedIn} />
           </Suspense>
         )}
 
