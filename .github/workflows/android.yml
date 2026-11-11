@@ -51,10 +51,16 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      # The SDK's command-line tools and its licences accepted, so Gradle can
-      # fetch the platform the project compiles against (compileSdkVersion in
-      # android/variables.gradle) if the image lacks it.
-      - uses: android-actions/setup-android@v3
+      # No SDK setup step: GitHub's Ubuntu image already carries the Android
+      # SDK with its licences accepted and ANDROID_HOME set, and Gradle fetches
+      # the platform the project compiles against (compileSdkVersion in
+      # android/variables.gradle) if the image lacks it. The first run used
+      # android-actions/setup-android@v3, which failed in its own sdkmanager
+      # call ("Failed to find package 'tools'") on the image's command-line
+      # tools 16.0, and as an outside action it would also have to be pinned
+      # to a commit (npm run cisecrets).
+      - name: The image's Android SDK
+        run: echo "ANDROID_HOME=$ANDROID_HOME" && ls "$ANDROID_HOME/platforms"
       - run: npm ci
       - name: Build the site into the app
         run: npm run build && npx cap sync android
