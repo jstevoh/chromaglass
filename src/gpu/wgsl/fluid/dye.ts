@@ -267,7 +267,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   heatPack: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var sq: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
