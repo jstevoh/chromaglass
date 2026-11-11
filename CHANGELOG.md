@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Lava Lamp's wax as blobs in a clear liquid; Oil Weight (PLAN 27f-9c)
+
+- Lava Lamp's wax is a liquid of its own: crimson bodies in a clear, lamp-lit liquid that pool
+  low and are lifted by the lamp, instead of a red wash over the whole plate.
+- Oil Weight (Settings → Oil & Soap, MIDI, the phone): how heavy the oil is against the water.
+  Left it floats up a standing plate, right it sinks like a lamp's wax and melts light at the
+  lamp. The default keeps every oil look as it was.
+
 ### Added — song titles as a 1980s corner caption (PLAN 37x-10j)
 
 - Song titles now go up by default as a corner caption, the card a music channel put over a
