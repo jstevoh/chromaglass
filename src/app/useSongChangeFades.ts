@@ -5,7 +5,8 @@ import { showFor, type SongShow } from '../lib/songShows';
 import { evolvedLook } from '../lib/lookFade';
 import { luckyLook } from '../lib/lucky';
 import { stream } from '../lib/rng';
-import { PRESETS } from '../presets';
+import { canUseMoirePack } from '../lib/tierGates';
+import { randomLook } from './shared';
 import type { Ear } from '../hooks/useAudioAnalyzer';
 import type { MusicIntelResult } from '../hooks/useMusicIntelligence';
 import type { VisualizerSettings, LiquidType } from '../types';
@@ -103,14 +104,14 @@ export function useSongChangeFades({
       setPinnedPresetId(null);
       // The song boundary's own stream, not Lucky's default: a Lucky press
       // between songs must not decide which look the next song brings.
-      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float)), songFadeSeconds(songChange.reason));
+      fadeSettingsTo(evolvedLook(from, luckyLook(from, liquidTypesRef.current.map(t => t.color), stream('show.newSong').float, canUseMoirePack())), songFadeSeconds(songChange.reason));
       return;
     }
-    const pool = PRESETS.filter(p => !p.settings.macroMode && p.id !== activePresetId);
     // Which look a song boundary brings is on the plate for the whole song:
     // seeded (lib/rng.ts), on a stream of its own so Lucky presses between
-    // songs do not decide it.
-    const next = stream('show.newSong').pick(pool);
+    // songs do not decide it; weighted, owned and not the liquid just played
+    // (randomLook, lib/lookPick.ts).
+    const next = randomLook(activePresetId, stream('show.newSong').float);
     if (!next) return;
     previousLook.current = { id: pinnedPresetId, settings: from };
     adoptPreset(next.id);

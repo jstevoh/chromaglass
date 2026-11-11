@@ -15,6 +15,8 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   linkWithCredential,
+  signInWithCredential,
+  OAuthCredential,
   updatePassword,
   EmailAuthProvider,
   signOut,
@@ -129,6 +131,7 @@ export async function signInWithProvider(
   try {
     const cred = await signInWithPopup(auth, provider);
     setSignedInCached(cred.user.email);
+    keepProviderCredential(providerId, cred);
     await attachPendingCredential(cred.user);
     return cred.user;
   } catch (err: unknown) {
@@ -160,6 +163,45 @@ export async function signInWithProvider(
     }
     throw err;
   }
+}
+
+/**
+ * The provider's own credential from the last Google or Apple sign-in in this
+ * tab, as JSON, for the Mac app's window to sign in with (PLAN.md 23.17f,
+ * server/signin-handoff.js). Firebase keeps only its own session, never the
+ * provider's token, so it is caught here, from the sign-in's result, or never.
+ * Taken once.
+ */
+let lastProviderCredential: object | null = null;
+
+function keepProviderCredential(providerId: 'google.com' | 'apple.com', result: Parameters<typeof GoogleAuthProvider.credentialFromResult>[0]): void {
+  try {
+    const c = providerId === 'google.com' ? GoogleAuthProvider.credentialFromResult(result) : OAuthProvider.credentialFromResult(result);
+    lastProviderCredential = c ? c.toJSON() : null;
+  } catch {
+    lastProviderCredential = null;
+  }
+}
+
+export function takeProviderCredential(): object | null {
+  const c = lastProviderCredential;
+  lastProviderCredential = null;
+  return c;
+}
+
+/**
+ * Sign this window in with a credential a browser handed over (the Mac app,
+ * PLAN.md 23.17f): Firebase's documented way to sign in with a provider's token
+ * obtained elsewhere. The token is Google's or Apple's, checked by Firebase's
+ * server as any sign-in is; nothing here trusts it.
+ */
+export async function signInWithHandedCredential(json: object): Promise<User> {
+  const auth = getFirebaseAuth();
+  const credential = OAuthCredential.fromJSON(json);
+  if (!credential) throw new Error('That sign-in could not be read.');
+  const res = await signInWithCredential(auth, credential);
+  setSignedInCached(res.user.email);
+  return res.user;
 }
 
 /**
@@ -245,6 +287,8 @@ export async function checkPendingRedirect(): Promise<User | null> {
     const res = await getRedirectResult(auth);
     if (res?.user) {
       setSignedInCached(res.user.email);
+      const pid = res.providerId;
+      if (pid === 'google.com' || pid === 'apple.com') keepProviderCredential(pid, res);
       return res.user;
     }
   } catch (err: unknown) {

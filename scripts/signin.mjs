@@ -111,7 +111,7 @@
  */
 import { chromium } from 'playwright';
 import { launchChromium, port } from './chromium.mjs';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, statSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
@@ -119,6 +119,8 @@ import { tmpdir } from 'node:os';
 import { gzipSync } from 'node:zlib';
 import licenseWorker from '../server/license-worker.js';
 import { signLicenseKey } from '../server/license-key.js';
+import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from '../server/signin-handoff.js';
+import { isLaptop } from '../server/laptop.js';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -202,9 +204,18 @@ const firebaseChunks = new Set(jsFiles(ON_DIST).filter(hasFirebase).map((f) => '
 
 // ── the servers ─────────────────────────────────────────────────────────────
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm' };
+// The Mac app's sign-in hand-off (PLAN.md 23.17f), mounted as the show server
+// mounts it, with the show server's own rule for who is the laptop
+// (server/laptop.js, imported, not copied).
+const handoff = createSignInHandoff();
 function serve(dist, port) {
   const server = createServer((req, res) => {
-    const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    const url = new URL(req.url, 'http://x');
+    if (url.pathname === SIGNIN_HANDOFF_PATH) {
+      void handoff.handleRequest(req, res, url, isLaptop(req));
+      return;
+    }
+    const path = decodeURIComponent(url.pathname);
     let file = join(dist, path);
     if (!file.startsWith(dist) || !existsSync(file) || statSync(file).isDirectory()) file = join(dist, 'index.html');
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
@@ -1033,6 +1044,102 @@ try {
       check('24. a refunded key: the running show stays up, the key leaves the machine, and the next start asks to buy', upAgain && retired && stayed && backToBuy && noPlate,
         `a key held before ${typeof heldBefore === 'string' && heldBefore.startsWith('cg1.')}, opened on it ${upAgain}, key taken off ${retired}, show still up ${stayed}, next start ${await step(p) ?? 'the plate'}`);
       await c.close();
+    }
+    // ── 25: a Google sign-in from the Mac app signs its window in too ─────
+    // (PLAN.md 23.17f; the owner, 2026-11-10, on 1.3.1276: "this login stuff
+    // is fucked. google is no longer there?"). The app sends Google to the real
+    // browser, which has storage of its own (a second context here). Before
+    // this, only the account's key came back: the window stayed signed out, its
+    // Google button read "Finish in your browser…" for good, and a browser tab
+    // on a Mac that already had a key never asked anyone to sign in. Here the
+    // window is the app (its shell's word `shell: 'desktop'`, and an
+    // `openInBrowser` that records the address instead of opening it), the
+    // account holds a Pro key, and the only road from the browser's sign-in to
+    // the window is the app's server (`server/signin-handoff.js`, mounted on
+    // this check's server as the show server mounts it). On the code before,
+    // the address carries no code and the window never signs in: 25 fails.
+    {
+      const E = 'mac-handoff@example.com';
+      await deleteAccount(E);
+      licKV.clear();
+      await fileProKey(E);
+      const appCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await appCtx.addInitScript(LICENSE_PUBLIC_INIT + "window.__CHROMAGLASS_NATIVE__ = Object.assign(window.__CHROMAGLASS_NATIVE__ || {}, { shell: 'desktop', openInBrowser: (u) => { window.__cgOpened = u; } });");
+      const a = await appCtx.newPage();
+      await a.goto(SHOW + '&requireSignIn=1');
+      const doorAt = (p) => p.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
+      const signinShown = await waitFor(async () => (await doorAt(a)) === 'signin', 30_000)
+        && await a.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 15_000 }).then(() => true, () => false);
+      await a.click('[data-cg-signin-provider="google.com"]').catch(() => {});
+      const openedUrl = await waitFor(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null), 5000).then(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null));
+      const label = await a.locator('[data-cg-signin-provider="google.com"]').innerText().catch(() => '');
+      const waiting = await a.evaluate(() => document.querySelector('[data-cg-signin-in-browser]')?.getAttribute('data-cg-signin-in-browser') ?? null).catch(() => null);
+      const code = openedUrl ? new URL(openedUrl).searchParams.get('h') : null;
+
+      // The browser: its own storage, the address the app opened.
+      // The app's server serves the site built for the app (`VITE_MAC_APP=1`,
+      // desktop.yml), where every page asks for a paid key: this check's build
+      // is the site's, so the browser is told so the way the app's shell tells
+      // its window, `requireSignIn` (lib/authFlag.ts), with no `shell`, since
+      // it is a browser and not the app.
+      // And the Mac already holds the account's Pro key, which the tab finds
+      // (the app's server hands it over; here the browser's storage holds it):
+      // the case where the tab used to say "Your licence is on this Mac now"
+      // and ask nobody to sign in. It must say the key was found (the owner,
+      // 2026-11-10) and still offer the sign-in.
+      const heldKey = await signLicenseKey({ id: 'check-pro-1', tier: 'pro', email: E, issuedAt: Date.now() }, licEnv.LICENSE_PRIVATE_KEY);
+      const brCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };' +
+        `try { localStorage.setItem('chromaglass:license-key', ${JSON.stringify(heldKey)}); } catch {}`);
+      let browserDone = null, keyFound = null;
+      if (openedUrl) {
+        const b = await brCtx.newPage();
+        await b.goto(openedUrl);
+        keyFound = await b.waitForSelector('[data-cg-app-licence-found]', { timeout: 30_000 }).then((el) => el.getAttribute('data-cg-app-licence-found'), () => null);
+        if (await b.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 30_000 }).then(() => true, () => false)) {
+          const popup = answerGoogle(brCtx, E);
+          await b.click('[data-cg-signin-provider="google.com"]');
+          await popup;
+          await waitFor(async () => (await b.evaluate(() => document.querySelector('[data-cg-app-licence-done]')?.getAttribute('data-cg-app-licence-done')).catch(() => null)) != null, 45_000);
+          browserDone = await b.evaluate(() => document.querySelector('[data-cg-app-licence-done]')?.getAttribute('data-cg-app-licence-done') ?? null).catch(() => null);
+        }
+      }
+
+      // The window: the door gone on the account's Pro key, and its sheet naming the account.
+      const doorGone = await waitFor(async () => (await doorAt(a)) === null, 30_000);
+      const up = doorGone && await waitFor(() => appUp(a), BOOT_MS);
+      let named = false;
+      if (up) {
+        await a.click('[data-cg-account-open]').catch(() => {});
+        named = await waitFor(() => a.evaluate((e) => {
+          const st = document.querySelector('[data-cg-account-status]');
+          return st?.getAttribute('data-cg-account-status') === 'signed-in' && (st.textContent ?? '').includes(e);
+        }, E).catch(() => false), 20_000);
+      }
+      // Taken once: the code is spent. And the server refuses a page of
+      // another site, and a request whose Host is not this Mac's own name (a
+      // page that rebinds its name to 127.0.0.1).
+      const again = code ? await fetch(`${ORIGIN}signin-handoff?h=${code}`).then((r) => r.json()).catch(() => null) : null;
+      const spent = again?.pending === true;
+      const crossSite = await fetch(`${ORIGIN}signin-handoff?h=${'x'.repeat(24)}`, { headers: { origin: 'https://example.com', 'sec-fetch-site': 'cross-site' } }).then((r) => r.status).catch(() => 0);
+      // The planting direction too: another site's page posting a credential under a guessed code.
+      const crossPost = await fetch(`${ORIGIN}signin-handoff`, {
+        method: 'POST', headers: { origin: 'https://example.com', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' },
+        body: JSON.stringify({ h: 'y'.repeat(24), credential: { providerId: 'google.com', signInMethod: 'google.com', idToken: 'x' } }),
+      }).then((r) => r.status).catch(() => 0);
+      // The show server hands the route the same rule this check mounts it with.
+      const wired = /signInHandoff\.handleRequest\(req, res, url, isLaptop\(req\)\)/.test(readFileSync('server/remote-server.js', 'utf8'))
+        && /import \{[^}]*\bisLaptop\b[^}]*\} from '\.\/laptop\.js'/.test(readFileSync('server/remote-server.js', 'utf8'));
+      const rebound = await new Promise((ok) => {
+        const req = httpRequest({ host: '127.0.0.1', port: ON_PORT, path: `/signin-handoff?h=${'x'.repeat(24)}`, headers: { host: `attacker.example:${ON_PORT}` } }, (r) => { r.resume(); ok(r.statusCode); });
+        req.on('error', () => ok(0));
+        req.end();
+      });
+      check('25. a Google sign-in from the Mac app: the button keeps its name, the browser tab says the Mac\'s key was found and signs in, and the app\'s window signs in as the same account (its sheet names it), the code spent and the route closed to other sites and names',
+        signinShown && label.trim() === 'Continue with Google' && waiting === 'waiting' && !!code && keyFound === 'Pro' && browserDone === 'signed-in' && up && named && spent && crossSite === 403 && crossPost === 403 && rebound === 403 && wired,
+        `sign-in ${signinShown}, button "${label.trim()}", window ${waiting ?? 'no waiting line'}, code ${code ? 'in the address' : 'none'}, tab says ${keyFound ? `the ${keyFound} key was found` : 'nothing of the key'}, browser ${browserDone ?? 'never finished'}, show ${up}, sheet names the account ${named}, spent ${spent}, cross-site GET ${crossSite} POST ${crossPost}, rebound ${rebound}, show server wired ${wired}`);
+      await brCtx.close();
+      await appCtx.close();
     }
   }
 } catch (e) {

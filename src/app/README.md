@@ -55,7 +55,7 @@ comments, which moved with it.
 | `useCheckHooks` | the checks' `?debug` doors (`lib/checkHooks.ts` declares them) |
 | `useCrashState` | the black box's half from here |
 
-`shared.ts` holds what App and several hooks read: the look the page opens on, the shapes
+`shared.ts` holds what App and several hooks read: the look the page opens on, `randomLook` (the phone's Surprise me and a new song's look, through `pickLook`, PLAN 45a-13), the shapes
 of an armed look and the wall's look, and the keys the sound and the room camera are kept
 under (`MAC_SYSTEM_AUDIO_KEY` since PLAN 14y-2: the Mac app's System audio, kept across a
 relaunch). A check that reads App's source as text reads App and these together

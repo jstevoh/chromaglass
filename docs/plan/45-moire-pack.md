@@ -87,3 +87,7 @@ own. Check: `npm run moire`.
     stills: a few seconds off the Mac's take (the film script and takes are on the owner's
     Mac), as a muted, looping, `playsinline` video under 1 MB with a still as its poster.
     Needs #691 merged and a Mac session for the file.
+  - ~~**45a-13. Random looks land on moiré one pick in sixteen, not one in five**~~
+    (**shipped** 2026-11-11, `npm run panel`; story in `docs/plan-shipped.md`).
+  - ~~**45a-14. Randomise lays a pair of sheets now and then**~~ (**shipped** 2026-11-11 with
+    45a-13, `npm run panel`; story in `docs/plan-shipped.md`).
