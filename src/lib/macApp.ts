@@ -153,6 +153,45 @@ export function openSignInInBrowser(code?: string, provider?: HandoffProvider): 
 }
 
 /**
+ * The app's window to the front (desktop/main.js `chromaglass:bring-to-front`),
+ * when a sign-in it sent to the browser comes back. The owner, 2026-11-11:
+ * after the web sign-in "it should just close the login window and go back to
+ * the app". The browser is in front at that moment, the window behind it; it
+ * signed in, but nobody saw it. False outside the app, or on a shell too old
+ * to have the call.
+ */
+export async function bringAppToFront(): Promise<boolean> {
+  const native = (window as unknown as { __CHROMAGLASS_NATIVE__?: { bringToFront?: () => Promise<boolean> } }).__CHROMAGLASS_NATIVE__;
+  try {
+    return (await native?.bringToFront?.()) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The browser tab's end of the hand-off, after it filed its sign-in: did the
+ * app's window take it? Asked of the app's server (`?status=1`, which answers
+ * yes or no and never shows the credential) until it says yes or `ms` pass. Only
+ * a yes lets the tab say "done" and close itself; a no means the window was not
+ * watching (closed, or restarted since the button was pressed), and the tab
+ * says so rather than "go back to the app" over an app still signed out.
+ */
+export async function waitForAppToTake(code: string, ms = 30_000): Promise<boolean> {
+  const until = Date.now() + ms;
+  while (Date.now() < until) {
+    try {
+      const res = await fetch(`/signin-handoff?h=${encodeURIComponent(code)}&status=1`, { cache: 'no-store' });
+      if (res.ok && ((await res.json()) as { taken?: boolean }).taken === true) return true;
+    } catch {
+      // The app's own server; a miss is a moment.
+    }
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  return false;
+}
+
+/**
  * The licences the Mac app opens on (PLAN.md 23.17d; the owner's choice,
  * 2026-10-26, "Home can open the app"): Home and Pro, each with
  * its own features, as on the website. Home's phone remote, song ID and

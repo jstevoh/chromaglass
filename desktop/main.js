@@ -723,6 +723,18 @@ async function start() {
     void shell.openExternal(url);
     return true;
   });
+  // The way back (PLAN.md 23.17f-3): the sign-in the browser just made has
+  // reached the window, which is behind the browser. The owner, 2026-11-11:
+  // "it should just close the login window and go back to the app". Only the
+  // show's own window may ask, and it can only bring itself forward.
+  ipcMain.handle('chromaglass:bring-to-front', (e) => {
+    if (!showWindow || showWindow.isDestroyed() || e.sender !== showWindow.webContents) return false;
+    if (showWindow.isMinimized()) showWindow.restore();
+    showWindow.show();
+    app.focus({ steal: true });
+    showWindow.focus();
+    return true;
+  });
   // The live stream (PLAN.md 37x-4b): the page encodes, this process speaks
   // RTMPS (live.js), and the stream keys stay in the keychain store (keys.js),
   // where a packed app alone can read them. Headless until the panel (37x-4d):
