@@ -2004,6 +2004,23 @@
       ]
     },
     {
+      "name": "The TV app finds the show and pairs by four digits",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tvpair.mjs",
+      "why": [
+        "The Android TV app's network half (scripts/tvpair.mjs, PLAN.md 12-tv-2):",
+        "the real show server's Bonjour advert asked as NsdManager asks and as a",
+        "one-shot question (its port, the TV page's path, the show's id, never",
+        "its key); pairing by four digits over raw sockets from the server's",
+        "network address (Allow, No and the lockout, a phone unable to allow,",
+        "kept keys across a restart, unknown keys never locking out, Forget);",
+        "the built /tv page pairing, keeping its key and joining with it after a",
+        "reload; the laptop's card laid out with the built stylesheet. The app's",
+        "own build and lint are the Android TV app workflow. dist/ is the phone",
+        "step's build. About thirty seconds."
+      ]
+    },
+    {
       "name": "A TV at home plays the show's plate",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/tv.mjs",

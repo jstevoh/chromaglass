@@ -50,7 +50,7 @@ module.exports = {
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },
-    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'osc.js', 'abletonLink.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'signin-handoff.js', 'laptop.js', 'license-key.js', 'assistant.js', 'assistantMusic.js', 'assistantEar.js', 'assistantRecord.js', 'assistantUpdates.js', 'assistantSound.js', 'assistantMedia.js', 'assistantOutputs.js', 'assistantProjector.js', 'assistantDesk.js', 'assistant-room-keys.json'] },
+    { from: '../server', to: 'server', filter: ['remote-server.js', 'artnet.js', 'osc.js', 'abletonLink.js', 'account-shows.js', 'firebase-token.js', 'server-license.js', 'signin-handoff.js', 'laptop.js', 'license-key.js', 'assistant.js', 'assistantMusic.js', 'assistantEar.js', 'assistantRecord.js', 'assistantUpdates.js', 'assistantSound.js', 'assistantMedia.js', 'assistantOutputs.js', 'assistantProjector.js', 'assistantDesk.js', 'assistant-room-keys.json', 'tv-pairing.js', 'bonjour.js'] },
   ],
   // All of it in one archive: Electron reads the site (the server's fs calls)
   // and imports the server (an ES module) from inside it. `npm run desktop --

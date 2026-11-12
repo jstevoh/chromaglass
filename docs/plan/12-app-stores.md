@@ -217,7 +217,8 @@ builds against a red check (briefs in the project files, `antigravity/briefs-202
   `android`, `nogpu`, and the workflow green.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
-  when 12-tv-2's advert is on main.
+  when 12-tv-2's advert is on main. The advert is in (`server/bonjour.js`, `_chromaglass._tcp`,
+  TXT `id` and `path`; `browse()` there is a querier a check can reuse).
 - **12-ctl-ship** (Claude): the Android bundle signed through Play App Signing (the upload key
   stays with the owner, the CI secret is Claude's to wire), an upload job to the Play closed test
   from main, and the iPhone's half is 12-ship. Sign-in, in-app account deletion (5.1.1(v)), the
@@ -288,17 +289,32 @@ Pro on the laptop, three TVs at most; `npm run tv`.
 
 What route 2 still needs, found while building 12-tv-1:
 
-- **12-tv-2: the Android TV shell and the Play listing (M, next).** A WebView app
-  that finds the Mac by itself and opens its `/tv`. Finding it: the Mac app
-  advertises the show server over Bonjour (`_chromaglass._tcp`, a small mDNS
-  responder in `desktop/main.js`; nothing advertises it today) and the shell
-  looks with Android's NSD. Pairing without typing the show key on a remote: the
-  TV shows four digits, the Mac's cast menu shows "a TV wants to join: 4821
-  [Allow]", and Allow hands that TV a key of its own (a relay change: a `tv`
-  hello with no key waits in a pending list the display can admit). D-pad: the
-  page has no controls today; the shell's own screens (pick a Mac, sign in) are
-  focusable. WebView settings: autoplay without a gesture, keep the screen on.
-  Listing under 12-play-org, the Android TV banner (320 x 180), no price in it.
+- **12-tv-2: the Android TV app, the Bonjour advert and pairing by four digits
+  (shipped, this PR; story in `docs/plan-shipped.md` §12-tv-2).** `androidtv/`
+  (plain Java, a WebView on `/tv` plus NsdManager; the `Android TV app` workflow
+  builds, unit-tests and lints it and keeps the debug APK); `server/bonjour.js`
+  (`_chromaglass._tcp` from the show server itself, so `npm run remote` and the
+  Mac app both advertise); `server/tv-pairing.js` (four digits, Allow and No on
+  the laptop, a key per TV, Forget); `npm run tvpair`.
+- **12-tv-2b: the Play listing (S, after 12-play-org).** Upload a signed release
+  bundle (Play App Signing, the same secrets and upload job as 12-ctl-ship),
+  the TV store listing (no price, "needs ChromaGlass on a Mac" plainly said),
+  TV screenshots at 1920 x 1080, and a banner made for 320 x 180 rather than the
+  cut from the social card in `androidtv/.../drawable-xhdpi/banner.png`, which
+  shows the card's glow as a lighter band. The Play org account is in Google's
+  review (2026-11-09).
+- **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
+  workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
+  Unseen so far: NsdManager against the advert on a real network, the advert
+  beside the Mac's own mDNSResponder (both on udp 5353; it works on Linux in
+  the check, and Node Bonjour libraries share the port the same way on macOS),
+  and the WebView's WebRTC decode on a TV box. `docs/judging.md` §12-tv-2.
+- **12-tv-2d: the newer NSD calls (S).** `resolveService` is deprecated from
+  Android 14 for `registerServiceInfoCallback`, which also follows a Mac whose
+  address changes while the TV watches; the app uses the old call on every
+  version today, which still works. And an IPv6 link-local address with a zone
+  (`fe80::1%wlan0`) would need its `%` escaped in the URL; NSD hands back IPv4
+  first on every box seen in documentation, so it is left until one does not.
 - **12-tv-signin: films with the Mac off, and the TV-code sign-in (M).** Today
   `/tv` plays films only while the Mac's show server answers. With the Mac off,
   the shell opens the site's `/tv`, which shows a code and a QR; the phone signs

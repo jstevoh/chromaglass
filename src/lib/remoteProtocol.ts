@@ -301,14 +301,27 @@ export type TvSignal =
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string }
+  | {
+      type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string;
+      /** A TV with no key asking to pair by four digits (PLAN 12-tv-2, server/tv-pairing.js). */
+      pair?: boolean;
+    }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
    * minutes, `retryMs` from now. A locked phone waits that long rather than
    * knocking again, since every knock while locked is refused unread.
    */
-  | { type: 'denied'; reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop'; retryMs?: number }
+  | {
+      type: 'denied'; retryMs?: number;
+      /**
+       * A TV pairing (PLAN 12-tv-2) hears four more: the laptop said No
+       * (`refused`), nobody answered in two minutes or it asked again
+       * (`expired`), four TVs already ask (`busy`), or its own key is one this
+       * show does not hold, forgotten or another Mac's (`unpaired`).
+       */
+      reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop' | 'refused' | 'expired' | 'busy' | 'unpaired';
+    }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -358,6 +371,19 @@ export type RemoteMessage =
    * signal alone. TV → relay carries the signal alone; the relay adds `from`.
    */
   | { type: 'tv-signal'; to?: string; from?: string; signal: TvSignal }
+  /**
+   * Pairing a TV by four digits (PLAN 12-tv-2, server/tv-pairing.js). Relay →
+   * the TV asking: the digits to show. Relay → display: who is asking, and
+   * how many TVs hold a key, on every change and on hello. Display → relay:
+   * Allow, No, or forget every paired TV; the relay takes them from the
+   * laptop's own page only. Relay → the TV allowed: its own key, to keep.
+   */
+  | { type: 'tv-code'; code: string }
+  | { type: 'tv-pairing'; asks: { id: string; code: string }[]; paired: number }
+  | { type: 'tv-allow'; id: string }
+  | { type: 'tv-refuse'; id: string }
+  | { type: 'tv-forget' }
+  | { type: 'tv-key'; key: string }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**

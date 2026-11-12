@@ -1,0 +1,62 @@
+name: Android TV app
+
+# Builds the Android TV app (PLAN 12-tv-2, androidtv/), runs its unit tests and
+# Android's lint, so a change that breaks the TV app goes red on its PR rather
+# than on a TV. Lint matters here beyond style: its TV rules (a banner, a
+# Leanback launcher, no touchscreen required) and its API-level check are the
+# first things the Play review for TV would turn the app away for, and the
+# API-level check caught a call that would have crashed every TV older than
+# Android 13. The debug APK is kept as the run's artifact, so a TV can be
+# side-loaded from any green run (docs/judging.md).
+#
+# Its own workflow, as ios.yml is: deploy.yml calls checks.yml, and the website
+# should not wait on, or be stopped by, the TV app's build. It runs only when
+# something the app is made from changes. The page it plays (/tv) and the
+# pairing it does are the website's and the show server's, held by `npm run tv`
+# and `npm run tvpair` in Measure.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'androidtv/**'
+      - '.github/workflows/androidtv.yml'
+
+concurrency:
+  group: androidtv-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only, written out rather than left to the repository's default, which a
+# settings change could widen (the security audit of 2026-10-28).
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Android TV app (build, unit tests, lint)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: androidtv
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      # The runner image carries the Android SDK (ANDROID_HOME); the
+      # platform the app compiles against is fetched if the image lacks it.
+      - name: Android platform 36
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" > /dev/null
+      - name: Build, test, lint
+        run: ./gradlew assembleDebug testDebugUnitTest lintDebug --console=plain
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromaglass-tv-debug
+          path: |
+            androidtv/app/build/outputs/apk/debug/app-debug.apk
+            androidtv/app/build/reports/lint-results-debug.html
+            androidtv/app/build/reports/tests/
+          retention-days: 14

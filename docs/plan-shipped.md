@@ -13349,6 +13349,51 @@ gone stopping the stage, a frozen plate after it, and the phone. By hand on the 
 the real app on a software GPU feeding a TV page in a second browser over the
 network address, the plate on the TV.
 
+## 12-tv-2. The Android TV app finds the Mac and pairs by four digits (2026-11-09)
+
+Asked: the owner's TV app for Home and Pro (2026-11-08), route 2: a receiver of
+the Mac's stream (12-tv-1). This PR is the app and the two things it needs from
+the show.
+
+- **The app** (`androidtv/`): one Activity in plain Java, no libraries. NsdManager
+  looks for `_chromaglass._tcp`; the Mac played last opens as soon as it is
+  seen, else the only one after a three-second look, else a list for the
+  remote's arrows. A WebView then plays `/tv?app=android` (autoplay without a
+  gesture, screen kept on, held to the Mac's origin). The `ChromaglassTv` bridge
+  keeps the key the Mac hands over by the show's id from the advert, not by
+  address. Back returns to the list. Java rather than Kotlin, Capacitor or a
+  TWA: the shell is a WebView and a service lookup, and a TWA could not open
+  `ws://` on the LAN. Its own workflow (`androidtv.yml`, as `ios.yml` is): build,
+  9 unit tests of `Shows.java`, Android lint, the debug APK kept 14 days. Lint
+  found `URLEncoder.encode(String, Charset)`, API 33, which would have crashed
+  every TV older than Android 13: the key's pattern needs no encoding.
+- **The advert** (`server/bonjour.js`): a small mDNS responder in the show
+  server itself rather than `desktop/main.js` as planned, so `npm run remote` on
+  any computer advertises too and the check asks the same code. PTR, SRV, TXT
+  (`v`, `id`, `path`) and an A record per LAN address; legacy unicast answered;
+  announced three times at start, goodbye on the Mac app's quit. The SRV names
+  its own host (`chromaglass-<id>.local`), never the Mac's, which mDNSResponder
+  defends. The show key is never in it.
+- **Pairing** (`server/tv-pairing.js`, the relay's `pairing` role): a `tv` hello
+  with `pair` and no key waits, relaying nothing; the relay picks four digits
+  (unique among asks, so a stranger cannot ask with the real TV's), the laptop's
+  page shows a card at the top of its screen and rows in Cast → TV at home;
+  Allow hands that TV `tv-<32 hex>`, kept in `CHROMAGLASS_TV_FILE` (the Mac
+  app's `tvs.json`, mode 600); No counts as a wrong key (three lock the address
+  out); an unknown TV key is `unpaired`, never a lockout, and the page pairs
+  again; Forget closes every paired TV. Four asks at most, two minutes each,
+  one per address.
+- **The page**: `/tv` with no key pairs (big digits over the films); keeps the
+  key in localStorage and the bridge (`lib/tvKey.ts`); a forgotten key in the
+  URL is dropped and the page pairs again. App.tsx carries the card in no more
+  bytes than before (its file is over the size limit).
+
+Measured: `npm run tvpair` 52/52 (the advert asked both ways, pairing, kept
+keys across a restart, unknown keys, Forget, No and the lockout, the built page,
+the card laid out with the built stylesheet at laptop and phone width, the
+digits on a phone); `npm run tv` 33/33 unchanged; `./gradlew assembleDebug
+testDebugUnitTest lintDebug` green, APK 159 KB. Not yet seen: a real TV (12-tv-2c).
+
 ## 45a-2. Selling the moiré pack to Home (2026-11-07)
 
 The owner chose to sell the moiré pack as a $15 add-on to Home and to include it in Pro.
