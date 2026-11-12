@@ -243,6 +243,7 @@
     "rimhold": "node scripts/rimhold.mjs",
     "sealed": "node scripts/sealed.mjs",
     "lavawax": "node scripts/lavawax.mjs",
+    "lavacycle": "node scripts/lavacycle.mjs",
     "musicforce": "node scripts/musicforce.mjs",
     "bassboost": "node scripts/bassboost.mjs",
     "kickbloom": "esbuild scripts/kickbloom.mjs --bundle --platform=node --format=esm --log-level=warning --outfile=node_modules/.cache/kickbloom.mjs && node node_modules/.cache/kickbloom.mjs",

@@ -85,6 +85,12 @@ struct Sim {
   */
   oilRho: f32,
   oilExpand: f32,
+  /*
+    A standing plate's lamp: how far its glass draws a water cell's heat
+    down in one step, π²κ·secs/h² on the step's real seconds and the gap
+    (PLAN 27f-9e, constants.ts KAPPA_WAX), the heat kept exp(−that).
+  */
+  lampCool: f32,
 };
 @group(0) @binding(0) var<uniform> S: Sim;
 

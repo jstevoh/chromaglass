@@ -303,7 +303,11 @@ try {
     with it, as far: the line asks the heat's centre to follow the colour's
     to within a fifth of the distance, where without the carry the heat
     stays where it was laid (a shift of 0). No lamp and no cooling, so the
-    heat in the dish is kept too. The blob is barely warm (half a unit), so
+    heat in the dish is kept too: Heat Decay 1, the lamp dimmed, and the blob
+    laid in the lower half (0.40, its top at 0.48), where a standing plate's
+    glass rides the warm liquid, not in the upper half, whose cool glass
+    takes the heat (PLAN 27f-9e: laid at 0.62 it kept 69.6% of its heat
+    there, the cooling working, not the carry failing). The blob is barely warm (half a unit), so
     its heat's lift is small beside its colour's weight. Measured with the
     carry switched off: colour -2.82 cells, heat 0.00.
   */
@@ -330,8 +334,8 @@ try {
     // The sealed bottle's kernels first, as the app builds them before a standing plate (PLAN 27f-9).
     await lab.create(N, N);
     for (let k = 0; k < 40 && !lab.solver().sealReady(); k++) await new Promise((q) => setTimeout(q, 250));
-    lab.dye(0.5, 0.62, 0.08, [1, 1, 1], 1.0);
-    lab.vel(0.5, 0.62, 0.08, [0, 0, 0.5, 0]);
+    lab.dye(0.5, 0.40, 0.08, [1, 1, 1], 1.0);
+    lab.vel(0.5, 0.40, 0.08, [0, 0, 0.5, 0]);
     lab.flush();
     await lab.step(1, over);
     const dye0 = dyeY(await lab.field('dye'));
