@@ -159,17 +159,7 @@ function download(url, dir) {
   const y = findYtDlp();
   if (!y) fail(`a URL needs yt-dlp. ${INSTALL}`, 2);
   const help = spawnSync(y[0], [...y.slice(1), '--help'], { encoding: 'utf8' }).stdout ?? '';
-  const args = [
-    ...y.slice(1), '--no-playlist', '--write-info-json', '--no-progress',
-    // Up to 1080 on the short side: `res` sorts by the smaller dimension, so a
-    // vertical Short gets 1080×1920 and not the 608×1080 a height cap picks.
-    '-f', 'bv*+ba/b', '-S', 'res:1080', '--merge-output-format', 'mkv',
-    '-o', path.join(dir, 'source.%(ext)s'),
-  ];
-  const loc = ffmpegLocation();
-  if (loc) args.push('--ffmpeg-location', loc);
-  // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
-  if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
+  const args = [...y.slice(1), ...fetchArgs(dir, help)];
   // A fetch into a folder used before must not pick last time's file.
   for (const f of fs.readdirSync(dir)) if (f.startsWith('source.')) fs.rmSync(path.join(dir, f), { force: true });
   console.log(`fetching ${url}`);
@@ -205,6 +195,27 @@ function download(url, dir) {
     fail(err);
   }
   return { file: pickSource(dir, files), info: readInfo(path.join(dir, 'source.mkv')) ?? readInfo(path.join(dir, files[0])) };
+}
+
+/**
+ * yt-dlp's arguments for a fetch into `dir` (the URL goes after), given its
+ * `--help` text. A function of its own so the self-test can hold what it
+ * hands yt-dlp, the ffmpeg path above all (PLAN.md 47w), with no yt-dlp
+ * installed.
+ */
+function fetchArgs(dir, help = '') {
+  const args = [
+    '--no-playlist', '--write-info-json', '--no-progress',
+    // Up to 1080 on the short side: `res` sorts by the smaller dimension, so a
+    // vertical Short gets 1080×1920 and not the 608×1080 a height cap picks.
+    '-f', 'bv*+ba/b', '-S', 'res:1080', '--merge-output-format', 'mkv',
+    '-o', path.join(dir, 'source.%(ext)s'),
+  ];
+  const loc = ffmpegLocation();
+  if (loc) args.push('--ffmpeg-location', loc);
+  // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
+  if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
+  return args;
 }
 
 /**
@@ -1169,13 +1180,32 @@ async function selftest() {
   const joined = picks.every(p => typeof p === 'string' && /source\.mkv$/.test(p) && (() => { const q = probe(p); return q.audio && q.stored === A.pr.stored; })());
   check('47w: a picture and a separate sound are joined into one file with both, in either order',
     madeF && joined, picks.map(p => (typeof p === 'string' ? path.basename(p) : `refused: ${p.message}`)).join(' / '));
+  // G's sound carries a cover picture, as a music upload's often does: ffmpeg
+  // lists it as a Video stream marked "attached pic", and it is not a picture
+  // to watch, so the fetch is still refused.
+  const cover = path.join(G, 'cover.png');
+  const madeG = spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=64x64:d=1', '-frames:v', '1', cover]).status === 0
+    && spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', path.join(F, 'source.f251.webm'), '-i', cover, '-map', '0:a', '-map', '1:v',
+      '-c:a', 'aac', '-c:v', 'png', '-disposition:v', 'attached_pic', path.join(G, 'source.f140.m4a')]).status === 0;
+  const gInfo = madeG ? spawnSync(ff(), ['-hide_banner', '-i', path.join(G, 'source.f140.m4a')], { encoding: 'utf8' }).stderr : '';
   let refusal = null;
-  try { pickSource(G, ['source.f251.webm']); } catch (e) { refusal = e; }
-  check('47w: a fetch that brought only sound is refused, saying so',
-    refusal instanceof WatchError && /sound and no picture/.test(refusal.message), refusal ? refusal.message.slice(0, 90) : 'not refused: it picked the sound file');
+  try { pickSource(G, ['source.f140.m4a']); } catch (e) { refusal = e; }
+  check('47w: a fetch that brought only sound, with a cover picture in it, is refused, saying so',
+    madeG && /attached pic/.test(gInfo) && refusal instanceof WatchError && /sound and no picture/.test(refusal.message),
+    refusal ? refusal.message.slice(0, 90) : `not refused: it picked the sound file (cover ${/attached pic/.test(gInfo) ? 'present' : 'missing'})`);
+  // A fetch that merged and left its pieces: the merged file wins, untouched.
+  const Hd = path.join(dir, 'h'); fs.mkdirSync(Hd);
+  fs.copyFileSync(path.join(dir, 'a.webm'), path.join(Hd, 'source.webm'));
+  for (const f of ['source.f137.webm', 'source.f251.webm']) fs.copyFileSync(path.join(F, f), path.join(Hd, f));
+  const hPick = pickSource(Hd, ['source.f137.webm', 'source.f251.webm', 'source.webm']);
+  check('47w: a merged file beside its leftover pieces is the one watched, and nothing is joined',
+    path.basename(hPick) === 'source.webm' && !fs.existsSync(path.join(Hd, 'source.mkv')), `${path.basename(hPick)}`);
   const bare = path.basename(ff()), loc = ffmpegLocation(bare);
+  const fa = fetchArgs(dir, '--js-runtimes'), li = fa.indexOf('--ffmpeg-location');
   check('47w: yt-dlp is handed ffmpeg as a full path that exists, not a bare name',
-    !!loc && path.isAbsolute(loc) && fs.existsSync(loc) && ffmpegLocation('no-such-ffmpeg-here') === null, `${bare} → ${loc}`);
+    !!loc && path.isAbsolute(loc) && fs.existsSync(loc) && ffmpegLocation('no-such-ffmpeg-here') === null
+      && li >= 0 && path.isAbsolute(fa[li + 1]) && fs.existsSync(fa[li + 1]) && fa.includes('--merge-output-format'),
+    `${bare} → ${loc}; fetch args ${li >= 0 ? `--ffmpeg-location ${fa[li + 1]}` : 'have no --ffmpeg-location'}`);
 
   // The design and physics reads, on frames and sequences whose answers are
   // known by construction (scripts/watchreadtest.mjs).
@@ -1264,7 +1294,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, macFetch };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where

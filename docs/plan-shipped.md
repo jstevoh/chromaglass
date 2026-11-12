@@ -13593,8 +13593,8 @@ coarse to fine with normalised SAD, the whole-field part set apart by an affine 
 rotation and divergence), the share of change the flow carries, turnover, lifetime, the
 spectrum's slope, vertical drift; the page's technique words, chapters and links, and
 guesses from the numbers. `--vs` ranks the gaps against a reference; `--crop` reads only a
-projection. 18 new self-test lines (`scripts/watchreadtest.mjs` and watch.mjs) on known
+projection. 22 new self-test lines (`scripts/watchreadtest.mjs` and watch.mjs) on known
 frames and flows: a texture slid at 2.5% of the width a second read 2.50, turned once a
-minute read one turn in 62 s, pulsing in place read carried 0.02. Proved on Liquid Light
+minute read one turn in 62 s (and the opposite sign turned back), sinking and rising read drift +2.49 and −2.49, pulsing in place read carried 0.02. One check-skeptic pass found seven ways the first draft could pass while broken (no window on the spectrum, the curl sign, a cooking video named as technique); each is now a line that goes red on its mutant. Proved on Liquid Light
 Lab's *Quick Tutorial* fetched on the owner's Mac (47y holds what it found).
 

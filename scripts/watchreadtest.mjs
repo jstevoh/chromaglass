@@ -58,7 +58,10 @@ export function readSelftest(check) {
     `scale ${fine.scaleX?.toFixed(2)}% → ${coarse.scaleX?.toFixed(2)}% (${(coarse.scaleX / fine.scaleX).toFixed(2)}×); coherence ${fine.coherence.toFixed(2)}, ${coarse.coherence.toFixed(2)}`);
   const sumA = designSummary([one, six], null), sumB = designSummary([coarse], null);
   const cmp = compareDesign(sumA, sumB, 'discs', 'grid');
-  check('design: --vs ranks the gaps and words them', cmp.length > 4 && cmp.some(l => /forms/.test(l)), cmp[4] ?? 'no rows');
+  const sizes = cmp.map(l => /^- \((\d+(?:\.\d+)?)\)/.exec(l)?.[1]).filter(Boolean).map(Number);
+  check('design: --vs words the forms gap (6 discs against the grid\'s) and ranks the gaps biggest first',
+    cmp.some(l => l.includes(`forms a frame: grid ${f2(sumB.forms.med)} against ${f2(sumA.forms.med)}, `) && /separate forms/.test(l)) && sumA.forms.med === 6 && sizes.length > 4 && sizes.every((v, i) => !i || v <= sizes[i - 1]),
+    `${cmp.find(l => /forms a frame/.test(l)) ?? 'no forms row'}; sizes ${sizes.join(', ')}`);
 
   // The physics read, on sequences whose flow is known by construction: a
   // texture of soft blobs slid, turned, or faded in place, sampled
@@ -85,13 +88,25 @@ export function readSelftest(check) {
   check('physics: a texture slid 2.5% of the width a second reads that speed, all of it whole-field, carried',
     Math.abs(slid.whole.med - 2.5) < 0.25 && slid.wholeShare > 0.9 && slid.own.med < 0.3 && slid.carried.med > 0.8,
     `whole ${f2(slid.whole.med)}%/s, share ${f2(slid.wholeShare)}, own ${f2(slid.own.med)}, carried ${f2(slid.carried.med)}`);
+  check('physics: and it reads the direction: rightward is positive across, with no drift up or down',
+    Math.abs(slid.horizontal - 2.5) < 0.25 && Math.abs(slid.vertical) < 0.2, `across ${f2(slid.horizontal)}, down ${f2(slid.vertical)}`);
+  const down = physicsSummary(seq(NS, (x, y, k) => [x + 80, y + 150 - 0.8 * k]), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const up = physicsSummary(seq(NS, (x, y, k) => [x + 80, y + 150 + 0.8 * k]), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  const gDown = guessTechniques(null, down).map(x => x.text).join(' | '), gUp = guessTechniques(null, up).map(x => x.text).join(' | ');
+  check('physics: a texture sinking reads drift down (+2.5) and guesses gravity; rising reads −2.5 and guesses buoyancy',
+    Math.abs(down.vertical - 2.5) < 0.25 && Math.abs(up.vertical + 2.5) < 0.25 && /gravity/.test(gDown) && !/buoyancy/.test(gDown) && /buoyancy/.test(gUp) && !/gravity/.test(gUp),
+    `down ${f2(down.vertical)}, up ${f2(up.vertical)}`);
   // Turned about the centre at 0.1 rad/s (a turn in 63 s): curl is 2Ω = 0.2/s,
   // and anticlockwise on screen reads negative (image y runs down).
   const OM = 0.1 / RATE;
   const turned = physicsSummary(seq(NS, (x, y, k) => { const c = Math.cos(OM * k), sn = Math.sin(OM * k), X = x - 160, Y = y - 90; return [240 + c * X + sn * Y, 240 - sn * X + c * Y]; }), { rate: RATE, cut: noCut, W: DW, scale: 2 });
-  check('physics: a texture turned once a minute reads a curl of 0.2/s and a turn in about 63 s',
-    Math.abs(Math.abs(turned.curl.med) - 0.2) < 0.03 && turned.wholeShare > 0.8 && Math.abs(turned.div.med) < 0.02,
-    `curl ${turned.curl.med?.toFixed(3)}/s (one turn in ${(4 * Math.PI / Math.abs(turned.curl.med)).toFixed(0)} s), share ${f2(turned.wholeShare)}, divergence ${turned.div.med?.toFixed(3)}`);
+  // The map moves the content clockwise on screen (image y runs down), which
+  // the summary words from a positive curl; the mirrored turn must read the
+  // opposite sign.
+  const turnedBack = physicsSummary(seq(NS, (x, y, k) => { const c = Math.cos(-OM * k), sn = Math.sin(-OM * k), X = x - 160, Y = y - 90; return [240 + c * X + sn * Y, 240 - sn * X + c * Y]; }), { rate: RATE, cut: noCut, W: DW, scale: 2 });
+  check('physics: a texture turned clockwise once a minute reads a curl of +0.2/s and a turn in about 63 s; turned back, −0.2',
+    Math.abs(turned.curl.med - 0.2) < 0.03 && Math.abs(turnedBack.curl.med + 0.2) < 0.03 && turned.wholeShare > 0.8 && Math.abs(turned.div.med) < 0.02,
+    `curl ${turned.curl.med?.toFixed(3)}/s, back ${turnedBack.curl.med?.toFixed(3)}/s (one turn in ${(4 * Math.PI / Math.abs(turned.curl.med)).toFixed(0)} s), share ${f2(turned.wholeShare)}, divergence ${turned.div.med?.toFixed(3)}`);
   // Bands that slide alternately left and right (u = 0.8 sin(2πy/120) px a
   // sample): the fluid's own flow, which no whole-picture move explains. RMS
   // 2.5/√2 = 1.77% of the width a second.
@@ -108,8 +123,11 @@ export function readSelftest(check) {
     faded.own.med < 0.4 && faded.whole.med < 0.4 && faded.carried.med < 0.25,
     `own ${f2(faded.own.med)}, whole ${f2(faded.whole.med)}, carried ${f2(faded.carried.med)}`);
   // Spectra: a field built with power per band k^-1 against k^-4.
+  // Built 256 square (periodic, from an inverse FFT) and read through a 128
+  // square cut from inside it at an odd offset, so the window sees hard,
+  // non-matching edges as it does on real footage.
   const field = slope => {
-    const S = 128, re = Array.from({ length: S }, () => new Float64Array(S)), im = Array.from({ length: S }, () => new Float64Array(S));
+    const S = 256, re = Array.from({ length: S }, () => new Float64Array(S)), im = Array.from({ length: S }, () => new Float64Array(S));
     let sd = 5; const r2 = () => (sd = (sd * 48271) % 2147483647) / 2147483647;
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       const ky = y <= S / 2 ? y : y - S, kx = x <= S / 2 ? x : x - S, k = Math.hypot(kx, ky);
@@ -122,15 +140,26 @@ export function readSelftest(check) {
     const cr = new Float64Array(S), ci = new Float64Array(S);
     for (let x = 0; x < S; x++) { for (let y = 0; y < S; y++) { cr[y] = re[y][x]; ci[y] = im[y][x]; } ifft(cr, ci); for (let y = 0; y < S; y++) re[y][x] = cr[y]; }
     let lo = Infinity, hi = -Infinity; for (const row of re) for (const v of row) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-    return frame((x, y) => grey(x >= 96 && x < 224 && y >= 26 && y < 154 ? Math.round(30 + 200 * (re[y - 26][x - 96] - lo) / (hi - lo)) : 130));
+    return frame((x, y) => grey(Math.round(30 + 200 * (re[(y + 53) % S][(x + 37) % S] - lo) / (hi - lo))));
   };
-  const s1 = spectrumSlope(field(-1), DW, DH), s4 = spectrumSlope(field(-4), DW, DH);
-  check('physics: a field built at slope −1 reads about −1, one at −4 about −4',
-    Math.abs(s1 + 1) < 0.5 && Math.abs(s4 + 4) < 0.6, `${s1?.toFixed(2)}, ${s4?.toFixed(2)}`);
+  const f1 = field(-1), f4 = field(-4);
+  const s1 = spectrumSlope(f1, DW, DH), s4 = spectrumSlope(f4, DW, DH), s4raw = spectrumSlope(f4, DW, DH, { hann: false });
+  // −4 reads about −3: 8-bit quantisation is white noise, and the field's
+  // power falls under it inside the band (watchphysics.mjs). What matters is
+  // that it reads steep (the "smooth blobs" band, under −2.8), apart from −1,
+  // and that the window is what keeps it there.
+  check('physics: a field built at slope −1 reads about −1, one at −4 reads steep (under −2.8), and the window is what holds it',
+    Math.abs(s1 + 1) < 0.35 && s4 < -2.8 && s4raw - s4 > 0.6, `${s1?.toFixed(2)}, ${s4?.toFixed(2)}; with no window ${s4raw?.toFixed(2)}`);
   const tech = scanTechniques({ title: 'Liquid light show with an overhead projector', description: 'Mineral oil, food coloring and a clock glass; slow motion at 240 fps', tags: ['ferrofluid'] });
   check('physics: the page scan names the rig, the oils, the dyes, the magnet and the camera speed',
     ['liquid light rig', 'oils and water', 'dyes and inks', 'magnetism', 'camera speed'].every(fam => tech.some(t => t.family === fam)),
     tech.map(t => `${t.family}: ${t.words.join('/')}`).join('; '));
+  const notTech = scanTechniques({ title: 'Weeknight steak', description: 'Olive oil in the pan, a reverse sear, the recipe on the fridge magnet, notes with a ballpoint ink pen' });
+  check('physics: and a cooking video\'s olive oil, fridge magnet, reverse sear and ink pen name none of them',
+    !notTech.some(t => ['oils and water', 'dyes and inks', 'magnetism', 'camera speed'].includes(t.family)), notTech.map(t => `${t.family}: ${t.words.join('/')}`).join('; ') || 'none');
   const guess = guessTechniques(null, turned).map(x => x.text);
-  check('physics: a turning texture is guessed as a turned glass', /turned/.test(guess[0] ?? ''), guess[0] ?? 'no guess');
+  const gSlid = guessTechniques(null, slid).map(x => x.text), gBand = guessTechniques(null, banded).map(x => x.text);
+  check('physics: a turning texture is guessed as a turned glass; a slid or banded one is not',
+    /turned/.test(guess[0] ?? '') && !gSlid.some(t => /turned/.test(t)) && !gBand.some(t => /turned/.test(t)),
+    `${guess[0] ?? 'no guess'}; slid: ${gSlid[0] ?? 'none'}`);
 }

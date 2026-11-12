@@ -44,14 +44,16 @@
 //                  shot) falls to a half. Unlike motion, it counts a form that
 //                  slowly reshapes in place.
 //   spectrum       the slope of the luminance power spectrum over a centre
-//                  square, between 1/32 and 1/3 of its width (a Hann window
-//                  first). A passive dye stirred into a viscous liquid (the
-//                  Batchelor regime) reads near −1 in a 1D spectrum, −2 here
-//                  in 2D power per wavenumber band... so the slope is given as
-//                  measured and the bands are named: shallower than −2 is fine
-//                  filamentary detail all the way down; −2 to −3 is
-//                  turbulent-like cascades; steeper than −3 is smooth blobs
-//                  with soft edges (a defocused or under-resolved plate).
+//                  square, from 4 to 42 cycles across it (a Hann window
+//                  first), as power per wavenumber band. Shallower than −1.8
+//                  is fine filamentary detail all the way down (a slowly
+//                  diffusing dye stretched by flow); −1.8 to −2.8 a cascade
+//                  of detail at every scale; steeper is smooth blobs with soft
+//                  edges (a defocused or under-resolved plate). The steep end
+//                  saturates near −3 on 8-bit video: the codec's quantisation
+//                  is white noise, and a field built at −4 falls under it
+//                  within the band (it reads about −3.0; without the window,
+//                  −1.9).
 //   drift          the median direction of the whole-field motion's vertical
 //                  part over the clip: things falling or rising (a pour from
 //                  above, bubbles, a tilted plate).
@@ -253,7 +255,7 @@ export function fft(re, im, inv = false) {
  * over a centre square of S pixels (S a power of two no bigger than the
  * frame's shorter side, at most 128), from 4 to 42 cycles across it.
  */
-export function spectrumSlope(px, W, H) {
+export function spectrumSlope(px, W, H, { hann = true } = {}) {
   let S = 128; while (S > Math.min(W, H)) S >>= 1;
   if (S < 32) return null;
   const x0 = (W - S) >> 1, y0 = (H - S) >> 1;
@@ -262,7 +264,9 @@ export function spectrumSlope(px, W, H) {
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) { const p = ((y0 + y) * W + x0 + x) * 3; re[y][x] = 0.2126 * px[p] + 0.7152 * px[p + 1] + 0.0722 * px[p + 2]; mean += re[y][x]; }
   mean /= S * S;
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
-    const wgt = (0.5 - 0.5 * Math.cos((2 * Math.PI * x) / (S - 1))) * (0.5 - 0.5 * Math.cos((2 * Math.PI * y) / (S - 1)));
+    // The window, so the square's hard edges do not leak power into every
+    // band and flatten a steep spectrum (the self-test turns it off to show it).
+    const wgt = hann ? (0.5 - 0.5 * Math.cos((2 * Math.PI * x) / (S - 1))) * (0.5 - 0.5 * Math.cos((2 * Math.PI * y) / (S - 1))) : 1;
     re[y][x] = (re[y][x] - mean) * wgt;
   }
   for (let y = 0; y < S; y++) fft(re[y], im[y]);
@@ -358,6 +362,7 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
   const curl = pairs.map(p => p.af?.curl).filter(x => x != null);
   const div = pairs.map(p => p.af?.div).filter(x => x != null);
   const vert = pairs.map(p => p.af?.v).filter(x => x != null);
+  const horiz = pairs.map(p => p.af?.u).filter(x => x != null);
   // Carried: only where the picture changed by more than the codec's noise.
   const carr = pairs.map(p => (p.c1 && p.c1.raw > 1.5 ? Math.max(0, Math.min(1, 1 - p.c1.res / p.c1.raw)) : null)).filter(x => x != null);
 
@@ -398,6 +403,7 @@ export function physicsSummary(acc, { rate, cut, W, scale }) {
     curl: { med: quant(curl, 0.5), p10: quant(curl, 0.1), p90: quant(curl, 0.9) },
     div: { med: quant(div, 0.5), p10: quant(div, 0.1), p90: quant(div, 0.9) },
     vertical: quant(vert, 0.5),
+    horizontal: quant(horiz, 0.5),
     carried: { med: quant(carr, 0.5), p10: quant(carr, 0.1), p90: quant(carr, 0.9), n: carr.length },
     turnover: scale != null && ownMed ? scale / ownMed : null,
     lifetime, lifeCapped, longestShot,
@@ -421,7 +427,7 @@ export function physicsLines(p) {
   const car = p.carried.med;
   const carriedWord = band(car, [[0.2, 'the picture changes in place more than it moves (fading, light changes, dissolves, or diffusion outrunning flow)'], [0.5, 'part carried, part changing in place'], [0.75, 'mostly carried by the flow'], [Infinity, 'carried: the material is transported']]);
   const sl = p.spectrum.med;
-  const spec = band(sl, [[-3.2, 'steep: smooth blobs and soft edges, little fine detail (defocus, or a coarse grid)'], [-2.2, 'a cascade: detail at every scale, falling off like stirred turbulence'], [Infinity, 'shallow: fine filaments and sharp detail all the way down, as a slowly diffusing dye stretched by flow']]);
+  const spec = band(sl, [[-2.8, 'steep: smooth blobs and soft edges, little fine detail (defocus, or a coarse grid)'], [-1.8, 'a cascade: detail at every scale, falling off like stirred turbulence'], [Infinity, 'shallow: fine filaments and sharp detail all the way down, as a slowly diffusing dye stretched by flow']]);
   const vert = p.vertical;
   const drift = vert == null || Math.abs(vert) < 0.3 ? 'no steady drift up or down' : vert > 0 ? `drifting down (${f(vert, 1)}% of the width a second): falling, pouring or a plate tilted down` : `drifting up (${f(-vert, 1)}% a second): rising, as warm wax or bubbles`;
   const turnover = p.turnover;
@@ -473,13 +479,16 @@ export function comparePhysics(ref, cur, refName = 'the reference', curName = 't
  */
 const TECHNIQUE_WORDS = [
   ['liquid light rig', /overhead projector|\bOHP\b|clock ?(face|glass)|watch ?glass|petri|pyrex|\bdish(es)?\b|color ?wheel|colou?r wheel|light ?show/i],
-  ['oils and water', /mineral oil|baby oil|glycerin|glycerol|vegetable oil|castor oil|oil and water|\boils?\b|immiscib/i],
-  ['dyes and inks', /food colou?r|\bdyes?\b|\binks?\b|alcohol ink|india ink|watercolou?r|acrylic|paint pour|fluid art/i],
+  // Not a bare "oil", "ink" or "magnet": a cooking video's olive oil, a
+  // ballpoint's ink and a fridge magnet are not the technique (the check
+  // skeptic's counter-example, 2026-11-12).
+  ['oils and water', /mineral oil|baby oil|glycerin|glycerol|vegetable oil|castor oil|silicone oil|oil and water|oil dyes?|oil colou?rs?|oil-based|immiscib/i],
+  ['dyes and inks', /food colou?r|\bdyes?\b|\binks?\b(?! ?(pen|jet|cartridge))|alcohol ink|india ink|watercolou?r|acrylic|paint pour|fluid art/i],
   ['surface tension', /dish ?soap|detergent|surfactant|marangoni|milk|soap film|bubbles?/i],
   ['heat and convection', /\bheat\b|lava|convection|hot plate|candle|warm/i],
-  ['magnetism', /ferrofluid|magnet/i],
+  ['magnetism', /ferrofluid|neodymium|electromagnet|magnetic (field|fluid)/i],
   ['optics and lighting', /\bUV\b|black ?light|fluoresc|macro|polari[sz]|schlieren|shadowgraph|caustic|refract|prism|dichroic|kaleidoscope|mirror/i],
-  ['camera speed', /slow[ -]?mo|high[ -]?speed|phantom|time[ -]?lapse|\d{3,4} ?fps|reverse/i],
+  ['camera speed', /slow[ -]?mo|high[ -]?speed camera|phantom|time[ -]?lapse|\d{3,4} ?fps|reversed footage|played backwards/i],
   ['digital', /after effects|touchdesigner|houdini|blender|cinema ?4d|\bC4D\b|unreal|shader|glsl|notch|resolume|\bVJ\b|generative|simulation|\bCGI\b|\bAI\b|stable diffusion|runway/i],
 ];
 
@@ -521,7 +530,7 @@ export function guessTechniques(d, p, cutsPerMin = 0) {
   if (Math.max(med(d, 'mirror') ?? -1, med(d, 'halfTurn') ?? -1) > 0.85) say(2.5, 'a kaleidoscope or mirror (optical, or a digital mirror effect)', `mirror ${f(med(d, 'mirror'), 2)}, half-turn ${f(med(d, 'halfTurn'), 2)}`);
   const ew = med(d, 'edgeWidth');
   if (ew != null && ew > 2.5) say(1.5, 'soft focus: a projection out of focus, a soft lens, or a coarse simulation scaled up', `edge width ${ew.toFixed(1)}% of the width${sl != null ? `, spectrum ${sl.toFixed(2)}` : ''}`);
-  if (ew != null && ew < 0.5 && sl != null && sl > -2.4) say(1.5, 'sharp, in-focus macro or a high-resolution render: detail all the way down', `edge width ${ew.toFixed(2)}%, spectrum ${sl.toFixed(2)}`);
+  if (ew != null && ew < 0.5 && sl != null && sl > -2.2) say(1.5, 'sharp, in-focus macro or a high-resolution render: detail all the way down', `edge width ${ew.toFixed(2)}%, spectrum ${sl.toFixed(2)}`);
   const dark = med(d, 'p5'), M = med(d, 'colourfulness');
   if (dark != null && dark < 0.05 && M != null && M > 45) say(1, 'saturated colour on a dark ground: dyes lit by transmitted light (a projector) or fluorescing under UV', `5th percentile luminance ${dark.toFixed(2)}, colourfulness ${M.toFixed(0)}`);
   if (cutsPerMin > 6) say(1, 'an edited montage: many shots, not one continuous performance', `${cutsPerMin.toFixed(1)} cuts a minute`);
