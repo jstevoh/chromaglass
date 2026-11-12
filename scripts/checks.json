@@ -359,6 +359,22 @@
       ]
     },
     {
+      "name": "Watching a video",
+      "shard": "sound",
+      "run": "npm run watch -- --selftest",
+      "why": [
+        "The watch tool (scripts/watch.mjs, the watch skill) on clips and frames",
+        "whose answers are known by construction: cuts, motion against sound, the",
+        "show's shape; the fetch's picture and sound joined, an audio-only fetch",
+        "refused and ffmpeg handed to yt-dlp as a full path (PLAN.md 47w); the",
+        "design read (palette, colourfulness, edge width, scale, flow lines,",
+        "forms, symmetry, composition, scripts/watchdesign.mjs) and the physics",
+        "read (a slid, a turned, a banded and a pulsing texture, the spectrum's",
+        "slope, the page scan, scripts/watchphysics.mjs). In the sound shard for",
+        "its ffmpeg. About a minute."
+      ]
+    },
+    {
       "name": "Following a song",
       "shard": "logic",
       "run": "npm run songfollow",

@@ -13570,3 +13570,31 @@ updater's `install()` refuses while the show is on the projector or live. A phon
 `assistant-updates` is dropped (`ASSISTANT_ONLY`). Checked by `npm run updates` (the rules
 on the real updater) and `npm run assistant` (`updates-full`, `phone-updates`, each with
 its mutant).
+
+## 47v-47w-1. Watching any link: the fetch fixed, a design, physics and techniques read (2026-11-12)
+
+The owner asked to point Claude at any video or animation and have it watch, then use what it
+learns, with "enhanced design evaluation (color, form, etc)", "a physics read", "scan pages
+for the techniques used or guess based on video", and to judge our own visuals with it.
+
+The fetch. YouTube refuses cloud addresses; the owner's Mac is not refused. The download on
+the Mac had left picture and sound as two files (47w): reproduced on the owner's Mac, yt-dlp
+printed "ffmpeg-location ffmpeg does not exist! Continuing without ffmpeg", because
+`watch.mjs` handed it the bare name `findFfmpeg` returns when ffmpeg is on PATH. It now
+passes the full path (`ffmpegLocation`), joins any pair itself (`pickSource`) and refuses an
+audio-only fetch. A refused fetch in the cloud prints the one-line Mac command
+(`macFetch`), which a thread runs with Desktop Commander and stages back. Vimeo wants a
+login from anyone and its copies were DRM-locked: a screen recording is the route.
+
+The reads. `scripts/watchdesign.mjs`: palette, colourfulness (Hasler–Süsstrunk), hue
+harmony, contrast, edge width, form scale, flow-line coherence, forms and elongation,
+symmetry, composition. `scripts/watchphysics.mjs`: block-matched flow a second apart,
+coarse to fine with normalised SAD, the whole-field part set apart by an affine fit (its
+rotation and divergence), the share of change the flow carries, turnover, lifetime, the
+spectrum's slope, vertical drift; the page's technique words, chapters and links, and
+guesses from the numbers. `--vs` ranks the gaps against a reference; `--crop` reads only a
+projection. 18 new self-test lines (`scripts/watchreadtest.mjs` and watch.mjs) on known
+frames and flows: a texture slid at 2.5% of the width a second read 2.50, turned once a
+minute read one turn in 62 s, pulsing in place read carried 0.02. Proved on Liquid Light
+Lab's *Quick Tutorial* fetched on the owner's Mac (47y holds what it found).
+
