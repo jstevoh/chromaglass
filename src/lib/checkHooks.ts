@@ -121,6 +121,8 @@ declare global {
     __cgTestLicensePublicKey?: JsonWebKey;
     /** Where the Android app's Open in Chrome hands the show's address instead of Chrome, so a check can read it (`lib/appLink.ts`, `openInChrome`; `npm run controller`). */
     __cgOpenExternal?: (url: string) => void;
+    /** Stands in for the phone apps' camera: the text a scanned code says, or null for a cancel (`lib/appLink.ts`, `scanLaptopCode`; `npm run controller`, part scan). */
+    __cgScan?: () => Promise<string | null>;
 
     // ── Elsewhere (the file and its gate on each line) ──
 

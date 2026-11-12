@@ -1865,16 +1865,16 @@
     {
       "name": "The phone controller apps, owed",
       "shard": "browser2",
-      "run": "npm run controller -- --owed=scan",
+      "run": "npm run controller",
       "why": [
         "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
         "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
         "song shows on the phone's remote, and the laptop's half that sends them and",
         "acts on a tap (12-ctl-1); Scan the Phone panel's QR code instead of typing",
         "(12-ctl-2); the Android app as a Capacitor project that may open ws:// to the",
-        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). --owed: each",
-        "line is excused only in main's state and printed as owed; the PR that builds",
-        "it takes its id out and never edits a line. The lines with no id hold on main:",
+        "LAN, and its notice when the web view has no WebGPU (12-ctl-3). Every line is",
+        "built since 12-ctl-2 (2026-11-12), so none is owed: --owed is for a line written",
+        "before its build, excused only in main's state. The lines with no id hold too:",
         "the looks stay on Controls, the laptop answers a controller, no Scan on the",
         "website, no Open in Chrome on the iPhone. No plate needed; about a minute."
       ]
