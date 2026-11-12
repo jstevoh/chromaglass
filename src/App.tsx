@@ -519,7 +519,7 @@ export default function App() {
    */
   const stageLayers = Math.max(1, settings.layerCount ?? 1, backLook ? 2 : 1);
 
-  useEffect(() => setStageLayers(stageLayers), [stageLayers, setStageLayers]);
+  useEffect(() => setStageLayers(stageLayers), [stageLayers, activeLayer, setStageLayers]);
 
   const {
     calibrateNonce, setCalibrateNonce, engineStatus, setEngineStatus, shownEngineStatus,

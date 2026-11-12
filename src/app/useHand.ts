@@ -25,12 +25,13 @@ export function useHand() {
   const activeToolRef = useRef(activeTool);
   activeToolRef.current = activeTool;
   const setToolAmount = useCallback((tool: string, v: number) => setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })), []);
-  const [stageLayers, setStageLayers] = useState(1);
-  useEffect(() => {
-    if (activeLayer >= stageLayers) {
-      setActiveLayer(Math.max(0, stageLayers - 1));
-    }
-  }, [stageLayers, activeLayer]);
+  // Clamped with the count it is handed, not a copy a render old: a look that
+  // stacks two plates and a pick of the second in one batch keeps the second.
+  const [stageLayers, setLayers] = useState(1);
+  const setStageLayers = useCallback((n: number) => {
+    setLayers(n);
+    setActiveLayer(l => (l >= n ? Math.max(0, n - 1) : l));
+  }, []);
 
   useEffect(() => { publishHand(activeTool, toolAmount, activeLayer, stageLayers); }, [activeTool, toolAmount, activeLayer, stageLayers]);
   useEffect(() => {

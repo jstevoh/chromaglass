@@ -420,7 +420,7 @@ export function createAssistantGuard(send, now = Date.now) {
         }
         if (entry.kind === 'desk') {
           send({ type: 'assistant-desk', do: 'tab-restore' });
-          return { ok: true, undid: 'the tabs as they were' };
+          return { ok: true, undid: 'the tab taken away, if the desk took it: show_state\'s desk.tabs reads it' };
         }
         if (entry.kind === 'action') {
           // A toggle undoes itself, unless the performer has toggled it back already.

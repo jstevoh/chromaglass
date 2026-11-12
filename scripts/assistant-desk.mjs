@@ -188,6 +188,9 @@ export async function deskPageLines(page, say, guard) {
   const afterDel = tabs.map((t) => t.id).join();
   r.restore = await page.askDesk({ do: 'tab-restore' });
   r.twice = await page.askDesk({ do: 'tab-restore' });
+  // A delete the page refused still holds its place, so the guard's next Undo is not spent on an earlier tab.
+  r.goneDel = await page.askDesk({ do: 'tabs', op: 'delete', tab: 'Gig' });
+  r.goneBack = await page.askDesk({ do: 'tab-restore' });
   const restored = tabs[0];
   r.fold = await page.askDesk({ do: 'panel', verb: 'fold', tab: 'Perform', panel: restored.layout.right[0] });
   r.notOut = await page.askDesk({ do: 'panel', verb: 'close', panel: 'Mixer', tab: 'Setup' });
@@ -211,12 +214,12 @@ export async function deskPageLines(page, say, guard) {
   const ok = (...k) => k.every((x) => r[x] === null);
   say(ok('up', 'rename', 'del', 'restore', 'fold', 'pin', 'palette') && /no tab "Gig" \(the tabs: Perform, Sequence, Setup\)/.test(r.gig ?? '')
     && reloaded === 'Perform,Club,Setup' && afterDel === 'sequence,setup' && restored.id === 'perform' && JSON.stringify({ ...restored.layout, collapsed: [] }) === JSON.stringify({ ...JSON.parse(performPanels), collapsed: [] })
-    && /no tab taken away/.test(r.twice ?? '') && tabs[0].layout.collapsed.length === 1 && /not out on that tab/.test(r.notOut ?? '') && /no panel "Nowhere" \(the panels: .*Mixer/.test(r.wrong ?? '')
+    && /no tab taken away/.test(r.twice ?? '') && /no tab "Gig"/.test(r.goneDel ?? '') && /no tab taken away/.test(r.goneBack ?? '') && tabs[0].layout.collapsed.length === 1 && /not out on that tab/.test(r.notOut ?? '') && /no panel "Nowhere" \(the panels: .*Mixer/.test(r.wrong ?? '')
     && /not a setting the desk can pin/.test(r.pinWrong ?? '') && /not running/.test(none ?? '') && lock === 1 && /no palette "Plaid"/.test(r.noPalette ?? '')
     && /layer: 0, the plates/.test(r.layer ?? '') && /not running/.test(r.ambient ?? '')
     && JSON.stringify(hand) === '["tool magnet","amount magnet 3"]' && JSON.stringify(page.HAND_TOOLS.slice().sort()) === JSON.stringify(guard.DESK_TOOLS.slice().sort())
     && guard.AMOUNT_RANGE.join() === `${page.HAND_AMOUNT.min},${page.HAND_AMOUNT.max}`,
-  `the page's askDesk finds a tab by id or name and answers a wrong one with the tabs there are, renames one so the stored tabs read it back after a reload, puts a deleted tab back with its panels at its place once and only once, folds a panel out and refuses one not out or not a panel (with the list), refuses a pin the desk cannot draw, finds a palette by name, holds a layer to the plates on the stage, says when a door is not running, and keeps the guard's tools and Amount range its own (${JSON.stringify(r)} ${JSON.stringify(did)} ${JSON.stringify(hand)})`.slice(0, 600));
+  `the page's askDesk finds a tab by id or name and answers a wrong one with the tabs there are, renames one so the stored tabs read it back after a reload, puts a deleted tab back with its panels at its place once and only once (a refused delete holding its place in Undo's list), folds a panel out and refuses one not out or not a panel (with the list), refuses a pin the desk cannot draw, finds a palette by name, holds a layer to the plates on the stage, says when a door is not running, and keeps the guard's tools and Amount range its own (${JSON.stringify(r)} ${JSON.stringify(did)} ${JSON.stringify(hand)})`.slice(0, 600));
 }
 
 export const DESK_MUTANTS = [

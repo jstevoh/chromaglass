@@ -29,9 +29,9 @@
  * names (the owner renames tabs). The guard holds the verbs and the shapes;
  * this answers "no tab Gig" with the tabs there are.
  *
- * A delete, or a reset of every tab, is kept here once so that the guard's
- * Undo can put it back (`tab-restore`): the tab with its panels as they
- * were, at its old place. A person's own delete is not kept: the desk's
+ * A delete, or a reset of every tab, is kept here so that the guard's Undo
+ * can put it back (`tab-restore`): the tab with its panels as they were, at
+ * its old place, newest first, as deep as the guard's Undo. A person's own delete is not kept: the desk's
  * Reset menu and the account are theirs, and Undo is the assistant's.
  */
 import { useSyncExternalStore } from 'react';
@@ -99,8 +99,16 @@ export function setHandDoor(d: HandDoor | null): void { handDoor = d; }
 export function setPaletteDoor(d: ((index: number | null) => void) | null): void { paletteDoor = d; }
 export function setAmbientDoor(d: ((on: boolean) => void) | null): void { ambientDoor = d; }
 
-/** What the assistant took away, once, for its Undo to put back. */
-let kept: { tab: DeskTab; at: number } | { all: DeskTab[] } | null = null;
+/**
+ * What the assistant took away, newest last, for its Undo to put back: one
+ * entry for every delete or reset the guard let through (it remembers each),
+ * a refused one kept as nothing, so the guard's Undo and this list stay in
+ * step and an Undo meant for an earlier change is not spent on it. As deep
+ * as the guard's Undo (UNDO_DEPTH, ten).
+ */
+type Kept = { tab: DeskTab; at: number } | { all: DeskTab[] } | { none: true };
+const kept: Kept[] = [];
+const keep = (k: Kept) => { kept.push(k); if (kept.length > 10) kept.shift(); };
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 const tabNames = () => tabsHeld.map((t) => t.name).join(', ');
@@ -152,7 +160,7 @@ export async function askDesk(m: DeskMessage): Promise<string | null> {
     if (typeof v.activity === 'boolean') { if (!deskDoor) return 'the desk is not running'; deskDoor.activity(v.activity); }
     return null;
   }
-  if (!deskDoor) return 'the desk is not running';
+  if (!deskDoor) { if (m.op === 'delete' || m.op === 'reset-all') keep({ none: true }); return 'the desk is not running'; }
   const door = deskDoor;
   if (m.do === 'tab') {
     const t = findTab(m.tab);
@@ -168,23 +176,22 @@ export async function askDesk(m: DeskMessage): Promise<string | null> {
       door.edit({ op: 'add', ...(src ? { copyOf: src.id } : {}) });
       return null;
     }
-    if (m.op === 'reset-all') { kept = { all: tabsHeld }; door.edit({ op: 'reset-all' }); return null; }
+    if (m.op === 'reset-all') { keep({ all: tabsHeld }); door.edit({ op: 'reset-all' }); return null; }
     const t = findTab(m.tab);
-    if (typeof t === 'string') return t;
+    if (typeof t === 'string') { if (m.op === 'delete') keep({ none: true }); return t; }
     if (m.op === 'rename') { door.edit({ op: 'rename', id: t.id, name: String(m.name) }); return null; }
     if (m.op === 'move') { door.edit({ op: 'move', id: t.id, by: Number(m.by) }); return null; }
     if (m.op === 'delete') {
-      if (tabsHeld.length <= 1) return 'the last tab stays: a desk with no tab has nowhere to put a panel back';
-      kept = { tab: t, at: tabsHeld.indexOf(t) };
+      if (tabsHeld.length <= 1) { keep({ none: true }); return 'the last tab stays: a desk with no tab has nowhere to put a panel back'; }
+      keep({ tab: t, at: tabsHeld.indexOf(t) });
       door.edit({ op: 'delete', id: t.id });
       return null;
     }
     return `not a tab edit: ${String(m.op)}`;
   }
   if (m.do === 'tab-restore') {
-    const k = kept;
-    if (!k) return 'no tab taken away from here to put back';
-    kept = null;
+    const k = kept.pop();
+    if (!k || 'none' in k) return 'no tab taken away from here to put back';
     door.restore('all' in k ? () => k.all : (t) => restoreTab(t, k.tab, k.at));
     return null;
   }
