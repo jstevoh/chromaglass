@@ -72,13 +72,15 @@ export async function editSuggestLines({ mcp, display, check }) {
   const t = Date.now();
   const read = await mcp.call('sequence_edit', { command: 'read' });
   const out = await mcp.call('set_list_edit', { command: 'export' });
-  const t2 = Date.now();
+  // Counted, not timed: "nothing sent" is the display's count of edits not moving across the add, so a CI clock that steps back cannot read an earlier message as the add's.
+  const before = display.since(0, 'assistant-edit').length;
   const add = await mcp.call('set_list_edit', { command: 'add', look: 'Calm' });
   await sleep(200);
+  const c = { read: read.ok, slow: /"name": "Slow build"/.test(read.text), out: out.ok, file: /chromaglass-setlist/.test(out.text), two: display.since(t, 'assistant-edit').filter((m) => m.op === 'read' || m.op === 'export').length === 2,
+    refused: !add.ok && /Full mode is needed/.test(add.text), none: display.since(0, 'assistant-edit').length === before };
   check('edit-suggest', 'in Suggest a sequence read and a set list file written out reach the display and answer with the sequence and the file, and an add is refused for want of Full with nothing sent',
-    read.ok && /"name": "Slow build"/.test(read.text) && out.ok && /chromaglass-setlist/.test(out.text) && display.since(t, 'assistant-edit').filter((m) => m.op === 'read' || m.op === 'export').length === 2
-      && !add.ok && /Full mode is needed/.test(add.text) && display.since(t2, 'assistant-edit').length === 0,
-    `read ${read.ok}; export ${out.ok}: ${out.text.slice(0, 120)} | add: ${add.text.slice(0, 100)} | sent ${JSON.stringify(display.since(t, 'assistant-edit').map((m) => m.op))}`);
+    Object.values(c).every(Boolean),
+    `${Object.entries(c).filter(([, v]) => !v).map(([k]) => k).join(',') || 'all'} | read: ${read.text.slice(0, 160)} | add: ${add.text.slice(0, 100)} | sent ${JSON.stringify(display.since(t, 'assistant-edit').map((m) => m.op))}`.replace(/\n/g, ' '));
 }
 
 /** In Play: every edit refused for want of Full; a sequence read is Suggest's and answers. */
