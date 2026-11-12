@@ -624,8 +624,8 @@ function startUpdater() {
   ipcMain.handle('chromaglass:update-auto', (_e, on) => { updates.setAuto(on === true); return { ...updates.state, history: undefined }; });
 }
 
-/** The menu's OSC choice: kept, then applied to the running server without a restart. */
-async function setOscMode(mode) {
+/** The menu's OSC choice: kept, then applied to the running server without a restart. `quiet` (the assistant's call) answers with the socket's words instead of a dialog. */
+async function setOscMode(mode, quiet = false) {
   show.oscMode = mode;
   writeShowFile({ osc: mode });
   const state = await showServer?.setOsc?.(mode === 'off' ? 0 : show.osc, OSC_BINDS[mode]);
@@ -634,9 +634,39 @@ async function setOscMode(mode) {
   globalThis.__chromaglassOsc = { mode, state };
   buildMenu();
   // A port that is taken says so, rather than leaving a menu that claims OSC is on.
-  if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE) {
+  if (mode !== 'off' && !/^udp /.test(state ?? '') && !process.env.CHROMAGLASS_OFFLINE && !quiet) {
     void dialog.showMessageBox(showWindow ?? undefined, { type: 'warning', message: `OSC could not open UDP port ${show.osc}`, detail: `${state ?? 'The show server is not running'}. Another program may be using the port; quit it, or pick the setting again.`, buttons: ['OK'] });
   }
+}
+
+/*
+  OSC in and Syphon for the owner's assistant (PLAN 44k-14,
+  server/assistantOutputs.js): the Show menu's own doors, so a choice the
+  assistant makes is the menu's, ticked there and kept in show.json, and the
+  performer sees it where they would have made it. Syphon is reached through
+  its menu item (`syphon-out`, the contract scripts/desktop-syphon.mjs holds
+  PLAN 13.2's build to), so this never touches the output itself: a build
+  with no such item says so.
+*/
+function outputsHook() {
+  const syphonItem = () => Menu.getApplicationMenu()?.getMenuItemById('syphon-out') ?? null;
+  return {
+    state: () => {
+      const item = syphonItem(), s = globalThis.__chromaglassSyphon;
+      return {
+        oscIn: { mode: show.oscMode, port: show.osc, socket: showServer?.oscState?.() ?? 'off', kept: true },
+        syphon: item ? { on: item.checked, serving: !!s?.serving, name: s?.name ?? null } : null,
+      };
+    },
+    setOscIn: async (mode) => { await setOscMode(mode, true); return showServer?.oscState?.() ?? 'off'; },
+    setSyphon: (on) => {
+      const item = syphonItem();
+      if (!item) return 'Syphon out is not in this build of the Mac app yet';
+      if (!item.enabled) return 'Syphon out is greyed out in the Show menu';
+      if (item.checked !== on) item.click();
+      return null;
+    },
+  };
 }
 
 function buildMenu() {
@@ -803,6 +833,8 @@ async function start() {
   showServer = await import(pathToFileURL(SERVER).href);
   // The updater, for the owner's assistant (PLAN 44k-18): its state and its doors; the server judges the mode.
   if (updates) showServer.setAppUpdates?.(updatesHook(updates));
+  showServer.setAppOutputs?.(outputsHook());
+  globalThis.__chromaglassOutputs = outputsHook();
   // The tick set in place, not the menu rebuilt: a rebuild closes a menu the
   // operator has open, and below Pro the page asks again every few seconds.
   showServer.onLinkChange?.((on) => {

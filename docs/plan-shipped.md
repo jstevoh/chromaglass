@@ -12997,6 +12997,36 @@ in `scripts/assistant-media.mjs`; the music-type mutant follows the refusal's wo
 layout's film, room camera and mark), 44k-13b (the doors in a browser), 44k-13c (the
 owner's own media folders).
 
+
+## 44k-14. OSC out, OSC in, MIDI and Syphon from the assistant (2026-11-11)
+
+The eighth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
+control of the show from Claude. The four outputs live in three places, so each call
+goes to the one that owns it and nothing keeps a second copy of a switch the desk shows:
+
+- OSC out's switch is the page's (`useShowFeed` remembers the performer's choice and
+  asks a restarted server to open it again), so `outputs osc_out` goes to the display
+  and flips the Sound panel row's own door; sent straight to the server's socket, the
+  next restart would have put back what the page remembered. The target is held to the
+  row's `address:port` (an IPv4 address or localhost) by the guard and again by the page.
+- MIDI is the page's (Web MIDI): on or off and its two ports by the MIDI panel's names,
+  found in any case and refused with the list when not there. Switching on waits for
+  Web MIDI to answer (`useMidi` gains `open`), so a refused permission comes back as the
+  reason and never as "done". Learning a control stays the person's.
+- OSC in is the show server's socket and the Mac app's Show menu choice, so `osc_in`
+  (off, local, network) is answered by the relay at once through a hook main.js hands
+  the server (`setAppOutputs`): the menu ticks it, `show.json` keeps it, and a port
+  another program holds is the refusal, with no dialog. A show run from a terminal
+  opens its own socket and keeps nothing past a restart.
+- Syphon out is not on main (13.2, its own thread), so `syphon` goes through the Show
+  menu item `syphon-out` its check holds it to, and a build without it says so (44k-14a).
+- `show_state`'s `outputs` merges the display's two with the relay's two; `outputs
+  status` reads the relay's in any mode. Everything that changes an output is Full.
+
+Checks: `npm run assistant` gains `scripts/assistant-outputs.mjs` (15 lines, 11 mutants);
+`npm run desktop`'s OSC block gains the line that the assistant's choice is the menu's.
+`assistantOutputs.js` joins the Mac app's `server` filter. Found: 44k-14a (Syphon on a
+real Syphon build), 44k-14b (MIDI's permission on a fresh Mac app).
 ## 44k-12. The microphone's input from the assistant (2026-11-11)
 
 The sixth batch of 44k's gaps, built by Claude. `set_sound_source microphone` opened

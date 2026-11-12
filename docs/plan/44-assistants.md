@@ -232,7 +232,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | **shipped** 2026-11-11: `record_options`, `take`, `show_state`'s `record` | Full | 44k-11 |
   | 12 | The microphone's input device | **shipped** 2026-11-11: `set_sound_source`'s `device`, `show_state`'s `sound.inputs` and `sound.input` | Full | 44k-12 |
   | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | **shipped** 2026-11-11: `film`, `pour_file`, `room_camera`, `mark`, `show_state`'s `media` | Full | 44k-13 |
-  | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
+  | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its ports, Syphon once it ships (its own thread) | **shipped** 2026-11-11: `outputs` (osc_out, osc_in, midi, syphon, status), `show_state`'s `outputs` | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
   | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | none | Play (palette, tool), Full (the rest) | 44k-16 |
   | 18 | The Mac app's updates: Install Updates Automatically, check, install | **shipped** 2026-11-11: `app_updates` (status any mode; auto, check, install Full; install refused mid-show) | Full | 44k-18 |
@@ -398,13 +398,27 @@ through cords and preset patches, and the plate shader is untouched.
   folder) must be moved first. A Settings row in the Mac app, "Folders Claude may open",
   kept in `show.json` and read by the show server, would let the owner widen it without
   a terminal.
-- **44k-14. OSC, MIDI and Syphon.** *(M, AG lane; Syphon after its own thread ships
-  it.)* `outputs` (OSC out on, off and its target, via `useShowFeed`'s `onOscOut`; OSC
-  in's Off, This Mac, Network, which today is only the Mac menu, `desktop/main.js`
-  `setOscMode`, so a bridge message is owed first; MIDI on, off and its ports via
-  `useMidi`; Syphon on, off), all read back in `show_state`. MIDI learning stays the
-  person's (it needs a hand on the controller). Full. Pass: lines for each, and the
-  Mac's OSC-in half in `npm run desktop`.
+- ~~**44k-14. OSC, MIDI and Syphon.**~~ **Shipped** 2026-11-11: `outputs` (osc_out on or
+  off and its target, osc_in off, local or network, midi on or off and its ports by name,
+  syphon on or off, status in any mode), Full, read back in `show_state`'s `outputs`;
+  OSC out and MIDI through the page's own doors (`app/outputsNow.ts`), OSC in and Syphon
+  answered by the relay through the Mac app's Show menu (`server/assistantOutputs.js`,
+  `setAppOutputs`). MIDI learning stays the person's (`npm run assistant`,
+  `outputs-full`, `-relay-full`, `-target`, `-target-bad`, `-midi-name`, `-midi-port`,
+  `-answer`, `-oscin`, `-oscin-mode`, `-oscin-taken`, `phone-outputs`; the Mac's half in
+  `npm run desktop`'s OSC block). Story in `docs/plan-shipped.md` §44.
+- **44k-14a. Syphon from the assistant, on a real Syphon build.** *(S, found building
+  44k-14.)* Syphon out (13.2, PR 723) is not on main, so `outputs syphon` reaches it only
+  through the Show menu item `syphon-out` its check holds it to, and says "not in this
+  build" until then; nothing has switched a real Syphon server from the assistant. Once
+  13.2 ships: run `npm run desktop`'s OSC block on the Mac (its Syphon half then takes
+  the item's branch) and add a line that `outputs syphon on` leaves
+  `__chromaglassSyphon.serving` true.
+- **44k-14b. MIDI's permission on a fresh Mac app.** *(S, found building 44k-14.)*
+  `outputs midi on` waits five seconds for Web MIDI to answer and says the browser may be
+  asking. Whether the Mac app grants MIDI without a prompt (`grantPermissions`) is
+  unmeasured from the assistant: switch it on from Claude on the Mac with MIDI off, and
+  read `outputs.midi.open`.
 - **44k-15. The projector.** *(M, AG lane.)* `projector` (cast window open or closed,
   projector mode, the test card on or off) and `wall` (the output's geometry and
   grade as `useOutput`'s `OutputConfig`, and reset). The mapping's shapes stay the

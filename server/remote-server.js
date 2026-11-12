@@ -35,6 +35,7 @@ import { LOOPBACK, isLaptop } from './laptop.js';
 import { createAssistantGuard, readAssistantMode } from './assistant.js';
 import { serveMusicFile } from './assistantMusic.js';
 import { updatesCall } from './assistantUpdates.js';
+import { OSC_IN_BINDS, RELAY_OUTPUTS, oscInMode, outputsCall } from './assistantOutputs.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -433,11 +434,27 @@ const pairTv = (tv, except) => {
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
+const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-outputs', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 /** The Mac app's updater, when main.js hands it over (PLAN 44k-18); null in a show run from a terminal. */
 let appUpdates = null;
 export function setAppUpdates(hook) { appUpdates = hook && typeof hook.state === 'function' ? hook : null; }
+/*
+  OSC in and Syphon for the assistant (PLAN 44k-14, assistantOutputs.js): the
+  Mac app hands its own doors (`setAppOutputs`), so a change made by the
+  assistant is the Show menu's choice, kept in show.json and ticked in the
+  menu. A show run from a terminal has only this server's socket, so OSC in
+  is opened here, on the port it was started with (or CHROMAGLASS_OSC_PORT,
+  9000, when it started with OSC off), and is gone at the next restart; it
+  has no Syphon.
+*/
+let appOutputs = null;
+export function setAppOutputs(hook) { appOutputs = hook && typeof hook.state === 'function' ? hook : null; }
+const OSC_ON_PORT = OSC_PORT > 0 ? OSC_PORT : Number(process.env.CHROMAGLASS_OSC_PORT) || 9000;
+const serverOutputs = {
+  state: () => ({ oscIn: { mode: oscInMode(oscStatus), port: OSC_ON_PORT, socket: oscStatus, kept: false }, syphon: null }),
+  setOscIn: (mode) => setOsc(mode === 'off' ? 0 : OSC_ON_PORT, OSC_IN_BINDS[mode]),
+};
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
@@ -597,6 +614,12 @@ wss.on('connection', (socket, req) => {
       } else if (message.type === 'assistant-updates') {
         // The Mac app's updates (PLAN 44k-18): the main process's, answered here and never sent to the display.
         reply = updatesCall(message, assistantMode(), appUpdates);
+      } else if (message.type === 'assistant-outputs' && RELAY_OUTPUTS.includes(message.do)) {
+        // OSC in, Syphon and their status (PLAN 44k-14): the relay's own, answered once the socket has bound.
+        void outputsCall(message, assistantMode(), appOutputs ?? serverOutputs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+          if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...r }));
+        });
+        return;
       } else {
         // The guard hands the display the number its answer comes back under
         // (PLAN 44f-4): one of the relay's own, since each assistant numbers
