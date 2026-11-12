@@ -2680,3 +2680,21 @@ own mDNSResponder beside the advert, and the WebView's video decode are only see
    `node server/bonjour.js` on another computer on the Wi-Fi), digits that never reach the
    Mac, a black picture after Allow, or a picture that stutters where the browser's `/tv`
    on the same TV did not.
+
+## 126. The TV's remote picks the look (PLAN 12-tv-remote)
+
+The check (`npm run tvremote`) presses the keys on the built `/tv` page as the app hands
+them over and watches the presets a stand-in laptop is handed; a real remote through the
+Android TV WebView, and the look changing on the Mac, are only seen here.
+
+1. With the TV app paired and live (§125), press **right** on the remote: the Mac should play
+   the next preset in its list, and the TV's top line say *Next: …* then *Now playing: …*.
+   **Left** goes back one.
+2. Hold **right** for two seconds: one look on, not ten.
+3. Press **OK**: a random look, never the one already playing.
+4. Press **up** (or **Menu**, if the remote has one): the list of looks opens on the right,
+   the playing one marked. Move with up and down, press OK: that look plays and the list
+   shuts. Open it again and press **Back**: the list shuts and the TV stays on the show
+   (a second Back leaves for the list of Macs, as before).
+5. Good: each press changes the Mac within a second. Bad: a key that does nothing, Back
+   leaving the show while the list is open, or the D-pad moving a focus ring on the page.

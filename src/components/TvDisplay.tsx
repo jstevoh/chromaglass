@@ -3,6 +3,8 @@ import { useRemoteLink } from '../hooks/useRemoteLink';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { showKeyFromUrl, type RemoteMessage, type TvSignal } from '../lib/remoteProtocol';
 import { forgetTvKey, keepTvKey, keptTvKey } from '../lib/tvKey';
+import type { TvLook } from '../lib/tvLooks';
+import TvRemote from './TvRemote';
 
 /**
  * A TV at home (PLAN 12-tv, route 2): the laptop's plate, played as video.
@@ -27,9 +29,10 @@ import { forgetTvKey, keepTvKey, keptTvKey } from '../lib/tvKey';
  * What it says, in a line at the bottom that fades after a few seconds: that
  * it is live, that the show is off, or why it was turned away (a wrong key,
  * three TVs already, or a copy without Home or Pro). No pointer and no
- * controls: a TV is driven by a remote with no cursor, and the phone remote
- * already drives the show it shows. Enter, Space, F or a tap asks for full
- * screen.
+ * controls on the picture: a TV is driven by a remote with no cursor. The
+ * remote picks the look the Mac plays (PLAN 12-tv-remote, TvRemote.tsx says
+ * which keys); the phone remote still drives everything else. F or a tap
+ * asks for full screen, and so does the first OK in a TV's own browser.
  *
  * With no key at all (the Android TV app opening a Mac for the first time, or
  * `/tv` typed bare), it asks the relay to pair (PLAN 12-tv-2): four digits fill
@@ -86,6 +89,7 @@ export default function TvDisplay() {
   const [says, setSays] = useState(true);
   const [film, setFilm] = useState(0);
   const [code, setCode] = useState<string | null>(null);
+  const [looks, setLooks] = useState<{ presets: TvLook[]; active: string | null }>({ presets: [], active: null });
   // A URL's key wins; else the one kept from pairing; else this TV pairs.
   const [kept] = useState(() => (showKeyFromUrl() ? null : keptTvKey()));
   const liveRef = useRef<HTMLVideoElement>(null);
@@ -189,6 +193,8 @@ export default function TvDisplay() {
         else { hangUp(); setState('films'); }
       } else if (m.type === 'tv-signal') {
         onSignal(m.signal);
+      } else if (m.type === 'tv-looks') {
+        setLooks({ presets: Array.isArray(m.presets) ? m.presets : [], active: m.active ?? null });
       }
     },
   });
@@ -229,10 +235,18 @@ export default function TvDisplay() {
     if (!document.fullscreenElement) void document.documentElement.requestFullscreen?.().catch(() => { /* the TV app is full screen already */ });
   }, []);
   useEffect(() => {
-    const key = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'f' || e.key === 'F') fullScreen(); };
+    const key = (e: KeyboardEvent) => { if (e.key === 'f' || e.key === 'F') fullScreen(); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [fullScreen]);
+  // OK in a TV's own browser goes full screen first, as it did before the
+  // remote picked looks; in the TV app (full screen already) it is Random at once.
+  const fullScreenFirst = useCallback(() => {
+    if (window.ChromaglassTv || document.fullscreenElement || !document.documentElement.requestFullscreen) return false;
+    fullScreen();
+    return true;
+  }, [fullScreen]);
+  const pickLook = useCallback((presetId: string) => link.send({ type: 'tv-pick', presetId }), [link]);
 
   const live = state === 'live';
   const films = !live;
@@ -272,9 +286,16 @@ export default function TvDisplay() {
           <div className="opacity-60" style={{ fontSize: 'clamp(13px, 1.6vw, 26px)' }}>It shows there as “A TV wants to join” with these four digits: press Allow.</div>
         </div>
       )}
+      <TvRemote
+        presets={looks.presets}
+        active={looks.active}
+        enabled={looks.presets.length > 0 && (state === 'live' || state === 'looking')}
+        pick={pickLook}
+        fullScreenFirst={fullScreenFirst}
+      />
       <div
         data-testid="tv-says"
-        className="absolute left-0 right-0 bottom-0 px-[4vw] pb-[4vh] pt-[8vh] text-white/85 transition-opacity duration-1000"
+        className="absolute left-0 right-0 bottom-0 px-[4vw] pb-[4vh] pt-[8vh] text-white/85 transition-opacity duration-1000 pointer-events-none"
         style={{
           opacity: says ? 1 : 0,
           fontSize: 'clamp(14px, 1.8vw, 28px)',

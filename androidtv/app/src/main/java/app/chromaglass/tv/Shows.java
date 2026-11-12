@@ -79,4 +79,18 @@ final class Shows {
         byte[] v = attrs.get(name);
         return v == null ? null : new String(v, StandardCharsets.UTF_8);
     }
+
+    /** The page's key for Menu, which opens the remote's list of looks (src/components/TvRemote.tsx). */
+    static final String KEY_MENU = "ContextMenu";
+    /** The page's key for Back while that list is open, which closes it. */
+    static final String KEY_CLOSE = "Escape";
+
+    /**
+     * A keydown the page's remote reads (PLAN 12-tv-remote), for a key the
+     * WebView would not hand it: run on the page with evaluateJavascript.
+     * Only this file's two constants are ever passed, never anything typed.
+     */
+    static String pageKey(String key) {
+        return "window.dispatchEvent(new KeyboardEvent('keydown',{key:'" + key + "'}))";
+    }
 }

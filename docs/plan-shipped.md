@@ -13377,6 +13377,42 @@ gone stopping the stage, a frozen plate after it, and the phone. By hand on the 
 the real app on a software GPU feeding a TV page in a second browser over the
 network address, the plate on the TV.
 
+## 12-tv-remote. The TV's remote picks the look (2026-11-12)
+
+Asked by the owner (2026-11-12): the TV stays a receiver for now, playing the Mac's
+plate as video, but the remote should choose what plays, a random look or one of
+the presets. The coordinator's reading, built: the D-pad's right and left play the
+next and previous preset, OK a random one, up (or Menu) a list to choose from.
+
+- **The relay** (`server/tv-remote.js`, beside `remote-server.js`, which is past the
+  size the repo warns at). Until now a TV could say nothing but its half of the
+  video handshake. It may now send `tv-pick` naming a preset, which the relay hands
+  the display as the `preset` a phone sends, only if the laptop listed that preset
+  in its last state, and at most one every `TV_PICK_MS` (400 ms) from each TV: a
+  preset cuts the plate to clean glass, and a held button repeats ten times a
+  second. The TV names the preset rather than sending `preset-next`, so the relay
+  knows what it passes on and a TV can never reach a patch or another action. A
+  TV is sent `tv-looks` (the presets' ids and names, the live one) as it joins and
+  when either changes, not the phone's whole state. Any TV in the show may pick: a
+  paired one, or one opened with the show key, which could already be a phone;
+  a TV still asking to pair cannot.
+- **The page** (`src/components/TvRemote.tsx`, `src/lib/tvLooks.ts`): the keys as
+  the Android TV WebView hands them; repeats ignored; a step counts from the last
+  pick, so two presses before the laptop answers move two; a random pick is never
+  the live one; a line at the top names the look coming, then the one playing.
+  Off on a refusal and on the films. In a TV's own browser the first OK still goes
+  full screen. Phone version: a tap brings a bar of Previous, Random, Next and
+  Looks; the bottom line no longer takes taps (it covered the bar).
+- **The app** (`MainActivity.dispatchKeyEvent`, `Shows.pageKey`): Menu, and Back
+  while the list is open, go to the page as `ContextMenu` and `Escape`; the page
+  says when its list is open through the bridge's new `menu`, so Back closes the
+  list rather than leaving the show.
+
+Measured: `npm run tvremote` 45/45 (new: the rules, the relay against the real show
+server and a stand-in laptop, the page's keys, a TV browser's first OK, the phone's
+bar and list); `npm run tvpair` 52/52 and `npm run tv` 33/33 unchanged. Not yet
+seen: a real remote through a TV's WebView (`docs/judging.md` §126).
+
 ## 12-tv-2. The Android TV app finds the Mac and pairs by four digits (2026-11-09)
 
 Asked: the owner's TV app for Home and Pro (2026-11-08), route 2: a receiver of

@@ -2021,6 +2021,22 @@
       ]
     },
     {
+      "name": "The TV's remote picks the look",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tvremote.mjs",
+      "why": [
+        "The TV remote picks what the Mac plays (scripts/tvremote.mjs, PLAN.md",
+        "12-tv-remote): the relay's rules (a TV hears only the presets and the",
+        "live one, picks only a listed preset, one every TV_PICK_MS, and nothing",
+        "else it sends reaches the laptop; a phone's or a pairing ask's pick",
+        "reaches nothing) against the real show server and a stand-in laptop;",
+        "the built /tv page's keys as the Android TV app hands them (left, right,",
+        "OK, up, Menu and Back), a TV's own browser's first OK, and the phone's",
+        "tap bar and list inside a phone's screen. dist/ is the phone step's",
+        "build. About twenty seconds."
+      ]
+    },
+    {
       "name": "A TV at home plays the show's plate",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/tv.mjs",

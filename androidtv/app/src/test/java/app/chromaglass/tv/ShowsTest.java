@@ -87,4 +87,10 @@ public class ShowsTest {
         for (int n = 0; n < Sample.CLIPS.length; n++) i = Sample.next(i);
         assertEquals(0, i);
     }
+
+    // The keys the page's remote listens for (src/components/TvRemote.tsx): Menu opens the list, Escape closes it.
+    @Test public void menuAndBackReachThePageAsTheKeysItReads() {
+        assertEquals("window.dispatchEvent(new KeyboardEvent('keydown',{key:'ContextMenu'}))", Shows.pageKey(Shows.KEY_MENU));
+        assertEquals("window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}))", Shows.pageKey(Shows.KEY_CLOSE));
+    }
 }

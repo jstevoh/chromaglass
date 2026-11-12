@@ -357,7 +357,10 @@ export function useRemote({
           setTvPairing({ asks: message.asks, paired: message.paired });
           break;
         case 'tv-show':
+        case 'tv-looks':
           break;   // the relay's word to a TV, never a display's
+        case 'tv-pick':
+          break;   // a TV's to the relay, which hands the display a `preset` (server/tv-remote.js)
         case 'patch':
           queuePatch(message.settings);
           break;

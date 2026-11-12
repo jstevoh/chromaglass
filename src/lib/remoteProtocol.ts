@@ -384,6 +384,14 @@ export type RemoteMessage =
   | { type: 'tv-refuse'; id: string }
   | { type: 'tv-forget' }
   | { type: 'tv-key'; key: string }
+  /**
+   * The TV's remote picks the look (PLAN 12-tv-remote, server/tv-remote.js).
+   * Relay → TV: the laptop's presets in its order, and the live one, when
+   * either changes and when the TV joins. TV → relay: play this one, which
+   * the relay hands the display as `preset` if the laptop listed it.
+   */
+  | { type: 'tv-looks'; presets: { id: string; name: string }[]; active: string | null }
+  | { type: 'tv-pick'; presetId: string }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**

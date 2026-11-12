@@ -19,6 +19,12 @@ interface ChromaglassTvBridge {
   paired(key: string): void;
   /** This Mac no longer knows the key: drop it, the page is pairing again. */
   forget(): void;
+  /**
+   * The remote's list of looks is open (true) or shut (PLAN 12-tv-remote), so
+   * the app's Back closes it instead of leaving the show. Missing in builds
+   * before it.
+   */
+  menu?(open: boolean): void;
 }
 
 declare global {

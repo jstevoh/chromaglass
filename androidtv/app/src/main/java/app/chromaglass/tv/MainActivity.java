@@ -62,6 +62,14 @@ import java.util.Map;
  *
  * Back from the show or the sample returns to the list; Back from the list
  * leaves the app.
+ *
+ * The remote picks the look the Mac plays (PLAN 12-tv-remote): the page
+ * reads the D-pad itself (src/components/TvRemote.tsx), since the WebView
+ * hands it left, right, up, down and OK as arrow keys and Enter. Two keys it
+ * does not reliably get are this app's to pass on: Menu, which opens the
+ * page's list of looks, and Back while that list is open, which closes the
+ * list instead of leaving the show. The page says when its list is open
+ * through `ChromaglassTv.menu`.
  */
 public class MainActivity extends Activity {
     static final String SERVICE_TYPE = "_chromaglass._tcp";
@@ -84,6 +92,8 @@ public class MainActivity extends Activity {
     private LinearLayout list;
     private TextView status;
     private WebView web;
+    /** The page's list of looks is open (Bridge.menu), set from the WebView's thread. */
+    private volatile boolean menuOpen = false;
     private Shows.Show playing;
     private Button sampleButton;
     private FrameLayout sampleLayer;
@@ -326,6 +336,7 @@ public class MainActivity extends Activity {
     }
 
     private void closeShow(String says) {
+        menuOpen = false;
         if (web != null) {
             root.removeView(web);
             web.destroy();
@@ -337,6 +348,25 @@ public class MainActivity extends Activity {
         showList();
         if (says != null) status.setText(says);
         startLooking();
+    }
+
+    /**
+     * Menu, and Back while the page's list is open, go to the page as the
+     * keys it listens for (ContextMenu, Escape), before the WebView or
+     * onKeyDown can take them. Both the press and its release are eaten, so
+     * a release of Back never reaches the activity as a Back of its own.
+     */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int code = event.getKeyCode();
+        if (web != null && playing != null && sampleLayer == null
+                && (code == KeyEvent.KEYCODE_MENU || (code == KeyEvent.KEYCODE_BACK && menuOpen))) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
+                web.evaluateJavascript(Shows.pageKey(code == KeyEvent.KEYCODE_MENU ? Shows.KEY_MENU : Shows.KEY_CLOSE), null);
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override
@@ -424,6 +454,11 @@ public class MainActivity extends Activity {
         private final String showId;
 
         Bridge(String showId) { this.showId = showId; }
+
+        @JavascriptInterface
+        public void menu(boolean open) {
+            menuOpen = open;
+        }
 
         @JavascriptInterface
         public void paired(String key) {
