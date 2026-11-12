@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1446,23 +1446,28 @@
       ]
     },
     {
-      "name": "Lava Lamp's wax goes round: up off the lamp, down from the cool top, up again",
-      "shard": "lab10",
+      "name": "Lava Lamp's wax goes round, and keeps going round: up off the warm floor, down from the cool top, minute after minute",
+      "shard": "show",
       "run": "npm run lavacycle",
-      "timeout": 22,
+      "timeout": 8,
       "why": [
-        "With the heat carried (38f-1) Lava Lamp's wax rose and stayed at the top: nothing",
-        "took its heat but Heat Decay, about ten minutes on the look's clock (PLAN 27f-9e).",
-        "Now the heat crosses the gap to the cool upper glass at the gap's conduction rate in",
-        "real seconds. On the look's settings and the app's lay: the wax rises and comes down",
-        "where a lab built without the cooling stays up, then rises again; and the rate is",
-        "pi^2 kappa / h^2 at the rest gap, read off the solver on the step's real seconds.",
-        "About fifteen minutes on SwiftShader, a part of its own (lab10): beside moire in lab9",
-        "it reached the Measure warning line, past the 25 minutes on the slow tier."
+        "With the heat carried (38f-1) Lava Lamp's wax rose and stayed at the top; 27f-9e gave",
+        "the heat a way out, to the cool upper glass at the gap's conduction rate. But the bulb",
+        "was a kick of heat to the wax alone, the water under it left cold: the wax rose once,",
+        "came down to the band's edge and hung there, weightless, from the first minute on, and",
+        "this check, which watched 30 s, was green on it (PLAN 27f-9h). Now the floor's glass is",
+        "warm and heats water and wax alike at the same conduction rate. Two minutes of the look",
+        "on the app's lay: the wax rises and comes down, rises again, and in the second minute",
+        "still falls and rises by a fifth of the height; with the cool glass taken out it stays",
+        "up, with the warm floor or the wax's swelling taken out it never rises (lavawax's",
+        "old third line); and the rate is pi^2 kappa / h^2 at the rest gap, read off the",
+        "solver on the step's real seconds. On the Mac: six minutes of the lamp in four labs",
+        "is half a minute on Metal and two hours on SwiftShader, where it had Measure's lab10",
+        "to itself while it watched 50 s."
       ]
     },
     {
-      "name": "Lava Lamp's wax holds together and the lamp lifts it",
+      "name": "Lava Lamp's wax holds together and is heavy while cold",
       "shard": "lab8",
       "run": "npm run lavawax",
       "timeout": 22,
@@ -1471,10 +1476,12 @@
         "wall to wall (PLAN 27f-9c). Now it is the oil with a weight of its own (Oil",
         "Weight) and a melt. On the look's settings, its own step and the app's lay, each",
         "line against a run that takes away the one thing it names: laid as dye (the wash),",
-        "Oil Bodies off (the colour in the bodies), Oil Weight 0 (the cold top body sinks),",
-        "no heat and a lab built without the melt (the lamp lifts the wax's centre of mass).",
-        "About ten minutes on SwiftShader, so about twenty on the slow tier: a part of its",
-        "own, lab8, since lab4 already runs about eleven there."
+        "Oil Bodies off (the colour in the bodies), Oil Weight 0 (the cold top body sinks).",
+        "That the lamp lifts the wax was its third line, read at 6 s; a lamp that heats",
+        "through its glass has not warmed the wax by then, so that line and its no-swelling",
+        "lab are lavacycle's now, on the Mac (PLAN 27f-9h). It was about ten minutes on",
+        "SwiftShader with that line, about twenty on the slow tier: a part of its own, lab8,",
+        "since lab4 already runs about eleven there."
       ]
     },
     {

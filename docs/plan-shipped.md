@@ -6249,6 +6249,8 @@ The glass laid by height is a shortcut, named as 27f-9g.
 half the height and is 0.15 below its highest by 16 s where a lab built without the cooling stays
 within 0.05 of its own (0.73 at 16 s); it rises again by 0.06 from its lowest by 26 s; and the
 rate is π²κ/h² at the rest gap on real seconds. Not yet seen: the Mac's film of the minute.
+(The check watches two minutes now and runs on the Mac's `show`: 27f-9h below, where the lamp
+this shipped was found to hover from its first minute on.)
 
 ### 27f-9h. Lava Lamp looks like a lit lamp (2026-11-12)
 
@@ -6284,6 +6286,49 @@ down to 0.31 at 26 s and up to 0.41 at 36 s, so it goes round as far, with a slo
 blobs sink at their lighter weight). The haze (cells a tenth to a half oil) at 24 s fell from 531
 to 384. Contact sheets of both are in the
 PR. The Mac's film of a minute is the owner's verdict.
+
+**The stall, and the warm floor.** The Mac's second film (90 s, no hands) showed fat teardrops
+for twenty seconds, then pale ghosts and no second rise, and `npm run lavacycle` was red on the
+new settings: up to 0.60 at 11 s, then 0.49 to 0.50 from 22 s on. Followed back, the settings
+were not the cause. Dye Weight is floored at 0.5 on a standing plate (`fluid.ts`, so a standing
+bottle always has weight), so the 0.2 above ran as 0.5 and 0.35 and 0.5 are the same run (the
+preset says 0.5 now; the dead range is 27f-9j); the weight the wax lost was its colour's, LAVA_DYE
+2.6 to 0.55 (27f-9k). And main's lamp, at 0.7 with the dark wax, hovers too: run past the 30 s
+the check watched, it damps to 0.49 to 0.50 inside 60 to 80 s. The cycle 27f-9e shipped was one
+or two swings of a damped overshoot.
+
+The cause was the bulb. It was a kick of heat laid in the wax alone, in a band over the floor,
+fast (a thermostat), with the water under and round it left cold. An overdamped body in a thin
+gap has no inertia to overshoot with, so it goes where it is weightless and stays: the wax rose
+off the band, cooled to the weight of the cold water at the band's upper edge, and hung there,
+heated from below exactly as fast as it cooled. A real lamp goes round because its liquid has a
+gradient of its own, hot at the floor and cool at the top, and the wax, slow to warm and slow to
+cool by conduction, is always out of step with the liquid it is passing through. So the floor's
+glass is warm now (LAMP_GLASS, 6 heat units), and everything touching it, water and wax, the wax
+at its own conductivity, relaxes toward it at the gap's conduction rate π²κ/h² over the glass's
+fin length up from the floor: the mirror of 27f-9e's cool glass, and in place of the kick
+wherever there is a wax phase. What floats the wax over warm water is then only that it swells
+more than the water does (OIL_EXPAND), as a real lamp's wax does: with the swelling taken out
+it never leaves the floor.
+
+Lab, 128², the look's settings, the oil's centre of mass on Metal: laid at 0.35 the cold wax
+sinks to 0.15 by 9 s, is up at 0.60 at 23 s, down to 0.19 at 42 s, 0.64 at 56 s, 0.24 at 74 s,
+0.60 at 90 s, 0.22 at 108 s, 0.60 at 120 s, a round about every 32 s, and a run to 180 s was
+still between 0.24 and 0.62. With the cool glass out it rises to 0.81 and stays; with the warm
+floor or the swelling out it sinks to 0.13 and stays. At 192² the same (peaks 0.60, 0.58, 0.59;
+on the look's own dt 0.56, 0.54, 0.56 with lows of 0.17 to 0.20).
+
+`npm run lavacycle` holds that: the first rise and fall (0.55 and a fall of 0.15 by 40 s), a
+second rise inside the first minute, the warm floor's and the swelling's controls, and a fall
+and a rise of 0.2 wholly inside the second minute, which is the line the old lamp is red on.
+The heights it asks are the old ones; its clock is not (the fall was read at 16 s and the
+round at 26 s, when the kick lifted the wax in seconds; conduction takes ten seconds to warm a
+cold lay). Six minutes of the lamp in four labs is half a minute on Metal and two hours on
+SwiftShader, so the check left Measure (`lab10` is gone) for the Mac's `show` (19k-19), and
+`npm run lavawax`'s third line, which read the lamp's lift at 6 s, moved into it as the two
+controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures laid by height,
+the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
+old kick. The Mac's film of two minutes is the owner's verdict.
 
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 

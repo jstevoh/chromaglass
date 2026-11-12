@@ -2106,10 +2106,12 @@ export const PRESETS: Preset[] = [
       /*
         A look for physics that shipped with no look to show it (PLAN.md 28a).
         Stand the plate up (Plate Upright) and gravity acts in it. The solver
-        keeps a lamp under the plate where it leaves the frame (LAMP_HEAT in
-        gpu/fluid.ts), so what pools there is warmed, rises, cools and sinks
-        again: the cycle a lava lamp runs on, rather than a dish that settles.
-        Lit from behind like the real lamp.
+        keeps the bottle's floor warm and its upper glass cool (LAMP_GLASS and
+        LAMP_COOL_FROM in gpu/fluid/constants.ts: both heat the water and the
+        wax alike, by conduction through the gap, PLAN 27f-9h), so what pools
+        on the floor is warmed, rises, cools and sinks again: the cycle a lava
+        lamp runs on, rather than a dish that settles. Lit from behind like
+        the real lamp.
 
         The wax is a liquid of its own (PLAN 27f-9c): the oil (Oil Tension,
         Cahn–Hilliard, so it holds itself in bodies and the liquid round it
@@ -2132,15 +2134,17 @@ export const PRESETS: Preset[] = [
         surface tension (PLAN 27f-9h): a real lamp's wax is a few per cent
         heavier than its liquid cold and its capillary length is about
         1.5 cm, so its blobs are fat and round; at 0.7 ours was about 3 mm
-        and the wax rose as many thin worms. At 0.2 the weight and the heat's
-        lift both fall by the same factor, the capillary length grows by
-        √3.5 ≈ 1.9, and the lab (192², the look's own step, 36 s) laid fat
-        round blobs that still go round: the centre of mass up to 0.55 at 8 s,
-        down to 0.31 at 26 s and up to 0.41 at 36 s (at 0.7: 0.57 at 8 s,
-        0.31 at 16 s, 0.40 at 24 s; the lighter blobs sink slower).
-        Hand-poured colour weighs less with it.
+        and the wax rose as many thin worms. 0.5 is as low as a standing
+        plate goes: the solver floors Dye Weight there when the plate is
+        upright (fluid.ts, "Dye weighs something whether or not a look says
+        how much"), so the 0.2 this look carried for a day ran as 0.5, and
+        0.2, 0.35 and 0.5 are one run to the last digit (measured, PLAN
+        27f-9j). At 0.5 the weight and the heat's lift both fall by 1.4 and
+        the capillary length grows by √1.4 ≈ 1.2; the rest of the rounder
+        look is Oil Tension at 1 and the lighter colour in the wax
+        (LAVA_DYE). Hand-poured colour weighs less with it.
       */
-      solutalBuoyancy: 0.2,
+      solutalBuoyancy: 0.5,
       /*
         Heat spreads at water's own rate (PLAN 27f-9c). 0.5 made it fifty times
         faster for salt fingers in the dye-wax: with the wax a body, the heat
