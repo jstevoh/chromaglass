@@ -13063,6 +13063,62 @@ page's wait for the window (2 s) ends inside the MCP server's wait for its answe
 had run `npm run lint` out of heap. `assistantProjector.js`
 joins the Mac app's `server` filter. Found: 44k-15a (the cast on the Mac with a real
 projector), 44k-15b (whether the window fills its screen).
+## 44k-16a. Set lists and sequences built from the assistant (2026-11-12)
+
+The eleventh batch of 44k's gaps, asked for by name by the owner on 2026-11-12 ("Both":
+the set list's editing and the sequences'). Until now `set_list` armed and fired an item
+and `sequencer` chose and ran a sequence, but nothing built one. Two tools, one message
+type (`assistant-edit`), read back in `show_state`'s `set` (which now lists the kept sets
+and each item's song) and `sequencer` (each sequence's `builtIn`, `loop` and song):
+
+- `set_list_edit`: add a look (by name or id, built-in or saved) or a sequence, at a
+  place or at the end, with its own row name; remove, move, name an item, tie it to a
+  song (named, or the one identified now) or untie it; rename the set, empty it, keep it
+  (Save), open a kept set, delete a kept set; import a set list file (a whole set
+  replaces the working one, one look or sequence file is added, with the saved looks
+  and sequences it carries) and export one.
+- `sequence_edit`: read a sequence whole (every stage's look by name, timing, palette,
+  ending, settings); new, copy, rename, loop, delete; add, edit, move and take out
+  stages (never the last); bind or unbind its song; import and export its file.
+  Built-in sequences stay as they shipped: an edit of one is refused with "copy it
+  first".
+- Full, because every edit changes the owner's saved work, as the desk's layout is
+  Full; a read and a file written out change nothing and are Suggest. Every edit is on
+  Undo's list: Undo sends `restore`, and the page puts back what that edit changed only
+  while it is still as the edit left it, so a row the performer added since is never
+  taken away by the assistant's Undo.
+- Files: the MCP server runs on the owner's Mac, so `path` reads a file in or writes
+  one out there, a .json file in the home folder only, never over one already there
+  without `overwrite`; without a path, the text goes in and comes back.
+- The guard (`server/assistantEdit.js`) holds the ops, the shapes and the ranges (a
+  stage's 1 to 3600 seconds, 0 to 300 of transition, 1 to 3 dyes, lead 0 to 7, an item
+  or a stage past the list) and refuses rather than clamps; the page (`app/editNow.ts`)
+  finds the names, refuses a room setting on a stage and a setting out of its range,
+  and keeps each write in a mirror until React renders it, so two calls landing before
+  a render both stand. `useSetActions` sets the door; App.tsx did not grow.
+
+Found on the way and fixed: `useShowSequencer`'s `upsertSequence` wrote over the list
+its render saw, so a set list file or a show kit carrying three sequences, upserted one
+after another, kept only the last. It and `removeSequence` now go through the state's
+own updater, and `putSequences` replaces the list whole. Found and written in: 44k-16b
+(an item's own fade and captured rides) and 44k-16c (the show kit, whose import reloads
+the page).
+
+Also found and fixed: `duplicateSequence` (and a new sequence) took its id from the
+millisecond alone, so two made in the same millisecond shared one and the second
+replaced the first; the id now carries a counter. And the sequence chosen is mirrored as
+the set is, so `new` then `add_stage` naming none, before a render, adds to the new one.
+
+Checks: `npm run assistant` gains `scripts/assistant-edit.mjs`: 8 scenario lines (Suggest,
+Play and Full) with 11 mutants of `server/`, each caught, and a page line on the real
+`editNow.ts`, `setList.ts`, `sequencer.ts` and `userPresets.ts`, fed the guard's own
+messages (so the two cannot drift apart on an op or a field) and holding every op the
+guard sends, two edits before a render, Undo leaving the performer's change and as deep
+as the guard's, a file's sequences and saved look kept, a file written that reads back.
+The page line has its own 15 mutants of `editNow.ts`, built in with an esbuild onLoad,
+each caught. A skeptic pass on the first version found 13 of them living; all were
+closed before the PR.
+
 ## 44k-16, 44k-17. The desk from the assistant (2026-11-12)
 
 The tenth batch of 44k's gaps, built by Claude, toward the owner's goal of complete

@@ -325,7 +325,8 @@ export function stageAtOffset(stages: readonly Pick<ShowStage, 'seconds'>[], off
 export function duplicateSequence(seq: ShowSequence, name?: string): ShowSequence {
   return {
     ...seq,
-    id: `seq-${Date.now().toString(36)}`,
+    // The counter too: two copies made in one millisecond (the assistant's, PLAN 44k-16a) shared an id, and the second replaced the first.
+    id: `seq-${Date.now().toString(36)}-${(idCounter++).toString(36)}`,
     name: name ?? `${seq.name} copy`,
     builtIn: false,
     stages: seq.stages.map(st => ({ ...st, id: stageId(), settings: st.settings ? { ...st.settings } : undefined })),

@@ -16,6 +16,14 @@ Mac app, and not named on any page a visitor or customer reads.
   notes are a file outside the repo (`CHROMAGLASS_ASSISTANT_NOTES`, default
   `~/.chromaglass/assistant-notes.md`).
 
+- `editTools.js`: `set_list_edit` and `sequence_edit` (Full; a sequence read and a file
+  written out from Suggest), the set list and the sequences built, PLAN 44k-16a:
+  `EDIT_TOOLS` (spread into `TOOLS`), `EDIT_TOOL_NAMES`, `editCall` (numbers from 1 to
+  the display's from 0, a stage's fields in the page's words, read back in
+  `show_state`'s `set` and `sequencer`). A file by `path` is read or written here, on
+  the owner's Mac: a .json file in the home folder only, never over one already there
+  without `overwrite`.
+
 - `youtube-mcp.js`: the channel, with no show running. The YouTube Data API v3 signed in
   as a desktop app (`login` once: loopback, PKCE, the refresh key at 600 in
   `~/.chromaglass/youtube/`, `CHROMAGLASS_YOUTUBE_DIR`, beside the Google client file
@@ -34,7 +42,10 @@ Mac app, and not named on any page a visitor or customer reads.
 
 - Decides nothing: every rule is the show server's guard (`server/assistant.js`), and a
   refusal is passed on in the guard's words.
-- Imports `ROOM_KEYS` from `server/assistant.js`; `server/` never imports this folder.
+- Imports `ROOM_KEYS` from `server/assistant.js` and `EDIT_TEXT_MAX` from
+  `server/assistantEdit.js`; `server/` never imports this folder. The one thing it judges
+  itself is where a file it reads or writes for `set_list_edit` or `sequence_edit` may be
+  (the home folder, .json), since only this program touches the owner's disk.
 - Writes nothing to stdout but protocol; logs to stderr.
 - Dormant unless the owner's switch is on: `CHROMAGLASS_ASSISTANT`, or one word (off,
   suggest, play, full) in the file the show server reads (`CHROMAGLASS_ASSISTANT_FILE`;

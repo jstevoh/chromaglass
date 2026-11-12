@@ -64,7 +64,7 @@ export function useSetListState() {
   // The owner's assistant reads the set and the fade, and sets the fade and
   // takes the cue back, through the same state as the desk (app/setNow.ts,
   // PLAN 44k-3): one owner, here.
-  useEffect(() => { publishSet({ list: setList, armedItem: cued?.item ?? null, liveItem: liveItemId, fadeSeconds }); }, [setList, cued, liveItemId, fadeSeconds]);
+  useEffect(() => { publishSet({ list: setList, armedItem: cued?.item ?? null, liveItem: liveItemId, fadeSeconds, saved: savedSets }); }, [setList, cued, liveItemId, fadeSeconds, savedSets]);
   useEffect(() => {
     setCueDoor({ fade: setFadeSeconds, cancel: () => setCued(null) });
     return () => setCueDoor(null);
