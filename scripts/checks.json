@@ -1449,7 +1449,7 @@
       "name": "Lava Lamp's wax goes round, and keeps going round: up off the warm floor, down from the cool top, minute after minute",
       "shard": "show",
       "run": "npm run lavacycle",
-      "timeout": 8,
+      "timeout": 4,
       "why": [
         "With the heat carried (38f-1) Lava Lamp's wax rose and stayed at the top; 27f-9e gave",
         "the heat a way out, to the cool upper glass at the gap's conduction rate. But the bulb",
@@ -1462,8 +1462,9 @@
         "up, with the warm floor or the wax's swelling taken out it never rises (lavawax's",
         "old third line); and the rate is pi^2 kappa / h^2 at the rest gap, read off the",
         "solver on the step's real seconds. On the Mac: six minutes of the lamp in four labs",
-        "is half a minute on Metal and two hours on SwiftShader, where it had Measure's lab10",
-        "to itself while it watched 50 s."
+        "is half a minute on an M4's Metal, 78 s on the hosted Mac (this PR's first `show` run,",
+        "2026-11-12; the four minutes are three times that) and two hours on SwiftShader, where",
+        "it had Measure's lab10 to itself while it watched 50 s."
       ]
     },
     {
