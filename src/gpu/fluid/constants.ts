@@ -248,6 +248,74 @@ export const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 export const LAMP_HEAT = 6;
 /*
+  The cool top of a lamp (PLAN 27f-9e): where the heat a standing plate's
+  lamp lays goes out again.
+
+  Reported (the 38f-1 lab, 192², 16 s): with the heat carried, Lava Lamp's
+  wax rose in plumes and gathered at the top, and stayed there. Nothing took
+  its heat but Heat Decay, a per-look fade on the look's clock (decayVel),
+  which on Lava Lamp's step (0.0013 of a unit against a sixtieth of a
+  second) is a time constant of about ten minutes: a risen body was still
+  light when the take ended.
+
+  In a thin gap every parcel of the liquid touches both glasses, a
+  millimetre either side, and that is where its heat goes: across the gap
+  by conduction, whose slowest mode in a slab of thickness h between two
+  walls held at one temperature dies as exp(−π²κt/h²). At the rest gap of
+  2 mm that is 2.9 s for water (κ = 1.4e-7 m²/s) and 5.8 s for a paraffin
+  wax (KAPPA_WAX below). A real lava lamp's blob, ten times wider than its
+  distance to any wall, keeps its heat for minutes and cools on the liquid
+  round it; a gap's blob cools on the glass, in seconds, which is the gap's
+  own physics and not a speed-up.
+
+  Where the glass is cold. A lava lamp's top is its cooler: the heat the
+  lamp puts in at the floor leaves through the cap and the upper glass,
+  while the lower glass stands in the lamp's own warm air, rising off the
+  base, and rides the warm liquid behind it (a 2 mm gap conducts about
+  k/(h/2) = 600 W/m²K to its glass against still air's 10 from it, so a
+  glass the air does not cool sits within a few percent of its liquid). So
+  the column holds a gradient, warm below and cool above, and that is what
+  turns a rising blob round: warmed on the floor, it keeps its heat through
+  the warm lower part and gives it up in the cool upper one. LAMP_COOL_FROM
+  is where the cool glass starts, as a share of the plate's height from the
+  floor, and it comes in over a sheet of glass's fin length,
+  √(k t / h_air) = √(1.0 W/mK × 3 mm / 10 W/m²K) ≈ 17 mm (GLASS_FIN, in the
+  plate's widths of 0.2 m), the distance over which a glass sheet carries
+  heat sideways before the air has taken it.
+
+  Measured in the lab (128², Lava Lamp's settings, 30 s; the oil's centre
+  of mass as a share of the height, the lay at 0.35):
+    no cooling (Heat Decay alone): up to 0.73 by 12 s and there at 30 s;
+    the cool glass from the lamp's own band (0.22 of the height) up: up to
+    0.46 at 6 s and down by 10 s, then the pool on the floor turned over
+    in itself and never let a blob go (its top always in the cold), 0.29
+    at 30 s;
+    from 0.35: 0.52 at 6 s, 0.28 at 16 s, 0.39 at 24 s, a shallow cycle;
+    from the half: 0.59 at 8 s, 0.31 at 18 s, 0.50 at 30 s, rising
+    again: the cycle, about 25 s round. So the half.
+
+  A shortcut, named (PLAN 27f-9g): the glass's temperature is laid by
+  height (riding the liquid below LAMP_COOL_FROM, the room's above) rather
+  than given a temperature of its own that the liquid warms and the air
+  cools (the lumped glass and air of lib/lampBoil.ts), so a lamp run for an
+  hour does not warm up as a real one does, and the cool line does not
+  move with how hot the lamp runs.
+*/
+export const KAPPA_WAX = 7e-8;       // m²/s: liquid paraffin, k ≈ 0.16 W/mK over ρc ≈ 780 kg/m³ × 2.9 kJ/kgK
+export const GLASS_FIN = 0.017 / DISH_METRES;
+export const LAMP_COOL_FROM = 0.5;
+/**
+ * How far a standing plate's glass draws a water cell's heat down in one
+ * step (S.lampCool, writeSim): the gap's slowest conduction mode, π²κ/h²,
+ * at the gap the cover holds (metres), times the step's real seconds. The
+ * heat a cell keeps is exp(−that), the wax's at its own κ (mixForce).
+ */
+export function lampCoolOf(gapMetres: number, seconds: number | undefined): number {
+  const h = Number.isFinite(gapMetres) ? Math.max(1e-5, gapMetres) : REST_GAP_METRES;
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.min(0.1, seconds as number)) : 1 / 60;
+  return (Math.PI * Math.PI * KAPPA_WATER * s) / (h * h);
+}
+/*
   Vorticity confinement's push, as a fraction of the local spin, per step.
   The Swirl dial scales it up to 2 (PLAN 27h-2; fluid.ts holds the top). It
   puts back the spin the grid smooths away, so it keeps an unforced plate
@@ -839,4 +907,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), 54..55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), the lamp's glass cooling at 54 (PLAN 27f-9e), 55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks

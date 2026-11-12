@@ -21,7 +21,7 @@ import { createServer } from 'node:http';
 import { chmodSync, createReadStream, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { extname, join, normalize, resolve } from 'node:path';
-import { networkInterfaces } from 'node:os';
+import { hostname, networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { createSocket } from 'node:dgram';
@@ -36,6 +36,8 @@ import { createAssistantGuard, readAssistantMode } from './assistant.js';
 import { serveMusicFile } from './assistantMusic.js';
 import { updatesCall } from './assistantUpdates.js';
 import { OSC_IN_BINDS, RELAY_OUTPUTS, oscInMode, outputsCall } from './assistantOutputs.js';
+import { createTvPairing, TV_KEY } from './tv-pairing.js';
+import { advertise, instanceLabel } from './bonjour.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -405,7 +407,7 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show', 'tv-code', 'tv-key', 'tv-pairing']);
 
 // ── TVs at home (PLAN 12-tv) ───────────────────────────────────────────
 // A TV plays the display's plate as a WebRTC video (src/lib/tvFeed.ts); the
@@ -426,6 +428,28 @@ const pairTv = (tv, except) => {
   sendTo(tv, { type: 'tv-show', here: display !== null });
   if (display) sendTo(display, { type: 'tv-join', id: tvIds.get(tv) });
 };
+/** A TV in: by the show key, its own key, or the laptop's Allow. */
+const admitTv = (tv) => {
+  roles.set(tv, 'tv');
+  tvIds.set(tv, `tv${++tvSeq}`);
+  pairTv(tv);
+};
+
+// Pairing by four digits (PLAN 12-tv-2, `tv-pairing.js` says why): a TV with
+// no key waits as `pairing`, hears nothing and relays nothing, while the
+// laptop's page shows its digits with Allow and No.
+const pairing = createTvPairing({ file: process.env.CHROMAGLASS_TV_FILE ?? join(HERE, '.tvs.json') });
+/** The sockets let in by a TV key, closed when the laptop forgets the paired TVs. */
+const pairedTvs = new WeakSet();
+const pairingMessage = () => ({ type: 'tv-pairing', asks: pairing.list(), paired: pairing.paired() });
+const tellPairing = () => { for (const d of clientsOf('display')) sendTo(d, pairingMessage()); };
+const refuseTv = (socket, reason) => { sendTo(socket, { type: 'denied', reason }); try { socket.close(); } catch { /* gone */ } };
+const pairingWatch = setInterval(() => {
+  const old = pairing.expire();
+  for (const s of old) refuseTv(s, 'expired');
+  if (old.length) tellPairing();
+}, 5000);
+pairingWatch.unref?.();
 
 // ── The assistant (PLAN 44b) ───────────────────────────────────────────
 // The owner's own AI assistant, joined from this Mac (`mcp/chromaglass-mcp.js`).
@@ -520,7 +544,34 @@ wss.on('connection', (socket, req) => {
         socket.close();
         return;
       }
-      if (!keyIs(message.key, role === 'display' ? DISPLAY_KEY : SHOW_KEY)) {
+      // A TV asking to pair has no key to be wrong: it waits for the
+      // laptop's Allow, and asking is never a guess.
+      if (role === 'tv' && message.pair === true && !message.key) {
+        clearTimeout(deadline);
+        const ask = pairing.ask(socket, address);
+        if (ask.replaced) refuseTv(ask.replaced, 'expired');
+        if (ask.busy) {
+          console.log('  tv refused: too many TVs asking to pair');
+          refuseTv(socket, 'busy');
+          if (ask.replaced) tellPairing();
+          return;
+        }
+        roles.set(socket, 'pairing');
+        console.log(`  a TV asks to pair: ${ask.code}`);
+        sendTo(socket, { type: 'tv-code', code: ask.code });
+        tellPairing();
+        return;
+      }
+      // A TV's own key is 128 random bits, never a guess at the show's
+      // eight digits: one this show does not hold (forgotten, or another
+      // Mac's) is told so, and the TV asks to pair again.
+      const tvKey = role === 'tv' && typeof message.key === 'string' && TV_KEY.test(message.key);
+      if (tvKey && !pairing.isTvKey(message.key)) {
+        console.log('  tv refused: a TV key this show does not hold');
+        refuseTv(socket, 'unpaired');
+        return;
+      }
+      if (!tvKey && !keyIs(message.key, role === 'display' ? DISPLAY_KEY : SHOW_KEY)) {
         // A display with no key is not a guess: it is the laptop's own page
         // opened at an address the relay does not give the display key to
         // (its Wi-Fi address, say), which the page no longer even sends
@@ -552,8 +603,8 @@ wss.on('connection', (socket, req) => {
         broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
       }
       if (role === 'tv') {
-        tvIds.set(socket, `tv${++tvSeq}`);
-        pairTv(socket);
+        if (tvKey) pairedTvs.add(socket);
+        admitTv(socket);
       }
       if (role === 'assistant') {
         socket.send(JSON.stringify({ type: 'assistant-mode', mode: assistantMode() }));
@@ -568,6 +619,8 @@ wss.on('connection', (socket, req) => {
           socket.send(linkMessage());
           // And OSC out's state, which offers its switch the same way.
           socket.send(oscOutMessage());
+          // And the TVs asking to pair, and how many are paired.
+          socket.send(JSON.stringify(pairingMessage()));
         }
         // TVs waiting with no show (the laptop's page reloaded, or the app
         // just opened) are this display's now.
@@ -578,7 +631,36 @@ wss.on('connection', (socket, req) => {
 
     const from = roles.get(socket);
     // Nothing is relayed for a socket that never said hello with the key.
-    if (from === 'unknown' || RELAY_ONLY.has(message.type)) return;
+    if (from === 'unknown' || from === 'pairing' || RELAY_ONLY.has(message.type)) return;
+    // The laptop's answer to a TV asking to pair, and its Forget. From the
+    // laptop's own page only: a phone remote is a guest's as often as not.
+    if (message.type === 'tv-allow' || message.type === 'tv-refuse' || message.type === 'tv-forget') {
+      if (from !== 'display') return;
+      if (message.type === 'tv-forget') {
+        pairing.forget();
+        console.log('  paired TVs forgotten');
+        for (const c of clientsOf('tv')) if (pairedTvs.has(c)) refuseTv(c, 'unpaired');
+      } else if (message.type === 'tv-allow') {
+        const ok = pairing.allow(String(message.id));
+        if (ok && ok.socket.readyState === 1) {
+          console.log('  a TV paired');
+          sendTo(ok.socket, { type: 'tv-key', key: ok.key });
+          pairedTvs.add(ok.socket);
+          admitTv(ok.socket);
+        }
+      } else {
+        const no = pairing.refuse(String(message.id));
+        if (no) {
+          // Counted as a wrong key: No three times locks the address out,
+          // so a stranger's asks cannot keep the laptop's screen busy.
+          if (!LOOPBACK.test(no.address ?? '')) wrongKey(no.address);
+          console.log('  a TV was refused');
+          refuseTv(no.socket, 'refused');
+        }
+      }
+      tellPairing();
+      return;
+    }
     // A TV's handshake: display → the one TV it names, TV → its own display
     // with its id added. A TV says nothing else: it only watches, and a
     // patch from it must never reach the show as a phone's would.
@@ -718,6 +800,7 @@ wss.on('connection', (socket, req) => {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
     }
+    if (role === 'pairing' && pairing.drop(socket)) tellPairing();
     if (role === 'tv') {
       const display = tvDisplay.get(socket);
       if (display) sendTo(display, { type: 'tv-leave', id: tvIds.get(socket) });
@@ -978,7 +1061,13 @@ const portTaken = (err) => {
 server.on('error', portTaken);
 wss.on('error', portTaken);
 
+// The Bonjour advert, so a TV app finds this show by itself (PLAN 12-tv-2,
+// `bonjour.js`). CHROMAGLASS_BONJOUR=0 keeps it quiet.
+let bonjour = null;
+/** Say goodbye on the network, for the Mac app's quit. */
+export const stopBonjour = () => { bonjour?.stop(); bonjour = null; };
 server.listen(PORT, '0.0.0.0', () => {
+  if (process.env.CHROMAGLASS_BONJOUR !== '0') bonjour = advertise({ port: PORT, id: pairing.showId(), name: instanceLabel(hostname()) });
   const hosts = lanAddresses();
   console.log('\n  ChromaGlass show server\n');
   console.log(`  Show key:           ${SHOW_KEY}${process.env.SHOW_KEY ? '' : '  (kept between launches; delete server/.show-key for a new one)'}`);

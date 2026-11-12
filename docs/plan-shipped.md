@@ -6222,6 +6222,34 @@ lay alone; the check skeptic's review is why each line has its control. Left ope
 settles over the lamp as a low sheet instead of cycling (27f-9e), a quarter of its colour
 leaves it in its first seconds (27f-9f), and a melt that does something (27f-9d).
 
+### 27f-9e. Lava Lamp's wax goes round (2026-11-12)
+
+With the heat carried (38f-1) Lava Lamp's wax went up in plumes with mushroom caps and gathered
+at the top, and stayed: nothing took its heat but Heat Decay, a per-look fade on the look's
+clock (decayVel), which on Lava Lamp's step (0.0013 of a unit against the lab's sixtieth) is a
+time constant of about ten minutes. Before the carry the wax hung as a low sheet over the lamp
+instead (the old story is in the 27f-9e text this replaces: the heat stayed where the lamp laid
+it, so a warmed body rose out of its own heat).
+
+In a thin gap every parcel of liquid touches both glasses a millimetre away, and that is where
+its heat goes: by conduction across the gap, whose slowest mode dies as exp(−π²κt/h²), 2.9 s for
+water and 5.8 s for a paraffin wax (KAPPA_WAX 7e-8 m²/s) at the 2 mm rest gap, on the step's real
+seconds (`lampCoolOf`, Sim slot 54, laid in `mixForce` only where a standing plate's lamp is
+on). A lamp's top is its cooler and its lower glass rides the warm liquid (600 W/m²K through the
+gap against still air's 10), so the glass takes the heat in the plate's upper half
+(`LAMP_COOL_FROM` 0.5), coming in over a glass sheet's fin length (`GLASS_FIN`, 17 mm). Measured in
+the lab (128², 30 s, the oil's centre of mass as a share of the height): no cooling, up to 0.73
+and there; cool glass from the lamp's own band up, one fall and then the floor's pool turned over
+in itself, its top always in the cold (0.29 at 30 s); from 0.35 of the height a shallow cycle;
+from the half, 0.59 at 8 s, 0.31 at 19 s, 0.45 at 26 s. At 192² on the look's own clock (dt
+0.00133): 0.56 at 6 s, 0.28 at 14 s, 0.44 at 22 s, 0.31 at 30 s, two falls in half a minute.
+The glass laid by height is a shortcut, named as 27f-9g.
+
+`npm run lavacycle` (Measure `lab9`, about fifteen minutes on SwiftShader): the wax rises past
+half the height and is 0.15 below its highest by 16 s where a lab built without the cooling stays
+within 0.05 of its own (0.73 at 16 s); it rises again by 0.06 from its lowest by 26 s; and the
+rate is π²κ/h² at the rest gap on real seconds. Not yet seen: the Mac's film of the minute.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
@@ -13326,6 +13354,34 @@ Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setli
 `cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
 the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
 
+## 12-ctl-3. The Android app (2026-11-11)
+
+The owner asked for the phone apps to be the Mac app's controller (12-ctl), and the
+Android app first planned as a Trusted Web Activity could not be: a TWA is the https
+site in Chrome, and an https page cannot open the plain ws:// socket the laptop's
+remote server listens on. So Android is Capacitor too, as the iPhone is: `android/`
+beside `ios/`, the same bundled build in the system WebView, applicationId
+`app.chromaglass`, minSdk 24. The manifest allows cleartext and the config mixed
+content, so the remote reaches a laptop on the show network; it asks for the
+microphone and camera (both optional features), keeps the screen on
+(`FLAG_KEEP_SCREEN_ON`, since the WebView has no Wake Lock) and hides the system bars,
+which a swipe brings back. The window is black from the first frame, so no white
+flash comes before the page.
+
+Android's WebView has WebGPU on fewer phones than Chrome does, so a phone without it
+does not get the website's list of browsers (the person is not in a browser) but
+`NeedsWebGpu.tsx`'s app form: a sentence, **Open the show in Chrome** (a local plugin,
+`OpenInChromePlugin.java`, sends https only, to Chrome, or to the default browser if
+Chrome is missing) and **Be the laptop's remote**, which needs no GPU. The iPhone app
+never gets it. `appLink.ts` gained `isAndroidApp()`, `SITE_SHOW_URL` and
+`openInChrome()`; the check hook `__cgOpenExternal` lets `controller` see the call.
+
+`android.yml` builds an unsigned debug APK on every PR that touches the shell and
+keeps it as the run's artifact, with no secrets; signing, the upload key and the
+Play upload are 12-ctl-ship. `npm run android` builds, syncs and opens Android Studio.
+`npm run controller` dropped `android` and `nogpu` from its owed lines (25/25, owed
+`scan` only).
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,
@@ -13376,6 +13432,51 @@ the laptop, films when the laptop goes and live again when it comes, the last TV
 gone stopping the stage, a frozen plate after it, and the phone. By hand on the cloud:
 the real app on a software GPU feeding a TV page in a second browser over the
 network address, the plate on the TV.
+
+## 12-tv-2. The Android TV app finds the Mac and pairs by four digits (2026-11-09)
+
+Asked: the owner's TV app for Home and Pro (2026-11-08), route 2: a receiver of
+the Mac's stream (12-tv-1). This PR is the app and the two things it needs from
+the show.
+
+- **The app** (`androidtv/`): one Activity in plain Java, no libraries. NsdManager
+  looks for `_chromaglass._tcp`; the Mac played last opens as soon as it is
+  seen, else the only one after a three-second look, else a list for the
+  remote's arrows. A WebView then plays `/tv?app=android` (autoplay without a
+  gesture, screen kept on, held to the Mac's origin). The `ChromaglassTv` bridge
+  keeps the key the Mac hands over by the show's id from the advert, not by
+  address. Back returns to the list. Java rather than Kotlin, Capacitor or a
+  TWA: the shell is a WebView and a service lookup, and a TWA could not open
+  `ws://` on the LAN. Its own workflow (`androidtv.yml`, as `ios.yml` is): build,
+  9 unit tests of `Shows.java`, Android lint, the debug APK kept 14 days. Lint
+  found `URLEncoder.encode(String, Charset)`, API 33, which would have crashed
+  every TV older than Android 13: the key's pattern needs no encoding.
+- **The advert** (`server/bonjour.js`): a small mDNS responder in the show
+  server itself rather than `desktop/main.js` as planned, so `npm run remote` on
+  any computer advertises too and the check asks the same code. PTR, SRV, TXT
+  (`v`, `id`, `path`) and an A record per LAN address; legacy unicast answered;
+  announced three times at start, goodbye on the Mac app's quit. The SRV names
+  its own host (`chromaglass-<id>.local`), never the Mac's, which mDNSResponder
+  defends. The show key is never in it.
+- **Pairing** (`server/tv-pairing.js`, the relay's `pairing` role): a `tv` hello
+  with `pair` and no key waits, relaying nothing; the relay picks four digits
+  (unique among asks, so a stranger cannot ask with the real TV's), the laptop's
+  page shows a card at the top of its screen and rows in Cast → TV at home;
+  Allow hands that TV `tv-<32 hex>`, kept in `CHROMAGLASS_TV_FILE` (the Mac
+  app's `tvs.json`, mode 600); No counts as a wrong key (three lock the address
+  out); an unknown TV key is `unpaired`, never a lockout, and the page pairs
+  again; Forget closes every paired TV. Four asks at most, two minutes each,
+  one per address.
+- **The page**: `/tv` with no key pairs (big digits over the films); keeps the
+  key in localStorage and the bridge (`lib/tvKey.ts`); a forgotten key in the
+  URL is dropped and the page pairs again. App.tsx carries the card in no more
+  bytes than before (its file is over the size limit).
+
+Measured: `npm run tvpair` 52/52 (the advert asked both ways, pairing, kept
+keys across a restart, unknown keys, Forget, No and the lockout, the built page,
+the card laid out with the built stylesheet at laptop and phone width, the
+digits on a phone); `npm run tv` 33/33 unchanged; `./gradlew assembleDebug
+testDebugUnitTest lintDebug` green, APK 159 KB. Not yet seen: a real TV (12-tv-2c).
 
 ## 45a-2. Selling the moiré pack to Home (2026-11-07)
 
