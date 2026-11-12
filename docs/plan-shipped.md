@@ -6264,8 +6264,19 @@ gravity's weight on the liquids' density differences, the wax's weight and the h
 alike, so lowering it lowers the Bond number without changing the cycle's balance: 0.7 → 0.2
 grows ℓc by √3.5, and Oil Tension goes to its top, 1. And a lamp's wax is a lightly dyed paraffin
 the bulb shines through, so it glows: the wax was laid with Clock Glass's body dye (2.6), which
-backlit absorbs nearly everything; LAVA_DYE is 0.9 now. The bulb behind is an incandescent warm
-white (ledColor #ffc457, was #b58c5c), and Exposure 0.55 (was 0.46).
+backlit absorbs nearly everything; LAVA_DYE is 0.55 now (0.9 at first, which the Mac filmed
+still darker than the ground). The bulb behind is an incandescent warm white (ledColor #ffc457,
+was #b58c5c), and Exposure 0.55 (was 0.46).
+
+The Mac's first film of that (60 s, the band playing) opened on the fat blobs, a teardrop and an
+upside-down U rising off a glowing gold ground, and by 17 s they were beads of red and faint
+smears that never gathered again; the film before it was the same story as a peach haze. The lab
+had none of that because the lab runs no app hands: Evolve (Evolve Speed 0.30, set in 28i-2 to
+keep the wax moving before the lamp went round on its own) pours colour and breathes air into
+the plate, and the music's hands (Sound Drive 0.55) lay bursts, sparks and streams of dye and
+flow on the beat, and Plate Rock tips it. A lamp is a sealed bottle on a table: none of that
+reaches its wax. All three are 0 on the look now; the band reaches it through the wax's heat,
+the bass on Buoyancy, as the look's own patch comment always said.
 
 Lab, 192², the look's own step, the oil's centre of mass as a share of the height: at 0.7 it
 went up to 0.57 at 8 s, down to 0.31 at 16 s and up to 0.40 at 24 s; at 0.2 up to 0.55 at 8 s,

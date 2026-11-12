@@ -2186,7 +2186,14 @@ export const PRESETS: Preset[] = [
       buoyancy: 0.1,
       advection: 0.48,
       damping: 0.988,
-      automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
+      /*
+        No Evolve (PLAN 27f-9h). 28i-2 set 0.30 to keep the wax moving before
+        the lamp went round on its own (27f-9e); its hand pours colour and
+        breathes air into the plate, which no sealed lamp has, and on the Mac
+        film (2026-11-12) the lamp's fat blobs were beads and smears of
+        poured red by 17 s. The cycle is the motion now.
+      */
+      automateRate: 0,
       platePressure: 0.28,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -2195,7 +2202,14 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.001,
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
-      audioImpact: 0.55,
+      /*
+        The music's hands off (PLAN 27f-9h): at 0.55 its bursts, sparks and
+        streams laid dye and kicks of flow into the sealed lamp and tore the
+        wax into beads on the Mac film. The band reaches the lamp as the
+        look's own comment below says it should, through the wax's heat
+        (sceneMappings: the bass on Buoyancy) and the colours' turn.
+      */
+      audioImpact: 0,
       /*
         No stirring (it was 0.42, which with no music is 0.51 of the hand's
         speed, PLAN 27c): a lamp is not stirred, its liquid moves by the wax's
@@ -2217,7 +2231,7 @@ export const PRESETS: Preset[] = [
       */
       exposure: 0.55,
       glossiness: 0.15,
-      plateRock: 0.25,
+      plateRock: 0,              // 27f-9h: a lamp stands still on its table; the rock on a standing plate also goes over the open rim (27f-9a)
       beatSqueeze: 0.0,
       dyeBudget: 0.65,
       bubbles: 0,

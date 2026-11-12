@@ -229,7 +229,8 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     - **27f-9h. Lava Lamp looks like a lit lamp (shipped 2026-11-12; story in
       docs/plan-shipped.md §27f-9h).** The wax's Bond number brought toward a real lamp's
       (Dye Weight 0.7 → 0.2, Oil Tension 1), so its blobs are fat and round; the wax dyed
-      lightly (LAVA_DYE 0.9) so the bulb shines through it; the bulb a warm white. The owner's
+      lightly (LAVA_DYE 0.55) so the bulb shines through it; the bulb a warm white; and nothing
+      poured or kicked into the sealed lamp (Evolve, Sound Drive and Plate Rock at 0). The owner's
       verdict on the Mac film decides whether the look stays (2026-11-12: "one last try").
     - **27f-9i, open. The wax's capillary length is still a third of a real lamp's.** At Dye
       Weight 0.2 the wax's ℓc is about 5.6 mm against a real lamp's 1.5 cm; lower still and the

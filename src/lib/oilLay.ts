@@ -213,10 +213,11 @@ export const LAVA_BODIES: readonly OilBody[] = [
   was Clock Glass's body dye (BODY_DYE, 2.6), and backlit through the gap
   that much absorbs nearly all of the lamp: the wax filmed as near-black
   blobs. A lamp's wax is a lightly dyed paraffin that the bulb shines
-  through, so it glows its colour; a third of the body dye is that, in the
-  lab a bright crimson against the bulb's gold.
+  through, so it glows its colour. 0.9 still filmed darker than the ground
+  on the Mac (2026-11-12); a fifth of the body dye, in the lab a bright
+  crimson against the bulb's gold.
 */
-export const LAVA_DYE = 0.9;
+export const LAVA_DYE = 0.55;
 
 /** One cell of Lava Lamp's lay: the wax's oil (flat to its edge, a cell of antialiasing) and its dye; nothing in the liquid round it. */
 export function lavaLampCell(x: number, y: number, n: number): { oil: number; dye: number } {
