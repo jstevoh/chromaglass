@@ -12,7 +12,7 @@
 # and add the Worker's host to Firebase Authentication's authorized domains, so its
 # sign-in page can open Google's and Apple's sign-in.
 name = "chromaglass-tunnel"
-main = "server/tunnel-worker.js"
+main = "mcp/tunnel-worker.js"
 compatibility_date = "2026-07-01"
 
 # One object, `idFromName('owner')`, holds the Mac's socket, the sign-ins and the

@@ -492,7 +492,7 @@ through cords and preset patches, and the plate shader is untouched.
   the MCP server inside the app. Pass: a `desktop` line, the tunnel up with the app and
   down without it.
 - **44h-3. ChatGPT and the Gemini app.** *(XS each, the owner's call.)* Each is one more
-  callback in `REDIRECTS` (`server/tunnel-worker.js`), read from that vendor's own pages
+  callback in `REDIRECTS` (`mcp/tunnel-worker.js`), read from that vendor's own pages
   first, and its line in `npm run relay`. Not added: the owner asked for Claude. Claude
   Code's loopback callback was taken out in review (any program on the approving computer
   could listen on it); Claude Code on the Mac has the local server.

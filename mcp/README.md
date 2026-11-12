@@ -1,7 +1,7 @@
 # mcp
 
-The owner's two Model Context Protocol servers over stdio, each run by a local
-assistant on the owner's Mac. `chromaglass-mcp.js` is the assistant link (PLAN 44c): it
+The owner's Model Context Protocol servers: two over stdio, each run by a local
+assistant on the owner's Mac, and the relay Worker that carries the show's to claude.ai. `chromaglass-mcp.js` is the assistant link (PLAN 44c): it
 joins the show server as its `assistant` role. `youtube-mcp.js` is the owner's YouTube
 channel (PLAN 44i). A private tool: not shipped inside the
 Mac app, and not named on any page a visitor or customer reads.
@@ -16,9 +16,10 @@ Mac app, and not named on any page a visitor or customer reads.
   notes are a file outside the repo (`CHROMAGLASS_ASSISTANT_NOTES`, default
   `~/.chromaglass/assistant-notes.md`).
 
+- `tunnel-worker.js`: the owner's assistant over the internet (PLAN 44h): the remote MCP address claude.ai signs in to (OAuth 2.1 with DCR and PKCE S256, only Claude's hosted callbacks, only `OWNER_UID`'s Firebase sign-in made on its page, twenty registrations or pages an address per ten minutes) and the Durable Object `ShowTunnel` the Mac's `mcp/tunnel.js` dials out to; a pipe, every request answered on the Mac. Exports `REDIRECTS`, `redirectAllowed`, `sha256Hex`, `OFFLINE` and its lifetimes. A Worker (`wrangler.tunnel.toml`), kept here with the owner's other private servers, not in `server/`: no visitor's data reaches it (it admits only the owner), so the privacy page, which `npm run privacy` holds to `server/` and `src/`, does not name it, as it does not name the YouTube server's Google; imports `../server/firebase-token.js`.
 - `tunnel.js`: the same server for claude.ai on the web and the phone (PLAN 44h):
   `node chromaglass-mcp.js tunnel` holds one outbound WebSocket to the owner's relay
-  Worker (`server/tunnel-worker.js`) and answers each request it brings with the stdio
+  Worker (`mcp/tunnel-worker.js`) and answers each request it brings with the stdio
   server's own `onRequest(m, write)`, so the tools and the guard are the local ones. Open
   only while the show admits the assistant (the app running, the switch on); `tunnel key`
   makes the Mac's key (`~/.chromaglass/tunnel/key`, 600; `CHROMAGLASS_TUNNEL_DIR`) and
@@ -44,7 +45,7 @@ Mac app, and not named on any page a visitor or customer reads.
 
 - Decides nothing: every rule is the show server's guard (`server/assistant.js`), and a
   refusal is passed on in the guard's words.
-- Imports `ROOM_KEYS` from `server/assistant.js`; `server/` never imports this folder.
+- Imports `ROOM_KEYS` from `server/assistant.js` (and the relay Worker `verifyFirebaseToken` from `server/firebase-token.js`); `server/` never imports this folder.
 - Over stdio, writes nothing to stdout but protocol; logs to stderr. (`tunnel key`, `status` and `revoke` print their answer.)
 - Dormant unless the owner's switch is on: `CHROMAGLASS_ASSISTANT`, or one word (off,
   suggest, play, full) in the file the show server reads (`CHROMAGLASS_ASSISTANT_FILE`;

@@ -2,7 +2,7 @@
 /**
  * The owner's assistant over the internet (PLAN 44h): `npm run relay`.
  *
- * What it holds. The relay Worker (`server/tunnel-worker.js`) run in Node,
+ * What it holds. The relay Worker (`mcp/tunnel-worker.js`) run in Node,
  * signed in to and called the way claude.ai drives a remote connector, with the
  * Mac's end (`node mcp/chromaglass-mcp.js tunnel`) dialled out to it, the real
  * show server behind that, and a stand-in display that echoes what reaches it.
@@ -253,7 +253,7 @@ async function scenario(serverDir, mcpDir, showPort) {
     const hash = /\b([0-9a-f]{64})\b/.exec(keyOut)?.[1] ?? '';
     const keyFile = join(dir, 'tunnel', 'key');
     const rawKey = readFileSync(keyFile, 'utf8').trim();
-    const relay = await startRelay(join(serverDir, 'tunnel-worker.js'), relayPort, hash);
+    const relay = await startRelay(join(mcpDir, 'tunnel-worker.js'), relayPort, hash);
     const mint = (uid, key = google.privateKey, signedInAgo = 0) => idToken(uid, key, relay.env.CLOCK(), signedInAgo);
     cleanup.push(() => relay.close());
     const tun = mac.run();
@@ -454,7 +454,7 @@ async function scenario(serverDir, mcpDir, showPort) {
 
 // ── The mutants: each rule removed from a copy ─────────────────────────
 
-const W = 'server/tunnel-worker.js';
+const W = 'mcp/tunnel-worker.js';
 const MUTANTS = [
   { rule: 'callbacks', file: W, find: "typeof u === 'string' && REDIRECTS.includes(u)", to: 'true', line: 'a client with any callback but Claude\'s is refused' },
   { rule: 'owner', file: W, find: "if (who.uid !== owner) return", to: 'if (false) return', line: 'another account, and the owner\'s uid in a token Google did not sign, are refused' },

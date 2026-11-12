@@ -12845,7 +12845,7 @@ and 14 of 14 mutants (one review pass added: an update keeping the Studio-set st
 Asked 2026-11-07 ("internet control too", owner-only, his account) and started on the
 owner's word 2026-11-12. claude.ai on the web and the phone reaches only an `https://`
 MCP server on the public internet, and Claude's own enterprise tunnels are not offered on
-the owner's plan, so it is ours: `server/tunnel-worker.js`, a Cloudflare Worker with one
+the owner's plan, so it is ours: `mcp/tunnel-worker.js`, a Cloudflare Worker with one
 Durable Object (`wrangler.tunnel.toml`, SQLite-backed, inside the free plan for one
 person), and the Mac's end, `node mcp/chromaglass-mcp.js tunnel` (`mcp/tunnel.js`), which
 dials out to it, so nothing on the Mac listens on the internet. The Worker is a pipe,

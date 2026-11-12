@@ -5,7 +5,7 @@
  * claude.ai on the web and the phone reaches only an address on the public
  * internet, and the show runs on the owner's Mac behind whatever network it is
  * on. So the Mac dials out: this holds one WebSocket to the owner's Worker
- * (`server/tunnel-worker.js`), takes the MCP requests claude.ai sends it, and
+ * (`mcp/tunnel-worker.js`), takes the MCP requests claude.ai sends it, and
  * answers each with the very `onRequest` that answers Claude Desktop over
  * stdio, so every tool, its guide, and the show server's guard behind it are
  * the local ones. Nothing on the Mac listens on the internet, and the Worker

@@ -85,7 +85,7 @@
  * (default `chromaglass`); `GOOGLE_JWKS` only in the check. The binding
  * `TUNNEL` is this file's `ShowTunnel` (wrangler.tunnel.toml).
  */
-import { verifyFirebaseToken } from './firebase-token.js';
+import { verifyFirebaseToken } from '../server/firebase-token.js';
 
 /** Where a code may be sent: Claude's hosted apps (claude.com is the address Claude says it may move to). */
 export const REDIRECTS = ['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'];

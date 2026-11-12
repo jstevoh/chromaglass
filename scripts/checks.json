@@ -1981,7 +1981,7 @@
       "shard": "browser2",
       "run": "npm run relay",
       "why": [
-        "The relay Worker (PLAN 44h; scripts/relay.mjs): server/tunnel-worker.js in Node,",
+        "The relay Worker (PLAN 44h; scripts/relay.mjs): mcp/tunnel-worker.js in Node,",
         "signed in to and called as claude.ai drives a remote connector (a 401 naming the",
         "metadata, DCR, PKCE S256, the code, refresh), the Mac's end (chromaglass-mcp.js",
         "tunnel) dialled out to it, the real show server and a stand-in display behind. Only",
