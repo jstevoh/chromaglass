@@ -2,6 +2,20 @@ plugins {
     id 'com.android.application'
 }
 
+// The release's upload signing and version (PLAN 12-tv-2b). Play App Signing
+// holds the key the TVs check; what is uploaded is signed with the owner's
+// upload key, which never enters the repository: the release job in
+// androidtv.yml writes it from the ANDROID_UPLOAD_KEYSTORE secret to a file
+// outside the tree and names that file here, with its password in the
+// environment. Made by scripts/android-upload-key.sh on the owner's Mac as a
+// PKCS#12 file (openssl, which every Mac has; keytool needs a Java the Mac may
+// not have), one password for the store and the key. With no key named, the
+// release bundle is built unsigned, which is what a pull request's run checks.
+def uploadStore = System.getenv('ANDROID_UPLOAD_STORE_FILE')
+// Play refuses a version code it has seen, so each upload needs a larger one:
+// the workflow's run number, which only ever grows. A local build is 1.
+def buildNumber = (System.getenv('ANDROIDTV_VERSION_CODE') ?: '1') as int
+
 android {
     namespace 'app.chromaglass.tv'
     compileSdk 36
@@ -13,13 +27,26 @@ android {
         // page's WebRTC is the same on each.
         minSdk 24
         targetSdk 36
-        versionCode 1
-        versionName '0.1.0'
+        versionCode buildNumber
+        versionName "1.0.${buildNumber}"
+    }
+
+    signingConfigs {
+        upload {
+            if (uploadStore) {
+                storeFile file(uploadStore)
+                storeType 'pkcs12'
+                storePassword System.getenv('ANDROID_UPLOAD_PASSWORD')
+                keyAlias 'upload'
+                keyPassword System.getenv('ANDROID_UPLOAD_PASSWORD')
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            if (uploadStore) signingConfig signingConfigs.upload
         }
     }
 

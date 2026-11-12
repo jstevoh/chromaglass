@@ -167,7 +167,7 @@ feature ships its phone version is what keeps them whole.
 - **12-link** *(later, US only)*: a "Get the Mac app" link from the iPhone app to our
   own checkout, once the court has set what Apple may charge on linked-out sales.
   Outside the US the app names no price and links to no purchase.
-- **12-play-org** *(owner)*: the Play Console account as the LLC (organization,
+- **12-play-org** *(owner; cleared Google's review 2026-11-12)*: the Play Console account as the LLC (organization,
   D-U-N-S number), not a personal one, so publishing does not wait on the 14-day
   closed test. Before it, step 1's Android smoke test. Unchecked: the iPhone app's
   laptop remote leans on the app's own origin (4a), and a TWA is the https site,
@@ -290,25 +290,50 @@ Pro on the laptop, three TVs at most; `npm run tv`.
 What route 2 still needs, found while building 12-tv-1:
 
 - **12-tv-2: the Android TV app, the Bonjour advert and pairing by four digits
-  (shipped, this PR; story in `docs/plan-shipped.md` §12-tv-2).** `androidtv/`
+  (shipped 2026-11-12, merged with 12-tv-2b after #768 sat green unmerged; story in
+  `docs/plan-shipped.md` §12-tv-2).** `androidtv/`
   (plain Java, a WebView on `/tv` plus NsdManager; the `Android TV app` workflow
   builds, unit-tests and lints it and keeps the debug APK); `server/bonjour.js`
   (`_chromaglass._tcp` from the show server itself, so `npm run remote` and the
   Mac app both advertise); `server/tv-pairing.js` (four digits, Allow and No on
   the laptop, a key per TV, Forget); `npm run tvpair`.
-- **12-tv-2b: the Play listing (S, after 12-play-org).** Upload a signed release
-  bundle (Play App Signing, the same secrets and upload job as 12-ctl-ship),
-  the TV store listing (no price, "needs ChromaGlass on a Mac" plainly said),
-  TV screenshots at 1920 x 1080, and a banner made for 320 x 180 rather than the
-  cut from the social card in `androidtv/.../drawable-xhdpi/banner.png`, which
-  shows the card's glow as a lighter band. The Play org account is in Google's
-  review (2026-11-09).
+- **12-tv-2b: the Play listing (S; the repository's half built 2026-11-12, the
+  owner's half in Play Console open).** The Play org account cleared Google's
+  review on 2026-11-12. Built: the signed release bundle (`bundleRelease`, signed
+  by the owner's upload key through the `ANDROID_UPLOAD_KEYSTORE` and
+  `ANDROID_UPLOAD_PASSWORD` secrets, version code the run number; Actions →
+  Android TV app → Run workflow with *release* ticked, main only, artifact
+  `chromaglass-tv-release`); `scripts/android-upload-key.sh`, which makes the
+  upload key on the owner's Mac with its own openssl (PKCS#12, password in the
+  Keychain) and sets both secrets, and which 12-ctl-ship can share; the TV listing
+  in `docs/store-listings.md` (no price, no tier, "needs the ChromaGlass app on a
+  Mac" said plainly; data safety: nothing collected; the reviewer's App access
+  text); the 1280 x 720 TV banner and the 320 x 180 launcher banner drawn by
+  `npm run brand` (`tvBanner`, replacing the cut from the social card); six TV
+  screenshots at 1920 x 1080 from the press stills. Found and fixed: with no Mac on
+  the network the app showed only "Looking for the show…", which is all Play's TV
+  review (a real TV, no Mac) would have seen, and a reason Play turns TV apps away;
+  the first screen now has **Watch a sample film**, the press clips played in a
+  `VideoView` with their CC BY music credit on screen, while it keeps looking (a
+  Mac that turns up takes over). *Measure:* `presskit` (the TV listing's limits and
+  no selling words, the banners' sizes with no alpha, the screenshots' sizes, the
+  sample clips served by the site); the workflow's `bundleRelease` on every PR and
+  its unit tests (every clip carries its credit). Owed by the owner: the upload key
+  (one command), then the Play Console steps (create the app, the forms, the TV
+  form factor, the first upload by hand).
+- **12-tv-2e: uploads to Play from CI (S, after the first upload).** Play's first
+  bundle for an app must go up by hand in Play Console; after that the release job
+  could send each bundle to the internal track itself with the Play Developer API
+  (a Google Cloud service account the owner adds in Play Console → Users and
+  permissions, its JSON as a secret). Shared with 12-ctl-ship's upload job.
 - **12-tv-2c: judged on a real TV (S, the owner's eyes).** Side-load the
   workflow's APK on a Google TV, pair it with the Mac app, watch an evening.
   Unseen so far: NsdManager against the advert on a real network, the advert
   beside the Mac's own mDNSResponder (both on udp 5353; it works on Linux in
   the check, and Node Bonjour libraries share the port the same way on macOS),
-  and the WebView's WebRTC decode on a TV box. `docs/judging.md` §12-tv-2.
+  and the WebView's WebRTC decode on a TV box. `docs/judging.md` §125; the
+  sample film (12-tv-2b) on the TV too: Back returns to the list, and a Mac
+  starting its show replaces it.
 - **12-tv-2d: the newer NSD calls (S).** `resolveService` is deprecated from
   Android 14 for `registerServiceInfoCallback`, which also follows a Mac whose
   address changes while the TV watches; the app uses the old call on every

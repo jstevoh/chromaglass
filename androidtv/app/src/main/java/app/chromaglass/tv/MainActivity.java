@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
@@ -26,6 +27,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.VideoView;
 
 import java.net.InetAddress;
 import java.util.ArrayDeque;
@@ -55,7 +57,11 @@ import java.util.Map;
  * through `ChromaglassTv.paired`, kept by the show's id from the advert, not
  * by its address, which a router may change any evening.
  *
- * Back from the show returns to the list; Back from the list leaves the app.
+ * With no Mac to be found, "Watch a sample film" plays the press page's clips
+ * (Sample.java) while the app keeps looking; a Mac that turns up takes over.
+ *
+ * Back from the show or the sample returns to the list; Back from the list
+ * leaves the app.
  */
 public class MainActivity extends Activity {
     static final String SERVICE_TYPE = "_chromaglass._tcp";
@@ -79,6 +85,11 @@ public class MainActivity extends Activity {
     private TextView status;
     private WebView web;
     private Shows.Show playing;
+    private Button sampleButton;
+    private FrameLayout sampleLayer;
+    private VideoView sampleVideo;
+    private TextView sampleCredit;
+    private int sampleAt = 0;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -98,6 +109,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onPause() {
+        stopSample(null);
         stopLooking();
         super.onPause();
     }
@@ -141,9 +153,22 @@ public class MainActivity extends Activity {
         list.setGravity(Gravity.CENTER_HORIZONTAL);
         picker.addView(list, new LinearLayout.LayoutParams(dp(520), LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        sampleButton = new Button(this);
+        sampleButton.setText("Watch a sample film");
+        sampleButton.setAllCaps(false);
+        sampleButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        sampleButton.setTextColor(Color.argb(220, 255, 255, 255));
+        sampleButton.setFocusable(true);
+        sampleButton.setBackground(rowBackground());
+        sampleButton.setOnClickListener(v -> startSample());
+        LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(dp(520), dp(56));
+        slp.topMargin = dp(12);
+        picker.addView(sampleButton, slp);
+
         TextView help = new TextView(this);
         help.setText("Open the ChromaGlass app on your Mac, on the same Wi-Fi as this TV, and start the show. "
-                + "The first time, the TV shows four digits: press Allow on the Mac.");
+                + "The first time, the TV shows four digits: press Allow on the Mac. "
+                + "No Mac yet? The sample film shows what the TV will play.");
         help.setTextColor(Color.argb(140, 255, 255, 255));
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         help.setGravity(Gravity.CENTER);
@@ -172,6 +197,7 @@ public class MainActivity extends Activity {
         }
         if (found.isEmpty()) {
             status.setText("Looking for the show on this network…");
+            sampleButton.requestFocus();
         } else {
             status.setText(found.size() == 1 ? "Found the show:" : "Pick the show to play:");
             list.getChildAt(0).requestFocus();
@@ -268,6 +294,8 @@ public class MainActivity extends Activity {
 
     @SuppressLint({ "SetJavaScriptEnabled", "AddJavascriptInterface" })
     private void open(Shows.Show show) {
+        // A Mac found while the sample plays takes over: the show is what the sample stood in for.
+        stopSample(null);
         stopLooking();
         playing = show;
         prefs.edit().putString("last", show.id).apply();
@@ -313,6 +341,10 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_BACK && sampleLayer != null) {
+            stopSample(null);
+            return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && playing != null) {
             // Back from the show is the list, and forgetting "last" so the
             // list stays up long enough to pick another Mac.
@@ -321,6 +353,63 @@ public class MainActivity extends Activity {
             return true;
         }
         return super.onKeyDown(keyCode, event);
+    }
+
+    // ── The sample film ─────────────────────────────────────────────────
+
+    /**
+     * The press clips, one after another until Back, over the list. Looking
+     * goes on underneath (discovery is not stopped), so a Mac starting its
+     * show replaces the sample through open(). VideoView rather than the
+     * WebView: the WebView only ever loads the Mac's own page (open()), and
+     * the platform player plays an H.264 file on every TV this app runs on.
+     */
+    private void startSample() {
+        if (sampleLayer != null || playing != null) return;
+        sampleLayer = new FrameLayout(this);
+        sampleLayer.setBackgroundColor(Color.BLACK);
+        sampleVideo = new VideoView(this);
+        sampleLayer.addView(sampleVideo, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        sampleCredit = new TextView(this);
+        sampleCredit.setTextColor(Color.argb(200, 255, 255, 255));
+        sampleCredit.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        sampleCredit.setShadowLayer(dp(3), 0, dp(1), Color.BLACK);
+        sampleCredit.setPadding(dp(32), 0, dp(32), dp(24));
+        sampleLayer.addView(sampleCredit, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START));
+        sampleVideo.setOnCompletionListener(mp -> playClip(Sample.next(sampleAt)));
+        sampleVideo.setOnErrorListener((mp, what, extra) -> {
+            stopSample("Could not play the sample film. Is this TV on the internet?");
+            return true;
+        });
+        root.addView(sampleLayer, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        picker.setVisibility(View.GONE);
+        playClip(sampleAt);
+    }
+
+    private void playClip(int i) {
+        if (sampleVideo == null) return;
+        sampleAt = i;
+        Sample.Clip c = Sample.CLIPS[i];
+        sampleCredit.setText("Sample film: " + c.look + " \u00b7 " + c.credit
+                + "\nBack to look for your Mac");
+        sampleVideo.setVideoURI(Uri.parse(c.url));
+        sampleVideo.setOnPreparedListener(MediaPlayer::start);
+    }
+
+    private void stopSample(String says) {
+        if (sampleLayer == null) return;
+        sampleVideo.stopPlayback();
+        root.removeView(sampleLayer);
+        sampleLayer = null;
+        sampleVideo = null;
+        sampleCredit = null;
+        if (playing == null) {
+            picker.setVisibility(View.VISIBLE);
+            showList();
+            if (says != null) status.setText(says);
+        }
     }
 
     @SuppressWarnings("deprecation")
