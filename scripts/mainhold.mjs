@@ -147,10 +147,11 @@ export async function fetchRetrying(doFetch, url, init, sleep = sleeper) {
   }
 }
 
-async function call(url, init = {}) {
+// `doFetch` is `fetch` except in the self-test.
+export async function call(url, init = {}, doFetch = fetch) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('needs GITHUB_TOKEN (or --runs <file> to read a saved list)');
-  const res = await fetchRetrying(fetch, url, {
+  const res = await fetchRetrying(doFetch, url, {
     ...init,
     headers: {
       authorization: `Bearer ${token}`,
@@ -381,6 +382,7 @@ async function selfTest() {
   const answer = (status, body = '{}') => ({ status, ok: status < 400, text: async () => body, json: async () => JSON.parse(body) });
   const quiet = console.error;
   console.error = () => {};
+  try {
   const tries = async (...results) => {
     const log = { calls: 0, waited: [] };
     const doFetch = async () => { const x = results[Math.min(log.calls++, results.length - 1)]; if (x instanceof Error) throw x; return x; };
@@ -421,7 +423,17 @@ async function selfTest() {
     throw new Error('HTTP 502');
   });
   check(lostOne.length === 0 && !holdFrom(lostOne).held, 'with none readable nothing is held and nothing is invented', `${lostOne.length} read`);
-  console.error = quiet;
+  // The wiring itself: call() must go through the retry, not a bare fetch.
+  const had = process.env.GITHUB_TOKEN;
+  process.env.GITHUB_TOKEN = 'test';
+  let wired = 0;
+  const flaky = async () => (++wired === 1 ? answer(502) : answer(200, '{"jobs":[]}'));
+  const viaCall = await Promise.race([call('https://x/y', {}, flaky), sleeper(RETRY_WAITS[0] + 2000).then(() => 'slow')]).catch((e) => e.message);
+  if (had === undefined) delete process.env.GITHUB_TOKEN; else process.env.GITHUB_TOKEN = had;
+  check(viaCall?.jobs && wired === 2, 'call() itself reads the 200 that follows a 502', `${wired} calls, ${JSON.stringify(viaCall)}`);
+  } finally {
+    console.error = quiet;
+  }
 
   console.log(failed ? `\n${failed} failed` : '\nall ok');
   process.exit(failed ? 1 : 0);
