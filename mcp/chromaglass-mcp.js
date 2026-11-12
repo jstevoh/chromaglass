@@ -561,11 +561,14 @@ async function call(name, a = {}) {
 
 // ── The protocol ───────────────────────────────────────────────────────
 
-const write = (m) => process.stdout.write(`${JSON.stringify(m)}\n`);
+const writeOut = (m) => process.stdout.write(`${JSON.stringify(m)}\n`);
 // The client gone (its end of the pipe closed): nothing left to answer.
 process.stdout.on('error', () => process.exit(0));
 
-async function onRequest(m) {
+/* One request, answered through `write`: stdout here, and the tunnel's socket
+   in tunnel mode (PLAN 44h, ./tunnel.js), so claude.ai over the internet is
+   answered by exactly this code and these tools. */
+async function onRequest(m, write = writeOut) {
   const { id, method, params } = m;
   const reply = (result) => { if (id !== undefined) write({ jsonrpc: '2.0', id, result }); };
   const error = (code, message) => { if (id !== undefined) write({ jsonrpc: '2.0', id, error: { code, message } }); };
@@ -594,12 +597,20 @@ async function onRequest(m) {
   }
 }
 
+/* `tunnel` (and `tunnel key`, `tunnel status`, `tunnel revoke`): the same
+   server, answering claude.ai through the owner's relay (PLAN 44h) instead of
+   stdio. Nothing below the tunnel reads stdin. */
+if (process.argv[2] === 'tunnel') {
+  const { tunnelMain } = await import('./tunnel.js');
+  await tunnelMain(process.argv.slice(3), { onRequest, link, linked: () => socket?.readyState === 1, log });
+} else {
 const lines = createInterface({ input: process.stdin });
 lines.on('line', (line) => {
   if (!line.trim()) return;
   let m;
-  try { m = JSON.parse(line); } catch { write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); return; }
+  try { m = JSON.parse(line); } catch { writeOut({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } }); return; }
   void onRequest(m);
 });
 lines.on('close', () => { try { socket?.close(); } catch { /* gone */ } process.exit(0); });
 log(`ready; the show at ${HOST}:${PORT}`);
+}
