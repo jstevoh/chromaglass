@@ -119,6 +119,8 @@ declare global {
     __cgFadeLog?: unknown[];
     /** The licence key's public key, swapped for a test pair by the licence checks (`lib/licenseKey.ts`). */
     __cgTestLicensePublicKey?: JsonWebKey;
+    /** Where the Android app's Open in Chrome hands the show's address instead of Chrome, so a check can read it (`lib/appLink.ts`, `openInChrome`; `npm run controller`). */
+    __cgOpenExternal?: (url: string) => void;
 
     // ── Elsewhere (the file and its gate on each line) ──
 

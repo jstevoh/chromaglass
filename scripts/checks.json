@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -356,6 +356,22 @@
         "nothing at all in two minutes of groove, the same at 30 fps, triggers",
         "bound to each fire once per event; then the shelf, decoded by the",
         "ffmpeg installed above, held to at most a drop a minute."
+      ]
+    },
+    {
+      "name": "Watching a video",
+      "shard": "sound",
+      "run": "npm run watch -- --selftest",
+      "why": [
+        "The watch tool (scripts/watch.mjs, the watch skill) on clips and frames",
+        "whose answers are known by construction: cuts, motion against sound, the",
+        "show's shape; the fetch's picture and sound joined, an audio-only fetch",
+        "refused and ffmpeg handed to yt-dlp as a full path (PLAN.md 47w); the",
+        "design read (palette, colourfulness, edge width, scale, flow lines,",
+        "forms, symmetry, composition, scripts/watchdesign.mjs) and the physics",
+        "read (a slid, a turned, a banded and a pulsing texture, the spectrum's",
+        "slope, the page scan, scripts/watchphysics.mjs). In the sound shard for",
+        "its ffmpeg. About a minute."
       ]
     },
     {
@@ -1446,6 +1462,22 @@
       ]
     },
     {
+      "name": "Lava Lamp's wax goes round: up off the lamp, down from the cool top, up again",
+      "shard": "lab10",
+      "run": "npm run lavacycle",
+      "timeout": 22,
+      "why": [
+        "With the heat carried (38f-1) Lava Lamp's wax rose and stayed at the top: nothing",
+        "took its heat but Heat Decay, about ten minutes on the look's clock (PLAN 27f-9e).",
+        "Now the heat crosses the gap to the cool upper glass at the gap's conduction rate in",
+        "real seconds. On the look's settings and the app's lay: the wax rises and comes down",
+        "where a lab built without the cooling stays up, then rises again; and the rate is",
+        "pi^2 kappa / h^2 at the rest gap, read off the solver on the step's real seconds.",
+        "About fifteen minutes on SwiftShader, a part of its own (lab10): beside moire in lab9",
+        "it reached the Measure warning line, past the 25 minutes on the slow tier."
+      ]
+    },
+    {
       "name": "Lava Lamp's wax holds together and the lamp lifts it",
       "shard": "lab8",
       "run": "npm run lavawax",
@@ -1849,7 +1881,7 @@
     {
       "name": "The phone controller apps, owed",
       "shard": "browser2",
-      "run": "npm run controller -- --owed=scan,android,nogpu",
+      "run": "npm run controller -- --owed=scan",
       "why": [
         "Written before their builds (scripts/controller.mjs, 2026-11-09, PLAN 12-ctl):",
         "the iPhone and Android apps as the Mac's controller. The Mac's set list and",
@@ -2001,6 +2033,39 @@
         "stand-in laptop on the show server's relay hears every touch, tool,",
         "dye and button a phone and an iPad send, and where a touch lands in",
         "the wall's frame. No GPU; dist/ is the phone step's build."
+      ]
+    },
+    {
+      "name": "The TV app finds the show and pairs by four digits",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tvpair.mjs",
+      "why": [
+        "The Android TV app's network half (scripts/tvpair.mjs, PLAN.md 12-tv-2):",
+        "the real show server's Bonjour advert asked as NsdManager asks and as a",
+        "one-shot question (its port, the TV page's path, the show's id, never",
+        "its key); pairing by four digits over raw sockets from the server's",
+        "network address (Allow, No and the lockout, a phone unable to allow,",
+        "kept keys across a restart, unknown keys never locking out, Forget);",
+        "the built /tv page pairing, keeping its key and joining with it after a",
+        "reload; the laptop's card laid out with the built stylesheet. The app's",
+        "own build and lint are the Android TV app workflow. dist/ is the phone",
+        "step's build. About thirty seconds."
+      ]
+    },
+    {
+      "name": "The TV's remote picks the look",
+      "shard": "browser2",
+      "run": "node --experimental-strip-types scripts/tvremote.mjs",
+      "why": [
+        "The TV remote picks what the Mac plays (scripts/tvremote.mjs, PLAN.md",
+        "12-tv-remote): the relay's rules (a TV hears only the presets and the",
+        "live one, picks only a listed preset, one every TV_PICK_MS, and nothing",
+        "else it sends reaches the laptop; a phone's or a pairing ask's pick",
+        "reaches nothing) against the real show server and a stand-in laptop;",
+        "the built /tv page's keys as the Android TV app hands them (left, right,",
+        "OK, up, Menu and Back), a TV's own browser's first OK, and the phone's",
+        "tap bar and list inside a phone's screen. dist/ is the phone step's",
+        "build. About twenty seconds."
       ]
     },
     {

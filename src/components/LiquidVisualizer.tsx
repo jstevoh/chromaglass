@@ -264,6 +264,7 @@ interface LiquidVisualizerProps {
 
 import type { LiquidVisualizerHandle } from './visualizerHandle';
 import { rgbToHex } from './layerSwatch';
+import { NeedsWebGpu } from './NeedsWebGpu';
 
 /** Held to 0..1 (a score of the frame loop's dials). */
 const c01 = (v: number) => Math.max(0, Math.min(1, v));
@@ -7403,43 +7404,19 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         no explanation is the worst thing that can happen to an operator in
         front of a room: this says the machine knows, and is coming back.
       */}
-      {/*
-        A browser without WebGPU gets a clear screen rather than a degraded
-        show (docs/webgpu-plan.md): what is missing, and where it works. There
-        is no second renderer to fall back to any more, so this is the whole
-        answer for a machine that cannot run it.
-      */}
+      {/* What is missing and where it works, or on Android, Chrome or the remote (NeedsWebGpu.tsx). */}
       {gpuFailure && (
-        <div className="absolute inset-0 flex items-center justify-center p-6" data-testid="needs-webgpu">
-          <div className="max-w-md text-center font-mono text-[12px] leading-relaxed text-white/70">
-            <div className="mb-3 text-[15px] tracking-wide text-white">ChromaGlass needs WebGPU</div>
-            <div className="mb-4 text-white/50">
-              {gpuFailure.failure === 'no-webgpu' ? 'This browser has no WebGPU.'
-                : gpuFailure.failure === 'no-adapter' ? 'This browser has WebGPU but no GPU to give it.'
-                : 'The GPU would not start.'}
-            </div>
-            <div>It runs in Chrome or Edge on a desktop, Chrome on a recent Android phone, Safari 26 on macOS and iOS, and Firefox on Windows.</div>
-            {gpuFailure.failure !== 'no-webgpu' && (
-              /* A GPU that would not start a minute ago may start now — the
-                 driver finished resetting, the other tab closed — and asking
-                 again costs nothing next to a reload that loses the set. */
-              <button
-                onClick={() => {
-                  recoveryTriesRef.current = 0;
-                  gpuSupportedRef.current = null;
-                  glLostRef.current = true;
-                  setGlLost(true);
-                  setGpuFailure(null);
-                  setGlEpoch((n) => n + 1);
-                }}
-                className="pointer-events-auto mt-5 rounded-md border border-white/20 px-4 py-2 text-[12px] text-white/90 transition-colors hover:bg-white/10"
-                data-testid="gpu-retry"
-              >
-                Try again
-              </button>
-            )}
-          </div>
-        </div>
+        <NeedsWebGpu
+          failure={gpuFailure.failure}
+          onRetry={() => {
+            recoveryTriesRef.current = 0;
+            gpuSupportedRef.current = null;
+            glLostRef.current = true;
+            setGlLost(true);
+            setGpuFailure(null);
+            setGlEpoch((n) => n + 1);
+          }}
+        />
       )}
       {glLost && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center" data-testid="gl-lost">

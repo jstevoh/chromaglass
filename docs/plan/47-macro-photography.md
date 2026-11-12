@@ -264,17 +264,49 @@ Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 
-On a YouTube download the watch tool's URL path left the video and audio as two files,
-unmerged, then picked the audio file and stopped (found 2026-11-11 on the owner's Mac; they
-were merged by hand to go on; the cause was not found). Make `scripts/watch.mjs` ask yt-dlp
-for a merged file (or merge the pair with ffmpeg itself) and refuse a file with no video
-stream with a message that says so; on the next download it kept the silent video
-instead, so the pair is not even picked the same way twice. And its cut detector misses
-dissolves: on *Streams II* it read 3.8 cuts a minute where the takes, found by eye, run about
-7 a minute, and its "longest shots" were several takes each. Detect a dissolve as a run of
-frames whose difference stays raised and whose start and end frames differ by a cut's worth.
-*Measure:* `npm run watch -- --selftest` plus a line that hands it an audio-only file and
-reads the refusal, and a synthetic dissolve in the self-test clip that it counts.
+~~**47w-1** The download half~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1): the
+cause was yt-dlp handed a bare `ffmpeg` as `--ffmpeg-location`; the tool now passes the full
+path, joins a picture-and-sound pair itself and refuses an audio-only fetch.
+
+- **47w-2. Open: dissolves.** The cut detector misses dissolves: on *Streams II* it read 3.8
+  cuts a minute where the takes, found by eye, run about 7 a minute, and its "longest shots"
+  were several takes each. Detect a dissolve as a run of frames whose difference stays raised
+  and whose start and end frames differ by a cut's worth. *Measure:* a synthetic dissolve in
+  `npm run watch -- --selftest` that it counts.
+
+## 47v. Watching any link: a design read, a physics read and the techniques (S–M)
+
+~~**47v**~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1). Asked 2026-11-12: point
+Claude at any video or animation and get meaningful feedback on colour and form, a physics
+read, and the techniques used, and judge our own visuals the same way.
+
+- **47v-2. Open: a reference library.** Each reference watched leaves a `design.json`; keep the
+  ones the owner likes in `/mnt/project-files/references/<name>/` with their timeline and a
+  sheet, so `--vs` can be pointed at "the look we want" without fetching again, and a look's
+  retune can be held to its reference's numbers.
+- **47v-3. Open: the physics read's real-footage bars.** The physics measures are proved on
+  synthetic flows; on real footage the "carried" share is pulled down by hands, refocusing and
+  the projector's lamp, and a tutorial is not a performance. Watch three performance films
+  (Joshua Light Show, a Liquid Light Lab set, a bar show) and write their ranges beside the
+  design bands in `scripts/watchphysics.mjs`.
+
+## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
+
+Liquid Light Lab's *Quick Tutorial* (cropped to the projected disc) against our *Poster 1969*
+take from 2026-11-11, by `npm run watch -- … --vs`:
+
+- **Cells.** Theirs: 22 bright forms a frame, elongation 0.87: the oil beaded into round cells
+  on the water, dozens across a pool. Ours: 12, elongation 0.66. Immiscible break-up and
+  coalescence at the plate's own scale; see 33f and 38r for the drop physics.
+- **Rims.** Theirs: each cell outlined by a thin dark line (light refracted away at the
+  meniscus), soft colour washes between: edge width 2.2% of the width. Ours: soft outer dye
+  edges (3.9%, 1.8× softer) and hard combed striations inside each dye body (flow-line
+  coherence 0.75 against 0.57). 47j caustics and 38h's shadowgraph carry the rim; the
+  striations want a look at the dye's own stretch and diffusion.
+- **Ground.** Theirs: dark around the cells with the lamp's hot centre (luminance 0.36);
+  ours: a white ground (0.63). A look's choice, but the projector's falloff is optics.
+- **Turnover.** Ours 2.6× brisker (5 s against 13 s to carry a form its own size): a viscous
+  pool moves slower.
 
 ## Order
 
@@ -282,5 +314,6 @@ reads the refusal, and a synthetic dissolve in the self-test clip that it counts
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h and 47i when wanted; 47w whenever the watch tool is next touched. Each its own thread
+47h and 47i when wanted; 47w-2 and 47v-2, 47v-3 whenever the watch tool is next touched; 47y
+as each of its bullets' items comes up. Each its own thread
 and PR.
