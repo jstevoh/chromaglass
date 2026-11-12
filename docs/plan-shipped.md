@@ -13598,3 +13598,44 @@ frames and flows: a texture slid at 2.5% of the width a second read 2.50, turned
 minute read one turn in 62 s (and the opposite sign turned back), sinking and rising read drift +2.49 and −2.49, pulsing in place read carried 0.02. One check-skeptic pass found seven ways the first draft could pass while broken (no window on the spectrum, the curl sign, a cooking video named as technique); each is now a line that goes red on its mutant. Proved on Liquid Light
 Lab's *Quick Tutorial* fetched on the owner's Mac (47y holds what it found).
 
+
+## 47w-2-47v-2-47v-3. Dissolves, a reference library, and real shows beside the physics bands (2026-11-12)
+
+The follow-up the owner asked for to the watch tool, as one PR.
+
+Dissolves (47w-2). On *Streams II* the cut detector read 3.8 cuts a minute against about 7 by
+eye: a dissolve spreads a cut's change over a second, no one sample of it is an outlier, and
+lowering the bar cannot work on liquid, which changes by itself as fast. What a dissolve has
+that a pour does not is its arithmetic: every frame is a mix of its two ends.
+`scripts/watchcuts.mjs` finds a run of raised change on a 32×18 thumbnail, asks that its ends
+differ by 2.5 times what each take changes by itself over the span, that every frame inside
+fit a·A + (1−a)·B to within a fifth with a running from one end to the other, and that the
+new picture is unlike anything the old take showed in the three seconds before (a lamp that
+dims and returns is a perfect mix of its ends). Each dissolve is one cut at its middle; its
+samples are left out of the motion and flow reads. Self-test clip F (a same-colour dissolve
+over 1.5 s, a hard cut, a dissolve into other colours) reads cuts at 4.80 (dissolve), 8.00,
+10.50 (dissolve), left 0.01; clip G (one take: a pour sweeping across, a dye body
+spreading, the lamp dimming and coming back) reads none, the pour turned down by the mix and
+the lamp both ways by the revisit; mutants removing either step turn G red. On the Joshua
+Light Show film: 13 dissolves in ten minutes, each a superimposition of two loops on the
+sheets; on the bar, one camera, none. At two samples a second a hard cut no longer counts
+twice on the next sample.
+
+A reference library (47v-2). `--keep <name> [--note]` copies a watched clip's design.json,
+summary, timeline, first sheet and palette with a `ref.json` (title, link, crop, span, why)
+into `/mnt/project-files/references/<name>/` (on the Mac `~/chromaglass-films/references`,
+or `$CHROMAGLASS_REFERENCES`), `--vs <name>` compares with it without fetching again and
+`--refs` lists the library with its numbers (`scripts/watchrefs.mjs`). Outside the repo: the
+repository is public.
+
+Real shows (47v-3). Two performance films from the Internet Archive watched at 10 samples a
+second and kept: the Joshua Light Show's *Liquid Loops 1969* (35 mm film of the loops; flow
+8.0% of the width a second, carried 0.19, turnover 1.5 s, lifetime 0.9 s, spectrum −2.69) and
+a liquid light show on the wall behind a band at a bar, one camera from the floor, cropped to
+the wall (2.0, 0.13, 2.4 s, 5.0 s, −2.79). Their numbers are `REAL_SHOWS` in
+`scripts/watchphysics.mjs`; the physics read prints the range beside flow, carried, turnover,
+lifetime and spectrum and says when a clip is under or over every real show. The finding:
+real shows read carried 0.13 to 0.19, which the synthetic bands called "changes in place …
+or a digital effect"; the in-place guess now fires only under the real shows' floor (47v-5
+is the measure's fix). The Dregs (2023), the third archive film considered, is mostly
+digital overlay over a band and was left out; a Liquid Light Lab set waits on the Mac (47v-4).
