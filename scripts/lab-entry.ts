@@ -21,7 +21,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, LAVA_BODIES, lavaLampCell } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
@@ -358,6 +358,9 @@ const api = {
   },
   /** One cell of Clock Glass's lay, as seedPreset lays it (src/lib/oilLay.ts). */
   clockGlassCell,
+  /** Lava Lamp's wax as the app lays it (src/lib/oilLay.ts, PLAN 27f-9c): its bodies, and one cell's oil and dye. */
+  lavaBodies: LAVA_BODIES,
+  lavaLampCell,
   /** The splodascope's crowd as the app lays it (src/lib/oilLay.ts), from a seeded stream of the lab's own. */
   splodascopeDiscs(seed: number, dyes: number) {
     let s = seed;

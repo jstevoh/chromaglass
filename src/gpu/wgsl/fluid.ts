@@ -14,6 +14,7 @@ import { DYE_KERNELS } from './fluid/dye';
 import { GRID_FILTER_KERNELS } from './fluid/gridFilter';
 import { REACTION_KERNELS } from './fluid/reactions';
 import { FIELD_KERNELS } from './fluid/fields';
+import { SEAL_KERNELS } from './fluid/seal';
 import { HEAD, NOISE_WGSL, THIN_FACE, W } from './fluid/shared';
 import { thinGapKernels } from './thinGap';
 import { filmKernels } from './film';
@@ -40,6 +41,8 @@ export const KERNELS: Record<string, string> = {
   ...GRID_FILTER_KERNELS,
   ...REACTION_KERNELS,
   ...FIELD_KERNELS,
+  // A standing plate's weight inside a sealed bottle (PLAN 27f-9): see wgsl/fluid/seal.ts.
+  ...SEAL_KERNELS,
   // The plate as a Hele-Shaw cell (PLAN §18a): see wgsl/thinGap.ts.
   ...thinGapKernels(HEAD, W, NOISE_WGSL),
   // A clear film that tears (PLAN §20b): see wgsl/film.ts.

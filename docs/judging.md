@@ -2477,3 +2477,184 @@ On the live site, signed out, in a private window:
 
 Bad: a second account for the same person, an error saying the provider is not enabled, or the Mac app's window
 stuck on "Finish in your browser" after the browser signed in.
+
+## 114. Song titles painted as ink, then swept away (PLAN 37x-10)
+
+The lab measures a still plate; how a look's own flow treats a title is taste, and only the
+Mac's film shows the letters at the solver's full grid.
+
+1. Settings → **Logo & Titles** → **Song titles as ink** on. Play a song the ear names (or
+   pour words from the phone remote's **Pour words**), on two or three looks: a calm one
+   (Classic), a busy one, and a dark one.
+2. The title should land as crisp ink in the look's first colour, readable for about three
+   seconds at the default **Title Sweep**, then drift and break up into the show's own
+   colour by about ten. **Title Sweep** at the top: gone in a second or two. Near the bottom:
+   it drifts, readable, for many seconds.
+3. **Title Size** small to the plate's width, a long title shrinking to fit; **Title Height**
+   moves it up and down; the phone's **Title** switch turns it on and off.
+4. Bad: soft or blocky letters (poured at the wrong grid), a title that fades rather than
+   moves, a wash that shakes the whole plate, a busy look that tears the title apart before
+   it can be read.
+5. Since 37x-10g the ink is made up thick, on a clear pad under the letters, and the wash
+   rinses it with clear liquid. On a busy look (the private rehearsal's album looks) the
+   title should now sit, sliding and turning slowly, for two or three seconds while the
+   colour moves round it, then burst into branching fingers where the rinse goes in and
+   mix into the show. Bad: a visible box or rim round the title (the pad is meant to be
+   clear), a title that never leaves, a rinse that pushes the whole plate's colour out over
+   the rim.
+
+## 115. Heat from the lamp, and blocking the fan's air by hand (PLAN 36e-2)
+
+`npm run boilgpu` (54/54 on Metal) holds the GPU dish solver to the CPU reference (`npm run boil`,
+38/38), and `npm run plateboil` (8/8 on `zero`, 6/6 on `boil`) holds the live plate's boil at
+1/60 s steps; only the Mac and phone at 60 fps show how the **Heat** dial and a held finger feel
+on a live look.
+
+1. Settings → Lamp & Light → **Heat** (also Perform desk, MIDI, the remote and the phone's Looks
+   sheet). Default is 0, so every look opens as before.
+2. On a look with dye over the lamp (Fillmore East, 1969 or Lava Lamp), raise **Heat** to 0.7:
+   where the lamp's hot spot and dark dye sit, the dish warms; with Gravity up (a tilted plate),
+   warm plumes rise by Kell buoyancy without hitting the old 50-unit ceiling.
+3. Press and hold a finger or pointer still on the dish over the warm spot (on the desk pad, iPad
+   or phone): blocking the cooling air drops $h$ from $50$ to $10\,\text{W/(m}^2\text{K)}$ under
+   the hand, nucleating a vapour pocket that pushes the surrounding liquid out and shades as an
+   air pocket; lift the hand and the fan's air condenses the vapour back down.
+4. Bad: any look changing with **Heat** at 0, Evolve turning **Heat** on by itself, or vapour
+   failing to condense after the hand lifts or **Heat** returns to 0.
+
+## 116. Listen in the Songs panel (PLAN 28h-8)
+
+`npm run listen` holds the design (cues firing on each chorus through the real scheduler,
+stages where the sequencer lays them, louder sections fuller against the song's own range)
+and the flow on a known song; only a record playing in the room can say whether it names
+the song and whether the show it designs plays well.
+
+1. Sequence tab, Songs panel: with the Mac's speakers playing a record and nothing chosen as
+   the source, press **Listen**. The microphone comes on and, within a few tries, the song
+   is added and opened with its title, artist and length.
+2. Let the song play to its end (or the next song). The line should say what was designed;
+   the song's actions list the title, a burst on every chorus, new dyes for the bridge and
+   the last chorus, and the drain; Stage sequences lists "<title> (Listen)".
+3. Play the song again: the stages should open up on each chorus and settle in the verses,
+   the bridge go in close and come back out, the cues land on their sections.
+4. Press **Listen** again on a song a minute in (a song not heard before): on its second
+   play the stages should still change on the song's sections, an *Unheard* stage covering
+   the start it missed (28h-9 moved the map to the song's own seconds).
+5. Bad: a burst a few seconds before its chorus on every play (the map's offset, 28h-9, on
+   a song first heard after this fix), a look change when the song is added, the plate left
+   in close after the bridge.
+
+## 117. Song titles poured as ink from the phone (PLAN 37x-10c)
+
+`npm run assistant` and `npm run remotemix` hold the message: what the phone's box and the
+assistant send, what the guard lets through, and how the rows are laid out. Only the wall
+can say whether the words read when they land and how a look's own flow carries them off.
+
+1. Open the show on the Mac with the phone remote linked, and play a song from a file.
+2. On the phone, Controls → **Pour words**: type `Song name - Artist` and press **Pour**.
+   The name should land in capitals across the middle of the plate with the artist under
+   it, dark on a bright plate and the look's brightest dye on a dark one.
+3. Watch it on three looks: a still one (Classic), a busy one, and the look the live set
+   uses. The words should read for a few seconds, then smear and drift into the colour.
+4. Bad: letters too small to read from across a room, words that never break up on a still
+   look (37x-10d's wash is the fix, not a fade), a pour that clears or dims the plate around
+   the words, a second pour inside 1.5 s landing on top of the first.
+
+## 118. The closeup camera answers your hand (PLAN 27d)
+
+Zoom in past 2x on Classic with the camera on Hold and pan with the arrow keys: a tap moves a
+quarter of the frame, Shift a whole frame, a held key a slow drift; it should feel like a heavy
+rig on a slider, never a lurch. Then move Chase Speed from 0 to 3 while pressing an arrow or
+Alt-clicking elsewhere on the plate: at 0 the frame should glide across in about three seconds,
+at 0.4 (the default) as it always did, at 3 snap there. Music Sync is greyed in Hold and Follow
+until Frame Sway is up; nothing the sound does should move the frame meanwhile.
+
+## 119. The logo melts at the start of a film or a stream (PLAN 37x-11)
+
+Turn on Settings → Logo & Titles → **Melt the logo at the start**, then press Record (or
+**Test** in the Live Show panel) on three looks: a still one (Classic), a busy one, and the
+live set's look. The ChromaGlass wordmark should land big across the middle in teal, read
+for two or three seconds, then run and finger apart and melt into the colour within about
+six seconds, leaving its teal in the show. Bad: a logo too faint to read on a bright or a
+dark look, one that smears before it can be read, one that never melts on a still look, a
+square or a halo around it, the plate around it clearing or dimming.
+
+## 120. Song titles as a 1980s corner caption (PLAN 37x-10j)
+
+1. Settings → **Logo & Titles** → **Song titles** on, **As a corner caption** on (the
+   default). Play a song the ear names, or have the assistant call `song_title`, on a dark
+   look and a bright one, and once with the Live Show on air.
+2. The card should come up in the bottom-left corner in about a fifth of a second: the
+   artist, the song in quotation marks, the album, the label, white with a dark drop shadow,
+   one size, left-aligned; it should sit still for seven seconds and fade out in under half
+   a second. The stream (and its portrait encode) should carry the same card in its own
+   bottom-left corner.
+3. Bad: letters lost on a bright plate, a card cut off at the edge on the portrait stream, a
+   card over the desk's controls, a second card stacked on the first.
+
+## 121. MIDI notes as voices: a sequencer playing a chord (PLAN 24.3)
+
+`npm run soundowed` (`voices`) holds the placement on Melody Walk's line, the velocity sizing,
+the attack/release envelope, the four-voice cap, the `notes` patch-bay source and the channel
+learn; only a real sequencer on the Mac can show how a played chord lands and pours at 60 fps.
+
+1. Connect a MIDI keyboard or hardware/iPad sequencer. Open the MIDI panel (or Settings →
+   MIDI & Controllers → **Learn channel as notes**), press any note on the sequencer's channel:
+   the channel appears under **Notes as voices** with Tool (`Drop` / `Streak`), Liquid,
+   Attack, Release and Cap (4).
+2. Play a low-to-high scale of short notes: each note-on lets go of one real pipette drop
+   across the plate from left to right along the look's Melody Walk line, softer notes smaller
+   and harder notes fuller.
+3. Play and hold a three-note chord, then add a fourth and a fifth held note: the chord lands
+   as three separate drops at once, ordered across the plate by pitch, pouring while held; the
+   fifth held note releases the oldest of the first four so the plate does not flood.
+4. Raise Attack to 0.3 s and Release to 0.5 s: a held note swells in and trails off after
+   release. In the Patch Bay, add a cord with Source **Notes** (`Velocity`, `Pitch` or `Held`)
+   and check the target follows the played notes.
+5. Bad: a note firing a button instead of laying a drop, chord notes landing on top of each
+   other instead of spread by pitch, a stuck voice after note-off, or any look opening with a
+   voices binding before one is learned.
+
+## 122. Chemical Clock without the kick's dye clusters (PLAN 25i-10)
+
+The kick's droplets, the music's streams and the automation's drops no longer pour dye in an
+area whose liquid is a reagent: Chemical Clock's three activator places and Red Cabbage's acid
+and base wells. Each still lands its drop of the reagent, so the gel still fires a ring on each
+kick and the wells still turn.
+
+1. Chemical Clock with a song for five minutes: no dark green or teal clusters building up in
+   the upper left, upper right or bottom places (the clusters on the 2026-11-10 rehearsal
+   stream); a blue ring still runs out from each kick's place.
+2. Red Cabbage: the pink and green in its wells are the indicator's, and fade back to violet
+   where the fronts meet, with no painted pink or green spots on the kicks.
+3. Bad: Chemical Clock going flat or pale over a long set (its seed's pools now only fade,
+   25i-11), or no ring on the kicks.
+
+## 123. Lava Lamp's wax as blobs in a clear liquid (PLAN 27f-9c)
+
+The wax is a liquid of its own now (the oil, heavy cold, swelling lighter with the lamp's heat), not a heavy
+dye. Filmed on the owner's Mac before and after.
+
+1. Lava Lamp for a minute: separate crimson bodies of wax in a clear, lamp-lit liquid, never a
+   red wash over the whole plate (the 2026-11-11 film of the sealed plate).
+2. The wax sinks to the lamp and is held up off the floor by it, in bodies that move.
+3. Known short of a real lamp (27f-9e): the wax settles as a low sheet over the lamp instead of
+   rising to the top and coming down, and some of its colour leaks into the liquid as a
+   pale pink, in the lab a quarter of it in the first seconds (27f-9f). Bad beyond that: the wax gone to a haze, blobs stuck to the
+   rim, or a plate that does not move.
+4. Settings → Oil & Soap → Oil Weight on Oil & Water with Gravity up: left, the oil floats up the
+   standing plate; right, it sinks.
+
+## 124. Lava Lamp's wax goes round (PLAN 27f-9e)
+
+The heat now leaves the wax through the cool upper glass, at the gap's own conduction rate in
+real seconds (about 3 s for the liquid, 6 s for the wax), so a risen body cools and comes down.
+
+1. Lava Lamp for two minutes: wax rises off the lamp in bodies, slows and turns in the upper
+   half, and comes back down to the floor, then rises again; in the lab about 16 s round on
+   the look's own clock. Good: it never stays all at the top (it did before, 0.73 of the
+   height for good) and never lies still on the floor.
+2. The colour stays in the bodies through the fall (what is left of 27f-9f).
+3. Bad: the wax hanging in the middle in a line where the cool glass starts (half the
+   height), a pool on the floor that turns over in itself and never lets a blob go, or a
+   cycle so quick it looks like boiling.

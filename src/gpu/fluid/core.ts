@@ -101,6 +101,16 @@ export class FluidCore {
   /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
   protected sloshLevel = true;
   protected sloshTex: GPUTexture | null = null;
+  /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
+  protected boilAlpha: PingPong | null = null;
+  protected boilSites: GPUBuffer | null = null;
+  protected boilUni: GPUBuffer | null = null;
+  protected readonly boilUniData = new ArrayBuffer(112);
+  protected readonly boilUniF = new Float32Array(this.boilUniData);
+  protected readonly boilUniU = new Uint32Array(this.boilUniData);
+  protected boilLive = false;
+  protected boilFresh = false;
+  protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
   protected readonly velRide: GPUTexture;
   protected readonly scratchA: GPUTexture;
@@ -204,6 +214,9 @@ export class FluidCore {
   protected hsOilMean: GPUBuffer | null = null;
   protected hsLiftSrc: GPUBuffer | null = null;
   protected hsLiftPsi: GPUBuffer | null = null;
+  /** The sealed bottle's (PLAN 27f-9): the weight's right-hand side and its Ψ, on the lift's grid. */
+  protected hsSealSrc: GPUBuffer | null = null;
+  protected hsSealPsi: GPUBuffer | null = null;
   protected liftN = 2;
   protected hsP: GPUBuffer | null = null;
   /** The warm start's sums and fit, and the step before last's P (wgsl/thinWarm.ts, PLAN 38r-12). */
@@ -708,6 +721,11 @@ export class FluidCore {
     for (const t of [this.swirl.a, this.swirl.b, this.swirlP.a, this.swirlP.b, this.swirlDiv]) this.fill(pass, t, [0, 0, 0, 0], this.M);
     this.swirlLive = false;
     this.swirlTail = 0;
+    if (this.boilAlpha) for (const t of [this.boilAlpha.a, this.boilAlpha.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.boilLive = false;
+    this.boilFresh = true;
+    this.boilTail = 0;
+    this.air?.setBoilAlpha(null);
     if (this.grain) {
       // Identity coordinates: seedGrain with both phases reseeded. It reads the
       // other texture of the pair — a dispatch may not sample what it writes.
@@ -728,6 +746,8 @@ export class FluidCore {
     if (this.hsPour) this.clearBuffer(pass, this.hsPour, 'clear pours');
     // The oil lift's Ψ is the last oil's shape; the next plate's starts from still.
     if (this.hsLiftPsi) this.dispatchBuf(pass, 'mgZero', 'mgZero:lift', this.arg('lift zero', [2 * this.liftN * this.liftN, 0, 0, 0]), [this.hsLiftPsi], 2 * this.liftN * this.liftN);
+    // And the sealed bottle's, the last wax's.
+    if (this.hsSealPsi) this.dispatchBuf(pass, 'mgZero', 'mgZero:seal', this.arg('lift zero', [2 * this.liftN * this.liftN, 0, 0, 0]), [this.hsSealPsi], 2 * this.liftN * this.liftN);
     if (this.oilDye) for (const t of [this.oilDye.a, this.oilDye.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.oilPoured = 0;
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);

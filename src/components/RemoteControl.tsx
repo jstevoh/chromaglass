@@ -1,6 +1,6 @@
 import type { ComponentType, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
+import { ListMusic, Play, Pause, Shuffle, Droplets, Eraser, Waves, Microscope, Monitor, MonitorOff, Wifi, WifiOff, Hand, Compass, Clapperboard, SkipBack, SkipForward, Square, Maximize2, PenTool, ChevronLeft, ChevronRight, Circle } from 'lucide-react';
 import { PRESETS } from '../presets';
 import { PALETTE } from '../constants';
 import { DEFAULT_LIQUID_TYPES } from '../types';
@@ -16,12 +16,15 @@ import { SPIN_AUTO_NAMES } from '../lib/turntable';
 import { readSetting } from '../lib/readout';
 import { MixerPanel } from './MixerPanel';
 import { LiveRemoteChip } from './LiveRemoteChip';
+import { RemotePourText } from './RemotePourText';
+import { PhoneInkTitle } from './phone/PhoneInkTitle';
 import { Slider } from './RemoteSlider';
 import { LOCKUP_URL } from '../brand';
 import { AlphaBadge } from './AlphaBadge';
 import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
+import { RemoteSongs } from './RemoteSongs';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -234,9 +237,11 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
     mixer) opens as that again after a reload or a lost link (S15), rather
     than on a pad they then have to leave mid-song.
   */
-  const [view, setView] = useState<'draw' | 'controls'>(() => {
-    try { return localStorage.getItem(REMOTE_VIEW_KEY) === 'controls' ? 'controls' : 'draw'; } catch { return 'draw'; }
+  const [view, setView] = useState<'draw' | 'controls' | 'songs'>(() => {
+    try { const v = localStorage.getItem(REMOTE_VIEW_KEY); return v === 'controls' || v === 'songs' ? v : 'draw'; } catch { return 'draw'; }
   });
+  // Where Songs' Back goes: the screen it was opened from (PLAN 12-ctl-1).
+  const [songsFrom, setSongsFrom] = useState<'draw' | 'controls'>('draw');
   useEffect(() => { try { localStorage.setItem(REMOTE_VIEW_KEY, view); } catch { /* private mode */ } }, [view]);
   /*
     Draw's Amount, a multiple of how much a touch lays (1× is today's). The
@@ -393,6 +398,12 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
   const openControls = async () => {
     letGo();
     setView('controls');
+    try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
+  };
+  const openSongs = async (from: 'draw' | 'controls') => {
+    letGo();
+    setSongsFrom(from);
+    setView('songs');
     try { if (document.fullscreenElement) await document.exitFullscreen(); } catch { /* already out */ }
   };
 
@@ -608,6 +619,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
         onPadUp={onPadUp}
         action={action}
         onControls={openControls}
+        onSongs={() => openSongs('draw')}
+      />
+    );
+  }
+
+  if (view === 'songs') {
+    return (
+      <RemoteSongs
+        state={state}
+        send={send}
+        connected={connected}
+        onBack={songsFrom === 'controls' ? openControls : openDraw}
+        backLabel={songsFrom === 'controls' ? 'Controls' : 'Draw'}
       />
     );
   }
@@ -699,6 +723,23 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </button>
           </div>
 
+          {/* The set list and the song shows (PLAN 12-ctl-1), their own screen */}
+          <button
+            onClick={() => openSongs('controls')}
+            className="mb-6 flex min-h-14 w-full items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 text-left active:scale-[0.99]"
+            data-testid="remote-to-songs"
+          >
+            <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
+              <ListMusic size={15} /> Set list &amp; songs
+            </span>
+            <span className="truncate pl-3 text-[12px] text-white/45">
+              {state?.songs?.runningId ? state.songs.shows.find(sh => sh.id === state.songs?.runningId)?.title ?? '' : state?.setList?.name ?? ''}
+            </span>
+          </button>
+
+          {/* A song's name poured as ink (PLAN 37x-10c), its own file */}
+          <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
+
           {/* The dials that change the mood most */}
           <Slider label="Sound Drive" field="audioImpact" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('audioImpact') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Speed" field="globalSpeed" step={0.005} format={(v) => v.toFixed(3)} value={value('globalSpeed') as number | undefined} {...sliderProps} connected={connected} />
@@ -721,6 +762,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           </div>
           <Slider label="Dye Budget" field="dyeBudget" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('dyeBudget') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Projector Focus" field="projectorFocus" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('projectorFocus') as number | undefined} {...sliderProps} connected={connected} />
+          <Slider label="Heat" field="heat" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('heat') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Plate Rock" field="plateRock" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('plateRock') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Melody Walk" field="melodyWalk" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('melodyWalk') as number | undefined} {...sliderProps} connected={connected} />
           <Slider label="Kick Bloom" field="kickBloom" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('kickBloom') as number | undefined} {...sliderProps} connected={connected} />
@@ -817,10 +859,19 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {(settings?.oilTension ?? 0) > 0.001 && (
             <Slider label="Film Hold" field="filmHold" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmHold') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* And Oil Weight, how heavy that oil is: a lava lamp's wax on a standing plate (PLAN 27f-9c). */}
+          {(settings?.oilTension ?? 0) > 0.001 && (
+            <Slider label="Oil Weight" field="oilWeight" step={0.05} format={(v) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2))} value={value('oilWeight') as number | undefined} {...sliderProps} connected={connected} />
+          )}
           {/* And Soap Breakdown while Soap Bursts is on, so a long set can let the soap clear. */}
           {((settings?.surfactantFlow ?? 0) > 0.001 || (settings?.soapBreakdown ?? 0) > 0.001) && (
             <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
+
+          {/* Song titles as ink in a live set (PLAN 37x-10), the phone's Title switch. */}
+          <div className="mb-6">
+            <PhoneInkTitle settings={settings} onSetting={patch} disabled={!connected} testId="remote-ink-title" />
+          </div>
 
           {/* Macro camera */}
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -841,6 +892,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             {settings?.macroMode && (
               <div className="mt-4">
                 <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
+                <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Music Sync" field="macroSync" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroSync') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Shot Length" field="macroHold" step={0.5} format={(v) => `${v.toFixed(1)}s`} value={value('macroHold') as number | undefined} {...sliderProps} connected={connected} />
               </div>

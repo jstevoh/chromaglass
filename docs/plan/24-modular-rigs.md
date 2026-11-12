@@ -69,48 +69,21 @@ do not, Chrome stops at two. That item is now 24.1's audio half; its home is her
 - **24.2** *The interface picked at soundcheck is the one the show hears, and comes back
   after a knocked cable.* This is Wave 1's 1.5 (14s) and 1.6 (14g); a rack is plugged
   in at soundcheck and knocked at the gig, so 24.1 is not offered before both ship.
-- **24.3** *MIDI notes as voices* (lane D then B, one PR). A sequencer's notes play the
-  plate rather than press a button: a channel picks the tool and the liquid, pitch the
-  dye (or a place on the plate, by a scale across it), velocity the drop's size, and a
-  held note pours for as long as it is held. It is a binding kind beside `setting`,
-  `action`, `preset` and `dye` in `MidiTarget`, learned from the first note that
-  arrives, so one learn covers every note on that channel. Start as bar one is 14e's
-  (Start and dropout) and 5-downbeat's; 24.3 does not do it twice. *Measure:* beside
-  `npm run desk`'s MIDI lines, a page fed a recorded sequence of notes on two
-  channels: one drop per note-on, the dye by pitch, the size rising with velocity, and
-  a held note's pour lasting its length within a frame.
-  *Moved up and widened (§30, 2026-10-11).* Sequencer apps in an iPad host (AUM, Loopy
-  Pro, Drambo) send notes rather than CCs, and Imaginando's VS is played by notes firing
-  envelopes. Two additions: each channel's pour gets an attack and a release, so a note
-  can swell in and fade out rather than start and stop; and notes become a patch-bay
-  source (`notes`: velocity, pitch, held, per channel), so a note can ride any setting
-  the way a band does. The measure adds a held note whose pour rises over its attack
-  and falls over its release, each within 10% of its time.
-  *Chords placed (VS 2, 2026-10-24).* VS plays four voices a layer, held notes stacking
-  into a chord with each voice somewhere else on screen. Here a chord lands as several
-  drops at once, spread across the plate by pitch (a scale across it, as above), each a
-  real pipette drop whose volume is its velocity, meeting the others by the liquids' own
-  immiscibility. Each channel has a voice cap (four by default; the oldest held note gives
-  way) so a pad held on ten fingers does not flood the plate, and a channel can be sent to
-  an area (25h). The measure adds a three-note chord: three drops in one frame, ordered
-  across the plate by pitch, and a fifth held note releasing the first.
-  *Check written first (2026-11-07):* `npm run soundowed`, id `voices` (nine lines,
-  owed): a new `src/lib/noteVoices.ts` (`makeNoteVoices`, `voiceOn`, `voiceOff`,
-  `voicePour`, `noteSource`, `VOICE_DEFAULTS`), Melody Walk's placement taken out as
-  `melodyPlace(pitch, line)` so a sequencer's note lands where the heard note does
-  (24.3-place-1), and a `{ kind: 'voices' }` target that `liveBindings` answers for
-  every note on its channel. Each measure above is a line; the hook laying the drop
-  through `layMelodyDrop` and the phone's list are the review's.
+- ~~**24.3** *MIDI notes as voices* (lane D then B, one PR).~~ (shipped: a channel learned
+  from any note plays the plate, placing each note-on by pitch on Melody Walk's own line
+  and scale (`melodyPlace`), sizing the drop by velocity through `layMelodyDrop`, pouring
+  held notes with attack and release envelopes (`voicePour`), capping held voices per
+  channel (default 4, oldest released), and exposing `notes` (`velocity`, `pitch`, `held`)
+  as a patch-bay source; `npm run soundowed`, owed judging §121.) Story in
+  `docs/plan-shipped.md` §24.
   ~~*The melody walks across the plate (24.3-place, direction B of the owner's 2026-10-24
   exploration; after 25h).*~~ (shipped: each note the microphone hears lets go of one drop,
   low notes on one side of the plate and high on the other, a harder note a bigger drop; a
   `Melody Walk` dial, on Aurora Borealis and Oil & Water; `npm run melody`.) Story in
   `docs/plan-shipped.md` §24. Open, found building it:
-  - **24.3-place-1. Only the microphone path, not MIDI.** The chord version (a note-on
-    from a sequencer, spread across the plate by pitch, velocity as the drop's volume, a
-    voice cap per channel) is still 24.3 proper; it should lay through `layMelodyDrop`
-    and take its place from `melodyWalk.ts` (the same scale, the same line) so a played
-    line looks alike whichever way it arrives.
+  - ~~**24.3-place-1. Only the microphone path, not MIDI.**~~ (shipped with 24.3:
+    `melodyPlace(pitch, line)` extracted in `src/lib/melodyWalk.ts` and shared by
+    `MelodyWalk.update` and `src/lib/noteVoices.ts`, laid through `layMelodyDrop`.)
   - **24.3-place-2. The notes the ear misses.** Under a kick on every beat and a snare on
     the backbeat, 10 of the scale's 15 notes were called (14 of 15 with no drums): the
     note onset (55 to 1000 Hz) is a rise against the band's recent loudness, and a note

@@ -30,7 +30,12 @@ import { encodeBundle, encodeOsc, feedMessages, oscOutTarget, oscToMessage, read
 import { ARTNET_PORT, artnetConfig, artnetInUniverse, buildUniverse, decodeArtDmx, encodeArtDmx, parseInMap, patchFromUniverse } from './artnet.js';
 import { ACCOUNT_SHOWS_PATH, createAccountShowsHandler } from './account-shows.js';
 import { createServerLicenseManager, LICENSE_ACTIVATE_PATH, LICENSE_DEACTIVATE_PATH, LICENSE_INFO_PATH } from './server-license.js';
+import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from './signin-handoff.js';
+import { LOOPBACK, isLaptop } from './laptop.js';
 import { createAssistantGuard, readAssistantMode } from './assistant.js';
+import { serveMusicFile } from './assistantMusic.js';
+import { updatesCall } from './assistantUpdates.js';
+import { OSC_IN_BINDS, RELAY_OUTPUTS, oscInMode, outputsCall } from './assistantOutputs.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const DIST = resolve(process.env.REMOTE_DIST ?? join(HERE, '..', 'dist'));
@@ -87,22 +92,7 @@ const digest = (s) => createHash('sha256').update(String(s)).digest();
 /** Compared by digest so the time taken says nothing about how much of a guess was right. */
 const keyIs = (given, key) => timingSafeEqual(digest(given ?? ''), digest(key));
 
-const LOOPBACK = /^(127\.|::1$|::ffff:127\.)/;
-/**
- * The laptop itself: a request from this machine, not forwarded by the tunnel
- * or a proxy, and addressed to this machine by a local name. The last part is
- * what stops DNS rebinding: a web page anywhere can point its own name at
- * 127.0.0.1 and have the laptop's browser fetch `/remote-info.json` from it,
- * and that request comes from loopback with no forwarding headers. Its Host is
- * the page's name, though, which is how it is told apart. The Mac app loads
- * `http://localhost:<port>` and asks `127.0.0.1` for the key, so both pass.
- */
-const isLaptop = (req) => {
-  if (!LOOPBACK.test(req.socket.remoteAddress ?? '')) return false;
-  if (req.headers['x-forwarded-for'] || req.headers['cf-connecting-ip']) return false;
-  const host = String(req.headers.host ?? '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
-  return host === 'localhost' || host === '::1' || /^127\.\d+\.\d+\.\d+$/.test(host);
-};
+// `LOOPBACK` and `isLaptop`, the laptop itself: server/laptop.js.
 /**
  * Who a request is, for counting wrong keys and sockets. Through the tunnel
  * every request arrives from loopback and the caller is in cf-connecting-ip
@@ -152,6 +142,11 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json; charset=utf-8',
+  // The films a TV plays while the show is off (PLAN 12-tv) and the cartoons
+  // the Film source pours: a TV's WebView is stricter about a video sent as
+  // octet-stream than a desktop browser, which sniffs it.
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
 };
 
 if (!existsSync(DIST)) {
@@ -167,6 +162,8 @@ const lanAddresses = () =>
 
 const handleAccountShows = createAccountShowsHandler();
 const licenseManager = createServerLicenseManager();
+// The Mac app's Google or Apple sign-in, carried from the browser to its window (PLAN.md 23.17f).
+const signInHandoff = createSignInHandoff();
 
 /*
   OSC and Art-Net are Pro (PLAN.md §23's table, the Pro page, the Settings
@@ -215,6 +212,12 @@ const server = createServer((req, res) => {
     void handleAccountShows(req, res, url);
     return;
   }
+  if (url.pathname === SIGNIN_HANDOFF_PATH) {
+    void signInHandoff.handleRequest(req, res, url, isLaptop(req));
+    return;
+  }
+  // A music file the owner's assistant named by its path (PLAN 44k-2), to the laptop alone.
+  if (serveMusicFile(req, res, url, isLaptop(req))) return;
   if (
     url.pathname === LICENSE_INFO_PATH ||
     url.pathname === LICENSE_ACTIVATE_PATH ||
@@ -402,7 +405,27 @@ const heartbeat = setInterval(() => {
 heartbeat.unref();
 
 /** Messages only the relay itself may send; a client sending one is ignored. */
-const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply']);
+const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors', 'controllers', 'hello', 'link', 'osc-out', 'assistant-mode', 'assistant-reply', 'tv-join', 'tv-leave', 'tv-show']);
+
+// ── TVs at home (PLAN 12-tv) ───────────────────────────────────────────
+// A TV plays the display's plate as a WebRTC video (src/lib/tvFeed.ts); the
+// relay only carries the handshake. Each TV gets an id, so the display can
+// answer it alone, and is paired with one display: the laptop's page that was
+// here when it joined (or the next to arrive), so two of the laptop's tabs do
+// not both make it an offer. When that display goes, the TV moves to another
+// if there is one, and otherwise hears that the show is gone, and plays films.
+const tvIds = new WeakMap();
+const tvDisplay = new WeakMap();
+let tvSeq = 0;
+const sendTo = (client, message) => { if (client.readyState === 1) client.send(JSON.stringify(message)); };
+const clientsOf = (role, except) => [...wss.clients].filter(c => c !== except && c.readyState === 1 && roles.get(c) === role);
+/** Pair a TV with a display (the newest, which is the laptop's page as it is now), or tell it there is none. */
+const pairTv = (tv, except) => {
+  const display = clientsOf('display', except).at(-1) ?? null;
+  tvDisplay.set(tv, display);
+  sendTo(tv, { type: 'tv-show', here: display !== null });
+  if (display) sendTo(display, { type: 'tv-join', id: tvIds.get(tv) });
+};
 
 // ── The assistant (PLAN 44b) ───────────────────────────────────────────
 // The owner's own AI assistant, joined from this Mac (`mcp/chromaglass-mcp.js`).
@@ -411,13 +434,35 @@ const RELAY_ONLY = new Set(['denied', 'request-state', 'request-cast', 'mirrors'
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['cue-look', 'assistant-live', 'assistant-undo', 'assistant-still', 'song-action']);
+const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-outputs', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music', 'assistant-projector', 'assistant-desk']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
+/** The Mac app's updater, when main.js hands it over (PLAN 44k-18); null in a show run from a terminal. */
+let appUpdates = null;
+export function setAppUpdates(hook) { appUpdates = hook && typeof hook.state === 'function' ? hook : null; }
+/*
+  OSC in and Syphon for the assistant (PLAN 44k-14, assistantOutputs.js): the
+  Mac app hands its own doors (`setAppOutputs`), so a change made by the
+  assistant is the Show menu's choice, kept in show.json and ticked in the
+  menu. A show run from a terminal has only this server's socket, so OSC in
+  is opened here, on the port it was started with (or CHROMAGLASS_OSC_PORT,
+  9000, when it started with OSC off), and is gone at the next restart; it
+  has no Syphon.
+*/
+let appOutputs = null;
+export function setAppOutputs(hook) { appOutputs = hook && typeof hook.state === 'function' ? hook : null; }
+const OSC_ON_PORT = OSC_PORT > 0 ? OSC_PORT : Number(process.env.CHROMAGLASS_OSC_PORT) || 9000;
+const serverOutputs = {
+  state: () => ({ oscIn: { mode: oscInMode(oscStatus), port: OSC_ON_PORT, socket: oscStatus, kept: false }, syphon: null }),
+  setOscIn: (mode) => setOsc(mode === 'off' ? 0 : OSC_ON_PORT, OSC_IN_BINDS[mode]),
+};
 const assistantMode = () => assistantNow;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
 let assistantWantsPicture = -Infinity;
+/** The display's answers still owed: the relay's number for each, to the assistant and the message id that asked (PLAN 44f-4). */
+const answerTo = new Map();
+let answerSeq = 0;
 let assistantWantsStill = -Infinity;
 const assistantWatch = setInterval(() => {
   const mode = readAssistantMode(process.env, ASSISTANT_FILE);
@@ -458,7 +503,7 @@ wss.on('connection', (socket, req) => {
     if (message.type === 'hello') {
       // One hello a socket: a second would be a free guess past the lock.
       if (roles.get(socket) !== 'unknown') return;
-      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : message.role === 'assistant' ? 'assistant' : 'controller';
+      const role = message.role === 'display' ? 'display' : message.role === 'mirror' ? 'mirror' : message.role === 'assistant' ? 'assistant' : message.role === 'tv' ? 'tv' : 'controller';
       // Only from this Mac, and only while the owner's switch is on. Not a
       // guess at the key, so it never counts towards a lockout.
       const notHere = role === 'assistant' && !laptop ? 'not-laptop' : role === 'assistant' && assistantMode() === 'off' ? 'off' : null;
@@ -506,6 +551,10 @@ wss.on('connection', (socket, req) => {
         broadcastTo('display', JSON.stringify({ type: 'request-cast' }));
         broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
       }
+      if (role === 'tv') {
+        tvIds.set(socket, `tv${++tvSeq}`);
+        pairTv(socket);
+      }
       if (role === 'assistant') {
         socket.send(JSON.stringify({ type: 'assistant-mode', mode: assistantMode() }));
         broadcastTo('display', JSON.stringify({ type: 'request-state' }));
@@ -520,6 +569,9 @@ wss.on('connection', (socket, req) => {
           // And OSC out's state, which offers its switch the same way.
           socket.send(oscOutMessage());
         }
+        // TVs waiting with no show (the laptop's page reloaded, or the app
+        // just opened) are this display's now.
+        for (const tv of clientsOf('tv')) if (!tvDisplay.get(tv) || tvDisplay.get(tv).readyState !== 1) pairTv(tv);
       }
       return;
     }
@@ -527,6 +579,22 @@ wss.on('connection', (socket, req) => {
     const from = roles.get(socket);
     // Nothing is relayed for a socket that never said hello with the key.
     if (from === 'unknown' || RELAY_ONLY.has(message.type)) return;
+    // A TV's handshake: display → the one TV it names, TV → its own display
+    // with its id added. A TV says nothing else: it only watches, and a
+    // patch from it must never reach the show as a phone's would.
+    if (message.type === 'tv-signal' && (from === 'display' || from === 'tv')) {
+      const signal = message.signal;
+      if (!signal || typeof signal !== 'object' || typeof signal.kind !== 'string') return;
+      if (from === 'display') {
+        const tv = clientsOf('tv').find(c => tvIds.get(c) === message.to && tvDisplay.get(c) === socket);
+        if (tv) sendTo(tv, { type: 'tv-signal', signal });
+      } else {
+        const display = tvDisplay.get(socket);
+        if (display) sendTo(display, { type: 'tv-signal', from: tvIds.get(socket), signal });
+      }
+      return;
+    }
+    if (from === 'tv') return;
     // The assistant's every message goes through the guard, and only what it
     // passes reaches the display. A picture request is looking, not touching,
     // so any mode on may ask.
@@ -543,10 +611,39 @@ wss.on('connection', (socket, req) => {
         assistantWantsStill = Date.now();
         broadcastTo('display', JSON.stringify({ type: 'assistant-still', width: Number(message.width) || 1280 }));
         reply = { ok: true };
+      } else if (message.type === 'assistant-updates') {
+        // The Mac app's updates (PLAN 44k-18): the main process's, answered here and never sent to the display.
+        reply = updatesCall(message, assistantMode(), appUpdates);
+      } else if (message.type === 'assistant-outputs' && RELAY_OUTPUTS.includes(message.do)) {
+        // OSC in, Syphon and their status (PLAN 44k-14): the relay's own, answered once the socket has bound.
+        void outputsCall(message, assistantMode(), appOutputs ?? serverOutputs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+          if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...r }));
+        });
+        return;
       } else {
-        reply = guard.handle(message, assistantMode());
+        // The guard hands the display the number its answer comes back under
+        // (PLAN 44f-4): one of the relay's own, since each assistant numbers
+        // its messages from 1, and two connected at once would otherwise be
+        // settled by each other's answers.
+        const n = ++answerSeq;
+        if (message.id !== undefined) {
+          answerTo.set(n, { socket, id: message.id, at: Date.now() });
+          if (answerTo.size > 64) for (const [k, v] of answerTo) if (Date.now() - v.at > 10_000) answerTo.delete(k);
+        }
+        reply = guard.handle({ ...message, id: n }, assistantMode());
       }
       if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...reply }));
+      return;
+    }
+    // The display's word on an assistant's call (PLAN 44f-4, 44k-3, 44k-5):
+    // to the assistant alone, and only from the display, so a phone cannot
+    // tell the assistant a call was done that was not.
+    if (message.type === 'assistant-answer') {
+      const to = from === 'display' ? answerTo.get(message.answer) : undefined;
+      if (to) {
+        answerTo.delete(message.answer);
+        if (to.socket.readyState === 1) to.socket.send(JSON.stringify({ ...message, answer: to.id }));
+      }
       return;
     }
     // What only the guard may hand the display: a look the assistant made, and
@@ -621,6 +718,12 @@ wss.on('connection', (socket, req) => {
       const count = [...wss.clients].filter(c => c !== socket && roles.get(c) === 'mirror').length;
       broadcastTo('display', JSON.stringify({ type: 'mirrors', count }));
     }
+    if (role === 'tv') {
+      const display = tvDisplay.get(socket);
+      if (display) sendTo(display, { type: 'tv-leave', id: tvIds.get(socket) });
+    }
+    // A display gone: its TVs move to another, or hear the show is off.
+    if (role === 'display') for (const tv of clientsOf('tv')) if (tvDisplay.get(tv) === socket) pairTv(tv, socket);
     // The last assistant gone: nothing it started keeps gliding.
     if (role === 'assistant' && ![...wss.clients].some(c => c !== socket && roles.get(c) === 'assistant')) guard.stop();
   });
@@ -890,6 +993,7 @@ server.listen(PORT, '0.0.0.0', () => {
     for (const host of hosts) {
       console.log(`  Phone (the remote): http://${host}:${PORT}/?remote=1&key=${SHOW_KEY}`);
       console.log(`  Network display:    http://${host}:${PORT}/?cast=true&key=${SHOW_KEY}`);
+      console.log(`  TV at home:         http://${host}:${PORT}/tv?key=${SHOW_KEY}`);
     }
   }
   console.log('\n  Same Wi-Fi: use the addresses above. Across buildings, other access points');

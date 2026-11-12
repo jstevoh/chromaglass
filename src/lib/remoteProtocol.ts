@@ -15,6 +15,7 @@
 
 import type { VisualizerSettings } from '../types';
 import type { CastMessage } from './castProtocol';
+import type { LiveSetup } from './liveShow';
 import { isPhoneApp, relayFromUrl, relaySocketUrl } from './appLink';
 
 /** WebSocket path the relay listens on. */
@@ -82,6 +83,13 @@ export interface RemoteSequencer {
   /** 0..1 through the current stage. */
   progress: number;
   stages: { name: string; seconds: number }[];
+  /**
+   * Every sequence there is to choose from, and the one chosen (PLAN 44k-8),
+   * for the owner's assistant to pick one by name. Optional, since a display
+   * one build older sends only the transport above.
+   */
+  sequences?: { id: string; name: string; stages: number }[];
+  selectedId?: string | null;
 }
 
 /** What the phone shows: mirrored from the display, never guessed. */
@@ -123,12 +131,177 @@ export interface RemoteState {
    * can say so and stop it: a test or the real thing, for how long, to
    * where, and whether a destination is dropping frames or retrying.
    */
-  live?: { test: boolean; seconds: number; names: string[]; trouble: boolean } | null;
+  live?: {
+    test: boolean; seconds: number; names: string[]; trouble: boolean;
+    /**
+     * Each destination's health and the frames the encoder could not take
+     * (PLAN 44j), for the owner's assistant to read a stream by: what the
+     * Live Show panel shows, without an address or a key. Optional, since a
+     * display one build older sends only the four above.
+     */
+    destinations?: { name: string; phase: string; kbps: number; secondsBehind: number; dropping: boolean; reconnects: number; error: string | null }[];
+    skipped?: number;
+  } | null;
+  /**
+   * What can be streamed to before going live (PLAN 44j): the Live Show
+   * panel's saved destinations by name, service and whether a key is kept,
+   * never the address or the key, and how the last stream ended. Null
+   * outside the Mac app.
+   */
+  liveSetup?: LiveSetup | null;
+  /** What the show hears (PLAN 44j): the sound source, and the file's name when it is one; the microphone's inputs by the picker's names, and the one chosen, null for the default (44k-12). */
+  sound?: { source: 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone'; file: string | null; input?: string | null; inputs?: string[] };
+  /**
+   * The bottles on the bench, by id, name and the colour each pours, and the
+   * one in hand (PLAN 44k-6), so the owner's assistant picks a bottle that is
+   * there rather than guessing one this bench never had.
+   */
+  bench?: { bottles: { id: string; name: string; color: string }[]; inHand: string };
+  /** The beat clock's tempo, where it comes from, and Ableton Link (PLAN 44k-7, app/tempoNow.ts). */
+  tempo?: { bpm: number; source: string | null; link: { available: boolean; on: boolean; peers: number; follows: boolean } };
+  /**
+   * The set list (PLAN 44k-3): its items by number from 1, as the desk lists
+   * them, which one is armed and the Go's fade, so the owner's assistant arms
+   * item 3 rather than guessing what "the third" is. `look` is the look an
+   * item sends (null for a sequence), for the guard's Undo.
+   */
+  set?: { name: string; items: { n: number; name: string; kind: string; look: string | null; fade: number | null; missing: boolean }[]; armed: number | null; fadeSeconds: number };
+  /**
+   * The song shows (PLAN 44k-5): Follow songs, the show running and the show
+   * of the song playing, and every show by id and song, without their actions
+   * (the assistant reads one show whole with its own question, so the state a
+   * phone is sent stays small). Not `songs`: that name is the phone
+   * controller's own, already fixed by its check (`scripts/controller.mjs`,
+   * PLAN 12-ctl), with another shape (PLAN 44k-5a folds the two together).
+   */
+  songShows?: { follow: boolean; running: { showId: string; song: string | null; manual: boolean } | null; current: string | null; shows: { id: string; song: string; actions: number }[] };
+  /**
+   * The music player (PLAN 44k-2, app/musicNow.ts): what is loaded (a shelf
+   * track's title or a file's name), its length, playing or not, the loop,
+   * and the shelf. `at` is where it was at `atTime` (epoch ms), taken on a
+   * play, pause, seek or new file and not on the clock's every tick, so the
+   * state is not re-sent to every phone four times a second; the reader
+   * carries it forward while it plays.
+   */
+  player?: { name: string | null; kind: 'track' | 'file' | null; artist: string | null; length: number; at: number; atTime: number; playing: boolean; loop: boolean; library: { title: string; artist: string; seconds: number }[] };
+  /**
+   * The ear's presses (PLAN 44k-10, app/earNow.ts): the song detector on or
+   * off, the room's calibration as it was when it last started or ended
+   * (null with Auto Calibrate off or nothing heard; dBFS, rounded), and
+   * Listen's phase, the song it named and the Songs panel's line for it.
+   */
+  ear?: { detector: boolean; room: { calibrating: boolean; floorDb: number; peakDb: number } | null; listen: { phase: string; song: { title: string; artist: string } | null; line: string } };
+  /**
+   * The set list as the phone controller shows it (PLAN 12-ctl-1): the desk's
+   * cue list in its order, each item by its id and the name the desk shows,
+   * the item on stage and the item armed, both from the desk, never from the
+   * phone's own tap. Beside `set`, which is the assistant's numbered reading
+   * of the same list (PLAN 44k-5a folds the two together).
+   */
+  setList?: { name: string; items: { id: string; name: string }[]; liveId: string | null; cuedId: string | null };
+  /**
+   * The song shows as the phone controller shows them (PLAN 12-ctl-1): each by
+   * id and its song's title, the one running, and the Songs panel's Follow
+   * songs switch (not the `songFollow` dial). Beside `songShows`, the
+   * assistant's reading.
+   */
+  songs?: { shows: { id: string; title: string }[]; runningId: string | null; follow: boolean };
+  /**
+   * Recording's options and the kept Takes (PLAN 44k-11, app/recordNow.ts):
+   * what Record makes, the Plate video's quality, fps, container and sound,
+   * the containers this browser's encoder writes, the last video, and the
+   * newest Takes (numbered from 1, the newest) with the one replaying.
+   */
+  record?: {
+    makes: 'video' | 'take' | 'both'; quality: string; fps: number; format: string; sound: boolean; formats: string[]; videoSupported: boolean;
+    lastVideo: { filename: string; seconds: number; sizeBytes: number } | null;
+    takes: { n: number; id: string; title: string | null; artist: string | null; seconds: number; gestures: number; clock: 'song' | 'wall'; date: string }[];
+    takeCount: number; replaying: number | null;
+  };
+  /**
+   * Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts):
+   * what drives the plate as the film, what pours into the dish, the room
+   * camera on or off and which camera, the mark up or not, the cameras by the
+   * pickers' names, and the cartoon shelf.
+   */
+  media?: MediaNow;
+  /** OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts): OSC out's switch and target, MIDI on or off, its ports by name, clock and the map. */
+  outputs?: OutputsNow;
+  /** The projector (PLAN 44k-15, app/projectorNow.ts): the cast window and the projector mode, and the wall's geometry, grade and test card. */
+  projector?: ProjectorNow;
+  /** The desk (PLAN 44k-16, 44k-17, app/deskNow.ts): its tabs and their panels, the pins, the palette lock, the tool and plate in hand, Ambient TV and the MIDI activity overlay. */
+  desk?: DeskNow;
 }
+
+/** One panel on a tab: where it is (a column, the deck, floating) and whether it is folded to its header. */
+export interface DeskPanelNow { id: string; name: string; where: 'left' | 'right' | 'deck' | 'float'; folded: boolean }
+/** The desk as the page holds it (PLAN 44k-16, 44k-17, app/deskNow.ts); each part null until its hook has run. */
+export interface DeskNow {
+  /** The tabs in the strip's order, the one up, and each one's panels, plate mode and deck. */
+  tabs: { id: string; name: string; plate: 'live' | 'preview'; deckFolded: boolean; panels: DeskPanelNow[] }[] | null;
+  up: string | null;
+  /** The settings pinned to the rides (Perform) and to the recipe (Design), by key, in their order. */
+  pins: { rides: string[]; recipe: string[] } | null;
+  /** The MIDI activity overlay, and Ambient TV mode (the governor's quiet rungs). */
+  activity: boolean | null;
+  ambient: boolean | null;
+  /** The palette lock, by its harmony's name, or null when the colours roam. */
+  palette: { lock: string | null } | null;
+  /** The tool in hand and its amount, and the plate in hand (from 0) of the plates on the stage. */
+  hand: { tool: string; amount: number; layer: number; layers: number } | null;
+}
+
+/** The projector as the page holds it (PLAN 44k-15, app/projectorNow.ts); null until its hook has run. */
+export interface ProjectorNow {
+  /** The second screen found (its label, or null), the screens permission, the projector mode, and whether the show's window is open. */
+  cast: { screen: string | null; permission: string; mode: 'ask' | 'auto' | 'off'; casting: boolean } | null;
+  /** The wall (lib/outputConfig.ts): its geometry and grade, the mapped shapes counted, and the test card and Identify. */
+  wall: {
+    flipX: boolean; flipY: boolean; corners: number[];
+    maskTop: number; maskRight: number; maskBottom: number; maskLeft: number; maskFeather: number;
+    gain: number; gamma: number; flashGuard: boolean; surfaces: number; test: boolean; identifying: boolean;
+  } | null;
+}
+
+/** What the plate is filmed, poured and marked with, as the display reports it (RemoteState `media`). */
+/** OSC out and MIDI as the page holds them (PLAN 44k-14, app/outputsNow.ts). */
+export interface OscOutNow { on: boolean; target: string; pro: boolean; says: string }
+export interface MidiNow {
+  /** Web MIDI exists in this browser (Safari has none). */
+  supported: boolean;
+  /** Switched on, and Web MIDI answered (`open`), or why not (`error`). */
+  on: boolean; open: boolean; error: string | null;
+  inputs: string[]; outputs: string[];
+  /** `all`, or an input's name; `auto`, `off`, or an output's name. A port chosen and since unplugged reads as its word. */
+  input: string; output: string;
+  /** MIDI clock arriving, and the map in use, by its name and its bindings' count. */
+  clocked: boolean; map: { name: string; bindings: number };
+}
+export interface OutputsNow { oscOut: OscOutNow | null; midi: MidiNow | null }
+
+export interface MediaNow {
+  /** The film: its source, the file's or the cartoon's name, the cartoon's id, the camera's name, and whether that camera was unplugged mid-show. */
+  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; cartoon: string | null; camera: string | null; cameraLost: boolean };
+  /** The film pouring into the dish (a picture, once laid, is dye and not a pour). */
+  pour: { playing: boolean; name: string | null; cartoon: string | null };
+  /** The room camera (the motion camera): on, the camera's name (null: the browser's own pick), and whether last session left it on. */
+  room: { on: boolean; camera: string | null; resume: boolean };
+  /** The mark (the logo card) is up. */
+  mark: boolean;
+  /** The cameras by the pickers' names. */
+  cameras: string[];
+  cartoons: { id: string; title: string; seconds: number }[];
+}
+
+/** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
+export type TvSignal =
+  | { kind: 'offer' | 'answer'; sdp: string }
+  | { kind: 'ice'; candidate: RTCIceCandidateInit | null }
+  | { kind: 'refused'; reason: 'tier' | 'full' };
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant'; key?: string }
+  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
@@ -170,6 +343,21 @@ export type RemoteMessage =
       /** The beat clock's tempo, 0 before it has one. */
       bpm?: number;
     }
+  /**
+   * A TV at home (PLAN 12-tv, lib/tvFeed.ts). Relay → display: a TV joined,
+   * under an id the relay made for its socket; a TV left. Relay → TV: the show
+   * is here (a display joined) or gone (the last display left), so a TV
+   * playing films while the laptop is off goes live when it comes on.
+   */
+  | { type: 'tv-join'; id: string }
+  | { type: 'tv-leave'; id: string }
+  | { type: 'tv-show'; here: boolean }
+  /**
+   * The offer, the answer and the ICE candidates, both ways through the relay.
+   * Display → relay carries `to` (the TV's id); the relay hands the TV the
+   * signal alone. TV → relay carries the signal alone; the relay adds `from`.
+   */
+  | { type: 'tv-signal'; to?: string; from?: string; signal: TvSignal }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**
@@ -191,6 +379,15 @@ export type RemoteMessage =
   /** Controller → display. */
   | { type: 'patch'; settings: Partial<VisualizerSettings> }
   /**
+   * The phone controller's Songs screen (PLAN 12-ctl-1), controller → display:
+   * arm a set item for the next Go, as tapping its row on the desk does; run
+   * or stop a song's show; the Songs panel's Follow songs switch.
+   */
+  | { type: 'cue-set-item'; id: string }
+  | { type: 'song-run'; id: string }
+  | { type: 'song-stop' }
+  | { type: 'song-follow'; on: boolean }
+  /**
    * The owner's assistant (PLAN 44b–44d; the relay's guard is
    * `server/assistant.js`, the program the assistant talks to
    * `mcp/chromaglass-mcp.js`). Only the relay's guard sends the first two to
@@ -200,12 +397,17 @@ export type RemoteMessage =
    * `cue-look`: arm a look the assistant made, a base from the library with
    * its own settings over it (`lib/assistantLook.ts`), for the performer's Go.
    * `assistant-live`: start the live stream to the saved destinations, or the
-   * test ones; Full mode only. The rest pass between the relay and the
+   * test ones, or only those `names` names (44j); Full mode only.
+   * `assistant-sound`: change the sound source (44j), Full mode, on air too
+   * since 44j-2 (the stream follows it); `device` names the microphone's
+   * input from the state's `sound.inputs`, or `default` (44k-12), and
+   * `answer` is the number the display's answer comes back under. The rest pass between the relay and the
    * assistant and never reach the display: the switch's mode, the guard's
    * answer to a numbered message, and Undo.
    */
   | { type: 'cue-look'; name: string; base: string | null; settings: Partial<VisualizerSettings> }
-  | { type: 'assistant-live'; test: boolean }
+  | { type: 'assistant-live'; test: boolean; names?: string[] }
+  | { type: 'assistant-sound'; source: 'none' | 'microphone' | 'system' | 'simulated' | 'drone'; device?: string; answer?: number }
   | { type: 'assistant-mode'; mode: 'off' | 'suggest' | 'play' | 'full' }
   | { type: 'assistant-reply'; id: number | string; ok: boolean; reason?: string }
   | { type: 'assistant-undo' }
@@ -217,8 +419,64 @@ export type RemoteMessage =
    * is (lib/songShows.ts `parseSongAction`, app/songCue.ts).
    */
   | { type: 'assistant-still'; width: number }
-  | { type: 'song-action'; when: unknown; what: unknown }
+  | { type: 'song-action'; when: unknown; what: unknown; answer?: number }
+  /**
+   * The owner's assistant (PLAN 44k-7, 44k-8), relayed only from the guard.
+   * The tempo: a typed bpm (60 to 200, the beat clock's range), a tap, or
+   * back to the ear; Link on or off and whether Live's transport moves the
+   * Sequence (Full). The Sequence: choose one by its id (as the state's
+   * `sequencer.sequences` lists them), or go to a stage by its number from
+   * 0, one or the other in a message.
+   */
+  | { type: 'assistant-tempo'; do: 'bpm' | 'tap' | 'heard'; bpm?: number }
+  | { type: 'assistant-link'; on?: boolean; transport?: boolean }
+  | { type: 'assistant-seq'; select?: string; stage?: number }
+  /**
+   * The set list and the song shows from the owner's assistant (PLAN 44k-3,
+   * 44k-5), relayed only from the guard. Each carries `answer`, the number
+   * the display's `assistant-answer` comes back under: the guard can say a
+   * call is allowed, only the display can say it was done (44f-4).
+   */
+  | { type: 'assistant-set'; do: string; item?: number; look?: string; seconds?: number; answer?: number }
+  | { type: 'assistant-songs'; do: string; show?: string | null; actionId?: string; to?: string; seconds?: number; on?: boolean; answer?: number }
+  /**
+   * The music player from the owner's assistant (PLAN 44k-2), relayed only
+   * from the guard, with `answer`: a shelf track by its title, a file as the
+   * show server's own address for it (`url`, server/assistantMusic.js; the
+   * path itself never reaches the page), play, pause, seek, loop, close.
+   */
+  | { type: 'assistant-music'; do: string; track?: string; url?: string; name?: string; seconds?: number; on?: boolean; answer?: number }
+  /** Calibrate, the song detector and Listen from the owner's assistant (PLAN 44k-10), relayed only from the guard, with `answer`. */
+  | { type: 'assistant-ear'; do: string; on?: boolean; title?: string; artist?: string; answer?: number }
+  /** Recording's options and a Take replayed, stopped or deleted, from the owner's assistant (PLAN 44k-11), relayed only from the guard, with `answer`. */
+  | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
+  /** Film, pours, the room camera and the mark from the owner's assistant (PLAN 44k-13), relayed only from the guard, with `answer`; a file as the show server's own address for it (`url`, server/assistantMedia.js). */
+  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
+  /** OSC out and MIDI from the owner's assistant (PLAN 44k-14), relayed only from the guard, with `answer`; OSC in and Syphon are the relay's own. */
+  | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
+  /** The projector and the wall from the owner's assistant (PLAN 44k-15), relayed only from the guard, with `answer`; the geometry already judged there (server/assistantProjector.js). */
+  | { type: 'assistant-projector'; do: string; on?: boolean; mode?: string; wall?: Record<string, unknown>; answer?: number }
+  /** The desk from the owner's assistant (PLAN 44k-16, 44k-17), relayed only from the guard (server/assistantDesk.js), with `answer`; names and ids are found on the page. */
+  | { type: 'assistant-desk'; do: string; verb?: string; tab?: string; op?: string; name?: string; by?: number; copyOf?: string; panel?: string; slot?: string; index?: number; plate?: string; surface?: string; key?: string; on?: boolean; hand?: Record<string, unknown>; view?: Record<string, unknown>; answer?: number }
+  /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
+  | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
+  /**
+   * Words poured onto the plate as dye, which the flow then carries off
+   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
+   * of each track in a live set. From the phone remote's text box, or
+   * through the relay's guard; the display reads it with `parsePourText`
+   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   */
+  | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
+  /**
+   * A song's credit shown as the corner caption over the plate and burned
+   * into the live stream (PLAN 37x-10j, `lib/songCaption.ts`): the artist,
+   * the title, and the album and label when known, as a music channel's
+   * card of the early 1980s, for about seven seconds. The display reads it
+   * with `parseSongCaption` whoever sent it.
+   */
+  | { type: 'song-title'; title: string; artist?: string; album?: string; label?: string }
   /**
    * Arm a look without sending it. `null` disarms.
    *
@@ -298,7 +556,7 @@ export type RemoteMessage =
  * the link named (found in review, and checked by `npm run applink`). A
  * controller outside the app has no reason to go anywhere but home either.
  */
-export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror'): string {
+export function remoteSocketUrl(role: 'display' | 'controller' | 'mirror' | 'tv'): string {
   const relay = role === 'controller' && isPhoneApp() ? relayFromUrl() : null;
   if (relay) return relaySocketUrl(relay, REMOTE_WS_PATH);
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';

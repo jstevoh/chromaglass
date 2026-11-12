@@ -84,7 +84,7 @@ export const THIN_GAP_THICKNESS = 0.45;
  */
 export const FERRO_NU = 5e-6;
 /** The thin gap's kernels (wgsl/thinGap.ts): built before the opening's first step, or when first turned on in a show that opened without it. */
-export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin'];
+export const THIN_GAP_KERNELS = ['hsBody', 'hsPrep', 'hsDivergence', 'hsWarmDot', 'hsWarmFit', 'hsWarmScale', 'hsSmooth0', 'hsRestrict0', 'hsCoarsen', 'hsSmooth', 'hsRestrict', 'hsProlong', 'hsProlong0', 'hsGradient', 'carryCourant', 'carryPlan', 'airGiveSub', 'airGiveThin', 'heatPack', 'heatUnpack'];
 /** The least step displacement a bubble's air pushes the thin solve's liquid at (fluid.ts, PLAN 15g-8b): Classic's is 0.00065. */
 export const AIR_DISP_LEAST = 1e-5;
 /*
@@ -168,6 +168,78 @@ export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
 export const OIL_CELLS = 0.5;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
+/*
+  The oil's own weight against the water, cold, and how much more than the
+  water it swells when warmed (PLAN 27f-9c, Oil Weight; mixForce and
+  sealSource lay both).
+
+  What was reported (the Mac film of Lava Lamp sealed, 2026-11-11): the
+  wax stayed in the plate but the plate was red wall to wall, with no
+  separate blobs and no clear liquid. The wax was dye, and dye is one liquid
+  with the water: it mixes. A real lamp's wax is an immiscible liquid (a
+  paraffin blend, a few per cent heavier than the liquid round it cold) that
+  holds itself in bodies by its surface tension, and it rises because it
+  swells with heat more than the liquid does, so it is lighter warm. The
+  engine's immiscible phase is the oil (Oil Tension's Cahn–Hilliard mix), and
+  until now its weight was fixed at "lighter than the water" (the mineral
+  oil of a light show's dish): 0.15 of a unit of dye, the number mixForce
+  carried since PLAN §18f.
+
+  OIL_RHO is the oil's density over the water's at full Oil Weight in the
+  dye's units (the units Dye Weight lays: a unit of dye is a heavy ink), so
+  the dial's −1..1 runs from 3 units lighter to 3 heavier, and
+  OIL_WEIGHT_DEFAULT, −0.05, is the 0.15 lightness every oil look had, so
+  they keep it. The scale is the heat's, not the mineral oil's: the lamp
+  warms the wax on the bottom glass to about 15 of the heat's units, and the
+  heat lifts a cell HEAT_LIFT/DYE_WEIGHT = half a unit of dye per unit of
+  heat (three halves in the oil), so a wax that is to sink once it has
+  cooled to a fifth of that and still lift off the lamp weighs one to two
+  units cold. Measured in the lab (128², Lava Lamp's settings): at 0.24
+  (the first scale's 0.8) the risen wax cooled to the bath's heat, about 1,
+  where its weight and its swelling all but cancelled, and it hung in the
+  upper half for good (the oil's centroid 0.28 → 0.58 of the plate's height
+  in 48 s and never back). The far ends are past any real oil, as the dials'
+  rule asks (PLAN 27h).
+
+  OIL_EXPAND is the oil's heat lift beyond the water's, per unit of oil: the
+  heat lifts a cell by HEAT_LIFT × T × (1 + OIL_EXPAND × c). Paraffin's
+  volumetric expansion is about 7.6e-4 per kelvin and water's 2.1e-4 at 20 °C
+  (4.6e-4 at 50 °C, CRC Handbook), so the oil swells two to three and a half
+  times what the water does: 2 is the low end, a warm lamp's. Every oil has
+  it, light or heavy, and it acts only where a heat and a gravity in the
+  plate meet (a standing plate with its lamp), which no oil look stood on
+  before this.
+*/
+export const OIL_RHO = 3;
+export const OIL_WEIGHT_DEFAULT = -0.05;
+export const OIL_EXPAND = 2;
+/*
+  No melt. A first cut gave a heavier oil a melt too (WAX_MELT, 2 of the
+  heat's units over ±0.5, the weight turned from heavy to as light across
+  it): paraffin grows 10 to 15% in volume on melting, which is what a real
+  lamp runs on. Measured on Lava Lamp's own step (`npm run lavawax`'s, against
+  a lab built without it), it changed nothing the plate does: the wax's centre of
+  mass at six seconds 0.24 of the height with it, 0.23 without, against 0.13
+  with no heat. The wax settles over the lamp where its warmth and swelling
+  balance its weight, and the melt's turn did not move that balance. So it
+  went (its two Sim slots are padding now, SIM_FLOATS); a lamp that cycles is PLAN 27f-9e, and a melt that does
+  something comes back with it, measured.
+*/
+/** The oil's density over the water's in dye units, from Oil Weight (−1..1; left out, the mineral oil's −0.15). */
+export function oilRhoOf(weight: number | undefined): number {
+  const w = Number.isFinite(weight) ? Math.max(-1, Math.min(1, weight as number)) : OIL_WEIGHT_DEFAULT;
+  return OIL_RHO * w;
+}
+/**
+ * The oil's lightness as a share of the mineral oil's, for the passes that
+ * carry a lightness of their own in real units (the oil's lift up a rocked
+ * plate, OIL_LIFT; the centrifuge, SPIN_OIL_LIGHT): 1 at the default, 0 for
+ * an oil as heavy as the water, below zero for one heavier (it then falls
+ * down the rocked plate and goes out to the rim of a turning dish).
+ */
+export function oilLightnessOf(weight: number | undefined): number {
+  return -oilRhoOf(weight) / (OIL_RHO * -OIL_WEIGHT_DEFAULT);
+}
 /**
  * The lamp heating rate: absorbed lamp irradiance turning into heat per second (PLAN §18f).
  * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
@@ -175,6 +247,74 @@ export const HEAT_LIFT = 0.06;
 export const LAMP_HEATING = 0.24;
 /** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
 export const LAMP_HEAT = 6;
+/*
+  The cool top of a lamp (PLAN 27f-9e): where the heat a standing plate's
+  lamp lays goes out again.
+
+  Reported (the 38f-1 lab, 192², 16 s): with the heat carried, Lava Lamp's
+  wax rose in plumes and gathered at the top, and stayed there. Nothing took
+  its heat but Heat Decay, a per-look fade on the look's clock (decayVel),
+  which on Lava Lamp's step (0.0013 of a unit against a sixtieth of a
+  second) is a time constant of about ten minutes: a risen body was still
+  light when the take ended.
+
+  In a thin gap every parcel of the liquid touches both glasses, a
+  millimetre either side, and that is where its heat goes: across the gap
+  by conduction, whose slowest mode in a slab of thickness h between two
+  walls held at one temperature dies as exp(−π²κt/h²). At the rest gap of
+  2 mm that is 2.9 s for water (κ = 1.4e-7 m²/s) and 5.8 s for a paraffin
+  wax (KAPPA_WAX below). A real lava lamp's blob, ten times wider than its
+  distance to any wall, keeps its heat for minutes and cools on the liquid
+  round it; a gap's blob cools on the glass, in seconds, which is the gap's
+  own physics and not a speed-up.
+
+  Where the glass is cold. A lava lamp's top is its cooler: the heat the
+  lamp puts in at the floor leaves through the cap and the upper glass,
+  while the lower glass stands in the lamp's own warm air, rising off the
+  base, and rides the warm liquid behind it (a 2 mm gap conducts about
+  k/(h/2) = 600 W/m²K to its glass against still air's 10 from it, so a
+  glass the air does not cool sits within a few percent of its liquid). So
+  the column holds a gradient, warm below and cool above, and that is what
+  turns a rising blob round: warmed on the floor, it keeps its heat through
+  the warm lower part and gives it up in the cool upper one. LAMP_COOL_FROM
+  is where the cool glass starts, as a share of the plate's height from the
+  floor, and it comes in over a sheet of glass's fin length,
+  √(k t / h_air) = √(1.0 W/mK × 3 mm / 10 W/m²K) ≈ 17 mm (GLASS_FIN, in the
+  plate's widths of 0.2 m), the distance over which a glass sheet carries
+  heat sideways before the air has taken it.
+
+  Measured in the lab (128², Lava Lamp's settings, 30 s; the oil's centre
+  of mass as a share of the height, the lay at 0.35):
+    no cooling (Heat Decay alone): up to 0.73 by 12 s and there at 30 s;
+    the cool glass from the lamp's own band (0.22 of the height) up: up to
+    0.46 at 6 s and down by 10 s, then the pool on the floor turned over
+    in itself and never let a blob go (its top always in the cold), 0.29
+    at 30 s;
+    from 0.35: 0.52 at 6 s, 0.28 at 16 s, 0.39 at 24 s, a shallow cycle;
+    from the half: 0.59 at 8 s, 0.31 at 18 s, 0.50 at 30 s, rising
+    again: the cycle, about 25 s round. So the half.
+
+  A shortcut, named (PLAN 27f-9g): the glass's temperature is laid by
+  height (riding the liquid below LAMP_COOL_FROM, the room's above) rather
+  than given a temperature of its own that the liquid warms and the air
+  cools (the lumped glass and air of lib/lampBoil.ts), so a lamp run for an
+  hour does not warm up as a real one does, and the cool line does not
+  move with how hot the lamp runs.
+*/
+export const KAPPA_WAX = 7e-8;       // m²/s: liquid paraffin, k ≈ 0.16 W/mK over ρc ≈ 780 kg/m³ × 2.9 kJ/kgK
+export const GLASS_FIN = 0.017 / DISH_METRES;
+export const LAMP_COOL_FROM = 0.5;
+/**
+ * How far a standing plate's glass draws a water cell's heat down in one
+ * step (S.lampCool, writeSim): the gap's slowest conduction mode, π²κ/h²,
+ * at the gap the cover holds (metres), times the step's real seconds. The
+ * heat a cell keeps is exp(−that), the wax's at its own κ (mixForce).
+ */
+export function lampCoolOf(gapMetres: number, seconds: number | undefined): number {
+  const h = Number.isFinite(gapMetres) ? Math.max(1e-5, gapMetres) : REST_GAP_METRES;
+  const s = Number.isFinite(seconds) ? Math.max(0, Math.min(0.1, seconds as number)) : 1 / 60;
+  return (Math.PI * Math.PI * KAPPA_WATER * s) / (h * h);
+}
 /*
   Vorticity confinement's push, as a fraction of the local spin, per step.
   The Swirl dial scales it up to 2 (PLAN 27h-2; fluid.ts holds the top). It
@@ -199,10 +339,33 @@ export const CONFINE = 0.35;
 /** Cahn–Hilliard substeps a step for the oil (see the 'mix' stage). */
 export const CH_SUBSTEPS = 4;
 /*
+  Where the oil's mixture stops being able to sit still (its spinodal), as a
+  share of oil from either pure liquid: the deep quench of mixMu's free
+  energy (wgsl/fluid/capillary.ts, PLAN 38f-2). The old quartic double well
+  put it at 0.21, so a smear of oil under a fifth full was stable for ever: a
+  rising wax plume's trailing edge, once the carry had spread it, stayed a
+  coloured haze. Wax and water mix to parts per million, so their spinodal
+  lies within a few per cent of the pure liquids; 0.05 is as near as the
+  explicit step allows (the wall's curvature, OIL_WELL / OIL_SPINODAL, sets
+  its limit: below).
+*/
+export const OIL_SPINODAL = 0.05;
+/*
+  The free energy's slope at the spinodal (its peak), set so the curvature
+  between the two spinodals is −1, the old quartic's at half full: the edge's
+  width is what it was. The wall's curvature is then OIL_WELL / OIL_SPINODAL =
+  9, and the explicit Cahn–Hilliard step on this stencil holds while
+  M·dt·(64 + 8 × 9) < 2, M·dt < 0.0147, over the 0.012 the mix stage runs.
+*/
+export const OIL_WELL = 0.5 - OIL_SPINODAL;
+/*
   Film Hold at 1, as a chemical potential: what the water in a film one
-  cell thick costs the oil, against the double well's own height (1/16)
-  and its steepest pull (0.19 at a fifth full). Set in the lab against
-  the packed splodascope plate (npm run filmhold): see there.
+  cell thick costs the oil, against the double well's own height and its
+  steepest pull. Set in the lab against the packed splodascope plate (npm
+  run filmhold) when the well was the quartic (1/16 high, 0.19 at a fifth
+  full); the deep well (OIL_WELL, PLAN 38f-2) is 0.11 high and pulls 0.45
+  at its spinodal, so the hold is now about 1.3 times that pull, not 3, and
+  filmhold still passes 6/6 on it (35 → 29 drops held, no oil made).
 */
 export const FILM_MU = 0.6;
 /*
@@ -570,7 +733,14 @@ export const ROCK_FALL = 12 * (DISH_GAP_METRES / 0.006) ** 2;
 */
 export const LIFT_MOST = 256;
 export const LIFT_SWEEPS = 8;
-export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax'];
+/*
+  Built behind the show with them: the sealed bottle's source and flow
+  (PLAN 27f-9, wgsl/fluid/seal.ts), which relax on hsLiftRelax with buffers
+  of their own. A standing plate lays its weight on the open rim until they
+  are in (sealReady), as it always did.
+*/
+export const SEAL_KERNEL_NAMES = ['sealSource', 'hsLiftRelax', 'sealFlow'];
+export const LIFT_KERNELS = ['hsOilMean', 'hsLiftSource', 'hsLiftRelax', 'sealSource', 'sealFlow'];
 export function liftGrid(n: number): number { return Math.max(2, 2 * Math.floor(Math.min(LIFT_MOST, n) / 2)); }
 export const OIL_LIFT = SPIN_OIL_LIGHT * 9.81 * REST_GAP_METRES ** 2 / (12 * NU_REF);
 /*
@@ -737,4 +907,4 @@ export const RG32 = 'rg32float';
 export const RGBA32 = 'rgba32float';
 
 /** The Sim uniform, laid out as WGSL sees it (see SIM_STRUCT). */
-export const SIM_FLOATS = 52;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51
+export const SIM_FLOATS = 56;      // 36 scalars (33 is the vec2's alignment), the fingers' three magnets at 36..47, the magnets' radius at 48, surfaceClear at 49, lampHeat at 50, the cover's gap at 51, the oil's weight and expansion at 52..53 (PLAN 27f-9c), the lamp's glass cooling at 54 (PLAN 27f-9e), 55 unused: a uniform struct binds at a multiple of 16 bytes, so 54 floats (216) failed validation against the 224 it asks

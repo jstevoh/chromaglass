@@ -33,6 +33,7 @@ the component.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
+- `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).
 - `speciesPoll.ts`: `SpeciesPoller` (`speciesShare` and `speciesSnapshot` polled once a second on a thin gap) and `stepPlateBubbles` (handing the snapshot to `BubbleField` on a thin gap and stepping the bubbles).
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
   `resolveSimResolution`, `engineLabel`.

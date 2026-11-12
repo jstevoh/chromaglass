@@ -11,6 +11,7 @@
 import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
 import { RIM_SIDE } from './oil';
+import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM } from '../../fluid/constants';
 
 /*
   How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
@@ -155,13 +156,37 @@ export const CAPILLARY_KERNELS: Record<string, string> = {
   /*
     Oil and water: the Cahn–Hilliard chemical potential.
 
-    μ = f′(c) − κ∇²c, with f(c) = c²(1 − c)², the double well whose two floors
-    are pure water and pure oil. The first term drives a mixed cell toward
-    one or the other; the second charges for every bit of boundary, which is
-    what surface tension *is*: a blob rounds up because a circle is the
-    shortest boundary for its area, and a thin thread breaks into drops for
-    the same reason (Rayleigh–Plateau). Neither is drawn; both fall out.
-    Stored in the mix's alpha for the update and the force to read.
+    μ = f′(c) − κ∇²c, with f a double well whose two floors are pure water
+    and pure oil. The first term drives a mixed cell toward one or the
+    other; the second charges for every bit of boundary, which is what
+    surface tension *is*: a blob rounds up because a circle is the shortest
+    boundary for its area, and a thin thread breaks into drops for the same
+    reason (Rayleigh–Plateau). Neither is drawn; both fall out. Stored in
+    the mix's alpha for the update and the force to read.
+
+    **The well is a deep quench** (PLAN 38f-2). It was c²(1 − c)², whose
+    spinodal (where f″ turns negative and a mixture comes apart by itself)
+    sits at 0.21 from either side: a cell under a fifth oil was metastable,
+    and with nothing to nucleate it, it stayed so. Once the heat rode the
+    flow (38f-1) the Lava Lamp's wax rose in plumes, and the carry spread
+    each plume's trailing edge into cells about 0.15 oil that never came
+    back: at 192², 6 s, 4,370 cells of haze, half the oil and its colour in
+    them, the dish 67% clear. Real wax and water are not like that. They
+    mix to parts per million (the regular solution at large χ, Flory–
+    Huggins' deep quench), so their spinodal lies within a few per cent of
+    the pure liquids and a smear of one in the other is unstable at any
+    share: it comes apart into drops, which ripen into the bodies.
+
+    So f′ is that shape, laid in two lines a side: from each pure liquid a
+    steep wall, f′ = (OIL_WELL / OIL_SPINODAL)·y for y (the share of the
+    other liquid) up to OIL_SPINODAL, then down in a straight line to 0 at
+    half full, a curvature of −1 there, the old well's own at the middle,
+    so an edge keeps the width it had. The capillary force does not read μ
+    (it is σκ∇c̃, mixForce), so the tension a body shows is unchanged; what
+    changes is that the mixture now has nowhere to rest between the two.
+    The same lab: haze 1,474 cells, 72% of the colour in the bodies against
+    42%, the dish 83% clear. Past the pure liquids the wall goes on, so an
+    overshoot is pulled back as before.
 
     And, with Film Hold (A.a.x), the water film between two bodies of oil
     pushes back as it thins: FILM_WGSL says what that is and why.
@@ -182,7 +207,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let m = textureLoad(src, p, 0);
   let c = m.r;
   let lap = ccN(p, vec2i(1, 0), n, c) + ccN(p, vec2i(-1, 0), n, c) + ccN(p, vec2i(0, 1), n, c) + ccN(p, vec2i(0, -1), n, c) - 4.0 * c;
-  var mu = 2.0 * c * (1.0 - c) * (1.0 - 2.0 * c) - lap;
+  // The deep quench's slope (above): y the share of the other liquid, the wall then the slope to half full.
+  let y = min(c, 1.0 - c);
+  let well = select((${(OIL_WELL / OIL_SPINODAL).toFixed(4)}) * y, ${OIL_WELL.toFixed(4)} * (0.5 - y) / ${(0.5 - OIL_SPINODAL).toFixed(4)}, y > ${OIL_SPINODAL.toFixed(4)});
+  var mu = select(well, -well, c > 0.5) - lap;
   // In the water only: an edge cell on the oil's side sees its own oil
   // both ways along the edge's tangent, and is not in a film.
   if (A.a.x > 0.0) { mu += A.a.x * filmSqueeze(p, n) * (1.0 - smoothstep(0.15, 0.5, c)); }
@@ -356,19 +384,68 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let wax = textureLoad(dye, p, 0).a;
   let oil = textureLoad(mix, p, 0).r;
-  // Oil has density below water (PLAN §18f): floats upward when plate is upright/tilted.
-  let rho = wax - S.meanD - 0.15 * oil;
-  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z);
+  /*
+    The oil's own weight (Oil Weight, S.oilRho: −0.15 the mineral oil that
+    floats up a standing plate, PLAN §18f; heavier than the water for a lava
+    lamp's wax, PLAN 27f-9c), and its heat lift beyond the water's: an oil
+    swells with heat two or three times what water does (OIL_EXPAND), so a
+    warmed body of it lifts more than the warmed water beside it, which is
+    what turns a lamp's wax from heavy to light.
+  */
+  let rho = wax - S.meanD + S.oilRho * oil;
+  let buoy = A.b.xy * (A.b.z * rho - A.b.w * v.z * (1.0 + S.oilExpand * oil));
   var heat = v.z;
   if (A.a.z > 0.0) {
     /*
-      Into the dye, not the water round it. Warming everything in the band
+      Into the wax, not the water round it. Warming everything in the band
       alike lifts nothing: the wax is still the heaviest thing there, and a
       force the same everywhere is a pressure. The wax is what swells with
       heat in a lava lamp, so that is where the lamp's heat goes.
+
+      Where the wax is dye it has no body to lie anywhere, so its heat is laid
+      in the band just past the view (A.a.w), where a dye spreads out of
+      sight. Where it is a liquid of its own (the oil, PLAN 27f-9c) its body
+      lies on the glass at the bottom of the bottle, and the lamp warms it
+      there, through that floor: the last tenth of the plate's half-width
+      inside the rim. Laid in the same band as the dye's, the lab's wax
+      (128², Lava Lamp's settings) never reached the floor: a cooled body
+      sank to the band's top edge, warmed within half a second and lifted
+      again, and the wax hung as a layer a third of the way up with clear
+      liquid under it, where a lamp's wax lies in a pool on the bottom and
+      leaves it in bodies.
+    */
+    /*
+      An oil heavier than the water (S.oilRho above 0) is the wax, and then
+      the dye is only the colour: in the water it is what the bodies have
+      lost, and warmed in the dye's band it made a hot pool of water under
+      the wax that held the risen bodies up for good (the lab at 60 s: the
+      water below a quarter of the plate's height at 12 of the heat's units
+      against 2.9 in the wax and 1.8 in the water above). And the oil is
+      warmed as a body (from a quarter to three quarters full), not as the
+      faint haze Cahn–Hilliard leaves in the water, which on the warm floor
+      was a heater of its own.
     */
     let down = dot(uvOf(id) - vec2f(0.5), normalize(A.b.xy));
-    heat += A.a.z * smoothstep(A.a.w - 0.08, A.a.w, down) * clamp(wax * 2.0, 0.0, 1.0);
+    let dyeWax = select(clamp(wax * 2.0, 0.0, 1.0), 0.0, S.oilRho > 0.0);
+    heat += A.a.z * max(smoothstep(A.a.w - 0.08, A.a.w, down) * dyeWax * (1.0 - oil),
+                        smoothstep(0.28, 0.34, down) * (1.0 - smoothstep(0.42, 0.46, down)) * smoothstep(0.25, 0.75, oil));
+    /*
+      And out through the cool upper glass (PLAN 27f-9e; constants.ts
+      KAPPA_WAX has the physics): every cell's heat crosses the gap to the
+      two glasses at the gap's slowest conduction rate, π²κ/h² (S.lampCool,
+      water's, on the step's real seconds), the wax's at its own κ, and the
+      glass takes it where it is cold: the plate's upper part, from
+      LAMP_COOL_FROM of its height, coming in over the glass's fin length
+      (GLASS_FIN). So a body that rose off the lamp keeps its heat through
+      the warm lower half, gives it up in the upper one in a few seconds,
+      is heavy again and comes down to be warmed: the cycle. Toward the
+      room's temperature, zero, from either side, so a hand's cold goes too.
+      down is 0 at the middle and 0.5 at the floor, so the height over the
+      floor is 0.5 − down.
+    */
+    let cold = 1.0 - exp(-max(${(0.5 - LAMP_COOL_FROM).toFixed(3)} - down, 0.0) / ${GLASS_FIN.toFixed(5)});
+    // (The wax's κ over the water's, by how much of the cell is wax; not mix(), the oil's texture's name here.)
+    heat *= exp(-S.lampCool * (1.0 - ${(1 - KAPPA_WAX / KAPPA_WATER).toFixed(5)} * clamp(oil, 0.0, 1.0)) * cold);
   }
   v = vec4f(v.xy + capillary + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));

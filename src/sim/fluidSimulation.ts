@@ -22,7 +22,7 @@ import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, layLavaLamp } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -47,7 +47,7 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP } from './stepping';
+import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { rimCount, rimMask } from '../lib/rimMask';
 
@@ -253,10 +253,12 @@ export class FluidSimulation {
   private sheetLaid = false;
   /** Sound Drive's bass, as a hand on the glass (lib/squish.ts `BassPress`, PLAN 27e). */
   readonly bassPress = new BassPress();
+  /** Hands held on the glass this step (0..1 plate coords), blocking the fan's air over the spot (PLAN 36e-2). */
+  boilHolds: { x: number; y: number; radius?: number }[] = [];
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.boilHolds = []; this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -1370,7 +1372,7 @@ export class FluidSimulation {
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
-    const harmony = PRESET_CONTRACTS[presetId] || pickHarmony();
+    const harmony = PRESET_CONTRACTS[look] || pickHarmony();
     const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
 
     const dishSum = () => {
@@ -1430,8 +1432,8 @@ export class FluidSimulation {
 
     switch (presetId) {
       case 'galaxy': {
-        // Bright core + compact two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
-        this.splatBlob(cx, cy, 4.2, 3.8, 0.85, 0.92, 1.0);
+        // Gold core (28i-7) + two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
+        this.splatBlob(cx, cy, 4.2, 3.8, 1.0, 0.8, 0.45);
         this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {
@@ -2050,25 +2052,9 @@ export class FluidSimulation {
       }
 
       case 'lava-lamp': {
-        // Translucent wax plumes (seedMean ~0.52 so Beer-Lambert transmission stays
-        // bright at 8 s without opaque blackout) with warm rising lower blobs and
-        // sinking upper blobs so convection is already underway by 8 s and sustains
-        // >=0.02 motion through 40 s at luma <=0.60 (PLAN 28i-2).
-        const blobs: [number, number, number, number, number, number][] = [
-          [0.50, 0.66, 14, 0, 14, -0.10],
-          [0.34, 0.62, 13, 1, 12, -0.08],
-          [0.66, 0.60, 13, 2, 12, -0.08],
-          [0.48, 0.46, 13, 0,  6, -0.05],
-          [0.34, 0.36, 12, 1,  0,  0.08],
-          [0.66, 0.36, 12, 2,  0,  0.08],
-        ];
-        for (const [fx, fy, rad, ci, heat, vy] of blobs) {
-          const c = col(ci);
-          const x = fx * S, y = fy * S;
-          this.splatBlob(x, y, rad, 1.15, c.r, c.g, c.b);
-          if (heat > 0) this.addTemp(Math.floor(x), Math.floor(y), heat);
-          this.addVelocity(Math.floor(x), Math.floor(y), 0, vy);
-        }
+        // The wax as a liquid of its own, a pool and three bodies (PLAN 27f-9c; src/lib/oilLay.ts says why).
+        const c = col(0);
+        layLavaLamp(S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }), (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
         break;
       }
 
@@ -2599,10 +2585,9 @@ export class FluidSimulation {
   }
 
   /*
-    `dye`, the share of `amount` that is colour: 0 for a clear liquid poured
-    with no dye in it (lib/liquidColour.ts). A drop's impact is its size, not
-    its colour, so a clear drop from a height still splashes; only what it
-    lays is scaled.
+    `dye`, the share of `amount` that is colour, in every style: 0 for a clear
+    liquid (lib/liquidColour.ts) or the music on a reagent (PLAN 25i-10). A
+    clear drop still splashes; only what it lays is scaled.
   */
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1) {
     const S = this.size;
@@ -2621,7 +2606,7 @@ export class FluidSimulation {
             const noise = this.rng.float();
             if (noise > 0.4) continue;
             const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * (1 - noise);
-            this.addDensity(px, py, amount * w, r, g, b);
+            this.addDensity(px, py, amount * dye * w, r, g, b);
           }
         }
         break;
@@ -2641,7 +2626,7 @@ export class FluidSimulation {
               const dd = Math.sqrt(ddx * ddx + ddy * ddy);
               if (dd > dropR) continue;
               const nx = clamp(px + ddx, 1, S - 2), ny = clamp(py + ddy, 1, S - 2);
-              this.addDensity(nx, ny, amount * (1 - dd / dropR) * 0.6, r, g, b);
+              this.addDensity(nx, ny, amount * dye * (1 - dd / dropR) * 0.6, r, g, b);
             }
           }
           this.addVelocity(px, py, Math.cos(a) * (0.3 + energy * 0.5), Math.sin(a) * (0.3 + energy * 0.5));
@@ -2656,7 +2641,7 @@ export class FluidSimulation {
             if (dd > pourR) continue;
             const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
             const w = Math.pow(1 - dd / pourR, 1.5);
-            this.addDensity(nx, ny, amount * 1.3 * w, r, g, b);
+            this.addDensity(nx, ny, amount * dye * 1.3 * w, r, g, b);
             /*
               `outward` is a hand's Pour from anywhere but the mouse, which
               spreads from where it lands as the mouse's does (see the hand
@@ -2679,7 +2664,7 @@ export class FluidSimulation {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
           if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
           const w = 1.0 - Math.abs(t) / len;
-          this.addDensity(sx, sy, amount * 0.35 * w, r, g, b);
+          this.addDensity(sx, sy, amount * dye * 0.35 * w, r, g, b);
           this.addVelocity(sx, sy, dx * 0.2 * w, dy * 0.2 * w);
         }
         break;
@@ -3371,6 +3356,8 @@ export class FluidSimulation {
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
+      // The oil's weight against the water (PLAN 27f-9c): −0.05, the mineral oil's lightness, where a look leaves it out.
+      oilWeight: Math.max(-1, Math.min(1, Number.isFinite(settings.oilWeight) ? settings.oilWeight : -0.05)),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),
       soapBreakdown: c01(settings.soapBreakdown),
@@ -3460,6 +3447,8 @@ export class FluidSimulation {
       particleLife: 4,
       meanDensity: this.meanDensity,
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
+      heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
+      boilHolds: this.boilHolds,
     };
   }
 
@@ -3471,57 +3460,7 @@ export class FluidSimulation {
    * itself lives in cvx/cvy.
    */
   private stepCurrent(p: GpuStepParams) {
-    const M = this.CM, S = this.size;
-    const cvx = this.cvx, cvy = this.cvy, cpr = this.cpr, cdv = this.cdv;
-    for (let j = 1; j < M - 1; j++) {
-      for (let i = 1; i < M - 1; i++) {
-        const k = i + j * M;
-        const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
-        const dd = Math.tanh(this.density[q] - p.meanDensity);   // saturated (see the GPU twin)
-        const upright = c01(p.plateUpright ?? 0);
-        let fx = p.rockX * dd;
-        let fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd;   // Boussinesq linear in temperature, gated on upright (see the GPU twin)
-        const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
-        const r = Math.sqrt(tx * tx + ty * ty);
-        if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
-        // Relax toward the flow the forces ask for (see the GPU twin).
-        let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
-        let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
-        const s = Math.sqrt(vx * vx + vy * vy);
-        if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
-        cvx[k] = vx; cvy[k] = vy;
-      }
-    }
-    // Walls: no flow through them.
-    for (let i = 0; i < M; i++) { cvx[i] = cvy[i] = cvx[i + (M - 1) * M] = cvy[i + (M - 1) * M] = 0; cvx[i * M] = cvy[i * M] = cvx[M - 1 + i * M] = cvy[M - 1 + i * M] = 0; }
-    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-      const k = i + j * M;
-      cdv[k] = -0.5 * (cvx[k + 1] - cvx[k - 1] + cvy[k + M] - cvy[k - M]) / M;
-    }
-    for (let it = 0; it < 10; it++) {
-      for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-        const k = i + j * M;
-        cpr[k] = (cdv[k] + cpr[k - 1] + cpr[k + 1] + cpr[k - M] + cpr[k + M]) * 0.25;
-      }
-      for (let i = 0; i < M; i++) { cpr[i] = cpr[i + M]; cpr[i + (M - 1) * M] = cpr[i + (M - 2) * M]; cpr[i * M] = cpr[1 + i * M]; cpr[M - 1 + i * M] = cpr[M - 2 + i * M]; }
-    }
-    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-      const k = i + j * M;
-      cvx[k] -= 0.5 * (cpr[k + 1] - cpr[k - 1]) * M;
-      cvy[k] -= 0.5 * (cpr[k + M] - cpr[k - M]) * M;
-    }
-    // Into the velocity the dye is carried by, sampled up to the logical grid.
-    for (let j = 1; j < S - 1; j++) {
-      const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = c01(y - j0);
-      for (let i = 1; i < S - 1; i++) {
-        const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = c01(x - i0);
-        const k = i0 + j0 * M;
-        const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
-        const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;
-        this.vx[i + j * S] += ux;
-        this.vy[i + j * S] += uy;
-      }
-    }
+    stepCurrentCpu(this.CM, this.size, this.cvx, this.cvy, this.cpr, this.cdv, this.density, this.temp, this.vx, this.vy, p);
   }
 
   // ── Private simulation methods ─────────────────────────────────────
