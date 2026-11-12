@@ -10,6 +10,7 @@ import { useGamepad } from '../hooks/useGamepad';
 import { laidColour } from '../lib/liquidColour';
 import { useProjector } from '../hooks/useProjector';
 import { midiDoorOf, publishMidi, setMidiDoor } from './outputsNow';
+import { publishCast, setCastDoor } from './projectorNow';
 import type { SettingRide } from '../lib/ride';
 import type { VisualizerSettings, LiquidType } from '../types';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
@@ -55,6 +56,7 @@ interface ControllersDeps {
   setActiveLayer: Dispatch<SetStateAction<number>>;
   stageLayers: number;
   startCast: (mode?: "window" | "device", screen?: ScreenLike | null | undefined) => Promise<void>;
+  stopCast: () => void;
   isCasting: boolean;
 }
 
@@ -62,7 +64,7 @@ export function useControllers({
   ride, settingsRef, rideSetting, runAction, cuePreset, playSetItem, selectDye, wallRef, activePresetId,
   selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
   blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
-  visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
+  visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
 }: ControllersDeps) {
   const midi = useMidi(
     {
@@ -146,6 +148,26 @@ export function useControllers({
     send: (screen) => { void startCast('window', screen); },
     casting: isCasting,
   });
+  /*
+    The owner's assistant opens and closes the show's window, and sets the
+    mode, through the calls the chip and Send to wall make (PLAN 44k-15,
+    app/projectorNow.ts). Opened on the screen the chip offers, so the show
+    lands where a click on it would put it; with no second screen found, a
+    window, as the menu's Send to wall opens.
+  */
+  useEffect(() => {
+    publishCast({ screen: projector.projector?.label ?? null, permission: projector.permission, mode: projector.mode, casting: isCasting });
+  }, [projector.projector, projector.permission, projector.mode, isCasting]);
+  const castRef = useRef({ startCast, stopCast, screen: projector.projector, setMode: projector.setMode });
+  castRef.current = { startCast, stopCast, screen: projector.projector, setMode: projector.setMode };
+  useEffect(() => {
+    setCastDoor({
+      open: () => { void castRef.current.startCast('window', castRef.current.screen); },
+      close: () => castRef.current.stopCast(),
+      setMode: (m) => castRef.current.setMode(m),
+    });
+    return () => setCastDoor(null);
+  }, []);
   // Where the controller's ring is drawn: the plate's rectangle, or the window before it has one.
   const gamepadRingRect = useCallback(() => {
     const r = visualizerRef.current?.drawnRect?.();

@@ -47,6 +47,7 @@ import { recordCall, recordOf } from './assistantRecord.js';
 import { inputsOf, soundDevice } from './assistantSound.js';
 import { mediaCall, mediaOf } from './assistantMedia.js';
 import { midiPortsOf, outputsGuard } from './assistantOutputs.js';
+import { projectorGuard } from './assistantProjector.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -723,6 +724,17 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-outputs', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // The projector and the wall (PLAN 44k-15): assistantProjector.js's rules, Full.
+      if (type === 'assistant-projector') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = projectorGuard(message);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-projector', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

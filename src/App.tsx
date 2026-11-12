@@ -1957,16 +1957,14 @@ export default function App() {
     connected: remoteLink.status === 'connected', relaySendRef, wallRef, blackoutRef, hear, tempoRef, oscOutHearRef,
   });
 
-  // ── MIDI controller and game controller ─────────────────────────
+  // ── MIDI controller and game controller ──────────────────────
   const allPresetIds = useMemo(() => allPresets.map(p => p.id), [allPresets]);
 
-  const {
-    midi, runSoundTrigger, gamepad, projector, gamepadRingRect,
-  } = useControllers({
+  const { midi, runSoundTrigger, gamepad, projector, gamepadRingRect } = useControllers({
     ride, settingsRef, rideSetting, runAction, cuePreset, playSetItem, selectDye, wallRef, activePresetId,
     selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
     blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
-    visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
+    visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
   });
 
   const {

@@ -13027,6 +13027,42 @@ Checks: `npm run assistant` gains `scripts/assistant-outputs.mjs` (15 lines, 11 
 `npm run desktop`'s OSC block gains the line that the assistant's choice is the menu's.
 `assistantOutputs.js` joins the Mac app's `server` filter. Found: 44k-14a (Syphon on a
 real Syphon build), 44k-14b (MIDI's permission on a fresh Mac app).
+
+## 44k-15. The projector and the wall from the assistant (2026-11-11)
+
+The ninth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
+control of the show from Claude. Two tools, both Full, since the projector is the room
+and never the look:
+
+- `projector`: `cast` opens the show's window full size on the second screen the page
+  found (or a window, when none), as the projector chip's click does, and closes it;
+  `mode` is the chip's ask, auto or off; `test` puts the test card up or down, `identify`
+  flashes the screen's name for three seconds. The cast answers once the window is
+  open: in a browser a window no click opened is a blocked popup, and the answer says
+  so instead of "done" for a wall that stayed dark. The Mac app opens it at once.
+- `wall`: the geometry and grade (flips, the four corners, the masks and their feather,
+  gain, gamma), only the keys named, laid on through `normalizeOutput` as every other
+  way into the wall is; `reset` squares the projector and keeps the mapped shapes, as
+  the desk's Reset does. The shapes themselves stay the desk's: placing one on a panel
+  is done by eye, in the room.
+- The guard (`server/assistantProjector.js`) refuses, rather than clamps, a geometry
+  that would leave the wall dark: corners that cross or fold the picture, a picture
+  less than half on the screen, or one shrunk under a fiftieth of it; and numbers out
+  of their ranges, with the range. The flash guard can be turned on and never off from
+  the assistant: `outputConfig.ts` keeps it out of the settings so that a preset cannot
+  switch a safety off, and the same holds for an assistant.
+- The state reaches the remote link through `app/projectorNow.ts`, published from
+  `useControllers` (the cast and the mode) and `useOutput` (the wall), so App() gained
+  only `stopCast` in `useControllers`' arguments and still shrank by six bytes.
+
+Checks: `npm run assistant` gains `scripts/assistant-projector.mjs` (14 lines, 12
+mutants, each caught), a page line on the real `projectorNow.ts`, and a line that the
+page's wait for the window (2 s) ends inside the MCP server's wait for its answer
+(2.5 s), found in review: at 4 s a blocked window came back "allowed, not confirmed".
+`tsconfig.json` now leaves out `scratch/`, where the mutant run's copies of `server/`
+had run `npm run lint` out of heap. `assistantProjector.js`
+joins the Mac app's `server` filter. Found: 44k-15a (the cast on the Mac with a real
+projector), 44k-15b (whether the window fills its screen).
 ## 44k-12. The microphone's input from the assistant (2026-11-11)
 
 The sixth batch of 44k's gaps, built by Claude. `set_sound_source microphone` opened
