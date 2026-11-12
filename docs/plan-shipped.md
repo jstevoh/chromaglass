@@ -13063,6 +13063,44 @@ page's wait for the window (2 s) ends inside the MCP server's wait for its answe
 had run `npm run lint` out of heap. `assistantProjector.js`
 joins the Mac app's `server` filter. Found: 44k-15a (the cast on the Mac with a real
 projector), 44k-15b (whether the window fills its screen).
+## 44k-16, 44k-17. The desk from the assistant (2026-11-12)
+
+The tenth batch of 44k's gaps, built by Claude, toward the owner's goal of complete
+control of ChromaGlass from Claude: the desk's own layout, added on the owner's word of
+2026-11-11, and the parts of 44k-16 a show reaches for. Six tools, one message type
+(`assistant-desk`), read back in `show_state`'s `desk`:
+
+- Play, because they change the person's screen or the next gesture and not the plate:
+  `desk_tab` puts a tab up, and `hand` sets the palette lock (by its harmony's name, or
+  off), the tool, its amount and the plate a gesture lands on, as the palette picker,
+  the tool picker, its Amount and the layer chips do.
+- Full, because they change the owner's saved desk, which travels to the account
+  (8-tabs-a): `desk_tabs` (rename, move, add or copy, delete, reset every tab),
+  `desk_panel` (open, dock, float, close, fold or unfold a panel; fold them all; fold
+  the deck; a tab's plate mode, live or preview), `desk_pins` (a dial on the rides or
+  the recipe) and `desk_view` (the MIDI activity overlay, Ambient TV mode).
+- A delete and a reset of every tab are Undo's to put back: the guard remembers them,
+  Undo sends `tab-restore`, and the page puts back the one it kept (`restoreTab`: at its
+  old place, with its panels, once).
+- The guard (`server/assistantDesk.js`) holds the verbs, the shapes and the ranges, and
+  refuses an amount past 5, a move of 0 places, a name past 24 characters rather than
+  clamping them. Names are the page's (`app/deskNow.ts`), which alone knows a renamed
+  tab, and a wrong one is answered with the ones there are.
+- App() could not carry the doors, so the desk's state moved out of it whole: the tabs,
+  the pins and the MIDI activity overlay to `app/useDesk.ts`, the tool, its amounts and
+  the plate in hand to `app/useHand.ts`; the palette lock and Ambient TV publish from
+  their own hooks. App.tsx went from 208,528 to 205,716 bytes.
+
+Checks: `npm run assistant` gains `scripts/assistant-desk.mjs` (12 scenario lines, 11
+mutants, each caught) and a page line on the real `deskNow.ts`, `deskTabs.ts` and
+`deskLayout.ts` (an edit survives a reload of the stored tabs; a deleted tab comes back
+with its panels). Found on the way: the mutant run made each mutant's copy of `server/`
+in a folder named by its rule, so two mutants of one rule (five rules had two or
+three) shared a folder and the first was run on the second's code. Each now has its
+own folder; the eleven mutants of those rules were run again, each caught on its own
+code. `assistantDesk.js` joins the Mac app's `server` filter. Found: 44k-16a (set
+lists' and sequences' own editing and files), 44k-17a (a panel in its own window),
+44k-17b (the desk's doors in a browser).
 ## 44k-12. The microphone's input from the assistant (2026-11-11)
 
 The sixth batch of 44k's gaps, built by Claude. `set_sound_source microphone` opened

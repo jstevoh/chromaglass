@@ -101,6 +101,20 @@ export function deleteTab(tabs: DeskTab[], id: string): DeskTab[] {
   return tabs.filter(x => x.id !== id);
 }
 
+/**
+ * A deleted tab put back where it was (the owner's assistant's Undo, PLAN
+ * 44k-17): at its old place, or the end if the list has shrunk past it.
+ * Nothing changes when a tab of its id is back already or the strip is full,
+ * so an Undo that arrives twice cannot make two of one tab; its name is kept
+ * free of the others', as an added tab's is.
+ */
+export function restoreTab(tabs: DeskTab[], tab: DeskTab, at: number): DeskTab[] {
+  if (tabs.length >= TABS_MAX || tabs.some(x => x.id === tab.id)) return tabs;
+  const out = [...tabs];
+  out.splice(Math.max(0, Math.min(at, out.length)), 0, { ...tab, name: freeName(tabs, tab.name) });
+  return out;
+}
+
 /** A name not on another tab: "New tab", then "New tab 2". */
 export function freeName(tabs: DeskTab[], want: string): string {
   const names = new Set(tabs.map(t => t.name.toLowerCase()));

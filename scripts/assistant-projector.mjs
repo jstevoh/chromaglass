@@ -212,5 +212,5 @@ export const PROJECTOR_MUTANTS = [
   { rule: 'wall-tiny', file: 'assistantProjector.js', find: 'if (seen < COVER_MIN) return', replace: 'if (false) return' },
   { rule: 'wall-range', file: 'assistantProjector.js', find: 'w[k] < lo || w[k] > hi)', replace: 'false)' },
   { rule: 'wall-flash', file: 'assistantProjector.js', find: 'if (w.flashGuard !== true) return', replace: 'if (false) return' },
-  { rule: 'phone-projector', file: 'remote-server.js', find: ", 'assistant-projector']);", replace: ']);' },
+  { rule: 'phone-projector', file: 'remote-server.js', find: ", 'assistant-projector', ", replace: ', ' },
 ];

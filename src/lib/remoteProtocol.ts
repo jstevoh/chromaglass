@@ -229,6 +229,26 @@ export interface RemoteState {
   outputs?: OutputsNow;
   /** The projector (PLAN 44k-15, app/projectorNow.ts): the cast window and the projector mode, and the wall's geometry, grade and test card. */
   projector?: ProjectorNow;
+  /** The desk (PLAN 44k-16, 44k-17, app/deskNow.ts): its tabs and their panels, the pins, the palette lock, the tool and plate in hand, Ambient TV and the MIDI activity overlay. */
+  desk?: DeskNow;
+}
+
+/** One panel on a tab: where it is (a column, the deck, floating) and whether it is folded to its header. */
+export interface DeskPanelNow { id: string; name: string; where: 'left' | 'right' | 'deck' | 'float'; folded: boolean }
+/** The desk as the page holds it (PLAN 44k-16, 44k-17, app/deskNow.ts); each part null until its hook has run. */
+export interface DeskNow {
+  /** The tabs in the strip's order, the one up, and each one's panels, plate mode and deck. */
+  tabs: { id: string; name: string; plate: 'live' | 'preview'; deckFolded: boolean; panels: DeskPanelNow[] }[] | null;
+  up: string | null;
+  /** The settings pinned to the rides (Perform) and to the recipe (Design), by key, in their order. */
+  pins: { rides: string[]; recipe: string[] } | null;
+  /** The MIDI activity overlay, and Ambient TV mode (the governor's quiet rungs). */
+  activity: boolean | null;
+  ambient: boolean | null;
+  /** The palette lock, by its harmony's name, or null when the colours roam. */
+  palette: { lock: string | null } | null;
+  /** The tool in hand and its amount, and the plate in hand (from 0) of the plates on the stage. */
+  hand: { tool: string; amount: number; layer: number; layers: number } | null;
 }
 
 /** The projector as the page holds it (PLAN 44k-15, app/projectorNow.ts); null until its hook has run. */
@@ -436,6 +456,8 @@ export type RemoteMessage =
   | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
   /** The projector and the wall from the owner's assistant (PLAN 44k-15), relayed only from the guard, with `answer`; the geometry already judged there (server/assistantProjector.js). */
   | { type: 'assistant-projector'; do: string; on?: boolean; mode?: string; wall?: Record<string, unknown>; answer?: number }
+  /** The desk from the owner's assistant (PLAN 44k-16, 44k-17), relayed only from the guard (server/assistantDesk.js), with `answer`; names and ids are found on the page. */
+  | { type: 'assistant-desk'; do: string; verb?: string; tab?: string; op?: string; name?: string; by?: number; copyOf?: string; panel?: string; slot?: string; index?: number; plate?: string; surface?: string; key?: string; on?: boolean; hand?: Record<string, unknown>; view?: Record<string, unknown>; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
