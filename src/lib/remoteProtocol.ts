@@ -225,9 +225,26 @@ export interface RemoteState {
    * pickers' names, and the cartoon shelf.
    */
   media?: MediaNow;
+  /** OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts): OSC out's switch and target, MIDI on or off, its ports by name, clock and the map. */
+  outputs?: OutputsNow;
 }
 
 /** What the plate is filmed, poured and marked with, as the display reports it (RemoteState `media`). */
+/** OSC out and MIDI as the page holds them (PLAN 44k-14, app/outputsNow.ts). */
+export interface OscOutNow { on: boolean; target: string; pro: boolean; says: string }
+export interface MidiNow {
+  /** Web MIDI exists in this browser (Safari has none). */
+  supported: boolean;
+  /** Switched on, and Web MIDI answered (`open`), or why not (`error`). */
+  on: boolean; open: boolean; error: string | null;
+  inputs: string[]; outputs: string[];
+  /** `all`, or an input's name; `auto`, `off`, or an output's name. A port chosen and since unplugged reads as its word. */
+  input: string; output: string;
+  /** MIDI clock arriving, and the map in use, by its name and its bindings' count. */
+  clocked: boolean; map: { name: string; bindings: number };
+}
+export interface OutputsNow { oscOut: OscOutNow | null; midi: MidiNow | null }
+
 export interface MediaNow {
   /** The film: its source, the file's or the cartoon's name, the cartoon's id, the camera's name, and whether that camera was unplugged mid-show. */
   film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; cartoon: string | null; camera: string | null; cameraLost: boolean };
@@ -401,6 +418,8 @@ export type RemoteMessage =
   | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
   /** Film, pours, the room camera and the mark from the owner's assistant (PLAN 44k-13), relayed only from the guard, with `answer`; a file as the show server's own address for it (`url`, server/assistantMedia.js). */
   | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
+  /** OSC out and MIDI from the owner's assistant (PLAN 44k-14), relayed only from the guard, with `answer`; OSC in and Syphon are the relay's own. */
+  | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }

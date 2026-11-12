@@ -1201,6 +1201,23 @@ try {
       local?.state === `udp 127.0.0.1:${oscPort}` && heldLocal && net?.state === `udp 0.0.0.0:${oscPort}` && off?.state === 'off' && freeAgain,
       `this Mac only: ${local?.state ?? 'unread'} (port ${heldLocal ? 'held' : 'NOT held'}); network: ${net?.state ?? 'unread'}; off: ${off?.state ?? 'unread'} (port ${freeAgain ? 'free' : 'STILL TAKEN'})`);
 
+    /*
+      The owner's assistant's door to the same choice (PLAN 44k-14, the hook
+      main.js hands the show server, server/assistantOutputs.js): it is the
+      menu's, so the menu's tick follows it and the socket opens with no
+      dialog, and a build with no Syphon item says so rather than claiming one.
+    */
+    const viaHook = await first.evaluate(async ({ Menu }) => {
+      const h = globalThis.__chromaglassOutputs;
+      const said = await h.setOscIn('network');
+      return { said, state: h.state(), ticked: Menu.getApplicationMenu().getMenuItemById('osc-network')?.checked === true, syphon: Menu.getApplicationMenu().getMenuItemById('syphon-out') ? 'item' : h.setSyphon(true) };
+    }).catch((err) => ({ error: String(err) }));
+    const afterHook = await settle(first, (s) => s.mode === 'network');
+    check('OSC closed: the assistant\'s OSC-in choice is the Show menu\'s (ticked there, the socket open on the network), and Syphon says whether this build has it',
+      viaHook.said === `udp 0.0.0.0:${oscPort}` && viaHook.state?.oscIn?.mode === 'network' && viaHook.state.oscIn.kept === true && viaHook.ticked && afterHook?.state === `udp 0.0.0.0:${oscPort}`
+        && (viaHook.syphon === 'item' || (/not in this build/.test(viaHook.syphon ?? '') && viaHook.state.syphon === null)),
+      JSON.stringify(viaHook).slice(0, 240));
+
     await pick(first, 'osc-local');
     await settle(first, (s) => s.mode === 'local');
     await first.close().catch(() => {});

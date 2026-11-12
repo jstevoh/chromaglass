@@ -27,6 +27,7 @@ import { usePlayerNow, askMusic } from './musicNow';
 import { useEarNow, askEar } from './earNow';
 import { useRecordNow, askRecord } from './recordNow';
 import { useMediaNow, askMedia } from './mediaNow';
+import { useOutputsNow, askOutputs } from './outputsNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet, armSetItem } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
@@ -173,6 +174,7 @@ export function useRemote({
   const ear = useEarNow();
   const record = useRecordNow();
   const media = useMediaNow();
+  const outputs = useOutputsNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -250,7 +252,8 @@ export function useRemote({
     ear,
     record,
     media,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media]);
+    outputs,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -466,6 +469,11 @@ export function useRemote({
         // Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts), answered once a camera or window opened.
         case 'assistant-media':
           void askMedia(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
+          break;
+        // OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts), answered once MIDI has opened or failed.
+        case 'assistant-outputs':
+          void askOutputs(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
             (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
           break;
         /*

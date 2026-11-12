@@ -178,7 +178,9 @@ download, once more, and update in place from then on.
   keeps the show key, starts the server, grants the show's permissions (sound,
   cameras, MIDI, screens) to its own pages only, opens the show window, and puts the
   projector window on the projector's screen in full screen. Why each of these, at
-  length, is in its comments.
+  length, is in its comments. It hands the show server the Show menu's OSC-in and Syphon
+  doors for the owner's assistant (`outputsHook`, PLAN 44k-14; also
+  `globalThis.__chromaglassOutputs` for `npm run desktop`).
 - `updates.js`: finds new releases and offers or installs them (above), with
   electron-updater; `npm run updates` checks it in plain Node, and `npm run
   desktop -- --packaged` checks the packed app against a feed of its own.

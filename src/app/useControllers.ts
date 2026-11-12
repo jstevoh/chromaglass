@@ -3,12 +3,13 @@ import { isUserPresetId, type UserPreset } from '../lib/userPresets';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { livePresetId } from '../presets';
 import { PALETTE_RGB } from '../constants';
-import { useCallback, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import type { SoundBinding, MidiAction, MidiMap } from '../lib/midi';
 import { runTrigger } from '../lib/soundLearn';
 import { useGamepad } from '../hooks/useGamepad';
 import { laidColour } from '../lib/liquidColour';
 import { useProjector } from '../hooks/useProjector';
+import { midiDoorOf, publishMidi, setMidiDoor } from './outputsNow';
 import type { SettingRide } from '../lib/ride';
 import type { VisualizerSettings, LiquidType } from '../types';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
@@ -105,6 +106,16 @@ export function useControllers({
     }, []),
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
+  /*
+    MIDI for the owner's assistant (PLAN 44k-14, app/outputsNow.ts): read as
+    the MIDI panel shows it, and switched through the panel's own calls.
+  */
+  const midiNow = useRef(midi);
+  midiNow.current = midi;
+  useEffect(() => {
+    publishMidi({ supported: midi.supported, enabled: midi.enabled, open: midi.open, error: midi.error, inputs: midi.inputs, outputs: midi.outputs, ports: midi.ports, clocked: midi.clocked, map: midi.map });
+  }, [midi.supported, midi.enabled, midi.open, midi.error, midi.inputs, midi.outputs, midi.ports, midi.clocked, midi.map]);
+  useEffect(() => { setMidiDoor(midiDoorOf(() => midiNow.current)); return () => setMidiDoor(null); }, []);
   /*
     A trigger the music fired (sound learn, PLAN §5): the same action and
     preset doors a pad goes through, so a kick on Next Preset and a pad on

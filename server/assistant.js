@@ -46,6 +46,7 @@ import { earCall } from './assistantEar.js';
 import { recordCall, recordOf } from './assistantRecord.js';
 import { inputsOf, soundDevice } from './assistantSound.js';
 import { mediaCall, mediaOf } from './assistantMedia.js';
+import { midiPortsOf, outputsGuard } from './assistantOutputs.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -351,6 +352,8 @@ export function createAssistantGuard(send, now = Date.now) {
         inputs: inputsOf(state.sound),
         // Film, pours, the room and the mark (PLAN 44k-13): the cameras' names and the shelf's cartoons.
         media: mediaOf(state.media),
+        // OSC out and MIDI (PLAN 44k-14): the MIDI ports by the panel's names.
+        midiPorts: midiPortsOf(state.outputs),
       };
     },
 
@@ -709,6 +712,17 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-media', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // OSC out and MIDI (PLAN 44k-14): assistantOutputs.js's rules, Full; OSC in and Syphon are the relay's own.
+      if (type === 'assistant-outputs') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = outputsGuard(message, show.midiPorts);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-outputs', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 
