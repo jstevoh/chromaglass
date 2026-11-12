@@ -234,9 +234,9 @@ through cords and preset patches, and the plate shader is untouched.
   | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | **shipped** 2026-11-11: `film`, `pour_file`, `room_camera`, `mark`, `show_state`'s `media` | Full | 44k-13 |
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its ports, Syphon once it ships (its own thread) | **shipped** 2026-11-11: `outputs` (osc_out, osc_in, midi, syphon, status), `show_state`'s `outputs` | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
-  | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | none | Play (palette, tool), Full (the rest) | 44k-16 |
+  | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | **shipped** 2026-11-12 but the editing: `hand`, `desk_view`, `show_state`'s `desk`; the editing is 44k-16a | Play (palette, tool), Full (the rest) | 44k-16 |
   | 18 | The Mac app's updates: Install Updates Automatically, check, install | **shipped** 2026-11-11: `app_updates` (status any mode; auto, check, install Full; install refused mid-show) | Full | 44k-18 |
-  | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | none (`overlays-off` hides the desk, nothing more) | Play (the tab up), Full (edits) | 44k-17 |
+  | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | **shipped** 2026-11-12 but a panel's own window (44k-17a): `desk_tab`, `desk_tabs`, `desk_panel`, `desk_pins`, `desk_view`, `show_state`'s `desk` | Play (the tab up), Full (edits) | 44k-17 |
 
 - **44k-1. The Mac's assistant runs the current server.** *(S, Claude on the Mac,
   then the owner's Cmd-Q.)* Found in the audit: the tools the owner's Mac offers
@@ -441,22 +441,37 @@ through cords and preset patches, and the plate shader is untouched.
   `useControllers` only through App(), which may not grow, so `show_state` does not say
   whether a browser's title bar is on the wall. The Mac app fills the projector's screen
   itself, so this matters only in a browser. Pass it with the next byte App() frees.
-- **44k-16. The rest.** *(S each, AG lane, as wanted.)* The palette lock and the tool
-  and layer in hand (Play); Ambient TV mode; set lists' and sequences' own editing,
-  files and binding to songs (Full). Wanted least in a show: build when the owner
-  asks for one by name.
-- **44k-17. The desk's layout.** *(M, asked 2026-11-11.)* `show_state`'s `desk` (the
-  tabs by id and name, the one up, each tab's panels and whether each is docked,
-  floating, folded or in its own window); `desk_tab` (put a tab up, Play: the
-  person's screen changes, the plate does not); `desk_tabs` (rename, move, add as a
-  copy, delete, reset, as `useDeskLayout`'s `TabEdit`, Full); `desk_panel` (dock,
-  float, fold, close, open a panel on a tab, Full); `desk_pins` (pin or unpin a
-  setting, the rides' and the recipe's lists, Full). The door: `useDeskTabs` and the
-  pins in `App()`, through a sink, as the others. The desk syncs its tabs with the
-  owner's account (8-tabs-a), so an edit from the assistant travels there too, as a
-  person's would; a delete is Undo's to take back (the tab and its panels as they
-  were). Pass: `npm run assistant` lines for each verb at the stand-in, and a `desk`
-  line that the edited tab survives a reload.
+- ~~**44k-16. The rest.**~~ **Shipped** 2026-11-12 but its editing (44k-16a): `hand` (the
+  palette lock by name, the tool, its amount, the plate in hand), Play, and `desk_view`'s
+  Ambient TV, Full, read back in `show_state`'s `desk` (`app/deskNow.ts`, `app/useHand.ts`;
+  `npm run assistant`, `desk-hand`, `desk-hand-range`, `desk-pin`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-16a. Set lists' and sequences' own editing, from the assistant.** *(M, found
+  building 44k-16.)* Adding, taking out and reordering a set list's items, saving and
+  opening set list files, and a sequence's stages and its binding to a song are the
+  Cues and Sequences panels' alone; `set` arms and fires an item and `sequencer`
+  chooses and runs one, but nothing builds one. Build when the owner asks for it by
+  name: in a show it is wanted least.
+- ~~**44k-17. The desk's layout.**~~ **Shipped** 2026-11-12: `desk_tab` (Play), and
+  `desk_tabs` (rename, move, add or copy, delete, reset every tab), `desk_panel` (open,
+  dock, float, close, fold, fold all, the deck folded, a tab's plate mode), `desk_pins`
+  and `desk_view`'s MIDI activity overlay (Full), read back in `show_state`'s `desk`;
+  through the tab strip's, the panel menu's and the pins' own calls (`app/deskNow.ts`,
+  `app/useDesk.ts`), the guard `server/assistantDesk.js`; a delete or a reset is Undo's
+  to put back (`npm run assistant`, `desk-play`, `desk-tab`, `desk-answer`, `desk-tabs`,
+  `desk-move`, `desk-undo`, `desk-panel`, `desk-pin`, `phone-desk`, and the page line on
+  the real `deskTabs.ts`). Story in `docs/plan-shipped.md` §44.
+- **44k-17a. A panel in its own window, from the assistant.** *(S, found building
+  44k-17.)* "Open in its own window" is the Desk component's own state (`popOut` in
+  `components/desk/Desk.tsx`), opened by a click, and a window no click opened is a
+  blocked popup in a browser, so `desk_panel` has no `pop_out`. In the Mac app a window
+  is not blocked: lift the popped-out list into `useDesk` and give it a door there.
+- **44k-17b. The desk's doors, in a browser.** *(S, found building 44k-17.)* As 44k-13b:
+  `npm run assistant` holds the guard against a stand-in display and `askDesk` against a
+  stand-in door built on the real `deskTabs.ts` (an edit survives `loadTabs`), but no
+  line mounts `useDesk` and watches a real `desk_tabs rename` change the chip and
+  survive a page reload, the plan's own pass for 44k-17. A `npm run desk` line through
+  the check hooks would.
 - **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
   lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
   ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP

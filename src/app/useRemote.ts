@@ -29,6 +29,7 @@ import { useRecordNow, askRecord } from './recordNow';
 import { useMediaNow, askMedia } from './mediaNow';
 import { useOutputsNow, askOutputs } from './outputsNow';
 import { useProjectorNow, askProjector } from './projectorNow';
+import { useDeskNow, askDesk } from './deskNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
 import { useSetNow, askSet, armSetItem } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
@@ -177,6 +178,7 @@ export function useRemote({
   const media = useMediaNow();
   const outputs = useOutputsNow();
   const projector = useProjectorNow();
+  const desk = useDeskNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -255,8 +257,8 @@ export function useRemote({
     record,
     media,
     outputs,
-    projector,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector]);
+    projector, desk,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector, desk]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -482,6 +484,11 @@ export function useRemote({
         // The projector and the wall (PLAN 44k-15, app/projectorNow.ts), answered once the show's window opened or did not.
         case 'assistant-projector':
           void askProjector(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
+          break;
+        // The desk: its tabs and panels, the pins, the palette lock and what is in the hand (PLAN 44k-16, 44k-17, app/deskNow.ts).
+        case 'assistant-desk':
+          void askDesk(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
             (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
           break;
         /*

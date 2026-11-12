@@ -48,6 +48,7 @@ import { inputsOf, soundDevice } from './assistantSound.js';
 import { mediaCall, mediaOf } from './assistantMedia.js';
 import { midiPortsOf, outputsGuard } from './assistantOutputs.js';
 import { projectorGuard } from './assistantProjector.js';
+import { deskGuard, deskLeast } from './assistantDesk.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -417,6 +418,10 @@ export function createAssistantGuard(send, now = Date.now) {
           quietUntil = t + fadeSeconds * 1000 + ECHO_MS;
           return { ok: true, undid: 'look' };
         }
+        if (entry.kind === 'desk') {
+          send({ type: 'assistant-desk', do: 'tab-restore' });
+          return { ok: true, undid: 'the tabs as they were' };
+        }
         if (entry.kind === 'action') {
           // A toggle undoes itself, unless the performer has toggled it back already.
           if (show.blackout !== entry.after) return refuse('the performer has changed the blackout since');
@@ -735,6 +740,19 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-projector', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // The desk (PLAN 44k-16, 44k-17): assistantDesk.js's rules; the tab up and the hand in Play, the rest Full.
+      if (type === 'assistant-desk') {
+        const why = needs(mode, deskLeast(message.do)) ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = deskGuard(message);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        // A delete or a reset of every tab is Undo's to put back; the page keeps what it took.
+        if (call.out.op === 'delete' || call.out.op === 'reset-all') remember({ kind: 'desk' });
+        send({ type: 'assistant-desk', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

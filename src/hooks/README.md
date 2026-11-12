@@ -20,7 +20,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 
 - `useCameras.ts`: cameras plugged in.
 - `useCastSession.ts`: casting, sender side (`useCastSender`).
-- `useDeskLayout.ts`: `useDeskTabs`, `TabEdit`, the desk's tabs.
+- `useDeskLayout.ts`: `useDeskTabs`, `TabEdit`, the desk's tabs; its `restore(change)` commits any change to the list as an edit is, for the owner's assistant's Undo (PLAN 44k-17, `app/deskNow.ts`).
 - `useDeviceTilt.ts`: phone tilt as Gravity.
 - `useEscape.ts`: Esc closes.
 - `useMoirePreview.ts`: whether the moiré pack's controls move here, and a copy without it a minute's try (the desk's Moiré Sheets section and the phone's Looks sheet both call it; PLAN 45a).

@@ -16,9 +16,8 @@ import { CastNetworkItems } from './components/CastNetworkItems';
 import { usePreviewFrame } from './hooks/usePreviewFrame';
 import { Desk } from './components/desk/Desk';
 import type { Cue, ControlKind } from './components/desk/deskProps';
-import { useDeskTabs } from './hooks/useDeskLayout';
 import { closePanel, isSectionPanel, openPanel, openPanels, whereIs } from './lib/deskLayout';
-import { DEFAULT_RECIPE, DEFAULT_RIDES, loadPins, savePins, togglePin, travelOfKey, valueOfKey, type DeskSurface } from './lib/deskPins';
+import { travelOfKey, valueOfKey } from './lib/deskPins';
 import { SlowEvolve, type EvolveEar } from './lib/slowEvolve';
 import { unhandled } from './lib/unhandled';
 import { CommandPalette } from './components/desk/CommandPalette';
@@ -33,7 +32,7 @@ import { VisualizerSettings, DEFAULT_SETTINGS, LiquidType, DEFAULT_LIQUID_TYPES 
 import { sanitizePatch } from './lib/sanitizeSettings';
 import { loadCustomLiquids, saveCustomLiquids, isCustomLiquid } from './lib/liquidFile';
 import { bottleSwatch, isClearLiquid, isNatural } from './lib/liquidColour';
-import { loadToolAmounts, saveToolAmounts, clampAmount } from './lib/toolAmount';
+import { clampAmount } from './lib/toolAmount';
 import { ToolAmount } from './components/ToolAmount';
 import { PRESETS, findPreset, livePresetId } from './presets';
 import { useCastSender } from './hooks/useCastSession';
@@ -91,7 +90,6 @@ const DRIFT_STEP_MS = 500;
  * The ear's own rate (useAudioAnalyzer's EAR_VIEW_MS), for the same reason.
  */
 const RIDE_VIEW_MS = 100;
-const MIDI_ACTIVITY_KEY = 'chromaglass-midi-activity';
 
 // Detect which preset (if any) matches the current settings. Only the look is
 // compared: a look does not set the room (see RIG_KEYS).
@@ -128,6 +126,8 @@ import { useToast } from './app/useToast';
 import { useFilm } from './app/useFilm';
 import { useSceneSource } from './app/useSceneSource';
 import { usePaletteLock } from './app/usePaletteLock';
+import { useDesk } from './app/useDesk';
+import { useHand } from './app/useHand';
 import { useLayerReport } from './app/useLayerReport';
 import { useSetListState } from './app/useSetListState';
 import { usePhoneLayout } from './app/usePhoneLayout';
@@ -248,14 +248,8 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   /** Which guide topic to open at, when something sent you there to read one. */
   const [helpFocus, setHelpFocus] = useState<string | null>(null);
-  /*
-    The desk's tabs (lib/deskTabs.ts): the owner's to make since 2026-10-27,
-    each a set of panels, with Perform, Sequence and Setup shipped as the
-    three to start from. The tab that is up is kept under the old desk mode's
-    key, so a laptop left on Gig or Build opens on Perform and one left on
-    Load-in opens on Setup. Each tab remembers where its panels were.
-  */
-  const deskTabs = useDeskTabs();
+  // The desk's tabs, its pins and the MIDI activity overlay (app/useDesk.ts).
+  const { deskTabs, rideKeys, setRideKeys, recipeKeys, setRecipeKeys, pinSetting, showActivity, setShowActivity } = useDesk();
   const deskTab = deskTabs.tab;
   const setDeskTab = deskTabs.setTab;
   const deskLayout = deskTabs.layout;
@@ -265,25 +259,6 @@ export default function App() {
   const onDeskReset = useCallback(() => resetLayout(deskTab), [resetLayout, deskTab]);
   /** The Stage sheet (⌘,): the room and the machine, the sections no look saves. */
   const [showStage, setShowStage] = useState(false);
-  /*
-    What is out on each surface.
-
-    A property of this desk rather than of a look: two rooms with the same
-    presets want different things under the hand, and a saved look that
-    rearranged your faders would be unusable. Both lists come from the one
-    registry in `deskPins`, so a control the settings panel draws can be put on
-    either surface — which is the thing that could not be done before, and the
-    reason the panel was the only place most of the app existed.
-  */
-  const [rideKeys, setRideKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('perform', DEFAULT_RIDES));
-  useEffect(() => { savePins('perform', rideKeys, DEFAULT_RIDES); }, [rideKeys]);
-  const [recipeKeys, setRecipeKeys] = useState<(keyof VisualizerSettings)[]>(() => loadPins('design', DEFAULT_RECIPE));
-  useEffect(() => { savePins('design', recipeKeys, DEFAULT_RECIPE); }, [recipeKeys]);
-  /** Put a control on a surface, or take it off, from the settings panel. */
-  const pinSetting = useCallback((desk: DeskSurface, key: keyof VisualizerSettings, on: boolean) => {
-    const set = desk === 'perform' ? setRideKeys : setRecipeKeys;
-    set(prev => togglePin(prev, key, on));
-  }, []);
   /**
    * The preset last applied by hand. Which preset is *active* is derived from
    * the settings below rather than stored: it only ever differed from them
@@ -322,7 +297,8 @@ export default function App() {
   const flickPlate = (layer: number) => setSpinFlick(p => ({ seq: (p?.seq ?? 0) + 1, layer }));
   const [clearTrigger, setClearTrigger] = useState(0);
   const [drainTrigger, setDrainTrigger] = useState(0);
-  const [activeLayer, setActiveLayer] = useState(0);
+  // The tool, its amount and the plate in hand (app/useHand.ts).
+  const { activeLayer, setActiveLayer, activeTool, setActiveTool, toolAmounts, setToolAmounts, toolAmount, activeToolRef, setToolAmount, setStageLayers } = useHand();
   // The shelf: the bottles the app ships, then any someone made (lib/liquidFile.ts).
   const [liquidTypes, setLiquidTypes] = useState<LiquidType[]>(() => [...DEFAULT_LIQUID_TYPES, ...loadCustomLiquids()]);
   useEffect(() => { saveCustomLiquids(liquidTypes); }, [liquidTypes]);
@@ -340,16 +316,8 @@ export default function App() {
     setSelectedLiquidId(sel => (sel === id ? 'water' : sel));
   }, []);
   const [selectedLiquidId, setSelectedLiquidId] = useState('water');
-  const [activeTool, setActiveTool] = useState<'dropper' | 'blow' | 'spray' | 'splatter' | 'pour' | 'streak' | 'press' | 'finger' | 'magnet' | 'spin'>('dropper');
 
   const selectedLiquid = liquidTypes.find(t => t.id === selectedLiquidId) ?? liquidTypes[0];
-  // How much each tool does, per tool (lib/toolAmount.ts); 1 is what it always did.
-  const [toolAmounts, setToolAmounts] = useState<Record<string, number>>(() => loadToolAmounts());
-  useEffect(() => { saveToolAmounts(toolAmounts); }, [toolAmounts]);
-  const toolAmount = toolAmounts[activeTool] ?? 1;
-  const activeToolRef = useRef(activeTool);
-  activeToolRef.current = activeTool;
-  const setToolAmount = useCallback((tool: string, v: number) => setToolAmounts(prev => ({ ...prev, [tool]: clampAmount(v) })), []);
   // The message handler is built once and must not go stale when a liquid's
   // colour is edited.
   const liquidTypesRef = useRef(liquidTypes);
@@ -551,11 +519,7 @@ export default function App() {
    */
   const stageLayers = Math.max(1, settings.layerCount ?? 1, backLook ? 2 : 1);
 
-  useEffect(() => {
-    if (activeLayer >= stageLayers) {
-      setActiveLayer(Math.max(0, stageLayers - 1));
-    }
-  }, [stageLayers, activeLayer]);
+  useEffect(() => setStageLayers(stageLayers), [stageLayers, setStageLayers]);
 
   const {
     calibrateNonce, setCalibrateNonce, engineStatus, setEngineStatus, shownEngineStatus,
@@ -640,20 +604,6 @@ export default function App() {
   const [showTrackPanel, setShowTrackPanel] = useState(false);
   const [showSequencer, setShowSequencer] = useState(false);
   const [showMidi, setShowMidi] = useState(false);
-  /*
-    The controller's own readout, and whether it is up.
-
-    A property of this desk rather than of a look: whether you want to see what
-    the hardware is doing depends on how well you know the map, not on which
-    preset is loaded. Remembered, because someone who wants it wants it all
-    night and someone who does not should not have to hide it every time.
-  */
-  const [showActivity, setShowActivity] = useState<boolean>(() => {
-    try { return localStorage.getItem(MIDI_ACTIVITY_KEY) === '1'; } catch { return false; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem(MIDI_ACTIVITY_KEY, showActivity ? '1' : '0'); } catch { /* private window */ }
-  }, [showActivity]);
   const [presetMenu, setPresetMenu] = useState<'none' | 'title'>('none');
   const [castMenu, setCastMenu] = useState(false);
   // ── The user's own presets: a library in the browser, files on disk ──
