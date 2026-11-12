@@ -93,6 +93,7 @@
     "applink": "npm run build && esbuild scripts/applink.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/applink.mjs && node node_modules/.cache/applink.mjs",
     "controller": "npm run build && esbuild scripts/controller.mjs --bundle --platform=node --format=esm --log-level=warning --external:playwright --external:ws --outfile=node_modules/.cache/controller.mjs && node node_modules/.cache/controller.mjs",
     "ios": "npm run build && npx cap sync ios && npx cap open ios",
+    "android": "npm run build && npx cap sync android && npx cap open android",
     "check": "node scripts/quick.mjs --measure",
     "actionlint": "node scripts/actionlint.mjs",
     "checks": "node scripts/checks.mjs",
@@ -345,6 +346,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2",
     "@capacitor/ios": "^8.5.2",

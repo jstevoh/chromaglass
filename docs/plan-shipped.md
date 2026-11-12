@@ -13298,6 +13298,34 @@ Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setli
 `cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
 the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
 
+## 12-ctl-3. The Android app (2026-11-11)
+
+The owner asked for the phone apps to be the Mac app's controller (12-ctl), and the
+Android app first planned as a Trusted Web Activity could not be: a TWA is the https
+site in Chrome, and an https page cannot open the plain ws:// socket the laptop's
+remote server listens on. So Android is Capacitor too, as the iPhone is: `android/`
+beside `ios/`, the same bundled build in the system WebView, applicationId
+`app.chromaglass`, minSdk 24. The manifest allows cleartext and the config mixed
+content, so the remote reaches a laptop on the show network; it asks for the
+microphone and camera (both optional features), keeps the screen on
+(`FLAG_KEEP_SCREEN_ON`, since the WebView has no Wake Lock) and hides the system bars,
+which a swipe brings back. The window is black from the first frame, so no white
+flash comes before the page.
+
+Android's WebView has WebGPU on fewer phones than Chrome does, so a phone without it
+does not get the website's list of browsers (the person is not in a browser) but
+`NeedsWebGpu.tsx`'s app form: a sentence, **Open the show in Chrome** (a local plugin,
+`OpenInChromePlugin.java`, sends https only, to Chrome, or to the default browser if
+Chrome is missing) and **Be the laptop's remote**, which needs no GPU. The iPhone app
+never gets it. `appLink.ts` gained `isAndroidApp()`, `SITE_SHOW_URL` and
+`openInChrome()`; the check hook `__cgOpenExternal` lets `controller` see the call.
+
+`android.yml` builds an unsigned debug APK on every PR that touches the shell and
+keeps it as the run's artifact, with no secrets; signing, the upload key and the
+Play upload are 12-ctl-ship. `npm run android` builds, syncs and opens Android Studio.
+`npm run controller` dropped `android` and `nogpu` from its owed lines (25/25, owed
+`scan` only).
+
 ## 12-tv-1. The plate on a TV at home: the stream and the `/tv` page (2026-11-08)
 
 The owner asked for a Google TV app that plays the show on a big screen at home,
