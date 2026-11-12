@@ -12868,6 +12868,41 @@ the bytes exact; private by default; an update naming only the title keeping the
 and 14 of 14 mutants (one review pass added: an update keeping the Studio-set status fields, the thumbnail as a simple upload, an access key running out mid-upload, a stalled chunk timed out at 2 minutes, a reused pid not holding a job).
 
 
+## 44h. The owner's assistant over the internet (2026-11-12)
+
+Asked 2026-11-07 ("internet control too", owner-only, his account) and started on the
+owner's word 2026-11-12. claude.ai on the web and the phone reaches only an `https://`
+MCP server on the public internet, and Claude's own enterprise tunnels are not offered on
+the owner's plan, so it is ours: `mcp/tunnel-worker.js`, a Cloudflare Worker with one
+Durable Object (`wrangler.tunnel.toml`, SQLite-backed, inside the free plan for one
+person), and the Mac's end, `node mcp/chromaglass-mcp.js tunnel` (`mcp/tunnel.js`), which
+dials out to it, so nothing on the Mac listens on the internet. The Worker is a pipe,
+not a second server: each JSON-RPC request is handed down the tunnel whole and answered
+by the stdio server's own `onRequest`, so the tools, the guide and the guard on the Mac
+are the local ones, and a rule cannot drift between the two. Sign-in is OAuth 2.1 as
+Claude's connector pages describe it (read the same day): a 401 naming the resource
+metadata, DCR, PKCE S256 on every request, a form-encoded `/token`, refresh tokens
+rotated, `invalid_grant` for a dead one. The `/authorize` page signs in with Firebase,
+the app's own accounts, and admits only `OWNER_UID`, checked by signature with
+`firebase-token.js`, and only from a sign-in made on that page (its `auth_time`, now
+returned as `authTime`), so one of the owner's tokens copied from elsewhere cannot be
+posted by a script to mint a code. `/register` takes only Claude's hosted callbacks
+(claude.ai, claude.com; not a loopback, where any local program could listen), so a code
+is never delivered to a stranger's server, and one address gets twenty registrations or
+sign-in pages in ten minutes. Tokens,
+codes and the Mac's key are kept only as SHA-256; every token carries its uid and dies
+when `OWNER_UID` changes; an old refresh token after a minute's grace ends its sign-in, and inside the grace
+leaves one live pair; a client whose tokens have all run out is dropped;
+`tunnel revoke` ends them all with the Mac's key. The tunnel is open only while the
+show server admits the assistant (the app running, the switch on), so the owner's one
+switch turns the internet off with the rest; while it is closed, claude.ai still lists
+the menu the Mac last sent and every call says the show is not connected. Check:
+`npm run relay`, 32 lines (the Worker in Node with the runtime's pieces stood in, the
+real show server, a stand-in display, the real MCP server in tunnel mode) and 18 of 18
+mutants (one security review pass: the fresh sign-in, the flood limit, one pair per
+rotation, clients dropped, the loopback callback taken out, a reconnect not failing calls
+sent on the new socket, which no line measures). Open: 44h-1 (the owner's deploy and one real sign-in), 44h-2 to 44h-5.
+
 ## 44j. The live stream and the sound from the assistant (2026-11-09)
 
 The owner asked whether the live streaming was run through the assistant. It was

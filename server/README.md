@@ -15,7 +15,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - Imports only each other, `node:*` and `ws`; never `src/`.
 - The browser side mirrors the wire: `lib/remoteProtocol.ts` (relay), `lib/licenseKey.ts` (keys), `lib/cloudSync.ts` (sync), `lib/crashLog.ts` (reports), `lib/feedback.ts` (feedback), `lib/fingerprint.ts` (song ID).
 - `desktop/main.js` starts `remote-server.js` and imports `server-license.js` in its own process. The packed app carries only the server files named in `desktop/electron-builder.config.cjs` (`server` filter): a new file the show server imports goes on that list, or the app will not start (`signin-handoff.js` and `laptop.js` were missed once; the Mac app job caught it).
-- Workers deploy with wrangler: `wrangler.toml` (song ID), `wrangler.report.toml` (reports), `wrangler.feedback.toml` (feedback, with its D1 database). Secrets live in the Worker's environment, never here.
+- Workers deploy with wrangler: `wrangler.toml` (song ID), `wrangler.report.toml` (reports), `wrangler.feedback.toml` (feedback, with its D1 database), `wrangler.tunnel.toml` (the owner's assistant over the internet, with its Durable Object; its code is `mcp/tunnel-worker.js`, beside the owner's other private servers). Secrets live in the Worker's environment, never here.
 
 ## Files
 
@@ -30,7 +30,7 @@ What runs off the page: the local show server the laptop and phones meet at, and
 - `cloud-sync.js`: Pro cloud sync store.
 - `fingerprint-worker.js`: song ID proxy.
 - `feedback-schema.sql`: the feedback table, run once against D1.
-- `firebase-token.js`: `verifyFirebaseToken` (the shows and feedback Workers): `{ uid, aud, email, emailVerified }`, `emailVerified` added for feedback.
+- `firebase-token.js`: `verifyFirebaseToken` (the shows, feedback and tunnel Workers): `{ uid, aud, email, emailVerified, authTime }`, `emailVerified` added for feedback, `authTime` (the token's `auth_time`, seconds, or null) for the tunnel Worker's fresh sign-in (`mcp/tunnel-worker.js`).
 - `license-packs.js`: art packs sold on top of Home (`PACK_PRODUCTS`, `packForProduct`, `packFields`, `addPack`, `removePack`): a pack order signs the Home key again with the pack.
 - `server-license.js`: local key storage for show server and Mac app; `currentStatus()` carries the key's `packs`. Also exports `fromAnotherSite(req)` and `saysJson(req)`, the loopback routes' guards.
 - `assistantMusic.js`: the music player for the owner's assistant (PLAN 44k-2): `musicCall(message, player)` (the guard's rules after its mode and pace: a shelf track by title, a path admitted by `admitMusicFile`, a seek inside the track), `playerOf(state.player)`, `musicFolders(env)` (~/Music, or `CHROMAGLASS_MUSIC_DIR`), `admitMusicFile(path)` (a sound file, a real file, inside a music folder with links and `..` resolved; its one-off address and name), `serveMusicFile(req, res, url, laptop)` (`/assistant-music/<token>`, `MUSIC_PATH`, to the laptop alone, with Range), `MUSIC_TYPES`. Since PLAN 44k-13 also `admitFile(path, { folders, types, at, what, only })`, the same rules for any kind of file and folder, and `MEDIA_PATH` (`/assistant-media/`, its own eight addresses), which `serveMusicFile` serves too. Imported by `assistant.js`, `assistantMedia.js` and `remote-server.js`; on the Mac app's `server` filter.
@@ -47,4 +47,4 @@ What runs off the page: the local show server the laptop and phones meet at, and
 
 ## Checks
 
-Every file must pass `node --check` (Measure's "The scripts parse"). `npm run report-worker`, `feedback-worker`, `license-worker`, `fingerprint-worker`, `cloudsync`, `accountlink`, `signin` (25: the sign-in hand-off), `tiers`, `showkey`, `assistant` (the assistant role and guard), `lights` (Art-Net), `link` (Ableton Link), `oscout` (OSC out). The relay: `applink`, `remotemix`, `phonelink`, `draw`, `drawwall`, `tv`, `tvpair` (the advert and pairing). The Mac app: `desktop`.
+Every file must pass `node --check` (Measure's "The scripts parse"). `npm run report-worker`, `feedback-worker`, `license-worker`, `fingerprint-worker`, `cloudsync`, `accountlink`, `signin` (25: the sign-in hand-off), `tiers`, `showkey`, `assistant` (the assistant role and guard), `relay` (the relay Worker and the Mac's tunnel), `lights` (Art-Net), `link` (Ableton Link), `oscout` (OSC out). The relay: `applink`, `remotemix`, `phonelink`, `draw`, `drawwall`, `tv`, `tvpair` (the advert and pairing). The Mac app: `desktop`.

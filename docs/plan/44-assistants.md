@@ -472,21 +472,39 @@ through cords and preset patches, and the plate shader is untouched.
   line mounts `useDesk` and watches a real `desk_tabs rename` change the chip and
   survive a page reload, the plan's own pass for 44k-17. A `npm run desk` line through
   the check hooks would.
-- **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
-  lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
-  ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
-  over HTTPS), OAuth that admits the owner's ChromaGlass account alone (Firebase
-  sign-in, as `account-shows.js` already verifies), and a Durable Object the Mac app's
-  show server holds an outbound WebSocket to, joining the relay as the same
-  `assistant` role, so nothing on the Mac listens on the internet and the guard (44d)
-  still decides everything on the Mac. Owed first: the vendors' current pages on
-  custom connectors read (transport, auth), the running cost (expected inside the
-  Workers free tier for one user), and a security review. Its check: the Worker
-  against a stand-in Mac relay, a token for any other account refused, the switch off
-  closing the tunnel. Pass: `npm run assistant` driven through the Worker as well as
-  over stdio.
-
+- **44h.** Control over the internet: a Cloudflare Worker claude.ai on the web and the phone signs in to as a remote connector, only the owner's Firebase account admitted, and a tunnel the Mac dials out on, answered by the local MCP server's own code with the Mac's guard deciding: **built 2026-11-12** (`npm run relay`; story in `docs/plan-shipped.md` §44). Live once the owner's setup (44h-1) is done.
+- **44h-1. Deploy it, and one real sign-in.** *(The owner, about ten minutes, most of it
+  done by a session on the Mac.)* `npm run deploy:tunnel`; the Worker's secrets
+  (`OWNER_UID`, `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, and `TUNNEL_KEY_SHA256` from
+  `node mcp/chromaglass-mcp.js tunnel key`); the Worker's host added to Firebase
+  Authentication's authorized domains (the one step only the owner's console can do, so
+  the sign-in page can open Google's popup); the relay's address in
+  `~/.chromaglass/tunnel/relay` and the tunnel run as a LaunchAgent; the connector added
+  in claude.ai (Settings, Connectors, Add custom connector, the Worker's `/mcp`). Steps in
+  the owner's private setup file. What only this proves: the real Firebase popup on the
+  page, claude.ai's own client through DCR and refresh, and Cloudflare's hibernation with
+  the Mac's socket open. Pass: `show_state` read from claude.ai on the phone, and the
+  switch set off on the Mac answered "not connected" there within seconds.
+- **44h-2. The tunnel started by the Mac app.** *(S.)* Today the tunnel is its own process
+  (a LaunchAgent the setup installs), because `mcp/` is not shipped inside the app. The
+  app could start it beside the show server when the switch file and a relay address
+  exist, so a Mac set up once needs nothing at login. Only if the owner wants it: it puts
+  the MCP server inside the app. Pass: a `desktop` line, the tunnel up with the app and
+  down without it.
+- **44h-3. ChatGPT and the Gemini app.** *(XS each, the owner's call.)* Each is one more
+  callback in `REDIRECTS` (`mcp/tunnel-worker.js`), read from that vendor's own pages
+  first, and its line in `npm run relay`. Not added: the owner asked for Claude. Claude
+  Code's loopback callback was taken out in review (any program on the approving computer
+  could listen on it); Claude Code on the Mac has the local server.
+- **44h-5. A reconnect measured.** *(XS.)* When the Mac reconnects, the old socket's close
+  fails only the calls sent on it (`webSocketClose`), but no `relay` line holds that: one
+  with two stand-in sockets, a call on the newer surviving the older's close.
+- **44h-4. Progress and a call cancelled.** *(S.)* The Worker answers each request with
+  one JSON body; a call the owner stops in claude.ai keeps running on the Mac until it
+  finishes (at most `MAC_WAIT_MS`). An SSE answer would carry MCP progress and
+  `notifications/cancelled` both ways. Pass: a `relay` line where a cancelled
+  `look_at_plate` is not answered.
 ## Order
 
-44k's gaps next, 44k-1 to 44k-8 first (the audit done 2026-11-11, the table under 44k), then 44h, each in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
+44k's gaps next, 44k-1 to 44k-8 first (the audit done 2026-11-11, the table under 44k); 44h built 2026-11-12, 44h-1 (the owner's setup) next for it; each in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
 are wanted.

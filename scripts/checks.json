@@ -2012,6 +2012,22 @@
       ]
     },
     {
+      "name": "The owner's assistant over the internet",
+      "shard": "browser2",
+      "run": "npm run relay",
+      "why": [
+        "The relay Worker (PLAN 44h; scripts/relay.mjs): mcp/tunnel-worker.js in Node,",
+        "signed in to and called as claude.ai drives a remote connector (a 401 naming the",
+        "metadata, DCR, PKCE S256, the code, refresh), the Mac's end (chromaglass-mcp.js",
+        "tunnel) dialled out to it, the real show server and a stand-in display behind. Only",
+        "Claude's callbacks, only the owner's Firebase uid from a fresh sign-in, a code once,",
+        "rotation, theft and the grace, expiry, OWNER_UID changed, nothing raw stored, a flood",
+        "cut off; the same tools as over stdio, the Mac's guard still refusing; only the Mac's",
+        "key opens the tunnel; the switch off closes it. Then eighteen mutants, each of which",
+        "must fail its own line. No GPU, no network; about twenty seconds."
+      ]
+    },
+    {
       "name": "The remote's Draw screen",
       "shard": "browser2",
       "run": "node --experimental-strip-types scripts/draw.mjs",
