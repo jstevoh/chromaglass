@@ -270,7 +270,7 @@ path, joins a picture-and-sound pair itself and refuses an audio-only fetch.
 
 ~~**47w-2** Dissolves~~ (shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): a run
 of raised change whose ends differ by a cut's worth, whose frames are mixes of its ends and
-whose new picture the take never showed (`scripts/watchcuts.mjs`); 13 found in the Joshua
+whose new picture the take never showed (`scripts/watchcuts.mjs`); 12 found in the Joshua
 Light Show film, each a superimposition on the sheets.
 
 - **47w-3. Open: *Streams II* again.** The film that showed the miss is on the owner's Mac

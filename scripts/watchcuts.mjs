@@ -17,22 +17,23 @@
  * arithmetic. Every frame inside it is a weighted mix of the last frame of
  * the old take and the first frame of the new one, with the weight running
  * from one to the other. A pour moves dye across the frame: the frame halfway
- * through has the dye halfway across, which no mix of the two ends gives. A
- * palette crossfade inside one take (the self-test's clip D) keeps moving
- * while it changes, so its middle frame is not a mix of its ends either, and
- * its ends differ no more than the take does over the same span by itself.
+ * through has the dye halfway across, which no mix of the two ends gives.
  *
- * So a dissolve is found in three steps, on a 32×18 thumbnail of each
+ * So a dissolve is found in four steps, on a 32×18 thumbnail of each
  * sample's brightness (small enough that a slow drift inside each take
  * stays near a mix, and cheap to keep for an hour of samples):
  *
  *   1. A run of samples whose change is raised above the take's own: more
  *      than 1.6 times the median change of the three seconds either side.
  *   2. Its two ends differ by a cut's worth: more than 2.5 times what each
- *      side's take changes by itself over the same number of samples.
+ *      side's take changes by itself over the same number of samples (a
+ *      fast take's ends always differ a lot), and by more than 4% of full
+ *      brightness. Both halves were set on real footage: without the first
+ *      the Joshua Light Show film read 37 dissolves where the sheets show
+ *      about a dozen, and without the second a bar show filmed on one
+ *      camcorder read four, each 0.2 s of its noise and the lamp.
  *   3. Every frame inside it is the mix: fitting a·A + (1−a)·B to it leaves
- *      under a fifth of the ends' difference unexplained, and a falls from
- *      the old take to the new across the run.
+ *      under a fifth of the ends' difference unexplained.
  *   4. What follows is new: the frame after it is unlike every frame of the
  *      three seconds before it, and the frame before it unlike every frame
  *      of the three seconds after, each by more than half the ends'
@@ -111,8 +112,11 @@ export function findDissolves({ thumbs, cuts = [], rate, rejected = null }) {
   for (const [s, e] of runs) {
     // Sample s's change is from s−1 to s, so the run spans frames s−1 to e.
     const from = s - 1, to = e, L = to - from;
-    const no = why => { rejected?.push({ from, to, why }); };
-    if (L < 2 || L > 4 * rate) { no('len'); continue; }
+    const at = {};
+    const no = why => { rejected?.push({ from, to, why, ...at }); };
+    // Two samples at least: one inner frame to test the mix on. No upper
+    // bound: a slow dissolve over five seconds is still one.
+    if (L < 2) { no('len'); continue; }
     if (cuts.some(c => c >= from - near && c <= to + near)) { no('cut'); continue; }
     const gap = diff(thumbs[from], thumbs[to]);
     // What each take changes by itself over L samples, where there is room
@@ -122,21 +126,18 @@ export function findDissolves({ thumbs, cuts = [], rate, rejected = null }) {
     if (to + L < n) sides.push(diff(thumbs[to], thumbs[to + L]));
     if (!sides.length) { no('len'); continue; }
     const inside = Math.max(...sides);
+    Object.assign(at, { gap, inside });
     if (!(gap > 4 && gap > 2.5 * inside)) { no('gap'); continue; }
     const fits = [];
     for (let j = from + 1; j < to; j++) fits.push(mixFit(thumbs[j], thumbs[from], thumbs[to]));
-    if (!fits.length) { no('len'); continue; }
     const left = fits.reduce((a, f) => a + f.left, 0) / fits.length;
+    // How far the weight runs, reported but not required: a crossfade that
+    // flickers or pauses on its way is still a change of take, and the
+    // first draft's demand that the weight fall steadily turned down
+    // nothing the other steps let through (the check-skeptic pass).
     const fall = fits[0].a - fits.at(-1).a;
-    // The weight falls across the run: of the steps between inner frames,
-    // at most a quarter go the wrong way.
-    let back = 0;
-    for (let i = 1; i < fits.length; i++) if (fits[i].a > fits[i - 1].a + 0.05) back++;
-    const falls = fits.length === 1 ? fits[0].a > 0.15 && fits[0].a < 0.85 : fall > 0.4 && back <= (fits.length - 1) / 4;
-    // One step, not two: frames that each fit a mix but whose weight does
-    // not run from the old take to the new (a hold half-way, a flicker)
-    // are not a dissolve's frames.
-    if (!(left < 0.2 && falls)) { no('mix'); continue; }
+    Object.assign(at, { left, fall });
+    if (!(left < 0.1)) { no('mix'); continue; }
     let seen = Infinity;
     for (let j = Math.max(0, from - W3); j < from; j++) seen = Math.min(seen, diff(thumbs[to], thumbs[j]));
     for (let j = to + 1; j <= Math.min(n - 1, to + W3); j++) seen = Math.min(seen, diff(thumbs[from], thumbs[j]));

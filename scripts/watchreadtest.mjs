@@ -10,7 +10,7 @@
 // so that file stays under the size bar (`npm run sizes`).
 
 import { designFrame, designSummary, compareDesign, palette, paletteAcc } from './watchdesign.mjs';
-import { physicsAcc, physicsFrame, physicsSummary, physicsLines, spectrumSlope, scanTechniques, guessTechniques, REAL_SHOWS, realRange, fft as fftSelf } from './watchphysics.mjs';
+import { physicsAcc, physicsFrame, physicsSummary, physicsLines, spectrumSlope, scanTechniques, guessTechniques, realRange, fft as fftSelf } from './watchphysics.mjs';
 
 const f2 = x => (x == null || !Number.isFinite(x) ? String(x) : x.toFixed(2));
 
@@ -164,23 +164,25 @@ export function readSelftest(check) {
     /turned/.test(guess[0] ?? '') && !gSlid.some(t => /turned/.test(t)) && !gBand.some(t => /turned/.test(t)),
     `${guess[0] ?? 'no guess'}; slid: ${gSlid[0] ?? 'none'}`);
 
-  // The real shows' ranges (47v-3), beside the bands. A clip that changes
-  // only in place (the pulsing light, carried near 0) is still guessed as
-  // changing in place; one at a real show's own carried share is not, where
-  // the synthetic bar (0.3) called both real films digital.
-  const rc = realRange('carried'), meds = REAL_SHOWS.map(r => r.carried);
-  const atReal = { ...faded, carried: { ...faded.carried, med: meds.reduce((a, b) => a + b, 0) / meds.length } };
+  // The real shows' ranges (47v-3), beside the bands. The in-place guess
+  // fires just under the lowest real show and not just over it: the bar is
+  // the real shows' floor, where the synthetic bar (0.3) called both real
+  // films digital.
+  const rc = realRange('carried');
+  const atCarried = v => ({ ...faded, carried: { ...faded.carried, med: v } });
   const inPlace = g => g.some(t => /changes in place/.test(t.text));
-  check('physics: the pulsing light is guessed to change in place; a clip at the real shows\' own carried share is not',
-    REAL_SHOWS.length >= 2 && rc[0] === Math.min(...meds) && rc[1] === Math.max(...meds) && inPlace(guessTechniques(null, faded)) && !inPlace(guessTechniques(null, atReal)),
-    `real shows carried ${rc.map(v => f2(v)).join(' to ')}; pulsing ${f2(faded.carried.med)}, at the real shows ${f2(atReal.carried.med)}`);
-  // And the read prints the range beside each measure, saying when a clip
-  // falls outside every real show: the pulsing light's lifetime and carried
-  // share are under them, the slid texture's carried share over.
-  const fl = physicsLines(faded).join('\n'), sl = physicsLines(slid).join('\n');
+  check('physics: the in-place guess fires just under the lowest real show\'s carried share and not just over it',
+    inPlace(guessTechniques(null, atCarried(rc[0] - 0.01))) && !inPlace(guessTechniques(null, atCarried(rc[0] + 0.01))),
+    `real shows carried ${rc.map(v => f2(v)).join(' to ')}; guessed at ${f2(rc[0] - 0.01)}, not at ${f2(rc[0] + 0.01)}`);
+  // And the read prints the range beside each of the five measures, by
+  // name, saying when a clip falls outside every real show: the pulsing
+  // light (given a lifetime, which on its own it never loses) is under them
+  // on carried, the slid texture over.
+  const fl = physicsLines({ ...faded, lifetime: 0.5 }).join('\n'), sl = physicsLines(slid).join('\n');
+  const noted = ['flow', 'carried', 'turnover', 'lifetime', 'spectrum'].filter(m => new RegExp(`\\*\\*${m}\\*\\*: [^\\n]*real shows`).test(fl));
   check('physics: the read prints the real shows beside flow, carried, turnover, lifetime and spectrum, and says under or over',
-    (fl.match(/real shows/g) ?? []).length >= 4 && /carried\*\*: [^\n]*under every real show/.test(fl) && /carried\*\*: [^\n]*over every real show/.test(sl),
-    (fl.split('\n').find(l => /carried\*\*/.test(l)) ?? '').slice(0, 140));
+    noted.length === 5 && /carried\*\*: [^\n]*under every real show/.test(fl) && /carried\*\*: [^\n]*over every real show/.test(sl),
+    `noted on ${noted.join(', ')}; ${(fl.split('\n').find(l => /carried\*\*/.test(l)) ?? '').slice(0, 110)}`);
 }
 
 /**
@@ -219,7 +221,7 @@ export function blobTake(seed, colours, v = 0.4, W = 320, H = 180) {
  *
  * F, fourteen seconds of four takes of drifting dye (47w-2): a dissolve
  * over 1.5 s from 4.0 s into a take in the same colours (which the colour
- * test cannot see), a hard cut at 8.0 s, and a dissolve over 1.0 s from
+ * test cannot see), pausing for one sample half-way, a hard cut at 8.0 s, and a dissolve over 1.0 s from
  * 10.0 s into a take in other colours. G is one calm take with three
  * things that change the frame by a cut's worth over a second and are not
  * dissolves, each turned down by its own step of scripts/watchcuts.mjs: a
@@ -236,7 +238,10 @@ export function dissolveClips(W, H, FPS) {
   const frameF = f => {
     const t = f / FPS;
     if (t < 4) return tk[0](f);
-    if (t < 5.5) return xf(tk[0](f), tk[1](f), (t - 4) / 1.5);
+    // The weight holds for one sample (4.7 to 4.8 s) half-way: one quiet
+    // sample, as the codec or the takes' own motion make, must not split
+    // the dissolve in two.
+    if (t < 5.5) return xf(tk[0](f), tk[1](f), ((t < 4.7 ? t : t < 4.8 ? 4.7 : t - 0.1) - 4) / 1.4);
     if (t < 8) return tk[1](f);
     if (t < 10) return tk[2](f);
     if (t < 11) return xf(tk[2](f), tk[3](f), t - 10);
@@ -245,7 +250,7 @@ export function dissolveClips(W, H, FPS) {
   const ease = u => Math.max(0, Math.min(1, u));
   const frameG = f => {
     const t = f / FPS, img = calm(f);
-    const px = 30 + 260 * ease((t - 3) / 1.5), rad = 15 + 55 * ease(t - 8);
+    const px = 30 + 260 * ease((t - 3) / 1.5), rad = 10 + 90 * ease(t - 8);
     const lamp = 1 - 0.55 * (ease(t - 13) - ease(t - 15));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const p = (y * W + x) * 3;

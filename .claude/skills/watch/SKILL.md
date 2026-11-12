@@ -93,7 +93,7 @@ two ends, and whose new picture the old take never showed. A pour, a dye
 body spreading and a lamp dimming and coming back are each turned down by
 their own step (the self-test's clip G). Each dissolve counts as one cut, at
 its middle, and its samples are left out of the motion and physics reads. On
-the Joshua Light Show film it found 13 dissolves in ten minutes, each a
+the Joshua Light Show film it found 12 dissolves in ten minutes, each a
 superimposition of two loops on the sheets.
 
 ## The reference library

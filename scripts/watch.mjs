@@ -1120,22 +1120,33 @@ async function selftest() {
     `cuts at ${ts(DF)}; dissolves ${dv(DF)}`);
   // The first dissolve is in the takes' own colours, so the hard-cut test
   // (colours, or one sample's change) sees nothing of it: what finds it is
-  // the mix. And every sample inside it is left out of the motion reads.
-  const inF = DF.rows.filter(r => r.t > 4.15 && r.t < 5.4);
-  check('F: the samples inside the first dissolve are fades, left out of motion and flow', inF.length >= 10 && inF.every(r => r.fade),
-    `${inF.filter(r => r.fade).length} of ${inF.length} marked`);
+  // the mix. Every sample inside each dissolve is a fade, and none outside.
+  const fades = (t0, t1) => DF.rows.filter(r => r.t > t0 && r.t < t1);
+  const in1 = fades(4.15, 5.4), in2 = fades(10.15, 10.95), out = DF.rows.filter(r => [3.9, 5.6, 9.9, 11.1].some(t => Math.abs(r.t - t) < 0.01));
+  check('F: the samples inside both dissolves are fades, and the samples just outside them are not',
+    in1.length >= 10 && in1.every(r => r.fade) && in2.length >= 7 && in2.every(r => r.fade) && out.length === 4 && !out.some(r => r.fade),
+    `${in1.filter(r => r.fade).length} of ${in1.length}, ${in2.filter(r => r.fade).length} of ${in2.length} marked; outside ${out.filter(r => r.fade).length} of ${out.length}`);
+  // What a fade does: the physics read takes no pair across one. Its longest
+  // shot is then the first take, 0.0 to 4.0 s (41 samples, 4.1 s); with
+  // only the dissolve's middle sample a cut, it would run to 4.7 s.
+  check('F: the physics read measures across no fade: its longest shot is the first take, 4.1 s', Math.abs(DF.design.physics.longestShot - 4.1) < 0.06,
+    `longest shot ${DF.design.physics.longestShot?.toFixed(2)} s`);
   const why = (r, t0, t1) => r.turnedDown.filter(v => r.rows[v.to].t > t0 && r.rows[v.from].t < t1).map(v => v.why);
-  const downs = r => r.turnedDown.map(v => `${r.rows[v.from].t.toFixed(1)}–${r.rows[v.to].t.toFixed(1)} s ${v.why}`).join(', ') || 'none';
+  const downs = r => r.turnedDown.map(v => `${r.rows[v.from].t.toFixed(1)}–${r.rows[v.to].t.toFixed(1)} s ${v.why}${v.left != null ? ` (left ${v.left.toFixed(2)})` : ''}`).join(', ') || 'none';
   check('G: a pour, a dye body spreading and the lamp dimming and coming back, in one take, are no cut and no dissolve',
     !DG.cuts.length && !DG.dissolves.length, `cuts at ${ts(DG)}; dissolves ${dv(DG)}`);
   // Each turned down by the step meant for it, so a step that stops working
-  // reads red here and not only on a film: the pour by the mix (its ends
-  // differ by a cut's worth against the calm take), the lamp by the revisit
-  // (a perfect mix of its ends).
-  check('G: the pour is turned down as no mix of its ends; the lamp, both ways, as a return to a picture already shown',
-    why(DG, 3.1, 4.4).includes('mix') && why(DG, 13.1, 13.9).includes('revisit') && why(DG, 15.1, 15.9).includes('revisit'),
+  // reads red here and not only on a film: the pour (its ends differ by a
+  // cut's worth against the calm take) and the dye body by the mix, the
+  // dye body only since the mix's bar was set from the Joshua Light Show
+  // film's dissolves (all under 0.03; the body reads about 0.14); the lamp,
+  // a perfect mix of its ends, by the revisit.
+  check('G: the pour and the dye body are turned down as no mix of their ends; the lamp, both ways, as a return to a picture already shown',
+    why(DG, 3.1, 4.4).includes('mix') && why(DG, 8.1, 8.9).includes('mix') && why(DG, 13.1, 13.9).includes('revisit') && why(DG, 15.1, 15.9).includes('revisit'),
     `turned down: ${downs(DG)}`);
-  check('D: the palette crossfade at 24–27 s is no dissolve', !D.dissolves.length, `dissolves ${dv(D)}`);
+  // C's stripes between its two hard cuts raise a run that touches both:
+  // it is the cuts', turned down as such, not judged again as a dissolve.
+  check('C: the raised run between its hard cuts is turned down as touching a cut', why(C, 2.1, 3.9).includes('cut'), `turned down: ${downs(C)}`);
 
   // C stands still twice: the grey square until the cut at 2.0 s (2.0 s
   // still), and the blue from 4.1 s to the end at 6.0 (1.9 s). At the default
