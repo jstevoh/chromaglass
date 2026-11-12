@@ -32,14 +32,14 @@ web views differ in what matters here:
 
 | | iPhone | Android |
 |---|---|---|
-| Shell | Capacitor: the built site **bundled** in the app, drawn by WKWebView | A Trusted Web Activity (Bubblewrap): the **live** site in full-screen Chrome |
-| WebGPU | iOS 26 (iPhone 11 and newer), Safari and WKWebView alike | Chrome on Android 12+, Qualcomm and ARM GPUs; the app's "needs WebGPU" screen covers the rest |
-| Web MIDI | None in WebKit; a CoreMIDI plugin later | Chrome has it, so USB controllers work from day one |
-| Record and Render | A web download does not save in a web view: route to the share sheet or Photos | Chrome downloads as it does now |
-| Updates | A new App Store build each time (guideline 2.5.2: no downloading code that changes the app) | Every deploy to `main` reaches the app at once; the store only sees a new build when the shell changes |
-| Offline | Everything is inside the app | The service worker (`public/sw.js`) caches a file only once it has been fetched; precaching the build is 14h |
+| Shell | Capacitor: the built site **bundled** in the app, drawn by WKWebView | Capacitor too (12-ctl-3, in place of the Trusted Web Activity first planned): the same bundled build, drawn by Android's WebView |
+| WebGPU | iOS 26 (iPhone 11 and newer), Safari and WKWebView alike | Android's WebView, on fewer phones than Chrome (Android 12+, Qualcomm and ARM GPUs); where it has none the app says so and offers Chrome or the Laptop remote (`NeedsWebGpu.tsx`) |
+| Web MIDI | None in WebKit; a CoreMIDI plugin later | None in the WebView either; Chrome has it, which the website on the phone keeps |
+| Record and Render | A web download does not save in a web view: route to the share sheet or Photos | The same in the WebView: route to the share sheet |
+| Updates | A new App Store build each time (guideline 2.5.2: no downloading code that changes the app) | A new Play build each release (12-ctl-ship), as on the iPhone |
+| Offline | Everything is inside the app | Everything is inside the app, with no service worker (as on the iPhone) |
 | Account | Apple Developer Program, $99 a year | Google Play Console, $25 once |
-| Tools | Xcode on the Mac | Bubblewrap (JDK and Android SDK), on the Mac or in CI; Android Studio optional |
+| Tools | Xcode on the Mac | JDK 21 and the Android SDK: `android.yml` builds a debug APK in CI; `npm run android` opens Android Studio |
 
 A Trusted Web Activity is Chrome itself, not a web view, so Android gets WebGPU, Web
 MIDI, WebCodecs, wake lock and downloads exactly as the website has them today. A
@@ -47,6 +47,9 @@ Capacitor Android app would run in Android's WebView instead, which has no Web M
 and whose WebGPU would need its own test; the TWA is less work and does more. iOS
 has no equivalent (every iPhone browser is WebKit, and Apple does not take a shell
 that just points at a website), so there the build ships inside the app.
+*Overtaken 2026-11-09 (12-ctl-3, built 2026-11-11): a TWA is the https site, which cannot
+open a plain ws:// socket to the Mac, so it could never be the controller; Android is
+Capacitor too, and a phone whose WebView lacks WebGPU is sent to Chrome.*
 
 `detectTier()` in `src/lib/platform.ts` already has a `native` tier keyed on
 `window.__CHROMAGLASS_NATIVE__`; the iPhone shell sets it. The Android app is the
@@ -97,7 +100,9 @@ forms and a 15 % cut.
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
    The upload key stays with the owner, never in the repo. Then the closed test
-   starts, 12 testers for 14 days, while the iPhone work carries on. *Not started.*
+   starts, 12 testers for 14 days, while the iPhone work carries on. *Built instead as
+   12-ctl-3 (2026-11-11): `android/`, a Capacitor project, its debug APK from `android.yml`;
+   signing and the Play upload are 12-ctl-ship.*
 4. **The iPhone shell** (one PR): Capacitor's `ios/` project with `webDir: dist`,
    no service worker in the app, permission strings, status bar hidden, minimum
    iOS 26, and an `xcodebuild` step on the macOS runner. ***Built*** (the "iPhone
@@ -169,10 +174,9 @@ feature ships its phone version is what keeps them whole.
   Outside the US the app names no price and links to no purchase.
 - **12-play-org** *(owner)*: the Play Console account as the LLC (organization,
   D-U-N-S number), not a personal one, so publishing does not wait on the 14-day
-  closed test. Before it, step 1's Android smoke test. Unchecked: the iPhone app's
-  laptop remote leans on the app's own origin (4a), and a TWA is the https site,
-  which cannot open a plain ws:// socket to a laptop, so the Android app may have
-  no laptop remote without more work.
+  closed test. Before it, step 1's Android smoke test. *Answered by 12-ctl-3
+  (2026-11-11): the Android app is Capacitor, not a TWA, with cleartext and mixed
+  content allowed, so it has the laptop remote as the iPhone's does.*
 - **12-mas** *(not doing, for now)*: a Mac App Store build. It would need a
   sandboxed Electron build in place of the Developer ID one, give up
   `desktop/updates.js` for Apple's review of every release, and put at risk the
@@ -204,17 +208,7 @@ builds against a red check (briefs in the project files, `antigravity/briefs-202
   refused in words. This is 4a's open "QR code" without the URL scheme: one code serves a phone's
   camera (it opens the show server's own remote in the browser) and the app. *Measure:*
   `controller` line `scan`.
-- **12-ctl-3** (M, Antigravity): **the Android app, as Capacitor, not a TWA.** Step 3 planned a
-  Trusted Web Activity: the hosted https site in Chrome, which cannot open a plain `ws://` socket
-  to the Mac on the LAN (mixed content; 12-play-org's open question), so it could never be the
-  controller. The Android app is therefore the iPhone's shell on Android: `npx cap add android`
-  beside `ios/`, the same bundled build and app id `app.chromaglass`, the microphone and camera,
-  cleartext and mixed content allowed for the LAN, and a CI workflow that builds an unsigned debug
-  APK (no secrets). What it gives up is the TWA's every-deploy-reaches-the-app; a release builds a
-  new bundle (12-ctl-ship). Android's WebView has WebGPU on fewer phones than Chrome does, so when
-  the plate cannot start in the app it says so, offers the Laptop remote, and opens the show in
-  Chrome. Step 1's Android smoke test still stands for Chrome. *Measure:* `controller` lines
-  `android`, `nogpu`, and the workflow green.
+- ~~**12-ctl-3**~~ *(shipped 2026-11-11)*: the Android app, a Capacitor project beside `ios/`; its story is in `docs/plan-shipped.md`.
 - **12-ctl-find** (S, after 12-tv-2): the app finds the Mac on the network by the Mac app's
   Bonjour advert that 12-tv-2 adds, so neither typing nor a scan is needed. Its check is written
   when 12-tv-2's advert is on main.
@@ -222,6 +216,13 @@ builds against a red check (briefs in the project files, `antigravity/briefs-202
   stays with the owner, the CI secret is Claude's to wire), an upload job to the Play closed test
   from main, and the iPhone's half is 12-ship. Sign-in, in-app account deletion (5.1.1(v)), the
   licence Worker and anything that touches a key are Claude's, never in an Antigravity brief.
+- **12-ctl-weight** (S, found 2026-11-11 building 12-ctl-3): the phone apps bundle all of
+  `dist/`, so the Android debug APK is 148 MB (`android.yml`'s artifact, 147774968 bytes), and
+  the iPhone app carries the same. Most of it is media the website streams: `dist/video` 81 MB
+  (the cartoons 78 MB), `dist/music` 38 MB, `dist/press` 27 MB. Play's limit for a bundle's base
+  is 200 MB, and a phone used as a remote needs none of it. Leave those folders out of the
+  apps' copy (or serve them from the site when the app plays one) before 12-ctl-ship, and add a
+  size line to `controller` so the bundle cannot grow back unseen.
 
 **12-tv: the plate on a living-room TV (asked 2026-11-08; the owner chose route 2, the receiver app, the same day).** The
 owner asked whether a Google TV / Android TV app should play the plate on a big
