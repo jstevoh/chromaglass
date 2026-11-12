@@ -227,6 +227,20 @@ export interface RemoteState {
   media?: MediaNow;
   /** OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts): OSC out's switch and target, MIDI on or off, its ports by name, clock and the map. */
   outputs?: OutputsNow;
+  /** The projector (PLAN 44k-15, app/projectorNow.ts): the cast window and the projector mode, and the wall's geometry, grade and test card. */
+  projector?: ProjectorNow;
+}
+
+/** The projector as the page holds it (PLAN 44k-15, app/projectorNow.ts); null until its hook has run. */
+export interface ProjectorNow {
+  /** The second screen found (its label, or null), the screens permission, the projector mode, and whether the show's window is open. */
+  cast: { screen: string | null; permission: string; mode: 'ask' | 'auto' | 'off'; casting: boolean } | null;
+  /** The wall (lib/outputConfig.ts): its geometry and grade, the mapped shapes counted, and the test card and Identify. */
+  wall: {
+    flipX: boolean; flipY: boolean; corners: number[];
+    maskTop: number; maskRight: number; maskBottom: number; maskLeft: number; maskFeather: number;
+    gain: number; gamma: number; flashGuard: boolean; surfaces: number; test: boolean; identifying: boolean;
+  } | null;
 }
 
 /** What the plate is filmed, poured and marked with, as the display reports it (RemoteState `media`). */
@@ -420,6 +434,8 @@ export type RemoteMessage =
   | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
   /** OSC out and MIDI from the owner's assistant (PLAN 44k-14), relayed only from the guard, with `answer`; OSC in and Syphon are the relay's own. */
   | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
+  /** The projector and the wall from the owner's assistant (PLAN 44k-15), relayed only from the guard, with `answer`; the geometry already judged there (server/assistantProjector.js). */
+  | { type: 'assistant-projector'; do: string; on?: boolean; mode?: string; wall?: Record<string, unknown>; answer?: number }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }

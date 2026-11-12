@@ -434,7 +434,7 @@ const pairTv = (tv, except) => {
 // holds the door, re-reads the switch every second, and closes a connected
 // assistant the moment the switch goes off.
 const ASSISTANT_FILE = process.env.CHROMAGLASS_ASSISTANT_FILE ?? join(HERE, '.assistant');
-const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-outputs', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music']);
+const ASSISTANT_ONLY = new Set(['assistant-ear', 'cue-look', 'assistant-outputs', 'assistant-live', 'assistant-sound', 'assistant-updates', 'assistant-undo', 'assistant-record', 'assistant-still', 'assistant-media', 'song-action', 'assistant-tempo', 'assistant-link', 'assistant-seq', 'assistant-set', 'assistant-songs', 'assistant-music', 'assistant-projector']);
 let assistantNow = readAssistantMode(process.env, ASSISTANT_FILE);
 /** The Mac app's updater, when main.js hands it over (PLAN 44k-18); null in a show run from a terminal. */
 let appUpdates = null;

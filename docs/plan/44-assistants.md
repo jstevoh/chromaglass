@@ -419,11 +419,28 @@ through cords and preset patches, and the plate shader is untouched.
   asking. Whether the Mac app grants MIDI without a prompt (`grantPermissions`) is
   unmeasured from the assistant: switch it on from Claude on the Mac with MIDI off, and
   read `outputs.midi.open`.
-- **44k-15. The projector.** *(M, AG lane.)* `projector` (cast window open or closed,
-  projector mode, the test card on or off) and `wall` (the output's geometry and
-  grade as `useOutput`'s `OutputConfig`, and reset). The mapping's shapes stay the
-  desk's (a picture-led job). Full. Pass: lines for each, a geometry off the screen
-  refused.
+- ~~**44k-15. The projector.**~~ **Shipped** 2026-11-11: `projector` (cast the show's
+  window on or off, the projector mode ask, auto or off, the test card, Identify) and
+  `wall` (flips, corners, masks, feather, gain, gamma, the flash guard on only, reset),
+  Full, read back in `show_state`'s `projector`; through the chip's and Settings → Wall's
+  own calls (`app/projectorNow.ts`), the geometry judged by the guard
+  (`server/assistantProjector.js`: corners convex, half the picture on the screen, a
+  fiftieth of the screen covered). The mapping's shapes stay the desk's (`npm run
+  assistant`, `projector-full`, `-answer`, `-cast`, `-mode`, `-test`, `wall-patch`,
+  `-off-screen`, `-fold`, `-tiny`, `-range`, `-flash`, `phone-projector`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-15a. The cast from the assistant on the Mac, with a real projector.** *(S, found
+  building 44k-15.)* The check holds the call to the page's door and the page's door to
+  the cast sender's; nothing has opened the show's window from Claude on the Mac app with
+  a second screen plugged in. Plug one in, ask Claude to put the show on the projector,
+  and read `show_state`'s `projector.cast.casting` and the wall: the window should land on
+  that screen, filling it, as a click on the chip puts it. In a browser it is refused (a
+  window that no click opened is a blocked popup), and the answer says so.
+- **44k-15b. Whether the show's window fills its screen.** *(S, found building 44k-15.)*
+  The cast sender knows (`windowFullscreen`, the "fill the screen" chip), but it reaches
+  `useControllers` only through App(), which may not grow, so `show_state` does not say
+  whether a browser's title bar is on the wall. The Mac app fills the projector's screen
+  itself, so this matters only in a browser. Pass it with the next byte App() frees.
 - **44k-16. The rest.** *(S each, AG lane, as wanted.)* The palette lock and the tool
   and layer in hand (Play); Ambient TV mode; set lists' and sequences' own editing,
   files and binding to songs (Full). Wanted least in a show: build when the owner

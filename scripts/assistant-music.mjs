@@ -227,5 +227,5 @@ export const MUSIC_MUTANTS = [
   { rule: 'music-type', file: 'assistantMusic.js', find: 'if (!type) return { reason: `not ${what}', replace: 'if (false) return { reason: `not ${what}' },
   { rule: 'music-length', file: 'assistantMusic.js', find: 'if (player?.length > 0 && s > player.length)', replace: 'if (false)' },
   { rule: 'music-answer', file: 'assistant.js', find: "send({ type: 'assistant-music', ...call.out, ...answerOf(message) });", replace: "send({ type: 'assistant-music', ...call.out });" },
-  { rule: 'phone-music', file: 'remote-server.js', find: "'assistant-songs', 'assistant-music']", replace: "'assistant-songs']" },
+  { rule: 'phone-music', file: 'remote-server.js', find: "'assistant-songs', 'assistant-music',", replace: "'assistant-songs'," },
 ];
