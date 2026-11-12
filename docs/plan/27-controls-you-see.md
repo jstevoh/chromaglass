@@ -298,6 +298,22 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       at 6 s, 192²: haze 1,474 cells, colour in the bodies 72%, 83% clear (`lavawax` 4/4).
       What is left of 27f-9f is the Mac's minute: whether the plumes still strip colour
       over a long take, which the film after this PR shows.
+      *The Mac's minute, filmed (27f-9h, 2026-11-12, two takes of 150 s, no hands, no
+      sound):* yes, in the app, and not in the lab. The film: fat dark caps on stalks to
+      about 20 s, red streaks and folded sheets by 30 s, and from about 1:40 one marbled
+      orange-red column up the middle with a pale orange wash round it; the wax never
+      gathers back into separate round bodies. The lab over the same 150 s (128², the
+      look's own settings, `scratch/stall/probe.mjs`): the share of the colour inside the
+      wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
+      cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
+      and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
+      take and the app's picture does not. What differs between the two is not yet known,
+      and is the next thing to measure before anything is changed: the app's grid and step
+      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
+      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
+      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
+      it would read the app's own fields after two minutes (the share of the dye inside
+      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).
