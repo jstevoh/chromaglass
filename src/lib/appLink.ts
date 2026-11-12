@@ -201,3 +201,56 @@ export function openInChrome(url: string = SITE_SHOW_URL): void {
   if (typeof cap?.nativePromise !== 'function') { viaLink(); return; }
   cap.nativePromise('OpenInChrome', 'open', { url }).catch(viaLink);
 }
+
+/**
+ * Read a scanned QR code as the laptop's address (12-ctl-2).
+ *
+ * The code the Phone · iPad panel draws says the Phone line in full
+ * (`http://192.168.1.20:3000/?remote=1&key=1234`, lib/qr.ts), so a scan is
+ * held to more than the typed field is: it must say http:// or https://
+ * itself. The typed field fills in `http://` for `192.168.1.20` because a
+ * person typing an address leaves it off; a code never does, and a code that
+ * says a bare word ("laptop", a Wi-Fi password, a product number) is not a
+ * laptop's address that happens to lack its scheme. The key is the code's own:
+ * the server printed it with this code, and the one remembered may be old.
+ */
+export function parseScannedCode(text: string): LaptopLink | null {
+  const raw = text.trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  return parseLaptopAddress(raw);
+}
+
+/** What a scan came back with: the code's text, a person backing out, or why it could not scan. */
+export type ScanOutcome = { text: string } | { cancelled: true } | { error: string };
+
+/**
+ * Scan the laptop's code with the phone's camera, in either app.
+ *
+ * Each shell has a small plugin of its own named LaptopScan: VisionKit's live
+ * scanner on the iPhone (ios/App/App/LaptopScan.swift), Google's code scanner
+ * from Play services on Android (android/…/LaptopScanPlugin.java). The
+ * community ML Kit plugin would have been one plugin for both, but on iOS it
+ * installs only through CocoaPods, and the iPhone app is a Swift Package
+ * Manager project. Both resolve with `{ text }` or `{ cancelled: true }` and
+ * reject with a sentence the form can show as it is.
+ *
+ * A check sets `window.__cgScan` to stand in for the camera
+ * (`npm run controller`, part scan): it returns the text a code would say, or
+ * null for a cancel.
+ */
+export async function scanLaptopCode(): Promise<ScanOutcome> {
+  if (typeof window.__cgScan === 'function') {
+    const text = await window.__cgScan();
+    return text == null ? { cancelled: true } : { text };
+  }
+  const cap = (window as unknown as { Capacitor?: { nativePromise?: (plugin: string, method: string, options: unknown) => Promise<unknown> } }).Capacitor;
+  if (typeof cap?.nativePromise !== 'function') return { error: 'This app has no scanner. Type the laptop\'s address instead.' };
+  try {
+    const got = await cap.nativePromise('LaptopScan', 'scan', {}) as { text?: unknown; cancelled?: unknown } | null;
+    if (got && typeof got.text === 'string') return { text: got.text };
+    return { cancelled: true };
+  } catch (e) {
+    const message = (e as { message?: unknown } | null)?.message;
+    return { error: typeof message === 'string' && message ? message : 'The scanner would not open. Type the laptop\'s address instead.' };
+  }
+}

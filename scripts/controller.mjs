@@ -3,7 +3,8 @@
  * The phone controller apps (PLAN.md 12-ctl): the iPhone and Android apps as
  * the show's controller, written before their builds.
  *
- *   npm run controller -- --owed=setlist,songs,display,scan,android,nogpu
+ *   npm run controller                 # every line built (12-ctl-2, 2026-11-12)
+ *   npm run controller -- --owed=<ids>  # a line written before its build
  *   npm run controller -- --head    # watch it
  *
  * Asked for on 2026-11-08: "shouldn't we have 2 apps on each platform? tv apps
@@ -266,6 +267,43 @@ await part('the remote\'s songs', async () => {
   owedCheck('songs', 'Follow songs, off on the Mac, shows off, sends song-follow on, and shows on once the Mac says so', followBefore === 'false' && follow?.type === 'song-follow' && follow.on === true && followAfter, `aria-checked ${followBefore}, ${JSON.stringify(follow)}, then on ${followAfter}`, !open);
   await ctx.close();
 });
+
+// ── Scan the laptop's code ─────────────────────────────────────────
+// While the stand-in Mac is still connected: written after the laptop's side,
+// this part ran once `mac.close()` had hung the stand-in up, so a correct scan
+// reached the right address and read Offline with no laptop there (measured
+// 2026-11-12, the socket closed before the scan). A scan has to meet a
+// laptop, as the typed address in the songs part does.
+await part('scan', async () => {
+  // The Phone · iPad panel's QR code says exactly the Phone line (lib/qr.ts,
+  // read back by `npm run qr`), so a scan hands the form that line.
+  const { ctx, page } = await phone('ios', { fn: (text) => { window.__cgScan = async () => text; }, arg: PRINTED });
+  await page.goto(`${APP}/?remote=1`, { waitUntil: 'load' });
+  await until(page, () => visible(page, 'laptop-link'));
+  const has = await visible(page, 'laptop-scan');
+  if (has) await page.getByTestId('laptop-scan').tap();
+  const went = has && await page.waitForURL(/relay=/, { timeout: 10_000 }).then(() => true, () => false);
+  const url = new URL(page.url());
+  owedCheck('scan', 'the app\'s Laptop remote form has Scan, and a scanned Phone line links with its key', went && url.searchParams.get('relay') === RELAY && url.searchParams.get('key') === KEY && await until(page, () => linked(page)), url.search, !has);
+  await ctx.close();
+
+  const bad = await phone('ios', { fn: () => { window.__cgScan = async () => 'javascript:alert(1)'; } });
+  await bad.page.goto(`${APP}/?remote=1`, { waitUntil: 'load' });
+  await until(bad.page, () => visible(bad.page, 'laptop-link'));
+  const hasBad = await visible(bad.page, 'laptop-scan');
+  if (hasBad) await bad.page.getByTestId('laptop-scan').tap();
+  await bad.page.waitForTimeout(1000);
+  const stayed = !new URL(bad.page.url()).searchParams.has('relay') && await visible(bad.page, 'laptop-link');
+  const said = hasBad && await visible(bad.page, 'laptop-error') && ((await bad.page.getByTestId('laptop-error').first().textContent().catch(() => '')) ?? '').trim().length > 10;
+  owedCheck('scan', 'a code that is not a laptop\'s address is refused, in words, and goes nowhere', hasBad && stayed && said, `stayed ${stayed}, said ${said}`, !hasBad);
+  await bad.ctx.close();
+
+  const web = await phone(null);
+  await web.page.goto(PRINTED, { waitUntil: 'load' });
+  await until(web.page, () => linked(web.page));
+  check('the website\'s remote has no Scan (it has no camera plugin, and needs no address)', !(await visible(web.page, 'laptop-scan')));
+  await web.ctx.close();
+});
 mac.close();
 
 // ── The laptop's half: the real app, as the Mac runs it ────────────
@@ -322,38 +360,6 @@ await part('the laptop\'s side', async () => {
   owedCheck('display', 'and song-follow turns Follow songs over', flipped, `follow ${before} → ${last().songs?.follow ?? null}`, !sg);
   ctl.close();
   await lap.close();
-});
-
-// ── Scan the laptop's code ─────────────────────────────────────────
-await part('scan', async () => {
-  // The Phone · iPad panel's QR code says exactly the Phone line (lib/qr.ts,
-  // read back by `npm run qr`), so a scan hands the form that line.
-  const { ctx, page } = await phone('ios', { fn: (text) => { window.__cgScan = async () => text; }, arg: PRINTED });
-  await page.goto(`${APP}/?remote=1`, { waitUntil: 'load' });
-  await until(page, () => visible(page, 'laptop-link'));
-  const has = await visible(page, 'laptop-scan');
-  if (has) await page.getByTestId('laptop-scan').tap();
-  const went = has && await page.waitForURL(/relay=/, { timeout: 10_000 }).then(() => true, () => false);
-  const url = new URL(page.url());
-  owedCheck('scan', 'the app\'s Laptop remote form has Scan, and a scanned Phone line links with its key', went && url.searchParams.get('relay') === RELAY && url.searchParams.get('key') === KEY && await until(page, () => linked(page)), url.search, !has);
-  await ctx.close();
-
-  const bad = await phone('ios', { fn: () => { window.__cgScan = async () => 'javascript:alert(1)'; } });
-  await bad.page.goto(`${APP}/?remote=1`, { waitUntil: 'load' });
-  await until(bad.page, () => visible(bad.page, 'laptop-link'));
-  const hasBad = await visible(bad.page, 'laptop-scan');
-  if (hasBad) await bad.page.getByTestId('laptop-scan').tap();
-  await bad.page.waitForTimeout(1000);
-  const stayed = !new URL(bad.page.url()).searchParams.has('relay') && await visible(bad.page, 'laptop-link');
-  const said = hasBad && await visible(bad.page, 'laptop-error') && ((await bad.page.getByTestId('laptop-error').first().textContent().catch(() => '')) ?? '').trim().length > 10;
-  owedCheck('scan', 'a code that is not a laptop\'s address is refused, in words, and goes nowhere', hasBad && stayed && said, `stayed ${stayed}, said ${said}`, !hasBad);
-  await bad.ctx.close();
-
-  const web = await phone(null);
-  await web.page.goto(PRINTED, { waitUntil: 'load' });
-  await until(web.page, () => linked(web.page));
-  check('the website\'s remote has no Scan (it has no camera plugin, and needs no address)', !(await visible(web.page, 'laptop-scan')));
-  await web.ctx.close();
 });
 
 // ── The Android app on a phone without WebGPU ──────────────────────

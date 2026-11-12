@@ -13298,6 +13298,35 @@ Measured: `npm run controller -- --owed=scan,android,nogpu` 25 of 25, the `setli
 `cuedPresetId comet`; a show run, stopped and Follow turned over each read back from
 the laptop's own state); scan, android and nogpu stay owed for 12-ctl-2 and 12-ctl-3.
 
+## 12-ctl-2. Scan the laptop's code (2026-11-12)
+
+The Laptop remote form asked a phone to type or paste the laptop's address and key.
+The show's Phone · iPad panel already draws that address as a QR code (8f,
+`lib/qr.ts`), so the app now reads it: **Scan the laptop's code**, drawn only in the
+iPhone and Android apps (the website's remote needs no address, and has no camera
+plugin). One code serves both: a phone's own camera opens the show server's remote
+in the browser, and the app links with it, so 4a's open "QR code" needed no
+`chromaglass://` scheme.
+
+Each shell has a local plugin, `LaptopScan`, called through the bridge
+(`appLink.ts`'s `scanLaptopCode()`; the bundle still imports no Capacitor package).
+On the iPhone it is VisionKit's `DataScannerViewController` (`ios/App/App/LaptopScan.swift`,
+registered by `AppViewController`, which the storyboard and SceneDelegate now name in
+place of the bare bridge controller), asking for the camera the Info.plist already
+names. On Android it is Google's code scanner from Play services
+(`LaptopScanPlugin.java`, `play-services-code-scanner`), which draws its own camera
+view and needs no camera permission. The ML Kit Capacitor plugin was the obvious
+choice and was not taken: on iOS it installs only through CocoaPods, and this project
+is Swift Package Manager. What the scanner reads goes through `parseScannedCode`: only
+http(s), then the same parser as a typed address, so the code's own key is used; a
+cancel says nothing, and anything else is refused in words on the form.
+
+Measured: `npm run controller` 25 of 25 with nothing owed (it was 24 of 25 owed
+`scan`). The check's scan part had been written after the part that hangs up its
+stand-in Mac, so a correct scan reached the right address and read Offline; it now
+runs while the stand-in is connected. The scanners themselves need a phone: `ios.yml`
+and `android.yml` prove they compile.
+
 ## 12-ctl-3. The Android app (2026-11-11)
 
 The owner asked for the phone apps to be the Mac app's controller (12-ctl), and the
