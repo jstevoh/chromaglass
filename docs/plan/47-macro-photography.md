@@ -289,10 +289,22 @@ read, and the techniques used, and judge our own visuals the same way.
 read and kept, their numbers in `REAL_SHOWS` (`scripts/watchphysics.mjs`) and printed beside
 each band.
 
-- **47v-4. Open: the third real show, a Liquid Light Lab set.** YouTube only, so it is fetched
-  on the owner's Mac (the watch skill's routine), watched at `--rate 10`, kept with `--keep`
-  and added as a row of `REAL_SHOWS`. The two read so far are a 1969 film of the loops and a
-  bar in 2016: a current projector show by the artist the owner follows is the gap.
+- **47v-4. Open: the third real show.** Tried 2026-11-12 with Liquid Light Lab, fetched on the
+  owner's Mac, and none of their films makes a plain row. Their own films (*Melt Your Face
+  Vol. 1*) run the dish camera through a video mirror and colouriser: flow 14.5, carried
+  0.27, turnover 0.8 s, lifetime 0.2 s, spectrum −2.37, mirror symmetry 0.69, colour flips
+  read as a burst of cuts at 3:33. That is their look, so it is kept in the library
+  (`lll-melt-your-face-1`, for `--vs`) and left out of `REAL_SHOWS`, whose rows are filmed
+  oils. Their concert videos lay photographs of the band over the oils. Their set behind
+  High Time at Brooklyn Bowl (2024) is filmed from the crowd: the screen is a strip about
+  250 pixels wide between the truss and the band's heads, and read there it gives carried
+  0.03, turnover 0.5 s and a lifetime longer than the clip, which is the stage lights and the
+  camera, not the oils. Still wanted: a projected show filmed square-on and close, or a dish
+  camera with no video effects (the owner's own rig filmed is the surest).
+- **47v-6. Open: a crop too small to read says so.** `--crop 0.05,0.33,0.9,0.13` on the
+  Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
+  blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
+  the flow read needs a taller crop, and a selftest line for it.
 - **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
   synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
   spot and superimposed loops all count as change the flow does not carry. Measure the
@@ -324,6 +336,6 @@ take from 2026-11-11, by `npm run watch -- … --vs`:
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h and 47i when wanted; 47w-3, 47v-4 and 47v-5 whenever the watch tool is next touched; 47y
+47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up. Each its own thread
 and PR.

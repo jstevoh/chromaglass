@@ -13691,4 +13691,7 @@ lifetime and spectrum and says when a clip is under or over every real show. The
 real shows read carried 0.13 to 0.19, which the synthetic bands called "changes in place …
 or a digital effect"; the in-place guess now fires only under the real shows' floor (47v-5
 is the measure's fix). The Dregs (2023), the third archive film considered, is mostly
-digital overlay over a band and was left out; a Liquid Light Lab set waits on the Mac (47v-4).
+digital overlay over a band and was left out. Liquid Light Lab's films were fetched on the
+owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a video mirror and
+colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
+row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).

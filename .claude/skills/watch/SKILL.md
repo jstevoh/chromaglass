@@ -107,6 +107,14 @@ puts a watched clip there, `--vs <name>` compares a take with it without
 fetching again, and `--refs` lists them. A look's retune can be held to its
 reference's numbers this way. `scripts/watchrefs.mjs` has the rules.
 
+Kept so far: `jls-liquid-loops-1969` and `bar-the-dip-2016` (the two real
+shows) and `lll-melt-your-face-1` (Liquid Light Lab's own look: a dish
+camera through a video mirror and colouriser, so not a real-show row).
+
+A crop is decoded 320 pixels wide. A thin strip (a screen filmed from the
+crowd) leaves too few rows for the flow read's blocks, and the physics
+section prints dashes: crop a squarer piece of the screen (47v-6).
+
 ## The design, physics and techniques sections
 
 Definitions, with why each measure and what its bands mean, are at the top of
