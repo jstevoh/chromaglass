@@ -13715,6 +13715,40 @@ minute read one turn in 62 s (and the opposite sign turned back), sinking and ri
 Lab's *Quick Tutorial* fetched on the owner's Mac (47y holds what it found).
 
 
+## 47v-5-47v-6. Grain out of the carried share, and a crop too small to read says so (2026-11-12)
+
+Both are fixes to numbers the watch tool prints (`scripts/watchphysics.mjs`, selftest in
+`scripts/watchreadtest.mjs`).
+
+**47v-6.** `--crop 0.05,0.33,0.9,0.13` on the Brooklyn Bowl film decoded to 320×26 and the
+physics read printed dashes with no reason. The flow is read in 8-pixel blocks on a half-size
+copy with the outer ring left out, so a strip under 64 rows (`MIN_ROWS`) has no row of blocks to
+read. The summary now carries `rows` and `tooShort`, and `physicsLines` prints "The flow read
+needs a taller crop" with the decoded height, in place of speed, whole-field, rotation,
+spreading, carried, turnover and drift, keeping lifetime and spectrum (which do not need the
+blocks). The selftest holds the line at 26 and 62 rows (says it), 64 and 180 (does not).
+
+**47v-5.** The change between two samples includes the grain: film grain, a camcorder's noise in
+the dark. The flow cannot carry it, so it counted against the carried share. Each pair now
+reads its own noise floor (`noiseSigma`: Immerkaer's response to the mask [1 −2 1; −2 4 −2;
+1 −2 1], which answers to white noise and not to ramps or soft blobs, ×1.128 for the mean
+absolute difference of two samples; capped by `quietestBlock`, the change in the quietest
+tenth of the blocks) and `carriedShare` takes it out of both sides in quadrature, which is how
+noise and motion add in a mean absolute change. The first version took the quietest tenth of
+the blocks alone as the floor; on a texture that fills the frame and moves, every block's
+change is the motion, so it read a floor of 26 grey levels on clean footage and was dropped as
+the estimate, kept as the cap. Measured on the selftest's slid texture at a fifth of its
+contrast with ±6 grey levels of grain: carried 0.79 before, 0.94 now (0.99 clean); grain over a
+still texture read 14 changing pairs before and none now; pulsing in place under grain stays
+in place (0.01).
+
+On the real films: the 1969 film (full 10 minutes) 0.187 → 0.229, the bar 0.125 → 0.127. The
+real range in `REAL_SHOWS` is now 0.13 to 0.23 (the in-place guess fires under 0.127). The
+finding is that grain was a small part of why real shows read carried low; on the 1969 film the
+pairs with the least grain read the same as the rest. What is left (the lamp, superimposed
+loops, flow faster than the search) is 47v-7. The two kept references were patched with the new
+carried and noise floor in `/mnt/project-files/references/` so `--vs` compares like with like.
+
 ## 47w-2-47v-2-47v-3. Dissolves, a reference library, and real shows beside the physics bands (2026-11-12)
 
 The follow-up the owner asked for to the watch tool, as one PR.

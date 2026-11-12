@@ -301,16 +301,18 @@ each band.
   0.03, turnover 0.5 s and a lifetime longer than the clip, which is the stage lights and the
   camera, not the oils. Still wanted: a projected show filmed square-on and close, or a dish
   camera with no video effects (the owner's own rig filmed is the surest).
-- **47v-6. Open: a crop too small to read says so.** `--crop 0.05,0.33,0.9,0.13` on the
-  Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
-  blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
-  the flow read needs a taller crop, and a selftest line for it.
-- **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
-  synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
-  spot and superimposed loops all count as change the flow does not carry. Measure the
-  noise floor from the clip's own still samples and take it out of the raw change, so a
-  real plate's transport reads as transport; until then the read prints the real range and
-  the in-place guess fires only under it.
+- ~~**47v-6. A crop too small to read says so.**~~ Shipped, this PR (story in `docs/plan-shipped.md`).
+- ~~**47v-5. Carried on real footage: the grain taken out.**~~ Shipped, this PR (story in `docs/plan-shipped.md`); it moved
+  the real films' carried only from 0.187 to 0.229 and from 0.125 to 0.127, so 47v-7 is what is left.
+- **47v-7. Open: what still keeps carried low on real footage.** With the grain taken out the pairs
+  of the 1969 film still read carried 0.23 where the pairs with the least grain (a floor under half a grey
+  level) read about the same, 0.23, so the rest is not noise: the lamp's brightening and fading
+  across a whole shot, loops superimposed (two flows in one picture, one of which the other
+  hides), a dissolve, and flow faster than a second's search. Try, on those two films and the
+  synthetic cases, a second measure beside it: the share carried only over pairs inside one
+  shot with no whole-frame brightness change, and one with the lamp's change (the picture's
+  mean) taken out of both sides; see which of them moves real shows toward 0.5 without moving
+  the pulsing-in-place case. Keep the band's words as they are until one does.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
@@ -336,6 +338,6 @@ take from 2026-11-11, by `npm run watch -- … --vs`:
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
+47h and 47i when wanted; 47w-3, 47v-4 and 47v-7 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up. Each its own thread
 and PR.
