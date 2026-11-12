@@ -265,9 +265,11 @@ style (§31).
   time), **47c** blacklight (fluorescent dyes under a UV lamp), **47d** depth of
   field from the gap's depth (built under 38q), **47a** the fine window, **47e** sparkle, **47f** the
   stir bar, **47k** threads that bead; **47g**, **47h**, **47i** when wanted; **47m** the owner's reference kit; ~~**47w-1**~~ (shipped) and
-  ~~**47v**~~ (shipped, this PR): any link watched with a design, physics and techniques read;
-  **47w-2** dissolves, **47v-2** a reference library, **47v-3** real-footage bars, **47y** what Poster 1969
-  against a real projection found.
+  ~~**47v**~~ (shipped): any link watched with a design, physics and techniques read;
+  ~~**47w-2**~~ dissolves, ~~**47v-2**~~ a reference library and ~~**47v-3**~~ real-footage bars
+  (shipped, this PR), then **47v-4** a third real show filmed square-on (Liquid Light Lab's films tried, kept as a reference only), **47v-5**
+  carried on real footage, **47v-6** a too-small crop says so, **47w-3** *Streams II* again; **47y** what Poster 1969 against a real
+  projection found.
 
 ### Wave 7. Reach
 

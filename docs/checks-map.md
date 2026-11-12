@@ -27,7 +27,7 @@ the rows for the paths you touched: `grep -n '<path or word>' docs/checks-map.md
 | the owner's YouTube connector (`mcp/youtube-mcp.js`, PLAN 44i) | `youtube` (a stand-in Google; nothing reaches the real one) |
 | `server/report-worker.js`, `wrangler.report.toml` | `report-worker` |
 | Settings → Feedback (`server/feedback-worker.js`, `feedback-schema.sql`, `wrangler.feedback.toml`, `src/lib/feedback*.ts`, `FeedbackPane.tsx`) | `feedback-worker`, `feedbackpane` (the pane on the desk and the phone), `phone` |
-| `scripts/watch.mjs`, `watchdesign.mjs`, `watchphysics.mjs`, `watchreadtest.mjs` | `npm run watch -- --selftest` (Measure, `sound` shard) and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
+| `scripts/watch.mjs`, `watchdesign.mjs`, `watchphysics.mjs`, `watchreadtest.mjs`, `watchcuts.mjs`, `watchrefs.mjs` | `npm run watch -- --selftest` (Measure, `sound` shard) and `codecblip`; `moving`, `gig` and `film` import it (Mac only) |
 | `scripts/recorder.mjs` | `moving` and `film` record through it (Mac only; a PR touching it films three looks in `film.yml`) |
 | the mixer (`src/lib/mixer.ts`, `MixerPanel.tsx`) | `mixer`, `rowfade` (the take buttons), `panel`, `phone`, `remotemix` (the remote's) |
 | the projector's pass (`src/gpu/output.ts`, `src/gpu/wgsl/output.ts`, `src/lib/outputConfig.ts`, `src/lib/plateSources.ts`, `OutputPanel.tsx`) | `map`, `beams`, `wallpattern` and `mixer` (the lab, `PW_WEBGPU=1`), `phone`; `wall` on the Mac |

@@ -268,11 +268,14 @@ Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 cause was yt-dlp handed a bare `ffmpeg` as `--ffmpeg-location`; the tool now passes the full
 path, joins a picture-and-sound pair itself and refuses an audio-only fetch.
 
-- **47w-2. Open: dissolves.** The cut detector misses dissolves: on *Streams II* it read 3.8
-  cuts a minute where the takes, found by eye, run about 7 a minute, and its "longest shots"
-  were several takes each. Detect a dissolve as a run of frames whose difference stays raised
-  and whose start and end frames differ by a cut's worth. *Measure:* a synthetic dissolve in
-  `npm run watch -- --selftest` that it counts.
+~~**47w-2** Dissolves~~ (shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): a run
+of raised change whose ends differ by a cut's worth, whose frames are mixes of its ends and
+whose new picture the take never showed (`scripts/watchcuts.mjs`); 12 found in the Joshua
+Light Show film, each a superimposition on the sheets.
+
+- **47w-3. Open: *Streams II* again.** The film that showed the miss is on the owner's Mac
+  (`~/chromaglass-films/watch/`); watch it once with this tool and write its cuts a minute
+  beside the 7 counted by eye. Needs a thread with the Mac connected.
 
 ## 47v. Watching any link: a design read, a physics read and the techniques (S–M)
 
@@ -280,15 +283,34 @@ path, joins a picture-and-sound pair itself and refuses an audio-only fetch.
 Claude at any video or animation and get meaningful feedback on colour and form, a physics
 read, and the techniques used, and judge our own visuals the same way.
 
-- **47v-2. Open: a reference library.** Each reference watched leaves a `design.json`; keep the
-  ones the owner likes in `/mnt/project-files/references/<name>/` with their timeline and a
-  sheet, so `--vs` can be pointed at "the look we want" without fetching again, and a look's
-  retune can be held to its reference's numbers.
-- **47v-3. Open: the physics read's real-footage bars.** The physics measures are proved on
-  synthetic flows; on real footage the "carried" share is pulled down by hands, refocusing and
-  the projector's lamp, and a tutorial is not a performance. Watch three performance films
-  (Joshua Light Show, a Liquid Light Lab set, a bar show) and write their ranges beside the
-  design bands in `scripts/watchphysics.mjs`.
+~~**47v-2** A reference library~~ and ~~**47v-3** the physics read's real-footage bars~~
+(shipped; story in `docs/plan-shipped.md` §47w-2-47v-2-47v-3): `--keep`, `--refs` and `--vs
+<name>` over `/mnt/project-files/references/` (`scripts/watchrefs.mjs`); two performance films
+read and kept, their numbers in `REAL_SHOWS` (`scripts/watchphysics.mjs`) and printed beside
+each band.
+
+- **47v-4. Open: the third real show.** Tried 2026-11-12 with Liquid Light Lab, fetched on the
+  owner's Mac, and none of their films makes a plain row. Their own films (*Melt Your Face
+  Vol. 1*) run the dish camera through a video mirror and colouriser: flow 14.5, carried
+  0.27, turnover 0.8 s, lifetime 0.2 s, spectrum −2.37, mirror symmetry 0.69, colour flips
+  read as a burst of cuts at 3:33. That is their look, so it is kept in the library
+  (`lll-melt-your-face-1`, for `--vs`) and left out of `REAL_SHOWS`, whose rows are filmed
+  oils. Their concert videos lay photographs of the band over the oils. Their set behind
+  High Time at Brooklyn Bowl (2024) is filmed from the crowd: the screen is a strip about
+  250 pixels wide between the truss and the band's heads, and read there it gives carried
+  0.03, turnover 0.5 s and a lifetime longer than the clip, which is the stage lights and the
+  camera, not the oils. Still wanted: a projected show filmed square-on and close, or a dish
+  camera with no video effects (the owner's own rig filmed is the surest).
+- **47v-6. Open: a crop too small to read says so.** `--crop 0.05,0.33,0.9,0.13` on the
+  Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
+  blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
+  the flow read needs a taller crop, and a selftest line for it.
+- **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
+  synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
+  spot and superimposed loops all count as change the flow does not carry. Measure the
+  noise floor from the clip's own still samples and take it out of the raw change, so a
+  real plate's transport reads as transport; until then the read prints the real range and
+  the in-place guess fires only under it.
 
 ## 47y. Found doing this: Poster 1969 against a real overhead projection (M)
 
@@ -314,6 +336,6 @@ take from 2026-11-11, by `npm run watch -- … --vs`:
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h and 47i when wanted; 47w-2 and 47v-2, 47v-3 whenever the watch tool is next touched; 47y
+47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up. Each its own thread
 and PR.
