@@ -78,7 +78,7 @@ export async function editSuggestLines({ mcp, display, check }) {
   check('edit-suggest', 'in Suggest a sequence read and a set list file written out reach the display and answer with the sequence and the file, and an add is refused for want of Full with nothing sent',
     read.ok && /"name": "Slow build"/.test(read.text) && out.ok && /chromaglass-setlist/.test(out.text) && display.since(t, 'assistant-edit').filter((m) => m.op === 'read' || m.op === 'export').length === 2
       && !add.ok && /Full mode is needed/.test(add.text) && display.since(t2, 'assistant-edit').length === 0,
-    `${read.text} | ${out.text} | ${add.text}`.slice(0, 260));
+    `read ${read.ok}; export ${out.ok}: ${out.text.slice(0, 120)} | add: ${add.text.slice(0, 100)} | sent ${JSON.stringify(display.since(t, 'assistant-edit').map((m) => m.op))}`);
 }
 
 /** In Play: every edit refused for want of Full; a sequence read is Suggest's and answers. */
