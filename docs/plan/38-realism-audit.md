@@ -153,6 +153,10 @@ written first. Line numbers are as read on main at d07ac31.
     38f-1): mixMu's double well is a deep quench, its spinodal 0.05 from either pure liquid
     (`OIL_SPINODAL`) instead of the quartic's 0.21, so the haze the carried heat's plumes
     left behind comes apart into the bodies. Story in `docs/plan-shipped.md` §38f-2.
+  - ~~**A standing lamp's cool top.**~~ **Shipped** (27f-9e, 2026-11-12): under a standing
+    plate's lamp the heat crosses the gap to the cool upper glass at π²κ/h² on real seconds
+    (`lampCoolOf`, mixForce), so Lava Lamp's wax cycles. Every other look still cools by
+    Heat Decay on the look's clock (below). Story in `docs/plan-shipped.md` §27f-9e.
   - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
     at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
     Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in

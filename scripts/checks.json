@@ -11,7 +11,7 @@
     "known-flaky FAIL lines, each with its plan id and an end date: until that date they",
     "still run and report and do not block. `scripts/checks.mjs` holds the rules."
   ],
-  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"], "mac": ["show","tools","plate","open","fifth"] },
+  "shards": { "measure": ["logic","sound","browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9","lab10"], "mac": ["show","tools","plate","open","fifth"] },
   "checks": [
     {
       "name": "Typecheck",
@@ -1443,6 +1443,22 @@
         "every look. --owed: each line is excused only in main's state and printed",
         "as owed until the PR that builds it takes its id out. The lab alone, about",
         "four minutes on SwiftShader, beside soap in `lab3` (PLAN 19k-8)."
+      ]
+    },
+    {
+      "name": "Lava Lamp's wax goes round: up off the lamp, down from the cool top, up again",
+      "shard": "lab10",
+      "run": "npm run lavacycle",
+      "timeout": 22,
+      "why": [
+        "With the heat carried (38f-1) Lava Lamp's wax rose and stayed at the top: nothing",
+        "took its heat but Heat Decay, about ten minutes on the look's clock (PLAN 27f-9e).",
+        "Now the heat crosses the gap to the cool upper glass at the gap's conduction rate in",
+        "real seconds. On the look's settings and the app's lay: the wax rises and comes down",
+        "where a lab built without the cooling stays up, then rises again; and the rate is",
+        "pi^2 kappa / h^2 at the rest gap, read off the solver on the step's real seconds.",
+        "About fifteen minutes on SwiftShader, a part of its own (lab10): beside moire in lab9",
+        "it reached the Measure warning line, past the 25 minutes on the slow tier."
       ]
     },
     {

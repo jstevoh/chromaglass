@@ -46,10 +46,8 @@
  *      water; the swelling's share, measured when this was written, was 0.02
  *      (0.23 against 0.21), and the bar is half of it. Measured
  *      against those plates and not against the lay: the bodies laid high fall first, so a rise from the
- *      lay is not what the plate does. Not asserted, because the solver does
- *      not do it yet: the full cycle, wax rising to the top and falling again
- *      (PLAN 27f-9e; today it settles as a low sheet over the lamp). A line
- *      for the cycle belongs to that item.
+ *      lay is not what the plate does. The full cycle, wax rising and falling
+ *      and rising again, is `npm run lavacycle`'s (PLAN 27f-9e).
  *   And any GPU validation error fails the run; a seal that never builds, a
  *   missing mix, a look key that is not a number or oil lost from the plate
  *   stops the run with an error rather than measuring something else.

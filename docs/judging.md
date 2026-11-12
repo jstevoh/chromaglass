@@ -2644,3 +2644,17 @@ dye. Filmed on the owner's Mac before and after.
    rim, or a plate that does not move.
 4. Settings → Oil & Soap → Oil Weight on Oil & Water with Gravity up: left, the oil floats up the
    standing plate; right, it sinks.
+
+## 124. Lava Lamp's wax goes round (PLAN 27f-9e)
+
+The heat now leaves the wax through the cool upper glass, at the gap's own conduction rate in
+real seconds (about 3 s for the liquid, 6 s for the wax), so a risen body cools and comes down.
+
+1. Lava Lamp for two minutes: wax rises off the lamp in bodies, slows and turns in the upper
+   half, and comes back down to the floor, then rises again; in the lab about 16 s round on
+   the look's own clock. Good: it never stays all at the top (it did before, 0.73 of the
+   height for good) and never lies still on the floor.
+2. The colour stays in the bodies through the fall (what is left of 27f-9f).
+3. Bad: the wax hanging in the middle in a line where the cool glass starts (half the
+   height), a pool on the floor that turns over in itself and never lets a blob go, or a
+   cycle so quick it looks like boiling.

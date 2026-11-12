@@ -11,7 +11,7 @@
 import { OPEN_RIM } from '../../../lib/turntable';
 import { HEAD, W } from './shared';
 import { RIM_SIDE } from './oil';
-import { OIL_SPINODAL, OIL_WELL } from '../../fluid/constants';
+import { OIL_SPINODAL, OIL_WELL, KAPPA_WAX, KAPPA_WATER, GLASS_FIN, LAMP_COOL_FROM } from '../../fluid/constants';
 
 /*
   How far inside the rim the rim's pressure is laid in (CAPILLARY, below), in
@@ -429,6 +429,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     let dyeWax = select(clamp(wax * 2.0, 0.0, 1.0), 0.0, S.oilRho > 0.0);
     heat += A.a.z * max(smoothstep(A.a.w - 0.08, A.a.w, down) * dyeWax * (1.0 - oil),
                         smoothstep(0.28, 0.34, down) * (1.0 - smoothstep(0.42, 0.46, down)) * smoothstep(0.25, 0.75, oil));
+    /*
+      And out through the cool upper glass (PLAN 27f-9e; constants.ts
+      KAPPA_WAX has the physics): every cell's heat crosses the gap to the
+      two glasses at the gap's slowest conduction rate, π²κ/h² (S.lampCool,
+      water's, on the step's real seconds), the wax's at its own κ, and the
+      glass takes it where it is cold: the plate's upper part, from
+      LAMP_COOL_FROM of its height, coming in over the glass's fin length
+      (GLASS_FIN). So a body that rose off the lamp keeps its heat through
+      the warm lower half, gives it up in the upper one in a few seconds,
+      is heavy again and comes down to be warmed: the cycle. Toward the
+      room's temperature, zero, from either side, so a hand's cold goes too.
+      down is 0 at the middle and 0.5 at the floor, so the height over the
+      floor is 0.5 − down.
+    */
+    let cold = 1.0 - exp(-max(${(0.5 - LAMP_COOL_FROM).toFixed(3)} - down, 0.0) / ${GLASS_FIN.toFixed(5)});
+    // (The wax's κ over the water's, by how much of the cell is wax; not mix(), the oil's texture's name here.)
+    heat *= exp(-S.lampCool * (1.0 - ${(1 - KAPPA_WAX / KAPPA_WATER).toFixed(5)} * clamp(oil, 0.0, 1.0)) * cold);
   }
   v = vec4f(v.xy + capillary + buoy, heat, v.w);
   textureStore(dst, p, safeVel(v));

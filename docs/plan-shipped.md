@@ -6222,6 +6222,34 @@ lay alone; the check skeptic's review is why each line has its control. Left ope
 settles over the lamp as a low sheet instead of cycling (27f-9e), a quarter of its colour
 leaves it in its first seconds (27f-9f), and a melt that does something (27f-9d).
 
+### 27f-9e. Lava Lamp's wax goes round (2026-11-12)
+
+With the heat carried (38f-1) Lava Lamp's wax went up in plumes with mushroom caps and gathered
+at the top, and stayed: nothing took its heat but Heat Decay, a per-look fade on the look's
+clock (decayVel), which on Lava Lamp's step (0.0013 of a unit against the lab's sixtieth) is a
+time constant of about ten minutes. Before the carry the wax hung as a low sheet over the lamp
+instead (the old story is in the 27f-9e text this replaces: the heat stayed where the lamp laid
+it, so a warmed body rose out of its own heat).
+
+In a thin gap every parcel of liquid touches both glasses a millimetre away, and that is where
+its heat goes: by conduction across the gap, whose slowest mode dies as exp(−π²κt/h²), 2.9 s for
+water and 5.8 s for a paraffin wax (KAPPA_WAX 7e-8 m²/s) at the 2 mm rest gap, on the step's real
+seconds (`lampCoolOf`, Sim slot 54, laid in `mixForce` only where a standing plate's lamp is
+on). A lamp's top is its cooler and its lower glass rides the warm liquid (600 W/m²K through the
+gap against still air's 10), so the glass takes the heat in the plate's upper half
+(`LAMP_COOL_FROM` 0.5), coming in over a glass sheet's fin length (`GLASS_FIN`, 17 mm). Measured in
+the lab (128², 30 s, the oil's centre of mass as a share of the height): no cooling, up to 0.73
+and there; cool glass from the lamp's own band up, one fall and then the floor's pool turned over
+in itself, its top always in the cold (0.29 at 30 s); from 0.35 of the height a shallow cycle;
+from the half, 0.59 at 8 s, 0.31 at 19 s, 0.45 at 26 s. At 192² on the look's own clock (dt
+0.00133): 0.56 at 6 s, 0.28 at 14 s, 0.44 at 22 s, 0.31 at 30 s, two falls in half a minute.
+The glass laid by height is a shortcut, named as 27f-9g.
+
+`npm run lavacycle` (Measure `lab9`, about fifteen minutes on SwiftShader): the wax rises past
+half the height and is 0.15 below its highest by 16 s where a lab built without the cooling stays
+within 0.05 of its own (0.73 at 16 s); it rises again by 0.06 from its lowest by 26 s; and the
+rate is π²κ/h² at the rest gap on real seconds. Not yet seen: the Mac's film of the minute.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)
