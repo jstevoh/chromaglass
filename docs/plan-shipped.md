@@ -6250,6 +6250,30 @@ half the height and is 0.15 below its highest by 16 s where a lab built without 
 within 0.05 of its own (0.73 at 16 s); it rises again by 0.06 from its lowest by 26 s; and the
 rate is π²κ/h² at the rest gap on real seconds. Not yet seen: the Mac's film of the minute.
 
+### 27f-9h. Lava Lamp looks like a lit lamp (2026-11-12)
+
+The owner, 2026-11-12, after the cycle (27f-9e) shipped: "The lava lamp isn't that exciting
+visually … Let's give it one last try." Rendered in the lab (192², the look's own step, 24 s),
+it went round, but as dark maroon worms on a dim tan: many thin plumes off the floor's pool,
+the wax nearly black, the liquid the colour of mud.
+
+Two things a real lamp has that the look did not. Its wax is fat and round because its Bond
+number is small: a few per cent heavier than its liquid cold, against a low interfacial tension,
+a capillary length of about 1.5 cm, where ours was about 3 mm. Dye Weight (solutalBuoyancy) is
+gravity's weight on the liquids' density differences, the wax's weight and the heat's lift
+alike, so lowering it lowers the Bond number without changing the cycle's balance: 0.7 → 0.2
+grows ℓc by √3.5, and Oil Tension goes to its top, 1. And a lamp's wax is a lightly dyed paraffin
+the bulb shines through, so it glows: the wax was laid with Clock Glass's body dye (2.6), which
+backlit absorbs nearly everything; LAVA_DYE is 0.9 now. The bulb behind is an incandescent warm
+white (ledColor #ffc457, was #b58c5c), and Exposure 0.55 (was 0.46).
+
+Lab, 192², the look's own step, the oil's centre of mass as a share of the height: at 0.7 it
+went up to 0.57 at 8 s, down to 0.31 at 16 s and up to 0.40 at 24 s; at 0.2 up to 0.55 at 8 s,
+down to 0.31 at 26 s and up to 0.41 at 36 s, so it goes round as far, with a slower fall (the
+blobs sink at their lighter weight). The haze (cells a tenth to a half oil) at 24 s fell from 531
+to 384. Contact sheets of both are in the
+PR. The Mac's film of a minute is the owner's verdict.
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)

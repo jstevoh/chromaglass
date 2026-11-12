@@ -226,6 +226,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       Wanted: the glass as a temperature per cell (stationary, so not carried), warmed by
       the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, with the lamp
       heating the floor's glass; then the cycle's period should follow the lamp.
+    - **27f-9h. Lava Lamp looks like a lit lamp (shipped 2026-11-12; story in
+      docs/plan-shipped.md §27f-9h).** The wax's Bond number brought toward a real lamp's
+      (Dye Weight 0.7 → 0.2, Oil Tension 1), so its blobs are fat and round; the wax dyed
+      lightly (LAVA_DYE 0.9) so the bulb shines through it; the bulb a warm white. The owner's
+      verdict on the Mac film decides whether the look stays (2026-11-12: "one last try").
+    - **27f-9i, open. The wax's capillary length is still a third of a real lamp's.** At Dye
+      Weight 0.2 the wax's ℓc is about 5.6 mm against a real lamp's 1.5 cm; lower still and the
+      lamp's heat lift falls with the weight, so the cycle would need the lamp's heat (LAMP_HEAT)
+      or the oil's swelling (OIL_EXPAND) to carry it. The full answer is σ per liquid in N/m
+      (§38e's bottles) with the wax's own low interfacial tension against its liquid.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%

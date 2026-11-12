@@ -2122,11 +2122,25 @@ export const PRESETS: Preset[] = [
         dye a little too. Laid as a pool on the warm glass and three bodies
         on their way (lib/oilLay.ts, LAVA_BODIES).
       */
-      oilTension: 0.9,
+      oilTension: 1,             // 27f-9h: all the tension the dial has, for the rounder blobs
       oilBodies: 1,
       oilWeight: 0.6,
       plateUpright: 1,
-      solutalBuoyancy: 0.7,
+      /*
+        How strongly gravity weighs the liquids' density differences (Dye
+        Weight), which for the wax sets its Bond number, weight against
+        surface tension (PLAN 27f-9h): a real lamp's wax is a few per cent
+        heavier than its liquid cold and its capillary length is about
+        1.5 cm, so its blobs are fat and round; at 0.7 ours was about 3 mm
+        and the wax rose as many thin worms. At 0.2 the weight and the heat's
+        lift both fall by the same factor, the capillary length grows by
+        √3.5 ≈ 1.9, and the lab (192², the look's own step, 36 s) laid fat
+        round blobs that still go round: the centre of mass up to 0.55 at 8 s,
+        down to 0.31 at 26 s and up to 0.41 at 36 s (at 0.7: 0.57 at 8 s,
+        0.31 at 16 s, 0.40 at 24 s; the lighter blobs sink slower).
+        Hand-poured colour weighs less with it.
+      */
+      solutalBuoyancy: 0.2,
       /*
         Heat spreads at water's own rate (PLAN 27f-9c). 0.5 made it fifty times
         faster for salt fingers in the dye-wax: with the wax a body, the heat
@@ -2140,7 +2154,14 @@ export const PRESETS: Preset[] = [
       lampGround: 1,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#b58c5c',
+      /*
+        The lamp's bulb behind the liquid (PLAN 27f-9h): an incandescent
+        lamp's warm white, about 2700 K, which through a clear liquid reads
+        as the golden glow of a real lamp. It was a dim tan (#b58c5c), and
+        under it the wax read as dark blobs on mud (the owner, 2026-11-12:
+        "isn't that exciting visually").
+      */
+      ledColor: '#ffc457',
       ledSpeed: 0.0,
       globalSpeed: 0.0168,
       surge: 0.38,
@@ -2189,7 +2210,12 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,
-      exposure: 0.46,
+      /*
+        Brighter than the old 0.46 with the wax laid lighter (LAVA_DYE) and
+        the bulb's warm white behind it (ledColor): the plate's mean light
+        went from a dim tan with near-black blobs to a lit lamp's.
+      */
+      exposure: 0.55,
       glossiness: 0.15,
       plateRock: 0.25,
       beatSqueeze: 0.0,
