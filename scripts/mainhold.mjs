@@ -114,10 +114,43 @@ export function statusFor(hold, labels) {
 // --- GitHub ---------------------------------------------------------------
 
 const REPO = process.env.GITHUB_REPOSITORY || 'jstevoh/chromaglass';
+
+// GitHub's API answers a 502 or 503 now and then and the next try is fine; 11-12
+// it did on `actions/runs/<id>/jobs` twice running, `call()` threw on the first,
+// and the run posted no status on any PR, so every PR sat with no "Main not held
+// red" at all (a missing status is not a pass, see above). Retry what is the
+// server's or the network's fault and nothing else: a 5xx, or a fetch that threw
+// before it got an answer. A 4xx is ours (a bad token, a missing run) and a
+// second try would say the same, and a rate limit (403/429) needs a wait longer
+// than this script should hold the one queued run for. Every call here is safe to
+// repeat: the GETs and the GraphQL read change nothing, and a status posted twice
+// with the same state is one more line in the PR's history and no more.
+export const RETRY_WAITS = [2000, 6000, 18000]; // ms before the 2nd, 3rd and 4th try
+const sleeper = (ms) => new Promise((r) => setTimeout(r, ms));
+export async function fetchRetrying(doFetch, url, init, sleep = sleeper) {
+  for (let i = 0; ; i++) {
+    let res;
+    try {
+      res = await doFetch(url, init);
+    } catch (e) {
+      if (i >= RETRY_WAITS.length) throw new Error(`${init.method ?? 'GET'} ${url}: ${e.message} (after ${i + 1} tries)`);
+      console.error(`mainhold: ${init.method ?? 'GET'} ${url}: ${e.message}; trying again in ${RETRY_WAITS[i] / 1000}s`);
+      await sleep(RETRY_WAITS[i]);
+      continue;
+    }
+    if (res.status >= 500 && i < RETRY_WAITS.length) {
+      console.error(`mainhold: ${init.method ?? 'GET'} ${url}: HTTP ${res.status}; trying again in ${RETRY_WAITS[i] / 1000}s`);
+      await sleep(RETRY_WAITS[i]);
+      continue;
+    }
+    return res;
+  }
+}
+
 async function call(url, init = {}) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) throw new Error('needs GITHUB_TOKEN (or --runs <file> to read a saved list)');
-  const res = await fetch(url, {
+  const res = await fetchRetrying(fetch, url, {
     ...init,
     headers: {
       authorization: `Bearer ${token}`,
@@ -137,20 +170,35 @@ const jobMap = (jobs) => Object.fromEntries(jobs.map((j) => [j.name, j.conclusio
 // Main's deploys, newest first, with their jobs. `enough(runs)` says when to
 // stop reading: for the hold now, when every check red at its newest result
 // has a second result or ten finished deploys have been read.
-async function deploys(enough, most = 400) {
+//
+// A deploy whose jobs still cannot be read after `call()`'s retries is left out
+// with a line saying which, as a cancelled one is: the verdict is then read from
+// the deploys that could be, and the run posts. The other way, throwing, left
+// every PR without a status for as long as GitHub stayed down on that one URL,
+// and a missing status is the worse of the two. What is left out is never
+// counted green: no deploy is invented, so the rule in `holdFrom` is untouched,
+// and a hold keeps standing unless the unread deploy was the red one (the next
+// run of this script, on the next event, reads it again).
+// `get` is `api` except in the self-test.
+async function deploys(enough, most = 400, get = api) {
   const out = [];
   for (let page = 1; out.length < most; page++) {
-    const { workflow_runs: runs } = await api(`actions/workflows/deploy.yml/runs?branch=main&per_page=100&page=${page}`);
+    const { workflow_runs: runs } = await get(`actions/workflows/deploy.yml/runs?branch=main&per_page=100&page=${page}`);
     for (const r of runs) {
       const run = { number: r.run_number, conclusion: r.status === 'completed' ? r.conclusion : null, url: r.html_url, jobs: {} };
       if (run.conclusion !== 'cancelled' && (run.conclusion !== null || r.run_attempt > 1)) {
-        run.jobs = jobMap((await api(`actions/runs/${r.id}/jobs?filter=latest&per_page=100`)).jobs);
-        if (run.conclusion === null) {
-          // A re-run in progress: its queued jobs keep the attempt before's result.
-          const prior = await api(`actions/runs/${r.id}/attempts/${r.run_attempt - 1}`);
-          const was = jobMap((await api(`actions/runs/${r.id}/attempts/${r.run_attempt - 1}/jobs?per_page=100`)).jobs);
-          for (const [n, c] of Object.entries(was)) if (!PASS.has(run.jobs[n]) && !FAIL.has(run.jobs[n])) run.jobs[n] = c;
-          run.conclusion = prior.conclusion === 'cancelled' ? 'cancelled' : 'rerunning';
+        try {
+          run.jobs = jobMap((await get(`actions/runs/${r.id}/jobs?filter=latest&per_page=100`)).jobs);
+          if (run.conclusion === null) {
+            // A re-run in progress: its queued jobs keep the attempt before's result.
+            const prior = await get(`actions/runs/${r.id}/attempts/${r.run_attempt - 1}`);
+            const was = jobMap((await get(`actions/runs/${r.id}/attempts/${r.run_attempt - 1}/jobs?per_page=100`)).jobs);
+            for (const [n, c] of Object.entries(was)) if (!PASS.has(run.jobs[n]) && !FAIL.has(run.jobs[n])) run.jobs[n] = c;
+            run.conclusion = prior.conclusion === 'cancelled' ? 'cancelled' : 'rerunning';
+          }
+        } catch (e) {
+          console.error(`mainhold: leaving deploy ${run.number} out, its jobs could not be read: ${e.message}`);
+          continue;
         }
       }
       out.push(run);
@@ -248,7 +296,7 @@ function history(runs) {
 
 // --- self-test ------------------------------------------------------------
 
-function selfTest() {
+async function selfTest() {
   let failed = 0;
   const check = (ok, what, detail = '') => {
     console.log(`${ok ? 'ok  ' : 'FAIL'} ${what}${detail ? `: ${detail}` : ''}`);
@@ -329,6 +377,52 @@ function selfTest() {
   const s3 = statusFor(many, []);
   check(s3.description.length <= 140 && s3.description.endsWith('until it is green'), 'a long list of checks still fits 140 characters and keeps what to do', `${s3.description.length} chars`);
 
+  // GitHub answering 5xx (11-12: 502 on a run's jobs, twice on one PR's run).
+  const answer = (status, body = '{}') => ({ status, ok: status < 400, text: async () => body, json: async () => JSON.parse(body) });
+  const quiet = console.error;
+  console.error = () => {};
+  const tries = async (...results) => {
+    const log = { calls: 0, waited: [] };
+    const doFetch = async () => { const x = results[Math.min(log.calls++, results.length - 1)]; if (x instanceof Error) throw x; return x; };
+    try { log.res = await fetchRetrying(doFetch, 'https://x/y', {}, async (ms) => { log.waited.push(ms); }); } catch (e) { log.err = e.message; }
+    return log;
+  };
+  const t1 = await tries(answer(502), answer(502), answer(200));
+  check(t1.res?.ok && t1.calls === 3 && t1.waited.join() === '2000,6000', 'two 502s then 200: read on the third try', `${t1.calls} calls, waited ${t1.waited}`);
+  const t2 = await tries(answer(502));
+  check(t2.res?.status === 502 && t2.calls === 4 && t2.waited.join() === RETRY_WAITS.join(), 'a 502 that stays gives up after four tries and hands the 502 back', `${t2.calls} calls`);
+  const t3 = await tries(answer(404));
+  check(t3.res?.status === 404 && t3.calls === 1, 'a 404 is not retried', `${t3.calls} calls`);
+  const t4 = await tries(answer(403), answer(200));
+  check(t4.res?.status === 403 && t4.calls === 1, 'nor a 403 or 429 (a rate limit wants a longer wait than this script holds the queue for)', `${t4.calls} calls`);
+  const t5 = await tries(new TypeError('fetch failed'), answer(200));
+  check(t5.res?.ok && t5.calls === 2, 'a fetch that threw before any answer is tried again', `${t5.calls} calls`);
+  const t6 = await tries(new TypeError('fetch failed'));
+  check(t6.err?.includes('fetch failed') && t6.calls === 4, 'and gives up with its own message after four', t6.err);
+
+  // The deploy whose jobs cannot be read is left out, the others still hold.
+  const wire = (r) => ({ id: 1000 + r.number, run_number: r.number, status: 'completed', conclusion: r.conclusion, html_url: `u${r.number}`, run_attempt: 1 });
+  const listing = [red(4, 'open'), red(3, 'open'), red(2, 'open'), green(1)];
+  const fake = (broken) => async (path) => {
+    if (path.startsWith('actions/workflows/')) return { workflow_runs: listing.map(wire) };
+    const id = Number(path.match(/runs\/(\d+)\/jobs/)[1]) - 1000;
+    if (id === broken) throw new Error(`GET ${path}: HTTP 502`);
+    const r = listing.find((x) => x.number === id);
+    return { jobs: Object.entries(r.jobs).map(([name, conclusion]) => ({ name, conclusion })) };
+  };
+  const readAll = async (broken) => deploys(() => false, 400, fake(broken));
+  const allRead = await readAll(0);
+  check(allRead.length === 4 && holdFrom(allRead).held, 'with every deploy readable, the three reds hold main', `${allRead.length} read`);
+  const lost = await readAll(3);
+  check(lost.length === 3 && !lost.some((r) => r.number === 3) && holdFrom(lost).held && holdFrom(lost).before.number === 2,
+    'a deploy whose jobs 502 is left out, not thrown on, and the hold is read from the rest', `${lost.map((r) => r.number)} read`);
+  const lostOne = await deploys(() => false, 400, async (path) => {
+    if (path.startsWith('actions/workflows/')) return { workflow_runs: [wire(red(2, 'open'))] };
+    throw new Error('HTTP 502');
+  });
+  check(lostOne.length === 0 && !holdFrom(lostOne).held, 'with none readable nothing is held and nothing is invented', `${lostOne.length} read`);
+  console.error = quiet;
+
   console.log(failed ? `\n${failed} failed` : '\nall ok');
   process.exit(failed ? 1 : 0);
 }
@@ -339,7 +433,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const val = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
   try {
-    if (args.includes('--self-test')) selfTest();
+    if (args.includes('--self-test')) await selfTest();
     else if (args.includes('--post')) await post();
     else if (val('--runs')) history(fromFile(val('--runs')));
     else if (args.includes('--history')) { const n = Number(val('--history')) || 20; history(await deploys((r) => r.length >= n, n)); }
