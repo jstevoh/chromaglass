@@ -46,7 +46,10 @@ export async function claimTvCode(code: string): Promise<TvClaimResult> {
   const userCode = normalizeTvCode(code);
   if (!base) return { state: 'unreachable' };
   if (!userCode) return { state: 'no-such-code' };
-  const auth = await import('./firebaseAuth').catch(() => null);
+  // Only a build with a sign-in carries Firebase: Vite drops this import from a build
+  // without its keys, as it drops the form (`npm run signin`, 1a), and such a build
+  // has no account to claim for.
+  const auth = import.meta.env.VITE_FIREBASE_API_KEY ? await import('./firebaseAuth').catch(() => null) : null;
   const token = await auth?.getCurrentIdToken().catch(() => null);
   if (!token) return { state: 'signed-out' };
   try {

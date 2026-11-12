@@ -55,7 +55,9 @@ export default function TvLink(): React.ReactElement {
   const input = useRef<HTMLInputElement>(null);
 
   const refreshAccount = async () => {
-    const auth = await import('../../lib/firebaseAuth').catch(() => null);
+    // Behind the same key as the form above, so a build without a sign-in carries no
+    // Firebase (`npm run signin`, 1a): there the page says it cannot sign in.
+    const auth = import.meta.env.VITE_FIREBASE_API_KEY ? await import('../../lib/firebaseAuth').catch(() => null) : null;
     const who = await auth?.getCurrentUserEmail().catch(() => null);
     setEmail(who ?? null);
     setPhase(who ? 'code' : 'signin');
