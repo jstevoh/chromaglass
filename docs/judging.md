@@ -2658,3 +2658,25 @@ real seconds (about 3 s for the liquid, 6 s for the wax), so a risen body cools 
 3. Bad: the wax hanging in the middle in a line where the cool glass starts (half the
    height), a pool on the floor that turns over in itself and never lets a blob go, or a
    cycle so quick it looks like boiling.
+
+## 125. The Android TV app finds the Mac and pairs by four digits (PLAN 12-tv-2)
+
+The check (`npm run tvpair`) asks the advert and pairs on Linux; a real Google TV, the Mac's
+own mDNSResponder beside the advert, and the WebView's video decode are only seen here.
+
+1. Download `chromaglass-tv-debug` from the newest green run of the **Android TV app**
+   workflow (Actions), unzip it, and side-load `app-debug.apk` on a Google TV or Android TV
+   box (Settings → Developer options → USB or network debugging, then
+   `adb connect <tv-ip>` and `adb install app-debug.apk`).
+2. Open the Mac app with a show running, on the same Wi-Fi. Start **ChromaGlass** on the TV.
+   It should find the Mac within a few seconds and show four large digits.
+3. On the Mac, a card *A TV wants to join* shows the same four digits: press **Allow**. The
+   TV should go live with the plate within a few seconds.
+4. Quit the TV app and open it again: it should go straight to the plate, asking nothing.
+   Quit the Mac app: the TV's list should drop the Mac at once (the goodbye), and find it
+   again when the Mac app reopens.
+5. **Cast → TV at home → Forget the paired TV**: the TV should show four new digits.
+6. Bad: the list stays empty with the Mac app open (the advert not heard: try
+   `node server/bonjour.js` on another computer on the Wi-Fi), digits that never reach the
+   Mac, a black picture after Allow, or a picture that stutters where the browser's `/tv`
+   on the same TV did not.

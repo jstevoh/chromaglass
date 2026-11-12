@@ -36,7 +36,7 @@ comments, which moved with it.
 | `useRecording` | the one Record button |
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
-| `useRemote` | the phone remote's link, both ways; and the TVs at home, `tvCount` (PLAN 12-tv, `lib/tvFeed.ts`) |
+| `useRemote` | the phone remote's link, both ways; and the TVs at home, `tv` (a `TvAtHome`: watching, asking to pair, paired, and Allow, No, Forget; PLAN 12-tv, 12-tv-2, `lib/tvFeed.ts`) |
 | `useInkTitle` | the identified song's title poured as ink when it changes and the Title switch is on (PLAN 37x-10), called by `useRemote` |
 | `useLogoMelt` | the wordmark poured and melted when the Live Show goes live or a Record take starts, with Logo melt on (PLAN 37x-11), called by `useRemote` |
 | `useShowFeed` | the plate's colour to the rig, and colour, sound and the beat to a VJ app (OSC out's switch) |
