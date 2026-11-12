@@ -322,6 +322,17 @@ What route 2 still needs, found while building 12-tv-1:
   its unit tests (every clip carries its credit). Owed by the owner: the upload key
   (one command), then the Play Console steps (create the app, the forms, the TV
   form factor, the first upload by hand).
+- **12-tv-remote: the TV's remote picks the look (shipped 2026-11-12; story in
+  `docs/plan-shipped.md` §12-tv-remote).** Asked 2026-11-12, the TV staying a
+  receiver: right and left play the next and previous preset on the Mac, OK a
+  random one, up, down or Menu the list. The relay lets a TV pick only a preset
+  the laptop listed, one every 0.4 s (`server/tv-remote.js`); the page reads the
+  D-pad (`src/components/TvRemote.tsx`), the app passes on Menu and Back; the
+  phone version is a tap bar. `npm run tvremote`; on a real TV `docs/judging.md` §126.
+- **12-tv-remote-2: more than presets from the remote (S, if asked).** The remote
+  picks presets only. The owner's own looks and the set list's songs are the next
+  things a sofa might want (the set list's Go is `cue-set-item` on the phone), and
+  a long-press of OK could arm Go rather than cut to clean glass at once.
 - **12-tv-2e: uploads to Play from CI (S, after the first upload).** Play's first
   bundle for an app must go up by hand in Play Console; after that the release job
   could send each bundle to the internal track itself with the Play Developer API
