@@ -3,7 +3,8 @@
  * Watch a video: a file or a URL, turned into pictures and numbers Claude can read.
  *
  *   npm run watch -- <file or URL> [--out DIR] [--frames 24] [--from S] [--to S]
- *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12]
+ *                                  [--at 3.5,12] [--rate 10] [--per-sheet 12] [--vs REF_OUT]
+ *                                  [--crop x,y,w,h]
  *   npm run watch -- --selftest
  *
  * Asked for: "a skill or agent that is able to better watch video … it will make
@@ -30,6 +31,11 @@
  *                  forty rows and names the dominant hues.
  *   still-*.png    full-resolution frames at the times given with --at, for the
  *                  close look after the sheets say where to look.
+ *   design.json    the design read (`watchdesign.mjs`): palette, colourfulness,
+ *   palette.png    hue harmony, contrast, edge width, form scale, flow lines,
+ *                  forms, symmetry and composition, in the summary's "Design"
+ *                  section. `--vs <a reference's out folder>` adds the gaps
+ *                  between that reference and this clip, biggest first.
  *
  * Plus a number for "does it move with the music": the correlation of motion
  * with loudness, and the lag at which it peaks. It is a measurement, not a
@@ -64,10 +70,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { physicsAcc, physicsFrame, physicsSummary, physicsLines, comparePhysics, techniqueLines } from './watchphysics.mjs';
+import { designFrame, designSummary, designLines, compareDesign, paletteAcc, paletteStrip } from './watchdesign.mjs';
+import { readSelftest } from './watchreadtest.mjs';
 
 // ─── arguments ───────────────────────────────────────────────────────────────
 
-const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false, quiet: false, crop: null };
+const DEFAULTS = { frames: 24, perSheet: 12, rate: 0, from: 0, to: 0, at: [], out: '', input: '', selftest: false, quiet: false, crop: null, vs: '' };
 const opt = { ...DEFAULTS };
 
 /** A failure the caller can report: a harness catches it, the command line prints it and exits with `code`. */
@@ -84,6 +93,11 @@ function parseArgs(argv) {
     else if (a === '--from') opt.from = Number(v()) || 0;
     else if (a === '--to') opt.to = Number(v()) || 0;
     else if (a === '--at') opt.at = v().split(',').map(Number).filter(Number.isFinite);
+    else if (a === '--vs') opt.vs = v();
+    // A footage of the whole room (the projector, the hands, the screen) reads
+    // the room; `--crop x,y,w,h` (fractions of the picture) reads only the
+    // projection or the plate.
+    else if (a === '--crop') { const [x, y, w, h] = v().split(',').map(Number); if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) opt.crop = { x, y, w, h }; else fail('--crop wants x,y,w,h as fractions, e.g. 0.5,0,0.25,0.35', 2); }
     else if (a === '--selftest') opt.selftest = true;
     else if (a === '--help' || a === '-h') { printHelp(); process.exit(0); }
     else if (!opt.input) opt.input = a;
@@ -92,7 +106,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 7).map(l => l.replace(/^ \* ?/, '')).join('\n'));
+  console.log(fs.readFileSync(new URL(import.meta.url), 'utf8').split('\n').slice(2, 8).map(l => l.replace(/^ \* ?/, '')).join('\n'));
 }
 
 // ─── tools ───────────────────────────────────────────────────────────────────
@@ -104,6 +118,23 @@ function findFfmpeg() {
   const py = spawnSync('python3', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())'], { encoding: 'utf8' });
   if (py.status === 0 && py.stdout.trim()) return py.stdout.trim();
   return null;
+}
+
+/**
+ * The path to hand yt-dlp's `--ffmpeg-location`. It must be a path that
+ * exists: given a bare `ffmpeg` (what findFfmpeg returns when ffmpeg is on
+ * PATH, as it is on the owner's Mac), yt-dlp prints "ffmpeg-location ffmpeg
+ * does not exist! Continuing without ffmpeg", and then "requested merging of
+ * multiple formats but ffmpeg is not installed", and leaves the video and the
+ * sound as two files (PLAN.md 47w, reproduced 2026-11-12 on the owner's Mac:
+ * `source.f137.mp4` and `source.f251.webm`). So a bare name is looked up on
+ * PATH first, and when it cannot be, yt-dlp is left to find ffmpeg itself.
+ */
+function ffmpegLocation(bin = ff()) {
+  if (path.isAbsolute(bin)) return fs.existsSync(bin) ? bin : null;
+  const r = spawnSync('sh', ['-c', 'command -v "$0"', bin], { encoding: 'utf8' });
+  const found = r.status === 0 ? r.stdout.trim() : '';
+  return found && path.isAbsolute(found) ? found : null;
 }
 
 function findYtDlp() {
@@ -128,19 +159,12 @@ function download(url, dir) {
   const y = findYtDlp();
   if (!y) fail(`a URL needs yt-dlp. ${INSTALL}`, 2);
   const help = spawnSync(y[0], [...y.slice(1), '--help'], { encoding: 'utf8' }).stdout ?? '';
-  const args = [
-    ...y.slice(1), '--no-playlist', '--write-info-json', '--no-progress',
-    // Up to 1080 on the short side: `res` sorts by the smaller dimension, so a
-    // vertical Short gets 1080×1920 and not the 608×1080 a height cap picks.
-    '-f', 'bv*+ba/b', '-S', 'res:1080', '--merge-output-format', 'mkv',
-    '--ffmpeg-location', ff(), '-o', path.join(dir, 'source.%(ext)s'),
-  ];
-  // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
-  if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
-  args.push(url);
+  const args = [...y.slice(1), ...fetchArgs(dir, help)];
+  // A fetch into a folder used before must not pick last time's file.
+  for (const f of fs.readdirSync(dir)) if (f.startsWith('source.')) fs.rmSync(path.join(dir, f), { force: true });
   console.log(`fetching ${url}`);
-  const r = spawnSync(y[0], args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15 * 60_000 });
-  const files = fs.readdirSync(dir).filter(f => f.startsWith('source.') && !/\.(json|part|ytdl)$/.test(f));
+  const r = spawnSync(y[0], [...args, url], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15 * 60_000 });
+  const files = fs.readdirSync(dir).filter(f => f.startsWith('source.') && !/\.(json|part|ytdl|jpg|png|webp)$/.test(f));
   if (r.status !== 0 || !files.length) {
     const err = (r.stderr || '').trim().split('\n').filter(l => /ERROR/.test(l)).join('\n') || (r.stderr || '').slice(-600);
     if (/not a bot|Sign in to confirm|HTTP Error 403/.test(err)) {
@@ -156,15 +180,97 @@ function download(url, dir) {
         ] : []),
         'watch: YouTube refused the video to this machine. It does that to cloud',
         'addresses; it is not the environment\'s network setting. Ways round it:',
-        '  1. run this on the owner\'s Mac (Remote Control), where it works as is;',
+        '  1. fetch it on the owner\'s Mac, where YouTube serves it (a home address),',
+        '     then bring the file here and watch that. With the Mac\'s Desktop Commander',
+        '     tools (start_process), or through Remote Control, run:',
+        '',
+        `     ${macFetch(url)}`,
+        '',
+        '     then stage source.mkv and source.info.json with device_stage_files and',
+        '     run `npm run watch` on the staged source.mkv (the skill says more);',
         '  2. ask for the file: a screen recording or a download dropped in the thread;',
         '  3. look for a mirror (archive.org keeps many YouTube uploads).',
       ].join('\n'));
     }
     fail(err);
   }
-  const file = path.join(dir, files[0]);
-  return { file, info: readInfo(file) };
+  return { file: pickSource(dir, files), info: readInfo(path.join(dir, 'source.mkv')) ?? readInfo(path.join(dir, files[0])) };
+}
+
+/**
+ * yt-dlp's arguments for a fetch into `dir` (the URL goes after), given its
+ * `--help` text. A function of its own so the self-test can hold what it
+ * hands yt-dlp, the ffmpeg path above all (PLAN.md 47w), with no yt-dlp
+ * installed.
+ */
+function fetchArgs(dir, help = '') {
+  const args = [
+    '--no-playlist', '--write-info-json', '--no-progress',
+    // Up to 1080 on the short side: `res` sorts by the smaller dimension, so a
+    // vertical Short gets 1080×1920 and not the 608×1080 a height cap picks.
+    '-f', 'bv*+ba/b', '-S', 'res:1080', '--merge-output-format', 'mkv',
+    '-o', path.join(dir, 'source.%(ext)s'),
+  ];
+  const loc = ffmpegLocation();
+  if (loc) args.push('--ffmpeg-location', loc);
+  // Recent yt-dlp needs a JavaScript runtime for YouTube; node is always here.
+  if (help.includes('--js-runtimes')) args.push('--js-runtimes', 'node');
+  return args;
+}
+
+/**
+ * The one line that fetches a URL on the owner's Mac the way `download`
+ * does here: Homebrew's yt-dlp and ffmpeg (`brew install yt-dlp ffmpeg`),
+ * named by their full paths because a Desktop Commander shell does not have
+ * Homebrew on its PATH, and node on PATH for YouTube's JavaScript. Into
+ * ~/chromaglass-films/watch/<name>, a folder this project's threads are
+ * already allowed to stage files from.
+ */
+function macFetch(url) {
+  const name = url.replace(/^https?:\/\/(www\.)?/, '').replace(/[^\w.-]+/g, '_').slice(0, 48);
+  const q = s => `'${s.replace(/'/g, `'\\''`)}'`;
+  return [
+    `export PATH=/opt/homebrew/bin:$PATH; d=~/chromaglass-films/watch/${name}; mkdir -p "$d" && cd "$d" &&`,
+    `yt-dlp --no-playlist --write-info-json --no-progress -f 'bv*+ba/b' -S res:1080 --merge-output-format mkv`,
+    `--ffmpeg-location /opt/homebrew/bin/ffmpeg --js-runtimes node -o 'source.%(ext)s' ${q(url)} && ls -la "$d"`,
+  ].join(' ');
+}
+
+/**
+ * Which of the files a fetch left is the video. yt-dlp leaves one merged
+ * file when it can find ffmpeg, but when it cannot it leaves the picture and
+ * the sound as two (`source.f137.mp4`, `source.f251.webm`), and which of them
+ * `readdir` names first is not fixed: on the owner's Mac one fetch picked the
+ * sound and stopped, the next picked the silent picture (PLAN.md 47w). So
+ * each file is probed for its streams: a file with both wins; a picture and
+ * a separate sound are joined here (stream copy, into `source.mkv`, which
+ * takes any codec pair); a fetch that brought only sound is refused, saying
+ * so, rather than failing later as "no video stream".
+ */
+function pickSource(dir, files) {
+  const streams = files.map(f => {
+    const s = spawnSync(ff(), ['-hide_banner', '-i', path.join(dir, f)], { encoding: 'utf8' }).stderr ?? '';
+    // A cover picture in a sound file is a Video stream marked "attached pic".
+    const lines = s.split('\n');
+    return { f, video: lines.some(l => /Stream #.*Video:/.test(l) && !/attached pic/.test(l)), audio: lines.some(l => /Stream #.*Audio:/.test(l)) };
+  });
+  const both = streams.find(s => s.video && s.audio);
+  if (both) return path.join(dir, both.f);
+  const pic = streams.find(s => s.video), snd = streams.find(s => s.audio);
+  if (pic && snd) {
+    const out = path.join(dir, 'source.mkv');
+    const r = spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', path.join(dir, pic.f), '-i', path.join(dir, snd.f),
+      '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', out], { encoding: 'utf8' });
+    if (r.status === 0 && fs.existsSync(out)) {
+      console.log(`joined ${pic.f} (picture) and ${snd.f} (sound) into source.mkv`);
+      return out;
+    }
+    console.log(`could not join ${pic.f} and ${snd.f} (${(r.stderr || '').trim().slice(-200)}); watching the picture without sound`);
+    return path.join(dir, pic.f);
+  }
+  if (pic) return path.join(dir, pic.f);
+  fail(`the fetch brought sound and no picture (${files.join(', ')}): nothing to watch. `
+    + 'The site served this link as audio only, or yt-dlp could not get its video format.');
 }
 
 /**
@@ -193,8 +299,14 @@ function youtubeThumbs(url, dir) {
 function readInfo(file) {
   try {
     const j = JSON.parse(fs.readFileSync(file.replace(/\.[^.\/]+$/, '.info.json'), 'utf8'));
+    const full = j.description ?? '';
     return { title: j.title, uploader: j.uploader ?? j.channel, url: j.webpage_url, duration: j.duration,
-      description: (j.description ?? '').replace(/\s+/g, ' ').slice(0, 400) };
+      description: full.replace(/\s+/g, ' ').slice(0, 400),
+      // For the techniques section (watchphysics.mjs): the maker's own words,
+      // and the links they give, which are where gear lists and tutorials live.
+      descriptionFull: full.slice(0, 8000), tags: j.tags ?? [], categories: j.categories ?? [],
+      chapters: (j.chapters ?? []).map(c => ({ start: c.start_time, title: c.title })),
+      links: [...new Set(full.match(/https?:\/\/[^\s)>\]"']+/g) ?? [])] };
   } catch { return null; }
 }
 
@@ -320,7 +432,7 @@ async function watch() {
   const out = path.resolve(opt.out || path.join(os.tmpdir(), 'chromaglass-watch',
     (/^https?:/.test(opt.input) ? opt.input.replace(/^https?:\/\//, '') : path.basename(opt.input)).replace(/[^\w.-]+/g, '_').slice(0, 60)));
   fs.mkdirSync(out, { recursive: true });
-  for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|still-.*)\.png$|^(stats\.tsv|summary\.md)$/.test(f)) fs.rmSync(path.join(out, f));
+  for (const f of fs.readdirSync(out)) if (/^(sheet-\d+|timeline|palette|still-.*)\.png$|^(stats\.tsv|summary\.md|design\.json)$/.test(f)) fs.rmSync(path.join(out, f));
 
   let info = null;
   if (/^https?:\/\//.test(opt.input)) ({ file: opt.file, info } = download(opt.input, out));
@@ -338,7 +450,9 @@ async function watch() {
   const aw = 320;
 
   // Pass 1: every sample, small, for the numbers and the slit scan.
-  const rows = [], slit = [];
+  const rows = [], slit = [], design = [], pacc = paletteAcc(), phys = physicsAcc();
+  // The spectrum costs an FFT a sample: take it on about 400 of them.
+  phys.spectrumEvery = known ? Math.max(1, Math.ceil((known * rate) / 400)) : 1;
   let prev = null;
   // `crop` ({ x, y, w, h } as fractions of the picture) keeps only part of it:
   // a harness filming the whole page wants the plate, not the desk's meters,
@@ -383,6 +497,10 @@ async function watch() {
     rows.push({ t: opt.from + k / rate, lum: lum / N, sat: sat / N, dark: dark / N, bright: bright / N,
       motion: prev ? (diff / N) * 100 : 0, coloured, colour: coloured / N, hue, hue12, hist: hist.map(v => v / N), hv: hv.map(v => v / N) });
     prev = cur;
+    // The design read (colour, form, light, composition) of the same sample:
+    // scripts/watchdesign.mjs says what each number is and why.
+    design.push(designFrame(px, W, H, pacc));
+    physicsFrame(px, W, H, phys, k);
     const col = Buffer.alloc(H * 3);
     for (let y = 0; y < H; y++) px.copy(col, y * 3, (y * W + (W >> 1)) * 3, (y * W + (W >> 1)) * 3 + 3);
     slit.push(col);
@@ -560,6 +678,26 @@ async function watch() {
     ...(sh.sections ? [`- motion vs loudness by window: ${[1, 5, 10, 20].map(w => `${w} s ${sh.sections[w].r == null ? '–' : sh.sections[w].r.toFixed(2)}`).join(', ')}`] : []),
   ];
 
+  // The design read: the summary's section, design.json for a later `--vs`,
+  // and the palette as a strip.
+  const ds = designSummary(design, pacc);
+  // The physics read needs the cuts (no flow is measured across one) and the
+  // form size from the design read (for the turnover time).
+  const ps = physicsSummary(phys, { rate, cut: rows.map(r => !!r.cut), W: w, scale: ds.scaleX?.med ?? null });
+  phys.frames.length = 0;
+  ds.physics = ps;
+  fs.writeFileSync(path.join(out, 'design.json'), JSON.stringify({ title: info?.title ?? path.basename(opt.file), ...ds }, null, 1) + '\n');
+  const palettePng = path.join(out, 'palette.png');
+  if (ds.palette.length) writePng(palettePng, 960, 96, paletteStrip(ds.palette));
+  const designOut = [...designLines(ds), '', ...physicsLines(ps), '', ...techniqueLines(info, ds, ps, cuts.length / Math.max(1 / 60, span / 60))];
+  if (opt.vs) {
+    const vf = fs.existsSync(path.join(opt.vs, 'design.json')) ? path.join(opt.vs, 'design.json') : opt.vs;
+    let ref = null;
+    try { ref = JSON.parse(fs.readFileSync(vf, 'utf8')); } catch { fail(`--vs: no design.json at ${opt.vs} (watch the reference first, with this version of the tool)`, 2); }
+    designOut.push('', ...compareDesign(ref, ds, `the reference (${ref.title ?? vf})`, 'this'));
+    if (ref.physics) designOut.push('', ...comparePhysics(ref.physics, ps, 'the reference', 'this'));
+  }
+
   const buckets = Math.min(40, n);
   const table = ['| time | luma | dark | sat | motion | loud dB |', '|---|---|---|---|---|---|'];
   for (let b = 0; b < buckets; b++) {
@@ -586,13 +724,16 @@ async function watch() {
     `- ${timeline}`,
     ...sheets.map(s => `- ${s.f} (${s.count} frames, ${stamp(s.from)} to ${stamp(s.to)}, ${s.SW}x${s.SH})`),
     ...stills.map(f => `- ${f}`),
+    ...(ds.palette.length ? [`- ${palettePng} (the palette, each colour as wide as its share)`] : []),
     `- ${path.join(out, 'stats.tsv')} (every sample)`,
+    '',
+    ...designOut,
     '',
     ...table,
   ];
   fs.writeFileSync(path.join(out, 'summary.md'), lines.join('\n') + '\n');
   if (!opt.quiet) console.log(lines.join('\n'));
-  return { out, rows, cuts, sync, shape: sh, sheets, tiles, picks, timeline, span, pr, w, h, rate };
+  return { out, rows, cuts, sync, shape: sh, design: ds, sheets, tiles, picks, timeline, span, pr, w, h, rate };
 }
 
 // ─── the show's shape ────────────────────────────────────────────────────────
@@ -1024,6 +1165,52 @@ async function selftest() {
   check('E, silent: no correlation with a sound that is not there', allNull,
     eh.sections ? [1, 5, 10, 20].map(w => `${w} s ${f2(eh.sections[w].r)}`).join(', ') : 'no audio track read');
 
+  // PLAN.md 47w: a fetch that leaves the picture and the sound as two files,
+  // or only the sound. F is A's picture alone and its sound alone, named as
+  // yt-dlp names an unmerged pair; G is the sound alone.
+  const F = path.join(dir, 'f'), G = path.join(dir, 'g');
+  fs.mkdirSync(F); fs.mkdirSync(G);
+  const split = (to, args) => spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', path.join(dir, 'a.webm'), ...args, to]).status === 0;
+  const madeF = split(path.join(F, 'source.f137.webm'), ['-an', '-c', 'copy']) && split(path.join(F, 'source.f251.webm'), ['-vn', '-c', 'copy']);
+  fs.copyFileSync(path.join(F, 'source.f251.webm'), path.join(G, 'source.f251.webm'));
+  const fFiles = fs.readdirSync(F).filter(f => f.startsWith('source.'));
+  // Both orders: readdir's is not fixed, and on the owner's Mac it differed
+  // between two fetches.
+  const picks = [fFiles, [...fFiles].reverse()].map(order => { try { return pickSource(F, order); } catch (e) { return e; } });
+  const joined = picks.every(p => typeof p === 'string' && /source\.mkv$/.test(p) && (() => { const q = probe(p); return q.audio && q.stored === A.pr.stored; })());
+  check('47w: a picture and a separate sound are joined into one file with both, in either order',
+    madeF && joined, picks.map(p => (typeof p === 'string' ? path.basename(p) : `refused: ${p.message}`)).join(' / '));
+  // G's sound carries a cover picture, as a music upload's often does: ffmpeg
+  // lists it as a Video stream marked "attached pic", and it is not a picture
+  // to watch, so the fetch is still refused.
+  const cover = path.join(G, 'cover.png');
+  const madeG = spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=64x64:d=1', '-frames:v', '1', cover]).status === 0
+    && spawnSync(ff(), ['-hide_banner', '-loglevel', 'error', '-y', '-i', path.join(F, 'source.f251.webm'), '-i', cover, '-map', '0:a', '-map', '1:v',
+      '-c:a', 'aac', '-c:v', 'png', '-disposition:v', 'attached_pic', path.join(G, 'source.f140.m4a')]).status === 0;
+  const gInfo = madeG ? spawnSync(ff(), ['-hide_banner', '-i', path.join(G, 'source.f140.m4a')], { encoding: 'utf8' }).stderr : '';
+  let refusal = null;
+  try { pickSource(G, ['source.f140.m4a']); } catch (e) { refusal = e; }
+  check('47w: a fetch that brought only sound, with a cover picture in it, is refused, saying so',
+    madeG && /attached pic/.test(gInfo) && refusal instanceof WatchError && /sound and no picture/.test(refusal.message),
+    refusal ? refusal.message.slice(0, 90) : `not refused: it picked the sound file (cover ${/attached pic/.test(gInfo) ? 'present' : 'missing'})`);
+  // A fetch that merged and left its pieces: the merged file wins, untouched.
+  const Hd = path.join(dir, 'h'); fs.mkdirSync(Hd);
+  fs.copyFileSync(path.join(dir, 'a.webm'), path.join(Hd, 'source.webm'));
+  for (const f of ['source.f137.webm', 'source.f251.webm']) fs.copyFileSync(path.join(F, f), path.join(Hd, f));
+  const hPick = pickSource(Hd, ['source.f137.webm', 'source.f251.webm', 'source.webm']);
+  check('47w: a merged file beside its leftover pieces is the one watched, and nothing is joined',
+    path.basename(hPick) === 'source.webm' && !fs.existsSync(path.join(Hd, 'source.mkv')), `${path.basename(hPick)}`);
+  const bare = path.basename(ff()), loc = ffmpegLocation(bare);
+  const fa = fetchArgs(dir, '--js-runtimes'), li = fa.indexOf('--ffmpeg-location');
+  check('47w: yt-dlp is handed ffmpeg as a full path that exists, not a bare name',
+    !!loc && path.isAbsolute(loc) && fs.existsSync(loc) && ffmpegLocation('no-such-ffmpeg-here') === null
+      && li >= 0 && path.isAbsolute(fa[li + 1]) && fs.existsSync(fa[li + 1]) && fa.includes('--merge-output-format'),
+    `${bare} → ${loc}; fetch args ${li >= 0 ? `--ffmpeg-location ${fa[li + 1]}` : 'have no --ffmpeg-location'}`);
+
+  // The design and physics reads, on frames and sequences whose answers are
+  // known by construction (scripts/watchreadtest.mjs).
+  readSelftest(check);
+
   const bad = checks.filter(v => !v).length;
   console.log(bad ? `\n${bad} FAIL` : '\nall ok');
   fs.rmSync(dir, { recursive: true, force: true });
@@ -1107,7 +1294,7 @@ export function freezes(r, { below = FREEZE_FLOOR, minSeconds = 2, blipSeconds =
   return out;
 }
 
-export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg };
+export { WatchError, FREEZE_FLOOR, STILL, findFfmpeg, pickSource, ffmpegLocation, fetchArgs, macFetch };
 
 // Run as a command only when this file is the one node was given: a harness
 // that imports it, or bundles it (gig.mjs goes through esbuild, where
