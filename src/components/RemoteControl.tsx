@@ -737,7 +737,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </span>
           </button>
 
-          {/* A song's name poured as ink (PLAN 37x-10c), its own file */}
+          {/* A song's title as the corner caption (PLAN 37x-10c, 37x-10m), its own file */}
           <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
 
           {/* The dials that change the mood most */}
@@ -868,7 +868,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
-          {/* Song titles as ink in a live set (PLAN 37x-10), the phone's Title switch. */}
+          {/* Song titles in a live set (PLAN 37x-10), the phone's Title switch. */}
           <div className="mb-6">
             <PhoneInkTitle settings={settings} onSetting={patch} disabled={!connected} testId="remote-ink-title" />
           </div>

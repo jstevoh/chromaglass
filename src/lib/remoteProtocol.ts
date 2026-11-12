@@ -496,11 +496,12 @@ export type RemoteMessage =
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
   /**
-   * Words poured onto the plate as dye, which the flow then carries off
-   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
-   * of each track in a live set. From the phone remote's text box, or
-   * through the relay's guard; the display reads it with `parsePourText`
-   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   * A song's name and credit as rows (PLAN 37x-10c, `lib/pourText.ts`), at
+   * the top of each track in a live set, through the relay's guard (the
+   * assistant's `pour_text`) or from a phone one build older. Poured onto
+   * the plate as ink until the owner shelved that (37x-10m); the display now
+   * shows it as the corner caption (`rowsCaption`), reading it with
+   * `parsePourText` whoever sent it. `colour` is kept on the wire, unread.
    */
   | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
   /**
