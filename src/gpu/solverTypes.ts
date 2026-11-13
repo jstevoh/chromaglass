@@ -201,6 +201,13 @@ export interface GpuStepParams {
   soapFilmRate?: number;
   /** The frame's tilt from flat, degrees (default 90, hanging; PLAN 32h): gravity along the film is g sin of it. */
   soapFilmTilt?: number;
+  /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
+  tank?: number;
+  tankFeed?: number;
+  tankWeight?: number;
+  tankNozzle?: number;
+  tankDrain?: number;
+  tankHue?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**

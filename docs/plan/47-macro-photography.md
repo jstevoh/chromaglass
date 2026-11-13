@@ -287,13 +287,55 @@ Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 ## 47n. A side view: a falling thread and a gravity current in a tank (L; owner's call)
 
 *Gravity L1* films a tank from the side: fluorescent dye falls as a jet that stretches into
-one thread over about 40 s (the thread thins as gravity accelerates it, so its radius goes
-as the flow rate over the speed, a ∝ (Q/v)^½), lands, and spreads along the floor as a
-gravity current whose head curls into filaments, with glitter floating in dark water
-(near black 76 to 83 %, motion median 0.013, a jump to 0.029 at the landing). Our plate is a
-thin layer seen from above, so this is a different solver (a vertical 2D slice with
-buoyancy, or a 3D tank), not a camera move. Written down so it is not lost; the owner's
-call whether the show wants a tank at all.
+one thread over about 40 s, lands, and spreads along the floor as a gravity current whose
+head curls into filaments, with glitter floating in dark water (near black 76 to 83 %, motion
+median 0.013, a jump to 0.029 at the landing). The owner asked for it on 2026-11-13 and chose
+its own solver over standing the plate up (the plate's glass drag eats the momentum a jet and
+a curling head need).
+
+~~**47n-1** The tank~~ (shipped; story in `docs/plan-shipped.md` §47n-1): Tank, a vertical
+slice of water with heavy dye falling from a nozzle (`src/lib/tank.ts`, `src/gpu/tank.ts`,
+drawn in the plate's place by `src/gpu/tankDraw.ts`), with Feed, Dye Weight, Nozzle, Drain
+and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
+`npm run tank`, `npm run tankgpu`.
+
+- **47n-2. Open: momentum carried with less smearing.** The momentum is carried
+  semi-Lagrangian, which smears it by about u·dx/2, about three times water's own viscosity
+  at a centimetre a second on 0.94 mm cells: the slice behaves like slightly thicker water,
+  and the lock exchange's floor front reads 0.42 of √(g′H) where experiments read 0.44 to
+  0.48. A MacCormack or BFECC carry would sharpen the gravity current's curling head; the
+  reference changes first, then the GPU, held by `tankgpu` as now. (Shortcut named in
+  `src/lib/tank.ts`, item 5.)
+- **47n-3. Open: a finger's place on the screen, exactly.** A held finger carries the nozzle
+  through the plate's hold coordinates, turned back to the screen assuming its long side is
+  the width and the camera unzoomed and unturned (`gpu/tankPlate.ts`, `screenX`). Hand the
+  solver the screen's own mapping so a portrait screen or a zoomed camera lands the nozzle
+  under the finger. A screen wider than 16:9 is off too: the tank keeps its shape and fills
+  the height there, with black water at the sides (`gpu/tankDraw.ts`), so the finger's x wants
+  that letterbox taken out as well.
+- **47n-4. Open: a Gravity Tank look.** Tank is a switch on any look today. A built-in look
+  needs its plate entries (`presetPlate.ts`: dyes, tools, liquids) and a seed case in
+  `sim/fluidSimulation.ts`, which is over its size ceiling, so the seed goes in a module
+  beside it first. Its cords: the bass on Feed, the kick on Dye Weight a little.
+- **47n-5. Open: the rest of the film in the tank.** A rod, not a sheet: the slice is 2D, so
+  the thread thins as a ∝ 1/v where the film's round jet thins as (Q/v)^½ (a 3D tank, or an
+  axisymmetric solve about the jet's axis, replaces it). Glitter (47e) and the side light
+  (47v-7's red rake) carried and lit in the tank once they exist; two or three dyes of
+  their own colours and weights, each a concentration the flux form carries.
+- **47n-6. Open: the dish's solver rests while the tank shows.** With Tank up the plate's
+  own solver still steps under it, unseen. Skipping it would hand the tank the frame's
+  whole budget; it has to come back where it was when Tank goes off. Touches and pours land
+  on that hidden plate too (a pour's dye, a magnet, a blow), so a tap meant for the tank
+  changes a look nobody sees until Tank goes off: route them to the tank (a tap drops a bead
+  of dye where it lands) or hold them while it shows.
+- **47n-7. Open: a real tank's stir, so the jet is not a mirror.** Filmed on the Mac
+  (2026-11-13), the flow is mirror-symmetric about the nozzle for the first 45 s: nothing in
+  the slice breaks the symmetry but float rounding, which takes that long to grow into the
+  buckling a real jet shows within seconds. A real tank is never still (the pour's own
+  wobble, a fraction of a degree of temperature): seed the water with a small, physical
+  disturbance (velocity noise of a few µm/s, or the nozzle wandering by a tenth of its bore),
+  in the reference first, the GPU after, and let `tankgpu` measure the left-right difference
+  growing where today it stays at rounding.
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 

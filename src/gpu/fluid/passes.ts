@@ -18,6 +18,7 @@ import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
 import { SoapFilmPlate, SOAP_PLATE_DX, soapLean } from '../soapFilmPlate';
+import { TankPlate } from '../tankPlate';
 import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
@@ -267,6 +268,30 @@ export class FluidPasses extends FluidFields {
     const w = Math.ceil(this.N / 8);
     pass.dispatchWorkgroups(w, w);
     this.phaseGapPrimed = true;
+  }
+
+  /**
+   * The solvers that run beside the plate's own, on `enc` before the step's
+   * pass: the frame's soap film and the tank's side view.
+   */
+  protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepSoapPlate(enc, p);
+    this.stepTankPlate(enc, p);
+  }
+
+  /**
+   * The tank seen through its side (PLAN 47n, gpu/tankPlate.ts): made the
+   * first time Tank is up, stepped on the show's own seconds, with the
+   * fingers held on the plate to carry its nozzle. Turned off, it goes, and
+   * the next time it is clear water.
+   */
+  protected stepTankPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.tank ?? 0) > 0.001)) {
+      if (this.tankPlate) { this.tankPlate.dispose(); this.tankPlate = null; }
+      return;
+    }
+    if (!this.tankPlate) this.tankPlate = new TankPlate(this.device);
+    this.tankPlate.step(enc, p.magnetSeconds ?? 1 / 60, p, p.boilHolds);
   }
 
   /**

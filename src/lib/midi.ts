@@ -315,6 +315,8 @@ const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', '
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
   'slosh',
+  // Tank is whether the picture is a tank or the dish (PLAN 47n): the whole frame, never the beat's (sceneMap NOT_A_TARGET).
+  'tank',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
@@ -627,6 +629,12 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
   { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
+  { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
+  { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
+  { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },
+  { key: 'tankNozzle',      label: 'Nozzle',           min: 0, max: 1 },
+  { key: 'tankDrain',       label: 'Drain',            min: 0, max: 1 },
+  { key: 'tankHue',         label: 'Glow Hue',         min: 0, max: 360 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.

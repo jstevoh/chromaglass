@@ -11,6 +11,8 @@ import { BEAD_KERNELS } from '../src/gpu/wgsl/beadMask';
 import { SOAP_KERNELS } from '../src/gpu/wgsl/soapFilm';
 import { SOAP_PLATE_KERNELS } from '../src/gpu/wgsl/soapFilmPlate';
 import { SOAP_AIR_KERNELS } from '../src/gpu/wgsl/soapAir';
+import { TANK_KERNELS } from '../src/gpu/wgsl/tank';
+import { TANK_DRAW_WGSL } from '../src/gpu/tankDraw';
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -42,8 +44,10 @@ const FORMATS: Record<string, string> = {};
   for (const [name, code] of Object.entries(BEAD_KERNELS)) await check(`beads.${name}`, code);
   // The draining soap film (PLAN 32c) and what the plate adds to it (32d): stepped behind Soap Film.
   for (const [name, code] of Object.entries(SOAP_KERNELS)) await check(`soap.${name}`, code);
+  for (const [name, code] of Object.entries(TANK_KERNELS)) await check(`tank.${name}`, code);
+  await check('tank.draw', TANK_DRAW_WGSL);
   for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
   for (const [name, code] of Object.entries(SOAP_AIR_KERNELS)) await check(`soapAir.${name}`, code);
-  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(SOAP_AIR_KERNELS).length} shaders`);
+  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(SOAP_AIR_KERNELS).length + Object.keys(TANK_KERNELS).length + 1} shaders`);
   return out;
 };

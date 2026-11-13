@@ -187,6 +187,13 @@ const NOT_THE_LOOK = new Set([
     without (PLAN 10-8d-3).
   */
   'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
+  /*
+    The tank's side view (PLAN 47n) for the same reason: Tank is whether the
+    picture is a tank at all, and its nozzle, feed and dye are the
+    performer's hand on it. Left out of the pool, Evolve reaches for the
+    dials it reached for before (they were not in it, being new).
+  */
+  'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

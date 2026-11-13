@@ -40,6 +40,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `slump.ts`: slosh, soap film, lamp-boiling dish, ink slump. `soapFilm.ts`'s setup reads an `ext` face push (binding 8), zero unless written.
 - `soapFilmPlate.ts`: what the plate adds to the soap film (PLAN 32d): `soapPullState` and `soapPull` (a drained film drawn again, top first); `SOAP_PLATE_KERNELS`, `NOISE_CELLS`.
 - `soapAir.ts`: the air over the film and the film's big swirls (PLAN 32d-1, 32k): `soapAirForce`, `soapAirDiv`, `soapAirJacobi`, `soapAirProject` (the air, a fluid with inertia, stirred by the plate's flow and the film's plumes), `soapAirBrinkSource`, `soapAirBrinkJacobi` (the film's large-scale Brinkman flow), `soapAirExt` (both into the solver's `ext` faces); `SOAP_AIR_KERNELS`. `plateThinFilm.ts` also draws the film (`soapFilmOver`, display bindings 18 and 19: the thickness and `soapFilmLut`, storage buffers because the pass already samples sixteen textures).
+- `tank.ts`: `TANK_KERNELS` (`tankBounds`, `tankDye`, `tankAdvect`, `tankForce`, `tankDiv`, `tankSmoothRed`, `tankSmoothBlack`, `tankRestrict`, `tankProlong` (the pressure's multigrid V-cycle, each on a level's own small uniform), `tankProject`) and `TANK_UNIFORM_BYTES`: the tank's substep (PLAN 47n), pass for pass the CPU reference's (`lib/tank.ts`); `npm run tankgpu` checks it.
 
 ## Checks
 
