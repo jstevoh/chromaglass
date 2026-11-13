@@ -330,6 +330,71 @@ take from 2026-11-11, by `npm run watch -- … --vs`:
 - **Turnover.** Ours 2.6× brisker (5 s against 13 s to carry a form its own size): a viscous
   pool moves slower.
 
+## 47z. Found doing this: a crowd of oil drops in vivid colour, against our drop looks (M–L)
+
+The owner sent a screen recording (2026-11-12) of a Liquid Light Lab post, oils on an overhead
+projector with an oscilloscope's figures mixed over them, and asked for the physics of the
+drops and bubbles and for its vivid colour (the oscilloscope is not wanted). Kept in the
+library as `lll-oscilloscope-vectors` (`npm run watch -- --refs`); cropped to the video,
+`--crop 0,0.2,1,0.64`. Read against our closest takes from 2026-11-11 (`--vs`, 10 s windows,
+24 frames):
+
+| | theirs | Splodascope | Macro Bead | Crowd Plate | Poster 1969 |
+|---|---|---|---|---|---|
+| separate forms a frame | 63 | 12 | 25 | 17 | 11 |
+| elongation (1 round) | 0.75 | 0.60 | 0.62 | 0.49 | 0.66 |
+| edge width, % of width | 1.38 | 2.90 | 1.04 | 3.28 | 3.91 |
+| colourfulness | 137 | 43 | 47 | 125 | 138 |
+| coloured share of the frame | 0.99 | 0.39 | 0.34 | 0.80 | 0.66 |
+| hue spread (0 one hue) | 0.08 | 0.06 | 0.31 | 0.39 | 0.40 |
+
+What the frames show: hundreds of round drops from specks to a tenth of the frame, warm
+(red, orange, yellow) on a dark blue or violet water, each a lens with a bright core and a
+thin dark rim, a few drops inside drops, and fingers of yellow pinching into chains of
+beads. Their pace is not a target: a social edit of short clips (17.5 cuts a minute) whose
+turnover and lifetime (0.4 s) are under every real show's. Some of their saturation is
+likely the camera and video mixer's gain; the plate's should come from the dye and the light.
+
+The physics, in the order to build (each its own thread and PR):
+
+- **47z-1. Colour: a drop takes the water out of the light's path.** In the gap an oil drop
+  pushes the water aside, so the lamp's light through a red drop meets red dye only; the
+  plate multiplies the oil's colour by the water's, so red on cobalt reads black and
+  Splodascope's drops read murky green (its take: colourfulness 43 against 137, coloured
+  0.39 of the frame against 0.99). This is **28i-7b** (the displaced share, as
+  `gapScale × (1 − film)` does for Clear Film) and **28k-5** (a drop's edge multiplying
+  toward black); build them together, then give Splodascope the photograph's cobalt back.
+  *Measure:* a red drop on cobalt water keeps the red drop's own transmitted colour within a
+  just-noticeable step at its centre, and the edge's few cells do not go darker than either
+  liquid alone; Splodascope's take reads colourfulness over 100 and coloured share over 0.8.
+- **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
+  a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
+  equal viscosities) stretches and splits, its pieces split again until each is under the
+  critical size, so the sizes spread over a decade or more; threads between them bead at the
+  Rayleigh–Plateau wavelength (**47k**). Whether that happens on our plate depends on the
+  tension in real units and the capillary cap that bites at the moment of break-up (**38e**).
+  Specks under three cells are the beads' (**28k-3**). *Build:* first measure: stir a pool of
+  oil in the lab at three rates and count the drops and their sizes after five seconds; then
+  fix what stops it in that order (38e's cap, 47k's gap curvature, 28k-3's specks).
+  *Measure:* the count rises with the stir rate, the largest surviving drop's radius falls as
+  σ / (μ γ̇) within 30% (the free-shear law; a drop squashed in the gap may follow a
+  confined variant, which the build PR names before it measures), and the size distribution spans at least a factor of ten.
+- **47z-3. Drops that touch and wait.** A crowd stays a crowd because the water film between
+  two drops must drain before they merge, a time that grows with the drop's size and the
+  viscosity; Film Hold holds a film until pressed, which is the threshold without the timing.
+  This is **28k-2** (Reynolds' drainage, μR²/(gap·σ)-scaled, and a rupture drawn from it).
+  *Measure:* after a stir, the count halves over a time that scales with R² within 30% across
+  two drop sizes, not at once and not never.
+- **47z-4. Each drop a lens.** A drop's curved meniscus bends the light: the projected drop
+  has a bright core and a thin dark rim where light is turned out of the lens's aperture.
+  That is **47y**'s rims, **18c-4** (lens or film by the spreading coefficient), **47j**
+  (caustics) and **38h**'s shadowgraph; our edges are 1.7 to 2.4 times softer on the drop
+  looks (Macro Bead's beads already read 1.04%). *Measure:* edge width on Splodascope's take
+  under 1.6% of the width, from the optics, never a drawn outline.
+
+Each lands as a watched take against this reference (`--vs lll-oscilloscope-vectors`), the
+number it moves printed before and after.
+
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
@@ -337,5 +402,6 @@ lighting term on the bend the plate already computes, the biggest change to the 
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
 47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
-as each of its bullets' items comes up. Each its own thread
+as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
+for the drops' physics and their colour, 2026-11-12). Each its own thread
 and PR.
