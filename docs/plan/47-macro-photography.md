@@ -159,6 +159,22 @@ lamp's cone set as an annulus outside the pupil. *Measure:* `nolight`-style lab 
 Dark field a flat dye with no gradient reads black within 2 levels, a front's ring reads
 brighter than either side by at least 30 levels, and Rheinberg's ring takes the ring's hue.
 
+~~**47b-1** A side lamp~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): Side Light, Side Colour and Side Angle, a second coloured
+lamp raking in low from one side over the glow (the Microlab films' amber or magenta over
+blue), lighting the pigment by single back-scatter, the glasses' slopes by Fresnel and the
+glitter by the mirror law, falling off by the inverse square across the stage (`npm run glint`).
+
+- **47b-2. Open: the side lamp casts no shadows.** Its light reaches every height of the
+  dye undimmed: a thick blob should shade the dye behind it from a lamp this low, and the
+  lit side of a front should be brighter than its far side by the dye's own transmission
+  along the slanted ray. Needs a short march through the dye toward the lamp (four to eight
+  taps along `sideRay`), in the lens pass. *Measure:* in the lab, dye behind a dense blob on
+  the lamp's line reads at least 30 % darker than the same dye with the blob moved aside.
+- **47b-3. Open: the lens pass on every picture.** Projector sources drawn by `drawSource`
+  and the kaleidoscope's copy are drawn without it, so glitter and the side lamp vanish when
+  a source is up. Run `PlateGlint` after those paths too. *Measure:* a `glint` line with a
+  source up.
+
 ## 47c. Blacklight: fluorescent dyes under a UV lamp (M)
 
 *Seen:* blue and magenta that glow out of black, brightest where dye is thin and fresh, with
@@ -195,6 +211,17 @@ radius A·|z − z_f|/z_f on linear light so glints become discs. Built under 38
 it. *Measure:* 31f-3's DoF law within 10 % in the lab, and a glint's disc at the radius the
 law gives for its depth.
 
+~~**47d-1** The glitter's depth of field and the iris's stars~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): each flake has
+its height in the gap; the lens (magnification 0.27 × zoom on a full-frame sensor, Lens Stop
+f/1.4 to f/22, focal plane at Projector Focus) draws it as its aperture's disc, a hexagon
+from a six-bladed iris stopped down and a circle wide open, of diameter |z − z_f|·gap·m/(N(1+m)),
+in linear light; and stopped down, its Airy core grows (1.22 λ N (1+m)/m, per colour) and
+six diffraction spikes reach out from it, fading as the flake leaves focus.
+
+- **47d-2. Open: discs and stars on every highlight.** Only the glitter is drawn through the
+  lens; the beads' and bubbles' speculars and the softbox's glints on the dye stay sharp and
+  starless. The whole-plate disc kernel above is the rest of 47d.
+
 ## 47e. Sparkle: microbubbles and mica that show the flow (M)
 
 *Seen:* pin-point glints scattered through the liquid; specks that light up along the
@@ -212,6 +239,22 @@ orientation is quasi-steady (the stretching axis), not an integrated Jeffery orb
 to integrate it if the shimmer reads wrong. *Measure:* glint count follows the population,
 and in a shear flow the mica's brightness correlates with the strain's direction as the
 mirror law predicts (lab).
+
+~~**47e** Sparkle, its glitter half~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): Glitter puts up to 32,768 polystyrene
+flakes in the liquid, riding the dye's own flow at their height in the gap (Poiseuille's
+profile), turning in integrated Jeffery orbits (the shortcut above is not taken), settling
+by Stokes and lying flat where they land, and flashing where the side lamp or the softbox
+meets the mirror angle; dark specks on a lamp ground.
+
+- **47e-1. Open: microbubbles.** The other half: bubbles far smaller than a cell, each a
+  convex mirror returning a glint of the same brightness whatever its size, beside the flakes.
+- **47e-2. Open: two shortcuts in the flakes.** A flake's orbit constant (which of Jeffery's
+  closed orbits it is on) is stood in for by a fixed lean, so every flake tumbles in the
+  flow's plane; and a flake that has lived 40 to 160 s fades out and is born again elsewhere,
+  standing in for a stir lifting it off the floor. Integrate the orbit constant from the
+  flow's vorticity, and lift landed flakes by the shear at the floor. *Measure:* in a shear
+  flow the share of flakes flashing settles to the closed-orbit average, and a stirred plate
+  lifts what a still one lets lie.
 
 ## 47f. A stir bar: the magnetic stirrer's vortex as a tool (S)
 
@@ -524,7 +567,7 @@ number it moves printed before and after.
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
-picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
+picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
 47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
