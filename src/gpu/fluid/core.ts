@@ -374,6 +374,15 @@ export class FluidCore {
   protected handFastest = 0;
   /** A Blow's breath on the liquid (applyDeltas' `breath`, lib/breath.ts), on the CPU's grid and on the solver's, made at the first breath on a thin gap. */
   protected cpuBreathTex: GPUTexture | null = null;
+  /*
+    A look's lay saying which of the dye it lays is the oil's (Oil Bodies,
+    PLAN 47z-1): the CPU's L² share and the solver's N² one, made the first
+    time a lay sends one (applyDeltas' oilAdd), and whether the fold still
+    owes the share to the oil (bodyLay).
+  */
+  protected cpuOilTex: GPUTexture | null = null;
+  protected deltaOilTex: GPUTexture | null = null;
+  protected oilLayPending = false;
   protected breathTex: GPUTexture | null = null;
   /** Whether the next step has a breath on it: laid each step the wind blows, gone the step after, as the hands are. */
   protected breathLive = false;

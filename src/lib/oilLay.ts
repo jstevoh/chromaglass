@@ -243,3 +243,50 @@ export function layLavaLamp(n: number, oil: (x: number, y: number, r: number) =>
     if (cell.dye > 0) dye(x, y, cell.dye);
   }
 }
+
+/**
+ * Dye a look's lay puts in its oil as the oil's own colour (Oil Bodies, PLAN
+ * 47z-1), added to `share` (L²×4, R, G, B absorbance and amount, as the
+ * solver's dye delta), which is made at `cells` cells if there is none yet.
+ * FluidSimulation.addOilDensity lays the dye as addDensity does and this
+ * beside it; the share goes to the solver with that flush (applyDeltas'
+ * `oilAdd`), so the oil takes its colour and the water the rest. Without it
+ * the solver shares the frame's dye by the oil under each cell, and a lay's
+ * rim, where the CPU's 192² colour and the solver's sharper oil disagree,
+ * handed the water's colour to the drop and the drop's to the water: the
+ * water's crept into each drop from its edge (28k-5), and the drop's lay in
+ * the water round it, multiplying with the water's toward black.
+ */
+export function layOilShare(share: Float32Array | null, index: number, amount: number, absorbance: readonly number[], cells: number): Float32Array {
+  const out = share ?? new Float32Array(cells * 4);
+  const k = index * 4;
+  out[k] += amount * absorbance[0];
+  out[k + 1] += amount * absorbance[1];
+  out[k + 2] += amount * absorbance[2];
+  out[k + 3] += amount;
+  return out;
+}
+
+/**
+ * Clock Glass's or Splodascope's dish for one lay (FluidSimulation's seed):
+ * the bodies from `float` (a seeded stream), each laid as oil (`oil`, a
+ * negative amount cutting a compound drop's hole), then every cell as
+ * clockGlassCell or splodascopeCell lays it, the water's wash as dye
+ * (`water`) and each body's colour in its oil as the oil's own (`inOil`,
+ * with which of the look's dyes it is; PLAN 47z-1).
+ */
+export function layCrowd(look: 'clock-glass' | 'splodascope', n: number, float: () => number, dyes: number,
+  oil: (x: number, y: number, r: number, amount: number) => void,
+  water: (x: number, y: number, amount: number) => void,
+  inOil: (x: number, y: number, amount: number, dye: number) => void): void {
+  const glass = look === 'clock-glass';
+  const bodies: readonly (OilBody & { oil?: number })[] = glass ? clockGlassBodies(float, dyes) : splodascopeDiscs(float, dyes);
+  for (const b of bodies) oil(b.x, b.y, b.r, b.oil ?? 1);
+  for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
+    const u = (x + 0.5) / n, v = (y + 0.5) / n;
+    const cell = glass ? clockGlassCell(u, v, n, bodies) : splodascopeCell(u, v, n, bodies as readonly OilDisc[]);
+    const which = glass ? (cell as { body: number }).body : (cell as { disc: number }).disc;
+    if (cell.water > 0) water(x, y, cell.water);
+    if (cell.dye > 0) inOil(x, y, cell.dye, bodies[which].dye);
+  }
+}

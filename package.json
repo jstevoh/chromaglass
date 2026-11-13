@@ -188,6 +188,7 @@
     "bodies": "node scripts/bodies.mjs",
     "clockglass": "node scripts/clockglass.mjs",
     "filmhold": "node scripts/filmhold.mjs",
+    "dropcolour": "node scripts/dropcolour.mjs",
     "microscope": "node scripts/microscope.mjs",
     "ferrolook": "node scripts/ferrolook.mjs",
     "maze": "node scripts/maze.mjs",

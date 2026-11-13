@@ -13875,3 +13875,39 @@ digital overlay over a band and was left out. Liquid Light Lab's films were fetc
 owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a video mirror and
 colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
 row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
+
+## 47z-1 (with 28i-7b and 28k-5). A drop takes the water out of the light's path (2026-11-13)
+
+The owner asked for the drops' physics and their vivid colour (2026-11-12, against Liquid Light
+Lab's `lll-oscilloscope-vectors`: colourfulness 137, coloured 0.99 of the frame; Splodascope's
+take 43 and 0.39). Splodascope with the photograph's cobalt water had turned every drop green and
+ringed each with black, so it had been given a pale water (28i-7b), and a crowd's yellow drops
+went orange and brown from their edges inward over ten seconds (28k-5).
+
+Measured in the lab first (192², the look's own settings, four seconds): the solver had already
+kept the colours apart inside the drops (the water's dye in cells over 0.95 oil 16.5 against the
+oil's 8496), so the drops were not green from water in them. The black was the edge, two ways:
+
+- **The plate multiplied the two liquids in a part-oil cell.** 3438 cells between a tenth and
+  nine tenths oil against 7374 deep in drops, and there the composite summed both liquids'
+  absorbance, as if the light went through one and then the other. In the gap a drop spans
+  glass to glass, so a column of light goes through one liquid or the other; the part-oil cell
+  is Cahn–Hilliard's few-cell smear of a sharp edge. `packDyeBodies` (`src/gpu/wgsl/pack.ts`)
+  averages the light over the cell, c·exp(−k·o/c) + (1 − c)·exp(−k·w/(1 − c)), and writes back
+  the absorbance that lets it through, so every decode of the plate reads it unchanged; the
+  total in alpha is kept. The solver's fields hand the plate the oil's share and the mix
+  (`fields.oilDye`, `fields.mix`) where Oil Bodies keeps one.
+- **The lay labelled the rim's colours the wrong way.** A look lays its drops' colours as dye
+  on the CPU's 192² grid and the oil as a sharp disc on the solver's; the dye was then shared by
+  the oil under each cell (`bodyLand`), so on each rim the water's cobalt became the oil's and
+  the drop's colour the water's. The cobalt then spread into the drop as the oil's own colour
+  (28k-5's browning) and the drop's colour lay round it in the water, multiplying toward black.
+  A lay now says which colour is the oil's (`FluidSimulation.addOilDensity`, `applyDeltas`'
+  `oilAdd`, the `bodyLay` kernel); Splodascope and Clock Glass lay that way.
+
+`npm run dropcolour` (a red drop in cobalt water, the look's settings with its two refraction
+stand-ins off, 47z-4's): the darkest pixel across the edge 0.0002 → 0.061 of relative luminance,
+the water's own 0.063; the edge 0.050 off the line between the two colours; the drop's middle
+ΔE 0.00 from the same drop in clear water, before and after. Splodascope in the lab (192², four
+seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89; cobalt before
+140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).

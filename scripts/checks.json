@@ -2932,6 +2932,19 @@
       ]
     },
     {
+      "name": "An oil drop shows its own colour and its edge is no darker than either liquid",
+      "shard": "fifth",
+      "run": "npm run dropcolour",
+      "timeout": 5,
+      "why": [
+        "PLAN 47z-1 (with 28i-7b and 28k-5): a red oil drop laid in cobalt water",
+        "as a look lays it keeps its own colour in the middle, and across its",
+        "edge the light is the two liquids side by side, never darker than the",
+        "darker of them; the edge used to go black. Three 128² plates of one",
+        "second; in the fifth shard, beside the crowd's Film Hold."
+      ]
+    },
+    {
       "name": "A pour pushes the liquid out over the rim",
       "shard": "open",
       "run": "npm run flush",

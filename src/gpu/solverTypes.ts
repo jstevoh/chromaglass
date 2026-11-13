@@ -390,7 +390,13 @@ export interface PlateSolver {
    * is zero (`dyeMul` one), and only those rows, with the rows the last upload
    * wrote, go across.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null): void;
+  /**
+   * `oilAdd` (Oil Bodies): the part of `dyeAdd` a look's lay says is the
+   * oil's own colour, L²×4, so the oil takes its colour and the water the
+   * rest (PLAN 47z-1); left out, the frame's dye is shared by the oil under
+   * each cell.
+   */
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null, oilAdd?: Float32Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

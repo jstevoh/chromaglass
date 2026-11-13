@@ -398,16 +398,30 @@ likely the camera and video mixer's gain; the plate's should come from the dye a
 
 The physics, in the order to build (each its own thread and PR):
 
-- **47z-1. Colour: a drop takes the water out of the light's path.** In the gap an oil drop
-  pushes the water aside, so the lamp's light through a red drop meets red dye only; the
-  plate multiplies the oil's colour by the water's, so red on cobalt reads black and
-  Splodascope's drops read murky green (its take: colourfulness 43 against 137, coloured
-  0.39 of the frame against 0.99). This is **28i-7b** (the displaced share, as
-  `gapScale × (1 − film)` does for Clear Film) and **28k-5** (a drop's edge multiplying
-  toward black); build them together, then give Splodascope the photograph's cobalt back.
-  *Measure:* a red drop on cobalt water keeps the red drop's own transmitted colour within a
-  just-noticeable step at its centre, and the edge's few cells do not go darker than either
-  liquid alone; Splodascope's take reads colourfulness over 100 and coloured share over 0.8.
+- ~~**47z-1. Colour: a drop takes the water out of the light's path.**~~ (**shipped**, this PR;
+  story in `docs/plan-shipped.md` 47z-1, with 28i-7b and 28k-5): a part-oil cell's light is the two
+  liquids' side by side (`packDyeBodies`), a look's lay puts each drop's colour in its own oil
+  (`addOilDensity`), Splodascope has its cobalt water back; `npm run dropcolour`. Found doing it,
+  open:
+  - **47z-1a. Lava Lamp and the other lays.** Splodascope and Clock Glass lay each body's colour
+    as the oil's own; Lava Lamp still lays its wax's colour as plain dye, so the rim's share goes
+    to the water by the oil under each cell, and a faint halo of the wax's colour is the water's.
+    Left as it was because the owner had just approved the lamp's look (2026-11-12); try it in the
+    lab against `npm run lavawax`, and any other look that lays oil with a colour.
+  - **47z-1b. The averaging's path and the cells between.** The pack averages the light at the
+    composite's rest-gap path (DYE_PATH, 2.8), not the pixel's own gap (gapScale, 0.3 to 3 times),
+    and the composite's bicubic still interpolates absorbance between two cells, so a drop's edge
+    keeps a band about one cell wide where red and cobalt multiply. Named shortcuts: the true
+    sum is per pixel, which needs the oil's share in the composite, and its sixteen textures are
+    full (`view0` is packed to the bit); a seventeenth needs a binding freed first.
+  - **47z-1c. A rebuilt solver forgets whose colour is whose.** A lay's labels go across once,
+    with its flush; a solver rebuilt before the plate has come back (`restoreSeed`) or carried
+    to a new grid (`takeOver`) starts the oil's share from the oil under each cell again, as
+    before this item. Carry the share with the dye where the carry allows.
+  - **47z-1d. A drop inside another drop goes dark where they meet.** Splodascope's compound
+    drops (a hole in one colour with another drop in it): once the ring of water between them
+    thins, the two oils are one phase holding both colours, and they multiply. Real ones keep a
+    water film between them: 47z-3's films, or a second oil phase.
 - **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
   a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
   equal viscosities) stretches and splits, its pieces split again until each is under the
@@ -431,7 +445,12 @@ The physics, in the order to build (each its own thread and PR):
   That is **47y**'s rims, **18c-4** (lens or film by the spreading coefficient), **47j**
   (caustics) and **38h**'s shadowgraph; our edges are 1.7 to 2.4 times softer on the drop
   looks (Macro Bead's beads already read 1.04%). *Measure:* edge width on Splodascope's take
-  under 1.6% of the width, from the optics, never a drawn outline.
+  under 1.6% of the width, from the optics, never a drawn outline. Found in 47z-1: the look's
+  dark rims today are two stand-ins, the boundary line (Boundary Contrast, a colour step drawn as
+  a deflection, though a dye moves water's index by almost nothing) and Edge Relief's slope line,
+  each four or five of the solver's cells wide at a drop's rim; with both off a red drop's rim in
+  cobalt is no darker than the water (`npm run dropcolour`). This build replaces them at an oil
+  rim with the oil's own index step (18e-2's deflection by ∇OPL).
 
 Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
 page, add one build and a note:
