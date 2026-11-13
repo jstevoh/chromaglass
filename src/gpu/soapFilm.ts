@@ -62,9 +62,30 @@ export interface SoapFilmGpuReadback {
   vf: Float32Array;
 }
 
+/**
+ * The solver's own buffers, for a caller that drives the film from outside
+ * (the plate, src/gpu/soapFilmPlate.ts, PLAN 32d): the thickness in nm, the
+ * outside push on the faces in m/s (the (nx + 1) * ny horizontal faces, then
+ * the nx * (ny + 1) vertical ones; zero unless written), the step's stats
+ * (stats[0] the mean thickness), and the rupture flags and Vrij clocks a
+ * fresh film resets.
+ */
+export interface SoapFilmGpuBuffers {
+  h: GPUBuffer;
+  ext: GPUBuffer;
+  stats: GPUBuffer;
+  ruptured: GPUBuffer;
+  age: GPUBuffer;
+}
+
 export interface SoapFilmGpu {
+  readonly nx: number;
+  readonly ny: number;
+  readonly buffers: SoapFilmGpuBuffers;
   write(h: ArrayLike<number>): void;
   step(dt: number, opts?: SoapFilmStepOptions): void;
+  /** The step, recorded into the caller's encoder (no submit of its own). Its arguments are written to the queue now, so one encode per submit. */
+  encode(enc: GPUCommandEncoder, dt: number, opts?: SoapFilmStepOptions): void;
   read(): Promise<SoapFilmGpuReadback>;
   destroy(): void;
 }
@@ -98,6 +119,7 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   const slopesBuf = makeBuf('soap slopes', n * 8);
   const fluxesBuf = makeBuf('soap fluxes', (nUf + nVf) * 4);
   const ageBuf = makeBuf('soap age', n * 4);
+  const extBuf = makeBuf('soap ext', (nUf + nVf) * 4);
   const readBuf = makeBuf('soap readback', (n + nUf + nVf) * 4, GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ);
 
   const pipe = (k: SoapKernel): GPUComputePipeline => {
@@ -112,7 +134,7 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   const projectPipe = pipe('soapProject');
   const transportPipe = pipe('soapTransport');
 
-  const setupBg = bindGroup(device, setupPipe, [uniBuf, hBuf, ufBuf, vfBuf, pBuf, rhsBuf, rupturedBuf, statsBuf]);
+  const setupBg = bindGroup(device, setupPipe, [uniBuf, hBuf, ufBuf, vfBuf, pBuf, rhsBuf, rupturedBuf, statsBuf, extBuf]);
   const sorRedBg = bindGroup(device, sorRedPipe, [uniBuf, pBuf, rhsBuf, statsBuf]);
   const sorBlackBg = bindGroup(device, sorBlackPipe, [uniBuf, pBuf, rhsBuf, statsBuf]);
   const projectBg = bindGroup(device, projectPipe, [uniBuf, pBuf, ufBuf, vfBuf, statsBuf]);
@@ -131,7 +153,10 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
   let lastG = NaN;
   let destroyed = false;
 
-  return {
+  const film: SoapFilmGpu = {
+    nx,
+    ny,
+    buffers: { h: hBuf, ext: extBuf, stats: statsBuf, ruptured: rupturedBuf, age: ageBuf },
     write(h: ArrayLike<number>): void {
       if (destroyed) return;
       for (let i = 0; i < n; i++) {
@@ -149,6 +174,13 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
     },
 
     step(dt: number, stepOpts: SoapFilmStepOptions = {}): void {
+      if (destroyed) return;
+      const enc = device.createCommandEncoder({ label: 'soapFilm step' });
+      film.encode(enc, dt, stepOpts);
+      device.queue.submit([enc.finish()]);
+    },
+
+    encode(enc: GPUCommandEncoder, dt: number, stepOpts: SoapFilmStepOptions = {}): void {
       if (destroyed) return;
       const g = stepOpts.g ?? 9.81;
       const evap = stepOpts.evap ?? 0;
@@ -186,7 +218,6 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       uniF32[19] = ((96 * Math.PI * Math.PI * sigma * mu) / (A * A)) * 1e-45;
       device.queue.writeBuffer(uniBuf, 0, uniBytes);
 
-      const enc = device.createCommandEncoder({ label: 'soapFilm step' });
       const pass = enc.beginComputePass({ label: 'soapFilm' });
 
       pass.setPipeline(setupPipe);
@@ -211,7 +242,6 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       pass.dispatchWorkgroups(1);
 
       pass.end();
-      device.queue.submit([enc.finish()]);
     },
 
     async read(): Promise<SoapFilmGpuReadback> {
@@ -236,4 +266,5 @@ export function createSoapFilmGpu(device: GPUDevice, opts: SoapFilmGpuOptions): 
       disposer.dispose();
     },
   };
+  return film;
 }

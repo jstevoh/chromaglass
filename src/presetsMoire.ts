@@ -1,7 +1,7 @@
 import type { VisualizerSettings } from './types';
 
 /**
- * The moiré pack's looks (PLAN 45a): six of the house looks with a pair of
+ * The moiré pack's looks (PLAN 45a): seven of the house looks with a pair of
  * the pack's sheets on the stage. Each starts from a look that already
  * ships, so the liquid is one people know, and sets only what the sheets
  * need: which two, how they sit, and the lamp.
@@ -37,13 +37,46 @@ export const MOIRE_LOOKS: readonly {
     },
   },
   {
+    /*
+      PLAN 45a-11. The owner picked this one off the moiré reel of 2026-11-08
+      ("I like the waves one"): the clip was Moiré Star's stage with the spoke
+      sheets swapped for Waves, laid the same way up. Face down, two wave
+      sheets cross their crests and troughs into a lattice of eyes; face up
+      the crests stay in step and beat into broad swells that roll across the
+      plate as the top sheet turns, which is what the clip showed. The turn is
+      Star's less one degree and its spin half, so the swells are wide and
+      slow, and Curl (the waves' height) at 0.4 is the clip's. The kick cord
+      is Star's: on Waves the Curl is the height of the waves, so a kick
+      lifts them and the swells jump with it.
+      28i-7 (film of 2026-11-11): on Classic's dyes it read as Star's rainbow
+      grid. It has the sea's dyes now (presetPlate.ts), and a coarser sheet
+      turning slower, so the swells are longer and slower.
+    */
+    id: 'moire-waves',
+    name: 'Moiré Waves',
+    description: 'Two wave sheets turning slowly against each other over sea-blue dye: their crests beat into long swells that roll across the plate. A kick lifts the waves.',
+    from: 'classic',
+    settings: {
+      lampGround: 1, moireAmount: 1, moireSheetA: 'waves', moireSheetB: 'waves', moireFlip: false,
+      moireDensity: 30, moireAngle: 1.5, moireSpin: 0.12, moireCurl: 0.4, moireGap: 3,
+      sceneMappings: [{ source: 'hits', feature: 'kickHit', setting: 'moireCurl', depth: 0.06 }],
+    },
+  },
+  {
+    /*
+      28i-7 (film of 2026-11-11): thin dim purple rings, near black for 37 s,
+      and the same ring disc as Song Groove. Wider rings (a coarser sheet),
+      slid three times as far, so the fringes' centre sits out toward the
+      edge and the rings come in from it as a dropped stone's do; a pond's
+      dyes of its own (presetPlate.ts), and Clock Glass's larger dish.
+    */
     id: 'moire-ripple',
     name: 'Moiré Ripple',
-    description: 'Two ring sheets slid a little apart: curved fringes like a pond, and every pool of dye bends them. The bass slides the top sheet.',
+    description: 'Two ring sheets slid apart: rings roll in from the edge like a pond after a stone, over teal water and bright oil. The bass slides the top sheet.',
     from: 'clock-glass',
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'rings', moireSheetB: 'rings', moireFlip: false,
-      moireDensity: 44, moireAngle: 0, moireSlide: 0.035, moireGap: 5,
+      moireDensity: 34, moireAngle: 0, moireSlide: 0.09, moireGap: 5,
       sceneMappings: [{ source: 'bands', feature: 'bass', setting: 'moireSlide', depth: 0.05 }],
     },
   },

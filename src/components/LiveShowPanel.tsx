@@ -7,6 +7,7 @@ import {
   type LiveDestination, type LiveFormat, type LiveOrientation, type LiveServiceId,
 } from '../lib/liveShow';
 import { probeVideoEncoders } from '../lib/liveStream';
+import { liveRates, type LiveEncodeRate } from '../lib/liveRate';
 
 /**
  * The Live Show panel (PLAN.md 37x-4d): the Mac app streaming the show to
@@ -88,7 +89,12 @@ export function LiveShowPanel() {
   const forLive = useMemo(() => chosenFor(list, false).filter(d => kept.has(keyNameFor(d))), [list, kept]);
   const forTest = useMemo(() => chosenFor(list, true).filter(d => kept.has(keyNameFor(d))), [list, kept]);
   const need = needKbps(forLive.length ? forLive : forTest, format);
-  const advice = uploadAdvice(need, loadUpload());
+  const measured = loadUpload();
+  const advice = uploadAdvice(need, measured);
+  // What each encode will be given (37x-4h): the line says the rate, and why
+  // when it is less than the size asks for, so a soft stream has a reason on screen.
+  const rates = liveRates(forLive.length ? forLive : forTest, format, measured);
+  const rateLine = rateText(rates.landscape, `${format.height}p${format.fps}`, rates.portrait);
 
   const go = async (test: boolean) => {
     const to = test ? forTest : forLive;
@@ -101,7 +107,7 @@ export function LiveShowPanel() {
     }
     setArmed(false);
     setNote(null);
-    try { await startLive({ ...liveOptionsFor(to, format), test }); } catch (e) { setNote(String((e as Error)?.message ?? e)); }
+    try { await startLive({ ...liveOptionsFor(to, format, loadUpload()), test }); } catch (e) { setNote(String((e as Error)?.message ?? e)); }
   };
 
   const runProbe = async () => {
@@ -139,7 +145,7 @@ export function LiveShowPanel() {
               <span className="min-w-0 flex-1 truncate text-text">{d.name}</span>
               <span className="shrink-0 font-mono text-text-2">
                 {d.phase === 'live'
-                  ? `${mbps(d.kbps)} Mb/s · ${d.secondsBehind.toFixed(1)} s behind${d.dropping ? ' · dropping' : ''}`
+                  ? `${mbps(d.kbps)} Mb/s · ${d.secondsBehind.toFixed(1)} s behind${d.avSkewSeconds != null && Math.abs(d.avSkewSeconds) >= 0.5 ? ` · sound ${Math.abs(d.avSkewSeconds).toFixed(1)} s ${d.avSkewSeconds < 0 ? 'late' : 'early'}` : ''}${d.dropping ? ' · dropping' : ''}`
                   : d.retryInMs != null ? `retrying in ${Math.ceil(d.retryInMs / 1000)} s` : d.error ? `ended: ${d.error}` : d.phase}
               </span>
             </li>
@@ -181,6 +187,7 @@ export function LiveShowPanel() {
           <button key={f} aria-pressed={format.fps === f} className={chip(format.fps === f)} disabled={streaming} onClick={() => changeFormat({ ...format, fps: f })} data-testid={`live-format-fps-${f}`}>{f} fps</button>
         ))}
       </div>
+      {rateLine && <p className="text-[12px] text-text-2" data-testid="live-rate" data-kbps={rates.landscape?.kbps ?? rates.portrait?.kbps ?? 0}>{rateLine}</p>}
       <button className="self-start text-[11px] text-text-2 underline-offset-2 hover:underline disabled:opacity-40" onClick={() => { void runProbe(); }} disabled={streaming} data-testid="live-probe">Check the encoder at this size</button>
       {probe && <p className="text-[12px] text-text-2" data-testid="live-probe-result">{probe}</p>}
       {advice.text && (
@@ -290,4 +297,17 @@ function AddDestination({ onAdd }: { onAdd: (d: LiveDestination, key: string) =>
       </div>
     </form>
   );
+}
+
+const mb = (kbps: number) => `${(kbps / 1000).toFixed(1)} Mb/s`;
+const why = (r: LiveEncodeRate) =>
+  r.limit === 'platform' ? `, ${serviceById(r.by ?? 'other').name} takes up to ${mb(r.kbps)}`
+  : r.limit === 'upload' ? `, under ${mb(r.wanted)} to fit the last stream's upload`
+  : '';
+/** The panel's line of what the stream's picture will be given. */
+function rateText(wide: LiveEncodeRate | null, format: string, tall: LiveEncodeRate | null): string {
+  const parts: string[] = [];
+  if (wide) parts.push(`${format} at ${mb(wide.kbps)}${why(wide)}`);
+  if (tall) parts.push(`portrait at ${mb(tall.kbps)}${why(tall)}`);
+  return parts.length ? `Picture: ${parts.join('; ')}.` : '';
 }

@@ -80,6 +80,14 @@ export function useDeskTabs() {
     }
   }, [commit]);
 
+  /**
+   * Any change to the list, committed and saved as an edit is: the owner's
+   * assistant's Undo of a delete or a reset puts what it took back through it
+   * (app/deskNow.ts), so the restored list reaches the account as a person's
+   * edit would.
+   */
+  const restore = useCallback((change: (t: DeskTab[]) => DeskTab[]) => { commit(change); }, [commit]);
+
   const layout = tabs.find(t => t.id === current)!.layout;
-  return { tabs, tab: current, layout, setTab, update, reset, edit };
+  return { tabs, tab: current, layout, setTab, update, reset, edit, restore };
 }

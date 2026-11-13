@@ -18,7 +18,11 @@ import { rimMask } from '../lib/rimMask';
 export class RimRead {
   private buf: GPUBuffer | null = null;
   private reading: Promise<number> | null = null;
+  private snapshot: Float32Array | null = null;
   constructor(private readonly device: GPUDevice, private readonly disposer: Disposer, private readonly label: string) {}
+
+  /** The last field read, unpadded (L × L × 4 floats), or null before the first. */
+  get data(): Float32Array | null { return this.snapshot; }
 
   /**
    * `encode` downsamples the field into `target` (L × L, rgba32float, rows
@@ -43,11 +47,16 @@ export class RimRead {
     let sum = 0, cells = 0;
     try {
       const f = new Float32Array(buf.getMappedRange());
+      if (!this.snapshot || this.snapshot.length !== L * L * 4) this.snapshot = new Float32Array(L * L * 4);
+      const out = this.snapshot;
       const stride = row / 4;
-      for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
-        if (!rim[i + j * L]) continue;
-        sum += f[j * stride + i * 4];
-        cells++;
+      for (let j = 0; j < L; j++) {
+        out.set(f.subarray(j * stride, j * stride + L * 4), j * L * 4);
+        for (let i = 0; i < L; i++) {
+          if (!rim[i + j * L]) continue;
+          sum += f[j * stride + i * 4];
+          cells++;
+        }
       }
     } finally { buf.unmap(); }
     return sum / Math.max(1, cells);

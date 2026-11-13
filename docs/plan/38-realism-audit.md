@@ -146,11 +146,17 @@ written first. Line numbers are as read on main at d07ac31.
   `src/lib/lampBoil.ts:38-50` already models on the CPU. *Measure:* a plume's rise speed
   against Δρgh²/(12μ); the cooling time from lampBoil's model, the same in every look.
   *Found reading it for the build (2026-10-30), before any of it was built:*
-  - **The heat is not carried on a thin gap.** The temperature lives in the velocity's z,
-    and a thin gap skips the self-advection (`fluid.ts`, step 2's `if (thin) return`), so
-    the lamp's heat stays where it was laid while the flow it drives moves the colour out
-    from under it: a warm patch cannot rise as a thermal, it pushes from a fixed place.
-    The build starts here: carry h·T with the gap's flow, as the dye's amount is carried.
+  - ~~**The heat is not carried on a thin gap.**~~ **Shipped** (38f-1, 2026-11-11): the heat
+    rides the liquid as the colour does, h·T beside h through the thin solve's faces
+    (`carryHeat`, heatPack in `wgsl/fluid/dye.ts`). Story in `docs/plan-shipped.md` §38f-1.
+  - ~~**38f-2. The oil's free energy let a smear of it rest.**~~ **Shipped** (2026-11-11, with
+    38f-1): mixMu's double well is a deep quench, its spinodal 0.05 from either pure liquid
+    (`OIL_SPINODAL`) instead of the quartic's 0.21, so the haze the carried heat's plumes
+    left behind comes apart into the bodies. Story in `docs/plan-shipped.md` §38f-2.
+  - ~~**A standing lamp's cool top.**~~ **Shipped** (27f-9e, 2026-11-12): under a standing
+    plate's lamp the heat crosses the gap to the cool upper glass at π²κ/h² on real seconds
+    (`lampCoolOf`, mixForce), so Lava Lamp's wax cycles. Every other look still cools by
+    Heat Decay on the look's clock (below). Story in `docs/plan-shipped.md` §27f-9e.
   - **The heat runs on the look's clock.** `decayVel` heats at `lampHeat·S.dt` and cools
     at `heatDecay^(4·S.dt)`, and S.dt is the look's step (Speed × 0.2), not seconds. On
     Classic's clock (0.0018 a step against a sixtieth) the default 0.98 is about 115 s in
@@ -261,6 +267,23 @@ written first. Line numbers are as read on main at d07ac31.
     ferrofluid's glint is a fixed key light (with **38j**). The photo style's softbox is a
     print lit from the front and stays. And the lab draws only the derived path, so the
     plain path's rims are checked through the camera's, which shares `meniscus`.
+    *The film's check, written first (2026-11-08):* `npm run nolight -- --owed=film` line
+    15, the camera's bubbles at Iridescence 1 against 0, at Film Physics 0 and 1: no pixel
+    brighter (by over 1), over 0.2% of the picture still moved, and Film Physics 0 the same
+    picture as 1 (one transmitted film; main differs by 31). Main: 22 levels over at
+    Film Physics 0 (`camFilm`'s `0.45 + 1.25 × filmC`), 0 at 1, where it already
+    transmits. A throwaway `camFilm` that returns `mix(1, filmTableAt(filmP, true), irid)`
+    at any Film Physics passed it (10.83% moved at each).
+  - **38h-14. The projector's bubble film still reflects at Film Physics 0** (S, nil; a
+    look change on the looks that set Iridescence over 0.25). Found writing 38h-6's
+    check: the plate's own bubbles at Iridescence 1 against 0 read 51 levels brighter at
+    Film Physics 0 (`cp * (0.45 + 1.25 * filmC)` above Iridescence 0.25, plate.ts's bubble
+    block), 0 at Film Physics 1. A pocket between the glasses throws only the light
+    through its film, so at Film Physics 0 the rainbow wants a transmitted form too (the
+    pale complement, 1 − k·R, never over 1), or Film Physics 0 is kept as the deliberate
+    look it was written as and named so. Owner's call on the looks. *Measure:* `npm run
+    nolight` line 15 prints the projector's number beside the camera's; ask it under
+    line 15's bar when this ships.
   - ~~**38h-4**~~ *shipped 2026-10-31.* The back plate's lamp takes the pigment's grain as
     dye, T^grain (`lampGrain1`), as the front's does. `npm run grainedge` line 4. Story in
     `docs/plan-shipped.md` §38.

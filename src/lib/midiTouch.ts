@@ -67,7 +67,9 @@ export function touchKey(t: MidiTarget): string {
     case 'setting': return `setting:${String(t.key)}`;
     case 'action':  return `action:${t.action}`;
     case 'preset':  return `preset:${t.presetId}`;
+    case 'setlist': return `setlist:${t.index}`;
     case 'dye':     return `dye:${t.paletteIndex}`;
+    case 'voices':  return `voices:${t.tool ?? 'dropper'}`;
   }
 }
 

@@ -2,13 +2,46 @@
 
 Part 2 of 2 of §23; it begins at 23.15. The section starts in `23-selling.md`.
 
-- **23.15** (*later*, the owner 2026-10-24: no Apple sign-in for now; with §12's iPhone
-  app, which needs it beside Google's under App Store guideline 4.8, and the paid Apple
-  Developer account): Sign in with Apple on the site (`APPLE_SIGN_IN`, the Services ID
-  and key in the Firebase console) and native in the iPhone app, and
-  deleting the account inside the app (App Store guideline 5.1.1(v)). The app as the
-  laptop's remote still never asks; 23.14 is how it finds the laptop. *Measure:*
-  `ios.yml`'s build, and on a phone by hand (`docs/judging.md`, next free number).
+- **23.15** (**shipped**, this PR): Sign in with Apple on the site, the Mac app and the phone
+  (the owner, 2026-11-08: "should we add the apple login option as well, now that we have a
+  developer ID?"). `APPLE_SIGN_IN` is on in `SignInScreen.tsx`; the button sits under Google's
+  in the one shared form (the first-visit screen, the profile sheet, the Mac app's licence
+  gate, every phone and tablet layout). Apple asks for the email scope, because the licence is
+  kept under the account's email. In the Mac app the button sends Apple to the browser, as
+  Google's does (the app opens outside addresses in the real browser, so a popup never comes
+  back). An email that already has an account made another way keeps Apple's (or Google's)
+  credential with the email it was refused for and attaches it on the next sign-in of that
+  same address only (closes 23.10e-5). The account sheet lists Apple among the ways in and
+  says when the address is Apple's Hide My Email relay. The owner's half (App ID
+  `app.chromaglass`, Services ID `app.chromaglass.signin`, the key, the provider in Firebase,
+  the relay email source) is in the project's shared files, never the repo. *Measure:*
+  `npm run signin` line 4 (Apple offered, reaches Apple's provider, asks for the email) and
+  11/15 (three buttons fit every screen); judging §113 on the live site.
+  - **23.15a** (open, with §12's iPhone app): native Sign in with Apple in the iPhone app
+    (the `AuthenticationServices` sheet, not the web popup; the App ID already carries the
+    capability) and deleting the account inside the app (App Store guideline 5.1.1(v)). The
+    app as the laptop's remote still never asks; 23.14 is how it finds the laptop.
+    *Measure:* `ios.yml`'s build, and on a phone by hand.
+  - **23.15b** (open): the Mac app could sign in with Apple in its own window through a
+    native `ASAuthorizationController` call in the shell, with Firebase's `signInWithCredential`
+    from the identity token; today it finishes in the browser like Google's.
+  - **23.15c** (open): a buyer who signs in with Apple and hides their email gets a relay
+    address (`…@privaterelay.appleid.com`), and the licence Worker keeps a licence under the
+    address it was bought with, so that account reads Free until they sign in with their own
+    email. The sheet says so (`isApplePrivateRelay`); a fix lets the owner of both addresses
+    join them (the Worker moving `keys:<bought>` to the relay after a confirmed link from the
+    bought address). Apple's relay passes on mail only from senders registered in the owner's
+    Apple account: Firebase's `noreply@chromaglass.firebaseapp.com` is registered with this
+    PR's setup; Lemon Squeezy's receipt and key mail (its sending domain) is not yet, so a
+    buyer who checks out with a relay address may not get the receipt.
+  - **23.15d** (open, from this PR's review): no emulator line drives the linking itself (an
+    Apple sign-in refused because the email has an account, then a sign-in of that address
+    and confirmed email links it, a different address or an unconfirmed one does not). The
+    emulator's fake provider page can do it; `linkWithCredential`'s errors are swallowed, so a
+    broken link (Apple's nonce through `credentialFromError`) would go unseen until then.
+    Also: an account made with only the emailed link cannot pick up the kept credential (the
+    link opens a new page); an "Add Apple / Add Google" button on the account sheet
+    (`linkWithPopup`) would cover it.
 - **23.16** (**shipped**, this PR): one address. Story in `docs/plan-shipped.md` §23.16
   (moved 2026-10-29, 19m).
   - **23.16a** (open): what the forward cannot carry. IndexedDB (`chromaglass-music`: song maps,
@@ -38,7 +71,10 @@ Part 2 of 2 of §23; it begins at 23.15. The section starts in `23-selling.md`.
   owner, 2026-10-25: "The Mac app should check the license. The app won't work for free").
   Story in `docs/plan-shipped.md` §23.17d (moved 2026-10-29, 19m).
 - **23.17e** (**song ID shipped; crash Send owed by the owner**): the Mac app's site is built with `VITE_FINGERPRINT_PROXY_URL` and `VITE_CRASH_REPORT_URL` (the secrets `deploy.yml` uses). The song ID's is set, so the app has song ID now; `VITE_CRASH_REPORT_URL` is empty in this repository, because the report Worker was never deployed (`docs/crash-plan.md` steps 4 and 5: `npm run deploy:reports`, then the secret), so neither the site nor the app shows Send until the owner does that, and the next build of either picks it up. Both Workers' origin lists already name `http://localhost:<port>`. *Measure:* `npm run desktop` reads each address this run was given out of the bundles the app's page loaded and sends that Worker a preflight from the app's origin, asking for the header the app sends (a build that lacks an address its run has fails; with neither, the line skips). The network-off line exempts the two Workers' hosts: with the song ID's address in the build, the tone of the System audio phase makes the music intelligence ask the Worker what is playing, and the guard refuses it.
-- **23.17f. A Google sign-in from the app signs the browser in, not the app.** 23.17d's browser hand-off brings the account's key to the app, which is all the door needs, but the app's window stays signed out, so what needs the account inside it (cloud sync of looks, 13-sync; the profile sheet's name) does not have it. Hand the session over too, with an OAuth loopback sign-in in the browser that returns to the app's server (Google's own way for desktop apps), not a token in a URL. *Measure:* a check signs in with Google in a browser beside the app and reads the app's sheet naming the account.
+- **23.17f** (**shipped**, this PR): a Google or Apple sign-in from the Mac app signs its window in too, by a one-time hand-off through the app's own server (`server/signin-handoff.js`, `src/lib/macSignInHandoff.ts`); the Account sheet leads with the plan and the key found on this machine, signed in or not, and the Google button keeps its name and its real mark (`npm run signin` 25). Story in `docs/plan-shipped.md` §23.17f.
+- **23.17f-1. Prove Apple's hand-off on the live project.** The window rebuilds the browser's credential with `OAuthCredential.fromJSON`; for Google that is an ID token Firebase takes back as is (25 proves it on the emulator). Apple's token from Firebase's popup may carry a nonce only Firebase's handler knows, and then `signInWithCredential` refuses it: the window says so in words ("Your browser signed in, but this window could not follow") and the licence still arrives, as before 23.17f. *Measure:* on the owner's Mac, Continue with Apple from the app's Account sheet, then the sheet names the account; if it fails, carry Apple by a loopback sign-in of the app's own (23.15b) instead.
+- **23.17f-3** (**shipped**, this PR): after a Google or Apple sign-in in the browser, the Mac app's window comes to the front and the browser tab, once the app's server says the window took the sign-in, says done and closes itself (`npm run signin` 25, 25b; `npm run desktop`). Story in `docs/plan-shipped.md` §23.17f-3. *Owed:* the release, then the owner's Mac.
+- **23.17f-2. The emailed link from the Mac app signs in the browser only.** The link opens in the real browser and its one-time code is spent there, so the window stays signed out (the licence still comes across). The Mac app already leads with the password, which signs the window in directly. Either hand the link's sign-in over the way 23.17f hands Google's (the browser posts a fresh credential), or open the link in the app's window from the browser tab (`chromaglass://`). *Measure:* a `signin` line like 25 for the emailed link.
 - **23.17g** (**shipped**, #524): a key opens the Mac app on two Macs, not any number (`src/lib/macSeat.ts`, `server/server-license.js`; `npm run license-worker` 12a–12j). Story in `docs/plan-shipped.md` §23.17g (moved 2026-10-29, 19m-2). *Open:* a seat is lost for good when its Mac dies, is sold or has its data folder wiped, because only that Mac can give it back; the refusal tells the buyer to remove it on a Mac they no longer have, and only a hand edit of KV frees it (the review of #524). Now that every online start refreshes `activatedAt`, the Worker could let a seat unseen for N days be taken when the key is full. Lemon Squeezy sends `order_refunded` for partial refunds too, and the Worker revokes on any of them; read the order's `refunded` or `status` before a refund of an upgrade does this much. The packed app's own line (`desktop`: a third Mac's first start refused) needs a Worker for the app to reach and is not built, so the app's wiring is read through the page code only; and a Mac that never goes online is not counted at all, which no check of a signature can change (23.17h's lease would).
 - **23.17h. A timed lease, if refunds kept offline become a problem.** 23.17d chose no grace period (above). If the owner wants refunds to bite offline, the key the app keeps would carry a renewal date (say 60 days) that each online start renews, and the door would say so a week ahead, never mid-show. The owner's call; not started.
 - **23.17i** (**shipped**, this PR): refunding just an upgrade order takes the buyer's Home key back to them. Found in the review of #494: an upgrade files the Pro key over the Home one under the same id, so the refund of the upgrade dropped the only record and revoked the id, and 23.17d then took the Mac app off the buyer at the next start. The upgrade now keeps what it replaced (`replaces` on the Pro record) and the refund files the Home key again (`refileHome`, `server/license-worker.js`), signed afresh with the Home entitlement (`issuedAt`, `updatesUntil`, `maxMachines`) the buyer bought, rebuilt from the Pro record when it predates `replaces`. It gets a new id (`<proId>_home_<upgradeOrderId>`), not the Pro key's: the Pro token verifies offline for ever, and a Mac holding it keeps it while `/keys` lists its id (`heldKeyRefunded`), so the id has to leave the list and be revoked. Refunding the Home order itself, which the upgrade stood on, still takes every key. *Measured:* `npm run license-worker` 11a–11d; on the old Worker 11a–11c fail (`keys after=0`) and 12a fails for want of the Macs' names (4 of 26 red, 22/26), with the new Worker 26/26. The Worker is deployed by hand from the owner's Mac (the owner's OK first); until it is, the live Worker still refunds as before. An upgrade filed before this change has no `replaces`, and its refund rebuilds the Home key from the Pro record (11c).

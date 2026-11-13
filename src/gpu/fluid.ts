@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
@@ -176,6 +176,8 @@ export class WebGPUFluid extends FluidCover {
         opening steps do.
       */
       ['speciesSplat', [RGBA32], false],
+      // A title's ink carrier (PLAN 37x-10g), only for a show with titles on.
+      ['inkSpecies', [RGBA32], false],
       ['liquidSplat0', [VEL], false],
       ['liquidSplat1', [VEL], false],
       /*
@@ -188,6 +190,7 @@ export class WebGPUFluid extends FluidCover {
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
+      ['bodyLay', [dye], false],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -198,10 +201,10 @@ export class WebGPUFluid extends FluidCover {
       // 9w): only when the governor moves the grid, a few seconds into a
       // show at the earliest, so built behind it.
       ['carryArea', [R32, RGBA32], false],
-      // The clear film (PLAN §20b): no look lays one, so built behind the show.
-      ['filmAdvect', [RGBA32], false],
-      ['filmMu', [R32], false],
-      ['filmUpdate', [RGBA32], false],
+      // The clear film (§20b), if a look lays one (Opening.film).
+      ['filmAdvect', [RGBA32], open.film],
+      ['filmMu', [R32], open.film],
+      ['filmUpdate', [RGBA32], open.film],
       ['filmSplat', [RGBA32], false],
       // The reaction (chemical-clock) and the gel, each on its own
       // full-float grid.
@@ -283,6 +286,8 @@ export class WebGPUFluid extends FluidCover {
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
       // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
       for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      // The sealed bottle's (PLAN 27f-9): waited for where the look opens stood up, whose first step is sealed (opening.ts).
+      for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
       for (const [key, code] of WebGPUFluid.driftBuilds(dye)) add(key, code, false);
     } else {
@@ -307,6 +312,8 @@ export class WebGPUFluid extends FluidCover {
     // opening's first twenty seconds on the Mac: built behind, and `npm run
     // startup` gives each look's opening seconds as well as steps to say so.
     for (const name of ['splatDeltas', 'pourImage']) add(`${name}:${RGBA32}`, splatKernel(name, RGBA32), false);
+    // A song's title poured as ink (PLAN 37x-10), only for a show with titles on.
+    add(`pourInk:${RGBA32}`, splatKernel('pourInk', RGBA32), false);
     // The video pour's (PLAN 14ab-2), only for a show that pours a video.
     add('videoSample:rgba8unorm', splatKernel('videoSample', 'rgba8unorm'), false);
     add(`videoFlow:${RGBA32}`, splatKernel('videoFlow', RGBA32), false);
@@ -387,7 +394,9 @@ export class WebGPUFluid extends FluidCover {
     f[16] = thin ? 1 : fin(p.damping, 0.99); f[17] = fin(p.heatDecay, 0.98); f[18] = thin ? 1000 : MAX_SPEED; f[19] = fin(p.evapFactor, 0); f[20] = fin(p.sharpness, 0);
     i[21] = Math.max(1, Math.min(4, Math.round(fin(p.turbDetail, 1))));
     const upright = Math.max(0, Math.min(1, fin(p.plateUpright, 0)));
-    f[22] = fin(p.currentDamp, 0.98); f[23] = upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
+    // A sealed bottle's heat lift goes round inside the wall (sealWeight), not in the current, whose solve has an open rim (PLAN 27f-9).
+    const sealsHeat = thin && upright > 0.001 && !this.boilLive && this.sealReady();
+    f[22] = fin(p.currentDamp, 0.98); f[23] = sealsHeat ? 0 : upright * fin(p.currentBuoy, 0); f[24] = fin(p.currentGrav, 0); f[25] = fin(p.cometX, 0);
     f[26] = fin(p.meanDensity, 0); f[27] = fin(p.maxCurrent, 0.002);
     // On a thin gap the rock is the dye's weight down the tilted plate (hsBody, ROCK_FALL), not a stir in the current.
     f[28] = thin ? 0 : fin(p.rockX, 0); f[29] = thin ? 0 : fin(p.rockY, 0);
@@ -407,6 +416,10 @@ export class WebGPUFluid extends FluidCover {
     f[49] = p.surfaceClear ? 1 : 0;
     f[50] = fin(p.dimmer, 1) * LAMP_HEATING;
     f[51] = this.coverGap;
+    // The oil's weight and heat swelling (PLAN 27f-9c, OIL_RHO), for mixForce and sealSource; the lamp's glass cooling (27f-9e).
+    const oilRho = oilRhoOf(p.oilWeight);
+    f[52] = oilRho; f[53] = OIL_EXPAND;
+    f[54] = lampCoolOf(this.coverGap * GAP_METRES, p.magnetSeconds);
     this.device.queue.writeBuffer(this.sim, 0, this.simData);
   }
 
@@ -505,6 +518,7 @@ export class WebGPUFluid extends FluidCover {
       under a bubble that had already popped.
     */
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
+    this.stepPlateBoil(enc, p);
     this.air.splat(enc, (label) => this.profiler.renderPass(label));
     /*
       And on the step after the last bubble goes: its hole is a sink in the
@@ -526,6 +540,7 @@ export class WebGPUFluid extends FluidCover {
     this.lastDt = p.dt;
     // The slosh dish, before the step's pass opens: its own pass, whose flow the thin stage reads (PLAN 18a-13).
     this.stepSloshDish(enc, p);
+    this.stepBeside(enc, p);
 
     /*
       One pass, or one per stage.
@@ -752,17 +767,17 @@ export class WebGPUFluid extends FluidCover {
         gap as the dye's weight down the tipped plate, in hsBody, and on the
         old plate through the lasting current.)
 
-        And a lamp under it, just where the plate goes out of view: what
-        sinks there is warmed, rises, cools as it goes and sinks again,
-        which is what keeps a lava lamp going rather than settled.
+        And a lamp at the floor: what sinks there is warmed and rises,
+        and the cold glass above cools it till it sinks (27f-9e).
       */
       const gl = Math.hypot(p.gravityX ?? 0, p.gravityY ?? -1) || 1;
       const gx = upright * (p.gravityX ?? 0) / gl, gy = upright * (p.gravityY ?? -1) / gl;
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)),
-        gx, gy, buoy * DYE_WEIGHT * perSecond, buoy * HEAT_LIFT * perSecond]);
+      // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
+      const sealed = thin && upright > 0.001 && this.sealReady(), wax = buoy * DYE_WEIGHT * perSecond, heatLift = buoy * HEAT_LIFT * perSecond;
+      const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)), gx, gy, sealed ? 0 : wax, sealed ? 0 : heatLift]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
         wgsl/fluid.ts): φ round the ring, from this step's oil, for the
@@ -774,6 +789,7 @@ export class WebGPUFluid extends FluidCover {
       if (thin) this.run(pass, 'rimLaplace', rim, [smooth], args, 1);
       this.run(pass, 'mixForce', this.vel.write, [this.vel.read, mix!.read, this.dye.read, smooth, rim], args);
       this.vel.swap();
+      if (sealed) this.sealWeight(pass, p, mix!.read, upright, gx, gy, wax, heatLift);
       // Film Hold's push: the film between two drops holds them apart (mixFilm).
       const hold = Math.max(0, Math.min(1, p.filmHold ?? 0));
       if (hold > 0.001 && oil > 0.001) {
@@ -837,7 +853,8 @@ export class WebGPUFluid extends FluidCover {
           }
           const built = (name: string) => this.pipelines.hasCompute(`${name}:thin`, WebGPUFluid.liftCode(name));
           if (built('hsOilMean') && built('hsLiftSource') && built('hsLiftRelax')) {
-            lift = -OIL_LIFT * this.coverH2 * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
+            // Signed by the oil's own weight (Oil Weight, PLAN 27f-9c): a wax heavier than the water falls down the tipped plate.
+            lift = -OIL_LIFT * this.coverH2 * oilLightnessOf(p.oilWeight) * seconds / (PLATE_METRES * Math.max(disp, 1e-9));
           }
         }
         this.hsRun(pass, 'hsBody', `hsBody:${this.vel.read.label}:${this.dye.read.label}:${this.squeeze.read.label}:${breathTex.label}:${mixTex.label}:${oilDyeTex.label}`,
@@ -1183,13 +1200,13 @@ export class WebGPUFluid extends FluidCover {
         this.chem.swap();
       }
     });
+    // The lamp's heat, carried with the colour (PLAN 38f, carryHeat).
+    stage('carry heat', (pass) => this.carryHeat(pass, disp, thinAt), thin && !this.boilLive);
     /*
       The grid's checkerboard out of the dye (dampGrid, and why), topped up to
-      GRID_DAMP a step in every look. Isotropic Jacobi diffusion used to take
-      about 8a/(1+8a) of it a step. With physical molecular diffusion
-      Dm ~ 4e-10 m²/s (dm ≈ 0), gridDiff is ~0, so grid damping runs at full
-      nominal strength (GRID_DAMP = 0.05) across all 29 looks that previously had
-      elevated diffusion, keeping high-frequency grid modes smoothly damped.
+      GRID_DAMP a step in every look. Jacobi diffusion took 8a/(1+8a) of it a
+      step; at molecular diffusion (dm ≈ 0) gridDiff is ~0, so the damping
+      runs at full GRID_DAMP in every look.
     */
     const gridDiff = (8 * dm) / (1 + 8 * dm);
     const gridTop = ((p.gridDamp ?? GRID_DAMP) - gridDiff) / (1 - gridDiff);
@@ -1451,7 +1468,7 @@ export class WebGPUFluid extends FluidCover {
           m.swap();
         }
         /*
-          M dt under the explicit limit (1/64 for this stencil), in several
+          M dt under the explicit limit (0.0147 with the deep well, OIL_WELL), in several
           substeps: the flow smears the oil's edge every step and the
           separation has to win it back as fast. Surfactant diffuses at its
           own molecular rate and is kept (soapPlan, PLAN 38c); acidity
@@ -1659,7 +1676,7 @@ export class WebGPUFluid extends FluidCover {
     stage('decay', (pass) => {
       this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], none);
+      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], this.boilLive ? this.arg('decay boil', [1, 0, 0, 0]) : none);
       this.vel.swap();
     });
 

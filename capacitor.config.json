@@ -7,6 +7,10 @@
     "backgroundColor": "#000000",
     "limitsNavigationsToAppBoundDomains": false
   },
+  "android": {
+    "backgroundColor": "#000000",
+    "allowMixedContent": true
+  },
   "experimental": {
     "ios": {
       "spm": {

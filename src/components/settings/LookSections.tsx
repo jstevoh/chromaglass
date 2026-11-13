@@ -467,6 +467,64 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
         <Slider label="Film Physics" value={settings.filmPhysics ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ filmPhysics: v })}
           settingKey="filmPhysics"
         />
+        {/* The frame's own soap film over the plate (PLAN 32d): a film with a
+            thickness that drains under gravity, is blown about by the plate's
+            flow, goes black from the top and is drawn again. Its colour is its
+            thickness's, seen in reflection. Drain Rate runs its clock; Film
+            Angle is where it is seen from (every band moves thicker). */}
+        <Slider label="Soap Film" value={settings.soapFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ soapFilm: v })}
+          settingKey="soapFilm"
+        />
+        {(settings.soapFilm ?? 0) > 0.001 && (
+          <>
+            <Slider label="Drain Rate" value={settings.soapFilmRate ?? 1} min={0.25} max={8} step={0.25} onChange={(v: number) => onUpdate({ soapFilmRate: v })}
+              settingKey="soapFilmRate"
+            />
+            <Slider label="Film Angle" value={settings.soapFilmAngle ?? 0} min={0} max={70} step={1} onChange={(v: number) => onUpdate({ soapFilmAngle: v })}
+              settingKey="soapFilmAngle"
+            />
+          </>
+        )}
+        {/* Glitter suspended in the liquid, and while there is any the lens's
+            stop (PLAN 47e, 47d): the specks ride the gap's flow at their own
+            depth, flip in its shear and glint in the side lamp; off the focal
+            plane (Projector Focus) they are discs of the aperture's shape,
+            and in focus a bright one is a six-pointed star. */}
+        <Slider label="Glitter" value={settings.glitter ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ glitter: v })}
+          settingKey="glitter"
+        />
+        {(settings.glitter ?? 0) > 0.001 && (
+          <Slider label="Lens Stop" value={settings.lensStop ?? 4} min={1.4} max={22} step={0.1} onChange={(v: number) => onUpdate({ lensStop: v })}
+            settingKey="lensStop"
+          />
+        )}
+        {/* The tank seen through its side instead of the dish from above
+            (PLAN 47n): heavy dye falls from a nozzle at the surface, thins to
+            a thread as gravity speeds it and runs along the floor. Tank is
+            its glow; the rest are the nozzle's feed and place, the dye's
+            weight, the floor's drain and the dye's colour. */}
+        <Slider label="Tank" value={settings.tank ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ tank: v })}
+          settingKey="tank"
+        />
+        {(settings.tank ?? 0) > 0.001 && (
+          <>
+            <Slider label="Feed" value={settings.tankFeed ?? 1.5} min={0} max={6} step={0.1} onChange={(v: number) => onUpdate({ tankFeed: v })}
+              settingKey="tankFeed"
+            />
+            <Slider label="Dye Weight %" value={settings.tankWeight ?? 0.5} min={0.05} max={3} step={0.05} onChange={(v: number) => onUpdate({ tankWeight: v })}
+              settingKey="tankWeight"
+            />
+            <Slider label="Nozzle" value={settings.tankNozzle ?? 0.5} min={0} max={1} step={0.01} onChange={(v: number) => onUpdate({ tankNozzle: v })}
+              settingKey="tankNozzle"
+            />
+            <Slider label="Drain" value={settings.tankDrain ?? 1} min={0} max={1} step={0.05} onChange={(v: number) => onUpdate({ tankDrain: v })}
+              settingKey="tankDrain"
+            />
+            <Slider label="Glow Hue" value={settings.tankHue ?? 205} min={0} max={360} step={1} onChange={(v: number) => onUpdate({ tankHue: v })}
+              settingKey="tankHue"
+            />
+          </>
+        )}
       </section>
       )}
     </>
@@ -614,6 +672,15 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           settingKey="lampHotspot"
         />
         <Slider
+          label="Heat"
+          value={settings.heat ?? 0}
+          min={0}
+          max={1.0}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ heat: v })}
+          settingKey="heat"
+        />
+        <Slider
           label="Second Lamp"
           value={settings.secondLamp ?? 0}
           min={0}
@@ -622,6 +689,22 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
           onChange={(v: number) => onUpdate({ secondLamp: v })}
           settingKey="secondLamp"
         />
+        {/* A coloured lamp low beside the dish (PLAN 47b-side): its colour on the
+            dye and on the walls facing it, falling off across the stage, and
+            the glints on the glitter. Its colour and its place while it is on. */}
+        <Slider label="Side Light" value={settings.sideLight ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ sideLight: v })}
+          settingKey="sideLight"
+        />
+        {(settings.sideLight ?? 0) > 0.001 && (
+          <>
+            <Slider label="Side Colour" value={settings.sideLightHue ?? 30} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ sideLightHue: v })}
+              settingKey="sideLightHue"
+            />
+            <Slider label="Side Angle" value={settings.sideLightAngle ?? 160} min={0} max={360} step={5} onChange={(v: number) => onUpdate({ sideLightAngle: v })}
+              settingKey="sideLightAngle"
+            />
+          </>
+        )}
         <Slider
           label="Iridescence"
           value={settings.iridescence ?? 0}
@@ -800,7 +883,7 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
           settingKey="macroAimY"
         />
                 <Info>
-                  Alt-drag (Option-drag) on the plate pans the camera; Alt-click fixes it on the spot under the pointer.
+                  Arrow keys pan the camera (Shift for a whole frame); Alt-drag (Option-drag) on the plate pans it too; Alt-click fixes it on the spot under the pointer.
                   {(settings.macroCamera ?? 'hold') === 'follow' ? ' Follow locks onto the liquid there and rides with it.' : ''}
                   {' '}With Random Evolve on, the aim wanders slowly.
                 </Info>
@@ -826,7 +909,10 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
           settingKey="macroHold"
         />
             )}
+            {/* Honest about what it does: with Frame Sway at 0 the music times Auto's cuts and
+                moves nothing else, so in Hold and Follow there is nothing for it to do until Frame Sway is up. */}
             <Slider
+              disabled={(settings.macroCamera ?? 'hold') !== 'auto' && (settings.frameSway ?? 0) <= 0.001 && 'needs Frame Sway'}
               label="Music Sync"
               value={settings.macroSync ?? 0.6}
               min={0}
