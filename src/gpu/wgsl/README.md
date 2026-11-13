@@ -39,6 +39,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `probe.ts`: brightness probe.
 - `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `slump.ts`: slosh, soap film, lamp-boiling dish, ink slump. `soapFilm.ts`'s setup reads an `ext` face push (binding 8), zero unless written.
 - `soapFilmPlate.ts`: what the plate adds to the soap film (PLAN 32d): `soapAir` (the plate's flow as the film's air), `soapPullState` and `soapPull` (a drained film drawn again, top first); `SOAP_PLATE_KERNELS`, `NOISE_CELLS`. `plateThinFilm.ts` also draws the film (`soapFilmOver`, display bindings 18 and 19: the thickness and `soapFilmLut`, storage buffers because the pass already samples sixteen textures).
+- `tank.ts`: `TANK_KERNELS` (`tankBounds`, `tankDye`, `tankAdvect`, `tankForce`, `tankDiv`, `tankSorRed`, `tankSorBlack`, `tankProject`) and `TANK_UNIFORM_BYTES`: the tank's substep (PLAN 47n), pass for pass the CPU reference's (`lib/tank.ts`); `npm run tankgpu` checks it.
 
 ## Checks
 

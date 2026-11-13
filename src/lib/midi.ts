@@ -315,6 +315,8 @@ const PATCH_MASTERS: ReadonlySet<string> = new Set(['filmDrive', 'filmImpact', '
   'frameSway',
   // Slosh is a hand's alone: the tilt is the owner's, never the room's (lib/slosh.ts).
   'slosh',
+  // Tank is whether the picture is a tank or the dish (PLAN 47n): the whole frame, never the beat's (sceneMap NOT_A_TARGET).
+  'tank',
   ...FADE_CONTROLS.map(c => String(c.key))]);
 export const soundMappable = (key: keyof VisualizerSettings): boolean =>
   LEARNABLE_SETTINGS.some(s => s.key === key) && !PATCH_MASTERS.has(key) && !String(key).startsWith('scene');
