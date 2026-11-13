@@ -222,6 +222,7 @@
     "boilgpu": "PW_WEBGPU=1 node scripts/boilgpu.mjs",
     "plateboil": "node scripts/plateboil.mjs",
     "particles": "node scripts/particles.mjs",
+    "glint": "node scripts/glint.mjs",
     "finite": "node scripts/finite.mjs",
     "derive": "node scripts/derive.mjs",
     "encode": "node scripts/encode.mjs",

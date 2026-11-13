@@ -57,6 +57,9 @@ function halves(data: number[]): ArrayBuffer {
 
 type Lab = {
   solver: WebGPUFluid; L: number; N: number; time: number; cellClock: number;
+  /** The plate a render asked to keep (`keepPlate`), drawn again by the next that asks: the glitter's flakes live on it (PLAN 47e). */
+  kept?: WebGPUPlate;
+  keptReady?: boolean;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
   /** The hands laid this step (layFinger), or null with none down. */
   hands: Float32Array | null;
@@ -448,6 +451,27 @@ const api = {
   async squeeze() { const f = await lab!.solver.readSqueeze(); return f ? { n: f.n, gap: Array.from(f.gap), rate: Array.from(f.rate) } : null; },
   solver() { return lab!.solver; },
   /**
+   * The glitter's flakes on the kept plate, read back: per flake 12 numbers,
+   * (x, y, z, ξ), (radius, aspect, lean, heading), (age, life, generation,
+   * alive) (gpu/wgsl/glint.ts's Speck), x and y in the solver's uv and z in
+   * gap widths. Empty before a kept render with Glitter up (PLAN 47e).
+   */
+  async glintSpecks(count: number) {
+    const l = lab!;
+    const buf = l.kept?.glint['specks'] as GPUBuffer | null | undefined;
+    if (!buf) return [];
+    const device = l.solver['device'] as GPUDevice;
+    const size = count * 48;
+    const read = device.createBuffer({ size, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = device.createCommandEncoder();
+    enc.copyBufferToBuffer(buf, 0, read, 0, size);
+    device.queue.submit([enc.finish()]);
+    await read.mapAsync(GPUMapMode.READ);
+    const out = Array.from(new Float32Array(read.getMappedRange().slice(0)));
+    read.unmap(); read.destroy();
+    return out;
+  },
+  /**
    * The governor moving the grid, as the app's FluidSimulation moves it (PLAN
    * 9w): the old solver hands over, is let go, and a new one on the same
    * device opens cleared and takes the carry. `carry: false` is the move as
@@ -690,12 +714,21 @@ const api = {
         it (npm run pixels, the speckle at dye edges).
       */
       grain?: boolean;
+      /*
+        Draw on the plate the last render that asked kept, not a new one: the
+        glitter's flakes (PLAN 47e) are stepped once a frame on the plate's
+        lens pass and born on its first frame, so a check of how they move
+        draws frames on one plate with the solver stepped between them, as
+        the app's frames are (`npm run glint`).
+      */
+      keepPlate?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
-    const plate = new WebGPUPlate(device, 'rgba8unorm');
+    const plate = (cam.keepPlate && l.kept) || new WebGPUPlate(device, 'rgba8unorm');
+    if (cam.keepPlate && !l.kept) l.kept = plate;
     // The closeup's drop kernels, built behind the show in the app; here before the one frame drawn (PLAN §29a).
-    await plate.drop.prepare();
+    if (plate !== l.kept || !l.keptReady) { await plate.drop.prepare(); if (plate === l.kept) l.keptReady = true; }
     const zoom = cam.zoom ?? 1;
     // The beads' mask: a BeadField itself, drawn on the GPU as the app draws
     // it (PLAN 14ab-6), or a picture of it (its render(), square for rings
@@ -785,7 +818,8 @@ const api = {
     }
     // The closeup's drop surface this frame solved (PLAN §29a), for npm run ferrodrop.
     lastDrop = await plate.drop.read();
-    plate.dispose();
+    // A kept plate lives on for the next render that asks for it (its flakes are on it); a fresh lab drops it.
+    if (plate !== l.kept) plate.dispose();
     return cam.sources ? pictures : pictures.wall;
   },
   /** The ferrofluid drop's surface the last render solved, in l_c, or null if it solved none (PLAN §29a). */

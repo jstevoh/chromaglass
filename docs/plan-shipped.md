@@ -13896,3 +13896,61 @@ digital overlay over a band and was left out. Liquid Light Lab's films were fetc
 owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a video mirror and
 colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
 row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
+
+
+## 47e-47d-1-47b-1. Glitter in the liquid, the lens that photographs it, and a side lamp (2026-11-13)
+
+Asked by the owner after the Microlab films were watched in the page: suspended specks,
+out-of-focus specks as discs, star glints from a stopped-down lens, and a second amber or
+red light raking in from the side over the blue glow, as one PR, modelled as the optics are.
+
+The glitter (47e's flake half). Up to 32,768 flakes (Glitter, 0 to 1), 10 to 50 µm across
+and 3 to 12 % as thick, polystyrene's density, 5 % over water's. They are stepped once a frame
+in the lens pass (`gpu/glint.ts`), not in the solver: they ride the packed `velForced` the
+dye rides, scaled by Poiseuille's 6z(1−z) at their height, by the lead plate's own
+displacement read from its cell clock (lib/detailFlow), so a flake and the dye beside it
+move together however many solver steps a frame took. They turn in Jeffery orbits integrated
+in closed form, tan θ = r tan ξ with ξ advancing by the strain over (r + 1/r) (stepped from
+the equation in node: worst 0.000°, a thin flake within 20° of flat for 90 % of its turn);
+settle by Stokes on the volume-equivalent sphere (0.020 mm/s, about 100 s to cross the
+2 mm gap) and lie flat where they land; and live 40 to 160 s, fading in and out.
+
+The lens (47d-1). Magnification 0.27 × zoom on a 36 mm sensor, Lens Stop f/1.4 to f/22, the
+focal plane at Projector Focus. A flake is drawn as its aperture's image: a disc of
+diameter |z − z_f|·gap·m/(N(1+m)), a hexagon from the six-bladed iris above f/2 and a circle
+wide open, its energy spread over its area in linear light; stopped down its Airy core
+grows (1.22 λ N (1+m)/m, by colour) and six spikes reach out at the share of the light the
+blade edges diffract, fading as the flake leaves focus. Each flake's light is the mirror
+law: the side lamp's and the softbox's (Light Play) rays reflected off its normal, spread by
+the lamp's size and the flake's crinkle (0.15 rad), times 0.85; a flake under the dye is
+filtered by the dye above it, and on a lamp ground it is a dark speck by its shadow.
+
+The side lamp (47b-1). Side Light, Side Colour (default amber, 30°) and Side Angle (160°): a
+lamp 0.35 rad above the stage, 30 cm off, its light refracted into the water by Snell,
+falling off by the inverse square and the slant across the stage, scattered back by the
+pigment (0.35 of it, filtered by the dye; on black a fluorescent dye counts as pale) and
+reflected by the glasses' slopes by Fresnel (3 %), read from the plate's normals.
+
+The pass. At Glitter and Side Light 0 nothing runs and nothing is allocated: the plate
+draws to its target as before, to the byte. Otherwise the display draws, unfinished, into
+the pass's picture, and the lens pass adds the light and lays the finish the display would
+have (`lensFinish`). Desks (Camera and Lamp sections), MIDI, glides, drift's not-the-look
+list and the phone's remote all carry the five dials.
+
+Measured (`npm run glint`, 20 lines): the laws in node; off is off to the byte with every
+other lens dial moved, and Side Light 0.05 is not; under the side lamp the black ground
+rises at most 1 level, the dye gains red over blue (+69.7 against +0.4) and the half toward
+the lamp gains more (69.7 against 59.7, both ways round); on a lamp ground at 4× the dark
+specks at Glitter 1 are about twice those at 0.5 (412 against 216, none at 0); at 8× and
+1024 px the glints cover 3.8 times the pixels wide open as at f/5.6 (5291 against 1388),
+and at f/16 the brightest glint's light along the six spike directions is 326 against 7
+between them, where wide open it is 4; focused on the floor glass the glints at f/5.6 cover
+2442 pixels against 1388 mid-gap. Over eight frames on one plate pushed to +x (the lab's
+`keepPlate` and `glintSpecks`, the flakes read back), mid-gap flakes go 3.64 times as far as
+those by the glass where 6z(1−z) says 3.66, and their travel over 6z(1−z) is 0.0197 of the
+plate against the dye's own 0.0198. One check-skeptic pass found that every line drew a
+single frame of newborn flakes (the step shader never measured), that "none at 0" compared
+a picture with itself, and that nothing could see the pass's picture upside down or the
+lamp's hue ignored; each is now a line. Found doing it: 47b-2 (the side lamp casts no
+shadows), 47b-3 (sources and the kaleidoscope draw without the pass), 47d-2 (discs and stars
+only on the glitter), 47e-1 (microbubbles), 47e-2 (the orbit constant and rebirth shortcuts).

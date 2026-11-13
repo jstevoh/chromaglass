@@ -2722,3 +2722,28 @@ seen here.
    (as if the film were thicker). **Drain Rate** at 4: everything above happens four times as fast.
 5. On another look, Soap Film at 0: the look exactly as before.
 
+
+## 128. Glitter, the lens and a side lamp (PLAN 47e, 47d-1, 47b-1)
+
+The check (`npm run glint`) proves the laws, that off is off to the byte, that the side lamp
+lights the dye from its side and leaves black black, that glitter darkens a lamp ground in
+proportion, and that the lens spreads specks into discs wide open and draws six-pointed stars
+stopped down, on the lab's software WebGPU at one frame. How it moves at sixty frames is
+only seen here.
+
+1. Open a blue-glowing look on black. Settings → Lamp & Light → **Side Light** to 0.6. Good:
+   the dye's near side takes on an amber sheen, the slopes of fronts and blobs facing the lamp
+   catch it, the ground stays black. Bad: the whole frame tinted, a hard line across the plate,
+   or the far side as bright as the near.
+2. **Side Angle** round the dial: the lit side should walk round the plate. **Side Colour** to
+   magenta: the sheen follows.
+3. Settings → Camera → **Glitter** to 0.5, then zoom into the closeup with Light Play up. Good:
+   pin-point glints scattered through the liquid that drift with the dye (not across it),
+   flashing on and off as the flakes turn, thickest where the flow shears. Bad: glints sliding
+   over still dye, all flashing at once, or a frozen field.
+4. **Lens Stop** to 1.4: out-of-focus specks swell into soft round discs; move **Projector
+   Focus** and different specks come sharp. Lens Stop to 16: the discs shrink to small hexagons
+   and the brightest glints grow six-pointed stars. Bad: square or cross-shaped stars, or stars
+   on every speck alike.
+5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
+6. Glitter and Side Light at 0 on any look: the look exactly as before.

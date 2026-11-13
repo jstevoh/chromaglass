@@ -27,6 +27,7 @@ import { DROP_KERNELS } from './wgsl/ferroDrop';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
 import { soapFilmLut } from '../lib/soapFilm';
+import { PlateGlint } from './glint';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -135,6 +136,8 @@ export class WebGPUPlate {
   readonly drop: FerroDrop;
   /** The oil beads' mask, drawn here from their list rather than uploaded as a picture (PLAN 14ab-6). */
   readonly beads: BeadMask;
+  /** Glitter in the liquid, the lens photographing it, the side lamp (PLAN 47e, 47d, 47b-side): a pass after the display, when asked for. */
+  readonly glint: PlateGlint;
 
   private layers: LayerTargets[] = [];
   private sources = new Map<string, Source>();
@@ -184,6 +187,8 @@ export class WebGPUPlate {
       ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
+      // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
+      ...PlateGlint.prepare(cache, device, format, picture),
       // Into a texture rather than the canvas: the camera's, in the canvas's
       // format, and the film stock's picture.
       ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
@@ -196,6 +201,7 @@ export class WebGPUPlate {
     this.pack = new UniformPack(PLATE_LAYOUT);
     this.drop = new FerroDrop(device, this.pipelines, this.disposer);
     this.beads = new BeadMask(device, this.pipelines, this.disposer);
+    this.glint = new PlateGlint(device, this.pipelines, this.disposer);
     this.sampler = device.createSampler({
       magFilter: 'linear', minFilter: 'linear',
       addressModeU: 'clamp-to-edge', addressModeV: 'clamp-to-edge',
@@ -346,7 +352,20 @@ export class WebGPUPlate {
     const grid = fields[0].dye.width;
     this.ensureLayers(fields.length, grid);
     this.drawBeads(encoder);
+    /*
+      The lens pass (gpu/glint.ts), when Glitter or Side Light is up and its
+      pipelines and the flipped display's are there: the display then draws
+      into the pass's own picture without its finish, and the pass lays the
+      finish (lensFinish, which fillPlateUniforms sets to what the display's
+      would have been). Otherwise not a byte of this frame differs.
+    */
+    const lensOn = PlateGlint.wanted(this.pack)
+      && this.glint.ready(format, toTexture, this.pack.get('glitter')[0] > 0.001)
+      && !!this.pipelines.renderPipeline(displayName(format, true), displayRecipe(this.device, format, true));
+    const finish = this.pack.get('finishInMain')[0];
+    if (lensOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
+    if (lensOn) this.pack.set('finishInMain', finish);
     // The pack's one number is the grid, which changes with a rung and not
     // with a frame: written when it does, not sixty times a second (14ab-5).
     if (grid !== this.packGrid) {
@@ -423,6 +442,11 @@ export class WebGPUPlate {
       this.auxSize = [size.width, size.height];
     }
 
+    if (lensOn) {
+      this.display(encoder, this.glint.sceneView(size.width, size.height, format), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, format);
+      this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
+      return;
+    }
     this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
   }
 

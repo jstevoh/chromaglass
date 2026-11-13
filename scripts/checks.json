@@ -1347,6 +1347,23 @@
       ]
     },
     {
+      "name": "Glitter, the lens and the side lamp",
+      "shard": "lab4",
+      "run": "npm run glint",
+      "timeout": 12,
+      "why": [
+        "PLAN 47e, 47d-1, 47b-1 (gpu/glint.ts, lib/glint.ts): the laws in node (Poiseuille's",
+        "profile, the Jeffery orbit stepped from its equation, Stokes settling, the defocus",
+        "disc and Airy core, the side lamp's falloff, the flake's mirror law); then the real",
+        "shaders in the lab: off is off to the byte with every other lens dial moved; the side",
+        "lamp leaves black black, colours the dye, and lights the half toward it more both ways",
+        "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
+        "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
+        "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
+      ]
+    },
+    {
       "name": "The soap film on the plate",
       "shard": "lab3",
       "run": "npm run soapplate",

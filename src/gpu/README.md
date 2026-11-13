@@ -25,6 +25,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.
 - `ferroDrop.ts`: the closeup's ferrofluid drop.
 - `fluid/`: the solver's class chain, six files.
+- `glint.ts`: `PlateGlint`, the plate's lens pass (PLAN 47e, 47d-1, 47b-1): the glitter's flakes stepped on the dye's flow and splatted through the lens, and the side lamp, run after the display only while Glitter or Side Light is up (`WebGPUPlate.glint`; `npm run glint`).
 - `groupCache.ts`: `groupOf`, `viewOf`: bind groups and views made once.
 - `opening.ts`: pipelines the opening look needs.
 - `output.ts`: projector pass: mirror, keystone, blanking, grade.
