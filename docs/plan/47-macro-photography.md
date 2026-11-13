@@ -392,7 +392,32 @@ The physics, in the order to build (each its own thread and PR):
   looks (Macro Bead's beads already read 1.04%). *Measure:* edge width on Splodascope's take
   under 1.6% of the width, from the optics, never a drawn outline.
 
-Each lands as a watched take against this reference (`--vs lll-oscilloscope-vectors`), the
+Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
+page, add one build and a note:
+
+- **47z-5. A crowd packed past touching becomes polygons.** `cosmo-packed-foam-cells`
+  (`--to 4.7 --crop 0.05,0.2,0.9,0.62`): pale cells pressed into polygons, thin films meeting
+  in threes, rust-red dye collected in the borders. That is a packed emulsion or a foam held
+  by the films of 47z-3: past about nine tenths of the area the drops can no longer stay
+  round, each film is flat at the drops' pressure difference, and three films meet at 120°
+  (Plateau's laws, here in the plane of the gap); the dye of the continuous liquid is
+  squeezed out of the films into the borders, thickest where three meet. Splodascope's
+  photograph ("packed edge to edge") is the same crowd at a lower fill. *Build:* after 47z-3,
+  pack held drops past nine tenths and see whether the field forms flat films and three-way
+  junctions; where the Cahn–Hilliard edge (two to five cells, 28k-2's shortcut (a)) rounds
+  the junctions off, that edge is what to replace. *Measure:* at nine tenths fill, nine in
+  ten junctions are three-way and their angles 120° within 10°; the continuous liquid's dye
+  per area is higher in the borders than in the films by their width ratio.
+- **The magnet beside the drops.** `cosmo-ferro-maze-drops` (`--crop 0,0.22,1,0.53`):
+  ferrofluid in a thin cell as a labyrinth where it is thick and a lattice of fine dots at a
+  drop's thin rim, beside large orange drops; stripes against dots by the fill and the
+  magnetic Bond number is **38d** (the dipolar sheet), §09 the rest. Its vivid colour
+  (colourfulness 114) is on a bright ground (luminance 0.52), so 47z-1's measure is the
+  colour itself, not a darker ground. Its white crescents are a ring light reflected in the
+  domed drops: a camera over a lit dish, not a projection (§09's note on speculars, 47e).
+
+Each lands as a watched take against its reference (`--vs lll-oscilloscope-vectors`, `--vs
+cosmo-packed-foam-cells` for 47z-5), the
 number it moves printed before and after.
 
 ## Order
@@ -402,6 +427,6 @@ lighting term on the bend the plate already computes, the biggest change to the 
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
 47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
-as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
+as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4, 47z-5 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12). Each its own thread
 and PR.
