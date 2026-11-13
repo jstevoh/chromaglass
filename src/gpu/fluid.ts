@@ -144,31 +144,30 @@ export class WebGPUFluid extends FluidCover {
       ['curl', [R32], open.vorticity],
       ['confine', [VEL], open.vorticity],
       // The mix (soap-film), always full float, and its surface tension on
-      // the dye as well as on itself.
+      // the dye as well as on itself. Its own steps also run from the first
+      // step of a look that laid oil (Opening.oil, which has the story).
       ['marangoniFlux', [dye, RGBA32], open.mix],
-      ['mixSplat', [RGBA32], open.mix],
+      ['mixSplat', [RGBA32], open.mix || open.oil],
       // The mix's carry on the old plate; on a thin gap it is carried in
       // substeps (mixAdvectSub, below), so a look opening on one never asks.
-      ['mixAdvect', [RGBA32], open.mix && !open.thinGap],
-      ['mixRelax', [RGBA32], open.mix],
-      ['mixMu', [RGBA32], open.mix],
-      ['mixUpdate', [RGBA32], open.mix],
+      ['mixAdvect', [RGBA32], (open.mix || open.oil) && !open.thinGap],
+      ['mixRelax', [RGBA32], open.mix || open.oil],
+      ['mixMu', [RGBA32], open.mix || open.oil],
+      ['mixUpdate', [RGBA32], open.mix || open.oil],
       /*
         Oil Bodies, and the oil's smoothed shape that its reach and the
-        oil's surface tension (mixForce) both read: built behind the show,
-        like mixForce. They were first waited for whenever a look with Oil
-        Bodies opened the show, and `npm run startup` on Metal failed it:
-        Oil & Water, opened on its own, asked for none of the six in its
-        first forty steps, because nothing runs them until oil has been
-        poured, and the opening's rule is to wait only for what a look's
-        first steps use. Behind the show they are ready some fifteen
-        seconds after it opens, as mixForce always has been.
+        oil's surface tension (mixForce) both read. Nothing runs them until
+        there is oil on the plate, so the settings alone make no look wait
+        (`npm run startup` failed that: Oil & Water, nothing poured, asked
+        for none of the six in forty steps, and builds them behind the
+        show). A look's own oil, laid with it, does (PLAN 27f-9m,
+        Opening.oilPull and oilBodies), and so does a standing plate, whose
+        dye's weight runs the mix force from its first step
+        (Opening.gravity).
       */
-      // Except on a look that stands the plate up, whose dye's weight runs
-      // the mix force from its first step (Opening.gravity).
-      ['mixSmooth', [R32], open.gravity],
+      ['mixSmooth', [R32], open.gravity || open.oilPull],
       // The oil's pressure along the open rim, which mixForce reads (PLAN 18g-6): with it, as it runs with it.
-      ['rimLaplace', [R32], open.gravity],
+      ['rimLaplace', [R32], open.gravity || open.oilPull],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -187,9 +186,9 @@ export class WebGPUFluid extends FluidCover {
       */
       ['bodyAdvect', [dye], open.maze && !open.thinGap],
       ['bodyAdvectThin', [dye], open.maze && open.thinGap],
-      ['bodyPartition', [dye], false],
-      ['bodyUnspread', [dye], false],
-      ['bodyLand', [dye], false],
+      ['bodyPartition', [dye], open.oilBodies],
+      ['bodyUnspread', [dye], open.oilBodies],
+      ['bodyLand', [dye], open.oilBodies],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -243,11 +242,10 @@ export class WebGPUFluid extends FluidCover {
       // drain. None was seen in a look's first steps, the mix's and the
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
-      ['mixForce', [VEL], open.gravity],
-      // Film Hold's push: built behind the show, as the oil's other kernels
-      // are (no look opens with it in its first steps' set; startup fails one
-      // waited for and never run).
-      ['mixFilm', [VEL], false],
+      ['mixForce', [VEL], open.gravity || open.oilPull],
+      // Film Hold's push, inside the mix force: waited for where that runs
+      // at once with it on (Splodascope, Opening.filmHold), else built behind.
+      ['mixFilm', [VEL], open.filmHold],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -277,14 +275,14 @@ export class WebGPUFluid extends FluidCover {
     */
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
-      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
+      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix || open.oil);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
       // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
-      // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
-      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show; the lift waits for it.
+      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.oilLift && name.startsWith('hs'));
       // The sealed bottle's (PLAN 27f-9): waited for where the look opens stood up, whose first step is sealed (opening.ts).
       for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.

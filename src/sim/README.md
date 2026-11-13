@@ -10,7 +10,8 @@ the component.
 
 - `fluidSimulation.ts` (194 KB, grep it): `FluidSimulation`, one layer: its seeding
   (`seedPreset`), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
-  `dropGpu`, `syncFromGpu`).
+  `dropGpu`, `syncFromGpu`). `wait.pending` (`mixWait.ts`) says whether a look's oil waits for that solver,
+  which the show asks before it builds its pipelines (`gpu/opening.ts`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
 - `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom, Turing's rates, the currents.
@@ -33,6 +34,7 @@ the component.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
+- `mixWait.ts`: `mixWait()` (a look's oil laid before its solver is built: kept, played onto the solver when it attaches, put back if that solver goes before it has spoken, dropped on a clear or when a carry holds it; PLAN 27f-9m, `npm run oillaid`).
 - `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).
 - `speciesPoll.ts`: `SpeciesPoller` (`speciesShare` and `speciesSnapshot` polled once a second on a thin gap) and `stepPlateBubbles` (handing the snapshot to `BubbleField` on a thin gap and stepping the bubbles).
 - `stepping.ts`: the step's pinned grid, timings, `?prepare=0` and recovery switches,
