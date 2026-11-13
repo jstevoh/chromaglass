@@ -49,6 +49,7 @@ import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
+import { soapFilmStep } from '../gpu/soapFilmPlate';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -1782,8 +1783,7 @@ export class FluidSimulation {
       }
 
       case 'soap-film': {
-        // One unbroken sheet. Everything this preset does it does by tearing
-        // holes in that sheet, so the seed is the sheet and nothing else.
+        // The film is the frame's own (32d); this is the dye seen through it.
         for (let i = 0; i < 3; i++) {
           const c = col(i);
           this.splatBlob(cx + this.rng.centred() * S * 0.28, cy + this.rng.centred() * S * 0.28,
@@ -3390,8 +3390,7 @@ export class FluidSimulation {
         No stir for the look's motor (PLAN 22j). The current had one, a
         swirl round the middle at rotationSpeed × 30, fastest at the centre
         and nothing at the rim: a stand-in from when the motor turned the
-        picture rigidly and nothing else made the liquid go round. The motor
-        turns the dish now (22h, dishFrame), and a dish turning steadily
+        picture rigidly. The motor turns the dish now (22h, dishFrame), and a dish turning steadily
         under its liquid drags it round through the gap until it turns with
         the glass, after which there is nothing left to stir: the picture
         turns, and the liquid in it is still. What the glass does to the
@@ -3420,6 +3419,7 @@ export class FluidSimulation {
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
       heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
       boilHolds: this.boilHolds,
+      ...soapFilmStep(settings, this.layerIndex),
     };
   }
 

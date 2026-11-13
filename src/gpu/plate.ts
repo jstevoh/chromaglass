@@ -26,6 +26,7 @@ import { groupOf, viewOf } from './groupCache';
 import { DROP_KERNELS } from './wgsl/ferroDrop';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
+import { soapFilmLut } from '../lib/soapFilm';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -154,6 +155,15 @@ export class WebGPUPlate {
   private readonly blank: GPUTexture;
   /** The same, for the packed view (unsigned integers). */
   private readonly blankU: GPUTexture;
+  /**
+   * The frame's soap film (PLAN 32d): a 16-byte stand-in bound where no layer
+   * holds a film (the shader reads its length, 4, and draws nothing), and the
+   * film's reflected colour by thickness (soapFilmLut), made the first time a
+   * film is drawn. Storage buffers, not textures: the display pass already
+   * samples WebGPU's sixteen.
+   */
+  private readonly blankStore: GPUBuffer;
+  private soapLut: GPUBuffer | null = null;
   /** The same, for the species field (rgba32float). */
   private readonly blankSpecies: GPUTexture;
 
@@ -208,6 +218,7 @@ export class WebGPUPlate {
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
     }));
     device.queue.writeTexture({ texture: this.blankU }, new Uint32Array(4), { bytesPerRow: 16 }, [1, 1]);
+    this.blankStore = this.disposer.track(device.createBuffer({ label: 'plate blank store', size: 16, usage: GPUBufferUsage.STORAGE }));
     this.blankSpecies = this.disposer.track(device.createTexture({
       label: 'blank species', size: [1, 1], format: 'rgba32float',
       usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
@@ -319,7 +330,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -454,7 +465,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -485,7 +496,7 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
@@ -504,6 +515,12 @@ export class WebGPUPlate {
     const air = (i: number) => fields[i]?.air ?? this.blank;
     // The front plate's physics, packed (packView), or zeros before a step has run.
     const view = (i: number) => fields[i]?.view ?? this.blankU;
+    const soap = fields[0]?.soapFilm?.h ?? null;
+    if (soap && !this.soapLut) {
+      const lut = soapFilmLut();
+      this.soapLut = this.disposer.track(this.device.createBuffer({ label: 'soap film colour', size: lut.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
+      this.device.queue.writeBuffer(this.soapLut, 0, lut);
+    }
     const pass = encoder.beginRenderPass({
       label: 'plate',
       colorAttachments: [
@@ -521,6 +538,7 @@ export class WebGPUPlate {
       grain(0), grain(1),
       this.source('film'), this.source('mark'), this.source('beads'),
       parts(0), parts(1), air(0), air(1), view(0),
+      soap ?? this.blankStore, (soap && this.soapLut) || this.blankStore,
     ]));
     pass.draw(6);
     pass.end();

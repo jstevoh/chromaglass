@@ -9,6 +9,7 @@ import { kernel } from '../wgsl/fluid';
 import { STATS_GROUPS } from '../wgsl/stats';
 import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
+import type { SoapFilmPlate } from '../soapFilmPlate';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -101,6 +102,8 @@ export class FluidCore {
   /** The dish is to be laid level before its next step: it was driven by nothing for a while, or has just been made. */
   protected sloshLevel = true;
   protected sloshTex: GPUTexture | null = null;
+  /** The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts): made when Soap Film is first up, null on every other look. */
+  protected soapPlate: SoapFilmPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;

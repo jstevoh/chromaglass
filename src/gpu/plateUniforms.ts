@@ -23,6 +23,7 @@ import { MAGNET_RADIUS } from './wgsl/magnetDisc';
 import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
+import { SOAP } from '../lib/filmTable';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
@@ -343,6 +344,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('thinFilm', clamp01(s.thinFilm ?? 0));
     // Not clamp01 alone: it passes NaN, and ?set=filmPhysics=x is how the owner is asked to try it.
     pack.set('filmPhysics', Number.isFinite(s.filmPhysics) ? clamp01(s.filmPhysics) : 0);
+    // The frame's soap film (PLAN 32d): its reflection, and Snell's law for the angle it is seen at.
+    pack.set('soapFilm', Number.isFinite(s.soapFilm) ? clamp01(s.soapFilm) : 0);
+    const sinT = (SOAP.n0 / SOAP.n1) * Math.sin((Math.max(0, Math.min(80, s.soapFilmAngle || 0)) * Math.PI) / 180);
+    pack.set('soapCosT', Math.sqrt(1 - sinT * sinT));
   }
   {
     // Lumia and gel colours come from the working harmony, so they

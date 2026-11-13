@@ -795,6 +795,14 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
             <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
           )}
+          {/* The frame's soap film (PLAN 32d), and while it is up its clock and the angle it is seen at, as on the desk. */}
+          <Slider label="Soap Film" field="soapFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('soapFilm') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.soapFilm ?? 0) > 0.001 && (
+            <>
+              <Slider label="Drain Rate" field="soapFilmRate" step={0.25} format={(v) => `${v.toFixed(2)}×`} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
           {/*
             And, by the same rule, Pushes Dye only while there is ferrofluid
             on the plate to do the pushing.
