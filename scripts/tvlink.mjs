@@ -37,9 +37,14 @@ const stubAuth = {
   name: 'stub-auth',
   setup(b) {
     b.onResolve({ filter: /lib\/firebaseAuth$|^\.\/firebaseAuth$|^\.\.\/\.\.\/lib\/firebaseAuth$/ }, () => ({ path: 'stub-auth', namespace: 'stub' }));
-    b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({
-      contents: `export const getCurrentUserEmail = async () => 'fan@example.com';
-                 export const getCurrentIdToken = async () => 'id-token-of-fan';`,
+    // The sign-in form is never shown to a signed-in player, but a build with a key
+    // bundles it, and it starts Firebase when its module loads: stubbed the same way.
+    b.onResolve({ filter: /^\.\.\/SignInScreen$/ }, () => ({ path: 'stub-signin', namespace: 'stub' }));
+    b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({
+      contents: a.path === 'stub-signin'
+        ? `export const SignInForm = () => null;`
+        : `export const getCurrentUserEmail = async () => 'fan@example.com';
+           export const getCurrentIdToken = async () => 'id-token-of-fan';`,
       loader: 'js',
     }));
   },
@@ -59,7 +64,10 @@ const out = await build({
   jsx: 'automatic',
   plugins: [stubAuth],
   define: {
-    'import.meta.env.VITE_FIREBASE_API_KEY': '""',
+    // A key, as the site's build has: the page reaches the account (and the form) only
+    // in a build with one, so a build without one carries no Firebase (`npm run signin`,
+    // 1a). With "" here the page stopped at its sign-in step and every check below timed out.
+    'import.meta.env.VITE_FIREBASE_API_KEY': '"test-key"',
     'import.meta.env.VITE_FIREBASE_LICENSES_URL': '"https://licence.test/keys"',
     'process.env.NODE_ENV': '"production"',
   },
