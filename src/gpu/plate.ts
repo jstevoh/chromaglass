@@ -102,11 +102,11 @@ function deriveRecipe(device: GPUDevice): RenderRecipe {
   });
 }
 
-function displayName(format: GPUTextureFormat, toTexture: boolean): string {
-  return `display ${format}${toTexture ? ' flipped' : ''}`;
+function displayName(format: GPUTextureFormat, toTexture: boolean, aux = false): string {
+  return `display ${format}${toTexture ? ' flipped' : ''}${aux ? ' aux' : ''}`;
 }
 
-function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean): RenderRecipe {
+function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean, aux = false): RenderRecipe {
   return (module) => {
     const code = plateWgsl(DISPLAY_MAIN);
     return {
@@ -118,7 +118,7 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
         // The fragment stage needs to know too: an override is set per stage,
         // and without it the fragment read FLIP_Y as 1 on both paths.
         module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
-        targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }],
+        targets: aux ? [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] : [{ format }],
       },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     };
@@ -194,12 +194,16 @@ export class WebGPUPlate {
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
       ...PlateGlint.prepare(cache, device, format, picture),
       // And the display it draws under, flipped into its half-float picture (unless that is one of the two below).
+      // The lens pass reads the aux, so this one keeps its second target (H2c-6).
       ...(format === GLINT_SCENE_FORMAT || picture === GLINT_SCENE_FORMAT ? []
-        : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true), displayRecipe(device, GLINT_SCENE_FORMAT, true), true)]),
-      // Into a texture rather than the canvas: the camera's, in the canvas's
-      // format, and the film stock's picture.
-      ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
-        !((f === format && open.camera) || (f === picture && open.stock)))),
+        : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(device, GLINT_SCENE_FORMAT, true, true), true)]),
+      // Into a texture rather than the canvas: the film stock's picture (and
+      // the projector's) with one target, the camera's with two (H2c-6: the
+      // camera pass alone reads the second, so the opening builds the variant
+      // its first frame draws and leaves the other for later).
+      ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true, false), displayRecipe(device, f, true, false),
+        !(f === picture && open.stock && !open.camera))),
+      cache.renderPrep(displayName(format, true, true), displayRecipe(device, format, true, true), !open.camera),
     ];
   }
 
@@ -369,7 +373,7 @@ export class WebGPUPlate {
     const wanted = PlateGlint.wanted(this.pack);
     const lensOn = wanted
       && this.glint.ready(format, toTexture, this.pack.get('glitter')[0] > 0.001)
-      && !!this.pipelines.renderPipeline(displayName(GLINT_SCENE_FORMAT, true), displayRecipe(this.device, GLINT_SCENE_FORMAT, true));
+      && !!this.pipelines.renderPipeline(displayName(GLINT_SCENE_FORMAT, true, true), displayRecipe(this.device, GLINT_SCENE_FORMAT, true, true));
     // Both dials back at 0: the pass's pictures and flakes go (a 4K frame's two are about 100 MB).
     if (!wanted && this.glint.holding) this.glint.release();
     const finish = this.pack.get('finishInMain')[0];
@@ -452,26 +456,42 @@ export class WebGPUPlate {
 
     // ── Display ─────────────────────────────────────────────────────
 
-    // The second target is what the camera pass reads: the normal, the dye's
-    // height and the bubble mask. It is written whether or not that pass is
-    // on, because a render pass has to be given somewhere to put it.
-    if (!this.aux || this.auxSize[0] !== size.width || this.auxSize[1] !== size.height) {
-      if (this.aux) this.disposer.release(this.aux);
-      this.aux = this.disposer.track(this.device.createTexture({
-        label: 'aux', size: [size.width, size.height], format: 'rgba8unorm',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-      }));
-      this.auxSize = [size.width, size.height];
-    }
+    /*
+      The second target holds what the camera pass reads: the normal, the
+      dye's height and the bubble mask. The lens pass (glitter, side light)
+      reads it too, and the tank's draw writes it, so the aux lives while any
+      of the three is up and not otherwise: with the camera off a frame of
+      2560x1600 no longer writes 16 MB nothing reads, and an aux made for the
+      camera is let go the frame after it (H2c-6). The camera's state is the
+      plate's own uniform, which LiquidVisualizer fills with `!!cam`.
+    */
+    const tank = fields[0]?.tank;
+    this.keepAux(size, this.pack.get('cameraOn')[0] > 0.5 || lensOn || !!tank);
+    const aux = this.aux ? viewOf(this.aux) : null;
 
     // The tank's side view (PLAN 47n) draws in the plate's place when its look is up.
-    if (drawTank(this.device, this.pipelines, encoder, target, viewOf(this.aux), fields[0]?.tank, size, timestamps, toTexture, format, this.trackBuf)) return;
-    if (lensOn) {
-      this.display(encoder, this.glint.sceneView(size.width, size.height), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, GLINT_SCENE_FORMAT);
+    if (aux && drawTank(this.device, this.pipelines, encoder, target, aux, tank, size, timestamps, toTexture, format, this.trackBuf)) return;
+    if (lensOn && aux && this.aux) {
+      this.display(encoder, this.glint.sceneView(size.width, size.height), aux, this.uniformBuffer, fields, timestamps, true, GLINT_SCENE_FORMAT);
       this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
       return;
     }
-    this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
+    this.display(encoder, target, aux, this.uniformBuffer, fields, timestamps, toTexture, format);
+  }
+
+  /** Make the aux at the frame's size when `wanted`, let it go when not (H2c-6). */
+  private keepAux(size: { width: number; height: number }, wanted: boolean): void {
+    if (!wanted) {
+      if (this.aux) { this.disposer.release(this.aux); this.aux = null; this.auxSize = [0, 0]; }
+      return;
+    }
+    if (this.aux && this.auxSize[0] === size.width && this.auxSize[1] === size.height) return;
+    if (this.aux) this.disposer.release(this.aux);
+    this.aux = this.disposer.track(this.device.createTexture({
+      label: 'aux', size: [size.width, size.height], format: 'rgba8unorm',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    }));
+    this.auxSize = [size.width, size.height];
   }
 
   /** The uniforms for a projector's plate source, to fill with `fillPlateUniforms` before `drawSource`. */
@@ -532,14 +552,15 @@ export class WebGPUPlate {
   private display(
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
-    auxView: GPUTextureView,
+    auxView: GPUTextureView | null,
     uniforms: GPUBuffer,
     fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
   ): void {
-    const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
+    const aux = auxView !== null;
+    const display = this.pipelines.renderPipeline(displayName(format, toTexture, aux), displayRecipe(this.device, format, toTexture, aux));
     if (!display) return;
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
@@ -559,12 +580,15 @@ export class WebGPUPlate {
       this.soapLut = this.disposer.track(this.device.createBuffer({ label: 'soap film colour', size: lut.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }));
       this.device.queue.writeBuffer(this.soapLut, 0, lut);
     }
+    const colorAttachments: GPURenderPassColorAttachment[] = [
+      { view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } },
+    ];
+    if (auxView) {
+      colorAttachments.push({ view: auxView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } });
+    }
     const pass = encoder.beginRenderPass({
       label: 'plate',
-      colorAttachments: [
-        { view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } },
-        { view: auxView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } },
-      ],
+      colorAttachments,
       // The frame's own timing goes on the pass that draws it, not on the
       // clear that used to stand in for it.
       timestampWrites: timestamps,

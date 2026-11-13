@@ -14129,3 +14129,27 @@ seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89;
 140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).
 On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
 131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
+
+## H2c-6. No aux target while the camera is off (2026-11-13)
+
+`WebGPUPlate.draw` (`src/gpu/plate.ts`) allocated a frame-size `rgba8unorm` aux texture and
+the display pass wrote it every frame, though only the camera pass reads it: 4 bytes a pixel,
+about 16 MB a frame at 2560x1600 with the camera off. The plate now reads the camera's state
+from its own uniforms (`this.pack.get('cameraOn')`, which `LiquidVisualizer` already fills with
+`!!cam`), so `draw`'s signature is as it was. `displayName` and `displayRecipe` take an `aux`
+flag: with it, the display pipeline has two colour targets (the picture and the aux); without
+it, one, and the render pass is given one colour attachment (a pipeline built for two targets
+rejects a pass with one, which is a black screen). `keepAux` makes the aux when it is wanted
+and lets it go when it is not, so one made for the camera is released the frame after the
+camera goes off, and `auxTarget` is null while it is. The aux is wanted while the camera is on,
+while the lens pass (glitter, side light: it samples the aux) is up, and while the tank's draw
+is up (its own pipeline writes a second target). `WebGPUPlate.prepare` builds the one-target
+display for the stock's picture and the two-target one for the camera (and the lens pass's
+scene), each behind the show's opening only where the opening's first frame draws it.
+
+Measured by `scripts/framereads-owed.mjs` (the `h2c6` line, taken out of `--owed`): a plate kept
+across frames, camera off from its first frame, on, then off again, drawn at 72² over a 128²
+grid so a texture at the frame's size can only be a frame target. Main 2 display targets and 1
+frame-size texture alive in both off stretches; now 1 and 0 in both, with the camera-on control
+at 2 targets, 1 alive and `auxTarget` there. Not done (left in section 40): the tank's draw and
+the projector sources' `aux (sources)` keep their second target.
