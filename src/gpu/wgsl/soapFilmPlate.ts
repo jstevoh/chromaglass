@@ -3,7 +3,7 @@
  * frame's film that the film's own solver (`soapFilm.ts` beside this, 32c) does
  * not. Driven by `src/gpu/soapFilmPlate.ts`.
  *
- * 1. `soapAir`: the air the plate's tools and the music stir pushes the film.
+ * 1. The air the plate's tools and the music stir pushes the film.
  *
  *    A soap film is the textbook two-dimensional fluid (Couder 1989, Kellay and
  *    Goldburg 2002: soap-film tunnels are how 2D turbulence is studied), and
@@ -11,15 +11,11 @@
  *    is not, so the drag wins in a few milliseconds and the film moves with the
  *    air over it, less whatever its own tension has to take back to stay
  *    inextensible: the overdamped limit, u* = (buoyancy + ζ_air u_air) / ζ,
- *    with ζ_air = ζ for a film carried whole. That is what this writes into
- *    the solver's `ext` faces; the solver adds the buoyancy and projects the
- *    sum onto ∇·u = 0, so the stir comes out as the swirls and combed streaks a
- *    film shows when it is blown on, never as a stretch.
- *
- *    The air is the plate's own flow (`velForced`, the field the dye rides).
- *    Named shortcut (32d-1): there is no separate air solver over the film; the
- *    plate's flow is the stir the hands and the sound make, and the film takes
- *    it as its air.
+ *    with ζ_air = ζ for a film carried whole. The air is its own fluid now
+ *    (wgsl/soapAir.ts, 32d-1), and its kernel writes that into the solver's
+ *    `ext` faces; the solver adds the buoyancy and projects the sum onto
+ *    ∇·u = 0, so the stir comes out as the swirls and combed streaks a film
+ *    shows when it is blown on, never as a stretch.
  *
  * 2. `soapPullState` and `soapPull`: when the film has drained, the frame is
  *    dipped and drawn again.
@@ -39,14 +35,14 @@
 
 import { SOAP_FRAME_LO, SOAP_FRAME_SPAN } from '../soapFrame';
 
-/** The fresh film's patches, cells apart (this pull and gpu/soapFilmPlate.ts's lay both): 6 mm. */
-export const NOISE_CELLS = 6;
+/** The fresh film's patches, cells apart (this pull and gpu/soapFilmPlate.ts's lay both): 12 mm, the sheets a hand-drawn film comes out in (gpu/soapFilmPlate.ts SOAP_FRESH_NOISE). */
+export const NOISE_CELLS = 12;
 
 const ARGS = /* wgsl */ `
 struct PlateArgs {
   // nx, ny, the step's seed, 0
   grid: vec4u,
-  // m/s per unit of the plate's velocity, floorNm, rowsPerStep, hTop
+  // 0 (the plate's stir, now the air's: wgsl/soapAir.ts), floorNm, rowsPerStep, hTop
   air: vec4f,
   // hBottom, noise share, 0, 0
   pull: vec4f,
@@ -55,51 +51,6 @@ struct PlateArgs {
 // Where the frame sits on the plate (gpu/soapFrame.ts).
 const SOAP_FRAME_LO: f32 = ${SOAP_FRAME_LO};
 const SOAP_FRAME_SPAN: f32 = ${SOAP_FRAME_SPAN};
-`;
-
-const AIR = /* wgsl */ `${ARGS}
-@group(0) @binding(1) var vel: texture_2d<f32>;
-@group(0) @binding(2) var<storage, read_write> ext: array<f32>;
-
-// The plate's velocity at a point in the film's frame (0..1 both ways, row 0
-// at the top as the film's), between texels, turned into the film's axes. The
-// plate's rows run up the picture (the display flips y) and the film's run
-// down it, the way gravity does, so y is mirrored and so is its velocity.
-fn plateVel(film: vec2f) -> vec2f {
-  let uv = SOAP_FRAME_LO + vec2f(film.x, 1.0 - film.y) * SOAP_FRAME_SPAN;
-  let size = vec2f(textureDimensions(vel));
-  let p = clamp(uv * size - 0.5, vec2f(0.0), size - 1.0);
-  let i = vec2i(floor(p));
-  let f = p - floor(p);
-  let hi = min(i + 1, vec2i(size) - 1);
-  let a = textureLoad(vel, i, 0).xy;
-  let b = textureLoad(vel, vec2i(hi.x, i.y), 0).xy;
-  let c = textureLoad(vel, vec2i(i.x, hi.y), 0).xy;
-  let d = textureLoad(vel, hi, 0).xy;
-  let v = mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-  return vec2f(v.x, -v.y);
-}
-
-@compute @workgroup_size(64) fn main(@builtin(global_invocation_id) id: vec3u) {
-  let nx = A.grid.x;
-  let ny = A.grid.y;
-  let nUf = (nx + 1u) * ny;
-  let nVf = nx * (ny + 1u);
-  let k = id.x;
-  if (k >= nUf + nVf) { return; }
-  let size = vec2f(f32(nx), f32(ny));
-  if (k < nUf) {
-    // A horizontal face: x on the cell edge, y at the row's middle.
-    let j = k / (nx + 1u);
-    let i = k % (nx + 1u);
-    ext[k] = plateVel(vec2f(f32(i), f32(j) + 0.5) / size).x * A.air.x;
-  } else {
-    let q = k - nUf;
-    let j = q / nx;
-    let i = q % nx;
-    ext[k] = plateVel(vec2f(f32(i) + 0.5, f32(j)) / size).y * A.air.x;
-  }
-}
 `;
 
 const PULL_STATE = /* wgsl */ `${ARGS}
@@ -174,7 +125,6 @@ fn patchNoise(x: f32, y: f32, seed: u32) -> f32 {
 `;
 
 export const SOAP_PLATE_KERNELS = {
-  soapAir: AIR,
   soapPullState: PULL_STATE,
   soapPull: PULL,
 } as const;

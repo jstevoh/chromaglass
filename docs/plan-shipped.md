@@ -7139,6 +7139,47 @@ across, all on the GPU from the solver's own stats. Measured on the lab's pictur
 follow the CPU reference's picture of the read-back film at r = 0.955 (−0.01 upside down); off is
 the plate to the byte. The shortcuts it leaves are 32d-1..5.
 
+### 32k, 32h, 32d-1 (in part). The film's big swirls, its air, and the frame's tilt
+
+Reported 2026-11-13 (Soap Film after 32d, filmed on the Mac against the owner's "Liquid
+Tapestry"): about 12 bright forms a frame against the photograph's 55 to 62, lower contrast,
+and none of its folded, marbled streaks. Measured in the lab (scratch scripts rendering the look
+every ten film seconds over two drain cycles, the watch tool's design read on each): the film
+moved under a stir by a cell or two, and the picture was the laid 6 mm patches and the drainage
+plumes. The solver's Darcy law gives every size of motion the one tuned friction ζ = 1.5, so a
+frame-wide swirl crawled as slowly as a 6 mm patch, and the film copied the plate's flow step by
+step (it stopped when the plate stopped).
+
+What shipped (`src/gpu/soapAir.ts`, `src/gpu/wgsl/soapAir.ts`, on a grid half the film's):
+
+- **32k, the film is a Brinkman fluid.** The air's drag on the film's faces, ζ_air = 2 μ_air / δ,
+  resists a motion of any size; the film's surface viscosity η resists a small one far more
+  (η k²). η is the value at which the 6 mm patches keep the tuned ζ (1.4e-6 Pa·s·m), so the
+  patches crawl as they did and the frame-scale motions run: `(1 − ℓ²∇²) W = F / ζ_air`, solved
+  warm-started on the air's grid against each row's mean (a level stratification is a gradient
+  the frame holds), projected, and handed to the solver less its own Darcy part. `npm run
+  soapplate` 7: a frame-wide 20 nm imbalance turns over at 5.8 mm/s rms (main 0.05; the tuned
+  Darcy ceiling 0.13), 6 mm patches at 0.21.
+- **32d-1 in part, the air over the film.** A slab 5.5 mm deep with its own inertia (it carries
+  its momentum, semi-Lagrangian, projected), dragged by the film's plumes at 2 μ / (ρ δ²), losing
+  its momentum to the room at ν / δ², and pushed by the plate's flow at 6 a second (the stir is
+  still the plate's flow, named). The film takes the air whole. `soapplate` 8: on a plate with no
+  flow at all, the film's own plumes set the air moving (8 mm/s rms after a fresh dip; main has
+  no air). The stir lines hold: 11.6 nm under the stir, 0.9 at its mirror.
+- **The fresh film is laid in 12 mm sheets at 50%** (was 6 mm at 25%): a hand-drawn film's
+  unevenness, which the big swirls fold into marbling. Still a laid profile, not a pull (32d-2).
+- **32h, Frame Tilt** (`soapFilmTilt`, degrees from flat, default 90 hanging, today's film):
+  gravity along the film is g sin θ, the fresh film's √z profile scales with it. With the big
+  swirls free, a hanging film sorts itself into level bands within seconds (measured: 11 forms
+  a frame over a cycle, the bands of a draining film); a frame held near flat keeps its
+  marbling. The look Soap Film holds it at 12°: 57 forms a frame over a cycle (main 48, the
+  photograph 62), RMS contrast 0.21 (main 0.20), near black 1.8% (main 1.3%). On the desk,
+  the phone's remote and MIDI. `soapplate` 7: at 12° the imbalance turns over at 0.208 of the
+  hanging speed (sin 12° = 0.208).
+
+Tried and left out: the lamp's heat as a stir (warm air rising from the frame's foot in plumes):
+at 1.5 K it moved the air at a millimetre a second and the film not visibly (32m).
+
 ## 33. Bubbles and the closeup, per liquid
 
 ### 33a. No stepped ring round a bubble's hole (this PR)

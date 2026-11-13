@@ -483,6 +483,9 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
             <Slider label="Film Angle" value={settings.soapFilmAngle ?? 0} min={0} max={70} step={1} onChange={(v: number) => onUpdate({ soapFilmAngle: v })}
               settingKey="soapFilmAngle"
             />
+            <Slider label="Frame Tilt" value={settings.soapFilmTilt ?? 90} min={0} max={90} step={1} onChange={(v: number) => onUpdate({ soapFilmTilt: v })}
+              settingKey="soapFilmTilt"
+            />
           </>
         )}
       </section>

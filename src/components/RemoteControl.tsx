@@ -801,6 +801,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <>
               <Slider label="Drain Rate" field="soapFilmRate" step={0.25} format={(v) => `${v.toFixed(2)}×`} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
               <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
           {/*

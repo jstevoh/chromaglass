@@ -108,6 +108,7 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['soapFilm', 0.05],
   ['soapFilmRate', 0.25],
   ['soapFilmAngle', 1],
+  ['soapFilmTilt', 1],
   ['lumia', 0.05],
   ['chemistry', 0.05],
   ['gelWheel', 0.05],

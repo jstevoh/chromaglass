@@ -186,7 +186,7 @@ const NOT_THE_LOOK = new Set([
     it (a granulation glide drawn the length of its reach in 6 s) and 4.20
     without (PLAN 10-8d-3).
   */
-  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

@@ -172,6 +172,7 @@ const SECTION_OF: Record<string, string> = {
   soapFilm: 'camera',
   soapFilmRate: 'camera',
   soapFilmAngle: 'camera',
+  soapFilmTilt: 'camera',
   phaseDisplace: 'ferro',
   oilBodies: 'oil',
   filmHold: 'oil',

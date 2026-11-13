@@ -199,6 +199,8 @@ export interface GpuStepParams {
   soapFilm?: number;
   /** The film's drain rate, its seconds per show second (default 1; PLAN 32i's time dial). */
   soapFilmRate?: number;
+  /** The frame's tilt from flat, degrees (default 90, hanging; PLAN 32h): gravity along the film is g sin of it. */
+  soapFilmTilt?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**

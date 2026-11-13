@@ -113,6 +113,7 @@ export const CONTROL_HELP: Record<string, string> = {
   soapFilm: 'A real soap film in the frame: it drains, swirls with the flow, goes black from the top and is drawn again.',
   soapFilmRate: 'How fast the soap film runs: drains, swirls and is drawn again. One is a real film\'s pace sped up for the stage.',
   soapFilmAngle: 'The angle the soap film is seen from. Leaning it moves every band of colour to a thicker film.',
+  soapFilmTilt: 'How the soap film\'s frame is held: 90 hangs it, so gravity drains it into level bands; toward 0 it lies flat, and it keeps its swirls.',
 
   // Macro
   macroZoom: 'How close the camera looks into the plate. One is the whole plate, sixteen is a single bead.',
