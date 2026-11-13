@@ -1222,7 +1222,7 @@ try {
     check('OSC closed: the assistant\'s OSC-in choice is the Show menu\'s (ticked there, the socket open on the network) but the network is not kept for the next launch, and Syphon says whether this build has it',
       viaHook.said === `udp 0.0.0.0:${oscPort}` && viaHook.state?.oscIn?.mode === 'network' && viaHook.state.oscIn.kept === false && savedOsc === 'off' && viaHook.ticked && afterHook?.state === `udp 0.0.0.0:${oscPort}`
         && (viaHook.syphon === 'item' || (/not in this build/.test(viaHook.syphon ?? '') && viaHook.state.syphon === null)),
-      `show.json osc ${savedOsc}; ${JSON.stringify(viaHook).slice(0, 220)}`);
+      `show.json osc ${savedOsc}; ${JSON.stringify(viaHook).slice(0, 240)}`);
 
     await pick(first, 'osc-local');
     await settle(first, (s) => s.mode === 'local');
