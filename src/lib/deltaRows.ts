@@ -18,8 +18,19 @@
  *
  * A writer that does not say (`whole()`, which FluidSimulation's old `dirty =
  * true` now means) sends the whole grid, as before: a writer that forgets is
- * slower, never wrong. The room's stir, a press, a lift and the liquids' own
- * step cover the plate or near it and stay whole.
+ * slower, never wrong. The room's stir and the liquids' own step cover the
+ * plate or near it and stay whole. A press, a lift, a bubble's press, a
+ * kick's hold and give-back and the bass's hand all lay their cells through
+ * FluidSimulation's `squishCell`, which marks each cell's row (14ab-11).
+ * It was `dirty = true`, the whole grid, and three of those writers run on
+ * steps no hand is near the plate: a bubble sitting on the glass presses
+ * every step it sits, a kick holds and gives back over a third of a second,
+ * and the bass's hand follows the bass. So with bubbles out or music playing
+ * every step packed and uploaded the three grids whole, 1.33 MB, for a disc
+ * 5 to 17 rows tall (`npm run frameuploads`: 0.04 to 0.24 MB now). Each
+ * call writes its one index and nothing else, so the row is exactly what it
+ * wrote; an index that is not a whole number is a write the arrays drop,
+ * and the row marked for it is a row of zeros sent, never one missed.
  *
  * The rows are a mask, not one span from the first row written to the last:
  * a bubble near the top and a hand near the bottom in the same step are two
@@ -61,6 +72,13 @@ export class DeltaRows {
     this.mask.fill(1, a, b + 1);
     this.marked = true;
   }
+
+  /**
+   * The row of cell index `idx` (x + y·L), for a writer of one cell at a
+   * time (squishCell, 14ab-11). Floored, since `add` floors its lower row
+   * and ceils its upper and would mark two for a fraction.
+   */
+  cell(idx: number): void { const y = Math.floor(idx / this.L); this.add(y, y); }
 
   /** A disc of reach `r` round row `y`, as layFinger and layBreath lay one. */
   disc(y: number, r: number): void { this.add(Math.round(y) - Math.ceil(r), Math.round(y) + Math.ceil(r)); }

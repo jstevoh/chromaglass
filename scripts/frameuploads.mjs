@@ -143,6 +143,25 @@ const frames = [
   })],
   ['a tool\'s few cells again', (s) => s.addDensity(150, 170, 0.2)],
   ['and the next step', (s) => s.addDensity(150, 171, 0.2)],
+  /*
+    The squish writers that run with no hand near the plate (PLAN 14ab-11):
+    a bubble sitting on the glass presses its disc every step it sits
+    (LiquidVisualizer's bubble poll, 'bubble'), a kick presses three nested
+    discs, holds them against the gap's spring a step at a time and gives
+    the gap back (KickRelease.step), and the bass's hand follows the bass
+    down and up (BassPress.follow). Each went through squishCell, whose
+    `dirty = true` sent the whole grid every step a bubble sat or music
+    played; each now says the rows of its disc. The spring (0.5) and the
+    one long step that gives the kick back whole are numbers for a check,
+    not the app's: what is asked is where each writes, not how much.
+  */
+  ['a bubble\'s press', (s) => s.applySquish(70, 50, 2, 0.0035, 0, false, 'press', 'bubble')],
+  ['a kick\'s press, three discs', (s) => s.pressKick(96, 96, 0.004, 0, [6, 4, 2])],
+  // Two steps: a kick's first step after its press holds nothing (KickRelease.step lays the hold from the second).
+  ['the kick held against the spring', (s) => { s.kickRelease.step(L, 0.02, s.squishCell, 0.5); s.kickRelease.step(L, 0.02, s.squishCell, 0.5); }],
+  ['the kick given back', (s) => s.kickRelease.step(L, 1, s.squishCell, 0.5)],
+  ['the bass\'s hand down', (s) => s.pressBass(140, 60, 9, 0.003)],
+  ['the bass\'s hand let up', (s) => s.pressBass(140, 60, 9, 0)],
   ['the room\'s stir, the whole plate', (s) => { for (let i = 0; i < AREA; i++) s.vx[i] += 1e-3; s.markDirty(); }],
   ['a tool\'s few cells after it', (s) => s.addVelocity(20, 100, 0.1, 0.1)],
 ];
@@ -190,6 +209,21 @@ check('rows and whole leave the solver the same, bit for bit, every flush', off.
 const at = frames.findIndex(([n]) => n === 'and the next step');
 const few = rowsRun[at].bytes, all = wholeRun[at].bytes;
 check('a step of a few cells after another sends their rows and nothing else', few === 2 * L * 36, `${MB(all)} → ${MB(few)}, against ${MB(2 * L * 36)} for rows 170 and 171`);
+/*
+  The squish writers say their rows, and those rows are a small share of the
+  grid (PLAN 14ab-11). "Said rows" alone would pass a writer that marked
+  every row one by one, so their count is held too: under a quarter of the
+  grid's 192 for each, where the largest disc above is 17 rows tall. The
+  bytes are printed beside it, and they carry the rows the last upload held
+  as well (rowsToWrite), so they are not the bar. Before the fix each handed
+  `rows()` null, the whole grid, and the scan above could not fault them:
+  it only asks about the rows a writer said, and "all" leaves none outside.
+*/
+const saidRows = (f) => f.span.reduce((n, [a, b]) => n + b - a + 1, 0);
+const squishers = rowsRun.map((f, i) => ({ f, all: wholeRun[i].bytes, i })).filter(({ i }) => /bubble's press|kick|bass/.test(frames[i][0]));
+check('a bubble\'s press, a kick\'s hold and release and the bass\'s hand hand rows, a small share of the grid',
+  squishers.length === 6 && squishers.every(({ f }) => f.span && f.rows > 0 && saidRows(f) < L / 4),
+  squishers.map(({ f, all }) => `${f.name}: ${f.span ? `${saidRows(f)} rows said` : 'whole'}, ${MB(all)} → ${MB(f.bytes)}`).join('; '));
 const sum = (r) => r.reduce((a, f) => a + f.bytes, 0);
 console.log(`  over the ${frames.length} frames: ${MB(sum(wholeRun))} → ${MB(sum(rowsRun))}`);
 

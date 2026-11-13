@@ -399,6 +399,11 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   the GPU, `applyDeltas` still upsamples the three delta grids and folds them over the
   whole plate each flush; a dispatch over the written bands' rows (scaled to N) would do.
   `npm run frameuploads` holds whichever writer moves to rows to its own scan.
+  *Part shipped (2026-11-13):* every writer through `squishCell` (a press, a lift, a
+  splash, a bubble's press, a kick's hold and give-back, the bass's hand) marks its
+  cell's row (`DeltaRows.cell`); frameuploads' new frames read 1.327 MB a step → 0.04
+  to 0.24 MB for them. Still whole: the room's and film's stir, the rhythm sheet, a
+  carry, the liquids' step, and the GPU's whole-plate fold in `applyDeltas`.
 
 ## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 

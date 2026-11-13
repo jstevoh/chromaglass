@@ -2193,9 +2193,9 @@ export class FluidSimulation {
   /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
   get thinGap(): boolean { return !!this.gpu?.thinGapLive; }
 
-  /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
+  /** A cell of a press, lift or splash: the deltas on the GPU (its row, 14ab-11), the fields on the CPU. */
   private readonly squishCell = (idx: number, gap: number, vx: number, vy: number, m: number): void => {
-    this.dirty = true;
+    this.rows.cell(idx);
     this.vx[idx] += vx;
     this.vy[idx] += vy;
     if (this.gpu) {
