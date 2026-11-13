@@ -402,8 +402,20 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   *Part shipped (2026-11-13):* every writer through `squishCell` (a press, a lift, a
   splash, a bubble's press, a kick's hold and give-back, the bass's hand) marks its
   cell's row (`DeltaRows.cell`); frameuploads' new frames read 1.327 MB a step → 0.04
-  to 0.24 MB for them. Still whole: the room's and film's stir, the rhythm sheet, a
-  carry, the liquids' step, and the GPU's whole-plate fold in `applyDeltas`.
+  to 0.24 MB for them. The liquids' step with the GPU holding the liquids asks for the
+  fold with no rows (`foldDue`, as a video frame does): 1.327 MB a step → 0. Still
+  whole: the room's and film's stir, the rhythm sheet, a carry, and the GPU's
+  whole-plate fold in `applyDeltas`.
+- **14ab-12** (open, found with 14ab-11) *The GPU liquids' forces run only on a step that
+  flushes.* `liquidForces` and the soap's thinning of the dye (`deltaDye`'s `soapMul`)
+  run in `foldDeltas` and nowhere in `step`, so they run every step only because the
+  liquids' step asks for a fold, and it asks only while the CPU `LiquidField` is
+  `live`: true from a layer's first pour (which lands on the CPU, `gpuNative` being
+  set only by a step), never again after `clearAll` (`gpuNative` stays true, so a new
+  pour returns before `live`). After a clear, a pour's push and the soap's clearing run
+  only on steps some other writer flushes. And the CPU copy of that first pour never
+  fades (`step` returns on `gpuNative`). Fix: the fold's liquid passes in `step` itself,
+  gated on the GPU's own liquids; a look change, so the owner's eyes.
 
 ## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
 

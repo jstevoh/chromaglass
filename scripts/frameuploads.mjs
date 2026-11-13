@@ -241,6 +241,39 @@ thinSim.rbSeq++; thinSim.depositBubbleRims(new Float32Array(4), 0);
 const thinFill = writtenRows(thinSim).length;
 check('on a thin gap a bubble\'s rim and its popped hole write nothing', thinRim === 0 && thinFill === 0, `rows ${thinRim} for the rim, ${thinFill} after the pop`);
 
+/*
+  The liquids' step with the GPU holding the liquids (14ab-11). Its CPU side
+  writes nothing there (LiquidField.apply and .step stand down), but the
+  first pour on a layer lands on the CPU too, since `gpuNative` is set only
+  by a step, and from then on every step said `dirty = true`: the whole
+  grid, 1.33 MB of zeros a step until the plate is cleared. The flush itself
+  is not nothing: the solver's fold (foldDeltas) is where its liquidForces
+  and the soap's thinning of the dye run, and they run on a step that
+  flushes and on no other. So the step still asks for the fold, as a video
+  frame does, and hands no rows. The solver here takes addLiquidDrop, as
+  the real one does, so the field knows the GPU holds the liquid.
+*/
+const liq = new FluidSimulation(L, 0, 0, 0.1);
+const liqGpu = keeper();
+liqGpu.addLiquidDrop = () => {};
+liq.attachGpu(liqGpu);
+liq.flushDeltas(0.01);
+liq.liquid.deposit(96, 96, 10, { soap: 1, body: 0.5 }, 1);
+const liqSteps = [];
+for (let k = 0; k < 4; k++) {
+  const before = liqGpu.bytes;
+  liq.stepLiquid(1 / 60, 0.5);
+  // As the step reads them: a fold is due, and the rows flushDeltas hands across.
+  const due = liq.dirty || !!liq.foldDue, said = liq.rows.any ? liq.rows.rows() : liq.rows.mask;
+  const written = writtenRows(liq).length;
+  if (due) liq.flushDeltas(0.01);
+  liqSteps.push({ due, rows: said ? said.reduce((n, v) => n + v, 0) : L, written, bytes: liqGpu.bytes - before });
+}
+check('the liquids\' step with the GPU holding them still asks for the fold, and hands it no rows',
+  // The first step re-sends the rows the attach's whole flush held (rowsToWrite); from the second, nothing.
+  liqSteps.every((s, k) => s.due && s.rows === 0 && s.written === 0 && (k === 0 || s.bytes === 0)),
+  liqSteps.map((s, k) => `step ${k + 1}: ${s.due ? 'fold' : 'no fold'}, ${s.rows} rows, ${MB(s.bytes)}`).join('; '));
+
 // Controls.
 const sneak = new FluidSimulation(L, 0, 0, 0.1);
 sneak.attachGpu(keeper());

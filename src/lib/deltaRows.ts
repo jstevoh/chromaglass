@@ -32,6 +32,19 @@
  * wrote; an index that is not a whole number is a write the arrays drop,
  * and the row marked for it is a row of zeros sent, never one missed.
  *
+ * A flush with no rows at all is a fold: the solver's `applyDeltas` runs its
+ * passes (foldDeltas) on what its copies hold, and only the rows the last
+ * upload wrote go across again, as zeros. Two things want that and nothing
+ * else. A video pour's frames, which the solver keeps itself (14ab-2). And
+ * the liquids' step with the GPU holding the liquids (14ab-11): its CPU side
+ * writes nothing there, but the solver's liquidForces and the soap's
+ * thinning of the dye (deltaDye) run in the fold and on no step without
+ * one, so the step that said `dirty = true`, 1.33 MB of zeros every step
+ * from a layer's first pour until a clear, now says `foldDue`. Not dropped:
+ * a step with no flush would leave the liquids' push and the soap's clearing
+ * out, and the plate would change. `npm run frameuploads` holds it (a fold
+ * every step, no rows, no bytes).
+ *
  * The rows are a mask, not one span from the first row written to the last:
  * a bubble near the top and a hand near the bottom in the same step are two
  * bands, and one span over both sent most of the plate (`npm run frameuploads`
