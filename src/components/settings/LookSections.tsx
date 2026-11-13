@@ -485,6 +485,33 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
             />
           </>
         )}
+        {/* The tank seen through its side instead of the dish from above
+            (PLAN 47n): heavy dye falls from a nozzle at the surface, thins to
+            a thread as gravity speeds it and runs along the floor. Tank is
+            its glow; the rest are the nozzle's feed and place, the dye's
+            weight, the floor's drain and the dye's colour. */}
+        <Slider label="Tank" value={settings.tank ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ tank: v })}
+          settingKey="tank"
+        />
+        {(settings.tank ?? 0) > 0.001 && (
+          <>
+            <Slider label="Feed" value={settings.tankFeed ?? 1.5} min={0} max={6} step={0.1} onChange={(v: number) => onUpdate({ tankFeed: v })}
+              settingKey="tankFeed"
+            />
+            <Slider label="Dye Weight %" value={settings.tankWeight ?? 0.5} min={0.05} max={3} step={0.05} onChange={(v: number) => onUpdate({ tankWeight: v })}
+              settingKey="tankWeight"
+            />
+            <Slider label="Nozzle" value={settings.tankNozzle ?? 0.5} min={0} max={1} step={0.01} onChange={(v: number) => onUpdate({ tankNozzle: v })}
+              settingKey="tankNozzle"
+            />
+            <Slider label="Drain" value={settings.tankDrain ?? 1} min={0} max={1} step={0.05} onChange={(v: number) => onUpdate({ tankDrain: v })}
+              settingKey="tankDrain"
+            />
+            <Slider label="Glow Hue" value={settings.tankHue ?? 205} min={0} max={360} step={1} onChange={(v: number) => onUpdate({ tankHue: v })}
+              settingKey="tankHue"
+            />
+          </>
+        )}
       </section>
       )}
     </>

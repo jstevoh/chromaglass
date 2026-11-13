@@ -646,6 +646,19 @@
       ]
     },
     {
+      "name": "The tank seen through its side",
+      "shard": "logic",
+      "run": "npm run tank",
+      "why": [
+        "The tank's CPU reference (PLAN 47n, src/lib/tank.ts, scripts/tank.mjs):",
+        "a vertical slice of water with heavy dye, held to a still stratified tank,",
+        "Rayleigh-Taylor overturning, a lock exchange's fronts at a real gravity",
+        "current's Froude number (0.38-0.55), a nozzle's jet that is steady, thins",
+        "as gravity speeds it and does nothing without gravity, and no dye made or",
+        "lost. About a minute of float64."
+      ]
+    },
+    {
       "name": "The dish that boils",
       "shard": "logic",
       "run": "npm run boil",
@@ -1344,6 +1357,20 @@
         "In Measure's lab3 part rather than logic because soapgpu.mjs opens the lab",
         "page in Chromium and requests a WebGPU adapter before running the solver,",
         "and checks.yml installs Chromium only on the browser and lab parts."
+      ]
+    },
+    {
+      "name": "The tank on the GPU (SwiftShader)",
+      "shard": "lab5",
+      "run": "npm run tankgpu",
+      "why": [
+        "The tank's GPU solver (PLAN 47n, src/gpu/tank.ts) against its CPU",
+        "reference (scripts/tankgpu.mjs): faces and dye cell by cell after two",
+        "steps and the jet's dye after a second, and the physics at the app's own",
+        "sweep count (the lock exchange's fronts, a closed tank's dye kept, the",
+        "jet steady and thinning). In a lab part because it opens the lab page",
+        "and asks for a WebGPU adapter; lab5 held one check. About a minute on",
+        "SwiftShader."
       ]
     },
     {
@@ -2655,6 +2682,16 @@
         "ruptured hole unrefilled and black spreading within 15%, every step",
         "submitting GPU work and every read mapping a buffer, and the CPU",
         "reference absent from the solver's bundle."
+      ]
+    },
+    {
+      "name": "The tank on Metal",
+      "shard": "plate",
+      "run": "npm run tankgpu",
+      "why": [
+        "The tank's GPU solver against its CPU reference on Metal (PLAN 47n,",
+        "scripts/tankgpu.mjs): the same lines as the lab's run, on the compiler",
+        "the show runs on, which may fuse the arithmetic differently."
       ]
     },
     {

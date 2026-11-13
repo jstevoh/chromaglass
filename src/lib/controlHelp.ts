@@ -113,6 +113,12 @@ export const CONTROL_HELP: Record<string, string> = {
   soapFilm: 'A real soap film in the frame: it drains, swirls with the flow, goes black from the top and is drawn again.',
   soapFilmRate: 'How fast the soap film runs: drains, swirls and is drawn again. One is a real film\'s pace sped up for the stage.',
   soapFilmAngle: 'The angle the soap film is seen from. Leaning it moves every band of colour to a thicker film.',
+  tank: 'A tank of water seen through its side instead of the dish from above: heavy dye falls from a nozzle, thins to a thread and runs along the floor.',
+  tankFeed: 'How fast the nozzle feeds dye into the tank. More feed, a thicker jet.',
+  tankWeight: 'How much heavier the dye is than water. Heavier dye falls faster and thins to a finer thread.',
+  tankNozzle: 'Where the nozzle sits across the top of the tank. Holding a finger on the plate carries it there too.',
+  tankDrain: 'How much of the water fed in drains out through the floor. At none the dye pools on the floor and fills the tank.',
+  tankHue: 'The colour the dye glows.',
 
   // Macro
   macroZoom: 'How close the camera looks into the plate. One is the whole plate, sixteen is a single bead.',

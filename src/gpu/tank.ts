@@ -137,8 +137,10 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
       const feed = Math.max(0, o.feed ?? 0);
       const n = tankSubsteps(dt, dx, ny * dx, gPrime, feed);
       const h = dt / n;
-      const [i0, i1] = nozzleSpan(nx, dx, o.nozzleX ?? 0.5, o.nozzleW ?? 3e-3);
-      const nIn = i1 - i0;
+      // nozzleSpan's cells, worked out here so the frame makes no array.
+      const nIn = Math.max(1, Math.min(nx - 1, Math.round((o.nozzleW ?? 3e-3) / dx)));
+      const i0 = Math.max(0, Math.min(nx - nIn, Math.round(Math.max(0, Math.min(1, o.nozzleX ?? 0.5)) * nx - nIn / 2)));
+      const i1 = i0 + nIn;
       const drain = Math.max(0, Math.min(1, o.drain ?? 1));
       U32[0] = nx; U32[1] = ny; U32[2] = i0; U32[3] = i1;
       F32[4] = h / dx; F32[5] = (o.nu ?? TANK_NU) * h / (dx * dx); F32[6] = gPrime * h; F32[7] = omega;
