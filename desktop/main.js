@@ -652,8 +652,11 @@ async function setOscMode(mode, quiet = false, keep = true) {
 /*
   OSC in and Syphon for the owner's assistant (PLAN 44k-14,
   server/assistantOutputs.js): the Show menu's own doors, so a choice the
-  assistant makes is the menu's, ticked there and kept in show.json, and the
-  performer sees it where they would have made it. Syphon is reached through
+  assistant makes is the menu's, ticked there, and the performer sees it where
+  they would have made it. Off and this Mac only are kept in show.json; the
+  network is not (the owner's choice after the security review of 2026-11-13):
+  it lasts until the assistant switch goes off or the app quits, and the
+  owner's own pick in the menu keeps it. Syphon is reached through
   its menu item (`syphon-out`, the contract scripts/desktop-syphon.mjs holds
   PLAN 13.2's build to), so this never touches the output itself: a build
   with no such item says so.

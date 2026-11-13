@@ -1206,6 +1206,10 @@ try {
       main.js hands the show server, server/assistantOutputs.js): it is the
       menu's, so the menu's tick follows it and the socket opens with no
       dialog, and a build with no Syphon item says so rather than claiming one.
+      Opening to the network is not kept (the owner's choice after the security
+      review of 2026-11-13: an assistant talked round by a web page must not
+      leave the venue's Wi-Fi able to drive the show next launch), so the state
+      says kept false and show.json still holds the menu's last choice, off.
     */
     const viaHook = await first.evaluate(async ({ Menu }) => {
       const h = globalThis.__chromaglassOutputs;
@@ -1213,10 +1217,12 @@ try {
       return { said, state: h.state(), ticked: Menu.getApplicationMenu().getMenuItemById('osc-network')?.checked === true, syphon: Menu.getApplicationMenu().getMenuItemById('syphon-out') ? 'item' : h.setSyphon(true) };
     }).catch((err) => ({ error: String(err) }));
     const afterHook = await settle(first, (s) => s.mode === 'network');
-    check('OSC closed: the assistant\'s OSC-in choice is the Show menu\'s (ticked there, the socket open on the network), and Syphon says whether this build has it',
-      viaHook.said === `udp 0.0.0.0:${oscPort}` && viaHook.state?.oscIn?.mode === 'network' && viaHook.state.oscIn.kept === true && viaHook.ticked && afterHook?.state === `udp 0.0.0.0:${oscPort}`
+    let savedOsc = 'unread';
+    try { savedOsc = JSON.parse(readFileSync(join(dir, 'show.json'), 'utf8')).osc ?? 'unset'; } catch { /* not written */ }
+    check('OSC closed: the assistant\'s OSC-in choice is the Show menu\'s (ticked there, the socket open on the network) but the network is not kept for the next launch, and Syphon says whether this build has it',
+      viaHook.said === `udp 0.0.0.0:${oscPort}` && viaHook.state?.oscIn?.mode === 'network' && viaHook.state.oscIn.kept === false && savedOsc === 'off' && viaHook.ticked && afterHook?.state === `udp 0.0.0.0:${oscPort}`
         && (viaHook.syphon === 'item' || (/not in this build/.test(viaHook.syphon ?? '') && viaHook.state.syphon === null)),
-      JSON.stringify(viaHook).slice(0, 240));
+      `show.json osc ${savedOsc}; ${JSON.stringify(viaHook).slice(0, 220)}`);
 
     await pick(first, 'osc-local');
     await settle(first, (s) => s.mode === 'local');
