@@ -270,8 +270,8 @@ style (§31).
   (shipped, this PR), then **47v-4** a third real show filmed square-on (Liquid Light Lab's films tried, kept as a reference only), **47v-5**
   carried on real footage, **47v-6** a too-small crop says so, **47v-7** watching in the page where a file can't be fetched, **47w-3** *Streams II* again; **47y** what Poster 1969 against a real
   projection found; **47z** a crowd of drops in vivid colour (47z-1 the drop takes the water out of the
-  light, 47z-2 sizes from a stir, 47z-3 films that drain, 47z-4 each drop a lens, 47z-5 a packed crowd
-  becomes polygons).
+  light, 47z-2 sizes from a stir, 47z-3 films that drain, 47z-4 each drop a lens, ~~47z-5~~ a packed foam at 120°, shipped as Foam Cells; then 47z-6
+  a crowd that packs itself, 47z-7 films that pop by draining, 47z-8 smaller cells).
 
 ### Wave 7. Reach
 

@@ -22,7 +22,7 @@ import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, layLavaLamp } from '../lib/oilLay';
+import { layClockGlass, splodascopeCell, splodascopeDiscs, layLavaLamp, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -1940,36 +1940,10 @@ export class FluidSimulation {
         break;
       }
 
-      case 'clock-glass': {
-        /*
-          A clock-glass dish is coloured water and oil that will not mix
-          (src/lib/oilLay.ts, and why): the water is the first dye, laid wide
-          and deepest in the middle where the bowed glasses hold the most,
-          and bodies of oil are laid over it across the dish, each with one
-          of the other dyes in it. With Oil Bodies on (the look's) each body
-          keeps its colour while it moves, and two only mix where they merge,
-          as two dyed oils do. The oil is laid only where the solver is there
-          to take it; before it is, the colours still land, as spots in the
-          water.
-        */
-        const water = col(0);
-        const bodies = clockGlassBodies(this.rng.float, harmony.length);
-        /*
-          Each cell as clockGlassCell lays it (and why): a body's colour in
-          its oil and nowhere else, the water's wash in what is left.
-        */
-        const g = this.gpu;
-        for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
-        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
-          const cell = clockGlassCell((x + 0.5) / S, (y + 0.5) / S, S, bodies);
-          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
-          if (cell.dye > 0) {
-            const c = col(bodies[cell.body].dye);
-            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
-          }
-        }
+      case 'clock-glass':
+        // Oil and water that will not mix, the water wide, bodies of oil across it (layClockGlass, src/lib/oilLay.ts).
+        layClockGlass(this.rng.float, harmony.length, S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }), (x, y, d, k) => { const c = col(k); this.addDensity(x, y, d, c.r, c.g, c.b); });
         break;
-      }
 
       case 'splodascope': {
         /*
@@ -1993,6 +1967,11 @@ export class FluidSimulation {
         }
         break;
       }
+
+      case 'foam-cells':
+        // Pressed cells across the dish, rust water in the films (layFoamCells, src/lib/oilLay.ts, says why).
+        layFoamCells(this.rng.float, harmony.length, this.gpu?.N ?? S, S, (f) => this.gpu?.layOil?.(f), (x, y, d, k) => { const c = col(k); this.addDensity(x, y, d, c.r, c.g, c.b); });
+        break;
 
       case 'turing-print': {
         // Coloured ink pools across the plate so the reaction-diffusion print

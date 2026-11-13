@@ -1,5 +1,6 @@
 import { VisualizerSettings } from './types';
 import { MOIRE_LOOKS } from './presetsMoire';
+import { FOAM_CELLS } from './presetsFoam';
 
 export interface Preset {
   id: string;
@@ -1926,6 +1927,7 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
+  FOAM_CELLS,
   /*
     Two looks were made after Chemical Bouillon's ferrofluid films, the references the
     owner gave for how ferrofluid should look (docs/bubbles-plan.md); Ferro Maze
@@ -2345,14 +2347,13 @@ export const PRESETS: Preset[] = [
 
 /*
   The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
-  it starts from. Its cords are that look's, and a sheet's cord takes the
-  place of the last of them: a look carries two or three fast cords
-  (PLAN 28i-3b, `npm run soundpatch`), and the first version, which added the
-  sheet's to the house look's three, made four, too many for a hand to read
-  on the wall. A pack look laid over a look with areas adds none: its areas'
-  cords are the music there, and a plate-wide one beside them is the
-  redundancy 28i-3b turns away. The plate itself (dyes, pours, dish, areas)
-  is the house look's under the pack look's id (presetPlate.ts).
+  it starts from. Its cords are that look's, a sheet's cord in the place of
+  the last: a look carries two or three fast cords (PLAN 28i-3b, `npm run
+  soundpatch`); the sheet's added to the house look's three made four, too
+  many to read on the wall. A pack look laid over a look with areas adds
+  none: its areas' cords are the music there, and a plate-wide one beside
+  them is the redundancy 28i-3b turns away. The plate itself (dyes, pours,
+  dish, areas) is the house look's under the pack look's id (presetPlate.ts).
 */
 for (const m of MOIRE_LOOKS) {
   const from = PRESETS.find(p => p.id === m.from);
