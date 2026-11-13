@@ -328,6 +328,14 @@ and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
   on that hidden plate too (a pour's dye, a magnet, a blow), so a tap meant for the tank
   changes a look nobody sees until Tank goes off: route them to the tank (a tap drops a bead
   of dye where it lands) or hold them while it shows.
+- **47n-7. Open: a real tank's stir, so the jet is not a mirror.** Filmed on the Mac
+  (2026-11-13), the flow is mirror-symmetric about the nozzle for the first 45 s: nothing in
+  the slice breaks the symmetry but float rounding, which takes that long to grow into the
+  buckling a real jet shows within seconds. A real tank is never still (the pour's own
+  wobble, a fraction of a degree of temperature): seed the water with a small, physical
+  disturbance (velocity noise of a few µm/s, or the nozzle wandering by a tenth of its bore),
+  in the reference first, the GPU after, and let `tankgpu` measure the left-right difference
+  growing where today it stays at rounding.
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 
