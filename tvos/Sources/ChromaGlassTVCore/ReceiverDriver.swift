@@ -163,4 +163,11 @@ private final class SocketDelegate: NSObject, URLSessionWebSocketDelegate, @unch
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         opened?(webSocketTask)
     }
+
+    /// Empty on purpose: a close already reaches the machine through the failed receive
+    /// above. It is written out because Linux's Foundation (where `npm run tvswift` runs
+    /// in CI) declares both WebSocket callbacks as requirements and gives their empty
+    /// defaults internal access, so a delegate outside Foundation must implement both or
+    /// it does not conform; Apple's Foundation makes both optional.
+    func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {}
 }
