@@ -10,6 +10,10 @@ import { SPLAT_KERNELS, splatKernel } from '../src/gpu/wgsl/splat';
 import { BEAD_KERNELS } from '../src/gpu/wgsl/beadMask';
 import { SOAP_KERNELS } from '../src/gpu/wgsl/soapFilm';
 import { SOAP_PLATE_KERNELS } from '../src/gpu/wgsl/soapFilmPlate';
+import { FINE_ADVECT_WGSL, FINE_REDUCE_WGSL, FINE_DETAIL_WGSL } from '../src/gpu/wgsl/fineDye';
+
+/** The closeup's fine dye (PLAN 47a): carried, averaged and turned into detail, built behind the show. */
+const FINE_KERNELS: Record<string, string> = { advect: FINE_ADVECT_WGSL, reduce: FINE_REDUCE_WGSL, detail: FINE_DETAIL_WGSL };
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -42,6 +46,7 @@ const FORMATS: Record<string, string> = {};
   // The draining soap film (PLAN 32c) and what the plate adds to it (32d): stepped behind Soap Film.
   for (const [name, code] of Object.entries(SOAP_KERNELS)) await check(`soap.${name}`, code);
   for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
-  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length} shaders`);
+  for (const [name, code] of Object.entries(FINE_KERNELS)) await check(`fine.${name}`, code);
+  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(FINE_KERNELS).length} shaders`);
   return out;
 };

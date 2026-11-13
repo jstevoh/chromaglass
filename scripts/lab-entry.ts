@@ -409,6 +409,30 @@ const api = {
     s.device.queue.submit([enc.finish()]);
     await s.device.queue.onSubmittedWorkDone();
   },
+  /**
+   * The closeup's fine dye detail (PLAN 47a-1, gpu/fineDye.ts), read back:
+   * its window, how much the plate adds, and its texels as rgba floats
+   * (texX × texY), or null when there is none. `npm run macroview` asks it
+   * whether stirring, and only stirring, makes detail.
+   */
+  async fine() {
+    const s = lab!.solver;
+    const t = s.fineDetail, w = s.fineWindow;
+    if (!t || !w) return null;
+    const device = s['device'] as GPUDevice;
+    const row = Math.ceil(t.width * 8 / 256) * 256;
+    const buf = device.createBuffer({ size: row * t.height, usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ });
+    const enc = device.createCommandEncoder();
+    enc.copyTextureToBuffer({ texture: t }, { buffer: buf, bytesPerRow: row }, [t.width, t.height]);
+    device.queue.submit([enc.finish()]);
+    await buf.mapAsync(GPUMapMode.READ);
+    const half = new Uint16Array(buf.getMappedRange());
+    const out = new Float32Array(t.width * t.height * 4);
+    const f16 = (h: number) => { const e = (h >> 10) & 31, m = h & 1023, sg = h & 32768 ? -1 : 1; return sg * (e === 0 ? m / 1024 * 2 ** -14 : e === 31 ? (m ? NaN : Infinity) : (1 + m / 1024) * 2 ** (e - 15)); };
+    for (let y = 0; y < t.height; y++) for (let x = 0; x < t.width * 4; x++) out[y * t.width * 4 + x] = f16(half[y * row / 2 + x]);
+    buf.unmap(); buf.destroy();
+    return { window: { ...w }, strength: s.fineStrength, data: Array.from(out) };
+  },
   async field(which: 'dye' | 'vel' | 'oilDye' | 'species') { return Array.from(await lab!.solver.readField(which)); },
   /**
    * The clear film (PLAN §20b), read back: its grid, and its thickness and
@@ -739,7 +763,7 @@ const api = {
     // and be 0, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: null, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: l.solver.fineDetail, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a

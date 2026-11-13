@@ -964,6 +964,8 @@ export interface VisualizerSettings {
   macroLacing: number;        // dark lacing filaments along dye boundaries
   macroDepth: number;         // dome shading, contact shadow and shallow depth of field
   macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
+  /** The dye finer than the grid in the closeup: carried over the frame without diffusion and added as detail below a cell (PLAN 47a-1, gpu/fineDye.ts), 0–1; 0 is the grid magnified. */
+  macroFine: number;
   macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
@@ -1294,6 +1296,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroDepth: 0.5,
   macroEdgeDetail: 0.6,
   macroRelief: 0.7,
+  macroFine: 1,              // the owner asked for the closeup's fine detail (2026-11-13); 0 is the closeup before it
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,
   sceneImpact: 0.5,         // the depth room patches are read at once any are added

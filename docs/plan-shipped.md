@@ -13896,3 +13896,39 @@ digital overlay over a band and was left out. Liquid Light Lab's films were fetc
 owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a video mirror and
 colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
 row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
+
+
+## 47a. The closeup's fine dye: a fine window, with the dye finer than the flow (2026-11-13)
+
+Asked 2026-11-11 from a macro artist's films; approved with the rest of §47 on 2026-11-13. At 6x
+a solver cell covers tens of screen pixels, and the closeup was a magnified blur: fine over coarse
+(the mean luminance gradient at a fine scale over a four-times-coarser one) 1.08 to 1.2 where the
+films read 2.2 to 3.1.
+
+Built: `gpu/closeupWindow.ts` (where the camera looks, screen-aligned, turning with the layer,
+square texels at two screen pixels each, margin 1.1, none at 1x, under the kaleidoscope or the
+dish spread, or when a cell is under three texels), `gpu/fineDye.ts` and `wgsl/fineDye.ts` (two
+fine fields over the window, carried every step through the solver's velocity by a clamped
+Catmull-Rom semi-Lagrangian step, no diffusion, the Batchelor limit; each born again from the grid
+every three time units, half a life apart, crossfaded by a triangle on age; a camera that pans,
+turns or zooms is the same remap as the flow; dye from past the window's edge is the grid's), and
+`wgsl/fineWindow.ts` (the plate multiplies the grid's raw dye by the fine dye's ratio to it, in
+the dye's encoded space, through the same warp and defocus taps). Setting Fine Detail
+(`macroFine`, Macro section, desks, phone, MIDI, default 1).
+
+What the lab taught on the way, each a form dropped: the fine field nudged to the grid lost the
+detail (CPU toy 1.03); particles born in the window made 2.8 on the measure as Poisson grain; a
+difference added (fine less its cell mean) drew black beads on thin arms (thickness to nothing,
+colour left); a ratio per channel drew pale wisps in dark gaps. The shipped form scales each fine
+field by one number so its mean round each cell has the grid's thickness, keeps the colour it
+carried, and trusts it only as far as it holds the grid's dye (a pour since it was born shows at
+once). Advection alone never sharpens an edge the flow does not squeeze, so a field born blurred
+stayed blurred: each is born with one backward heat step (`FINE_SHARP` 2, clamped to its
+neighbours' range) undoing the grid's numerical diffusion, which on this plate is about a cell
+where a real dye's is an eighth of one (named shortcut, 47a-3).
+
+Measured (`npm run finedye`, lab, 256², 6x, a forced vortex over three dyes, 600 steps): fine over
+coarse 1.08 to 1.11 stirred; see the PR for the check's numbers. Open: 47a-2 (diffusion at real
+D, capillary forces, the back plate), 47a-3 (a carried interface), 47a-4 (the plate folds little
+below a cell; more detail needs more stirring).
+

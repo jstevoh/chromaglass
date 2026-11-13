@@ -98,28 +98,31 @@ phone version in the same PR.
 
 ## 47a. Detail at the closeup's own scale: a fine window, with the dye finer than the flow (L)
 
-*Seen:* sharp structure down to a few hundredths of a millimetre inside a reaction a few
-centimetres across. *Physics:* a dye in water diffuses about a thousand times more slowly
-than momentum (Schmidt number Sc = ν/D ≈ 10³), so stirring folds it into filaments far
-finer than the smallest eddy: the Batchelor scale, η_B = η·Sc^(-1/2), about thirty times
-finer than the flow's own smallest scale. Fine dye over coarse flow is therefore not a
-cheat but what a real dish does. *Today:* the closeup is a crop of the whole plate's grid,
-magnified 1x to 16x; the particles of H1 (`wgsl/particles.ts`) carry finer structure than
-the grid, but at zoom they are drawn at the plate's scale, not the screen's. *Build:* in the
-closeup only, a second dye field covering the camera's window at screen resolution (about
-0.1 mm a cell at 6x), advected by the plate's velocity interpolated smoothly (one-way
-nesting, as a weather model nests a fine grid in a coarse one), seeded from the coarse dye
-when the window moves and fed back to nothing. Molecular diffusion at its real D (so a
-filament keeps its edge for seconds, not frames), and the window's own velocity correction
-where surface tension acts at that scale (capillary and Marangoni forces grow as the scale
-shrinks, so the fine window is where they belong). *Shortcut, named:* the fine window does
-not feed back into the coarse flow. *Measure:* in the lab at zoom 6, structure at 4 to 8
-screen pixels (the H1 measure) at least three times today's, and the edge's ripple at the
-cell's pitch gone (`macroview` gains both lines). Frame cost held by `npm run stages`.
-- **47a-1. First, the particles and the dye's edge at screen scale in the closeup** (S–M).
-  Draw H1's particles as screen-sized discs when `macroMode` is on, and cut the dye's edge
-  by its interpolated level set rather than its cells (with 38h-9, which names the same
-  grain). Closes the serrated edge in the photograph cheaply before 47a's window.
+~~**47a** The fine window~~ (shipped; story in `docs/plan-shipped.md` §47a): the dye carried over
+the closeup's frame at two screen pixels a texel through the solver's velocity, without diffusion,
+born with the grid's numerical blur undone, drawn at the grid's thickness round each cell (Fine
+Detail, Macro section, default 1; `gpu/fineDye.ts`, `npm run finedye`).
+~~**47a-1** Particles and the edge at screen scale~~ (dropped for 47a, 2026-11-13): the particles
+born in the window drew Poisson grain; the edge is the fine field's seed, which undoes the grid's
+blur.
+
+- **47a-2. The rest of the fine window's physics** (M). Molecular diffusion at the dye's real D
+  in the fine fields (today none: a filament keeps its edge for the field's whole life, where a
+  real one blurs by √(Dt), a tenth of a millimetre in ten seconds, about a texel at 6x), and
+  capillary and Marangoni forces at the window's scale (they grow as the scale shrinks). The back
+  plate gets no fine dye (it is drawn through its own zoom and offset, `layer1`); give it its own
+  window.
+- **47a-3. A sharp interface carried, not a seed sharpened** (M). Named shortcut in 47a: each
+  fine field is born from the grid's dye with one backward step of the heat equation
+  (`FINE_SHARP`, clamped to its neighbours' range), a reconstruction of the sharp edge the grid
+  has blurred. Replace it with an interface the fine field carries itself (a level set or VOF
+  fraction per dye body), so an edge is never rebuilt from a blur.
+- **47a-4. Where the films' fine structure comes from** (finding, 2026-11-13). On the lab's
+  stirred swirl the fine dye raises fine over coarse from 1.08 to 1.11, where the films read 2.2
+  to 3.1: the thin gap's drag stops a free vortex in nine steps, so the plate's flow is slow and
+  smooth and folds little below a cell in the fine field's few-second life. More detail needs
+  more folding: a stir bar (47f), chaotic stirring, reactions and Marangoni cells (47g, the
+  owner's call). Measure each against `npm run finedye`'s line 1 on the owner's Mac.
 
 ## 47j. Caustics: the light focused into a network by a rippled or mixing layer (M)
 

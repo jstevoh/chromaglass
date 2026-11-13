@@ -260,10 +260,10 @@ style (§31).
   18d-3), **42b** the top glass by hand, **42f** the RGB turntable's patterns, **42d** the open
   dish, **42g** moiré, **42c** the triple plate, **42h** diffraction; **42i** the owner's call.
 - **6.12** The closeup as a macro photographer films liquid (§47, asked 2026-11-11), each its own
-  thread: **47a-1** the particles and the dye's edge at screen scale in the closeup, **47b** dark-field
+  thread: ~~**47a-1**~~ (dropped for 47a), **47b** dark-field
   and Rheinberg lighting, **47j** caustics (most of the picture in the films watched over
   time), **47c** blacklight (fluorescent dyes under a UV lamp), **47d** depth of
-  field from the gap's depth (built under 38q), **47a** the fine window, **47e** sparkle, **47f** the
+  field from the gap's depth (built under 38q), ~~**47a**~~ the fine window (shipped, this PR; 47a-2, 47a-3, 47a-4 open), **47e** sparkle, **47f** the
   stir bar, **47k** threads that bead; **47g**, **47h**, **47i**, **47n** (a side view through a tank) when wanted; **47m** the owner's reference kit; ~~**47w-1**~~ (shipped) and
   ~~**47v**~~ (shipped): any link watched with a design, physics and techniques read;
   ~~**47w-2**~~ dissolves, ~~**47v-2**~~ a reference library and ~~**47v-3**~~ real-footage bars

@@ -126,6 +126,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
   macroDepth: 'Dome shading, contact shadow and a shallow depth of field in the close-up.',
   macroEdgeDetail: 'Breaks up smooth, blown-up edges with a fractal warp so a silhouette stays ragged and real.',
+  macroFine: 'Dye finer than the grid up close, carried without blur: stirring folds it into fine threads. 0 is the grid magnified.',
   macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig
