@@ -318,14 +318,6 @@ check('and neither does a sequence stage',
     mid.every(m => foldSteps.includes(m.kaleidoscope) && (m.layerCount === 1 || m.layerCount === 2)),
     mid.map(m => `${m.kaleidoscope}/${m.layerCount}`).join(' '));
 }
-// The side lamp's hue and place are round a circle (PLAN 47b-1): from 350° to 10° the short way, through 0, never through 180.
-{
-  const way = [0.25, 0.5, 0.75].map(t => lerpSettings({ sideLightHue: 350, sideLightAngle: 10 }, { sideLightHue: 10, sideLightAngle: 350 }, t));
-  const end = lerpSettings({ sideLightHue: 350 }, { sideLightHue: 10 }, 1);
-  check('and a stage glides the side lamp\'s hue and angle the short way round the circle',
-    way.every(m => (m.sideLightHue >= 350 || m.sideLightHue <= 10) && (m.sideLightAngle >= 350 || m.sideLightAngle <= 10)) && end.sideLightHue === 10,
-    way.map(m => `${m.sideLightHue}/${m.sideLightAngle}`).join(' '));
-}
 // And a desk strip takes the step, so a pinned Layers cannot write 1.4.
 // Since Desk v2 one control draws every strip, as a slider (learned to a
 // fader) or a knob (an encoder, or nothing): both of them take the step,

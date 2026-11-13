@@ -68,9 +68,22 @@ const check = (name, ok, detail = '') => { results.push({ name, ok }); console.l
 
 // ── A. The laws ────────────────────────────────────────────────────
 const lawsOut = 'node_modules/.cache/glint-laws.mjs';
-await build({ entryPoints: ['src/lib/glint.ts'], bundle: true, format: 'esm', platform: 'node', outfile: lawsOut, logLevel: 'warning' });
+// The laws, and the sequencer's glide (lerpSettings) for the side lamp's dials round the circle.
+await build({
+  stdin: { contents: "export * from './src/lib/glint.ts'; export { lerpSettings } from './src/lib/sequencer.ts';", resolveDir: process.cwd(), loader: 'ts' },
+  bundle: true, format: 'esm', platform: 'node', outfile: lawsOut, logLevel: 'warning',
+});
 const L = await import(pathToFileURL(`${process.cwd()}/${lawsOut}`).href);
 
+// The side lamp's hue and place are round a circle: a stage glides them from 350° to 10° the short way, through 0.
+// (Here and not in panel.mjs, which is over its size budget and may not grow.)
+{
+  const way = [0.25, 0.5, 0.75].map(t => L.lerpSettings({ sideLightHue: 350, sideLightAngle: 10 }, { sideLightHue: 10, sideLightAngle: 350 }, t));
+  const end = L.lerpSettings({ sideLightHue: 350 }, { sideLightHue: 10 }, 1);
+  check("a stage glides the side lamp's hue and angle the short way round the circle",
+    way.every(m => (m.sideLightHue >= 350 || m.sideLightHue <= 10) && (m.sideLightAngle >= 350 || m.sideLightAngle <= 10)) && end.sideLightHue === 10,
+    way.map(m => `${m.sideLightHue}/${m.sideLightAngle}`).join(' '));
+}
 {
   let mean = 0; const n = 1000;
   for (let i = 0; i < n; i++) mean += L.gapSpeed((i + 0.5) / n) / n;
