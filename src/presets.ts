@@ -2106,10 +2106,12 @@ export const PRESETS: Preset[] = [
       /*
         A look for physics that shipped with no look to show it (PLAN.md 28a).
         Stand the plate up (Plate Upright) and gravity acts in it. The solver
-        keeps a lamp under the plate where it leaves the frame (LAMP_HEAT in
-        gpu/fluid.ts), so what pools there is warmed, rises, cools and sinks
-        again: the cycle a lava lamp runs on, rather than a dish that settles.
-        Lit from behind like the real lamp.
+        keeps the bottle's floor warm and its upper glass cool (LAMP_GLASS and
+        LAMP_COOL_FROM in gpu/fluid/constants.ts: both heat the water and the
+        wax alike, by conduction through the gap, PLAN 27f-9h), so what pools
+        on the floor is warmed, rises, cools and sinks again: the cycle a lava
+        lamp runs on, rather than a dish that settles. Lit from behind like
+        the real lamp.
 
         The wax is a liquid of its own (PLAN 27f-9c): the oil (Oil Tension,
         Cahn–Hilliard, so it holds itself in bodies and the liquid round it
@@ -2122,11 +2124,27 @@ export const PRESETS: Preset[] = [
         dye a little too. Laid as a pool on the warm glass and three bodies
         on their way (lib/oilLay.ts, LAVA_BODIES).
       */
-      oilTension: 0.9,
+      oilTension: 1,             // 27f-9h: all the tension the dial has, for the rounder blobs
       oilBodies: 1,
       oilWeight: 0.6,
       plateUpright: 1,
-      solutalBuoyancy: 0.7,
+      /*
+        How strongly gravity weighs the liquids' density differences (Dye
+        Weight), which for the wax sets its Bond number, weight against
+        surface tension (PLAN 27f-9h): a real lamp's wax is a few per cent
+        heavier than its liquid cold and its capillary length is about
+        1.5 cm, so its blobs are fat and round; at 0.7 ours was about 3 mm
+        and the wax rose as many thin worms. 0.5 is as low as a standing
+        plate goes: the solver floors Dye Weight there when the plate is
+        upright (fluid.ts, "Dye weighs something whether or not a look says
+        how much"), so the 0.2 this look carried for a day ran as 0.5, and
+        0.2, 0.35 and 0.5 are one run to the last digit (measured, PLAN
+        27f-9j). At 0.5 the weight and the heat's lift both fall by 1.4 and
+        the capillary length grows by √1.4 ≈ 1.2; the rest of the rounder
+        look is Oil Tension at 1 and the lighter colour in the wax
+        (LAVA_DYE). Hand-poured colour weighs less with it.
+      */
+      solutalBuoyancy: 0.5,
       /*
         Heat spreads at water's own rate (PLAN 27f-9c). 0.5 made it fifty times
         faster for salt fingers in the dye-wax: with the wax a body, the heat
@@ -2140,7 +2158,14 @@ export const PRESETS: Preset[] = [
       lampGround: 1,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#b58c5c',
+      /*
+        The lamp's bulb behind the liquid (PLAN 27f-9h): an incandescent
+        lamp's warm white, about 2700 K, which through a clear liquid reads
+        as the golden glow of a real lamp. It was a dim tan (#b58c5c), and
+        under it the wax read as dark blobs on mud (the owner, 2026-11-12:
+        "isn't that exciting visually").
+      */
+      ledColor: '#ffc457',
       ledSpeed: 0.0,
       globalSpeed: 0.0168,
       surge: 0.38,
@@ -2165,7 +2190,14 @@ export const PRESETS: Preset[] = [
       buoyancy: 0.1,
       advection: 0.48,
       damping: 0.988,
-      automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
+      /*
+        No Evolve (PLAN 27f-9h). 28i-2 set 0.30 to keep the wax moving before
+        the lamp went round on its own (27f-9e); its hand pours colour and
+        breathes air into the plate, which no sealed lamp has, and on the Mac
+        film (2026-11-12) the lamp's fat blobs were beads and smears of
+        poured red by 17 s. The cycle is the motion now.
+      */
+      automateRate: 0,
       platePressure: 0.28,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -2174,7 +2206,14 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.001,
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
-      audioImpact: 0.55,
+      /*
+        The music's hands off (PLAN 27f-9h): at 0.55 its bursts, sparks and
+        streams laid dye and kicks of flow into the sealed lamp and tore the
+        wax into beads on the Mac film. The band reaches the lamp as the
+        look's own comment below says it should, through the wax's heat
+        (sceneMappings: the bass on Buoyancy) and the colours' turn.
+      */
+      audioImpact: 0,
       /*
         No stirring (it was 0.42, which with no music is 0.51 of the hand's
         speed, PLAN 27c): a lamp is not stirred, its liquid moves by the wax's
@@ -2189,9 +2228,14 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,
-      exposure: 0.46,
+      /*
+        Brighter than the old 0.46 with the wax laid lighter (LAVA_DYE) and
+        the bulb's warm white behind it (ledColor): the plate's mean light
+        went from a dim tan with near-black blobs to a lit lamp's.
+      */
+      exposure: 0.55,
       glossiness: 0.15,
-      plateRock: 0.25,
+      plateRock: 0,              // 27f-9h: a lamp stands still on its table; the rock on a standing plate also goes over the open rim (27f-9a)
       beatSqueeze: 0.0,
       dyeBudget: 0.65,
       bubbles: 0,
