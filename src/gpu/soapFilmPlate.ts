@@ -28,8 +28,10 @@
  *
  * Off (Soap Film at 0, every look but this one) nothing here is made or run.
  */
-import { Disposer, PipelineCache, bindGroup } from './kit';
+import { Disposer, PipelineCache, bindGroup, type Prep } from './kit';
+import type { Opening } from './opening';
 import { createSoapFilmGpu, type SoapFilmGpu } from './soapFilm';
+import { SOAP_KERNELS } from './wgsl/soapFilm';
 import { NOISE_CELLS, SOAP_PLATE_KERNELS, type SoapPlateKernel } from './wgsl/soapFilmPlate';
 
 /** The film's grid, square, filling the plate. 128 keeps the solver's single-workgroup passes under a couple of milliseconds on Metal. */
@@ -94,6 +96,20 @@ export class SoapFilmPlate {
   private readonly u32 = new Uint32Array(this.args);
   private readonly f32 = new Float32Array(this.args);
   private seed = 1;
+
+  /**
+   * The film's pipelines, for the show to build before it opens (gpu/prepare.ts):
+   * the solver's and the plate's, in their caches' names, ahead when the look
+   * hangs a frame from its first step (gpu/opening.ts, soap), behind otherwise.
+   */
+  static prepare(device: GPUDevice, open: Opening): Prep[] {
+    const film = PipelineCache.for(device, 'soapFilm');
+    const plate = PipelineCache.for(device, 'soapFilmPlate');
+    return [
+      ...Object.entries(SOAP_KERNELS).map(([k, code]) => film.computePrep(k, code, !open.soap)),
+      ...Object.entries(SOAP_PLATE_KERNELS).map(([k, code]) => plate.computePrep(k, code, !open.soap)),
+    ];
+  }
 
   constructor(private readonly device: GPUDevice, n = SOAP_PLATE_GRID) {
     this.film = createSoapFilmGpu(device, { nx: n, ny: n, dx: SOAP_PLATE_DX });
