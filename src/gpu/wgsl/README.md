@@ -36,6 +36,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `output.ts`, `outputFields.ts`: projector pass.
 - `pack.ts`: fields to the 8-bit plate (`PACK_KERNELS`); where Oil Bodies keeps the oil's share, `packDyeBodies` lets a part-oil cell's two liquids pass the light side by side, at the composite's rest path `DYE_PATH` (PLAN 47z-1; `npm run dropcolour`).
 - `particles.ts`: particle dye.
+- `fineDye.ts`: the closeup's fine dye (PLAN 47a): `FINE_ADVECT_WGSL`, `FINE_REDUCE_WGSL`, `FINE_DETAIL_WGSL`, `FINE_LAYOUT`, `FINE_EPS`, `FINE_MOST`. `fineWindow.ts`: `FINE_WINDOW_WGSL`, how the plate multiplies the grid's dye by it (`fineRaw`, read through `U.fineWin`/`U.fineTurn`).
 - `post.ts`, `postFields.ts`: post chain.
 - `probe.ts`: brightness probe.
 - `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `slump.ts`: slosh, soap film, lamp-boiling dish, ink slump. `soapFilm.ts`'s setup reads an `ext` face push (binding 8), zero unless written.
@@ -44,4 +45,4 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 ## Checks
 
-`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. A changed constant: `checkguard`.
+`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`, `finedye`. A changed constant: `checkguard`.

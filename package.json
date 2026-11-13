@@ -272,6 +272,7 @@
     "nolight": "node scripts/nolight.mjs",
     "closeupdepth": "node scripts/closeupdepth.mjs",
     "macroview": "node scripts/macroview.mjs",
+    "finedye": "node scripts/finedye.mjs",
     "turing": "node scripts/turing.mjs",
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",

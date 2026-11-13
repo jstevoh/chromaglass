@@ -10,9 +10,13 @@ import { SPLAT_KERNELS, splatKernel } from '../src/gpu/wgsl/splat';
 import { BEAD_KERNELS } from '../src/gpu/wgsl/beadMask';
 import { SOAP_KERNELS } from '../src/gpu/wgsl/soapFilm';
 import { SOAP_PLATE_KERNELS } from '../src/gpu/wgsl/soapFilmPlate';
+import { FINE_ADVECT_WGSL, FINE_REDUCE_WGSL, FINE_DETAIL_WGSL } from '../src/gpu/wgsl/fineDye';
 import { STEP_WGSL, SPLAT_WGSL, LENS_WGSL } from '../src/gpu/wgsl/glint';
 import { TANK_KERNELS } from '../src/gpu/wgsl/tank';
 import { TANK_DRAW_WGSL } from '../src/gpu/tankDraw';
+
+/** The closeup's fine dye (PLAN 47a): carried, averaged and turned into detail, built behind the show. */
+const FINE_KERNELS: Record<string, string> = { advect: FINE_ADVECT_WGSL, reduce: FINE_REDUCE_WGSL, detail: FINE_DETAIL_WGSL };
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -47,9 +51,10 @@ const FORMATS: Record<string, string> = {};
   for (const [name, code] of Object.entries(TANK_KERNELS)) await check(`tank.${name}`, code);
   await check('tank.draw', TANK_DRAW_WGSL);
   for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
+  for (const [name, code] of Object.entries(FINE_KERNELS)) await check(`fine.${name}`, code);
   // The lens pass after the plate (PLAN 47e, 47d, 47b-side): glitter, the lens, the side lamp.
   const glint = { step: STEP_WGSL, splat: SPLAT_WGSL, lens: LENS_WGSL };
   for (const [name, code] of Object.entries(glint)) await check(`glint.${name}`, code);
-  out.push(`checked ${Object.keys(glint).length + Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(TANK_KERNELS).length + 1} shaders`);
+  out.push(`checked ${Object.keys(glint).length + Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(TANK_KERNELS).length + 1 + Object.keys(FINE_KERNELS).length} shaders`);
   return out;
 };

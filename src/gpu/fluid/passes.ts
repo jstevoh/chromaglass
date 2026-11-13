@@ -542,6 +542,8 @@ export class FluidPasses extends FluidFields {
   }
 
   protected stepParticles(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    // The closeup's fine dye rides the same velocity by the same displacement (PLAN 47a-1, fineDye.ts).
+    this.fine?.step(enc, this.dye.read, this.velForced, this.N, stepDisplacement(p.dt, p.advection, this.N), p.dt);
     const want = Math.max(0, Math.min(1, p.particles ?? 0));
     if (want <= 0) {
       if (this.particles) { this.particles.dispose(); this.particles = null; }

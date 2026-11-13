@@ -130,6 +130,8 @@ export const PLATE_FIELDS: Field[] = [
     type: 'f32',
     note: 'the splat weight a fully populated texel carries, so coverage reads 1 there',
   },
+  { name: 'fineWin', type: 'vec4f', note: "the front plate's fine dye window (PLAN 47a-1): centre and half size in fluid uv along the screen's axes; half size 0 is none" },
+  { name: 'fineTurn', type: 'vec4f', note: 'its screen-to-fluid cos and sin; z how much of the detail is added' },
   { name: 'photo', type: 'f32' },
   { name: 'postBlur', type: 'f32', note: 'gooey blur radius multiplier' },
   { name: 'rotation0', type: 'f32' },

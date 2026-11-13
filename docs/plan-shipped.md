@@ -13940,6 +13940,57 @@ owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a vid
 colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
 row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
 
+
+## 47a. The closeup's fine dye: a fine window, with the dye finer than the flow (2026-11-13)
+
+Asked 2026-11-11 from a macro artist's films; approved with the rest of §47 on 2026-11-13. At 6x
+a solver cell covers tens of screen pixels, and the closeup was a magnified blur: fine over coarse
+(the mean luminance gradient at a fine scale over a four-times-coarser one) 1.08 to 1.2 where the
+films read 2.2 to 3.1.
+
+Built: `gpu/closeupWindow.ts` (where the camera looks, screen-aligned, turning with the layer,
+square texels at two screen pixels each, margin 1.1, none at 1x, under the kaleidoscope or the
+dish spread, or when a cell is under three texels), `gpu/fineDye.ts` and `wgsl/fineDye.ts` (two
+fine fields over the window, carried every step through the solver's velocity by a clamped
+Catmull-Rom semi-Lagrangian step, no diffusion, the Batchelor limit; each born again from the grid
+every three time units, half a life apart, crossfaded by a triangle on age, stepped about once
+a frame; a camera that pans,
+turns or zooms is the same remap as the flow; dye from past the window's edge is the grid's), and
+`wgsl/fineWindow.ts` (the plate multiplies the grid's raw dye by the fine dye's ratio to it, in
+the dye's encoded space, through the same warp and defocus taps). Setting Fine Detail
+(`macroFine`, Macro section, desks, phone, MIDI, default 1).
+
+What the lab taught on the way, each a form dropped: the fine field nudged to the grid lost the
+detail (CPU toy 1.03); particles born in the window made 2.8 on the measure as Poisson grain; a
+difference added (fine less its cell mean) drew black beads on thin arms (thickness to nothing,
+colour left); a ratio per channel drew pale wisps in dark gaps. The shipped form scales each fine
+field by one number so its mean round each cell has the grid's thickness, keeps the colour it
+carried, and trusts it only as far as it holds the grid's dye (a pour since it was born shows at
+once). A seed sharpened by one backward heat step was tried and taken out: on the owner's Mac
+it drew a still poured column's edge as regular teeth (the grid's cell staircase, given back).
+Stepping the fine dye at every solver step cost a third of the frame rate on held closeups
+(Acid Trip 28 to 16 fps, Classic 27 to 17, filmed 2026-11-13), so it gathers the steps to about
+one a frame (`FINE_TICK`), and the window's edge is capped at 1024 texels.
+
+The owner then saw still drops in the closeup with toothed edges and a faint grid of squares
+(2026-11-13). Three causes, each found on the finedye check's still plate and fixed: the scale was
+the plate's dye at the texel over the field's block mean, which is not 1 even for a field equal
+to the plate's dye, so blocks straddling a pool's edge dimmed one side and lifted the other (now
+the field's block mean against the plate's over the same texels); the field was seeded from and
+divided by a full sixteen-tap Catmull-Rom where the plate draws a five-tap one, a dark rim round
+every pool (now `plateRead`, the plate's own read); and the fields were 16-bit, read back and
+stored again every step, so each store snapped a still pool's gentle slope into flat runs and the
+slope became a stair of blocks a cell across (now 32-bit). The block means are read Catmull-Rom,
+clamped: bilinear's creases were a screen-aligned grid the per-cell mass line read as 0.27 at the
+p90 against 0.11.
+
+Measured (`npm run finedye`, lab, 256², 6x, a forced vortex over three dyes, 600 steps): fine over
+coarse 1.099 to 1.121 stirred against no rise still; dyed cells' thickness off the grid's by a
+median 0.023 (nine in ten under 0.11); still pools' texture 0.004 at the 99th percentile (bar
+0.02; 0.025 before the fixes). Open: 47a-2 (diffusion at real
+D, capillary forces, the back plate), 47a-3 (a carried interface), 47a-4 (the plate folds little
+below a cell; more detail needs more stirring), 47a-5 (bars after a camera whip), 47a-6 (a characteristic map in place of resampling every step).
+
 ## 47z-5. Foam Cells: a packed foam whose films meet at 120° (2026-11-13)
 
 The owner asked for every finding of the Microlab films (2026-11-13, "Ok let's do this all"),

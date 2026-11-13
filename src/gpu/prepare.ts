@@ -60,6 +60,7 @@ import { WebGPUAir } from './air';
 import { WebGPUSlosh } from './slosh';
 import { SoapFilmPlate } from './soapFilmPlate';
 import { WebGPUParticles } from './particles';
+import { FineDye } from './fineDye';
 import { WebGPUCamera } from './camera';
 import { WebGPUOutput } from './output';
 import { PICTURE_FORMAT, WebGPUPostChain } from './post';
@@ -413,6 +414,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
     ...WebGPUSlosh.prepare(device, open),
     ...SoapFilmPlate.prepare(device, open),
     ...WebGPUParticles.prepare(device, open),
+    ...FineDye.prepare(device, open),
     ...WebGPUCamera.prepare(device, format, open),
     ...WebGPUOutput.prepare(device, format),
     ...WebGPUPostChain.prepare(device, format, open),

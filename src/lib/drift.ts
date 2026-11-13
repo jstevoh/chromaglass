@@ -122,7 +122,7 @@ const NOT_THE_LOOK = new Set([
   // The song's title as ink (PLAN 37x-10): where it lands and how fast it goes are the show's, never a wander.
   'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   'macroHold', 'macroCells', 'macroCellScale', 'macroLacing', 'macroDepth',
-  'macroEdgeDetail', 'macroRelief', 'macroSync', 'macroChase',
+  'macroEdgeDetail', 'macroRelief', 'macroFine', 'macroSync', 'macroChase',
   // How far the music moves the frame (lib/plateRock.ts): a wander would
   // start the frame sliding under the viewer by itself, the very thing the
   // owner turned off (2026-10-11).

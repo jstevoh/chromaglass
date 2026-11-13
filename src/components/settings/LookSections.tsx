@@ -975,6 +975,15 @@ export const MacroSection = ({ c }: { c: SectionCtx }) => {
               onChange={(v: number) => onUpdate({ macroRelief: v })}
           settingKey="macroRelief"
         />
+            <Slider
+              label="Fine Detail"
+              value={settings.macroFine}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v: number) => onUpdate({ macroFine: v })}
+          settingKey="macroFine"
+        />
           </>
         )}
       </section>
