@@ -1,6 +1,7 @@
-import { VisualizerSettings } from './types';
+import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
 import { MOIRE_LOOKS } from './presetsMoire';
 import { FOAM_CELLS } from './presetsFoam';
+import { stirCord, stirCordDepth } from './lib/stir';
 
 export interface Preset {
   id: string;
@@ -2362,6 +2363,36 @@ for (const m of MOIRE_LOOKS) {
   const house = from.settings.sceneMappings ?? [];
   const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
   PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
+}
+
+/*
+  The music's stir, on every look (PLAN 38u-4, 38u-5).
+
+  Until the physics audit of 2026-11-13 the solver's step read the analyser
+  itself: the energy multiplied Turbulence's stir by up to two, and mid and
+  treble laid a second curl of noise wherever there was dye. Every look
+  churned with the band by that and no look said so: with its cords all
+  pulled out it still moved to the music, which is the one thing the plate's
+  rule (sound reaches it only through cords and preset patches) says cannot
+  happen. The owner chose to route it through cords. So the step takes no
+  sound, and each look carries what it always did as a cord that can be
+  seen, turned and pulled: the sound's mids on Turbulence, at the depth
+  that puts its stir with a band playing about where the multiplier and the
+  eddies had it for that look's own Turbulence and Sound Drive (lib/stir.ts
+  `stirCordDepth`; `npm run musicstir` holds each look within a quarter over
+  a song).
+
+  Added here, after the looks are written and the pack's are laid over
+  theirs, and not typed into each look: it is one rule with one depth
+  formula, and a look whose Turbulence is retuned keeps the right cord
+  without anyone remembering to. It is beside a look's two or three answers
+  to the drums (PLAN 28i-3b), not one of them: those are what a look does on
+  a hit, written per look, and this is the stir every look had under them
+  all along (`npm run soundpatch` counts them apart).
+*/
+for (const p of PRESETS) {
+  const depth = stirCordDepth(p.settings.turbulenceScale ?? DEFAULT_SETTINGS.turbulenceScale, p.settings.audioImpact ?? DEFAULT_SETTINGS.audioImpact);
+  if (depth > 0) p.settings.sceneMappings = [...(p.settings.sceneMappings ?? []), stirCord(depth)];
 }
 
 /*

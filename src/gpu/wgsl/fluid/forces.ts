@@ -120,29 +120,13 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
 
   /*
-    Spin's stir, where there is colour. Masked by the colour of the cell and
-    its four neighbours, [1 4 1] each way, not of the cell alone (PLAN 38r-6).
-    A force between two glasses does not stop at a cell's edge: the gap's
-    viscous shear spreads it over about the gap's own width (Brinkman's
-    ν∇²u, whose reach in a Hele-Shaw cell is h/√12), and at 2 mm that is a
-    cell or so of the app's plate. Masked by the cell alone the stir stepped
-    from nothing to whole at every pool's sharp edge, and glycerine, which
-    takes a step's force whole (kΔt 50), left that step's grid-scale
-    pressure in the flow: \`npm run thingap\` read its |∇·(hu)| at 0.0059 of
-    the flux against 0.005, and 0.00056 with Spin off.
+    The music's eddies were here: a second curl of noise laid wherever there
+    was colour, sized by mid and treble read straight off the analyser, with
+    no cord and no control (PLAN 38u-5; the physics audit, 2026-11-13).
+    Sound reaches the plate only through cords, so they are gone, and what
+    they added is in the depth of each look's cord from the sound's mids
+    onto Turbulence above (lib/stir.ts); npm run musicstir holds it.
   */
-  if (S.spin > 0.0) {
-    let n4 = textureLoad(dye, clampP(q + vec2i(1, 0), S.n), 0).a + textureLoad(dye, clampP(q - vec2i(1, 0), S.n), 0).a
-           + textureLoad(dye, clampP(q + vec2i(0, 1), S.n), 0).a + textureLoad(dye, clampP(q - vec2i(0, 1), S.n), 0).a;
-    let dm = (4.0 * d + n4) / 8.0;
-    if (dm > 0.05) {
-      let qn = p * 0.025 + vec2f(0.0, S.time * 0.08);
-      let n = snoise(qn);
-      let dn_dx = (snoise(qn + vec2f(0.01, 0.0)) - n) * 100.0;
-      let dn_dy = (snoise(qn + vec2f(0.0, 0.01)) - n) * 100.0;
-      v = vec4f(v.xy + vec2f(dn_dy, -dn_dx) * (S.spin / 0.03) * (0.4 / 3.0) * min(1.0, dm), v.z, v.w);
-    }
-  }
 
   if (S.tension > 0.0 && d >= 0.01) {
     let col = dyeC.rgb / d;

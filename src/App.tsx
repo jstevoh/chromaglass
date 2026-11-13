@@ -4,6 +4,7 @@ import { RenderPanel } from './components/RenderPanel';
 import { RecordPanel } from './components/RecordPanel';
 import { LiquidVisualizer, LiquidVisualizerHandle } from './components/LiquidVisualizer';
 import { followLine } from './lib/followedPlace';
+import { musicStirOf, withMusicStir } from './lib/stir';
 import { songCueFrom } from './lib/scenePacing';
 import { holdWhereItIs, macroKey, shotLabel } from './lib/macroCamera';
 import { PRESET_CONTRACTS } from './presetPlate';
@@ -3135,6 +3136,7 @@ export default function App() {
             onToggleMusic={toggleMusic}
             onTrack={playTrack}
             soundDrive={settings.audioImpact}
+            musicStir={musicStirOf(settings.sceneMappings)}
             songLine={audioSource === 'none' ? '' : songLine}
             score={scoreProps}
             mapLine={followLine(musicIntel.state.follow, musicIntel.state.track?.title)}
@@ -3196,6 +3198,7 @@ export default function App() {
             onSlosh={(v) => updateSettings({ slosh: v })}
             barLine={audioSource === 'none' ? '' : barKnown}
             onSoundDrive={(v) => updateSettings({ audioImpact: v })}
+            onMusicStir={(v) => updateSettings({ sceneMappings: withMusicStir(settingsRef.current.sceneMappings, v) })}
             mixer={{ settings, onSetting: updateSettings, hasFilm: filmSource !== 'none', hasMark: markLoaded, takes: mixTakes, backLook: backLookName }}
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}

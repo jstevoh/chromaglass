@@ -213,6 +213,9 @@ export interface PhoneStageProps {
   onTrack: (t: Track) => void;
   soundDrive: number;
   onSoundDrive: (v: number) => void;
+  /** How deep the look's cord from the sound's mids onto Turbulence is (lib/stir.ts `musicStirOf`), and setting it (`withMusicStir`). */
+  musicStir: number;
+  onMusicStir: (v: number) => void;
   /** The song's shape in a word (lib/songShape.ts): "drop", "build 40%", "breakdown", or empty while it simply plays. */
   songLine: string;
   /*
@@ -1113,6 +1116,21 @@ export function PhoneStage(p: PhoneStageProps) {
           <div className="mt-4">
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
+          </div>
+          {/*
+            Music Stir: the depth of the look's cord from the sound's mids
+            onto Turbulence, which is how the music stirs the liquid since
+            the solver stopped reading the analyser itself (PLAN 38u-4,
+            38u-5). The desk has it in Patches, as the cord it is, where its
+            depth is set and it is pulled like any other; the phone has no
+            patch bay, so this slider is that cord's control here
+            (lib/stir.ts `musicStirOf`, `withMusicStir`). At 0 the cord is
+            pulled and the band stirs nothing; raised on a look saved
+            before the cord existed, it puts one in.
+          */}
+          <div className="mt-3">
+            <Slider label="Music Stir" value={p.musicStir} min={0} max={1} step={0.01} onChange={p.onMusicStir}
+              display={`${Math.round(p.musicStir * 100)}%`} touch testId="phone-music-stir" />
           </div>
           </PanelGuard>
         </PhoneSheet>
