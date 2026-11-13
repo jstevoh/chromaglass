@@ -2204,10 +2204,13 @@
       "run": "node scripts/renders.mjs",
       "why": [
         "The sound re-renders nothing it need not (scripts/renders.mjs, PLAN.md",
-        "§14f): with the band playing the App renders at most five times a",
-        "second more than the ear tells it (ten), and the plate still hears a",
-        "new reading nearly every frame; on a quiet page, at most one and a",
-        "half. On a laptop page and a phone.",
+        "§14f and 46f): with the band playing the ear's view is told ten times",
+        "a second and the App renders for none of them (at most four a second,",
+        "for the song line), the desk's level still moves, at most sixty",
+        "components render a second (main: 5,840), and the plate still hears a",
+        "new reading nearly every frame; on a quiet page the App does not",
+        "render and the desk's clock ticks in its own component. On a laptop",
+        "page and a phone.",
         "The counts need no GPU; the plate's own line (a new reading nearly",
         "every frame) needs a plate that draws and is held on the Mac's open",
         "shard below. On the dist/ the phone's step built, like the Mixer."
@@ -3342,7 +3345,8 @@
       "run": "node scripts/renders.mjs",
       "why": [
         "The plate hears a new reading nearly every frame while the App renders",
-        "ten times a second (scripts/renders.mjs, PLAN.md §14f): the line the",
+        "for none of the ear's ten a second (scripts/renders.mjs, PLAN.md §14f,",
+        "46f): the line the",
         "Measure job skips, because there no plate draws. About forty seconds."
       ]
     },

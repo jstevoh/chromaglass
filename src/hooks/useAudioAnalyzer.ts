@@ -8,6 +8,7 @@ import { EarClock, onWallAsk, onPlateFrame } from '../lib/earClock';
 import { handSounds, listenForHands } from '../lib/handSounds';
 import { installLiveConsole, setLiveAudio } from '../lib/liveShow';
 import { canUseProFeature } from '../lib/tierGates';
+import { createEarView, type EarView } from './useEarView';
 
 export interface AudioData {
   /**
@@ -93,19 +94,27 @@ const TICK_MS = 16;
 
   So the ear keeps two things. `live` is a ref holding every reading the
   moment it is made, and the plate (and the cast feed) read it on their own
-  clocks. `audioData` is the same reading published as state at most every
-  EAR_VIEW_MS, for what renders. 100 ms is ten a second: faster than a meter
-  needs to look alive, and slow enough that a render of the App is no longer
-  a per-frame cost.
+  clocks. `view` is the same reading published at most every EAR_VIEW_MS,
+  for what renders. 100 ms is ten a second: faster than a meter needs to look
+  alive, and slow enough that a render is no longer a per-frame cost.
+
+  It was React state on this hook until PLAN.md 46f, so each of those ten
+  rendered the App that calls it, shell and desks and all: 14.3 ms at the
+  median on the owner's Mac, 5.4 s of a 34 s profile with the band playing.
+  Now it is a store (hooks/useEarView.ts) that the few components showing a
+  level subscribe to, each for the part it shows, and the App renders for
+  none of them.
 */
 const EAR_VIEW_MS = 100;
 
 export interface Ear {
   /**
-   * The show's analysis is running and hearing, as React state at most ten
-   * times a second, for the desks, meters and anything else that renders.
+   * The show's analysis is running and hearing, published at most ten times
+   * a second, for the meters and readouts: a store, read with `useEarView`
+   * by the component that shows a part of it, so nothing above that
+   * component renders for a reading (PLAN.md 46f). Stable for the hook's life.
    */
-  audioData: AudioData | null;
+  view: EarView;
   /**
    * Every reading, the moment it is made, for readers on their own clock (the
    * plate's frame, the cast feed). Null while the ear is off. Reading it
@@ -155,7 +164,7 @@ export function useAudioAnalyzer(
    */
   sharedContext: AudioContext | null = null,
 ): Ear {
-  const [audioData, setAudioData] = useState<AudioData | null>(null);
+  const [earView] = useState(createEarView);
   const liveRef = useRef<AudioData | null>(null);
   /*
     The live stream's console in the Mac app (PLAN.md 37x-4b; the panel is
@@ -223,7 +232,7 @@ export function useAudioAnalyzer(
     sourceRef.current = null;
     liveRef.current = null;
     publishedAtRef.current = -Infinity;
-    setAudioData(null);
+    earView.publish(null);
     deafRef.current = false;
     setDeaf(false);
   }, []);
@@ -347,7 +356,7 @@ export function useAudioAnalyzer(
         if (now - due >= EAR_VIEW_MS) {
           publishedAtRef.current = Number.isFinite(due) ? Math.max(due + EAR_VIEW_MS, now - EAR_VIEW_MS) : now;
           publishedRef.current++;
-          setAudioData(next);
+          earView.publish(next);
         }
         if (deafRef.current && audioContext.state === 'running') { deafRef.current = false; setDeaf(false); }
       };
@@ -472,5 +481,5 @@ export function useAudioAnalyzer(
     return () => { set.delete(fn); };
   }, []);
 
-  return { audioData, live: liveRef, onReading, deaf: deaf && isActive, debug };
+  return { view: earView.view, live: liveRef, onReading, deaf: deaf && isActive, debug };
 }

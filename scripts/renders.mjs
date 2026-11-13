@@ -23,15 +23,24 @@
  *   the band        the simulated band playing. The ear has to be reading
  *                   (forty-five a second here; where a plate draws, once for
  *                   every frame it drew), or nothing below means anything.
- *                   React is told eight to ten and a half times a second
- *                   (EAR_VIEW_MS): a floor too, because meters frozen on one
- *                   reading render nothing and would pass a ceiling. The App
- *                   renders for each of those and at most ALLOWED_EXTRA a
- *                   second besides, so a dead counter is red as well as a
- *                   busy one, and every commit on the page, of any component,
- *                   is held to the same, so a component listening to the ear
- *                   and rendering itself per reading cannot hide under the
- *                   App's count. And the plate: a new reading on four frames
+ *                   The ear's view is told eight to ten and a half times a
+ *                   second (EAR_VIEW_MS): a floor too, because meters frozen
+ *                   on one reading render nothing and would pass a ceiling,
+ *                   and on the laptop the level in the desk's status line has
+ *                   to move at least five times a second, read off the page.
+ *                   The App renders for none of them (PLAN 46f: the view is a
+ *                   store its readers subscribe to, where it was state on the
+ *                   App and rendered the whole shell for each, 14.3 ms a time
+ *                   on the owner's Mac), at most ALLOWED_EXTRA a second for
+ *                   what is named there; every commit on the page, of any
+ *                   component, is held to the ear's ten and those, so a
+ *                   component listening to the ear and rendering itself per
+ *                   reading cannot hide under the App's count; and the
+ *                   components that render in a second are counted (`work`,
+ *                   every one in every commit) and held to WORK_HEARING, so
+ *                   a reader of the view that sits above a desk, and so
+ *                   renders the desk ten times a second in a commit of its
+ *                   own, is as red as the App doing it. And the plate: a new reading on four frames
  *                   in five, and on nine in ten a reading taken on that very
  *                   frame. The last two are the feature, not the counts: a
  *                   fix that stopped the renders by feeding the plate the
@@ -49,8 +58,9 @@
  *                   ride itself (PLAN.md §14f). So: the desk's Dimmer changes
  *                   seven to ten and a half times a second (a floor too: a
  *                   desk frozen on one value renders nothing and passes a
- *                   ceiling), the App renders for each of those plus the
- *                   Perform desk's clock and no more, the fader's last value
+ *                   ceiling), the App renders for each of those and no more
+ *                   (and each of them commits, which is what says the commit
+ *                   counter is fed on this page), the fader's last value
  *                   is where the setting lands, and, where a plate draws, the
  *                   Dimmer the plate draws changes at least twice as often as
  *                   the desk's (read by value on every frame, so a stale copy
@@ -58,16 +68,25 @@
  *                   renders by feeding the plate React's ten-a-second state
  *                   would pass every count and step the picture. And a
  *                   second after the fader stops, no frame lays a ride at all
- *                   and the App is back to its clock: #348's first try laid
+ *                   and the App renders for nothing: #348's first try laid
  *                   the ride over every frame for good after one touch.
- *   the quiet page  no sound source: the App renders between 0.6 and 1.5
- *                   times a second, which is the Perform desk's "live for
- *                   m:ss" clock (a real change, once a second; a
- *                   three-second window holds up to four of its ticks) and
- *                   nothing else. On the Design desk it rendered five times a
- *                   second before, every one a poll setting a label or a
- *                   badge to what it already was, and the engine status did
- *                   the same once a second where a plate draws.
+ *   the quiet page  no sound source: the App does not render (at most
+ *                   QUIET_APP a second), and on the laptop the page commits
+ *                   0.6 to 1.5 times a second, which is the Perform desk's
+ *                   "live for m:ss" clock in a component of its own (a real
+ *                   change, once a second; a three-second window holds up
+ *                   to four of its ticks): its text has to change, and at
+ *                   most WORK_QUIET components render a second. The clock
+ *                   was state on the App until PLAN 46f, so this line asked
+ *                   0.6 to 1.5 App renders a second, each of them the whole
+ *                   shell (13.8 ms on the owner's Mac, once a second, on a
+ *                   page whose frame is 16.7). The phone has no desk and no
+ *                   clock: nothing commits there, and what says its counters
+ *                   are fed is that they counted the page's opening. On the
+ *                   Design desk it rendered five times a second before §14f,
+ *                   every one a poll setting a label or a badge to what it
+ *                   already was, and the engine status did the same once a
+ *                   second where a plate draws.
  *
  * The counts come from `?debug`: `appRenders` counts the App's function
  * bodies (so it counts renders React threw away too, which cost the same),
@@ -141,6 +160,7 @@ const sample = (page) => page.evaluate(() => {
   return {
     rideFrames: rd.frames, laid: rd.laid, deskMoves: window.__deskMoves ?? 0, drawnMoves: window.__drawnMoves ?? 0, offered: window.__offered ?? 0,
     t: performance.now(), renders: c.appRenders, commits: window.__commits ?? NaN, whoAt: window.__who?.length ?? 0, lost: window.__lost ?? 0,
+    work: window.__work ?? NaN, levelMoves: window.__levelMoves ?? 0,
     reads: r.frame + r.ask + r.tick, published: c.ear?.published ?? 0,
     frames: h.frames, fresh: h.fresh, ownFrame: h.ownFrame ?? 0,
   };
@@ -207,6 +227,7 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
       itself is the label whose count matches its renders.
     */
     window.__who = [];
+    window.__work = 0;
     /*
       And the GPU devices lost (LiquidVisualizer's loss handler logs each one):
       a loss and its recovery commit the plate's own state twice, without
@@ -236,6 +257,10 @@ async function open(browser, screen, { source, desk, fader = false, pad = false 
         for (let f = first; f; f = f.sibling) {
           now.add(f);
           const worked = !seen.has(f) && (f.flags & 1) === 1 && f.alternate !== null && typeof f.type !== 'string';
+          // Every one, not only the topmost: what a commit cost is how many
+          // components ran, and a count of commits cannot tell one leaf from
+          // the whole shell (PLAN 46f; `work` below).
+          if (worked) window.__work++;
           if (worked && !under) out.push(label(f));
           if (f.child) stack.push([f.child, under || worked]);
         }
@@ -356,6 +381,8 @@ async function measure(page) {
       commits: (b3.commits - a.commits) / s3,
       published: (b3.published - a.published) / s3,
       deskMoves: (b3.deskMoves - a.deskMoves) / s3,
+      work: (b3.work - a.work) / s3,
+      levelMoves: (b3.levelMoves - a.levelMoves) / s3,
       reads: (b.reads - a.reads) / s,
       frames: b.frames - a.frames,
       frameRate: (b.frames - a.frames) / s,
@@ -376,13 +403,41 @@ async function measure(page) {
 const heldFor = (w) => (w.some(x => x.seconds > 3.5) ? ` (frames over windows of ${w.map(x => x.seconds.toFixed(1)).join(' and ')} s)` : '');
 
 /*
-  What else may render the App, a second, beside the ear's ten: the Perform
-  desk's "live for" clock (one) and the song line's build and drop readout,
-  which the desk polls four times a second and which really changes while a
-  build climbs (four). Named rather than folded into one round number, so a
-  new renderer has to be added here, with its reason, to pass.
+  What may render the App, a second, while the band plays: the song line's
+  build and drop readout, which the desk polls four times a second and which
+  really changes while a build climbs (four). Named rather than folded into
+  one round number, so a new renderer has to be added here, with its reason,
+  to pass. It was `1 + 4` and "beside the ear's ten" until PLAN 46f: the one
+  was the Perform desk's "live for" clock, which now ticks in a component of
+  its own (CLOCK below), and the ten were the ear's view, which is now a
+  store its readers subscribe to.
 */
-const ALLOWED_EXTRA = 1 + 4;
+const ALLOWED_EXTRA = 4;
+/** The desk's clock: one commit a second where there is a desk (the laptop), in its own component. */
+const CLOCK = 1;
+/** App renders a second on a page where nothing is happening: none, with room for one stray in a three-second window. */
+const QUIET_APP = 0.5;
+/*
+  Components that render in a second (`work`: every function or class
+  component React ran, in every commit, counted by the devtools hook).
+
+  This is the line PLAN 46f is held by. A count of renders or commits says
+  how often and not how much: main's ten App renders a second and this
+  tree's ten commits of one percentage both read "ten". Read 2026-11-13 in a
+  cloud session, both screens, two windows each:
+    the band    main 5,840 a second on the laptop and 714 on the phone, this tree 11 and 0
+    no sound    main 531 a second on the laptop and 65 on the phone, this tree 1 and 0
+  The bars sit an order of magnitude under main and a few times over what
+  the readers need (a percentage ten times a second; a clock once), so a
+  reader moved up the tree, or a new ten-a-second state on the App, is red
+  long before it costs what main did.
+*/
+const WORK_HEARING = 60;
+const WORK_QUIET = 10;
+/** The quiet page, by screen: the App still, and the page committing for the desk's clock where there is one. */
+const quietPage = (screen, renders, commits) => renders <= QUIET_APP
+  && (screen.touch ? commits <= QUIET_APP : commits >= 0.6 * CLOCK && commits <= 1.5 * CLOCK);
+const quietSays = (screen) => (screen.touch ? `at most ${QUIET_APP} App renders and commits a second` : `at most ${QUIET_APP} App renders a second, 0.6 to 1.5 commits for the desk's clock`);
 
 const browser = await launchChromium(chromium);
 let failed = 0;
@@ -390,6 +445,18 @@ try {
   for (const screen of SCREENS) {
     {
       const { page, ctx } = await open(browser, screen, { source: 'simulated', desk: 'perform' });
+      // The level the desk's status line shows, read on every animation frame: how often what a person sees moves.
+      await page.evaluate(() => {
+        let last;
+        window.__levelMoves = 0;
+        const watch = () => {
+          const t = document.querySelector('[data-testid="status-hearing"]')?.textContent ?? null;
+          if (last !== undefined && t !== last) window.__levelMoves++;
+          last = t;
+          requestAnimationFrame(watch);
+        };
+        watch();
+      });
       const w = await measure(page);
       const f = (x) => x.toFixed(1);
       /*
@@ -401,16 +468,29 @@ try {
       check(`${screen.name}, the band: the ear is reading`,
         w.every(x => (PLATE ? x.frames >= FRAMES_ASKED && x.reads >= 0.9 * x.frameRate : x.reads >= 45)),
         w.map(x => `${f(x.reads)}/s${PLATE ? ` for ${f(x.frameRate)} frames/s, ${x.frames} frames` : ''}`).join(', ') + heldFor(w));
-      check(`${screen.name}, the band: React is told what the ear heard eight to ten and a half times a second`,
+      check(`${screen.name}, the band: the ear's view is told what it heard eight to ten and a half times a second`,
         w.every(x => x.published >= 8 && x.published <= 10.5), w.map(x => `${f(x.published)}/s`).join(', '));
-      check(`${screen.name}, the band: the App renders for each of those and at most ${ALLOWED_EXTRA} a second besides`,
-        w.every(x => x.renders >= 0.9 * x.published && x.renders <= x.published + ALLOWED_EXTRA),
+      /*
+        And somebody is shown it. The floor that says the meters are alive
+        was the App's own renders (one for each reading told); the App no
+        longer renders for a reading, so the floor is what the page shows:
+        the level in the desk's status line, which the band moves on nearly
+        every reading (10.0 a second in a cloud session). The phone shows no
+        level (no desk, no status line), and says so.
+      */
+      const levelLine = `${screen.name}, the band: the desk's level moves five to ten and a half times a second`;
+      if (screen.touch) skip(levelLine, 'the phone shows no level');
+      else check(levelLine, w.every(x => x.levelMoves >= 5 && x.levelMoves <= 10.5), w.map(x => `${f(x.levelMoves)}/s`).join(', '));
+      check(`${screen.name}, the band: the App renders for none of those, at most ${ALLOWED_EXTRA} a second`,
+        w.every(x => x.renders <= ALLOWED_EXTRA),
         w.map(x => `${f(x.renders)}/s for ${f(x.published)}`).join(', '));
-      check(`${screen.name}, the band: and nothing else on the page commits more`,
-        // A floor too: every App render React finishes is a commit, so a
-        // counter the devtools hook stopped feeding (React swallows its own
-        // errors injecting it) reads 0 and must not pass as "nothing".
-        w.every(x => x.commits >= 0.9 * x.renders && x.commits <= x.published + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.renders)} renders`).join(', ') + whoFor(w));
+      check(`${screen.name}, the band: and the page commits no more than the ear's view, the clock and those`,
+        // A floor too, where the level is shown: each move of it is a commit,
+        // so a counter the devtools hook stopped feeding (React swallows its
+        // own errors injecting it) reads 0 and must not pass as "nothing".
+        w.every(x => x.commits >= 0.9 * x.levelMoves && x.commits <= x.published + CLOCK + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.levelMoves)} moves of the level`).join(', ') + whoFor(w));
+      check(`${screen.name}, the band: at most ${WORK_HEARING} components render a second`,
+        w.every(x => x.work <= WORK_HEARING && Number.isFinite(x.work)), w.map(x => `${f(x.work)}/s`).join(', '));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
         check(hears, w.every(x => x.frames >= FRAMES_ASKED && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
@@ -464,8 +544,9 @@ try {
       const w = await measure(page);
       check(`${screen.name}, a fader: the desk shows its value seven to ten and a half times a second`,
         w.every(x => x.deskMoves >= 7 && x.deskMoves <= 10.5), w.map(x => `${f(x.deskMoves)}/s`).join(', '));
-      check(`${screen.name}, a fader: the App renders for those and the desk's clock, at most ${ALLOWED_EXTRA} a second besides`,
-        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits <= x.deskMoves + ALLOWED_EXTRA),
+      check(`${screen.name}, a fader: the App renders for those, at most ${ALLOWED_EXTRA} a second besides, and each render commits`,
+        // The commits' floor is what says the devtools hook is fed on this page (it was the band's line that said so, when the App rendered for the ear).
+        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits >= 0.9 * x.renders && x.commits <= x.deskMoves + CLOCK + ALLOWED_EXTRA),
         w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s for ${f(x.deskMoves)}`).join(', '));
       /*
         On nine frames in ten that were offered a new value the plate draws
@@ -515,26 +596,38 @@ try {
       check(`${screen.name}, a fader: where it stops is where the Dimmer lands`,
         Math.abs(landed - at / 127) < 1e-6, `fader ${(at / 127).toFixed(3)}, Dimmer ${Number(landed).toFixed(3)}`);
       const still = await measure(page);
-      const stillLine = `${screen.name}, a fader let go: no frame lays a ride, and the App renders for its clock alone (0.6 to 1.5 a second)`;
+      // The same page whose counters read ten a second a moment ago: a still one here is the App, not a dead counter.
+      const stillLine = `${screen.name}, a fader let go: no frame lays a ride, and the App renders for nothing (at most ${QUIET_APP} a second)`;
       check(stillLine,
-        still.every(x => x.laid === 0 && x.renders >= 0.6 && x.renders <= 1.5) && (!PLATE || still.every(x => x.rideFrames >= FRAMES_ASKED)),
+        still.every(x => x.laid === 0 && x.renders <= QUIET_APP) && (!PLATE || still.every(x => x.rideFrames >= FRAMES_ASKED)),
         still.map(x => `${x.laid} laid of ${x.rideFrames} frames, ${f(x.renders)} renders/s`).join(', ') + heldFor(still));
       await page.evaluate(() => cancelAnimationFrame(window.__deskWatch));
       await ctx.close();
     }
     {
       const { page, ctx } = await open(browser, screen, { source: 'none', desk: 'perform' });
+      const clockAt = () => page.evaluate(() => document.querySelector('[data-testid="live-for"]')?.textContent ?? null);
+      const opened = await sample(page);
+      const clock0 = await clockAt();
       const w = await measure(page);
+      const clock1 = await clockAt();
       /*
-        Between its clock and one and a half: the clock has to tick (a dead
-        counter or a frozen App reads 0.0 and must not pass), and a
-        three-second window holds up to four of its ticks. Over frames on
-        the Mac, so a plate that stopped drawing cannot pass it by being
+        The App still, and on the laptop the page committing between its
+        clock and one and a half: the clock has to tick (a dead counter
+        reads 0.0 and must not pass), and a three-second window holds up to
+        four of its ticks. The phone has no clock, so what says its counters
+        are fed is the opening they counted before the window. Over frames
+        on the Mac, so a plate that stopped drawing cannot pass it by being
         quiet for the wrong reason.
       */
-      check(`${screen.name}, no sound, the Perform desk: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5) && (!PLATE || w.every(x => x.frames >= FRAMES_ASKED)),
-        w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + heldFor(w) + whoFor(w));
+      check(`${screen.name}, no sound, the Perform desk: ${quietSays(screen)}`,
+        opened.renders >= 1 && opened.commits >= 1 && w.every(x => quietPage(screen, x.renders, x.commits)) && (!PLATE || w.every(x => x.frames >= FRAMES_ASKED)),
+        w.map(x => `${x.renders.toFixed(1)} renders/s, ${x.commits.toFixed(1)} commits/s over ${x.frames} frames`).join(', ') + `; ${opened.renders} renders and ${opened.commits} commits in the opening` + heldFor(w) + whoFor(w));
+      const tickLine = `${screen.name}, no sound, the Perform desk: the desk's clock moves on`;
+      if (screen.touch) skip(tickLine, 'the phone has no desk and no clock');
+      else check(tickLine, /^\d+:\d\d$/.test(clock0 ?? '') && /^\d+:\d\d$/.test(clock1 ?? '') && clock0 !== clock1, `${clock0} then ${clock1}`);
+      check(`${screen.name}, no sound, the Perform desk: at most ${WORK_QUIET} components render a second`,
+        w.every(x => x.work <= WORK_QUIET && Number.isFinite(x.work)), w.map(x => `${x.work.toFixed(1)}/s`).join(', '));
       await ctx.close();
     }
     {
@@ -614,8 +707,8 @@ try {
       check(`${screen.name}, the bottle in hand: it draws a Dye Budget reading that moves, on its own poll`,
         patched && seen.length >= 8 && planted && drawn && own >= 5,
         patched ? `${seen.length} levels in ${w.reduce((s, x) => s + x.seconds, 0).toFixed(1)} s, ${own} with no App render since the last (${seen.slice(0, 5).map(x => `${x.l} at y ${x.y.toFixed(2)}`).join(', ')}${seen.length > 5 ? ', …' : ''})${planted ? '' : '; not the planted levels'}${drawn ? '' : '; the liquid is not where the level says'}` : 'found no handle carrying dyeRoom among the App\'s hooks');
-      check(`${screen.name}, the bottle in hand: and the page commits for the App's clock and no more while it moves (0.6 to 1.5 a second)`,
-        patched && w.every(x => x.renders >= 0.6 && x.renders <= 1.5 && x.commits >= 0.6 && x.commits <= 1.5),
+      check(`${screen.name}, the bottle in hand: and the page stays quiet while it moves (${quietSays(screen)})`,
+        patched && w.every(x => quietPage(screen, x.renders, x.commits)),
         w.map(x => `${x.renders.toFixed(1)}/s, ${x.commits.toFixed(1)} commits/s`).join(', ') + whoFor(w));
       await page.evaluate(() => clearInterval(window.__levelWatch));
       await ctx.close();
@@ -659,8 +752,8 @@ try {
       const moved = new Set(places.filter(Boolean)).size;
       check(`${screen.name}, a gamepad stick sweeping: the ring is on the page and changes place`,
         places.every(Boolean) && moved >= 5 && (await ringAt())?.on, `${places.filter(Boolean).length} of 12 looks found it, ${moved} places`);
-      check(`${screen.name}, a gamepad stick sweeping: the App renders for its clock and no more (0.6 to 1.5 a second)`,
-        (b.renders - a.renders) / s >= 0.6 && (b.renders - a.renders) / s <= 1.5 && (b.commits - a.commits) / s <= 1.5 && (!PLATE || bf.frames - a.frames >= FRAMES_ASKED),
+      check(`${screen.name}, a gamepad stick sweeping: the page stays quiet (${quietSays(screen)})`,
+        quietPage(screen, (b.renders - a.renders) / s, (b.commits - a.commits) / s) && (!PLATE || bf.frames - a.frames >= FRAMES_ASKED),
         `${((b.renders - a.renders) / s).toFixed(1)} renders/s, ${((b.commits - a.commits) / s).toFixed(1)} commits/s; ${bf.frames - a.frames} frames in ${((bf.t - a.t) / 1000).toFixed(1)} s` + whoFor([{ renders: (b.renders - a.renders) / s, commits: (b.commits - a.commits) / s, who: await whoBetween(page, a, b) }]));
       // The stick let go and the right trigger held: the ring swells and stays where it is.
       await page.evaluate(() => { clearInterval(window.__sweep); window.__pad.axes = [0, 0, 0, 0]; window.__pad.rt = 1; });
@@ -673,8 +766,8 @@ try {
       const after = await ringAt();
       const held = after ? after.width : null;
       const s2 = (d.t - c.t) / 1000;
-      check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the App renders for its clock and no more`,
-        held === '44px' && before && after && before.at === after.at && after.on && after.shown && (d.renders - c.renders) / s2 >= 0.6 && (d.renders - c.renders) / s2 <= 1.5 && (d.commits - c.commits) / s2 <= 1.5 && (!PLATE || df.frames - c.frames >= FRAMES_ASKED),
+      check(`${screen.name}, a gamepad trigger held: the ring is up and swollen, and the page stays quiet`,
+        held === '44px' && before && after && before.at === after.at && after.on && after.shown && quietPage(screen, (d.renders - c.renders) / s2, (d.commits - c.commits) / s2) && (!PLATE || df.frames - c.frames >= FRAMES_ASKED),
         `ring ${held} ${before?.at === after?.at ? 'still' : 'moved'}${after?.on ? ', on the page' : ', off the page'}, ${((d.renders - c.renders) / s2).toFixed(1)} renders/s, ${((d.commits - c.commits) / s2).toFixed(1)} commits/s; ${df.frames - c.frames} frames in ${((df.t - c.t) / 1000).toFixed(1)} s` + whoFor([{ renders: (d.renders - c.renders) / s2, commits: (d.commits - c.commits) / s2, who: await whoBetween(page, c, d) }]));
       await ctx.close();
     }

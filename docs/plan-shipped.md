@@ -14129,3 +14129,39 @@ seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89;
 140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).
 On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
 131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
+
+## 46f. The ear's view and the desk's clock render themselves, not the shell (2026-11-13)
+
+Asked by the owner on 2026-11-13: the code as light on GPUs and CPUs as it can be, and less
+jitter. The page's one thread was profiled on the owner's Mac (main c778019, Classic, the
+Perform desk, headless on Metal, the simulated band, 34 s): React ran 328 times, 14.3 ms each
+at the median and 22.2 at the ninetieth percentile, 5.4 s of the 34, and 33 MB of garbage a
+second, about half of it React's. With no sound it ran once a second, 13.8 ms. A frame is
+16.7 ms at sixty a second.
+
+What rendered: §14f had taken the ear's readings out of React state per reading (seventy
+renders a second to ten), and left the ten-a-second reading as state on `App()`; the "live
+for m:ss" clock was state there too, set once a second. Each rendered the whole shell: every
+desk panel and knob, both plates' components, and (React 19) an update of every DOM element
+under them, more than half the cost. The readers of that state were a percentage in the
+desk's status line, three meters over the plate, the Sound section's calibration readout and
+four characters of clock.
+
+What changed: the ear's ten-a-second reading is a store (`hooks/useEarView.ts`: `Ear.view`,
+`useEarView(view, select)`), and each reader is a leaf that subscribes for the part it shows
+(`components/EarLeaves.tsx`, `SoundSection`'s `RoomReadout`); the clock is a component with
+its own tick (`components/desk/LiveFor.tsx`). The hooks that took the reading as state take
+the ear's `live` ref or a boolean selected from the view (`useMusicIntelligence`,
+`app/useCastFeed.ts`). The plate's components are handed no reading (they read `hear()` on
+their own frame, as since §14f). The performance clock is told only when its second changes.
+
+Measured, `npm run renders` (a cloud session; its bars re-aimed, named in the PR): components
+rendered a second with the band 5,840 → 11 on the laptop and 714 → 0 on the phone; with no
+sound 531 → 1 and 65 → 0; App renders 11.0 → 0.0 and 1.0 → 0.0; the desk's level still moves
+ten times a second and the clock still ticks. The same profile in a cloud session: React's
+time with the band 13.5 s of 44 → 0.015 s of 31, garbage 257 KB a frame → 32.
+
+Exports changed: `Ear.audioData` is gone and `Ear.view` is in its place; `DeskProps.liveFor`
+(a string) is `liveSince` (a time), `DeskProps.status.audio` a node; `SettingsPanelProps`
+takes `earView` where it took `calibration`; `useMusicIntelligence`'s second argument is the
+ear's `live` ref.
