@@ -144,8 +144,8 @@ export function useRemote({
     How a title goes up, wherever it came from (app/songTitle.ts): the corner
     caption (37x-10j), always. The ink was the other choice until 2026-11-12,
     when the owner shelved it (PLAN 37x-10m: "this poured option never really
-    worked"); `titleCaption` is no longer read, so a show saved with the ink
-    chosen still gets the caption rather than a title nobody can switch off.
+    worked"); the `titleCaption` setting that chose went with it, so a show
+    saved with the ink chosen still gets the caption.
     The caption's screen layer lives as long as this hook does; the stream
     draws its own copy.
   */

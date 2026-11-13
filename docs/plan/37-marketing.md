@@ -642,16 +642,17 @@ rest is routine and the owner's calls.
     `foldDye` and pour pictures at the solver's grid, or delete it.
   - **37x-10m. The poured-ink titles shelved.** *(shipped 2026-11-12.)* The owner: "this
     poured option never really worked. We should shelve this". Every title is the corner
-    caption; the ink's controls are off the desk, the phone and MIDI; the phone's box,
+    caption; the ink's controls are off the desk, the phone and MIDI, and `titleCaption` is gone; the phone's box,
     `pour_text` and a song show's sign-off go up as the caption. The ink stays, dormant,
     for the logo melt. `npm run caption`, `remotemix`, `assistant`; story in
     `docs/plan-shipped.md` §37x-10m. Found doing it:
     - **37x-10n. Take the dormant ink settings out.** *(S.)* `inkTitleColor`,
-      `inkTitleSize`, `inkTitleY`, `inkTitleSweep` and `titleCaption` are still in
-      `VisualizerSettings`, the look fade's rig keys, drift and the desk pins, read by no
-      title. Remove them (with `npm run inktitle`'s setting line and the controlHelp
-      entries) once the owner is sure the ink is not coming back, or bring the ink back
-      through `app/songTitle.ts`'s sink.
+      `inkTitleSize`, `inkTitleY` and `inkTitleSweep` are still in `VisualizerSettings`,
+      the look fade's rig keys, drift and the desk pins, and listed in `npm run panel`'s
+      deliberately-without-a-control set; only the ink's run reads them, for a title
+      nothing sends (`titleCaption` itself went with 37x-10m). Remove them (with
+      `npm run inktitle`'s setting line) once the owner is sure the ink is not coming
+      back, or bring the ink back through `app/songTitle.ts`'s sink with its controls.
   - *Owed:* nothing: the Mac film of the ink (judging §114, §117) was cancelled with
     37x-10m.
   - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the

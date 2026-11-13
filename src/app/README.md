@@ -57,7 +57,7 @@ comments, which moved with it.
 | `setNow.ts` (not a hook) | the set list, the armed item, the live item and the fade, for the remote link to report (`useSetNow`, `publishSet`), and the door the owner's assistant arms and Goes through (`askSet`, `setGoDoor`, `setCueDoor`), and the phone controller arms an item by its id through (`armSetItem`, PLAN 12-ctl-1), set by `useLookFades` and `useSetListState` (PLAN 44k-3) |
 | `songShowNow.ts` (not a hook) | the song shows in brief, for the remote link to report (`useSongsNow`, `publishSongs`, `showBrief`, which carries the song's own `title` for the phone controller), and the door the owner's assistant reads, edits, runs and nudges them through (`askSongs`, `readShow`, `setSongsDoor`, `setFollowDoor`, `ASSISTANT_ACTION_PREFIX`, `SONG_NUDGE_MAX_S`), set by `useSongScore` and `useShowLibrary` (PLAN 44k-5) |
 | `songCue.ts` (not a hook) | where the owner's assistant's song action lands: `setSongCueSink`, set by `useSongScore`; `addSongCue`, called by `useRemote` (PLAN 44f) |
-| `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` is no longer read); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
+| `songTitle.ts` (not a hook) | where a song's title goes: `setSongTitleSink`, set by `useRemote` (the corner caption only since the ink was shelved, 37x-10m; `titleCaption` deleted); `showSongTitle`, called by `useSongScore` and `useInkTitle` (PLAN 37x-10j) |
 | `useSongRendering` | a song rendered to a film |
 | `useControllers` | MIDI, the gamepad, the projector window |
 | `useCommandPalette` | the palette's commands and the keyboard |

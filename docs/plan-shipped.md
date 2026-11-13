@@ -13690,7 +13690,7 @@ conductor one build older) is read back into a card by `lib/pourText.ts` `rowsCa
 as the caption. The phone's box is now "Song title" with a Show button and sends
 `song-title`, built from what was typed by `typedCaption`, case kept. The sign-off shows
 "ChromaGlass" in the corner. The ink's controls are gone from Logo & Titles, the phone and
-MIDI; the settings stay, unread by any title (37x-10n takes them out). The ink itself
+MIDI, and `titleCaption` is deleted; the ink's own four settings stay, listed in `npm run panel`'s deliberately-without-a-control set (37x-10n takes them out). The ink itself
 (`lib/inkTitle.ts`, the solver's `pourInk`, the pad and rinse) stays for the logo melt
 (37x-11), and the owed Mac film of the ink (judging §114, §117) is cancelled.
 

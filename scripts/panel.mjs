@@ -1226,6 +1226,13 @@ check('and neither starts over the limit',
     // Blend pad per row, not a slider or a select on this sheet. `npm run phone`
     // presses them.
     'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
+    // The ink title's colour, size, height and sweep (PLAN 37x-10): dormant
+    // since the owner shelved the poured-ink titles (37x-10m, 2026-11-12).
+    // Every title is the corner caption now, and the ink's run still reads
+    // them only for a title nothing sends; their controls went with the ink
+    // so no dial sits on the desk changing nothing. Taking the keys out, or
+    // bringing the ink back with its controls, is 37x-10n.
+    'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   ]);
   const panelSrc = settingsSource();
   const drawn = new Set([

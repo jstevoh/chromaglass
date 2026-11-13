@@ -156,7 +156,8 @@ if (!/type: 'song-title'/.test(src('src/components/RemotePourText.tsx')) || /typ
 }
 if (/\.pourText\s*\(/.test(src('src/app/useSongScore.ts'))) bad.push('a song show still pours words as ink');
 if (!/case 'signoff':\s*showSongCaption\s*\(/.test(src('src/app/useSongScore.ts'))) bad.push('a song show\'s sign-off is not the caption');
-if (!/titleCaption:\s*true/.test(src('src/types.ts'))) bad.push('titleCaption does not default to the caption');
+// The caption/ink setting is gone with the ink (37x-10m): a `titleCaption` back in the settings is the choice come back.
+if (/\btitleCaption\b/.test(src('src/types.ts'))) bad.push('titleCaption, the shelved caption/ink choice, is back in the settings');
 check('wired', 'the app, the stream, the phone, the assistant and the MCP all reach the caption', bad.length === 0, bad.join('; '));
 
 console.log(fails.length ? `\n${fails.length} failed: ${fails.join(', ')}` : '\nall passed');
