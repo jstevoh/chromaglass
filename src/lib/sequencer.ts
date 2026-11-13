@@ -108,6 +108,17 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
   ['soapFilm', 0.05],
   ['soapFilmRate', 0.25],
   ['soapFilmAngle', 1],
+  ['glitter', 0.05],
+  ['lensStop', 0.5],
+  ['sideLight', 0.05],
+  ['sideLightHue', 5],
+  ['sideLightAngle', 5],
+  ['tank', 0.05],
+  ['tankFeed', 0.1],
+  ['tankWeight', 0.05],
+  ['tankNozzle', 0.01],
+  ['tankDrain', 0.05],
+  ['tankHue', 1],
   ['lumia', 0.05],
   ['chemistry', 0.05],
   ['gelWheel', 0.05],
@@ -123,6 +134,9 @@ export const GLIDES: [keyof VisualizerSettings, number][] = [
 ];
 
 /** The numeric fields a stage may glide; everything else switches at stage entry. */
+/** Dials that are a place round a circle, in degrees (PLAN 47b-1's side lamp): `lerpSettings` glides them the short way round. */
+const ROUND_THE_CIRCLE = new Set<keyof VisualizerSettings>(['sideLightHue', 'sideLightAngle']);
+
 export function lerpSettings(
   from: Partial<VisualizerSettings>,
   to: Partial<VisualizerSettings>,
@@ -141,7 +155,9 @@ export function lerpSettings(
         with a second layer wrote 1.002, 1.004… layers, one a tick for the
         whole transition. The ends are left exactly where the stages put them.
       */
-      const v = a + (b - a) * k;
+      // A dial that is a place round a circle glides the short way: from 350° to 10° through 0, not back through every hue or round the far side of the stage.
+      const d = ROUND_THE_CIRCLE.has(key) ? ((((b - a) % 360) + 540) % 360) - 180 : b - a;
+      const v = !ROUND_THE_CIRCLE.has(key) ? a + d * k : k >= 1 ? b : (((a + d * k) % 360) + 360) % 360;
       out[key] = k > 0 && k < 1 ? onSettingStep(String(key), v) : v;
     } else {
       out[key] = k >= 1 || a === undefined ? b : (k > 0.5 ? b : a);

@@ -10,6 +10,7 @@ import { STATS_GROUPS } from '../wgsl/stats';
 import type { SloshDrive } from '../../lib/slosh';
 import { WebGPUSlosh } from '../slosh';
 import type { SoapFilmPlate } from '../soapFilmPlate';
+import type { TankPlate } from '../tankPlate';
 import { RimRead } from '../rimRead';
 import { ReadGate } from '../readGate';
 import { WebGPUParticles } from '../particles';
@@ -104,6 +105,8 @@ export class FluidCore {
   protected sloshTex: GPUTexture | null = null;
   /** The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts): made when Soap Film is first up, null on every other look. */
   protected soapPlate: SoapFilmPlate | null = null;
+  /** The tank's side view (PLAN 47n), made while Tank is up. */
+  protected tankPlate: TankPlate | null = null;
   /** The plate's boiling vapour fraction (.r) and float32 temperature (.g, °C above T_AMBIENT) field (`rg32float`, PLAN §36e-2), per-cell nucleation superheat, and uniform buffer. */
   protected boilAlpha: PingPong | null = null;
   protected boilSites: GPUBuffer | null = null;
@@ -698,6 +701,8 @@ export class FluidCore {
     // on the next deposit, and until then the plate shows the (empty) dye.
     this.printLive = false;
     this.resetFilm();
+    // And the tank's water clear again (PLAN 47n): the performer's wipe is the tank emptied and refilled.
+    this.tankPlate?.reset();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
     // The sim buffer only needs its grid sizes for a fill, and the cover's gap

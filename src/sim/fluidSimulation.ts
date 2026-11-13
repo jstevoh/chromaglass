@@ -22,7 +22,7 @@ import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
-import { layCrowd, layLavaLamp, layOilShare } from '../lib/oilLay';
+import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -49,7 +49,7 @@ import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
-import { soapFilmStep } from '../gpu/soapFilmPlate';
+import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -1965,6 +1965,11 @@ export class FluidSimulation {
         break;
       }
 
+      case 'foam-cells':
+        // Pressed cells across the dish, rust water in the films (layFoamCells, src/lib/oilLay.ts, says why).
+        layFoamCells(this.rng.float, harmony.length, this.gpu?.N ?? S, S, (f) => this.gpu?.layOil?.(f), (x, y, d, k) => { const c = col(k); this.addDensity(x, y, d, c.r, c.g, c.b); });
+        break;
+
       case 'turing-print': {
         // Coloured ink pools across the plate so the reaction-diffusion print
         // carves through saturated indigo, magenta, and gold from the start
@@ -3419,7 +3424,7 @@ export class FluidSimulation {
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
       heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
       boilHolds: this.boilHolds,
-      ...soapFilmStep(settings, this.layerIndex),
+      ...besideStep(settings, this.layerIndex),
     };
   }
 

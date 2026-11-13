@@ -13897,6 +13897,158 @@ owner's Mac and read: *Melt Your Face Vol. 1* runs the dish camera through a vid
 colouriser (lifetime 0.2 s, flow 14.5), so it is kept in the library as their look and not a
 row; their Brooklyn Bowl set, filmed from the crowd, leaves too small a screen to read (47v-4).
 
+## 47z-5. Foam Cells: a packed foam whose films meet at 120° (2026-11-13)
+
+The owner asked for every finding of the Microlab films (2026-11-13, "Ok let's do this all"),
+cells first among them: cellular networks came up in five of the ten, and a macro film of a
+packed foam (`cosmo-packed-foam-cells`) was already in the library. Drawn cells were retired at
+his word (2026-10-29, 33g-3), so these had to come from the liquid.
+
+What the field did with a packed crowd, in the lab (SwiftShader): laid pressed (a power diagram
+of random drops cut by water films), a crowd with two-cell films merged into one body in two
+seconds even with Film Hold; with four-cell films it held. With cells twenty grid cells across,
+four-cell films leave a third of the dish water, over the sixth at which discs in the plane
+jam, and the cells rounded up into a wet crowd (68 cells to 33 in twelve seconds, water in
+lanes): the right physics for a wet foam. With cells fifty across and the foam laid to the
+dish's open rim (laid past it, 1.3% of the oil ran out over the rim in four seconds), the oil
+is 0.84 of the dish and the crowd is a foam: it holds, its films flatten and its junctions turn
+toward 120° (Plateau's laws in the plane of the gap) from the lay's random angles, by the
+tension alone.
+
+Sticky films were tried for a crowd that packs itself (47z-6): a push falling as e^(−h/5)
+against the hold's e^(−h/2.5), and the same as a chemical potential. The drops pulled together
+and then merged through the film at every strength tried; the potential seeded oil in the film.
+
+The tension had to come down for the app's grid: at 384² a fifty-cell cell is smaller on the
+plate than at 256², its pressure higher, and at 0.45 half the cells merged in four seconds, at
+0.2 a quarter, at 0.1 four of 39. The look is Foam Cells (`src/presetsFoam.ts`, laid by
+`layFoamCells` in `src/lib/oilLay.ts` through the solver's new `layOil`). `npm run foam` (384²,
+four seconds): laid 39 cells, median 14.5° off 120°, 31% within 10°; after, 35 cells, median
+7.3°, 69% within 10°, every junction three-way and still there, no oil made or lost. The
+reader's floor on an exact hexagonal foam is a median 2.3° and 99% (192²); it reads each film
+past its border's arcs, after the check-skeptic showed a fixed ring read rounded corners. To make room for the
+seed in `fluidSimulation.ts`, which is over its size budget, Clock Glass's lay moved beside its
+bodies in `oilLay.ts` (`layClockGlass`, the same cells in the same order).
+
+
+
+## 47e-47d-1-47b-1. Glitter in the liquid, the lens that photographs it, and a side lamp (2026-11-13)
+
+Asked by the owner after the Microlab films were watched in the page: suspended specks,
+out-of-focus specks as discs, star glints from a stopped-down lens, and a second amber or
+red light raking in from the side over the blue glow, as one PR, modelled as the optics are.
+
+The glitter (47e's flake half). Up to 32,768 flakes (Glitter, 0 to 1), 10 to 50 µm across
+and 3 to 12 % as thick, polystyrene's density, 5 % over water's. They are stepped once a frame
+in the lens pass (`gpu/glint.ts`), not in the solver: they ride the packed `velForced` the
+dye rides, scaled by Poiseuille's 6z(1−z) at their height, by the lead plate's own
+displacement read from its cell clock (lib/detailFlow), so a flake and the dye beside it
+move together however many solver steps a frame took. They turn in Jeffery orbits integrated
+in closed form, tan θ = r tan ξ with ξ advancing by the strain over (r + 1/r) (stepped from
+the equation in node: worst 0.000°, a thin flake within 20° of flat for 90 % of its turn);
+settle by Stokes on the volume-equivalent sphere (0.020 mm/s, about 100 s to cross the
+2 mm gap) and lie flat where they land; and live 40 to 160 s, fading in and out.
+
+The lens (47d-1). Magnification 0.27 × zoom on a 36 mm sensor, Lens Stop f/1.4 to f/22, the
+focal plane at Projector Focus. A flake is drawn as its aperture's image: a disc of
+diameter |z − z_f|·gap·m/(N(1+m)), a hexagon from the six-bladed iris above f/2 and a circle
+wide open, its energy spread over its area in linear light; stopped down its Airy core
+grows (1.22 λ N (1+m)/m, by colour) and six spikes reach out at the share of the light the
+blade edges diffract, fading as the flake leaves focus. Each flake's light is the mirror
+law: the side lamp's and the softbox's (Light Play) rays reflected off its normal, spread by
+the lamp's size and the flake's crinkle (0.15 rad), times 0.85; a flake under the dye is
+filtered by the dye above it, and on a lamp ground it is a dark speck by its shadow.
+
+The side lamp (47b-1). Side Light, Side Colour (default amber, 30°) and Side Angle (160°): a
+lamp 0.35 rad above the stage, 30 cm off, its light refracted into the water by Snell,
+falling off by the inverse square and the slant across the stage, scattered back by the
+pigment (0.35 of it, filtered by the dye; on black a fluorescent dye counts as pale) and
+reflected by the glasses' slopes by Fresnel (3 %), read from the plate's normals.
+
+The pass. At Glitter and Side Light 0 nothing runs and nothing is held (a frame that does
+not want the pass lets its pictures and flakes go): the plate draws to its target as before,
+to the byte. Otherwise the display draws, unfinished, into the pass's half-float picture (in
+8 bits a dark ramp would band before the finish's dither), and the lens pass adds the light
+and lays the finish the display would have (`lensFinish`). The flakes age and settle on the
+plate's own clock, so a paused show pauses them, and a gap in it over a quarter second
+carries nothing. A stage glides Side Colour and Side Angle the short way round the circle. Desks (Camera and Lamp sections), MIDI, glides, drift's not-the-look
+list and the phone's remote all carry the five dials.
+
+Measured (`npm run glint`, 20 lines): the laws in node; off is off to the byte with every
+other lens dial moved, and Side Light 0.05 is not; under the side lamp the black ground
+rises at most 1 level, the dye gains red over blue (+69.7 against +0.4) and the half toward
+the lamp gains more (69.7 against 59.7, both ways round); on a lamp ground at 4× the dark
+specks at Glitter 1 are about twice those at 0.5 (412 against 216, none at 0); at 8× and
+1024 px the glints cover 3.8 times the pixels wide open as at f/5.6 (5291 against 1388),
+and at f/16 the brightest glint's light along the six spike directions is 326 against 7
+between them, where wide open it is 4; focused on the floor glass the glints at f/5.6 cover
+2442 pixels against 1388 mid-gap. Over eight frames on one plate pushed to +x (the lab's
+`keepPlate` and `glintSpecks`, the flakes read back), mid-gap flakes go 3.64 times as far as
+those by the glass where 6z(1−z) says 3.66, and their travel over 6z(1−z) is 0.0197 of the
+plate against the dye's own 0.0198. One check-skeptic pass found that every line drew a
+single frame of newborn flakes (the step shader never measured), that "none at 0" compared
+a picture with itself, and that nothing could see the pass's picture upside down or the
+lamp's hue ignored; each is now a line. Found doing it: 47b-2 (the side lamp casts no
+shadows), 47b-3 (sources and the kaleidoscope draw without the pass), 47d-2 (discs and stars
+only on the glitter), 47e-1 (microbubbles), 47e-2 (the orbit constant and rebirth shortcuts).
+
+
+## 47n-1. The tank seen through its side (2026-11-13)
+
+Asked by the owner on 2026-11-13 after the Microlab films were watched: Davy Evans' *Gravity
+L1* films a tank of water from the side, fluorescent dye falling as a jet that stretches into
+one thread, lands and runs along the floor as a gravity current whose head curls. Two ways
+were put to the owner: stand the plate up (Gravity with Dye Weight, which already pours heavy
+dye downhill) or a solver of its own. The plate is a Hele-Shaw cell: the glass's drag,
+12ν/h² across a millimetre, is about ten a second, so it keeps no momentum from step to step,
+and a falling jet thins only because it keeps its momentum and speeds up. The owner chose the
+solver.
+
+What it is. `src/lib/tank.ts`, the CPU reference: a vertical slice 24 cm by 13.5 cm, the
+incompressible Navier–Stokes equations in the Boussinesq approximation on a staggered grid,
+water's own viscosity, glass walls and floor no-slip, the surface stress-free, heavy dye
+(g′ = g Δρ/ρ₀, half a percent by default) carried in flux form with a minmod limiter, the
+momentum semi-Lagrangian, the pressure by a multigrid V-cycle. A nozzle feeds dye at the surface; the
+water it adds leaves through the floor (Drain) or raises the level. Substeps from a bound on
+the fall speed, √(feed² + 2g′H), so the GPU never reads the field back to choose them.
+`src/gpu/tank.ts` and `src/gpu/wgsl/tank.ts` are the same substep, pass for pass, in compute passes;
+`src/gpu/tankPlate.ts` steps it with the plate (beside the soap film, `stepBeside`, the
+settings through `gpu/besidePlate.ts`) and `src/gpu/tankDraw.ts` draws it in the plate's place,
+the dye's fluorescence 1 − exp(−3c) on black, so the camera, the post-effects and the projector
+take it as they take the plate.
+
+Measured. `npm run tank` 18/18: a stable tank's largest flow 3.3e-9 m/s in 10 s; heavy over
+light falls 28% of the height in 10 s and not at all without gravity; the lock exchange's
+fronts at 0.424 (floor) and 0.457 (surface) of √(g′H), Benjamin's 0.5 and experiments' 0.44 to
+0.48 (0.427, 0.420, 0.417 on 96, 128 and 200 cells wide: the model's, not the grid's); the jet
+carries 99.9% and 100.1% of the nozzle's flux through 80% and 55% of the height, thins from
+1.75 to 1.38 mm of dye as it speeds from 3.2 to 4.1 cm/s (free fall 7.8); with g′ = 0 it never
+reaches 55%; the dye kept to 1e-9 of what was fed less what drained. `npm run tankgpu` 15/15 on
+SwiftShader (24/24 after the multigrid): the faces 5.7e-7 and the dye 7.9e-8 of the reference
+after two steps, the jet's dye identical to 0.001% after a second, the same fronts (0.424,
+0.457) and jet (99.9% and 100.1% of Q, 1.75 → 1.38 mm as 3.2 → 4.1 cm/s) at the app's two
+V-cycles a substep, the closed tank's dye kept to 2.9e-7, the jet's leftover divergence
+4.5e-9 m/s·cell; the app's own tank at the heaviest settings (Weight 3%, Feed 6 cm/s, set
+through `TankPlate.step`) holding exactly what the bore fed for two seconds, and at three, the
+jet on the floor, finite, the dye within 0 to 0.9985, its divergence 2.1e-8 m/s·cell.
+
+Found building it: the pressure solve. The first GPU solve was red-black SOR, 40 sweeps a
+substep, which held every check on the checks' grids (up to 128 × 72) and blew the app's own
+256 × 144 tank to NaN in a quarter of a second at Weight 1% and Feed 3 cm/s (150 sweeps held;
+Chebyshev-accelerated SOR at 40 blew up sooner). The nozzle feeds at the surface and the drain
+takes the water out across the floor, so the pressure between them spans the whole tank, and
+a sweep carries news one cell: 40 cannot reach a floor 144 cells down, the flow stays
+divergent and the dye's flux runs past its bound. The fix is a V-cycle (two red-black
+Gauss–Seidel sweeps a level, the residual summed over 2 × 2 blocks, the coarsest 16 × 9 by SOR
+at its optimal ω, bilinear back up), the CPU reference first and the GPU pass for pass after;
+`tankgpu` gained the heaviest-settings line on the app's grid so the next solver change is
+judged where this one failed.
+
+Shortcuts, each an open item: the momentum's smear (47n-2), the finger's mapping (47n-3), no
+built-in look yet (47n-4), a sheet and not a rod, and one dye (47n-5), the dish's solver still
+running under the tank (47n-6).
+
+
 ## 47z-1 (with 28i-7b and 28k-5). A drop takes the water out of the light's path (2026-11-13)
 
 The owner asked for the drops' physics and their vivid colour (2026-11-12, against Liquid Light
