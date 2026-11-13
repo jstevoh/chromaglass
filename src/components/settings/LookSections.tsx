@@ -467,6 +467,24 @@ export const CameraSection = ({ c }: { c: SectionCtx }) => {
         <Slider label="Film Physics" value={settings.filmPhysics ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ filmPhysics: v })}
           settingKey="filmPhysics"
         />
+        {/* The frame's own soap film over the plate (PLAN 32d): a film with a
+            thickness that drains under gravity, is blown about by the plate's
+            flow, goes black from the top and is drawn again. Its colour is its
+            thickness's, seen in reflection. Drain Rate runs its clock; Film
+            Angle is where it is seen from (every band moves thicker). */}
+        <Slider label="Soap Film" value={settings.soapFilm ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ soapFilm: v })}
+          settingKey="soapFilm"
+        />
+        {(settings.soapFilm ?? 0) > 0.001 && (
+          <>
+            <Slider label="Drain Rate" value={settings.soapFilmRate ?? 1} min={0.25} max={8} step={0.25} onChange={(v: number) => onUpdate({ soapFilmRate: v })}
+              settingKey="soapFilmRate"
+            />
+            <Slider label="Film Angle" value={settings.soapFilmAngle ?? 0} min={0} max={70} step={1} onChange={(v: number) => onUpdate({ soapFilmAngle: v })}
+              settingKey="soapFilmAngle"
+            />
+          </>
+        )}
       </section>
       )}
     </>

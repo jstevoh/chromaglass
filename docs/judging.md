@@ -2702,3 +2702,23 @@ Android TV WebView, and the look changing on the Mac, are only seen here.
    (a second Back leaves for the list of Macs, as before).
 5. Good: each press changes the Mac within a second. Bad: a key that does nothing, Back
    leaving the show while the list is open, or the D-pad moving a focus ring on the page.
+
+## 127. Soap Film is a real film (PLAN 32d)
+
+The check (`npm run soapplate`) proves the plate draws the film's own colours from its
+thickness, that the plate's flow moves it, and that a drained film is drawn again, on the
+lab's software WebGPU. How it looks moving at sixty frames, and with the band playing, is only
+seen here.
+
+1. Open **Soap Film**. Good: one sheet of interference colour over the whole view, thin
+   (gold, blue, magenta) at the top and paler, higher orders lower down, mottled into patches
+   that rise and sink. Bad: black, one hue, a flat rainbow by height, or the colours upside
+   down (pale at the top).
+2. Let it play two or three minutes: the top should thin through gold and blue toward black,
+   the black creeping down; then a fresh film is drawn from the top down in about two seconds.
+3. With music, the kicks open soap on the plate and its flow should swirl the film into combed
+   streaks. Bad: the film never moves, or moves as a whole.
+4. Settings → Camera → **Film Angle**: leaning it should move every band toward the thin end
+   (as if the film were thicker). **Drain Rate** at 4: everything above happens four times as fast.
+5. On another look, Soap Film at 0: the look exactly as before.
+

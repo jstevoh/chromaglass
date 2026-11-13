@@ -36,7 +36,8 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
 - `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.
 - `selftest.ts`: kit tests, `?debug`.
-- `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `standing.ts`: slosh dish, soap film, lamp-boiling dish, ferrofluid domes.
+- `slosh.ts`, `soapFilm.ts`, `lampBoil.ts`, `standing.ts`: slosh dish, soap film, lamp-boiling dish, ferrofluid domes. `soapFilm.ts` also exports `encode(enc, dt, opts)` (the step into a caller's encoder) and `buffers` (`h`, `ext` the outside push on the faces, `stats`, `ruptured`, `age`) for the plate's film.
+- `soapFilmPlate.ts`: the frame's soap film on the plate (PLAN 32d): `SoapFilmPlate` (made by the solver when Soap Film is up; `step(enc, seconds, vel, travel)` blows it with the plate's flow and draws it again when drained; `field` is `{ h, nx, ny }` for the plate), `soapFilmStep` (the step's params, the front plate's only), `freshFilm` and the film's constants. `soapFrame.ts`: where the frame sits on the plate (`SOAP_FRAME_LO`, `SOAP_FRAME_SPAN`).
 - `splats.ts`: a frame's pours as GPU records.
 - `uniforms.ts`: `layOut`, `wgslStruct`, `UniformPack`.
 
