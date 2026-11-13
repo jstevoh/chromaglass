@@ -1407,7 +1407,7 @@
     },
     {
       "name": "Glitter, the lens and the side lamp",
-      "shard": "lab4",
+      "shard": "lab9",
       "run": "npm run glint",
       "timeout": 12,
       "why": [
@@ -1501,7 +1501,7 @@
     },
     {
       "name": "The rest of a bubble's air, owed until its builds",
-      "shard": "lab4",
+      "shard": "lab8",
       "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
       "why": [
         "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
@@ -1511,7 +1511,7 @@
         "and fills its hole evenly without airShed, and the app lays no press",
         "under a bubble while the flow round it stays the same. Each owed id",
         "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
-        "it: about three and a half minutes, in lab4, which has the room."
+        "it: about three and a half minutes, in lab8 (PLAN 19k-11c moved it from lab4)."
       ]
     },
     {
