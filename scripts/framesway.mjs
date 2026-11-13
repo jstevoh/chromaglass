@@ -41,7 +41,10 @@
  *      motion, PLAN 27a), still swings with the kicks at Frame Sway 0.
  *   3. The frame loop calls these functions and not a copy of them: its
  *      source hands the cover `coverRoom(…frameSway)`, the lamp `lampRock`,
- *      and the plate shader `beatSway`, which scales both beat pulses.
+ *      and the plate shader `beatSway`, which scales every beat pulse in it:
+ *      one now, the kaleidoscope's (the closeup's edge warp, the other, went
+ *      with Edge Detail, PLAN 38u-1), and the beat's phase is read nowhere
+ *      else in the shader, so a pulse under another name is seen too.
  */
 import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
@@ -243,7 +246,8 @@ const pulses = plate.match(/let beatPulse = [^;]*;/g) ?? [];
 check('the frame loop steps the cover in coverRoom(Frame Sway), moves the lamp by lampRock and hands the plate beatSway',
   /stepCover\([^;]*coverRoom\(currentSettings\.frameSway\)\)/s.test(lv) && /lampRock\(rock, currentSettings\.plateRock, currentSettings\.frameSway\)/.test(lv)
   && /beatSway: frameSway\(currentSettings\.frameSway\)/.test(lv));
-check('and every beat pulse in the plate shader is scaled by beatSway', pulses.length >= 2 && pulses.every((p) => /U\.beatSway/.test(p)), `${pulses.length} pulses: ${pulses.join(' | ')}`);
+const phaseReads = (plate.match(/U\.beatPhase/g) ?? []).length;
+check('and every beat pulse in the plate shader is scaled by beatSway', pulses.length >= 1 && pulses.every((p) => /U\.beatSway/.test(p)) && phaseReads === pulses.length, `${pulses.length} pulses, ${phaseReads} reads of the beat's phase: ${pulses.join(' | ')}`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n${checks.length - failed} passed, ${failed} failed`);

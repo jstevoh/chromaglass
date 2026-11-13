@@ -316,7 +316,6 @@ export function luckyLook(
     macroCellScale: 0.25 + rand() * 0.7,
     macroLacing: 0,
     macroDepth: 0.25 + rand() * 0.6,
-    macroEdgeDetail: 0.3 + rand() * 0.7,
     macroRelief: 0.4 + rand() * 0.6,
     simResolution: current.simResolution,
     ...sheetsRoll(rand, moirePack),

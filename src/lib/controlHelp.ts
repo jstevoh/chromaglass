@@ -135,8 +135,7 @@ export const CONTROL_HELP: Record<string, string> = {
   macroCells: 'How much paint-cell and bubble structure shows up close.',
   macroCellScale: 'How big those cells are. Small is many tiny cells.',
   macroLacing: 'Dark filaments along the edges of the dye, seen up close.',
-  macroDepth: 'Dome shading, contact shadow and a shallow depth of field in the close-up.',
-  macroEdgeDetail: 'Breaks up smooth, blown-up edges with a fractal warp so a silhouette stays ragged and real.',
+  macroDepth: 'The close-up camera\'s depth of field: how fast the liquid goes soft away from the point it is focused on.',
   macroRelief: 'Depth up close: focused just past the liquid, swells gather the light from beneath and hollows spread it; steep walls go dark.',
 
   // Mirror rig

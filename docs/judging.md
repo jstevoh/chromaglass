@@ -2765,3 +2765,20 @@ only seen here.
    on every speck alike.
 5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
 6. Glitter and Side Light at 0 on any look: the look exactly as before.
+
+## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
+
+The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
+falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
+Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.
+
+1. Macro Bead, Cell Bloom and any look with Close-up on, at 4x to 6x. Good: pool and drop
+   edges are smooth curves that hold still when the liquid does; the clear ground is an even
+   light with no paper grain; depth reads from the soft surround and the relief's light and
+   dark along slopes. Bad: the closeup reads flat, like a sticker, with nothing to say which
+   liquid is over which.
+2. Before 38h-17 merges, the oil beads' own outline is still scalloped (their mask's grid);
+   that is its PR's, not this one's.
+3. A bubble in the closeup at Iridescence 1, the plate left alone: its colours hold. Stir
+   beside it: they shift as it moves.
+

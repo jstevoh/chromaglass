@@ -485,10 +485,9 @@ export class BubbleField {
 
   /**
    * Advance by `dt` seconds. `velocity` samples the solver field in its own
-   * units; `tiltX/Y` is the plate's hold tilt (air climbs against it);
-   * `agitation` (0..1, from the treble) shakes them.
+   * units; `tiltX/Y` is the plate's hold tilt (air climbs against it).
    */
-  step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number, agitation = 0): void {
+  step(dt: number, velocity: (x: number, y: number) => [number, number], tiltX: number, tiltY: number): void {
     const N = this.grid;
     const bs = this.bubbles;
     const m = DISH_METRES / N;            // metres a cell
@@ -554,16 +553,21 @@ export class BubbleField {
       const vMag = Math.hypot(vx, vy) * CELLS_PER_UNIT;
       const Ca = (mu * vMag * m) / sigma;
       const speedRatio = 2 / (1 + FILM_DRAG * Math.cbrt(Ca * Ca));
-      // In the absence of audio agitation, millimeter air pancakes between plates
-      // have zero artificial Brownian wander (Pe >> 10^6, thermal drift < 10^-6 m/s).
-      // Treble acoustic agitation provides physical vibrational jitter scaling continuously
-      // in proportion to agitation (from 0 at 0 up to 2.0 at full agitation), with two
-      // independent random draws for x and y.
-      const wanderScale = agitation * 2.0;
-      const wx = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
-      const wy = wanderScale > 0 ? this.rng.centred() * wanderScale : 0;
-      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb + b.kx + wx;
-      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb + b.ky + wy;
+      /*
+        Nothing shakes a pocket (PLAN 38u-13). Until 2026-11-13 the treble
+        did: two random draws a step, up to 1.2 cells a second at full
+        treble, called "acoustic agitation". A pocket of air a few
+        millimetres across, pressed between two glasses, has no thermal
+        wander to speak of (Pe over 1e6), and the sound in a room moves the
+        liquid round it by nanometres. Measured before it went: a pocket in
+        still liquid at full treble jumped up to 0.02 cells a step (half a
+        pixel a frame in a 6x closeup, a shimmer) and ended 0.083 cells
+        from where it began after two seconds, the dice's way; 0 now. It
+        moves with the flow, up the tilt and off a press, and with nothing
+        else.
+      */
+      const dx = vx * CELLS_PER_UNIT * speedRatio - sinX * climb + b.kx;
+      const dy = vy * CELLS_PER_UNIT * speedRatio - sinY * climb + b.ky;
       b.x += dx * dt;
       b.y += dy * dt;
       b.kx *= Math.exp(-dt / 0.22);
