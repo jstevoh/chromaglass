@@ -269,7 +269,9 @@ style (§31).
   ~~**47w-2**~~ dissolves, ~~**47v-2**~~ a reference library and ~~**47v-3**~~ real-footage bars
   (shipped, this PR), then **47v-4** a third real show filmed square-on (Liquid Light Lab's films tried, kept as a reference only), **47v-5**
   carried on real footage, **47v-6** a too-small crop says so, **47w-3** *Streams II* again; **47y** what Poster 1969 against a real
-  projection found.
+  projection found; **47z** a crowd of drops in vivid colour (47z-1 the drop takes the water out of the
+  light, 47z-2 sizes from a stir, 47z-3 films that drain, 47z-4 each drop a lens, 47z-5 a packed crowd
+  becomes polygons).
 
 ### Wave 7. Reach
 
