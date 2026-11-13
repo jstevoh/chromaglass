@@ -24,7 +24,9 @@ targets:
   ChromaGlassTV:
     type: application
     platform: tvOS
-    sources: [Sources]
+    # The icon and top shelf are drawn by `npm run brand` (scripts/brand.mjs), not
+    # kept by hand in Xcode; the privacy manifest says the app tracks nothing.
+    sources: [Sources, Assets.xcassets, PrivacyInfo.xcprivacy]
     dependencies:
       - package: ChromaGlassTV
         product: ChromaGlassTVCore
@@ -36,6 +38,11 @@ targets:
         CFBundleDisplayName: ChromaGlass
         CGLicenceURL: $(CG_LICENCE_URL)
         UILaunchScreen: {}
+        # The app's only encryption is HTTPS through the system and WebRTC's standard
+        # DTLS-SRTP to the Mac: no proprietary cipher, so no export papers to upload,
+        # and saying so here keeps every TestFlight build from stopping at the
+        # compliance question (PLAN 12-tv-apple-7).
+        ITSAppUsesNonExemptEncryption: false
         # The Mac's show server is on the house's network, by address, over plain ws://:
         # local networking is allowed without opening the app to arbitrary HTTP.
         NSAppTransportSecurity:
@@ -43,8 +50,13 @@ targets:
         NSLocalNetworkUsageDescription: ChromaGlass connects to the Mac running your show on this network.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.chromaglass
-        MARKETING_VERSION: "0.1"
+        # The App Store record "ChromaGlass TV" is app.chromaglass.tv: the bare
+        # app.chromaglass was never registered, and the name ChromaGlass is kept
+        # for the iPhone app's own record (PLAN 12-tv-apple-7).
+        PRODUCT_BUNDLE_IDENTIFIER: app.chromaglass.tv
+        MARKETING_VERSION: "1.0"
+        # Every upload needs a build number App Store Connect has not seen: pass
+        # CURRENT_PROJECT_VERSION=<n> to the archive (README, "TestFlight").
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         DEVELOPMENT_TEAM: $(CG_TEAM)
@@ -53,3 +65,4 @@ targets:
         # symbol. No Intel Mac runs this app's simulator any more; the device slice is arm64.
         "EXCLUDED_ARCHS[sdk=appletvsimulator*]": x86_64
         CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
