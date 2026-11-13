@@ -56,11 +56,11 @@
  */
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { createInterface } from 'node:readline';
 
 const DIR = process.env.CHROMAGLASS_YOUTUBE_DIR ?? join(homedir(), '.chromaglass', 'youtube');
@@ -314,10 +314,47 @@ async function updateVideo(a) {
 }
 
 const IMAGE = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png' };
+
+/*
+  Which files this server will send to YouTube (the security review of
+  2026-11-13). It took any path at all: `upload_video` any file, sent as
+  application/octet-stream when its kind was unknown, and `set_thumbnail` any
+  .jpg or .png, the Photos library's originals included. The show server's own
+  media door refuses the Photos library because "an assistant steered by
+  somebody's words" might put a private picture up (server/assistantMedia.js),
+  and this door is wider: what it sends can go public on the owner's channel.
+  A web page, a document or a track title read in the same Claude session is
+  enough to ask for it, and the guide's "only when the owner said so" is a
+  request to the model, not a control.
+
+  So a file is judged where it really is (links followed, so a link in
+  ~/Movies to a private library is judged as the library), and must be of the
+  kind asked for: a video for an upload, a .jpg or .png for a thumbnail. Never
+  from Apple's private libraries (Photos, Photo Booth, iMovie), ~/Library, or
+  any hidden folder (a dot-folder holds keys and app data, never a film). Not
+  narrowed to fixed folders: the owner's films are made in several places
+  (~/chromaglass-films, ~/Movies, a recording's own folder), and a list that
+  missed one would refuse the owner's own upload in the middle of a release.
+*/
+const PRIVATE_PLACE = /(\.photoslibrary|Photo Booth Library|\.imovielibrary|\.tvlibrary|\.musiclibrary)(\/|$)/i;
+function uploadable(raw, kinds, what, home = homedir()) {
+  const asked = String(raw ?? '').trim().replace(/^~(?=$|\/)/, home);
+  if (!asked) throw new Error(`${what}: a full path to the file on this Mac.`);
+  let real;
+  try { real = realpathSync(resolve(asked)); } catch { throw new Error(`No file at ${resolve(asked)}.`); }
+  if (!statSync(real).isFile()) throw new Error(`${real} is not a file.`);
+  const type = kinds[extname(real).toLowerCase()];
+  if (!type) throw new Error(`${what} is one of ${Object.keys(kinds).join(' ')}; ${real} is not.`);
+  const inHome = real === home || real.startsWith(home.endsWith(sep) ? home : home + sep);
+  const under = inHome ? real.slice(home.length) : real;
+  if (PRIVATE_PLACE.test(real) || (inHome && /^[\/]Library([\/]|$)/.test(under)) || /[\/]\.[^\/]/.test(under)) {
+    throw new Error(`${real} is inside a private library or a hidden folder; this server never sends from there. Export the file to ~/Movies first.`);
+  }
+  return { path: real, type };
+}
+
 async function setThumbnail(videoId, file) {
-  const path = resolve(file);
-  const type = IMAGE[extname(path).toLowerCase()];
-  if (!type) throw new Error('A thumbnail is a .jpg or .png file.');
+  const { path, type } = uploadable(file, IMAGE, 'A thumbnail');
   if (statSync(path).size > 2 * 1024 * 1024) throw new Error('A thumbnail must be 2 MB or less.');
   await api('POST', 'thumbnails/set', { base: G.upload, query: { videoId, uploadType: 'media' }, raw: readFileSync(path), type });
   return 'thumbnail set';
@@ -447,14 +484,13 @@ function run(job) {
 
 const PRIVACY = ['private', 'unlisted', 'public'];
 async function uploadVideo(a) {
-  const file = resolve(String(a.file ?? ''));
-  if (!existsSync(file)) throw new Error(`No file at ${file}.`);
+  const { path: file } = uploadable(a.file, MIME, 'A video');
   const st = statSync(file);
   if (!a.title) throw new Error('A title is needed.');
   if (String(a.title).length > 100) throw new Error('YouTube takes a title of at most 100 characters.');
   if (a.privacy !== undefined && !PRIVACY.includes(a.privacy)) throw new Error(`privacy is one of ${PRIVACY.join(', ')}.`);
   if (a.publish_at && a.privacy && a.privacy !== 'private') throw new Error('A scheduled video goes up private and turns public at publish_at; leave privacy out or private.');
-  if (a.thumbnail && !existsSync(resolve(a.thumbnail))) throw new Error(`No thumbnail at ${resolve(a.thumbnail)}.`);
+  if (a.thumbnail) uploadable(a.thumbnail, IMAGE, 'A thumbnail');
   await accessToken();
   const jobs = readJobs();
   const same = (j) => j.file === file && j.size === st.size && j.mtime === st.mtimeMs && j.meta.snippet.title === a.title;
@@ -465,7 +501,7 @@ async function uploadVideo(a) {
   if (job && busyElsewhere(job)) return { ...jobView(job), note: 'already uploading from another app on this Mac' };
   if (!job) {
     job = {
-      id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
+      id: b64url(randomBytes(6)), file, size: st.size, mtime: st.mtimeMs, mime: MIME[extname(file).toLowerCase()],
       meta: {
         snippet: { title: a.title, description: a.description ?? '', tags: a.tags ?? [], categoryId: String(a.category_id ?? 10), ...(a.language ? { defaultLanguage: a.language, defaultAudioLanguage: a.language } : {}) },
         status: { privacyStatus: a.privacy ?? 'private', selfDeclaredMadeForKids: Boolean(a.made_for_kids ?? false), ...(a.publish_at ? { publishAt: a.publish_at } : {}) },

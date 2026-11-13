@@ -58,7 +58,23 @@ export const STATUSES = ['new', 'read', 'done'];
  * plate's JPEG 25–150 kB as base64; D1 holds a row of up to 2 MB, and this
  * keeps every row under that with the picture and the context together.
  */
-export const MAX_BYTES = 1536 * 1024;
+export const MAX_BYTES = 1024 * 1024;
+/*
+  What one entry may store, and what a day of entries may (the security review
+  of 2026-11-13). Each anonymous post could keep about 1.1 MB of "JPEG" (only
+  its first three bytes were checked) and 0.4 MB of context, at up to sixty an
+  hour from addresses spread over six IPv6 blocks: about 2 GB a day into a
+  database that holds 500 MB on the free plan and 10 GB on the paid one, and no
+  row is ever deleted, so feedback would stop for good until someone cleared it
+  by hand. A real plate's JPEG is 25–150 kB and a real context 10–60 kB, so an
+  entry over either cap keeps its note and loses only the oversized part
+  (`context.dropped` says which), and the day's stored bytes have a ceiling
+  past which new entries are refused like the hourly cap's.
+*/
+export const MAX_PICTURE_BYTES = 400 * 1024;
+export const MAX_CONTEXT_CHARS = 256 * 1024;
+/** Stored bytes (pictures and contexts) in the last 24 hours, from everyone. DAY_BYTES in the Worker's vars raises it. */
+export const DAY_BYTES = 64 * 1024 * 1024;
 export const MAX_MESSAGE = 5000;
 /** Entries per address per hour. Ten notes in an hour is a person with a lot to say; more is a script. */
 export const RATE_PER_HOUR = 10;
@@ -147,7 +163,9 @@ async function receive(request, env, ctx, cors) {
   const day = dayOf(now);
   const id = `${day}-${now.toString(36)}-${rand(6)}`;
   const at = new Date(now).toISOString();
-  const pic = body.picture && typeof body.picture === 'object' ? decodeJpegDataUrl(body.picture.dataUrl) : null;
+  const dropped = [];
+  let pic = body.picture && typeof body.picture === 'object' ? decodeJpegDataUrl(body.picture.dataUrl) : null;
+  if (pic && pic.length > MAX_PICTURE_BYTES) { pic = null; dropped.push('picture'); }
   const app = obj(body.app);
   // Only the parts the page sends, and scrubbed again here: a stale or a
   // hostile client is not trusted to have taken the credentials out, and a
@@ -157,6 +175,13 @@ async function receive(request, env, ctx, cors) {
     app: body.app ?? null, env: body.env ?? null, snapshot: body.snapshot ?? null, diagnostics: body.diagnostics ?? null,
   });
   context.picture = pic ? { bytes: pic.length, width: num(body.picture.width), height: num(body.picture.height) } : null;
+  // The bulkiest parts go first, so the note and what it was sent from are kept.
+  for (const k of ['snapshot', 'diagnostics', 'env', 'app']) {
+    if (JSON.stringify(context).length <= MAX_CONTEXT_CHARS) break;
+    context[k] = null;
+    dropped.push(k);
+  }
+  if (dropped.length) context.dropped = dropped;
   // The account's address only when the token says Firebase proved it: an
   // account can be made with anyone's address and a password.
   const email = who?.emailVerified ? who.email : null;
@@ -206,8 +231,13 @@ async function receive(request, env, ctx, cors) {
   await env.FEEDBACK_DB.prepare('UPDATE feedback SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND at <= ?').bind(hourAgo).run();
   const mine = await countSince(env, hourAgo, ipHash, id);
   const all = await countSince(env, hourAgo, null, id);
+  // The day's bytes, counted the same way (this row's and those before it), so a burst cannot all slip under.
+  const stored = await env.FEEDBACK_DB.prepare(
+    'SELECT COALESCE(SUM(LENGTH(picture)), 0) + COALESCE(SUM(LENGTH(context)), 0) AS b FROM feedback WHERE at > ? AND rowid <= (SELECT rowid FROM feedback WHERE id = ?)',
+  ).bind(new Date(now - 86_400_000).toISOString(), id).first();
+  const overDay = Number(stored?.b ?? 0) > (Number(env.DAY_BYTES) || DAY_BYTES);
   // ALL_PER_HOUR can be raised in the Worker's vars without a deploy of the code, for a launch day.
-  if (mine > RATE_PER_HOUR || all > (Number(env.ALL_PER_HOUR) || ALL_PER_HOUR)) {
+  if (mine > RATE_PER_HOUR || all > (Number(env.ALL_PER_HOUR) || ALL_PER_HOUR) || overDay) {
     await env.FEEDBACK_DB.prepare('DELETE FROM feedback WHERE id = ?').bind(id).run();
     return mine > RATE_PER_HOUR ? json({ error: 'too many' }, 429, cors) : json({ error: 'busy' }, 503, cors);
   }

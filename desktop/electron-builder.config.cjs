@@ -47,6 +47,7 @@ module.exports = {
     'liveSession.js',
     'rtmp.js',
     'keys.js',
+    'pickSource.js',
     'preload.cjs',
     'package.json',
     { from: '../dist', to: 'dist', filter: ['**/*'] },

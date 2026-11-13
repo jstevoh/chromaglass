@@ -86,6 +86,7 @@
  * `TUNNEL` is this file's `ShowTunnel` (wrangler.tunnel.toml).
  */
 import { verifyFirebaseToken } from '../server/firebase-token.js';
+import { ipKey } from '../server/turns.js';
 
 /** Where a code may be sent: Claude's hosted apps (claude.com is the address Claude says it may move to). */
 export const REDIRECTS = ['https://claude.ai/api/mcp/auth_callback', 'https://claude.com/api/mcp/auth_callback'];
@@ -101,6 +102,8 @@ export const ROTATE_GRACE_S = 60;
 const CLIENT_IDLE_S = 3600;
 const MAX_CLIENTS = 30;
 const MAX_PENDING = 20;
+/** Addresses counted in one window; past it a new address waits rather than everyone's count being forgotten. */
+const MAX_ADDRESSES = 1000;
 const MAX_FAMILIES = 10;
 /** An approval takes a Firebase sign-in at most this old, and none from before its page was opened. */
 export const FRESH_SIGN_IN_S = 300;
@@ -199,6 +202,11 @@ export default {
   },
 };
 
+/** Who is asking, for the per-address counts: Cloudflare's address for them, IPv6 cut to its /64 (server/turns.js). */
+function addressOf(request) {
+  return ipKey(request.headers.get('cf-connecting-ip') ?? '') || 'here';
+}
+
 export class ShowTunnel {
   constructor(ctx, env) {
     this.ctx = ctx;
@@ -224,10 +232,20 @@ export class ShowTunnel {
 
   /** False once an address has asked PER_ADDRESS times in the window. */
   allowed(request) {
-    const who = request.headers.get('cf-connecting-ip') ?? 'here';
+    const who = addressOf(request);
     const now = this.now();
     const h = this.hits.get(who);
-    if (!h || now - h.since > WINDOW_S) { this.hits.set(who, { since: now, n: 1 }); if (this.hits.size > 1000) this.hits.clear(); return true; }
+    if (!h || now - h.since > WINDOW_S) {
+      // This cleared the whole map once it held 1000 addresses, which handed every address,
+      // a flood's included, a fresh allowance (the security review of 2026-11-13). Now the
+      // spent windows are dropped, and if a thousand live ones remain a new address waits.
+      if (!h && this.hits.size >= MAX_ADDRESSES) {
+        for (const [k, v] of this.hits) if (now - v.since > WINDOW_S) this.hits.delete(k);
+        if (this.hits.size >= MAX_ADDRESSES) return false;
+      }
+      this.hits.set(who, { since: now, n: 1 });
+      return true;
+    }
     h.n += 1;
     return h.n <= PER_ADDRESS;
   }
@@ -257,7 +275,7 @@ export class ShowTunnel {
       }
       if ((path === '/register' || path === '/authorize') && !this.allowed(request)) return json({ error: 'slow_down' }, 429, { 'retry-after': String(WINDOW_S) });
       if (path === '/register' && m === 'POST') return await this.register(request);
-      if (path === '/authorize' && m === 'GET') return await this.authorize(url, origin);
+      if (path === '/authorize' && m === 'GET') return await this.authorize(url, origin, addressOf(request));
       if (path === '/authorize/approve' && m === 'POST') return await this.approve(request, origin);
       if (path === '/authorize/deny' && m === 'GET') return await this.deny(url, origin);
       if (path === '/token' && m === 'POST') return await this.token(request, origin);
@@ -348,7 +366,7 @@ export class ShowTunnel {
     return json({ client_id: id, client_id_issued_at: now, client_name: name || undefined, redirect_uris: uris, token_endpoint_auth_method: 'none', grant_types: ['authorization_code', 'refresh_token'], response_types: ['code'], scope: SCOPE }, 201);
   }
 
-  async authorize(url, origin) {
+  async authorize(url, origin, who = 'here') {
     const q = url.searchParams;
     const client = await this.client(q.get('client_id'));
     const redirect = q.get('redirect_uri');
@@ -364,10 +382,21 @@ export class ShowTunnel {
     const resource = q.get('resource');
     if (resource && resource !== `${origin}/mcp`) return back('invalid_target');
     await this.sweep();
-    const pending = [...(await this.store.list({ prefix: 'pend:' }))];
-    if (pending.length >= MAX_PENDING) await this.store.delete(pending.sort((a, b) => a[1].exp - b[1].exp)[0][0]);
+    // Room for this page. Full, this used to delete the oldest page of all, so two addresses
+    // opening pages could push out the owner's own while they were signing in (the security
+    // review of 2026-11-13). Now a full relay gives up the oldest page of whichever address
+    // holds the most, so a flood only ever pushes out its own pages, and when no address holds
+    // more than one it says so and keeps every page, the owner's among them.
+    const pending = [...(await this.store.list({ prefix: 'pend:' }))].sort((a, b) => a[1].exp - b[1].exp);
+    if (pending.length >= MAX_PENDING) {
+      const count = new Map();
+      for (const [, v] of pending) count.set(v.who, (count.get(v.who) ?? 0) + 1);
+      const most = Math.max(...count.values());
+      if (most <= 1) return page('<h1>ChromaGlass</h1><p>Too many sign-ins are open on this relay just now. Try again in a few minutes.</p>', 503);
+      await this.store.delete(pending.find(([, v]) => count.get(v.who) === most)[0]);
+    }
     const p = random(24);
-    await this.store.put(`pend:${p}`, { clientId: q.get('client_id'), redirect, challenge, state: state ?? null, opened: this.now(), exp: this.now() + PENDING_S });
+    await this.store.put(`pend:${p}`, { clientId: q.get('client_id'), redirect, challenge, state: state ?? null, who, opened: this.now(), exp: this.now() + PENDING_S });
     const host = new URL(redirect).host;
     return consentPage({
       p,

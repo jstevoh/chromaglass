@@ -40,7 +40,7 @@
 
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
-import worker, { MAX_BYTES, RATE_PER_HOUR, ALL_PER_HOUR, MAIL_PER_DAY, MAX_MESSAGE, composeMail, ipKey, scrub as serverScrub } from '../server/feedback-worker.js';
+import worker, { MAX_BYTES, MAX_PICTURE_BYTES, MAX_CONTEXT_CHARS, RATE_PER_HOUR, ALL_PER_HOUR, MAIL_PER_DAY, MAX_MESSAGE, composeMail, ipKey, scrub as serverScrub } from '../server/feedback-worker.js';
 import { scrub, scrubText, consented } from '../src/lib/feedbackScrub.ts';
 
 const checks = [];
@@ -242,6 +242,31 @@ const count = () => Number(DB.raw.prepare('SELECT COUNT(*) AS n FROM feedback').
   const aged = Number(DB.raw.prepare('SELECT COUNT(*) AS n FROM feedback WHERE ip_hash IS NOT NULL AND at <= ?').get(new Date(Date.now() - 3600_000).toISOString()).n);
   check('and an address\'s hash is dropped once its hour has passed', aged === 0, `${aged} older than an hour still hashed`);
   check('and the address is kept only as a hash', !!stored && !String(stored.ip_hash).includes('192.0.2') && /^[0-9a-f]{24}$/.test(stored.ip_hash), stored?.ip_hash);
+}
+
+// ── 4b. What an entry and a day may store (the security review of 2026-11-13) ──
+/* Anyone could keep about 1.5 MB a post, sixty posts an hour, and no row is ever deleted,
+   so a script could fill the database and stop feedback for good. What is measured is the
+   bytes that reach the database: an oversized picture or context is not stored (the note
+   is), and past a day's ceiling nothing is. */
+{
+  const bigJpeg = `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(MAX_PICTURE_BYTES + 1024, 7)]).toString('base64')}`;
+  const bigPic = await post(note({ picture: { dataUrl: bigJpeg, width: 320, height: 200 } }));
+  const bp = row(JSON.parse(bigPic.text).id ?? '');
+  const bulky = await post(note({ snapshot: { junk: 'y'.repeat(MAX_CONTEXT_CHARS) } }));
+  const bc = row(JSON.parse(bulky.text).id ?? '');
+  const bcx = bc ? JSON.parse(bc.context) : null;
+  check('an oversized picture or context is not stored, and the note still is',
+    bigPic.status === 200 && bp && bp.picture === null && bp.message.includes('ferrofluid') &&
+      bulky.status === 200 && bc && bc.context.length <= MAX_CONTEXT_CHARS && bcx?.snapshot === null && bcx?.dropped?.includes('snapshot') && bcx?.diagnostics?.log?.length === 1,
+    `picture ${bigPic.status} stored ${bp?.picture?.length ?? null}; context ${bulky.status} ${bc?.context?.length} chars, dropped ${bcx?.dropped}`);
+  // The day's ceiling, set low in the vars: the first post fits, the next is refused and leaves no row.
+  const dayEnv = { ...ENV, ALL_PER_HOUR: '1000', DAY_BYTES: String(Number(DB.raw.prepare("SELECT COALESCE(SUM(LENGTH(picture)),0)+COALESCE(SUM(LENGTH(context)),0) AS b FROM feedback WHERE at > ?").get(new Date(Date.now() - 86_400_000).toISOString()).b) + 1000) };
+  const fits = await post(note(), { env: dayEnv });
+  const beforeOver = count();
+  const over = await post(note(), { env: dayEnv });
+  check('past the day\'s stored bytes (DAY_BYTES) a new entry is refused and nothing is kept',
+    fits.status === 200 && over.status === 503 && count() === beforeOver, `first ${fits.status}, then ${over.status}, rows ${beforeOver} -> ${count()}`);
 }
 
 // ── 5. The mail fails; the entry does not ──
