@@ -7118,6 +7118,27 @@ at 120 s, 4.0% black, 18.4% dark, 13% saturated, 8/12 hues.
 
 Checks: `npm run soapfilm` 32/32 (C8 five lines, C9 four; main's model fails eight of the nine new ones (the 300 nm film staying clear is the ninth) and passes the other 23; four look-alikes from the check review, a border solved for one fixed thickness, sides not graded by hydrostatics, a spot spreading its liquid over the whole film, and a clock read from the time since the film was made, each fail one line), `npm run soapgpu` 32/32 on software WebGPU with three new lines (border cell by cell 0.16% of the reference's change, volume lost 5.359% against 5.359%; 21 black cells against 21; Vrij's step 178 against 178), `npm run soapgpu -- --selftest` 32/32.
 
+### 32d. On the plate (and 32e, the phone)
+
+Reported 2026-11-12 (the looks filmed against the owner's references): Soap Film was 82 to 87%
+black, mean luminance 0.05 against 0.48 for the owner's "Liquid Tapestry" photograph, one hue
+(spread 0.02 against 0.41). It had no film: its colour was Thin Film's ring table read off the
+dye's amount and multiplied onto the dye, and the soap tore the dye away. Now the frame holds
+§32's film (`createSoapFilmGpu`, 128² at 1 mm, evaporation 5 nm/s, the 1 mm Plateau border),
+stepped with the plate on the film's own clock (the show's seconds times Drain Rate), and the
+plate draws its reflected colour: `soapFilmLut` (soapFilmRgb's soft-box colour in linear light,
+by h cos θ_t to 2 µm) read through a cubic B-spline of the thickness, laid over the plate as a
+reflection (`c (1 − Y) + film`). The frame fills the view's longer side (`soapFrame.ts`: the
+plate's camera shows the middle two thirds of the plate). Two things join the film to the plate:
+the plate's flow drags it (the overdamped air drag, projected onto ∇·u = 0, so a swirl never a
+stretch; the solver gained an `ext` face push, zero by default, `npm run soapgpu` 32/32
+unchanged), and a drained film (mean under 160 nm) is drawn again top first over two seconds, a
+fresh film thin at the top and thick at the bottom (Mysels' √z, 350 to 750 nm) with patches 6 mm
+across, all on the GPU from the solver's own stats. Measured on the lab's picture of the look
+(`npm run soapplate`): luminance 0.48, 0.1% near black, 11 of 12 hue sectors; the plate's colours
+follow the CPU reference's picture of the read-back film at r = 0.955 (−0.01 upside down); off is
+the plate to the byte. The shortcuts it leaves are 32d-1..5.
+
 ## 33. Bubbles and the closeup, per liquid
 
 ### 33a. No stepped ring round a bubble's hole (this PR)

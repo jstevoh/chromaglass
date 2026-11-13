@@ -11,7 +11,7 @@ particular piece: no item reproduces one of the artist's films or images.
 films by their own descriptions and their poster frames (Vimeo's public oEmbed), and two
 press features. The Microlab films themselves were not played: Vimeo refuses a cloud
 address, and on the owner's Mac a headless browser met its bot check, which we do not get
-round; the route is the owner's own screen recording (`scratch/davy/` on the Mac). What the descriptions say, in their own words: "Micro chemical
+round; they were watched later in the owner's own Chrome (below). What the descriptions say, in their own words: "Micro chemical
 reaction in a 3x3 inch Petri dish [6144 x 3456 30fps]"; "filmed under UV lights using
 fluorescent materials"; "All macro effects have been filmed with a canon 5D Mark 3 and a
 100mm macro lens"; "blending acrylic paints in a 90mm Petri dish", time-lapsed over five to
@@ -49,6 +49,28 @@ channel of ink pinches into a row of beads in about a second, the beads then thr
 tendrils into dark stars and cells with pale droplets drifting between (47k), and the
 motion settles from its peak to a steady low within about 2 s. Sheets and timelines:
 `~/chromaglass/scratch/davy/` on the owner's Mac.
+
+**The Microlab films themselves, watched in the page (2026-11-13).** Ten of the eleven,
+played in the owner's own Chrome on vimeo.com (no bot check there) and read frame by frame
+into a canvas in the page: 24-frame sheets, a centre slit-scan, and per sample the mean
+luma, saturation, share near black, hue spread, motion (mean luma change over 1/24 s on a
+96×54 copy) and edge detail at 384×216 and at 96×54 ("fine" and "coarse"; their ratio is
+how much detail sits below a coarse grid). Read across the ten: near black 20 to 90 % (the
+glass and sphere films 80 to 100 %); saturation 0.7 to 0.85 in the fluorescent films and 0.3
+to 0.45 in the glass ones; azure and blue are the leading hues in eight of ten, with
+magenta, rose or amber as a second light in five; fine over coarse is 2.2 to 3.1 in every
+film. Motion splits two ways: *Rebirth*, *Forms IV* and *Fryars* drift (median 0.004 to 0.006,
+calm about half the time), *Underworlds*, *III* and *At0m* churn (0.02 to 0.04, calm under
+5 %). What recurs: cellular networks in five (*Rebirth*'s core bursting into a mesh that
+drifts apart as fragments, *Underworlds*' dense foam of cells with glowing cores, *Fryars*'
+thin-rimmed polygons with sparkles along the rims, the rings of *II* breaking into fine
+cells: 47g); suspended glitter or specks in four (47e); big out-of-focus discs and
+starburst spikes on speculars from a stopped-down lens (*Forms IV*, *III*: 47d, 47i); a
+second coloured light raking in from one side over the blue glow (*II*, *Underworlds*:
+47b's Rheinberg); a top-down vortex with concentric rings (*At0m*: 47f); clear glassy
+strands glinting gold (*III*); a left-right mirror laid on in the edit (*IV*); and a side
+view through a tank (*Gravity L1*: 47n). Numbers and sheets:
+`/mnt/project-files/macro-davy-evans/microlab-watch/` in the project's shared files.
 
 **What the poster frames show, across the eleven.** A black ground everywhere, with the
 liquid as the only light. Structure at every scale at once: a front a few millimetres
@@ -262,6 +284,17 @@ a full-frame camera with a 100 mm macro lens, later a 6K cinema camera, UV light
 fluorescent materials, 3 inch and 90 mm Petri dishes, acrylic paints, inks and dyes, glass.
 Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 
+## 47n. A side view: a falling thread and a gravity current in a tank (L; owner's call)
+
+*Gravity L1* films a tank from the side: fluorescent dye falls as a jet that stretches into
+one thread over about 40 s (the thread thins as gravity accelerates it, so its radius goes
+as the flow rate over the speed, a ∝ (Q/v)^½), lands, and spreads along the floor as a
+gravity current whose head curls into filaments, with glitter floating in dark water
+(near black 76 to 83 %, motion median 0.013, a jump to 0.029 at the landing). Our plate is a
+thin layer seen from above, so this is a different solver (a vertical 2D slice with
+buoyancy, or a 3D tank), not a camera move. Written down so it is not lost; the owner's
+call whether the show wants a tank at all.
+
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 
 ~~**47w-1** The download half~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1): the
@@ -305,6 +338,14 @@ each band.
   Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
   blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
   the flow read needs a taller crop, and a selftest line for it.
+- **47v-7. Open: watching where the file can't be fetched.** Vimeo refuses the cloud and a
+  headless browser, and a recording saved by the owner's Chrome lands in Downloads, which a
+  thread may not open. What worked (2026-11-13): read the frames in the page itself, in the
+  owner's Chrome, stepping the video by seeks (live playback skipped ahead and restarted
+  under the per-frame work) and taking a pair of frames 1/24 s apart for motion. Make that
+  a script the watch skill keeps (`scripts/watchpage.js`, pasted into the page), printing the
+  same names as `watch.mjs` so `--vs` can compare, with the run's own numbers checked
+  against `watch.mjs` on one clip both can read.
 - **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
   synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
   spot and superimposed loops all count as change the flow does not carry. Measure the
@@ -330,12 +371,103 @@ take from 2026-11-11, by `npm run watch -- … --vs`:
 - **Turnover.** Ours 2.6× brisker (5 s against 13 s to carry a form its own size): a viscous
   pool moves slower.
 
+## 47z. Found doing this: a crowd of oil drops in vivid colour, against our drop looks (M–L)
+
+The owner sent a screen recording (2026-11-12) of a Liquid Light Lab post, oils on an overhead
+projector with an oscilloscope's figures mixed over them, and asked for the physics of the
+drops and bubbles and for its vivid colour (the oscilloscope is not wanted). Kept in the
+library as `lll-oscilloscope-vectors` (`npm run watch -- --refs`); cropped to the video,
+`--crop 0,0.2,1,0.64`. Read against our closest takes from 2026-11-11 (`--vs`, 10 s windows,
+24 frames):
+
+| | theirs | Splodascope | Macro Bead | Crowd Plate | Poster 1969 |
+|---|---|---|---|---|---|
+| separate forms a frame | 63 | 12 | 25 | 17 | 11 |
+| elongation (1 round) | 0.75 | 0.60 | 0.62 | 0.49 | 0.66 |
+| edge width, % of width | 1.38 | 2.90 | 1.04 | 3.28 | 3.91 |
+| colourfulness | 137 | 43 | 47 | 125 | 138 |
+| coloured share of the frame | 0.99 | 0.39 | 0.34 | 0.80 | 0.66 |
+| hue spread (0 one hue) | 0.08 | 0.06 | 0.31 | 0.39 | 0.40 |
+
+What the frames show: hundreds of round drops from specks to a tenth of the frame, warm
+(red, orange, yellow) on a dark blue or violet water, each a lens with a bright core and a
+thin dark rim, a few drops inside drops, and fingers of yellow pinching into chains of
+beads. Their pace is not a target: a social edit of short clips (17.5 cuts a minute) whose
+turnover and lifetime (0.4 s) are under every real show's. Some of their saturation is
+likely the camera and video mixer's gain; the plate's should come from the dye and the light.
+
+The physics, in the order to build (each its own thread and PR):
+
+- **47z-1. Colour: a drop takes the water out of the light's path.** In the gap an oil drop
+  pushes the water aside, so the lamp's light through a red drop meets red dye only; the
+  plate multiplies the oil's colour by the water's, so red on cobalt reads black and
+  Splodascope's drops read murky green (its take: colourfulness 43 against 137, coloured
+  0.39 of the frame against 0.99). This is **28i-7b** (the displaced share, as
+  `gapScale × (1 − film)` does for Clear Film) and **28k-5** (a drop's edge multiplying
+  toward black); build them together, then give Splodascope the photograph's cobalt back.
+  *Measure:* a red drop on cobalt water keeps the red drop's own transmitted colour within a
+  just-noticeable step at its centre, and the edge's few cells do not go darker than either
+  liquid alone; Splodascope's take reads colourfulness over 100 and coloured share over 0.8.
+- **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
+  a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
+  equal viscosities) stretches and splits, its pieces split again until each is under the
+  critical size, so the sizes spread over a decade or more; threads between them bead at the
+  Rayleigh–Plateau wavelength (**47k**). Whether that happens on our plate depends on the
+  tension in real units and the capillary cap that bites at the moment of break-up (**38e**).
+  Specks under three cells are the beads' (**28k-3**). *Build:* first measure: stir a pool of
+  oil in the lab at three rates and count the drops and their sizes after five seconds; then
+  fix what stops it in that order (38e's cap, 47k's gap curvature, 28k-3's specks).
+  *Measure:* the count rises with the stir rate, the largest surviving drop's radius falls as
+  σ / (μ γ̇) within 30% (the free-shear law; a drop squashed in the gap may follow a
+  confined variant, which the build PR names before it measures), and the size distribution spans at least a factor of ten.
+- **47z-3. Drops that touch and wait.** A crowd stays a crowd because the water film between
+  two drops must drain before they merge, a time that grows with the drop's size and the
+  viscosity; Film Hold holds a film until pressed, which is the threshold without the timing.
+  This is **28k-2** (Reynolds' drainage, μR²/(gap·σ)-scaled, and a rupture drawn from it).
+  *Measure:* after a stir, the count halves over a time that scales with R² within 30% across
+  two drop sizes, not at once and not never.
+- **47z-4. Each drop a lens.** A drop's curved meniscus bends the light: the projected drop
+  has a bright core and a thin dark rim where light is turned out of the lens's aperture.
+  That is **47y**'s rims, **18c-4** (lens or film by the spreading coefficient), **47j**
+  (caustics) and **38h**'s shadowgraph; our edges are 1.7 to 2.4 times softer on the drop
+  looks (Macro Bead's beads already read 1.04%). *Measure:* edge width on Splodascope's take
+  under 1.6% of the width, from the optics, never a drawn outline.
+
+Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
+page, add one build and a note:
+
+- **47z-5. A crowd packed past touching becomes polygons.** `cosmo-packed-foam-cells`
+  (`--to 4.7 --crop 0.05,0.2,0.9,0.62`): pale cells pressed into polygons, thin films meeting
+  in threes, rust-red dye collected in the borders. That is a packed emulsion or a foam held
+  by the films of 47z-3: past about nine tenths of the area the drops can no longer stay
+  round, each film is flat at the drops' pressure difference, and three films meet at 120°
+  (Plateau's laws, here in the plane of the gap); the dye of the continuous liquid is
+  squeezed out of the films into the borders, thickest where three meet. Splodascope's
+  photograph ("packed edge to edge") is the same crowd at a lower fill. *Build:* after 47z-3,
+  pack held drops past nine tenths and see whether the field forms flat films and three-way
+  junctions; where the Cahn–Hilliard edge (two to five cells, 28k-2's shortcut (a)) rounds
+  the junctions off, that edge is what to replace. *Measure:* at nine tenths fill, nine in
+  ten junctions are three-way and their angles 120° within 10°; the continuous liquid's dye
+  per area is higher in the borders than in the films by their width ratio.
+- **The magnet beside the drops.** `cosmo-ferro-maze-drops` (`--crop 0,0.22,1,0.53`):
+  ferrofluid in a thin cell as a labyrinth where it is thick and a lattice of fine dots at a
+  drop's thin rim, beside large orange drops; stripes against dots by the fill and the
+  magnetic Bond number is **38d** (the dipolar sheet), §09 the rest. Its vivid colour
+  (colourfulness 114) is on a bright ground (luminance 0.52), so 47z-1's measure is the
+  colour itself, not a darker ground. Its white crescents are a ring light reflected in the
+  domed drops: a camera over a lit dish, not a projection (§09's note on speculars, 47e).
+
+Each lands as a watched take against its reference (`--vs lll-oscilloscope-vectors`, `--vs
+cosmo-packed-foam-cells` for 47z-5), the
+number it moves printed before and after.
+
 ## Order
 
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
-as each of its bullets' items comes up. Each its own thread
+47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
+as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4, 47z-5 in that order (the owner asked
+for the drops' physics and their colour, 2026-11-12). Each its own thread
 and PR.

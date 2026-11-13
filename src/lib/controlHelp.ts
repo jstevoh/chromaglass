@@ -110,6 +110,9 @@ export const CONTROL_HELP: Record<string, string> = {
   microDroplets: 'Satellite droplets on the glass, hundreds of tiny lenses.',
   thinFilm: 'Interference colour where the dye runs thinnest.',
   filmPhysics: 'The thin-film colours, from a plain rainbow at zero to a real soap film\'s at one.',
+  soapFilm: 'A real soap film in the frame: it drains, swirls with the flow, goes black from the top and is drawn again.',
+  soapFilmRate: 'How fast the soap film runs: drains, swirls and is drawn again. One is a real film\'s pace sped up for the stage.',
+  soapFilmAngle: 'The angle the soap film is seen from. Leaning it moves every band of colour to a thicker film.',
 
   // Macro
   macroZoom: 'How close the camera looks into the plate. One is the whole plate, sixteen is a single bead.',

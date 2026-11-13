@@ -621,6 +621,11 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   // The film's colours, the rainbow to a real soap film's. A fader because
   // the mix between them is a look of its own, not only the two ends.
   { key: 'filmPhysics',     label: 'Film Physics',     min: 0, max: 1 },
+  // The frame's soap film (PLAN 32d): how much of it, its clock, its angle.
+  // Faders: riding the angle sweeps every band through the orders at once.
+  { key: 'soapFilm',        label: 'Soap Film',        min: 0, max: 1 },
+  { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
+  { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
   // How hard the ferrofluid shoves the colour aside. A fader because riding
   // it is a gesture: down, the black slides over still colour; up, it cuts
   // channels through it and the colour piles along its edges.

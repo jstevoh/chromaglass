@@ -99,8 +99,8 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       `clock-glass` (`3.0 swells/min` on 40 s / `0.0` on 30 s, `0.0 colour changes/min`, `r1 = 0.10`),
       `ferro-paint` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.03`),
       `roy` (`0.0 swells/min`, `0.0 colour changes/min`, `r1 = -0.08`).
-  - **28i-4. Soap Film** waits on PLAN 32 drawing the film's interference colours (today:
-    magenta cells, no rainbow); then four or more hues on the film.
+  - ~~**28i-4. Soap Film**~~ — **Shipped with 32d**: the frame's own film draws its
+    interference colours (`npm run soapplate`: 11 of 12 hue sectors on the lab's picture).
 
   - **28i-6. What retiring nine left a check or a page standing on** (found in 28i-1;
     whoever has credit). Each is a shortcut or a gap the retirement made, named so it
