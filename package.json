@@ -247,6 +247,7 @@
     "stefan": "node scripts/stefan.mjs",
     "rimhold": "node scripts/rimhold.mjs",
     "sealed": "node scripts/sealed.mjs",
+    "oillaid": "node scripts/oillaid.mjs",
     "lavawax": "node scripts/lavawax.mjs",
     "lavacycle": "node scripts/lavacycle.mjs",
     "musicforce": "node scripts/musicforce.mjs",

@@ -49,6 +49,7 @@ import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
+import { mixWait } from './mixWait';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -401,6 +402,7 @@ export class FluidSimulation {
   */
   private gpuLanded = false;
   private seed: Float32Array[] | null = null;
+  private wait = mixWait(() => this.gpu);
   /*
     The liquids that never cross to the CPU (the ferrofluid, the mix, the
     reactions), handed from the last solver to this one (PLAN 9w; handOver
@@ -606,6 +608,7 @@ export class FluidSimulation {
     this.gpu = gpu;
     gpu.clear();
     this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
+    this.wait.play(gpu);
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -644,6 +647,7 @@ export class FluidSimulation {
       if (next) {
         this.carry?.destroy();
         this.carry = next;
+        this.wait.drop();
       }
     }
     gpu.dispose();
@@ -687,6 +691,7 @@ export class FluidSimulation {
     if (!this.seed) return false;
     const dst = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
     for (let k = 0; k < dst.length; k++) dst[k].set(this.seed[k]);
+    this.wait.putBack();
     this.restAfterRestore();
     return true;
   }
@@ -1241,11 +1246,13 @@ export class FluidSimulation {
   /** A still picture poured as dye, into the middle of the dish (lib/videoFlow.ts). */
   injectImage(imgData: ImageData) { pourPictureCpu(this, imgData, this.size); }
 
+  /** Its oil, soap and acid gone, waiting or laid (mixWait.ts). */
+  clearChemistry() { this.wait.drop(); this.gpu?.clearChemistry?.(); }
   clearAll() {
     this.liquid.clear();
     this.speciesPoll.clear();
     this.gpu?.clear();
-    if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
+    this.clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
@@ -1948,9 +1955,7 @@ export class FluidSimulation {
           and bodies of oil are laid over it across the dish, each with one
           of the other dyes in it. With Oil Bodies on (the look's) each body
           keeps its colour while it moves, and two only mix where they merge,
-          as two dyed oils do. The oil is laid only where the solver is there
-          to take it; before it is, the colours still land, as spots in the
-          water.
+          as two dyed oils do.
         */
         const water = col(0);
         const bodies = clockGlassBodies(this.rng.float, harmony.length);
@@ -1958,8 +1963,7 @@ export class FluidSimulation {
           Each cell as clockGlassCell lays it (and why): a body's colour in
           its oil and nowhere else, the water's wash in what is left.
         */
-        const g = this.gpu;
-        for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
+        for (const b of bodies) this.wait.oil(b.x, b.y, b.r);
         for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
           const cell = clockGlassCell((x + 0.5) / S, (y + 0.5) / S, S, bodies);
           if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
@@ -1981,8 +1985,7 @@ export class FluidSimulation {
         */
         const water = col(0);
         const discs = splodascopeDiscs(this.rng.float, harmony.length);
-        const g = this.gpu;
-        for (const d of discs) g?.addMix?.(d.x, d.y, d.r, { oil: d.oil });
+        for (const d of discs) this.wait.lay(d.x, d.y, d.r, { oil: d.oil });
         for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
           const cell = splodascopeCell((x + 0.5) / S, (y + 0.5) / S, S, discs);
           if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
@@ -2054,7 +2057,7 @@ export class FluidSimulation {
       case 'lava-lamp': {
         // The wax as a liquid of its own, a pool and three bodies (PLAN 27f-9c; src/lib/oilLay.ts says why).
         const c = col(0);
-        layLavaLamp(S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }), (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
+        layLavaLamp(S, this.wait.oil, (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
         break;
       }
 
