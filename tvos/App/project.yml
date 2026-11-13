@@ -48,4 +48,8 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         DEVELOPMENT_TEAM: $(CG_TEAM)
+        # LiveKit's WebRTC build ships its tvOS simulator slice for Apple silicon only, so a
+        # generic simulator build linked x86_64 against nothing and failed on every LKRTC
+        # symbol. No Intel Mac runs this app's simulator any more; the device slice is arm64.
+        "EXCLUDED_ARCHS[sdk=appletvsimulator*]": x86_64
         CODE_SIGN_STYLE: Automatic
