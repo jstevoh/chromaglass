@@ -131,6 +131,19 @@ blur.
   each texel's back-trace to where its dye was at the field's birth (a displacement field,
   advected) and read the birth snapshot once, through the plate's own read, so a field resamples
   its dye once in its life whatever the steps. Measure against finedye's lines 1 and 4.
+- **47a-7. Scalloped drop edges in macro** (M, reported by the owner 2026-11-13: "the drops in
+  macro still have jagged edges"). Not the fine window's: photographed on the owner's Mac (Macro
+  Bead, 6x, the same frame drawn four ways in one page), the bead outline is scalloped with Fine
+  Detail at 0 as at 1, a regular row of bumps about 12 to 13 screen pixels apart with a dark dot
+  in each. Edge Detail (`macroEdge`, `macroWarpOffset` in `wgsl/plate.ts`) adds an fbm
+  "silhouette crinkle" on top, visibly rougher at 0.75 than at 0. Two parts. (a) Retire the
+  crinkle: surface tension makes a drop's edge a smooth curve at this scale, so a drawn wobble
+  breaks the physics rule; whatever real roughness an edge has (capillary ripples, 47a-3's carried
+  interface) should come from the solver. It is a setting four presets lean on (0.75, 0.9), so
+  it needs the setting auditor and a film. (b) Find what draws the scallops at Edge Detail 0:
+  check whether their spacing is the grid's cell at 6x (a bilinear read of the phase or the
+  bead mask, `wgsl/beadMask.ts`, kinks at each cell), and read that field through the plate's
+  bicubic or carry it as a level set.
 - **47a-4. Where the films' fine structure comes from** (finding, 2026-11-13). On the lab's
   stirred swirl the fine dye raises fine over coarse from 1.08 to 1.11, where the films read 2.2
   to 3.1: the thin gap's drag stops a free vortex in nine steps, so the plate's flow is slow and
