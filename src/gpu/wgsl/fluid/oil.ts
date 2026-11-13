@@ -155,6 +155,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Oil Bodies: a look's lay, which says which colour is the oil's (PLAN
+    47z-1; inputs.ts foldDye says why). The oil's share takes the lay's oil
+    colour, never more than the frame's dye in that cell nor less than none,
+    and keeps the multiplier as the dye does; the rest of the frame's dye is
+    the water's, by being left out of the share.
+  */
+  bodyLay: `${HEAD}
+@group(0) @binding(2) var oil: texture_2d<f32>;
+@group(0) @binding(3) var addT: texture_2d<f32>;
+@group(0) @binding(4) var mulT: texture_2d<f32>;
+@group(0) @binding(5) var layT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let add = max(textureLoad(addT, p, 0), vec4f(0.0));
+  let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + clamp(textureLoad(layT, p, 0), vec4f(0.0), add);
+  textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
+}`,
+
+  /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
     host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused

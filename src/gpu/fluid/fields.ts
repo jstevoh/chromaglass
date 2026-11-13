@@ -439,6 +439,13 @@ export class FluidFields extends FluidCore {
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
       chem: this.chemLive ? this.chem.read : null,
+      /*
+        The oil's own share of the dye (Oil Bodies, bodyPartition), or null
+        when the oil carries no colour of its own or the plate shows a print:
+        with it the pack lets a part-oil cell's two liquids pass the light
+        side by side (packDyeBodies in wgsl/pack.ts, PLAN 47z-1).
+      */
+      oilDye: this.bodiesWanted && !this.oilDyeStale && this.oilDye && !(this.printLive && this.printDye) && this.mixLive && this.mix ? this.oilDye.read : null,
       /** The poured species field (carries scatter in b channel). */
       species: this.speciesLive && this.species ? this.species.read : null,
       /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */

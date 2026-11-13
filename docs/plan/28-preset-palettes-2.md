@@ -174,12 +174,9 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       took the beads' grain out of proportion: `npm run grainedge` line 2 read body texture
       0.124 and 0.234 at twice the grain, under the 2x it asks (WebGPU macOS, open shard),
       so it came out. A second dye under the beads wants a way that keeps the grain's depth.
-    - **28i-7b, open. Splodascope's oil is filtered by the water it displaced.** In a thin
-      cell an oil drop pushes the water out of the gap, so a drop's colour should not pass
-      through the water's dye; the plate multiplies the two, so a cobalt water turned every
-      drop green. The pale water is the stopgap; the fix is the oil's share taking the water
-      out of the light's path (as `gapScale × (1 − film)` does for Clear Film), then the
-      photograph's cobalt back.
+    - ~~**28i-7b. Splodascope's oil is filtered by the water it displaced.**~~ (**shipped** as
+      PLAN 47z-1; story in `docs/plan-shipped.md` 47z-1): a drop's light no longer passes through the
+      water it pushed aside. The cobalt itself, filmed, read darker (47z-1e), so the pale water stays.
 
   The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
   (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
@@ -239,14 +236,9 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
     colours once 28k-1 is judged.
   - **28k-4. Judged on the Mac** (`docs/judging.md` §79): the look beside the photograph at
     the app's own grid, and whether a kick (Plate Pressure) breaks a few films and no more.
-  - **28k-5. The colours darken at the walls over time** (found here, lab at 256²): yellow
-    drops go orange and brown from their edges inward over ten seconds, and green darkens,
-    though the oil's own share of the dye holds (19369 → 19368). The water's cobalt meets
-    each drop's colour in the edge's few cells of part-oil and the two multiply toward
-    black there; pressed into a crowd, a drop is mostly edge. Measure where the colour
-    goes (the dye per drop against its laid colour, the angle of its absorbance) and find
-    whether it is the partition's hand-over at a held film (bodyPartition) or the edge's
-    width; never by thinning the dyes further.
+  - ~~**28k-5. The colours darken at the walls over time**~~ (**shipped** as PLAN 47z-1; story
+    in `docs/plan-shipped.md` 47z-1): the lay handed the water's colour to each drop's rim and
+    the drop's to the water; each drop's colour is now laid in its own oil.
 - **28l. Saffron Lace: yellow lace over lavender, cobalt and coral** (the owner, 2026-11-07,
   from a still of another show: yellow veins and cells of lace, fine spatter, a lavender
   wash, cobalt and coral; "can we create a preset that looks like this?"). Built on Clear
