@@ -217,15 +217,59 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       §27f-9e).** The heat crosses the gap to the cool upper glass at the gap's conduction
       rate, π²κ/h² in real seconds (2.9 s water, 5.8 s wax), so a risen body cools, sinks
       and is warmed again: about 16 s round on the look's clock at 192². `npm run lavacycle`.
-    - **27f-9g, open (a shortcut named, with 27f-9e).** The glass's temperature is laid by
-      height (riding the liquid below half the plate, the room's above, LAMP_COOL_FROM)
-      rather than a field of its own that the liquid warms and the air cools (the lumped
-      glass and air of `lib/lampBoil.ts`): a lamp run for an hour does not warm up as a
-      real one does, the cool line does not move with Heat or the lamp's brightness, and the
-      floor's warm glass warms only the wax (mixForce's source), not the water beside it.
-      Wanted: the glass as a temperature per cell (stationary, so not carried), warmed by
-      the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, with the lamp
-      heating the floor's glass; then the cycle's period should follow the lamp.
+      It went round once or twice and then hovered: 27f-9h.
+    - **27f-9g, open (shortcuts named, with 27f-9e and 27f-9h).** The glass's temperature is
+      laid by height (the floor's at LAMP_GLASS, fading up over a fin length; the room's above
+      half the plate, LAMP_COOL_FROM) rather than a field of its own that the lamp heats, the
+      liquid warms and the air cools (the lumped glass and air of `lib/lampBoil.ts`): a lamp
+      run for an hour does not warm up as a real one does, the cool line and the floor's
+      temperature do not move with Heat or the lamp's brightness, and Gravity turns the floor
+      on (any tilt) rather than dimming it. The rate both ends work at is the thin gap's
+      (π²κ/h², 2.9 s in water), standing in for a fat bottle's far slower conduction, which
+      is why the lamp goes round in 32 s where a real one takes minutes. And a wax that is dye
+      with a weight (no oil phase) is still warmed by the old kick into the wax alone
+      (LAMP_HEAT), which hovers for the same reason 27f-9h found. Wanted: the glass as a
+      temperature per cell (stationary, so not carried), heated by the lamp at the floor,
+      warmed by the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, for dye
+      and oil alike; then the cycle's period should follow the lamp.
+    - **27f-9h. Lava Lamp looks like a lit lamp, and keeps going round (shipped 2026-11-12;
+      story in docs/plan-shipped.md §27f-9h).** The wax dyed lightly (LAVA_DYE 0.55) so the
+      bulb shines through it, the bulb a warm white, Oil Tension 1 and Dye Weight at the 0.5 a
+      standing plate floors it to, and nothing poured or kicked into the sealed lamp (Evolve,
+      Sound Drive and Plate Rock at 0). And the stall the Mac filmed, root-caused: the bulb
+      was a kick of heat to the wax alone, a thermostat the wax parked on, and every lamp
+      since 27f-9e hovered within 60 to 80 s. The floor's glass is warm now (LAMP_GLASS) and
+      heats water and wax alike by conduction: the wax goes round every 32 s, for minutes.
+      What lifts warm wax through warm water is only that it swells more than the water
+      does (OIL_EXPAND), as a real lamp's wax does: with the swelling out it never leaves
+      the floor. `npm run lavacycle` watches two minutes of it, on the Mac's `show`, and
+      holds the warm floor's and the swelling's controls (`npm run lavawax`'s old third
+      line, which read the lamp at 6 s, before conduction has warmed anything). The owner's verdict
+      on the Mac film decides whether the look stays (2026-11-12: "one last try").
+    - **27f-9i, open. The wax's capillary length is a quarter of a real lamp's.** At the Dye
+      Weight 0.5 a standing plate runs (27f-9j) the wax's ℓc is about 3.5 mm against a real
+      lamp's 1.5 cm. The full answer is σ per liquid in N/m (§38e's bottles) with the wax's own
+      low interfacial tension against its liquid, and a weight the dial can take below 0.5.
+    - **27f-9j, open. Dye Weight is dead below 0.5 on a standing plate.** The solver floors it
+      there when Plate Upright is on (`fluid.ts`, "Dye weighs something whether or not a look
+      says how much"), so the dial reads 0.2 and the plate runs 0.5: Lava Lamp at 0.2, 0.35 and
+      0.5 was one run to the last digit (lab, 128², 30 s), and 27f-9h's "0.7 → 0.2" was 0.7 →
+      0.5. Wanted: the floor only where a look sets no weight at all, or the dial showing what
+      runs; `npm run lavacycle` held while it moves.
+    - **27f-9k, open. The colour is counted in the wax's weight, and the projector's light
+      heats the wax wherever it floats.** Two things found under the stall. Dye Weight weighs
+      the wax's own dye, so lightening the colour (LAVA_DYE 2.6 → 0.55) lightened the wax and
+      moved its balance; a liquid's weight should be its own (Oil Weight) and its colour a
+      tracer. And the absorbed light of the projector (LAMP_HEATING, derived for a 1 mm layer,
+      §38's audit) warms dyed wax at any height on a standing lamp: with all conduction off
+      the wax rose on that alone to 0.86 of the height and stayed. A real lamp's bulb is
+      under the bottle; the light through the glass is not what lifts its wax. Wanted: the
+      look's light as heat only where the look asks for it, and measured against the floor's.
+    - **27f-9l, open. `gapThickness` is the Thickness (viscosity) dial, not the gap.** The
+      setting's key reads as the glass gap, which is the cover's own (Plate Pressure squeezes it; the
+      solver's `REST_GAP`); a lab script that passes
+      it as the gap is wrong by the name alone (it cost an hour here). Rename the key with a
+      migration, or say so where `VisualizerSettings` declares it.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
@@ -254,6 +298,22 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       at 6 s, 192²: haze 1,474 cells, colour in the bodies 72%, 83% clear (`lavawax` 4/4).
       What is left of 27f-9f is the Mac's minute: whether the plumes still strip colour
       over a long take, which the film after this PR shows.
+      *The Mac's minute, filmed (27f-9h, 2026-11-12, two takes of 150 s, no hands, no
+      sound):* yes, in the app, and not in the lab. The film: fat dark caps on stalks to
+      about 20 s, red streaks and folded sheets by 30 s, and from about 1:40 one marbled
+      orange-red column up the middle with a pale orange wash round it; the wax never
+      gathers back into separate round bodies. The lab over the same 150 s (128², the
+      look's own settings, `scratch/stall/probe.mjs`): the share of the colour inside the
+      wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
+      cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
+      and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
+      take and the app's picture does not. What differs between the two is not yet known,
+      and is the next thing to measure before anything is changed: the app's grid and step
+      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
+      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
+      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
+      it would read the app's own fields after two minutes (the share of the dye inside
+      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).

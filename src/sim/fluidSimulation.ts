@@ -22,7 +22,7 @@ import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, layLavaLamp } from '../lib/oilLay';
+import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -49,6 +49,7 @@ import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
+import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -327,6 +328,7 @@ export class FluidSimulation {
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
+  private oilAdd: Float32Array | null = null; // the lay's oil colour (layOilShare)
   private velAdd: Float32Array;
   /** The fingers in the liquid this step on a thin gap (lib/handSolid.ts), made when one first touches it. */
   private hands: Float32Array | null = null;
@@ -789,7 +791,8 @@ export class FluidSimulation {
     this.videoLaid = false;
     const a = { ...this.dyeTarget(), vx: this.vx, vy: this.vy, temp: this.temp, gap: this.gap, dyeAdd: this.dyeAdd, velAdd: this.velAdd, hands: this.handsLaid ? this.hands : null, breath: this.breathLaid ? this.breath : null };
     const runs = packRows(a, rows);
-    gpu.applyDeltas(a.dyeAdd, a.velAdd, a.mul, dt, a.hands, a.breath, this.sheetLaid ? this.sheetGap : null, rows);
+    gpu.applyDeltas(a.dyeAdd, a.velAdd, a.mul, dt, a.hands, a.breath, this.sheetLaid ? this.sheetGap : null, rows, this.oilAdd);
+    this.oilAdd = null;
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     restRows(a, runs);
     this.handsLaid = this.breathLaid = false;
@@ -1138,6 +1141,12 @@ export class FluidSimulation {
     this.densityR[index] += amount * ar;
     this.densityG[index] += amount * ag;
     this.densityB[index] += amount * ab;
+  }
+
+  /** Dye laid in the oil as its own colour (src/lib/oilLay.ts layOilShare, PLAN 47z-1). */
+  addOilDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
+    this.addDensity(x, y, amount, r, g, b);
+    if (this.gpu) this.oilAdd = layOilShare(this.oilAdd, x + y * this.size, amount, dyeAbsorbances(r, g, b), GRID_AREA);
   }
 
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
@@ -1774,8 +1783,7 @@ export class FluidSimulation {
       }
 
       case 'soap-film': {
-        // One unbroken sheet. Everything this preset does it does by tearing
-        // holes in that sheet, so the seed is the sheet and nothing else.
+        // The film is the frame's own (32d); this is the dye seen through it.
         for (let i = 0; i < 3; i++) {
           const c = col(i);
           this.splatBlob(cx + this.rng.centred() * S * 0.28, cy + this.rng.centred() * S * 0.28,
@@ -1940,59 +1948,27 @@ export class FluidSimulation {
         break;
       }
 
-      case 'clock-glass': {
+      case 'clock-glass':
+      case 'splodascope': {
         /*
-          A clock-glass dish is coloured water and oil that will not mix
-          (src/lib/oilLay.ts, and why): the water is the first dye, laid wide
-          and deepest in the middle where the bowed glasses hold the most,
-          and bodies of oil are laid over it across the dish, each with one
-          of the other dyes in it. With Oil Bodies on (the look's) each body
-          keeps its colour while it moves, and two only mix where they merge,
-          as two dyed oils do. The oil is laid only where the solver is there
-          to take it; before it is, the colours still land, as spots in the
-          water.
+          Coloured water and oil that will not mix, each body of oil laid with
+          one of the other dyes as its own colour (src/lib/oilLay.ts, and why;
+          layCrowd). With Oil Bodies on (the look's) each body keeps its colour
+          while it moves; Splodascope's Film Hold keeps its crowd apart where
+          they touch. The oil is laid only where the solver is there to take
+          it; before it is, the colours still land, as spots in the water.
         */
         const water = col(0);
-        const bodies = clockGlassBodies(this.rng.float, harmony.length);
-        /*
-          Each cell as clockGlassCell lays it (and why): a body's colour in
-          its oil and nowhere else, the water's wash in what is left.
-        */
-        const g = this.gpu;
-        for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
-        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
-          const cell = clockGlassCell((x + 0.5) / S, (y + 0.5) / S, S, bodies);
-          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
-          if (cell.dye > 0) {
-            const c = col(bodies[cell.body].dye);
-            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
-          }
-        }
+        layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
+          (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
+          (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
         break;
       }
 
-      case 'splodascope': {
-        /*
-          The splodascope's crowd (src/lib/oilLay.ts, and why): a blue water
-          across the dish and a packed crowd of oil drops in it, each with
-          one of the other dyes, a few big ones holding a drop of another
-          colour in a ring of water. The look's Film Hold keeps them apart
-          where they touch, and Oil Bodies keeps each one's colour its own.
-        */
-        const water = col(0);
-        const discs = splodascopeDiscs(this.rng.float, harmony.length);
-        const g = this.gpu;
-        for (const d of discs) g?.addMix?.(d.x, d.y, d.r, { oil: d.oil });
-        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
-          const cell = splodascopeCell((x + 0.5) / S, (y + 0.5) / S, S, discs);
-          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
-          if (cell.dye > 0) {
-            const c = col(discs[cell.disc].dye);
-            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
-          }
-        }
+      case 'foam-cells':
+        // Pressed cells across the dish, rust water in the films (layFoamCells, src/lib/oilLay.ts, says why).
+        layFoamCells(this.rng.float, harmony.length, this.gpu?.N ?? S, S, (f) => this.gpu?.layOil?.(f), (x, y, d, k) => { const c = col(k); this.addDensity(x, y, d, c.r, c.g, c.b); });
         break;
-      }
 
       case 'turing-print': {
         // Coloured ink pools across the plate so the reaction-diffusion print
@@ -3419,8 +3395,7 @@ export class FluidSimulation {
         No stir for the look's motor (PLAN 22j). The current had one, a
         swirl round the middle at rotationSpeed × 30, fastest at the centre
         and nothing at the rim: a stand-in from when the motor turned the
-        picture rigidly and nothing else made the liquid go round. The motor
-        turns the dish now (22h, dishFrame), and a dish turning steadily
+        picture rigidly. The motor turns the dish now (22h, dishFrame), and a dish turning steadily
         under its liquid drags it round through the gap until it turns with
         the glass, after which there is nothing left to stir: the picture
         turns, and the liquid in it is still. What the glass does to the
@@ -3449,6 +3424,7 @@ export class FluidSimulation {
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
       heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
       boilHolds: this.boilHolds,
+      ...besideStep(settings, this.layerIndex),
     };
   }
 

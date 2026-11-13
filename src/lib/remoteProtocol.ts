@@ -301,14 +301,27 @@ export type TvSignal =
 
 export type RemoteMessage =
   /** Sent on connect so the relay knows which way to route. A mirror is a network display: any browser on the LAN showing the show. */
-  | { type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string }
+  | {
+      type: 'hello'; role: 'display' | 'controller' | 'mirror' | 'assistant' | 'tv'; key?: string;
+      /** A TV with no key asking to pair by four digits (PLAN 12-tv-2, server/tv-pairing.js). */
+      pair?: boolean;
+    }
   /**
    * Relay → a client it is turning away, before it closes it: the wrong key, or
    * (PLAN 14m) an address that gave three wrong keys and is locked out for a few
    * minutes, `retryMs` from now. A locked phone waits that long rather than
    * knocking again, since every knock while locked is refused unread.
    */
-  | { type: 'denied'; reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop'; retryMs?: number }
+  | {
+      type: 'denied'; retryMs?: number;
+      /**
+       * A TV pairing (PLAN 12-tv-2) hears four more: the laptop said No
+       * (`refused`), nobody answered in two minutes or it asked again
+       * (`expired`), four TVs already ask (`busy`), or its own key is one this
+       * show does not hold, forgotten or another Mac's (`unpaired`).
+       */
+      reason: 'key' | 'locked' | 'assistant-off' | 'not-laptop' | 'refused' | 'expired' | 'busy' | 'unpaired';
+    }
   /** Relay → display, when a network display joins and needs the whole show. */
   | { type: 'request-cast' }
   /** Relay → display: how many network displays are connected. */
@@ -358,6 +371,27 @@ export type RemoteMessage =
    * signal alone. TV → relay carries the signal alone; the relay adds `from`.
    */
   | { type: 'tv-signal'; to?: string; from?: string; signal: TvSignal }
+  /**
+   * Pairing a TV by four digits (PLAN 12-tv-2, server/tv-pairing.js). Relay →
+   * the TV asking: the digits to show. Relay → display: who is asking, and
+   * how many TVs hold a key, on every change and on hello. Display → relay:
+   * Allow, No, or forget every paired TV; the relay takes them from the
+   * laptop's own page only. Relay → the TV allowed: its own key, to keep.
+   */
+  | { type: 'tv-code'; code: string }
+  | { type: 'tv-pairing'; asks: { id: string; code: string }[]; paired: number }
+  | { type: 'tv-allow'; id: string }
+  | { type: 'tv-refuse'; id: string }
+  | { type: 'tv-forget' }
+  | { type: 'tv-key'; key: string }
+  /**
+   * The TV's remote picks the look (PLAN 12-tv-remote, server/tv-remote.js).
+   * Relay → TV: the laptop's presets in its order, and the live one, when
+   * either changes and when the TV joins. TV → relay: play this one, which
+   * the relay hands the display as `preset` if the laptop listed it.
+   */
+  | { type: 'tv-looks'; presets: { id: string; name: string }[]; active: string | null }
+  | { type: 'tv-pick'; presetId: string }
   /** Display → relay: a beat the plate pressed on, sent the frame it lands, while OSC out is on. Stops at the relay. */
   | { type: 'beat' }
   /**
@@ -462,11 +496,12 @@ export type RemoteMessage =
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }
   /**
-   * Words poured onto the plate as dye, which the flow then carries off
-   * (PLAN 37x-10c, `lib/pourText.ts`): a song's name and credit at the top
-   * of each track in a live set. From the phone remote's text box, or
-   * through the relay's guard; the display reads it with `parsePourText`
-   * whoever sent it. `colour` is `#rrggbb` or `contrast` (the default).
+   * A song's name and credit as rows (PLAN 37x-10c, `lib/pourText.ts`), at
+   * the top of each track in a live set, through the relay's guard (the
+   * assistant's `pour_text`) or from a phone one build older. Poured onto
+   * the plate as ink until the owner shelved that (37x-10m); the display now
+   * shows it as the corner caption (`rowsCaption`), reading it with
+   * `parsePourText` whoever sent it. `colour` is kept on the wire, unread.
    */
   | { type: 'pour-text'; rows: { text: string; weight?: number }[]; colour?: string }
   /**

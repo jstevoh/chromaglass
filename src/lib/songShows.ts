@@ -55,7 +55,7 @@ export type ActionWhat =
   | { do: 'lights-up'; over: number }                 // and back
   | { do: 'set'; key: keyof VisualizerSettings; value: number; over: number } // any setting, glided
   | { do: 'title' }                                   // pour the song's title into the plate
-  | { do: 'signoff' }                                 // pour ChromaGlass into the plate
+  | { do: 'signoff' }                                 // ChromaGlass in the corner caption (poured as ink until 37x-10m)
   | { do: 'pour'; color: string; amount: number; x?: number; y?: number; wall?: true }; // a drop of this dye, at a point (the middle if none; `wall`: the point is the wall's, as the picture shows it)
 
 export interface SongAction {
@@ -114,7 +114,7 @@ export function describeWhat(a: ActionWhat, lookName: (l: SongLook) => string = 
     case 'lights-up': return `Lights up over ${a.over} s`;
     case 'set': return `${String(a.key)} → ${a.value}${a.over > 0 ? ` over ${a.over} s` : ''}`;
     case 'title': return 'Pour the title';
-    case 'signoff': return 'Pour the ChromaGlass name';
+    case 'signoff': return 'Show the ChromaGlass name';
     case 'pour': return `Pour ${a.color}${a.x !== undefined && a.y !== undefined ? ` at ${Math.round(a.x * 100)}%, ${Math.round(a.y * 100)}%` : ''}`;
   }
 }
@@ -140,7 +140,7 @@ export const COMMON_ACTIONS: CommonAction[] = [
   { label: 'Switch look at the bridge', when: { at: 'section', section: 'bridge' }, what: { do: 'look', look: { kind: 'preset', id: 'galaxy', name: 'Galaxy' }, fade: 4 } },
   { label: 'Switch look at 1:00', when: { at: 'time', sec: 60 }, what: { do: 'look', look: { kind: 'preset', id: 'classic', name: 'Classic Light Show' }, fade: 4 } },
   { label: 'Drain 8 s before the end', when: { at: 'before-end', sec: 8 }, what: { do: 'drain' } },
-  { label: 'Pour the name 6 s before the end', when: { at: 'before-end', sec: 6 }, what: { do: 'signoff' } },
+  { label: 'Show the name 6 s before the end', when: { at: 'before-end', sec: 6 }, what: { do: 'signoff' } },
   { label: 'Fade to black 4 s before the end', when: { at: 'before-end', sec: 4 }, what: { do: 'blackout', over: 4 } },
 ];
 

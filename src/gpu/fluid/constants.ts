@@ -245,7 +245,10 @@ export function oilLightnessOf(weight: number | undefined): number {
  * Derived from irradiance / (rho * c * h) ≈ 1000 W/m² / (1000 kg/m³ * 4184 J/(kg·K) * 0.001 m) ≈ 0.24 K/s.
  */
 export const LAMP_HEATING = 0.24;
-/** The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity. */
+/**
+ * The lamp under a standing plate: heat a second into the wax where the plate goes out of view, at full Gravity.
+ * Only where the wax is dye: a wax that is a liquid of its own is warmed by the floor's glass (LAMP_GLASS below).
+ */
 export const LAMP_HEAT = 6;
 /*
   The cool top of a lamp (PLAN 27f-9e): where the heat a standing plate's
@@ -304,6 +307,55 @@ export const LAMP_HEAT = 6;
 export const KAPPA_WAX = 7e-8;       // m²/s: liquid paraffin, k ≈ 0.16 W/mK over ρc ≈ 780 kg/m³ × 2.9 kJ/kgK
 export const GLASS_FIN = 0.017 / DISH_METRES;
 export const LAMP_COOL_FROM = 0.5;
+/*
+  The warm floor of a lamp (PLAN 27f-9h): the glass over the bulb, in the
+  heat's units, and the other end of the gradient the cool top makes.
+
+  Reported: on the owner's machine the lamp's wax rose once and then hung
+  ("no second rise from the floor" in a 90 s film), and `npm run lavacycle`
+  went red when the wax was made paler. Measured in the lab (128², Lava
+  Lamp's settings, a sample every 2 s for 180 s, the oil's centre of mass as
+  a share of the height): the paler wax rose to 0.60 at 11 s and hovered at
+  0.49 to 0.50 from 22 s on; the wax the check was written on went round
+  once or twice and was hovering too by 60 to 80 s, past the 30 s the check
+  looked at. The maps showed why. The bulb was a kick of LAMP_HEAT a second
+  into the wax alone, in a band over the floor, with the water under it
+  left cold. The wax's neutral heat is about 1.3 of the heat's units, so a
+  body entering the band was light again within a quarter of a second, long
+  before it had sunk through it: the band was a thermostat with the wax
+  parked on its upper edge, one weightless slab, the water below it at 0.
+  No dial moved it (stronger gravity, a thinner liquid, slower cooling, no
+  cooling by the room at all), and it could not have: a body in a liquid
+  this thick has no inertia, its speed is its weight at that moment, and a
+  system of two such numbers (height, heat) that comes to rest somewhere
+  stays there. A lamp goes round on two things the kick did not have. The
+  liquid round the wax is warm below and cool above, so a body is lighter
+  against it the higher it gets, and it warms slowly, by conduction from the
+  floor, so it has sunk all the way down before it is light again.
+
+  So the bulb is what it is in a lamp: it heats the glass floor, and the
+  floor heats whatever lies on it, water and wax alike, by the same
+  conduction across the gap that the cool glass takes it out by (S.lampCool,
+  the wax at its own κ), toward the floor's temperature, over the same fin
+  length of glass (GLASS_FIN) up from the floor. LAMP_GLASS is that
+  temperature. Measured, the same lab:
+    4: up to 0.57, then a swing that dies to 0.34 to 0.40 by 180 s;
+    6: down to 0.15 at 8 s (wax laid cold sinks first), 0.60 at 22 s, 0.19
+    at 42 s, 0.64 at 56 s, 0.23 at 76 s, 0.60 at 90 s, 0.22 at 108 s, 0.62
+    at 122 s, and 0.24 to 0.62 still at 180 s: about 32 s round, in whole
+    fat bodies, the water at 2.7 on the floor, 1.0 a quarter of the way
+    up, 0.4 in the middle and 0 at the top;
+    8: 0.25 to 0.62, 26 s round, the wax torn into more and smaller bodies.
+  And the kick kept beside the warm floor (floors of 2, 3 and 4) hovered
+  every time: it is the kick that stops the lamp. The projector's own light
+  on the wax (LAMP_HEATING) was left on throughout; with it off and the
+  floor at 3 the wax never left the floor.
+
+  The same shortcut as the cool glass's (PLAN 27f-9g): the floor's
+  temperature is laid, not computed from a bulb's watts and the air's
+  cooling, so Gravity turns the whole lamp on or off and does not dim it.
+*/
+export const LAMP_GLASS = 6;
 /**
  * How far a standing plate's glass draws a water cell's heat down in one
  * step (S.lampCool, writeSim): the gap's slowest conduction mode, π²κ/h²,

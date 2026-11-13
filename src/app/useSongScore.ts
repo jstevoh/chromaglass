@@ -3,6 +3,7 @@ import { type SongAction, type SongLook, type SongShow, titleRows, showFor, type
 import { setSongCueSink } from './songCue';
 import { publishSongs, setSongsDoor, showBrief } from './songShowNow';
 import { showSongTitle } from './songTitle';
+import { showSongCaption } from '../lib/songCaption';
 import { unhandled } from '../lib/unhandled';
 import { useSongShows } from '../hooks/useSongShows';
 import { PRESETS } from '../presets';
@@ -82,11 +83,12 @@ export function useSongScore({
       case 'blackout': glideSetting('dimmer', 0, a.over); break;
       case 'lights-up': glideSetting('dimmer', 1, a.over); break;
       case 'set': glideSetting(a.key, a.value, a.over); break;
-      // In an ink that reads against the plate as it is: a title poured into a
-      // full, bright plate in the look's own dye does not show.
-      // The corner caption by default, or this ink when the show is set to pour it (app/songTitle.ts, 37x-10j).
+      // The corner caption (app/songTitle.ts, 37x-10j); the ink's rows ride along, dormant, since the ink was shelved (37x-10m).
       case 'title': showSongTitle(show.song, { rows: titleRows(show.song), colour: 'contrast' }); break;
-      case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
+      // The show's name in the corner as the song ends. It was poured as ink
+      // until the owner shelved the poured words (37x-10m): on a busy look the
+      // flow smeared the word before it could be read, as it did the titles.
+      case 'signoff': showSongCaption({ artist: '', title: 'ChromaGlass' }); break;
       // A drop of this dye, as a pad's Drop lays it (lib/songShows.ts pourGesture).
       case 'pour': v?.applyGesture(pourGesture(a, (x, y) => v.wallToPlate(x, y, 0, true))); break;
       // A show that names something this build cannot do says so, rather

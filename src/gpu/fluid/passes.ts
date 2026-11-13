@@ -17,6 +17,9 @@ import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
+import { SoapFilmPlate, SOAP_PLATE_DX } from '../soapFilmPlate';
+import { TankPlate } from '../tankPlate';
+import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
  * How much of the plate the air's cover has to change in a step (a bubble of
@@ -265,6 +268,48 @@ export class FluidPasses extends FluidFields {
     const w = Math.ceil(this.N / 8);
     pass.dispatchWorkgroups(w, w);
     this.phaseGapPrimed = true;
+  }
+
+  /**
+   * The solvers that run beside the plate's own, on `enc` before the step's
+   * pass: the frame's soap film and the tank's side view.
+   */
+  protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepSoapPlate(enc, p);
+    this.stepTankPlate(enc, p);
+  }
+
+  /**
+   * The tank seen through its side (PLAN 47n, gpu/tankPlate.ts): made the
+   * first time Tank is up, stepped on the show's own seconds, with the
+   * fingers held on the plate to carry its nozzle. Turned off, it goes, and
+   * the next time it is clear water.
+   */
+  protected stepTankPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.tank ?? 0) > 0.001)) {
+      if (this.tankPlate) { this.tankPlate.dispose(); this.tankPlate = null; }
+      return;
+    }
+    if (!this.tankPlate) this.tankPlate = new TankPlate(this.device);
+    this.tankPlate.step(enc, p.magnetSeconds ?? 1 / 60, p, p.boilHolds);
+  }
+
+  /**
+   * The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts), on `enc` before the
+   * step's pass: made the first time Soap Film is up and stepped on the film's
+   * own clock (the show's seconds times the drain rate), blown by the flow the
+   * last step left. Turned off, it goes, and the next time it is a fresh film.
+   */
+  protected stepSoapPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.soapFilm ?? 0) > 0.001)) {
+      if (this.soapPlate) { this.soapPlate.dispose(); this.soapPlate = null; }
+      return;
+    }
+    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device);
+    const rate = Math.max(0, p.soapFilmRate ?? 1);
+    // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement), in the frame's metres.
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N) * this.soapPlate.field.nx * SOAP_PLATE_DX / SOAP_FRAME_SPAN;
+    this.soapPlate.step(enc, (p.magnetSeconds ?? 1 / 60) * rate, this.velForced, travel);
   }
 
   /** Step the dish on `enc` if it is driven and built, and say which flow `addSlosh` lays over the gap's. */

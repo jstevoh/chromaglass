@@ -190,6 +190,7 @@ export class WebGPUFluid extends FluidCover {
       ['bodyPartition', [dye], false],
       ['bodyUnspread', [dye], false],
       ['bodyLand', [dye], false],
+      ['bodyLay', [dye], false],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
       // its first steps, only a Finger or a Blow does, so like mixCarry it is
@@ -539,6 +540,7 @@ export class WebGPUFluid extends FluidCover {
     this.lastDt = p.dt;
     // The slosh dish, before the step's pass opens: its own pass, whose flow the thin stage reads (PLAN 18a-13).
     this.stepSloshDish(enc, p);
+    this.stepBeside(enc, p);
 
     /*
       One pass, or one per stage.

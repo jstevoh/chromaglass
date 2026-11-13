@@ -737,7 +737,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             </span>
           </button>
 
-          {/* A song's name poured as ink (PLAN 37x-10c), its own file */}
+          {/* A song's title as the corner caption (PLAN 37x-10c, 37x-10m), its own file */}
           <RemotePourText send={send} connected={connected} trackName={state?.trackName} />
 
           {/* The dials that change the mood most */}
@@ -794,6 +794,37 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
           */}
           {((settings?.thinFilm ?? 0) > 0.001 || (settings?.iridescence ?? 0) > 0.001) && (
             <Slider label="Film Physics" field="filmPhysics" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('filmPhysics') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          {/* The frame's soap film (PLAN 32d), and while it is up its clock and the angle it is seen at, as on the desk. */}
+          <Slider label="Soap Film" field="soapFilm" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('soapFilm') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.soapFilm ?? 0) > 0.001 && (
+            <>
+              <Slider label="Drain Rate" field="soapFilmRate" step={0.25} format={(v) => `${v.toFixed(2)}×`} value={value('soapFilmRate') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
+          {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
+          <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.glitter ?? 0) > 0.001 && (
+            <Slider label="Lens Stop" field="lensStop" step={0.1} format={(v) => `f/${v.toFixed(1)}`} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          <Slider label="Side Light" field="sideLight" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.sideLight ?? 0) > 0.001 && (
+            <>
+              <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
+          {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
+          <Slider label="Tank" field="tank" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.tank ?? 0) > 0.001 && (
+            <>
+              <Slider label="Feed" field="tankFeed" step={0.1} format={(v) => `${v.toFixed(1)} cm/s`} value={value('tankFeed') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dye Weight" field="tankWeight" step={0.05} format={(v) => `${v.toFixed(2)}%`} value={value('tankWeight') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Nozzle" field="tankNozzle" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('tankNozzle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Drain" field="tankDrain" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tankDrain') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Hue" field="tankHue" step={1} format={(v) => `${Math.round(v)}°`} value={value('tankHue') as number | undefined} {...sliderProps} connected={connected} />
+            </>
           )}
           {/*
             And, by the same rule, Pushes Dye only while there is ferrofluid
@@ -868,7 +899,7 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <Slider label="Soap Breakdown" field="soapBreakdown" step={0.01} format={(v) => readSetting('soapBreakdown', v, 0, 1)} value={value('soapBreakdown') as number | undefined} {...sliderProps} connected={connected} />
           )}
 
-          {/* Song titles as ink in a live set (PLAN 37x-10), the phone's Title switch. */}
+          {/* Song titles in a live set (PLAN 37x-10), the phone's Title switch. */}
           <div className="mb-6">
             <PhoneInkTitle settings={settings} onSetting={patch} disabled={!connected} testId="remote-ink-title" />
           </div>
