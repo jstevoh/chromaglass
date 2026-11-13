@@ -91,3 +91,26 @@ hand, keeping both sections (24.3 stays ยง121, Chemical Clock's 25i-10 becomes ย
   `>>>>>>> `-prefixed (the three together, so a Markdown rule of `=======` alone is not
   caught), with a self-test that plants a block and goes red. An entry in
   `scripts/checks.json`, not a step in `checks.yml`.
+
+## 19ao. The Mac app's ambient TV line fails when the hosted runner draws four frames a second (2026-11-12)
+
+`npm run desktop`'s line "ambient TV: caps solver at 30 steps/s, display at 60 Hz, and holds
+the opening rung" went red twice on the hosted macOS runner on PR #820 (runs 43277666913 and
+43277185397) with `drawn=4/s, skipped=118 of 120 Hz offers`, passed on the rerun, and passes
+on main. The code under test did what it should: the solver was at 30, the rung held, and
+118 of 120 offers were skipped. What failed is the floor in `drawCapped`
+(`scripts/desktop.mjs`): on the Mac it asks for five frames and five draws in the counted
+second, to say the plate is drawing and not stalled. That floor was already lowered once
+from 20, with a comment saying it "measured the runner"; at five it still does, because a
+loaded hosted runner drew four.
+
+- **19ao-1. Open: the floor counts frames a second on a machine whose speed is not the
+  feature.** The ceiling (no more than 60 draws on a 120 Hz offer) is the feature and stays.
+  The floor should ask what it means, that the plate is not stalled, without a rate: wait
+  for a set number of draws under ambient mode with a generous deadline (a condition, not a
+  second on the wall clock), then read the ratio of skipped offers to drawn frames over that
+  stretch, which a slow machine does not change. `npm run rungs` already counts the 120 Hz
+  cap on a clock the machine cannot touch; this line then only has to show the app is wired
+  to it and still drawing. Not a lowered number: four today would be three on a worse day.
+  Until then it is a known flake of the `desktop` job: rerun it, and count it in
+  `npm run flakes -- --check 'ambient TV'`.
