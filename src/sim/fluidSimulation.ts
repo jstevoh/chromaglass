@@ -402,7 +402,7 @@ export class FluidSimulation {
   */
   private gpuLanded = false;
   private seed: Float32Array[] | null = null;
-  private wait = mixWait(() => this.gpu);
+  readonly wait = mixWait(() => this.gpu);
   /*
     The liquids that never cross to the CPU (the ferrofluid, the mix, the
     reactions), handed from the last solver to this one (PLAN 9w; handOver

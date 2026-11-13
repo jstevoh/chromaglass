@@ -49,6 +49,18 @@ type Splat = { x: number; y: number; r: number; what: Mix };
 export interface MixWait {
   waiting: Splat[];
   seed: Splat[];
+  /**
+   * Whether anything waits. The show asks each plate before it builds its
+   * pipelines (`openingOf` in gpu/opening.ts): waiting oil is laid on the
+   * solver's first step, and the mix's kernels then run from that step, where
+   * a plate with nothing in its mix runs none of them. `npm run startup` read
+   * Clock Glass, Splodascope and Lava Lamp compiling them on the frame once
+   * their oil was kept. Read off what waits and not off a list of looks, so a
+   * look given oil tomorrow is waited for without anyone remembering to say
+   * so. The simulation holds this object as its `wait`, readable for this
+   * one question; only the simulation lays, plays or drops.
+   */
+  readonly pending: boolean;
   /** A look's oil (or soap, or acid): onto the solver, or kept for the one still to come. */
   lay(x: number, y: number, r: number, what: Mix): void;
   /** A disc of whole oil: `lay` with `{ oil: 1 }`, and a plain function, so it can be handed on as one. */
@@ -65,6 +77,7 @@ export interface MixWait {
 export function mixWait(solver: () => PlateSolver | null): MixWait {
   const w: MixWait = {
     waiting: [], seed: [],
+    get pending() { return w.waiting.length > 0; },
     oil(x, y, r) { w.lay(x, y, r, { oil: 1 }); },
     lay(x, y, r, what) {
       const gpu = solver();

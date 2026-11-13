@@ -26,7 +26,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `ferroDrop.ts`: the closeup's ferrofluid drop.
 - `fluid/`: the solver's class chain, six files.
 - `groupCache.ts`: `groupOf`, `viewOf`: bind groups and views made once.
-- `opening.ts`: pipelines the opening look needs.
+- `opening.ts`: pipelines the opening look needs: `openingOf(settings, oilWaiting)`, the second argument being whether the look laid oil that waits for the solver (`FluidSimulation.wait.pending`), which is what `Opening.oil`, `oilPull`, `oilBodies`, `filmHold` and `oilLift` follow (PLAN 27f-9m).
 - `output.ts`: projector pass: mirror, keystone, blanking, grade.
 - `padGrab.ts`: the remote's Draw picture.
 - `particles.ts`: dye carried by particles.
