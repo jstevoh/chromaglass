@@ -10,7 +10,8 @@ the component.
 
 - `fluidSimulation.ts` (194 KB, grep it): `FluidSimulation`, one layer: its seeding
   (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
-  `dropGpu`, `syncFromGpu`).
+  `dropGpu`, `syncFromGpu`). `wait.pending` (`mixWait.ts`) says whether a look's oil waits for that solver,
+  which the show asks before it builds its pipelines (`gpu/opening.ts`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
 - `constants.ts`: `GRID_SIZE`, `GRID_SCALE`, the macro zoom, Turing's rates, the currents.

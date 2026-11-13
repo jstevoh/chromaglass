@@ -6174,10 +6174,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       preparing = s.device;
       try {
         // What the look now up turns on: the opening's, or the one on when a
-        // lost device is replaced mid-show (`gpu/opening.ts`).
+        // lost device is replaced mid-show, and its oil (`gpu/opening.ts`).
         // The intro held still until the opening is built (`Quiet` in
         // gpu/prepare.ts says why).
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current));
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current, fluidsRef.current.some((f) => f.wait.pending)));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }

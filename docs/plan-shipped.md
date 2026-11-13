@@ -6375,6 +6375,19 @@ With it, 15 of 15: Lava Lamp opens with 6.67% held and 6.67% poured, the same la
 and 11.47% laid again (its bodies are random, so the bar between the two is 0.6 to 1.5 and
 only Lava Lamp is held to a tenth); Splodascope 26.16% against 26.80%.
 
+*And what the show builds before it opens.* With the oil kept, `npm run startup` on Metal
+went red on this PR's first run: Clock Glass and Splodascope asked on the frame for
+fourteen and fifteen pipelines their opening had not waited for (the mix's splat, carry,
+relax, potential and update, the oil's smoothed shape, rim pressure and force, the
+bodies' three, the lift's three, and Splodascope's Film Hold), and Lava Lamp for eight.
+The check was right: those kernels had always been "built behind the show" because no
+opening ran them, and no opening ran them because the oil was lost. So the opening now
+learns of the oil from the plate and not from a list of looks: the visualizer asks the
+simulation whether oil waits for the solver (`FluidSimulation.wait.pending`) and
+`openingOf` takes it, and `Opening.oil`, `oilPull`, `oilBodies`, `filmHold` and `oilLift`
+are the step's own conditions for each group of kernels (`WebGPUFluid.prepare`). A look
+with the settings and nothing poured (Oil & Water) still waits for none of them.
+
 *And the wax, once it is really there (the same Mac, 150 s, no hands):* it goes round (its
 centre of mass between 0.13 and 0.53 of the plate's height, about every 35 s) and it is
 bodies with their own edges, not a wash, but it is not round: heads on stalks, threads and

@@ -56,12 +56,10 @@ landed on a red main.
 - **19am-1. Shipped:** `hold.yml` posts `Main not held red` on every open PR, red while
   the same job is red at its newest two results on main's deploys, green on a PR labelled
   `fixes-main` (`scripts/mainhold.mjs`, `npm run mainhold`; docs/plan-shipped.md, 19am).
-- **19am-2. Open: the ruleset on main requires `Main not held red`.** Until it does, the
-  status refuses nothing by itself; the ship skill and docs/handoff.md's merge step read
-  it. Add the context to ruleset 24848041's required checks (a cloud session's proxy
-  refuses rulesets writes, 19u), only after `hold.yml` has posted on every open PR once,
-  or a PR with no status waits forever. Pin it to GitHub Actions (integration 15368) so
-  no other app's status of that name satisfies it.
+- **19am-2. Declined (the owner, 2026-11-13): `Main not held red` stays advisory.** It
+  was to be added to ruleset 24848041's required checks, so that the status refused a
+  merge by itself. The owner chose to keep it a status the ship skill and
+  docs/handoff.md's merge step read, and not a rule on main. Nothing to build.
 - **19am-3. Open: the same check line, not the same shard.** A shard holds dozens of
   lines, so two different flakes in `fifth` on two deploys hold main as if one check
   were red. The failing lines are in each red job's log (`FAIL` lines from checks.mjs);
