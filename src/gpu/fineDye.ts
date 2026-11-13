@@ -13,8 +13,8 @@
  * exactly the regime the real liquid is in.
  *
  * **How.** Two fields over the window (`closeupWindow.ts`), each a copy of
- * the grid's dye at about two screen pixels a texel, carried every step
- * through the solver's own velocity with no diffusion (the Batchelor limit),
+ * the grid's dye at about two screen pixels a texel, carried about once a
+ * frame through the solver's own velocity with no diffusion (the Batchelor limit),
  * read back by a clamped Catmull-Rom that neither blurs nor rings. Where the
  * flow stretches and folds, an edge the grid had a cell wide becomes a
  * thread a texel wide, as in the dish. Each field is born again from the
@@ -66,31 +66,29 @@ import { type CloseupWindow, WINDOW_MIN_CELL } from './closeupWindow';
 export const FINE_LIFE = 3;
 
 /**
- * How much of the grid's numerical diffusion a fine field's seed undoes: k in
- * `c - k (mean of the four neighbours a cell away - c)`, one step of the heat
- * equation run backward (`seed` in `wgsl/fineDye.ts`).
- *
- * Why at all. Measured in the lab on 2026-11-13, carrying the fine fields
- * freely added little on the plate's own flows (fine over coarse 1.08 to
- * 1.13 on a stirred spiral), because the thin gap's drag keeps the flow slow
- * and smooth, and in a few seconds it folds little below a cell; and an edge
- * the fine field is born with blurred stays blurred, since advection alone
- * never steepens an edge the flow does not squeeze. The grid's blur is not
- * the dye's. A semi-Lagrangian step with a bilinear read diffuses by about a
- * cell's width over a few hundred steps, where a real dye's diffusion length
- * over ten seconds is a tenth of a millimetre (D ≈ 10⁻⁹ m²/s), an eighth of a
- * cell on this plate: a real edge is sharp at the closeup's scale. Undoing
- * that numerical diffusion where the fine field is born gives it the edge the
- * dye would have had; the flow then carries it without blurring it again.
- *
- * The four neighbours a cell away make a Laplacian, `(h²/4)∇²c`; 2 runs the
- * heat equation back by about the blur a Gaussian of a cell's width adds,
- * which is what the grid leaves on an edge. A smooth gradient has no
- * Laplacian and is left alone, so a pool's own shading is not terraced; the
- * clamp to the five samples' range is what keeps a steepened edge from
- * overshooting into a bright rim and a dark moat.
+ * The least time, in the step's own units, between two steps of the fine
+ * dye. The solver may run several steps a frame and only the last is seen;
+ * stepping the fine dye at every one cost the owner's Mac a third of its
+ * frame rate on a held closeup (Acid Trip 28 to 16 fps, Classic 27 to 17,
+ * filmed 2026-11-13). So the steps' displacements and times are summed and
+ * the fine dye takes them in one: about one step a frame at the app's pace
+ * (a frame of a plate-second is about 0.01 of `dt`, lib/detailFlow.ts), every
+ * third in the lab (dt 0.004). A semi-Lagrangian step is stable at any
+ * length; the cost is that the velocity of the last step carries the whole
+ * sum, which over a hundredth of a plate-second is the flow it already was.
  */
-export const FINE_SHARP = 2;
+export const FINE_TICK = 0.01;
+
+/*
+  The seed is the grid's dye as it is. A version born with the grid's
+  numerical diffusion undone (one backward heat step, clamped to its
+  neighbours) made a still edge crisp, and on the owner's Mac it drew a
+  poured column's edge as a row of regular teeth that held all fifteen
+  seconds: the grid's own edge is a staircase at its cells, softened by the
+  Catmull-Rom read, and sharpening a softened staircase gives back the
+  stairs. Only the flow sharpens now, as it does in the dish (47a-3 is the
+  edge carried as an interface instead).
+*/
 
 const WG = 8;
 
@@ -125,6 +123,9 @@ export class FineDye {
   /** Each field's age, seconds. */
   private a0 = 0;
   private a1 = FINE_LIFE / 2;
+  /** The steps' displacement and time not yet taken (FINE_TICK). */
+  private sumDisp = 0;
+  private sumDt = 0;
   private disposed = false;
 
   static prepare(device: GPUDevice): Prep[] {
@@ -185,9 +186,17 @@ export class FineDye {
    * grid's dye now and `vel` the velocity it rode, `disp` the uv a unit of
    * that velocity moved it, `dt` the step's seconds.
    */
-  step(enc: GPUCommandEncoder, dye: GPUTexture, vel: GPUTexture, grid: number, disp: number, dt: number): void {
+  step(enc: GPUCommandEncoder, dye: GPUTexture, vel: GPUTexture, grid: number, stepDisp: number, stepDt: number): void {
     const w = this.want;
-    if (this.disposed || !w || !(this.amount > 0.001)) { this.held = null; return; }
+    if (this.disposed || !w || !(this.amount > 0.001)) { this.held = null; this.sumDisp = this.sumDt = 0; return; }
+    // Gathered to about one step a frame (FINE_TICK); a window that is new or
+    // moved to a new size steps at once, so it never shows a stale texture.
+    this.sumDisp += stepDisp;
+    this.sumDt += Math.max(0, stepDt);
+    const sized = this.detailTex && this.detailTex.width === w.texX && this.detailTex.height === w.texY;
+    if (this.held && sized && this.sumDt < FINE_TICK) return;
+    const disp = this.sumDisp, dt = this.sumDt;
+    this.sumDisp = this.sumDt = 0;
     const advect = this.pipelines.computePipeline('fine advect', FINE_ADVECT_WGSL);
     const reduce = this.pipelines.computePipeline('fine reduce', FINE_REDUCE_WGSL);
     const detail = this.pipelines.computePipeline('fine detail', FINE_DETAIL_WGSL);
@@ -222,8 +231,7 @@ export class FineDye {
       .set('lx', lx)
       .set('ly', ly)
       .set('w0', tri(this.a0))
-      .set('w1', tri(this.a1))
-      .set('sharp', FINE_SHARP);
+      .set('w1', tri(this.a1));
     this.device.queue.writeBuffer(this.uniform, 0, this.pack.bytes);
 
     const r = this.read, wr = 1 - r;

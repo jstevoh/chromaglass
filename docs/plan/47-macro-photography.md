@@ -100,7 +100,7 @@ phone version in the same PR.
 
 ~~**47a** The fine window~~ (shipped; story in `docs/plan-shipped.md` §47a): the dye carried over
 the closeup's frame at two screen pixels a texel through the solver's velocity, without diffusion,
-born with the grid's numerical blur undone, drawn at the grid's thickness round each cell (Fine
+about once a frame, drawn at the grid's thickness round each cell (Fine
 Detail, Macro section, default 1; `gpu/fineDye.ts`, `npm run finedye`).
 ~~**47a-1** Particles and the edge at screen scale~~ (dropped for 47a, 2026-11-13): the particles
 born in the window drew Poisson grain; the edge is the fine field's seed, which undoes the grid's
@@ -112,11 +112,18 @@ blur.
   capillary and Marangoni forces at the window's scale (they grow as the scale shrinks). The back
   plate gets no fine dye (it is drawn through its own zoom and offset, `layer1`); give it its own
   window.
-- **47a-3. A sharp interface carried, not a seed sharpened** (M). Named shortcut in 47a: each
-  fine field is born from the grid's dye with one backward step of the heat equation
-  (`FINE_SHARP`, clamped to its neighbours' range), a reconstruction of the sharp edge the grid
-  has blurred. Replace it with an interface the fine field carries itself (a level set or VOF
-  fraction per dye body), so an edge is never rebuilt from a blur.
+- **47a-3. A sharp interface carried** (M). A real dye's edge is sharp at the closeup's scale
+  (its diffusion length over ten seconds is an eighth of a cell here), the grid's is a cell or
+  two of numerical blur, and the fine fields only sharpen what the flow squeezes. Sharpening the
+  seed (one backward heat step, clamped) was tried and taken out: it turned the grid's edge,
+  a staircase at its cells softened by the Catmull-Rom read, into a row of teeth on a still
+  poured column (filmed on the owner's Mac, 2026-11-13). Carry the edge instead: a level set
+  or VOF fraction per dye body in the fine field, so an edge is never rebuilt from a blur.
+- **47a-5. Bars after a camera whip** (S). Filmed on the owner's Mac, Macro Bead, 2026-11-13:
+  for about half a second after the auto camera whips to a new bead, straight horizontal smear
+  bars at the top of the frame with Fine Detail at 1. Not reproduced in the lab; suspect the
+  window's margin reaching past the plate's edge (the fine fields clamp to the edge row there)
+  or the fields' remap across a jump. Film it again after the per-frame step and find it.
 - **47a-4. Where the films' fine structure comes from** (finding, 2026-11-13). On the lab's
   stirred swirl the fine dye raises fine over coarse from 1.08 to 1.11, where the films read 2.2
   to 3.1: the thin gap's drag stops a free vortex in nine steps, so the plate's flow is slow and

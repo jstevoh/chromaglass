@@ -13910,7 +13910,8 @@ square texels at two screen pixels each, margin 1.1, none at 1x, under the kalei
 dish spread, or when a cell is under three texels), `gpu/fineDye.ts` and `wgsl/fineDye.ts` (two
 fine fields over the window, carried every step through the solver's velocity by a clamped
 Catmull-Rom semi-Lagrangian step, no diffusion, the Batchelor limit; each born again from the grid
-every three time units, half a life apart, crossfaded by a triangle on age; a camera that pans,
+every three time units, half a life apart, crossfaded by a triangle on age, stepped about once
+a frame; a camera that pans,
 turns or zooms is the same remap as the flow; dye from past the window's edge is the grid's), and
 `wgsl/fineWindow.ts` (the plate multiplies the grid's raw dye by the fine dye's ratio to it, in
 the dye's encoded space, through the same warp and defocus taps). Setting Fine Detail
@@ -13922,13 +13923,15 @@ difference added (fine less its cell mean) drew black beads on thin arms (thickn
 colour left); a ratio per channel drew pale wisps in dark gaps. The shipped form scales each fine
 field by one number so its mean round each cell has the grid's thickness, keeps the colour it
 carried, and trusts it only as far as it holds the grid's dye (a pour since it was born shows at
-once). Advection alone never sharpens an edge the flow does not squeeze, so a field born blurred
-stayed blurred: each is born with one backward heat step (`FINE_SHARP` 2, clamped to its
-neighbours' range) undoing the grid's numerical diffusion, which on this plate is about a cell
-where a real dye's is an eighth of one (named shortcut, 47a-3).
+once). A seed sharpened by one backward heat step was tried and taken out: on the owner's Mac
+it drew a still poured column's edge as regular teeth (the grid's cell staircase, given back).
+Stepping the fine dye at every solver step cost a third of the frame rate on held closeups
+(Acid Trip 28 to 16 fps, Classic 27 to 17, filmed 2026-11-13), so it gathers the steps to about
+one a frame (`FINE_TICK`), its block means are read bilinear, and the window's edge is capped
+at 1024 texels.
 
 Measured (`npm run finedye`, lab, 256², 6x, a forced vortex over three dyes, 600 steps): fine over
 coarse 1.08 to 1.11 stirred; see the PR for the check's numbers. Open: 47a-2 (diffusion at real
 D, capillary forces, the back plate), 47a-3 (a carried interface), 47a-4 (the plate folds little
-below a cell; more detail needs more stirring).
+below a cell; more detail needs more stirring), 47a-5 (bars after a camera whip).
 

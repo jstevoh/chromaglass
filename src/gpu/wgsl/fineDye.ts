@@ -41,7 +41,6 @@ export const FINE_FIELDS: Field[] = [
   { name: 'ly', type: 'f32' },
   { name: 'w0', type: 'f32', note: "field 0's weight in the detail" },
   { name: 'w1', type: 'f32' },
-  { name: 'sharp', type: 'f32', note: "how much of the grid's numerical diffusion a seed undoes (FINE_SHARP)" },
 ];
 
 export const FINE_LAYOUT = layOut(FINE_FIELDS);
@@ -132,25 +131,6 @@ export const FINE_ADVECT_WGSL = /* wgsl */ `${HEAD}
 @group(0) @binding(5) var dst0: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(6) var dst1: texture_storage_2d<rgba16float, write>;
 
-/*
-  The grid's dye at p as the fine field takes it: with the grid's numerical
-  diffusion undone, by one step of the heat equation run backward,
-  c - k (mean of the four a cell away - c), held inside the five samples'
-  range so it can steepen an edge and never ring past it. See FINE_SHARP.
-*/
-fn seed(p: vec2f) -> vec4f {
-  let g = vec2f(U.grid);
-  let h = 1.0 / U.grid;
-  let c = cr(dye, p, g, true);
-  let e = cr(dye, clamp(p + vec2f(h, 0.0), vec2f(0.0), vec2f(1.0)), g, true);
-  let w = cr(dye, clamp(p - vec2f(h, 0.0), vec2f(0.0), vec2f(1.0)), g, true);
-  let n = cr(dye, clamp(p + vec2f(0.0, h), vec2f(0.0), vec2f(1.0)), g, true);
-  let s = cr(dye, clamp(p - vec2f(0.0, h), vec2f(0.0), vec2f(1.0)), g, true);
-  let lo = min(min(min(e, w), min(n, s)), c);
-  let hi = max(max(max(e, w), max(n, s)), c);
-  return clamp(c - U.sharp * ((e + w + n + s) * 0.25 - c), lo, hi);
-}
-
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = U.newTurn.zw;
@@ -166,9 +146,9 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   // Carried in from past the window: the grid's dye where it came from.
   var a: vec4f;
   var b: vec4f;
-  if (inside) { a = cr(src0, sq, size, true); b = cr(src1, sq, size, true); } else { a = seed(back); b = a; }
+  if (inside) { a = cr(src0, sq, size, true); b = cr(src1, sq, size, true); } else { a = cr(dye, back, vec2f(U.grid), true); b = a; }
   if (U.reseed0 > 0.5 || U.reseed1 > 0.5) {
-    let now = seed(p);
+    let now = cr(dye, p, vec2f(U.grid), true);
     if (U.reseed0 > 0.5) { a = now; }
     if (U.reseed1 > 0.5) { b = now; }
   }
@@ -228,7 +208,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
  *
  * The block means' texture is bigger than this window needs (it is made for
  * the smallest block), so it is read as `lx × ly` of its texels, by loads,
- * through a clamped Catmull-Rom so the mean never dips below its neighbours.
+ * bilinear: the means are smooth by making, and a Catmull-Rom of them cost
+ * four times the loads for nothing the picture showed.
  * `FINE_EPS` is a thickness too thin to see; `FINE_MOST` holds the scale and
  * the ratio, so a thread in a cell the grid holds almost empty is not drawn
  * as thick as a pool.
@@ -246,6 +227,18 @@ export const FINE_DETAIL_WGSL = /* wgsl */ `${HEAD}
 const EPS: f32 = ${FINE_EPS};
 const MOST: f32 = ${FINE_MOST.toFixed(1)};
 
+/** The block means, bilinear over the first lx × ly texels of their texture. */
+fn lerpL(t: texture_2d<f32>, q: vec2f, n: vec2f) -> vec4f {
+  let p = q * n - 0.5;
+  let i = floor(p);
+  let f = p - i;
+  let hi = vec2i(n) - 1;
+  let lo = clamp(vec2i(i), vec2i(0), hi);
+  let up = clamp(vec2i(i) + 1, vec2i(0), hi);
+  return mix(mix(textureLoad(t, lo, 0), textureLoad(t, vec2i(up.x, lo.y), 0), f.x),
+             mix(textureLoad(t, vec2i(lo.x, up.y), 0), textureLoad(t, up, 0), f.x), f.y);
+}
+
 fn says(f: vec4f, m: vec4f, c: vec4f) -> vec4f {
   let k = clamp((c.a + EPS) / (max(m.a, 0.0) + EPS), 1.0 / MOST, MOST);
   let trust = clamp(max(m.a, 0.0) / max(c.a, EPS), 0.0, 1.0);
@@ -261,8 +254,8 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let c = max(cr(dye, p, vec2f(U.grid), false), vec4f(0.0));
   let ln = vec2f(U.lx, U.ly);
   let lq = (vec2f(id.xy) + 0.5) / U.block / ln;
-  let t0 = says(textureLoad(f0, vec2i(id.xy), 0), cr(l0, lq, ln, true), c);
-  let t1 = says(textureLoad(f1, vec2i(id.xy), 0), cr(l1, lq, ln, true), c);
+  let t0 = says(textureLoad(f0, vec2i(id.xy), 0), lerpL(l0, lq, ln), c);
+  let t1 = says(textureLoad(f1, vec2i(id.xy), 0), lerpL(l1, lq, ln), c);
   let want = t0 * U.w0 + t1 * U.w1;
   textureStore(detail, id.xy, clamp((want + EPS) / (c + EPS), vec4f(0.0), vec4f(MOST)));
 }`;

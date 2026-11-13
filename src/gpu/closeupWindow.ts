@@ -63,8 +63,12 @@ export const WINDOW_MARGIN = 1.1;
  * draws as a line and not a stair, at a quarter the texels of one pixel each.
  */
 export const WINDOW_PX_PER_TEXEL = 2;
-/** The window's longest edge, in texels: five textures of 1280 × 720 half float are 37 MB. */
-export const WINDOW_MAX_EDGE = 1280;
+/**
+ * The window's longest edge, in texels: five textures of 1024 × 576 half float
+ * are 24 MB, and on a Retina screen a texel then covers about three pixels,
+ * which held the frame's cost where 1280 did not (the owner's Mac, 2026-11-13).
+ */
+export const WINDOW_MAX_EDGE = 1024;
 /**
  * The fewest window texels a solver cell may span before the fine dye is
  * worth carrying. Below it the window is finer than the grid by less than

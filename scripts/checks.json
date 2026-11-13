@@ -3189,9 +3189,10 @@
       "run": "npm run finedye",
       "timeout": 8,
       "why": [
-        "The closeup's fine dye (PLAN 47a, gpu/fineDye.ts): at 6x on a stirred",
-        "swirl Fine Detail raises fine over coarse, the rise is structure and",
-        "not grain, it moves no light, a still pool grows no texture, and at 1x",
+        "The closeup's fine dye (PLAN 47a, gpu/fineDye.ts): at 6x Fine Detail",
+        "raises fine over coarse more on a stirred swirl than on still dye, the",
+        "rise is structure on the dye's edges and not grain, every dyed cell",
+        "keeps the grid's thickness, a still pool grows no texture, and at 1x",
         "nothing runs. The lab only, beside macroview on the runner's own",
         "adapter: 600 steps and eight 768-pixel frames, minutes on SwiftShader",
         "and seconds on Metal."
