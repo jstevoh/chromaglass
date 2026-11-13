@@ -94,6 +94,36 @@ fn bilerp(t: texture_2d<f32>, uv: vec2f, n: f32) -> vec4f {
   return mix(mix(textureLoad(t, lo, 0), textureLoad(t, vec2i(hi.x, lo.y), 0), f.x),
              mix(textureLoad(t, vec2i(lo.x, hi.y), 0), textureLoad(t, hi, 0), f.x), f.y);
 }
+/*
+  The plate's own read of the grid's dye: plate.ts's bicubicSigned (five
+  bilinear taps, the corners dropped and the weights renormalised), with the
+  bilinear taps done by loads, clamped at the edge as the plate's sampler is.
+  The plate multiplies exactly this by the detail ratio, so the ratio has to
+  be taken against exactly this: a fine field seeded from a full sixteen-tap
+  Catmull-Rom and divided by it was a different curve from the one the plate
+  drew, and the difference showed as a dark rim round every still pool.
+*/
+fn plateRead(t: texture_2d<f32>, uv: vec2f, n: f32) -> vec4f {
+  let samplePos = uv * n;
+  let texPos1 = floor(samplePos - 0.5) + 0.5;
+  let f = samplePos - texPos1;
+  let w0 = f * (-0.5 + f * (1.0 - 0.5 * f));
+  let w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  let w2 = f * (0.5 + f * (2.0 - 1.5 * f));
+  let w3 = f * f * (-0.5 + 0.5 * f);
+  let w12 = w1 + w2;
+  let off12 = w2 / w12;
+  let p0 = (texPos1 - 1.0) / n;
+  let p3 = (texPos1 + 2.0) / n;
+  let p12 = (texPos1 + off12) / n;
+  let acc = bilerp(t, vec2f(p12.x, p0.y), n) * (w12.x * w0.y)
+          + bilerp(t, vec2f(p0.x, p12.y), n) * (w0.x * w12.y)
+          + bilerp(t, vec2f(p12.x, p12.y), n) * (w12.x * w12.y)
+          + bilerp(t, vec2f(p3.x, p12.y), n) * (w3.x * w12.y)
+          + bilerp(t, vec2f(p12.x, p3.y), n) * (w12.x * w3.y);
+  let wsum = w12.x * w0.y + w0.x * w12.y + w12.x * w12.y + w3.x * w12.y + w12.x * w3.y;
+  return max(acc / wsum, vec4f(0.0));
+}
 `;
 
 /**
@@ -128,8 +158,8 @@ export const FINE_ADVECT_WGSL = /* wgsl */ `${HEAD}
 @group(0) @binding(2) var src1: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
 @group(0) @binding(4) var vel: texture_2d<f32>;
-@group(0) @binding(5) var dst0: texture_storage_2d<rgba16float, write>;
-@group(0) @binding(6) var dst1: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var dst0: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(6) var dst1: texture_storage_2d<rgba32float, write>;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -146,9 +176,9 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   // Carried in from past the window: the grid's dye where it came from.
   var a: vec4f;
   var b: vec4f;
-  if (inside) { a = cr(src0, sq, size, true); b = cr(src1, sq, size, true); } else { a = cr(dye, back, vec2f(U.grid), true); b = a; }
+  if (inside) { a = cr(src0, sq, size, true); b = cr(src1, sq, size, true); } else { a = plateRead(dye, back, U.grid); b = a; }
   if (U.reseed0 > 0.5 || U.reseed1 > 0.5) {
-    let now = cr(dye, p, vec2f(U.grid), true);
+    let now = plateRead(dye, p, U.grid);
     if (U.reseed0 > 0.5) { a = now; }
     if (U.reseed1 > 0.5) { b = now; }
   }
@@ -162,6 +192,7 @@ export const FINE_REDUCE_WGSL = /* wgsl */ `${HEAD}
 @group(0) @binding(2) var f1: texture_2d<f32>;
 @group(0) @binding(3) var l0: texture_storage_2d<rgba16float, write>;
 @group(0) @binding(4) var l1: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(5) var dye: texture_2d<f32>;
 
 @compute @workgroup_size(8, 8)
 fn main(@builtin(global_invocation_id) id: vec3u) {
@@ -170,17 +201,20 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   let size = vec2i(U.newTurn.zw);
   let base = vec2i(id.xy) * b;
   let top = min(base + b, size);
-  var s0 = vec4f(0.0);
-  var s1 = vec4f(0.0);
+  var s0 = 0.0;
+  var s1 = 0.0;
+  var sc = 0.0;
   for (var y = base.y; y < top.y; y++) {
     for (var x = base.x; x < top.x; x++) {
-      s0 += textureLoad(f0, vec2i(x, y), 0);
-      s1 += textureLoad(f1, vec2i(x, y), 0);
+      s0 += textureLoad(f0, vec2i(x, y), 0).a;
+      s1 += textureLoad(f1, vec2i(x, y), 0).a;
+      let q = (vec2f(f32(x), f32(y)) + 0.5) / U.newTurn.zw;
+      sc += plateRead(dye, clamp(fromWin(q, U.newWin, U.newTurn.xy), vec2f(0.0), vec2f(1.0)), U.grid).a;
     }
   }
   let n = f32(max(1, (top.x - base.x) * (top.y - base.y)));
-  textureStore(l0, id.xy, s0 / n);
-  textureStore(l1, id.xy, s1 / n);
+  textureStore(l0, id.xy, vec4f(s0, sc, 0.0, 0.0) / n);
+  textureStore(l1, id.xy, vec4f(s1, sc, 0.0, 0.0) / n);
 }`;
 
 /**
@@ -208,8 +242,10 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
  *
  * The block means' texture is bigger than this window needs (it is made for
  * the smallest block), so it is read as `lx × ly` of its texels, by loads,
- * bilinear: the means are smooth by making, and a Catmull-Rom of them cost
- * four times the loads for nothing the picture showed.
+ * Catmull-Rom held inside the nearest four. Bilinear came first and was
+ * dropped on the finedye check: its creases at every block centre are a
+ * screen-aligned grid in the scale, which the check's per-cell mass line
+ * read as a spread of 0.27 at the p90 against 0.13 for this.
  * `FINE_EPS` is a thickness too thin to see; `FINE_MOST` holds the scale and
  * the ratio, so a thread in a cell the grid holds almost empty is not drawn
  * as thick as a pool.
@@ -227,21 +263,21 @@ export const FINE_DETAIL_WGSL = /* wgsl */ `${HEAD}
 const EPS: f32 = ${FINE_EPS};
 const MOST: f32 = ${FINE_MOST.toFixed(1)};
 
-/** The block means, bilinear over the first lx × ly texels of their texture. */
-fn lerpL(t: texture_2d<f32>, q: vec2f, n: vec2f) -> vec4f {
-  let p = q * n - 0.5;
-  let i = floor(p);
-  let f = p - i;
-  let hi = vec2i(n) - 1;
-  let lo = clamp(vec2i(i), vec2i(0), hi);
-  let up = clamp(vec2i(i) + 1, vec2i(0), hi);
-  return mix(mix(textureLoad(t, lo, 0), textureLoad(t, vec2i(up.x, lo.y), 0), f.x),
-             mix(textureLoad(t, vec2i(lo.x, up.y), 0), textureLoad(t, up, 0), f.x), f.y);
-}
-
+/*
+  m.x is the field's thickness over the block round this texel, m.y the
+  plate's over the same block: the same texels, both read the plate's way.
+  Mean against mean is what keeps the cell's dye the grid's and lets the
+  field only move it about inside the cell. The scale was once the plate's
+  value at this texel over the field's mean, which is not 1 even for a field
+  that is the plate's dye exactly: inside a block that straddles a pool's
+  edge it dimmed the pool side and lifted the dark side, block by block, and
+  that was the grid of squares and the toothed rims on still pools.
+*/
 fn says(f: vec4f, m: vec4f, c: vec4f) -> vec4f {
-  let k = clamp((c.a + EPS) / (max(m.a, 0.0) + EPS), 1.0 / MOST, MOST);
-  let trust = clamp(max(m.a, 0.0) / max(c.a, EPS), 0.0, 1.0);
+  let mf = max(m.x, 0.0);
+  let mc = max(m.y, 0.0);
+  let k = clamp((mc + EPS) / (mf + EPS), 1.0 / MOST, MOST);
+  let trust = clamp(mf / max(mc, EPS), 0.0, 1.0);
   return mix(c, max(f, vec4f(0.0)) * k, trust);
 }
 
@@ -251,11 +287,11 @@ fn main(@builtin(global_invocation_id) id: vec3u) {
   if (f32(id.x) >= size.x || f32(id.y) >= size.y) { return; }
   let q = (vec2f(id.xy) + 0.5) / size;
   let p = clamp(fromWin(q, U.newWin, U.newTurn.xy), vec2f(0.0), vec2f(1.0));
-  let c = max(cr(dye, p, vec2f(U.grid), false), vec4f(0.0));
+  let c = plateRead(dye, p, U.grid);
   let ln = vec2f(U.lx, U.ly);
   let lq = (vec2f(id.xy) + 0.5) / U.block / ln;
-  let t0 = says(textureLoad(f0, vec2i(id.xy), 0), lerpL(l0, lq, ln), c);
-  let t1 = says(textureLoad(f1, vec2i(id.xy), 0), lerpL(l1, lq, ln), c);
+  let t0 = says(textureLoad(f0, vec2i(id.xy), 0), cr(l0, lq, ln, true), c);
+  let t1 = says(textureLoad(f1, vec2i(id.xy), 0), cr(l1, lq, ln, true), c);
   let want = t0 * U.w0 + t1 * U.w1;
   textureStore(detail, id.xy, clamp((want + EPS) / (c + EPS), vec4f(0.0), vec4f(MOST)));
 }`;

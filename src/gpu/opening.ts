@@ -26,6 +26,8 @@
  */
 
 import { DEFAULT_SETTINGS, type VisualizerSettings } from '../types';
+import { macroAmountOf } from '../sim/constants';
+import { closeupFine } from './closeupWindow';
 import { carrierViscosity, dishFollow, dragSeconds, liquidFollow, lookMotorRate } from '../lib/turntable';
 
 export interface Opening {
@@ -133,6 +135,15 @@ export interface Opening {
    * Soap Film up mid-set.
    */
   soap: boolean;
+  /**
+   * The closeup's fine dye (PLAN 47a-1): its three kernels from the first
+   * step, when the look opens zoomed into the plate with Fine Detail up
+   * (macro-bead, cell-bloom, lace-run). Added with the fine dye's first
+   * kernels: the open check found those three looks asking for all three in
+   * their first steps with no list naming them. A look that opens at the
+   * plate builds them behind the show, for the hand that zooms in mid-set.
+   */
+  closeup: boolean;
 }
 
 /**
@@ -188,5 +199,7 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
     soap: (s.soapFilm ?? 0) > 0.001,
+    closeup: closeupFine(s, macroAmountOf({ ...DEFAULT_SETTINGS, ...s })) > 0.001
+      && Math.round(s.kaleidoscope ?? 0) < 2 && !((s.dishSpread ?? 0) > 0.001),
   };
 }

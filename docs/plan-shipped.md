@@ -13927,11 +13927,24 @@ once). A seed sharpened by one backward heat step was tried and taken out: on th
 it drew a still poured column's edge as regular teeth (the grid's cell staircase, given back).
 Stepping the fine dye at every solver step cost a third of the frame rate on held closeups
 (Acid Trip 28 to 16 fps, Classic 27 to 17, filmed 2026-11-13), so it gathers the steps to about
-one a frame (`FINE_TICK`), its block means are read bilinear, and the window's edge is capped
-at 1024 texels.
+one a frame (`FINE_TICK`), and the window's edge is capped at 1024 texels.
+
+The owner then saw still drops in the closeup with toothed edges and a faint grid of squares
+(2026-11-13). Three causes, each found on the finedye check's still plate and fixed: the scale was
+the plate's dye at the texel over the field's block mean, which is not 1 even for a field equal
+to the plate's dye, so blocks straddling a pool's edge dimmed one side and lifted the other (now
+the field's block mean against the plate's over the same texels); the field was seeded from and
+divided by a full sixteen-tap Catmull-Rom where the plate draws a five-tap one, a dark rim round
+every pool (now `plateRead`, the plate's own read); and the fields were 16-bit, read back and
+stored again every step, so each store snapped a still pool's gentle slope into flat runs and the
+slope became a stair of blocks a cell across (now 32-bit). The block means are read Catmull-Rom,
+clamped: bilinear's creases were a screen-aligned grid the per-cell mass line read as 0.27 at the
+p90 against 0.11.
 
 Measured (`npm run finedye`, lab, 256², 6x, a forced vortex over three dyes, 600 steps): fine over
-coarse 1.08 to 1.11 stirred; see the PR for the check's numbers. Open: 47a-2 (diffusion at real
+coarse 1.099 to 1.121 stirred against no rise still; dyed cells' thickness off the grid's by a
+median 0.023 (nine in ten under 0.11); still pools' texture 0.004 at the 99th percentile (bar
+0.02; 0.025 before the fixes). Open: 47a-2 (diffusion at real
 D, capillary forces, the back plate), 47a-3 (a carried interface), 47a-4 (the plate folds little
-below a cell; more detail needs more stirring), 47a-5 (bars after a camera whip).
+below a cell; more detail needs more stirring), 47a-5 (bars after a camera whip), 47a-6 (a characteristic map in place of resampling every step).
 

@@ -124,6 +124,13 @@ blur.
   bars at the top of the frame with Fine Detail at 1. Not reproduced in the lab; suspect the
   window's margin reaching past the plate's edge (the fine fields clamp to the edge row there)
   or the fields' remap across a jump. Film it again after the per-frame step and find it.
+- **47a-6. The fine fields resampled every step** (S, a shortcut named). Each step reads the
+  fields back through a clamped Catmull-Rom and stores them again, so three seconds of steps are
+  a few hundred resamplings, each a little blur and a little rounding (32-bit now, after 16-bit's
+  rounding drew a grid of squares on still pools). The physics is a characteristic map: carry
+  each texel's back-trace to where its dye was at the field's birth (a displacement field,
+  advected) and read the birth snapshot once, through the plate's own read, so a field resamples
+  its dye once in its life whatever the steps. Measure against finedye's lines 1 and 4.
 - **47a-4. Where the films' fine structure comes from** (finding, 2026-11-13). On the lab's
   stirred swirl the fine dye raises fine over coarse from 1.08 to 1.11, where the films read 2.2
   to 3.1: the thin gap's drag stops a free vortex in nine steps, so the plate's flow is slow and

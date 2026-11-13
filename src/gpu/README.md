@@ -30,7 +30,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `output.ts`: projector pass: mirror, keystone, blanking, grade.
 - `padGrab.ts`: the remote's Draw picture.
 - `particles.ts`: dye carried by particles.
-- `closeupWindow.ts`: where the closeup looks (`CloseupWindow`, `closeupWindowOf`, `closeupFine`, `WINDOW_*`). `fineDye.ts`: `FineDye` (`setWindow`, `step`, `window`, `strength`, `detail`, `prepare`), `FINE_LIFE`, `FINE_TICK`: the dye finer than the grid over that window (PLAN 47a).
+- `closeupWindow.ts`: where the closeup looks (`CloseupWindow`, `closeupWindowOf`, `closeupFine`, `WINDOW_*`). `fineDye.ts`: `FineDye` (`setWindow`, `step`, `window`, `strength`, `detail`, `prepare(device, open)`: before the show opens when the look opens in the closeup, `Opening.closeup`), `FINE_LIFE`, `FINE_TICK`: the dye finer than the grid over that window (PLAN 47a).
 - `post.ts`: post-effects chain and finish.
 - `prepare.ts`: `prepareShow`, pipelines built before opening.
 - `probe.ts`: delivered brightness for the flash guard.

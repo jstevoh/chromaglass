@@ -263,7 +263,7 @@ style (§31).
   thread: ~~**47a-1**~~ (dropped for 47a), **47b** dark-field
   and Rheinberg lighting, **47j** caustics (most of the picture in the films watched over
   time), **47c** blacklight (fluorescent dyes under a UV lamp), **47d** depth of
-  field from the gap's depth (built under 38q), ~~**47a**~~ the fine window (shipped, this PR; 47a-2 to 47a-5 open), **47e** sparkle, **47f** the
+  field from the gap's depth (built under 38q), ~~**47a**~~ the fine window (shipped, this PR; 47a-2 to 47a-6 open), **47e** sparkle, **47f** the
   stir bar, **47k** threads that bead; **47g**, **47h**, **47i**, **47n** (a side view through a tank) when wanted; **47m** the owner's reference kit; ~~**47w-1**~~ (shipped) and
   ~~**47v**~~ (shipped): any link watched with a design, physics and techniques read;
   ~~**47w-2**~~ dissolves, ~~**47v-2**~~ a reference library and ~~**47v-3**~~ real-footage bars

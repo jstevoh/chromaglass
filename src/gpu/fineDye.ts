@@ -52,6 +52,7 @@ import { FINE_LAYOUT, FINE_ADVECT_WGSL, FINE_REDUCE_WGSL, FINE_DETAIL_WGSL } fro
 import { UniformPack } from './uniforms';
 import { PipelineCache, type Prep } from './kit';
 import { groupOf } from './groupCache';
+import type { Opening } from './opening';
 import { type CloseupWindow, WINDOW_MIN_CELL } from './closeupWindow';
 
 /**
@@ -92,11 +93,11 @@ export const FINE_TICK = 0.01;
 
 const WG = 8;
 
-function tex(device: GPUDevice, label: string, w: number, h: number): GPUTexture {
+function tex(device: GPUDevice, label: string, w: number, h: number, format: GPUTextureFormat = 'rgba16float'): GPUTexture {
   return device.createTexture({
     label,
     size: [w, h],
-    format: 'rgba16float',
+    format,
     usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
   });
 }
@@ -128,14 +129,17 @@ export class FineDye {
   private sumDt = 0;
   private disposed = false;
 
-  static prepare(device: GPUDevice): Prep[] {
+  /**
+   * Built before the show opens when the look opens in the closeup with
+   * Fine Detail up (`open.closeup`), and behind the show otherwise: the
+   * closeup is then reached by zooming in, after they are built.
+   */
+  static prepare(device: GPUDevice, open: Opening): Prep[] {
     const cache = PipelineCache.for(device, 'fineDye');
-    // Never at the opening: the closeup is reached by zooming in, and its
-    // three kernels build in the background before then.
     return [
-      cache.computePrep('fine advect', FINE_ADVECT_WGSL, true),
-      cache.computePrep('fine reduce', FINE_REDUCE_WGSL, true),
-      cache.computePrep('fine detail', FINE_DETAIL_WGSL, true),
+      cache.computePrep('fine advect', FINE_ADVECT_WGSL, !open.closeup),
+      cache.computePrep('fine reduce', FINE_REDUCE_WGSL, !open.closeup),
+      cache.computePrep('fine detail', FINE_DETAIL_WGSL, !open.closeup),
     ];
   }
 
@@ -165,8 +169,17 @@ export class FineDye {
     if (t && t.width === w.texX && t.height === w.texY) return false;
     this.release();
     const d = this.device;
-    this.f0 = [tex(d, 'fine dye 0a', w.texX, w.texY), tex(d, 'fine dye 0b', w.texX, w.texY)];
-    this.f1 = [tex(d, 'fine dye 1a', w.texX, w.texY), tex(d, 'fine dye 1b', w.texX, w.texY)];
+    // The two fields are 32-bit. They are read back and written again every
+    // step for three seconds, and at 16 bits the rounding of each store was
+    // the texture: a still pool's smooth slope changes by less than one
+    // 16-bit step across a texel, so each store snapped runs of texels to the
+    // same value, and three hundred stores later the slope was a stair of
+    // flat blocks about a solver cell across, which the plate drew as a grid
+    // of squares and toothed rims (finedye's still rise 0.236 and still
+    // texture 0.025 at 16 bits, 0.000 and 0.004 at 32). The means and the
+    // detail are made fresh from the fields every step and stay 16-bit.
+    this.f0 = [tex(d, 'fine dye 0a', w.texX, w.texY, 'rgba32float'), tex(d, 'fine dye 0b', w.texX, w.texY, 'rgba32float')];
+    this.f1 = [tex(d, 'fine dye 1a', w.texX, w.texY, 'rgba32float'), tex(d, 'fine dye 1b', w.texX, w.texY, 'rgba32float')];
     const lx = Math.ceil(w.texX / WINDOW_MIN_CELL), ly = Math.ceil(w.texY / WINDOW_MIN_CELL);
     this.l0 = tex(d, 'fine dye means 0', lx, ly);
     this.l1 = tex(d, 'fine dye means 1', lx, ly);
@@ -242,7 +255,7 @@ export class FineDye {
     pass.setBindGroup(0, groupOf(this.device, advect, [this.uniform, f0[r], f1[r], dye, vel, f0[wr], f1[wr]]));
     pass.dispatchWorkgroups(gx, gy);
     pass.setPipeline(reduce);
-    pass.setBindGroup(0, groupOf(this.device, reduce, [this.uniform, f0[wr], f1[wr], this.l0!, this.l1!]));
+    pass.setBindGroup(0, groupOf(this.device, reduce, [this.uniform, f0[wr], f1[wr], this.l0!, this.l1!, dye]));
     pass.dispatchWorkgroups(Math.ceil(lx / WG), Math.ceil(ly / WG));
     pass.setPipeline(detail);
     pass.setBindGroup(0, groupOf(this.device, detail, [this.uniform, f0[wr], f1[wr], this.l0!, this.l1!, dye, this.detailTex!]));
