@@ -98,11 +98,11 @@ function deriveRecipe(device: GPUDevice): RenderRecipe {
   });
 }
 
-function displayName(format: GPUTextureFormat, toTexture: boolean): string {
-  return `display ${format}${toTexture ? ' flipped' : ''}`;
+function displayName(format: GPUTextureFormat, toTexture: boolean, aux = false): string {
+  return `display ${format}${toTexture ? ' flipped' : ''}${aux ? ' aux' : ''}`;
 }
 
-function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean): RenderRecipe {
+function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: boolean, aux = false): RenderRecipe {
   return (module) => {
     const code = plateWgsl(DISPLAY_MAIN);
     return {
@@ -114,7 +114,7 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
         // The fragment stage needs to know too: an override is set per stage,
         // and without it the fragment read FLIP_Y as 1 on both paths.
         module: module(code), entryPoint: 'fs', constants: toTexture ? { FLIP_Y: -1 } : undefined,
-        targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }],
+        targets: aux ? [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] : [{ format }],
       },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     };
@@ -174,10 +174,12 @@ export class WebGPUPlate {
       ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
-      // Into a texture rather than the canvas: the camera's, in the canvas's
-      // format, and the film stock's picture.
-      ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
-        !((f === format && open.camera) || (f === picture && open.stock)))),
+      // Into a texture rather than the canvas: the film stock's picture and
+      // the projector's without the second target, and the camera's (and
+      // projector sources') with it (H2c-6).
+      ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true, false), displayRecipe(device, f, true, false),
+        !(f === picture && open.stock && !open.camera))),
+      cache.renderPrep(displayName(format, true, true), displayRecipe(device, format, true, true), !open.camera),
     ];
   }
 
@@ -401,18 +403,26 @@ export class WebGPUPlate {
     // ── Display ─────────────────────────────────────────────────────
 
     // The second target is what the camera pass reads: the normal, the dye's
-    // height and the bubble mask. It is written whether or not that pass is
-    // on, because a render pass has to be given somewhere to put it.
-    if (!this.aux || this.auxSize[0] !== size.width || this.auxSize[1] !== size.height) {
-      if (this.aux) this.disposer.release(this.aux);
-      this.aux = this.disposer.track(this.device.createTexture({
-        label: 'aux', size: [size.width, size.height], format: 'rgba8unorm',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-      }));
-      this.auxSize = [size.width, size.height];
+    // height and the bubble mask. Only that pass reads it, so with the camera
+    // off none is made, any made while it was on is let go, and the display
+    // draws to `target` alone (H2c-6).
+    const cameraOn = this.pack.get('cameraOn')[0] > 0.5;
+    if (cameraOn) {
+      if (!this.aux || this.auxSize[0] !== size.width || this.auxSize[1] !== size.height) {
+        if (this.aux) this.disposer.release(this.aux);
+        this.aux = this.disposer.track(this.device.createTexture({
+          label: 'aux', size: [size.width, size.height], format: 'rgba8unorm',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        }));
+        this.auxSize = [size.width, size.height];
+      }
+    } else if (this.aux) {
+      this.disposer.release(this.aux);
+      this.aux = null;
+      this.auxSize = [0, 0];
     }
 
-    this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
+    this.display(encoder, target, this.aux ? viewOf(this.aux) : null, this.uniformBuffer, fields, timestamps, toTexture, format);
   }
 
   /** The uniforms for a projector's plate source, to fill with `fillPlateUniforms` before `drawSource`. */
@@ -471,14 +481,15 @@ export class WebGPUPlate {
   private display(
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
-    auxView: GPUTextureView,
+    auxView: GPUTextureView | null,
     uniforms: GPUBuffer,
     fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
   ): void {
-    const display = this.pipelines.renderPipeline(displayName(format, toTexture), displayRecipe(this.device, format, toTexture));
+    const aux = auxView !== null;
+    const display = this.pipelines.renderPipeline(displayName(format, toTexture, aux), displayRecipe(this.device, format, toTexture, aux));
     if (!display) return;
     const one = this.layers[0];
     const two = this.layers[1] ?? one;
@@ -492,12 +503,15 @@ export class WebGPUPlate {
     const air = (i: number) => fields[i]?.air ?? this.blank;
     // The front plate's physics, packed (packView), or zeros before a step has run.
     const view = (i: number) => fields[i]?.view ?? this.blankU;
+    const colorAttachments: GPURenderPassColorAttachment[] = [
+      { view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } },
+    ];
+    if (auxView) {
+      colorAttachments.push({ view: auxView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } });
+    }
     const pass = encoder.beginRenderPass({
       label: 'plate',
-      colorAttachments: [
-        { view: target, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 } },
-        { view: auxView, loadOp: 'clear', storeOp: 'store', clearValue: { r: 0.5, g: 0.5, b: 0, a: 0 } },
-      ],
+      colorAttachments,
       // The frame's own timing goes on the pass that draws it, not on the
       // clear that used to stand in for it.
       timestampWrites: timestamps,
