@@ -216,6 +216,7 @@
     "filmlook": "node scripts/filmlook.mjs",
     "filmrings": "node scripts/filmrings.mjs",
     "soapfilm": "node scripts/soapfilm.mjs",
+    "soapplate": "PW_WEBGPU=1 node scripts/soapplate.mjs",
     "boil": "node scripts/boil.mjs",
     "soapgpu": "PW_WEBGPU=1 node scripts/soapgpu.mjs",
     "boilgpu": "PW_WEBGPU=1 node scripts/boilgpu.mjs",

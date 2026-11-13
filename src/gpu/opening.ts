@@ -123,6 +123,16 @@ export interface Opening {
    * opened on the leak the seal is there to stop.
    */
   sealed: boolean;
+  /**
+   * The frame's soap film (PLAN 32d): its solver's five kernels and the
+   * plate's three that drive it (the air, the re-dip's state and its lay),
+   * from the first step, when the look hangs a frame (Soap Film above
+   * nought). Added with the film: `npm run startup` on the Mac found Soap
+   * Film asking for all eight in its first steps with no list naming them.
+   * Every other look builds them behind the show, for the hand that turns
+   * Soap Film up mid-set.
+   */
+  soap: boolean;
 }
 
 /**
@@ -177,5 +187,6 @@ export function openingOf(s: Partial<VisualizerSettings>): Opening {
       && ((on(s.plateRock ?? DEFAULT_SETTINGS.plateRock) && on(s.frameSway)) || (on(s.slosh) && on(s.plateUpright))),
     film: (s.clearFilm ?? 0) > 0.001,
     sealed: (s.thinGap ?? DEFAULT_SETTINGS.thinGap) > 0.5 && on(s.plateUpright),
+    soap: (s.soapFilm ?? 0) > 0.001,
   };
 }

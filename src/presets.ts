@@ -1402,19 +1402,20 @@ export const PRESETS: Preset[] = [
   {
     id: 'soap-film',
     name: 'Soap Film',
-    description: 'One sheet of interference colour, torn open again and again: each hole rushes outward, thins to a rim, and curls into filaments before the next one lands.',
+    description: 'A real soap film in its frame: it drains through the colours of its own thickness, silver to gold, blue and magenta, swirls with the music, goes black from the top, and is drawn again.',
     settings: {
       surfactantFlow: 0.6,
-      // Thin-film optics over a plate whose only event is the tear. The film
-      // has to be thin for the colour to be there at all, which is also what
-      // makes it easy to break — so evaporation runs high and the dye budget
-      // low, and the soap keeps re-opening what the flow closes.
+      // The frame's own film (PLAN 32d) over a dark ground: its colour is its
+      // thickness, seen in reflection. The plate under it is a faint dye
+      // whose flow, stirred by the soap and the music, is the air that
+      // swirls the film. No dish motor: the frame does not turn.
+      soapFilm: 1,
       globalSpeed: 0.0168,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.3,
-      rotationSpeed: 0.116,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0,
       centerGravity: 0.08,
       ledPlatform: false,
       ledMode: 'single',
@@ -1442,7 +1443,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.35,
       glossiness: 0.2,
       postBlurRadius: 0.2,
-      dyeBudget: 0.9,              // 28i-7: warmer and fuller until 28i-4 draws the film's own colours
+      dyeBudget: 0.3,
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
@@ -1453,7 +1454,7 @@ export const PRESETS: Preset[] = [
       lampMotion: 0.2,
       lampHotspot: 0.45,
       iridescence: 0.6,
-      thinFilm: 1.0,
+      thinFilm: 0,
       secondLamp: 0,
       /*
         The soap sheet's own fast patches (PLAN 28i-3b): kicks pull thin spots

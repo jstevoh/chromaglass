@@ -8,6 +8,8 @@ import { DROP_KERNELS } from '../src/gpu/wgsl/ferroDrop';
 import { SLOSH_KERNELS } from '../src/gpu/wgsl/slosh';
 import { SPLAT_KERNELS, splatKernel } from '../src/gpu/wgsl/splat';
 import { BEAD_KERNELS } from '../src/gpu/wgsl/beadMask';
+import { SOAP_KERNELS } from '../src/gpu/wgsl/soapFilm';
+import { SOAP_PLATE_KERNELS } from '../src/gpu/wgsl/soapFilmPlate';
 
 const FORMATS: Record<string, string> = {};
 (window as unknown as { runWgsl: () => Promise<string[]> }).runWgsl = async () => {
@@ -37,6 +39,9 @@ const FORMATS: Record<string, string> = {};
   for (const name of Object.keys(SPLAT_KERNELS)) await check(`splat.${name}`, splatKernel(name, 'rgba32float'));
   // The oil beads' mask (PLAN 14ab-6), drawn by the plate from the beads' list.
   for (const [name, code] of Object.entries(BEAD_KERNELS)) await check(`beads.${name}`, code);
-  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length} shaders`);
+  // The draining soap film (PLAN 32c) and what the plate adds to it (32d): stepped behind Soap Film.
+  for (const [name, code] of Object.entries(SOAP_KERNELS)) await check(`soap.${name}`, code);
+  for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
+  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length} shaders`);
   return out;
 };

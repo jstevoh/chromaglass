@@ -441,6 +441,8 @@ export class FluidFields extends FluidCore {
       chem: this.chemLive ? this.chem.read : null,
       /** The poured species field (carries scatter in b channel). */
       species: this.speciesLive && this.species ? this.species.read : null,
+      /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */
+      soapFilm: this.soapPlate?.field ?? null,
     };
   }
 
@@ -452,6 +454,7 @@ export class FluidFields extends FluidCore {
     this.air?.dispose();
     this.air = null;
     this.slosh?.dispose();
+    this.soapPlate?.dispose();
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

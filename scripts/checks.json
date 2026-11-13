@@ -1347,6 +1347,20 @@
       ]
     },
     {
+      "name": "The soap film on the plate",
+      "shard": "lab3",
+      "run": "npm run soapplate",
+      "why": [
+        "Soap Film draws the frame's own draining film (PLAN 32d, gpu/soapFilmPlate.ts):",
+        "off is the plate to the byte and makes no film; on, the plate's colours follow the",
+        "CPU reference's picture of the film's read-back thickness cell for cell and not",
+        "upside down; the look is lit, not black, and a rainbow (the 2026-11-12 report's",
+        "numbers); the plate's flow moves the film without making or losing any; a drained",
+        "film is drawn again top first; Film Angle follows Snell's law. On the lab's",
+        "software WebGPU, beside the soap film's GPU control."
+      ]
+    },
+    {
       "name": "The dials held in the solver reach their tops",
       "shard": "lab3",
       "run": "npm run widedials",

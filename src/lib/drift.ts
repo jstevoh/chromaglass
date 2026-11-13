@@ -175,6 +175,18 @@ const NOT_THE_LOOK = new Set([
   'clearFilm',
   // And its dye (PLAN 20b-13): a dye dissolved in the oil does not thin or deepen by itself.
   'clearFilmDye',
+  /*
+    The frame's soap film (PLAN 32d) keeps its own clock: it drains, goes
+    black and is dipped again on the film's physics, and that cycle is its
+    evolving. Soap Film is whether a frame hangs in front of the plate at all
+    (a wander would fade the frame out of a look built on it), Film Angle is
+    the hand holding the frame, and Drain Rate is the film's clock. Joining
+    the pool also moved which dials Evolve reached for, as Kick Bloom's did:
+    `npm run slowevolve`'s full-speed pace read 5.69 %/s with these three in
+    it (a granulation glide drawn the length of its reach in 6 s) and 4.20
+    without (PLAN 10-8d-3).
+  */
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

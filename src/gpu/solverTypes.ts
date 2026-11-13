@@ -195,6 +195,10 @@ export interface GpuStepParams {
   dimmer?: number;
   /** Lamp Heat dial (0..1, default 0): two-band lamp irradiance and two-phase boil model (PLAN §36e-2). */
   heat?: number;
+  /** Soap Film (0..1, default 0): the frame's draining film runs while it is up (PLAN 32d, gpu/soapFilmPlate.ts). */
+  soapFilm?: number;
+  /** The film's drain rate, its seconds per show second (default 1; PLAN 32i's time dial). */
+  soapFilmRate?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
