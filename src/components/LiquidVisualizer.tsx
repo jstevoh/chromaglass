@@ -2379,8 +2379,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           loud it is and steps up on a kick, and a stronger field makes the
           labyrinth finer and busier while a weaker one lets the fingers
           fatten and round (Zakinyan et al.; the ferrofluid speakers that
-          drive a coil from the audio do the same). Slewed, so the maze
-          breathes rather than flickers.
+          drive a coil from the audio do the same). Slewed; about the
+          setting on average (38d-1).
         */
         const lab = look.ferroLabyrinth ?? 0;
         let field = lab;
@@ -2390,7 +2390,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           k.at = now;
           k.env = kickRef.current?.kick ? 1 : k.env * Math.exp(-dtS / 0.8);
           const energy = Math.min(1, currentAudioData.energy);
-          field = Math.min(1, lab * (0.55 + 0.35 * energy + 0.45 * k.env));
+          field = Math.min(1, lab * (0.75 + 0.35 * energy + 0.45 * k.env));
         }
         /*
           A hand bringing a magnet to a look that has none: the look takes

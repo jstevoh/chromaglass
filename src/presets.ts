@@ -1655,7 +1655,7 @@ export const PRESETS: Preset[] = [
     name: 'Magnet Garden',
     description: 'Black ferrofluid on a bright golden pool over a field coil, with a magnet under the glass: it fingers into a labyrinth that sharpens on the beat.',
     settings: {
-      ferroLabyrinth: 0.8,
+      ferroLabyrinth: 0.58,
       globalSpeed: 0.0105,
       surge: 0.35,
       layerCount: 1,
@@ -1937,7 +1937,7 @@ export const PRESETS: Preset[] = [
     name: 'Ferro Paint',
     description: 'Ferrofluid worked through yellow, coral and pink dye under a wandering magnet: black channels and beads between bright cells of colour, wet and glossy, as in Colored I and II.',
     settings: {
-      ferroLabyrinth: 0.9,
+      ferroLabyrinth: 0.65,
       globalSpeed: 0.0105,
       surge: 0.5,
       layerCount: 1,
@@ -1982,10 +1982,9 @@ export const PRESETS: Preset[] = [
       // Colored I and II (npm run ferrodye): full, because it is the look.
       phaseDisplace: 1,
       // Poured over the whole plate (PRESET_PHASE_POUR, npm run ferropour),
-      // the maze fills it, and this is how fine it fills it: Ferro Maze's
-      // value, for the same reasons (npm run maze measures it; on the
-      // hosted 512² it is still above the twelve-cell floor).
-      mazeDetail: 0.5,
+      // the maze fills it at the coil's own period (Labyrinth, by the Bond
+      // number, PLAN 38d-1): Colored I and II's wide cells.
+      mazeDetail: 0,
       beatSqueeze: 0.0,
       lampHotspot: 0.3,
       secondLamp: 0.2,

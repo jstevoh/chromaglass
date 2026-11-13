@@ -2611,6 +2611,18 @@
       ]
     },
     {
+      "name": "The ferrofluid maze's period from the Bond number",
+      "shard": "logic",
+      "run": "npm run bondmaze",
+      "why": [
+        "The labyrinth's period follows the coil's field through the magnetic Bond",
+        "number (PLAN 38d-1, src/gpu/fluid/mazeBond.ts): the closed form against",
+        "the stripe energy minimised from its Fourier sum, M on the Langevin curve",
+        "of the inner field, finer with field and a pool under the onset, the",
+        "looks' wide cells, and the field the maze feels averaged over seconds."
+      ]
+    },
+    {
       "name": "The ferrofluid maze's detail",
       "shard": "plate",
       "run": "npm run maze",

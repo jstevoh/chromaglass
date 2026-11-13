@@ -118,9 +118,10 @@ const { page, close } = await openLab();
 try {
   /*
     The look laid and played. Its dye is left off: nothing here reads it, and
-    the phase does not depend on it. The field is the look's Labyrinth at
-    0.725 of full, where the app holds it between kicks at middling
-    loudness; the magnet walks the app's path at the app's speed for middling
+    the phase does not depend on it. The field is the look's Labyrinth, about
+    which the app plays it on average (it was 0.725 of it until PLAN 38d-1
+    centred the frame loop's swing on the setting, so the period the Bond
+    number reads from it is the look's whether music plays or not); the magnet walks the app's path at the app's speed for middling
     loudness (magnetWalk in LiquidVisualizer), at the look's strength and
     height. Read at the pour and at each checkpoint.
   */
@@ -156,7 +157,7 @@ try {
       for (; done < c; done += 3) {
         const mx = 0.5 + 0.34 * walk * Math.sin(walkT * 0.9), my = 0.5 + 0.28 * walk * Math.sin(walkT * 1.3 + 1.1);
         await lab.step(3, {
-          ferroLabyrinth: Math.min(1, need('ferroLabyrinth') * 0.725), phaseSharp: need('phaseSharp'), phaseTension: scale * 0.45,
+          ferroLabyrinth: need('ferroLabyrinth'), phaseSharp: need('phaseSharp'), phaseTension: scale * 0.45,
           magnetStrength: need('magnetStrength'), magnetX: mx, magnetY: my,
           magnetHeight: need('magnetHeight') * (0.5 + scale),
           mazeDetail: need('mazeDetail'), phaseDisplace: need('phaseDisplace'),

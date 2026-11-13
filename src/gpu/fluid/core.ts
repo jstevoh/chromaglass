@@ -418,6 +418,8 @@ export class FluidCore {
   protected phaseGap: GPUBuffer | null = null;
   protected phaseGapPrimed = false;
   protected mazeReady = false;
+  /** The coil's field as the maze feels it, its square averaged over MAZE_SETTLE (fluid/mazeBond.ts, mazeFelt). */
+  protected mazeMean = 0;
   protected airCover = 0;
   /*
     Last frame's coverage, so the rate term can be made zero-mean.
