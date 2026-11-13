@@ -11,7 +11,7 @@ particular piece: no item reproduces one of the artist's films or images.
 films by their own descriptions and their poster frames (Vimeo's public oEmbed), and two
 press features. The Microlab films themselves were not played: Vimeo refuses a cloud
 address, and on the owner's Mac a headless browser met its bot check, which we do not get
-round; the route is the owner's own screen recording (`scratch/davy/` on the Mac). What the descriptions say, in their own words: "Micro chemical
+round; they were watched later in the owner's own Chrome (below). What the descriptions say, in their own words: "Micro chemical
 reaction in a 3x3 inch Petri dish [6144 x 3456 30fps]"; "filmed under UV lights using
 fluorescent materials"; "All macro effects have been filmed with a canon 5D Mark 3 and a
 100mm macro lens"; "blending acrylic paints in a 90mm Petri dish", time-lapsed over five to
@@ -49,6 +49,28 @@ channel of ink pinches into a row of beads in about a second, the beads then thr
 tendrils into dark stars and cells with pale droplets drifting between (47k), and the
 motion settles from its peak to a steady low within about 2 s. Sheets and timelines:
 `~/chromaglass/scratch/davy/` on the owner's Mac.
+
+**The Microlab films themselves, watched in the page (2026-11-13).** Ten of the eleven,
+played in the owner's own Chrome on vimeo.com (no bot check there) and read frame by frame
+into a canvas in the page: 24-frame sheets, a centre slit-scan, and per sample the mean
+luma, saturation, share near black, hue spread, motion (mean luma change over 1/24 s on a
+96×54 copy) and edge detail at 384×216 and at 96×54 ("fine" and "coarse"; their ratio is
+how much detail sits below a coarse grid). Read across the ten: near black 20 to 90 % (the
+glass and sphere films 80 to 100 %); saturation 0.7 to 0.85 in the fluorescent films and 0.3
+to 0.45 in the glass ones; azure and blue are the leading hues in eight of ten, with
+magenta, rose or amber as a second light in five; fine over coarse is 2.2 to 3.1 in every
+film. Motion splits two ways: *Rebirth*, *Forms IV* and *Fryars* drift (median 0.004 to 0.006,
+calm about half the time), *Underworlds*, *III* and *At0m* churn (0.02 to 0.04, calm under
+5 %). What recurs: cellular networks in five (*Rebirth*'s core bursting into a mesh that
+drifts apart as fragments, *Underworlds*' dense foam of cells with glowing cores, *Fryars*'
+thin-rimmed polygons with sparkles along the rims, the rings of *II* breaking into fine
+cells: 47g); suspended glitter or specks in four (47e); big out-of-focus discs and
+starburst spikes on speculars from a stopped-down lens (*Forms IV*, *III*: 47d, 47i); a
+second coloured light raking in from one side over the blue glow (*II*, *Underworlds*:
+47b's Rheinberg); a top-down vortex with concentric rings (*At0m*: 47f); clear glassy
+strands glinting gold (*III*); a left-right mirror laid on in the edit (*IV*); and a side
+view through a tank (*Gravity L1*: 47n). Numbers and sheets:
+`/mnt/project-files/macro-davy-evans/microlab-watch/` in the project's shared files.
 
 **What the poster frames show, across the eleven.** A black ground everywhere, with the
 liquid as the only light. Structure at every scale at once: a front a few millimetres
@@ -262,6 +284,17 @@ a full-frame camera with a 100 mm macro lens, later a 6K cinema camera, UV light
 fluorescent materials, 3 inch and 90 mm Petri dishes, acrylic paints, inks and dyes, glass.
 Filming the kit is a `watch` pass (`npm run watch`) that sets each item's bar.
 
+## 47n. A side view: a falling thread and a gravity current in a tank (L; owner's call)
+
+*Gravity L1* films a tank from the side: fluorescent dye falls as a jet that stretches into
+one thread over about 40 s (the thread thins as gravity accelerates it, so its radius goes
+as the flow rate over the speed, a ∝ (Q/v)^½), lands, and spreads along the floor as a
+gravity current whose head curls into filaments, with glitter floating in dark water
+(near black 76 to 83 %, motion median 0.013, a jump to 0.029 at the landing). Our plate is a
+thin layer seen from above, so this is a different solver (a vertical 2D slice with
+buoyancy, or a 3D tank), not a camera move. Written down so it is not lost; the owner's
+call whether the show wants a tank at all.
+
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 
 ~~**47w-1** The download half~~ (shipped; story in `docs/plan-shipped.md` §47v-47w-1): the
@@ -305,6 +338,14 @@ each band.
   Brooklyn Bowl film decoded to 320×26, and the physics read printed dashes ("0% of textured
   blocks matched") with no reason. When the decoded crop is under about 64 rows, print that
   the flow read needs a taller crop, and a selftest line for it.
+- **47v-7. Open: watching where the file can't be fetched.** Vimeo refuses the cloud and a
+  headless browser, and a recording saved by the owner's Chrome lands in Downloads, which a
+  thread may not open. What worked (2026-11-13): read the frames in the page itself, in the
+  owner's Chrome, stepping the video by seeks (live playback skipped ahead and restarted
+  under the per-frame work) and taking a pair of frames 1/24 s apart for motion. Make that
+  a script the watch skill keeps (`scripts/watchpage.js`, pasted into the page), printing the
+  same names as `watch.mjs` so `--vs` can compare, with the run's own numbers checked
+  against `watch.mjs` on one clip both can read.
 - **47v-5. Open: carried on real footage.** Real shows read carried 0.13 to 0.19 where the
   synthetic texture slid reads 0.97: grain, a camcorder's noise in the dark, the lamp's hot
   spot and superimposed loops all count as change the flow does not carry. Measure the
@@ -426,7 +467,7 @@ number it moves printed before and after.
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
-47h and 47i when wanted; 47w-3, 47v-4, 47v-5 and 47v-6 whenever the watch tool is next touched; 47y
+47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4, 47z-5 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12). Each its own thread
 and PR.
