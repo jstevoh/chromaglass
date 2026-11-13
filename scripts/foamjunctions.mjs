@@ -9,19 +9,23 @@
  * (d1 < NEAR) three drops at once (d3 − d1 < TIE), a Plateau border; its
  * order is four when a fourth drop is as near. Each film of a three-way
  * junction is read as the mean direction from the junction's centre to the
- * cells equidistant from its two drops, RHO0 to RHO1 cells out: past the
- * border's own curve, inside the film's straight run.
+ * cells equidistant from its two drops, from PAST cells beyond the border's
+ * own reach (its farthest cell from the centre) for RUN cells: on the film's
+ * straight run, never on the border's arcs. Read at a fixed ring three to
+ * seven cells out instead, it read 120° from corners rounded by a blur with
+ * no film turned (the check-skeptic, 2026-11-13: the laid foam blurred and
+ * re-cut read median 5.8°, 65% within 10°, where the lay reads 12.8°, 22%).
  *
  * Read on an exact hexagonal foam laid as Foam Cells lays its own (every
- * junction 120°, 192², films four cells), the angles read a median 4° off
- * 120° and 98% within 10°: that is this reader's floor, the grid's.
+ * junction 120°, 192², films four cells), the angles read a median 2.3° off
+ * 120° and 99% within 10°: that is this reader's floor, the grid's.
  *
  * Also returned: which water cells are border (in a junction's cluster) and
  * which are film (two drops equidistant within a cell, near both), for the
  * dye's share in each.
  */
 export function junctions(n, oil, o = {}) {
-  const SPECK = o.speck ?? 12, NEAR = o.near ?? 5, TIE = o.tie ?? 1.2, RHO0 = o.rho0 ?? 3, RHO1 = o.rho1 ?? 7;
+  const SPECK = o.speck ?? 12, NEAR = o.near ?? 5, TIE = o.tie ?? 1.2, PAST = o.past ?? 2, RUN = o.run ?? 5;
   const lab = new Int32Array(n * n).fill(-1);
   const sizes = [];
   for (let q = 0; q < n * n; q++) {
@@ -82,6 +86,10 @@ export function junctions(n, oil, o = {}) {
     let cx = 0, cy = 0, w = 0;
     for (const c of cells) { const ww = 1 / (0.2 + D[c * 3 + 2] - D[c * 3]); cx += (c % n) * ww; cy += Math.floor(c / n) * ww; w += ww; }
     cx /= w; cy /= w;
+    // The border's own reach from its centre: a film is read past it, never on the border's arcs.
+    let reach = 0;
+    for (const c of cells) reach = Math.max(reach, Math.hypot((c % n) - cx, Math.floor(c / n) - cy));
+    const RHO0 = reach + PAST, RHO1 = RHO0 + RUN;
     const j = { x: cx, y: cy, order: four || ids.size >= 4 ? 4 : 3, ids: [...ids] };
     if (j.order === 3 && ids.size === 3) {
       const [A, B, C] = j.ids, pairs = [[A, B], [B, C], [C, A]], dirs = [];

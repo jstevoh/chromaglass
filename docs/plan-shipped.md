@@ -13923,8 +13923,9 @@ The tension had to come down for the app's grid: at 384² a fifty-cell cell is s
 plate than at 256², its pressure higher, and at 0.45 half the cells merged in four seconds, at
 0.2 a quarter, at 0.1 four of 39. The look is Foam Cells (`src/presetsFoam.ts`, laid by
 `layFoamCells` in `src/lib/oilLay.ts` through the solver's new `layOil`). `npm run foam` (384²,
-four seconds): laid 39 cells, median 13.3° off 120°, 32% within 10°; after, 35 cells, median
-6.1°, 70% within 10° (80% at two seconds), every junction three-way, no oil made or lost. The
-reader's floor on an exact hexagonal foam is a median 4° and 98% (192²). To make room for the
+four seconds): laid 39 cells, median 14.5° off 120°, 31% within 10°; after, 35 cells, median
+7.3°, 69% within 10°, every junction three-way and still there, no oil made or lost. The
+reader's floor on an exact hexagonal foam is a median 2.3° and 99% (192²); it reads each film
+past its border's arcs, after the check-skeptic showed a fixed ring read rounded corners. To make room for the
 seed in `fluidSimulation.ts`, which is over its size budget, Clock Glass's lay moved beside its
 bodies in `oilLay.ts` (`layClockGlass`, the same cells in the same order).
