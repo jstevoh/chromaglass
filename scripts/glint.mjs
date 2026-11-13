@@ -326,7 +326,8 @@ try {
     return { up, flipped, stillWorst, mid, glass, perK: perK / Math.max(1, nK), nK, dye: c1[0] - c0[0], dyeY: c1[1] - c0[1] };
   }, L.speckCount(1));
   // Side Light just past its threshold still adds a thousandth of the lamp, which the display curve's slope at dark values
-  // (about 25 of 255) turns into 2 levels at a handful of pixels (7 of 196,608 channels measured); a picture the pass left
+  // (about 25 of 255) turned into 2 levels at a handful of pixels with an 8-bit picture under the pass (7 of 196,608
+  // channels), 1 with the half-float one; a picture the pass left
   // upside down differs by tens of levels over the whole off-centre disc.
   const fine = (d) => d.worst <= 3 && d.near > 0.999;
   check('F. the pass turns the plate\'s picture back the right way up: with it on and no flakes, the plate\'s own (99.9 % within a level)', fine(ride.up) && fine(ride.flipped),

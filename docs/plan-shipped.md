@@ -13931,10 +13931,13 @@ falling off by the inverse square and the slant across the stage, scattered back
 pigment (0.35 of it, filtered by the dye; on black a fluorescent dye counts as pale) and
 reflected by the glasses' slopes by Fresnel (3 %), read from the plate's normals.
 
-The pass. At Glitter and Side Light 0 nothing runs and nothing is allocated: the plate
-draws to its target as before, to the byte. Otherwise the display draws, unfinished, into
-the pass's picture, and the lens pass adds the light and lays the finish the display would
-have (`lensFinish`). Desks (Camera and Lamp sections), MIDI, glides, drift's not-the-look
+The pass. At Glitter and Side Light 0 nothing runs and nothing is held (a frame that does
+not want the pass lets its pictures and flakes go): the plate draws to its target as before,
+to the byte. Otherwise the display draws, unfinished, into the pass's half-float picture (in
+8 bits a dark ramp would band before the finish's dither), and the lens pass adds the light
+and lays the finish the display would have (`lensFinish`). The flakes age and settle on the
+plate's own clock, so a paused show pauses them, and a gap in it over a quarter second
+carries nothing. A stage glides Side Colour and Side Angle the short way round the circle. Desks (Camera and Lamp sections), MIDI, glides, drift's not-the-look
 list and the phone's remote all carry the five dials.
 
 Measured (`npm run glint`, 20 lines): the laws in node; off is off to the byte with every

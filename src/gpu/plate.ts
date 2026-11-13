@@ -27,7 +27,7 @@ import { DROP_KERNELS } from './wgsl/ferroDrop';
 import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
 import { soapFilmLut } from '../lib/soapFilm';
-import { PlateGlint } from './glint';
+import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -189,6 +189,9 @@ export class WebGPUPlate {
       ...BeadMask.prepare(cache),
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
       ...PlateGlint.prepare(cache, device, format, picture),
+      // And the display it draws under, flipped into its half-float picture (unless that is one of the two below).
+      ...(format === GLINT_SCENE_FORMAT || picture === GLINT_SCENE_FORMAT ? []
+        : [cache.renderPrep(displayName(GLINT_SCENE_FORMAT, true), displayRecipe(device, GLINT_SCENE_FORMAT, true), true)]),
       // Into a texture rather than the canvas: the camera's, in the canvas's
       // format, and the film stock's picture.
       ...[...new Set([format, picture])].map((f) => cache.renderPrep(displayName(f, true), displayRecipe(device, f, true),
@@ -359,9 +362,12 @@ export class WebGPUPlate {
       finish (lensFinish, which fillPlateUniforms sets to what the display's
       would have been). Otherwise not a byte of this frame differs.
     */
-    const lensOn = PlateGlint.wanted(this.pack)
+    const wanted = PlateGlint.wanted(this.pack);
+    const lensOn = wanted
       && this.glint.ready(format, toTexture, this.pack.get('glitter')[0] > 0.001)
-      && !!this.pipelines.renderPipeline(displayName(format, true), displayRecipe(this.device, format, true));
+      && !!this.pipelines.renderPipeline(displayName(GLINT_SCENE_FORMAT, true), displayRecipe(this.device, GLINT_SCENE_FORMAT, true));
+    // Both dials back at 0: the pass's pictures and flakes go (a 4K frame's two are about 100 MB).
+    if (!wanted && this.glint.holding) this.glint.release();
     const finish = this.pack.get('finishInMain')[0];
     if (lensOn) this.pack.set('finishInMain', 0);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, this.pack.bytes);
@@ -443,7 +449,7 @@ export class WebGPUPlate {
     }
 
     if (lensOn) {
-      this.display(encoder, this.glint.sceneView(size.width, size.height, format), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, format);
+      this.display(encoder, this.glint.sceneView(size.width, size.height), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, GLINT_SCENE_FORMAT);
       this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
       return;
     }

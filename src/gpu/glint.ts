@@ -25,11 +25,20 @@ import { Disposer, PipelineCache, type Prep, layoutFromWgsl, type RenderRecipe }
 import { groupOf, viewOf } from './groupCache';
 import type { UniformPack } from './uniforms';
 import { LENS_WGSL, SPECK_STRIDE, SPLAT_VERTS, SPLAT_WGSL, STEP_WGSL } from './wgsl/glint';
-import { SPECK_MAX, glintWanted, speckCount } from '../lib/glint';
+import { SIDE_RADIANCE, SPECK_MAX, glintWanted, speckCount } from '../lib/glint';
 import { CELL_CLOCK_WRAP, CELL_TRAVEL } from '../lib/detailFlow';
 
 const GROUP = 256;
 const GLINT_FORMAT: GPUTextureFormat = 'rgba16float';
+/*
+  The plate's picture under the pass: half floats, whatever the target. The
+  display draws into it without its finish (the pass lays that), so in the
+  canvas's 8 bits a dark ramp would be cut to steps before the pass's dither
+  could break them up, the banding the dither is there for (plateUniforms).
+*/
+export const GLINT_SCENE_FORMAT: GPUTextureFormat = 'rgba16float';
+/** A gap in the plate's clock longer than this (a stopped show, a hidden window, a frame the pass sat out) carries nothing: the flakes start again from where they are. */
+const FRAME_GAP = 0.25;
 const ADD: GPUBlendState = {
   color: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
   alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' },
@@ -85,7 +94,8 @@ export class PlateGlint {
 
   /** Whether the frame wants the pass: Glitter or Side Light above nothing (lib/glint glintWanted). */
   static wanted(pack: UniformPack): boolean {
-    return glintWanted(pack.get('glitter')[0], pack.get('sideLight')[0]);
+    // The pack holds the side lamp's radiance (Side Light × SIDE_RADIANCE); the threshold is the dial's.
+    return glintWanted(pack.get('glitter')[0], pack.get('sideLight')[0] / SIDE_RADIANCE);
   }
 
   constructor(private readonly device: GPUDevice, private readonly pipelines: PipelineCache, private readonly disposer: Disposer) {
@@ -103,8 +113,9 @@ export class PlateGlint {
     return !!this.pipelines.computePipeline('glint step', STEP_WGSL) && !!this.pipelines.renderPipeline('glint splat', splatRecipe(this.device));
   }
 
-  /** Where the plate draws while this pass is on: its own picture, the target's format. */
-  sceneView(width: number, height: number, format: GPUTextureFormat): GPUTextureView {
+  /** Where the plate draws while this pass is on: its own picture, in half floats (GLINT_SCENE_FORMAT). */
+  sceneView(width: number, height: number): GPUTextureView {
+    const format = GLINT_SCENE_FORMAT;
     if (!this.scene || this.size[0] !== width || this.size[1] !== height || this.sceneFormat !== format) {
       if (this.scene) this.disposer.release(this.scene);
       if (this.glints) { this.disposer.release(this.glints); this.glints = null; }
@@ -134,12 +145,36 @@ export class PlateGlint {
     return d * CELL_TRAVEL;
   }
 
-  private frameSeconds(): number {
-    const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
+  /*
+    The seconds since the last frame, on the plate's own clock (the pack's
+    time), not the wall's: a paused or offline-rendered show stops or steps
+    the flakes' ageing and settling with its picture. A gap past FRAME_GAP,
+    or the clock running back, carries nothing and starts the displacement
+    clock again too, so a frame the pass sat out cannot hand the flakes a
+    quarter of the clock's wrap in one step.
+  */
+  private frameSeconds(time: number): number {
     const last = this.lastTime;
-    this.lastTime = now;
-    return last === null ? 0 : Math.max(0, Math.min(0.1, now - last));
+    this.lastTime = time;
+    if (last === null || !Number.isFinite(time)) return 0;
+    const dt = time - last;
+    if (!(dt >= 0) || dt > FRAME_GAP) { this.lastClock = null; return 0; }
+    return Math.min(0.1, dt);
   }
+
+  /** Let go of the pass's pictures and flakes: the plate calls this on a frame that does not want the pass, so dials at 0 hold nothing. */
+  release(): void {
+    if (this.scene) { this.disposer.release(this.scene); this.scene = null; }
+    if (this.glints) { this.disposer.release(this.glints); this.glints = null; }
+    if (this.specks) { this.disposer.release(this.specks); this.specks = null; }
+    this.sceneFormat = null;
+    this.size = [0, 0];
+    this.lastClock = null;
+    this.lastTime = null;
+  }
+
+  /** Whether the pass holds anything to let go of. */
+  get holding(): boolean { return !!(this.scene || this.glints || this.specks); }
 
   /**
    * After the plate has drawn into `sceneView`: step and splat the specks,
@@ -162,8 +197,8 @@ export class PlateGlint {
     if (!this.scene) return;
     const [width, height] = this.size;
     const count = speckCount(pack.get('glitter')[0]);
+    const dt = this.frameSeconds(pack.get('time')[0]);
     const disp = this.frameDisp(pack.get('cellClock')[0]);
-    const dt = this.frameSeconds();
     let glints = this.blank;
     if (count > 0) {
       if (!this.specks) {
@@ -200,7 +235,9 @@ export class PlateGlint {
         glints = this.glints;
       }
     } else {
-      // Glitter off: the specks wait where they are (the buffer is kept), and the clocks start again when it is back.
+      // Glitter off with the side lamp on: the flakes wait where they are (their buffer is small and kept), the
+      // full-size glints picture goes, and the clocks start again when Glitter is back.
+      if (this.glints) { this.disposer.release(this.glints); this.glints = null; }
       this.lastClock = null;
       this.lastTime = null;
     }
