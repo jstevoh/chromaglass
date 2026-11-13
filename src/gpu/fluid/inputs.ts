@@ -707,6 +707,28 @@ export class FluidInputs extends FluidPasses {
   }
 
   /**
+   * Lay the oil cell for cell (Foam Cells, PLAN 47z-5): `oil(x, y, n)` is
+   * asked for every cell of the mix at its middle, in plate units, with the
+   * mix's own size, and what it answers (0..1) replaces the oil there; the
+   * soap and the acidity are cleared with it, as a fresh plate has none.
+   * addMix lays discs, which is all a crowd needs, but a foam's drops are
+   * pressed into polygons with a film between each pair (oilLay.ts,
+   * foamCell), which no sum of discs draws.
+   */
+  layOil(oil: (x: number, y: number, n: number) => number): void {
+    const m = this.ensureMix();
+    const n = this.N, data = new Float32Array(n * n * 4);
+    let sum = 0;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const c = Math.max(0, Math.min(1, oil((i + 0.5) / n, (j + 0.5) / n, n)));
+      data[(i + j * n) * 4] = c; sum += c;
+    }
+    this.device.queue.writeTexture({ texture: m.read }, data, { bytesPerRow: n * 16 }, [n, n]);
+    this.oilPoured = sum / (n * n);
+    this.mixLive = true;
+  }
+
+  /**
    * Drag the oil along a gesture, as the app drags the dye (carryDye in
    * LiquidVisualizer): taken from each cell under the hand in proportion to
    * how near its middle the cell is, and put down a hop ahead. In plate

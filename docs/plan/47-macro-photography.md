@@ -478,19 +478,35 @@ The physics, in the order to build (each its own thread and PR):
 Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
 page, add one build and a note:
 
-- **47z-5. A crowd packed past touching becomes polygons.** `cosmo-packed-foam-cells`
-  (`--to 4.7 --crop 0.05,0.2,0.9,0.62`): pale cells pressed into polygons, thin films meeting
-  in threes, rust-red dye collected in the borders. That is a packed emulsion or a foam held
-  by the films of 47z-3: past about nine tenths of the area the drops can no longer stay
-  round, each film is flat at the drops' pressure difference, and three films meet at 120°
-  (Plateau's laws, here in the plane of the gap); the dye of the continuous liquid is
-  squeezed out of the films into the borders, thickest where three meet. Splodascope's
-  photograph ("packed edge to edge") is the same crowd at a lower fill. *Build:* after 47z-3,
-  pack held drops past nine tenths and see whether the field forms flat films and three-way
-  junctions; where the Cahn–Hilliard edge (two to five cells, 28k-2's shortcut (a)) rounds
-  the junctions off, that edge is what to replace. *Measure:* at nine tenths fill, nine in
-  ten junctions are three-way and their angles 120° within 10°; the continuous liquid's dye
-  per area is higher in the borders than in the films by their width ratio.
+- ~~**47z-5. A packed foam whose films meet at 120°**~~ (shipped; story in `docs/plan-shipped.md`
+  §47z-5): the look **Foam Cells**, a packed emulsion laid pressed across the dish whose junctions
+  the oil's tension turns to Plateau's 120° (`npm run foam`). Asked again 2026-11-13 with the
+  Microlab films' cellular networks ("Ok let's do this all"). What it found, still open:
+- **47z-6. A crowd that packs itself.** Foam Cells is laid pressed; a crowd of round drops does not
+  press itself into polygons, because nothing presses it: in open water a held crowd has room to
+  stay round (Splodascope's bowed glass gathers it, but at 0.45 not past touching in six seconds).
+  Real foams are pressed by gravity draining them, or held by films that stick (an attractive
+  part of the disjoining pressure, as in adhesive emulsions, where the film's tension is under
+  twice the interface's and drops meet at a contact angle). The second was tried here (a push
+  falling as e^(−h/5) against Film Hold's e^(−h/2.5), and the same as a chemical potential): the
+  drops did pull together, and then merged through the film at every strength from 0.3 to 1,
+  the potential by seeding oil in the film. The field cannot hold a film under about four
+  cells (28k-2 (a)), and the attraction brings the faces there faster than the hold answers.
+  Needs a sharper film first (a film carried as its own thin field, or a phase field per drop
+  colour as multiphase foam solvers do); then sticky films, or a gravity that drains a raft
+  standing on a tilted plate.
+- **47z-7. Films that pop by draining, not only when pressed.** Foam Cells' films hold until a
+  kick presses one past the hold; a real foam coarsens as films drain and rupture by chance,
+  the small cells losing to the big (von Neumann's law in 2D: a cell's area changes at a rate
+  set by its number of sides less six). That is 47z-3's drainage time per film, then a check
+  that cells under six sides shrink and over six grow.
+- **47z-8. Smaller cells.** A cell must be about fifty grid cells across for its films (four
+  cells each, the field's edge) to leave under a sixth of the dish water; under that the cells
+  round up into a wet crowd (lab: twenty across, fill 0.69, 68 cells to 33 in twelve seconds).
+  So Foam Cells has about a seventh of the plate per cell at 384² and a ninth at 512², where
+  the macro film has twenty or thirty. Thinner films (28k-2 (a)) give smaller cells; and with
+  them `npm run foam`'s 120° bar can go toward the nine in ten first proposed, since the reader
+  is exact only where a film runs straight for seven cells.
 - **The magnet beside the drops.** `cosmo-ferro-maze-drops` (`--crop 0,0.22,1,0.53`):
   ferrofluid in a thin cell as a labyrinth where it is thick and a lattice of fine dots at a
   drop's thin rim, beside large orange drops; stripes against dots by the fill and the
@@ -510,6 +526,7 @@ lighting term on the bend the plate already computes, the biggest change to the 
 its size) and 47j (caustics, which the films watched over time showed to be most of the
 picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
 47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
-as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4, 47z-5 in that order (the owner asked
-for the drops' physics and their colour, 2026-11-12). Each its own thread
+as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
+for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
+Cells), then 47z-7 after 47z-3, 47z-8 and 47z-6 after 28k-2 (a). Each its own thread
 and PR.

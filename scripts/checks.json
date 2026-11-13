@@ -2985,6 +2985,19 @@
       ]
     },
     {
+      "name": "A packed foam's junctions turn to 120°",
+      "shard": "fifth",
+      "run": "npm run foam",
+      "timeout": 8,
+      "why": [
+        "Foam Cells (PLAN 47z-5): a packed emulsion laid pressed at random",
+        "angles holds its cells, and the oil's tension turns its junctions",
+        "toward Plateau's 120° (median off 120° halved, more within 10°),",
+        "with the rust in the water and no oil made or lost. One 384² plate of",
+        "four seconds; in the fifth shard beside Film Hold, which it stands on."
+      ]
+    },
+    {
       "name": "A pour pushes the liquid out over the rim",
       "shard": "open",
       "run": "npm run flush",
