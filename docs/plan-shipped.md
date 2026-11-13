@@ -7172,8 +7172,11 @@ What shipped (`src/gpu/soapAir.ts`, `src/gpu/wgsl/soapAir.ts`, on a grid half th
   gravity along the film is g sin θ, the fresh film's √z profile scales with it. With the big
   swirls free, a hanging film sorts itself into level bands within seconds (measured: 11 forms
   a frame over a cycle, the bands of a draining film); a frame held near flat keeps its
-  marbling. The look Soap Film holds it at 12°: 57 forms a frame over a cycle (main 48, the
-  photograph 62), RMS contrast 0.21 (main 0.20), near black 1.8% (main 1.3%). On the desk,
+  marbling. The look Soap Film holds it at 12°: over two cycles 52 bright forms a frame (main
+  48, the photograph 62), the forms frame-sized swirls where they were 6 mm blobs; RMS contrast
+  0.199 (main 0.203) and near black 0.5% (main 1.3%), so the contrast gap is not closed here:
+  mid-cycle the swirls blur into soft bands (32k-3), and the plate's dye shows through as a pale
+  disc in the middle (32d-5). On the desk,
   the phone's remote and MIDI. `soapplate` 7: at 12° the imbalance turns over at 0.208 of the
   hanging speed (sin 12° = 0.208).
 

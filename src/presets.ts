@@ -1415,9 +1415,9 @@ export const PRESETS: Preset[] = [
         the film's real big swirls (32k) sort it into level bands within
         seconds, a draining film's look; the owner's "Liquid Tapestry" is a
         film folded into marbling, which a frame near flat keeps, still
-        draining slowly toward its lower edge. Measured in the lab over a
-        drain cycle: 57 bright forms a frame (main 48, hung 11; the
-        photograph 62).
+        draining slowly toward its lower edge. Measured in the lab over two
+        drain cycles: 52 bright forms a frame, the swirls frame-sized where
+        they were 6 mm blobs (before 48 forms; hung, 11; the photograph 62).
       */
       soapFilmTilt: 12,
       globalSpeed: 0.0168,
