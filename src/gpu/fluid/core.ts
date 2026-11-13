@@ -33,6 +33,13 @@ export class FluidCore {
   public readonly activeMat: PingPong;
   public chemLive = false;
   /**
+   * Whether the poured liquids' two fields (liquids0, liquids1) may hold
+   * anything: set by addLiquidDrop, their one writer, and cleared where both
+   * halves of each pair are filled with zeros. While false the step does not
+   * carry them (carryLiquids, and why).
+   */
+  protected liquidsLive = false;
+  /**
    * The plate's dye while a print is drawn: the dye in the solver with the
    * print laid over it (depositChem). Separate from the dye so the print is a
    * picture of the reaction as it stands, never a thing the flow carries or
@@ -718,6 +725,7 @@ export class FluidCore {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
@@ -754,6 +762,7 @@ export class FluidCore {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.speciesClears++;

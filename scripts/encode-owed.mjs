@@ -55,6 +55,22 @@
 const MAIN_OPEN = 500;
 const MAIN_REST_CORRECTIONS = 3; // the dye's and the two liquids'
 const MAIN_REST_CARRIES = 7; // two for each of those, one for the grain
+/*
+  46g (2026-11-13): the two liquids' fields are carried only once a liquid
+  has been poured (carryLiquids in src/gpu/fluid/passes.ts), so the plate
+  encode leaves, a dye drop and no liquid, carries the dye and the grain and
+  nothing else: one correction and three carries, the step six dispatches
+  lighter (494). Main's numbers above are still what a step makes once
+  something is poured, so the open plate is counted twice: as encode leaves
+  it, for 46g's own line, and again after one drop of a liquid, the control
+  that the gate opens (a gate that never opened would pass 46g's line and
+  leave every poured liquid standing still on a moving plate) and the plate
+  H2c-5 is read from, since "every other field still corrected as on main"
+  can only be asked of a step that carries every field.
+*/
+const BARE_REST_CORRECTIONS = 1; // the dye's
+const BARE_REST_CARRIES = 3; // the dye's two, the grain's one
+const LIQUIDS_DISPATCHES = 6; // a correction and two carries for each of the two fields
 
 export const ENCODE_OWED = ['h2c5', 'h2c8'];
 
@@ -121,18 +137,22 @@ export async function owedLines(page, check) {
     const bare = { passes: air.passes / 4, live: air.live.size };
     // The open plate's step by kernel, four of them, each carry told by whether it binds the velocity's own pair.
     const velPair = new Set([s.vel.read, s.vel.write]);
-    const tagged = { vel: { corrections: 0, carries: 0 }, rest: { corrections: 0, carries: 0 } };
-    const dispatch = GPUComputePassEncoder.prototype.dispatchWorkgroups;
-    GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) {
-      const k = this.__kernel ?? '';
-      const kind = /^macCormack/.test(k) ? 'corrections' : /^advect/.test(k) ? 'carries' : null;
-      if (counts.on && kind) tagged[[...(this.__tex ?? [])].some((t) => velPair.has(t)) ? 'vel' : 'rest'][kind]++;
-      return dispatch.apply(this, a);
+    const openStep = async () => {
+      const tagged = { vel: { corrections: 0, carries: 0 }, rest: { corrections: 0, carries: 0 } };
+      const dispatch = GPUComputePassEncoder.prototype.dispatchWorkgroups;
+      GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) {
+        const k = this.__kernel ?? '';
+        const kind = /^macCormack/.test(k) ? 'corrections' : /^advect/.test(k) ? 'carries' : null;
+        if (counts.on && kind) tagged[[...(this.__tex ?? [])].some((t) => velPair.has(t)) ? 'vel' : 'rest'][kind]++;
+        return dispatch.apply(this, a);
+      };
+      counts.dispatches = 0; counts.indirect = 0; counts.by = {}; counts.on = true;
+      try { await lab.step(4, { thinGap: 0, immiscibility: 0.5 }); } finally { counts.on = false; GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch; }
+      for (const f of Object.values(tagged)) for (const k of Object.keys(f)) f[k] /= 4;
+      return { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])), tagged };
     };
-    counts.dispatches = 0; counts.indirect = 0; counts.by = {}; counts.on = true;
-    try { await lab.step(4, { thinGap: 0, immiscibility: 0.5 }); } finally { counts.on = false; GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch; }
-    for (const f of Object.values(tagged)) for (const k of Object.keys(f)) f[k] /= 4;
-    const open = { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])), tagged };
+    // As encode leaves it: a dye drop, no liquid ever poured (46g).
+    const open = await openStep();
     // The control: one bubble on the same plate, stamped on each step.
     s.setBubbles(new Float32Array([0.5, 0.5, 0.06, 1]), 1, 0.05, new Float32Array(4));
     air.passes = 0; air.on = true;
@@ -141,20 +161,28 @@ export async function owedLines(page, check) {
     const bubble = { passes: air.passes / 4, live: air.live.size };
     s.setBubbles(new Float32Array(4), 0, 0.05);
     await lab.step(2, { thinGap: 1, immiscibility: 0.5 });
-    return { bare, open, bubble };
+    // Last, because it leaves a liquid on the plate: the same step once one drop of a liquid is poured.
+    s.addLiquidDrop(0.5, 0.5, 0.08, { body: 1 }, 1);
+    const poured = await openStep();
+    return { bare, open, poured, bubble };
   });
 
-  const { vel, rest } = r.open.tagged;
-  console.log(`  the open plate's step: ${r.open.dispatches.toFixed(0)} dispatches (main ${MAIN_OPEN}); the velocity's ${vel.corrections} MacCormack corrections and ${vel.carries} carries (main 1 and 2), the dye's, liquids' and grain's ${rest.corrections} and ${rest.carries} (main ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}): ${JSON.stringify(Object.fromEntries(Object.entries(r.open.by).filter(([l]) => /^(advect|macCormack)/.test(l))))}`);
+  const bareRest = r.open.tagged.rest;
+  const { vel, rest } = r.poured.tagged;
+  console.log(`  the open plate's step, no liquid poured: ${r.open.dispatches.toFixed(0)} dispatches, the dye's and grain's ${bareRest.corrections} MacCormack corrections and ${bareRest.carries} carries; with one drop of a liquid poured: ${r.poured.dispatches.toFixed(0)} dispatches (main ${MAIN_OPEN}); the velocity's ${vel.corrections} corrections and ${vel.carries} carries (main 1 and 2), the dye's, liquids' and grain's ${rest.corrections} and ${rest.carries} (main ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}): ${JSON.stringify(Object.fromEntries(Object.entries(r.poured.by).filter(([k]) => /^(macCormack|advect)/.test(k))))}`);
   console.log(`  air: a plate never given a bubble makes ${r.bare.passes} air passes a step with ${r.bare.live} air textures alive; with one bubble ${r.bubble.passes} a step and ${r.bubble.live} alive`);
 
   check('control: a bubble on the plate is stamped, an air pass on every step and its texture alive', r.bubble.passes >= 1 && r.bubble.live >= 1,
     `${r.bubble.passes} passes a step, ${r.bubble.live} alive`);
   check('control: the counting tells the velocity\'s carry from the others\'', vel.carries + vel.corrections >= 1 && rest.corrections >= 1,
     `velocity ${vel.carries + vel.corrections}, the others ${rest.carries + rest.corrections}`);
+  check('46g: a plate no liquid was poured on carries the dye and the grain and neither of the liquids\' fields', bareRest.corrections === BARE_REST_CORRECTIONS && bareRest.carries === BARE_REST_CARRIES,
+    `${bareRest.corrections} corrections and ${bareRest.carries} carries a step that are not the velocity's (want ${BARE_REST_CORRECTIONS} and ${BARE_REST_CARRIES}; main ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.open.dispatches.toFixed(0)} dispatches`);
+  check('control: one drop of a liquid and both its fields are carried again, corrected as the dye is', rest.corrections === MAIN_REST_CORRECTIONS && rest.carries === MAIN_REST_CARRIES && r.poured.dispatches - r.open.dispatches === LIQUIDS_DISPATCHES,
+    `${rest.corrections} corrections and ${rest.carries} carries (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.poured.dispatches.toFixed(0)} dispatches against ${r.open.dispatches.toFixed(0)} with none poured (want ${LIQUIDS_DISPATCHES} more)`);
   line('h2c5', 'H2c-5: the open plate carries velocity first order (no MacCormack correction, one carry), every other field still corrected as on main, the step two dispatches lighter',
-    vel.corrections === 0 && vel.carries === 1 && rest.corrections === MAIN_REST_CORRECTIONS && rest.carries === MAIN_REST_CARRIES && r.open.dispatches <= MAIN_OPEN - 2,
-    `velocity ${vel.corrections} corrections and ${vel.carries} carries (want 0 and 1), the others ${rest.corrections} and ${rest.carries} (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.open.dispatches.toFixed(0)} dispatches (at most ${MAIN_OPEN - 2})`,
+    vel.corrections === 0 && vel.carries === 1 && rest.corrections === MAIN_REST_CORRECTIONS && rest.carries === MAIN_REST_CARRIES && r.poured.dispatches <= MAIN_OPEN - 2,
+    `velocity ${vel.corrections} corrections and ${vel.carries} carries (want 0 and 1), the others ${rest.corrections} and ${rest.carries} (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.poured.dispatches.toFixed(0)} dispatches with a liquid poured (at most ${MAIN_OPEN - 2})`,
     vel.corrections === 1 && vel.carries === 2);
   line('h2c8', 'H2c-8: a plate that never had a bubble makes no air pass a step and keeps no air texture',
     r.bare.passes === 0 && r.bare.live === 0,

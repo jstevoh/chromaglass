@@ -14165,3 +14165,38 @@ Exports changed: `Ear.audioData` is gone and `Ear.view` is in its place; `DeskPr
 (a string) is `liveSince` (a time), `DeskProps.status.audio` a node; `SettingsPanelProps`
 takes `earView` where it took `calibration`; `useMusicIntelligence`'s second argument is the
 ear's `live` ref.
+
+## 46g. The poured liquids' fields are carried only once something is poured (2026-11-13)
+
+Read in the code during the audit of 2026-11-13: every solver step carried both of the
+liquids' fields (`liquids0`, `liquids1`: soap, body, repel, weight, polarity), at every look,
+though most shows never pour one. On the open plate that is two MacCormack advections, three
+full-grid dispatches each; in the thin gap, where every look opens, two substepped conserving
+carries, a dispatch a substep and the glass's drift, 66 dispatches a step for fields that
+hold zeros.
+
+Every one of those kernels is a carry: a sum of the field's own values times weights (fluxes,
+a bilinear backtrace and its correction clamped to the neighbours' range, the gather of what
+dry cells hold). A field of zeros comes out zeros, and skipping the carry leaves the same
+zeros in whichever half of the pair is read, so the plate is the same bits. The fields have
+one writer, `addLiquidDrop`, and three places that zero both halves; `liquidsLive` is set by
+the one and cleared by the three, and `carryLiquids` (`src/gpu/fluid/passes.ts`) is the four
+carries behind it, as `chemLive` already gates the reaction's grid. `liquidForces` in the fold
+runs as before. `src/gpu/fluid.ts` is smaller by the four call sites.
+
+Measured, `npm run encode` (a cloud session, 512², the lab): a thin-gap step 272 dispatches
+and 128 indirect → 270 and 64 (400 → 334); the open plate 500 → 494. Its lines: a plate no
+liquid was poured on carries the dye and the grain only (one correction and three carries
+where main made three and seven), and the control, one drop of a liquid and both fields are
+carried again, six dispatches more, so a gate that never opened is red. H2c-5 is now read
+from the poured plate, where every field is carried, at its old numbers; H2c-1, -2 and -3's
+base moved from 269 and 96 (read 2026-11-01; main had grown to 272 and 128 by 2026-11-13,
+the lamp's heat being one more field carried since 38f-1, with the bars left behind) to 270 and 64,
+each bar the same removal as before taken off the new total (at most 239, 320 and 184, were
+270, 351 and 215). `npm run liquids`
+and `npm run physics` pour and read the plate with it.
+
+With it, 14ab-11's first parts (`npm run frameuploads`): a press, a lift, a bubble's press, a
+kick's hold and the bass's hand send the rows they wrote, 1.327 MB a step → 0.04 to 0.24 MB;
+the liquids' step with the GPU holding the liquids asks for the fold with no rows, 1.327 MB a
+step → 0.

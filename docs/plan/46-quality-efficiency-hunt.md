@@ -131,7 +131,10 @@ again ten times a second for three meters and a percentage.
   the laptop, 714 → 0 on the phone; no sound 531 → 1 and 65 → 0; story in
   `docs/plan-shipped.md`).
 - ~~**46g · The poured liquids' fields are carried only once something is poured**~~
-  (**shipped**, `npm run encode`, `physics`, `liquids`; story in `docs/plan-shipped.md`).
+  (**shipped**, `npm run encode`: a thin-gap step 400 dispatches, direct and indirect, → 334,
+  the open plate 500 → 494, and a liquid poured brings its carries back; `physics`,
+  `liquids`; with it 14ab-11's first parts, the uploads of a step with bubbles or music
+  1.33 MB → 0.04 to 0.24; story in `docs/plan-shipped.md`).
 - **46h · A ride and a fade still render the whole shell** (M; 14u names the fade). A MIDI
   fader tells React ten times a second and a Go fade thirty, each a render of every desk
   panel: 14.3 ms on the owner's Mac, more than half of it the commit (React 19 updates every
@@ -198,4 +201,15 @@ again ten times a second for three meters and a percentage.
   share the args name `'current grid'` with different values (`fluid/passes.ts`'s boil and
   thin-gap calls, `fluid.ts`'s open plate), so on the open plate `currentForces` reads Depth
   Drag as "boiling" whenever Depth Drag is above zero. Fixing it changes the picture there.
-
+- **46s · The lamp's heat is carried on every thin-gap step, heated or not** (S to M; found
+  2026-11-13 re-basing `encode`'s bars). `carryHeat` (38f-1, `src/gpu/fluid/passes.ts`) packs
+  the temperature, carries it through the colour's substeps and unpacks it on every thin
+  step that is not the boil's: 3 dispatches and 32 indirect of a 334 step, and a half-float
+  pair the size of the plate, at every look, though only a look whose lamp, hand or wax
+  heats the liquid has a temperature that is not the same everywhere. A uniform temperature
+  carried by a conserving carry is the same temperature, so the stage can wait behind a
+  flag its writers set, as 46g's does for the liquids. Not done with 46g because the
+  temperature has more than one writer (the lamp's floor, a held hand, the boil's hand-over,
+  a clear) and each has to be read; a missed one is heat that stands still. Checks:
+  `encode` (the step 35 lighter where nothing heats), `heat`, `plateboil`, `physics`,
+  `samelook`.

@@ -730,6 +730,7 @@ export class FluidInputs extends FluidPasses {
     this.run(pass, 'liquidSplat1', this.liquids1.write, [this.liquids1.read],
       this.arg('liquid splat 1', [x, y, radius, take, polar, 0, 0, 0]));
     this.liquids1.swap();
+    this.liquidsLive = true;
     pass.end();
     this.submit(enc);
   }
@@ -864,6 +865,7 @@ export class FluidInputs extends FluidPasses {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.speciesClears++;

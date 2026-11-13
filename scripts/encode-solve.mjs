@@ -48,22 +48,37 @@ import { ENCODE_OWED } from './encode-owed.mjs';
 /*
   Main's numbers, read by this file on 2026-11-01 at 512² under the lab
   (SwiftShader, the lab shard's adapter), the base the bars are fractions of.
-  The dispatches were 267 on 2026-10-24 (the plan's figure) and 269 here.
+  The dispatches were 267 on 2026-10-24 (the plan's figure) and 269 here;
+  270 since 2026-11-13 (below).
   The residuals, as printed: thin gap median 6.393e-2 of [8.43e-2 6.90e-2
   6.38e-2 6.32e-2 6.36e-2 6.39e-2], open plate 2.071e-3 of [1.99e-3 2.42e-3
   2.03e-3 2.07e-3 2.06e-3 2.72e-3]. The thin gap's solve is two warm-started
   V-cycles of a variable-coefficient operator and stops at about 6% of its
   right-hand side; the open plate's, two cold cycles twice a step, at 0.2%.
 */
-const MAIN_DISPATCHES = 269;
+const MAIN_DISPATCHES = 270;
 const MAIN_THIN_ZEROS = 14; // mgZero dispatches in a thin-gap step on main
 /*
-  And the indirect dispatches (the carries' substeps), 96 a thin step on main:
+  And the indirect dispatches (the carries' substeps), 64 a thin step on main:
   each owed line counts both, so work moved from one kind to the other is not
   a saving, and its bar is the plan's removal from the direct count (35% of
-  269 is 95; H2c-3's 14; H2c-2's 150) taken off main's total of 365.
+  270 is 95; H2c-3's 14; H2c-2's 150) taken off main's total of 334.
+
+  Read again 2026-11-13 with 46g, and why the base moved twice. It was 269
+  and 96 (365) on 2026-11-01. Main had since grown to 272 and 128 (400: the
+  lamp's heat is one more field carried through the thin gap, 38f-1's
+  carryHeat, a pack, 32 substeps and an unpack)
+  with the bars left where they were, 35 dispatches further off than the
+  plan's removals. Then 46g stopped carrying the two liquids' fields on a
+  plate nothing was poured on, which is this plate: 270 and 64 (334), 66
+  dispatches that were never any owed item's to remove. Left at 365, H2c-3's
+  dispatch clause would hold with nothing built (334 is under 351) and
+  H2c-1's would be 31 nearer; and each line's "what main makes" test (a total
+  within 2 of the base) would read 46g as a build that missed. So the base
+  is what main makes today and every bar is its own removal off that:
+  H2c-1 at most 239 (was 270), H2c-3 320 (was 351), H2c-2 184 (was 215).
 */
-const MAIN_TOTAL = 365;
+const MAIN_TOTAL = 334;
 const MAIN_RESIDUAL_THIN = 6.393e-2;
 const MAIN_RESIDUAL_OPEN = 2.071e-3;
 
