@@ -80,6 +80,8 @@ const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeIm
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
   'clearFilmDye',
+  // Nor the tank (PLAN 47n): whether the picture is a tank or the dish is the whole frame, never the beat's. Its feed, dye and nozzle are cords.
+  'tank',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
   // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).

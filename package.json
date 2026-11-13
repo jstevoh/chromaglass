@@ -220,6 +220,8 @@
     "soapplate": "PW_WEBGPU=1 node scripts/soapplate.mjs",
     "boil": "node scripts/boil.mjs",
     "soapgpu": "PW_WEBGPU=1 node scripts/soapgpu.mjs",
+    "tank": "node scripts/tank.mjs",
+    "tankgpu": "PW_WEBGPU=1 node scripts/tankgpu.mjs",
     "boilgpu": "PW_WEBGPU=1 node scripts/boilgpu.mjs",
     "plateboil": "node scripts/plateboil.mjs",
     "particles": "node scripts/particles.mjs",

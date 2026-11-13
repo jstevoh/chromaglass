@@ -49,7 +49,7 @@ import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
-import { soapFilmStep } from '../gpu/soapFilmPlate';
+import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -3427,7 +3427,7 @@ export class FluidSimulation {
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
       heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
       boilHolds: this.boilHolds,
-      ...soapFilmStep(settings, this.layerIndex),
+      ...besideStep(settings, this.layerIndex),
     };
   }
 
