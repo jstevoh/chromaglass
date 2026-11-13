@@ -25,6 +25,7 @@ import { mixBlendIndex, mixGrade, mixPositions } from '../lib/mixer';
 import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { SOAP } from '../lib/filmTable';
+import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
@@ -257,6 +258,18 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('benDay', clamp01(s.benDay ?? 0));
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('projectorFocus', clamp01(s.projectorFocus ?? 0.5));
+  /*
+    Glitter, the lens photographing it and the side lamp (PLAN 47e, 47d,
+    47b-side; lib/glint.ts). At 0 and 0 the lens pass does not run, and the
+    display is drawn as it was. Focus (projectorFocus) is the lens's focal
+    plane, a depth in the gap, for the specks as for the Becke lines.
+  */
+  pack.set('glitter', Number.isFinite(s.glitter) ? clamp01(s.glitter) : 0);
+  pack.set('lensStop', clamp(Number.isFinite(s.lensStop) ? s.lensStop : 4, 1.4, 22));
+  const side = Number.isFinite(s.sideLight) ? clamp01(s.sideLight) : 0;
+  pack.set('sideLight', side * SIDE_RADIANCE);
+  pack.set('sideColor', ...sideLampColour(Number.isFinite(s.sideLightHue) ? s.sideLightHue : 30));
+  pack.set('sideLamp', ...sideLampPlace(Number.isFinite(s.sideLightAngle) ? s.sideLightAngle : 160));
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));
@@ -498,7 +511,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
 
   // Into the chain's half floats nothing; into the camera's 8-bit texture
   // still a dither, or a dark ramp bands before the camera sees it.
-  pack.set('finishInMain', !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0);
+  const finishInMain = !ctx.postChain ? 1 : ctx.cameraOn ? 2 : 0;
+  pack.set('finishInMain', finishInMain);
+  // The lens pass lays this finish instead when it runs (gpu/glint.ts; WebGPUPlate.draw sets finishInMain to 0 for the display then).
+  pack.set('lensFinish', finishInMain);
 }
 
 /**

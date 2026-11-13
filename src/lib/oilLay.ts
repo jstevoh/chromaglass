@@ -14,6 +14,8 @@
  * single lavender disc within seconds (the Mac gallery at 12 s and 30 s).
  */
 
+import { OPEN_RIM } from './turntable';
+
 /** One body of oil: its middle and radius in plate units, and which of the look's dyes is in it. */
 export interface OilBody { x: number; y: number; r: number; dye: number }
 
@@ -75,6 +77,33 @@ export function clockGlassCell(x: number, y: number, n: number, bodies: readonly
   });
   const w = Math.exp(-((x - 0.5) ** 2 + (y - 0.5) ** 2) / (2 * WASH_SIGMA * WASH_SIGMA));
   return { oil, body, water: w >= 0.01 ? WASH_AMOUNT * w * (1 - oil) : 0, dye: body >= 0 ? BODY_DYE * oil : 0 };
+}
+
+/**
+ * Lay Clock Glass as seedPreset does (its 'clock-glass'). A clock-glass dish
+ * is coloured water and oil that will not mix: the water is the first dye,
+ * laid wide and deepest in the middle where the bowed glasses hold the most,
+ * and bodies of oil are laid over it across the dish, each with one of the
+ * other dyes in it. With Oil Bodies on (the look's) each body keeps its
+ * colour while it moves, and two only mix where they merge, as two dyed oils
+ * do. The oil is laid through `mix` only where the solver is there to take
+ * it; before it is, the colours still land, as spots in the water. Each cell
+ * as clockGlassCell lays it: a body's colour in its oil and nowhere else, the
+ * water's wash in what is left. `dye(x, y, amount, colour)` on the plate's
+ * `size` grid, the colour an index into the look's dyes.
+ */
+export function layClockGlass(
+  float: () => number, dyes: number, size: number,
+  mix: (x: number, y: number, r: number) => void,
+  dye: (x: number, y: number, amount: number, colour: number) => void,
+): void {
+  const bodies = clockGlassBodies(float, dyes);
+  for (const b of bodies) mix(b.x, b.y, b.r);
+  for (let y = 1; y < size - 1; y++) for (let x = 1; x < size - 1; x++) {
+    const cell = clockGlassCell((x + 0.5) / size, (y + 0.5) / size, size, bodies);
+    if (cell.water > 0) dye(x, y, cell.water, 0);
+    if (cell.dye > 0) dye(x, y, cell.dye, bodies[cell.body].dye);
+  }
 }
 
 /*
@@ -241,5 +270,108 @@ export function layLavaLamp(n: number, oil: (x: number, y: number, r: number) =>
   for (let y = 1; y < n - 1; y++) for (let x = 1; x < n - 1; x++) {
     const cell = lavaLampCell((x + 0.5) / n, (y + 0.5) / n, n);
     if (cell.dye > 0) dye(x, y, cell.dye);
+  }
+}
+
+/*
+  Foam Cells (PLAN 47z-5): a packed emulsion, oil cells pressed into
+  polygons with thin films of water between them, after a macro film of one
+  (`cosmo-packed-foam-cells` in the watch tool's library) and the cellular
+  networks that came up in five of the ten Microlab films (47, 2026-11-13).
+
+  What makes it a foam and not a crowd is how little water there is. A 2D
+  emulsion with more than about a sixth of its area water is wet: the drops
+  round up and the water collects in lanes between them (the jamming
+  fraction of discs in the plane, near 0.84). Under that the drops cannot
+  round up, because there is no water for the corners, so they press flat
+  against each other, and their tension pulls every meeting of films to
+  three at 120° (Plateau's laws, in the plane of the gap). The lab showed
+  both: with cells twenty grid cells across the films were a fifth of the
+  area and the cells rounded into a wet crowd in four seconds; with cells
+  fifty across they held as polygons and their junctions turned to 120°.
+
+  So the lay is the crowd pressed together, nothing more: drops at random
+  places a spacing apart (a Poisson disc, not a relaxed one, so the angles
+  they meet at are anything and the physics has to turn them), each a disc a
+  little bigger than its share, cut from its neighbours along the line where
+  their discs' powers are equal (the power diagram, where two pressed
+  circles meet) less a film of water FOAM_FILM grid cells thick. Four is the
+  thinnest Film Hold keeps (FILM_WGSL): two merged a pressed crowd into one
+  body in two seconds. The film is the field's own edge, tens of cells where
+  a real one is tens of nanometres (28k-2's shortcut (a)), and that is what
+  holds the cells to a size in grid cells, FOAM_CELL across, not in plate
+  units: at the app's 384² they are about a seventh of the plate, at the
+  lab's 256² a fifth.
+
+  The water carries the dye (the look's first colour, rust); the cells are
+  pale, each one tint of the others at a fraction of a drop's depth.
+*/
+export const FOAM_FILM = 4;
+export const FOAM_CELL = 50;
+export const FOAM_LEAST = 0.11;
+export const FOAM_OVERLAP = 0.8;
+export const FOAM_SPREAD = 0.2;
+export const FOAM_WASH = 0.6;
+export const FOAM_CELL_DYE = 0.35;
+
+/** One cell of the foam: where its drop was laid, its disc's radius and its colour (an index into the look's dyes, the water's 0 excepted). */
+export interface FoamSeed { x: number; y: number; r: number; dye: number }
+
+/** The foam's drops for one lay on an `n`-cell grid, from `float` (a seeded stream). */
+export function foamSeeds(float: () => number, dyes: number, n: number): FoamSeed[] {
+  const d = Math.max(FOAM_LEAST, FOAM_CELL / n);
+  const others = Math.max(1, dyes - 1);
+  const out: FoamSeed[] = [];
+  // Past the plate's edge by a spacing, so the cells along the rim are cut by neighbours too.
+  for (let t = 0; t < 6000; t++) {
+    const x = -d + (1 + 2 * d) * float(), y = -d + (1 + 2 * d) * float();
+    if (out.some((q) => (q.x - x) ** 2 + (q.y - y) ** 2 < d * d)) continue;
+    out.push({ x, y, r: FOAM_OVERLAP * d * (1 + FOAM_SPREAD * (2 * float() - 1)), dye: 1 + Math.floor(float() * others) });
+  }
+  return out;
+}
+
+/** What one grid cell of the foam is laid with: its oil (0..1) and whose cell it is (−1 in the water). */
+export function foamCell(x: number, y: number, n: number, seeds: readonly FoamSeed[]): { oil: number; cell: number } {
+  let b = -1, bp = Infinity, c = -1, cp = Infinity;
+  for (let k = 0; k < seeds.length; k++) {
+    const q = seeds[k], p = (x - q.x) ** 2 + (y - q.y) ** 2 - q.r * q.r;
+    if (p < bp) { c = b; cp = bp; b = k; bp = p; } else if (p < cp) { c = k; cp = p; }
+  }
+  if (b < 0 || bp >= 0) return { oil: 0, cell: -1 };
+  const q = seeds[b];
+  const disc = Math.max(0, Math.min(1, (q.r - Math.hypot(x - q.x, y - q.y)) * n + 0.5));
+  let cut = 1;
+  if (c >= 0) {
+    // the distance to the line where the two discs' powers are equal
+    const w = seeds[c], dist = (cp - bp) / (2 * Math.hypot(q.x - w.x, q.y - w.y));
+    cut = Math.max(0, Math.min(1, (dist - FOAM_FILM / (2 * n)) * n + 0.5));
+  }
+  // and a film's width inside the dish's open rim, where the plate's water goes on out over the edge
+  const rim = Math.max(0, Math.min(1, (OPEN_RIM - FOAM_FILM / (2 * n) - Math.hypot(x - 0.5, y - 0.5)) * n + 0.5));
+  const oil = disc * cut * rim;
+  return { oil, cell: oil > 0.5 ? b : -1 };
+}
+
+/**
+ * Lay Foam Cells as seedPreset does (its 'foam-cells'): the oil at the
+ * solver's own `n`, since the film is four of its cells whatever the plate's
+ * size, through `oil` (the solver's layOil); the dye at the plate's `size`
+ * through `dye(x, y, amount, colour)`, the colour an index into the look's
+ * dyes. The water's rust wherever the oil is not; each cell its pale tint.
+ * The tension then turns the junctions to 120°, Film Hold keeps the films and
+ * Oil Bodies the colours apart.
+ */
+export function layFoamCells(
+  float: () => number, dyes: number, n: number, size: number,
+  oil: (cell: (x: number, y: number, m: number) => number) => void,
+  dye: (x: number, y: number, amount: number, colour: number) => void,
+): void {
+  const seeds = foamSeeds(float, dyes, n);
+  oil((x, y, m) => foamCell(x, y, m, seeds).oil);
+  for (let y = 1; y < size - 1; y++) for (let x = 1; x < size - 1; x++) {
+    const c = foamCell((x + 0.5) / size, (y + 0.5) / size, n, seeds);
+    if (c.oil < 1) dye(x, y, FOAM_WASH * (1 - c.oil), 0);
+    if (c.cell >= 0) dye(x, y, FOAM_CELL_DYE * c.oil, seeds[c.cell].dye);
   }
 }

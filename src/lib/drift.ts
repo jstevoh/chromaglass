@@ -187,6 +187,21 @@ const NOT_THE_LOOK = new Set([
     without (PLAN 10-8d-3).
   */
   'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  /*
+    The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
+    photographer's: what is in the dish, the stop the lens is set to, and a
+    lamp put down beside it. A wander would pour glitter in and out of a look
+    or walk a lamp round the dish under nobody's hand, and leaving them out
+    keeps the pool, and so Evolve's pace, as it was (PLAN 10-8d-3).
+  */
+  'glitter', 'lensStop', 'sideLight', 'sideLightHue', 'sideLightAngle',
+  /*
+    The tank's side view (PLAN 47n) for the same reason: Tank is whether the
+    picture is a tank at all, and its nozzle, feed and dye are the
+    performer's hand on it. Left out of the pool, Evolve reaches for the
+    dials it reached for before (they were not in it, being new).
+  */
+  'tank', 'tankFeed', 'tankWeight', 'tankNozzle', 'tankDrain', 'tankHue',
   // The mixer is the operator's desk: a grade that wandered on its own would
   // be a film going grey under nobody's hand.
   ...MIX_KEYS.map(String),

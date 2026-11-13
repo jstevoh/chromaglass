@@ -803,6 +803,29 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Film Angle" field="soapFilmAngle" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmAngle') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
+          {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
+          <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.glitter ?? 0) > 0.001 && (
+            <Slider label="Lens Stop" field="lensStop" step={0.1} format={(v) => `f/${v.toFixed(1)}`} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          <Slider label="Side Light" field="sideLight" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.sideLight ?? 0) > 0.001 && (
+            <>
+              <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
+          {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
+          <Slider label="Tank" field="tank" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.tank ?? 0) > 0.001 && (
+            <>
+              <Slider label="Feed" field="tankFeed" step={0.1} format={(v) => `${v.toFixed(1)} cm/s`} value={value('tankFeed') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Dye Weight" field="tankWeight" step={0.05} format={(v) => `${v.toFixed(2)}%`} value={value('tankWeight') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Nozzle" field="tankNozzle" step={0.01} format={(v) => `${Math.round(v * 100)}%`} value={value('tankNozzle') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Drain" field="tankDrain" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tankDrain') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Glow Hue" field="tankHue" step={1} format={(v) => `${Math.round(v)}°`} value={value('tankHue') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
           {/*
             And, by the same rule, Pushes Dye only while there is ferrofluid
             on the plate to do the pushing.
