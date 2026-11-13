@@ -1436,7 +1436,7 @@
     },
     {
       "name": "Glitter, the lens and the side lamp",
-      "shard": "lab4",
+      "shard": "lab5",
       "run": "npm run glint",
       "timeout": 12,
       "why": [
@@ -1448,7 +1448,11 @@
         "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
         "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
         "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
-        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye.",
+        "In lab5, not lab4: on the PR 807 run of 2026-11-13 lab4 (encode, this, shaderdials,",
+        "bubbleair, holeline) was cancelled at its 25 minutes inside holeline, the",
+        "sixteen minutes before it green; this check ran 5 min 41 s of them, and lab5",
+        "holds only tankgpu (95 s) except when samelook is asked."
       ]
     },
     {
