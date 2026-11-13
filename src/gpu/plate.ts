@@ -188,7 +188,7 @@ export class WebGPUPlate {
       // in this order, and it is the longest compile of the show's opening
       // (`gpu/prepare.ts`).
       cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
-      ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
+      ...(['packDye', 'packDyeBodies', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
       // The lens pass (glitter, the side lamp; PLAN 47e): behind the show, as no look opens with it.
@@ -343,7 +343,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -406,10 +406,22 @@ export class WebGPUPlate {
       }
     }
     for (let i = 0; i < fields.length; i++) {
-      const pipeDye = this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
+      /*
+        Where the oil carries its own colour (Oil Bodies), a cell part oil
+        and part water lets through the two liquids' light side by side, not
+        one through the other (packDyeBodies, PLAN 47z-1). The oil's share
+        and the mix are on the dye's grid (bodyPartition reads all three).
+      */
+      const { oilDye, mix } = fields[i];
+      const bodies = !!oilDye && !!mix && oilDye.width === fields[i].dye.width && mix.width === fields[i].dye.width;
+      const pipeDye = bodies
+        ? this.pipelines.computePipeline('packDyeBodies', PACK_KERNELS.packDyeBodies)
+        : this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
       if (pipeDye) {
         packPass.setPipeline(pipeDye);
-        packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, this.layers[i].dye]));
+        packPass.setBindGroup(0, groupOf(this.device, pipeDye, bodies
+          ? [this.packArgs, fields[i].dye, oilDye!, mix!, this.layers[i].dye]
+          : [this.packArgs, fields[i].dye, this.layers[i].dye]));
         packPass.dispatchWorkgroups(groups, groups);
       }
       if (i === 0 && height) continue;
@@ -489,7 +501,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -522,7 +534,7 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null; oilDye?: GPUTexture | null; mix?: GPUTexture | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,

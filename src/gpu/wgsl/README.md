@@ -34,7 +34,7 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 - `filmDye.ts`: `FILM_DYE_WGSL` (`filmDyeThrough`, Beer–Lambert over the clear film's thickness above its precursor; `filmDyePaint`, the same on the black ground) and `FILM_DYE_DEPTH`; built into the plate shader after `TRANSMIT_WGSL`; `npm run lace` 8 checks it (PLAN 20b-13).
 - `fluid/`: the solver's kernels, one file a pass.
 - `output.ts`, `outputFields.ts`: projector pass.
-- `pack.ts`: fields to the 8-bit plate (`PACK_KERNELS`).
+- `pack.ts`: fields to the 8-bit plate (`PACK_KERNELS`); where Oil Bodies keeps the oil's share, `packDyeBodies` lets a part-oil cell's two liquids pass the light side by side, at the composite's rest path `DYE_PATH` (PLAN 47z-1; `npm run dropcolour`).
 - `particles.ts`: particle dye.
 - `fineDye.ts`: the closeup's fine dye (PLAN 47a): `FINE_ADVECT_WGSL`, `FINE_REDUCE_WGSL`, `FINE_DETAIL_WGSL`, `FINE_LAYOUT`, `FINE_EPS`, `FINE_MOST`. `fineWindow.ts`: `FINE_WINDOW_WGSL`, how the plate multiplies the grid's dye by it (`fineRaw`, read through `U.fineWin`/`U.fineTurn`).
 - `post.ts`, `postFields.ts`: post chain.

@@ -61,6 +61,8 @@ type Lab = {
   kept?: WebGPUPlate;
   keptReady?: boolean;
   dyeAdd: Float32Array; velAdd: Float32Array; mul: Float32Array;
+  /** The oil's own colour in the dye laid since the last flush (addOilDye), or null. */
+  oilAdd?: Float32Array | null;
   /** The hands laid this step (layFinger), or null with none down. */
   hands: Float32Array | null;
   /** A Blow's breath laid this step (layBreath), or null with none. */
@@ -130,6 +132,17 @@ const api = {
     const { dyeAdd } = lab!;
     if (data.length !== dyeAdd.length) throw new Error(`addDye: ${data.length} values for a ${dyeAdd.length}-value plate`);
     for (let k = 0; k < dyeAdd.length; k++) dyeAdd[k] += data[k];
+  },
+  /**
+   * Dye laid in the oil as its own colour, as a look's lay lays it
+   * (FluidSimulation.addOilDensity, PLAN 47z-1): L × L × 4 like addDye, added
+   * to the dye and told to the solver as the oil's on the next flush.
+   */
+  addOilDye(data: number[]) {
+    const l = lab!;
+    if (data.length !== l.dyeAdd.length) throw new Error(`addOilDye: ${data.length} values for a ${l.dyeAdd.length}-value plate`);
+    if (!l.oilAdd) l.oilAdd = new Float32Array(l.dyeAdd.length);
+    for (let k = 0; k < data.length; k++) { l.dyeAdd[k] += data[k]; l.oilAdd[k] += data[k]; }
   },
   /**
    * The oil's share of the dye (Oil Bodies), cell for cell: N × N × 4,
@@ -209,8 +222,8 @@ const api = {
   carrySubsteps: CARRY_SUBSTEPS,
   flush(dt = BASE.dt) {
     const l = lab!;
-    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap);
-    l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1);
+    l.solver.applyDeltas(l.dyeAdd, l.velAdd, l.mul, dt, l.hands, l.breath, l.sheetGap, null, l.oilAdd ?? null);
+    l.dyeAdd.fill(0); l.velAdd.fill(0); l.mul.fill(1); l.oilAdd = null;
     l.hands = null; l.breath = null; l.sheetGap = null;
   },
   /**
@@ -804,7 +817,7 @@ const api = {
     // and be 0, which a check of the flat dye beside a hole would take for the
     // mask not being there. Say so instead.
     if (cam.airField && !(l.solver as unknown as { air?: { field: GPUTexture } }).air?.field) throw new Error('lab.render: the air field asked for, but the solver has no air');
-    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: l.solver.fineDetail, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm };
+    const layer = { dye: l.solver.fields.dye, velForced: l.solver['velForced'], grain: cam.grain ? l.solver.grainTexture : null, particles: l.solver.fineDetail, air: (cam.bubbles ?? 0) > 0 || cam.airField ? (l.solver as unknown as { air?: { field: GPUTexture } }).air?.field ?? null : null, view: cam.view === false ? null : l.solver.fields.view, species: l.solver.fields.species, soapFilm: l.solver.fields.soapFilm, oilDye: l.solver.fields.oilDye, mix: l.solver.fields.mix };
     const layers = cam.backPlate ? [layer, { ...layer, air: null }] : [layer];
     /*
       With sources, the wall goes to a texture as the app's does when a
