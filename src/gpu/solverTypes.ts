@@ -318,6 +318,8 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
+  layOil?(oil: (x: number, y: number, n: number) => number): void;
   /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
