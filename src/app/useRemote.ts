@@ -26,19 +26,24 @@ import { useSoundNow, askSound } from './soundNow';
 import { usePlayerNow, askMusic } from './musicNow';
 import { useEarNow, askEar } from './earNow';
 import { useRecordNow, askRecord } from './recordNow';
+import { useMediaNow, askMedia } from './mediaNow';
+import { useOutputsNow, askOutputs } from './outputsNow';
+import { useProjectorNow, askProjector } from './projectorNow';
+import { useDeskNow, askDesk } from './deskNow';
 import { useTempoNow, askTempo, askLink } from './tempoNow';
-import { useSetNow, askSet } from './setNow';
+import { useSetNow, askSet, armSetItem } from './setNow';
 import { useSongsNow, askSongs } from './songShowNow';
 import { livePresetId } from '../presets';
 import { assistantLook } from '../lib/assistantLook';
 import { parseSongAction } from '../lib/songShows';
 import { addSongCue } from './songCue';
-import { takePourText } from '../lib/pourText';
+import { rowsCaption, takePourText } from '../lib/pourText';
 import { useInkTitle } from './useInkTitle';
 import { setSongTitleSink } from './songTitle';
 import { parseSongCaption, showSongCaption } from '../lib/songCaption';
 import { mountSongCaptionLayer } from '../components/songCaptionLayer';
 import { useLogoMelt } from './useLogoMelt';
+import { tvAtHome } from '../components/CastNetworkItems';
 
 /**
  * The phone remote (`hooks/useRemoteLink.ts`, `lib/remoteProtocol.ts`): the
@@ -129,28 +134,26 @@ export function useRemote({
   /*
     The Live Show's titles (PLAN 37x-10): when the identified song changes
     and the Title switch is on (the phone's, beside the controls below, or
-    the desk's Logo & Titles), its name is poured as ink and the wash takes
-    it. Here beside the remote's `pour-text` message, the other way a title
-    reaches the plate in a set, so the two are read in one place.
+    the desk's Logo & Titles), its credit goes up as the corner caption.
+    Here beside the remote's `pour-text` and `song-title` messages, the
+    other ways a title reaches the show in a set, so they are read in one
+    place.
   */
   useInkTitle(wallRef, musicIntel.state.track, settings.inkTitle);
   /*
-    How a title goes up, wherever it came from (app/songTitle.ts, 37x-10j):
-    the corner caption unless `titleCaption` is off, then the ink as before.
-    The setting is read through a ref when the title is due, so turning it
-    over mid-song does not put a second title up. The caption's screen layer
-    lives as long as this hook does; the stream draws its own copy.
+    How a title goes up, wherever it came from (app/songTitle.ts): the corner
+    caption (37x-10j), always. The ink was the other choice until 2026-11-12,
+    when the owner shelved it (PLAN 37x-10m: "this poured option never really
+    worked"); the `titleCaption` setting that chose went with it, so a show
+    saved with the ink chosen still gets the caption.
+    The caption's screen layer lives as long as this hook does; the stream
+    draws its own copy.
   */
-  const titleCaptionRef = useRef(settings.titleCaption);
-  titleCaptionRef.current = settings.titleCaption;
   useEffect(() => {
-    setSongTitleSink((card, ink) => {
-      if (titleCaptionRef.current !== false) showSongCaption(card);
-      else wallRef.current?.pourText(ink.rows, ink.colour ? { colour: ink.colour } : undefined);
-    });
+    setSongTitleSink((card) => showSongCaption(card));
     const unmount = mountSongCaptionLayer();
     return () => { setSongTitleSink(null); unmount(); };
-  }, [wallRef]);
+  }, []);
   // The logo poured and melted as a film starts (PLAN 37x-11): the stream on air, or a Record take.
   useLogoMelt(wallRef, { live: liveShow.phase === 'live', recording: recorder.recording }, !!settings.logoMelt);
   // Each destination's health too (PLAN 44j), rounded to what a reader acts
@@ -171,6 +174,10 @@ export function useRemote({
   const player = usePlayerNow();
   const ear = useEarNow();
   const record = useRecordNow();
+  const media = useMediaNow();
+  const outputs = useOutputsNow();
+  const projector = useProjectorNow();
+  const desk = useDeskNow();
   const tempo = useTempoNow();
   // The bench, for the state: it re-sends when a bottle changes (PLAN 44k-6).
   const bench = useMemo<RemoteState['bench']>(() => ({
@@ -192,6 +199,23 @@ export function useRemote({
     const armed = setNow.armedItem ? setNow.list.items.findIndex(i => i.id === setNow.armedItem) : -1;
     return { name: setNow.list.name, items, armed: armed >= 0 ? armed + 1 : null, fadeSeconds: setNow.fadeSeconds };
   }, [setNow, sequencer.sequences, allPresets]);
+  /*
+    The same set and shows as the phone controller lists them (PLAN 12-ctl-1):
+    rows by id with the desk's names, and what is on stage, armed and running
+    as the desk has it, so the phone's marks follow the laptop and never the
+    phone's own tap.
+  */
+  const setList = useMemo<RemoteState['setList']>(() => ({
+    name: setNow.list.name,
+    items: setNow.list.items.map((item, i) => ({ id: item.id, name: set?.items[i]?.name ?? item.ref })),
+    liveId: setNow.liveItem,
+    cuedId: setNow.armedItem,
+  }), [setNow, set]);
+  const songList = useMemo<RemoteState['songs']>(() => ({
+    shows: songs.shows.map(s => ({ id: s.id, title: s.title })),
+    runningId: songs.running?.showId ?? null,
+    follow: songs.follow,
+  }), [songs]);
   const remoteState = useMemo<RemoteState>(() => ({
     settings,
     activePresetId,
@@ -224,11 +248,16 @@ export function useRemote({
     bench,
     tempo,
     set,
+    setList,
+    songs: songList,
     songShows: songs,
     player,
     ear,
     record,
-  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, songs, player, ear, record]);
+    media,
+    outputs,
+    projector, desk,
+  }), [settings, activePresetId, isActive, isAutomated, overlaysVisible, musicIntel.state.track?.title, sequencer.status, sequencer.sequences, sequencer.selectedId, allPresets, blackout, recorder.recording, recorder.seconds, cued, fadeSeconds, filmSource, markLoaded, rowFading, live, liveSetup, sound, bench, tempo, set, setList, songList, songs, player, ear, record, media, outputs, projector, desk]);
 
   // Patches from a phone arrive at the rate of a thumb on a slider; apply
   // them in batches so the show isn't re-rendered thirty times a second.
@@ -278,6 +307,8 @@ export function useRemote({
   // TVs at home showing the plate (PLAN 12-tv), and how many, for the cast menu.
   const tvFeedRef = useRef<TvFeedSender | null>(null);
   const [tvCount, setTvCount] = useState(0);
+  // TVs asking to pair by four digits, and how many hold a key (PLAN 12-tv-2).
+  const [tvPairing, setTvPairing] = useState<{ asks: { id: string; code: string }[]; paired: number }>({ asks: [], paired: 0 });
   const linkAskedRef = useRef(-Infinity);
   /*
     Live's play and stop, when the operator asked for them (PLAN.md
@@ -320,8 +351,14 @@ export function useRemote({
         case 'tv-signal':
           if (message.from) void tvFeedRef.current?.signal(message.from, message.signal);
           break;
+        case 'tv-pairing':
+          setTvPairing({ asks: message.asks, paired: message.paired });
+          break;
         case 'tv-show':
+        case 'tv-looks':
           break;   // the relay's word to a TV, never a display's
+        case 'tv-pick':
+          break;   // a TV's to the relay, which hands the display a `preset` (server/tv-remote.js)
         case 'patch':
           queuePatch(message.settings);
           break;
@@ -344,8 +381,13 @@ export function useRemote({
           void startSavedLive(message.test === true, Array.isArray(message.names) ? message.names.filter((n): n is string => typeof n === 'string') : undefined).catch(() => { /* the panel and liveSetup say why */ });
           break;
         case 'assistant-sound': {
-          const why = askSound(message.source);
-          if (why) console.warn(`The assistant's sound source: ${why}`);
+          // With the microphone's input by name since 44k-12, answered once
+          // the source has opened or failed, so an input unplugged since the
+          // guard's copy, or one another app holds, comes back as why.
+          void askSound(message.source, message.device).then((why) => {
+            if (why) console.warn(`The assistant's sound source: ${why}`);
+            answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
+          });
           break;
         }
         // A still for the assistant to judge detail by (PLAN 44c-4), and a
@@ -400,6 +442,24 @@ export function useRemote({
         case 'assistant-songs':
           answer(message.answer, askSongs(message));
           break;
+        /*
+          The phone controller's Songs screen (PLAN 12-ctl-1), through the same
+          doors: a set row armed by its id, a song's show run or stopped, and
+          the Songs panel's Follow songs switch. The phone gets no answer: it
+          reads the result in the next state, as every other control does.
+        */
+        case 'cue-set-item':
+          if (typeof message.id === 'string') armSetItem(message.id);
+          break;
+        case 'song-run':
+          if (typeof message.id === 'string') askSongs({ do: 'start', show: message.id });
+          break;
+        case 'song-stop':
+          askSongs({ do: 'stop' });
+          break;
+        case 'song-follow':
+          if (typeof message.on === 'boolean') askSongs({ do: 'follow', on: message.on });
+          break;
         // The music player (PLAN 44k-2, app/musicNow.ts), answered as the set list is.
         case 'assistant-music': {
           const why = askMusic(message);
@@ -418,19 +478,41 @@ export function useRemote({
           answer(message.answer, why ? { ok: false, reason: why } : { ok: true });
           break;
         }
+        // Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts), answered once a camera or window opened.
+        case 'assistant-media':
+          void askMedia(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
+          break;
+        // OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts), answered once MIDI has opened or failed.
+        case 'assistant-outputs':
+          void askOutputs(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
+          break;
+        // The projector and the wall (PLAN 44k-15, app/projectorNow.ts), answered once the show's window opened or did not.
+        case 'assistant-projector':
+          void askProjector(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
+          break;
+        // The desk: its tabs and panels, the pins, the palette lock and what is in the hand (PLAN 44k-16, 44k-17, app/deskNow.ts).
+        case 'assistant-desk':
+          void askDesk(message).then((why) => answer(message.answer, why ? { ok: false, reason: why } : { ok: true }),
+            (err) => answer(message.answer, { ok: false, reason: `the show could not: ${String(err)}` }));
+          break;
         /*
-          Words poured as ink (PLAN 37x-10c): a song's name at the top of a
-          track, from the phone's text box or the relay's guard. Read as
-          untrusted whoever sent it, and one pour per POUR_TEXT_GAP_MS at
-          most (lib/pourText.ts `takePourText`), since a pour adds dye and a double tap
-          would stack the same words into a blot.
+          Words from the phone's box, the relay's guard or the assistant's
+          `pour_text` (PLAN 37x-10c), shown as the corner caption since the
+          ink was shelved (37x-10m, lib/pourText.ts `rowsCaption`): the
+          message is kept so a sender one build older still gets its title
+          up. Read as untrusted whoever sent it, and one per POUR_TEXT_GAP_MS
+          at most (`takePourText`), as before.
         */
         case 'pour-text': {
           const t = performance.now();
           const pour = takePourText(message, t, lastPourTextRef.current);
           if (!pour) break;
           lastPourTextRef.current = t;
-          wallRef.current?.pourText(pour.rows, { colour: pour.colour });
+          const card = rowsCaption(pour.rows);
+          if (card) showSongCaption(card);
           break;
         }
         /*
@@ -438,9 +520,7 @@ export function useRemote({
           album and label from the phone, the show server's conductor or the
           assistant, for a set the ear cannot name (files played on the Mac).
           Read as untrusted (lib/songCaption.ts `parseSongCaption`); a new
-          card replaces the last, so a double send shows one card. Always the
-          caption, whatever `titleCaption` says: words poured as ink have
-          their own message, `pour-text`, above.
+          card replaces the last, so a double send shows one card.
         */
         case 'song-title': {
           const card = parseSongCaption(message);
@@ -579,6 +659,8 @@ export function useRemote({
           `lights` and `state` this display *sends*: the first a few lines
           down from here, the second from the hook.
           `cast` is the mirror's, and `CastDisplay` has it.
+          `tv-code` and `tv-key` are a pairing TV's (TvDisplay); `tv-allow`,
+          `tv-refuse` and `tv-forget` this display sends (PLAN 12-tv-2).
         */
         case 'hello':
         case 'denied':
@@ -594,6 +676,11 @@ export function useRemote({
         case 'assistant-reply':
         case 'assistant-undo':
         case 'assistant-answer':
+        case 'tv-code':
+        case 'tv-key':
+        case 'tv-allow':
+        case 'tv-refuse':
+        case 'tv-forget':
           break;
         default: unhandled('a message from the phone', message);
       }
@@ -635,8 +722,12 @@ export function useRemote({
     return () => { t.onLinkSwitch = null; };
   }, [tempoRef, remoteSend]);
 
+  // What the cast menu and the pairing card hold: the TVs watching, asking
+  // and paired, and the laptop's three answers to them.
+  const tv = useMemo(() => tvAtHome(tvCount, tvPairing, remoteSend), [tvCount, tvPairing, remoteSend]);
+
   return {
     remoteLink,
-    tvCount,
+    tv,
   };
 }

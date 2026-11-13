@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Lava Lamp's wax is a liquid of its own (PLAN 27f-9c): bodies that hold
- * together in a clear liquid, heavy while cold, lifted by the lamp. Measured
+ * together in a clear liquid, heavy while cold (that the lamp then lifts it
+ * is `npm run lavacycle`'s, on the Mac). Measured
  * on the GPU solver alone (scripts/lab.mjs), on the look's own settings and
  * the wax the app lays (src/lib/oilLay.ts, LAVA_BODIES).
  *
@@ -37,19 +38,18 @@
  *      share still there over the first three seconds (the mean of one sample
  *      a second) is at least 15 points less at the look's Oil Weight than at
  *      Oil Weight 0, where only the colour's own weight (Dye Weight) pulls it.
- *   3. The lamp holds the wax up: after six seconds the oil's centre of mass
- *      is at least 0.06 of the plate's height above the same plate's with the
- *      heat taken off every step (Heat Decay near 0, where the cold wax lies
- *      on the floor), and at least 0.01 above a lab built with the oil's
- *      swelling taken out (OIL_EXPAND never reaches the shaders). Most of the
- *      lift is the lamp's heat laid in the wax, lifting it as it lifts warm
- *      water; the swelling's share, measured when this was written, was 0.02
- *      (0.23 against 0.21), and the bar is half of it. Measured
- *      against those plates and not against the lay: the bodies laid high fall first, so a rise from the
- *      lay is not what the plate does. Not asserted, because the solver does
- *      not do it yet: the full cycle, wax rising to the top and falling again
- *      (PLAN 27f-9e; today it settles as a low sheet over the lamp). A line
- *      for the cycle belongs to that item.
+ *   The lamp lifting the wax was this check's third line (after six seconds
+ *   the oil's centre of mass 0.06 of the height above a plate with its heat
+ *   taken off, and 0.01 above a lab built without the oil's swelling). It read
+ *   a kick laid in the wax alone, which lifted it within seconds. The lamp is
+ *   a warm glass floor now (PLAN 27f-9h), which heats water and wax alike by
+ *   conduction: wax laid cold sinks for ten seconds before it has warmed, and
+ *   at six the lamp has done nothing yet (0.175 against 0.162 and 0.164). The
+ *   line and its no-swelling lab moved to `npm run lavacycle` (its lines 3
+ *   and 4), which watches the first minute on the Mac's GPU: 0.60 of the
+ *   height at 23 s with the lamp, 0.13 with the warm floor or the swelling
+ *   taken out. Twenty-three seconds of three plates is a quarter of an hour
+ *   more on SwiftShader, which this part does not have.
  *   And any GPU validation error fails the run; a seal that never builds, a
  *   missing mix, a look key that is not a number or oil lost from the plate
  *   stops the run with an error rather than measuring something else.
@@ -59,9 +59,10 @@
  * the stirring), not the lab's defaults.
  *
  * No canvas, so it runs on any adapter that computes (PW_WEBGPU=1 on Linux).
- * About ten minutes on SwiftShader, in a measure part of its own (lab8).
+ * One lab and 15 seconds of the plate, in a measure part of its own (lab8):
+ * it was two labs and 27 seconds, about ten minutes on SwiftShader, while it
+ * carried the lamp's line.
  */
-import { readFileSync } from 'node:fs';
 import { openLab } from './lab.mjs';
 
 const checks = [];
@@ -71,20 +72,6 @@ const check = (name, ok, detail = '') => {
 };
 
 const SECONDS = 6, EARLY = 3;
-const EXPAND = 'f[53] = OIL_EXPAND;';
-// The swelling taken out: the one line that hands OIL_EXPAND to the shaders writes 0, so warmed oil lifts as the water does and no more.
-const NO_SWELL = {
-  name: 'no-swell',
-  setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]fluid\.ts$/ }, (a) => {
-      const s = readFileSync(a.path, 'utf8');
-      const found = s.split(EXPAND).length - 1;
-      if (found !== 1) throw new Error(`lavawax: the no-swell control found ${found} of 1 swelling lines in src/gpu/fluid.ts`);
-      return { contents: s.replace(EXPAND, 'f[53] = 0;'), loader: 'ts' };
-    });
-  },
-};
-
 const gpuErrors = [];
 async function inLab(opts, runs) {
   const lab = await openLab(opts);
@@ -175,10 +162,8 @@ const plain = await inLab({}, {
   oil: { over: {} },
   bodiesOff: { over: { oilBodies: 0 } },
   weightless: { over: { oilWeight: 0 }, seconds: EARLY },
-  cold: { over: { heatDecay: 0.0001 } },
 });
-const swell = await inLab({ plugins: [NO_SWELL], tag: 'no-swell' }, { noSwell: { over: {} } });
-const r = { ...plain.r, ...swell.r };
+const r = plain.r;
 
 const pct = (v) => `${(100 * v).toFixed(0)}%`;
 const end = (k) => r[k].at(-1);
@@ -194,18 +179,8 @@ check('the colour stays in the wax: at least 70% of the dish clear, and at least
   check(`cold wax is heavy: over the first ${EARLY} s at least 15 points less of the oil laid above 0.7 of the height stays there at the look's Oil Weight than at 0`,
     look <= zero - 0.15, `${pct(look)} stays at the look's Oil Weight, ${pct(zero)} at Oil Weight 0`);
 }
-// 3.
-{
-  const y = (k) => end(k).oilY;
-  // The control really is another program: the plain bundle hands the swelling to the shaders and the no-swell one does not.
-  const swells = (js) => /f\d*\[53\] = OIL_EXPAND\d*;/.test(js);
-  const other = swells(plain.js) && !swells(swell.js) && /f\d*\[53\] = 0;/.test(swell.js);
-  check(`the lamp holds the wax up: after ${SECONDS} s its centre of mass is 0.06 of the height above the plate's with no heat and 0.01 above the plate's with no swelling`,
-    other && y('oil') >= y('cold') + 0.06 && y('oil') >= y('noSwell') + 0.01,
-    `${other ? '' : 'the no-swell lab is the plain one; '}${y('oil').toFixed(3)} with the lamp (laid at ${f2(r.oil[0].oilY)}), ${y('cold').toFixed(3)} with no heat, ${y('noSwell').toFixed(3)} with no swelling`);
-}
 check('no GPU validation errors', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
-console.log(`\na second at a time: the oil's centre of mass ${r.oil.map((m) => f2(m.oilY)).join(' ')} (no swelling ${r.noSwell.map((m) => f2(m.oilY)).join(' ')}); colour in the bodies ${r.oil.map((m) => pct(m.inBody)).join(' ')}`);
+console.log(`\na second at a time: the oil's centre of mass ${r.oil.map((m) => f2(m.oilY)).join(' ')}; colour in the bodies ${r.oil.map((m) => pct(m.inBody)).join(' ')}`);
 
 const failed = checks.filter((c) => !c.ok);
 console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`);

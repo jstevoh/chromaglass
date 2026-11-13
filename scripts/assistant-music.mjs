@@ -224,8 +224,8 @@ export const MUSIC_MUTANTS = [
   { rule: 'music-real', file: 'assistantMusic.js', find: 'const found = real(asked);', replace: 'const found = real(asked) && asked;' },
   { rule: 'music-probe', file: 'assistantMusic.js', find: "? { reason: `no file at ${raw}` } : outside;", replace: "? { reason: `no file at ${raw}` } : { reason: `no file at ${raw}` };" },
   { rule: 'music-swap', file: 'assistantMusic.js', find: 'if (now && inside(now, f.folders.map(real).filter(Boolean)))', replace: 'if (now)' },
-  { rule: 'music-type', file: 'assistantMusic.js', find: 'if (!type) return { reason: `not a sound file', replace: 'if (false) return { reason: `not a sound file' },
+  { rule: 'music-type', file: 'assistantMusic.js', find: 'if (!type) return { reason: `not ${what}', replace: 'if (false) return { reason: `not ${what}' },
   { rule: 'music-length', file: 'assistantMusic.js', find: 'if (player?.length > 0 && s > player.length)', replace: 'if (false)' },
   { rule: 'music-answer', file: 'assistant.js', find: "send({ type: 'assistant-music', ...call.out, ...answerOf(message) });", replace: "send({ type: 'assistant-music', ...call.out });" },
-  { rule: 'phone-music', file: 'remote-server.js', find: "'assistant-songs', 'assistant-music']", replace: "'assistant-songs']" },
+  { rule: 'phone-music', file: 'remote-server.js', find: "'assistant-songs', 'assistant-music',", replace: "'assistant-songs'," },
 ];

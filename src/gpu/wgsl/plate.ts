@@ -2929,9 +2929,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     }
     // The BZ reaction in ferroin: red where the catalyst is reduced, blue
     // where the wave has oxidised it. The catalyst is in the whole dish, so
-    // the whole dish is red at rest: drawn only where a wave had been (either
-    // species over 0.0005), the dish was the look's own dye with red trails,
-    // the showreel's "muddy red-green marble".
+    // the whole dish is red at rest (drawn only where a wave had been, it was
+    // the showreel's "muddy red-green marble").
     if (U.bzShow > 0.001) {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
@@ -2946,10 +2945,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  // Thin Film, its rings read through a smooth spline (plateThinFilm.ts, 1i).
+  // Thin Film (1i), and the frame's soap film (32d): plateThinFilm.ts.
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
     outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
+  if (U.soapFilm > 0.001) { outColor = soapFilmOver(outColor, fuv0); }
 
   // ── The mixer: the front plate's grade and level ─────────────────
   // Its level fades the plate back to the bare lamp under it.

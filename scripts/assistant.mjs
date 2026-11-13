@@ -56,6 +56,12 @@ import { port } from './ports.mjs';
 import { MUSIC_MUTANTS, musicDir, musicFullLines, musicPageLines, musicPlayLines, standInPlayer } from './assistant-music.mjs';
 import { EAR_MUTANTS, earFullLines, earPageLines, earPlayLines, standInEar } from './assistant-ear.mjs';
 import { RECORD_MUTANTS, recordFullLines, recordPageLines, recordPlayLines, standInRecord } from './assistant-record.mjs';
+import { UPDATES_MUTANTS, updatesFullLines, updatesPlayLines } from './assistant-updates.mjs';
+import { SOUND_MUTANTS, soundFullLines, soundPageLines, standInSound } from './assistant-sound.mjs';
+import { MEDIA_MUTANTS, mediaDir, mediaFullLines, mediaPageLines, mediaPlayLines, standInMedia } from './assistant-media.mjs';
+import { OUTPUTS_MUTANTS, oscPort, outputsFullLines, outputsPageLines, outputsPlayLines, standInOutputs } from './assistant-outputs.mjs';
+import { PROJECTOR_MUTANTS, projectorFullLines, projectorPageLines, projectorPlayLines, projectorWaitLine, standInProjector } from './assistant-projector.mjs';
+import { DESK_MUTANTS, deskFullLines, deskPageLines, deskPlayLines, standInDesk } from './assistant-desk.mjs';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -106,7 +112,7 @@ async function startShow(serverDir, port, dir) {
   // The file is the switch here, so a CHROMAGLASS_ASSISTANT in the caller's
   // environment (which would win over it) is left out.
   mkdirSync(join(dir, 'dist'), { recursive: true });
-  const env = { ...process.env, REMOTE_DIST: join(dir, 'dist'), PORT: String(port), SHOW_KEY, SHOW_KEY_FILE: join(dir, 'key'), OSC_PORT: '0', CHROMAGLASS_ASSISTANT_FILE: modeFile, CHROMAGLASS_MUSIC_DIR: musicDir(dir) };
+  const env = { ...process.env, REMOTE_DIST: join(dir, 'dist'), PORT: String(port), SHOW_KEY, SHOW_KEY_FILE: join(dir, 'key'), OSC_PORT: '0', CHROMAGLASS_OSC_PORT: String(oscPort(port)), CHROMAGLASS_ASSISTANT_FILE: modeFile, CHROMAGLASS_MUSIC_DIR: musicDir(dir), CHROMAGLASS_MEDIA_DIR: mediaDir(dir) };
   delete env.CHROMAGLASS_ASSISTANT;
   const proc = spawn(process.execPath, [join(serverDir, 'remote-server.js')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
@@ -129,7 +135,7 @@ function standInDisplay(port, displayKey) {
      so none is here to leak), what the show hears, and the stream once a
      start reaches it, with each destination's health. */
   const stream = {
-    live: null, sound: { source: 'none', file: null },
+    live: null,
     setup: { destinations: [
       { name: 'YouTube', service: 'youtube', orientation: 'landscape', on: true, test: false, keyKept: true, urlValid: true },
       { name: 'Twitch', service: 'twitch', orientation: 'landscape', on: false, test: false, keyKept: true, urlValid: true },
@@ -165,11 +171,11 @@ function standInDisplay(port, displayKey) {
   const songs = { follow: true, running: null, current: 'show-a' };
   const player = standInPlayer();
   const ear = standInEar();
-  const rec = standInRecord();
+  const rec = standInRecord(), snd = standInSound(), med = standInMedia(), out = standInOutputs(), pj = standInProjector(), dk = standInDesk();
   const received = [];
   const ws = new WebSocket(`ws://127.0.0.1:${port}/remote-ws`, { headers: { Host: `127.0.0.1:${port}` } });
   let timer = null;
-  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: stream.sound, bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state(), ear: ear.state(), record: rec.state() } });
+  const state = () => ({ type: 'state', state: { settings: { ...settings }, activePresetId: look.on, isActive: true, isAutomated: false, overlaysVisible: true, trackName: TRACK, presets: [{ id: 'calm', name: 'Calm', macro: false, user: false }, { id: 'acid', name: 'Acid', macro: false, user: false }], fadeSeconds: 0.5, cuedPresetId: look.cued, cuedName: look.cued, live: stream.live, liveSetup: stream.setup, sound: snd.state(), bench: { ...bench }, tempo: { ...tempo, link: { ...tempo.link } }, sequencer: { ...seq }, set: { ...setl, items: setl.items.map((i) => ({ ...i })) }, songShows: { ...songs, shows: shows.map((x) => ({ id: x.id, song: x.song, actions: x.actions.length })) }, player: player.state(), ear: ear.state(), record: rec.state(), media: med.state(), outputs: out.state(), projector: pj.state(), desk: dk.state() } });
   const sendState = () => { if (timer) return; timer = setTimeout(() => { timer = null; if (ws.readyState === 1) ws.send(JSON.stringify(state())); }, 20); };
   const ready = new Promise((r) => ws.on('open', () => { ws.send(JSON.stringify({ type: 'hello', role: 'display', key: displayKey })); setTimeout(() => { ws.send(JSON.stringify(state())); r(); }, 100); }));
   ws.on('message', (data) => {
@@ -196,7 +202,6 @@ function standInDisplay(port, displayKey) {
       }, 1000);
     }
     if (m.type === 'action' && m.action === 'live-stop') { stream.live = null; sendState(); }
-    if (m.type === 'assistant-sound') { stream.sound = { source: m.source, file: null }; sendState(); }
     if (m.type === 'liquid' && bench.bottles.some((b) => b.id === m.id)) { bench.inHand = m.id; sendState(); }
     if (m.type === 'assistant-tempo') { if (m.do === 'bpm') { tempo.bpm = m.bpm; tempo.source = 'manual'; } if (m.do === 'heard') { tempo.bpm = 120; tempo.source = null; tempo.link.on = false; } sendState(); }
     // Link on leads the tempo, as lib/tempo.ts's source does once a session answers.
@@ -226,6 +231,11 @@ function standInDisplay(port, displayKey) {
     if (m.type === 'assistant-music') player.onMessage(m, answer, sendState);
     if (m.type === 'assistant-ear') ear.onMessage(m, answer, sendState);
     if (m.type === 'assistant-record') rec.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-sound') snd.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-media') med.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-outputs') out.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-projector') pj.onMessage(m, answer, sendState);
+    if (m.type === 'assistant-desk') dk.onMessage(m, answer, sendState);
     if (m.type === 'assistant-songs') {
       const find = (id) => shows.find((x) => x.id === (id ?? songs.current));
       if (m.do === 'read') { const x = find(m.show); answer(x ? { ok: true, data: x } : { ok: false, reason: `no song show "${m.show}"` }); return; }
@@ -325,7 +335,7 @@ async function scenario(serverDir, port, { full = true } = {}) {
     check('-', 'initialize answers with the protocol version and a guide', init.result?.protocolVersion === '2025-06-18' && /read_notes/.test(init.result?.instructions ?? ''), JSON.stringify(init.result ?? init.error).slice(0, 120));
     const listed = await mcp.request('tools/list', {});
     const names = (listed.result?.tools ?? []).map((t) => t.name);
-    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music', 'calibrate', 'song_detection', 'listen', 'record_options', 'take'];
+    const want = ['show_state', 'list_looks', 'get_settings', 'look_at_plate', 'read_notes', 'add_note', 'arm_look', 'arm_new_look', 'go', 'set', 'pour', 'blow', 'press', 'tilt', 'dye', 'sequencer', 'undo', 'show_action', 'play_look_now', 'add_song_action', 'pour_text', 'go_live', 'set_sound_source', 'bottle', 'finger', 'flick', 'tempo', 'link', 'set_list', 'back_plate', 'song_show', 'remove_song_action', 'song_show_run', 'nudge', 'play_track', 'music', 'calibrate', 'song_detection', 'listen', 'record_options', 'take', 'app_updates', 'film', 'pour_file', 'room_camera', 'mark'];
     check('-', 'tools/list offers every tool', want.every((n) => names.includes(n)), `missing: ${want.filter((n) => !names.includes(n)).join(', ') || 'none'}`);
     check('-', 'stdout carries nothing but protocol', mcp.strays.length === 0, mcp.strays.slice(0, 2).join(' | '));
 
@@ -578,6 +588,11 @@ async function scenario(serverDir, port, { full = true } = {}) {
     await musicPlayLines({ mcp, display, check });
     await earPlayLines({ mcp, display, check });
     await recordPlayLines({ mcp, display, check });
+    await updatesPlayLines({ mcp, display, check });
+    await mediaPlayLines({ mcp, display, check });
+    await outputsPlayLines({ mcp, display, check });
+    await projectorPlayLines({ mcp, display, check });
+    await deskPlayLines({ mcp, display, check });
 
     // Ten deep.
     await sleep(1100);
@@ -829,6 +844,12 @@ async function scenario(serverDir, port, { full = true } = {}) {
     // Calibrate, the song detector and Listen (PLAN 44k-10): scripts/assistant-ear.mjs.
     await earFullLines({ mcp, display, check, phone });
     await recordFullLines({ mcp, display, check, phone });
+    await updatesFullLines({ mcp, display, check, phone });
+    await soundFullLines({ mcp, display, check });
+    await mediaFullLines({ mcp, display, check, phone, port, dir });
+    await outputsFullLines({ mcp, display, check, phone, port });
+    await projectorFullLines({ mcp, display, check, phone });
+    await deskFullLines({ mcp, display, check, phone });
 
     // The switch turned off under it, mid-glide.
     const linked = await hello(port, 'assistant', SHOW_KEY);
@@ -911,11 +932,18 @@ const MUTANTS = [
   ...MUSIC_MUTANTS,
   ...EAR_MUTANTS,
   ...RECORD_MUTANTS,
+  ...UPDATES_MUTANTS,
+  ...SOUND_MUTANTS,
+  ...MEDIA_MUTANTS,
+  ...OUTPUTS_MUTANTS,
+  ...PROJECTOR_MUTANTS,
+  ...DESK_MUTANTS,
   { rule: 'still-phone', file: 'remote-server.js', find: "if (Date.now() - assistantWantsStill < 5000) broadcastTo('assistant', raw);\n      return;", replace: "broadcastTo('assistant', raw);" },
 ];
 
-function mutantDir(m) {
-  const dir = join(ROOT, 'scratch', 'assistant-mutants', m.rule);
+// Its own directory, by its place: two mutants of one rule in one directory test the second twice.
+function mutantDir(m, i) {
+  const dir = join(ROOT, 'scratch', 'assistant-mutants', `${i}-${m.rule}`);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   cpSync(join(ROOT, 'server'), join(dir, 'server'), { recursive: true, filter: (p) => !p.endsWith('.show-key') && !p.endsWith('.assistant') });
@@ -932,7 +960,7 @@ const failures = [];
 const say = (ok, line) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${line}`); if (!ok) failures.push(line); };
 
 // The room's keys: the relay's list against the page's.
-const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts';");
+const page = await pageModule("export { RIG_KEYS, SETUP_KEYS } from './src/lib/lookFade.ts'; export { assistantLook } from './src/lib/assistantLook.ts'; export { PadPictureSender, PAD_STILL_MAX_CHARS } from './src/lib/padPicture.ts'; export { parsePourText, pourTextRows, takePourText, typedCaption, rowsCaption, POUR_TEXT_MAX_ROWS, POUR_TEXT_MAX_CHARS, POUR_TEXT_GAP_MS } from './src/lib/pourText.ts'; export { pickSaved, setupOf, keyNameFor } from './src/lib/liveShow.ts'; export { askSound, setSoundDoor, publishInputs, readSound, ASSISTANT_SOURCES } from './src/app/soundNow.ts'; export { askTempo, askLink, setTempoDoor, TEMPO_MIN_BPM, TEMPO_MAX_BPM } from './src/app/tempoNow.ts'; export { askSet, publishSet, setGoDoor, setCueDoor } from './src/app/setNow.ts'; export { FADE_CHOICES } from './src/lib/lookFade.ts'; export { askSongs, setSongsDoor, setFollowDoor, ASSISTANT_ACTION_PREFIX, SONG_NUDGE_MAX_S } from './src/app/songShowNow.ts'; export { newId } from './src/lib/songShows.ts'; export { askMusic, setMusicDoor, setLoopDoor, publishPlayer, ASSISTANT_MUSIC_PATH } from './src/app/musicNow.ts'; export { askEar, setCalibrateDoor, setDetectorDoor, setListenDoor, publishRoom, publishListen, readEar } from './src/app/earNow.ts'; export { askRecord, setRecordDoor, publishRecord, readRecord } from './src/app/recordNow.ts'; export * from './src/app/mediaNow.ts'; export * from './src/app/outputsNow.ts'; export * from './src/app/projectorNow.ts'; export * from './src/app/deskNow.ts'; export * from './src/lib/deskTabs.ts';");
 const pageRoom = [...new Set([...page.RIG_KEYS, ...page.SETUP_KEYS])].sort();
 const roomFile = join(ROOT, 'server', 'assistant-room-keys.json');
 if (WRITE) { writeFileSync(roomFile, `${JSON.stringify(pageRoom, null, 1)}\n`); console.log(`wrote ${pageRoom.length} room keys to server/assistant-room-keys.json`); }
@@ -959,6 +987,20 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const r2 = page.pourTextRows('One\nTwo\nThree\nFour\nFive');
   say(r1.map((r) => r.text).join('|') === 'SUNSHINE OF|YOUR LOVE|Cream' && r1[2].weight === 0.75 && r2.length === 4 && r2[0].text === 'ONE' && r2[3].text === 'Four',
     `the remote's box reads the first line as the name and the rest as credits, "Song - Artist" as both (${JSON.stringify(r1.map((r) => r.text))}, ${JSON.stringify(r2.map((r) => r.text))})`);
+
+  /* Since the ink was shelved (37x-10m, 2026-11-12) the words go up as the
+     corner caption: the phone's box sends the card itself (typedCaption),
+     and rows from the assistant's pour_text or a phone one build older are
+     read back into one (rowsCaption), a name wrapped onto two rows joined. */
+  const c1 = page.typedCaption('Sunshine of Your Love - Cream');
+  const c2 = page.typedCaption('West End Blues\nLouis Armstrong\nHot Fives\nOKeh\nextra');
+  say(c1?.title === 'Sunshine of Your Love' && c1.artist === 'Cream' && !('album' in c1) && Object.keys(c2 ?? {}).length === 4 && c2?.title === 'West End Blues' && c2.artist === 'Louis Armstrong' && c2.album === 'Hot Fives' && c2.label === 'OKeh' && page.typedCaption(' \n ') === null,
+    `the remote's box reads the song, the artist, the album and the label, "Song - Artist" as both, case as typed (${JSON.stringify(c1)}, ${JSON.stringify(c2)})`);
+  const k1 = page.rowsCaption(r1);
+  const k2 = page.rowsCaption([{ text: 'BEATROOT', weight: 1 }, { text: 'Legendary Flower Punk', weight: 1 }]);
+  const k3 = page.rowsCaption([{ text: 'Song', weight: 1.25 }, { text: 'Band', weight: 0.75 }, { text: 'Album', weight: 0.75 }, { text: 'Label', weight: 0.75 }]);
+  say(k1?.title === 'SUNSHINE OF YOUR LOVE' && k1.artist === 'Cream' && k2?.title === 'BEATROOT' && k2.artist === 'Legendary Flower Punk' && k3?.title === 'Song' && k3.artist === 'Band' && k3.album === 'Album' && k3.label === 'Label' && page.rowsCaption([]) === null,
+    `pour-text rows read back as a caption: the heavy rows the title, the rest the artist, album and label; equal rows the title then credits (${JSON.stringify(k1)}, ${JSON.stringify(k2)})`);
 }
 
 /* The page's own still (44c-4), on the real PadPictureSender: its GPU grab
@@ -1036,10 +1078,10 @@ say(page.assistantLook({ name: 'x', base: 'gone', settings: {} }, presets, null)
   const toolSources = [...readFileSync(join(ROOT, 'mcp', 'chromaglass-mcp.js'), 'utf8').matchAll(/name: 'set_sound_source'[^\n]*?enum: \[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([a-z]+)'/g)].map((x) => x[1]).sort().join(','))[0];
   const pageSources = [...page.ASSISTANT_SOURCES].sort().join(',');
   say(guardSources === pageSources && toolSources === pageSources, `the guard's, the tool's and the page's sound sources are one list (guard ${guardSources}; tool ${toolSources}; page ${pageSources})`);
-  const noDoor = page.askSound('microphone');
+  const noDoor = await page.askSound('microphone');
   const asked = [];
   page.setSoundDoor((s) => asked.push(s));
-  const bad = page.askSound('file'), good = page.askSound('system');
+  const bad = await page.askSound('file'), good = await page.askSound('system');
   page.setSoundDoor(null);
   say(/not running/.test(noDoor ?? '') && /no such source/.test(bad ?? '') && good === null && asked.join(',') === 'system',
     `the page's door changes the source it is handed, refuses one it may not pick, and says so with no sound running (${noDoor} | ${bad} | ${good} | ${asked.join(',')})`);
@@ -1050,6 +1092,12 @@ musicPageLines(page, say);
 /* The page's own ear door (44k-10), on the real earNow. */
 earPageLines(page, say);
 recordPageLines(page, say);
+await soundPageLines(page, say);
+await mediaPageLines(page, say);
+await outputsPageLines(page, say);
+await projectorPageLines(page, say);
+projectorWaitLine(page, say, ROOT);
+await deskPageLines(page, say, await import('../server/assistantDesk.js'));
 say((await import(join(ROOT, 'server', 'assistantMusic.js'))).MUSIC_PATH === page.ASSISTANT_MUSIC_PATH, `the page takes a file at the show server's own address (${page.ASSISTANT_MUSIC_PATH})`);
 
 /* The page's own tempo door (44k-7), on the real tempoNow: it takes the
@@ -1165,7 +1213,7 @@ for (const l of main) say(l.ok, `${l.name}${l.ok ? '' : `  [${l.detail}]`}`);
 if (MUTANTS_ON) {
   console.log('\nThe mutants (each must fail its own line):');
   const results = await Promise.all(MUTANTS.map(async (m, i) => {
-    const { dir, why } = mutantDir(m);
+    const { dir, why } = mutantDir(m, i);
     if (!dir) return { m, why };
     const lines = await scenario(dir, BASE_PORT + 1 + i, { full: false });
     return { m, lines };

@@ -58,9 +58,9 @@ struct BeadArgs {
   wide: u32,
   amount: f32,
 }
-@group(0) @binding(20) var<uniform> beadArgs: BeadArgs;
-@group(0) @binding(21) var<storage, read> beadList: array<Bead>;
-@group(0) @binding(22) var<storage, read> beadTiles: array<u32>;
+@group(0) @binding(22) var<uniform> beadArgs: BeadArgs;
+@group(0) @binding(23) var<storage, read> beadList: array<Bead>;
+@group(0) @binding(24) var<storage, read> beadTiles: array<u32>;
 const BEAD_TILE_PX: f32 = ${BEAD_TILE}.0;
 
 fn beadWide() -> bool {

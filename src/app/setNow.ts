@@ -25,6 +25,8 @@ import { FADE_CHOICES } from '../lib/lookFade';
 export interface SetNow {
   list: SetList;
   armedItem: string | null;
+  /** The item on stage, by its id (the desk's live row), for the phone controller (PLAN 12-ctl-1). */
+  liveItem: string | null;
   fadeSeconds: number;
 }
 
@@ -43,13 +45,13 @@ export interface CueDoor {
   cancel: () => void;
 }
 
-let now: SetNow = { list: { name: '', items: [] }, armedItem: null, fadeSeconds: 2 };
+let now: SetNow = { list: { name: '', items: [] }, armedItem: null, liveItem: null, fadeSeconds: 2 };
 let go: GoDoor | null = null;
 let cue: CueDoor | null = null;
 const listeners = new Set<() => void>();
 
 export function publishSet(s: SetNow): void {
-  if (now.list === s.list && now.armedItem === s.armedItem && now.fadeSeconds === s.fadeSeconds) return;
+  if (now.list === s.list && now.armedItem === s.armedItem && now.liveItem === s.liveItem && now.fadeSeconds === s.fadeSeconds) return;
   now = s;
   for (const l of listeners) l();
 }
@@ -67,6 +69,18 @@ const secondsOf = (v: unknown): number | undefined | string =>
  * checked it, but a newer relay may send what this build does not know, and
  * the set may have changed since the guard's last look at it.
  */
+/**
+ * The phone controller's tap on a set row (PLAN 12-ctl-1): arm that item for
+ * the next Go, by its id, through the same arm as the desk's own row, so the
+ * look it names is armed too (`cuedPresetId`). By id and not by number: the
+ * phone lists the set it last heard, and a number would arm whatever moved
+ * into that place since.
+ */
+export function armSetItem(id: string): string | null {
+  const index = now.list.items.findIndex(i => i.id === id);
+  return index < 0 ? 'that item is no longer in the set' : askSet({ do: 'arm', item: index });
+}
+
 export function askSet(m: { do?: unknown; item?: unknown; look?: unknown; seconds?: unknown }): string | null {
   if (!go || !cue) return 'the set list is not running';
   const n = now.list.items.length;

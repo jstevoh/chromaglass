@@ -44,6 +44,11 @@ import { fileURLToPath } from 'node:url';
 import { musicCall, playerOf } from './assistantMusic.js';
 import { earCall } from './assistantEar.js';
 import { recordCall, recordOf } from './assistantRecord.js';
+import { inputsOf, soundDevice } from './assistantSound.js';
+import { mediaCall, mediaOf } from './assistantMedia.js';
+import { midiPortsOf, outputsGuard } from './assistantOutputs.js';
+import { projectorGuard } from './assistantProjector.js';
+import { deskGuard, deskLeast } from './assistantDesk.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -346,6 +351,11 @@ export function createAssistantGuard(send, now = Date.now) {
         player: playerOf(state.player),
         // Recording (PLAN 44k-11): the containers the encoder writes and the Takes' ids.
         record: recordOf(state.record),
+        inputs: inputsOf(state.sound),
+        // Film, pours, the room and the mark (PLAN 44k-13): the cameras' names and the shelf's cartoons.
+        media: mediaOf(state.media),
+        // OSC out and MIDI (PLAN 44k-14): the MIDI ports by the panel's names.
+        midiPorts: midiPortsOf(state.outputs),
       };
     },
 
@@ -407,6 +417,10 @@ export function createAssistantGuard(send, now = Date.now) {
           send({ type: 'action', action: 'back' });
           quietUntil = t + fadeSeconds * 1000 + ECHO_MS;
           return { ok: true, undid: 'look' };
+        }
+        if (entry.kind === 'desk') {
+          send({ type: 'assistant-desk', do: 'tab-restore' });
+          return { ok: true, undid: 'the tab taken away, if the desk took it: show_state\'s desk.tabs reads it' };
         }
         if (entry.kind === 'action') {
           // A toggle undoes itself, unless the performer has toggled it back already.
@@ -515,8 +529,11 @@ export function createAssistantGuard(send, now = Date.now) {
         const why = needs(mode, 'full') ?? paced('patch', mode, t);
         if (why) return refuse(why);
         if (!SOUND_SOURCES.has(message.source)) return refuse(`no such source: ${String(message.source)} (${[...SOUND_SOURCES].join(', ')})`);
+        // The microphone's input by name (PLAN 44k-12, assistantSound.js).
+        const dev = message.device === undefined ? {} : soundDevice(message, show.inputs);
+        if (dev.reason) return refuse(dev.reason);
         count('patch', mode, t);
-        send({ type: 'assistant-sound', source: message.source });
+        send({ type: 'assistant-sound', source: message.source, ...(dev.device === undefined ? {} : { device: dev.device }), ...answerOf(message) });
         return { ok: true };
       }
 
@@ -691,6 +708,51 @@ export function createAssistantGuard(send, now = Date.now) {
         if (call.reason) return refuse(call.reason);
         count('patch', mode, t);
         send({ type: 'assistant-record', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Film, pours, the room camera and the mark (PLAN 44k-13): assistantMedia.js's rules, Full.
+      if (type === 'assistant-media') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = mediaCall(message, show.media);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-media', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // OSC out and MIDI (PLAN 44k-14): assistantOutputs.js's rules, Full; OSC in and Syphon are the relay's own.
+      if (type === 'assistant-outputs') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = outputsGuard(message, show.midiPorts);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-outputs', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // The projector and the wall (PLAN 44k-15): assistantProjector.js's rules, Full.
+      if (type === 'assistant-projector') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = projectorGuard(message);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-projector', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // The desk (PLAN 44k-16, 44k-17): assistantDesk.js's rules; the tab up and the hand in Play, the rest Full.
+      if (type === 'assistant-desk') {
+        const why = needs(mode, deskLeast(message.do)) ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = deskGuard(message);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        // A delete or a reset of every tab is Undo's to put back; the page keeps what it took.
+        if (call.out.op === 'delete' || call.out.op === 'reset-all') remember({ kind: 'desk' });
+        send({ type: 'assistant-desk', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

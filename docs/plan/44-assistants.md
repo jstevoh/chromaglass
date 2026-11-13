@@ -230,12 +230,13 @@ through cords and preset patches, and the plate shader is untouched.
   | 9 | Saving a made look: save as new, save over, delete | none (44c-2) | Play (new), Full (over, delete) | 44k-9 = 44c-2 |
   | 10 | Calibrate the sound to the room; the song detector on or off; Listen | **shipped** 2026-11-11: `calibrate`, `song_detection`, `listen`, `show_state`'s `ear` | Full | 44k-10 |
   | 11 | Recording's options: what Record makes, quality, fps, format, sound in it; replay or delete a take | **shipped** 2026-11-11: `record_options`, `take`, `show_state`'s `record` | Full | 44k-11 |
-  | 12 | The microphone's input device | none (`set_sound_source microphone` takes the Sound panel's choice) | Full | 44k-12 |
-  | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | none | Full | 44k-13 |
-  | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its device and map, Syphon once it ships (its own thread) | none | Full | 44k-14 |
+  | 12 | The microphone's input device | **shipped** 2026-11-11: `set_sound_source`'s `device`, `show_state`'s `sound.inputs` and `sound.input` | Full | 44k-12 |
+  | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | **shipped** 2026-11-11: `film`, `pour_file`, `room_camera`, `mark`, `show_state`'s `media` | Full | 44k-13 |
+  | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its ports, Syphon once it ships (its own thread) | **shipped** 2026-11-11: `outputs` (osc_out, osc_in, midi, syphon, status), `show_state`'s `outputs` | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
-  | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | none | Play (palette, tool), Full (the rest) | 44k-16 |
-  | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | none (`overlays-off` hides the desk, nothing more) | Play (the tab up), Full (edits) | 44k-17 |
+  | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | **shipped** 2026-11-12 but the editing: `hand`, `desk_view`, `show_state`'s `desk`; the editing is 44k-16a | Play (palette, tool), Full (the rest) | 44k-16 |
+  | 18 | The Mac app's updates: Install Updates Automatically, check, install | **shipped** 2026-11-11: `app_updates` (status any mode; auto, check, install Full; install refused mid-show) | Full | 44k-18 |
+  | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | **shipped** 2026-11-12 but a panel's own window (44k-17a): `desk_tab`, `desk_tabs`, `desk_panel`, `desk_pins`, `desk_view`, `show_state`'s `desk` | Play (the tab up), Full (edits) | 44k-17 |
 
 - **44k-1. The Mac's assistant runs the current server.** *(S, Claude on the Mac,
   then the owner's Cmd-Q.)* Found in the audit: the tools the owner's Mac offers
@@ -347,58 +348,163 @@ through cords and preset patches, and the plate shader is untouched.
   video applies to the next one; the tool says "from the next press of Record" every
   time. Better: `show_state`'s `record` carries the options the running video was started
   with, so the assistant can tell the owner what the file being written is.
-- **44k-12. The microphone's input.** *(S, AG lane.)* `show_state`'s `inputs` (the
-  device names) and `set_sound_source microphone` gaining `device` (a name from that
-  list), through `useSoundSource`'s `chooseAudioInput`. Pass: a line where an unknown
-  name is refused with the list.
-- **44k-13. Film, pours and the room.** *(M, AG lane.)* `film` (a file path, a camera
-  by name, a window, a cartoon from the shelf, or clear), `pour_file` (an image or a
-  film poured into the dish, or stop), `room_camera` (on, off, device), `mark` (load a
-  logo or title card by path, or clear). Full; paths the Mac's only, as 44k-2's.
-  Pass: lines for each.
-- **44k-14. OSC, MIDI and Syphon.** *(M, AG lane; Syphon after its own thread ships
-  it.)* `outputs` (OSC out on, off and its target, via `useShowFeed`'s `onOscOut`; OSC
-  in's Off, This Mac, Network, which today is only the Mac menu, `desktop/main.js`
-  `setOscMode`, so a bridge message is owed first; MIDI on, off and its ports via
-  `useMidi`; Syphon on, off), all read back in `show_state`. MIDI learning stays the
-  person's (it needs a hand on the controller). Full. Pass: lines for each, and the
-  Mac's OSC-in half in `npm run desktop`.
-- **44k-15. The projector.** *(M, AG lane.)* `projector` (cast window open or closed,
-  projector mode, the test card on or off) and `wall` (the output's geometry and
-  grade as `useOutput`'s `OutputConfig`, and reset). The mapping's shapes stay the
-  desk's (a picture-led job). Full. Pass: lines for each, a geometry off the screen
-  refused.
-- **44k-16. The rest.** *(S each, AG lane, as wanted.)* The palette lock and the tool
-  and layer in hand (Play); Ambient TV mode; set lists' and sequences' own editing,
-  files and binding to songs (Full). Wanted least in a show: build when the owner
-  asks for one by name.
-- **44k-17. The desk's layout.** *(M, asked 2026-11-11.)* `show_state`'s `desk` (the
-  tabs by id and name, the one up, each tab's panels and whether each is docked,
-  floating, folded or in its own window); `desk_tab` (put a tab up, Play: the
-  person's screen changes, the plate does not); `desk_tabs` (rename, move, add as a
-  copy, delete, reset, as `useDeskLayout`'s `TabEdit`, Full); `desk_panel` (dock,
-  float, fold, close, open a panel on a tab, Full); `desk_pins` (pin or unpin a
-  setting, the rides' and the recipe's lists, Full). The door: `useDeskTabs` and the
-  pins in `App()`, through a sink, as the others. The desk syncs its tabs with the
-  owner's account (8-tabs-a), so an edit from the assistant travels there too, as a
-  person's would; a delete is Undo's to take back (the tab and its panels as they
-  were). Pass: `npm run assistant` lines for each verb at the stand-in, and a `desk`
-  line that the edited tab survives a reload.
-- **44h. Control over the internet.** *(L. Next, the owner asked 2026-11-07. Claude's
-  lane: security.)* For claude.ai on the web and the phone (and, if ever wanted,
-  ChatGPT and the Gemini app): an MCP endpoint on a Cloudflare Worker (Streamable HTTP
-  over HTTPS), OAuth that admits the owner's ChromaGlass account alone (Firebase
-  sign-in, as `account-shows.js` already verifies), and a Durable Object the Mac app's
-  show server holds an outbound WebSocket to, joining the relay as the same
-  `assistant` role, so nothing on the Mac listens on the internet and the guard (44d)
-  still decides everything on the Mac. Owed first: the vendors' current pages on
-  custom connectors read (transport, auth), the running cost (expected inside the
-  Workers free tier for one user), and a security review. Its check: the Worker
-  against a stand-in Mac relay, a token for any other account refused, the switch off
-  closing the tunnel. Pass: `npm run assistant` driven through the Worker as well as
-  over stdio.
-
+- ~~**44k-18. The Mac app's updates.**~~ **Shipped** 2026-11-11 with 13-update-auto:
+  `app_updates` status, auto, check, install, answered by the show server from the Mac
+  app's updater (`server/assistantUpdates.js`, `setAppUpdates`), never sent to the
+  display (`npm run updates`, `npm run assistant`: `updates-full`, `phone-updates`).
+  Story in `docs/plan-shipped.md` §44.
+- ~~**44k-12. The microphone's input.**~~ **Shipped** 2026-11-11: `show_state`'s
+  `sound.inputs` (the Sound panel's input names) and `sound.input` (the one chosen, null
+  for the default), and `set_sound_source microphone` with `device` (a name in any case,
+  or `default`), through `app/soundNow.ts` and `server/assistantSound.js` (`npm run
+  assistant`, `sound-device`, `sound-device-name`, `sound-device-mic`,
+  `sound-device-answer`). Story in `docs/plan-shipped.md` §44.
+- **44k-12a. Are the inputs named at launch, on the Mac?** *(S, found building 44k-12;
+  needs the Mac.)* A browser names its inputs only once the page has microphone
+  permission (until then `enumerateDevices` gives empty labels, and the list reads
+  "Input 1", "Input 2"); `useSoundState` asks again once the microphone opens. The Mac
+  app holds the permission, but whether its labels are there before the first open
+  is unmeasured. Read `show_state`'s `sound.inputs` on the Mac with the source none
+  after a fresh launch; if they are numbers, open the microphone once at launch for
+  the names (and close it), or say so in the tool.
+- ~~**44k-13. Film, pours and the room.**~~ **Shipped** 2026-11-11: `film` (a video
+  file by path, a cartoon, a camera by name, a window, clear), `pour_file` (a picture or
+  a film by path, a cartoon, stop), `room_camera` (on, off, a camera by name) and `mark`
+  (a picture by path, or clear), Full, read back in `show_state`'s `media`, through
+  `app/mediaNow.ts` and `server/assistantMedia.js`; files from `~/Movies` and
+  `~/Pictures` only, served by the show server as the music player's are (`npm run
+  assistant`, `media-full`, `-path`, `-kind`, `-folder`, `-cartoon`, `-camera`,
+  `-answer`, `phone-media`). Story in `docs/plan-shipped.md` §44.
+- **44k-13a. The phone layout has no film file, camera, window, room camera or mark.**
+  *(S, found building 44k-13.)* The phone's More sheet has the cartoon shelf (pour or
+  film a cartoon), so a cartoon the assistant puts on shows lit there; but a film from a
+  file, a camera or a window, the room camera and the mark are the desk's Film, Motion
+  camera and Mixer controls alone. A show run on a phone shows none of them, though the
+  assistant reaches a phone-layout display all the same (the doors are the hooks', not
+  the panels'). Give the sheet a line saying what is filmed and whether the room camera
+  and the mark are on, from `useMediaNow`, and the switches beside it.
+- **44k-13b. The media doors, in a browser.** *(S, found building 44k-13.)* As 44k-11b:
+  `npm run assistant` holds the guard against a stand-in display and the page's
+  `askMedia` against stand-in doors, but no line mounts `useFilm`, `usePour`,
+  `useSceneSource` and `useCastFeed` and watches a real `film file` put the served
+  video on the film, a real `mark` raise the Mixer's mark row, a real `pour_file` lay a
+  picture as dye. A browser line (the app in Chromium; the film and the pour read back
+  through the check hooks) would, and would measure that `loadFilmUrl` answers "done"
+  for a file that will not decode (it does today: its `play()` failure is caught).
+- **44k-13c. The owner's own media folders.** *(S, found building 44k-13.)* The
+  assistant opens films and pictures from `~/Movies` and `~/Pictures`, or the folders
+  `CHROMAGLASS_MEDIA_DIR` names, and the Mac app sets no such variable, so a film kept
+  anywhere else (the owner's filmed takes are in a folder of their own in the home
+  folder) must be moved first. A Settings row in the Mac app, "Folders Claude may open",
+  kept in `show.json` and read by the show server, would let the owner widen it without
+  a terminal.
+- ~~**44k-14. OSC, MIDI and Syphon.**~~ **Shipped** 2026-11-11: `outputs` (osc_out on or
+  off and its target, osc_in off, local or network, midi on or off and its ports by name,
+  syphon on or off, status in any mode), Full, read back in `show_state`'s `outputs`;
+  OSC out and MIDI through the page's own doors (`app/outputsNow.ts`), OSC in and Syphon
+  answered by the relay through the Mac app's Show menu (`server/assistantOutputs.js`,
+  `setAppOutputs`). MIDI learning stays the person's (`npm run assistant`,
+  `outputs-full`, `-relay-full`, `-target`, `-target-bad`, `-midi-name`, `-midi-port`,
+  `-answer`, `-oscin`, `-oscin-mode`, `-oscin-taken`, `phone-outputs`; the Mac's half in
+  `npm run desktop`'s OSC block). Story in `docs/plan-shipped.md` §44.
+- **44k-14a. Syphon from the assistant, on a real Syphon build.** *(S, found building
+  44k-14.)* Syphon out (13.2, PR 723) is not on main, so `outputs syphon` reaches it only
+  through the Show menu item `syphon-out` its check holds it to, and says "not in this
+  build" until then; nothing has switched a real Syphon server from the assistant. Once
+  13.2 ships: run `npm run desktop`'s OSC block on the Mac (its Syphon half then takes
+  the item's branch) and add a line that `outputs syphon on` leaves
+  `__chromaglassSyphon.serving` true.
+- **44k-14b. MIDI's permission on a fresh Mac app.** *(S, found building 44k-14.)*
+  `outputs midi on` waits five seconds for Web MIDI to answer and says the browser may be
+  asking. Whether the Mac app grants MIDI without a prompt (`grantPermissions`) is
+  unmeasured from the assistant: switch it on from Claude on the Mac with MIDI off, and
+  read `outputs.midi.open`.
+- ~~**44k-15. The projector.**~~ **Shipped** 2026-11-11: `projector` (cast the show's
+  window on or off, the projector mode ask, auto or off, the test card, Identify) and
+  `wall` (flips, corners, masks, feather, gain, gamma, the flash guard on only, reset),
+  Full, read back in `show_state`'s `projector`; through the chip's and Settings → Wall's
+  own calls (`app/projectorNow.ts`), the geometry judged by the guard
+  (`server/assistantProjector.js`: corners convex, half the picture on the screen, a
+  fiftieth of the screen covered). The mapping's shapes stay the desk's (`npm run
+  assistant`, `projector-full`, `-answer`, `-cast`, `-mode`, `-test`, `wall-patch`,
+  `-off-screen`, `-fold`, `-tiny`, `-range`, `-flash`, `phone-projector`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-15a. The cast from the assistant on the Mac, with a real projector.** *(S, found
+  building 44k-15.)* The check holds the call to the page's door and the page's door to
+  the cast sender's; nothing has opened the show's window from Claude on the Mac app with
+  a second screen plugged in. Plug one in, ask Claude to put the show on the projector,
+  and read `show_state`'s `projector.cast.casting` and the wall: the window should land on
+  that screen, filling it, as a click on the chip puts it. In a browser it is refused (a
+  window that no click opened is a blocked popup), and the answer says so.
+- **44k-15b. Whether the show's window fills its screen.** *(S, found building 44k-15.)*
+  The cast sender knows (`windowFullscreen`, the "fill the screen" chip), but it reaches
+  `useControllers` only through App(), which may not grow, so `show_state` does not say
+  whether a browser's title bar is on the wall. The Mac app fills the projector's screen
+  itself, so this matters only in a browser. Pass it with the next byte App() frees.
+- ~~**44k-16. The rest.**~~ **Shipped** 2026-11-12 but its editing (44k-16a): `hand` (the
+  palette lock by name, the tool, its amount, the plate in hand), Play, and `desk_view`'s
+  Ambient TV, Full, read back in `show_state`'s `desk` (`app/deskNow.ts`, `app/useHand.ts`;
+  `npm run assistant`, `desk-hand`, `desk-hand-range`, `desk-pin`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-16a. Set lists' and sequences' own editing, from the assistant.** *(M, found
+  building 44k-16.)* Adding, taking out and reordering a set list's items, saving and
+  opening set list files, and a sequence's stages and its binding to a song are the
+  Cues and Sequences panels' alone; `set` arms and fires an item and `sequencer`
+  chooses and runs one, but nothing builds one. Build when the owner asks for it by
+  name: in a show it is wanted least.
+- ~~**44k-17. The desk's layout.**~~ **Shipped** 2026-11-12: `desk_tab` (Play), and
+  `desk_tabs` (rename, move, add or copy, delete, reset every tab), `desk_panel` (open,
+  dock, float, close, fold, fold all, the deck folded, a tab's plate mode), `desk_pins`
+  and `desk_view`'s MIDI activity overlay (Full), read back in `show_state`'s `desk`;
+  through the tab strip's, the panel menu's and the pins' own calls (`app/deskNow.ts`,
+  `app/useDesk.ts`), the guard `server/assistantDesk.js`; a delete or a reset is Undo's
+  to put back (`npm run assistant`, `desk-play`, `desk-tab`, `desk-answer`, `desk-tabs`,
+  `desk-move`, `desk-undo`, `desk-panel`, `desk-pin`, `phone-desk`, and the page line on
+  the real `deskTabs.ts`). Story in `docs/plan-shipped.md` §44.
+- **44k-17a. A panel in its own window, from the assistant.** *(S, found building
+  44k-17.)* "Open in its own window" is the Desk component's own state (`popOut` in
+  `components/desk/Desk.tsx`), opened by a click, and a window no click opened is a
+  blocked popup in a browser, so `desk_panel` has no `pop_out`. In the Mac app a window
+  is not blocked: lift the popped-out list into `useDesk` and give it a door there.
+- **44k-17b. The desk's doors, in a browser.** *(S, found building 44k-17.)* As 44k-13b:
+  `npm run assistant` holds the guard against a stand-in display and `askDesk` against a
+  stand-in door built on the real `deskTabs.ts` (an edit survives `loadTabs`), but no
+  line mounts `useDesk` and watches a real `desk_tabs rename` change the chip and
+  survive a page reload, the plan's own pass for 44k-17. A `npm run desk` line through
+  the check hooks would.
+- **44h.** Control over the internet: a Cloudflare Worker claude.ai on the web and the phone signs in to as a remote connector, only the owner's Firebase account admitted, and a tunnel the Mac dials out on, answered by the local MCP server's own code with the Mac's guard deciding: **built 2026-11-12** (`npm run relay`; story in `docs/plan-shipped.md` §44). Live once the owner's setup (44h-1) is done.
+- **44h-1. Deploy it, and one real sign-in.** *(The owner, about ten minutes, most of it
+  done by a session on the Mac.)* `npm run deploy:tunnel`; the Worker's secrets
+  (`OWNER_UID`, `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, and `TUNNEL_KEY_SHA256` from
+  `node mcp/chromaglass-mcp.js tunnel key`); the Worker's host added to Firebase
+  Authentication's authorized domains (the one step only the owner's console can do, so
+  the sign-in page can open Google's popup); the relay's address in
+  `~/.chromaglass/tunnel/relay` and the tunnel run as a LaunchAgent; the connector added
+  in claude.ai (Settings, Connectors, Add custom connector, the Worker's `/mcp`). Steps in
+  the owner's private setup file. What only this proves: the real Firebase popup on the
+  page, claude.ai's own client through DCR and refresh, and Cloudflare's hibernation with
+  the Mac's socket open. Pass: `show_state` read from claude.ai on the phone, and the
+  switch set off on the Mac answered "not connected" there within seconds.
+- **44h-2. The tunnel started by the Mac app.** *(S.)* Today the tunnel is its own process
+  (a LaunchAgent the setup installs), because `mcp/` is not shipped inside the app. The
+  app could start it beside the show server when the switch file and a relay address
+  exist, so a Mac set up once needs nothing at login. Only if the owner wants it: it puts
+  the MCP server inside the app. Pass: a `desktop` line, the tunnel up with the app and
+  down without it.
+- **44h-3. ChatGPT and the Gemini app.** *(XS each, the owner's call.)* Each is one more
+  callback in `REDIRECTS` (`mcp/tunnel-worker.js`), read from that vendor's own pages
+  first, and its line in `npm run relay`. Not added: the owner asked for Claude. Claude
+  Code's loopback callback was taken out in review (any program on the approving computer
+  could listen on it); Claude Code on the Mac has the local server.
+- **44h-5. A reconnect measured.** *(XS.)* When the Mac reconnects, the old socket's close
+  fails only the calls sent on it (`webSocketClose`), but no `relay` line holds that: one
+  with two stand-in sockets, a call on the newer surviving the older's close.
+- **44h-4. Progress and a call cancelled.** *(S.)* The Worker answers each request with
+  one JSON body; a call the owner stops in claude.ai keeps running on the Mac until it
+  finishes (at most `MAC_WAIT_MS`). An SSE answer would carry MCP progress and
+  `notifications/cancelled` both ways. Pass: a `relay` line where a cancelled
+  `look_at_plate` is not answered.
 ## Order
 
-44k's gaps next, 44k-1 to 44k-8 first (the audit done 2026-11-11, the table under 44k), then 44h, each in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
+44k's gaps next, 44k-1 to 44k-8 first (the audit done 2026-11-11, the table under 44k); 44h built 2026-11-12, 44h-1 (the owner's setup) next for it; each in its own PR (44i shipped 2026-11-08 beside it, the owner's YouTube connector; 44i-1 waits on the owner's Google setup); then 44c-3; 44d-2 to 44d-4, 44c-2 and 44f-2 to 44f-4 as they
 are wanted.

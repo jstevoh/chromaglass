@@ -111,6 +111,8 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   const supported = useMemo(hasWebMidi, []);
   const [enabled, setEnabled] = useState<boolean>(() => { try { return localStorage.getItem(ENABLED_KEY) === '1'; } catch { return false; } });
   const [error, setError] = useState<string | null>(null);
+  // Web MIDI answered (PLAN 44k-14): what the assistant's switch waits for, since on is only asked until then.
+  const [open, setOpen] = useState(false);
   const [inputs, setInputs] = useState<MidiDevice[]>([]);
   const [outputs, setOutputs] = useState<MidiDevice[]>([]);
   const [ports, setPorts] = useState<{ input: string; output: string }>(() => {
@@ -410,6 +412,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         accessRef.current.onstatechange = null;
         accessRef.current = null;
       }
+      setOpen(false);
       refreshPorts();
       return;
     }
@@ -420,6 +423,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
         if (cancelled) return;
         accessRef.current = access;
         setError(null);
+        setOpen(true);
         access.onstatechange = () => { refreshPorts(); wireInputs(); };
         refreshPorts();
         wireInputs();
@@ -710,7 +714,7 @@ export function useMidi(host: MidiHost, feedback: MidiFeedback, presetIds: strin
   }, [enabled, inputs, ports.input]);
 
   return {
-    supported, enabled, enable, disable, error,
+    supported, enabled, open, enable, disable, error,
     inputs, outputs, ports, choosePorts, activeInputName,
     map, setMap, rename, clearMap, loadFactory, exportMap, importFile,
     learning, learn, cancelLearn, removeBinding, updateBinding, setBindingMode, setBindingBank, addBinding,

@@ -40,9 +40,24 @@ export class FluidInputs extends FluidPasses {
    * Fold the CPU-side deltas into the field. `dyeAdd` is L²×4 (R,G,B
    * absorption, density), `velAdd` is L²×4 (vx, vy, temp, gap), `dyeMul` is
    * L² (1 = no change).
+   *
+   * `oilAdd`, L²×4 like `dyeAdd`, is the part of `dyeAdd` a look's lay says
+   * is the oil's own colour (Oil Bodies), sent only by a lay that knows it
+   * (seedPreset's laySplodascope and the like): the oil's colour goes to the
+   * oil and the rest of the frame's dye to the water, where without it the
+   * frame's dye is shared by how much of each cell is oil (bodyLand). Sent
+   * whole, never by rows, and only on the flush that carries a lay.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null): void {
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands: Float32Array | null = null, breath: Float32Array | null = null, sheet: Float32Array | null = null, rows: Uint8Array | null = null, oilAdd: Float32Array | null = null): void {
     const q = this.device.queue;
+    if (oilAdd) {
+      if (!this.cpuOilTex) {
+        const usage = GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST;
+        this.cpuOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta (cpu)', size: [this.L, this.L], format: RGBA32, usage }));
+        this.deltaOilTex = this.disposer.track(this.device.createTexture({ label: 'oil dye delta', size: [this.N, this.N], format: RGBA32, usage }));
+      }
+      this.uploads.write(q, this.cpuOilTex, oilAdd, 16, null, this.L);
+    }
     /*
       The press's plate mean used to be worked out here, from the gap deltas
       just handed across over a resting gap of 0.03, so its source could be
@@ -109,6 +124,7 @@ export class FluidInputs extends FluidPasses {
     if (hands) this.handLive = true;
     if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
     if (sheet) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
+    if (oilAdd) { this.upsample(pass, this.cpuOilTex!, this.deltaOilTex!); this.oilLayPending = true; }
     this.foldDeltas(pass, !!sheet);
     pass.end();
     this.submit(enc);
@@ -400,11 +416,40 @@ export class FluidInputs extends FluidPasses {
       liquids by how much of each is where it lands (bodyLand), before the
       whole is added to, so both read the same plate.
     */
-    if (this.bodiesWanted && this.mix && this.mixLive && !this.oilDyeStale) {
+    if (this.oilLayPending && this.mix && this.mixLive) {
+      /*
+        A look's lay that says which colour is the oil's (applyDeltas'
+        oilAdd, PLAN 47z-1): the oil takes its own colour, the water the
+        rest, whatever share of each cell is oil. Shared by the oil under
+        each cell instead, as bodyLand does, a lay's rim (a cell or two where
+        the CPU's bilinear colour and the solver's sharper oil disagree, and
+        Cahn–Hilliard then widens to four) handed the water's cobalt to the
+        oil and each drop's colour to the water: the water's colour then
+        crept into each drop from its edge, yellow going orange and brown
+        over ten seconds (28k-5), and each drop's own colour lay round it in
+        the water, where it multiplied with the water's toward black.
+
+        Laid whether or not the last step asked for Oil Bodies, since a look
+        is laid before its first step: the share is made if need be and is
+        no longer stale, so that first step does not share the plate over
+        again by the oil (bodiesFresh). Where the share was stale, the
+        colour already on the plate is shared that way first.
+      */
+      const od = this.ensureOilDye();
+      if (this.oilDyeStale) {
+        for (const t of [od.a, od.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+        this.run(pass, 'bodyLand', od.write, [od.read, this.dye.read, this.deltaMulTex, this.mix.read], this.arg('body start', [0, 0, 0, 0]));
+        od.swap();
+        this.oilDyeStale = false;
+      }
+      this.run(pass, 'bodyLay', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.deltaOilTex!], this.arg('none', [0, 0, 0, 0]));
+      od.swap();
+    } else if (this.bodiesWanted && this.mix && this.mixLive && !this.oilDyeStale) {
       const od = this.ensureOilDye();
       this.run(pass, 'bodyLand', od.write, [od.read, this.deltaDyeTex, this.deltaMulTex, this.mix.read], this.arg('none', [0, 0, 0, 0]));
       od.swap();
     }
+    this.oilLayPending = false;
     this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex, this.liquids0.read], this.arg('none', [0, 0, 0, 0]));
     this.dye.swap();
   }
@@ -703,6 +748,28 @@ export class FluidInputs extends FluidPasses {
     m.swap();
     pass.end();
     this.submit(enc);
+    this.mixLive = true;
+  }
+
+  /**
+   * Lay the oil cell for cell (Foam Cells, PLAN 47z-5): `oil(x, y, n)` is
+   * asked for every cell of the mix at its middle, in plate units, with the
+   * mix's own size, and what it answers (0..1) replaces the oil there; the
+   * soap and the acidity are cleared with it, as a fresh plate has none.
+   * addMix lays discs, which is all a crowd needs, but a foam's drops are
+   * pressed into polygons with a film between each pair (oilLay.ts,
+   * foamCell), which no sum of discs draws.
+   */
+  layOil(oil: (x: number, y: number, n: number) => number): void {
+    const m = this.ensureMix();
+    const n = this.N, data = new Float32Array(n * n * 4);
+    let sum = 0;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const c = Math.max(0, Math.min(1, oil((i + 0.5) / n, (j + 0.5) / n, n)));
+      data[(i + j * n) * 4] = c; sum += c;
+    }
+    this.device.queue.writeTexture({ texture: m.read }, data, { bytesPerRow: n * 16 }, [n, n]);
+    this.oilPoured = sum / (n * n);
     this.mixLive = true;
   }
 

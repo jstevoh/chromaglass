@@ -54,9 +54,9 @@ import { AIR_RIM_WGSL } from './air';
 export const BUBBLE_SHAPE_WGSL = /* wgsl */ `
 ${AIR_RIM_WGSL}
 /** The bubbles as the air field was last stamped from them (WebGPUAir.geo): x, y, r (fluid uv), opacity. */
-@group(0) @binding(18) var<storage, read> airDiscs: array<vec4f>;
+@group(0) @binding(20) var<storage, read> airDiscs: array<vec4f>;
 /** And their rims: fingering, how many, phase, film. */
-@group(0) @binding(19) var<storage, read> airRims: array<vec4f>;
+@group(0) @binding(21) var<storage, read> airRims: array<vec4f>;
 
 /** A bubble at a point: where its centre is taken to be, its radius, its film, its number, and how opaque this pixel of it is. */
 struct AirHere {

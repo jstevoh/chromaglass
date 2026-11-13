@@ -158,9 +158,12 @@ jobs:
   # when it ran 25:06 and 25:17 of the 25 on #802's deploy (attempts 1 and
   # 2, every check in it green, cancelled at the limit), against 19:13 on
   # the same checks on #802's own run: the slow tier again, and the moiré's
-  # 6:23 there the largest piece the second could lose, PLAN 19k-18). Every
-  # check runs whatever failed before it in its part. GitHub's ubuntu runners
-  # are not the queue the Mac's are, so nine at once cost the queue nothing.
+  # 6:23 there the largest piece the second could lose, PLAN 19k-18). There
+  # was a tenth, Lava Lamp's cycle, while that check watched 50 s of the lamp;
+  # it watches five minutes now, an hour and a half on this rasteriser, and
+  # runs on the Mac's `show` (PLAN 27f-9h, 19k-19). Every check runs whatever
+  # failed before it in its part. GitHub's ubuntu runners are not the queue
+  # the Mac's are, so nine at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the

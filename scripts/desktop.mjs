@@ -1109,9 +1109,9 @@ try {
     await sleep(3000);
     const said = await page.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
     const plate = await page.locator('#liquid-canvas').count().catch(() => 0);
-    const native = await page.evaluate(() => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function' })).catch(() => null);
-    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
-      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser` : 'unread'}`);
+    const native = await page.evaluate(async () => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function', front: typeof window.__CHROMAGLASS_NATIVE__?.bringToFront === 'function' ? await window.__CHROMAGLASS_NATIVE__.bringToFront().catch(() => 'threw') : 'none' })).catch(() => null);
+    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate, and its window can bring itself forward (23.17f-3)`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser && native.front === true,
+      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser, brought to the front ${native.front}` : 'unread'}`);
     if (process.env.VITE_MAC_APP !== '1') {
       skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
     } else {
@@ -1200,6 +1200,23 @@ try {
     check('OSC closed: Show > OSC input opens it for this Mac only (127.0.0.1) or the network (0.0.0.0), and closes it, with no restart',
       local?.state === `udp 127.0.0.1:${oscPort}` && heldLocal && net?.state === `udp 0.0.0.0:${oscPort}` && off?.state === 'off' && freeAgain,
       `this Mac only: ${local?.state ?? 'unread'} (port ${heldLocal ? 'held' : 'NOT held'}); network: ${net?.state ?? 'unread'}; off: ${off?.state ?? 'unread'} (port ${freeAgain ? 'free' : 'STILL TAKEN'})`);
+
+    /*
+      The owner's assistant's door to the same choice (PLAN 44k-14, the hook
+      main.js hands the show server, server/assistantOutputs.js): it is the
+      menu's, so the menu's tick follows it and the socket opens with no
+      dialog, and a build with no Syphon item says so rather than claiming one.
+    */
+    const viaHook = await first.evaluate(async ({ Menu }) => {
+      const h = globalThis.__chromaglassOutputs;
+      const said = await h.setOscIn('network');
+      return { said, state: h.state(), ticked: Menu.getApplicationMenu().getMenuItemById('osc-network')?.checked === true, syphon: Menu.getApplicationMenu().getMenuItemById('syphon-out') ? 'item' : h.setSyphon(true) };
+    }).catch((err) => ({ error: String(err) }));
+    const afterHook = await settle(first, (s) => s.mode === 'network');
+    check('OSC closed: the assistant\'s OSC-in choice is the Show menu\'s (ticked there, the socket open on the network), and Syphon says whether this build has it',
+      viaHook.said === `udp 0.0.0.0:${oscPort}` && viaHook.state?.oscIn?.mode === 'network' && viaHook.state.oscIn.kept === true && viaHook.ticked && afterHook?.state === `udp 0.0.0.0:${oscPort}`
+        && (viaHook.syphon === 'item' || (/not in this build/.test(viaHook.syphon ?? '') && viaHook.state.syphon === null)),
+      JSON.stringify(viaHook).slice(0, 240));
 
     await pick(first, 'osc-local');
     await settle(first, (s) => s.mode === 'local');

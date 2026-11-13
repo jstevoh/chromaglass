@@ -330,17 +330,6 @@ export interface VisualizerSettings {
   inkTitleSize: number;
   inkTitleY: number;
   inkTitleSweep: number;
-  /**
-    How a song's title goes up (PLAN 37x-10j, app/songTitle.ts): true, the
-    default, is the corner caption of a 1980s music channel (artist, the
-    song in quotes, album, label; lib/songCaption.ts), on the screen and
-    burned into the live stream; false pours it as ink, as 37x-10 did. It
-    chooses for the ear's titles (`inkTitle`) and a song show's Pour the title.
-    The default is the caption on the owner's word (2026-11-10, "simple ui
-    overlay"), not today's ink: a saved show with titles on now captions
-    them. Titles themselves stay off by default, so no plate changes.
-  */
-  titleCaption: boolean;
   /*
     The logo melted at the start of a film or a stream (PLAN 37x-11,
     lib/logoMelt.ts): when the Live Show goes on air or the Record button
@@ -947,6 +936,20 @@ export interface VisualizerSettings {
   microDroplets: number;      // satellite droplets on the glass, hundreds of tiny lenses
   thinFilm: number;           // interference colour where the dye runs thinnest
   filmPhysics: number;        // film colour, rainbow (0) to a soap film's own colours (1): Thin Film and bubble film
+  soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
+  soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
+  soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
+  lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
+  sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
+  sideLightHue: number;       // the side lamp's colour as a hue, degrees (30 amber, 0 red, 320 magenta)
+  sideLightAngle: number;     // where round the dish the side lamp stands, degrees from the right, counter-clockwise
+  tank: number;               // a tank of water seen through its side instead of the dish: 0 off, else the dye's glow (PLAN 47n)
+  tankFeed: number;           // the nozzle's speed, cm/s: how fast dye is fed in at the surface (47n)
+  tankWeight: number;         // how much heavier the dye is than water, %: what gravity pulls it down with (47n)
+  tankNozzle: number;         // where the nozzle sits across the tank, 0..1 (a held finger carries it too) (47n)
+  tankDrain: number;          // the share of the fed water drained through the floor, 0..1; the rest raises the level and the dye pools (47n)
+  tankHue: number;            // the dye's glow, degrees of hue (47n)
   glossiness: number;         // the dye surface's relief as the optics see it: 0 the real slope, 1 four times it (lights nothing)
   postBlurRadius: number;     // final gooey blur radius multiplier
 
@@ -1027,7 +1030,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   inkTitleSize: 0.5,
   inkTitleY: 0.5,
   inkTitleSweep: 0.5,
-  titleCaption: true,
   logoMelt: false,
   beatPrediction: 0.7,
   beatLead: 80,
@@ -1217,6 +1219,20 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   microDroplets: 0,
   thinFilm: 0,
   filmPhysics: 0,           // the rainbow: the film every look was made with
+  soapFilm: 0,              // no film in the frame: every look but Soap Film
+  soapFilmRate: 1,
+  soapFilmAngle: 0,
+  glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
+  lensStop: 4,
+  sideLight: 0,
+  sideLightHue: 30,
+  sideLightAngle: 160,
+  tank: 0,                  // the dish from above: every look but the tank's
+  tankFeed: 1.5,
+  tankWeight: 0.5,
+  tankNozzle: 0.5,
+  tankDrain: 1,
+  tankHue: 205,
   lumia: 0,
   chemistry: 0,
   chemistryPattern: 0,

@@ -12,11 +12,14 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32 } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
 import { HAND_RADIUS, seedBoilSites } from '../lampBoil';
+import { SoapFilmPlate, SOAP_PLATE_DX } from '../soapFilmPlate';
+import { TankPlate } from '../tankPlate';
+import { SOAP_FRAME_SPAN } from '../soapFrame';
 
 /**
  * How much of the plate the air's cover has to change in a step (a bubble of
@@ -267,6 +270,48 @@ export class FluidPasses extends FluidFields {
     this.phaseGapPrimed = true;
   }
 
+  /**
+   * The solvers that run beside the plate's own, on `enc` before the step's
+   * pass: the frame's soap film and the tank's side view.
+   */
+  protected stepBeside(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    this.stepSoapPlate(enc, p);
+    this.stepTankPlate(enc, p);
+  }
+
+  /**
+   * The tank seen through its side (PLAN 47n, gpu/tankPlate.ts): made the
+   * first time Tank is up, stepped on the show's own seconds, with the
+   * fingers held on the plate to carry its nozzle. Turned off, it goes, and
+   * the next time it is clear water.
+   */
+  protected stepTankPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.tank ?? 0) > 0.001)) {
+      if (this.tankPlate) { this.tankPlate.dispose(); this.tankPlate = null; }
+      return;
+    }
+    if (!this.tankPlate) this.tankPlate = new TankPlate(this.device);
+    this.tankPlate.step(enc, p.magnetSeconds ?? 1 / 60, p, p.boilHolds);
+  }
+
+  /**
+   * The frame's soap film (PLAN 32d, gpu/soapFilmPlate.ts), on `enc` before the
+   * step's pass: made the first time Soap Film is up and stepped on the film's
+   * own clock (the show's seconds times the drain rate), blown by the flow the
+   * last step left. Turned off, it goes, and the next time it is a fresh film.
+   */
+  protected stepSoapPlate(enc: GPUCommandEncoder, p: GpuStepParams): void {
+    if (!((p.soapFilm ?? 0) > 0.001)) {
+      if (this.soapPlate) { this.soapPlate.dispose(); this.soapPlate = null; }
+      return;
+    }
+    if (!this.soapPlate) this.soapPlate = new SoapFilmPlate(this.device);
+    const rate = Math.max(0, p.soapFilmRate ?? 1);
+    // The uv a unit of velocity moves the dye this step (lib/detailFlow.ts stepDisplacement), in the frame's metres.
+    const travel = p.dt * p.advection * ((this.N - 2) / this.N) * this.soapPlate.field.nx * SOAP_PLATE_DX / SOAP_FRAME_SPAN;
+    this.soapPlate.step(enc, (p.magnetSeconds ?? 1 / 60) * rate, this.velForced, travel);
+  }
+
   /** Step the dish on `enc` if it is driven and built, and say which flow `addSlosh` lays over the gap's. */
   protected stepSloshDish(enc: GPUCommandEncoder, p: GpuStepParams): void {
     const drive = this.sloshDrive;
@@ -400,6 +445,42 @@ export class FluidPasses extends FluidFields {
     if (carry) this.carrySubsteps(pass, 'bodyAdvect', sp, this.arg('species advect thin', [0, 0, 0, 0, 0, this.speciesDisp, 1, REST_GAP]));
     this.run(pass, 'speciesSplat', sp.write, [sp.read, this.squeeze.read], this.arg('species rim', [0, 0, 0, 0, 0, 0, 0, OPEN_RIM]));
     sp.swap();
+  }
+
+  /** The heat carried with the liquid on a thin gap (PLAN 38f): h·T and h, made on the first thin step. */
+  private heatCarried: PingPong | null = null;
+
+  /**
+   * The lamp's heat carried with the liquid on a thin gap (PLAN 38f;
+   * heatPack in wgsl/fluid/dye.ts says how and why): packed as amounts,
+   * carried in the colour's substeps (planCarry ran in the advect dye stage
+   * before this) and put back in the velocity's z.
+   *
+   * Not while the plate's own boil runs (fluid.ts skips the stage on
+   * boilLive): the boil carries its temperature itself (boilAdvect, in
+   * float32, weighted by the liquid's heat capacity, wgsl/lampBoil.ts) and
+   * keeps a float32 copy beside the half-float z so a 1/60 s step's heating,
+   * under one half-float step, is not lost. Carried twice, this round trip
+   * moved z off that copy every step, the boil took the half-float again and
+   * lost each step's heat: `npm run plateboil -- --part=boil` on Metal went
+   * 6/6 → 2/6, the held hand's spot stalling at 52 °C and then cooling
+   * 0.93 K/s at 1/60 s steps. One owner for the heat while the boil is on.
+   *
+   * Carried in the velocity's half-float, whose carry pipeline is built
+   * before the show opens. A float32 carry was tried for Metal's lost heat
+   * and changed nothing (96.8% kept either way, `npm run heat` line 9) while
+   * its pipeline compiled in the frame; the loss was the store's rounding,
+   * which heatUnpack now does to the nearest half-float itself.
+   */
+  protected carryHeat(pass: GPUComputePassEncoder, disp: number, argsAt?: GPUBuffer[]): void {
+    const h = this.heatCarried ??= new PingPong(this.device, this.disposer, [this.N, this.N], VEL, 'heat carried');
+    const gap = this.arg('heat gap', [REST_GAP, 0, 0, 0]);
+    this.hsRun(pass, 'heatPack', `heatPack:${this.vel.read.label}:${h.write.label}:${this.squeeze.read.label}`, gap, [this.vel.read, this.squeeze.read, h.write]);
+    h.swap();
+    // With the colour's air arguments: a bubble pushes the heat out of its core with the liquid.
+    this.carrySubsteps(pass, 'bodyAdvect', h, this.arg('body advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]), undefined, argsAt);
+    this.hsRun(pass, 'heatUnpack', `heatUnpack:${this.vel.read.label}:${h.read.label}`, gap, [this.vel.read, h.read, this.vel.write]);
+    this.vel.swap();
   }
 
   protected packView(pass: GPUComputePassEncoder): void {
