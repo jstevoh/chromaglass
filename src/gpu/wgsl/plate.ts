@@ -2553,8 +2553,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     shadow to fall on, and the pad is centimetres out of focus, which leaves
     it featureless. Measured in the lab on a round pool on the lamp
     (npm run stillcloseup, line 3): the ground just outside the pool's edge
-    was 19% darker on one side than on the other; it is the same all round
-    now (0.003%).
+    was 20% darker on one side than on the other; it is the same all round
+    now (0.004%).
     Depth up close is the camera's own: its depth of field (Depth / Focus,
     still) and the shadowgraph of the liquid's curvature (Relief / 3D).
     The screen's lamp is kept apart for the second projector's beam, which

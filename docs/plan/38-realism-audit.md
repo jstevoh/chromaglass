@@ -630,7 +630,7 @@ Shipped with this pass (the closeup, `npm run stillcloseup`):
   scale. Part b of the owner's report (the beads' scalloped outline at Edge Detail 0) is the
   beads' 512² mask, fixed by 38h-17 in its own PR.
 - ~~**38u-2. Depth / Focus drew a lamp above the plate**~~ — **Shipped, this PR.** A paper's
-  fibre on the ground, the dye's shadow thrown down-right onto it (19% across a pool's edge in
+  fibre on the ground, the dye's shadow thrown down-right onto it (20% across a pool's edge in
   the lab) and thick dye brightened over thin. Depth / Focus is the camera's depth of field now.
 - ~~**38u-3. The bubble film's colour swayed on a sine of the time**~~ — **Shipped, this PR.**
 
@@ -709,7 +709,7 @@ Behind a dial at 0, or in one look:
 
 - **38u-9. The drawn textures that are left** (M, one PR; Low-Medium). Each is noise or a hash
   on a clock, drawn over the liquid: Macro Lacing (fbm filaments on `U.time`, Lacing Run only;
-  `npm run stillcloseup` prints 3.6% of its frame moving on a still plate), Lacing's pale
+  `npm run stillcloseup` prints 3.2% of its frame moving on a still plate, and Paint Cells at 1 the same), Lacing's pale
   thread (its level jittered by fbm on the clock), Paint Cells and the plate's Cells
   (`cellField` on a clock; **20c-1** holds the closeup's), Satellite Droplets (a hashed
   lattice that never moves with the flow; 38h fixed their optics, not their places), Thin

@@ -47,7 +47,7 @@
  *      else in the shader, so a pulse under another name is seen too.
  */
 import { build } from 'esbuild';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -242,12 +242,20 @@ check('a Frame Sway that is not a number is off', L.frameSway(NaN) === 0 && L.co
 // ── 3. The frame loop uses these ────────────────────────────────────────
 const lv = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
 const plate = readFileSync('src/gpu/wgsl/plate.ts', 'utf8');
-const pulses = plate.match(/let beatPulse = [^;]*;/g) ?? [];
 check('the frame loop steps the cover in coverRoom(Frame Sway), moves the lamp by lampRock and hands the plate beatSway',
   /stepCover\([^;]*coverRoom\(currentSettings\.frameSway\)\)/s.test(lv) && /lampRock\(rock, currentSettings\.plateRock, currentSettings\.frameSway\)/.test(lv)
   && /beatSway: frameSway\(currentSettings\.frameSway\)/.test(lv));
-const phaseReads = (plate.match(/U\.beatPhase/g) ?? []).length;
-check('and every beat pulse in the plate shader is scaled by beatSway', pulses.length >= 1 && pulses.every((p) => /U\.beatSway/.test(p)) && phaseReads === pulses.length, `${pulses.length} pulses, ${phaseReads} reads of the beat's phase: ${pulses.join(' | ')}`);
+// Every shader source the plate is assembled from (plate.ts splices a dozen
+// modules in), comments out, so a pulse in another file, or the phase read
+// under another name, is seen, and a comment that names it is not.
+const wgslDir = 'src/gpu/wgsl';
+const shaders = readdirSync(wgslDir).filter((f) => f.endsWith('.ts') && !/Fields\.ts$/.test(f))
+  .map((f) => readFileSync(`${wgslDir}/${f}`, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')).join('\n');
+const allPulses = shaders.match(/let beatPulse = [^;]*;/g) ?? [];
+const phaseReads = (shaders.match(/\bbeatPhase\b/g) ?? []).length;
+const readsInPulses = (allPulses.join('\n').match(/\bbeatPhase\b/g) ?? []).length;
+check('and every beat pulse in the plate shader is scaled by beatSway', allPulses.length >= 1 && allPulses.every((p) => /U\.beatSway/.test(p)) && phaseReads === readsInPulses,
+  `${allPulses.length} pulses, ${phaseReads} reads of the beat's phase in the shaders, ${readsInPulses} of them in a pulse: ${allPulses.join(' | ')}`);
 
 const failed = checks.filter((c) => !c.ok).length;
 console.log(`\n${checks.length - failed} passed, ${failed} failed`);

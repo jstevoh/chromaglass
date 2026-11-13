@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A bubble's film no longer shifts colour on a clock; it shifts when the bubble moves or drains.
 
 `npm run stillcloseup`: a still plate drawn ten seconds apart changed by 0.12% to 0.38% of the
-frame's mean, 0 now; the ground beside a pool was 19% darker on one side, 0.003% now.
+frame's mean, 0 now; the ground beside a pool was 20% darker on one side, 0.004% now.
 
 ### Added — Glitter, a macro lens's discs and stars, and a side lamp (PLAN 47e, 47d-1, 47b-1)
 

@@ -14158,9 +14158,11 @@ third pass, 38u). In the closeup four things were drawings and are gone.
 *Measured* (`npm run stillcloseup`, the lab on software WebGPU, main then this):
 a still plate of hard-edged discs, drawn ten seconds apart: 0.381% (defaults), 0.117% (on the
 lamp), 0.366% (Macro Bead), 0.276% (Cell Bloom) of the frame's mean changed → 0.000% on all four
-(1c, the control, a stirred plate: 11.4%); a still bubble at full Iridescence 3.412% → 0.000%;
-the ground just outside a round pool's edge, opposite quarters, 19.402% → 0.003% (3c, a second
-pool: 47.9%); Depth / Focus at 0 against 1 where the camera is in focus 27.052% → 0.000% (4c,
-the surround: 12.0%). Lacing Run is printed and not judged: 3.6% of its frame moves on a still
-plate, its Macro Lacing's noise (38u-9).
+(1c, the control, a stirred plate: 11.4%); a still bubble at full Iridescence 2.049% → 0.000%;
+the ground just outside a round pool's edge, opposite quarters, 20.171% → 0.004% (3c, a small
+faint pool: 12.6%); Depth / Focus at 0 against 1 where the camera is in focus 27.052% → 0.000%
+on the lamp and 15.043% → 0.000% on the dark ground (4c, the surround: 12.0%). What is still
+drawn on the clock is printed and not judged (38u-9), and is the control that the lab's clock
+reaches the plate (1d): Lacing Run 3.2% of its frame on a still plate, Paint Cells at 1 3.2%,
+Thin Film at 1 1.6%.
 
