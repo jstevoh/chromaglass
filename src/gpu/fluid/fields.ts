@@ -443,6 +443,8 @@ export class FluidFields extends FluidCore {
       species: this.speciesLive && this.species ? this.species.read : null,
       /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */
       soapFilm: this.soapPlate?.field ?? null,
+      /** The tank's dye (PLAN 47n), or null when Tank is off: the plate draws it in its own place. */
+      tank: this.tankPlate?.field ?? null,
     };
   }
 
@@ -455,6 +457,8 @@ export class FluidFields extends FluidCore {
     this.air = null;
     this.slosh?.dispose();
     this.soapPlate?.dispose();
+    this.tankPlate?.dispose();
+    this.tankPlate = null;
     this.slosh = null;
     this.disposer.dispose();
     this.groups.clear();

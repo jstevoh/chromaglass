@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the slopes facing it and leaves black ground black.
 - All five on MIDI, the desks and the phone's remote; at 0 every look is unchanged.
 
+### Added — the tank seen through its side (PLAN 47n)
+
+- Tank (Settings → Camera, MIDI, the phone): a tank of water seen through its side in place of
+  the dish from above, as Davy Evans' *Gravity L1* films one. Heavy dye falls from a nozzle at the
+  surface, thins to a thread as gravity speeds it, lands and runs along the floor as a gravity
+  current. Its own solver: a vertical slice of water with real viscosity, glass walls, a free
+  surface, and the dye's weight (`npm run tank`, `npm run tankgpu`).
+- While it is up: Feed (cm/s), Dye Weight %, Nozzle (a finger held on the plate, or a hold on the
+  phone, carries it too), Drain and Glow Hue. Feed, Dye Weight, Nozzle and Glow Hue take cords;
+  Tank itself never does. Tank at 0, the default, keeps the dish exactly as it was.
+
 ### Added — Lava Lamp's wax as blobs in a clear liquid; Oil Weight (PLAN 27f-9c)
 
 - Lava Lamp's wax is a liquid of its own: crimson bodies in a clear, lamp-lit liquid that sink

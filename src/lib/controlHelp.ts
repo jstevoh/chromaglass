@@ -118,6 +118,12 @@ export const CONTROL_HELP: Record<string, string> = {
   sideLight: 'A coloured lamp low beside the dish: glints on the glitter, its colour on the dye and the walls facing it. Clear liquid is untouched.',
   sideLightHue: 'The side lamp\'s colour: 30 is amber, 0 red, 320 magenta.',
   sideLightAngle: 'Where round the dish the side lamp stands, in degrees from the right.',
+  tank: 'A water tank seen through its side instead of the dish: heavy dye falls from a nozzle, thins to a thread and runs along the floor.',
+  tankFeed: 'How fast the nozzle feeds dye into the tank. More feed, a thicker jet.',
+  tankWeight: 'How much heavier the dye is than water. Heavier dye falls faster and thins to a finer thread.',
+  tankNozzle: 'Where the nozzle sits across the top of the tank. Holding a finger on the plate carries it there too.',
+  tankDrain: 'How much of the water fed in drains out through the floor. At none the dye pools on the floor and fills the tank.',
+  tankHue: 'The colour the dye glows.',
 
   // Macro
   macroZoom: 'How close the camera looks into the plate. One is the whole plate, sixteen is a single bead.',

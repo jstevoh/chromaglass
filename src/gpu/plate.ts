@@ -28,6 +28,8 @@ import { BeadMask } from './beadMask';
 import type { BeadField } from '../lib/beads';
 import { soapFilmLut } from '../lib/soapFilm';
 import { GLINT_SCENE_FORMAT, PlateGlint } from './glint';
+import { drawTank } from './tankDraw';
+import type { TankPlateField } from './tankPlate';
 
 /** What a layer needs on the way from the solver to the screen. */
 interface LayerTargets {
@@ -125,6 +127,8 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
 
 export class WebGPUPlate {
   private readonly disposer = new Disposer();
+  // Hands a buffer a draw makes to the disposer (the tank's arguments, tankDraw.ts): one function, not one a frame.
+  private readonly trackBuf = (b: GPUBuffer): GPUBuffer => this.disposer.track(b);
   private readonly pipelines: PipelineCache;
   private readonly sampler: GPUSampler;
   private readonly uniformBuffer: GPUBuffer;
@@ -339,7 +343,7 @@ export class WebGPUPlate {
     encoder: GPUCommandEncoder,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     /** True when this frame goes into a texture another pass will sample. */
     toTexture = false,
@@ -448,6 +452,8 @@ export class WebGPUPlate {
       this.auxSize = [size.width, size.height];
     }
 
+    // The tank's side view (PLAN 47n) draws in the plate's place when its look is up.
+    if (drawTank(this.device, this.pipelines, encoder, target, viewOf(this.aux), fields[0]?.tank, size, timestamps, toTexture, format, this.trackBuf)) return;
     if (lensOn) {
       this.display(encoder, this.glint.sceneView(size.width, size.height), viewOf(this.aux), this.uniformBuffer, fields, timestamps, true, GLINT_SCENE_FORMAT);
       this.glint.run(encoder, target, toTexture, format, this.pack, this.uniformBuffer, this.sampler, this.aux, this.layers[0].vel, this.source('mark'));
@@ -483,7 +489,7 @@ export class WebGPUPlate {
     kind: string,
     target: GPUTextureView,
     size: { width: number; height: number },
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null }[],
     timestamps?: GPURenderPassTimestampWrites,
     format = this.format,
   ): void {
@@ -498,7 +504,9 @@ export class WebGPUPlate {
       }));
       this.sourceAuxSize = [size.width, size.height];
     }
-    this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
+    if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.sourceAux), fields[0]?.tank, size, timestamps, true, format, this.trackBuf)) {
+      this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
+    }
   }
 
   /** Let go of the sources no projector shows any more (their buffers are small; the aux is not). */
@@ -514,7 +522,7 @@ export class WebGPUPlate {
     target: GPUTextureView,
     auxView: GPUTextureView,
     uniforms: GPUBuffer,
-    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null }[],
+    fields: { dye: GPUTexture; velForced: GPUTexture; grain: GPUTexture | null; particles: GPUTexture | null; air: GPUTexture | null; view: GPUTexture | null; species?: GPUTexture | null; soapFilm?: { h: GPUBuffer } | null; tank?: TankPlateField | null }[],
     timestamps: GPURenderPassTimestampWrites | undefined,
     toTexture: boolean,
     format: GPUTextureFormat,
