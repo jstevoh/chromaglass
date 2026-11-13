@@ -88,6 +88,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9, 21, 16], // purple water; red, amber, cobalt, coral and teal oil (the seed lays the first as the water; 28i-7: a second family)
   'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 28i-7: under cobalt every drop read green)
+  'foam-cells':         [12, 7, 17, 23],           // rust water (sienna) in the films; pale icy blue, amber and lavender cells (47z-5)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.
@@ -148,6 +149,7 @@ export const PRESET_INJECT_STYLES: Record<string, string[]> = {
   'home-movie':         ['drop', 'pour'],
   'clock-glass':        ['drop'],                 // drops that find the middle of the dome on their own
   'splodascope':        ['drop'],                 // a drop at a time into the crowd, as an eyedropper does
+  'foam-cells':         ['drop'],                 // a drop into the foam presses its neighbours aside
   'saffron-lace':       ['drop'],                 // an eyedropper's drops: each one a hole in the film, or more film
 };
 
@@ -244,6 +246,8 @@ export const PRESET_LIQUIDS: Record<string, string[]> = {
   'clock-glass':        ['oil', 'water', 'oil', 'syrup'],
   // More oil into the crowd, and now and then the soapy water that holds the films.
   'splodascope':        ['oil', 'oil', 'water'],
+  // More oil presses a new cell in among the others; the water wets the films.
+  'foam-cells':         ['oil', 'water'],
   // Oil poured onto a clear film joins it (it thickens where it lands, and tears again);
   // soap and alcohol are solvents that open a hole where they land (PLAN §20b); glycerine
   // is the lavender wash's body, which holds its place under the film.

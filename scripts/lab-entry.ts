@@ -21,7 +21,7 @@ import { DEFAULT_SETTINGS, type VisualizerSettings } from '../src/types';
 import type { GpuStepParams } from '../src/gpu/solverTypes';
 import { CELL_TRAVEL, advanceCellClock, stepDisplacement } from '../src/lib/detailFlow';
 import { phasePour, type PhasePourShape } from '../src/lib/phasePour';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, LAVA_BODIES, lavaLampCell } from '../src/lib/oilLay';
+import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs, LAVA_BODIES, lavaLampCell, foamSeeds, foamCell, FOAM_WASH, FOAM_CELL_DYE } from '../src/lib/oilLay';
 import { PRESETS } from '../src/presets';
 import { phasePourShape, PRESET_CONTRACTS, dyesOnPlate } from '../src/presetPlate';
 import { dyeAbsorbances } from '../src/lib/dye';
@@ -371,6 +371,14 @@ const api = {
   },
   /** One cell of the splodascope's lay, as seedPreset lays it. */
   splodascopeCell,
+  /** Foam Cells' pressed drops as the app lays them on an `n`-cell grid (src/lib/oilLay.ts, PLAN 47z-5), from a seeded stream of the lab's own; one cell of the lay; and its dye's depths. */
+  foamSeeds(seed: number, dyes: number, n: number) {
+    let s = seed;
+    return foamSeeds(() => (s = s * 16807 % 2147483647) / 2147483647, dyes, n);
+  },
+  foamCell,
+  foamWash: FOAM_WASH,
+  foamCellDye: FOAM_CELL_DYE,
   /** Every shipped look's id, for a check that asks something of all of them. */
   lookIds() { return PRESETS.map(p => p.id); },
   /** A palette colour as the app lays it: the dye's absorbance per unit (lib/dye.ts). */

@@ -2723,7 +2723,25 @@ seen here.
 5. On another look, Soap Film at 0: the look exactly as before.
 
 
-## 128. Glitter, the lens and a side lamp (PLAN 47e, 47d-1, 47b-1)
+## 128. Foam Cells: a packed foam at 120° (PLAN 47z-5)
+
+The check (`npm run foam`) proves, on the lab's software WebGPU at the app's 384², that the
+cells hold and that their junctions turn from the lay's random angles toward Plateau's 120°.
+How it looks at sixty frames, and with a band, is only seen here.
+
+1. Open **Foam Cells** on the lamp. Good: the dish filled with pale cells (icy blue, amber,
+   lavender) pressed into polygons, thin rust lines between them that meet in threes, a small
+   rust triangle at each meeting. Bad: round drops in rust water (a wet crowd), drops merging
+   in the first seconds, or square, grid-shaped cells.
+2. Watch the first five seconds: corners that start crooked should even out toward three equal
+   angles and the films straighten. The foam then stands almost still.
+3. With music, a hard kick should pop a film here and there, two cells becoming one with a
+   rust tail drawn back into the borders; the foam grows coarser over a few minutes. Bad:
+   every film popping at once, or none ever.
+4. Beside the macro film it was built from (`npm run watch -- --refs`,
+   `cosmo-packed-foam-cells`): the cells are bigger than the film's (PLAN 47z-8 says why).
+
+## 129. Glitter, the lens and a side lamp (PLAN 47e, 47d-1, 47b-1)
 
 The check (`npm run glint`) proves the laws, that off is off to the byte, that the side lamp
 lights the dye from its side and leaves black black, that glitter darkens a lamp ground in
