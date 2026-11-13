@@ -49,6 +49,7 @@ import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, B
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { besideStep } from '../gpu/besidePlate';
+import { mixWait } from './mixWait';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -402,6 +403,7 @@ export class FluidSimulation {
   */
   private gpuLanded = false;
   private seed: Float32Array[] | null = null;
+  private wait = mixWait(() => this.gpu);
   /*
     The liquids that never cross to the CPU (the ferrofluid, the mix, the
     reactions), handed from the last solver to this one (PLAN 9w; handOver
@@ -607,6 +609,7 @@ export class FluidSimulation {
     this.gpu = gpu;
     gpu.clear();
     this.carried = !!this.carry && !!gpu.takeOver?.(this.carry);
+    this.wait.play(gpu);
     // Its readings count from nothing again, and whatever was pending went with the last solver.
     this.dyeMoveAfter = 0; this.dyeMovePending = false; this.oilPressAfter = 0;
     this.keepSeed();
@@ -645,6 +648,7 @@ export class FluidSimulation {
       if (next) {
         this.carry?.destroy();
         this.carry = next;
+        this.wait.drop();
       }
     }
     gpu.dispose();
@@ -688,6 +692,7 @@ export class FluidSimulation {
     if (!this.seed) return false;
     const dst = [this.densityR, this.densityG, this.densityB, this.density, this.vx, this.vy, this.temp];
     for (let k = 0; k < dst.length; k++) dst[k].set(this.seed[k]);
+    this.wait.putBack();
     this.restAfterRestore();
     return true;
   }
@@ -1249,11 +1254,13 @@ export class FluidSimulation {
   /** A still picture poured as dye, into the middle of the dish (lib/videoFlow.ts). */
   injectImage(imgData: ImageData) { pourPictureCpu(this, imgData, this.size); }
 
+  /** Its oil, soap and acid gone, waiting or laid (mixWait.ts). */
+  clearChemistry() { this.wait.drop(); this.gpu?.clearChemistry?.(); }
   clearAll() {
     this.liquid.clear();
     this.speciesPoll.clear();
     this.gpu?.clear();
-    if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
+    this.clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0); this.temp0.fill(0);
@@ -1954,11 +1961,13 @@ export class FluidSimulation {
           one of the other dyes as its own colour (src/lib/oilLay.ts, and why;
           layCrowd). With Oil Bodies on (the look's) each body keeps its colour
           while it moves; Splodascope's Film Hold keeps its crowd apart where
-          they touch. The oil is laid only where the solver is there to take
-          it; before it is, the colours still land, as spots in the water.
+          they touch. The oil waits for a solver that is not there yet
+          (src/sim/mixWait.ts, PLAN 27f-9m); its colour share does not yet
+          (27f-9r), so on a look opened with the page that colour starts in
+          the water.
         */
         const water = col(0);
-        layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
+        layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.wait.lay(x, y, r, { oil }),
           (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
           (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
         break;
@@ -2029,7 +2038,7 @@ export class FluidSimulation {
       case 'lava-lamp': {
         // The wax as a liquid of its own, a pool and three bodies (PLAN 27f-9c; src/lib/oilLay.ts says why).
         const c = col(0);
-        layLavaLamp(S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }), (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
+        layLavaLamp(S, this.wait.oil, (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
         break;
       }
 

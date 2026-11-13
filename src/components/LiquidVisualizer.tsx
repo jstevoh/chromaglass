@@ -3821,7 +3821,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 new look is all but HANDOFF_KEEP of the plate.
               */
               if (!h.seeds) {
-                for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                for (const fluid of handed) { fluid.clearChemistry(); fluid.liquid.clear(); }
                 fluidsRef.current[0]?.gpu?.clearChemistry?.();
                 h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
@@ -3905,7 +3905,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const lambda = -Math.log(HANDOFF_KEEP);
                 fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
                 if (!h.seed) {
-                  if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry();
+                  fluid.clearChemistry();
                   fluid.liquid.clear();
                   let seeded: number[] = [];
                   h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });

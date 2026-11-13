@@ -1665,6 +1665,36 @@
       ]
     },
     {
+      "name": "A look's oil reaches its solver, whichever came first",
+      "shard": "logic",
+      "run": "npm run oillaid -- --node",
+      "why": [
+        "Lava Lamp's wax filmed as streaks on the Mac (PLAN 27f-9m): the look the page opens",
+        "on is laid before its solver is built, the oil went to `this.gpu?.addMix` and was",
+        "dropped, and the film was of dye alone (oil 0 for 150 s, read off the app's own mix",
+        "field). The real FluidSimulation on a stand-in solver that keeps every oil splat it",
+        "is handed, each line against the same look laid the way that always worked (a solver",
+        "there first): Lava Lamp, Clock Glass and Splodascope laid before any solver, after a",
+        "first solver dropped before it spoke (out of memory), and across a regrid, where the",
+        "carry has the oil and laying it again would double it; a look with no oil lays none,",
+        "and a cleared plate keeps none. The node half: a second, in any container."
+      ]
+    },
+    {
+      "name": "The look the page opens on holds its oil",
+      "shard": "open",
+      "run": "npm run oillaid",
+      "timeout": 4,
+      "why": [
+        "The other half of 27f-9m, in the app on Metal: each oil look opened by the address",
+        "(`?look=`), the solver's own mix field read back a few steps in, against the same",
+        "look laid again on the running page; and Lava Lamp's share against the area of its",
+        "four bodies. Before the fix the first reading was exactly zero. A stand-in cannot",
+        "say that App() and the visualizer lay and attach in the order the node half plays,",
+        "which is why this half is here."
+      ]
+    },
+    {
       "name": "A standing plate is a sealed bottle",
       "shard": "lab7",
       "run": "npm run sealed",

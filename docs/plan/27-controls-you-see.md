@@ -270,6 +270,62 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       solver's `REST_GAP`); a lab script that passes
       it as the gap is wrong by the name alone (it cost an hour here). Rename the key with a
       migration, or say so where `VisualizerSettings` declares it.
+    - **27f-9m. A look's oil laid before its solver is there (shipped 2026-11-12; story in
+      docs/plan-shipped.md §27f-9m).** The owner: on the Mac the wax smears into streaks
+      instead of holding round blobs. The filmed lamp had no wax in it: the look the page
+      opens on is seeded before the GPU solver is attached, its oil went to
+      `this.gpu?.addMix?.(…)` and was dropped, and its dye landed in water (the mix field's
+      oil 0 at every sample of 150 s). Clock Glass and Splodascope lost theirs the same way.
+      The oil waits now (`src/sim/mixWait.ts`) and is laid when the solver attaches;
+      `npm run oillaid`.
+    - **27f-9n, open. A lost device mid-show loses the plate's oil.** `dropGpu(true)` on a
+      solver that has spoken keeps the dye (the CPU's arrays, read back) and nothing of the
+      chemistry: the mix, the heat and the species live only on the GPU, and a device lost
+      without a hand-over has no carry to give the next solver. The plate comes back as its
+      colours in plain water. Wanted: the chemistry read back with the dye (slowly, a field
+      every few seconds is enough), or the look's oil laid again where its dye now is.
+    - **27f-9o, open. A bottle's dose given before the solver is there is dropped too.**
+      Read, not measured: the bottles' oil, soap and acid go to the solver by the same
+      optional call as the looks' did (`liquid.onDeposit`), so a pour in the page's first
+      second, or between a lost device and the next, lays its colour and not its liquid.
+      `mixWait` holds a look's splats; a pour is a stream over frames, so it wants its own
+      account of what is still owed.
+    - **27f-9p, open. What the lamp's Mac films showed was dye, so their verdicts want
+      reading again.** Every Mac take of Lava Lamp before 27f-9m opened the page on the look
+      (`?look=lava-lamp`), so 27f-9h's "hovers after 60 to 80 s", the "pale ghosts" and the
+      rim columns of its second take, and 27f-9f's Mac minute below were all a passive dye
+      in convecting water, not wax. The lab's numbers (which lay the oil themselves) stand.
+      Film the look again from an opened page before tuning anything on those verdicts.
+    - **27f-9q, open. The laid wax is heads on stalks, not round bodies: the tension is
+      capped a step, and breaks the wax up when the cap is lifted.** Measured 2026-11-12
+      with the wax really there (27f-9m). The Mac's app (256², 30 steps a second, 150 s): an
+      area-weighted roundness (4πA/P², a disc is 1) of 0.3 to 0.6, the cells over half oil
+      8.45% of the plate falling to 4.48% with the oil's sum kept. The lab on the app's own
+      step parameters reproduces it (`scratch/roundlab.mjs`, 90 s, mean roundness of the
+      samples from 5 s on): 0.48 as it is; the lasting current's cap lowered, the same to
+      the digit; 192² 0.60; Oil Weight halved 0.56 with more and smaller bodies; `OIL_TENSION`
+      ×4 0.45 and ×16 0.46, so more tension buys nothing. Why: `capillaryAt` holds the force
+      to `OIL_CELLS` (half a cell a step), and at the lamp's Oil Tension 1 the edge is
+      already on that cap. With the cap lifted (`OIL_CELLS` 50): 0.55 at today's tension with
+      the fringe down from 3.3% of the plate to 1.4%, and at ×2, ×4, ×16 and ×100 the wax is
+      gone (no body left from 35 s, 30 s, 15 s and 5 s, and under half a percent of the
+      plate over half oil at 90 s): the force is explicit, and
+      past the capillary step limit (Δt ≲ √(ρΔx³/2πσ), Brackbill 1992) it rings and tears
+      the edge. A cap of 2 cells at ×4 held and read 0.61. So the lamp's Bond number cannot
+      be brought down by turning tension up (27f-9i), which is the real reason a body rising
+      here fingers into a head and a stalk where a lamp's stays a ball. Two pieces of real
+      physics to build, in this order. **(a) A tension the step cannot break:** the
+      capillary force taken semi-implicitly (the interface's own motion over the step
+      counted in the curvature it is given, Hysing 2006), or substepped when it asks more
+      than a step can carry, as the slump and the ferrofluid are, so `OIL_CELLS` can go and
+      σ can be a lamp's. **(b) The second curvature:** the solver's κ is the edge's curve in
+      the plate alone, and between two glasses that is right, but a lamp is a bottle and its
+      wax a body of revolution: a stalk of width w has a curvature 2/w round itself that a
+      strip in a plane does not, which is what drains a real stalk into its head and pinches
+      it off (Rayleigh–Plateau; a straight strip in the plane has no such instability, so
+      the stalks here last). Wanted for a standing bottle: κ₂ from the body's local width
+      added to the Laplace pressure. Each with a check that holds a lamp's roundness over
+      two minutes of the app's own step, which `lavawax` (128², the lab's step) does not.
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
@@ -307,13 +363,16 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
       cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
       and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
-      take and the app's picture does not. What differs between the two is not yet known,
-      and is the next thing to measure before anything is changed: the app's grid and step
-      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
-      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
-      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
-      it would read the app's own fields after two minutes (the share of the dye inside
-      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
+      take and the app's picture does not. *What differed (27f-9m, the same day):* the
+      app's plate had no wax. Read from the filmed build's own fields over 150 s
+      (`?look=lava-lamp`, the Mac, Metal): the mix field's oil sums to 0 and no cell is
+      wax at any of eleven samples, while the dye is all there. The film is a dye in
+      convecting water, which folds into sheets as any passive colour does. With the wax
+      laid (27f-9m) the same 150 s on the Mac is bodies that go round and keep their edges,
+      though not round ones (27f-9q).
+      Still wanted: a check that reads the app's own fields after two minutes (the share
+      of the dye inside the wax, and the count of separate bodies), which the lab's
+      `lavawax` does not; `oillaid` asks only that the oil is there at the start.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).
