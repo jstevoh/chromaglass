@@ -12508,10 +12508,16 @@ at the glass (0.9 → 0.35, 7 mT; 0.6 → 0.25, 5 mT): at 18 and 12 mT the walki
 gathered the wider maze into one blob in 40 s, because the maze's grid-unit capillarity
 weakens with its period while the magnet's pull does not (38d-3).
 
-*Measured* (lab, 256², the look's pour, Labyrinth and walking magnet; the black's
-correlation length and its separate forms): Ferro Paint 1.83% / 55 forms → MEASURE_FP;
-Magnet Garden 2.36% / 27 → MEASURE_MG. `npm run bondmaze` 5/5. The Mac's films and the
-watch read against the photos are on the judging page.
+*Measured* on the Mac (`npm run film`, seed 1, 60 s; `npm run watch -- <take> --vs <ref>`,
+form scale across / forms a frame): Ferro Paint 1.6% / 64 → 3.2% / 55 (Colored I 10.9 / 21,
+Colored II 5.3 / 30: from 6.8× and 3.3× finer to 3.4× and 1.6×); Magnet Garden 2.8% / 31 →
+5.3% / 3 (the labyrinth photo 15.2 / 40, the thin-cell film 3 forms). In the lab (256², the
+look's pour, Labyrinth and walking magnet, 20 s; the black's correlation length and its
+separate forms): Ferro Paint 1.83% / 55 → 2.4% / 14, Magnet Garden 2.36% / 27 → 5.8% / 4.
+`npm run bondmaze` 5/5. Left: luminance (Ferro Paint 0.14 against 0.51–0.56) is 9ac;
+Magnet Garden's black now stands in wide pools on a joined gold sheet rather than
+stripes, the near-onset look of the thin cell rather than the labyrinth photo, which is
+the owner's call (judging).
 
 ## 38r. The rest gap: a real 2 mm glass sandwich (#613, #641, 2026-10-31)
 

@@ -2702,3 +2702,12 @@ Android TV WebView, and the look changing on the Mac, are only seen here.
    (a second Back leaves for the list of Macs, as before).
 5. Good: each press changes the Mac within a second. Bad: a key that does nothing, Back
    leaving the show while the list is open, or the D-pad moving a focus ring on the page.
+
+## 128. The ferrofluid's fingers as wide as the photos (PLAN 38d-1)
+
+Ferro Paint and Magnet Garden, before and after, filmed on the Mac (seed 1, 60 s). The
+maze's period now follows the coil's field through the magnetic Bond number, and both looks
+sit near the onset, where the photos' wide cells are. Judge: Ferro Paint's channels and
+cells against Colored I and II (twice as wide; still darker than the photos, 9ac); Magnet
+Garden's black, now a few wide pools on a joined gold sheet, against the thin-cell film's
+few broad fingers and the labyrinth photo's many stripes: which of the two it should be.
