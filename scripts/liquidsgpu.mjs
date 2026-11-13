@@ -103,10 +103,11 @@
  * Lines marked owed are measured and printed and do not fail the run: each
  * names the PLAN item that fixes it, and fails the run the day it passes,
  * so the fix promotes it to a gating line rather than leaving it owed. On
- * SwiftShader (2026-10-27) soap, milk and silicone do nothing on a still
- * plate (15e-1: glycerine still crawls there, its thickness being the thin
- * gap's own drag, every step); soap and silicone erase where they should
- * push (15e-5); and where the passes run they arrive at about a fifth of
+ * SwiftShader (2026-10-27) soap, milk and silicone did nothing on a still
+ * plate (15e-1: their passes ran only in the fold of a frame's deltas;
+ * shipped 2026-11-13, the step runs them itself, and the still plate's
+ * lines gate, reading what the fold-every-step plate reads); soap and
+ * silicone erase where they should push (15e-5); and where the passes run they arrive at about a fifth of
  * the stand-in's (15e-2): the GPU scales each by the solver's step, 0.004,
  * where the stand-in, and the app's CPU before the GPU had the liquids,
  * scaled them by the frame's 1/60 s. Folded with 1/60 in place of 0.004 (a
@@ -124,15 +125,10 @@ import { soapScene, glycerineScene, milkScene, siliconeScene } from './liquidSta
 
 /** Lines measured and owed by a PLAN item: printed, never failing, until they pass. */
 const OWED = {
-  'soap, a still plate: drives dye out of the spot': '15e-1',
-  'soap, a still plate: the disc stays open': '15e-1',
-  'soap, a still plate: as strong as the stand-in at half a second': '15e-1, 15e-2',
-  'soap, a still plate: as strong as the stand-in at two seconds': '15e-1',
+  'soap, a still plate: as strong as the stand-in at half a second': '15e-2',
   'soap, a still plate: moves the dye rather than erasing it': '15e-5',
-  'milk, a still plate: keeps its pool tighter than bare dye': '15e-1',
-  'milk, a still plate: as strong as the stand-in': '15e-1, 15e-4',
-  'silicone, a still plate: clears the middle': '15e-1',
-  'silicone, a still plate: as strong as the stand-in': '15e-1, 15e-2',
+  'milk, a still plate: as strong as the stand-in': '15e-4',
+  'silicone, a still plate: as strong as the stand-in': '15e-2',
   'silicone, a still plate: moves the dye rather than erasing it': '15e-5',
   'soap, every step: as strong as the stand-in at half a second': '15e-2',
   'soap, every step: moves the dye rather than erasing it': '15e-5',
@@ -369,8 +365,8 @@ for (const [mode, m] of [['every step', r.every], ['a still plate', r.still]]) {
   const k = m.milk.spread / m.bare.spread;
   console.log(`  milk, ${mode}: spread about its centre ${m.bare.spread.toFixed(3)} bare, ${m.milk.spread.toFixed(3)} held`);
   check(`milk, ${mode}: the pour landed`, m.milk.laid > 1, `${m.milk.laid.toFixed(1)} of repel in the field`);
-  // Owed on a still plate, where it reads exactly 1: it counts as passing there only past half the stand-in's effect.
-  check(`milk, ${mode}: keeps its pool tighter than bare dye`, k < 1, `${f3(k)} of bare dye's spread (the stand-in ${f3(sIn.milk.tight / sIn.milk.loose)})`, { clear: 1 - k > std.milk / 2, value: k });
+  // On a still plate it read exactly 1 and was owed to 15e-1; the forces run every step now, and it gates there as it does with a fold.
+  check(`milk, ${mode}: keeps its pool tighter than bare dye`, k < 1, `${f3(k)} of bare dye's spread (the stand-in ${f3(sIn.milk.tight / sIn.milk.loose)})`);
   check(`milk, ${mode}: as strong as the stand-in`, agrees(1 - k, std.milk), `effect ${(1 - k).toFixed(4)} against ${std.milk.toFixed(4)}`, { value: k });
 
   const c = m.silicone;
@@ -392,5 +388,5 @@ check('no GPU errors', gpuErrors.length === 0, gpuErrors[0] ?? '');
 
 const failed = checks.filter((c) => c.failed);
 const owed = checks.filter((c) => OWED[c.name]).length;
-console.log(`\n${checks.length - owed - failed.filter((c) => !OWED[c.name]).length}/${checks.length - owed} gating checks passed, ${owed} owed (PLAN 15e-1 to 15e-5)${failed.length ? `, ${failed.length} failed` : ''}`);
+console.log(`\n${checks.length - owed - failed.filter((c) => !OWED[c.name]).length}/${checks.length - owed} gating checks passed, ${owed} owed (PLAN 15e-2 to 15e-5)${failed.length ? `, ${failed.length} failed` : ''}`);
 process.exit(failed.length ? 1 : 0);

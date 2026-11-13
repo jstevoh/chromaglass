@@ -12,6 +12,25 @@ import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../l
 import { BOIL_PROPERTIES_WGSL } from '../lampBoil';
 
 export const FORCE_KERNELS: Record<string, string> = {
+  /*
+    A poured soap thins the dye it lies on, once a step (stepLiquids,
+    PLAN 15e-1). This is the multiply `deltaDye` carried, with the same
+    numbers, moved out of the fold of the hand's deltas so that it runs on
+    every step the soap is there and once on each. It erases where a soap
+    should push the dye out of its way; that is PLAN 15e-5's to replace.
+  */
+  soapThin: `${HEAD}
+@group(0) @binding(2) var dye: texture_2d<f32>;
+@group(0) @binding(3) var liquids0: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let soap = textureLoad(liquids0, p, 0).r;
+  let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
+  textureStore(dst, p, capDye(textureLoad(dye, p, 0) * soapMul));
+}`,
+
   liquidForces: `${HEAD}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var liquids0: texture_2d<f32>;

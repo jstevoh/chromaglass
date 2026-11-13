@@ -276,20 +276,17 @@ and on a still plate. SwiftShader, 2026-10-27 (effect = one less the share left)
 Neither plate's soap moves the dye it clears: the spot loses exactly what the whole plate
 loses (GPU, soap 149 to 107 at the spot and 507 to 465 on the plate; stand-in, 150 to 66
 and 507 to 423), so both clear by erasing (15e-5), and the table's soap and silicone rows
-compare two erasures. 21 lines gate; 16 are owed to the items below, print, and fail the
-run the day they pass (an owed line that reads no number fails too), so the fix that makes
-one pass also makes it gate. Briefs 11 (15e-1 and 15e-2) and 12 (15e-5) in the shared
-briefs.
+compare two erasures. 21 lines gated and 16 were owed to the items below; an owed line
+prints, and fails the run the day it passes (one that reads no number fails too), so the
+fix that makes one pass also makes it gate. Since 15e-1 shipped the still plate reads what
+the fold-every-step plate reads (the table's third column is its second), 26 lines gate
+and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
 
-- **15e-1. The liquids' forces act only on a frame something else is laid in.**
-  `liquidForces` (and soap's thinning, in `deltaDye`) run inside `foldDeltas`, which runs
-  only in `applyDeltas` and `applySplats`, and the app calls those only on a frame that is
-  `dirty` (LiquidVisualizer's step: a hand, a drop, a pour). On a still dish a spot of
-  soap pushes for the one step its own pour folds, then never again: the soap scene
-  leaves 99.6% of the dye at its spot where a fold every step leaves 72%. Glycerine is
-  the exception, as its thickness on a thin gap is the species' viscosity in the thin
-  solve, every step. Move the liquids' forces into the step, once a step, whether or not
-  the CPU sent anything. *Measure:* `npm run liquidsgpu`'s "a still plate" lines.
+- ~~**15e-1. The liquids' forces act only on a frame something else is laid in.**~~
+  **Shipped** (2026-11-13, met again as 14ab-16): the step runs them itself, once a step,
+  on any plate a bottle was poured on (`stepLiquids`); `npm run liquidpush`, and
+  `liquidsgpu`'s five "a still plate" lines owed to it gate. Story in
+  `docs/plan-shipped.md` §15e-1.
 - **15e-2. Where they act, the liquids' passes are about a fifth of the stand-in's.** The GPU
   scales each force by the solver's `dt` (0.004 in the lab; 0.0036 for the app at the
   default Speed), where liquidPhase.ts and the app's CPU before the port scaled them by
@@ -355,6 +352,29 @@ briefs.
   oil and syrup parting where they meet and a finger mixing them; liquidsgpu has only the
   four liquids' scenes. Lay those four on the GPU the same way, with the same owed rule,
   before or with Brief 11, which changes the forces they would measure.
+- **15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**
+  `liquidForces` adds to the flow before the step keeps "the velocity from before the
+  forces" (`thin gap keep`), as it did from the fold, so a thin gap reads the push as flow
+  the liquid already had and its drag has it within the step, where the oil's tension, the
+  magnet and the maze go in after the keep and are read as a speed to drive the liquid to.
+  Measured (`npm run liquidpush`, 64², six steps, a heavy drop on a plate rocked 0.5): the
+  slide under the drop is 3.4e-2 on the open plate and −9.4e-4 on the thin gap, beside a
+  flow of 0.53, under what a half float resolves there. So on the plate every look uses, a
+  heavy liquid does not slide down a rocked plate and an oil does not keep to itself by
+  these forces; what a bottle does there is its species' viscosity and weight in the thin
+  solve (18d) and the soap's erasure (15e-5). Move the pass after the keep and give its
+  constants the thin solve's units (a force per unit of drag, with 15e-2's time base), or
+  retire the terms the species already carry. Not done with 15e-1 because it changes what
+  every poured bottle does in every look, and wants its own before and after. *Measure:*
+  liquidpush's thin-gap reach line asks the slide the rock's way, as the open plate's does.
+- **15e-11. The CPU's stand-aside copy still asks for a fold every step (found with
+  15e-1).** `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so
+  the first pour on a new solver lands in the CPU's copy too, which then never decays
+  (`LiquidPhase.step` returns early) and marks the deltas written on every step until a
+  Clear: a fold of nothing each step, which was what kept the forces running and is now
+  only cost. Set `gpuNative` before the pour can land and return from `stepLiquid` when the
+  GPU has the liquids. 14ab-11 (the GPU efficiency PR) changes the same lines; settle it
+  there or after it.
 - **15e-9. Two lab checks at once share one bundle.** `scripts/lab.mjs` writes the plain
   lab's page to one file in `node_modules/.cache` for every run, so two lab checks started
   together (`npm run quick` runs them side by side) can load a bundle the other is writing.
