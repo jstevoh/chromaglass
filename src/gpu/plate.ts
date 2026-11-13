@@ -493,7 +493,6 @@ export class WebGPUPlate {
     }));
     this.auxSize = [size.width, size.height];
   }
-  }
 
   /** The uniforms for a projector's plate source, to fill with `fillPlateUniforms` before `drawSource`. */
   sourcePack(kind: string): UniformPack {
