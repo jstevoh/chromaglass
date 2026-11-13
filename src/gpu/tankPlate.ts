@@ -45,17 +45,26 @@ export interface TankStepParams {
   tankHue?: number;
 }
 
+const NO_TANK: TankStepParams = Object.freeze({});
+
 export function tankStep(s: TankStepParams, layer: number): TankStepParams {
-  if (layer > 0 || !((s.tank ?? 0) > 0.001)) return {};
+  if (layer > 0 || !((s.tank ?? 0) > 0.001)) return NO_TANK;
   return { tank: s.tank, tankFeed: s.tankFeed ?? 1.5, tankWeight: s.tankWeight ?? 0.5, tankNozzle: s.tankNozzle ?? 0.5, tankDrain: s.tankDrain ?? 1, tankHue: s.tankHue ?? 205 };
 }
 
-/** A hue's colour at full saturation and value, 0..1 per channel (the dye's glow; the camera's bloom spreads it). */
-export function hueColour(deg: number): [number, number, number] {
+/**
+ * A hue's colour at full saturation and value, 0..1 per channel, written into
+ * `out` (the dye's glow; the camera's bloom spreads it). Into an array the
+ * caller keeps, since a cord on Glow Hue changes it every step.
+ */
+export function hueColour(deg: number, out: [number, number, number]): [number, number, number] {
   const h = (((deg % 360) + 360) % 360) / 60;
   const x = 1 - Math.abs((h % 2) - 1);
-  const [r, g, b] = h < 1 ? [1, x, 0] : h < 2 ? [x, 1, 0] : h < 3 ? [0, 1, x] : h < 4 ? [0, x, 1] : h < 5 ? [x, 0, 1] : [1, 0, x];
-  return [r, g, b];
+  const k = Math.floor(h) % 6;
+  out[0] = k === 0 || k === 5 ? 1 : k === 1 || k === 4 ? x : 0;
+  out[1] = k === 1 || k === 2 ? 1 : k === 0 || k === 3 ? x : 0;
+  out[2] = k === 3 || k === 4 ? 1 : k === 2 || k === 5 ? x : 0;
+  return out;
 }
 
 /** What the plate draws: the dye, and how it glows. */
@@ -87,7 +96,7 @@ export class TankPlate {
   constructor(device: GPUDevice) {
     this.tank = createTankGpu(device, { nx: TANK_PLATE_NX, ny: TANK_PLATE_NY, width: TANK_PLATE_WIDTH });
     this.tank.write({});
-    this.field = { ...this.tank.field, colour: hueColour(205), glow: 1 };
+    this.field = { ...this.tank.field, colour: hueColour(205, [0, 0, 0]), glow: 1 };
   }
 
   /** A step of `seconds` of the tank's own time, on `enc`. */
@@ -103,8 +112,14 @@ export class TankPlate {
     this.tank.encode(enc, Math.max(0, Math.min(0.1, seconds)), o);
     this.field.c = this.tank.field.c;
     const hue = p.tankHue ?? 205;
-    if (hue !== this.hue) { this.hue = hue; this.field.colour = hueColour(hue); }
+    if (hue !== this.hue) { this.hue = hue; hueColour(hue, this.field.colour); }
     this.field.glow = Math.max(0, Math.min(1, p.tank ?? 1));
+  }
+
+  /** Clear water again (the plate's wipe). */
+  reset(): void {
+    this.tank.write({});
+    this.field.c = this.tank.field.c;
   }
 
   dispose(): void {

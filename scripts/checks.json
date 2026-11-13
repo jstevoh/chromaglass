@@ -1366,10 +1366,12 @@
       "why": [
         "The tank's GPU solver (PLAN 47n, src/gpu/tank.ts) against its CPU",
         "reference (scripts/tankgpu.mjs): faces and dye cell by cell after two",
-        "steps and the jet's dye after a second, and the physics at the app's own",
-        "sweep count (the lock exchange's fronts, a closed tank's dye kept, the",
-        "jet steady and thinning). In a lab part because it opens the lab page",
-        "and asks for a WebGPU adapter; lab5 held one check. About a minute on",
+        "steps and the jet's dye after a second, the physics at the app's own",
+        "V-cycles a substep (the lock exchange's fronts, a closed tank's dye kept,",
+        "the jet steady and thinning), and the app's own grid at the heaviest",
+        "settings held finite and divergence-free (where 40 SOR sweeps blew up).",
+        "In a lab part because it opens the lab page",
+        "and asks for a WebGPU adapter; lab5 held one check. About 95 s on",
         "SwiftShader."
       ]
     },

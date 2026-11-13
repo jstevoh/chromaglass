@@ -310,7 +310,9 @@ and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
   through the plate's hold coordinates, turned back to the screen assuming its long side is
   the width and the camera unzoomed and unturned (`gpu/tankPlate.ts`, `screenX`). Hand the
   solver the screen's own mapping so a portrait screen or a zoomed camera lands the nozzle
-  under the finger.
+  under the finger. A screen wider than 16:9 is off too: the tank keeps its shape and fills
+  the height there, with black water at the sides (`gpu/tankDraw.ts`), so the finger's x wants
+  that letterbox taken out as well.
 - **47n-4. Open: a Gravity Tank look.** Tank is a switch on any look today. A built-in look
   needs its plate entries (`presetPlate.ts`: dyes, tools, liquids) and a seed case in
   `sim/fluidSimulation.ts`, which is over its size ceiling, so the seed goes in a module
@@ -322,7 +324,10 @@ and Glow Hue on the desk, the phone and MIDI; a held finger carries the nozzle.
   their own colours and weights, each a concentration the flux form carries.
 - **47n-6. Open: the dish's solver rests while the tank shows.** With Tank up the plate's
   own solver still steps under it, unseen. Skipping it would hand the tank the frame's
-  whole budget; it has to come back where it was when Tank goes off.
+  whole budget; it has to come back where it was when Tank goes off. Touches and pours land
+  on that hidden plate too (a pour's dye, a magnet, a blow), so a tap meant for the tank
+  changes a look nobody sees until Tank goes off: route them to the tank (a tap drops a bead
+  of dye where it lands) or hold them while it shows.
 
 ## 47w. Found doing this: the watch tool keeps the audio and stops (S)
 

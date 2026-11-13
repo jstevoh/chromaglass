@@ -126,6 +126,8 @@ function displayRecipe(device: GPUDevice, format: GPUTextureFormat, toTexture: b
 
 export class WebGPUPlate {
   private readonly disposer = new Disposer();
+  // Hands a buffer a draw makes to the disposer (the tank's arguments, tankDraw.ts): one function, not one a frame.
+  private readonly trackBuf = (b: GPUBuffer): GPUBuffer => this.disposer.track(b);
   private readonly pipelines: PipelineCache;
   private readonly sampler: GPUSampler;
   private readonly uniformBuffer: GPUBuffer;
@@ -426,7 +428,7 @@ export class WebGPUPlate {
     }
 
     // The tank's side view (PLAN 47n) draws in the plate's place when its look is up.
-    if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.aux), fields[0]?.tank, size, timestamps, toTexture, format)) {
+    if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.aux), fields[0]?.tank, size, timestamps, toTexture, format, this.trackBuf)) {
       this.display(encoder, target, viewOf(this.aux), this.uniformBuffer, fields, timestamps, toTexture, format);
     }
   }
@@ -473,7 +475,7 @@ export class WebGPUPlate {
       }));
       this.sourceAuxSize = [size.width, size.height];
     }
-    if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.sourceAux), fields[0]?.tank, size, timestamps, true, format)) {
+    if (!drawTank(this.device, this.pipelines, encoder, target, viewOf(this.sourceAux), fields[0]?.tank, size, timestamps, true, format, this.trackBuf)) {
       this.display(encoder, target, viewOf(this.sourceAux), set.buffer, fields, timestamps, true, format);
     }
   }

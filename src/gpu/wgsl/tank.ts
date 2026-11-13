@@ -20,8 +20,11 @@
  *   `tankForce`    water's viscosity on what was carried, and the new dye's
  *                  weight on the y-faces, back into `u`, `v`;
  *   `tankDiv`      the cells' divergence;
- *   `tankSorRed`, `tankSorBlack`  one red-black SOR sweep on the pressure's
- *                  impulse `q`, in place (a red cell reads only black ones);
+ *   `tankSmoothRed`, `tankSmoothBlack`, `tankRestrict`, `tankProlong`  the
+ *                  pressure's impulse `q` by a multigrid V-cycle: red-black
+ *                  sweeps in place on each level (a red cell reads only
+ *                  black ones), the residual summed to the next level down,
+ *                  the correction added back bilinearly;
  *   `tankProject`  the interior faces lose q's gradient.
  *
  * One thread per cell, or per face corner ((nx+1) × (ny+1), which covers both
@@ -31,7 +34,7 @@
 const HEAD = /* wgsl */ `
 struct TankU {
   nx: u32, ny: u32, i0: u32, i1: u32,
-  k: f32, nuK: f32, gh: f32, omega: f32,
+  k: f32, nuK: f32, gh: f32, pad0: f32,
   feed: f32, levelOut: f32, floorOut: f32, pad: f32,
 };
 @group(0) @binding(0) var<uniform> T: TankU;
@@ -213,25 +216,77 @@ ${CELL_GUARD}
 `;
 
 /*
-  One colour of a sweep. The thread grid is half as wide as the tank: thread
-  (h, j) takes cell i = 2h + ((j + colour) & 1), the reference's order (a
-  colour's cells are those with i + j of its parity).
+  The multigrid's passes (lib/tank.ts vCycle, and why). Each level has its
+  own small uniform, its size and the relaxation its sweeps take (1, Gauss–
+  Seidel, on every level but the coarsest, which takes its SOR optimum).
 */
-const sor = (colour: number) => /* wgsl */ `${HEAD}
-@group(0) @binding(1) var<storage, read> div: array<f32>;
+const LEVEL = /* wgsl */ `
+struct LevelU { nx: u32, ny: u32, omega: f32, pad: f32 };
+@group(0) @binding(0) var<uniform> V: LevelU;
+`;
+
+/*
+  One colour of a sweep. The thread grid is half as wide as the level:
+  thread (h, j) takes cell i = 2h + ((j + colour) & 1), the reference's
+  order (a colour's cells are those with i + j of its parity).
+*/
+const smooth = (colour: number) => /* wgsl */ `${LEVEL}
+@group(0) @binding(1) var<storage, read> b: array<f32>;
 @group(0) @binding(2) var<storage, read_write> q: array<f32>;
 @compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) gid: vec3u) {
   let j = gid.y;
   let i = gid.x * 2u + ((j + ${colour}u) & 1u);
-  if (i >= T.nx || j >= T.ny) { return; }
+  if (i >= V.nx || j >= V.ny) { return; }
+  let k = j * V.nx + i;
   var sum = 0.0; var deg = 0.0;
-  if (i > 0u) { sum += q[cell(i - 1u, j)]; deg += 1.0; }
-  if (i < T.nx - 1u) { sum += q[cell(i + 1u, j)]; deg += 1.0; }
-  if (j > 0u) { sum += q[cell(i, j - 1u)]; deg += 1.0; }
-  if (j < T.ny - 1u) { sum += q[cell(i, j + 1u)]; deg += 1.0; }
-  let k = cell(i, j);
-  let want = (sum - div[k]) / deg;
-  q[k] = q[k] + T.omega * (want - q[k]);
+  if (i > 0u) { sum += q[k - 1u]; deg += 1.0; }
+  if (i < V.nx - 1u) { sum += q[k + 1u]; deg += 1.0; }
+  if (j > 0u) { sum += q[k - V.nx]; deg += 1.0; }
+  if (j < V.ny - 1u) { sum += q[k + V.nx]; deg += 1.0; }
+  q[k] = q[k] + V.omega * ((sum - b[k]) / deg - q[k]);
+}
+`;
+
+// The fine level's residual summed over each 2 × 2 block into the coarse right-hand side; the coarse correction zeroed. One thread a coarse cell; V is the fine level's.
+const RESTRICT = /* wgsl */ `${LEVEL}
+@group(0) @binding(1) var<storage, read> qf: array<f32>;
+@group(0) @binding(2) var<storage, read> bf: array<f32>;
+@group(0) @binding(3) var<storage, read_write> qc: array<f32>;
+@group(0) @binding(4) var<storage, read_write> bc: array<f32>;
+@compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let cx = V.nx / 2u; let cy = V.ny / 2u;
+  let I = gid.x; let J = gid.y;
+  if (I >= cx || J >= cy) { return; }
+  var r = 0.0;
+  for (var bj = 0u; bj < 2u; bj++) {
+    for (var bi = 0u; bi < 2u; bi++) {
+      let i = 2u * I + bi; let j = 2u * J + bj; let k = j * V.nx + i; let m = qf[k];
+      var lap = 0.0;
+      if (i > 0u) { lap += qf[k - 1u] - m; }
+      if (i < V.nx - 1u) { lap += qf[k + 1u] - m; }
+      if (j > 0u) { lap += qf[k - V.nx] - m; }
+      if (j < V.ny - 1u) { lap += qf[k + V.nx] - m; }
+      r += bf[k] - lap;
+    }
+  }
+  bc[J * cx + I] = r;
+  qc[J * cx + I] = 0.0;
+}
+`;
+
+// The coarse correction added to the fine level, bilinear on the cell centres, clamped at the walls. One thread a fine cell; V is the fine level's.
+const PROLONG = /* wgsl */ `${LEVEL}
+@group(0) @binding(1) var<storage, read> qc: array<f32>;
+@group(0) @binding(2) var<storage, read_write> qf: array<f32>;
+@compute @workgroup_size(8, 8) fn main(@builtin(global_invocation_id) gid: vec3u) {
+  let i = gid.x; let j = gid.y;
+  if (i >= V.nx || j >= V.ny) { return; }
+  let cx = V.nx / 2u; let cy = V.ny / 2u;
+  let X = clamp(f32(i) / 2.0 - 0.25, 0.0, f32(cx - 1u)); let Y = clamp(f32(j) / 2.0 - 0.25, 0.0, f32(cy - 1u));
+  let I = min(cx - 2u, u32(floor(X))); let J = min(cy - 2u, u32(floor(Y)));
+  let a = X - f32(I); let c = Y - f32(J);
+  qf[j * V.nx + i] += (qc[J * cx + I] * (1.0 - a) + qc[J * cx + I + 1u] * a) * (1.0 - c)
+                    + (qc[(J + 1u) * cx + I] * (1.0 - a) + qc[(J + 1u) * cx + I + 1u] * a) * c;
 }
 `;
 
@@ -252,8 +307,10 @@ export const TANK_KERNELS = {
   tankAdvect: ADVECT,
   tankForce: FORCE,
   tankDiv: DIV,
-  tankSorRed: sor(0),
-  tankSorBlack: sor(1),
+  tankSmoothRed: smooth(0),
+  tankSmoothBlack: smooth(1),
+  tankRestrict: RESTRICT,
+  tankProlong: PROLONG,
   tankProject: PROJECT,
 } as const;
 

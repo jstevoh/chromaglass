@@ -692,6 +692,8 @@ export class FluidCore {
     // on the next deposit, and until then the plate shows the (empty) dye.
     this.printLive = false;
     this.resetFilm();
+    // And the tank's water clear again (PLAN 47n): the performer's wipe is the tank emptied and refilled.
+    this.tankPlate?.reset();
     const enc = this.device.createCommandEncoder({ label: 'clear' });
     const pass = enc.beginComputePass({ label: 'clear' });
     // The sim buffer only needs its grid sizes for a fill, and the cover's gap

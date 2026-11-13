@@ -67,9 +67,10 @@
      a less diffusive scheme (PLAN 47n-2) without touching anything else.
 
   6. Viscosity explicitly (ν dt/dx² is under 0.05 at the frame's step on
-     the app's grid), then the pressure: red-black SOR on the cell
-     divergence with the boundary flows held, warm-started from the last
-     step's, and the gradient subtracted from the interior faces.
+     the app's grid), then the pressure: a multigrid V-cycle (vCycle, and
+     why) on the cell divergence with the boundary flows held, warm-started
+     from the last step's, and the gradient subtracted from the interior
+     faces.
 
   Substeps. The step is cut so no flow crosses more than 0.45 of a cell a
   substep. The speed is bounded without reading the field (which on the GPU
@@ -105,8 +106,8 @@ export interface Tank {
   q: Float64Array;
   fedIn: number;
   leftOut: number;
-  /** SOR sweeps the last solve took (the CPU solves to a tolerance). */
-  sweeps: number;
+  /** V-cycles the last solve took (the CPU solves to a tolerance). */
+  cycles: number;
 }
 
 export interface TankOptions {
@@ -121,8 +122,8 @@ export interface TankOptions {
   /** the share of the fed water leaving through the floor (the rest raises the level). */
   drain?: number;
   nu?: number;
-  /** a fixed SOR sweep count (the GPU's way); left out, the CPU solves to `tol`. */
-  sweeps?: number;
+  /** a fixed V-cycle count (the GPU's way); left out, the CPU solves to `tol`. */
+  cycles?: number;
   tol?: number;
 }
 
@@ -134,7 +135,7 @@ export function createTank(o: { nx: number; ny: number; width: number }): Tank {
     v: new Float64Array(nx * (ny + 1)),
     c: new Float64Array(nx * ny),
     q: new Float64Array(nx * ny),
-    fedIn: 0, leftOut: 0, sweeps: 0,
+    fedIn: 0, leftOut: 0, cycles: 0,
   };
 }
 
@@ -152,9 +153,130 @@ export function tankSubsteps(dt: number, dx: number, height: number, gPrime: num
   return Math.max(1, Math.min(TANK_MAX_SUBSTEPS, Math.ceil((vmax * dt) / (TANK_CFL * dx))));
 }
 
-/** The SOR relaxation for an nx × ny box (optimal for the Laplacian on the longer side). */
-export function tankOmega(nx: number, ny: number): number {
-  return 2 / (1 + Math.sin(Math.PI / Math.max(nx, ny)));
+/*
+  The pressure, by multigrid. First written as red-black SOR solved to a
+  tolerance on the CPU and cut to a fixed 40 sweeps a substep on the GPU.
+  That held on the checks' 128-wide tanks and blew up on the app's 256 ×
+  144 one (Dye Weight 1%, Feed 3 cm/s: NaN in a quarter of a second; 150
+  sweeps held, Chebyshev-accelerated SOR at 40 blew up sooner). The nozzle
+  feeds at the surface and the drain takes the water out across the floor,
+  so the pressure that carries one to the other spans the whole tank, and a
+  sweep moves news one cell: 40 sweeps cannot reach a floor 144 cells down,
+  the flow is left divergent, and the dye's flux runs past its CFL bound.
+  A grid of half the cells carries the same news twice as far a sweep, so a
+  V-cycle (Brandt 1977; Briggs, Henson and McCormick, *A Multigrid Tutorial*,
+  2000) smooths on each grid what that grid can, down to one of a few dozen
+  cells across, which is solved outright:
+    on each level, two red-black Gauss–Seidel sweeps; the residual
+      r = b − Σ_open(q_nb − q), summed over each 2 × 2 block to the next
+      level's right-hand side (cell-centred: the coarse cell is twice as
+      wide, so the same unscaled 5-point operator there wants the fine
+      residual times four, the block's sum), its correction started at 0;
+    on the coarsest, SOR at that grid's optimal ω, as many sweeps as its longer side;
+    back up, each correction added bilinearly (cell-centred, clamped at the
+      walls, which are closed), then two more sweeps.
+  The levels halve while both sides are even and at least 8 cells (the
+  app's 256 × 144 is five levels to 16 × 9). The GPU runs the same cycle,
+  pass for pass (wgsl/tank.ts), a fixed number a substep (TANK_CYCLES); the
+  CPU repeats it to a tolerance unless told the GPU's count.
+*/
+export const TANK_SMOOTH = 2;
+
+export function tankLevels(nx: number, ny: number): [number, number][] {
+  const out: [number, number][] = [[nx, ny]];
+  let [a, b] = [nx, ny];
+  while (a % 2 === 0 && b % 2 === 0 && a / 2 >= 8 && b / 2 >= 8) { a /= 2; b /= 2; out.push([a, b]); }
+  return out;
+}
+
+/** The coarsest grid's SOR: its optimal ω and sweep count. */
+export function tankCoarse(nx: number, ny: number): { omega: number; sweeps: number } {
+  return { omega: 2 / (1 + Math.sin(Math.PI / Math.max(nx, ny))), sweeps: Math.max(nx, ny) };
+}
+
+/** One red-black colour of a sweep on an nx × ny level; the largest change, for the tolerance. */
+function smooth(q: Float64Array, b: Float64Array, nx: number, ny: number, colour: number, omega: number): number {
+  let big = 0;
+  for (let j = 0; j < ny; j++) for (let i = (j + colour) & 1; i < nx; i += 2) {
+    let sum = 0, deg = 0;
+    if (i > 0) { sum += q[j * nx + i - 1]; deg++; }
+    if (i < nx - 1) { sum += q[j * nx + i + 1]; deg++; }
+    if (j > 0) { sum += q[(j - 1) * nx + i]; deg++; }
+    if (j < ny - 1) { sum += q[(j + 1) * nx + i]; deg++; }
+    const d = (sum - b[j * nx + i]) / deg - q[j * nx + i];
+    if (Math.abs(d) > big) big = Math.abs(d);
+    q[j * nx + i] += omega * d;
+  }
+  return big;
+}
+
+/** The fine level's residual, summed over each 2 × 2 block into the coarse right-hand side; the coarse correction zeroed. */
+function restrictResidual(qf: Float64Array, bf: Float64Array, nx: number, ny: number, qc: Float64Array, bc: Float64Array): void {
+  const cx = nx / 2, cy = ny / 2;
+  for (let J = 0; J < cy; J++) for (let I = 0; I < cx; I++) {
+    let r = 0;
+    for (let bj = 0; bj < 2; bj++) for (let bi = 0; bi < 2; bi++) {
+      const i = 2 * I + bi, j = 2 * J + bj, k = j * nx + i, m = qf[k];
+      let lap = 0;
+      if (i > 0) lap += qf[k - 1] - m;
+      if (i < nx - 1) lap += qf[k + 1] - m;
+      if (j > 0) lap += qf[k - nx] - m;
+      if (j < ny - 1) lap += qf[k + nx] - m;
+      r += bf[k] - lap;
+    }
+    bc[J * cx + I] = r;
+    qc[J * cx + I] = 0;
+  }
+}
+
+/** The coarse correction added to the fine level, bilinear on the cell centres, clamped at the walls. */
+function prolong(qc: Float64Array, qf: Float64Array, nx: number, ny: number): void {
+  const cx = nx / 2, cy = ny / 2;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const X = Math.max(0, Math.min(cx - 1, i / 2 - 0.25)), Y = Math.max(0, Math.min(cy - 1, j / 2 - 0.25));
+    const I = Math.min(cx - 2, Math.floor(X)), J = Math.min(cy - 2, Math.floor(Y));
+    const a = X - I, c = Y - J;
+    qf[j * nx + i] += (qc[J * cx + I] * (1 - a) + qc[J * cx + I + 1] * a) * (1 - c) + (qc[(J + 1) * cx + I] * (1 - a) + qc[(J + 1) * cx + I + 1] * a) * c;
+  }
+}
+
+const mgCache = new Map<string, { q: Float64Array[]; b: Float64Array[]; dims: [number, number][] }>();
+
+/** One V-cycle on q against b (the fine level's), the levels' scratch kept per grid; the last fine sweep's largest change. */
+function vCycle(q: Float64Array, b: Float64Array, nx: number, ny: number): number {
+  const key = `${nx}x${ny}`;
+  let mg = mgCache.get(key);
+  if (!mg) {
+    const dims = tankLevels(nx, ny);
+    mg = { dims, q: dims.map(([a, c], l) => (l === 0 ? new Float64Array(0) : new Float64Array(a * c))), b: dims.map(([a, c], l) => (l === 0 ? new Float64Array(0) : new Float64Array(a * c))) };
+    mgCache.set(key, mg);
+  }
+  const { dims } = mg;
+  const Q = (l: number) => (l === 0 ? q : mg!.q[l]), B = (l: number) => (l === 0 ? b : mg!.b[l]);
+  const L = dims.length - 1;
+  for (let l = 0; l < L; l++) {
+    const [a, c] = dims[l];
+    for (let s = 0; s < TANK_SMOOTH; s++) { smooth(Q(l), B(l), a, c, 0, 1); smooth(Q(l), B(l), a, c, 1, 1); }
+    restrictResidual(Q(l), B(l), a, c, Q(l + 1), B(l + 1));
+  }
+  {
+    const [a, c] = dims[L];
+    const { omega, sweeps } = tankCoarse(a, c);
+    if (L === 0) {
+      // No coarser grid (a small or odd tank): the whole solve is this level's SOR.
+      let big = 0;
+      for (let s = 0; s < sweeps; s++) { big = Math.max(smooth(q, b, a, c, 0, omega), smooth(q, b, a, c, 1, omega)); }
+      return big;
+    }
+    for (let s = 0; s < sweeps; s++) { smooth(Q(L), B(L), a, c, 0, omega); smooth(Q(L), B(L), a, c, 1, omega); }
+  }
+  let big = 0;
+  for (let l = L - 1; l >= 0; l--) {
+    const [a, c] = dims[l];
+    prolong(Q(l + 1), Q(l), a, c);
+    for (let s = 0; s < TANK_SMOOTH; s++) { const r0 = smooth(Q(l), B(l), a, c, 0, 1), r1 = smooth(Q(l), B(l), a, c, 1, 1); if (l === 0) big = Math.max(r0, r1); }
+  }
+  return big;
 }
 
 const minmod = (a: number, b: number): number => (a * b <= 0 ? 0 : Math.abs(a) < Math.abs(b) ? a : b);
@@ -221,7 +343,6 @@ export function stepTank(t: Tank, dt: number, opts: TankOptions = {}): void {
   if (scratchC.length !== c.length) { scratchC = new Float64Array(c.length); scratchD = new Float64Array(c.length); }
   const u0 = scratchU, v0 = scratchV, c0 = scratchC, div = scratchD;
   const [i0, i1] = boundaryFlows(t, o);
-  const omega = tankOmega(nx, ny);
 
   for (let s = 0; s < n; s++) {
     /*
@@ -313,28 +434,15 @@ export function stepTank(t: Tank, dt: number, opts: TankOptions = {}): void {
     for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
       div[j * nx + i] = u[j * wU + i + 1] - u[j * wU + i] + v[(j + 1) * nx + i] - v[j * nx + i];
     }
-    const fixed = opts.sweeps;
+    const fixed = opts.cycles;
     const tol = opts.tol ?? 1e-9;
-    let sweeps = 0;
+    let cycles = 0;
     for (;;) {
-      let resid = 0;
-      for (let colour = 0; colour < 2; colour++) {
-        for (let j = 0; j < ny; j++) for (let i = (j + colour) & 1; i < nx; i += 2) {
-          let sum = 0, deg = 0;
-          if (i > 0) { sum += q[j * nx + i - 1]; deg++; }
-          if (i < nx - 1) { sum += q[j * nx + i + 1]; deg++; }
-          if (j > 0) { sum += q[(j - 1) * nx + i]; deg++; }
-          if (j < ny - 1) { sum += q[(j + 1) * nx + i]; deg++; }
-          const target = (sum - div[j * nx + i]) / deg;
-          const d = target - q[j * nx + i];
-          if (Math.abs(d) > resid) resid = Math.abs(d);
-          q[j * nx + i] += omega * d;
-        }
-      }
-      sweeps++;
-      if (fixed !== undefined ? sweeps >= fixed : resid < tol || sweeps >= 20000) break;
+      const big = vCycle(q, div, nx, ny);
+      cycles++;
+      if (fixed !== undefined ? cycles >= fixed : big < tol || cycles >= 500) break;
     }
-    t.sweeps = sweeps;
+    t.cycles = cycles;
     for (let j = 0; j < ny; j++) for (let i = 1; i < nx; i++) u[j * wU + i] -= q[j * nx + i] - q[j * nx + i - 1];
     for (let j = 1; j < ny; j++) for (let i = 0; i < nx; i++) v[j * nx + i] -= q[j * nx + i] - q[(j - 1) * nx + i];
   }

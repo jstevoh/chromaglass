@@ -11,8 +11,8 @@
  * written to the queue now, so one encode per submit. `field` is what the
  * plate draws: the dye's buffer as it stands after the last step.
  *
- * The reference's few numbers (the substep bound, the nozzle's cells, the SOR
- * factor) are copied here under the same names rather than imported, so the
+ * The reference's few numbers (the substep bound, the nozzle's cells, the
+ * multigrid's levels) are copied here under the same names rather than imported, so the
  * GPU solver's bundle never carries the CPU reference, and the check can say
  * so (as the soap film's does).
  */
@@ -25,16 +25,28 @@ const TANK_CFL = 0.45;
 const TANK_SPEED_MARGIN = 1.5;
 const TANK_MAX_SUBSTEPS = 24;
 /*
-  Sweeps of the pressure a substep. The reference solves to a tolerance (about
-  180 sweeps from a warm start on its 128-wide tank); the plate cannot pay
-  that ten times a frame, and does not need to: each substep moves the flow a
-  little, so last substep's pressure is most of this one's, and what is left
-  of the divergence after these sweeps is taken up by the next substep's.
-  What that costs is measured by `npm run tankgpu`'s app line (the jet's
-  thinning and the front's speed at this count, against the reference solved
-  to tolerance).
+  V-cycles of the pressure a substep (the multigrid, lib/tank.ts's long
+  comment above tankLevels: why SOR alone blew the app's tank up). The
+  reference repeats the cycle to a tolerance; the plate cannot pay that ten
+  times a frame, and does not need to: each substep moves the flow a little,
+  so last substep's pressure is most of this one's, and what a cycle leaves
+  of the divergence is taken up by the next substep's. What that costs is
+  measured by `npm run tankgpu`'s app lines (the jet's thinning and the
+  front's speed at this count, against the reference solved to tolerance;
+  the leftover divergence at the heaviest settings).
 */
-export const TANK_SWEEPS = 40;
+export const TANK_CYCLES = 2;
+/** The most a caller may ask for. */
+export const TANK_MAX_CYCLES = 20;
+const TANK_SMOOTH = 2;
+
+/** The multigrid's levels, halving while both sides are even and at least 8 (lib/tank.ts tankLevels, copied). */
+function tankLevels(nx: number, ny: number): [number, number][] {
+  const out: [number, number][] = [[nx, ny]];
+  let a = nx, b = ny;
+  while (a % 2 === 0 && b % 2 === 0 && a / 2 >= 8 && b / 2 >= 8) { a /= 2; b /= 2; out.push([a, b]); }
+  return out;
+}
 
 export interface TankStep {
   gPrime?: number;
@@ -43,7 +55,7 @@ export interface TankStep {
   nozzleW?: number;
   drain?: number;
   nu?: number;
-  sweeps?: number;
+  cycles?: number;
 }
 
 export interface TankField {
@@ -81,8 +93,6 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
   const ny = Math.max(4, Math.floor(opts.ny));
   const dx = opts.width / nx;
   const nC = nx * ny, nU = (nx + 1) * ny, nV = nx * (ny + 1);
-  const omega = 2 / (1 + Math.sin(Math.PI / Math.max(nx, ny)));
-
   const disposer = new Disposer();
   const pipelines = PipelineCache.for(device, 'tank');
   const usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST;
@@ -91,6 +101,27 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
   const u = buf('tank u', nU), v = buf('tank v', nV), uT = buf('tank uT', nU), vT = buf('tank vT', nV);
   const c = [buf('tank c a', nC), buf('tank c b', nC)];
   const q = buf('tank q', nC), div = buf('tank div', nC);
+  /*
+    The multigrid's levels: level 0 is the pressure itself against the
+    divergence; each coarser one has its correction and right-hand side, and
+    a small uniform of its size and the relaxation its sweeps take (1 on
+    every level but the coarsest, which takes its SOR optimum; lib/tank.ts
+    tankCoarse). All written once here: nothing about them changes a frame.
+  */
+  const dims = tankLevels(nx, ny);
+  const L = dims.length - 1;
+  const qL = dims.map(([a, b], l) => (l === 0 ? q : buf(`tank q${l}`, a * b)));
+  const bL = dims.map(([a, b], l) => (l === 0 ? div : buf(`tank b${l}`, a * b)));
+  const [cxL, cyL] = dims[L];
+  const coarseSweeps = Math.max(cxL, cyL);
+  const levelU = dims.map(([a, b], l) => {
+    const ub = disposer.track(device.createBuffer({ label: `tank level ${l}`, size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    const w = new ArrayBuffer(16);
+    new Uint32Array(w, 0, 2).set([a, b]);
+    new Float32Array(w, 8, 1)[0] = l === L ? 2 / (1 + Math.sin(Math.PI / Math.max(a, b))) : 1;
+    device.queue.writeBuffer(ub, 0, w);
+    return ub;
+  });
   const readBuf = buf('tank readback', nU + nV + nC, GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ);
 
   const pipe = (k: TankKernel): GPUComputePipeline => {
@@ -100,7 +131,8 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
   };
   const P = {
     bounds: pipe('tankBounds'), dye: pipe('tankDye'), advect: pipe('tankAdvect'), force: pipe('tankForce'),
-    div: pipe('tankDiv'), red: pipe('tankSorRed'), black: pipe('tankSorBlack'), project: pipe('tankProject'),
+    div: pipe('tankDiv'), red: pipe('tankSmoothRed'), black: pipe('tankSmoothBlack'),
+    restrict: pipe('tankRestrict'), prolong: pipe('tankProlong'), project: pipe('tankProject'),
   };
   // Two of each group that reads the dye: substep by substep it goes a → b, then b → a.
   const G = {
@@ -109,13 +141,33 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
     advect: bindGroup(device, P.advect, [uni, u, v, uT, vT]),
     force: [bindGroup(device, P.force, [uni, uT, vT, c[1], u, v]), bindGroup(device, P.force, [uni, uT, vT, c[0], u, v])],
     div: bindGroup(device, P.div, [uni, u, v, div]),
-    red: bindGroup(device, P.red, [uni, div, q]),
-    black: bindGroup(device, P.black, [uni, div, q]),
+    red: dims.map((_, l) => bindGroup(device, P.red, [levelU[l], bL[l], qL[l]])),
+    black: dims.map((_, l) => bindGroup(device, P.black, [levelU[l], bL[l], qL[l]])),
+    restrict: dims.slice(0, L).map((_, l) => bindGroup(device, P.restrict, [levelU[l], qL[l], bL[l], qL[l + 1], bL[l + 1]])),
+    prolong: dims.slice(0, L).map((_, l) => bindGroup(device, P.prolong, [levelU[l], qL[l + 1], qL[l]])),
     project: bindGroup(device, P.project, [uni, q, u, v]),
   };
   const cellsX = Math.ceil(nx / 8), cellsY = Math.ceil(ny / 8);
   const facesX = Math.ceil((nx + 1) / 8), facesY = Math.ceil((ny + 1) / 8);
-  const halfX = Math.ceil(Math.ceil(nx / 2) / 8);
+  // Workgroups a level: a sweep's colour (half the width), a restriction (a coarse cell each), a prolongation (a fine cell each).
+  const halfW = dims.map(([a]) => Math.ceil(Math.ceil(a / 2) / 8)), rowsW = dims.map(([, b]) => Math.ceil(b / 8));
+  const restrictW = dims.map(([a, b]) => [Math.ceil(a / 16), Math.ceil(b / 16)]), fineW = dims.map(([a]) => Math.ceil(a / 8));
+  const sweep = (pass: GPUComputePassEncoder, l: number) => {
+    pass.setPipeline(P.red); pass.setBindGroup(0, G.red[l]); pass.dispatchWorkgroups(halfW[l], rowsW[l]);
+    pass.setPipeline(P.black); pass.setBindGroup(0, G.black[l]); pass.dispatchWorkgroups(halfW[l], rowsW[l]);
+  };
+  // One V-cycle, pass for pass the reference's vCycle.
+  const vCycle = (pass: GPUComputePassEncoder) => {
+    for (let l = 0; l < L; l++) {
+      for (let s = 0; s < TANK_SMOOTH; s++) sweep(pass, l);
+      pass.setPipeline(P.restrict); pass.setBindGroup(0, G.restrict[l]); pass.dispatchWorkgroups(restrictW[l][0], restrictW[l][1]);
+    }
+    for (let s = 0; s < coarseSweeps; s++) sweep(pass, L);
+    for (let l = L - 1; l >= 0; l--) {
+      pass.setPipeline(P.prolong); pass.setBindGroup(0, G.prolong[l]); pass.dispatchWorkgroups(fineW[l], rowsW[l]);
+      for (let s = 0; s < TANK_SMOOTH; s++) sweep(pass, l);
+    }
+  };
 
   const bytes = new ArrayBuffer(TANK_UNIFORM_BYTES);
   const U32 = new Uint32Array(bytes), F32 = new Float32Array(bytes);
@@ -143,10 +195,10 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
       const i1 = i0 + nIn;
       const drain = Math.max(0, Math.min(1, o.drain ?? 1));
       U32[0] = nx; U32[1] = ny; U32[2] = i0; U32[3] = i1;
-      F32[4] = h / dx; F32[5] = (o.nu ?? TANK_NU) * h / (dx * dx); F32[6] = gPrime * h; F32[7] = omega;
+      F32[4] = h / dx; F32[5] = (o.nu ?? TANK_NU) * h / (dx * dx); F32[6] = gPrime * h; F32[7] = 0;
       F32[8] = feed; F32[9] = (1 - drain) * feed * nIn / (nx - nIn); F32[10] = drain * feed * nIn / nx; F32[11] = 0;
       device.queue.writeBuffer(uni, 0, bytes);
-      const sweeps = Math.max(1, Math.round(o.sweeps ?? TANK_SWEEPS));
+      const cycles = Math.max(1, Math.min(TANK_MAX_CYCLES, Math.round(o.cycles ?? TANK_CYCLES)));
       const pass = enc.beginComputePass({ label: 'tank' });
       pass.setPipeline(P.bounds); pass.setBindGroup(0, G.bounds); pass.dispatchWorkgroups(Math.ceil(nx / 64));
       for (let s = 0; s < n; s++) {
@@ -154,10 +206,7 @@ export function createTankGpu(device: GPUDevice, opts: { nx: number; ny: number;
         pass.setPipeline(P.advect); pass.setBindGroup(0, G.advect); pass.dispatchWorkgroups(facesX, facesY);
         pass.setPipeline(P.force); pass.setBindGroup(0, G.force[cur]); pass.dispatchWorkgroups(facesX, facesY);
         pass.setPipeline(P.div); pass.setBindGroup(0, G.div); pass.dispatchWorkgroups(cellsX, cellsY);
-        for (let k = 0; k < sweeps; k++) {
-          pass.setPipeline(P.red); pass.setBindGroup(0, G.red); pass.dispatchWorkgroups(halfX, cellsY);
-          pass.setPipeline(P.black); pass.setBindGroup(0, G.black); pass.dispatchWorkgroups(halfX, cellsY);
-        }
+        for (let k = 0; k < cycles; k++) vCycle(pass);
         pass.setPipeline(P.project); pass.setBindGroup(0, G.project); pass.dispatchWorkgroups(facesX, facesY);
         cur ^= 1;
       }

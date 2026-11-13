@@ -21,7 +21,7 @@
 import { layoutFromWgsl, type PipelineCache } from './kit';
 import type { TankPlateField } from './tankPlate';
 
-const TANK_DRAW_WGSL = /* wgsl */ `
+export const TANK_DRAW_WGSL = /* wgsl */ `
 override FLIP_Y: f32 = 1.0;
 struct DrawU { res: vec2f, n: vec2u, colour: vec3f, glow: f32 };
 @group(0) @binding(0) var<uniform> D: DrawU;
@@ -61,8 +61,15 @@ struct FsOut { @location(0) colour: vec4f, @location(1) aux: vec4f };
 }
 `;
 
-const uniforms = new WeakMap<GPUDevice, { buf: GPUBuffer; data: Float32Array; u32: Uint32Array }>();
-const groups = new WeakMap<GPUBuffer, Map<GPURenderPipeline, GPUBindGroup>>();
+/*
+  Each target the tank is drawn into (the plate's picture, each projector
+  source) has its own arguments and groups, keyed by its aux view, which the
+  plate keeps for as long as the target: they are written before the frame's
+  one submit, and a buffer shared between them would hand every draw the
+  last one's size. The buffer goes with the plate (`track`, its disposer).
+*/
+interface DrawState { buf: GPUBuffer; data: Float32Array; u32: Uint32Array; groups: Map<GPUBuffer, Map<GPURenderPipeline, GPUBindGroup>> }
+const states = new WeakMap<GPUTextureView, DrawState>();
 
 /**
  * Draw the tank into the plate's targets, if this frame's front plate has one.
@@ -79,6 +86,7 @@ export function drawTank(
   timestamps: GPURenderPassTimestampWrites | undefined,
   toTexture: boolean,
   format: GPUTextureFormat,
+  track: (b: GPUBuffer) => GPUBuffer,
 ): boolean {
   if (!field) return false;
   const pipe = pipelines.renderPipeline(`tank draw ${format}${toTexture ? ' flipped' : ''}`, (module) => {
@@ -87,23 +95,23 @@ export function drawTank(
     return {
       layout: device.createPipelineLayout({ bindGroupLayouts: [layoutFromWgsl(device, TANK_DRAW_WGSL, 'tank draw', GPUShaderStage.FRAGMENT)] }),
       vertex: { module: m, entryPoint: 'vs', constants },
-      fragment: { module: m, entryPoint: 'fs', constants, targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] },
+      fragment: { module: m, entryPoint: 'fs', targets: [{ format }, { format: 'rgba8unorm' as GPUTextureFormat }] },
       primitive: { topology: 'triangle-list' as GPUPrimitiveTopology },
     };
   });
   if (!pipe) return false;
-  let u = uniforms.get(device);
+  let u = states.get(auxView);
   if (!u) {
     const data = new Float32Array(12);
-    u = { buf: device.createBuffer({ label: 'tank draw args', size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }), data, u32: new Uint32Array(data.buffer) };
-    uniforms.set(device, u);
+    u = { buf: track(device.createBuffer({ label: 'tank draw args', size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })), data, u32: new Uint32Array(data.buffer), groups: new Map() };
+    states.set(auxView, u);
   }
   u.data[0] = size.width; u.data[1] = size.height; u.u32[2] = field.nx; u.u32[3] = field.ny;
   u.data[4] = field.colour[0]; u.data[5] = field.colour[1]; u.data[6] = field.colour[2]; u.data[7] = field.glow;
   device.queue.writeBuffer(u.buf, 0, u.data);
   // A group per dye buffer (the solver ping-pongs two) and pipeline, made once.
-  let byPipe = groups.get(field.c);
-  if (!byPipe) { byPipe = new Map(); groups.set(field.c, byPipe); }
+  let byPipe = u.groups.get(field.c);
+  if (!byPipe) { byPipe = new Map(); u.groups.set(field.c, byPipe); }
   let group = byPipe.get(pipe);
   if (!group) {
     group = device.createBindGroup({ layout: pipe.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: u.buf } }, { binding: 1, resource: { buffer: field.c } }] });
