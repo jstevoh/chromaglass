@@ -345,9 +345,11 @@ function uploadable(raw, kinds, what, home = homedir()) {
   if (!statSync(real).isFile()) throw new Error(`${real} is not a file.`);
   const type = kinds[extname(real).toLowerCase()];
   if (!type) throw new Error(`${what} is one of ${Object.keys(kinds).join(' ')}; ${real} is not.`);
-  const inHome = real === home || real.startsWith(home.endsWith(sep) ? home : home + sep);
+  // A Mac's disk ignores case and realpath keeps the case it was asked in, so `~/library` is ~/Library.
+  const lower = real.toLowerCase(), homeLower = home.toLowerCase();
+  const inHome = lower === homeLower || lower.startsWith(homeLower.endsWith(sep) ? homeLower : homeLower + sep);
   const under = inHome ? real.slice(home.length) : real;
-  if (PRIVATE_PLACE.test(real) || (inHome && /^[\/]Library([\/]|$)/.test(under)) || /[\/]\.[^\/]/.test(under)) {
+  if (PRIVATE_PLACE.test(real) || (inHome && /^[\/]Library([\/]|$)/i.test(under)) || /[\/]\.[^\/]/.test(under)) {
     throw new Error(`${real} is inside a private library or a hidden folder; this server never sends from there. Export the file to ~/Movies first.`);
   }
   return { path: real, type };

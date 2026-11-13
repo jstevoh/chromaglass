@@ -45,11 +45,13 @@ const ALLOWED_ORIGINS = [
 ];
 
 const KIND = 'chromaglass-crash-report';
-/** A report is ~10 kB without the picture and the JPEG is 25–150 kB as base64. */
-// 1 MB, not 4 (docs/crash-plan.md, the security review of 2026-11-13): a report is about 10 kB
-// and a JPEG of up to 150 kB, and every byte past that was R2 storage a stranger could fill.
 import { ipKey, takeMemoryTurn } from './turns.js';
 
+/**
+ * A report is ~10 kB without the picture and the JPEG is 25–150 kB as base64. 1 MB, not 4
+ * (docs/crash-plan.md, the security review of 2026-11-13): every byte past that was R2
+ * storage a stranger could fill.
+ */
 export const MAX_BYTES = 1024 * 1024;
 /** Reports per IP per hour. A person who crashes thirty times an hour has told us already. */
 export const RATE_PER_HOUR = 30;
@@ -298,12 +300,6 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-/**
- * A counter per IP per clock hour, in KV with a TTL. KV is eventually
- * consistent, so a burst from one address can get a few past the limit before
- * the count catches up; that is fine for what this is for — keeping a script
- * from filling the bucket — and it costs one read and one write a report.
- */
 /*
   The hourly limit, in the isolate's memory (server/turns.js), by /64 for IPv6.
   It was a KV counter per full address (docs/crash-plan.md, the security review
@@ -312,7 +308,11 @@ function timingSafeEqual(a, b) {
   on the free plan and shared with the licence Worker, so about 500 junk posts
   stopped every report and every paid order's filing for the rest of the day.
   Counted in memory it writes nothing, and the everyone-cap bounds a sender
-  spread over many blocks to what one isolate takes in an hour.
+  spread over many blocks to what one isolate takes in an hour. The price,
+  accepted: four or so /64s sending junk fill that cap, and real reports
+  reaching the same isolate are refused (429) for the rest of the hour. The
+  page keeps a refused report to send again, and a crash is rarely so urgent
+  that an hour matters; R2 filling without end was the worse outcome.
 */
 async function underLimit(env, ip) {
   if (takeMemoryTurn('report', ipKey(ip), RATE_PER_HOUR)) return false;

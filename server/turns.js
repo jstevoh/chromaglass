@@ -28,9 +28,10 @@
 //
 // An attacker who rotates addresses fills the map instead. IPv6 is counted by its /64,
 // which is what one subscriber gets, so rotating within it buys nothing. Past
-// `TURNS_MAX_KEYS` callers in one hour a new caller is refused until the hour turns
-// rather than the map being cleared, because clearing it would give every caller a fresh
-// allowance (the flaw the relay's own counter had, mcp/tunnel-worker.js).
+// `TURNS_MAX_KEYS` callers in one hour the longest-standing caller's count is dropped for
+// the newcomer: never the whole map, which would give every caller a fresh allowance (the
+// flaw the relay's own counter had, mcp/tunnel-worker.js), and never the newcomer, who is as
+// likely to be a real Mac or TV.
 
 const HOUR_MS = 3_600_000;
 export const TURNS_MAX_KEYS = 20_000;
@@ -38,14 +39,22 @@ export const TURNS_MAX_KEYS = 20_000;
 const turns = new Map();
 let turnsHour = -1;
 
-/** One subscriber's address: IPv4 as is, IPv6 cut to its /64. */
+/**
+ * One subscriber's address: IPv4 as is (an IPv4-mapped IPv6 address too), IPv6 cut to its
+ * /64. The `::` is expanded to the zeros it stands for before the first four groups are taken:
+ * an earlier cut that filled zeros only after the groups before `::` read `2001::1:a:b:c:d`
+ * (2001:0:0:1:…) as 2001:0:0:0, so one subscriber had two allowances and strangers shared one
+ * (the review of this change).
+ */
 export function ipKey(ip) {
   if (!ip || !ip.includes(':')) return ip || '';
-  const [head] = ip.split('::');
-  const groups = ip.includes('::')
-    ? [...head.split(':').filter(Boolean), ...Array(8).fill('0')].slice(0, 4)
-    : ip.split(':').slice(0, 4);
-  return `${groups.map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (mapped) return mapped[1];
+  const [head, tail] = ip.split('::');
+  const before = head ? head.split(':') : [];
+  const after = tail === undefined ? [] : tail ? tail.split(':') : [];
+  const groups = tail === undefined ? before : [...before, ...Array(Math.max(0, 8 - before.length - after.length)).fill('0'), ...after];
+  return `${groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
 }
 
 /**
@@ -64,7 +73,11 @@ export function takeMemoryTurn(kind, who, limit, now = Date.now()) {
   const k = `${kind}\u0000${who}`;
   const used = turns.get(k) || 0;
   if (used >= limit) return wait;
-  if (!used && turns.size >= TURNS_MAX_KEYS) return wait;
+  // Full, the longest-standing caller's count goes (a Map keeps the order they came in), not the
+  // newcomer: refusing new callers would shut a real Mac or TV out to protect routes that write
+  // nothing for a stranger (the review of this change), and clearing all would hand every caller,
+  // a flood's included, a fresh allowance.
+  if (!used && turns.size >= TURNS_MAX_KEYS) turns.delete(turns.keys().next().value);
   turns.set(k, used + 1);
   return 0;
 }

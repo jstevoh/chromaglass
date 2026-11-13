@@ -102,7 +102,9 @@ export const ROTATE_GRACE_S = 60;
 const CLIENT_IDLE_S = 3600;
 const MAX_CLIENTS = 30;
 const MAX_PENDING = 20;
-/** Addresses counted in one window; past it a new address waits rather than everyone's count being forgotten. */
+/** When every address holds one sign-in page, a page this old (seconds) gives way to a new one. */
+export const RESERVE_S = 120;
+/** Addresses counted in one window; past it the oldest address's count goes, rather than everyone's. */
 const MAX_ADDRESSES = 1000;
 const MAX_FAMILIES = 10;
 /** An approval takes a Firebase sign-in at most this old, and none from before its page was opened. */
@@ -238,10 +240,12 @@ export class ShowTunnel {
     if (!h || now - h.since > WINDOW_S) {
       // This cleared the whole map once it held 1000 addresses, which handed every address,
       // a flood's included, a fresh allowance (the security review of 2026-11-13). Now the
-      // spent windows are dropped, and if a thousand live ones remain a new address waits.
+      // spent windows are dropped first.
       if (!h && this.hits.size >= MAX_ADDRESSES) {
         for (const [k, v] of this.hits) if (now - v.since > WINDOW_S) this.hits.delete(k);
-        if (this.hits.size >= MAX_ADDRESSES) return false;
+        // Still full: the longest-standing address's count goes, not the newcomer, who may be
+        // the owner (refusing new addresses let a thousand /64s shut the owner out).
+        if (this.hits.size >= MAX_ADDRESSES) this.hits.delete(this.hits.keys().next().value);
       }
       this.hits.set(who, { since: now, n: 1 });
       return true;
@@ -385,15 +389,23 @@ export class ShowTunnel {
     // Room for this page. Full, this used to delete the oldest page of all, so two addresses
     // opening pages could push out the owner's own while they were signing in (the security
     // review of 2026-11-13). Now a full relay gives up the oldest page of whichever address
-    // holds the most, so a flood only ever pushes out its own pages, and when no address holds
-    // more than one it says so and keeps every page, the owner's among them.
+    // holds the most, so a flood only ever pushes out its own pages; when no address holds more
+    // than one, only a page older than RESERVE_S gives way.
     const pending = [...(await this.store.list({ prefix: 'pend:' }))].sort((a, b) => a[1].exp - b[1].exp);
     if (pending.length >= MAX_PENDING) {
       const count = new Map();
       for (const [, v] of pending) count.set(v.who, (count.get(v.who) ?? 0) + 1);
       const most = Math.max(...count.values());
-      if (most <= 1) return page('<h1>ChromaGlass</h1><p>Too many sign-ins are open on this relay just now. Try again in a few minutes.</p>', 503);
-      await this.store.delete(pending.find(([, v]) => count.get(v.who) === most)[0]);
+      if (most > 1) await this.store.delete(pending.find(([, v]) => count.get(v.who) === most)[0]);
+      else {
+        // Every address holds one. A page that has stood RESERVE_S gives way, so twenty
+        // addresses re-opening a page every ten minutes cannot keep the owner from ever getting
+        // one (the review of this change); a younger one is never pushed out, so the owner's
+        // own page, once open, has at least that long to sign in.
+        const oldest = [...pending].sort((a, b) => a[1].opened - b[1].opened)[0];
+        if (this.now() - oldest[1].opened < RESERVE_S) return page('<h1>ChromaGlass</h1><p>Too many sign-ins are open on this relay just now. Try again in a minute.</p>', 503);
+        await this.store.delete(oldest[0]);
+      }
     }
     const p = random(24);
     await this.store.put(`pend:${p}`, { clientId: q.get('client_id'), redirect, challenge, state: state ?? null, who, opened: this.now(), exp: this.now() + PENDING_S });

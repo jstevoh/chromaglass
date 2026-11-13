@@ -228,6 +228,10 @@ const count = () => Number(DB.raw.prepare('SELECT COUNT(*) AS n FROM feedback').
     took === RATE_PER_HOUR && keptRows === took && burst.every((r) => r.status === 200 || r.status === 429) && sameBlock.status === 429,
     `${took} of 40 taken (${keptRows} rows), the /64's next ${sameBlock.status}`);
   check('an IPv6 address counts by its /64', ipKey('2001:DB8:0001:2::1') === '2001:db8:1:2::/64' && ipKey('2001:db8:1:2:3:4:5:6') === '2001:db8:1:2::/64' && ipKey('192.0.2.1') === '192.0.2.1', ipKey('2001:DB8:0001:2::1'));
+  // A `::` with groups after it inside the first four (server/turns.js): 2001::1:a:b:c:d is 2001:0:0:1:…, the /64 of 2001:0:0:1::5.
+  check('and a short form is expanded before it is cut: one /64 is one key, and an IPv4-mapped address is its IPv4',
+    ipKey('2001::1:a:b:c:d') === ipKey('2001:0:0:1::5') && ipKey('2001::1:a:b:c:d') !== ipKey('2001::2:a:b:c:d') && ipKey('::ffff:192.0.2.7') === '192.0.2.7',
+    `${ipKey('2001::1:a:b:c:d')} / ${ipKey('2001:0:0:1::5')} / ${ipKey('::ffff:192.0.2.7')}`);
   const hour = Number(DB.raw.prepare('SELECT COUNT(*) AS n FROM feedback WHERE at > ?').get(new Date(Date.now() - 3600_000).toISOString()).n);
   const fill = DB.raw.prepare("INSERT INTO feedback (id, at, topic, message, context) VALUES (?, ?, 'other', 'filler', '{}')");
   for (let i = hour; i < ALL_PER_HOUR; i++) fill.run(`busy-${i}`, new Date().toISOString());

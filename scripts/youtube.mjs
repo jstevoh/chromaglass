@@ -342,7 +342,7 @@ async function scenario(server, gport) {
     ];
     const allowed = await b.tool('set_thumbnail', { video_id: v?.id, file: thumb });
     line('files', 'nothing from the Photos library, a hidden folder or a link into either, and nothing that is not a film or a picture, goes to YouTube; an ordinary picture still does',
-      refusals.every((r) => r.error) && g.sessions.length === sessionsBefore && !allowed.error && g.thumbnails.length === thumbsBefore + 1,
+      refusals.every((r, i) => r.error && (i === 2 ? /is one of/ : /private library or a hidden folder/).test(r.text)) && g.sessions.length === sessionsBefore && !allowed.error && g.thumbnails.length === thumbsBefore + 1,
       refusals.map((r) => r.text.slice(0, 60)).join(' | ') + ` | allowed: ${allowed.text.slice(0, 40)}`);
 
     const up = await b.tool('update_video', { video_id: v?.id, title: 'A new title' });

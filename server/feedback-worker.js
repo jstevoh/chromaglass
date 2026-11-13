@@ -40,6 +40,7 @@
 //
 // Setup: wrangler.feedback.toml.
 
+import { ipKey } from './turns.js';
 import { verifyFirebaseToken } from './firebase-token.js';
 
 const ALLOWED_ORIGINS = [
@@ -413,14 +414,7 @@ async function countSince(env, since, ipHash, upTo = null) {
  * them. The salt is the Worker's secret (IP_SALT, else the reading token),
  * because with a public salt the 2^32 IPv4 addresses hash back in minutes.
  */
-export function ipKey(ip) {
-  if (!ip.includes(':')) return ip;
-  const [head] = ip.split('::');
-  const groups = ip.includes('::')
-    ? [...head.split(':').filter(Boolean), ...Array(8).fill('0')].slice(0, 4)
-    : ip.split(':').slice(0, 4);
-  return `${groups.map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
-}
+export { ipKey };
 
 async function hashIp(ip, env) {
   const bytes = new TextEncoder().encode(`${env.IP_SALT || env.FEEDBACK_TOKEN || 'chromaglass-feedback'}|${ipKey(ip)}`);

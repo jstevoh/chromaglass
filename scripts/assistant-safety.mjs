@@ -58,7 +58,15 @@ export async function pickSourceLines(check) {
   const askedFor = asked;
   const cancelled = await pickSource(sources, choose(3));
   const none = await pickSource([], choose(0));
-  check('pick-window', 'Film a window asks which, films the one picked, and Cancel or no windows films nothing',
-    picked?.id === 'w2' && askedFor?.buttons?.join('|') === 'Mail|Oil wheel film|Entire screen|Cancel' && askedFor.cancelId === 3 && cancelled === null && none === null,
-    `picked ${picked?.id}, buttons ${askedFor?.buttons?.join('|')}, cancel ${cancelled?.id ?? null}, none ${none}`);
+  /* And the Mac app asks it. main.js needs Electron, so its wiring is read, not run: the
+     picture-only branch of its display-media handler must film what pickSource answers and
+     nothing that indexes the list itself (the first-listed `sources[0]` it used to film). */
+  const { readFileSync } = await import('node:fs');
+  const main = readFileSync(new URL('../desktop/main.js', import.meta.url), 'utf8');
+  const handler = main.slice(main.indexOf('setDisplayMediaRequestHandler('), main.indexOf('\n  });', main.indexOf('setDisplayMediaRequestHandler(')));
+  const videoOnly = handler.slice(handler.lastIndexOf('getSources('));
+  const wired = /pickSource\(sources,/.test(videoOnly) && /callback\(chosen \? \{ video: chosen \} : \{\}\)/.test(videoOnly) && !/sources\[\d\]/.test(videoOnly);
+  check('pick-window', 'Film a window asks which, films the one picked, and Cancel or no windows films nothing; the Mac app\'s handler films only what it answers',
+    picked?.id === 'w2' && askedFor?.buttons?.join('|') === 'Mail|Oil wheel film|Entire screen|Cancel' && askedFor.cancelId === 3 && cancelled === null && none === null && wired,
+    `picked ${picked?.id}, buttons ${askedFor?.buttons?.join('|')}, cancel ${cancelled?.id ?? null}, none ${none}, main.js wired ${wired}`);
 }

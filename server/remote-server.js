@@ -521,8 +521,12 @@ const assistantWatch = setInterval(() => {
   if (mode === 'off' && assistantOpenedOsc !== null) {
     const back = assistantOpenedOsc;
     assistantOpenedOsc = null;
-    console.log(`  assistant switch off: OSC in back to ${back}`);
-    void Promise.resolve((appOutputs ?? serverOutputs).setOscIn(back)).catch(() => {});
+    const outs = appOutputs ?? serverOutputs;
+    // The owner picked it in the Show menu since (the Mac app keeps that choice): theirs, left open.
+    if (!(appOutputs && outs.state()?.oscIn?.kept)) {
+      console.log(`  assistant switch off: OSC in back to ${back}`);
+      void Promise.resolve(outs.setOscIn(back)).catch(() => {});
+    }
   }
 }, 1000);
 assistantWatch.unref?.();
