@@ -421,9 +421,15 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
 - **12-tv-apple-5, a shorter link for the phone.** The code screen shows
   `chromaglass.art/?tvlink` to type on a phone; a path such as `chromaglass.art/tv-link`
   (a Firebase rewrite to the same page) reads better aloud and from across a room.
-- **12-tv-apple-6, the app on a TV, judged.** Run it in the tvOS simulator against the
-  Mac's real show, then on an Apple TV (judging), and sign it with the owner's team for
-  TestFlight once the App Store Connect record exists (12-ship).
+- **12-tv-apple-6, the app on a TV, judged.** First run done 2026-11-13: Xcode built it
+  and it ran in the Apple TV 4K simulator, showed its code, received its pass when a
+  Home account claimed the code, and played the live plate over WebRTC. That run used a
+  local copy of the licence Worker with a demo signing key and a local show server with
+  a throwaway key, the address handed in at launch. LiveKit's tvOS simulator slice is
+  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Left: run it
+  against the Mac app's own show and the live Worker, then on an Apple TV (judging),
+  and sign it with the owner's team for TestFlight once the App Store Connect record
+  exists (12-ship).
 
 **~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
 `/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
@@ -438,6 +444,9 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
   (`tvpass:<id>`, and `tvpasses:<email>` lists an account's ten), so dropping one
   is deleting its record; what is missing is the account page that lists them
   (when linked, a name the TV sends) with a button to unlink, if owners ask.
+- **12-tv-signin-3, the live Worker carries `/tv/`.** The licence Worker is deployed by
+  hand from the owner's Mac with the owner's go, so the merged `/tv/` routes answer only
+  once it is redeployed; until then a TV cannot get a code.
 - **12-tv-signin-3, KV's lag between locations.** Workers KV is eventually
   consistent across Cloudflare's locations, for up to about a minute. A phone and
   a TV served by different locations can see each other's writes late: the phone
