@@ -23,6 +23,7 @@ import {
   verifyLicenseKey,
 } from './license-key.js';
 import { SYNC_PATH, handleSync } from './cloud-sync.js';
+import { TV_PREFIX, handleTv } from './tv-code.js';
 import { addPack, packFields, packForProduct, removePack } from './license-packs.js';
 
 const ALLOWED_ORIGINS = [
@@ -67,6 +68,20 @@ export default {
       }
       if (url.pathname === SYNC_PATH) {
         return await handleSync(request, env, cors, verifyFirebaseIdToken);
+      }
+      if (url.pathname.startsWith(TV_PREFIX)) {
+        // A TV's sign-in by a short code (server/tv-code.js, PLAN.md 12-tv-signin).
+        return await handleTv(request, env, url, {
+          cors,
+          json,
+          readCapped,
+          verifyFirebaseIdToken,
+          readEmailKeys,
+          readKeyById,
+          addressOf: () => addressOf(request),
+          takeTurn: (kind, who, limit, fallback) => takeActivateTurn(request, env, kind, who, limit, fallback),
+          tooMany: (seconds) => tooMany(seconds, cors),
+        });
       }
       if (url.pathname === '/keys') {
         if (request.method !== 'GET') return json({ error: 'GET only' }, 405, cors);
