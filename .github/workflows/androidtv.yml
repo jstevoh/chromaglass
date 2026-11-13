@@ -111,7 +111,10 @@ jobs:
           printf '%s' "$ANDROID_UPLOAD_KEYSTORE" | base64 -d > "$ANDROID_UPLOAD_STORE_FILE"
           ./gradlew bundleRelease --console=plain
           # Signed by the upload key, or the job is red: an unsigned bundle is refused by Play.
-          signed="$(jarsigner -verify -certs app/build/outputs/bundle/release/app-release.aab)"
+          # -verbose is what makes -certs print each signer's X.509 name; without it
+          # jarsigner says only "jar verified." and this grep failed on the first
+          # real release (2026-11-13), after the bundle had been signed correctly.
+          signed="$(jarsigner -verify -verbose -certs app/build/outputs/bundle/release/app-release.aab)"
           grep -q 'CN=ChromaGlass Android upload' <<<"$signed"
           echo "Version code $ANDROIDTV_VERSION_CODE (1.0.$ANDROIDTV_VERSION_CODE)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
