@@ -1702,7 +1702,7 @@ export const PRESETS: Preset[] = [
       phaseAmount: 0.9,
       phaseScale: 0.3,
       phaseSharp: 0.75,
-      magnetStrength: 0.9,
+      magnetStrength: 0.35, // 7 mT at the glass, near the coil's (38d-1)
       magnetHeight: 0.3,
       magnetWalk: 0.7,
       beatSqueeze: 0.0,
@@ -1973,9 +1973,9 @@ export const PRESETS: Preset[] = [
       phaseAmount: 0.8,
       phaseScale: 0.3,
       phaseSharp: 0.75,
-      // The magnet's field, not its pull (see Ferro Maze): 0.6 gathers
-      // as 0.5 did, and stays under the spikes (0.10 of the hand's field).
-      magnetStrength: 0.6,
+      // About the coil's field at the glass (5 mT, 38d-1): at 12 mT it
+      // gathered the wide maze into one blob in 40 s.
+      magnetStrength: 0.25,
       magnetHeight: 0.3,
       magnetWalk: 0.5,
       // The black pushes the colour aside and packs it along its edges, as in

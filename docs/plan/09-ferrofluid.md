@@ -205,3 +205,11 @@ Open, from building 9i:
   mean for the dye, which is an amount; the velocity resampled and projected),
   keeping the CPU path only for a lost device. Measure it first: the dye's fine
   structure (the `grating` or `microscope` measures) before and after one move.
+
+- **9ac. The ferrofluid looks lit from the front, in the photos' colours** (S-M). Held
+  against the owner's photos (2026-11-12, the looks-against-references read), Ferro Paint
+  reads luminance 0.14 against 0.56 and colourfulness 62 against 129, all warm, where
+  Colored I and II run blue to orange with bright dye between glossy black channels; Magnet
+  Garden is dark on dark gold (0.15) where the labyrinth photo is black on near-white (0.74).
+  38d-1 fixed the widths and left the light: a lamp from above (the dish's reflection, 38h)
+  and the looks' dye contracts. Measure with `npm run watch -- <take> --vs <ref>`.
