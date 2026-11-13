@@ -401,8 +401,13 @@ The physics, in the order to build (each its own thread and PR):
 - ~~**47z-1. Colour: a drop takes the water out of the light's path.**~~ (**shipped**, this PR;
   story in `docs/plan-shipped.md` 47z-1, with 28i-7b and 28k-5): a part-oil cell's light is the two
   liquids' side by side (`packDyeBodies`), a look's lay puts each drop's colour in its own oil
-  (`addOilDensity`), Splodascope has its cobalt water back; `npm run dropcolour`. Found doing it,
-  open:
+  (`addOilDensity`); `npm run dropcolour`. Found doing it, open:
+  - **47z-1e. Splodascope's water: cobalt was tried and is darker.** Filmed on the owner's Mac
+    (2026-11-13, 20 s takes): main's pale water read colourfulness 131, coloured 0.87, luminance
+    0.42; the photograph's cobalt with this PR 62, 0.51, 0.20, the frame 0.40 near black. The drops
+    kept their colours with no browning, but a full wash of cobalt passes too little of the lamp,
+    and the orange ferro reference's vivid colour is on a bright ground (luminance 0.52). Kept pale.
+    A thinner cobalt wash (the photograph's water is a thin layer) is the thing to try next, filmed.
   - **47z-1a. Lava Lamp and the other lays.** Splodascope and Clock Glass lay each body's colour
     as the oil's own; Lava Lamp still lays its wax's colour as plain dye, so the rim's share goes
     to the water by the oil under each cell, and a faint halo of the wax's colour is the water's.

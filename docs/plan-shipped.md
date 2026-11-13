@@ -13911,3 +13911,5 @@ the water's own 0.063; the edge 0.050 off the line between the two colours; the 
 ΔE 0.00 from the same drop in clear water, before and after. Splodascope in the lab (192², four
 seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89; cobalt before
 140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).
+On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
+131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).

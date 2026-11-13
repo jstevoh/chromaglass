@@ -87,7 +87,7 @@ export const PRESET_CONTRACTS: Record<string, number[]> = {
   'roy':                [3, 0, 9],            // red, yellow, cobalt: the three a comic was printed in (the print snaps to them anyway)
   'home-movie':         [1, 21, 17, 0, 16, 19], // the colours a Super 8 cartridge loved
   'clock-glass':        [10, 3, 17, 9, 21, 16], // purple water; red, amber, cobalt, coral and teal oil (the seed lays the first as the water; 28i-7: a second family)
-  'splodascope':        [9, 0, 6, 3, 2],        // cobalt water; yellow, green, red and hot pink oil, as the owner's photograph (the first is the water; 47z-1: a drop's light no longer passes through the water it pushed aside, so cobalt is back)
+  'splodascope':        [7, 0, 6, 3, 2],        // pale blue water; yellow, green, red and hot pink oil (the first is the water; 47z-1: cobalt filmed on the Mac 2026-11-13 read darker, colourfulness 62 against 131, the frame 0.40 near black: vivid colour wants a bright ground)
   // The owner's lace still: a pale lavender wash, cobalt, coral, and icy blue as the cobalt's
   // accent. The yellow lace is the film's own dye, not one of these: a yellow in the water
   // under a yellow film laid an olive-black blot in the lab.

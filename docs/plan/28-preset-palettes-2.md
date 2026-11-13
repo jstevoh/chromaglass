@@ -175,7 +175,8 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       0.124 and 0.234 at twice the grain, under the 2x it asks (WebGPU macOS, open shard),
       so it came out. A second dye under the beads wants a way that keeps the grain's depth.
     - ~~**28i-7b. Splodascope's oil is filtered by the water it displaced.**~~ (**shipped** as
-      PLAN 47z-1; story in `docs/plan-shipped.md` 47z-1): the cobalt water is back.
+      PLAN 47z-1; story in `docs/plan-shipped.md` 47z-1): a drop's light no longer passes through the
+      water it pushed aside. The cobalt itself, filmed, read darker (47z-1e), so the pale water stays.
 
   The packs (PLAN 23; the owner's Art packs thread decides what Home keeps): Listening
   (Aurora, Oil & Water, Milk Marbling, Velvet Underground, Jellyfish Bloom, Cell Bloom,
