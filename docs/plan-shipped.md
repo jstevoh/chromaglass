@@ -13673,6 +13673,35 @@ unreadable), the drop shadow 2.1%; streamed and decoded, the landscape's bottom-
 never touched, and the portrait at least 5.3% in its own corner.
 
 
+## 37x-10m. The poured-ink titles shelved (2026-11-12)
+
+**What was asked.** The owner, of the ink titles (37x-10, 37x-10c, 37x-10g): "I think
+this poured option never really worked. We should shelve this". The corner caption
+(37x-10j) had been the default since 2026-11-10; the ink was still the other choice on the
+desk (As a corner caption off, the ink's colour, size, height and sweep), on the phone
+(Caption / Ink and Sweep under Title), on MIDI (three knobs), and was what the phone's
+"Pour words" box, the assistant's `pour_text` and a song show's sign-off still poured.
+
+**What changed.** `useRemote`'s title sink shows the caption only and no longer reads
+`titleCaption`, so a show saved with the ink chosen gets the caption rather than a title
+nobody can switch off. A `pour-text` message (the assistant's `pour_text`, a phone or a
+conductor one build older) is read back into a card by `lib/pourText.ts` `rowsCaption`
+(the leading heavy rows the title, the lighter rows the artist, album and label) and shown
+as the caption. The phone's box is now "Song title" with a Show button and sends
+`song-title`, built from what was typed by `typedCaption`, case kept. The sign-off shows
+"ChromaGlass" in the corner. The ink's controls are gone from Logo & Titles, the phone and
+MIDI, and `titleCaption` is deleted; the ink's own four settings stay, listed in `npm run panel`'s deliberately-without-a-control set (37x-10n takes them out). The ink itself
+(`lib/inkTitle.ts`, the solver's `pourInk`, the pad and rinse) stays for the logo melt
+(37x-11), and the owed Mac film of the ink (judging §114, §117) is cancelled.
+
+**What it measured.** `npm run caption`'s `wired` line now fails on main's source (the
+sink choosing by `titleCaption`, `pour-text` poured, the phone's Caption / Ink, the desk's
+ink controls, the poured sign-off) and passes here. `npm run remotemix`: the phone's box
+was heard as one `pour-text` of ink rows (SUNSHINE OF@1.25|YOUR LOVE@1.25|Cream@0.75); now
+one `song-title`, "Sunshine of Your Love" by "Cream", and a `pour-text` from it fails the
+line. `npm run assistant`: `typedCaption` and `rowsCaption` in node; the guard's
+`pour_text` lines unchanged.
+
 ## 44k-18. The Mac app's updates from the assistant (2026-11-11)
 
 Built with 13-update-auto, on the coordinator's word that the switch be "exposed to

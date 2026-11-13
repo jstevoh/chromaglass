@@ -2480,6 +2480,8 @@ stuck on "Finish in your browser" after the browser signed in.
 
 ## 114. Song titles painted as ink, then swept away (PLAN 37x-10)
 
+*Cancelled 2026-11-12: the owner shelved the poured-ink titles (PLAN 37x-10m), so there is nothing here to judge; the steps below are kept as the record.*
+
 The lab measures a still plate; how a look's own flow treats a title is taste, and only the
 Mac's film shows the letters at the solver's full grid.
 
@@ -2546,6 +2548,8 @@ the song and whether the show it designs plays well.
 
 ## 117. Song titles poured as ink from the phone (PLAN 37x-10c)
 
+*Cancelled 2026-11-12: the owner shelved the poured-ink titles (PLAN 37x-10m), so there is nothing here to judge; the steps below are kept as the record.*
+
 `npm run assistant` and `npm run remotemix` hold the message: what the phone's box and the
 assistant send, what the guard lets through, and how the rows are laid out. Only the wall
 can say whether the words read when they land and how a look's own flow carries them off.
@@ -2581,8 +2585,8 @@ square or a halo around it, the plate around it clearing or dimming.
 
 ## 120. Song titles as a 1980s corner caption (PLAN 37x-10j)
 
-1. Settings → **Logo & Titles** → **Song titles** on, **As a corner caption** on (the
-   default). Play a song the ear names, or have the assistant call `song_title`, on a dark
+1. Settings → **Logo & Titles** → **Song titles** on (the caption is the only kind of
+   title since 37x-10m). Play a song the ear names, or have the assistant call `song_title`, on a dark
    look and a bright one, and once with the Live Show on air.
 2. The card should come up in the bottom-left corner in about a fifth of a second: the
    artist, the song in quotation marks, the album, the label, white with a dark drop shadow,

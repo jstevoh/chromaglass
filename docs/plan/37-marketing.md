@@ -606,7 +606,8 @@ rest is routine and the owner's calls.
   song's chapter is a link in the cuts' captions; the albums are one playlist ("Albums")
   beside 37b's three. The 60-second look videos (37b) continue less often, as the site's
   library.
-- **37x-10. The song's title painted as ink, then swept away.** *(shipped 2026-11-08.)*
+- **37x-10. The song's title painted as ink, then swept away.** *(shipped 2026-11-08;
+  shelved 2026-11-12 by 37x-10m.)*
   The identified song's title and artist poured into the dye as ink at the solver's own
   grid (`pourInk`), then a wash (a drift and eddies added to the step's velocity) breaks
   the letters up; Settings → Logo & Titles and the phone's Title switch; every title pour
@@ -615,15 +616,16 @@ rest is routine and the owner's calls.
   - **37x-10e. The check's arms on the thin gap too.** *(shipped 2026-11-09 with
     37x-10g: `npm run inktitle -- --thin`.)*
   - **37x-10g. Titles readable on a busy look: thick ink on a clear pad, washed off by a
-    rinse.** *(shipped 2026-11-09; superseded 2026-11-10 by 37x-10j.)* The owner judged
+    rinse.** *(shipped 2026-11-09; superseded 2026-11-10 by 37x-10j; shelved 2026-11-12
+    by 37x-10m.)* The owner judged
     the thick-ink titles still not readable enough and asked for a corner caption instead.
-    The pad and rinse stay as the ink choice's (`npm run inktitle -- --thin`); story in
+    The pad and rinse stay for the logo melt (37x-11, `npm run inktitle -- --thin`); story in
     `docs/plan-shipped.md` §37x-10g. Its follow-ups 37x-10h (a shear-thinning gum) and
     37x-10i (one pour call for the rinse) are dropped with it.
   - **37x-10j. Song titles as a corner caption, like a 1980s music channel.** *(shipped
     2026-11-10.)* The default for song titles: artist, the song in quotes, album and label,
     white in the bottom-left corner for seven seconds, on the screen and burned into the
-    live stream; ink is the other choice (`titleCaption`). `npm run caption`; story in
+    live stream; since 37x-10m the only kind of title. `npm run caption`; story in
     `docs/plan-shipped.md` §37x-10j. Found building it:
     - **37x-10k. The caption on the projector, the cast and recordings.** *(S.)* The card
       is drawn on the window's own layer and on the stream's encode; the projector window
@@ -638,17 +640,31 @@ rest is routine and the owner's calls.
     arrays), and its fold binds three textures to `deltaDye`, which reads four since
     the soap's breakdown: it would fail validation if called. Fold it through
     `foldDye` and pour pictures at the solver's grid, or delete it.
-  - *Owed:* the owner judges it on the Mac's film on two or three looks
-    (docs/judging.md).
+  - **37x-10m. The poured-ink titles shelved.** *(shipped 2026-11-12.)* The owner: "this
+    poured option never really worked. We should shelve this". Every title is the corner
+    caption; the ink's controls are off the desk, the phone and MIDI, and `titleCaption` is gone; the phone's box,
+    `pour_text` and a song show's sign-off go up as the caption. The ink stays, dormant,
+    for the logo melt. `npm run caption`, `remotemix`, `assistant`; story in
+    `docs/plan-shipped.md` §37x-10m. Found doing it:
+    - **37x-10n. Take the dormant ink settings out.** *(S.)* `inkTitleColor`,
+      `inkTitleSize`, `inkTitleY` and `inkTitleSweep` are still in `VisualizerSettings`,
+      the look fade's rig keys, drift and the desk pins, and listed in `npm run panel`'s
+      deliberately-without-a-control set; only the ink's run reads them, for a title
+      nothing sends (`titleCaption` itself went with 37x-10m). Remove them (with
+      `npm run inktitle`'s setting line) once the owner is sure the ink is not coming
+      back, or bring the ink back through `app/songTitle.ts`'s sink with its controls.
+  - *Owed:* nothing: the Mac film of the ink (judging §114, §117) was cancelled with
+    37x-10m.
   - **37x-10b. The title from the album's queue.** *(S, after 37x-10.)* As above: the
-    show's own track list and its clock, so the title lands on the song's first beat.
+    show's own track list and its clock, so the caption goes up on the song's first beat.
   - **37x-10c. Words poured from the phone, the show server and the assistant.**
-    *(shipped 2026-11-08.)* A `pour-text` message (`src/lib/pourText.ts`) that pours any
+    *(shipped 2026-11-08; shown as the corner caption since 37x-10m.)* A `pour-text` message (`src/lib/pourText.ts`) that pours any
     words onto the plate through today's title pour, from the phone remote's "Pour words"
     box, the relay, and the owner's assistant (`pour_text`), so a set played from files,
     which the ear names nothing in, still gets its titles; `npm run assistant` and
     `npm run remotemix`; story in `docs/plan-shipped.md` §37x-10c. Found building it:
-    - **37x-10d. Send `pour-text` into 37x-10's ink.** *(S, after 37x-10.)* Today the
+    - **37x-10d. Send `pour-text` into 37x-10's ink.** *(shipped 2026-11-08 with 37x-10;
+      undone by 37x-10m: `pour-text` is the caption now.)* Today the
       words go through `pourText`, which adds them to the dye in one pour and leaves
       the look's own flow to carry them off: real dye, really advected, but with no wash,
       so on a still look the letters stay readable longer than 37x-10's sweep allows.

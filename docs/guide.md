@@ -132,7 +132,7 @@ Playing the visuals for a band is a different job from running them in a living 
 - **Freeze, pause, wash out.** Play/Pause holds the plate where it is; Drain washes it; a breakdown can also be a stage in the sequencer with the turbulence low and the palette narrow.
 - **The cue sheet is the sequencer.** Write the song as stages (verse: cool, slow; chorus: bright, fast; bridge: hard cut to red), bind it to the song, and it starts itself when the song is identified.
 - **Listen.** The **Listen** button at the top of the Songs panel (on the Sequence tab, and the phone's Songs tile) names the song playing and adds it to the list with its title, artist and length, opened. It turns on the microphone if nothing is chosen, the song ID, and Follow songs, then asks the song ID to try at once. Once the show has heard the song through (a song heard before, at once), it designs its show from the song's map, the one the Score draws: a stage sequence made for the song, one stage per section, fuller, more stirred and pressed harder in the louder sections against the song's own quietest and loudest, the colours opening from two dyes in the intro to the whole palette for the chorus and the bridge in close; and cues on the song's show pinned to sections, the title on the first note, a burst on every chorus, new dyes for the bridge and the last chorus, the plate drained eight seconds before the end. The map is laid on the song's own seconds, counted from where the song ID placed the song when the show started recording, so a song named halfway through has its sections, and its designed stages and cues, where they are in the song; the part it never heard is one *Unheard* stage. Both are ordinary sequences and cues, to edit like any other; designing again replaces only what Listen wrote, and a sequence of your own for the song is kept. When it cannot name the song in 45 seconds, type the title and artist and press **Name it**: the show still learns the song as it plays. Measured by `npm run listen`
-- **Song titles as ink.** When the show names a song it can pour the title onto the plate as a cue (the Songs panel's *Pour the title*). For a set the show cannot name (an album played from files, a band's own songs), the phone remote's Controls have **Pour words**: type or paste the song's name and press **Pour**, and the laptop pours it across the plate as dye, the name in capitals with each further line under it smaller (`Song - Artist` on one line is read as both; **This song** fills the box with what the show heard). The words are real dye, so the look's own flow smears them and carries them off into the colour. Dark letters land on a bright plate and the look's brightest dye on a dark one; one pour every second and a half at most, so a double tap never stacks the words into a blot. Anything joined to the show server can send the same `pour-text` message, which is how a set's running order can pour each title as its track starts.
+- **Song titles.** When the show names a song it puts the credit up as the corner caption (the Songs panel's *Pour the title* cue does the same; the name is the ink's history). For a set the show cannot name (an album played from files, a band's own songs), the phone remote's Controls have **Song title**: type or paste the song's name, the artist on the next line, and press **Show** (`Song - Artist` on one line is read as both; **This song** fills the box with what the show heard). Anything joined to the show server can send the same `song-title` message, which is how a set's running order can put each title up as its track starts. Titles were once poured onto the plate as ink; that is shelved (PLAN 37x-10m).
 - **Record it.** The red button by the Cast button (or the *Record* action) writes the show to a `.webm` file straight from the canvas, with the music muxed in, for the band's socials.
 - **The logo melts at the start.** Settings → Logo & Titles → **Melt the logo at the start** (on the phone, **Logo melt** under Title): when the Live Show goes live or a recording starts, the ChromaGlass logo is poured across the plate as thick ink, holds for two or three seconds, and then clear liquid rinses through it and the liquid's eddies melt it into the show's first colour, gone in about five seconds on a busy look. It is dye in the liquid, not a picture over it, so it is in the stream, the recording and on the wall at once, and its colour stays in the show. Off by default.
 - **Stream it (Mac app, Pro).** The app encodes the plate and the sound it hears itself and sends them to stream keys over RTMPS: YouTube, Twitch, Facebook, Kick, X, or a local RTMP server, several at once (one landscape encode shared by them all, and a second, portrait encode of the plate's middle for Instagram and TikTok), each destination falling behind, dropping frames and reconnecting on its own, from the **Live Show** panel (+ Panel, search "live"): add each destination with its server and stream key (the key goes to the Mac's keychain store and is never shown again), mark an unlisted one "For tests" to rehearse with **Test**, then **Go live**, which asks once more and names where it is going. Each destination shows its rate and how far behind it is; under the buttons the panel says what upload the destinations need and whether the last stream showed the link can carry it. The stream opens at **1080p and 60 fps** (the rate the plate is drawn at; 720p and 30 fps are a tap away), and the **Picture** line says how many bits a second the picture gets: 14 Mb/s at 1080p60 (9.9 at 1080p30, 6.2 at 720p60), less when a platform takes less (Twitch about 6, Kick 8, Facebook and X 9, Instagram 4: the one landscape encode goes at the least of the landscape destinations on), and less when the last stream filled the upload, fitted to it with room to spare for up to half a day. A stream gets more bits than a recording of the same size, because YouTube and the rest compress it again for every viewer. The stream always carries sound: silence while the sound source is None, and whatever source is chosen after **Go live** (from the desk, the phone or the assistant) is heard on the stream at once, with no restart. The phone remote shows a red Live chip on Draw and Controls while the show is on air; two taps on it stop the stream. The console (`docs/live-show.md`) drives the same stream.
@@ -196,7 +196,7 @@ Send a number from 0 to 1: the server hands the number to the setting as it is. 
 
 **Settings → Logo & Titles → Song titles** (and **Title** on the phone, in the More
 sheet and on the remote's Controls) puts each new song's credit up when the song is
-named, and a song show's **Pour the title** does the same. By default it is a corner
+named, and a song show's **Pour the title** puts it up the same way. By default it is a corner
 caption, the card a music channel put over a video in the early 1980s: white letters
 low in the left corner, the artist, the song in quotation marks, the album and the
 label, up for seven seconds and gone. It is laid over the picture, on the screen and
@@ -205,23 +205,11 @@ cannot name, anything joined to the show server can send a `song-title` message 
 assistant's `song_title` tool) with the artist, title, album and label as each track
 starts. Not yet on the projector window, a cast or a recording (PLAN 37x-10k).
 
-**As a corner caption** off (the phone's **Ink**) pours the title and artist
-onto the plate as ink when the song is named, then washes it away. The ink is dye
-in the liquid itself, poured at the plate's full resolution, so it is on the wall,
-in a live stream and in every recording at once; nothing is drawn over the picture.
-What takes it away is a real flow: a drift across the plate and eddies a sixth of
-the plate wide that break the letters up, after a moment to read them. The dye
-stays on the plate afterwards as colour.
-
-- **Title ink**: the look's own first colour, or one you pick.
-- **Title Size**: from a small credit to the width of the plate. A long title shrinks to fit.
-- **Title Height**: where it lands, bottom to top.
-- **Title Sweep**: how hard the wash is. At the default the title reads for about
-  three seconds and is gone before twelve; at the top it is gone in two; near the
-  bottom it drifts, readable, for many seconds. Sweep, Size and Height are on MIDI.
-
-A song show's title card and sign-off, and words poured from the phone remote, the
-show server or the assistant in a live set, go through the same ink and wash.
+Titles used to have a second choice, poured onto the plate as ink and washed away,
+with its own colour, size, height and sweep. On a busy look the flow smeared the
+letters before they could be read, so it is shelved (PLAN 37x-10m): every title,
+the phone's **Song title** box and a song show's sign-off (the ChromaGlass name)
+included, is the corner caption. The logo melt below still pours the logo as ink.
 
 ## A logo that survives the plate
 
