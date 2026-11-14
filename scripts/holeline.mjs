@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * No line round a bubble's hole; the line between two dyes kept.
+ * No line round a bubble's hole, and none where two dyes meet.
  *
  *   npm run holeline      (the lab: any adapter that computes; in Measure's lab part)
  *
@@ -9,52 +9,58 @@
  * air cuts in the dye had a stepped halo round it, bright and dark blocks a
  * couple of cells out on a cross, a "+" stamped round each small bubble. The
  * dye field under it was clean: with Boundary Contrast at 0 the halo went.
- *
  * The cause was the line drawn between two dyes (boundaryDiff in
- * wgsl/plate.ts, on at 0.35 in every look). It is drawn where the lit colour
- * changes between taps on a cross, and the lit colour is the dye's depth as
- * well as its hue: one dye thinning to nothing at a hole's edge read as two
- * colours meeting, and the taps' offsets drew the cross. The fix gates that
- * line by how far the dye's colour per unit of dye moves between the same
- * taps, which a hole in one dye does not move and two dyes meeting do.
+ * wgsl/plate.ts, on at 0.35 in every look), which read one dye thinning to
+ * nothing at a hole's edge as two colours meeting; a gate on the dye's hue
+ * took it off the holes and kept it between two dyes.
  *
- * Two labs draw the same plates: the shader as it is, and a control built
- * from it with that gate taken out (CONTROL below, an esbuild plugin that
- * must find each of its two edits once, and a bundle that must differ from
- * the plain one). So every run shows that the halo is still there to be
- * found without the gate, and what the gate keeps is judged against the
- * line as it is drawn without it, on the same adapter, in the same run,
- * rather than against numbers remembered from one rasteriser.
+ * And again (2026-11-13), on Comet River: "I don't really like the super
+ * thick black lines around things. Where does this even come from?" That
+ * was the same line where it had been kept. Since the light was put under
+ * the glass (38h-2) it was drawn as a deflection, the colour step bending
+ * the lamp's light out of the lens's aperture: a band four or five cells
+ * wide with up to 78% of the light gone, wherever two colours met. Two dyes
+ * in one liquid have no index step between them and no surface to slope, so
+ * they bend nothing; what a boundary between them does is absorb with both
+ * dyes where they overlap, which the decode already draws. The line is gone
+ * from every path (PLAN 18e-5; the long comment in wgsl/plate.ts where
+ * boundaryDiff was). Measured on main the day it went, the lines below read:
+ * round a hole at most 0 levels (the hue gate's work), the pool's rim 0, and
+ * between two dyes 109 levels at one depth, 124 at depths five times apart,
+ * 76 photographed, the seam 96 levels darker than the darker of its two dyes.
  *
  * Asked on plates the lab lays out and the real solver and plate shader
  * draw (the air cut into the dye as the app cuts it, bubbleClear 1, the
  * bubbles' own drawing off so only the hole is seen), each picture against
- * the same plate with Boundary Contrast at 0, so what is measured is only
- * what the line adds. The two shots share a time and a dither laid by pixel,
- * so a pixel the line does not touch differs by exactly nothing:
+ * the same plate with Boundary Contrast at 0, at the dial's 0.35, 1 and 2,
+ * so what is measured is only what the dial adds. The two shots share a
+ * time and a dither laid by pixel, so a pixel the dial does not touch
+ * differs by exactly nothing:
  *
- *   1. round holes of 1.8 to 14 cells in one flat dye: under MAX_HALO % of the
- *      pixels in a ring from half the hole's radius to HALO_OUT cells past its
- *      rim are moved by the line by more than MOVED levels in any channel,
- *      and none by more than MAX_MOVE levels, so a halo turned down rather
- *      than taken off (a gate set too soft) fails too. The control must find
- *      the halo: more than CONTROL_WORST % on the worst hole, CONTROL_EACH %
- *      on every one (8.9 to 18.3 % read on SwiftShader, 2026-10-19)
- *   2. the pool's own rim into clear water, the same error (one dye's depth
- *      running to nothing, read as a second colour): under MAX_HALO % with
- *      the gate, more than CONTROL_EACH % without it. The pool's edge, its
+ *   0. the dial is live in these pictures: out of focus (Focus 0.8), where
+ *      it scales the optical path's contrast, it moves the pool's rim by
+ *      more than LIVE levels on average. So "moves nothing" below is the
+ *      shader's answer and not a setting the lab dropped
+ *   1. round holes of 1.8 to 14 cells in one flat dye: no pixel in a ring
+ *      from half the hole's radius to HALO_OUT cells past its rim is moved
+ *      by more than MAX_MOVE levels in any channel
+ *   2. the pool's own rim into clear water, the same. The pool's edge, its
  *      relief and its meniscus are drawn elsewhere and are untouched
- *   3. two dyes meeting, at one depth and at depths five times apart (a
- *      density gate, tried first, took the second's line off): the line moves
- *      at least KEEP of the pixels the control's line moves in a band across
- *      where they meet, and more than MIN_LINE % of the band, so a line that
- *      drew nothing anywhere fails here, not passes line 1
+ *   3. two dyes meeting, at one depth, at depths five times apart and at
+ *      near hues, and the first photographed (the camera's path): no pixel
+ *      in a band across where they meet is moved by more than MAX_MOVE
+ *   3b. and the seam is what the two dyes absorb, not a line: at one depth,
+ *      with the dial at 1, no pixel of the band is darker in any channel
+ *      than the darker of the two dyes beside it by more than SEAM_DARK
+ *      levels (at one depth the dye across the seam is a blend of the two,
+ *      so by Beer-Lambert each channel lies between them), asked only once
+ *      the two sides are shown to be two colours (over SIDES levels apart)
  *
  * Before any of it is judged, the plates are asked to be what they say:
  * every picture is whole, every ring selects the pixels its area says, and
  * each hole is cut where it was put, its rim within RIM_SLACK cells of its
  * radius along a ray, so a plate whose air missed the dye, or cut it wider
- * and left the ring in clear water (where no line is ever drawn), throws.
+ * and left the ring in clear water (where nothing is ever drawn), throws.
  *
  * A fourth line (33b, 2026-10-20), on the same plate A: no light on the dye's
  * relief round a hole. The report: "bubbles still look pixelated around
@@ -85,11 +91,6 @@
  *      MIN_RIM levels in the control, so a relief that is not there at all
  *      cannot pass for one that is kept
  *
- * Printed, not judged: the same rings with the bubbles drawn (Bubbles 1,
- * the picture the owner sees), and the line between two dyes of near hue,
- * about 0.08 and 0.2 apart in colour per unit of dye, against the control.
- * The gate fades the line between 0.03 and 0.12, so the first loses some of
- * its line: what the fix gives up, shown rather than hidden.
  */
 import { openLab } from './lab.mjs';
 
@@ -100,32 +101,10 @@ const check = (name, ok, detail = '') => {
 };
 
 const N = 256, SIZE = 768;
-const MOVED = 24, MAX_HALO = 1, MAX_MOVE = 4, HALO_OUT = 6, KEEP = 0.8, MIN_LINE = 10;
-const CONTROL_WORST = 5, CONTROL_EACH = 3, RIM_SLACK = 1.5;
+const MOVED = 24, MAX_MOVE = 4, HALO_OUT = 6, RIM_SLACK = 1.5;
+const DIALS = [0.35, 1, 2], LIVE = 3, SEAM_DARK = 6, SIDES = 60;
 const SIZES = [1.8, 3, 5, 8, 14];
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
-
-/*
-  The control: wgsl/plate.ts with the hue gate taken off the line, so the line
-  is drawn as it was before the fix. Each edit must be found exactly once; a
-  refactor that renames them makes the control throw rather than quietly
-  build the fixed shader twice.
-*/
-const CONTROL = {
-  name: 'no-hue-gate',
-  setup(b) {
-    b.onLoad({ filter: /src[\\/]gpu[\\/]wgsl[\\/]plate\.ts$/ }, async (a) => {
-      const { readFileSync } = await import('node:fs');
-      let s = readFileSync(a.path, 'utf8');
-      for (const cut of [' * hueX;', ' * hueY;']) {
-        const found = s.split(cut).length - 1;
-        if (found !== 1) throw new Error(`holeline: the control found ${found} of 1 "${cut}" in wgsl/plate.ts`);
-        s = s.replace(cut, ';');
-      }
-      return { contents: s, loader: 'ts' };
-    });
-  },
-};
 
 /*
   The 33b control: wgsl/plate.ts with the air's mask taken off the lead layer's
@@ -147,15 +126,15 @@ const CONTROL_AIR = {
   },
 };
 
-const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT }) => {
+const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT, DIALS }) => {
   const { L } = await lab.create(N);
   // The frame shows the middle 1/1.5 of the plate (plate.ts), so a point x
   // on the plate is at 0.5 + (x - 0.5) * 1.5 in the picture.
   const F = 1.5, W = SIZE, px = (W * F) / N; // pixels per solver cell, at zoom 1
   const plateAt = (u) => 0.5 + (u - 0.5) / F;
   const pink = [1.2, 0.3, 0.8], teal = [0.2, 1.0, 1.3];
-  const shot = async (bc, bubbles = 0) => {
-    const p = new Uint8ClampedArray(await lab.render(SIZE, { boundaryContrast: bc }, { zoom: 1, macroAmount: 0, view: true, bubbles }));
+  const shot = async (bc, over = {}) => {
+    const p = new Uint8ClampedArray(await lab.render(SIZE, { boundaryContrast: bc, ...over }, { zoom: 1, macroAmount: 0, view: true, bubbles: 0 }));
     if (p.length !== W * W * 4) throw new Error(`holeline: a picture came back ${p.length} bytes, not ${W * W * 4}`);
     return p;
   };
@@ -164,15 +143,22 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   // less than its area (the plate moved, the frame changed) throws rather
   // than reads as nothing moved.
   const share = (on, off, pick, area) => {
-    let n = 0, m = 0, max = 0;
+    let n = 0, sum = 0, max = 0;
     for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
       if (!pick(plateAt((x + 0.5) / W), plateAt((y + 0.5) / W))) continue;
       const d = moved(on, off, x + y * W);
-      n++; if (d > MOVED) m++; if (d > max) max = d;
+      n++; sum += d; if (d > max) max = d;
     }
     const want = area * (W * F) ** 2;
     if (n < 0.9 * want) throw new Error(`holeline: a selection picked ${n} pixels of the ${Math.round(want)} its area holds`);
-    return { n, pct: (100 * m) / n, max };
+    return { n, mean: sum / n, max };
+  };
+  // The most any of the dial's settings moves a pixel of the selection, against the dial at 0.
+  const dialled = async (pick, area, over = {}) => {
+    const off = await shot(0, over);
+    let n = 0, max = 0;
+    for (const bc of DIALS) { const r = share(await shot(bc, over), off, pick, area); n = r.n; max = Math.max(max, r.max); }
+    return { n, max, off };
   };
   const at = (p, x, y) => { const u = 0.5 + (x - 0.5) * F, v = 0.5 + (y - 0.5) * F; const i = Math.floor(u * W) + Math.floor(v * W) * W; return [p[4 * i], p[4 * i + 1], p[4 * i + 2]]; };
   const far = (a, b) => Math.max(...a.map((v, k) => Math.abs(v - b[k])));
@@ -187,23 +173,25 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   const list = holes.flatMap((h) => [h.x, h.y, h.r, 1]);
   lab.solver().setBubbles(new Float32Array(list), holes.length, 0.25, new Float32Array(holes.length * 4));
   await lab.step(2, { bubbleClear: 1 });
-  const aOn = await shot(0.35), aOff = await shot(0);
-  const bOn = await shot(0.35, 1), bOff = await shot(0, 1);
-  const halo = holes.map((h) => {
+  const halo = [];
+  for (const h of holes) {
     const lo = 0.5 * h.r, hi = h.r + HALO_OUT / N, area = Math.PI * (hi * hi - lo * lo);
-    const ring = (x, y) => { const d = Math.hypot(x - h.x, y - h.y); return d >= lo && d <= hi; };
-    const s = share(aOn, aOff, ring, area), drawn = share(bOn, bOff, ring, area);
+    const s = await dialled((x, y) => { const d = Math.hypot(x - h.x, y - h.y); return d >= lo && d <= hi; }, area);
     // Where the hole's rim is: out from the centre along a ray, the first
     // point within MOVED levels of the dye ten cells past the rim.
-    const beside = at(aOff, h.x, h.y + h.r + 10 / N);
+    const beside = at(s.off, h.x, h.y + h.r + 10 / N);
     let rim = NaN;
-    for (let d = 0; d <= h.r + 10 / N; d += 0.1 / N) if (far(at(aOff, h.x, h.y + d), beside) <= MOVED) { rim = d * N; break; }
-    return { cells: h.r * N, pct: s.pct, max: s.max, n: s.n, drawn: drawn.pct, cut: far(at(aOff, h.x, h.y), beside), rim };
-  });
-  const rim = share(aOn, aOff, (x, y) => Math.abs(Math.hypot(x - C, y - C) - R) < HALO_OUT / N && Math.abs(y - 0.5) > 0.1, 0);
+    for (let d = 0; d <= h.r + 10 / N; d += 0.1 / N) if (far(at(s.off, h.x, h.y + d), beside) <= MOVED) { rim = d * N; break; }
+    halo.push({ cells: h.r * N, max: s.max, n: s.n, cut: far(at(s.off, h.x, h.y), beside), rim });
+  }
+  const rimRing = (x, y) => Math.abs(Math.hypot(x - C, y - C) - R) < HALO_OUT / N && Math.abs(y - 0.5) > 0.1;
+  const rim = await dialled(rimRing, 0);
+  // Line 0: out of focus the dial scales the optical path's contrast, and the pool's rim shows it.
+  const live = share(await shot(1, { projectorFocus: 0.8 }), await shot(0, { projectorFocus: 0.8 }), rimRing, 0).mean;
 
   // Plate B: two dyes meeting down the middle.
-  const meet = async (left, dl, right, dr) => {
+  const band = (x, y) => Math.abs(x - 0.5) < 4 / N && y > 0.25 && y < 0.75;
+  const meet = async (left, dl, right, dr, over = {}) => {
     await lab.create(N);
     const add = new Array(L * L * 4).fill(0);
     for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
@@ -214,14 +202,28 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
       add[k] = c[0] * d; add[k + 1] = c[1] * d; add[k + 2] = c[2] * d; add[k + 3] = d;
     }
     lab.addDye(add); lab.flush(); await lab.step(10);
-    const on = await shot(0.35), off = await shot(0);
-    return share(on, off, (x, y) => Math.abs(x - 0.5) < 4 / N && y > 0.25 && y < 0.75, (8 / N) * 0.5).pct;
+    const r = await dialled(band, (8 / N) * 0.5, over);
+    // The seam against the two dyes beside it, 12 cells out on either side, row by row, with the dial at 1.
+    const on = await shot(1, over);
+    let dark = 0, sides = 255;
+    for (let y = Math.ceil(0.5 * W - 0.25 * F * W) + 2; y < 0.5 * W + 0.25 * F * W - 2; y++) {
+      const row = (u) => { const i = Math.floor((0.5 + (u - 0.5) * F) * W) + y * W; return [on[4 * i], on[4 * i + 1], on[4 * i + 2]]; };
+      const a = row(0.5 - 12 / N), b = row(0.5 + 12 / N);
+      sides = Math.min(sides, far(a, b));
+      for (let x = Math.ceil((0.5 - (4 / N) * F) * W); x < (0.5 + (4 / N) * F) * W; x++) {
+        const i = x + y * W;
+        for (let k = 0; k < 3; k++) dark = Math.max(dark, Math.min(a[k], b[k]) - on[4 * i + k]);
+      }
+    }
+    return { max: r.max, n: r.n, dark, sides };
   };
   const even = await meet(pink, 1.3, teal, 1.3), uneven = await meet(pink, 2.0, teal, 0.4);
   // Near hues: the green absorbance moved so exp(-c) moves about 0.08 and 0.2.
   const near = await meet(pink, 1.3, [1.2, 0.414, 0.8], 1.3), nearer = await meet(pink, 1.3, [1.2, 0.614, 0.8], 1.3);
-  return { halo, rim, even, uneven, near, nearer, px };
-}, { N, SIZE, SIZES, MOVED, HALO_OUT });
+  // The camera's path: the same two dyes photographed.
+  const photo = await meet(pink, 1.3, teal, 1.3, { renderStyle: 'photo' });
+  return { halo, rim, live, even, uneven, near, nearer, photo, px };
+}, { N, SIZE, SIZES, MOVED, HALO_OUT, DIALS });
 
 /*
   Plate A again, with the air handed to the plate and the bubbles not drawn.
@@ -326,13 +328,8 @@ const glow = (page) => page.evaluate(async ({ N, SIZE, SIZES, HOLE_FROM, HOLE_TO
 
 const t0 = Date.now(), lap = (what) => console.log(`   (${what}: ${((Date.now() - t0) / 1000).toFixed(0)} s in)`);
 const plain = await openLab();
-let now, then, glowNow, glowThen;
+let now, glowNow, glowThen;
 try { now = await measure(plain.page); lap('the plain lab measured'); glowNow = await glow(plain.page); lap('and its glow'); } finally { await plain.close(); }
-const control = await openLab({ plugins: [CONTROL], tag: 'no-hue-gate' });
-try {
-  if (control.js === plain.js) throw new Error('holeline: the control built the same bundle as the plain lab (its edits matched nothing)');
-  then = await measure(control.page); lap('the hue control');
-} finally { await control.close(); }
 
 const airOff = await openLab({ plugins: [CONTROL_AIR], tag: 'no-air-mask' });
 try {
@@ -340,29 +337,28 @@ try {
   glowThen = await glow(airOff.page); lap('the air control');
 } finally { await airOff.close(); }
 
-for (const [name, r] of [['the shader', now], ['the control (no hue gate)', then]]) {
-  console.log(`   ${name}:`);
-  for (const h of r.halo) console.log(`     hole ${h.cells.toFixed(1)} cells: ${h.pct.toFixed(2)}% of ${h.n} ring pixels moved by the line, at most ${h.max} levels; ${h.drawn.toFixed(2)}% with the bubbles drawn; centre ${h.cut} levels from the dye, rim at ${h.rim.toFixed(1)} cells`);
-  console.log(`     pool rim into water: ${r.rim.pct.toFixed(2)}% of ${r.rim.n} pixels moved, at most ${r.rim.max} levels`);
-  console.log(`     two dyes meeting: ${r.even.toFixed(1)}% of the band at one depth, ${r.uneven.toFixed(1)}% at depths five times apart; near hues (about 0.08 and 0.2 apart) ${r.near.toFixed(1)}% and ${r.nearer.toFixed(1)}% (printed)`);
+console.log('   what Boundary Contrast moves (0.35, 1 and 2 against 0), in levels:');
+for (const h of now.halo) console.log(`     hole ${h.cells.toFixed(1)} cells: at most ${h.max} of ${h.n} ring pixels; centre ${h.cut} levels from the dye, rim at ${h.rim.toFixed(1)} cells`);
+console.log(`     pool rim into water: at most ${now.rim.max} (${now.rim.n} pixels); out of focus the dial moves it ${now.live.toFixed(2)} on average`);
+for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues, about 0.08 apart', 'near'], ['near hues, about 0.2 apart', 'nearer'], ['one depth, photographed', 'photo']]) {
+  console.log(`     two dyes meeting, ${name}: at most ${now[k].max} (${now[k].n} pixels); the seam ${now[k].dark} darker than the darker dye beside it, the two sides ${now[k].sides} apart`);
 }
 
 // The plates are what they say, before anything is judged on them.
-for (const r of [now, then]) for (const h of r.halo) {
+for (const h of now.halo) {
   if (!(h.cut > MOVED)) throw new Error(`holeline: the hole of ${h.cells.toFixed(1)} cells is not cut in the dye (centre ${h.cut} levels from it)`);
   if (!(Math.abs(h.rim - h.cells) <= RIM_SLACK)) throw new Error(`holeline: the hole of ${h.cells.toFixed(1)} cells has its rim at ${h.rim} cells (the air cut it elsewhere, or wider)`);
 }
 
-const worst = (r) => Math.max(...r.halo.map((h) => h.pct));
-const least = (r) => Math.min(...r.halo.map((h) => h.pct));
-check(`the control finds the halo (worst ${worst(then).toFixed(1)}% > ${CONTROL_WORST}%, least ${least(then).toFixed(1)}% > ${CONTROL_EACH}%)`, worst(then) > CONTROL_WORST && least(then) > CONTROL_EACH);
-check(`no line round a hole in one dye (worst ${worst(now).toFixed(2)}% < ${MAX_HALO}%)`, worst(now) < MAX_HALO, `the control: ${worst(then).toFixed(1)}%`);
+check(`0. the dial is live: out of focus it moves the pool's rim (${now.live.toFixed(2)} levels > ${LIVE})`, now.live > LIVE);
 const most = Math.max(...now.halo.map((h) => h.max));
-check(`nor a fainter one (at most ${most} levels ≤ ${MAX_MOVE})`, most <= MAX_MOVE);
-check(`no line round the pool's rim (${now.rim.pct.toFixed(2)}% < ${MAX_HALO}%; the control ${then.rim.pct.toFixed(1)}% > ${CONTROL_EACH}%)`, now.rim.pct < MAX_HALO && then.rim.pct > CONTROL_EACH);
-for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven']]) {
-  check(`the line between two dyes is drawn, ${name} (${now[k].toFixed(1)}% > ${MIN_LINE}%)`, now[k] > MIN_LINE);
-  check(`and kept, ${name} (${now[k].toFixed(1)}% ≥ ${KEEP} × the control's ${then[k].toFixed(1)}%)`, now[k] >= KEEP * then[k]);
+check(`1. no line round a hole in one dye (at most ${most} levels ≤ ${MAX_MOVE})`, most <= MAX_MOVE);
+check(`2. no line round the pool's rim (at most ${now.rim.max} levels ≤ ${MAX_MOVE})`, now.rim.max <= MAX_MOVE);
+for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues', 'near'], ['nearer hues', 'nearer'], ['one depth, photographed', 'photo']]) {
+  check(`3. no line where two dyes meet, ${name} (at most ${now[k].max} levels ≤ ${MAX_MOVE})`, now[k].max <= MAX_MOVE);
+}
+for (const [name, k] of [['on the wall', 'even'], ['photographed', 'photo']]) {
+  check(`3b. the seam is the two dyes' own absorbance, ${name} (${now[k].dark} levels darker than the darker side ≤ ${SEAM_DARK}; the sides ${now[k].sides} apart > ${SIDES})`, now[k].dark <= SEAM_DARK && now[k].sides > SIDES);
 }
 
 for (const [name, r] of [['the shader', glowNow], ['the control (no air mask)', glowThen]]) {
