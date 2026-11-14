@@ -57,8 +57,11 @@
  *      24.1), are 15 to 17 and 23 to 25, the reference's about 20 between
  *   9. a queued drop is poured in its schedule's steps, each its share, and
  *      lays the stamp's whole dye, at the middle and against the plate's
- *      edge alike; and the music's trickle falls as one drop when it has a
- *      drop's worth (Tate), not every frame
+ *      edge alike; the music's trickle falls as one drop when it has a
+ *      drop's worth (Tate), not every frame; and forty drops on a plate that
+ *      takes no steps (Freeze the liquid) lay nothing on it until it does:
+ *      a full queue lets a drop go rather than stamping it (`npm run moving`
+ *      found the stamps ending its freeze early)
  *
  * Measured (SwiftShader, 2026-11-14): see the commit that added it.
  */
@@ -130,13 +133,16 @@ const WINDOW = 0.25, KEEP = 0.02, PUSH = [0.7, 1.3], CALM = 0.15, HOLD = 0.35, O
     return { n: q.pours.length, shares: q.pours.every((p) => Math.abs(p.share - sch.share) < 1e-6 && Math.abs(p.r - sch.radius) < 1e-6), dye: q.laid.reduce((s, l) => s + l[2], 0) };
   };
   const mid = pourAt(96), edge = pourAt(2), want = m0 * AMOUNT;
+  // A frozen plate (no steps) dropped on forty times: nothing reaches it until it steps (moving's freeze).
+  const frozen = plate(0);
+  for (let k = 0; k < 40; k++) D.layDrop(frozen, 96, 96, 5, 1, 1, 0.1, 1, true);
   const t = plate(0);
   let firstFall = -1;
   for (let k = 0; k < 200 && firstFall < 0; k++) { D.layDrop(t, 96, 96, 0.05, 1, 1, 0.1, 1, true); if (D.dropsLive(t.drops)) firstFall = k; }
   check('9. a drop pours in its schedule and lays all its dye, middle and edge, and the trickle falls as one drop when it has a drop\'s worth',
     mid.n === sch.steps && mid.shares && edge.n === sch.steps && Math.abs(mid.dye / want - 1) < 1e-3 && Math.abs(edge.dye / want - 1) < 1e-3
-      && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051,
-    `${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE})`);
+      && firstFall > 0 && Math.abs((firstFall + 1) * 0.05 - D.DROP_TATE) < 0.051 && frozen.laid.length === 0,
+    `${mid.n} pours of ${sch.share.toFixed(3)} (schedule ${sch.steps}); dye laid ${(mid.dye / want).toFixed(4)} of the stamp's at the middle, ${(edge.dye / want).toFixed(4)} at the edge; the trickle fell at its ${firstFall + 1}th frame (${((firstFall + 1) * 0.05).toFixed(2)} against ${D.DROP_TATE}); forty drops on a frozen plate laid ${frozen.laid.length} cells`);
 }
 
 // ── 1–6, on the solver ──

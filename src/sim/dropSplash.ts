@@ -79,7 +79,17 @@ export function layDrop(sim: FluidSimulation, x: number, y: number, amount: numb
   } else {
     // The same dye the stamp laid, brought in with the drop's volume.
     const mass = stampMass(Math.round(3 * k), amount * dye);
-    if (!queueDrop(sim.drops, sim.size, x, y, amount, mass, r, g, b)) stamp(sim, x, y, dropR, amount * dye / (spread * spread), r, g, b);
+    /*
+      With every slot busy the drop is let go, not stamped. The slots fill
+      only when drops keep coming and the plate takes no steps: Freeze the
+      liquid, while the automation and the music still drop. A stamp there
+      reached the frozen plate through the readback's flush and the colour
+      kept arriving on a plate meant to stand still: `npm run moving` (Mac,
+      soap-film) found its four-second freeze ending 1.2 to 1.9 s early,
+      from when the sixteen slots had filled. Sixteen drops within one
+      drop's five steps is not a show running.
+    */
+    queueDrop(sim.drops, sim.size, x, y, amount, mass, r, g, b);
   }
   if (e > 0.02) splash(sim, x, y, dropR, h, e, amount, amount * dye, r, g, b);
 }
