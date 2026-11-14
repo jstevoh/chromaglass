@@ -77,7 +77,7 @@ import { macroZoomOf, macroAmountOf, GRID_SIZE, GRID_SCALE, TURING_DRIFT_PER_SEC
 import { HAND_SETTLE, HAND_STILL_HOLD, HAND_MOVING, BLOW_DIR_HOLD_MS, BLOW_STRAW_FRAMES, type BlowDir, DROP_EVERY, type DropLaid, freshLaid, layBottle, LAYING_TOOLS, bottleReach, bottleDye, doseLiquid, pourLiquid, areaSink, stirAlongMove, type RemoteHoldMap, recordRemoteHold, syncBoilHolds } from '../sim/tools';
 import { STAGE_TIMINGS, PREPARE_OFF, PINNED_RUNG, engineLabel, RECOVERY_TRIES, SELF_HEAL_FRAMES, HANDOFF_KEEP, HANDOFF_POURS, EVOLVE_FLOODS, ERROR_STORM, resolveSimResolution, PINNED_STEP_RATE, SIM_MAX_CATCHUP, LOCKSTEP } from '../sim/stepping';
 import { PALETTE_COUNT, DICE, harmonyWithin, windowOf } from '../sim/dice';
-import { stepPlateBubbles } from '../sim/speciesPoll';
+import { stepPlateBubbles, syncBubblesGpu } from '../sim/speciesPoll';
 import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../sim/noteVoicesStep';
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
@@ -4579,6 +4579,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // across the plate ahead of the dye it is meant to be thinning.
             const adv = currentSettings.advection ?? 0.45;
             for (const fluid of fluidsRef.current) fluid.stepLiquid(simStepS, fluid.dt * adv * (GRID_SIZE - 2));
+            syncBubblesGpu(fluidsRef.current[0], bubblesRef.current);
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
@@ -6693,19 +6694,16 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           }
           /*
             The same list the compositor is given, handed to the solver too
-            (H6 · A). Once a frame rather than once a step: the positions
-            come from `bubbles.ts`, which moves at the frame's pace, and
-            stamping them again on each of the step's iterations would pay
-            for the splat several times over for one picture.
+            (H6 · A). Active frames sync per step in the loop above
+            (`syncBubblesGpu`, H2c-8) so multi-step frames spread bubble rate
+            across steps; frozen/draining frames sync here.
           */
           {
-            // The lead plate only: bubbles sit on the front of the dish, the
-            // same plate `disturb` works on above. Giving the list to every
-            // layer would cut the same holes through the background loop.
+            // The lead plate only: bubbles sit on the front of the dish, so background layers stay empty.
             const lead = fluidsRef.current[0];
             if (lead?.gpu instanceof WebGPUFluid) {
               const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
-              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
+              if (!isActiveRef.current || drainFrameRef.current !== 0) syncBubblesGpu(lead, bubblesRef.current);
               /*
                 And the dye those bubbles displace, put back as a ring
                 (H6 · A). Before the hand-off in reading order but after it in

@@ -9,7 +9,8 @@
  */
 
 import type { PlateSolver } from '../gpu/solverTypes';
-import type { BubbleField } from '../lib/bubbles';
+import { WebGPUFluid } from '../gpu/fluid';
+import { MAX_BUBBLES, type BubbleField } from '../lib/bubbles';
 import type { PouredLiquid, SpeciesSnapshot } from '../lib/bubbleLiquid';
 import type { LiquidPhase } from '../lib/liquidPhase';
 import type { VisualizerSettings } from '../types';
@@ -116,4 +117,17 @@ export function stepPlateBubbles(
       if (px > 2 && py > 2 && px < GRID_SIZE - 3 && py < GRID_SIZE - 3) lead.popBubble(px, py, Math.max(2, Math.round(ev.r / GRID_SCALE)), 0.04);
     }
   }
+}
+
+/**
+ * Push the lead plate's stepped bubble list to `WebGPUAir` once per solver step
+ * (rather than once per frame) so multi-step frames spread bubble rate evenly,
+ * doing nothing when there are no bubbles and no air field allocated (H2c-8).
+ */
+export function syncBubblesGpu(lead: FluidSimulation | undefined, bubbles: BubbleField): void {
+  const gpu = lead?.gpu;
+  if (!(gpu instanceof WebGPUFluid)) return;
+  if (bubbles.bubbles.length <= 0 && !gpu.airLive) return;
+  const live = Math.min(bubbles.pack(), MAX_BUBBLES);
+  gpu.setBubbles(bubbles.packed, live, 0.25, bubbles.packedFinger);
 }

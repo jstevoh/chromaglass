@@ -507,38 +507,9 @@ export class WebGPUFluid extends FluidCover {
     }
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
-    /*
-      The air field, before any compute pass opens (H6 · A).
-
-      It is a render pass and the stage that reads it is a compute pass, so
-      it has to be encoded first — commands run in the order they are
-      recorded, and a compute pass cannot be interrupted to draw into a
-      texture it is sampling. It is also cheap and unconditional: the load op
-      is what clears the field, so skipping it on a frame with no bubbles
-      would leave the last frame's air behind and the dye would stay missing
-      under a bubble that had already popped.
-    */
-    if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
     this.stepAhead(enc, p);
-    this.air.splat(enc, (label) => this.profiler.renderPass(label));
-    /*
-      And on the step after the last bubble goes: its hole is a sink in the
-      thin solve (the air leaving, hsDivergence), which is what lets the
-      liquid back in now that nothing paints it back (PLAN 15g-8b).
-    */
-    const hadAir = thin && this.airPush > 0 && this.airCover > 0;
-    /*
-      Not on a plate all but frozen (Advection near 0): the source is per
-      unit of the step's displacement, so a bubble arriving on a step that
-      moves nothing would ask the half-float velocity for more than it holds.
-      The liquid does not move off the air there; it does when the plate
-      moves again and the air does.
-    */
-    this.airPush = (this.air.any || hadAir) && disp > AIR_DISP_LEAST ? (p.bubbleClear ?? 1) : 0;
-    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
-    this.airCoverPrev = this.airCover;
-    this.airCover = this.air.coverage;
-    this.lastDt = p.dt;
+    // Air render pass before compute passes: lazy-allocated, cleared on pop, freed after 60s quiet (H2c-8).
+    this.stepAir(enc, p, thin, disp);
     // The slosh dish, before the step's pass opens: its own pass, whose flow the thin stage reads (PLAN 18a-13).
     this.stepSloshDish(enc, p);
     this.stepBeside(enc, p);
@@ -958,7 +929,13 @@ export class WebGPUFluid extends FluidCover {
       });
     } else {
       stage('project 1', (pass) => this.project(pass));
-      stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
+      // Open plate only (H2c-5): first-order semi-Lagrangian carry saves the backward
+      // trace and MacCormack correction on velocity, adding small-scale numerical
+      // momentum diffusion while leaving dye and liquid carries second-order.
+      stage('advect velocity', (pass) => {
+        this.run(pass, 'advect', this.vel.write, [this.vel.read, this.vel.read, this.sampler], this.arg4('advect forward', disp));
+        this.vel.swap();
+      });
       stage('project 2', (pass) => this.project(pass));
 
       // 6.5–8.7 The post-projection forces
