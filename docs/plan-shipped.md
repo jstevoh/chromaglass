@@ -4752,6 +4752,16 @@ Partly shipped in #355 (2026-10-17): on projected looks, the front plate's edges
   - `npm run lamp`: 9/9 and `npm run lampzero`: 4/4 (every look at Lamp Ground 0 as before the lamp, none different; two projectors add their light, mean error 0.51).
   - `npm run stages` (round 2): drawing pass at 768², two layers, 3.57 vs 3.46 ms base/branch.
 
+- **18e-5 (shipped 2026-11-13, #857). No line where two dyes meet.**
+  - **What was reported:** the owner, with a screenshot of Comet River on the Design desk: "I don't really like the super thick black lines around things. Where does this even come from?" Black bands a few percent of the plate wide ran along every place two colours met (cyan against yellow, orange against violet) and round the islands of one colour inside another.
+  - **Where it came from:** Boundary Contrast (Boundary Glow on the desks, 0.35 by default, 0.6 on Comet River, up to 0.9 on some looks). `boundaryDiff` read the lit colour on a cross of four taps 1.65 cells out and drew a line where it changed, gated since 33a to where the hue changes. It began as a bright seam (the dye times 1.6 plus a quarter of white). 38h-2 put the light under the glass and made the line a deflection, the colour step bending the lamp's light by 1.1 of the line in radians: on the wall `refractionOptics` took up to 78% of the light (`smoothstep(0.25, 1, uB) · 0.78`, at its ceiling from a dial of about 0.45 up), over the four or five cells the taps span; the camera's views took it through `boundaryShade`. In the closeup the same number does more, and still does (the last bullet).
+  - **The real phenomenon:** two dyes in one liquid do not bend light where they meet. A dye at a few percent moves water's index in the fourth decimal place, the liquids are miscible, and there is no surface between them to slope: no index step, no meniscus, nothing for the lens's aperture to lose. What the boundary does is absorb with both dyes where they overlap (Beer–Lambert, the absorbances added), which `decodeFluid` already draws. Dark rims are real where the index steps: oil in water, glycerine poured clear, an air pocket's wall.
+  - **What changed:** on the wall `refractionOptics` is the slope's aperture loss alone (the `uBound` term and its `bEdge`, `edgeK` gone), and the camera's line (`boundaryLine`, `boundaryEdge`, `boundaryShade`) is gone from a photographed look and from the closeup. A thinner or fainter line was not made: at any width it is a line the liquid does not draw. The back plate's painted bright rim (18e-1) and the dial's gain on the optical path are as they were. `boundaryDiff` stays for one reader, the closeup's relief (below).
+  - **Measured (the lab, SwiftShader, 256², `npm run holeline` rewritten to ask it):** Boundary Contrast at 0.35, 1 and 2 against 0 moved a seam between two dyes by up to 173 levels at one depth, 136 at depths five times apart, 13 at hues 0.2 apart and 141 photographed, and the seam on the wall was 43 levels darker than the darker dye beside it; now 0, 0, 0, 0 and 3. Round a bubble's hole and at a pool's rim it moved nothing before or after (33a's hue gate), and out of focus the dial still moves the pool's rim (19 levels on average), so the zeros are the shader's. On a Comet River plate of forty pools in five colours, the picture at the look's 0.6 is now the picture main draws at 0, to the byte.
+  - **Filmed on the Mac (Metal), main against the branch, the same seed and pours:** Comet River, Splodascope and Poster 1969 (the dial at 0.9): the black bands between colours gone in every pair; Splodascope's drops and bubbles keep their rims; the dark zone where red meets blue is in both (the two dyes' own absorbance).
+  - **The closeup is not fixed here, and why.** The closeup's relief (38h-7's `camShadow`) reads the derive pass's `.z` over `.w` as the optical path's curvature, but the camera's branch of that pass has only ever put the colour step's strength in `.z` and 0 in `.w`. So up close a seam between two dyes is shaded darker by the same step (26 levels at one depth in the lab), and that shading is all the depth Macro Relief draws where there are no cells. Two replacements were built and taken back. With nothing in `.z`, `npm run macroview` read relief 0 on every look: a flat closeup. With the wall's path and nine-tap Laplacian there, the Mac's film showed a flat white patch round a cluster of bubbles on pink dye, up to 17% of a closeup frame clipped (0% in any frame of main's), and the lab a doublet 119 levels darker and 99 brighter at a step in the dye's depth. The closeup therefore draws what main drew, to the byte (a Comet River closeup at 3x, Macro Relief 1), and the real thing is 18e-7.
+  - **Found on the way:** 18e-6 (what the dial is for now; `shaderdials`' owed `glow`), 18e-7 (the closeup's relief has never read the path).
+
 ### 18f. Heat comes from the lamp, and a level plate has no "up"
 
 **Shipped (#352):**
@@ -6767,6 +6777,29 @@ What shipped in #473:
 - **Area cords and colour families (`src/lib/plateAreas.ts`, `src/presets.ts`, `scripts/soundpatch.mjs`):** Added explicit disjoint `dyes` families to `lumia` (`[0]`, `[1]`, `[2]`) and `cell-bloom` (`[0, 3]`, `[1]`, `[2]`), and added `PRESET_AREAS` entries for `poster-1969` (three poster shapes: left `milk` `[0, 1]` on `bass`, right `ink` `[3, 4]` on `mid`, lower `milk` `[2]` on `treble`), `milk-marble` (three food-colouring spots in `OWN_SEED_AREAS` so `seedPreset` still lays the white milk dish and four spots: `[0, 1]` on `bass`, `[2, 3]` on `mid`, `[4, 5]` on `treble`), and `red-cabbage` (two pH wells: left `acid` `[0]` on `mid`, right `base` `[1]` on `bass`). `poster-1969` joins `soundpatch`'s `PATTERN` list (closing 28i-6(d)), and `soundpatch` §2 counts both plate-wide liquid patches and area cords on fast readings (`hits` and `bands`, including onsets and notes) toward a look's two or three while holding area looks free of redundant plate-wide patches (`100 of 100 move`, `29 looks checked (+ 3 from 25h)`).
 - **Patch bay hit targets on the desk (`src/components/SettingsPanel.tsx`):** Now that `classic` and `jellyfish-bloom` carry `sceneMappings`, the `patches` deck panel renders their patch cards on load; `Remove mapping` (`h-6 w-6`), `Depth` (`set-range`), `patch-gate-on` (`h-6 w-6`) and the gate sliders (`set-range`) meet the desk's 24 px minimum hit-target rule (`npm run layout`, `npm run qa`).
 - **Still open in `PLAN.md` (`28i-3` film measure, `28i-3b`, `28f-2`):** A fresh showreel (28f-2) and a main-vs-head film on the same looks (seed 1, band in a box) are still owed, and 27 of the 28 changed looks still miss one or more of the 28i film bars (`2–3.5 swells a minute`, `at least 6 colour changes a minute`, `r1 in [−0.13, 0.22]`); all 28 per-look numbers are recorded under `28i-3b` in `PLAN.md`.
+
+### 28i-7c. Velvet Underground's pools stay pools (asked 2026-11-11)
+
+Filmed with every look (28i-7): the frame was the violet ground with one ultramarine lobe
+and a fleck of red where the seed lays three pools, 83% near black, and more dye, more
+exposure, a brighter lamp and the screen blend left it as it was. A probe in the app on the
+owner's Mac (Metal, seed 1, five runs, each turning suspects off) found the dye was never
+lost: the dish held 0.43 to 0.42 of mean dye, while the magenta glycerine kept 38% of its
+dye over 90 s, the soap 71%, the syrup 86%, and the dye outside the three areas went from
+0.001 to 0.117 of the plate. The regulator, the music (band on or off), the hands, the rock,
+the plate pressure, the smear, the drip, the vibration, the air, the surge, the lamp's heat
+(dimmer 0), the buoyancy, the polarity, the carrier's viscosity and the cover glass each
+changed the minute by a point or two at most, and all of them off at once still drained;
+only Advection 0 stopped it, so the flow was the solver's own. It was Turbulence: the look
+never named it and ran the default 0.5, curl noise added to the flow everywhere every step
+(`forcesB`), the plate's speed 0.43 against 0.14 without it. With it at 0 the pools kept
+97/96/95% over 90 s (98.3/96.7/96.0% at 60 s against 67.2/75.5/90.9%), the band's run the
+same. `npm run pools` (Mac, `open` shard) holds the minute at 85% a pool from the moment the
+dish has settled (on GitHub's macOS runner the regulator was still trimming the seed when a
+fixed-time minute began, and took a fifth of every pool with the dish: 28i-7h), runs the old stir
+as its control (which must drain one), and asks that the plate still moves. Found along the
+way: 28i-7f (thirteen looks still inherit the noise stir) and 28i-7g (with the motor off
+too, a smaller out-flow remains).
 
 ## 28j. Changing looks without a jump
 

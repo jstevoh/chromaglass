@@ -233,7 +233,7 @@ style (§31).
   and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
 - **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
   ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
-- **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **18e-2** a clear pour's edge (its checks written first, `nolight -- --owed=rim`, `derive -- --owed=grad`; with 38h-6's film, `--owed=film`), **31a** the projector's
+- **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d; ~~18e-5~~ no line where two dyes meet, shipped #857, with **18e-6** what Boundary Contrast is for now and **18e-7** the closeup's relief from the path, which still draws the line up close), then **18e-2** a clear pour's edge (its checks written first, `nolight -- --owed=rim`, `derive -- --owed=grad`; with 38h-6's film, `--owed=film`), **31a** the projector's
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
   (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
@@ -254,7 +254,8 @@ style (§31).
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), ~~**38c**~~ soap conserved (and ~~**38c-3**~~ Soap Breakdown), **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), ~~**38h**~~
   nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; ~~38h-4~~ the back plate's grain and ~~38h-3~~ one shadowgraph for the whole column, ~~38h-15~~ bubbles and ~~38h-17~~ beads drawn at the screen's resolution shipped; 38h-5, 38h-6, 38h-8, 38h-9, 38h-11, 38h-12, 38h-14 and 38h-16 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f** (~~38f-1~~ the heat carried and ~~38f-2~~ the deep-quench oil shipped; ~~27f-9e~~ a standing lamp's cool top shipped; every look's cooling in real seconds open), **38g-2**, **38i**, **38j**; **38r** (the rest
   gap, shipped: one number, #613, then a real 2 mm, #655; **38r-5** the liquid's amount sets it, Liquid
-  and Cover Weight, part 1 shipped, then **38r-16** the pinch and the air edge) is read before 38d and 38i.
+  and Cover Weight, part 1 shipped, then **38r-16** the pinch and the air edge, designed and its checks
+  written first, `npm run gap` and `npm run airedge`, owed, Antigravity's to build) is read before 38d and 38i.
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own
   thread: **42m** the tutorials watched on the owner's Mac first, then **42a** the glass pair
   (Fast and Slow glass from real radii; after #655), **42e** the classic mixture's numbers (with
