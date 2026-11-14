@@ -36,6 +36,11 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: ChromaGlass
+        # XcodeGen writes literal versions into Info.plist unless told otherwise, so
+        # the first archive of build 2 still said 1: point them at the build settings, which
+        # the archive's CURRENT_PROJECT_VERSION=<n> overrides.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CGLicenceURL: $(CG_LICENCE_URL)
         UILaunchScreen: {}
         # The app's only encryption is HTTPS through the system and WebRTC's standard
@@ -48,6 +53,15 @@ targets:
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: ChromaGlass connects to the Mac running your show on this network.
+        # The app never opens a camera or a microphone: it only receives the Mac's
+        # video. But LiveKit's WebRTC framework links AVCaptureDevice and
+        # AVCaptureSession (its capture code is compiled in for every platform), and
+        # App Store Connect bounced build 1 with ITMS-90683 for the missing camera
+        # string. The microphone string is there for the same reason (the framework
+        # also links AVAudioSession), so the next upload does not bounce on it. No
+        # prompt is ever shown, because no code path asks.
+        NSCameraUsageDescription: ChromaGlass does not use the camera. It only shows the video your Mac sends; the video library it uses includes camera code that the app never calls.
+        NSMicrophoneUsageDescription: ChromaGlass does not use the microphone. It only plays the show your Mac sends; the video library it uses includes recording code that the app never calls.
     settings:
       base:
         # The App Store record "ChromaGlass TV" is app.chromaglass.tv: the bare
