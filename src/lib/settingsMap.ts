@@ -217,7 +217,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     every saved deep link name it, and an id is not something anyone reads.
   */
   { id: 'projectors', name: 'Wall', category: 'stage',
-    terms: 'wall projector projectors keystone corner pin mask masks blanking rear projection flip inverted output gain gamma grade flash limit strobe safety second screen hdmi load-in' },
+    terms: 'wall projector projectors keystone corner pin mask masks blanking rear projection flip inverted output gain gamma lit stage room light wash grade flash limit strobe safety second screen hdmi load-in' },
   // Out of the wall's section for the same reason as the mark: it made that
   // section three screens deep, and cutting a picture into shapes is a job of
   // its own.

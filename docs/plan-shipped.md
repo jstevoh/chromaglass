@@ -10571,6 +10571,30 @@ model cannot reach one, the PR says what it reached and asks.
 
 ### 36. What the analog operators could not do (researched 2026-10-27)
 
+#### 36a. A lit-stage grade
+
+- **36a. A lit-stage grade** (shipped PR #854, `npm run litstage` 15/15 across all 33 looks).
+  *The pain:* analog light "is not bright, and it's hard for that light to live in a modern
+  stage environment" (Mad Alchemy); under a stage wash the projector's black lifts to grey,
+  and near-black looks turn to a grey haze. *The build:* `litStage` (0 to 1, default 0) on
+  `OutputConfig` (`src/lib/outputConfig.ts`, load-in only — never in a look, preset, set,
+  patch bay, MIDI, fader or Evolve; song renders hold 0 via `rendering ? 0 : ...`), wired
+  through `PlateView.litStage` (`src/gpu/plateUniforms.ts`), `FrameView.litStage`
+  (`src/sim/frameTypes.ts`), `PLATE_FIELDS` (`src/gpu/wgsl/plateFields.ts`),
+  `LiquidVisualizer.tsx`, and `scripts/lab-entry.ts`. The grade lives in `litFluid`
+  (`src/gpu/wgsl/litStage.ts`), called only where dye is decoded (`decodeFluid`,
+  `decodeFluidRaw` in `src/gpu/wgsl/plate.ts`), wrapped in `/* lit stage { */ ... /* } lit stage */`:
+  at 0 it takes the unchanged plate path to the byte; above 0 it thickens thin/medium dye
+  (`1 - exp(-thickness * (1 + 2.0 * ls))`), deepens/saturates transmitted lamp dye on
+  `U.lampGround > 0.001` (`amount * (1 + 0.15 * ls)` + `litSat` weighted by `lampBg`
+  luminance), and (shortcut tracked under 36a-2) applies a per-pixel luminance lift and
+  `saturate3` (`litDyeLift`) on decoded dye while leaving the empty plate untouched (`b9`
+  `0.00 ΔE`). Exposed as the **Lit stage** knob in `OutputPanel.tsx` (also reached on the
+  phone under `More → Settings → Stage → Wall` and `More → Tabs → Setup`), indexed in
+  `src/lib/settingsMap.ts`, and documented in `docs/guide.md`. `scripts/checks.json`
+  ("Looks on a lit stage") flipped from `npm run litstage -- --controls` to `npm run litstage`
+  and its stale `lab`-room note updated.
+
 #### 36e-1. The model and its check, on the CPU
 
   - **36e-1. The model and its check, on the CPU (shipped).** `src/lib/lampBoil.ts` is the

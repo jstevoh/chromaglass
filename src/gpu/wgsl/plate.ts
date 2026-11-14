@@ -33,6 +33,7 @@ import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
+import { LIT_STAGE_WGSL } from './litStage';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -378,6 +379,7 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
   }
   return result;
 }
+${LIT_STAGE_WGSL}
 
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
@@ -424,6 +426,9 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
     let l = dot(lt, vec3f(0.299, 0.587, 0.114));
     ltBody = clamp(vec3f(l) + (lt - vec3f(l)) * (1.0 + 0.8 * body), vec3f(0.0), vec3f(1.0));
   }
+  /* lit stage { */
+  if (U.litStage > 0.0) { return litFluid(ltBody, thickness, unit, amount, m); }
+  /* } lit stage */
 
   return vec4f(ltBody, alpha);
 }
@@ -1040,6 +1045,9 @@ fn decodeFluidRaw(raw: vec4f) -> vec4f {
   let amount = mix(totalDensity * 2.8, max(0.0, totalDensity - U.filmLevel) * U.filmGain, clamp(U.macroOn, 0.0, 1.0));
   if (U.lampGround > 0.001) { dyeThrough = lampThrough(unit, amount * gapScale); }
   let thickness = amount * (1.0 + darkness * 1.7) * filmWater;
+  /* lit stage { */
+  if (U.litStage > 0.0) { return litFluid(c, thickness, unit, amount * gapScale, clamp(U.macroOn, 0.0, 1.0)); }
+  /* } lit stage */
   return vec4f(c, min(mix(0.95, 0.995, clamp(U.macroOn, 0.0, 1.0)), 1.0 - exp(-thickness)));
 }
 
@@ -1723,18 +1731,6 @@ fn beadAt(uv: vec2f) -> vec4f {
 fn beadColour(uv: vec2f) -> vec3f {
   let w = f32(textureDimensions(beadTex).x);
   return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
-}
-/** How much of a drop of radius R (plate uv) is flat on top, for half the
-    gap rho: none for a ball (R under rho), and all but its half-round edge,
-    rho wide, for a pancake. */
-fn dropFlat(R: f32, rho: f32) -> f32 {
-  return clamp(1.0 - rho / max(R, 1e-5), 0.0, 0.95);
-}
-/** Where on its meniscus a point is: 0 on the flat top (or the middle of a
-    small drop), 1 at the contact. */
-fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
-  let f = dropFlat(R, rho);
-  return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
 ${TRANSMIT_WGSL}
 ${FILM_DYE_WGSL}

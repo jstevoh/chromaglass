@@ -150,6 +150,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
   { name: 'projectorFocus', type: 'f32', note: 'projector lens focus plane (0..1, 0.5 = in-focus, defocus shifts Becke lines)' },
+  { name: 'litStage', type: 'f32', note: "the Wall's Lit stage amount, 0-1 (PLAN 36a)" },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

@@ -359,11 +359,11 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
 }) {
   const set = (patch: Partial<OutputConfig>) => onChange({ ...output, ...patch });
   const aspect = useFrameAspect();
-  // Reset puts the guard back on as well as squaring the geometry, so it has
-  // something to do even when the geometry is already square. It leaves the
-  // mapped shapes alone — they have a section and a Clear of their own — so
-  // "already reset" is judged without them.
-  const identity = outputIsIdentity({ ...output, surfaces: [] }) && output.flashGuard;
+  // Reset puts the guard back on and returns Lit stage to 0 as well as squaring
+  // the geometry, so it has something to do even when the geometry is already
+  // square. Lit stage stays out of `outputIsIdentity` on purpose: it grades on
+  // the plate shader, so turning it up must not pull in the projector output pass.
+  const identity = outputIsIdentity({ ...output, surfaces: [] }) && output.flashGuard && !(output.litStage > 1e-4);
 
   return (
     <div className="mb-6 flex flex-col gap-2" data-testid="output-panel">
@@ -461,6 +461,8 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
           onChange={v => set({ gain: v })} resetTo={1} size={56} testId="output-gain" />
         <Knob label="Gamma" help="Bends the middle tones for the room and the projector. Higher deepens the shadows and mid tones, lower lifts them." value={output.gamma} min={0.5} max={2.5} step={0.05} display={output.gamma.toFixed(2)}
           onChange={v => set({ gamma: v })} resetTo={1} size={56} testId="output-gamma" />
+        <Knob label="Lit stage" help="How lit the stage is. Zero leaves the plate for a dark room; one pours stronger, richer dye for a stage wash of about a tenth of white." value={output.litStage} min={0} max={1} step={0.05} display={`${Math.round(output.litStage * 100)}%`}
+          onChange={v => set({ litStage: v })} resetTo={0} size={56} testId="output-lit-stage" />
       </div>
 
       {/* Not a switch: the one Flash Limit switch is in Master. A state line only,
@@ -474,7 +476,7 @@ export function OutputPanel({ output, onChange, onReset, wakeLock, test, onTest 
         {' '}<span className="text-white/70">Rear</span> mirrors the picture for projection through a screen or a gauze from behind, which is how most of these shows were rigged and the surest way to keep the light off the band’s faces.
         {' '}<span className="text-white/70">The corners</span> square up a projector that could not be hung on axis: drag them until the grid’s lines are straight on the wall, or nudge with the arrow keys.
         {' '}<span className="text-white/70">The masks</span> are tape on the light: pull an edge in until the spill stops short of a face, a ceiling or the end of the screen, and <span className="text-white/70">Mask Edge</span> decides whether that stop is a hard line or a fade.
-        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song.
+        {' '}<span className="text-white/70">Gain</span> and <span className="text-white/70">Gamma</span> are for the room rather than the show — lift the gamma when a bright bar is washing the plate out, and leave <span className="text-white/70">Dimmer</span> free for riding the song. <span className="text-white/70">Lit stage</span> tells the plate how lit the stage is (from a dark room at 0 to a stage wash at 1), pouring deeper, richer dye on the glass so the show holds its contrast instead of fighting a grey floor.
         {' '}<span className="text-white/70">Flash Limit</span> watches what actually reaches the screen and holds the whole field below three flashes a second, which is the clinical line for photosensitive seizures. It counts flashes rather than smoothing fast changes, so one hard hit on a kick is left alone and only a sustained strobe is pulled back — and its switch is in Master (the one place it is, so there is never a second copy to leave in the other state), and like everything on this panel it is not saved in a preset, so no look can switch off a safety and no fader can knock it off in the dark. Turning it off is for a screen nobody is standing in front of.
         {wakeLock && (
           wakeLock.supported

@@ -13,7 +13,7 @@ import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, layAngle, poi
 import { phasePour } from '../lib/phasePour';
 import { magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
-import { laidColour, pourTint } from '../lib/liquidColour';
+import { laidColour, pourTint, rgbToHex } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
@@ -262,24 +262,6 @@ export type { LiquidVisualizerHandle };
 
 
 // ─── React Component ─────────────────────────────────────────────────
-
-/**
- * A layer's mean dye as a swatch.
- *
- * Normalised by its own brightest channel rather than shown raw: a layer with
- * a little dye on it averages to almost black across the whole grid, and a row
- * of near-black squares says nothing. Scaling to the hue keeps a quiet layer
- * legible while `fill` carries how much is actually there.
- */
-function rgbToHex(r: number, g: number, b: number): string {
-  const peak = Math.max(r, g, b);
-  const k = peak > 0.001 ? 0.85 / peak : 0;
-  const to = (v: number) => {
-    const n = Math.round(Math.max(0, Math.min(1, v * k)) * 255);
-    return n.toString(16).padStart(2, '0');
-  };
-  return peak <= 0.001 ? '#111111' : `#${to(r)}${to(g)}${to(b)}`;
-}
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
   audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
@@ -5360,6 +5342,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           bubbles: bubbleDebugRef.current,
           bubblePack: { packed: bubblesRef.current.packed, shape: bubblesRef.current.packedShape },
           dimmerGain: flashGainRef.current * paceNowRef.current.dim,
+          litStage: rendering ? 0 : outputCfgRef.current.litStage,
           filmLevel: filmLevelRef.current,
           filmGain: filmGainRef.current,
           mark: markRef.current,

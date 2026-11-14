@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Lit stage on the Wall and on the plate (PLAN 36a)
+
+- **Lit stage** (`litStage`, 0 to 1, 0 by default) in **Settings → Wall** beside **Output gain**
+  and **Gamma**, and reached on the phone via **More → Settings → Stage → Wall** and
+  **More → Tabs → Setup**: how lit the stage is (`npm run litstage`). Kept on this machine
+  as part of load-in (never saved into a look, preset, sequence or patch bay, and never on a
+  MIDI fader or song render). At 0 the plate renders unchanged to the byte; as it rises,
+  `decodeFluid` and `decodeFluidRaw` pour deeper optical depth on the glass (`lampThrough`
+  and body `thickness`) and lift decoded dye luminance and chroma above a 10% stage wash without
+  moving the bare field.
+
 ### Added — Film Dye: a colour for the clear film (PLAN 20b-13)
 
 - Beside Clear Film, while there is a film: **Film Dye** and a colour swatch, an
