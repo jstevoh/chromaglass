@@ -8,54 +8,43 @@
  * the one table every pass is asked for by name.
  */
 
-import { HEAD, W } from './shared';
+import { BILERP_N, HEAD, W } from './shared';
 import { DISH_GAP_RANGE, DISH_REST_GAP } from '../../../lib/turntable';
 
 export const SPLAT_KERNELS: Record<string, string> = {
-  // dye = max(dye * mul + add, 0), from the full-resolution delta fields.
-  deltaDye: `${HEAD}
+  /*
+    Fused deltaDye + deltaVel (soap thinning and liquid forces moved to
+    stepLiquids in PLAN 15e-1).
+    A.a.x > 0.5: thinLive (hand velocity imposed rather than added).
+    A.a.y > 0.5: bilinear-sample mulT (cpuMulTex) on the fly;
+    A.a.y in [-0.5, 0.5]: textureLoad(mulT, p, 0) (deltaMulTex);
+    A.a.y < -0.5: dye-only (pourImage / pourInk), skip dstVel write.
+  */
+  deltaFold: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var dye: texture_2d<f32>;
-@group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var mulT: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var addDyeT: texture_2d<f32>;
+@group(0) @binding(5) var addVelT: texture_2d<f32>;
+@group(0) @binding(6) var mulT: texture_2d<f32>;
+@group(0) @binding(7) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(8) var dstVel: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r + textureLoad(addT, p, 0)));
-}`,
+  let mul = select(textureLoad(mulT, p, 0).r, bilerpN(mulT, uvOf(id), S.l).r, A.a.y > 0.5);
+  textureStore(dstDye, p, capDye(d * mul + textureLoad(addDyeT, p, 0)));
+  if (A.a.y < -0.5) { return; }
 
-  // vel.xy += add.xy ; temp (vel.z) += add.z
-  /*
-    With the plate a thin gap (A.a.x = 1, PLAN §18a) a hand's velocity is
-    imposed rather than added.
-
-    Added was right while the velocity lasted one step: each frame's push
-    was the whole of the liquid's motion, and the clamp took it back. With
-    the drag time as the plate's memory, a Finger held still in its stroke
-    adds the same push every frame, and added it would run the liquid up to
-    sixty times the hand's own speed in a second of water. A hand in the
-    liquid is a solid moving through it: the liquid it touches moves with
-    it and no faster (Brinkman's penalised solid, in the limit where the
-    solid wins). So along the push the liquid is brought up to the push and
-    not past it, and across it keeps what it had.
-  */
-  deltaVel: `${HEAD}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let p = vec2i(id.xy);
-  let v = textureLoad(vel, p, 0);
-  let a = textureLoad(addT, p, 0);
-  var u = v.xy + a.xy;
-  let s = length(a.xy);
-  if (A.a.x > 0.5 && s > 0.0) {
-    let dir = a.xy / s;
-    u = v.xy + dir * max(0.0, s - dot(v.xy, dir));
+  let v0 = textureLoad(vel, p, 0);
+  let a = textureLoad(addVelT, p, 0);
+  var u = v0.xy + a.xy;
+  let sp = length(a.xy);
+  if (A.a.x > 0.5 && sp > 0.0) {
+    let dir = a.xy / sp;
+    u = v0.xy + dir * max(0.0, sp - dot(v0.xy, dir));
   }
-  textureStore(dst, p, safeVel(vec4f(u, v.z + a.z, 0.0)));
+  textureStore(dstVel, p, safeVel(vec4f(u, v0.z + a.z, 0.0)));
 }`,
 
   /*

@@ -108,8 +108,9 @@ export class FluidInputs extends FluidPasses {
     const enc = this.device.createCommandEncoder({ label: 'deltas' });
     const pass = enc.beginComputePass({ label: 'deltas' });
     // Onto the full grid, the same bilinear the delta passes used to do
-    // themselves, so the two paths meet at one place. The video pour's
-    // frames since the last flush are added on the way (pourVideo).
+    // themselves. The video pour's frames since the last flush are added
+    // on the way (pourVideo). Only cpuMulTex skips upsample when no bodyLand/bodyLay needs deltaMulTex.
+    const bodyMul = !!((oilAdd || this.oilLayPending || (this.bodiesWanted && !this.oilDyeStale)) && this.mix && this.mixLive);
     if (this.videoPending) {
       this.upsampleSum(pass, this.cpuDyeTex, this.videoDye!.read, this.deltaDyeTex);
       this.upsampleSum(pass, this.cpuVelTex, this.videoVel!.read, this.deltaVelTex);
@@ -118,14 +119,14 @@ export class FluidInputs extends FluidPasses {
       this.upsample(pass, this.cpuDyeTex, this.deltaDyeTex);
       this.upsample(pass, this.cpuVelTex, this.deltaVelTex);
     }
-    this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
+    if (bodyMul) this.upsample(pass, this.cpuMulTex, this.deltaMulTex);
     if (hands) this.upsample(pass, this.cpuHandTex!, this.handTex!);
     // Kept until the step takes them: a second flush before it (pullStateFromGpu's) brings no hands of its own.
     if (hands) this.handLive = true;
     if (breath) { this.upsample(pass, this.cpuBreathTex!, this.breathTex!); this.breathLive = true; }
     if (sheet) this.upsample(pass, this.cpuSheetTex!, this.sheetTex!);
     if (oilAdd) { this.upsample(pass, this.cpuOilTex!, this.deltaOilTex!); this.oilLayPending = true; }
-    this.foldDeltas(pass, !!sheet);
+    this.foldDeltas(pass, !!sheet, bodyMul);
     pass.end();
     this.submit(enc);
   }
@@ -191,7 +192,14 @@ export class FluidInputs extends FluidPasses {
     const pass = enc.beginComputePass({ label: 'pour image' });
     this.fill(pass, this.deltaMulTex, [1, 0, 0, 0], this.N);     // the picture adds; it takes nothing away
     this.splatRun(pass, 'pourImage', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, tex, this.sampler], this.N, false);
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    this.run2(
+      pass,
+      'deltaFold',
+      this.dye.write,
+      this.vel.write,
+      [this.dye.read, this.vel.read, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex],
+      this.arg('delta fold image', [0, -1, 0, 0]),
+    );
     this.dye.swap();
     pass.end();
     this.submit(enc);
@@ -409,8 +417,8 @@ export class FluidInputs extends FluidPasses {
     this.splatRun(pass, 'splatDeltas', 'rgba32float', [this.splatBuf!, this.deltaDyeTex, this.deltaVelTex, this.deltaMulTex], this.N);
   }
 
-  /** The dye takes up the dye's delta fields (foldDeltas, and pourInk's ink on its own). */
-  private foldDye(pass: GPUComputePassEncoder): void {
+  /** The dye (and velocity when `writeVel`) takes up the delta fields (foldDeltas, and pourInk's ink on its own). */
+  private foldDye(pass: GPUComputePassEncoder, writeVel = false, fullRes = true): void {
     /*
       Oil Bodies: the dye that lands this frame is shared between the two
       liquids by how much of each is where it lands (bodyLand), before the
@@ -450,8 +458,19 @@ export class FluidInputs extends FluidPasses {
       od.swap();
     }
     this.oilLayPending = false;
-    this.run(pass, 'deltaDye', this.dye.write, [this.dye.read, this.deltaDyeTex, this.deltaMulTex], this.arg('none', [0, 0, 0, 0]));
+    const args = writeVel
+      ? this.arg(fullRes ? 'delta fold' : 'delta fold cpu', [this.thinLive ? 1 : 0, fullRes ? 0 : 1, 0, 0])
+      : this.arg('delta fold dye', [0, -1, 0, 0]);
+    this.run2(
+      pass,
+      'deltaFold',
+      this.dye.write,
+      this.vel.write,
+      [this.dye.read, this.vel.read, this.deltaDyeTex, this.deltaVelTex, fullRes ? this.deltaMulTex : this.cpuMulTex],
+      args,
+    );
     this.dye.swap();
+    if (writeVel) this.vel.swap();
   }
 
   /**
@@ -462,10 +481,8 @@ export class FluidInputs extends FluidPasses {
    * for, and twice on a step folded twice. It is the step's own now
    * (`stepLiquids`, passes.ts, which says what was measured).
    */
-  private foldDeltas(pass: GPUComputePassEncoder, sheet = false): void {
-    this.foldDye(pass);
-    this.run(pass, 'deltaVel', this.vel.write, [this.vel.read, this.deltaVelTex], this.arg('delta vel', [this.thinLive ? 1 : 0, 0, 0, 0]));
-    this.vel.swap();
+  private foldDeltas(pass: GPUComputePassEncoder, sheet = false, fullRes = true): void {
+    this.foldDye(pass, true, fullRes);
     if (sheet) this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.sheetTex!], this.arg('squeeze delta sheet', [1, this.thinLive ? 1 : 0, 1, 0]));
     else this.run(pass, 'squeezeUpdate', this.squeeze.write, [this.squeeze.read, this.deltaVelTex, this.blank('r')], this.arg('squeeze delta', [1, this.thinLive ? 1 : 0, 0, 0]));
     this.squeeze.swap();
