@@ -166,6 +166,11 @@ export interface OutputConfig {
   /** Output gamma. Under 1 lifts the mid-tones for a washed-out room; over 1 deepens them. */
   gamma: number;
   /**
+   * How lit the stage is (PLAN 36a): 0 dark room (untouched), 1 a stage wash
+   * of about a tenth of white. Load-in only; kept on this machine with the Wall.
+   */
+  litStage: number;
+  /**
    * Hold the whole field below three flashes a second (`lib/flashGuard.ts`).
    *
    * On unless somebody turns it off, and here rather than in the settings for
@@ -237,6 +242,7 @@ export const DEFAULT_OUTPUT: OutputConfig = {
   maskFeather: 0.02,
   gain: 1,
   gamma: 1,
+  litStage: 0,
   flashGuard: true,
   surfaces: [],
 };
@@ -294,6 +300,7 @@ export function normalizeOutput(raw: unknown): OutputConfig {
     maskFeather: clamp(o.maskFeather === undefined ? DEFAULT_OUTPUT.maskFeather : Number(o.maskFeather) || 0, 0, 0.25),
     gain: clamp(o.gain === undefined ? 1 : Number(o.gain) || 1, 0.2, 3),
     gamma: clamp(o.gamma === undefined ? 1 : Number(o.gamma) || 1, 0.5, 2.5),
+    litStage: clamp(Number(o.litStage) || 0, 0, 1),
     flashGuard: o.flashGuard !== false,
     surfaces: normalizeSurfaces((o as { surfaces?: unknown }).surfaces),
   };

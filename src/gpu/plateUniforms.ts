@@ -78,6 +78,8 @@ export interface PlateView {
   bubblePack: { packed: Float32Array; shape: Float32Array };
   /** The flash guard's gain, from the luminance the last frame read back. */
   dimmerGain: number;
+  /** How lit the stage is (0-1, from the Wall's OutputConfig; PLAN 36a). */
+  litStage?: number;
   /** The exposure the film histogram settled on. */
   filmLevel: number;
   filmGain: number;
@@ -252,6 +254,9 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('benDay', clamp01(s.benDay ?? 0));
   pack.set('boundaryContrast', s.boundaryContrast ?? 0.35);
   pack.set('projectorFocus', clamp01(s.projectorFocus ?? 0.5));
+  /* lit stage { */
+  pack.set('litStage', clamp01(view.litStage ?? 0));
+  /* } lit stage */
   /*
     Glitter, the lens photographing it and the side lamp (PLAN 47e, 47d,
     47b-side; lib/glint.ts). At 0 and 0 the lens pass does not run, and the
