@@ -16,7 +16,7 @@ me perfection equals a kind of death", Joshua White), no visible pixels, above a
 people ("no one's body looks good with pixels on it", Drippy Eye), and the hand, not a
 button, making it look good. Every item here is held to those.
 
-- **36a. A lit-stage grade** (*proposed*, M). *The pain:* analog light "is not bright, and
+- **36a. A lit-stage grade** (*in progress*, `antigravity/36a-lit-stage`, M). *The pain:* analog light "is not bright, and
   it's hard for that light to live in a modern stage environment" (Mad Alchemy); one
   operator pre-records when there is "too much competition from bright stage lights"
   (Liquid Lights Bend). A video projector has the lumens, but every look is graded for a
