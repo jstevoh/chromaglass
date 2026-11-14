@@ -1278,7 +1278,7 @@
     {
       "name": "A step asks for nothing it throws away",
       "shard": "lab",
-      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2,h2c5,h2c8",
+      "run": "npm run encode -- --owed=h2c1,h2c3,h2c2,h2c8",
       "env": {"PW_WEBGPU":"1"},
       "why": [
         "What a solver step costs the main thread to ask for (scripts/encode.mjs,",

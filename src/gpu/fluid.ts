@@ -958,7 +958,13 @@ export class WebGPUFluid extends FluidCover {
       });
     } else {
       stage('project 1', (pass) => this.project(pass));
-      stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
+      // Open plate only (H2c-5): first-order semi-Lagrangian carry saves the backward
+      // trace and MacCormack correction on velocity, adding small-scale numerical
+      // momentum diffusion while leaving dye and liquid carries second-order.
+      stage('advect velocity', (pass) => {
+        this.run(pass, 'advect', this.vel.write, [this.vel.read, this.vel.read, this.sampler], this.arg4('advect forward', disp));
+        this.vel.swap();
+      });
       stage('project 2', (pass) => this.project(pass));
 
       // 6.5–8.7 The post-projection forces
