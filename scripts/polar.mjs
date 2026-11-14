@@ -175,7 +175,9 @@ try {
     };
     const centre = (px) => { const k = (C * S + C) * 4; return [px[k], px[k + 1], px[k + 2]]; };
     const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
-    const lamp = { lampGround: 1 };
+    // Birefringence 0.75 on the lab's plate is the app's default 0.3: the app's flow is steeper at its own grid
+    // (lib/polar.ts, the scale, measured on the owner's Mac). At Polarisers 0 it reaches nothing.
+    const lamp = { lampGround: 1, birefringence: 0.75 };
     // A flow laid exactly, u(x, y), v(x, y) in the solver's units, then one step for the plate to carry it.
     const laid = async (fn) => {
       const { L } = await lab.create(256);

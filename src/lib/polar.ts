@@ -85,12 +85,23 @@
   strain rate, measured. Through the lab (scratch probe, 2026-11-14, 192
   cells): a plate stirred by Turbulence 0.3 has a median strain rate of 1.6
   solver units and a 99th percentile of 4.0; Turbulence 1, 5.2 and 13. At
-  BIREF_NM_PER_STRAIN = 1000 and the default Birefringence of 0.3, a
-  Turbulence-0.3 stir is 480 nm at its median (first-order orange and red)
-  and 1200 nm in its strongest shear (second order), the broad bands of the
-  photograph; at 0.5 the lab's plate was already a contour map of fine
-  third-order rings. Past that the dial ramps to the pale high orders, as
-  the operating rules allow.
+  first, 1000 nm per unit at Birefringence 1, a Turbulence-0.3 stir sat in
+  the first and second orders at 0.3.
+
+  The app's plate is stronger than the lab's. Filmed on the owner's Mac
+  (Metal, 2026-11-14, Turbulence 0.35 on a lamp ground, sheets crossed) the
+  same scale drew a contour map of thin dark lines and third-order bands at
+  0.3, one broad first-order band at 0.08, and the first second-order green
+  and red rings, bands still broad, at 0.15. The readback's fastest cell was
+  the lab's (0.70 against 0.75), so the speeds agree and the strain does not:
+  the plate takes its differences on the packed flow at the solver's own
+  grid, where the app's turbulence carries finer, steeper eddies than the
+  lab's 256 cells. The scale is set on the app, where it is seen:
+  BIREF_NM_PER_STRAIN = 400, so the default 0.3 is the Mac's 0.12, broad
+  first- and second-order bands, and 1 the old 0.4, third order. The lab's
+  checks ask 0.75 where they want the lab's plate as bright as the app's.
+  Past that the dial ramps to the pale high orders, as the operating rules
+  allow.
 
   What this model leaves out, each a PLAN item: the colour lingering after
   the stir (a liquid with a relaxation time carries its alignment with the
@@ -110,8 +121,8 @@ export const POLAR_STEPS = POLAR_MAX_NM / POLAR_STEP_NM + 1;
  * table's last row to it over this many nanometres more.
  */
 export const POLAR_FADE_NM = 1500;
-/** Retardation, nm, per unit of the solver's principal strain rate at Birefringence 1 (measured above). */
-export const BIREF_NM_PER_STRAIN = 1000;
+/** Retardation, nm, per unit of the solver's principal strain rate at Birefringence 1 (set on the app's plate, above). */
+export const BIREF_NM_PER_STRAIN = 400;
 
 /** The retarder's two shares of the spectrum: S = sin^2(pi G / lambda), N = sin(2 pi G / lambda). */
 export const retarderSpectrum = (G: number, l: number) => Math.sin((Math.PI * G) / l) ** 2;

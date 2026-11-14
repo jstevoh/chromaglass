@@ -6999,10 +6999,16 @@ owner's photograph of dishes between polarisers (2026-11-14).
   main on the finished stage, before the film projector. plate.ts did not grow: the include
   swapped for `VIEW_OPTICS` (the thin film's block and this one) and three blank lines'
   trailing spaces went.
-- The scale: Birefringence 1 is 1000 nm per unit of the solver's strain rate; a
-  Turbulence-0.3 stir measured a median 1.6 and a 99th percentile 4.0, so the default 0.3
-  puts it in the first and second orders, the photograph's broad bands (0.5 was a contour map
-  of third-order rings on the lab's plate).
+- The scale: set on the app, filmed on the owner's Mac. At 1000 nm per unit of the solver's
+  strain rate (the lab's calibration) the app drew a contour map of third-order bands at the
+  default; its readback speeds matched the lab's (fastest cell 0.70 against 0.75) but its
+  plate's flow is steeper at the solver's own grid. A sweep on a lamp ground put broad first-
+  and second-order bands at 0.12 to 0.15 of that scale, so Birefringence 1 is 400 nm per
+  unit and the default 0.3 lands there. The lab's check asks 0.75 for the same brightness.
+- Light coloured by dye stays the dye's colour: on a dye-on-black look the sheets cut its
+  light into bands of its own colour (physics: a red light through the chart can only be
+  dark or red); the Michel-Levy colours need white light, a lamp ground with clear or pale
+  liquid, as in the photograph.
 - Quarter Wave defaults to 1: between plane sheets every place where the stretch lines up
   with a sheet is black whatever its retardation, and a stirred liquid is full of those thick
   dark worms; the plates take them out, as photoelasticity labs do. At 0 the pinwheel arms of
