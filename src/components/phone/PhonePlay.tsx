@@ -3,6 +3,7 @@ import { ChevronDown, CirclePlus, LogIn, Shuffle, User } from 'lucide-react';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { TouchSlider } from '../ui/TouchSlider';
 import type { VisualizerSettings } from '../../types';
+import { macroZoomOf } from '../../sim/constants';
 import type { PhoneLook, PhoneTool } from './PhoneStage';
 import { playHand, HOLD_MS, type PlayHand, type PlayTool } from '../../lib/playGesture';
 import { PHONE_SHORT_SIDE } from '../../lib/phone';
@@ -114,11 +115,8 @@ export interface PhonePlayProps {
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
-/** The zoom the plate is drawn at, as LiquidVisualizer's macroZoomOf reads the look (a closeup look with no zoom of its own is at 4). */
-const zoomOf = (s: PhonePlayProps['settings']) => {
-  const z = s.macroZoom ?? 1;
-  return s.macroMode === true ? (z > 1.05 ? z : 4) : Math.max(1, z);
-};
+/** The zoom the plate is drawn at (a closeup look with no zoom of its own is at 4): the frame's own reading, not a copy of it. */
+const zoomOf = macroZoomOf;
 
 /** A 36-tall glass pill in a 48 px target: lit while pressed, or solid red when what it holds is live (recording). */
 function Pill({ onPress, label, testId, children, pressed, live = false }: { onPress: () => void; label: string; testId: string; children: ReactNode; pressed?: boolean; live?: boolean }) {

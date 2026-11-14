@@ -68,6 +68,8 @@ import { clockText } from './lib/performanceTake';
 import { makesText, runningText } from './lib/recordChoice';
 import { MusicSettings } from './lib/musicTypes';
 import { COLOR_HARMONIES, COLOR_HARMONY_NAMES, PALETTE, DROPPER_COLORS } from './constants';
+import { macroZoomOf } from './sim/constants';
+import { CloseupRailButton } from './components/CloseupRailButton';
 import { TrackPanel } from './components/TrackPanel';
 import { LyricsOverlay } from './components/LyricsOverlay';
 import { getEffectiveTier } from './lib/tierGates';
@@ -1607,7 +1609,7 @@ export default function App() {
     // One ramp from the plate outward, with no step onto it: pushing in from
     // 1 is the closeup arriving, and coming back down lands at the plate
     // rather than at a switch that has to be found and turned off.
-    const z = Math.max(1, cur.macroZoom ?? 1);
+    const z = macroZoomOf(cur);
     const next = Math.max(1, Math.min(16, (z < 1.05 && dir > 0 ? 1.2 : z) * Math.pow(dir > 0 ? 1.2 : 1 / 1.2, amount)));
     const zoom = Math.round(next * 100) / 100;
     updateSettings({ macroZoom: zoom, macroMode: zoom > 1.05 });
@@ -1693,7 +1695,7 @@ export default function App() {
       // Still never *starts* a closeup: a trackpad brush over the plate must
       // not become a camera move. Once in, the wheel rides it all the way back
       // out to the plate, which is where the old guard would strand it.
-      if ((settingsRef.current.macroZoom ?? 1) <= 1.001 || e.deltaY === 0) return;
+      if (macroZoomOf(settingsRef.current) <= 1.001 || e.deltaY === 0) return;
       e.preventDefault();
       zoomMacro(e.deltaY < 0 ? 1 : -1, Math.min(1, Math.abs(e.deltaY) / 100));
     };
@@ -2386,7 +2388,7 @@ export default function App() {
         alike. The plate's box is the one place on a desk nothing else is
         drawn, and the chip is about the plate, so it goes there.
       */}
-      {(settings.macroZoom ?? 1) > 1.05 && overlaysVisible && !phone && (
+      {macroZoomOf(settings) > 1.05 && overlaysVisible && !phone && (
         <div
           style={preview.frame ? { top: preview.frame.top + 8, left: preview.frame.left + preview.frame.width / 2 } : undefined}
           className={`fixed ${preview.frame ? '' : 'top-3 left-1/2 translate-y-9 '}z-40 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-white/80 backdrop-blur-xl shadow-2xl`}
@@ -2394,7 +2396,7 @@ export default function App() {
         >
           <Microscope size={12} className="ml-1" />
           <button onClick={() => zoomMacro(-1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom out (− or the wheel over the plate)" aria-label="Zoom out" data-testid="macro-zoom-out">−</button>
-          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{(settings.macroZoom ?? 1).toFixed(1)}×</span>
+          <span className="font-mono tabular-nums" data-testid="macro-zoom-value">{macroZoomOf(settings).toFixed(1)}×</span>
           <button onClick={() => zoomMacro(1)} className="rounded-full px-2 py-0.5 hover:bg-white/15" title="Zoom in (+ or the wheel over the plate)" aria-label="Zoom in" data-testid="macro-zoom-in">+</button>
           {/* Who moves the camera. Alt-drag on the plate pans it; Alt-click fixes it on a spot.
               Follow and Auto read differently at a glance (QA-11): the owner found them the
@@ -2806,18 +2808,8 @@ export default function App() {
 
                 <div className="w-full h-px bg-white/10" />
 
-                {/* Macro closeup */}
-                <button
-                  aria-pressed={!!settings.macroMode}
-                  onClick={() => updateSettings({ macroMode: !settings.macroMode })}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all group w-full ${
-                    settings.macroMode ? LIT : 'bg-white/5 hover:bg-white/10 border-white/10'
-                  }`}
-                  title="Macro closeup — magnify the plate and chase a single bead of liquid"
-                >
-                  <Microscope size={16} className={settings.macroMode ? '' : 'opacity-60 group-hover:opacity-100'} />
-                  <span className="text-[7px] font-bold uppercase tracking-widest">Macro</span>
-                </button>
+                {/* Macro closeup: the one press every hand uses */}
+                <CloseupRailButton settings={settings} onSetting={updateSettings} />
 
                 {/* Settings */}
                 <button
@@ -3120,7 +3112,7 @@ export default function App() {
             onSpin={() => flickPlate(activeLayer)}
             spin={{ auto: settings.spinAuto ?? 0, rpm: settings.spinRpm ?? 6, beats: settings.spinBeats ?? 16, bpm: tempoLabel.source ? tempoLabel.bpm : heardBpm, onChange: updateSettings }}
             onLucky={triggerLucky}
-            zoom={settings.macroZoom ?? 1}
+            zoom={macroZoomOf(settings)}
             onZoom={() => runAction('macro-toggle')}
             camera={settings.macroCamera ?? 'hold'}
             cameraShot={shotLabel(settings.macroHold)}

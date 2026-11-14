@@ -9259,6 +9259,22 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   out with both, and so are the phone's Zoom, the remote's Closeup switch and the
   command palette's, whose lit states and a pad's light read `closeupIn`.
 
+- ~~**QA-32b** Two hands QA-32 missed (found rebuilding #575 and #432's rest, whose other
+  pieces #856 and #771 had shipped meanwhile).~~ **Fixed** (`npm run closeupland`, line 12):
+  the side rail's Macro button flipped `macroMode` alone, so a press put the plate at 4x
+  under a Macro Zoom reading 1.0x, a pinch or the slider left it dark, and pressed over a
+  pinched-in closeup it turned the flag on instead of taking the plate out; it is now
+  `closeupToggle` lit by `closeupIn` (`src/components/CloseupRailButton.tsx`, since App is
+  held at its size). And a look that turns the closeup on with `macroMode` and no zoom of
+  its own is drawn at 4 (`macroZoomOf`), while eleven readers took `macroZoom ?? 1`: the
+  zoom chip never appeared, the Settings slider read 1.00x, the wheel guard ignored the
+  wheel, the + key started from 1x and so took the frame from 4x out to 1.44x, the arrows
+  did not pan, the desk's zoom read 1x, the phone kept its own copy of the reading, the
+  look's pace missed a zoom set with the flag off, and Evolve never walked the aim of a
+  closeup look that it was drawing at 4x. Each now reads `macroZoomOf`, whose argument is now just the two
+  fields. The scan on main: 16 of 17, the rail's flip and thirteen raw reads named; after,
+  17 of 17.
+
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
