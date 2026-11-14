@@ -127,8 +127,12 @@ export const BREATH_STRESS = 0.5 * AIR_DENSITY * WALL_JET_FRICTION * BREATH_SPEE
   sheet of vorticity no breath has. What it leaves out is still 15g-2's
   (the jet's pressure and its dimple) and 15g-3's (the free surface).
 
-  Measured in the lab (`npm run airblow`): see the check's own lines for
-  the pool a held breath now moves from a palm away.
+  Measured in the lab (`npm run airblow`, software WebGPU), the disc
+  against the jet: under a held breath the liquid ran 19.62 and runs 31.84
+  mm/s (0.37 and 0.61 of τh/2μ: a patch of stress drives the liquid under
+  it against the pressure that sends it back round, and a long patch has a
+  longer way round); a palm on (ten footprints) 0.12 and 8.82 mm/s; as far
+  behind 0.12 and 0.86.
 */
 /** The jet's core, in footprint radii: how far along the surface it keeps the speed it landed with. */
 export const JET_CORE = 5;

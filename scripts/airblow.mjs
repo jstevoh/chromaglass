@@ -26,9 +26,10 @@
  *      the speed the physics gives it, τh/2μ (lib/breath.ts) times the
  *      share of a disc of force a rigid film lets through, which is a half
  *      for a uniform disc in an unbounded layer (the rest is the divergent
- *      part, the pressure's to take), less for the breath's softer edge
- *      and a footprint six cells across: read between 0.28 and 0.47 of
- *      τh₀/2μ (0.37 measured in software).
+ *      part, the pressure's to take), and more for the jet's long patch
+ *      (PLAN.md 15g-11), whose liquid has further to go to come back
+ *      round: read between 0.46 and 0.76 of τh₀/2μ (0.61 measured in
+ *      software; 0.37 while the stress landed in a disc under the hand).
  *      And on a liquid ten times as thick (Thickness 0.45 → 0.783), a
  *      tenth as fast, within a fifth, and under a held Press that has
  *      closed the gap, slower as the gap is: the stress is the air's and
@@ -40,10 +41,11 @@
  *   3. A pool of colour the wind is drawn across goes the wind's way, out
  *      to the right and out to the left, its centre of mass at least 0.5% of
  *      the plate, where left alone it moves under 0.1%. Measured in software
- *      +2.72% and +2.82% at the breath's 8 m/s (+1.04% and +1.11% at the
- *      6 m/s it was first set to, as far as the carries moved a pool: 1.06%
- *      in `npm run wind`), and the old push alone +0.02%: the bar is under a
- *      fifth of what the air does and twenty-five times what the push did.
+ *      +13.07% and +13.93% with the breath a jet (PLAN.md 15g-11; +2.72%
+ *      and +2.82% while its stress landed in a disc under the hand, and the
+ *      carries before that moved a pool 1.06% in `npm run wind`), and the
+ *      old push alone +0.02%: the bar is twenty-five times what the push
+ *      did.
  *   4. And keeps its colour to 0.5% (the carries kept 99.4% of a puff's;
  *      the old eraser lost 21%), the pool left alone to 0.1%.
  *   5. A pool of ferrofluid and a drop of oil under the same wind are
@@ -51,7 +53,12 @@
  *      colour, none of either made or lost (0.5%).
  *   6. The Amount's range (PLAN.md QA-20): a gentle breath (Amount 0.25, a
  *      sixteenth of the stress) moves the pool under a tenth of what the
- *      default does, a gale (Amount 2.5) at least three times as far.
+ *      default does, the default less far than the hand went, and a gale
+ *      (Amount 2.5) on ahead of the hand, further than the whole stroke.
+ *   7. The breath runs on along the surface (PLAN.md 15g-11): a palm ahead
+ *      of where a held breath lands the liquid goes its way at 0.15 or
+ *      more of the speed under the landing, and at least four times what
+ *      goes as far behind it.
  *
  * The old push is run and printed as the before, as `npm run fingerflow`
  * prints the Finger's.
@@ -214,7 +221,12 @@ try {
     const a = got.held, b = got['held thick'], c = got['held pressed'];
     /*
       The share is held to a quarter either side of what software measured
-      (0.37), not to the 0.3 to 0.8 a first version took: `theory` repeats
+      (0.61 since the breath's stress lands as a jet along the surface, PLAN
+      15g-11; 0.37 while it landed in a disc under the hand: τh/2μ is the
+      speed where nothing pushes back, the liquid under a patch of stress is
+      held back by the pressure that sends it round again, and the jet's
+      long patch has a longer way round than the disc had, so its middle
+      runs nearer the whole), not to the 0.3 to 0.8 a first version took: `theory` repeats
       the breath's own formula, so this band is the only guard on the
       constant that turns pascals into the flow's speed, and a breath twice
       as strong (a 2 dropped from 2μ) read 0.74 inside the wide one.
@@ -226,7 +238,7 @@ try {
     const share = a ? a.blowing / a.theory : 0;
     const gapRatio = a && c ? c.h / a.h : 1, speedRatio = a && c ? (c.blowing - c.still) / a.blowing : 0;
     check('under a held breath the liquid goes its way at the speed the air\'s stress gives it, τh/2μ: a tenth as fast in a liquid ten times as thick, slower where the gap is pressed',
-      need('held', 'held thick', 'held pressed') && share > 0.28 && share < 0.47 && Math.abs((b.blowing / a.blowing) / (b.theory / a.theory) - 1) < 0.2 &&
+      need('held', 'held thick', 'held pressed') && share > 0.46 && share < 0.76 && Math.abs((b.blowing / a.blowing) / (b.theory / a.theory) - 1) < 0.2 &&
         gapRatio < 0.75 && Math.abs(speedRatio / gapRatio - 1) < 0.2,
       need('held', 'held thick', 'held pressed') ? `${share.toFixed(2)} of τh₀/2μ; the thick liquid ${(b.blowing / a.blowing).toFixed(3)} as fast, against ${(b.theory / a.theory).toFixed(3)} from its viscosity; pressed to ${gapRatio.toFixed(2)} of the gap, ${speedRatio.toFixed(2)} as fast` : 'not run');
   }
@@ -237,6 +249,29 @@ try {
     check('and it stops when the breath stops, as the gap\'s drag says',
       !!a && Math.abs(a.after) < 2 * decay * Math.abs(a.blowing) + 1e-5,
       a ? `${(a.after * 1000).toFixed(3)} mm/s half a second on, against e^(−0.5/τ) of ${(a.blowing * 1000).toFixed(2)}, ${(decay * a.blowing * 1000).toFixed(3)}` : 'not run');
+  }
+  // 7.
+  {
+    /*
+      The breath runs on along the surface (PLAN.md 15g-11; lib/breath.ts
+      has the jet). Reported: blowing "doesn't blow across the surface like
+      I would expect". While the stress landed in a disc under the hand, a
+      palm ahead of a held breath (ten of its footprints, 60 mm) the liquid
+      went 0.12 mm/s, 0.006 of the 19.62 under it, and the same as far
+      behind: the far flow of any patch of force, the same fore and aft.
+      The jet's stress there is 0.16 of its middle's, and the liquid goes
+      8.82 mm/s, 0.28 of the 31.84 under the landing, against 0.86 behind
+      (software WebGPU). So: at least 0.15 of the landing's speed a palm
+      on, and at least four times what goes as far behind, in the thin
+      liquid and in the thick one (the flow is the stress's to scale, so
+      the two shares agree: 0.28 and 0.27). A disc fails both by a factor of
+      twenty and of four; a plume laid the wrong way round fails the second.
+    */
+    const a = got.held, b = got['held thick'];
+    const on = (m) => m.ahead / m.blowing, fore = (m) => m.ahead / Math.max(Math.abs(m.behind), 1e-9);
+    check('the breath runs on along the surface: a palm ahead of where it lands the liquid still goes its way, and far less as far behind',
+      need('held', 'held thick') && on(a) >= 0.15 && on(b) >= 0.15 && fore(a) >= 4 && fore(b) >= 4 && Math.abs(on(b) / on(a) - 1) < 0.2,
+      need('held', 'held thick') ? `a palm on ${on(a).toFixed(2)} of the speed under the landing (${(a.ahead * 1000).toFixed(2)} mm/s), ${fore(a).toFixed(1)} times what goes as far behind (${(a.behind * 1000).toFixed(2)}); in the thick liquid ${on(b).toFixed(2)} and ${fore(b).toFixed(1)} times` : 'not run');
   }
   console.log(`  before (blowDirected's push on a thin gap, no carry): the pool's middle ${need('push') ? pc(along('push')) : 'not run'} the wind's way`);
   // 3.
@@ -263,18 +298,34 @@ try {
     /*
       The Amount is the breath's speed against a firm one's, so its stress,
       and the flow it drives, goes as its square (PLAN.md QA-20). Measured
-      in software along this stroke: Amount 0.05 moved the pool 0.003% of
-      the plate, 0.25 0.085%, 1 2.72%, 2.5 14.6% and 5 16.5% (the stroke is
-      16% long: past 2.5 the colour goes with the hand, and what 5 adds is
-      speed, the flow four times 2.5's). So a gentle breath has to move the
-      pool under a tenth of what a firm one does, and a gale at least three
-      times as far, the colour kept to 0.5% in both.
+      in software along this stroke since the breath is a jet (PLAN.md
+      15g-11): Amount 0.25 moved the pool 0.27% of the plate, 1 13.07% and
+      2.5 30.90% (0.085%, 2.72% and 14.6% while the stress landed in a disc
+      under the hand). The stroke is 16% long. So a gentle breath has to
+      move the pool under a tenth of what a firm one does; a firm one moves
+      it, but less far than the hand went; and a gale sends it on ahead of
+      the hand, further than the whole stroke and at least half as far
+      again as the firm one. (The bar was three times the firm breath's.
+      The firm breath now takes the pool most of the way the hand goes, and
+      three times that is past the dish's rim.)
+
+      The colour: kept to 0.5% by the gentle breath and the firm one. Not
+      by the gale, and the check no longer asks it to: its plume reaches
+      the rim (135 mm from a hand that ends 68 mm short of it), the dish's
+      rim is open (wgsl/fluid/dye.ts: what is carried past it spills into
+      the trough and leaves the plate), and 36.17% of the pool went over it
+      in software. What is asked of the gale is that it makes no colour
+      (under +0.5%) and that some stays to be measured. That leaves a
+      breath at this strength that lost colour on the plate itself unseen
+      here: PLAN.md 15g-16 is the lab plate with a wall that would see it.
     */
     const off = (k) => got[k].t1.dye / got[k].t0.dye - 1;
-    check('the Amount runs from a breath that barely moves the colour to a gale that takes it with the hand',
-      need('gentle', 'gale', 'right') && along('right') >= 0.005 && along('gentle') < 0.1 * along('right') && along('gale') >= 3 * along('right') &&
-        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('gale')) < 0.005,
-      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate; colour ${pc(off('gentle'))}, ${pc(off('gale'))}` : 'not run');
+    const STROKE = 0.16;
+    check('the Amount runs from a breath that barely moves the colour, through one that moves it less far than the hand went, to a gale that sends it on ahead of the hand',
+      need('gentle', 'gale', 'right') && along('right') >= 0.005 && along('gentle') < 0.1 * along('right') && along('right') < STROKE &&
+        along('gale') > STROKE && along('gale') >= 1.5 * along('right') &&
+        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('right')) < 0.005 && off('gale') < 0.005 && off('gale') > -0.9,
+      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate, the stroke ${pc(STROKE)}; colour ${pc(off('gentle'))}, ${pc(off('right'))}, and the gale's ${pc(off('gale'))} (over the rim)` : 'not run');
   }
 } finally {
   await close();
