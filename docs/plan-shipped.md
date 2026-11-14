@@ -14267,3 +14267,13 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 17a–17f. Hear the set ahead, from files (no UI) (2026-11-14)
+
+Analysing songs ahead from decoded PCM and file bytes so cues can lead the beat and loudness is levelled into the analyser without UI changes (`src/lib/hearAhead.ts`, `src/lib/hearAheadWorker.ts`, `src/lib/songShows.ts`, `src/lib/songScore.ts`, `src/components/SongsPanel.tsx`).
+- **17a–17b (`analyseSongAhead`, `hearAheadWorker.ts`):** runs a single pass of `SongEar` at 60 fps (`hits` at `i / 60`), tracks local tempo through beatless stretches via a DP beat grid (`grid`), labels beat-synchronous sections (`sections`, with Foote novelty over chroma/bands/level and structural rules including one `drop` where the beat returns after ≥ 8 beatless beats), keeps serialized size well under 8 KB/min, and runs off-thread one song at a time transferring the mono `Float32Array` buffer. Live listening in `songMapAnalysis.ts` keeps its existing segmenter.
+- **17c (`songShows.ts`, `songScore.ts`):** `ActionWhen` section triggers accept whole `beatsAhead` (1–64) and `{ at: 'last-beat'; beatsAhead?: number }`. `SongClock.ahead` (`{ grid, sections } | null`) drives `dueActions` and `scoreOf` from one shared helper (`aheadMoments`), falling back to on-section timing (and suppressing `last-beat`) when `ahead` is absent.
+- **17d (`songLoudness`):** ITU-R BS.1770 loudness on the mono mix with K-weighting coefficients derived from the analogue prototype for arbitrary sample rates, 400 ms blocks overlapping 75%, −70 LUFS absolute gate, and −10 LU relative gate; `analyseSongAhead` records `loudnessLufs` from this function.
+- **17e (`setPosition` arithmetic):** sample-accurate `{ index, t }` across songs, negative `t` in gaps, `null` after the set; the Web Audio set player and transport remain for **17g**.
+- **17f (`readSongTags`):** parses ID3v2.4 (synchsafe sizes), ID3v2.3 (UTF-16/Latin-1/UTF-8), and FLAC Vorbis comments + PICTURE blocks, selecting picture type 3 (front cover) when present, normalising 12-character ISRCs, and returning `{}` safely on untagged or truncated input.
+- Checked by `npm run hearahead` (all `--owed` flags removed from `scripts/checks.json`). Left open: `17b-2`, `17c-2`, `17f-2`, `17g`, `17h`, and the Web Audio player part of `17e` with `17g`.

@@ -75,6 +75,7 @@ function defaultWhen(at: ActionWhen['at']): ActionWhen {
     case 'section': return { at: 'section', section: 'chorus' };
     case 'kick': return { at: 'kick', every: 4 };
     case 'before-end': return { at: 'before-end', sec: 8 };
+    case 'last-beat': return { at: 'last-beat' };
   }
 }
 
