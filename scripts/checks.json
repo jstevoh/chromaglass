@@ -836,6 +836,18 @@
       ]
     },
     {
+      "name": "The music stirs only through a cord",
+      "shard": "logic",
+      "run": "npm run musicstir",
+      "why": [
+        "The solver's step takes no sound (PLAN 38u-4, 38u-5): with every cord",
+        "at zero a loud band leaves a still plate still, value for value, a",
+        "patched cord moves it, and each look's cord from the mids onto",
+        "Turbulence keeps its stir within a quarter of what the multiplier and",
+        "eddies it replaces gave."
+      ]
+    },
+    {
       "name": "The melody walks across the plate",
       "shard": "logic",
       "run": "npm run melody",
@@ -1135,6 +1147,35 @@
       ]
     },
     {
+      "name": "A bubble's outline is round at the screen's resolution",
+      "shard": "lab9",
+      "run": "npm run bubbleround",
+      "why": [
+        "The owner, 2026-11-11: bubbles 'look like a old computer drew them'",
+        "(PLAN 38h-15, scripts/bubbleround.mjs). The plate drew each bubble's",
+        "outline from the air field's coverage, a polygon with a facet per",
+        "texel; now from the bubble's own disc, named by the field. Reads each",
+        "rim's radius along 96 rays on the real plate shader and on a lab built",
+        "with the index taken out (the field's drawing), which must still be a",
+        "polygon, so the bar is one the old outline failed. Two labs of four",
+        "plates on SwiftShader: beside the moiré check in lab9, which ran alone."
+      ]
+    },
+    {
+      "name": "A bead's outline is round at the screen's resolution",
+      "shard": "lab9",
+      "run": "npm run beadround",
+      "why": [
+        "The owner, 2026-11-11: 'Fix the small bubbles as well' (PLAN 38h-17,",
+        "scripts/beadround.mjs). The small scalloped balls in Macro Bead were the",
+        "oil beads, read from a 512-square eight-bit mask; the plate now evaluates",
+        "the rings at the point drawn from the bead list. Reads each bead's rim",
+        "along 96 rays in the projector and the closeup, and on a lab made to read",
+        "the mask as before, which must fail the same bar. Two labs of two",
+        "plates on SwiftShader: beside bubbleround in lab9."
+      ]
+    },
+    {
       "name": "The closeup's bubbles in depth",
       "shard": "lab2",
       "run": "npm run closeupdepth",
@@ -1407,7 +1448,7 @@
     },
     {
       "name": "Glitter, the lens and the side lamp",
-      "shard": "lab4",
+      "shard": "lab9",
       "run": "npm run glint",
       "timeout": 12,
       "why": [
@@ -1501,7 +1542,7 @@
     },
     {
       "name": "The rest of a bubble's air, owed until its builds",
-      "shard": "lab4",
+      "shard": "lab8",
       "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
       "why": [
         "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
@@ -1511,7 +1552,7 @@
         "and fills its hole evenly without airShed, and the app lays no press",
         "under a bubble while the flow round it stays the same. Each owed id",
         "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
-        "it: about three and a half minutes, in lab4, which has the room."
+        "it: about three and a half minutes, in lab8 (PLAN 19k-11c moved it from lab4)."
       ]
     },
     {
@@ -1790,6 +1831,39 @@
         "second lab on SwiftShader (lampzero's reason: two compiled programs compared",
         "byte for byte), and FluidSimulation's stepCurrent against today's body in",
         "node. Holds on main. About 90 s in a cloud session."
+      ]
+    },
+    {
+      "name": "One args name, one value a step (46r)",
+      "shard": "lab2",
+      "run": "npm run argnames",
+      "timeout": 6,
+      "why": [
+        "A dispatch's numbers live in a buffer the solver keeps under a name, and a",
+        "buffer holds what was written to it last before the submit, so two calls in",
+        "one step under one name with different numbers both read the second's. The",
+        "lasting current, the swirl's projection and the open plate's addCurrent",
+        "shared 'current grid', and on the open plate currentForces read Depth Drag",
+        "as the boil running (scripts/argnames.mjs). The solver's argWrite watched",
+        "from the page on eleven plates, with a planted pair as the control; the",
+        "current after one step the same at Depth Drag 0 and 1.5, bit for bit; and",
+        "the boil's rise read on the open plate at Heat 1. About 50 s here."
+      ]
+    },
+    {
+      "name": "A poured liquid acts on every step (15e-1)",
+      "shard": "lab2",
+      "run": "npm run liquidpush",
+      "timeout": 6,
+      "why": [
+        "A bottle's liquid pushed the flow and thinned the dye only inside the fold of",
+        "a frame's hand-laid deltas, so not at all on a step nothing was laid in (a",
+        "liquid poured after a Clear) and twice on a step folded twice",
+        "(scripts/liquidpush.mjs). A heavy drop and a soap's on a rocked plate, open",
+        "and thin, stepped with no fold, one and two, and after a Clear, each against",
+        "the same plate without the drops: all four do the same. `npm run liquidsgpu`",
+        "holds the liquids' sizes on the Mac; this holds when they act, in a minute,",
+        "on any adapter."
       ]
     },
     {
@@ -2657,7 +2731,7 @@
         "`npm run liquids` laid on the thin gap the looks use, each held to the",
         "stand-in's bar and to its size within a factor of two, with a fold of",
         "the deltas every step and on a still plate, and soap's and silicone's",
-        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-2 to",
         "15e-5 print and do not fail until they pass. Here on Metal, about a",
         "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
         "24 of its 25 minutes before signin without it (#513's first run)."

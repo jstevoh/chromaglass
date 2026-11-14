@@ -176,7 +176,19 @@ export async function mediaFullLines({ mcp, display, check, phone, port, dir }) 
   t = Date.now();
   const photo = await mcp.call('mark', { path: join(lib, 'IMG_0001.png') });
   await sleep(150);
-  check('media-photos', 'a picture inside a Photos library, even in a media folder, is refused, and nothing reaches the display', !photo.ok && /Photos library/.test(photo.text) && got(t).length === 0, photo.text.slice(0, 140));
+  check('media-photos', 'a picture inside a Photos library, even in a media folder, is refused, and nothing reaches the display', !photo.ok && /never opens the Photos/.test(photo.text) && got(t).length === 0, photo.text.slice(0, 140));
+  // Nor by a link to it, nor Photo Booth's (the security review of 2026-11-13: the test read only
+  // the path as typed, so a link in ~/Pictures into the library passed, and Photo Booth was never named).
+  symlinkSync(join(lib, 'IMG_0001.png'), join(media, 'holiday.png'));
+  const booth = join(media, 'Photo Booth Library', 'Pictures');
+  mkdirSync(booth, { recursive: true });
+  writeFileSync(join(booth, 'Photo on 1-1-26.png'), BYTES);
+  t = Date.now();
+  const viaLink = await mcp.call('mark', { path: join(media, 'holiday.png') });
+  const boothPic = await mcp.call('mark', { path: join(booth, 'Photo on 1-1-26.png') });
+  await sleep(150);
+  check('media-photos-link', 'a link in a media folder into the Photos library is judged where it leads and refused, and nothing reaches the display', !viaLink.ok && /never opens the Photos/.test(viaLink.text) && got(t).length === 0, viaLink.text.slice(0, 140));
+  check('media-photos', 'a Photo Booth picture is refused like a Photos one', !boothPic.ok && /Photo Booth/.test(boothPic.text) && got(t).length === 0, boothPic.text.slice(0, 140));
 
   // The video loaded (PLAN 14ag): the film put on above, poured and played again by `loaded`.
   t = Date.now();
@@ -275,7 +287,8 @@ export const MEDIA_MUTANTS = [
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'if (hit === undefined) return { reason: `no camera', replace: 'if (false) return { reason: `no camera' },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'return { camera: hit };', replace: 'return { camera: name };' },
   { rule: 'media-keep', file: 'assistantMusic.js', find: "shelf.delete([...shelf].find(([, f]) => f.type.startsWith('image/'))?.[0] ?? shelf.keys().next().value);", replace: 'shelf.delete(shelf.keys().next().value);' },
-  { rule: 'media-photos', file: 'assistantMedia.js', find: '/\\.photoslibrary(\\/|$)/i.test(raw)', replace: 'false' },
+  { rule: 'media-photos', file: 'assistantMedia.js', find: 'const PRIVATE_LIBRARY = /(\\.photoslibrary|Photo Booth Library)(\\/|$)/i;', replace: 'const PRIVATE_LIBRARY = /^$^/;' },
+  { rule: 'media-photos-link', file: 'assistantMusic.js', find: 'if (refuse && refuse.test.test(found)) return', replace: 'if (false) return' },
   { rule: 'media-answer', file: 'assistant.js', find: "send({ type: 'assistant-media', ...call.out, ...answerOf(message) });", replace: "send({ type: 'assistant-media', ...call.out });" },
   { rule: 'phone-media', file: 'remote-server.js', find: "'assistant-still', 'assistant-media', 'song-action',", replace: "'assistant-still', 'song-action'," },
 ];
