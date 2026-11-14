@@ -9232,6 +9232,29 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
   without, a cut lands on the drop's middle, and a drop on still paint moves 0.
 
+- ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
+  black/empty" (the owner, 2026-10-29, with a screenshot of the Recipe panel; built in
+  #575, which closed unmerged, and asked again 2026-11-14).~~ **Fixed** (`npm run
+  closeupland`): the closeup's camera is Hold by default, aimed at the middle of the
+  plate, and Hold sat on its aim and nowhere else, so on a plate whose middle was bare (a
+  look that pours in pools, a middle a finger had swept, a plate between pours) every way
+  in (the button, M, the zoom, the phone's pinch and Zoom) was a 4x view of nothing: the
+  exposure stays under what the frame holds, and the frame held nothing. In the app on
+  software WebGPU, classic cleared to one pool at (0.22, 0.30): the 4x frame's mean 1.4 of
+  255 and no pixel lit, for as long as it was in. Coming in, Hold and Follow now check
+  their aim (`src/lib/macroLanding.ts`, beside the camera, which is near the size the repo
+  warns at); if its frame holds under a tenth of the plate's average dye, they go to the
+  nearest frame holding at least half what the plate's fullest does, centred on the dye in
+  it, and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
+  and lands on the first pour; a hand moving the aim during the closeup is obeyed onto
+  glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). The camera
+  half on today's main: 5 of 13 lines before, 14 of 14 after (the 14th holds the
+  landing's copies of the solver's zooms to `src/sim/constants.ts` and the button's lit
+  state to `macroZoomOf`). And the desk's button flipped `macroMode` alone, so the plate
+  went to 4x while the Macro Zoom knob beside it read 1.00x; it is now the M key's press
+  (`closeupToggle`), in by the zoom and out with both, and the phone's Zoom is the same
+  press.
+
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
