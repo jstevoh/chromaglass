@@ -53,7 +53,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'beads', type: 'f32', note: 'how much of them' },
   { name: 'beadDrops', type: 'f32', note: 'rings (0) to coloured, domed, packed drops (1)' },
   { name: 'blendMode', type: 'i32' },
-  { name: 'boundaryContrast', type: 'f32', note: 'bright interface line between dye colors' },
+  { name: 'boundaryContrast', type: 'f32', note: 'gain on the optical path and the back plate rim; no two-dye line (18e-5)' },
   { name: 'bubbleCount', type: 'i32' },
   { name: 'bubbleStrength', type: 'f32' },
   { name: 'camZoom', type: 'f32', note: '1 = whole plate, 12 = extreme magnification' },
