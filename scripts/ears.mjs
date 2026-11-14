@@ -663,18 +663,22 @@ try {
   /*
     No wall: the worker's tick. A window stretched for a starved runner makes
     "more than 20" easy to clear (a tick at a quarter of its rate would, over
-    15 s), so the tick is also held to the turns the page got in that window:
-    at least half. The worker posts every 16 ms whatever the page is doing,
-    so each turn the page gets has a tick waiting (a queue of them reads
-    once, EAR_TICK_MIN_MS), and the page's own 16 ms timer fires at most once
-    a turn: a working tick reads about as often as the timer, 129 to 125 at
-    full speed here, 46 against 30 turns over 4.3 s on a page busy 130 ms
-    in every 140 (`--busy=130`).
+    15 s), so the tick is also held to a rate across the whole window: the
+    ten readings a second that make "hearing" (see "How many readings"
+    above), or, where the page itself got fewer turns than that, half the
+    turns it got (each turn has a tick waiting; a queue of them reads once,
+    EAR_TICK_MIN_MS). Not half the turns alone: that was this PR's first
+    try, and on a GitHub Mac (2026-11-14) the page's own 16 ms timer fired
+    99 times in 2.1 s while the worker's tick read 48, a worker thread that
+    runs about half as often as the page there, which is still hearing at
+    23 a second. Measured: 128 ticks against 127 turns in 2.0 s at full speed
+    here, 46 against 30 turns over 4.3 s on a page busy 130 ms in every 140
+    (`--busy=130`), 38 and 45 in 2 s on the hosted Macs of 11-09.
   */
   await page.waitForTimeout(300);
   const v4 = await watch(2000, (g) => g.turns >= ENOUGH && g.samples >= ENOUGH);
   check('covered with no wall, the worker\'s tick keeps the ear going',
-    v4.lv.size >= 10 && v4.d.tick > 20 && v4.d.tick >= v4.lv.got.turns / 2 && v4.d.ask === 0 && v4.d.frame === 0,
+    v4.lv.size >= 10 && v4.d.tick > 20 && v4.d.tick >= Math.min(10 * v4.lv.ms / 1000, v4.lv.got.turns / 2) && v4.d.ask === 0 && v4.d.frame === 0,
     `${v4.lv.size} distinct levels in ${(v4.lv.ms / 1000).toFixed(1)} s${capNote(v4)}; readings ${v4.d.tick} tick, ${v4.d.ask} ask, ${v4.d.frame} frame; ${v4.lv.got.turns} turns the page got`);
 
   /*

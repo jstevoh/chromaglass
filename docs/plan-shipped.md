@@ -10953,8 +10953,9 @@ is now the order of work's 0.3), `docs/roadmap.md`, the dispatch counts in
   every ask in the first half of each second went green at 31 asks, 49 ticks, 61 frames), so
   each excused ask is now found by its own time, stamped on the wall's side within 6 ms after a
   tick's reading (that build: red). And since a stretched window makes a fixed count easier,
-  the tick line is also held to half the page's own turns in its window (128 of 127 at full
-  speed, 46 of 30 at `--busy=130`), and "uncovered" to every frame drawn, as the visible lines.
+  the tick line is also held to ten readings a second over its window, or half the page's own
+  turns where the page got fewer (half the turns alone went red on a GitHub Mac whose worker ran
+  at half the page's rate: 48 ticks, 99 turns, 2.1 s), and "uncovered" to every frame drawn, as the visible lines.
   Cloud: 26/26 at full speed (2 s windows, 21 s run), `--slow=16`, 32 and `--busy=130` (up to
   100 s; a window that reaches the 15 s cap says so).
 
