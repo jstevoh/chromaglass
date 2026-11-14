@@ -12163,6 +12163,46 @@ model cannot reach one, the PR says what it reached and asks.
     0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
     look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
+  - **38h-15 (shipped 2026-11-11).** Bubbles drawn at the screen's resolution. The owner:
+    "the bubbles still look shitty and pixelated. They look like a old computer drew them."
+    In the lab every projected bubble's outline was a polygon, one flat facet per texel of
+    the air field (five to eleven screen pixels at the app's sizes): the projector's bubble
+    was as opaque as the field's coverage, `smoothstep(0.02, 0.28, coverage)`, and a contour
+    of a bilinearly filtered grid has its corners on the grid. Its size came from a
+    sixteen-step log packing 28% apart, and the closeup fitted a centre and radius to sixteen
+    gathered texels (`camBubble`). Now the field's fourth channel names which bubble of the
+    list a texel is (inside a rim, or a skirt three texels past it with no coverage, so a
+    pixel just outside a bubble still finds it; the boiling's steam keeps its own number and
+    the field's drawing), the air keeps a copy of the list as it was stamped, in the splat's
+    own encoder (`WebGPUAir.geo`), and the plate draws the rim from the disc, its exact
+    radius and fingers, one screen pixel wide in both views (`airHere`). Where the gathered
+    texels name two bubbles the one the point is most inside wins, so neighbours keep their
+    own rims. The camera's view through a bubble's wall, where its lens lands in the grid's
+    ramp just outside the rim, now reads the liquid past the hole (`airLiquid`); inside the
+    rim it still reads the field's hole (38h-16).
+    `npm run bubbleround` (new, lab9): rim radius along 96 rays, 1.5 to 6 cells at about 11
+    px a cell, spread 0.35 to 0.42 px (the field's drawing 3.2 to 3.5, and a 1.5 cell bubble
+    too faint to have a rim), at the laid radius within 0.41 px (the field's 3.7 to 4.6 px
+    inside it); two bubbles 2.5 cells apart 0.36 px. Found: 38h-16 (the projector's band and
+    the main decode still read the grid's hole).
+  - **38h-17 (shipped 2026-11-11).** The oil beads drawn at the screen's resolution. The
+    owner, after 38h-15: "Fix the small bubbles as well." Filmed on the Mac in Macro Bead,
+    the small balls with a dark wall, 40 to 60 px across, had scalloped outlines: they are
+    the oil beads (`beads` 0.7 there), not bubbles. Their mask is drawn on the GPU from each
+    bead's exact disc (14ab-6), but into a 512² picture of eight-bit channels read back
+    filtered: in a closeup a mask texel is six to ten screen pixels, the coverage's contour
+    a polygon, and the lens's push read from the eight-bit dome's gradient (`dropLens`)
+    swung round the rim with the steps. For the rings (`beadDrops` 0, every look but those
+    that turn the drops on) the mask is one function of a point, so the plate evaluates it
+    at the point it draws (`beadRingsAt`, `wgsl/beadShape.ts`), from the same list and tiles
+    the mask was drawn from (`BeadMask.rings`, bindings 20 to 22), at float precision with
+    its edge a screen pixel wide; the drops and a picture handed in place of a list read the
+    mask. `npm run beadround` (new, lab9): beads of 3 to 9 cells at 3x, rim radius along 96
+    rays, spread 0.16 to 0.60 px in the projector and the closeup; the mask's reading 1.7 to
+    3.6 px on every bead up to 7 cells (the 9 cell bead's facets shallow enough to pass).
+    The bubbles' "dark-cored holes with serrated rims" in the same film are 38h-16 (the
+    camera's read of the grid's hole inside the rim); two tries at it are written there.
+
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
 #### 39a. Settings → Feedback, mailed and kept
@@ -12528,6 +12568,49 @@ cells and heat −2.75, heat kept 99.9% (with the carry off: heat 0.00). Lava La
 (centre of mass 0.75 of the height against 0.24 lying on the floor without the carry); the colour
 the rising plumes strip is 38f-2, below, shipped with it; the cooling that would bring the wax
 down is 27f-9e.
+
+## 38u-5, 38u-4 (the multiplier). The music stirs through a cord (2026-11-13)
+
+Found by the third physics pass (38u, 2026-11-13). The plate's rule is that sound reaches it
+only through cords and preset patches, and the solver's own step broke it three ways:
+`stirOf(dial, energy, impact)` multiplied Turbulence's stir by the analyser's energy, up to
+two; `deriveStep` set "spin" from (0.6 mid + 0.4 treble) times Sound Drive and the forces pass
+laid it as a second noise curl wherever there was dye; and Vibration's push swelled with the
+energy, 0.3 to 1. None had a cord, a patch or a control, so a look with every cord pulled
+still churned with the band. The owner chose (the same day) to route it through cords, not to
+remove it and not to leave it.
+
+Shipped: `FluidSimulation.step(settings, time, noise2D)` takes no sound and its file never
+names the analyser's data; `spin` is gone from `GpuStepParams`, from the forces shader and from
+the CPU grid (the uniform's slot is kept, unused); `stirOf` takes the dial alone; Vibration's
+push is the dial's at 0.65, the middle of its old swing. Every look on the shelf carries one
+more cord, the sound's mids on Turbulence (`lib/stir.ts` `stirCord`, laid on all of them by
+one rule, `layStirCords`), at `stirCordDepth` of its own Turbulence and Sound Drive. The mids
+and not the energy: the dial's curve is a fourth power, and over three test songs an energy
+cord deep enough to carry the eddies' steady share ran 0.64 to 1.66 of the old stir by song
+and up to 3.4 times at loud moments, where mids ran 0.80 to 1.16 and never over. The depth is
+set at the song's loud fifth, not its mean (set at the mean, Bass Drop stirred 1.41 times at
+loud moments). The phone's Sound sheet has **Music Stir**, that cord's depth; the desk has
+the cord in Patches. Sound Drive is no longer a per-plate setting (the step does not read it).
+
+Measured, `npm run musicstir` (new, node, in Measure): before, 1 of 9 lines (the step took 4
+arguments and named the analyser 17 times; `stirOf(0.5)` with a band read 1.375 against 0.688
+alone). After, 18 of 18: with every cord at zero and the band at its ceiling, each of 41
+looks' 163 cords folds to the look's own settings key for key; a plate of hard-edged pools
+at Turbulence 0 is the same plate value for value in silence and under that band (r.m.s. speed
+1.2e-12, the solver's rounding), and with a cord patched has a speed of 9.9e-4 and 3.5% of its
+ink somewhere else after 120 steps; over the club song each look's stir through its cord is
+0.89 to 1.00 of what the multiplier and eddies gave, and 0.87 to 1.02 at its loudest
+twentieth; in silence it is the dial's exactly. `soundpatch` counts the stir cord apart from a
+look's two or three answers to the drums; `rides` holds the dial's curve on the dial alone.
+
+A shortcut, said plainly: the stir is still curl noise on a clock. Routing the music onto it
+makes the sound's path honest, not the stir's; the stir as a tool (a stick as a Brinkman
+solid, or the lamp's convection) is the rest of 38u-4, open. The equivalence of the old
+eddies to stir (`EDDY_AS_STIR`, 0.68) is a judgement from their amplitudes; the picture is
+judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music still speeds and
+slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
+saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
 ## 38f-2. Wax and water mix like immiscible liquids (2026-11-11)
 

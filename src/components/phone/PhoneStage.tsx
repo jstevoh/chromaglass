@@ -15,6 +15,7 @@ import { TipPad } from '../ui/TipPad';
 import { ACCOUNTS_ON, useSignedIn } from '../../lib/useSignedIn';
 import { useEscape } from '../../hooks/useEscape';
 import { SPIN_BEATS_RANGE, SPIN_RPM_MAX } from '../../lib/turntable';
+import { musicStirOf, withMusicStir } from '../../lib/stir';
 import { PIN_RANGE } from '../../lib/deskPins';
 import { readSetting } from '../../lib/readout';
 import type { LiquidType, VisualizerSettings } from '../../types';
@@ -1114,6 +1115,25 @@ export function PhoneStage(p: PhoneStageProps) {
             <Slider label="Sound Drive" value={p.soundDrive} min={0} max={1} step={0.01} onChange={p.onSoundDrive}
               display={`${Math.round(p.soundDrive * 100)}%`} touch testId="phone-sound-drive" midiKey="setting:audioImpact" />
           </div>
+          {/*
+            Music Stir: the depth of the look's cord from the sound's mids
+            onto Turbulence, which is how the music stirs the liquid since
+            the solver stopped reading the analyser itself (PLAN 38u-4,
+            38u-5). The desk has it in Patches, as the cord it is, where its
+            depth is set and it is pulled like any other; the phone has no
+            patch bay, so this slider is that cord's control here
+            (lib/stir.ts `musicStirOf`, `withMusicStir`, on the settings and
+            setter the sheets already share as `mixer`). At 0 the cord is
+            pulled and the band stirs nothing; raised on a look saved
+            before the cord existed, it puts one in.
+          */}
+          {p.mixer && (
+            <div className="mt-3">
+              <Slider label="Music Stir" value={musicStirOf(p.mixer.settings.sceneMappings)} min={0} max={1} step={0.01}
+                onChange={(v) => p.mixer!.onSetting({ sceneMappings: withMusicStir(p.mixer!.settings.sceneMappings, v) })}
+                display={`${Math.round(musicStirOf(p.mixer.settings.sceneMappings) * 100)}%`} touch testId="phone-music-stir" />
+            </div>
+          )}
           </PanelGuard>
         </PhoneSheet>
       )}

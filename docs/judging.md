@@ -2785,3 +2785,20 @@ here.
    pinks and greens. The default 0.3 should feel like the photograph.
 5. Polarisers at 0 on any look: the look exactly as before.
 
+## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
+
+The solver no longer reads the sound: each look carries a patch from the sound's Mid onto
+Turbulence instead, set so its stir with music is about what it was. The numbers hold each
+look within a quarter (`npm run musicstir`); what they cannot hold is the picture, because
+the old eddies were one scale and only under the dye, and Turbulence is three scales over the
+whole dish. Judge from the before and after films (same look, same song, same seconds):
+
+1. Does each look still move with the music about as much as before? Good: the same amount
+   of churn in the loud passages, calm in the quiet ones. Bad: plainly calmer, or the whole
+   dish swimming where before only the colour stirred.
+2. Settings → Patches: the patch "Sound · Mid → Turbulence" is there on every built-in look.
+   Pull it (or Music Stir to 0 on the phone) with music playing: the stir should fall to the
+   look's own Turbulence and stop following the band.
+3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
+   swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
+   too much in the quiet parts.
