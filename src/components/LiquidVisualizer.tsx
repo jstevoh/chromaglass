@@ -16,7 +16,7 @@ import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
-import { forgetReadbacks, readbacksLanded, trackReadbacks, PipelineCache } from '../gpu/kit';
+import { forgetReadbacks, readbacksLanded, trackReadbacks } from '../gpu/kit';
 import { WebGPUFluid, THIN_GAP_THICKNESS, thinGapViscosity } from '../gpu/fluid';
 import { WebGPUPlate, pictureSize } from '../gpu/plate';
 import { fillPlateUniforms, magnetsOnPlate } from '../gpu/plateUniforms';
@@ -27,7 +27,7 @@ import { WebGPUPadGrab } from '../gpu/padGrab';
 import { WebGPUPostChain, type PostTest } from '../gpu/post';
 import { isGpuFailure, type GpuFailure } from '../gpu/device';
 import { kitSelfTest, pressureSelfTest } from '../gpu/selftest';
-import { prepareLog, prepareShow } from '../gpu/prepare';
+import { pipelinesSeen, prepareShow } from '../gpu/prepare';
 import { openingOf } from '../gpu/opening';
 import type { TempoSource } from '../lib/tempo';
 import { lookSpeed, musicPace, tempoMultiplier } from '../lib/tempoPace';
@@ -4956,15 +4956,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 mode: currentSettings.macroCamera ?? 'hold',
                 aimX: currentSettings.macroAimX ?? 0.5,
                 aimY: currentSettings.macroAimY ?? 0.5,
+                onLand: onAimRef.current,
               },
             );
             camBassRef.current = camBass;
           }
           /*
-            Leaving the middle of the plate over the travel in, not at the
-            first notch. The camera goes to its subject as soon as there is
-            a zoom at all, and at 1.1x the frame may already move a fifth of
-            the plate: the first step of the slider was a lurch sideways.
+            Off the middle over the travel in, not at the first notch: the
+            camera goes to its subject at any zoom, and at 1.1x the frame
+            moved a fifth of the plate, a lurch on the slider's first step.
           */
           const raw = macroShotRef.current;
           macroShotRef.current = { ...raw, cx: 0.5 + (raw.cx - 0.5) * macroAmount, cy: 0.5 + (raw.cy - 0.5) * macroAmount };
@@ -6844,7 +6844,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
            * one built on a frame on any device this page has had (`npm run
            * startup` reads it).
            */
-          pipelines: () => ({ prepared: prepareLog[0] ?? null, prepares: prepareLog, ledger: PipelineCache.ledger() }),
+          pipelines: pipelinesSeen,
           /**
            * Twelve red-black sweeps against twenty-four Jacobi passes on one
            * divergence field, by the residual each leaves (H2). The claim
