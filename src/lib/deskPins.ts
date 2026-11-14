@@ -255,7 +255,6 @@ const FROM_PANEL: DeskSpec[] = [
   { key: 'macroCellScale', label: "Cell Size", min: 0.15, max: 3, section: 'macro', wanderSpan: 1.35 },
   { key: 'macroLacing', label: "Macro Lacing", min: 0, max: 1, section: 'macro' },
   { key: 'macroDepth', label: "Depth / Focus", min: 0, max: 1, section: 'macro' },
-  { key: 'macroEdgeDetail', label: "Edge Detail", min: 0, max: 2.5, section: 'macro', wanderSpan: 1 },
   { key: 'macroRelief', label: "Relief / 3D", min: 0, max: 1, section: 'macro' },
   { key: 'platePressure', label: "Plate Pressure", min: 0, max: 1, section: 'squish' },
   { key: 'phaseAmount', label: "Ferrofluid", min: 0, max: 1, section: 'ferro' },

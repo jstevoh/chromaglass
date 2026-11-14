@@ -973,8 +973,7 @@ export interface VisualizerSettings {
   macroCells: number;         // paint-cell / bubble structure amount
   macroCellScale: number;     // cell size (small = many tiny cells)
   macroLacing: number;        // dark lacing filaments along dye boundaries
-  macroDepth: number;         // dome shading, contact shadow and shallow depth of field
-  macroEdgeDetail: number;    // fractal warp that breaks up smooth upscaled silhouettes
+  macroDepth: number;         // the closeup camera's depth of field (it was also a drawn dome shading, contact shadow and paper grain until PLAN 38u-2)
   macroRelief: number;        // depth up close: the camera focused past the liquid (a shadowgraph of its curvature), and each cell's wall bending the light from beneath out of the lens (PLAN 38h-2)
 
   // The room — the camera read back as a sensor rather than shown as a slide.
@@ -1314,7 +1313,6 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   macroCellScale: 0.5,
   macroLacing: 0,
   macroDepth: 0.5,
-  macroEdgeDetail: 0.6,
   macroRelief: 0.7,
   sceneDrive: 0,            // the room does nothing to the plate until it is asked to
   sceneHands: 0,

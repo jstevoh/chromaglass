@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — three drawn stand-ins made physical (PLAN 38u-7, 38u-12, 38u-14)
+
+- **Rain Drip** needs the plate tipped (Gravity): the weight along a plate is g sin θ, nothing on a
+  level one. Eight looks that lean on it now sit on a plate tipped about 15 degrees.
+- **A clear oil drop** and a bubble in clear liquid are drawn with the same dark ring as in dyed
+  liquid (it was a third and 0.7 of it); the clear oil's tint fades over the meniscus.
+- **Polarity** pushes unlike colours apart the same everywhere; a noise had pulled them together in patches.
+
+### Removed — what the closeup drew over the liquid (PLAN 38u-1, 38u-2, 38u-3)
+
+- **Edge Detail** is gone (Settings → Macro, the desks, the phone). It read the closeup through
+  a drifting noise so that edges looked ragged; surface tension holds an edge smooth at that
+  scale, and the warp crawled on a plate that was still.
+- **Depth / Focus** is the close-up camera's depth of field and nothing else. It also drew a
+  paper's fibre on the ground, the dye's shadow down and to the right as if a lamp hung over
+  the plate, and a shading that made thick dye brighter than thin.
+- A bubble's film no longer shifts colour on a clock; it shifts when the bubble moves or drains.
+
+`npm run stillcloseup`: a still plate drawn ten seconds apart changed by 0.12% to 0.38% of the
+frame's mean, 0 now; the ground beside a pool was 20% darker on one side, 0.004% now.
+
 ### Added — Glitter, a macro lens's discs and stars, and a side lamp (PLAN 47e, 47d-1, 47b-1)
 
 - **Glitter** (Settings → Camera): fine flakes suspended in the liquid that ride the flow at

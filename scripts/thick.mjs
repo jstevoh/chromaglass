@@ -190,7 +190,7 @@ try {
       lab.flush();
       const before = await read();
       const mean = await meanDye();
-      const over = { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, meanDensity: mean };
+      const over = { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, plateUpright: 1, meanDensity: mean };
       const keep = async () => ({ dye: [...await lab.field('dye')], species: [...await lab.field('species')], how: lab.solver().lastSpeciesCarry });
       await lab.step(STEPS - 1, over);
       const prior = bottle === 'alcohol' ? await keep() : null;

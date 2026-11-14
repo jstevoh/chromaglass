@@ -985,35 +985,26 @@ fn ledColor(t: f32) -> vec3f {
 
 /** The closeup: the silhouette warp, the defocus, and the paint's own detail. */
 const MACRO = /* wgsl */ `
-// Crinkle the sampled position so bicubic-smooth silhouettes gain sub-cell
-// structure. A uniform drift (never a per-pixel flow offset) keeps it stable.
-fn macroWarpOffset(fuv: vec2f) -> vec2f {
-  if (U.macroEdge < 0.005) { return vec2f(0.0); }
-  let zoom = max(1.0, U.camZoom);
-  // The frequency of the noise must be tied to the physical plate, not the zoom!
-  // If we multiply by zoom, the noise becomes sub-pixel and aliases into chaotic black holes.
-  let f = U.logicalGrid * 0.85;
-  let t = vec2f(U.time * 0.003, U.time * -0.002);
-  var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
-  w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
-  
-  // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat,
-  // as far as Frame Sway lets the beat move the frame (0 by default: the
-  // whole closeup's silhouette throbbing on every beat reads as the camera
-  // shaking, not the liquid moving; lib/plateRock.ts). At 0 it rests where it
-  // rests with no beat clock (the edge as set), on purpose: a pulse held at its
-  // average would still be a beat-locked level, and the look without music is the reference.
-  // At full sway the pulse is ±15% of the edge (20c), not the ±40% it was.
-  let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
-  let pulseEdge = U.macroEdge * (1.0 + beatPulse * 0.15);
+/*
+  The closeup reads the plate where the camera points and nowhere else.
 
-  // Scaled by how far in we are (see macroAmt): sub-cell crinkle on a
-  // plate-wide frame is noise, and on a bead it is the silhouette.
-  // We divide the displacement by zoom so that the screen doesn't shake wildly when zoomed in.
-  return w * (pulseEdge * 1.1 * clamp(U.macroOn, 0.0, 1.0) / (U.logicalGrid * zoom));
-}
-
-fn macroWarp(fuv: vec2f) -> vec2f { return fuv + macroWarpOffset(fuv); }
+  It used to read it through a warp (Edge Detail, macroEdge): two octaves of
+  value noise, drifting on the clock and swelling on the beat, moved every
+  sample by up to a cell so that "bicubic-smooth silhouettes gain sub-cell
+  structure". Reported by the owner in the closeup (2026-11-13): "the drops in
+  macro still have jagged edges". At this scale a pool's edge is the smoothest
+  thing on the plate: interfacial tension pulls out any bump shorter than the
+  capillary length (2.7 mm for water in air, a few millimetres for oil in
+  water), and a closeup frame is a centimetre or two across. A ragged edge is
+  real only where something made it: a pinned contact line, a finger of a less
+  viscous liquid (Saffman–Taylor), a dewetting film. Each of those is the
+  solver's to produce and the camera's to find. The warp also crawled with
+  the clock on a plate that was not moving (npm run stillcloseup, line 1:
+  on a still plate of hard-edged discs 0.12% to 0.38% of the frame's mean
+  changed in ten seconds, 0 now), which is
+  motion the solver never made. So it is gone, and the setting with it: there
+  is no physical quantity for a dial to scale here (PLAN 47a-7, 38u-1).
+*/
 
 /*
   How far a structure of this size on the plate (in plate widths) is
@@ -1067,9 +1058,7 @@ fn decodeFluidDof(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool,
 // the height field, which are undefined inside divergent branches.
 fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: vec3f, grad: f32, dof: f32, lapK: f32) -> vec4f {
   var col = colIn;
-  // The silhouette warp is meant to crinkle blob outlines, not to deform the
-  // cells themselves — bent circles read as lumps rather than as bubbles.
-  let cuv = fuv - macroWarpOffset(fuv) * 0.75;
+  let cuv = fuv;
   let focus = 1.0 - dof * 0.85;
   let paint = smoothstep(0.02, 0.20, alpha);
 
@@ -1177,11 +1166,16 @@ fn macroDetail(colIn: vec3f, alpha: f32, fuv: vec2f, flow: vec2f, gridNormal: ve
     col *= mix(1.0, through * ao, r3 * paint) * mix(1.0, camShadow(lapK, r3), paint);
   }
 
-  // ── Dome shading — thickness across the bead as a whole ─────────
-  if (U.macroDepth > 0.005) {
-    let belly = smoothstep(0.05, 0.45, alpha);
-    col *= mix(1.0, 0.74 + 0.42 * belly, U.macroDepth * 0.8);
-  }
+  /*
+    No "dome shading" (PLAN 38u-2). Until 2026-11-13 Depth / Focus also
+    multiplied the colour by 0.74 where the dye was thin and by 1.16 where it
+    was thick, to make a pool's middle read as a lit belly. A plate on a
+    lamp does the opposite: more dye in the path passes less light
+    (Beer–Lambert, which the decode above has already applied once), and no
+    thickness of dye passes more than the lamp gave it. A pool's depth is
+    in the picture twice already, as its colour's depth and as the relief's
+    shadowgraph of its curvature just above.
+  */
 
   // Ink pooled in a cell core is opaque — let it read as true black rather
   // than as the lit ground showing through.
@@ -2349,7 +2343,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   var flow0 = vec2f(0.0);
   if (closeup) {
     flow0 = fluidFlow(vel0, fuv0) * macroAmt;
-    fuv0 = macroWarp(fuv0);
   }
   // The front plate's own physics, once, where it sits on the plate.
   let view = viewAt(fuvBase);
@@ -2537,23 +2530,26 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     fluid0 = mix(fluid0, detail0, macroAmt);
   }
 
-  // ── Substrate grain + contact shadow ──────────────────────────────
-  // Keep the screen's lamp before the front plate's contact shadow darkens
-  // lampBg: a second projector's beam (PLAN 18b-10) meets the screen's fibre
-  // but never passes through the front plate.
-  var lampScreen = lampBg;
-  if (closeup && U.macroDepth * macroAmt > 0.005) {
-    let depth = U.macroDepth * macroAmt;
-    let fiber = fbm3(uv * vec2f(aspect, 1.0) * 230.0);
-    bgColor = mix(bgColor, bgColor * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
-    lampBg = mix(lampBg, lampBg * (0.82 + 0.36 * fiber) + fiber * 0.02 * depth, macroAmt);
-    lampScreen = lampBg;
-    let shA = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.008, -0.008), c0, s0)).a) * 2.6);
-    let shB = 1.0 - exp(-decodeDensity(textureBicubic(layer0, uvToFluid(uv + vec2f(0.022, -0.022), c0, s0)).a) * 1.6);
-    let shadow = clamp(shA * 0.65 + shB * 0.5, 0.0, 1.0);
-    bgColor *= mix(1.0, 0.18, shadow * depth);
-    lampBg *= mix(1.0, 0.18, shadow * depth);
-  }
+  /*
+    No substrate grain and no contact shadow (PLAN 38u-2). Until 2026-11-13
+    the closeup laid a paper's fibre over the ground (value noise at 230
+    cycles a frame, fixed to the screen, so it stayed put while the plate
+    turned under it) and threw the dye's shadow down and to the right onto
+    it, twice, darkening the ground to 0.18 at full Depth / Focus. That is
+    the picture of paint on paper under a lamp at the upper left. The
+    closeup's camera looks down at two glasses on a light pad (38h-2): the
+    light comes from beneath, there is no surface behind the liquid for a
+    shadow to fall on, and the pad is centimetres out of focus, which leaves
+    it featureless. Measured in the lab on a round pool on the lamp
+    (npm run stillcloseup, line 3): the ground just outside the pool's edge
+    was 20% darker on one side than on the other; it is the same all round
+    now (0.004%).
+    Depth up close is the camera's own: its depth of field (Depth / Focus,
+    still) and the shadowgraph of the liquid's curvature (Relief / 3D).
+    The screen's lamp is kept apart for the second projector's beam, which
+    meets the screen and never the front plate (PLAN 18b-10).
+  */
+  let lampScreen = lampBg;
 
   var outColor = bgColor;
   if (U.photo > 0.5) {
@@ -2972,7 +2968,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var flow1 = vec2f(0.0);
     if (closeup) {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
-      fuv1 = macroWarp(fuv1);
     }
     var fluid1 = decodeFluidParts(layer1, parts1, fuv1, blurFluid, useBlur, dof);
     let through1 = dyeThrough;
@@ -3235,7 +3230,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // toward the bottom only as a gentle lean, since which way is "down"
       // across a bubble three cells wide is too coarse to draw colour from.
       let thick = mix(0.35, 1.0, film) * (0.75 + 0.25 * h + 0.08 * clamp(p.y, -1.0, 1.0));
-      let filmP = thick * 2.6 + 0.08 * sin(U.time * 0.4 + id * 40.0);
+      // No clock in it (PLAN 38u-3): the phase swayed by 0.08 on a sine of
+      // the time, a shimmer on a pocket that was not moving. A film's
+      // colours shift as it drains and as the pocket moves, and both are
+      // already in the film's thickness (bubbles.ts).
+      let filmP = thick * 2.6;
       let filmC = filmColourAt(filmP, filmP);
       let irid = (0.25 + 0.75 * U.iridescence) * (0.4 + 0.6 * k3);
 
@@ -3314,7 +3313,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       c = mix(c * fm, airColumn(c, rimCol, rimS, rimA, tB, R, rho) * fm * wall.x + camBounce(groundOf(bgColor), rimCol, rimS, rimA) * wall.y + vec3f(wall.z * softboxRadiance()), wallB);
       c = mix(cp, c, dropCam);
       let inside = smoothstep(0.0, 0.2, h);
-      outColor = mix(outColor, c, opac * U.bubbleStrength * mix(0.7, 1.0, filmT));
+      outColor = mix(outColor, c, opac * U.bubbleStrength);
       /*
         The camera pass (wgsl/camera.ts) bends the screen along this normal,
         which is the camera's dome: on the plate it would lens the window the
@@ -3370,8 +3369,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let inner = bm.r;
     let r = drop.z;
     let R = drop.w;
-    let inDye = smoothstep(0.015, 0.2, auxH);
-    let k = clamp(U.beads * 2.0, 0.0, 1.0) * mix(0.35, 1.0, inDye) * inner;
+    // Full strength in clear water: the band is the oil's curve (38u-14).
+    let k = clamp(U.beads * 2.0, 0.0, 1.0) * inner;
     let flat = dropFlat(R, dropRho);
     let t = dropBand(r, R, dropRho);
     // How much oil the light crosses: 1 over the flat top (or a small drop's
@@ -3410,7 +3409,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       the contact, where the meniscus is steepest and bends the most light
       out of the lens. The band and the camera's line are that rim (38h-2).
     */
-    var dropC = outColor * vec3f(0.99, 0.97, 0.93) * shade;
+    // Beer-Lambert tint (38u-14).
+    let oilTint = pow(vec3f(0.99, 0.97, 0.93), vec3f(th));
+    var dropC = outColor * oilTint * shade;
 
     /*
       Drops (beadDrops, PLAN.md batch 3): the second reference frame, where
@@ -3441,9 +3442,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       let absorb = -log(clamp(dc, vec3f(0.04), vec3f(1.0)));
       let trans = exp(-absorb * th * 1.0);
       let glowC = dc * (1.0 - dot(trans, vec3f(0.3333))) * 1.15 * (1.0 - U.lampGround);
-      let body = (outColor * vec3f(0.99, 0.97, 0.93) * trans + glowC) * shade;
+      let body = (outColor * oilTint * trans + glowC) * shade;
       dropC = mix(dropC, body, U.beadDrops);
-      kDrop = clamp(U.beads * 2.0, 0.0, 1.0) * mix(mix(0.35, 1.0, inDye), 1.0, U.beadDrops) * inner;
+      kDrop = k;
     }
     outColor = mix(outColor, dropC, kDrop);
     auxB = max(auxB, inner * 0.4 * kDrop);
