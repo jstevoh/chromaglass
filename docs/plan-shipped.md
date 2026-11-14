@@ -14753,3 +14753,24 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+## 14ag-3. The video as the lamp under the dish (shipped 2026-11-14)
+
+Of the four ways put to the owner for a video and the liquid to meet (2026-11-13), the owner
+chose the video as the lamp under the dish (2026-11-14), as a show sets its dish on a light
+panel or a tablet. The film can now go under the front plate in the mixer's stack (`MIX_LAMP`
+gains `film`; `filmInLamp`, `filmAsLamp` in `lib/mixer.ts`), and a Lamp switch on the video's
+row (`VideoShelf`, on the Video section, the Dyes panel and the phone's dye sheet) puts it at the
+top of the lamp and back over the back plate. Under the glass it is a row of the lamp
+(`wgsl/plateLamp.ts`, where `mixLamp` moved from `plate.ts`): the lamp passes through the
+picture colour by colour by Film Mix, outside a zoomed-out frame the lamp passes bare, and the
+lamp ground comes up with the film by Film Mix (`plateUniforms.ts`), since a picture under the
+dish is only seen through the dye. The dye's absorption is the lamp ground's Beer–Lambert, as it
+is for any lamp; the refraction is thin-prism optics on the solver's optical path: the ray is
+tilted by grad((n − 1)h), (n − 1)h being the derive pass's n·h less the column's depth from the
+view, and lands on the picture 2 cm below (`VIDEO_LAMP_DEPTH_M`), so a glycerine pool or an oil
+drop is a lens over the video. Saved orders read as before: a film missing from one goes above
+the glass. Check: `npm run videolamp` (the product with the white lamp within 0.32 of a level,
+bare water the film's colour within 1, Film Mix 0 byte-identical, the frame's edge, a glycerine
+rim moving stripes 19.6 against 3.6 in the pool's middle, a flat film's rim 0.0); `npm run mixer`
+for the stack's new rule.
