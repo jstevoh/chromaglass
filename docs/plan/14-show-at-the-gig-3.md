@@ -122,6 +122,14 @@ Open, found building it:
   path). The back dish sits in the same light; its liquid should bend it too, once the two dishes
   have their own heights in the projector's cone (18e-1). With Dish Spread on, the bend is off
   (its plate uv is `dishToPlate`'s, which `lampBendAt` does not undo); undo that one too.
+- **14ag-8** (M) *Oil drops are flat slabs to the light.* Filmed on the owner's Mac (2026-11-14),
+  the video under Splodascope and Classic stays ruler-straight: dye in water barely moves the
+  index, and the solver's oil is a share of the column with a sharp edge and no thickness profile,
+  so it bends the picture only in a thin band at its rim. A real floating oil lens is a cap,
+  thickest in the middle, its shape set by the three surface tensions (Neumann's triangle) and
+  gravity; give the view the oil's thickness from that, in the solver, and the drops become
+  magnifiers over the lamp (and the plate's own `refractionOptics` reads them too). Not a plate
+  shader fake: the path is the solver's.
 - **14ag-4** (S) *The framing's pixels have no check.* `npm run myvideo` holds the controls and
   their settings, not where the frame lands: on software WebGPU the app's plate was still
   rebuilding thirty seconds in, so a corner read there measured nothing. Give the lab a film
