@@ -803,6 +803,9 @@ export interface VisualizerSettings {
   filmKey: number;            // luminance below which the film is transparent (a black key)
   filmDrive: number;          // how hard the film's own motion stirs the liquid (0 = it is only a slide)
   filmImpact: number;         // master depth over every mapping, read from the film instead of the room
+  filmZoom: number;           // the film's frame on the plate: 1 fills it (cover-fit), above crops in, below shows it smaller with black round it
+  filmX: number;              // the film's frame slid across, in plate widths (0 centred)
+  filmY: number;              // the film's frame slid up, in plate heights (0 centred)
   dimmer: number;             // master brightness, the house dimmer: 1 full, 0 blackout
   fingering: number;          // a press lifts into radial fingers (Saffman–Taylor, the unstable stroke); the press itself stays round (lib/squish.ts)
   beads: number;              // oil beads: hundreds of small dark-rimmed droplets riding the flow
@@ -1259,6 +1262,10 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   // this existed shows the same picture and moves the same way.
   filmDrive: 0,
   filmImpact: 0,
+  // The frame as it always landed: cover-fit, centred (PLAN 14ag).
+  filmZoom: 1,
+  filmX: 0,
+  filmY: 0,
   lampWarmth: 0,
   transmission: 1,            // the dye's real depth (Beer–Lambert): thin washes pale, thick pools deep; at 0.5 until the dyes stopped being perfect filters (lib/dye.ts)
   dimmer: 1,

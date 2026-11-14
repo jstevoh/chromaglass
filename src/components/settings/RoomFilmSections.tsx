@@ -1,9 +1,9 @@
-import { Wind, Camera, Film, Video, MonitorPlay, ScanEye } from 'lucide-react';
+import { Wind, Camera, Film, Video, MonitorPlay, ScanEye, Maximize } from 'lucide-react';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
 import { Toggle, LIT } from '../ui';
 import { CameraPicker } from '../CameraPicker';
-import { FilmShelves } from '../FilmShelves';
+import { VideoShelf } from '../VideoShelf';
 import { Slider } from './controls';
 import type { SectionCtx } from './props';
 
@@ -179,11 +179,21 @@ export const RoomSection = ({ c }: { c: SectionCtx }) => {
 
 export const FilmSection = ({ c }: { c: SectionCtx }) => {
   const {
-    settings, onUpdate, cameras, filmSource, filmName, pourName, onFilmFile, onPourVideo,
-    onStopPourVideo, onFilmCamera, filmCameraId, onFilmCameraDevice, filmCamera, filmCameraLost,
-    onFilmWindow, onFilmClear, focusSection, embed, cartoons, filmInputRef, canCaptureWindow, keep,
+    settings, onUpdate, cameras, filmSource, filmName, onFilmFile,
+    onFilmCamera, filmCameraId, onFilmCameraDevice, filmCamera, filmCameraLost,
+    onFilmWindow, onFilmClear, focusSection, video, filmInputRef, canCaptureWindow, keep,
     shown, goTo, listens, CARD, GRID, TITLE,
   } = c;
+  /*
+    What the film's dials need (PLAN 14ag). How it shows (Mix, Key) and where
+    it lands (Zoom, Across, Up) need a film on the projector; what it does
+    (Drive, Impact) reads a poured video as well, since the owner asked for
+    the plate to react to the video loaded, and a video may be poured with
+    nothing on the projector at all.
+  */
+  const noFilm = (filmSource ?? 'none') === 'none' && 'needs a video, the camera or a window playing';
+  const noRead = (filmSource ?? 'none') === 'none' && !video?.pouring && 'needs a video playing or pouring, the camera or a window';
+  const framed = (settings.filmZoom ?? 1) !== 1 || (settings.filmX ?? 0) !== 0 || (settings.filmY ?? 0) !== 0;
   return (
     <>
 
@@ -199,7 +209,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
       {keep('film') && (
       <section id="settings-film" className={`${CARD} ${shown('film') ? GRID : 'hidden'} ${focusSection === 'film' ? 'border-accent-border' : 'border-white/[0.07]'}`} data-group={groupOf('film')} data-section="film">
         <h3 className={TITLE}>
-          <Video size={12} /> Film
+          <Video size={12} /> Video
         </h3>
         <div className="mt-2 mb-3 flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -237,7 +247,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
           <div className="flex flex-wrap gap-2" role="group" aria-label="Film source" data-testid="film-source">
             {([
               ['none', 'Off', null, 'film-off', 'No film under the dye', () => onFilmClear?.()],
-              ['file', 'Video file', Film, 'film-file', 'Play a video file from this machine through the dye, looping', () => filmInputRef.current?.click()],
+              ['file', 'Video file', Film, 'film-file', 'Load a video file from this machine and play it through the dye, looping; Pour, below, lays it in as dye too', () => filmInputRef.current?.click()],
               ['camera', 'Webcam', Camera, 'film-camera', 'Point a camera at a real dish of oil and composite it through the solver', () => onFilmCamera?.()],
               ['window', 'Window', MonitorPlay, 'film-window', canCaptureWindow
                 ? 'Play another tab, window or screen through the dye: a film from the Internet Archive, a media player, anything on this machine'
@@ -286,7 +296,18 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             )}
           </div>
 
-          <FilmShelves filmSource={filmSource} filmName={filmName} pourName={pourName} onFilmFile={onFilmFile} onFilmClear={onFilmClear} onPourVideo={onPourVideo} onStopPourVideo={onStopPourVideo} cartoons={embed ? undefined : cartoons} />
+          {/*
+            The video loaded, with its Play and Pour (PLAN 14ag). The demo
+            loops and the cartoon shelf that sat here are gone: the owner
+            loaded a video of their own, found it could be played and not
+            poured while the shipped ones could be both, and asked for the
+            shipped ones to go ("people can figure out their own videos").
+          */}
+          {video?.name && (
+            <div className="mt-1 rounded-lg border border-white/10 px-3 py-2" data-testid="film-video-row">
+              <VideoShelf {...video} />
+            </div>
+          )}
 
           <Info>
             <span className="text-white/60">Window</span> is the way to a film you did not download.
@@ -297,9 +318,61 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
             origin, only pixels. Mute the tab and let the room's own sound drive the plate.
           </Info>
         </div>
+        {/*
+          Where the frame lands (PLAN 14ag). The owner: "zoom in/out on the
+          video and move it around the canvas so I can deal with different
+          dimensions." It was always cover-fit and centred, so a 4:3 reel
+          lost its top and bottom on a wide wall and a portrait phone clip
+          showed a band of its middle. Zoom scales about the plate's centre
+          (below 1 shows the whole frame smaller, with no picture round it,
+          as a projector past its slide), Across and Up slide it by plate
+          widths and heights. Fit puts all three back.
+        */}
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <span className="text-[13px] font-medium text-text">Framing</span>
+          <button
+            onClick={() => onUpdate({ filmZoom: 1, filmX: 0, filmY: 0 })}
+            disabled={!framed}
+            className="flex h-7 items-center gap-1 rounded-md border border-white/15 px-2 text-[12px] text-text-2 hover:bg-white/10 disabled:opacity-30"
+            title="Fill the plate again, centred"
+            data-testid="film-fit"
+          >
+            <Maximize size={11} /> Fit
+          </button>
+        </div>
+        <Slider
+          label="Video Zoom"
+          disabled={noFilm}
+          value={settings.filmZoom ?? 1}
+          min={0.25}
+          max={4}
+          step={0.05}
+          onChange={(v: number) => onUpdate({ filmZoom: v })}
+          settingKey="filmZoom"
+        />
+        <Slider
+          label="Video Across"
+          disabled={noFilm}
+          value={settings.filmX ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ filmX: v })}
+          settingKey="filmX"
+        />
+        <Slider
+          label="Video Up"
+          disabled={noFilm}
+          value={settings.filmY ?? 0}
+          min={-1}
+          max={1}
+          step={0.01}
+          onChange={(v: number) => onUpdate({ filmY: v })}
+          settingKey="filmY"
+        />
         <Slider
           label="Film Mix"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          disabled={noFilm}
           value={settings.filmMix ?? 0.7}
           min={0}
           max={1.0}
@@ -309,7 +382,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Film Key"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          disabled={noFilm}
           value={settings.filmKey ?? 0.18}
           min={0}
           max={0.9}
@@ -331,7 +404,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
         */}
         <Slider
           label="Film Drive"
-          disabled={(filmSource ?? 'none') === 'none' && 'needs a loop, the camera or a window'}
+          disabled={noRead}
           value={settings.filmDrive ?? 0}
           min={0}
           max={1}
@@ -342,9 +415,7 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
         />
         <Slider
           label="Film Impact"
-          disabled={(filmSource ?? 'none') === 'none'
-            ? 'needs a loop, the camera or a window'
-            : !listens('film') && 'no patch reads the film'}
+          disabled={noRead || (!listens('film') && 'no patch reads the film')}
           value={settings.filmImpact ?? 0}
           min={0}
           max={1}
@@ -355,13 +426,14 @@ export const FilmSection = ({ c }: { c: SectionCtx }) => {
         <p className="mb-3 text-[12px] leading-relaxed text-white/40">
           Any feature of the film onto any control is a patch, in {goTo('patches', 'film')}, where Film Impact, just above, is its master.
         </p>
-        {filmSource !== 'none' && (
+        {(filmSource !== 'none' || video?.pouring) && (
           <Info>
             <span className="text-white/60">Film Drive</span> puts the film's own motion into the
             liquid: a pan drags the dye the way it pans, a crowd scene stirs it, a locked-off shot
             does nothing at all — which is right, because nothing is moving. A patch reads the same
             nine features off the reel that the room camera reads off the floor, so "how busy →
-            Turbulence" works off either. One warning worth having: capture this app's own window
+            Turbulence" works off either. With nothing on the projector, a video you are
+            pouring is the one read, so poured footage can stir the dish it pours into. One warning worth having: capture this app's own window
             with Film Drive up and you have built a feedback loop. It saturates rather than runs
             away — the stir is capped per cell — but a plate stirred by a picture of itself is a
             plate being stirred by nothing in particular.

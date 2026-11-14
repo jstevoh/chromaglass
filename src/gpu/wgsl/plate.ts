@@ -35,6 +35,7 @@ import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
+import { FILM_FRAME_WGSL } from './plateFilm';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 
 /** Bindings every plate shader shares. */
@@ -1983,27 +1984,7 @@ fn lumiaLight(uv: vec2f) -> vec3f {
   return lcol * (0.12 + 0.9 * sheet) * veil;
 }
 
-/** The film projector's frame where it lands, bent a little by the dye, graded. */
-fn filmFrame(uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
-  let fuvF = (uv - 0.5) * U.filmScale + 0.5 + normal0.xy * 0.03 * fluid0.a;
-  return gradeMix(tex2(film, vec2f(fuvF.x, 1.0 - fuvF.y)).rgb, U.mixGrade[3]);
-}
-
-/**
- * The film projector's frame over the picture. Its own way in, as it always
- * was: through the dye it lands on, keyed on its dark by Film Key. Any other
- * blend lays the frame itself, by Film Mix, and Key keys it by Film Key too.
- */
-fn filmOver(color: vec3f, uv: vec2f, fluid0: vec4f, normal0: vec3f) -> vec3f {
-  if (U.filmOn == 0 || U.filmMix <= 0.001) { return color; }
-  let filmC = filmFrame(uv, fluid0, normal0);
-  let fm = mixBlendOf(U.mixBlend.w);
-  if (fm != 0) { return blendRowKeyed(color, filmC, U.filmMix, fm, U.filmKey); }
-  let fl = dot(filmC, vec3f(0.299, 0.587, 0.114));
-  let key = smoothstep(U.filmKey, U.filmKey + 0.18, fl);
-  let tinted = filmC * mix(vec3f(1.0), fluid0.rgb * 1.5, fluid0.a * 0.8);
-  return mix(color, color * 0.35 + tinted * 0.95, key * U.filmMix);
-}
+${FILM_FRAME_WGSL}
 
 /** Light laid over light: screened, so it adds and cannot clip past white. */
 fn screenOver(c: vec3f, light: vec3f) -> vec3f {

@@ -10,7 +10,7 @@ import type { LiquidDesignerProps } from '../LiquidDesigner';
 import type { OutputConfig, WallTest } from '../../lib/outputConfig';
 import type { TempoLabel, TempoReading } from '../../lib/tempo';
 import type { OscOutLabel } from '../../lib/oscOut';
-import type { CartoonShelfProps } from '../CartoonShelf';
+import type { VideoShelfProps } from '../VideoShelf';
 import type { RoomCalibration } from '../../lib/audioCalibration';
 import type { EngineStatus } from '../../lib/platform';
 
@@ -24,8 +24,6 @@ import type { EngineStatus } from '../../lib/platform';
 */
 
 export interface SettingsPanelProps {
-  onPourVideo?: (file: File) => void;
-  onStopPourVideo?: () => void;
   settings: VisualizerSettings;
   /**
    * Song detection, the master switch: whether the app listens for which song
@@ -58,8 +56,6 @@ export interface SettingsPanelProps {
   filmSource?: 'none' | 'file' | 'camera' | 'window';
   /** The file playing as the film (its name), while the source is a file. */
   filmName?: string | null;
-  /** The file pouring as dye (its name), or null. */
-  pourName?: string | null;
   onFilmFile?: (file: File) => void;
   onFilmCamera?: () => void;
   /** The film's Webcam: which camera it shows, what opened, and whether it was unplugged. */
@@ -171,12 +167,12 @@ export interface SettingsPanelProps {
   scope?: 'all' | 'stage';
   /** On a desk panel, where a link to another section goes: the sheet, at that section. */
   onGoTo?: (id: string) => void;
-  /** The public domain cartoons that ship with the app, for the Film section (CartoonShelf, PLAN 14ac). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded and its Play and Pour, for the Video section (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
 }
 
-export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onPourVideo' | 'onStopPourVideo' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'cartoons'>
-  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'pourName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
+export type SectionCtx = Pick<SettingsPanelProps, 'settings' | 'onUpdate' | 'songDetection' | 'onSongDetection' | 'calibration' | 'onRecalibrate' | 'engineStatus' | 'onSceneToggle' | 'onSceneDevice' | 'scenePreviewRef' | 'onFilmFile' | 'onFilmCamera' | 'onFilmCameraDevice' | 'onFilmWindow' | 'onFilmClear' | 'mixTakes' | 'backLook' | 'onMarkFile' | 'onMarkClear' | 'onAudioSource' | 'onAudioInput' | 'onBlackout' | 'onProjectorMode' | 'output' | 'onOutput' | 'onOutputReset' | 'wakeLock' | 'wallTest' | 'onWallTest' | 'tempo' | 'onTap' | 'readTempo' | 'readEar' | 'onTempoClear' | 'onTempoBpm' | 'onLink' | 'oscOut' | 'onOscOut' | 'onLinkTransport' | 'liquids' | 'pins' | 'midi' | 'onOpenMidi' | 'soundSources' | 'onFlickPlate' | 'video'>
+  & Required<Pick<SettingsPanelProps, 'sceneOn' | 'sceneState' | 'cameras' | 'sceneDeviceId' | 'filmSource' | 'filmName' | 'filmCameraId' | 'filmCamera' | 'filmCameraLost' | 'markLoaded' | 'audioSource' | 'audioInputs' | 'audioInputId' | 'blackout' | 'projectorMode' | 'projectorName' | 'spinBpm' | 'midiClocked' | 'timecode' | 'focusSection' | 'embed'>>
   & {
     filmInputRef: React.RefObject<HTMLInputElement | null>;
     markInputRef: React.RefObject<HTMLInputElement | null>;

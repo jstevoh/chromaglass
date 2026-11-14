@@ -150,6 +150,8 @@ const SECTION_OF: Record<string, string> = {
   moireSpin: 'moire',
   beatLead: 'audio-input',
   filmDrive: 'film',
+  // The video's framing (PLAN 14ag), learnable in midi.ts, drawn in Video.
+  filmZoom: 'film', filmX: 'film', filmY: 'film',
   // The four masters, with the patch bay they pull down.
   filmImpact: 'film',
   soundImpact: 'audio-input',

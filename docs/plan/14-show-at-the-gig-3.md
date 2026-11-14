@@ -74,3 +74,44 @@ effect). `npm run music` only feeds it synthetic level traces.
   has been that loud for about 80 s (with the room rising 35 s before the gap, 1 of 8
   caught; `songends`' gap2rise gives it 95 s). Follow the floor faster without hearing a
   quiet passage as the room.
+
+## 14ag. Your own video: played, poured, read and framed; the demo videos gone (shipped, asked 2026-11-13)
+
+Asked by the owner (2026-11-13): "if I load my own background video I can't 'pour' it, only
+load it to play. Let's just get rid of the demo videos that can be poured or played. People can
+figure out their own videos. Also, I'd like the visuals to be able to react to the video that's
+loaded." Then: zoom and move the video on the canvas for different dimensions, and the video's
+controls in a panel of their own to work during the show.
+
+**Shipped**: the three demo loops and the nine cartoons are gone (`public/video`, 76 MB;
+`lib/cartoons.ts`, `CartoonShelf.tsx`, `FilmShelves.tsx`, `npm run cartoons`; 14ac's shelf). One
+video is loaded at a time, by Settings → Video's Video file, the Dyes panel's Pour a video… or the
+phone's A video as dye, and its row (`VideoShelf.tsx`) plays it through the projector and pours it
+as dye, either or both, on the Video section, the Dyes panel and the phone's dye sheet. The film
+sense reads the video pouring when nothing is on the projector, so Film Drive and the film's
+patches react to a poured video too. Video Zoom (0.25 to 4), Video Across and Video Up (−1 to 1)
+frame the film on the plate, with Fit; zoomed out, the frame stops at its edge (no smeared
+border). Film is named Video, and its panel is on the Perform tab's deck. The assistant's `film`
+and `pour_file` take `loaded` (the video loaded) in place of `cartoon`; `show_state`'s media says
+which video is loaded; the framing is `set`. Check: `npm run myvideo`.
+
+Open, found building it:
+
+- **14ag-1** (S) *The pour is not framed.* Video Zoom and the slides move the projector's frame;
+  the pour still lays the whole frame stretched over the square dish (`videoSample` in
+  `wgsl/splat.ts`, `pourVideoFrameCpu`), so a 16:9 clip pours squashed. Give the pour the same
+  cover-fit and framing, in the sample pass's uv.
+- **14ag-2** (S) *The video's own sound as a source.* "React to the video" could also mean its
+  soundtrack: a Video entry in Sound's Source that plays the loaded file's audio into the ear.
+  The film and the pour are muted today. Ask the owner before building.
+- **14ag-3** (M) *Blending video and liquid the way a real show does.* Four ways were put to the
+  owner (2026-11-13): the video as the lamp under the dish (refracted by the oil's thickness,
+  filtered by the dye, Beer–Lambert), the video poured as ink that the flow carries and thins,
+  the video's brightness as heat (buoyant and Marangoni currents from the picture's light), and
+  its motion stirring harder. Built in the order the owner picks; each as physics in the solver
+  or the light path, none as a shader overlay.
+- **14ag-4** (S) *The framing's pixels have no check.* `npm run myvideo` holds the controls and
+  their settings, not where the frame lands: on software WebGPU the app's plate was still
+  rebuilding thirty seconds in, so a corner read there measured nothing. Give the lab a film
+  texture (the plate shader's `filmFrame` is the same code) and read a corner at Zoom 1 and
+  0.25, and the edge with Across at 1. Until then the owner judges it (`docs/judging.md`).

@@ -1,9 +1,10 @@
 /**
  * Film, pours, the room camera and the mark, for the remote link to report
  * and the owner's assistant to drive (PLAN 44k-13): what drives the plate as
- * the film (a file, a cartoon, a camera, a window), what pours into the dish
- * (a picture laid as dye, a film poured frame by frame), the room camera
- * that stirs it, and the mark (the logo card) over it.
+ * the film (a file, a camera, a window), what pours into the dish (a picture
+ * laid as dye, a film poured frame by frame), the video loaded that either
+ * can take again (PLAN 14ag), the room camera that stirs it, and the mark
+ * (the logo card) over it.
  *
  * Why a holder here rather than props, as app/recordNow.ts: the film is
  * useFilm's, the pour usePour's, the room useSceneSource's, the mark
@@ -13,7 +14,7 @@
  * own door, whose every call is the one the panel's own controls make
  * (useFilm's `startFilmCamera`, usePour's `pourVideoFrom`, useSceneSource's
  * `toggleScene`, useCastFeed's `loadMark`), so a film the assistant put on is
- * the film the Film panel and the phone's cartoon shelf show lit.
+ * the film the Video panel and the phone's dye sheet show lit.
  *
  * A file by its path never reaches the page: the show server checks the
  * path (a media folder, the kind the call takes, a real file and not a link
@@ -30,7 +31,6 @@
  */
 import { useSyncExternalStore } from 'react';
 import type { MediaNow } from '../lib/remoteProtocol';
-import { CARTOONS, CARTOON_BY_ID } from '../lib/cartoons';
 import type { CameraChoice } from '../lib/cameras';
 
 /** The address the show server serves an admitted film or picture under (server/assistantMusic.js `MEDIA_PATH`). */
@@ -39,7 +39,8 @@ export const ASSISTANT_MEDIA_PATH = '/assistant-media/';
 export interface MediaDoors {
   film: {
     file(url: string, name: string): Promise<string | null>;
-    cartoon(id: string): Promise<string | null>;
+    /** The video loaded (by hand or by a file call), played again. */
+    loaded(): Promise<string | null>;
     /** A camera by id, or the Film panel's own with none. */
     camera(id?: string): Promise<string | null>;
     window(): Promise<string | null>;
@@ -48,7 +49,8 @@ export interface MediaDoors {
   pour: {
     image(url: string): Promise<string | null>;
     video(url: string, name: string): Promise<string | null>;
-    cartoon(id: string): void;
+    /** The video loaded, poured. */
+    loaded(): string | null;
     stop(): void;
   };
   /** Settles once the camera has opened or failed (off: at once). */
@@ -56,12 +58,12 @@ export interface MediaDoors {
   mark: { load(url: string, name: string): Promise<string | null>; clear(): void };
 }
 
-const SHELF = CARTOONS.map(c => ({ id: c.id, title: c.title, seconds: c.seconds }));
 let now: MediaNow = {
-  film: { source: 'none', name: null, cartoon: null, camera: null, cameraLost: false },
-  pour: { playing: false, name: null, cartoon: null },
+  film: { source: 'none', name: null, camera: null, cameraLost: false },
+  pour: { playing: false, name: null },
+  video: null,
   room: { on: false, camera: null, resume: false },
-  mark: false, cameras: [], cartoons: SHELF,
+  mark: false, cameras: [],
 };
 let nowKey = JSON.stringify(now);
 let cams: CameraChoice[] = [];
@@ -77,7 +79,7 @@ function take(next: MediaNow): void {
 }
 
 /** One hook's piece of the copy; the same copy is kept when nothing in it moved. */
-export function publishMedia(part: Partial<Pick<MediaNow, 'film' | 'pour' | 'room' | 'mark'>>): void { take({ ...now, ...part }); }
+export function publishMedia(part: Partial<Pick<MediaNow, 'film' | 'pour' | 'video' | 'room' | 'mark'>>): void { take({ ...now, ...part }); }
 /** The cameras, by the pickers' names (useFilm, which holds the one list of them). */
 export function publishCameras(list: CameraChoice[]): void {
   cams = list.map(c => ({ id: c.id, label: c.label }));
@@ -123,7 +125,7 @@ function cameraId(name: unknown): { id: string } | { why: string } {
  * once a camera or a window has opened or failed, so the answer is never
  * "done" for a camera that did not open.
  */
-export async function askMedia(m: { do?: unknown; url?: unknown; name?: unknown; kind?: unknown; cartoon?: unknown; camera?: unknown; on?: unknown }): Promise<string | null> {
+export async function askMedia(m: { do?: unknown; url?: unknown; name?: unknown; kind?: unknown; camera?: unknown; on?: unknown }): Promise<string | null> {
   const d = String(m.do);
   const which = d.startsWith('film-') ? 'film' : d.startsWith('pour-') ? 'pour' : d === 'room' ? 'room' : d.startsWith('mark') ? 'mark' : null;
   if (!which) return `not one of the media calls: ${d}`;
@@ -131,14 +133,12 @@ export async function askMedia(m: { do?: unknown; url?: unknown; name?: unknown;
   if (!door) return `the ${which === 'room' ? 'room camera' : which} is not running`;
   const file = d === 'film-file' || d === 'pour-file' || d === 'mark';
   if (file && !ours(m.url)) return 'a file reaches the plate only through the show server';
-  const cartoon = d === 'film-cartoon' || d === 'pour-cartoon' ? CARTOON_BY_ID.get(String(m.cartoon)) : undefined;
-  if ((d === 'film-cartoon' || d === 'pour-cartoon') && !cartoon) return `no cartoon "${String(m.cartoon)}" on the shelf (there are: ${SHELF.map(c => c.title).join('; ')})`;
   const cam = m.camera === undefined ? null : cameraId(m.camera);
   if (cam && 'why' in cam) return cam.why;
   const film = doors.film, pour = doors.pour, room = doors.room, mark = doors.mark;
   switch (d) {
     case 'film-file': return film!.file(m.url as string, nameOf(m.name, 'Film'));
-    case 'film-cartoon': return film!.cartoon(cartoon!.id);
+    case 'film-loaded': return film!.loaded();
     case 'film-camera': return film!.camera(cam?.id);
     case 'film-window': return film!.window();
     case 'film-clear':
@@ -149,7 +149,7 @@ export async function askMedia(m: { do?: unknown; url?: unknown; name?: unknown;
       if (m.kind === 'image') return pour!.image(m.url as string);
       if (m.kind !== 'video') return 'pour: a picture or a film';
       return pour!.video(m.url as string, nameOf(m.name, 'Film'));
-    case 'pour-cartoon': pour!.cartoon(cartoon!.id); return null;
+    case 'pour-loaded': return pour!.loaded();
     case 'pour-stop':
       if (!now.pour.name && !now.pour.playing) return 'nothing is pouring';
       pour!.stop();

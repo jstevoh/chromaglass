@@ -437,8 +437,8 @@ export default function App() {
   const { songLine, barKnown, heardBpm, songCueSeqRef } = useSongLine({ wallRef });
 
   const {
-    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying, pouringCartoon,
-    setPouringCartoon, pourName, setPourName, pourVideoFrom, stopPour, pourFile, handleVideoUpload,
+    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
+    pourName, stopPour, pourLoaded, handleVideoUpload, loaded, setLoaded,
   } = usePour({
     visualizerRef,
   });
@@ -532,9 +532,9 @@ export default function App() {
 
   const {
     filmSource, filmName, loadFilm, cameras, filmCameraId, filmCamera, filmCameraLost,
-    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, cartoons,
+    startFilmCamera, chooseFilmCamera, startFilmWindow, clearFilm, video,
   } = useFilm({
-    wallRef, setToast, pouringCartoon, pourVideoFrom, setPouringCartoon, setPourName, stopPour,
+    wallRef, setToast, loaded, setLoaded, pourName, pourLoaded, stopPour,
   });
 
   const {
@@ -554,11 +554,12 @@ export default function App() {
     twitchy a reading should be, which is a property of the plate rather than
     of where the pixels came from.
   */
-  const filmDriving = filmSource !== 'none'
+  // A poured video is read the same (PLAN 14ag): the film's when one plays, else the pour's.
+  const filmDriving = (filmSource !== 'none' || isVideoPlaying)
     && ((settings.filmDrive ?? 0) > 0 || (settings.filmImpact ?? 0) > 0);
   const filmSense = useFilmSense({
     enabled: filmDriving,
-    getVideo: () => wallRef.current?.filmVideoEl() ?? null,
+    getVideo: () => wallRef.current?.filmVideoEl() ?? (isVideoPlaying ? videoPlayerRef.current : null),
     deadzone: settings.sceneDeadzone ?? 0.25,
     smooth: settings.sceneSmooth ?? 0.35,
   });
@@ -2149,11 +2150,8 @@ export default function App() {
       scenePreviewRef={scenePreviewRef}
       filmSource={filmSource}
       filmName={filmSource === 'file' ? filmName : null}
-      pourName={isVideoPlaying ? pourName : null}
-      cartoons={cartoons}
+      video={video}
       onFilmFile={loadFilm}
-      onPourVideo={pourFile}
-      onStopPourVideo={stopPour}
       onFilmCamera={() => void startFilmCamera()}
       filmCameraId={filmCameraId}
       onFilmCameraDevice={chooseFilmCamera}
@@ -3103,7 +3101,7 @@ export default function App() {
             onPalette={selectPalette}
             onImageDye={() => fileInputRef.current?.click()}
             onVideoDye={() => videoInputRef.current?.click()}
-            cartoons={cartoons}
+            video={video}
             playing={isActive}
             onPlay={() => setIsActive(v => !v)}
             evolving={isAutomated}
@@ -3709,7 +3707,7 @@ export default function App() {
           onPalette={selectPalette}
           onImageDye={() => fileInputRef.current?.click()}
           onVideoDye={() => videoInputRef.current?.click()}
-          cartoons={cartoons}
+          video={video}
           tool={activeTool}
           onTool={(t) => setActiveTool(t as typeof activeTool)}
           toolAmount={toolAmount}

@@ -1565,7 +1565,7 @@ at a show, through the microphone in the room as well as through the laptop:
 Say whether a change ever lands in the middle of a song, whether one is ever missed, and whether
 the speeds feel right; if they do, On a New Song can open on New preset again (14z-4).
 
-## 66. The cartoons, poured and filmed (PLAN 14ac)
+## 66. The cartoons, poured and filmed (PLAN 14ac) — withdrawn 2026-11-13: the shelf is gone (14ag)
 
 On the desk, the Dye panel has a Cartoons shelf under Image… and Video…; on the phone, it is at
 the bottom of the dye sheet. Each cartoon has Pour and Film.
@@ -1926,7 +1926,7 @@ until the app next goes online (no grace period, PLAN 23.17h).
 4. Decide: is 3 (3560 K) the right amber for Home Movie, or the full 3.75 (3200 K)? And is the red clipping on
    hot reds acceptable, or should the end hold only half the brightness back?
 
-## 85. The colour cartoons (PLAN 14ac, 14ac-4)
+## 85. The colour cartoons (PLAN 14ac, 14ac-4) — withdrawn 2026-11-13: the shelf is gone (14ag)
 
 Five cartoons in colour on the Cartoons shelf (the desk's Dye panel, the phone's dye sheet), marked "colour":
 Fiddlesticks, Jack Frost, Balloon Land, Somewhere in Dreamland and Gulliver's Travels.
@@ -2765,6 +2765,20 @@ only seen here.
    on every speck alike.
 5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
 6. Glitter and Side Light at 0 on any look: the look exactly as before.
+
+## 130. Your own video: played, poured, read and framed (PLAN 14ag)
+
+Load a video of your own in the Video panel (on the Perform tab's deck, or Settings → Video):
+Video file. Its row shows Play and Pour.
+
+1. **Pour** while it plays: both lit, the picture through the dye and poured into it at once.
+2. **Video Zoom** at 0.5 with a 16:9 clip: the whole frame, smaller, with no picture round it
+   and no smeared edge. At 2, pushed in. **Across** and **Up** slide it; **Fit** puts it back.
+   Try a portrait phone clip and a 4:3 reel: can you frame each where it reads?
+3. **Film Drive** at about 0.5 with the film off and only the pour running: does the poured
+   footage stir the dish it pours into?
+4. Bad: Play or Pour that does not start, a zoomed-out frame with a stretched border, a drive
+   that does nothing with only the pour on.
 
 ## 131. The music stirs the liquid through a cord (PLAN 38u-4, 38u-5)
 

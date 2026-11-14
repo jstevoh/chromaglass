@@ -1,15 +1,27 @@
 import React, { useRef, useCallback, useState, useEffect, type RefObject } from 'react';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 import { uprightPicture } from '../lib/videoFlow';
-import { CARTOON_BY_ID } from '../lib/cartoons';
 import { publishMedia, setMediaDoor, videoOpens } from './mediaNow';
 
 /**
  * Pouring a picture or a film into the dish: an image laid as dye, a video
- * (a file, or a cartoon from the shelf) poured frame by frame. The film that
- * drives the plate rather than pouring into it is `useFilm`, which stops a pour
- * before it starts.
+ * poured frame by frame. The film that drives the plate rather than pouring
+ * into it is `useFilm`.
+ *
+ * Also the one video loaded (PLAN 14ag), which both panels share: a file
+ * chosen here to pour, or in the Video panel to play, is the same `loaded`,
+ * and the row under it (components/VideoShelf.tsx) plays and pours it. It
+ * lives here rather than in useFilm because this hook runs first and useFilm
+ * is handed what it returns.
  */
+export interface LoadedVideo {
+  /** The file itself, when one was chosen on this machine. */
+  file: File | null;
+  /** Else the address it is served from (the assistant's, app/mediaNow.ts). */
+  url: string | null;
+  name: string;
+}
+
 interface PourDeps {
   visualizerRef: RefObject<LiquidVisualizerHandle | null>;
 }
@@ -46,16 +58,18 @@ export function usePour({
   /** A poured file's object URL, revoked when the pour moves on. */
   const pourUrlRef = useRef<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  /** The shelf's cartoon pouring as dye (lib/cartoons.ts), or null for a file or nothing. */
-  const [pouringCartoon, setPouringCartoon] = useState<string | null>(null);
-  /** The file pouring as dye, by its name, so a row that poured it can say it is (Settings' demo loops). */
+  /** The video pouring as dye, by its name, or null: what the row lights its Pour by. */
   const [pourName, setPourName] = useState<string | null>(null);
+  /** The video loaded, by either door, or null before one is. */
+  const [loaded, setLoaded] = useState<LoadedVideo | null>(null);
+  const loadedRef = useRef(loaded);
+  loadedRef.current = loaded;
   /*
     The video pour: one hidden, muted, looping <video>, handed to the plate
     once when it starts playing. It used to be handed over again on every
     animation frame, which made the plate pause and play it every frame
     (PLAN 14ab-1, fixed in `pourVideo`); the plate's own frame loop reads the
-    picture, so once is enough. A cartoon is given by address, so it pours
+    picture, so once is enough. A served video is given by address, so it pours
     while it is still arriving; a file by an object URL.
   */
   const pourVideoFrom = useCallback((src: string, objectUrl: boolean) => {
@@ -75,14 +89,19 @@ export function usePour({
     if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
     if (pourUrlRef.current) { URL.revokeObjectURL(pourUrlRef.current); pourUrlRef.current = null; }
     setIsVideoPlaying(false);
-    setPouringCartoon(null);
     setPourName(null);
   }, []);
+  /** Pour a file, which becomes the video loaded. */
   const pourFile = useCallback((file: File) => {
     pourVideoFrom(URL.createObjectURL(file), true);
-    setPouringCartoon(null);
     setPourName(file.name);
+    setLoaded({ file, url: null, name: file.name });
   }, [pourVideoFrom]);
+  /** Pour the video loaded, whichever door it came in by: a file afresh, a served one by its address. */
+  const pourLoaded = useCallback((v: LoadedVideo) => {
+    if (v.file) pourFile(v.file);
+    else if (v.url) { pourVideoFrom(v.url, false); setPourName(v.name); }
+  }, [pourFile, pourVideoFrom]);
   const handleVideoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) pourFile(file);
@@ -91,8 +110,8 @@ export function usePour({
 
   /*
     The assistant's door and copy (app/mediaNow.ts): the Pour panel's own
-    calls, a cartoon poured as the shelf pours one. All are stable
-    callbacks, so the door is set once.
+    calls, and the video loaded poured as its row pours it. The door reads
+    the latest loaded through a ref, so it is set once.
   */
   useEffect(() => {
     setMediaDoor('pour', {
@@ -100,18 +119,24 @@ export function usePour({
       video: async (url, name) => {
         if (!videoPlayerRef.current || !visualizerRef.current) return 'the plate is not running';
         const why = await videoOpens(url);
-        if (!why) { pourVideoFrom(url, false); setPouringCartoon(null); setPourName(name); }
+        if (!why) { pourVideoFrom(url, false); setPourName(name); setLoaded({ file: null, url, name }); }
         return why;
       },
-      cartoon: (id) => { const c = CARTOON_BY_ID.get(id); if (!c) return; pourVideoFrom(c.src, false); setPouringCartoon(id); setPourName(c.title); },
+      loaded: () => {
+        const v = loadedRef.current;
+        if (!v) return 'no video is loaded (load one with film or pour_file first)';
+        if (!videoPlayerRef.current || !visualizerRef.current) return 'the plate is not running';
+        pourLoaded(v);
+        return null;
+      },
       stop: stopPour,
     });
     return () => setMediaDoor('pour', null);
-  }, [pourImageFrom, pourVideoFrom, stopPour]);
-  useEffect(() => { publishMedia({ pour: { playing: isVideoPlaying, name: pourName, cartoon: pouringCartoon } }); }, [isVideoPlaying, pourName, pouringCartoon]);
+  }, [pourImageFrom, pourVideoFrom, pourLoaded, stopPour]);
+  useEffect(() => { publishMedia({ pour: { playing: isVideoPlaying, name: pourName }, video: loaded?.name ?? null }); }, [isVideoPlaying, pourName, loaded]);
 
   return {
-    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying, pouringCartoon,
-    setPouringCartoon, pourName, setPourName, pourVideoFrom, stopPour, pourFile, handleVideoUpload,
+    fileInputRef, handleImageUpload, videoInputRef, videoPlayerRef, isVideoPlaying,
+    pourName, pourVideoFrom, stopPour, pourFile, pourLoaded, handleVideoUpload, loaded, setLoaded,
   };
 }
