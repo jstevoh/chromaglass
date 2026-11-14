@@ -19,6 +19,7 @@ holds the three longest:
 | `PatchesSection.tsx` | `patches` |
 | `MidiSection.tsx` | `midi` |
 | `LookSections.tsx` | `look`, `show`, `camera`, `stock`, `lamp`, `macro` |
+| `MoireSection.tsx` | `moire`, the moiré pack's sheets (PLAN 45a) |
 | `MotionSections.tsx` | `kaleidoscope`, `tilt`, `spin`, `physics`, `automation` |
 | `ChemistrySections.tsx` | `squish`, `oil`, `ferro`, `reactions` |
 | `PourSections.tsx` | `interaction`, `liquids` |
@@ -34,3 +35,8 @@ section starts reading goes into `SectionCtx` and the object the panel builds; t
 typecheck says which is missing. The checks that read the panel's markup as text (`panel`,
 `desklayout`, `rowfade`) read the panel and this folder as one text through
 `scripts/settingsSource.mjs`, so a section's `<Slider>` is found wherever it lives.
+
+Sound (`SoundSection.tsx`) is the one page for sound since PLAN 35c-7: its top is the
+Sound sheet's body (`SoundPanel`), which App() hands the panel as `soundSources`, a
+function given the section's Input picker to draw under the Mic. `SettingsPanelProps`
+lost `onOpenSound` for it: there is no sheet to open.

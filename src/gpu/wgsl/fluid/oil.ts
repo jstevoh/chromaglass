@@ -155,6 +155,27 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 }`,
 
   /*
+    Oil Bodies: a look's lay, which says which colour is the oil's (PLAN
+    47z-1; inputs.ts foldDye says why). The oil's share takes the lay's oil
+    colour, never more than the frame's dye in that cell nor less than none,
+    and keeps the multiplier as the dye does; the rest of the frame's dye is
+    the water's, by being left out of the share.
+  */
+  bodyLay: `${HEAD}
+@group(0) @binding(2) var oil: texture_2d<f32>;
+@group(0) @binding(3) var addT: texture_2d<f32>;
+@group(0) @binding(4) var mulT: texture_2d<f32>;
+@group(0) @binding(5) var layT: texture_2d<f32>;
+@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+  if (!inGrid(id)) { return; }
+  let p = vec2i(id.xy);
+  let add = max(textureLoad(addT, p, 0), vec4f(0.0));
+  let o = textureLoad(oil, p, 0) * textureLoad(mulT, p, 0).r + clamp(textureLoad(layT, p, 0), vec4f(0.0), add);
+  textureStore(dst, p, select(vec4f(0.0), max(o, vec4f(0.0)), finite4(o)));
+}`,
+
+  /*
     Oil Bodies: the dye's diffusion, for the water's colour only (see the
     host's 'dye disperse' stage). In: the whole dye and the oil's share, both
     diffused, and the oil's share before. Out: the water's colour diffused
@@ -417,7 +438,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     One step of the mix's own evolution.
 
       oil         ∂c/∂t = M ∇²μ         (Cahn–Hilliard: conserves the oil)
-      surfactant  ∂Γ/∂t = D ∇²Γ          (molecular, A.a.y: kept, PLAN 38c)
+      surfactant  ∂Γ/∂t = D ∇²Γ − k Γ    (molecular A.a.y; A.b.x = exp(−k·s), 1 at 0, PLAN 38c/38c-3)
       acidity     diffuses (A.a.w); acid and base neutralise by cancelling
 
     A.a.x = M × dt in cell units, kept under the explicit limit (1/64 for
@@ -425,7 +446,8 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     (0 closed): soap carried past it has gone over into the trough with
     the liquid, as the dye has (decayDye).
 
-    The soap does not break down and is not capped at a monolayer: what is
+    At Soap Breakdown = 0 (A.b.x = 1) the soap is kept and is not capped at
+    a monolayer: what is
     over one is in the water as micelles (src/gpu/fluid/soap.ts). It once
     faded to a tenth every ten seconds and was clamped at 1, so the plate
     forgot it and a second drop on the first was lost. The 64 is only a
@@ -452,7 +474,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // band is only a guard against a runaway.
   let c = clamp(m.r + A.a.x * lap.a, -0.25, 1.25);
   let rim = A.a.z > 0.0 && length(uvOf(id) - vec2f(0.5)) >= A.a.z;
-  let s = select(clamp(m.g + A.a.y * lap.g, 0.0, 64.0), 0.0, rim);
+  let s = select(clamp((m.g + A.a.y * lap.g) * A.b.x, 0.0, 64.0), 0.0, rim);
   let a = clamp(m.b + A.a.w * lap.b, -1.0, 1.0);
   let outVal = vec4f(c, s, a, m.a);
   textureStore(dst, p, select(vec4f(0.0), outVal, finite4(outVal)));

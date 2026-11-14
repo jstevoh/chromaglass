@@ -35,6 +35,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'mixPos2', type: 'vec4f', note: 'the rows of the gel wheel, the lumia and the front plate (everything under it is the lamp), and the top row' },
   { name: 'mixBlend', type: 'vec4f', note: 'the blends of the LED ring, the gel wheel, the lumia and the film: 0 own, 1 screen, 2 add, 3 multiply, 4 key' },
   { name: 'filmDye', type: 'vec4f', note: "the clear film's dye (PLAN 20b-13, filmDye.ts): rgb what one unit lets through, w the dial (0 none)" },
+  { name: 'sideLamp', type: 'vec4f', note: "the side lamp's foot (cos, sin of its angle round the dish), its distance and height, metres (PLAN 47b-side, glint.ts)" },
   { name: 'gel0', type: 'vec3f' },
   { name: 'gel1', type: 'vec3f' },
   { name: 'gel2', type: 'vec3f' },
@@ -44,6 +45,7 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'lumiaB', type: 'vec3f' },
   { name: 'paperA', type: 'vec3f' },
   { name: 'paperB', type: 'vec3f' },
+  { name: 'sideColor', type: 'vec3f', note: "the side lamp's colour, linear" },
   { name: 'camCenter', type: 'vec2f', note: 'fluid-UV the frame is centred on (0.5,0.5 = plate centre)' },
   { name: 'filmScale', type: 'vec2f' },
   { name: 'layerDrift1', type: 'vec2f' },
@@ -136,6 +138,8 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'colourBody', type: 'f32', note: 'how solid thin dye reads: opacity and body saturation, 0-1' },
   { name: 'thinFilm', type: 'f32', note: 'interference colour where the dye runs thinnest' },
   { name: 'filmPhysics', type: 'f32', note: "film colour: the rainbow (0) to a soap film's own colours (1), for Thin Film and the bubbles' film" },
+  { name: 'soapFilm', type: 'f32', note: "the frame's soap film's reflection over the plate, 0 off (PLAN 32d, plateThinFilm.ts)" },
+  { name: 'soapCosT', type: 'f32', note: "cos of the refracted angle in the film at Soap Film Angle: the path is 2 n h cos θ_t" },
   { name: 'time', type: 'f32' },
   { name: 'cellClock', type: 'f32', note: "the lead plate's dye travel, wrapped: what the drawn cells slide and breathe on (lib/detailFlow.ts)" },
   { name: 'transmission', type: 'f32' },
@@ -149,7 +153,23 @@ export const PLATE_FIELDS: Field[] = [
   { name: 'spectral', type: 'f32', note: 'dyes mixed across six bands of the spectrum rather than three' },
   { name: 'benDay', type: 'f32', note: 'the finished picture printed as a comic: flat inks, Ben-Day dots in the tints (the Roy look)' },
   { name: 'lampGround', type: 'f32', note: 'the lamp shining up through the dye (PLAN 18b): 0 the dye painted as light on black, 1 the lamp filtered by it' },
+  /* The moiré sheets on the stage (plateMoire.ts, lib/moire.ts; PLAN 45a). */
+  { name: 'moireAmount', type: 'f32', note: 'how dense the two sheets\' ink is: 0 takes them off the stage' },
+  { name: 'moireSheetA', type: 'f32', note: 'the lower sheet\'s design, an index into MOIRE_SHEETS (0 none)' },
+  { name: 'moireSheetB', type: 'f32', note: 'the upper sheet\'s design' },
+  { name: 'moireTurn', type: 'f32', note: 'the upper sheet\'s turn, radians: its angle and its spin\'s clock' },
+  { name: 'moireDensity', type: 'f32', note: 'the lower sheet\'s lines per frame height' },
+  { name: 'moireRatio', type: 'f32', note: 'the upper sheet\'s pitch against the lower\'s' },
+  { name: 'moireSlide', type: 'f32', note: 'the upper sheet slid sideways, frame heights' },
+  { name: 'moireGap', type: 'f32', note: 'each sheet\'s distance from the liquid, mm' },
+  { name: 'moireCurl', type: 'f32', note: 'the shape dial the designs share' },
+  { name: 'moireFlip', type: 'f32', note: '1 when the upper sheet is laid face down (mirrored)' },
   { name: 'projectorFocus', type: 'f32', note: 'projector lens focus plane (0..1, 0.5 = in-focus, defocus shifts Becke lines)' },
+  /* The lens pass after the display (gpu/glint.ts, lib/glint.ts; PLAN 47e, 47d, 47b-side). Read only there; the display ignores them. */
+  { name: 'glitter', type: 'f32', note: 'how much of SPECK_MAX glitter is suspended in the liquid, 0 none' },
+  { name: 'lensStop', type: 'f32', note: "the lens's f-number: the specks' defocus discs shrink and their diffraction spikes grow as it rises" },
+  { name: 'sideLight', type: 'f32', note: "the side lamp's radiance against the lamp ground's white, 0 off" },
+  { name: 'lensFinish', type: 'i32', note: "what finishInMain was: the lens pass lays the display's finish when it runs" },
 ];
 
 export const PLATE_LAYOUT = layOut(PLATE_FIELDS);

@@ -20,10 +20,10 @@
 import { chromium } from 'playwright';
 import { TIP_DELAY_MS } from '../src/lib/tipDelay.ts';
 import { spawn } from 'node:child_process';
-import { launchChromium } from './chromium.mjs';
+import { launchChromium, port } from './chromium.mjs';
 import { clickAt, modeSwitchX, legibility, coveredControls, statusDots, COVER_WIDTHS } from './layoutProbe.mjs';
 
-const PORT = Number(process.env.LAYOUT_PORT ?? 4179);
+const PORT = port(4179, 'LAYOUT_PORT');
 // The plate's resolution does not change a layout, and every millisecond the
 // software renderer spends on it is a millisecond the page is not answering.
 const URL = `http://localhost:${PORT}/?debug&look=classic&dpr=0.35`;
@@ -187,6 +187,53 @@ try {
   check('the mode switch does not move when you use it',
     inPerform !== null && inDesign !== null && back !== null && drift <= 1,
     `perform ${inPerform}, setup ${inDesign}, back ${back} — ${drift}px`);
+
+  // ── The Rides show whole under the Bottles ─────────────────────
+  /*
+    The owner (2026-11-07): "where is the macro zoom control?" It was the
+    seventh of the Rides, which on the Perform tab sit under the Bottles; at
+    1440×900 the right column left them room for three of their two-line rows
+    and the strip scrolled with its scrollbar hidden, so Macro Zoom was on the
+    page and nowhere anyone could see it. The owner chose denser faders. What
+    is asked is the feature, not a pixel: at a laptop's 1440×900 and a smaller
+    1512×860, every ride's row lies wholly inside what its scrolling ancestors
+    show, unscrolled, and Macro Zoom is one of them. The build before the fix
+    showed 3 of 8 and 2 of 8.
+  */
+  for (const [w, h] of [[1440, 900], [1512, 860]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await settle(800);
+    const r = await page.evaluate(() => {
+      const strip = document.querySelector('[data-testid="rides"]');
+      if (!strip) return null;
+      const rows = [...strip.querySelectorAll('[data-testid^="ride-"]')].filter(e => e.getAttribute('data-testid') !== 'ride-pick');
+      if (!rows.length) return { rows: 0, seen: [] };
+      /*
+        From the rows' own box up, so the strip's scroller counts (the
+        Choose, Mixer and Drain row is pinned under it, inside the strip),
+        and every scroller is put back to its top first: what is asked is
+        what shows without anyone scrolling.
+      */
+      let top = 0, bottom = innerHeight;
+      for (let e = rows[0].parentElement; e; e = e.parentElement) {
+        if (getComputedStyle(e).overflowY === 'visible') continue;
+        e.scrollTop = 0;
+        const q = e.getBoundingClientRect();
+        top = Math.max(top, q.top); bottom = Math.min(bottom, q.bottom);
+      }
+      // And nothing lies over a row: the thing drawn at its middle is the row's own.
+      const seen = rows.filter(e => {
+        const q = e.getBoundingClientRect();
+        if (!(q.height > 0 && q.top >= top - 1 && q.bottom <= bottom + 1)) return false;
+        const at = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+        return !!at && e.contains(at);
+      }).map(e => e.getAttribute('data-testid').slice('ride-'.length));
+      return { rows: rows.length, seen };
+    });
+    check(`at ${w}×${h} on Perform, every ride shows whole under the Bottles, Macro Zoom among them`,
+      !!r && r.rows >= 8 && r.seen.length === r.rows && r.seen.includes('macroZoom'),
+      r ? `${r.seen.length} of ${r.rows} in view: ${r.seen.join(', ')}` : 'no Rides on Perform');
+  }
 
   // ── Readable in a dark room, on both desks and inside the panels ─
   await page.setViewportSize({ width: 1600, height: 900 });
@@ -370,7 +417,7 @@ try {
     // section itself (with that section in it), or the desk panel's own list.
     const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score',
       // The screens that were the Sequence and Sound chips', drawn in a panel (`Sheet embed`).
-      songs: 'songs-panel-box', sequences: 'sequencer-panel-box', player: 'sound-panel-box' };
+      songs: 'songs-panel-box', sequences: 'sequencer-panel-box' };
     // Why each one failed, so a red run says which of three things it was:
     // the panel never reached the deck, it did and drew no body, or the body
     // is there and has no height.
@@ -384,9 +431,10 @@ try {
       return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
     }).filter(Boolean), { ids, own: OWN_BODY });
     const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
-    // 35: the eleven desk panels (the Score joined them, PLAN 28h, and Songs,
-    // Sequences and Music & Drone when the tabs became the owner's) and the
-    // twenty-four settings sections. Before those three it was 32, before the Score 31, and it was
+    // 34: the ten desk panels (the Score joined them, PLAN 28h, and Songs and
+    // Sequences when the tabs became the owner's; Music & Drone too, until it
+    // became the top of Sound, PLAN 35c-7) and the twenty-four settings
+    // sections. Before those it was 32, before the Score 31, and it was
     // 33 until Sound Mappings and Heat Slide were folded into Sound and Fluid
     // Physics (2026-10-10; `npm run desklayout` holds that), and a browser
     // listing fewer has lost a panel.
@@ -394,9 +442,9 @@ try {
     const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
     await noteIds();
     check('every panel there is, docked, draws its own body, readable and big enough to use',
-      stageGone && onLoadin && reloaded && ids.length >= 35 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      stageGone && onLoadin && reloaded && ids.length >= 34 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
       [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Setup never came up', !reloaded && 'not on Setup after the reload',
-        ids.length < 35 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+        ids.length < 34 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
         || `${ids.length} panels, ${deck.n} controls`);
     await page.evaluate(() => localStorage.removeItem('chromaglass-desk-tabs'));
     await page.reload({ waitUntil: 'networkidle' });

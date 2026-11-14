@@ -50,9 +50,10 @@ import {
   CHECKOUT_HOME_URL,
   CHECKOUT_PRO_URL,
   buildCheckoutUrl,
+  getActiveLicenseInfo,
 } from '../lib/tierGates';
 import { isDesktopApp } from '../lib/platform';
-import { MAC_SIGN_IN_PARAM, macAppLicensed } from '../lib/macApp';
+import { MAC_SIGN_IN_PARAM, handoffFromUrl, macAppLicensed, waitForAppToTake } from '../lib/macApp';
 
 const ACCOUNTS = Boolean(import.meta.env.VITE_FIREBASE_API_KEY);
 // The variable itself, not ACCOUNTS: only that is folded at build time, so a
@@ -68,6 +69,8 @@ const LazySignInForm = import.meta.env.VITE_FIREBASE_API_KEY
  */
 const firebase = () =>
   import.meta.env.VITE_FIREBASE_API_KEY ? import('../lib/firebaseAuth').catch(() => null) : Promise.resolve(null);
+
+const TIER_LABEL: Record<string, string> = { home: 'Home', pro: 'Pro' };
 
 /** How often the screen asks the app's server whether a key has arrived from the browser. */
 const WATCH_MS = 2_500;
@@ -116,13 +119,35 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opened = useRef(false);
+  // The browser tab the app's window sent a Google or Apple sign-in to, with
+  // the window's one-time code (PLAN.md 23.17f). The person pressed a sign-in
+  // button, so the tab asks for that sign-in even when the Mac already holds a
+  // key: before, it saw the key, said "Your licence is on this Mac now" and
+  // never signed anyone in, while the window waited for good. It does say the
+  // key was found (the owner, 2026-11-10: "perhaps we acknowledge that a
+  // license key was detected?").
+  const [handoff] = useState(() => handoffFromUrl());
+  const handedOver = useRef(false);
+  // Whether the sign-in made here reached the app's window (null until one is made).
+  const [handedToApp, setHandedToApp] = useState<boolean | null>(null);
+  const [keyFound, setKeyFound] = useState<string | null>(null);
+  // Whether the app's window took that sign-in from its server: 'waiting' while
+  // the tab asks, then 'yes' (the tab closes itself) or 'no' (the window was not
+  // watching). The owner, 2026-11-11: after the web sign-in "it should just
+  // close the login window and go back to the app" (PLAN.md 23.17f-3).
+  const [appTook, setAppTook] = useState<'waiting' | 'yes' | 'no' | null>(null);
 
   const open = useCallback(() => {
     if (opened.current) return;
+    if (handoff && !handedOver.current) {
+      setKeyFound(TIER_LABEL[getActiveLicenseInfo().tier] ?? 'ChromaGlass');
+      setStep('signin');
+      return;
+    }
     opened.current = true;
     if (handedOff()) setStep('done');
     else onUnlocked();
-  }, [onUnlocked]);
+  }, [onUnlocked, handoff]);
 
   // The screen stays as it is while it asks again (the buy screen asks every
   // twenty seconds), and its buttons say they are asking.
@@ -132,8 +157,9 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
     const next = await look().catch((): Step => 'offline');
     setAsking(false);
     if (next === 'open') open();
-    else setStep(next);
-  }, [open]);
+    // The browser tab a sign-in was sent to signs in first, whatever it finds.
+    else setStep(handoff && !handedOver.current ? 'signin' : next);
+  }, [open, handoff]);
 
   useEffect(() => {
     void check();
@@ -141,6 +167,20 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
     // sign-out from the buy screen: each is a new answer.
     return onAuthFlagChange(() => { void check(); });
   }, [check]);
+
+  const asked = useRef(false);
+  useEffect(() => {
+    if (step !== 'done' || !handoff || !handedToApp || asked.current) return;
+    asked.current = true;
+    setAppTook('waiting');
+    void waitForAppToTake(handoff.code).then((took) => {
+      setAppTook(took ? 'yes' : 'no');
+      // A tab the system opened (one page in its history, as here: Google's
+      // and Apple's sign-ins are popups) may close itself in Chrome, Firefox
+      // and Safari; where a browser refuses, the line below says it is done.
+      if (took) setTimeout(() => { try { window.close(); } catch { /* the line stays */ } }, 1500);
+    });
+  }, [step, handoff, handedToApp]);
 
   // A sign-in finished in the browser files its key with the app's server,
   // not with this window: ask the server until it has one.
@@ -184,6 +224,13 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
     }
   };
 
+  // Stable, so the form's redirect check does not re-run under it.
+  const onFormSignedIn = useCallback((handed?: boolean) => {
+    handedOver.current = true;
+    setHandedToApp(handed ?? null);
+    void check();
+  }, [check]);
+
   const confirmed = async () => {
     const m = await firebase();
     await m?.refreshAccountVerification().catch(() => false);
@@ -214,7 +261,9 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
         <div className="mb-3 text-center">
           <h1 className="text-lg font-medium tracking-wide text-neutral-100">ChromaGlass</h1>
           <p className="mt-0.5 text-xs text-neutral-400">
-            {step === 'done'
+            {handoff && step === 'signin'
+              ? 'Sign in to the ChromaGlass app on this Mac'
+              : step === 'done'
               ? 'Signed in'
               : step === 'buy'
                 ? 'The app comes with ChromaGlass Home or Pro'
@@ -225,14 +274,32 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
         {step === 'checking' && <p className="py-4 text-center text-xs text-neutral-400">Checking your licence…</p>}
 
         {step === 'done' && (
-          <p data-cg-app-licence-done="" className="text-center text-sm leading-snug text-neutral-200">
-            Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.
+          <p
+            data-cg-app-licence-done={!handoff ? 'licence' : handedToApp ? 'signed-in' : 'browser-only'}
+            data-cg-app-took={handoff && handedToApp ? appTook ?? 'waiting' : undefined}
+            className="text-center text-sm leading-snug text-neutral-200"
+          >
+            {!handoff
+              ? 'Your licence is on this Mac now. Go back to the ChromaGlass app: it opens the show by itself. You can close this tab.'
+              : !handedToApp
+                ? "You're signed in here, and your licence is on this Mac. To sign the app's window in too, use your email and password there, or Continue with Google or Apple again. You can close this tab."
+                : appTook === 'yes'
+                  ? 'Done. The ChromaGlass app is signed in and back in front. This tab closes by itself; if it stays, close it.'
+                  : appTook === 'no'
+                    ? "You're signed in here, but the ChromaGlass app didn't pick it up. Is it still open? Press Continue with Google or Apple in the app again."
+                    : "You're signed in. Handing it to the ChromaGlass app…"}
+          </p>
+        )}
+
+        {step === 'signin' && keyFound && (
+          <p data-cg-app-licence-found={keyFound} className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-center text-xs leading-snug text-emerald-100">
+            Your {keyFound} licence is already on this Mac. Sign in to bring your account to the app too: your saved looks and running shows.
           </p>
         )}
 
         {step === 'signin' && LazySignInForm && (
           <Suspense fallback={<p className="py-4 text-center text-xs text-neutral-400">Loading…</p>}>
-            <LazySignInForm onSignedIn={() => { void check(); }} />
+            <LazySignInForm onSignedIn={onFormSignedIn} />
           </Suspense>
         )}
 
@@ -303,7 +370,7 @@ export const AppLicenceGate: React.FC<{ onUnlocked: () => void }> = ({ onUnlocke
           </p>
         )}
 
-        {step !== 'done' && step !== 'checking' && (
+        {step !== 'done' && step !== 'checking' && !keyFound && (
           <div className="mt-3">
             {!keyOpen ? (
               <button type="button" onClick={() => setKeyOpen(true)} className="w-full text-center text-[11px] text-neutral-400 underline-offset-2 hover:underline">

@@ -125,8 +125,17 @@ try {
       // Roy's comic print (Ben-Day Dots) decides ink or paper for every pixel
       // of the finished picture, by design: any change in the picture under it
       // flips some, grain or not, so it is the plate under the print that is
-      // asked here. The print's own edges are benday's (and PLAN 1f).
-      const under = (Lk.settings.benDay ?? 0) > 0 ? { benDay: 0 } : {};
+      // asked here. The print's own edges are benday's (and PLAN 1f). The
+      // moiré pack's sheets (PLAN 45a) likewise: two printed films on the
+      // lamp's side of the glass, multiplying the light after the dye has
+      // drawn, grain and all, so the grain under them is the grain without
+      // them. Left on, their lines are every edge on the plate (Moiré Ripple
+      // on 2026-11-07: 36254 edge pixels and 13671 body, under the 3% floor),
+      // and the edges asked about would be the sheets' and not the dye's.
+      const under = {
+        ...((Lk.settings.benDay ?? 0) > 0 ? { benDay: 0 } : {}),
+        ...((Lk.settings.moireAmount ?? 0) > 0 ? { moireAmount: 0 } : {}),
+      };
       // The back plate alone: two plates, the front's level at 0 (the mixer
       // fades it to the bare lamp, so the back plate filters the lamp itself),
       // and no satellite droplets, which still read the front plate's dye.
@@ -179,7 +188,7 @@ try {
       }
       if (e < 0.03 * P || b < 0.03 * P) throw new Error(`${id}: ${e} edge and ${b} body pixels: too few to measure`);
       const f = (v, k = 2) => +v.toFixed(k);
-      return { id: `${id}${under.benDay === 0 ? ' (under its print)' : ''}${back ? ' (back plate)' : ''}`, back, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3), dense: f(100 * dn / P, 1), logTex: f(Math.sqrt(dT / Math.max(1, dn)), 4), lone: f(100 * lone / e) };
+      return { id: `${id}${under.benDay === 0 ? ' (under its print)' : ''}${under.moireAmount === 0 ? ' (under its sheets)' : ''}${back ? ' (back plate)' : ''}`, back, g0, eff: f(eff), edge: f(100 * e / P, 1), body: f(100 * b / P, 1), flecks: f(100 * eF / e), edgeMove: f(eD / e), texture: f(Math.sqrt(bT / b), 3), texture2: f(Math.sqrt(bT2 / b), 3), dense: f(100 * dn / P, 1), logTex: f(Math.sqrt(dT / Math.max(1, dn)), 4), lone: f(100 * lone / e) };
     }, { id, SIZE, FLECK, back });
     rows.push(row);
     console.log(`  ${row.id.padEnd(20)} grain ${row.eff}  edges ${row.edge}%  body ${row.body}%  flecks ${row.flecks}%  edge moved ${row.edgeMove}  body texture ${row.texture} (x2 grain: ${row.texture2})  dense ${row.dense}% log texture ${row.logTex}  lone flecks ${row.lone}%`);

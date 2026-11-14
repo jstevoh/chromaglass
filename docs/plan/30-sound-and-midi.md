@@ -27,10 +27,10 @@ check written first and built by Antigravity. None moves the whole frame by defa
 (the owner's rule), and every reading is a fast one (the owner's rule for sound patches).
 
 1. ~~**30a**, below: shape each sound cord.~~ (Shipped; `npm run soundcords`.)
-2. **14t-pc**: Program Change picks a look or a set-list item.
-3. **24.3**, moved up: notes as voices, with an envelope per note and notes as a source.
+2. ~~**14t-pc**: Program Change picks a look or a set-list item.~~ (Shipped; `npm run soundowed`.)
+3. ~~**24.3**, moved up: notes as voices, with an envelope per note and notes as a source.~~ (Shipped; `npm run soundowed`.)
 4. **13.5-link** before **13.5-osc**: Link first.
-5. **30b**, below: LFOs and envelopes you set.
+5. ~~**30b**, below: LFOs and envelopes you set.~~ (Shipped; `npm run soundowed`, `30b-loop` open.)
 6. **13.4-ipad**: playing from an iPad in AUM, written up and tried once.
 7. **13.7-ipad**, later: an AUv3 bridge for iPad hosts.
 
@@ -91,25 +91,11 @@ Shipped (`npm run soundcords`, 34/34 lines in `scripts/checks.json`). Story in
   run on 2026-10-30 read 194 at 0.8 against 331 at 0 (bar 200), so the warm-up was not the cause;
   the quarter is, and the line stays red about half the time until it is found.
 
-## 30b. The LFOs and envelopes are fixed
+## ~~30b. The LFOs and envelopes are fixed~~ (shipped 2026-11-08)
 
-`modulators.ts` has four LFOs locked to bars and two envelopes, all fixed: an eight-bar
-and a two-bar sine, a one-bar triangle, a stepped LFO every beat, a snap and a swell,
-and a MIDI note fires both envelopes. A fixed eight-bar sine fits some songs and fights
-others. Let each LFO pick its rate in bars (a quarter to sixteen) and its shape (sine,
-triangle, ramp, stepped), and each envelope its attack and decay and what fires it (the
-kick, the snare, a note channel, a pad, or anything, as today). Today's rates and shapes
-are the defaults, so a look saved before keeps its motion; an LFO aimed at a setting
-that moves the frame stays off by default as every frame-moving source is. On the phone,
-rate and shape on the patch view. *Measure:* `npm run shapes` with each rate and shape
-set: the period within a frame of its bars at 120 and at 90 bpm, and an envelope fired
-by the kick on a recorded loop once per kick.
-*Added from VS 2 (2026-10-24).* Two shapes VS has and this lacks: a smoothed random (a new
-random target each period, glided to rather than stepped) beside the stepped one; and an
-LFO that restarts its cycle on a trigger (a note on a channel, the kick, a pad), so a
-sweep begins with the phrase rather than wherever the bar clock left it. The measure adds
-the smoothed random's slope bounded (no step larger than a frame's share of its range)
-and a restart landing within a frame of each kick on the recorded loop.
+Shipped (`npm run soundowed`, id `lfo` taken out of `--owed` in `scripts/checks.json`; `npm run shapes` 15/15). Story in `docs/plan-shipped.md` §30b.
+
+- **30b-loop. A recorded song's onsets driving `Modulators.trigger`.** In `soundowed.mjs` the drum loop is written out; the ear's kick and snare onsets call `trigger('kick')` and `trigger('snare')` in `Modulators.step`, and a check line feeding a recorded song's analysed onsets through the ear to `trigger` remains open here.
 
 **Not copied.** A shader editor and imports from Shadertoy, ISF or GLSL Sandbox: the
 plate is a simulated liquid, not a stack of shaders (the owner's rule to model the real

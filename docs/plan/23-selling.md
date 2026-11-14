@@ -220,7 +220,7 @@ once the login works (23.14).*
   the next one in the cloud, before the Mac job.
   **23.18-exit** (open): a Mac app quit straight after an edit sends it the next time it opens
   (no send on `pagehide`); a `keepalive` push of the waiting records under 64 KB would close it.
-- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (`APPLE_SIGN_IN` in `SignInScreen.tsx`; `npm run signin` line 4). Story in `docs/plan-shipped.md` §23.10d (moved 2026-10-29, 19m-2).
+- **23.10d** (**shipped**, #460): Sign in with Apple is not offered (`APPLE_SIGN_IN` in `SignInScreen.tsx`; `npm run signin` line 4). Story in `docs/plan-shipped.md` §23.10d (moved 2026-10-29, 19m-2). Undone by 23.15 (2026-11-08): Apple is offered again.
 - **23.10e** (**shipped**, this PR): email and password accounts beside Google and the emailed link (`SignInForm`, `AccountSignInMethods.tsx`; `npm run signin` 17–21), live since the 2026-10-25 deploy. Story in `docs/plan-shipped.md` §23.10e (moved 2026-10-29, 19m-2).
   *Owed by the owner:* the one hand-try the emulator cannot do (Google account,
   Account, Set a password, sign out, sign in with the password, same licence;
@@ -235,7 +235,7 @@ once the login works (23.14).*
   password-strength setting) is not turned on; the form asks for 8 characters, Firebase's own
   floor is 6. **23.10e-4** (open): the iPhone app's sign-in (23.15) needs the same form and the
   keychain's autofill hints.
-  **23.10e-5** (open, from #475's review): `pendingProviderCredential` (Google's credential kept
+  **23.10e-5** (**shipped** with 23.15): the kept credential now carries the email it was refused for and is attached only to a sign-in of that address. Was: `pendingProviderCredential` (Google's credential kept
   when Firebase refuses a Google sign-in because the email has a password) is attached on the
   next password sign-in for *any* email. Firebase refuses to link it to another account today
   (`email-already-in-use`, swallowed), so it is safe by the platform and not by this code; store

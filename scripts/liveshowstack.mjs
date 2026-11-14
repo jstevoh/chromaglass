@@ -109,18 +109,128 @@ function partsOf(f) {
 }
 
 /**
- * Where the bar is: the column of the bar's third (row 7) whose cell is
- * whitest, among 2 to 13. Null when no cell there is near white.
+ * Row 7 of the 16 x 9 grid (the bar's third) on film frame `i`, as the grid
+ * reads it: each cell the half's colour mixed with the bar's white by how
+ * much of the cell the bar covers. For `barMovesProof`, so it reads made-up
+ * frames through the same `barColumnOfRow` the real line reads decoded ones.
  */
-export function barColumn(f) {
-  if (!f?.grid) return null;
-  const p = partsOf(f);
+export function filmRow(i) {
+  const cw = W / 16, x0 = barX(i), row = [];
+  for (let x = 0; x < 16; x++) {
+    const c = Math.max(0, Math.min(x0 + cw, (x + 1) * cw) - Math.max(x0, x * cw)) / cw;
+    const base = x < 8 ? FILM_LEFT : FILM_RIGHT;
+    row.push(base.map((v, k) => v * (1 - c) + BAR[k] * c));
+  }
+  return row;
+}
+
+/**
+ * Where the bar is in one row of 16 cells (row 7, the bar's third): the
+ * column whose cell is whitest, among 2 to 13. Null when no cell there is
+ * near white.
+ */
+export function barColumnOfRow(row) {
   let best = null, most = 0;
   for (let x = 2; x <= 13; x++) {
-    const c = p.at(x, 7), w = Math.min(...c);
+    const w = Math.min(...row[x]);
     if (w > most) { most = w; best = x; }
   }
   return most > 100 ? best : null;
+}
+
+/**
+ * Whether a stream's bar moves with the film, from where it sat on every
+ * frame decoded (`trail`: `{ ms, col }` in decode order, `col` null where no
+ * bar was found).
+ *
+ * Why every frame and not the first and the last (PLAN.md 37x-4d-7): the bar
+ * loops, so two frames a whole number of loops apart read the same column
+ * on a stream that is moving. Red once that way on the Mac (moiré pack PR,
+ * fifth shard: "bar at column 6 then 6, 2.45 s apart", green on the re-run).
+ * The loop is 45 frames of the fake camera's, and the camera's pace is
+ * Chromium's, not the packets' clock, so no span can be chosen that is never
+ * a whole number of loops. A frozen stream instead shows the bar in one
+ * column on every frame. Three things are asked, each for a reason the
+ * review found (2026-11-09):
+ *  - a second or more between the first frame with the bar and the last;
+ *  - the bar in two or more columns in each half of that span, since two
+ *    anywhere would pass a stream that moved for a moment after Go live and
+ *    then sent one frame for ever, the fault this line is for (a stream that
+ *    froze in its second half can still pass: the halves catch a freeze
+ *    before the middle);
+ *  - two or more columns of travel forward, with the film, summed over its
+ *    steps from column to column (each step taken round the loop's twelve
+ *    columns the short way, so the loop's return from 13 to 2 is one
+ *    forward): a still frame whose bar sits across two cells can read the
+ *    one, then the other, as the encoder's noise changes, and that flicker
+ *    goes back as often as forward, so it sums to one column at most. A
+ *    moving stream's flicker as the bar crosses a cell edge cancels the
+ *    same way and leaves the film's travel.
+ * At the slowest rate a moving stream has been met at (about five frames a
+ * second, GitHub's Mac VM's canvas readback) the bar goes on a column and a
+ * half a frame, so half of a second-long span holds two or three frames in
+ * two or more columns.
+ */
+export function barMoves(trail, minSpanMs = 1000) {
+  const seen = trail.filter(t => t.col !== null);
+  const missing = trail.length - seen.length;
+  if (seen.length < 2) return { ok: false, detail: `the bar was found on ${seen.length} of ${trail.length} frames decoded` };
+  const t0 = seen[0].ms, span = seen[seen.length - 1].ms - t0, mid = t0 + span / 2;
+  const columns = (part) => new Set(part.map(t => t.col)).size;
+  const early = columns(seen.filter(t => t.ms < mid)), late = columns(seen.filter(t => t.ms >= mid));
+  const runs = [];
+  for (const t of seen) if (runs[runs.length - 1] !== t.col) runs.push(t.col);
+  let travel = 0;
+  for (let i = 1; i < runs.length; i++) travel += ((runs[i] - runs[i - 1] + 12 + 5) % 12) - 5;
+  const path = runs.length > 24 ? `${runs.slice(0, 24).join(' ')} …` : runs.join(' ');
+  const ok = span >= minSpanMs && early >= 2 && late >= 2 && travel >= 2;
+  return {
+    ok,
+    detail: `bar in ${early} column${early === 1 ? '' : 's'} in the first half and ${late} in the second, ${travel} column${Math.abs(travel) === 1 ? '' : 's'} of travel,`
+      + ` ${seen.length} frames over ${(span / 1000).toFixed(2)} s${missing ? ` (${missing} more with no bar)` : ''}; columns ${path}`,
+  };
+}
+
+/**
+ * The judgement above against streams made up from the film, so the cloud
+ * (where the real line is skipped) proves it tells moving from frozen, each
+ * frame's column read from `filmRow` by `barColumnOfRow` as the real line
+ * reads it. For camera paces of 10 to 60 frames a second, stream rates of 5
+ * and 30, spans of 1 to 4 s and three starting frames, every moving stream
+ * passes, and red are: a frozen one, one that froze a third in, one 0.9 s
+ * long, one with no bar on any frame, and a frozen one whose bar flickers
+ * between the two cells it straddles. `aliased` counts the moving streams
+ * the old first-against-last rule read as still, so the cases include the
+ * one met on the Mac.
+ */
+export function barMovesProof() {
+  const colOf = (f) => barColumnOfRow(filmRow(f));
+  const trail = (camFps, streamFps, spanS, phase, frozeAt = Infinity) => {
+    const out = [];
+    for (let k = 0; k * (1000 / streamFps) <= spanS * 1000 + 1e-6; k++) {
+      const ms = k * (1000 / streamFps), held = Math.min(ms, frozeAt * 1000);
+      out.push({ ms, col: colOf(Math.floor((held / 1000) * camFps + phase)) });
+    }
+    return out;
+  };
+  const wrong = [];
+  let cases = 0, aliased = 0;
+  for (let cam = 10; cam <= 60; cam += 0.5) for (const fps of [5, 30]) for (let span = 1; span <= 4; span += 0.05) for (const phase of [0, 16, 40]) {
+    cases++;
+    const at = `camera ${cam} fps, stream ${fps}, ${span.toFixed(2)} s, from film frame ${phase}`;
+    const t = trail(cam, fps, span, phase);
+    if (!barMoves(t).ok) wrong.push(`moving: ${at}`);
+    if (t[0].col === t[t.length - 1].col) aliased++;
+    if (barMoves(trail(cam, fps, span, phase, 0)).ok) wrong.push(`frozen: ${at}`);
+    if (barMoves(trail(cam, fps, span, phase, span / 3)).ok) wrong.push(`froze a third in: ${at}`);
+    if (barMoves(trail(cam, fps, span, phase).map(p => ({ ...p, col: null }))).ok) wrong.push(`no bar: ${at}`);
+    if (barMoves(trail(cam, fps, span, phase, 0).map((p, k) => ({ ...p, col: p.col + (k % 3 === 1 ? 1 : 0) }))).ok) wrong.push(`frozen, flickering: ${at}`);
+  }
+  for (let cam = 10; cam <= 60; cam += 5) for (const fps of [5, 30]) {
+    cases++;
+    if (barMoves(trail(cam, fps, 0.9, 0)).ok) wrong.push(`moving, 0.9 s: camera ${cam} fps, stream ${fps}`);
+  }
+  return { ok: wrong.length === 0 && aliased > 0, cases, aliased, wrong };
 }
 
 /**

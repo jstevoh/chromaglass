@@ -21,6 +21,7 @@ import { identify, manualIdentity, fingerprintingAvailable, capturePcm } from '.
 import { addToIndex, matchSnippet, FingerprintIndex, TrackFingerprint } from '../lib/localFingerprint';
 import { loadFingerprintIndex } from '../lib/fingerprintIndexBuild';
 import { ListenRecorder, generateSongMap, sectionAt, energyAt } from '../lib/songMap';
+import { songSecAt } from '../lib/songMapLead';
 import { SongPosition, nudgeFor, type NudgeKind } from '../lib/songScore';
 import { FollowedPlace, readSection } from '../lib/followedPlace';
 import { buildLyrics, LyricsResult, lineAt, sectionSentiment } from '../lib/lyrics';
@@ -82,6 +83,8 @@ export interface MusicIntelState {
   line: LyricLine | null;
   sectionSentimentValue: number;
   identifying: boolean;
+  /** The map the last first listen made, kept after its song ends (the track and its map are forgotten then): what Listen designs from (`lib/songDesign.ts`). */
+  heardMap: SongMap | null;
   recording: boolean;
   analyzing: boolean;
   fingerprintEnabled: boolean;
@@ -119,6 +122,8 @@ export interface MusicIntelResult {
   stopPerformanceReplay: () => void;
   deletePerformance: (id: string) => void;
   manualTag: (artist: string, title: string) => void;
+  /** Try to name the song now rather than on the next turn of the song ID (Listen, `lib/songDesign.ts`). */
+  listenNow: () => void;
   clearTrack: () => void;
   replayListen: (listenNumber: number) => void;
   stopReplay: () => void;
@@ -132,6 +137,12 @@ export interface MusicIntelResult {
   nudgeToSection: (kind: NudgeKind) => void;
   /** Take the nudge back out: the position is the clock's own again. */
   resetNudge: () => void;
+  /**
+   * Where the song is this instant, read from the clock (or the follower's
+   * place) when called: `state.positionSec` is set twice a second, so a cue
+   * read from it lands up to half a second after its section starts.
+   */
+  positionNow: () => number;
 }
 
 export function useMusicIntelligence(
@@ -154,6 +165,7 @@ export function useMusicIntelligence(
   const [follow, setFollow] = useState<MusicIntelState['follow']>(null);
   const [identifying, setIdentifying] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [heardMap, setHeardMap] = useState<SongMap | null>(null);
   const [recordingActive, setRecordingActive] = useState(false);
   const [replayListenNumber, setReplayListenNumber] = useState<number | null>(null);
   const [allTracks, setAllTracks] = useState<TrackEvolutionState[]>([]);
@@ -174,6 +186,8 @@ export function useMusicIntelligence(
   const audioRef = useRef<AudioData | null>(null);
   const lastLoudMsRef = useRef(performance.now());
   const listenStartMsRef = useRef(0);
+  // When the first listen's recorder really started: after the awaits in adoptTrack, so a little after listenStartMsRef.
+  const recordStartMsRef = useRef<number | null>(null);
   const lastIdentifyMsRef = useRef(-Infinity); // first attempt fires as soon as sound is present
   const lastPosRef = useRef(0);
   /** Where the show reads the map (lib/followedPlace.ts); null while no track has been identified. */
@@ -323,6 +337,7 @@ export function useMusicIntelligence(
     // First listen of this track: record it for offline analysis
     if (!cached && streamForRecording) {
       const ok = recorderRef.current.start(streamForRecording);
+      recordStartMsRef.current = ok ? performance.now() : null;
       setRecordingActive(ok);
     }
 
@@ -348,9 +363,17 @@ export function useMusicIntelligence(
     // Generate + cache the song map from the first-listen recording
     if (recording && !songMapRef.current && listenMs > MIN_LISTEN_MS) {
       setAnalyzing(true);
+      // The recording began seconds into the song (PLAN 28h-9): its first
+      // sample is the song second the clock read then, by the newest anchor
+      // the track has now. The trim was counted from the listen's start.
+      const recStart = recordStartMsRef.current ?? listenStartMsRef.current;
+      const trim = trimToSec == null ? undefined : trimToSec - (recStart - listenStartMsRef.current) / 1000;
       const generated = await generateSongMap(currentTrack.isrc, recording, {
         title: currentTrack.title, artist: currentTrack.artist,
-      }, trimToSec);
+      }, trim, songSecAt(currentTrack, recStart));
+      // Before the awaits below, in the same render as the analysis ending:
+      // Listen reads "analysis over and no map" as a song heard too short.
+      if (generated) setHeardMap(generated.map);
       setAnalyzing(false);
       if (generated) {
         const { map, fingerprint } = generated;
@@ -598,6 +621,7 @@ export function useMusicIntelligence(
   }, [adoptTrack, finalizeListen, stream]);
 
   const clearTrack = useCallback(() => { finalizeListen('manual'); }, [finalizeListen]);
+  const listenNow = useCallback(() => { lastIdentifyMsRef.current = -Infinity; lastLocalMatchMsRef.current = -Infinity; }, []);
 
   /*
     A nudge is a seek, not playback: what lies between the old position and
@@ -644,6 +668,24 @@ export function useMusicIntelligence(
     if (d !== null) seekBy(d);
   }, [seekBy]);
   const resetNudge = useCallback(() => seekBy(-posClockRef.current.nudge), [seekBy]);
+  /*
+    The song's position as the clock reads it now (PLAN 44f). The tick above
+    sets `positionSec` every 500 ms, which is plenty for the score's
+    playhead and the lyrics, and was the song show's clock too: a pour on the
+    drop fired up to half a second after the drop, a whole beat at 120. The
+    show's runtime calls this on its own tick instead. Same reading as the
+    tick's (the follower's place for the song it holds, else the clock), and
+    the last position set when there is no clock to read.
+  */
+  const positionSecRef = useRef(positionSec);
+  positionSecRef.current = positionSec;
+  const positionNow = useCallback((): number => {
+    const track = trackRef.current;
+    if (track?.identifiedAtMs == null) return positionSecRef.current;
+    const now = performance.now();
+    const held = placeRef.current;
+    return held && held.isrc === track.isrc ? held.place.at(now / 1000).positionSec : posClockRef.current.at(track, now) ?? 0;
+  }, []);
 
   const replayListenNumberRef = useRef<number | null>(null);
   useEffect(() => { replayListenNumberRef.current = replayListenNumber; }, [replayListenNumber]);
@@ -750,12 +792,12 @@ export function useMusicIntelligence(
   return {
     state: {
       track, songMap, lyrics, trackState, positionSec, nudgeSec, follow, section, line,
-      sectionSentimentValue, identifying, recording: recordingActive, analyzing,
+      sectionSentimentValue, identifying, heardMap, recording: recordingActive, analyzing,
       fingerprintEnabled: fingerprintingAvailable(), replayListenNumber, allTracks,
     },
     overrides, harmonyIndex, trigger, presetPick, gestureFire, performance: performanceState,
     recordGesture, startPerformance, stopPerformance, replayPerformance, stopPerformanceReplay, deletePerformance,
-    manualTag, clearTrack, replayListen, stopReplay, refreshTracks,
-    nudgePosition, nudgeToSection, resetNudge,
+    manualTag, listenNow, clearTrack, replayListen, stopReplay, refreshTracks,
+    nudgePosition, nudgeToSection, resetNudge, positionNow,
   };
 }

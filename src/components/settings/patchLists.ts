@@ -1,7 +1,8 @@
 import { SceneFeature, PatchSource, AudioFeature } from '../../types';
-import { MODULATOR_FEATURES, MODULATOR_LABELS } from '../../lib/modulators';
+import { MODULATOR_FEATURES, modulatorLabel, type ModulatorSettingsSlice } from '../../lib/modulators';
 import { SOURCE_NAMES } from '../../lib/audioFeatures';
 import { HIT_FEATURES, HIT_FEATURE_LABELS } from '../../lib/hitSource';
+import { NOTE_FEATURES, NOTE_FEATURE_LABELS } from '../../lib/noteVoices';
 import { MUSIC_SOURCE_LABELS } from '../../lib/midi';
 import { PATCH_TARGETS } from '../../lib/sceneMap';
 import { SETTINGS_SECTIONS } from '../../lib/settingsMap';
@@ -49,6 +50,8 @@ export const PATCH_SOURCES: [PatchSource, string][] = [
   // And its hits and its note (`lib/hitSource.ts`): how hard each drum's
   // last hit was, falling over a quarter second. Same microphone, same master.
   ['hits', 'Hits'],
+  // MIDI notes as voices (`lib/noteVoices.ts`): velocity, pitch and held.
+  ['notes', 'Notes'],
   // The odd one out, and last for that reason: the other three report what is
   // happening in the room, and this one is a shape you asked for.
   ['shape', 'Shapes'],
@@ -62,11 +65,12 @@ export const PATCH_SOURCES: [PatchSource, string][] = [
  * them has to change the list — "how many people" is not something a microphone
  * can tell you.
  */
-export const featuresFor = (source: PatchSource): [string, string][] =>
+export const featuresFor = (source: PatchSource, settings?: ModulatorSettingsSlice): [string, string][] =>
   source === 'sound' ? AUDIO_FEATURES
     : source === 'bands' ? SOURCE_NAMES.map(f => [f, MUSIC_SOURCE_LABELS[f]] as [string, string])
     : source === 'hits' ? HIT_FEATURES.map(f => [f, HIT_FEATURE_LABELS[f]] as [string, string])
-    : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, MODULATOR_LABELS[f]] as [string, string])
+    : source === 'notes' ? NOTE_FEATURES.map(f => [f, NOTE_FEATURE_LABELS[f]] as [string, string])
+    : source === 'shape' ? MODULATOR_FEATURES.map(f => [f, modulatorLabel(f, settings)] as [string, string])
     : SCENE_FEATURES;
 
 /**

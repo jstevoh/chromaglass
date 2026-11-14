@@ -99,6 +99,26 @@ import { thinWarmKernels } from './thinWarm';
 /** The least share of its mobility a cell part air keeps (standingLiquid in hsPrep, PLAN 15g-8d). */
 const AIR_RIM_LEAST = 0.05;
 
+/*
+  Whether a cell of the oil lift's grid (m on a side) is where Ψ is solved:
+  inside the rim by three of its cells. The flow is ∇⊥ψ by central
+  differences, and the flux through a face between two cells is the
+  difference of ψ across the face's two ends, the cells either side of
+  it; with ψ = 0 on every cell near the rim no face of it carries any of
+  the lift. Held at the rim's own cells, the cells just inside it still had
+  ψ, and a lens rocked into the rim lost 7% of its oil through it in three
+  seconds at 6° (lab, at a hundredth of the looks' Oil Tension, so the
+  surface tension's own drain, PLAN 18g-6 then, was out of it); two cells in, it
+  lost 2.3% in six; three, 0.9%, of which the same lens left level there
+  loses 0.2%. The lens stops three cells short of the rim, 3 mm on a 192
+  plate, a meniscus's width.
+*/
+export const LIFT_GRID = /* wgsl */ `
+fn liftIn(q: vec2i, m: i32) -> bool {
+  return q.x >= 0 && q.y >= 0 && q.x < m && q.y < m && length((vec2f(q) + 0.5) / f32(m) - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)} - 3.0 / f32(m);
+}
+`;
+
 export function thinGapKernels(HEAD: string, W: string, NOISE: string): Record<string, string> {
   /*
     Shared by every kernel below: where a cell sits in the packed level-0
@@ -152,25 +172,6 @@ fn hsRowSums(x: i32, y: i32, n: i32) -> vec2f {
 }
 `;
 
-  /*
-    Whether a cell of the oil lift's grid (m on a side) is where Ψ is solved:
-    inside the rim by three of its cells. The flow is ∇⊥ψ by central
-    differences, and the flux through a face between two cells is the
-    difference of ψ across the face's two ends, the cells either side of
-    it; with ψ = 0 on every cell near the rim no face of it carries any of
-    the lift. Held at the rim's own cells, the cells just inside it still had
-    ψ, and a lens rocked into the rim lost 7% of its oil through it in three
-    seconds at 6° (lab, at a hundredth of the looks' Oil Tension, so the
-    surface tension's own drain, PLAN 18g-6 then, was out of it); two cells in, it
-    lost 2.3% in six; three, 0.9%, of which the same lens left level there
-    loses 0.2%. The lens stops three cells short of the rim, 3 mm on a 192
-    plate, a meniscus's width.
-  */
-  const LIFT_GRID = /* wgsl */ `
-fn liftIn(q: vec2i, m: i32) -> bool {
-  return q.x >= 0 && q.y >= 0 && q.x < m && q.y < m && length((vec2f(q) + 0.5) / f32(m) - vec2f(0.5)) < ${OPEN_RIM.toFixed(2)} - 3.0 / f32(m);
-}
-`;
 
   /*
     The water's share of a cell's colour, for the colour's weight on a
@@ -639,7 +640,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   */
   let tempVisc = exp(-0.02 * clamp(uf.z, 0.0, 50.0));
   let kdt = A.a.x / (hw * hw) * A.a.y * pow(max(A.b.x, 1e-6), share) * poured * filmDrag * tempVisc;
-  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (A.a.z * A.a.z) * A.a.y) + A.b.zw * kdt;
+  var ustar = u0 + ((um - u0) * A.b.y + (uf.xy - um)) * (A.a.x / (S.cover * S.cover) * A.a.y) + A.b.zw * kdt;
   /*
     A hand in the liquid (PLAN 15b, 18a-3): a solid moving through the
     layer, and the liquid it touches moves with it. Brinkman's penalised

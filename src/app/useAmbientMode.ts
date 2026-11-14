@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { isGlobalAmbientMode, setGlobalAmbientMode, onAmbientModeChange } from '../lib/ambient';
+import { publishAmbient, setAmbientDoor } from './deskNow';
 
 /**
  * Ambient TV mode's switch (PLAN 23.8, 14j): the governor's quieter rungs for
@@ -29,6 +30,10 @@ export function useAmbientMode() {
       unsubNative?.();
     };
   }, []);
+
+  // The owner's assistant switches it through the same call as the switch and the Mac menu (PLAN 44k-16, app/deskNow.ts).
+  useEffect(() => { publishAmbient(ambientMode); }, [ambientMode]);
+  useEffect(() => { setAmbientDoor(setAmbientMode); return () => setAmbientDoor(null); }, [setAmbientMode]);
 
   return {
     ambientMode, setAmbientMode, setAmbientModeRef,

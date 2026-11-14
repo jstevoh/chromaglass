@@ -17,7 +17,7 @@ Frames from the app itself. They were made on a machine drawing in software, so 
 
 - **A real fluid, not a video.** Navier-Stokes flow on the GPU (WebGPU compute shaders) with squeeze-film flow, buoyancy, immiscible liquids, bubbles, ferrofluid and magnets.
 - **It listens.** Microphone, system audio or a music file drive the plate. A beat clock settles on the tempo and fires ahead of the sound; the room's own noise floor is learned.
-- **You perform it.** A Perform desk for the night, a Design desk to build looks, a sequencer that scripts a song or a set, and presets from Classic Light Show to macro closeups.
+- **You perform it.** A Perform desk for the night, a Design desk to build looks, a sequencer that scripts a song or a set, song titles poured onto the plate as ink (from the phone too), and presets from Classic Light Show to macro closeups.
 - **It plugs into a rig.** MIDI and game controllers, OSC, Art-Net, MIDI timecode, a phone or tablet as a remote, a second display or a projector with corner pin and masks.
 - **It records.** The plate, with the music muxed in, to a video file.
 

@@ -3,12 +3,14 @@ import { isUserPresetId, type UserPreset } from '../lib/userPresets';
 import { PRESET_CONTRACTS } from '../presetPlate';
 import { livePresetId } from '../presets';
 import { PALETTE_RGB } from '../constants';
-import { useCallback, useEffect, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import type { SoundBinding, MidiAction, MidiMap } from '../lib/midi';
 import { runTrigger } from '../lib/soundLearn';
 import { useGamepad } from '../hooks/useGamepad';
 import { laidColour } from '../lib/liquidColour';
 import { useProjector } from '../hooks/useProjector';
+import { midiDoorOf, publishMidi, setMidiDoor } from './outputsNow';
+import { publishCast, setCastDoor } from './projectorNow';
 import type { SettingRide } from '../lib/ride';
 import type { VisualizerSettings, LiquidType } from '../types';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
@@ -29,6 +31,7 @@ interface ControllersDeps {
   rideSetting: (key: keyof VisualizerSettings, value: number) => void;
   runAction: (a: MidiAction) => void;
   cuePreset: (presetId: string) => void;
+  playSetItem?: (index: number) => void;
   selectDye: (paletteIndex: number) => void;
   wallRef: RefObject<LiquidVisualizerHandle | null>;
   activePresetId: string | null;
@@ -53,14 +56,15 @@ interface ControllersDeps {
   setActiveLayer: Dispatch<SetStateAction<number>>;
   stageLayers: number;
   startCast: (mode?: "window" | "device", screen?: ScreenLike | null | undefined) => Promise<void>;
+  stopCast: () => void;
   isCasting: boolean;
 }
 
 export function useControllers({
-  ride, settingsRef, rideSetting, runAction, cuePreset, selectDye, wallRef, activePresetId,
+  ride, settingsRef, rideSetting, runAction, cuePreset, playSetItem, selectDye, wallRef, activePresetId,
   selectedDyeIndex, userPresetsRef, isActive, isAutomated, settings, overlaysVisible, sequencer,
   blackout, recorder, musicIntel, allPresetIds, tempoRef, timecodeRef, midiRef, colourDye,
-  visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, isCasting,
+  visualizerRef, activeLayer, selectedLiquid, setActiveLayer, stageLayers, startCast, stopCast, isCasting,
 }: ControllersDeps) {
   const midi = useMidi(
     {
@@ -68,9 +72,11 @@ export function useControllers({
       setSetting: rideSetting,
       action: runAction,
       applyPreset: cuePreset,
+      playSetItem,
       selectDye,
       // Every note plays the envelopes, whatever else that pad is for.
-      noteStruck: (velocity) => wallRef.current?.fireEnvelopes?.(velocity),
+      noteStruck: (velocity, source) => wallRef.current?.fireEnvelopes?.(velocity, source),
+      noteVoice: (e, target) => (visualizerRef.current ?? wallRef.current)?.noteVoice?.(e, target),
     },
     {
       activePresetId,
@@ -103,6 +109,16 @@ export function useControllers({
   );
   midiRef.current = midi as unknown as typeof midiRef.current;
   /*
+    MIDI for the owner's assistant (PLAN 44k-14, app/outputsNow.ts): read as
+    the MIDI panel shows it, and switched through the panel's own calls.
+  */
+  const midiNow = useRef(midi);
+  midiNow.current = midi;
+  useEffect(() => {
+    publishMidi({ supported: midi.supported, enabled: midi.enabled, open: midi.open, error: midi.error, inputs: midi.inputs, outputs: midi.outputs, ports: midi.ports, clocked: midi.clocked, map: midi.map });
+  }, [midi.supported, midi.enabled, midi.open, midi.error, midi.inputs, midi.outputs, midi.ports, midi.clocked, midi.map]);
+  useEffect(() => { setMidiDoor(midiDoorOf(() => midiNow.current)); return () => setMidiDoor(null); }, []);
+  /*
     A trigger the music fired (sound learn, PLAN §5): the same action and
     preset doors a pad goes through, so a kick on Next Preset and a pad on
     Next Preset cannot come to mean different things. The dye is the one
@@ -111,7 +127,7 @@ export function useControllers({
     action a beat must not press, the last door before the show.
   */
   const runSoundTrigger = (b: SoundBinding) => {
-    runTrigger(b, { action: runAction, preset: cuePreset, dye: colourDye });
+    runTrigger(b, { action: runAction, preset: cuePreset, setlist: playSetItem, dye: colourDye });
   };
   const gamepad = useGamepad({
     gesture: (tool, x, y, amount, dx, dy) => visualizerRef.current?.applyGesture({ tool, x, y, amount, dx, dy, layer: activeLayer, ...(tool === 'drop' ? laidColour(selectedLiquid) : {}) }),
@@ -132,6 +148,26 @@ export function useControllers({
     send: (screen) => { void startCast('window', screen); },
     casting: isCasting,
   });
+  /*
+    The owner's assistant opens and closes the show's window, and sets the
+    mode, through the calls the chip and Send to wall make (PLAN 44k-15,
+    app/projectorNow.ts). Opened on the screen the chip offers, so the show
+    lands where a click on it would put it; with no second screen found, a
+    window, as the menu's Send to wall opens.
+  */
+  useEffect(() => {
+    publishCast({ screen: projector.projector?.label ?? null, permission: projector.permission, mode: projector.mode, casting: isCasting });
+  }, [projector.projector, projector.permission, projector.mode, isCasting]);
+  const castRef = useRef({ startCast, stopCast, screen: projector.projector, setMode: projector.setMode });
+  castRef.current = { startCast, stopCast, screen: projector.projector, setMode: projector.setMode };
+  useEffect(() => {
+    setCastDoor({
+      open: () => { void castRef.current.startCast('window', castRef.current.screen); },
+      close: () => castRef.current.stopCast(),
+      setMode: (m) => castRef.current.setMode(m),
+    });
+    return () => setCastDoor(null);
+  }, []);
   // Where the controller's ring is drawn: the plate's rectangle, or the window before it has one.
   const gamepadRingRect = useCallback(() => {
     const r = visualizerRef.current?.drawnRect?.();

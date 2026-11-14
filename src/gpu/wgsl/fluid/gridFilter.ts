@@ -120,17 +120,45 @@ export const GRID_FILTER_KERNELS: Record<string, string> = {
     main's +1.47 ppm/s, bar < 10 ppm/s). `npm run grating` holds it to all of
     this.
 
+    Why the three passes share their work rather than each working it out
+    (PLAN 18m-5b): as #485 shipped them, all three evaluated the 25-tap
+    stencil and the 3×3 bounds for every cell, and the stage cost 7.1–9.5% of
+    a layer's step on Metal against 1.4–3.8% for the one-pass filter before
+    it. Only the first pass needs them everywhere. `dampGridCurv` now writes
+    c into the field's write side as well as w into the room, so where
+    nothing comes back (w = 0, or ∑β = 0, which is everywhere but within
+    three cells of a clamp) `dampGrid` writes nothing and c stands, the same
+    number the old pass stored. Where something does come back it works c,
+    lo and hi out again in f32, as before, rather than reading c back from
+    the field, so that on a half-float dye the value it adds to is not the
+    rounded one. `dampGrid` reads its 14×14 of β once per 8×8 workgroup into
+    shared memory instead of 49 texture loads a cell, summed in the same
+    order. The 7×7 sums drop the rim test on each tap (only the grid's own
+    bounds remain) because both passes before them write 0 past the rim, and
+    adding 0 to a sum that starts at +0 changes no bit.
+
+    Why [lo, hi] is also held to `here` unless the cross-curvature m = δx²δy²f
+    oscillates along both grid axes (PLAN 18m-5c): once the glass gap became a
+    real 2 mm (PLAN 18m-6), the glycerine drop's bare 2% front moved only
+    3.94 → 4.13 mm in 20 s, exposing +0.36 mm of filter creep (to 4.50 mm, with
+    its half-peak contour pulled in 2.92 → 2.79 mm). Along a diagonal rim at
+    (5, 1), (4, 1) and (3, 2), `here - mn > 0` passed the one-sided `6.0` foot
+    gate while inner dome cells (1, 0) and (2, 0) had large room w and absorbed
+    the clamp's returned excess in place of (2, 2). A 1D front or radially
+    symmetric dome has m = δx²δy²f = 0, and at a curved front m does not
+    alternate along both axes, whereas any 2D grid wave with kx, ky in (π/3, π]
+    (cos k < 1/2) reverses sign on at least one axial neighbour or has both
+    axial neighbours below m0 / 2 (`ax & ay`), accumulated from the same 5×5
+    loads with no extra texture reads.
+
     A.a.x is s.
   */
   dampGridCurv: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(3) var clamped: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
 fn pastRim(p: vec2i) -> bool {
   return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
-}
-fn inDom(q: vec2i) -> bool {
-  let n = i32(S.n);
-  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
 }
 fn reflect1(x: i32, n: i32) -> i32 {
   if (x < 0) { return -1 - x; }
@@ -157,18 +185,28 @@ fn loadBox(q: vec2i, here: vec4f) -> vec4f {
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
+  let here = textureLoad(src, p, 0);
   if (pastRim(p)) {
+    textureStore(clamped, p, here);
     textureStore(dst, p, vec4f(0.0));
     return;
   }
-  let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  let k2 = array<f32, 5>(0.0, 1.0, -2.0, 1.0, 0.0);
   var acc = vec4f(0.0);
+  var r2: array<vec4f, 5>;
+  var c2 = array<vec4f, 5>(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
   for (var j = -2; j <= 2; j++) {
     let wy = k[j + 2];
+    let wy2 = k2[j + 2];
+    var row2 = vec4f(0.0);
     for (var i = -2; i <= 2; i++) {
-      acc += (k[i + 2] * wy) * (loadDom(p + vec2i(i, j), here) - here);
+      let d0 = loadDom(p + vec2i(i, j), here) - here;
+      acc += (k[i + 2] * wy) * d0;
+      row2 += k2[i + 2] * d0;
+      c2[i + 2] += wy2 * d0;
     }
+    r2[j + 2] = row2;
   }
   let nW  = loadBox(p + vec2i(-1,  0), here);
   let nE  = loadBox(p + vec2i( 1,  0), here);
@@ -191,11 +229,22 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   lo = max(lo, vec4f(0.0));
   hi = max(hi, vec4f(0.0));
+  let m0 = r2[1] - 2.0 * r2[2] + r2[3];
+  let mW = c2[0] - 2.0 * c2[1] + c2[2];
+  let mE = c2[2] - 2.0 * c2[3] + c2[4];
+  let mS = r2[0] - 2.0 * r2[1] + r2[2];
+  let mN = r2[2] - 2.0 * r2[3] + r2[4];
+  let ax = (mW * m0 < vec4f(0.0)) | (mE * m0 < vec4f(0.0)) | (((2.0 * mW - m0) * m0 < vec4f(0.0)) & ((2.0 * mE - m0) * m0 < vec4f(0.0)));
+  let ay = (mS * m0 < vec4f(0.0)) | (mN * m0 < vec4f(0.0)) | (((2.0 * mS - m0) * m0 < vec4f(0.0)) & ((2.0 * mN - m0) * m0 < vec4f(0.0)));
+  let alt = ax & ay;
+  lo = select(here, lo, alt);
+  hi = select(here, hi, alt);
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);
   let e = c - (here + u);
   let w = max(vec4f(0.0), min(c - lo, hi - c));
+  textureStore(clamped, p, c);
   textureStore(dst, p, select(w, vec4f(-1.0), abs(e) > vec4f(1e-20)));
 }`,
 
@@ -205,10 +254,6 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(4) var dst: texture_storage_2d<DYE_FORMAT, write>;
 fn pastRim(p: vec2i) -> bool {
   return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
-}
-fn inDom(q: vec2i) -> bool {
-  let n = i32(S.n);
-  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
 }
 fn reflect1(x: i32, n: i32) -> i32 {
   if (x < 0) { return -1 - x; }
@@ -246,19 +291,28 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  let k2 = array<f32, 5>(0.0, 1.0, -2.0, 1.0, 0.0);
   var acc = vec4f(0.0);
   var sumW = vec4f(0.0);
+  var r2: array<vec4f, 5>;
+  var c2 = array<vec4f, 5>(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
   for (var j = -2; j <= 2; j++) {
     let wy = k[j + 2];
+    let wy2 = k2[j + 2];
+    var row2 = vec4f(0.0);
     for (var i = -2; i <= 2; i++) {
-      let q = p + vec2i(i, j);
-      acc += (k[i + 2] * wy) * (loadDom(q, here) - here);
+      let d0 = loadDom(p + vec2i(i, j), here) - here;
+      acc += (k[i + 2] * wy) * d0;
+      row2 += k2[i + 2] * d0;
+      c2[i + 2] += wy2 * d0;
     }
+    r2[j + 2] = row2;
   }
+  let n = i32(S.n);
   for (var j = -3; j <= 3; j++) {
     for (var i = -3; i <= 3; i++) {
       let q = p + vec2i(i, j);
-      if (inDom(q)) {
+      if (q.x >= 0 && q.x < n && q.y >= 0 && q.y < n) {
         sumW += max(vec4f(0.0), textureLoad(room, q, 0));
       }
     }
@@ -284,6 +338,16 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   lo = max(lo, vec4f(0.0));
   hi = max(hi, vec4f(0.0));
+  let m0 = r2[1] - 2.0 * r2[2] + r2[3];
+  let mW = c2[0] - 2.0 * c2[1] + c2[2];
+  let mE = c2[2] - 2.0 * c2[3] + c2[4];
+  let mS = r2[0] - 2.0 * r2[1] + r2[2];
+  let mN = r2[2] - 2.0 * r2[3] + r2[4];
+  let ax = (mW * m0 < vec4f(0.0)) | (mE * m0 < vec4f(0.0)) | (((2.0 * mW - m0) * m0 < vec4f(0.0)) & ((2.0 * mE - m0) * m0 < vec4f(0.0)));
+  let ay = (mS * m0 < vec4f(0.0)) | (mN * m0 < vec4f(0.0)) | (((2.0 * mS - m0) * m0 < vec4f(0.0)) & ((2.0 * mN - m0) * m0 < vec4f(0.0)));
+  let alt = ax & ay;
+  lo = select(here, lo, alt);
+  hi = select(here, hi, alt);
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);
@@ -297,12 +361,9 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
 @group(0) @binding(3) var room: texture_2d<f32>;
 @group(0) @binding(4) var lim: texture_2d<f32>;
 @group(0) @binding(5) var dst: texture_storage_2d<DYE_FORMAT, write>;
+var<workgroup> betas: array<vec4f, 196>;
 fn pastRim(p: vec2i) -> bool {
   return S.thinGap > 0.5 && length((vec2f(p) + 0.5) / S.n - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)};
-}
-fn inDom(q: vec2i) -> bool {
-  let n = i32(S.n);
-  return q.x >= 0 && q.x < n && q.y >= 0 && q.y < n && !pastRim(q);
 }
 fn reflect1(x: i32, n: i32) -> i32 {
   if (x < 0) { return -1 - x; }
@@ -326,21 +387,55 @@ fn loadBox(q: vec2i, here: vec4f) -> vec4f {
   if (pastRim(qp)) { return here; }
   return textureLoad(src, qp, 0);
 }
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
+${W} fn main(
+  @builtin(global_invocation_id) id: vec3u,
+  @builtin(workgroup_id) wg: vec3u,
+  @builtin(local_invocation_index) li: u32,
+) {
+  // The group's 8×8 cells and three either side: 14×14 of β, read once.
+  let n = i32(S.n);
+  let base = vec2i(wg.xy) * 8 - vec2i(3);
+  for (var t = li; t < 196u; t += 64u) {
+    let q = base + vec2i(i32(t % 14u), i32(t / 14u));
+    var b = vec4f(0.0);
+    if (q.x >= 0 && q.x < n && q.y >= 0 && q.y < n) { b = textureLoad(lim, q, 0); }
+    betas[t] = b;
+  }
+  workgroupBarrier();
+
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
-  let here = textureLoad(src, p, 0);
-  if (S.thinGap > 0.5 && length(uvOf(id) - vec2f(0.5)) >= ${OPEN_RIM.toFixed(2)}) {
-    textureStore(dst, p, here);
-    return;
+  // Past the rim, and wherever nothing comes back, dampGridCurv's c stands.
+  if (pastRim(p)) { return; }
+  let w = max(vec4f(0.0), textureLoad(room, p, 0));
+  if (all(w == vec4f(0.0))) { return; }
+  let at = p - base;
+  var sumB = vec4f(0.0);
+  for (var j = -3; j <= 3; j++) {
+    for (var i = -3; i <= 3; i++) {
+      sumB += betas[(at.y + j) * 14 + at.x + i];
+    }
   }
+  let d = w * sumB;
+  if (all(d == vec4f(0.0))) { return; }
+
+  let here = textureLoad(src, p, 0);
   let k = array<f32, 5>(1.0, -4.0, 6.0, -4.0, 1.0);
+  let k2 = array<f32, 5>(0.0, 1.0, -2.0, 1.0, 0.0);
   var acc = vec4f(0.0);
+  var r2: array<vec4f, 5>;
+  var c2 = array<vec4f, 5>(vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0), vec4f(0.0));
   for (var j = -2; j <= 2; j++) {
     let wy = k[j + 2];
+    let wy2 = k2[j + 2];
+    var row2 = vec4f(0.0);
     for (var i = -2; i <= 2; i++) {
-      acc += (k[i + 2] * wy) * (loadDom(p + vec2i(i, j), here) - here);
+      let d0 = loadDom(p + vec2i(i, j), here) - here;
+      acc += (k[i + 2] * wy) * d0;
+      row2 += k2[i + 2] * d0;
+      c2[i + 2] += wy2 * d0;
     }
+    r2[j + 2] = row2;
   }
   let nW  = loadBox(p + vec2i(-1,  0), here);
   let nE  = loadBox(p + vec2i( 1,  0), here);
@@ -363,23 +458,19 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   }
   lo = max(lo, vec4f(0.0));
   hi = max(hi, vec4f(0.0));
+  let m0 = r2[1] - 2.0 * r2[2] + r2[3];
+  let mW = c2[0] - 2.0 * c2[1] + c2[2];
+  let mE = c2[2] - 2.0 * c2[3] + c2[4];
+  let mS = r2[0] - 2.0 * r2[1] + r2[2];
+  let mN = r2[2] - 2.0 * r2[3] + r2[4];
+  let ax = (mW * m0 < vec4f(0.0)) | (mE * m0 < vec4f(0.0)) | (((2.0 * mW - m0) * m0 < vec4f(0.0)) & ((2.0 * mE - m0) * m0 < vec4f(0.0)));
+  let ay = (mS * m0 < vec4f(0.0)) | (mN * m0 < vec4f(0.0)) | (((2.0 * mS - m0) * m0 < vec4f(0.0)) & ((2.0 * mN - m0) * m0 < vec4f(0.0)));
+  let alt = ax & ay;
+  lo = select(here, lo, alt);
+  hi = select(here, hi, alt);
 
   let u = -A.a.x * (acc * (1.0 / 256.0));
   let c = clamp(here + u, lo, hi);
-  let w = max(vec4f(0.0), textureLoad(room, p, 0));
-  if (all(w == vec4f(0.0))) {
-    textureStore(dst, p, c);
-    return;
-  }
-  var sumB = vec4f(0.0);
-  for (var j = -3; j <= 3; j++) {
-    for (var i = -3; i <= 3; i++) {
-      let q = p + vec2i(i, j);
-      if (inDom(q)) {
-        sumB += textureLoad(lim, q, 0);
-      }
-    }
-  }
-  textureStore(dst, p, clamp(c + w * sumB, lo, hi));
+  textureStore(dst, p, clamp(c + d, lo, hi));
 }`,
 };

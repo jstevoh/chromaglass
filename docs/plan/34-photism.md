@@ -134,12 +134,33 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
+- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
+  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
+  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
+    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
+    #679's cards are on main. Until then the channel link is the only way to see a look move.
+
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so
   the frame budget (Wave 4) is not touched. Phone: the Looks sheet gets the same grid.
   Line 1211 above already asks for a still saved in each preset file; that is the
   cheap first step, and the live preview follows.
+  *Briefed for the build lane* (2026-11-07): stills first (34b-1, a picture per look from the
+  gallery's own renders, the grid on the desk's preset menu and the phone's Looks sheet), then one
+  live preview at a time (34b-2). Its check is Claude's and lands before the build: the grid draws
+  every shipped look's still, only the hovered card runs, and the plate's step rate with the grid
+  open is its rate with it shut (the frame budget untouched).
+  *Check written* (2026-11-08): `npm run looksgrid -- --owed=stills,preview` (browser shard,
+  headless, about 20 s) and `npm run looksgrid -- --budget --owed=budget` (tools shard, Metal);
+  the header of `scripts/looksgrid.mjs` is the contract. Found on the way: the Perform desk has no
+  look menu (`PresetMenu` is only the narrow window's, under 1024 wide), so the contract asks for a
+  grid opened from the desk itself (`looks-grid-open`) beside the narrow menu and the phone sheet.
+  A throwaway build passed both cloud lines and failed them with one file for every look, a hidden
+  still and a preview left mounted. The Mac line asks the preview to report its own solver
+  (`chromaglassDebug().preview`, `{ id, stepCount }`), so a picture that only moves cannot pass it. Not in the check: no preview while a show is live on the wall (needs a cast
+  or mirror open; the reviewer reads it), and `BUDGET_SHARE` (0.95) is unmeasured on the Mac until
+  a preview exists.
 - **34c. An analyzer look.** *(M.)* Producers like to see the sound itself: spectrum,
   scope, spectrogram and a stereo goniometer, as a Mixer row (§11) over the plate or
   alone. Built from the same bands the plate already hears. Fast readings only (the

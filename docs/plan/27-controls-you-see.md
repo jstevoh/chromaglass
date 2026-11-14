@@ -188,6 +188,132 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     mineral oil is fifty times thicker (OIL_NU), which would slow a lens to about 1/25 of this in
     water looks (Darcy's inclusion, 2μ₂/(μ₁+μ₂)) and change how every oil body moves; its own item
     when the mix's oil gets its viscosity.
+  - **27f-9. A standing plate is a sealed bottle (shipped 2026-11-11; story in
+    docs/plan-shipped.md §27f-9).** Lava Lamp's wax poured out over the open rim; on a standing
+    plate the weight is now the closed cell's circulation (`wgsl/fluid/seal.ts`). `npm run sealed`.
+    - **27f-9a, open.** Plate Rock's and Rain Drip's weight (hsBody) on a standing plate still
+      go on the open rim: the same circulation with the rock's tilt added to gravity's (the
+      source as curl F of both, one ψ). Lava Lamp rocks at 0.25.
+    - **27f-9b, open (a shortcut named, with 27f-7).** The circulation is the even gap's: where
+      the mobility is not even (a press, glycerine beside water, the wax's own viscosity) the
+      gap's solve takes the rest through its open rim, which is the 1.3% the lamp run loses in
+      20 s where the wax lies on the bottom rim. A press on a standing plate is still an open
+      edge for the glass. The full answer is a closed rim for the weight's part of the gap's
+      own solve.
+    - **27f-9c. Lava Lamp's wax is a liquid of its own (shipped 2026-11-11; story in
+      docs/plan-shipped.md §27f-9c).** The wax is the oil, heavy cold (Oil Weight, a new
+      setting) and swelling lighter warm (OIL_EXPAND), its colour kept in it (Oil Bodies);
+      the lamp warms it as a body off the rim; the look no longer stirs itself.
+      `npm run lavawax`.
+    - **27f-9d, open. A melt that does something.** A first cut gave a heavy oil a melt
+      (heavy below 2 of the heat's units, as light above), which is what a real lamp runs on
+      (paraffin grows 10–15% in volume as it melts). On the look's own step it changed
+      nothing (the wax's centre of mass 0.24 of the height with it, 0.23 without), because
+      the wax settles over the lamp's band where the swelling balances its weight and is never
+      warmed through the melt; it went. The cycle (27f-9e) shipped without it, on the gap's
+      cooling; a melt comes back as a property of the poured liquid (§38e's bottles) rather than of any heavy oil, with a line in
+      `npm run lavawax` that fails without it.
+    - **27f-9e. The wax goes round (shipped 2026-11-12; story in docs/plan-shipped.md
+      §27f-9e).** The heat crosses the gap to the cool upper glass at the gap's conduction
+      rate, π²κ/h² in real seconds (2.9 s water, 5.8 s wax), so a risen body cools, sinks
+      and is warmed again: about 16 s round on the look's clock at 192². `npm run lavacycle`.
+      It went round once or twice and then hovered: 27f-9h.
+    - **27f-9g, open (shortcuts named, with 27f-9e and 27f-9h).** The glass's temperature is
+      laid by height (the floor's at LAMP_GLASS, fading up over a fin length; the room's above
+      half the plate, LAMP_COOL_FROM) rather than a field of its own that the lamp heats, the
+      liquid warms and the air cools (the lumped glass and air of `lib/lampBoil.ts`): a lamp
+      run for an hour does not warm up as a real one does, the cool line and the floor's
+      temperature do not move with Heat or the lamp's brightness, and Gravity turns the floor
+      on (any tilt) rather than dimming it. The rate both ends work at is the thin gap's
+      (π²κ/h², 2.9 s in water), standing in for a fat bottle's far slower conduction, which
+      is why the lamp goes round in 32 s where a real one takes minutes. And a wax that is dye
+      with a weight (no oil phase) is still warmed by the old kick into the wax alone
+      (LAMP_HEAT), which hovers for the same reason 27f-9h found. Wanted: the glass as a
+      temperature per cell (stationary, so not carried), heated by the lamp at the floor,
+      warmed by the liquid through the gap and cooled by the air at h ≈ 10 W/m²K, for dye
+      and oil alike; then the cycle's period should follow the lamp.
+    - **27f-9h. Lava Lamp looks like a lit lamp, and keeps going round (shipped 2026-11-12;
+      story in docs/plan-shipped.md §27f-9h).** The wax dyed lightly (LAVA_DYE 0.55) so the
+      bulb shines through it, the bulb a warm white, Oil Tension 1 and Dye Weight at the 0.5 a
+      standing plate floors it to, and nothing poured or kicked into the sealed lamp (Evolve,
+      Sound Drive and Plate Rock at 0). And the stall the Mac filmed, root-caused: the bulb
+      was a kick of heat to the wax alone, a thermostat the wax parked on, and every lamp
+      since 27f-9e hovered within 60 to 80 s. The floor's glass is warm now (LAMP_GLASS) and
+      heats water and wax alike by conduction: the wax goes round every 32 s, for minutes.
+      What lifts warm wax through warm water is only that it swells more than the water
+      does (OIL_EXPAND), as a real lamp's wax does: with the swelling out it never leaves
+      the floor. `npm run lavacycle` watches two minutes of it, on the Mac's `show`, and
+      holds the warm floor's and the swelling's controls (`npm run lavawax`'s old third
+      line, which read the lamp at 6 s, before conduction has warmed anything). The owner's verdict
+      on the Mac film decides whether the look stays (2026-11-12: "one last try").
+    - **27f-9i, open. The wax's capillary length is a quarter of a real lamp's.** At the Dye
+      Weight 0.5 a standing plate runs (27f-9j) the wax's ℓc is about 3.5 mm against a real
+      lamp's 1.5 cm. The full answer is σ per liquid in N/m (§38e's bottles) with the wax's own
+      low interfacial tension against its liquid, and a weight the dial can take below 0.5.
+    - **27f-9j, open. Dye Weight is dead below 0.5 on a standing plate.** The solver floors it
+      there when Plate Upright is on (`fluid.ts`, "Dye weighs something whether or not a look
+      says how much"), so the dial reads 0.2 and the plate runs 0.5: Lava Lamp at 0.2, 0.35 and
+      0.5 was one run to the last digit (lab, 128², 30 s), and 27f-9h's "0.7 → 0.2" was 0.7 →
+      0.5. Wanted: the floor only where a look sets no weight at all, or the dial showing what
+      runs; `npm run lavacycle` held while it moves.
+    - **27f-9k, open. The colour is counted in the wax's weight, and the projector's light
+      heats the wax wherever it floats.** Two things found under the stall. Dye Weight weighs
+      the wax's own dye, so lightening the colour (LAVA_DYE 2.6 → 0.55) lightened the wax and
+      moved its balance; a liquid's weight should be its own (Oil Weight) and its colour a
+      tracer. And the absorbed light of the projector (LAMP_HEATING, derived for a 1 mm layer,
+      §38's audit) warms dyed wax at any height on a standing lamp: with all conduction off
+      the wax rose on that alone to 0.86 of the height and stayed. A real lamp's bulb is
+      under the bottle; the light through the glass is not what lifts its wax. Wanted: the
+      look's light as heat only where the look asks for it, and measured against the floor's.
+    - **27f-9l, open. `gapThickness` is the Thickness (viscosity) dial, not the gap.** The
+      setting's key reads as the glass gap, which is the cover's own (Plate Pressure squeezes it; the
+      solver's `REST_GAP`); a lab script that passes
+      it as the gap is wrong by the name alone (it cost an hour here). Rename the key with a
+      migration, or say so where `VisualizerSettings` declares it.
+    - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
+      look's own step the share of the colour inside the bodies falls from 97% to 84% in the
+      first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
+      of the dish by two seconds and then holds. Clock Glass and the Splodascope lay their
+      colour the same way (BODY_DYE times each cell's oil, landed by bodyLand), so the first
+      suspect is the standing plate: the bodies laid high fall through the liquid at once,
+      and Oil Bodies' evening-out across a moving edge, and the dye's creep past it
+      (bodyPartition's E), leave colour behind. The colour should stay in the wax as an
+      oil-soluble dye does. With the dye weighing (Dye Weight 0.7) that wash also lies heavy
+      under the wax. At six seconds the dish is no clearer than with the wax laid as dye (both
+      about 80%): the difference is a minute's, the Mac's film.
+      *With the heat carried (38f-1, 2026-11-11), 192², 16 s:* the wax rises, and the colour
+      left behind is now the trails of the rising plumes: the share of it in the bodies 36%
+      at 16 s against 80% with the wax lying still on the floor, the haze (cells a tenth to a
+      half oil) about 3,500 against 2,400, the dish 67% clear against 80%; at 256² the same
+      (30% against 74%, haze 7,600 against 5,300). Split at 128², 6 s: of the colour outside
+      the bodies, 3,827 units are the oil's own colour in haze cells and 202 the water's, so
+      Oil Bodies keeps the colour with the oil and it is the oil itself that goes to haze
+      (mean 0.15 oil, inside the double well's metastable band below its 0.21 spinodal): the
+      rising plume's trailing edge, smeared by the carry faster than Cahn–Hilliard sharpens
+      it. So the haze's own fix comes with the carry: a free energy whose spinodal sits near
+      the binodals (a deep quench, Flory–Huggins at large χ, or the double obstacle), or the
+      ferrofluid's PHASE_COMPRESS on the mix's carry, named as the carry's correction.
+      `npm run lavawax` line 1 is red with the carry alone (60% clear, needs 70%).
+      *Fixed with it (38f-2):* the deep quench above, shipped with the carry; the same lab
+      at 6 s, 192²: haze 1,474 cells, colour in the bodies 72%, 83% clear (`lavawax` 4/4).
+      What is left of 27f-9f is the Mac's minute: whether the plumes still strip colour
+      over a long take, which the film after this PR shows.
+      *The Mac's minute, filmed (27f-9h, 2026-11-12, two takes of 150 s, no hands, no
+      sound):* yes, in the app, and not in the lab. The film: fat dark caps on stalks to
+      about 20 s, red streaks and folded sheets by 30 s, and from about 1:40 one marbled
+      orange-red column up the middle with a pale orange wash round it; the wax never
+      gathers back into separate round bodies. The lab over the same 150 s (128², the
+      look's own settings, `scratch/stall/probe.mjs`): the share of the colour inside the
+      wax (oil above a half) is 97% laid, then 81% to 92% at every 15 s sample, the wax's
+      cells 1,095 laid and 837 to 909 after, the fringe (a tenth to a half oil) 138 laid
+      and 164 to 334 after. So the lab's wax keeps its colour and its area for the whole
+      take and the app's picture does not. What differs between the two is not yet known,
+      and is the next thing to measure before anything is changed: the app's grid and step
+      on this Mac's tier against the lab's 128² at a sixtieth; what the plate draws (the
+      dye, at the dye's own grid) against what the probe reads (the oil); and whether the
+      sheets are 27f-9i's short capillary length seen at the app's finer grid. A check for
+      it would read the app's own fields after two minutes (the share of the dye inside
+      the wax, and the count of separate bodies), which the lab's `lavawax` does not.
 - **27g. Bass Boost is a gain on the bass's hand (shipped; the owner, 2026-10-22: "I don't
   feel like it actually does anything").** Story in `docs/plan-shipped.md` §27g (moved
   2026-10-29, 19m).
@@ -219,10 +345,24 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
     stable, the front a little under its Froude speed. 38r part 2's 2 mm gap takes this back
     under 20 (about 16); if it does not land, raise the cap (a SHOUTING_CASE number: name it
     under Check changes).
+  - **27h-2d, open. `widedials` Heat Spread total on Metal.** Written on SwiftShader (`Measure`
+    `lab3`), where Heat Spread at 0, 1, 2 keeps the heat within 1%; on a Mac's Metal (`rgba16float`
+    over 60 steps of Jacobi diffusion into the Gaussian tail) `npm run widedials` reads totals
+    `×0.9997, 0.9748, 0.9657`.
   - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
     `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
     the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate
     Boundary Glow near 0.45), Gate Edge (clamp the mix, let the width grow).
+    *Check written first* (2026-11-07): `npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate`
+    (lab4), each dial to its new top (2, 1.4, 2, 2, 2) in `PIN_RANGE`, its uniform not clamped to the
+    old top, no look moved, and in the lab the last quarter of the range changing the picture by a
+    quarter of what the first does (Gate Edge from its post shader's mix, which the lab does not draw).
+    Read on main: Micro-Droplets moves 6 px in its first half and none past 1, Plate Cells 3.64 levels
+    in 0 to 0.35 and none in 1.05 to 1.4, Glossiness 5.05 then 0.76 (15%). Two readings move the item:
+    Boundary Glow is alive past 1 on the lab's plate (0.34 in 0 to 0.5, 0.18 in 1.5 to 2), so its hold is
+    the range's 1, not a knee near 0.45; and Projector Focus changes the picture by 0.30 to 0.68 a step
+    across all of 0 to 1 (a focus plane, in focus at 0.5), so it has no dead travel and is not owed.
+    The build is Antigravity's, from a brief; each look's picture at its own values is the reviewer's.
   - **27h-4, open. Dead bottoms that need a re-map, not a range** (each must give today's value
     at today's default): Iridescence never reaches off (a 0.25 floor), Beat Prediction's lower
     half never locks (the lock asks trust × confidence ≥ 0.5), Sensitivity's trim never goes
