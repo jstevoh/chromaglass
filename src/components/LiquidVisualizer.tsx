@@ -69,7 +69,7 @@ import { Modulators } from '../lib/modulators';
 import * as crashLog from '../lib/crashLog';
 import { makeRng, restartStreams, setShowSeed, showSeed, stream, streamDraws, type Rng } from '../lib/rng';
 import { clockIsFixed, showEpochS, showNow } from '../lib/showClock';
-import { adoptIntro, introMove, introOut, introPlateFrame, introStill } from '../lib/intro';
+import { adoptIntro, introOut, introPlateFrame, introQuiet } from '../lib/intro';
 import { pourVideoFrame, type VideoPourState } from '../lib/videoFlow';
 import { newInkTitleRun, queueInkTitle, stepInkTitle } from '../lib/inkTitleRun';
 import { FluidSimulation } from '../sim/fluidSimulation';
@@ -6176,8 +6176,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
         // What the look now up turns on: the opening's, or the one on when a
         // lost device is replaced mid-show (`gpu/opening.ts`).
         // The intro held still until the opening is built (`Quiet` in
-        // gpu/prepare.ts says why).
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current));
+        // gpu/prepare.ts says why), and the builds counted on its line.
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: introQuiet }, openingOf(settingsRef.current));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }

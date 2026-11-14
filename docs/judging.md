@@ -2783,3 +2783,24 @@ whole dish. Judge from the before and after films (same look, same song, same se
 3. Looks that set Vibration high (Acid Trip, Cyberpunk, Boiling Point): the shimmer no longer
    swells with loudness; it sits where an ordinary level used to hold it. Say if it reads as
    too much in the quiet parts.
+
+## 132. A faster start, and a loading line until the plate shows (PLAN 14v-12)
+
+The show now compiles a display for the look it opens on, without every other look's
+effects, and builds the whole one just after the plate appears. On software WebGPU (all
+CPU, as on a phone) the first frame came about a fifth to a third sooner; nothing about any
+look's picture changed (`npm run leandisplay`: every look the same bytes). Under the mark,
+while nothing is drawn yet, a line now says what the wait is: "Loading", "Starting the
+graphics", "Compiling shaders 23 of 67", "Pouring the first frame", each with the seconds
+since the page opened, over a thin bar.
+
+1. On the phone, open chromaglass.art fresh (after a deploy, so the shaders are cold) and
+   again a second time. Write down the seconds the line shows at each stage and when the
+   plate appears, both times. This is the reading PLAN 14v-13 waits on.
+2. Does the line read clearly on the phone, under the mark and above the dock? Good: legible
+   at arm's length, steady (not blinking). Bad: too faint, too small, or under the dock.
+3. The count sometimes pauses for a second or two and then jumps: that is a render pipeline
+   compiling, when changing the words would stall the page's frames. Say if it looks stuck.
+4. Within the first seconds after the plate appears, change to a look with something
+   different (Ben-Day dots, Lacing, Lumia): the effect may come in a second or two late,
+   never a frozen plate. Say if anything looks wrong in those seconds.

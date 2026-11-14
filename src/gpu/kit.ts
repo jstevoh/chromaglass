@@ -381,6 +381,18 @@ export class PipelineCache {
     return !this.isFailed(name) && this.computeSlot(name, entryPoint).has(code);
   }
 
+  /**
+   * Whether `renderPipeline` would find this one built, without building it.
+   * With `ask`, the ask is kept in the ledger as `renderPipeline`'s would be:
+   * the plate asks for its whole display so (`WebGPUPlate.displayFor`) while
+   * drawing with its lean one, and a harness reading the ledger still sees
+   * that a look's first steps wanted it.
+   */
+  hasRender(name: string, ask = false): boolean {
+    if (ask) this.asked(name);
+    return !this.isFailed(name) && this.render.has(name);
+  }
+
   /** `renderPipeline`'s, ahead: see `prepareCompute`. */
   async prepareRender(name: string, make: RenderRecipe, use = false, times?: BuildTimes): Promise<boolean> {
     if (this.render.has(name)) return true;

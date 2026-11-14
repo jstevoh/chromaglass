@@ -153,6 +153,13 @@ export interface PrepareProgress {
   /** The most one build may take before the prepare gives up on it, ms. */
   cap: number;
   done: boolean;
+  /**
+   * Render pipelines compiling or making their first draw just now. While
+   * one is, a frame with anything new in it waits in the GPU process behind
+   * it (`Quiet` says what was measured), so the loading line
+   * (`lib/intro.ts`, `introStage`) holds its words until it is done.
+   */
+  rendering: number;
 }
 export const prepareProgress: PrepareProgress[] = [];
 
@@ -255,9 +262,10 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   const raw: Prepared['raw'] = [];
   const progress: PrepareProgress = {
     stage, device: PipelineCache.deviceIndex(device), asked: builds.length, settled: 0,
-    at: Math.round(t0), lastAt: Math.round(t0), cap: PREPARE_TIMEOUT_MS, done: false,
+    at: Math.round(t0), lastAt: Math.round(t0), cap: PREPARE_TIMEOUT_MS, done: false, rendering: 0,
   };
   prepareProgress.push(progress);
+  quiet?.progress?.(0, builds.length, 0);
   // Each lane takes the next build in the list when its last one settles, so
   // the order they are asked in is the list's, as it was with one, but for
   // the one render pipeline at a time (`renderBusy`, below).
@@ -356,7 +364,8 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       if (isFill(prep)) {
         void waited.then(() => { if (fillLeft > 0 && --fillLeft === 0) fillsDone?.(); });
       } else if (prep.kind === 'render') {
-        renderBusy = waited.then(() => { renderBusy = null; });
+        progress.rendering++;
+        renderBusy = waited.then(() => { renderBusy = null; progress.rendering--; quiet?.progress?.(progress.settled, progress.asked, progress.rendering); });
       }
       const settled = await waited;
       const now = performance.now();
@@ -364,6 +373,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       lastSettled = now;
       progress.settled++;
       progress.lastAt = Math.round(now);
+      quiet?.progress?.(progress.settled, progress.asked, progress.rendering);
       times.push([prep.key, Math.round(from), Math.round(now - from)]);
       const c = stamps.compiled;
       raw.push([prep.key, Math.round(b0), c == null ? null : Math.round(c - b0), c == null || stamps.used == null ? null : Math.round(stamps.used - c)]);
@@ -465,6 +475,13 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
 export interface Quiet {
   still(): Promise<void>;
   go(): void;
+  /**
+   * How far the opening has got, each time a build settles and each time a
+   * render pipeline starts or finishes: the loading line's count
+   * (`introStage` in `lib/intro.ts`), which holds its words while
+   * `rendering` is up, for the reason above.
+   */
+  progress?(settled: number, asked: number, rendering: number): void;
 }
 
 /**
@@ -517,7 +534,10 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
   const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES, opts.quiet);
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
-  void buildInTurn(device, 'later', builds.filter((b) => b.later), LATER_LANES)
+  // Render pipelines first here too, so the plate's whole display
+  // (`displayLean.ts`), which a look reaching past its opening's effects
+  // waits on, comes before the hundred-odd kernels of other looks.
+  void buildInTurn(device, 'later', builds.filter((b) => b.later).sort((a, b) => rank(a) - rank(b)), LATER_LANES)
     .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
   return opening;
 }
