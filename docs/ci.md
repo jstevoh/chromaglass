@@ -79,6 +79,8 @@ deploy:
   its exact tree, lifts it. It is posted when a deploy finishes and when a PR is opened,
   pushed, labelled or retargeted. `npm run mainhold` says whether main is held;
   `-- --history 40` replays the rule over the last 40 deploys.
+  A 5xx from GitHub is retried four times; a deploy whose jobs still cannot be read is
+  left out with a log line, so the run posts on every PR rather than none.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every

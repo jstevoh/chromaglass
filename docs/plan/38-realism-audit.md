@@ -548,20 +548,78 @@ written first. Line numbers are as read on main at d07ac31.
     weight draws the bead back. The solver steps it, packs `S.cover`, lays the dome about it,
     and turns a moving cover into flow at the rim; pours add to it; the main readers of the rest
     gap follow it; the dials are on the sheet, the desks, MIDI and the phone's remote. Open:
-    - **38r-16. The pinch and the air edge** (M-L; part 2, its own thread). A two-finger pinch
-      on the desk (trackpad: wheel + ctrlKey over the plate, outside the closeup) and the phone
-      (two fingers whose span changes, told from Blow's two fingers moving together in
-      `lib/playGesture.ts`, and the visualizer's hands let go as the closeup's pinch does) sets
-      `FluidSimulation.coverHand` (−1 lift to 1 press; the solver and `npm run gap` 16 already
-      take it). And the owner's pick (2026-10-31 20:08Z, "Build the air edge now", over a floor
-      at a full film): below a full film (V < A·h_floor, 9 mL at the 0.27 mm floor) the liquid
-      is a puddle under the glass with an air edge, whose meniscus between two wetted glasses
-      pulls, −2σ cosθ/h, so the glass sinks and the puddle spreads (A_wet = V/h) until it meets
-      the rim; a lift faster than the bead can feed, or the dial taken down faster than the
-      glass settles, draws air in from the rim, Saffman–Taylor unstable in the Hele-Shaw gap,
-      fingers at λ_c = πh√(σ/(μU)) (fastest √3 λ_c). The air is the bubbles' air (15g) entering
-      at the rim, never a drawn finger pattern. Liquid's dial then runs from 1 mL. Checks: the
-      puddle's area V/h; its settle; a lift's finger spacing against λ, water and thick.
+    - **38r-16. The pinch and the air edge** (M-L; part 2, its own thread). *Design pass and
+      checks written 2026-11-08* (`npm run gap -- --owed=puddle,settle,lift,pinch`, lines 19–23;
+      `npm run airedge -- --owed=rim,front,fingers`; a throwaway proof of the ledger half passes
+      every gap line but the wiring). Built by Antigravity from the brief in the project's files.
+      - *The pinch.* A two-finger pinch on the desk (trackpad: wheel + ctrlKey over the plate,
+        outside the closeup, scale ×exp(−deltaY/100) an event) and the phone (two fingers whose
+        span changes past `PINCH_SPAN`, 1.2, told from Blow's pair moving together in
+        `lib/playGesture.ts`: `playHand`'s fifth argument is the pair's span over its landing
+        span, and a blow becomes a pinch, never the other way) sets `FluidSimulation.coverHand`
+        through `pinchHand(scale)`: together presses (+), apart lifts (−), 0 at the start, odd in
+        log(scale), ±1 at half or twice the span, under 0.1 where a pinch is first told (a square
+        law in log₂ scale does it). The hand goes to 0 when the gesture ends (all fingers off; no
+        ctrl-wheel for 200 ms), and the visualizer's hands let go as the closeup's pinch does.
+      - *The air edge* (the owner's pick, 2026-10-31 20:08Z, "Build the air edge now", over a floor
+        at a full film). The ledger gains `wet`, the area under the glass the liquid wets (A on a
+        full film). Between two wetted glasses the puddle's free meniscus is concave across the
+        gap, so the liquid sits 2σ cosθ/h under the air (36 Pa at 2 mm) and pulls the glasses
+        together. The puddle's mean pressure is P̄ = P·A/wet + 2σ cosθ/h (P the glass's weight and
+        the hand over the whole cover), and Stefan's squeeze of a disc r = √(wet/π) moves the glass
+        at dh/dt = −(2/3)h³P̄/(μr²) with h·wet = V kept. So: a settle spreads the puddle to the rim,
+        where the edge pins (38r-5) and the glass stops at V/A; under the floor (a full film under
+        8.4 mL) it stops at the floor and stays a puddle (a shortcut of the solver's 0.27 mm floor:
+        a real glass would sink on to about V/A, tens of µm, over minutes); a lift (P̄ < 0) shrinks
+        it, air in at the rim, up to the 4 mm ceiling (38r-18). On a full film with the bead empty
+        the same sum says when air may come in at all: a pull weaker than P + 2σ cosθ/h moves
+        nothing, a wet glass sticks (`gap` 22, true on main and kept). The bead still feeds a lift
+        first (38r-5). The dial taken down no longer drops the glass at once: it cannot jump, so
+        the liquid leaves the rim (wet = V/h) and settles back out, halfway in about 6 ms for
+        water and 0.13 s for the thick carrier; the Liquid dial runs from 1 mL.
+      - *The fingers.* Air pushing into the liquid in the gap is Saffman–Taylor unstable. The plan
+        first wrote λ_c = πh√(σ/(μU)) "(fastest √3 λ_c)": that is the other way round.
+        πh√(σ/(μU)) is the fastest-growing wavelength λ_m, and the marginal one is λ_c = λ_m/√3
+        (the growth s = kU − σh²k³/(12μ)). Round a lifted disc the front moves in at U = rḣ/(2h)
+        and the linear stability gives the fastest mode n² = (1 + 6μr³ḣ/(σh³))/3; with the hand a
+        force, μḣ = (2/3)h³|P̄|/r², so n_max = √((1 + 4r|P̄|/σ)/3), with neither μ nor h in it: the
+        same pull fingers water and thick alike (water 22 times faster) and a harder pull finer, as
+        √|P̄| (a full pull, about 42 fingers round the cover; hand −0.1, about 10). The air is a
+        phase of the thin solve, not the bubbles' drawn rims (`air.ts`'s `packedFinger` is a drawn
+        pattern and is not used): a wet fraction w carried by the solve's flux, air cells at the
+        air's pressure (μ_air is 1/55 of water's, 1/1250 of the thick carrier's: the Saffman–Taylor
+        limit), the front's liquid side at p_air − 2σcosθ/h + σκ, κ = ∇·n̂ its in-plane curvature with
+        n̂ pointing out of the liquid (a convex liquid disc has κ > 0 and its liquid the higher;
+        the other sign makes the tension destabilise the front, and without κ every wavelength
+        grows: either way the fingers run to the grid), the rim's inflow liquid while
+        the ledger's bead has any and air after, with a white roughness seeded by the step's
+        `airSeed` (the cover's ground edge), the front substepped under a cell a substep. Named
+        shortcuts: at the hard pull's Ca = h²|P̄|/(3rσ) of about 0.4 the front leaves a wetting
+        film on the glasses that A − wet ignores (Park–Homsy), and water's rates are viscous-only
+        (38r-21). The air is written into the air field
+        so the dye leaves it and the plate draws it as it draws a bubble's air; a finger that
+        pinches off is a bubble (15g).
+      - Checks: `gap` 19 the puddle's area V/h at the floor; 20 the dial down and the settle back
+        (RK4, step-size free); 21 a lift past the bead and the suction, let go and back to V/A; 22
+        a wet glass sticks at the weight and 0.9 suctions (on main too), with 21 asking 1.1 to
+        lift, so the gate is the suction and not the edge's hold; 23 the pinch's hand and reading,
+        and its wiring, comments stripped (reach only: a desk DOM line that sends a ctrl-wheel and
+        reads the hand back to 0 after 200 ms is a follow-up; the feel is the Mac's film); lines 15 and 16 carry a branch for each ledger, exact in
+        both, the main one to go once this ships. `airedge`: the counter's control; the air comes
+        in at the rim only once the bead is empty; the field's air is A − wet; three pulls on
+        four seeds each, read as the ledger's wet crosses 0.8 and 0.6 of the cover: the averaged
+        spectra's power-weighted mode within 0.75–1.35 of n_max, half the power within n_max/2 to
+        2n_max, that band grown twofold, two seeds' fronts uncorrelated (under 0.5), the hard pull
+        at least 1.5 times the gentle, and Thickness 0.6 against 0.9 at one pull within 20%
+        (0.45 is not Darcy's at 3.3 mm: its drag time, 41 ms, outlasts the fingers' growth). The bars are the
+        linear theory's: re-aimed by Claude with the measurement if the nonlinear stage moves
+        them, never by the build.
+    - **38r-21. Water's glass is inertial, not Stefan's** (S-M; found in 38r-16's check review).
+      Water's settle (halfway in 6 ms) and a pull at hand −0.12 run the radial flow at Reynolds
+      numbers of thousands to 1.5e4; the flow's added mass ρπr⁴/(8h), about 2 kg against the
+      glass's 1.5 N, would put the half-settle at 40 ms or more. `lib/cover.ts` is viscous only
+      (Stefan, as `npm run gap` 14, 20 and 21 hold it); give the cover the unsteady squeeze
+      (ρ r² ḧ/h terms) and re-aim the water rows from it. The thick carrier is inside the theory.
     - **38r-17. The rest gap's other readers** (S-M). Still at the 2 mm constant: `FILM_TOP`
       (`wgsl/standing.ts`, compiled into phaseForces), `GAP_LC` (`wgsl/ferroDrop.ts`), the
       bubbles' `gapMetres` (`lib/bubbles.ts`, set by the visualizer), the rhythm sheet's h₀
