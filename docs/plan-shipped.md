@@ -14213,6 +14213,42 @@ seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89;
 On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
 131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
 
+## 38u-1, 38u-2, 38u-3. The closeup's drawn leftovers: Edge Detail, a lamp above the plate, the film's clock (2026-11-13)
+
+The owner, 2026-11-13: "the drops in macro still have jagged edges", and the same day asked that
+the visualization code be read for whether "things are actually based on real physics" (the
+third pass, 38u). In the closeup four things were drawings and are gone.
+
+- **Edge Detail** (`macroEdgeDetail`, 0.6 by default, 0.75 to 0.9 in the three macro looks) read
+  the plate through two octaves of value noise, `macroWarpOffset`, drifting on the clock and
+  swelling on the beat. The dye was read through it and the oil was not, so a drop's colour
+  wobbled against its own outline. Surface tension pulls out any bump shorter than the capillary
+  length, a few millimetres, and a closeup frame is a centimetre or two: a ragged edge is real
+  only where a pinned contact line, a viscous finger or a dewetting film made it, and those are
+  the solver's. No physical quantity for a dial to scale, so the setting is deleted (the desks,
+  the phone's rows, MIDI's pins, Lucky, the wander); a saved look that names it is read as
+  before and the key ignored.
+- **Depth / Focus** also drew paint on paper under a lamp at the upper left: a fibre texture on
+  the ground (noise at 230 cycles a frame, fixed to the screen), the dye's shadow thrown twice
+  down and to the right, darkening the ground to 0.18, and a "dome shading" that made thick dye
+  1.16 times brighter and thin dye 0.74. The closeup's camera looks down at two glasses on a
+  light pad (38h-2). The dial is the camera's depth of field and nothing else now.
+- **The bubble film's phase** carried `0.08·sin(0.4 t + 40·id)`.
+- **The treble shook every bubble** (38u-13's second half; `BubbleField.step`'s `agitation`, two
+  random draws a step). `BubbleField.step` and `stepPlateBubbles` lose the argument. In still liquid
+  at the most the app passed, 0.083 cells of wander in two seconds → 0.
+
+*Measured* (`npm run stillcloseup`, the lab on software WebGPU, main then this):
+a still plate of hard-edged discs, drawn ten seconds apart: 0.381% (defaults), 0.117% (on the
+lamp), 0.366% (Macro Bead), 0.276% (Cell Bloom) of the frame's mean changed → 0.000% on all four
+(1c, the control, a stirred plate: 11.4%); a still bubble at full Iridescence 2.049% → 0.000%;
+the ground just outside a round pool's edge, opposite quarters, 20.171% → 0.004% (3c, a small
+faint pool: 12.6%); Depth / Focus at 0 against 1 where the camera is in focus 27.052% → 0.000%
+on the lamp and 15.043% → 0.000% on the dark ground (4c, the surround: 12.0%). What is still
+drawn on the clock is printed and not judged (38u-9), and is the control that the lab's clock
+reaches the plate (1d): Lacing Run 3.2% of its frame on a still plate, Paint Cells at 1 3.2%,
+Thin Film at 1 1.6%.
+
 ## 15e-1 (met again as 14ab-16) and 46r. A poured liquid acts on every step, and the lasting current's args have a name of their own (shipped 2026-11-13)
 
 Two faults of the solver's plumbing, each with a check written red first.

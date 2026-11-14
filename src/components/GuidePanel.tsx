@@ -386,7 +386,7 @@ const SECTIONS: Section[] = [
           ['Chase Speed / Shot Length', <>How eagerly the camera follows its subject, and how long it stays on one before cutting.</>],
           ['Music Sync', <>The camera cuts on kicks. Its punch on the bass, push with the energy and tremor from the treble are the frame moving with the music, so they ride Frame Sway (Show), which is 0 unless you turn it up.</>],
           ['Paint Cells / Cell Size', <>Opt-in, off by default: synthesised cells at magnification, the rings a pour painting makes. No shipped look turns them on.</>],
-          ['Macro Lacing / Edge Detail / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Edge Detail is the fine boundary structure, and Relief the apparent thickness of the film, which is always on.</>],
+          ['Macro Lacing / Relief', <>Lacing is opt-in, off by default (Lace Run turns it on): the filaments between cells. Relief is the apparent thickness of the film, which is always on.</>],
           ['Depth / Focus', <>Shallow depth of field, the way a real macro lens has no choice about.</>],
         ]} />
         <Note>

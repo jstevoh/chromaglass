@@ -1054,7 +1054,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.45,
       macroLacing: 0,
       macroDepth: 0.6,
-      macroEdgeDetail: 0.75,
       macroRelief: 0.8,       // domed beads with wet highlights
       beads: 0.7,             // each a lens on the colour under it
       globalSpeed: 0.06,
@@ -1126,7 +1125,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.6,
       macroLacing: 0,
       macroDepth: 0.5,           // 28i-7: at 0.7 the shallow focus blurred the pools' edges
-      macroEdgeDetail: 0.75,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
       globalSpeed: 0.045,
       surge: 0.5,
@@ -1198,7 +1196,6 @@ export const PRESETS: Preset[] = [
       macroCellScale: 0.55,
       macroLacing: 1.0,          // lacing is the subject here
       macroDepth: 0.6,
-      macroEdgeDetail: 0.9,      // maximum silhouette crinkle
       macroRelief: 0.65,
       globalSpeed: 0.07,
       surge: 0.6,         // quick — this one rushes
@@ -2087,7 +2084,6 @@ export const PRESETS: Preset[] = [
       macroCells: 0,
       macroLacing: 0,
       macroDepth: 0,
-      macroEdgeDetail: 0,
       macroRelief: 0,
       /*
         Flat comic inks in the dish, with no beads or gloss (PLAN 28i-3b):

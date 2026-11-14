@@ -4561,7 +4561,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 }
                 bubbles.spawn(bx, by, (0.9 + bass01 * 1.2) * GRID_SCALE, 2 + DICE.music.int(3), 3 * GRID_SCALE);
               }
-              stepPlateBubbles(bubbles, fluidsRef.current[0], currentSettings, simStepS, tiltX, tiltY, currentAudioData ? Math.min(1, currentAudioData.treble / 70) : 0);
+              stepPlateBubbles(bubbles, fluidsRef.current[0], currentSettings, simStepS, tiltX, tiltY);
             }
             rock.lastBass = bass01;
           }

@@ -83,7 +83,6 @@ export function stepPlateBubbles(
   simStepS: number,
   tiltX: number,
   tiltY: number,
-  treble01: number,
 ): void {
   const vx = lead?.readVx, vy = lead?.readVy;
   const qk = particleFlowScale(lead, currentSettings);
@@ -96,7 +95,7 @@ export function stepPlateBubbles(
     const ix = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(bx)));
     const iy = Math.max(0, Math.min(GRID_SIZE - 1, Math.round(by)));
     return [vx[ix + iy * GRID_SIZE] * qk, vy[ix + iy * GRID_SIZE] * qk];
-  }, tiltX, tiltY, treble01 * 0.6);
+  }, tiltX, tiltY);
   // A bubble is air between the plates: the dye cannot sit under
   // it. A standing squeeze on each footprint keeps pumping the
   // dye out to the rim, so the field flows round the bubbles

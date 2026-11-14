@@ -3401,6 +3401,21 @@
       ]
     },
     {
+      "name": "The closeup of a still plate is still, and lit from beneath",
+      "shard": "open",
+      "run": "npm run stillcloseup",
+      "timeout": 8,
+      "why": [
+        "Nothing drawn over the closeup moves or lights it (PLAN 38u-1 to 38u-3):",
+        "a plate that is not stepped draws the same picture ten seconds on, a",
+        "still bubble keeps its colours, the ground round a pool is as bright",
+        "on every side (no lamp above the plate), and Depth / Focus changes",
+        "nothing where the camera is in focus. Each line has a control that",
+        "must read over its bar. The lab only; it runs on the runner's own",
+        "adapter, and the step carries a timeout of its own."
+      ]
+    },
+    {
       "name": "The Turing pattern and its print",
       "shard": "fifth",
       "run": "npm run turing",

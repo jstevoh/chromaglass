@@ -46,4 +46,4 @@ The shader sources, as TypeScript modules that export WGSL strings (`/* wgsl */`
 
 ## Checks
 
-`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. A changed constant: `checkguard`.
+`npm run wgsl` (every shader compiles), then as relevant `physics`, `maze`, `spikes`, `disc`, `fingers`, `ferrohands`, `domes`, `ferrodye`, `microscope`, `straw`, `derive`, `grating`. `plate.ts`: `pops`, `ferrolook`, `filmrings`, `mixer`, `grainedge`, `stillcloseup` (the closeup: nothing drawn moves on the clock or lights the plate from above), `lampzero`, `lampfield`, `litstage` and a `look` render. `output.ts`: `map`, `beams`, `wallpattern`. Also `sloshgpu`, `soapgpu`, `boilgpu`, `particles`. A changed constant: `checkguard`.

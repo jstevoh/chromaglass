@@ -14,7 +14,7 @@ Left out on purpose: the macro closeup's 3D beads (their tops, rims and the mask
 the "Closer 3D macro view" work owns now (14ab-6, #601).
 
 The music's stir, from the third pass (38u, 2026-11-13; its ranked list is in section 38u,
-which the audit's own PR adds at the foot of this file, and these lines join it there):
+at the foot of this file):
 
 - ~~**38u-5. Mid and treble stir the dye directly**~~, and ~~**38u-4**'s multiplier~~ —
   **Shipped 2026-11-13** (the story is in `docs/plan-shipped.md`). The solver's step takes no
@@ -665,6 +665,116 @@ rendering device for dye below the grid and not a fluid claim. The lamp's colour
 applied after the additive glints and lines, which a lamp's colour cannot reach (for
 **35e-3**).
 
+## 38u. A third pass: what is still drawn, scripted or pushed by sound (asked 2026-11-13)
+
+The owner, 2026-11-13: "look through the visualization code to make sure things are actually
+based on real physics." Four readers took the plate shader (two halves), the solver's kernels
+and the CPU side with the sound's paths; the ferrofluid, the soap film and the closeup's fine
+dye were left to their threads. Ranked by how many looks show each, most first. An item that
+an older item already holds is named there and only ranked here; `none` means it is new. What
+the readers found physical is added to the list at the foot of this file.
+
+Shipped with this pass (the closeup, `npm run stillcloseup`):
+
+- ~~**38u-1. Edge Detail**~~ — **Shipped, this PR** (47a-7's part a; the setting is gone, on the
+  desks and the phone). The closeup read the plate through two octaves of value noise that
+  drifted on the clock and swelled on the beat. Surface tension holds an edge smooth at this
+  scale. Part b of the owner's report (the beads' scalloped outline at Edge Detail 0) is the
+  beads' 512² mask, fixed by 38h-17 in its own PR.
+- ~~**38u-2. Depth / Focus drew a lamp above the plate**~~ — **Shipped, this PR.** A paper's
+  fibre on the ground, the dye's shadow thrown down-right onto it (20% across a pool's edge in
+  the lab) and thick dye brightened over thin. Depth / Focus is the camera's depth of field now.
+- ~~**38u-3. The bubble film's colour swayed on a sine of the time**~~ — **Shipped, this PR.**
+
+On in every look, or nearly:
+
+- **38u-4. Turbulence is curl noise on a clock, and the music turns it up with no cord** (M;
+  High). `wgsl/fluid/forces.ts:108-120`, sized by `stirOf` (`lib/stir.ts`), which multiplies it
+  by the sound's energy up to 2×. Turbulence 0.5 by default, set in 18 of 19 looks. §18 keeps
+  the noise as a named dial ("a hand stir"); the energy multiplier is new and breaks the rule
+  that sound reaches the plate only through cords. ~~First the multiplier becomes a cord (S).~~
+  (Shipped 2026-11-13 with 38u-5.)
+  Then the stir is a tool: a stick moved through the liquid as a Brinkman solid on a path, as
+  the Finger is, or the lamp's convection (38f). none.
+- ~~**38u-5. Mid and treble stir the dye directly**~~ — **Shipped 2026-11-13** with 38u-4's
+  multiplier (the owner chose "route it through cords"; see the note at the head of this file,
+  `npm run musicstir`, judging 131). As found: (S; High). `sim/fluidSimulation.ts:3076-3082`
+  sets `spin` from (0.6·mid + 0.4·treble)·Audio Impact over 0.08, and `forces.ts:134-145`
+  turns it into a noise curl wherever there is dye. No actuator and no cord. Either it goes,
+  or it is a cord to something real: the motor, Beat Squeeze, a tap on the glass as −∂h/∂t.
+  none.
+- **38u-6. The music speeds and slows the solver's clock** (M; High). `fluidSimulation.ts:
+  2794-2817` multiplies dt by `clockLean` (Surge), `tempoMul` (Tempo Sync) and `paceMul`. The
+  whole plate's physics runs faster on a loud bar, which is whole-frame motion from sound, and
+  dt stops being seconds, so every SI rate (`D_MOLECULAR`, the lamp's cooling, the drag) is
+  off by that factor. dt is real seconds times Speed; the music's pace reaches forces through
+  cords. none.
+- **38u-7. The force between colours changes sign in patches** (S; Medium). Polarity's push
+  (`forces.ts:147-167`) is multiplied by 1 + 2·snoise, which is negative where the noise is
+  under −0.5: there it pulls unlike colours together, the backward diffusion that had the
+  fingering push removed. Polarity 0.5 in every look. Drop the noise now; the force itself is
+  **18d-6**'s (dyes in water mix, only oil and water hold a line).
+- **38u-8. Granulation is value noise** (M; High, the owner's call). `plate.ts` grainAt and
+  pigmentGrain: the solver carries the speckle's coordinates, so it moves rightly, but the
+  speckle is invented and scales the dye's depth at every pixel. Granulation 0.5 by default,
+  on in every look. A dye in solution has no grain; a pigment (India ink) flocculates. The
+  real thing is a concentration the solver carries below the grid (the particles, the fine
+  dye of 47a). Until then the choice is the owner's: default 0, or keep it named as a
+  shortcut. 38h-9 holds only its scale at zoom. none.
+- **38u-10. The dye's refractive index is three times a stand-in** (S; Medium, changes the
+  Becke lines on every dye-only look). calcOpl adds d·0.015·max(1, 3·Boundary Contrast). A
+  few percent of dye raises water's index by about 1e-3 (dn/dc near 0.15 mL/g). A measured
+  dn/dc for each dye, and any boost a dial that says so. none (beside 18e-2).
+- **38u-11. Glass Smear slides the cover glass along a noise path, always** (S; Medium).
+  `fluidSimulation.ts:3129-3133`, noise2D(0.3 t), Glass Smear 0.3 by default and in 17 looks;
+  uniform, so the liquid leaves by the rim on one side and comes back on the other (18a-2).
+  The glass moves when a hand or a cord moves it; default 0. 27a-3 holds only its units.
+- Ranked here, held elsewhere: the black ground paints dye as light (**18b-2**, 23 of 35
+  looks); the line between two dyes is a colour difference fed to the pupil (**18e-2**,
+  **18e-1**); the gooey contrast curve decides where every edge falls (**18b-4**, the lit
+  ground only: the dark ground needs it too).
+
+On in many looks:
+
+- **38u-12. Rain Drip pulls heavy dye "down" a level plate** (S; Medium, changes 14 looks).
+  `thinGap.ts:357`: DRIP_WEIGHT·drip along `S.up`, not scaled by the plate's tilt. The in-plane
+  share of gravity is g·sin θ, nothing on a level stage, where heavy dye only slumps (built).
+  Scale it by the tilt (Plate Rock, Gravity) and give the looks that lean on it a tilt. none.
+- **38u-13. Kicks make air from nowhere** (S–M; Medium). On an onset 2 to 4 bubbles appear at
+  random places (`LiquidVisualizer.tsx:4549-4562`). Air enters under a drop that lands
+  (Oguz–Prosperetti) or through the straw. Tie the births to the drops the music pours. 38b-3
+  holds the turnover only. none. ~~The treble's shake of every pocket~~ (`lib/bubbles.ts`, two
+  random draws a step, up to 1.2 cells a second) **shipped, this PR**: a 2 mm pocket between
+  glasses is not shaken by the room's sound (0.083 cells of wander in two seconds → 0).
+- **38u-14. A clear drop's lens is drawn at a third** (S; Low-Medium). `plate.ts` mixes the
+  oil drop's band at 0.35 where there is no dye and the bubble's at 0.7 in clear liquid, and
+  tints clear oil by a flat (0.99, 0.97, 0.93) whatever its thickness. The aperture's band is
+  as real in clear water; the tint is exp(−α·thickness). none.
+- **38u-15. The drain fades the dye** (S; Low). `wgsl/fluid/dye.ts:318-328`: the inward speed
+  grows with distance, the swirl is constant, the dye is scaled to 0.62 over 50 frames. A sink
+  flows at Q/2πrh and conserves angular momentum (both ∝ 1/r), and the dye leaves by the
+  hole. none.
+- Ranked here, held elsewhere: Centre Gravity's fixed pull (**18a-4**, 25 looks); Vibration's
+  standing wave (**18a-2**, 23 looks, and it moves the dye by 1e-4, a pass for nothing: see
+  46); `gapMemory` (**18a-5**); the dye's "evaporation" and the budget (**18g-4**, **18c-2**);
+  Updraft (**38t**); the Auto camera's breath (**27a-8-1**); the standing lamp's heat units
+  (**27f-9g**: LAMP_HEATING is worked for 1 mm of a 2 mm gap).
+
+Behind a dial at 0, or in one look:
+
+- **38u-9. The drawn textures that are left** (M, one PR; Low-Medium). Each is noise or a hash
+  on a clock, drawn over the liquid: Macro Lacing (fbm filaments on `U.time`, Lacing Run only;
+  `npm run stillcloseup` prints 3.2% of its frame moving on a still plate, and Paint Cells at 1 the same), Lacing's pale
+  thread (its level jittered by fbm on the clock), Paint Cells and the plate's Cells
+  (`cellField` on a clock; **20c-1** holds the closeup's), Satellite Droplets (a hashed
+  lattice that never moves with the flow; 38h fixed their optics, not their places), Thin
+  Film at Film Physics 0 (**38m**, **38n-2**), Colour Body (a chroma grade), the glitter's
+  rebirth timer (`SPECK_LIFE`), the straw's satellites born at a rate and a random angle, the
+  round dish's shade and Lamp Warmth's vignette (**38a-2**), Gray–Scott's drift (**26d-6a**).
+  Each either becomes its phenomenon (viscous fingers and dewetting for the lacing,
+  Bénard–Marangoni cells from the heat field, droplets from the beads) or goes, as Edge
+  Detail did. Lacing Run's subject is its lacing, so that one waits for §20's film to draw it.
+
 ## What is already physical, and should be left alone
 
 The Hele-Shaw solve (implicit 12ν/h² drag, h-weighted mobility on harmonic faces, the open
@@ -678,3 +788,12 @@ the lace film's thin-film and disjoining equation, the soap film's Darcy flow an
 colour. Beer–Lambert through the dye, Planck and CIE for the lamp's colour, the derive
 pass's optical path with real indices, and the projector's drop and bubble bands from the
 pupil's acceptance with no highlight. A later pass should not touch these to "tune" a look.
+
+Added by the third pass (38u), read and found physical: the spin's drag in the rotating frame
+with its centrifugal term; the Stefan suction in the gap's spring; heat carried as h·T with a
+Beer–Lambert source and Kell's density; Blow as τh/2μ; the Oregonator and Keller–Rubinow's
+rings; `D_MOLECULAR`, `KAPPA_WATER`, `WATER_NU`, `OIL_NU` and Grunberg–Nissan's mixing; the
+bubbles' Taylor–Saffman speed and Bretherton film; Plate Rock and the motor; the milk's
+Kubelka–Munk and extinction; `defocusShadow`, `pouredDn` and the indices; `lampField` and
+`pupilPass`; the closeup's bubble wall (Snell, Fresnel, total internal reflection); the
+glitter's Stokes, Jeffery and Poiseuille; the pH, BZ and Liesegang colours as Beer–Lambert.

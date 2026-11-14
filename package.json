@@ -274,6 +274,7 @@
     "nolight": "node scripts/nolight.mjs",
     "closeupdepth": "node scripts/closeupdepth.mjs",
     "macroview": "node scripts/macroview.mjs",
+    "stillcloseup": "node scripts/stillcloseup.mjs",
     "turing": "node scripts/turing.mjs",
     "royopen": "node scripts/royopen.mjs",
     "lamp": "node scripts/lamp.mjs",
