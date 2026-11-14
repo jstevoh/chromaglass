@@ -41,6 +41,14 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { musicCall, playerOf } from './assistantMusic.js';
+import { earCall } from './assistantEar.js';
+import { recordCall, recordOf } from './assistantRecord.js';
+import { inputsOf, soundDevice } from './assistantSound.js';
+import { mediaCall, mediaOf } from './assistantMedia.js';
+import { midiPortsOf, outputsGuard } from './assistantOutputs.js';
+import { projectorGuard } from './assistantProjector.js';
+import { deskGuard, deskLeast } from './assistantDesk.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -102,7 +110,7 @@ const SONG_PLAY = new Set(['pour', 'burst', 'dyes', 'zoom', 'kaleidoscope', 'loo
 const SONG_KICKS_MIN = 2;
 const SONG_WHEN = new Set(['start', 'time', 'section', 'kick', 'before-end']);
 /** Full only: what a person at the desk can do that a Play assistant cannot. */
-const FULL_ACTIONS = new Set([
+export const FULL_ACTIONS = new Set([
   'play', 'pause', 'seed', 'clear', 'drain', 'lucky', 'automate-on', 'automate-off',
   'overlays-off', 'overlays-on', 'preset-next', 'preset-prev', 'blackout-toggle',
   'record-toggle', 'live-start', 'live-test', 'live-stop', 'performance-toggle', 'back',
@@ -110,6 +118,27 @@ const FULL_ACTIONS = new Set([
   'mix-fade-film', 'mix-fade-mark',
 ]);
 const RANK = { off: 0, suggest: 1, play: 2, full: 3 };
+/** A typed bpm's range: the beat clock's own (app/tempoNow.ts `TEMPO_MIN_BPM`, `TEMPO_MAX_BPM`; `npm run assistant` holds the two the same). */
+export const TEMPO_MIN_BPM = 60;
+export const TEMPO_MAX_BPM = 200;
+const TEMPO_DO = new Set(['bpm', 'tap', 'heard']);
+/*
+  The set list and the song shows (PLAN 44k-3, 44k-5), each call's least
+  mode. Arming changes nothing until Go, and reading is looking: Suggest. A
+  Go now, the fade, a show run and a nudge are Play, as Go is. The back plate
+  is half the wall, and Follow decides every later song: Full.
+*/
+const SET_DO = new Map([['arm', 'suggest'], ['cancel', 'suggest'], ['fade', 'play'], ['go-now', 'play'], ['back-armed', 'full'], ['back-look', 'full'], ['back-follow', 'full']]);
+const SONGS_DO = new Map([['read', 'suggest'], ['remove', 'play'], ['start', 'play'], ['stop', 'play'], ['nudge', 'play'], ['follow', 'full']]);
+/** The Go's fade, seconds: the desk's own choices (lib/lookFade.ts `FADE_CHOICES`; `npm run assistant` holds the two the same). */
+export const SET_FADES = [0, 1, 2, 4, 8];
+/** A song nudge by seconds, at most this far either way (app/songShowNow.ts `SONG_NUDGE_MAX_S`). */
+export const SONG_NUDGE_MAX_S = 30;
+const SONG_NUDGE_TO = new Set(['next-section', 'section-start', 'reset']);
+/** The id prefix of a song action the assistant added (app/songShowNow.ts `ASSISTANT_ACTION_PREFIX`): in Play it takes out only these. */
+export const ASSISTANT_ACTION_PREFIX = 'asst-';
+/** The sources the assistant may pick (app/soundNow.ts's ASSISTANT_SOURCES): a file needs the player's own choice of file. */
+export const SOUND_SOURCES = new Set(['none', 'microphone', 'system', 'simulated', 'drone']);
 
 /**
  * The owner's switch. `CHROMAGLASS_ASSISTANT` (off, suggest, play or full)
@@ -150,6 +179,8 @@ export function createAssistantGuard(send, now = Date.now) {
 
   const sentLog = new Map();       // key -> [{ t, v }] of the last ECHO_MS, numeric
   const refuse = (reason) => ({ ok: false, reason });
+  /** The number the display's answer comes back under: the assistant's own message id (PLAN 44f-4). */
+  const answerOf = (m) => (Number.isInteger(m?.id) ? { answer: m.id } : {});
   /*
     Whether a value the display reports is the assistant's own, come back.
     The display's snapshot is throttled and runs behind, and it rounds a value
@@ -262,6 +293,20 @@ export function createAssistantGuard(send, now = Date.now) {
   */
   const lookStarted = (t, id) => { lastLook = t; quietUntil = t + fadeSeconds * 1000 + ECHO_MS; remember({ kind: 'go', id }); };
 
+  /** A start's named destinations: none (the panel's choice), the names, or why not. */
+  function liveNames(raw, test) {
+    if (raw === undefined || raw === null) return null;
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > 8 || raw.some((n) => typeof n !== 'string' || !n.trim() || n.length > 60)) {
+      return 'destinations: a list of up to eight saved destinations\' names (show_state\'s liveSetup)';
+    }
+    if (show.destinations) {
+      const kind = show.destinations.filter((d) => d.test === test).map((d) => d.name);
+      const unknown = raw.filter((n) => !kind.some((k) => k.trim().toLowerCase() === n.trim().toLowerCase()));
+      if (unknown.length) return `no saved ${test ? 'test' : 'live'} destination named ${unknown.map((n) => `"${n}"`).join(', ')} (saved: ${kind.join(', ') || 'none'})`;
+    }
+    return raw.map((n) => n.trim());
+  }
+
   return {
     /** The display's snapshot: what the plate is set to, and what the performer moved since. */
     onDisplayState(state) {
@@ -276,7 +321,42 @@ export function createAssistantGuard(send, now = Date.now) {
         }
       }
       settings = { ...next };
-      show = { activePresetId: state.activePresetId ?? null, cuedPresetId: state.cuedPresetId ?? null, blackout: state.blackout === true };
+      show = {
+        activePresetId: state.activePresetId ?? null, cuedPresetId: state.cuedPresetId ?? null, blackout: state.blackout === true,
+        // The names of the live stream's saved destinations (PLAN 44j), so a
+        // start to a name that is not one is refused here with the list,
+        // where the assistant hears why.
+        destinations: Array.isArray(state.liveSetup?.destinations) ? state.liveSetup.destinations.map((d) => ({ name: String(d?.name ?? ''), test: d?.test === true })) : null,
+        // The bench and the sequences (PLAN 44k-6, 44k-8), so a bottle or a
+        // sequence that is not there is refused here with the list. Null from
+        // a display one build older, which then judges them itself.
+        bottles: Array.isArray(state.bench?.bottles) ? state.bench.bottles.map((b) => ({ id: String(b?.id ?? ''), name: String(b?.name ?? '') })) : null,
+        sequences: Array.isArray(state.sequencer?.sequences) ? state.sequencer.sequences.map((q) => ({ id: String(q?.id ?? ''), name: String(q?.name ?? ''), stages: Number(q?.stages) || 0 })) : null,
+        sequenceId: typeof state.sequencer?.selectedId === 'string' ? state.sequencer.selectedId : null,
+        // A run, playing or paused, and how many stages its sequence has: a
+        // stage is a stage of the run (useShowSequencer's goTo), never of
+        // the one chosen since, and with no run a stage would start the show
+        // without the performer's Pacing held, so it is refused.
+        run: typeof state.sequencer?.name === 'string' && Array.isArray(state.sequencer.stages) ? state.sequencer.stages.length : null,
+        legacySeq: !state.sequencer || !('sequences' in state.sequencer),
+        tempoSource: typeof state.tempo?.source === 'string' ? state.tempo.source : null,
+        // The set list and the song shows (PLAN 44k-3, 44k-5), so an item
+        // past the list or a show that is not there is refused here with the
+        // list. Null from a display one build older, which then judges them.
+        setItems: Array.isArray(state.set?.items) ? state.set.items.map((i) => ({ look: typeof i?.look === 'string' ? i.look : null, kind: String(i?.kind ?? '') })) : null,
+        songShows: Array.isArray(state.songShows?.shows) ? state.songShows.shows.map((x) => ({ id: String(x?.id ?? ''), song: String(x?.song ?? '') })) : null,
+        songCurrent: typeof state.songShows?.current === 'string' ? state.songShows.current : null,
+        songRunning: state.songShows && typeof state.songShows === 'object' ? !!state.songShows.running : null,
+        // The music player (PLAN 44k-2): loaded or not, its length, the shelf's titles.
+        player: playerOf(state.player),
+        // Recording (PLAN 44k-11): the containers the encoder writes and the Takes' ids.
+        record: recordOf(state.record),
+        inputs: inputsOf(state.sound),
+        // Film, pours, the room and the mark (PLAN 44k-13): the cameras' names and the shelf's cartoons.
+        media: mediaOf(state.media),
+        // OSC out and MIDI (PLAN 44k-14): the MIDI ports by the panel's names.
+        midiPorts: midiPortsOf(state.outputs),
+      };
     },
 
     /** A phone's, OSC's or Art-Net's message on its way to the display: a patch is the hand. */
@@ -338,6 +418,10 @@ export function createAssistantGuard(send, now = Date.now) {
           quietUntil = t + fadeSeconds * 1000 + ECHO_MS;
           return { ok: true, undid: 'look' };
         }
+        if (entry.kind === 'desk') {
+          send({ type: 'assistant-desk', do: 'tab-restore' });
+          return { ok: true, undid: 'the tab taken away, if the desk took it: show_state\'s desk.tabs reads it' };
+        }
         if (entry.kind === 'action') {
           // A toggle undoes itself, unless the performer has toggled it back already.
           if (show.blackout !== entry.after) return refuse('the performer has changed the blackout since');
@@ -377,11 +461,14 @@ export function createAssistantGuard(send, now = Date.now) {
           if (why) return refuse(why);
           const pace = paced('patch', mode, t);
           if (pace) return refuse(pace);
+          const going = action === 'live-start' || action === 'live-test';
+          const names = going ? liveNames(message.destinations, action === 'live-test') : null;
+          if (typeof names === 'string') return refuse(names);
           count('patch', mode, t);
           if (action === 'blackout-toggle') remember({ kind: 'action', action, after: !show.blackout });
           // The stream has its own message, which the relay takes from no one
           // but this guard: a phone may end a stream and never start one.
-          if (action === 'live-start' || action === 'live-test') send({ type: 'assistant-live', test: action === 'live-test' });
+          if (going) send({ type: 'assistant-live', test: action === 'live-test', ...(names ? { names } : {}) });
           else send({ type: 'action', action });
           return { ok: true };
         }
@@ -413,7 +500,10 @@ export function createAssistantGuard(send, now = Date.now) {
           return refuse(what.do === 'look' ? 'in Play a look never changes on the kicks: put it on a section' : `in Play a song action fires at most every ${SONG_KICKS_MIN} kicks`);
         }
         count('patch', mode, t);
-        send({ type: 'song-action', when, what });
+        // With the number its answer comes back under: the display can still
+        // drop it (no song by the time it lands, the cap reached, a what it
+        // does not know), and says so to the assistant (PLAN 44f-4).
+        send({ type: 'song-action', when, what, ...answerOf(message) });
         return { ok: true };
       }
 
@@ -425,6 +515,247 @@ export function createAssistantGuard(send, now = Date.now) {
         caps them (src/lib/pourText.ts `parsePourText`); here only the shape
         is held, so nothing but rows and a colour goes on.
       */
+      /*
+        The sound source (PLAN 44j): the room's, so Full only. On air too
+        (PLAN 44j-2, the owner 2026-11-10: "I shouldn't have to click the
+        system audio ever"). 44j refused it on air, because the encoder then
+        took the sound once at Go and a change left the stream silent; since
+        37x-4f-2 the stream moves to the new source without stopping
+        (lib/liveShow.ts `setLiveAudio`, called whenever the show's stream
+        changes, whoever changed it), so the refusal only stood between the
+        assistant and a stream it was asked to run.
+      */
+      if (type === 'assistant-sound') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (!SOUND_SOURCES.has(message.source)) return refuse(`no such source: ${String(message.source)} (${[...SOUND_SOURCES].join(', ')})`);
+        // The microphone's input by name (PLAN 44k-12, assistantSound.js).
+        const dev = message.device === undefined ? {} : soundDevice(message, show.inputs);
+        if (dev.reason) return refuse(dev.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-sound', source: message.source, ...(dev.device === undefined ? {} : { device: dev.device }), ...answerOf(message) });
+        return { ok: true };
+      }
+
+      /*
+        The tempo (PLAN 44k-7): what the desk's Tempo block does, in Play,
+        paced as a setting is, since a new tempo moves everything on the
+        beat at once. A bpm outside the beat clock's range is refused, not
+        folded into it as the clock would, so the assistant hears that its
+        number was not the one used. Link is Full: it joins the room's
+        network session, other people's machines included.
+      */
+      if (type === 'assistant-tempo') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (!TEMPO_DO.has(message.do)) return refuse(`tempo: bpm, tap or heard, not ${String(message.do)}`);
+        const bpm = Number(message.bpm);
+        if (message.do === 'bpm' && !(Number.isFinite(bpm) && bpm >= TEMPO_MIN_BPM && bpm <= TEMPO_MAX_BPM)) return refuse(`a bpm from ${TEMPO_MIN_BPM} to ${TEMPO_MAX_BPM} (the beat clock's range), not ${String(message.bpm)}`);
+        // While Link leads, the beat clock reads Link's tempo and a typed one
+        // would be kept underneath, unheard (lib/tempo.ts `bpm`, `active`):
+        // refused, so the assistant does not report a tempo the clock is not at.
+        if (message.do !== 'heard' && show.tempoSource === 'link') return refuse('Ableton Link leads the tempo now: switch link off first (Full), or set the tempo in Live');
+        count('patch', mode, t);
+        send(message.do === 'bpm' ? { type: 'assistant-tempo', do: 'bpm', bpm } : { type: 'assistant-tempo', do: message.do });
+        return { ok: true };
+      }
+      if (type === 'assistant-link') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const on = typeof message.on === 'boolean' ? message.on : undefined;
+        const transport = typeof message.transport === 'boolean' ? message.transport : undefined;
+        if (on === undefined && transport === undefined) return refuse('link: on, transport, or both, as true or false');
+        count('patch', mode, t);
+        send({ type: 'assistant-link', ...(on === undefined ? {} : { on }), ...(transport === undefined ? {} : { transport }) });
+        return { ok: true };
+      }
+
+      /*
+        The Sequence (PLAN 44k-8): choose one by name or id, as show_state
+        lists them, or go to a stage by its number. Play, paced as a
+        setting, since a stage is a look change on its own clock.
+      */
+      if (type === 'assistant-seq') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        if (typeof message.select === 'string') {
+          const want = message.select.trim().toLowerCase();
+          const hit = show.sequences ? show.sequences.find((q) => q.id === message.select || q.name.trim().toLowerCase() === want) : { id: message.select };
+          if (!hit) return refuse(`no sequence named "${message.select}" (there are: ${show.sequences.map((q) => q.name).join(', ') || 'none'})`);
+          count('patch', mode, t);
+          send({ type: 'assistant-seq', select: hit.id });
+          return { ok: true };
+        }
+        if (!Number.isInteger(message.stage)) return refuse('sequence: select a sequence, or a stage by its number');
+        if (message.stage < 0) return refuse('a stage by its number, from 1');
+        const n = show.run;
+        if (n === null && !show.legacySeq) return refuse('no sequence is running or paused: sequencer play first, then a stage');
+        if (n !== null && message.stage >= n) return refuse(`stage ${message.stage + 1} of a sequence with ${n} stage${n === 1 ? '' : 's'}`);
+        count('patch', mode, t);
+        send({ type: 'assistant-seq', stage: message.stage });
+        return { ok: true };
+      }
+
+      /*
+        The set list (PLAN 44k-3): an item by its number (from 0 here, 1 to
+        the assistant). Past the list is refused with its length, a fade off
+        the desk's choices with them (3 s would light no segment of its Fade).
+        A Go now is under Go's gap and on Undo's list, but not a sequence's
+        item: Undo's Back would leave the sequence running.
+      */
+      if (type === 'assistant-set') {
+        const least = SET_DO.get(message.do);
+        if (!least) return refuse(`set list: arm, cancel, fade, go-now, back-armed, back-look or back-follow, not ${String(message.do)}`);
+        const why = needs(mode, least) ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const seconds = message.seconds ?? undefined;
+        const fades = `${SET_FADES.join(', ')} seconds (0 a cut), the desk's choices`;
+        if ((seconds !== undefined || message.do === 'fade') && !SET_FADES.includes(seconds)) return refuse(`a fade of ${fades}, not ${String(seconds)}`);
+        const look = typeof message.look === 'string' && message.look ? message.look : null;
+        if (message.do === 'back-look' && !look) return refuse('a look id for the back plate');
+        const byItem = message.do === 'arm' || (message.do === 'go-now' && !look);
+        const items = show.setItems;
+        if (byItem) {
+          if (!Number.isInteger(message.item) || message.item < 0) return refuse('an item by its number, from 1');
+          if (items && message.item >= items.length) return refuse(items.length ? `item ${message.item + 1} of a set of ${items.length}` : 'the set list is empty: arm a look by its id (arm_look)');
+        }
+        const going = message.do === 'go-now' || message.do.startsWith('back-');
+        if (going) { const gap = lookChange(mode, t); if (gap) return refuse(gap); }
+        if (message.do === 'back-armed' && !show.cuedPresetId) return refuse('nothing is armed: arm an item or a look first');
+        count('patch', mode, t);
+        if (message.do === 'go-now') {
+          const item = byItem ? items?.[message.item] ?? null : null;
+          if (item?.kind === 'sequence') lastLook = t;
+          else lookStarted(t, byItem ? item?.look ?? null : look);
+        } else if (going) lastLook = t;
+        send({ type: 'assistant-set', do: message.do, ...(byItem ? { item: message.item } : {}), ...(look ? { look } : {}), ...(seconds !== undefined ? { seconds } : {}), ...answerOf(message) });
+        return { ok: true };
+      }
+
+      /*
+        The song shows (PLAN 44k-5). In Play an action comes out only if it
+        is the assistant's own (asst-): what the performer programmed is
+        theirs, as a setting they moved is. A show not there is refused with
+        the list, as a sequence is.
+      */
+      if (type === 'assistant-songs') {
+        const least = SONGS_DO.get(message.do);
+        if (!least) return refuse(`song shows: read, remove, start, stop, nudge or follow, not ${String(message.do)}`);
+        const why = needs(mode, least) ?? (message.do === 'read' ? null : paced('patch', mode, t));
+        if (why) return refuse(why);
+        const out = { type: 'assistant-songs', do: message.do };
+        if (message.do === 'read' || message.do === 'start') {
+          const named = typeof message.show === 'string' && message.show.trim() ? message.show : null;
+          const list = show.songShows;
+          if (named && list) {
+            const want = named.trim().toLowerCase();
+            const hit = list.find((x) => x.id === named) ?? list.find((x) => x.song.trim().toLowerCase() === want);
+            if (!hit) return refuse(`no song show "${named}" (there are: ${list.slice(0, 12).map((x) => x.song).join('; ') || 'none'}${list.length > 12 ? `; and ${list.length - 12} more` : ''})`);
+            out.show = hit?.id ?? named;
+          } else if (named) out.show = named;
+          else if (list && !show.songCurrent) return refuse('the song playing has no show: name one, as show_state\'s songs.shows lists them');
+          if (message.do === 'start') { const gap = lookChange(mode, t); if (gap) return refuse(gap); lastLook = t; }
+        }
+        if (message.do === 'remove') {
+          if (typeof message.actionId !== 'string' || !message.actionId) return refuse('an action by its id, as song_show lists them');
+          if (mode !== 'full' && !message.actionId.startsWith(ASSISTANT_ACTION_PREFIX)) return refuse(`in Play the assistant takes out only its own actions (ids beginning ${ASSISTANT_ACTION_PREFIX}): ${message.actionId} is the performer's, and Full takes it out`);
+          out.actionId = message.actionId;
+        }
+        if (message.do === 'stop' && show.songRunning === false) return refuse('no song show is running');
+        if (message.do === 'nudge') {
+          if (SONG_NUDGE_TO.has(message.to)) out.to = message.to;
+          else if (Number.isFinite(message.seconds) && message.seconds !== 0 && Math.abs(message.seconds) <= SONG_NUDGE_MAX_S) out.seconds = message.seconds;
+          else return refuse(`nudge: to next-section, section-start or reset, or seconds up to ${SONG_NUDGE_MAX_S} either way`);
+        }
+        if (message.do === 'follow') {
+          if (typeof message.on !== 'boolean') return refuse('follow: on, as true or false');
+          out.on = message.on;
+        }
+        if (message.do !== 'read') count('patch', mode, t);
+        send({ ...out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      /*
+        The music player (PLAN 44k-2): the sound source's own, so Full, and
+        paced as a setting. The rules, the one place the assistant's words
+        reach this Mac's files included, are assistantMusic.js's.
+      */
+      if (type === 'assistant-music') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = musicCall(message, show.player);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-music', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Calibrate, the song detector and Listen (PLAN 44k-10): assistantEar.js's rules, Full.
+      if (type === 'assistant-ear') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = earCall(message, settings);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-ear', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Recording's options and the Takes (PLAN 44k-11): assistantRecord.js's rules, Full.
+      if (type === 'assistant-record') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = recordCall(message, show.record);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-record', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+      // Film, pours, the room camera and the mark (PLAN 44k-13): assistantMedia.js's rules, Full.
+      if (type === 'assistant-media') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = mediaCall(message, show.media);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-media', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // OSC out and MIDI (PLAN 44k-14): assistantOutputs.js's rules, Full; OSC in and Syphon are the relay's own.
+      if (type === 'assistant-outputs') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = outputsGuard(message, show.midiPorts);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-outputs', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // The projector and the wall (PLAN 44k-15): assistantProjector.js's rules, Full.
+      if (type === 'assistant-projector') {
+        const why = needs(mode, 'full') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = projectorGuard(message);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        send({ type: 'assistant-projector', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // The desk (PLAN 44k-16, 44k-17): assistantDesk.js's rules; the tab up and the hand in Play, the rest Full.
+      if (type === 'assistant-desk') {
+        const why = needs(mode, deskLeast(message.do)) ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = deskGuard(message);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        // A delete or a reset of every tab is Undo's to put back; the page keeps what it took.
+        if (call.out.op === 'delete' || call.out.op === 'reset-all') remember({ kind: 'desk' });
+        send({ type: 'assistant-desk', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
       if (type === 'pour-text') {
         const why = needs(mode, 'play') ?? paced('patch', mode, t);
         if (why) return refuse(why);
@@ -437,11 +768,45 @@ export function createAssistantGuard(send, now = Date.now) {
         return { ok: true };
       }
 
+      /*
+        A song's credit as the corner caption (PLAN 37x-10j): what a set
+        played from files wants at each track's start, now that the owner
+        found the poured title hard to read. Play, paced as a setting change,
+        like the poured words above; only the four strings go on, each held
+        short here, and the page reads them as untrusted again
+        (src/lib/songCaption.ts `parseSongCaption`).
+      */
+      if (type === 'song-title') {
+        const why = needs(mode, 'play') ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const str = (v) => (typeof v === 'string' ? v.slice(0, 200) : '');
+        const title = str(message.title).trim();
+        if (!title) return refuse('a song title needs the title');
+        count('patch', mode, t);
+        send({ type: 'song-title', title, artist: str(message.artist), album: str(message.album), label: str(message.label) });
+        return { ok: true };
+      }
+
       if (GESTURES.has(type)) {
         const why = needs(mode, 'play') ?? paced('gesture', mode, t);
         if (why) return refuse(why);
+        // A bottle by id or name, as show_state's bench lists them (PLAN 44k-6):
+        // one this bench does not have is refused with the bench's list, where
+        // the display would only drop it in silence.
+        // Named `bottle` on the way in, since every message from the assistant
+        // carries its own `id` (the number its answer comes back under).
+        if (type === 'liquid') {
+          const want = String(message.bottle ?? '').trim().toLowerCase();
+          const hit = show.bottles ? show.bottles.find((b) => b.id === message.bottle || b.name.trim().toLowerCase() === want) : { id: String(message.bottle ?? '') };
+          if (!hit) return refuse(`no bottle "${String(message.bottle)}" on the bench (there are: ${show.bottles.map((b) => b.name).join(', ')})`);
+          count('gesture', mode, t);
+          send({ type: 'liquid', id: hit.id });
+          return { ok: true };
+        }
         count('gesture', mode, t);
-        send(message);
+        // A spin's `id` is the finger (two ids are two hands), so the
+        // assistant's finger comes in as `hand`, not as its answer's number.
+        send(type === 'spin' ? { ...message, id: Number.isInteger(message.hand) ? message.hand : 0 } : message);
         return { ok: true };
       }
 

@@ -179,7 +179,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
   the desk. Waits on the sequencer's cue model; no default look changes.
 - **34f. One-button share export.** *Shipped (2026-10-28): the Record button's portrait
   frame; the story is in `docs/plan-shipped.md` §34f, the owner's look is
-  `docs/judging.md` §118.* Not a second button (14ae): a **Frame** choice in the Record panel
+  `docs/judging.md` §132.* Not a second button (14ae): a **Frame** choice in the Record panel
   (and More › Record on the phone), *As the plate is* or *Portrait 9:16*, that makes the one
   Record button write a 9:16 MP4 with sound. Open from it:
   - **34f-2.** *(M; the shortcut to replace.)* With a projector attached the wall must keep its
@@ -197,7 +197,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
     tell it to turn the phone, or draw the stage at 9:16 as the desk does.
   - **34f-5.** *(S; the owner's Mac.)* Instagram and TikTok take the MP4 from the share sheet:
     whether they accept Chromium's and Safari's own H.264 mux is judged by posting one
-    (`docs/judging.md` §118), not by a check.
+    (`docs/judging.md` §132), not by a check.
 - **34g. Legible reactions, named on the page.** *(S, copy.)* Kicks that stir the dye,
   a hit that seeds a bubble: these already exist in the sound patches (§28i-3). Name each
   look's reaction on its card in 34a and 34b ("kicks stir the ink") so a viewer sees that

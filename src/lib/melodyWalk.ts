@@ -172,6 +172,23 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : Number.isFinite(
 /** Place in the circle of fifths, 0..11 (C = 0, G = 1, D = 2 ...): a fifth is 7 semitones, and 7 times 7 is 1 mod 12. */
 export const fifthsPlace = (pitchClass: number): number => (((Math.round(pitchClass) * 7) % 12) + 12) % 12;
 
+/**
+ * Where a note of `fine` MIDI pitch sits on `line`: along the C3..C6 scale and
+ * offset square to the line by its place in the circle of fifths. Shared by the
+ * microphone's MelodyWalk and MIDI's note voices (PLAN 24.3 / 24.3-place-1), so
+ * a played note lands on the exact pixel a heard one does.
+ */
+export function melodyPlace(fine: number, line: MelodyLine = DEFAULT_MELODY_LINE): { x: number; y: number; along: number } {
+  const along = clamp01((fine - SCALE_LOW) / (SCALE_HIGH - SCALE_LOW));
+  const cls = ((Math.round(fine) % 12) + 12) % 12;
+  const off = (fifthsPlace(cls) / 11 - 0.5) * line.spread;
+  // The line's own normal, so a line that climbs is offset square to its run.
+  const dx = line.x1 - line.x0, dy = line.y1 - line.y0, len = Math.hypot(dx, dy) || 1;
+  const x = clamp01(line.x0 + dx * along - (dy / len) * off);
+  const y = clamp01(line.y0 + dy * along + (dx / len) * off);
+  return { x, y, along };
+}
+
 export class MelodyWalk {
   /** The note armed by its onset, waiting for its pitch to settle. */
   private armed: { at: number; peak: number; settle: number; before: number; needsChange: boolean } | null = null;
@@ -246,13 +263,7 @@ export class MelodyWalk {
     if (a.at - this.lastDropAt < MIN_GAP_S) return [];
     this.lastDropAt = a.at;
 
-    const along = clamp01((fine - SCALE_LOW) / (SCALE_HIGH - SCALE_LOW));
-    const cls = ((Math.round(fine) % 12) + 12) % 12;
-    const off = (fifthsPlace(cls) / 11 - 0.5) * line.spread;
-    // The line's own normal, so a line that climbs is offset square to its run.
-    const dx = line.x1 - line.x0, dy = line.y1 - line.y0, len = Math.hypot(dx, dy) || 1;
-    const x = clamp01(line.x0 + dx * along - (dy / len) * off);
-    const y = clamp01(line.y0 + dy * along + (dx / len) * off);
+    const { x, y, along } = melodyPlace(fine, line);
     this.count++;
     return [{ x, y, along, pitch: fine, strength: a.peak, at: a.at }];
   }

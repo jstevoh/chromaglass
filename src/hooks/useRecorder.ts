@@ -121,6 +121,24 @@ const pickMime = (opts: RecorderOptions): string | null => {
   return null;
 };
 
+/**
+ * The containers this browser's encoder can write (PLAN 44k-11: the
+ * owner's assistant is refused a container the encoder lacks, because
+ * `pickMime` above would fall back to the other one without a word). A
+ * container counts when `pickMime` would take one of its own MIME types for
+ * it. The sound is asked for the lists it walks, though each ends in the bare
+ * `video/webm` or `video/mp4`, so today the answer is the same either way.
+ */
+export function videoFormats(includeAudio: boolean): ('webm' | 'mp4')[] {
+  const MR = typeof window === 'undefined' ? undefined : (window as unknown as { MediaRecorder?: { isTypeSupported?: (t: string) => boolean } }).MediaRecorder;
+  if (!MR) return [];
+  const takes = (list: string[]) => !MR.isTypeSupported || list.some((m) => MR.isTypeSupported!(m));
+  const out: ('webm' | 'mp4')[] = [];
+  if (takes(includeAudio ? MIME_WEBM_AUDIO : MIME_WEBM_SILENT)) out.push('webm');
+  if (takes(includeAudio ? MIME_MP4_AUDIO : MIME_MP4_SILENT)) out.push('mp4');
+  return out;
+}
+
 /** `?rec=<Mbps>`, or null for standard preset bitrates. */
 function masterBitrate(): number | null {
   let mbps = NaN;

@@ -80,6 +80,8 @@ const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeIm
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
   'clearFilmDye',
+  // Nor the tank (PLAN 47n): whether the picture is a tank or the dish is the whole frame, never the beat's. Its feed, dye and nozzle are cords.
+  'tank',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
   // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
@@ -109,10 +111,16 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  * (beat squeeze, plate rock, rotation).
  *
  * They are the right ones for the job: speed, turbulence and its detail, evolve
- * rate, dye budget, sound drive, and most of the physics — viscosity's damping,
+ * rate, dye budget, and most of the physics — viscosity's damping,
  * buoyancy, advection, diffusion, surface tension. How a plate moves and how it
  * evolves, which is exactly what you would want a film driving on one layer
  * while the bass drives another.
+ *
+ * Sound Drive was one of them while the step multiplied its stir by the
+ * analyser's energy times that dial. The step takes no sound now (PLAN 38u-4:
+ * the music's stir is a cord on Turbulence, lib/stir.ts), so it reads Sound
+ * Drive nowhere and a plate of its own for it would be a choice that does
+ * nothing; a cord can still be aimed at one plate, which is the real control.
  *
  * Written out rather than derived at runtime because it decides what a dropdown
  * offers, and checked against the solver's own source by `scripts/panel.mjs` in
@@ -122,7 +130,7 @@ export const SETTING_TRAVEL: Partial<Record<keyof VisualizerSettings, { min: num
  * of twenty-seven; the check is the only reason that was ever noticed.
  */
 export const PER_LAYER: ReadonlySet<string> = new Set([
-  'advection', 'airVelocity', 'audioImpact', 'automateRate', 'backgroundLoop',
+  'advection', 'airVelocity', 'automateRate', 'backgroundLoop',
   'blobSurfaceTension', 'buoyancy', 'centerGravity', 'cometSpeed', 'cometAngle', 'damping', 'diffusionRate',
   'dimmer', 'dyeBudget', 'evaporationRate', 'glassSmear', 'globalSpeed', 'heat', 'heatDecay',
   // The two glasses are this plate's own pair: their dome and how fast a
@@ -133,7 +141,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // The liquid under this plate's cover and the cover's weight (PLAN 38r-5).
   'liquidMl', 'coverWeight',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
-  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'surfactantFlow', 'soapBreakdown', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
+  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'oilWeight', 'surfactantFlow', 'soapBreakdown', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   // The clear film (PLAN §20b): the front plate's solver lays it; a back
   // plate is handed 0 until the display can draw one there (20b-5).
   'clearFilm',
@@ -173,6 +181,8 @@ export interface PatchContext {
    * the same master, Sound Impact.
    */
   hits?: HitSource | null;
+  /** MIDI notes as voices (`noteVoices.ts`): velocity, pitch and held in 0..1. */
+  notes?: { value: (feature: string) => number } | null;
   /** Master depth per source, so a whole source can be pulled down on a fader. */
   roomImpact: number;
   filmImpact: number;
@@ -252,6 +262,10 @@ function liveValue(
     // A note is a name (hitSource.ts noteClass): Sound Impact at zero still
     // silences it, but turned half down it would read as another note.
     return { value: ctx.hits.value(feature), impact: isClassFeature(feature) ? 1 : ctx.soundImpact };
+  }
+  if (source === 'notes') {
+    if (!ctx.notes) return null;
+    return { value: ctx.notes.value(feature), impact: 1 };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { inkTitleCue, inkTitleRows } from '../lib/inkTitle';
+import { showSongTitle } from './songTitle';
 import type { TrackIdentity } from '../lib/musicTypes';
 import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
 
@@ -16,6 +17,13 @@ import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
  * mistake on a stream. The next song is painted. Feeding the cue from the
  * album show's queue, so a title lands on the song's first beat rather than
  * when the ear recognises it, is 37x-10b.
+ *
+ * Since 37x-10j the title is the corner caption by default (the
+ * `titleCaption` setting, app/songTitle.ts, lib/songCaption.ts): the owner
+ * found the poured ink hard to read and asked for the card a music channel
+ * put up. Since 2026-11-12 it is the caption only: the owner shelved the
+ * ink (37x-10m, "this poured option never really worked"), and the name of
+ * this hook is the ink's history, not what it does.
  */
 export function useInkTitle(wallRef: RefObject<LiquidVisualizerHandle | null>, track: TrackIdentity | null, on: boolean): void {
   const last = useRef<string | null>(null);
@@ -23,6 +31,6 @@ export function useInkTitle(wallRef: RefObject<LiquidVisualizerHandle | null>, t
     const cue = inkTitleCue(last.current, track, true);
     if (!cue) return;
     last.current = cue.key;
-    if (inkTitleCue(null, track, on)) wallRef.current?.pourText(inkTitleRows(cue));
+    if (inkTitleCue(null, track, on) && track) showSongTitle({ artist: track.artist, title: track.title, album: track.album }, { rows: inkTitleRows(cue) });
   }, [track, on, wallRef]);
 }

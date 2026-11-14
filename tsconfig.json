@@ -30,8 +30,10 @@
     "node_modules",
     "dist",
     "desktop",
-    "plugin"
+    "plugin",
+    "scratch"
   ],
+  "//scratch": "scratch/ is git-ignored working space. `npm run assistant`'s mutant run leaves a copy of server/ there for each mutant (scratch/assistant-mutants), and with allowJs every copy was typechecked: tsc ran out of its 2 GB heap on the next `npm run lint` (2026-11-11, 4059 files, 4 GB with a bigger heap). Nothing in scratch/ is the product.",
   "//plugin": "The DAW bridge plugin is C++ (PLAN 13.7b). Its CMake build directory writes files named compiler_depend.ts, which are make rules, not TypeScript: with the plugin built, `npm run lint` read them and printed hundreds of syntax errors.",
   "//strict": "Measured, not aspirational: with @types/react installed this costs zero errors. Without those types it looked like 3774, and 3133 of them were 'no JSX.IntrinsicElements' - the missing declarations, not the code. With strict off, every React API and every JSX element was `any`: useState<VisualizerSettings> handed back an `any` setter, which is why a settings object missing 33 required keys typechecked and shipped, and useRef(map) left the whole MIDI dispatch switch unchecked. One line to dial back if it ever gets in the way."
 }

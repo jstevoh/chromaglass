@@ -55,12 +55,13 @@ const L = (x: Partial<DeskLayout> & Pick<DeskLayout, 'plateMode'>): DeskLayout =
   Sequence is Live too: a sequence that is played from it has to reach the
   plate, and Preview holds the sequencer off.
 
-  Setup is Load-in with the Sound screen's player and drone in it.
+  Setup is Load-in. It had the Sound screen's player and drone as a panel of
+  their own beside Sound; they are the top of Sound now (PLAN 35c-7).
 */
 export const DEFAULT_TABS: readonly DeskTab[] = Object.freeze([
   { id: 'perform', name: 'Perform', layout: L({ left: ['cues'], right: ['bottles', 'rides'], deck: ['dyes', 'tools', 'recipe', 'physics', 'squish', 'camera', 'macro', 'patches'], plateMode: 'live' }) },
   { id: 'sequence', name: 'Sequence', layout: L({ left: ['cues'], right: ['songs', 'sequences'], deck: ['score'], plateMode: 'live' }) },
-  { id: 'setup', name: 'Setup', layout: L({ left: ['midi', 'audio-input', 'player'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' }) },
+  { id: 'setup', name: 'Setup', layout: L({ left: ['midi', 'audio-input'], right: ['projectors', 'mapping'], deck: ['simulation', 'phone'], plateMode: 'live' }) },
 ]);
 const DEFAULT_BY_ID = new Map(DEFAULT_TABS.map(t => [t.id, t]));
 
@@ -98,6 +99,20 @@ export function moveTab(tabs: DeskTab[], id: string, by: number): DeskTab[] {
 export function deleteTab(tabs: DeskTab[], id: string): DeskTab[] {
   if (tabs.length <= 1 || !tabs.some(x => x.id === id)) return tabs;
   return tabs.filter(x => x.id !== id);
+}
+
+/**
+ * A deleted tab put back where it was (the owner's assistant's Undo, PLAN
+ * 44k-17): at its old place, or the end if the list has shrunk past it.
+ * Nothing changes when a tab of its id is back already or the strip is full,
+ * so an Undo that arrives twice cannot make two of one tab; its name is kept
+ * free of the others', as an added tab's is.
+ */
+export function restoreTab(tabs: DeskTab[], tab: DeskTab, at: number): DeskTab[] {
+  if (tabs.length >= TABS_MAX || tabs.some(x => x.id === tab.id)) return tabs;
+  const out = [...tabs];
+  out.splice(Math.max(0, Math.min(at, out.length)), 0, { ...tab, name: freeName(tabs, tab.name) });
+  return out;
 }
 
 /** A name not on another tab: "New tab", then "New tab 2". */

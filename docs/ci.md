@@ -70,6 +70,15 @@ deploy:
   `ready-for-review` and comments `READY #<n> <item> head <sha>` when `Checks` goes
   green on its current head, and takes the label off on the next push or a red run
   (`docs/handoff.md`, "Ready, review, merge"; PLAN.md 19al).
+- **Main held red** (`hold.yml`, `scripts/mainhold.mjs`, PLAN.md 19am): while the same
+  job (a Mac shard, a Measure part, the build; not the two summary jobs) is red at its
+  newest two results on main, counting only the deploys that ran it (cancelled ones, a
+  docs-only deploy and one with no Mac shards are left out for the jobs they did not
+  run), every open PR carries a red commit status `Main not held red`, and a PR labelled
+  `fixes-main` a green one. The first deploy that runs that job green, or whose PR passed
+  its exact tree, lifts it. It is posted when a deploy finishes and when a PR is opened,
+  pushed, labelled or retargeted. `npm run mainhold` says whether main is held;
+  `-- --history 40` replays the rule over the last 40 deploys.
 - Superseded PR runs are cancelled, and so are a PR's runs still queued or going
   when it merges or closes (`closed.yml`). `gallery.yml` (every preset
   photographed), `controls.yml` (every control measured), `pixels.yml` (every

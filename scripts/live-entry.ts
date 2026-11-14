@@ -5,7 +5,8 @@
 // a landscape encode to two destinations and a portrait one to a third
 // (37x-4c).
 import './lab-entry.ts';
-import { LiveEncoder, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
+import { liveVideoConfig, liveVideoBitrate } from '../src/lib/liveRate.ts';
+import { LiveEncoder, chooseAcceleration, liveCrop, liveConsolePlan, type LiveDestinationSpec, type LivePacket, type LiveStartRequest, type LiveTransport, type LiveTransportState } from '../src/lib/liveStream.ts';
 
 
 type LabApi = {
@@ -108,11 +109,12 @@ const api = {
    * what `__cgLive.start({ destinations })` would. The plate steps on and is
    * redrawn every `plateMs`.
    */
-  async start(url: string, keys: { key: string; orientation?: 'landscape' | 'portrait' }[], fps: number, audioCodec?: 'aac' | 'opus', plateMs = 700): Promise<unknown> {
+  async start(url: string, keys: { key: string; orientation?: 'landscape' | 'portrait' }[], fps: number, audioCodec?: 'aac' | 'opus', plateMs = 700, silent = false): Promise<unknown> {
     if (!canvas || !stream) throw new Error('setup first');
     const plan = liveConsolePlan({ destinations: keys.map((k) => ({ name: k.key, url, key: k.key, orientation: k.orientation })), width: W, height: H, portrait: { width: H, height: W }, videoBitrate: 1500000 });
     const destinations: LiveDestinationSpec[] = plan.destinations;
-    encoder = new LiveEncoder({ canvas, audio: stream, transport, outputs: plan.outputs, destinations, fps, audioBitrate: 96000, audioCodec });
+    // `silent`: the app with its sound source at None, which hands the encoder no stream at all (37x-4f).
+    encoder = new LiveEncoder({ canvas, audio: silent ? null : stream, transport, outputs: plan.outputs, destinations, fps, audioBitrate: 96000, audioCodec });
     await encoder.start();
     let busy = false;
     plateTimer = setInterval(() => {
@@ -166,6 +168,55 @@ const api = {
   /** The crop the portrait encode takes of the canvas, for the check to print and test. */
   crop: (cw: number, ch: number, w: number, h: number, fit: 'cover' | 'contain') => liveCrop(cw, ch, w, h, fit),
   plate: () => ({ redraws, errors: plateErrors.slice(0, 3) }),
+  /**
+   * The sound source switched off on air: the tone's track is stopped, which
+   * ends the encoder's reader as a source the owner turns off would, and a
+   * fresh tone is made for any stream started after (37x-4f).
+   */
+  endTone(): void {
+    if (!ac || !stream) throw new Error('setup first');
+    for (const t of stream.getAudioTracks()) t.stop();
+    const dest = ac.createMediaStreamDestination();
+    const tone = ac.createOscillator(); tone.frequency.value = 220;
+    const g = ac.createGain(); g.gain.value = 0.05;
+    tone.connect(g).connect(dest); tone.start();
+    stream = dest.stream;
+    (window as unknown as { __liveDest: MediaStreamAudioDestinationNode }).__liveDest = dest;
+  },
+  /**
+   * A sound source opened on air (37x-4f-2): a fresh tone, in a context of
+   * its own at `rate` (44.1 kHz, against the silent track's 48, so the
+   * encoder has to resample it), handed to the running stream as
+   * useAudioAnalyzer hands the app's (`setLiveAudio` → `setAudio`). The tone
+   * is silent for its first `stepInMs` and then steps up: a mark at a known
+   * instant, so the check can find where the source's sound landed on the
+   * stream's clock. Its onset alone could not tell: the track is read from
+   * whenever the hand-over happens, and a hole or a cut at the switch moves
+   * everything after it (Chromium's AudioEncoder stamps its packets by
+   * sample count, so a gap in the input is not a gap in the output, it is
+   * the rest of the sound arriving early; the check-skeptic's control put
+   * 100 ms of hole at the switch and an onset line still read 8 ms). The
+   * step's stream time is its render time, worked out as `event()` does.
+   */
+  async openTone(rate = 44100, stepInMs = 1000): Promise<{ openedMs: number; stepMs: number; rate: number }> {
+    if (!encoder) throw new Error('start first');
+    const c = new AudioContext({ sampleRate: rate });
+    await c.resume();
+    const dest = c.createMediaStreamDestination();
+    const tone = c.createOscillator(); tone.frequency.value = 220;
+    const g = c.createGain();
+    const t0 = encoder['t0'] as number;
+    // A context just resumed reports no output timestamp yet (0 and 0, which read as a step a minute in the past): wait for its first.
+    let pair = c.getOutputTimestamp();
+    for (let i = 0; i < 50 && !(pair.performanceTime && pair.contextTime); i++) { await new Promise((r) => setTimeout(r, 10)); pair = c.getOutputTimestamp(); }
+    const ctxNow = pair.contextTime ?? c.currentTime, perfNow = pair.performanceTime ?? performance.now();
+    const renderAheadMs = Math.max(0, c.currentTime - ctxNow) * 1000;
+    g.gain.setValueAtTime(0, 0); g.gain.setValueAtTime(0.05, ctxNow + stepInMs / 1000);
+    tone.connect(g).connect(dest); tone.start();
+    const openedMs = performance.now() - t0;
+    encoder.setAudio(dest.stream);
+    return { openedMs, stepMs: perfNow + stepInMs - renderAheadMs - t0, rate: c.sampleRate };
+  },
   state: async () => encoder ? encoder.refresh() : null,
   async stop(): Promise<unknown> {
     if (plateTimer) clearInterval(plateTimer);
@@ -212,6 +263,19 @@ const api = {
     if (vdec.state !== 'closed') vdec.close();
 
     const levels: { ts: number; rms: number }[] = [];
+    /*
+      And its pitch, every tenth of a second, from the rising zero crossings
+      (interpolated between samples) of the first channel: the tone is 220 Hz
+      and a pure sine, which this reads to a fraction of a hertz. A source
+      at 44.1 kHz fed unconverted into a 48 kHz track reads 239.5.
+    */
+    const pitch: { ts: number; hz: number }[] = [];
+    let pBuf: number[] = [], pTs = 0, pRate = 0;
+    const pitchOf = () => {
+      const ups: number[] = [];
+      for (let i = 1; i < pBuf.length; i++) if (pBuf[i - 1] < 0 && pBuf[i] >= 0) ups.push(i - 1 + -pBuf[i - 1] / (pBuf[i] - pBuf[i - 1]));
+      if (ups.length >= 3) pitch.push({ ts: pTs, hz: ((ups.length - 1) * pRate) / (ups[ups.length - 1] - ups[0]) });
+    };
     let audioError: string | null = null;
     let audioSeconds = 0;
     if (audio) {
@@ -225,6 +289,9 @@ const api = {
             let s = 0; for (let j = i; j < i + win; j++) s += buf[j] * buf[j];
             levels.push({ ts: a.timestamp / 1000 + (i / a.sampleRate) * 1000, rms: Math.sqrt(s / win) });
           }
+          if (!pBuf.length) { pTs = a.timestamp / 1000; pRate = a.sampleRate; }
+          for (let i = 0; i < n; i++) pBuf.push(buf[i]);
+          if (pBuf.length >= a.sampleRate / 10) { pitchOf(); pBuf = []; }
           audioSeconds += n / a.sampleRate;
           a.close();
         },
@@ -252,7 +319,7 @@ const api = {
       const samples = await codecDelay(audio.codec, audio.sampleRate, audio.channels);
       primingMs = samples === null ? null : (samples / (audio.codec === 'aac' ? audio.sampleRate : 48000)) * 1000;
     }
-    return { frames, size, videoError, levels, audioError, audioSeconds, primingMs };
+    return { frames, size, videoError, levels, pitch, audioError, audioSeconds, primingMs };
   },
 };
 
@@ -310,4 +377,92 @@ async function codecDelay(codec: string, sampleRate: number, channels: number): 
   return best > 0.5 ? bestLag : null;
 }
 
-(window as unknown as { liveLab: typeof api }).liveLab = api;
+/**
+ * The rate the live encoder makes (37x-4h): `seconds` of a moving picture
+ * at a size and frame rate, through the stream's own configuration
+ * (liveVideoConfig) at the stream's own rate for that size unless one is
+ * given, and the bytes that come out. Not the lab's plate: on software WebGPU
+ * it redraws a few times in ten seconds, a near-still picture that any CBR
+ * encoder that does not pad leaves far under its rate (64 kb/s of 1500 asked,
+ * measured on the first try), and the line would have measured the plate,
+ * not the encoder. The show's picture changes everywhere a little every
+ * frame, with detail at every scale; so does this one: three planes of
+ * low-passed noise at three scales, each sliding its own way, two of them
+ * cross-faded on a slow sine, so no one motion vector predicts a block and
+ * every macroblock has something to say, but nothing like white noise, which
+ * no encoder can hold at any sane rate. The timestamps are the stream's
+ * (i / fps), so rate control sees the frame rate it was told, however fast
+ * the frames are fed. The acceleration hint is the one the stream itself
+ * takes (`chooseAcceleration`, which picks the software encoder where the
+ * default cannot hold the rate, as on GitHub's Mac VM), so the line measures
+ * the encoder the stream would use; and a probe that has not finished in
+ * a minute stops and says so, so a slow runner fails this line by name and
+ * not the shard by its clock. `constant` is what the browser says it will
+ * run (isConfigSupported echoes the mode back): an encoder in VBR can land
+ * on the average rate too, so the average alone does not say CBR.
+ */
+async function rateProbe(width: number, height: number, fps: number, seconds: number, bitrate?: number): Promise<{ asked: number; madeKbps: number; frames: number; bytes: number; keyframes: number; firstSecondKbps: number; restKbps: number; acceleration: string; mode: string | null; ms: number; error: string | null }> {
+  const asked = bitrate ?? liveVideoBitrate(width, height, fps);
+  const t0 = performance.now();
+  const { acceleration } = await chooseAcceleration(width, height, fps);
+  const cfg = liveVideoConfig(width, height, fps, asked, acceleration);
+  const support = await VideoEncoder.isConfigSupported(cfg).catch(() => null);
+  const out = { asked, madeKbps: 0, frames: 0, bytes: 0, keyframes: 0, firstSecondKbps: 0, restKbps: 0, acceleration: String(acceleration), mode: (support?.config?.bitrateMode as string | undefined) ?? null, ms: 0, error: null as string | null };
+  // Three planes of low-passed noise, each drawn once at full size with a
+  // margin to slide in: the frames are sums of them at moving offsets.
+  const M = 256, pw = width + M, ph = height + M;
+  const plane = (seed: number, cell: number) => {
+    const gw = Math.ceil(pw / cell) + 2, g = new Float32Array(gw * (Math.ceil(ph / cell) + 2));
+    let x = seed >>> 0;
+    for (let i = 0; i < g.length; i++) { x = (x * 1664525 + 1013904223) >>> 0; g[i] = x / 4294967296; }
+    const out = new Uint8Array(pw * ph);
+    for (let y = 0; y < ph; y++) for (let xx = 0; xx < pw; xx++) {
+      const u = xx / cell, v = y / cell, i = Math.floor(u), j = Math.floor(v), fu = u - i, fv = v - j, k = j * gw + i;
+      out[y * pw + xx] = 255 * ((g[k] * (1 - fu) + g[k + 1] * fu) * (1 - fv) + (g[k + gw] * (1 - fu) + g[k + gw + 1] * fu) * fv);
+    }
+    return out;
+  };
+  const [pa, pb, pc] = [plane(7, 9), plane(11, 31), plane(13, 5)];
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  const n = Math.round(seconds * fps);
+  const sizes: { ts: number; bytes: number }[] = [];
+  const enc = new VideoEncoder({
+    output: (c) => { sizes.push({ ts: c.timestamp, bytes: c.byteLength }); if (c.type === 'key') out.keyframes++; },
+    error: (e) => { out.error = String(e?.message ?? e); },
+  });
+  try {
+    enc.configure(cfg);
+    for (let i = 0; i < n && !out.error; i++) {
+      // Each plane slides its own way and the first two cross-fade, so no one
+      // motion vector predicts a block: every pixel changes a little, as dye does.
+      const t = i / fps, w = Math.round(128 + 127 * Math.sin(t * 1.7));
+      const oa = (Math.floor(t * 37) % M) * pw + (Math.floor(t * 53) % M);
+      const ob = (Math.floor(t * 23) % M) * pw + (M - 1 - (Math.floor(t * 41) % M));
+      const oc = (M - 1 - (Math.floor(t * 29) % M)) * pw + (Math.floor(t * 17) % M);
+      for (let y = 0, p = 0; y < height; y++) {
+        const row = y * pw;
+        for (let x = 0; x < width; x++, p += 4) {
+          const m = (pa[oa + row + x] * (255 - w) + pb[ob + row + x] * w) >> 8, c = pc[oc + row + x];
+          rgba[p] = m; rgba[p + 1] = (m * 7 + c) >> 3; rgba[p + 2] = 255 - ((m * 4) / 5); rgba[p + 3] = 255;
+        }
+      }
+      const frame = new VideoFrame(rgba, { format: 'RGBA', codedWidth: width, codedHeight: height, timestamp: Math.round(i * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      // A keyframe every two seconds, as LiveEncoder asks for one.
+      enc.encode(frame, { keyFrame: i % Math.round(2 * fps) === 0 });
+      frame.close();
+      while (enc.encodeQueueSize > 4) await new Promise((r) => setTimeout(r, 1));
+      if (performance.now() - t0 > 60_000) { out.error = `not done in a minute: ${i + 1} of ${n} frames under ${acceleration}`; break; }
+    }
+    await enc.flush();
+  } catch (e) { out.error ??= String((e as Error)?.message ?? e); }
+  if (enc.state !== 'closed') enc.close();
+  out.ms = Math.round(performance.now() - t0);
+  out.frames = sizes.length;
+  out.bytes = sizes.reduce((k, s) => k + s.bytes, 0);
+  out.madeKbps = out.bytes * 8 / seconds / 1000;
+  const first = sizes.filter((s) => s.ts < 1e6).reduce((k, s) => k + s.bytes, 0);
+  out.firstSecondKbps = first * 8 / 1000;
+  out.restKbps = seconds > 1 ? (out.bytes - first) * 8 / (seconds - 1) / 1000 : 0;
+  return out;
+}
+(window as unknown as { liveLab: typeof api & { rateProbe: typeof rateProbe } }).liveLab = { ...api, rateProbe };
