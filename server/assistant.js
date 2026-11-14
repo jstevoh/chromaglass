@@ -49,6 +49,7 @@ import { mediaCall, mediaOf } from './assistantMedia.js';
 import { midiPortsOf, outputsGuard } from './assistantOutputs.js';
 import { projectorGuard } from './assistantProjector.js';
 import { deskGuard, deskLeast } from './assistantDesk.js';
+import { editChanges, editGuard, editLeast } from './assistantEdit.js';
 
 export const ASSISTANT_MODES = ['off', 'suggest', 'play', 'full'];
 
@@ -422,6 +423,10 @@ export function createAssistantGuard(send, now = Date.now) {
           send({ type: 'assistant-desk', do: 'tab-restore' });
           return { ok: true, undid: 'the tab taken away, if the desk took it: show_state\'s desk.tabs reads it' };
         }
+        if (entry.kind === 'edit') {
+          send({ type: 'assistant-edit', op: 'restore' });
+          return { ok: true, undid: 'the last edit of the set list or a sequence, if the performer has not changed it since: show_state reads it' };
+        }
         if (entry.kind === 'action') {
           // A toggle undoes itself, unless the performer has toggled it back already.
           if (show.blackout !== entry.after) return refuse('the performer has changed the blackout since');
@@ -753,6 +758,18 @@ export function createAssistantGuard(send, now = Date.now) {
         // A delete or a reset of every tab is Undo's to put back; the page keeps what it took.
         if (call.out.op === 'delete' || call.out.op === 'reset-all') remember({ kind: 'desk' });
         send({ type: 'assistant-desk', ...call.out, ...answerOf(message) });
+        return { ok: true };
+      }
+
+      // Set lists and sequences built (PLAN 44k-16a): assistantEdit.js's rules; a read or a file out in Suggest, every edit Full and on Undo's list.
+      if (type === 'assistant-edit') {
+        const why = needs(mode, editLeast(message.op)) ?? paced('patch', mode, t);
+        if (why) return refuse(why);
+        const call = editGuard(message, show.setItems ? show.setItems.length : null);
+        if (call.reason) return refuse(call.reason);
+        count('patch', mode, t);
+        if (editChanges(call.out.op)) remember({ kind: 'edit' });
+        send({ type: 'assistant-edit', ...call.out, ...answerOf(message) });
         return { ok: true };
       }
 

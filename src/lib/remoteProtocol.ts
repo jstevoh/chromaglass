@@ -88,7 +88,8 @@ export interface RemoteSequencer {
    * for the owner's assistant to pick one by name. Optional, since a display
    * one build older sends only the transport above.
    */
-  sequences?: { id: string; name: string; stages: number }[];
+  /** Each sequence; `builtIn` ones stay as they shipped (edit a copy), `song` the one it was made for (PLAN 44k-16a). */
+  sequences?: { id: string; name: string; stages: number; builtIn?: boolean; loop?: boolean; song?: string | null }[];
   selectedId?: string | null;
 }
 
@@ -165,7 +166,7 @@ export interface RemoteState {
    * item 3 rather than guessing what "the third" is. `look` is the look an
    * item sends (null for a sequence), for the guard's Undo.
    */
-  set?: { name: string; items: { n: number; name: string; kind: string; look: string | null; fade: number | null; missing: boolean }[]; armed: number | null; fadeSeconds: number };
+  set?: { name: string; items: { n: number; name: string; kind: string; look: string | null; fade: number | null; missing: boolean; song?: string | null }[]; armed: number | null; fadeSeconds: number; saved?: { name: string; items: number }[] };
   /**
    * The song shows (PLAN 44k-5): Follow songs, the show running and the show
    * of the song playing, and every show by id and song, without their actions
@@ -492,6 +493,8 @@ export type RemoteMessage =
   | { type: 'assistant-projector'; do: string; on?: boolean; mode?: string; wall?: Record<string, unknown>; answer?: number }
   /** The desk from the owner's assistant (PLAN 44k-16, 44k-17), relayed only from the guard (server/assistantDesk.js), with `answer`; names and ids are found on the page. */
   | { type: 'assistant-desk'; do: string; verb?: string; tab?: string; op?: string; name?: string; by?: number; copyOf?: string; panel?: string; slot?: string; index?: number; plate?: string; surface?: string; key?: string; on?: boolean; hand?: Record<string, unknown>; view?: Record<string, unknown>; answer?: number }
+  /** The set list and the sequences built from the owner's assistant (PLAN 44k-16a), relayed only from the guard (server/assistantEdit.js), with `answer`; names are found on the page (app/editNow.ts), which reads every field as untrusted. */
+  | { type: 'assistant-edit'; of?: string; op: string; answer?: number; [field: string]: unknown }
   /** The display's word on one of the above, or a song action: done, or why not, and what a read found. To the assistant only. */
   | { type: 'assistant-answer'; answer: number; ok: boolean; reason?: string; data?: unknown }
   | { type: 'preset'; presetId: string }

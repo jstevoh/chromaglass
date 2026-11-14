@@ -16,6 +16,13 @@ Mac app, and not named on any page a visitor or customer reads.
   notes are a file outside the repo (`CHROMAGLASS_ASSISTANT_NOTES`, default
   `~/.chromaglass/assistant-notes.md`).
 
+- `editTools.js`: `set_list_edit` and `sequence_edit` (Full; a sequence read and a file
+  written out from Suggest), the set list and the sequences built, PLAN 44k-16a:
+  `EDIT_TOOLS` (spread into `TOOLS`), `EDIT_TOOL_NAMES`, `editCall` (numbers from 1 to
+  the display's from 0, a stage's fields in the page's words, read back in
+  `show_state`'s `set` and `sequencer`). A file by `path` is read or written here, on
+  the owner's Mac: a .json file in the home folder only, never over one already there
+  without `overwrite`.
 - `tunnel-worker.js`: the owner's assistant over the internet (PLAN 44h): the remote MCP address claude.ai signs in to (OAuth 2.1 with DCR and PKCE S256, only Claude's hosted callbacks, only `OWNER_UID`'s Firebase sign-in made on its page, twenty registrations or pages an address per ten minutes) and the Durable Object `ShowTunnel` the Mac's `mcp/tunnel.js` dials out to; a pipe, every request answered on the Mac. Exports `REDIRECTS`, `redirectAllowed`, `sha256Hex`, `OFFLINE` and its lifetimes. A Worker (`wrangler.tunnel.toml`), kept here with the owner's other private servers, not in `server/`: no visitor's data reaches it (it admits only the owner), so the privacy page, which `npm run privacy` holds to `server/` and `src/`, does not name it, as it does not name the YouTube server's Google; imports `../server/firebase-token.js`.
 - `tunnel.js`: the same server for claude.ai on the web and the phone (PLAN 44h):
   `node chromaglass-mcp.js tunnel` holds one outbound WebSocket to the owner's relay
@@ -45,7 +52,11 @@ Mac app, and not named on any page a visitor or customer reads.
 
 - Decides nothing: every rule is the show server's guard (`server/assistant.js`), and a
   refusal is passed on in the guard's words.
-- Imports `ROOM_KEYS` from `server/assistant.js` (and the relay Worker `verifyFirebaseToken` from `server/firebase-token.js`); `server/` never imports this folder.
+- Imports `ROOM_KEYS` from `server/assistant.js` and `EDIT_TEXT_MAX` from
+  `server/assistantEdit.js` (and the relay Worker `verifyFirebaseToken` from
+  `server/firebase-token.js`); `server/` never imports this folder. The one thing it judges
+  itself is where a file it reads or writes for `set_list_edit` or `sequence_edit` may be
+  (the home folder, .json), since only this program touches the owner's disk.
 - Over stdio, writes nothing to stdout but protocol; logs to stderr. (`tunnel key`, `status` and `revoke` print their answer.)
 - Dormant unless the owner's switch is on: `CHROMAGLASS_ASSISTANT`, or one word (off,
   suggest, play, full) in the file the show server reads (`CHROMAGLASS_ASSISTANT_FILE`;
