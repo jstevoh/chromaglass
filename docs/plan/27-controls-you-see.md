@@ -326,6 +326,27 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       the stalks here last). Wanted for a standing bottle: κ₂ from the body's local width
       added to the Laplace pressure. Each with a check that holds a lamp's roundness over
       two minutes of the app's own step, which `lavawax` (128², the lab's step) does not.
+      *First try of (b), measured 2026-11-14 on the Mac's Metal (256², the app's step: dt
+      0.00133, 30 steps a second, 120 s; area-weighted roundness 4πA/P² of the bodies off
+      the wall, mean of the samples from 5 s):* κ₂ taken as 2 over the body's chord along
+      the edge's normal (a ball reads 1/R, a stalk 2/w), weighted by Plate Upright, in
+      `capillaryAt` so the rim's φ reads it too. Off 0.68, on 0.79, and `lavacycle` 7/7 with it
+      on (the wax still goes round: 0.61, 0.21, 0.61, and again in the second minute). But
+      it over-pinches: by 120 s the wax is about twenty bodies of 100 to 200 cells and the
+      cells over half oil fall from 4.7% to 2.1% of the plate (haze), where a lamp keeps a
+      few fat ones. Beside it, the cap at 2 cells with σ ×4 and no κ₂: four fat round bodies
+      (0.94), but a fifth of the oil gone in 120 s; both together: the oil drains away
+      entirely (4,373 to 283). So the next step is (a) and the oil loss under a stronger
+      force, before κ₂ ships: where that oil goes (the rim, or below zero), and the wax's
+      own viscosity (a real stalk is slow to pinch because the wax is thick, Tomotika's
+      rate σ/μR with the viscosity ratio; here both liquids have the water's mobility). The
+      κ₂ diff and the lab are kept: `/mnt/project-files/handoff/roundcurve-27f9q-b.patch`
+      (the owner's shared files), scratch lab `roundlab-27f9q.mjs` beside it.
+    - **27f-9r, open. A crowd look's oil colour is not kept for the solver.** 27f-9m keeps
+      the oil of a look laid before its solver exists, but `addOilDensity`'s colour share
+      (`layOilShare`, PLAN 47z-1) is still laid only with a solver there, so Clock Glass and
+      Splodascope opened with the page start with that colour in the water and the oil
+      clear. Keep it in the wait with the oil (`src/sim/mixWait.ts`).
     - **27f-9f, open. A quarter of the wax's colour leaves it in its first seconds.** On the
       look's own step the share of the colour inside the bodies falls from 97% to 84% in the
       first second and 68% by six (57% with Oil Bodies off), and a thin pink wash covers 12%
