@@ -53,7 +53,7 @@
  * 3% from the middle of the frame, where it sat 27% off.
  */
 import { stream, type Rng } from './rng';
-import { clearLanding, newLanding, steerLanding } from './macroLanding';
+import { clearLanding, newLanding, settledLanding, steerLanding } from './macroLanding';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -120,6 +120,8 @@ export interface MacroCameraOptions {
   /** Where it is aimed, in plate uv (0..1), for hold and follow. */
   aimX?: number;
   aimY?: number;
+  /** Told once where a closeup coming in on bare glass settled, plate uv, to make it the aim (macroLanding.ts). */
+  onLand?: (x: number, y: number) => void;
 }
 
 export interface MacroShot {
@@ -443,7 +445,9 @@ export class MacroCamera {
     if (aimMoved && !first) clearLanding(this.land, false);
     const riding = mode === 'follow' && !first;
     const landed = steerLanding(this.land, field, ax, ay, opts,
-      riding ? this.beadX : NaN, riding ? this.beadY : NaN, size * EDGE_MARGIN);
+      riding ? this.beadX : NaN, riding ? this.beadY : NaN, size * EDGE_MARGIN, step);
+    const settled = settledLanding(this.land, size);
+    if (settled) opts.onLand?.(settled.x, settled.y);
     const wantX = Number.isFinite(this.land.x) ? this.land.x : ax;
     const wantY = Number.isFinite(this.land.y) ? this.land.y : ay;
 

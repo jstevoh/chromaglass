@@ -4956,15 +4956,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 mode: currentSettings.macroCamera ?? 'hold',
                 aimX: currentSettings.macroAimX ?? 0.5,
                 aimY: currentSettings.macroAimY ?? 0.5,
+                onLand: onAimRef.current,
               },
             );
             camBassRef.current = camBass;
           }
           /*
-            Leaving the middle of the plate over the travel in, not at the
-            first notch. The camera goes to its subject as soon as there is
-            a zoom at all, and at 1.1x the frame may already move a fifth of
-            the plate: the first step of the slider was a lurch sideways.
+            Off the middle over the travel in, not at the first notch: the
+            camera goes to its subject at any zoom, and at 1.1x the frame
+            moved a fifth of the plate, a lurch on the slider's first step.
           */
           const raw = macroShotRef.current;
           macroShotRef.current = { ...raw, cx: 0.5 + (raw.cx - 0.5) * macroAmount, cy: 0.5 + (raw.cy - 0.5) * macroAmount };

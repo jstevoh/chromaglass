@@ -42,6 +42,12 @@
  *   9. the landing's copies of the solver's zooms agree with src/sim/constants
  *      (src/lib does not import src/sim), and the button's lit state
  *      (`closeupIn`) is `macroZoomOf(s) > 1.05` on every flag and zoom
+ *  10. a zoom parked short of 2x (a pinch let go at 1.5x) stops asking after
+ *      LAND_SECONDS: Hold on a full middle for ten seconds, the middle then
+ *      drained, does not cut across the plate (it did, in one frame)
+ *  11. where it settles is told once (`onLand`, which the app makes the aim),
+ *      and a nudge of the aim from there (the arrows, the sliders, Evolve)
+ *      pans on from the pool rather than back to the bare middle
  *
  * The app half: classic, the plate cleared and one pool laid at (0.33, 0.5)
  * through the debug hook; at 1x the pool is drawn (the control: a black frame
@@ -49,7 +55,7 @@
  * the 4x frame on the aim is under BARE of the plate's (the control for the
  * press); the desk's Close-up button pressed: lit, the knob at 4x, over
  * LIT_SHARE of the frame's pixels lit with the shot on the pool and the aim
- * still bare; pressed again, out at 1x.
+ * moved onto it; pressed again, out at 1x.
  */
 import { MacroCamera } from '../src/lib/macroCamera.ts';
 import { stream } from '../src/lib/rng.ts';
@@ -204,6 +210,39 @@ if (process.argv.includes('--node')) {
   }
 
   // 8. The button's press.
+  // 10. A zoom parked short of fully in stops asking.
+  {
+    const f = plate();
+    pour(f, 0.5, 0.5, 2, 6); pour(f, 0.22, 0.30);
+    const cam = new MacroCamera(stream('plate.macro'));
+    const parked = { ...opts('hold'), zoom: 1.5 };
+    for (let t = 0; t < 600; t++) cam.update(f, DT, parked);
+    for (let j = 0; j < SIZE; j++) for (let i = 0; i < SIZE; i++) { if (Math.hypot(i - SIZE / 2, j - SIZE / 2) < 30) f.density[j * SIZE + i] = 0; }
+    let worst = 0;
+    for (let t = 0; t < 120; t++) { const sh = cam.update(f, DT, parked); worst = Math.max(worst, Math.hypot(sh.cx - 0.5, sh.cy - 0.5)); }
+    check('a zoom parked at 1.5x stops asking: a held shot whose middle drains does not cut', worst < 1e-6,
+      `the frame moved ${worst.toExponential(1)} of the plate off the aim after the middle drained at 10 s (under 1e-6 wanted)`);
+  }
+
+  // 11. The landing is told once, and the aim made from it pans on from the pool.
+  {
+    const told = [];
+    const cam = new MacroCamera(stream('plate.macro'));
+    const landOpts = { ...opts('hold'), onLand: (x, y) => told.push([x, y]) };
+    for (let t = 0; t < 60; t++) cam.update(report, DT, landOpts);
+    const at = told[0] ?? [0.5, 0.5];
+    const toldOff = Math.max(Math.abs(at[0] - 0.22) * SIZE / hx, Math.abs(at[1] - 0.30) * SIZE / hy);
+    // A quarter of the frame to the right, as one tap of the arrow is (`panAim`).
+    const nudged = [at[0] + spanX / ZOOM * 0.25, at[1]];
+    let shot;
+    for (let t = 0; t < 90; t++) shot = cam.update(report, DT, { ...opts('hold', nudged[0], nudged[1]), onLand: landOpts.onLand });
+    const strayed = Math.hypot(shot.cx - nudged[0], shot.cy - nudged[1]);
+    const r = read(report, shot, 0.22, 0.30);
+    check('where it lands is told once, and a nudge of the aim from there pans on from the pool',
+      told.length === 1 && toldOff < 1 / 3 && strayed < 0.005 && r.off < 1,
+      `told ${told.length} time(s) (1 wanted), at ${told.map(([x, y]) => `${fx(x)}, ${fx(y)}`).join('; ') || 'nowhere'}, the pool ${fx(toldOff)} of a half-frame off it (under 0.333 wanted); nudged, the frame ${fx(strayed)} of the plate from the new aim (under 0.005 wanted) with the pool ${fx(r.off)} of a half-frame off its middle (in the frame, under 1, wanted)`);
+  }
+
   {
     const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     const inFromPlate = closeupToggle({ macroMode: false, macroZoom: 1 });
@@ -231,15 +270,15 @@ if (process.argv.includes('--node')) {
 } else {
   const { chromium } = await import('playwright');
   const { spawn } = await import('node:child_process');
-  const { launchChromium, presentsInXvfb } = await import('./chromium.mjs');
+  const { launchChromium, presentsInXvfb, port, untilServing } = await import('./chromium.mjs');
   const { engineQuery, installFrameReader, frameOf, waitForShow, waitForEngine, settlePlate } = await import('./frame.mjs');
-  const PORT = 4793;
+  const PORT = port(4793);
   /** The app's pool, in plate uv (see layPool). */
   const POOL = [0.33, 0.5];
   const server = spawn('./node_modules/.bin/vite', ['preview', '--port', String(PORT), '--strictPort'], { detached: true, stdio: 'ignore' });
   const stop = () => { try { process.kill(-server.pid, 'SIGKILL'); } catch {} };
   process.on('exit', stop);
-  await new Promise((r) => setTimeout(r, 2500));
+  await untilServing(PORT, { child: server });
   const browser = await launchChromium(chromium, { present: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
@@ -298,7 +337,7 @@ if (process.argv.includes('--node')) {
       const c = document.querySelector('#liquid-canvas') ?? document.querySelector('canvas');
       const w = c?.width || 16, h = c?.height || 10, maxDim = Math.max(w, h) * 1.5, z = Math.max(1, d.shot.zoom);
       const off = Math.max(Math.abs(d.shot.cx - px) / (w / maxDim / z * 0.5), Math.abs(d.shot.cy - py) / (h / maxDim / z * 0.5));
-      return { onAim: (frame / n) / (all / rd.length), off, zoom: d.shot.zoom, macroMode: s.macroMode, macroZoom: s.macroZoom };
+      return { onAim: (frame / n) / (all / rd.length), off, zoom: d.shot.zoom, macroMode: s.macroMode, macroZoom: s.macroZoom, aimX: s.macroAimX ?? 0.5, aimY: s.macroAimY ?? 0.5 };
     }, POOL);
     let before = null;
     for (let tries = 0; tries < 4 && !(before?.onAim < BARE); tries++) {
@@ -320,12 +359,14 @@ if (process.argv.includes('--node')) {
     const inside = await state();
     const pressed = await button.getAttribute('aria-pressed');
     const close = await lit();
-    // Lit, and lit by the pool: the shot on it, and the aim still bare, so
-    // a look that poured into the middle meanwhile cannot light the frame
-    // for the old camera.
-    check('Close-up lands on the liquid, not on bare glass',
-      close !== null && close > LIT_SHARE && inside.off < 1 / 3 && inside.onAim < BARE,
-      `${close === null ? 'no frame read' : fx(close)} of the 4x frame lit (over ${LIT_SHARE} wanted), the pool ${fx(inside.off)} of a half-frame off its middle (under 0.333 wanted), the aim's frame still ${fx(inside.onAim)} of the plate's average`);
+    // Lit, and lit by the pool: the shot on it, and the aim moved there from
+    // the bare middle (the landing is handed back as the aim, `onLand`). The
+    // old camera never wrote the aim, so a look that poured into the middle
+    // meanwhile cannot pass this for it.
+    const aimToPool = Math.hypot(inside.aimX - POOL[0], inside.aimY - POOL[1]);
+    check('Close-up lands on the liquid, not on bare glass, and the aim says where',
+      close !== null && close > LIT_SHARE && inside.off < 1 / 3 && aimToPool < 0.05,
+      `${close === null ? 'no frame read' : fx(close)} of the 4x frame lit (over ${LIT_SHARE} wanted), the pool ${fx(inside.off)} of a half-frame off its middle (under 0.333 wanted), the aim at ${fx(inside.aimX)}, ${fx(inside.aimY)}, ${fx(aimToPool)} of the plate from the pool (under 0.05 wanted)`);
     check('and the button lights and the zoom reads 4x', pressed === 'true' && inside.macroZoom === 4 && inside.zoom > 3,
       `aria-pressed ${pressed}, Macro Zoom ${inside.macroZoom}, the frame at ${fx(inside.zoom)}x`);
     await button.evaluate((b) => b.click());

@@ -44,6 +44,16 @@ export const EMPTY_PLATE = 1e-3;
  * src/sim, and `npm run closeupland` checks the two agree.
  */
 export const LAND_FULL_ZOOM = 2;
+/**
+ * How long a closeup coming in keeps asking, in seconds of liquid on the plate.
+ * The zoom alone does not end it: a pinch let go at 1.6x or the slider left at
+ * 1.5x never reaches LAND_FULL_ZOOM, and a closeup still pending there landed
+ * whenever its pool later flowed out of the frame, a cut in the middle of a
+ * held shot minutes on (the review of this port measured it: Hold at 1.5x on
+ * the middle for ten seconds, then across the plate in one frame). Long enough
+ * for the zoom's own ease in, which is most of a second.
+ */
+export const LAND_SECONDS = 1.5;
 /** The zoom the Close-up press goes to (`MACRO_PRESET_ZOOM`, checked the same way). */
 export const CLOSEUP_PRESS_ZOOM = 4;
 
@@ -73,6 +83,16 @@ export function frameMean(field: MacroField, x: number, y: number, hx: number, h
 }
 
 let sat = new Float64Array(0);
+let satW = 0;
+
+/** The mean dye in a (hx, hy) half-cell box about (cx, cy), from the summed-area table `landing` last built. */
+function boxMean(cx: number, cy: number, hx: number, hy: number, size: number): number {
+  const W = satW;
+  const x0 = clamp(Math.round(cx - hx), 0, size), x1 = clamp(Math.round(cx + hx), 0, size);
+  const y0 = clamp(Math.round(cy - hy), 0, size), y1 = clamp(Math.round(cy + hy), 0, size);
+  const area = (x1 - x0) * (y1 - y0);
+  return area > 0 ? (sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0]) / area : 0;
+}
 
 /**
  * The nearest frame to the aim (ax, ay) that holds at least half the dye the
@@ -90,6 +110,7 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
   const { density, size } = field;
   const W = size + 1;
   if (sat.length < W * W) sat = new Float64Array(W * W);
+  satW = W;
   for (let i = 0; i < W; i++) sat[i] = 0;
   for (let j = 0; j < size; j++) {
     let run = 0;
@@ -100,12 +121,6 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
       sat[(j + 1) * W + i + 1] = sat[j * W + i + 1] + run;
     }
   }
-  const boxMean = (cx: number, cy: number) => {
-    const x0 = clamp(Math.round(cx - hx), 0, size), x1 = clamp(Math.round(cx + hx), 0, size);
-    const y0 = clamp(Math.round(cy - hy), 0, size), y1 = clamp(Math.round(cy + hy), 0, size);
-    const area = (x1 - x0) * (y1 - y0);
-    return area > 0 ? (sat[y1 * W + x1] - sat[y0 * W + x1] - sat[y1 * W + x0] + sat[y0 * W + x0]) / area : 0;
-  };
   // Centres the frame can sit on: inside the plate, and its middle off the walls.
   const xLo0 = Math.max(hx, margin), xHi0 = size - Math.max(hx, margin);
   const yLo0 = Math.max(hy, margin), yHi0 = size - Math.max(hy, margin);
@@ -117,12 +132,12 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
   // candidate: the box sum is four reads, cheaper than the list.
   let best = 0;
   for (let y = yLo; y <= yHi + 1e-6; y += stride) {
-    for (let x = xLo; x <= xHi + 1e-6; x += stride) { const v = boxMean(x, y); if (v > best) best = v; }
+    for (let x = xLo; x <= xHi + 1e-6; x += stride) { const v = boxMean(x, y, hx, hy, size); if (v > best) best = v; }
   }
   let px = ax, py = ay, near = Infinity;
   for (let y = yLo; y <= yHi + 1e-6; y += stride) {
     for (let x = xLo; x <= xHi + 1e-6; x += stride) {
-      if (boxMean(x, y) < 0.5 * best) continue;
+      if (boxMean(x, y, hx, hy, size) < 0.5 * best) continue;
       const dist = Math.hypot(x - ax, y - ay);
       if (dist < near) { near = dist; px = x; py = y; }
     }
@@ -147,17 +162,39 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
 /**
  * A closeup's landing: whether it still has to check that its aim shows any
  * liquid (`pending`, set as it comes in), and where it landed instead when it
- * did not (grid cells, NaN while it sits on its aim). Owned by the camera.
+ * did not (grid cells, NaN while it sits on its aim); how long it has asked
+ * (`age`, seconds), and whether the place it settled on has been handed back
+ * as the aim (`told`). Owned by the camera.
  */
-export interface Landing { pending: boolean; x: number; y: number; out: { x: number; y: number } }
+export interface Landing { pending: boolean; x: number; y: number; age: number; told: boolean; out: { x: number; y: number } }
 
 export function newLanding(): Landing {
-  return { pending: true, x: NaN, y: NaN, out: { x: 0, y: 0 } };
+  return { pending: true, x: NaN, y: NaN, age: 0, told: false, out: { x: 0, y: 0 } };
 }
 
 /** Coming in again (`pending` true), or a hand on the camera (false): either way, back on the aim. */
 export function clearLanding(l: Landing, pending: boolean): void {
-  l.pending = pending; l.x = NaN; l.y = NaN;
+  l.pending = pending; l.x = NaN; l.y = NaN; l.age = 0; l.told = false;
+}
+
+/**
+ * Where the closeup settled, in plate uv, once and only once, the frame its
+ * asking ends with a landing: handed to the app as the aim (`onLand` in the
+ * camera's options), so the aim is where the camera is looking.
+ *
+ * Without it the landing was a private place inside the camera with the aim
+ * left on the bare middle, and anything that moves the aim from the stored
+ * aim (the arrows in Hold, the Aim sliders, a MIDI knob on them, Evolve's
+ * glide of the aim) moved it from there: one Right tap after landing took the
+ * frame from the pool at (0.22, 0.30) back to (0.54, 0.50), bare glass, within
+ * a second (the review of this port). The QA-12 rule is the same one: the aim
+ * is a setting, so the sliders say where it is.
+ */
+export function settledLanding(l: Landing, size: number): { x: number; y: number } | null {
+  if (l.pending || l.told || !Number.isFinite(l.x) || !(size > 0)) return null;
+  l.told = true;
+  l.out.x = clamp(l.x / size, 0, 1); l.out.y = clamp(l.y / size, 0, 1);
+  return l.out;
 }
 
 /**
@@ -168,11 +205,13 @@ export function clearLanding(l: Landing, pending: boolean): void {
  * first lands, so the camera cuts there rather than easing across the plate.
  */
 export function steerLanding(l: Landing, field: MacroField, ax: number, ay: number,
-  frame: { spanX: number; spanY: number; zoom: number }, followX: number, followY: number, margin: number): boolean {
+  frame: { spanX: number; spanY: number; zoom: number }, followX: number, followY: number, margin: number,
+  step: number): boolean {
   if (!l.pending) return false;
   const plate = plateMean(field, margin);
   // An empty plate waits on the aim, still pending, for the first pour.
   if (!(plate > EMPTY_PLATE)) return false;
+  l.age += step;
   const { size } = field;
   const hx = clamp(frame.spanX / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
   const hy = clamp(frame.spanY / Math.max(1, frame.zoom), 0, 1) * 0.5 * size;
@@ -183,7 +222,7 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
     never asked again, and the pinch went on into the bare middle (a ramp from
     1.01x to 4x over a second ended on 0.5, 0.5). Fully in, the answer stands.
   */
-  if (frame.zoom >= LAND_FULL_ZOOM) l.pending = false;
+  if (frame.zoom >= LAND_FULL_ZOOM || l.age >= LAND_SECONDS) l.pending = false;
   const had = Number.isFinite(l.x);
   const atX = Number.isFinite(followX) ? followX : had ? l.x : ax;
   const atY = Number.isFinite(followY) ? followY : had ? l.y : ay;
@@ -201,7 +240,7 @@ export function steerLanding(l: Landing, field: MacroField, ax: number, ay: numb
 }
 
 /** Whether the closeup is in: the same reading as `macroZoomOf(s) > 1.05` (src/sim/constants.ts). */
-export function closeupIn(s: Pick<VisualizerSettings, 'macroMode' | 'macroZoom'>): boolean {
+export function closeupIn(s: { macroMode?: boolean; macroZoom?: number }): boolean {
   return s.macroMode === true || (s.macroZoom ?? 1) > 1.05;
 }
 
@@ -215,6 +254,6 @@ export function closeupIn(s: Pick<VisualizerSettings, 'macroMode' | 'macroZoom'>
  * unlit; the M key read the zoom alone, so a look that set the flag was in
  * with M pressing it further in.
  */
-export function closeupToggle(s: Pick<VisualizerSettings, 'macroMode' | 'macroZoom'>): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
+export function closeupToggle(s: { macroMode?: boolean; macroZoom?: number }): Pick<VisualizerSettings, 'macroMode' | 'macroZoom'> {
   return closeupIn(s) ? { macroMode: false, macroZoom: 1 } : { macroMode: true, macroZoom: CLOSEUP_PRESS_ZOOM };
 }

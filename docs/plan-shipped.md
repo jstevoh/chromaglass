@@ -9247,13 +9247,17 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   nearest frame holding at least half what the plate's fullest does, centred on the dye in
   it, and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
   and lands on the first pour; a hand moving the aim during the closeup is obeyed onto
-  glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). The camera
-  half on today's main: 5 of 13 lines before, 14 of 14 after (the 14th holds the
-  landing's copies of the solver's zooms to `src/sim/constants.ts` and the button's lit
-  state to `macroZoomOf`). And the desk's button flipped `macroMode` alone, so the plate
-  went to 4x while the Macro Zoom knob beside it read 1.00x; it is now the M key's press
-  (`closeupToggle`), in by the zoom and out with both, and the phone's Zoom is the same
-  press.
+  glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). It stops
+  asking once fully in or after 1.5 s (a pinch let go at 1.5x otherwise cut across the
+  plate when its pool later drained), and where it settles is handed back as the aim, so
+  the arrows, the Aim sliders and Evolve pan on from the pool and not from the bare
+  middle (one arrow tap had taken it back there). The camera half on today's main: 5 of
+  13 lines before, 16 of 16 after; the app on software WebGPU, the report's plate: 0.543
+  of the 4x frame lit, the pool 0.015 of a half-frame off its middle. And the desk's
+  button flipped `macroMode` alone, so the plate went to 4x while the Macro Zoom knob
+  beside it read 1.00x; it is now the M key's press (`closeupToggle`), in by the zoom and
+  out with both, and so are the phone's Zoom, the remote's Closeup switch and the
+  command palette's, whose lit states and a pad's light read `closeupIn`.
 
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
