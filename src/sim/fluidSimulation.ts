@@ -47,7 +47,7 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP } from './stepping';
+import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
@@ -168,6 +168,12 @@ export class FluidSimulation {
   */
   private sloshClock = new SloshClock();
   private dishKicks: { x: number; y: number; amount: number; radii: number[]; t: number }[] = [];
+  // Kept for scripts/plateboil.mjs --part=zero (unreachable from step()).
+  private readonly CM = GRID_SIZE / 2;
+  private cvx = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
+  private cvy = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
+  private cpr = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
+  private cdv = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
   /** Which plate this is: 0 is the live plate, the rest run behind it as a background loop. */
   layerIndex = 0;
   /**
@@ -1197,6 +1203,7 @@ export class FluidSimulation {
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.temp.fill(0);
     this.vx.fill(0); this.vy.fill(0);
+    this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
@@ -3229,6 +3236,11 @@ export class FluidSimulation {
       boilHolds: this.boilHolds,
       ...besideStep(settings, this.layerIndex),
     };
+  }
+
+  // Kept for scripts/plateboil.mjs --part=zero (unreachable from step()).
+  private stepCurrent(p: GpuStepParams) {
+    stepCurrentCpu(this.CM, this.size, this.cvx, this.cvy, this.cpr, this.cdv, this.density, this.temp, this.vx, this.vy, p);
   }
 
   // Kept for scripts/plate.mjs text check (unreachable after 3.1).
