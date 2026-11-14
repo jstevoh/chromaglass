@@ -90,21 +90,40 @@
  *      least, and a pair that saved nothing reads 1. Under 0.9 of the
  *      colour's carry the pair would be timing less than it runs, so that
  *      fails too.
- *   8. Both ways carry the same: the alcohol run (whose pool moves three
- *      cells) again with the species in a stage of its own (`fuseSpecies`
- *      off), and the colour and the species after 30 steps the same to a
- *      half float's last place at the field's largest (1/1024 of it). On
- *      software they are the same to the bit. On Metal they are not: its
- *      compiler is free to reorder the two kernels' arithmetic differently
- *      (fast math), a carry's last bit differs, and the species feeds the
- *      flow back through the drag (hsPrep), so 30 steps grow a last bit to
- *      about 1e-4 of the largest (CI's Mac: 8.6e-5 in the colour, 1.4e-4 in
- *      the species of 1.36). The colour is kept in half floats, so a
- *      difference under its last place is none the plate can hold; a
- *      carry missed or made twice moves the pool three cells and reads
- *      near 1. Two runs that both carried
- *      the same way would match too, so each says how its last step carried
- *      the species (`lastSpeciesCarry`), and the check asks for one of each.
+ *   8. Both ways carry the same: the alcohol run (whose pool moves twelve
+ *      cells in its thirty steps) again with the species in a stage of its
+ *      own (`fuseSpecies` off) for the last step alone, and the colour and
+ *      the species after it the same to a half float's last place at the
+ *      field's largest (1/1024 of it). On software they are the same to the
+ *      bit. On Metal they need not be: its compiler is free to reorder the
+ *      two kernels' arithmetic differently (fast math), so a carry's last
+ *      bit may differ, and a half float holds nothing finer.
+ *      Until 2026-11-14 the second run carried apart from the first step
+ *      and the fields were compared after all thirty. That compared the
+ *      plate's dynamics as well as the carry: Rain Drip's heavy pool
+ *      falling through the thin liquid is a growing edge (the denser liquid
+ *      leading into the lighter one), and the species feeds the flow back
+ *      through the drag (hsPrep), so a last bit at the first step is
+ *      several at the thirtieth. Measured on software, colour laid one
+ *      half-float place lighter (1 − 1/2048) reads 4.9e-4 after one step,
+ *      1.4e-3 after ten and 2.3e-3 after thirty in the colour, 2.8e-3 in the
+ *      species: grown about 4.6 times. The bar was set when the pool moved
+ *      three cells (CI's Mac: 8.6e-5 in the colour, 1.4e-4 in the species);
+ *      with it moving twelve, GitHub's Mac read 7.2e-4 and 9.9e-4, and the
+ *      owner's (an M4, whose compiler orders the kernels its own way) 1.29e-3
+ *      and 1.77e-3, red on two deploys with no carry wrong. So the two runs
+ *      now share every step but the last, and the check asks they reach it
+ *      on the same plate to the bit (Metal runs the same kernels on the same
+ *      inputs the same way: both of the owner's runners read the same
+ *      digits). Then the difference is one carry's rounding and nothing
+ *      grown, held to the same bar. What a carry missed or made twice would
+ *      read is the species' change over that step (the pool moves 0.4 of a
+ *      cell a step): 0.28 on software, asked over ten of the bar's places,
+ *      so the check can still see the fault it is for. Two runs that both
+ *      carried the same way would match too, so each says how its last step
+ *      carried the species (`lastSpeciesCarry`), and the check asks for one
+ *      of each. The old reading, carried apart all thirty steps, is printed
+ *      beside it and not asked.
  *   And any GPU validation error fails the run.
  *
  * No canvas, so it runs on any adapter that computes: a Mac's Metal in CI, a
@@ -153,34 +172,56 @@ try {
       own viscosity says: syrup in the thickest look read 4 to 5 times colour
       alone, its pool 1.3. Real, and not what this asks.
     */
-    const run = async (t, bottle, ignored = false, separate = false) => {
+    /*
+      `separate` is the step from which the species is carried in a stage of
+      its own (check 8): STEPS - 1 carries it so for the last step alone,
+      after every step before it rode the colour's carry as the plate does;
+      0 carries it so from the start. The alcohol runs keep their fields
+      after the step before the last as well, so check 8 can ask that both
+      reached the last step on the same plate.
+    */
+    const run = async (t, bottle, ignored = false, separate = STEPS) => {
       await lab.create(N, N);
       lab.solver().readsSpecies = !ignored;
-      lab.solver().fuseSpecies = !separate;
+      lab.solver().fuseSpecies = separate > 0;
       lab.dyeDisc(0.5, 0.5, 0.08, [1, 0, 0], 1);
       let sp = null;
       if (bottle) sp = lab.addSpecies(0.5, 0.5, 0.08, 50, bottle);
       lab.flush();
       const before = await read();
       const mean = await meanDye();
-      await lab.step(STEPS, { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, meanDensity: mean });
-      const fields = bottle === 'alcohol' ? { dye: [...await lab.field('dye')], species: [...await lab.field('species')], how: lab.solver().lastSpeciesCarry } : null;
+      const over = { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, meanDensity: mean };
+      const keep = async () => ({ dye: [...await lab.field('dye')], species: [...await lab.field('species')], how: lab.solver().lastSpeciesCarry });
+      await lab.step(STEPS - 1, over);
+      const prior = bottle === 'alcohol' ? await keep() : null;
+      lab.solver().fuseSpecies = separate > STEPS - 1;
+      await lab.step(1, over);
+      const fields = bottle === 'alcohol' ? { ...await keep(), prior } : null;
       return { sp, before, after: await read(), nuClear: lab.thinGapViscosity(t), fields };
     };
     for (const [name, t, bottle, ignored, separate] of [['glycerine', 0.45, 'glycerine'], ['glycerine unread', 0.45, 'glycerine', true], ['colour 0.45', 0.45, null],
-      ['alcohol', 0.06, 'alcohol'], ['alcohol separate', 0.06, 'alcohol', false, true], ['colour 0.06', 0.06, null], ['syrup thick', 1, 'syrup'], ['syrup unread', 1, 'syrup', true], ['colour 1', 1, null]]) {
+      ['alcohol', 0.06, 'alcohol'], ['alcohol separate', 0.06, 'alcohol', false, STEPS - 1], ['alcohol apart', 0.06, 'alcohol', false, 0],
+      ['colour 0.06', 0.06, null], ['syrup thick', 1, 'syrup'], ['syrup unread', 1, 'syrup', true], ['colour 1', 1, null]]) {
       out[name] = await run(t, bottle, ignored, separate);
     }
-    // 8. The alcohol run carried both ways: the largest difference in any channel, against the largest value.
+    // 8. The alcohol run's last step carried both ways: the largest difference in any channel, against the largest value.
     {
-      const diff = (k) => {
-        const a = out.alcohol.fields[k], b = out['alcohol separate'].fields[k];
+      const diff = (a, b) => {
         let d = 0, m = 0;
         for (let i = 0; i < a.length; i++) { d = Math.max(d, Math.abs(a[i] - b[i])); m = Math.max(m, Math.abs(b[i])); }
         return { d, m };
       };
-      out.same = { dye: diff('dye'), species: diff('species'), how: [out.alcohol.fields.how, out['alcohol separate'].fields.how] };
-      delete out.alcohol.fields; delete out['alcohol separate'].fields;
+      const A = out.alcohol.fields, B = out['alcohol separate'].fields, C = out['alcohol apart'].fields;
+      out.same = {
+        dye: diff(A.dye, B.dye), species: diff(A.species, B.species), how: [A.how, B.how],
+        // Before the last step: the same plate to the bit, or the difference is not the carry's alone.
+        prior: Math.max(diff(A.prior.dye, B.prior.dye).d, diff(A.prior.species, B.prior.species).d),
+        // What a last carry missed would leave: the species as the step before left it, against after.
+        missed: diff(A.prior.species, A.species).d,
+        // Carried apart all thirty steps (the check's reading before 2026-11-14), printed only.
+        apart: { dye: diff(A.dye, C.dye).d, species: diff(A.species, C.species).d },
+      };
+      for (const k of ['alcohol', 'alcohol separate', 'alcohol apart']) delete out[k].fields;
     }
     out.steps = STEPS; out.stepSeconds = lab.stepSeconds;
     // 6. The stage's cost, on a stirred plate of glycerine.
@@ -244,10 +285,11 @@ try {
   check('the species riding the colour\'s carry costs under three quarters of carrying it alone',
     Number.isFinite(c.pair) && c.pair > c.dye * 0.9 && extra < 0.75 * c.ms,
     `the colour's carry with the species ${f(c.pair, 3)} ms (the three: ${c.pairAll.map((x) => f(x, 3)).join(', ')}), so the species adds ${f(extra, 3)} ms (${f(extra / c.dye, 2)} of the colour's carry), against ${f(c.ms, 3)} carried alone`);
-  const sd = r.same.dye, ss = r.same.species;
+  const sd = r.same.dye, ss = r.same.species, sm = r.same;
   check('the species riding the colour\'s carry moves both exactly as carried apart',
-    r.same.how[0] === 'pair' && r.same.how[1] === 'alone' && sd.m > 0.5 && ss.m > 1 && sd.d <= sd.m / 1024 && ss.d <= ss.m / 1024,
-    `carried ${r.same.how.join(' and ')}; largest difference ${sd.d.toExponential(2)} in the colour (of ${f(sd.m)}), ${ss.d.toExponential(2)} in the species (of ${f(ss.m)})`);
+    sm.how[0] === 'pair' && sm.how[1] === 'alone' && sd.m > 0.5 && ss.m > 1 && sm.prior === 0 && sm.missed > 10 * ss.m / 1024
+      && sd.d <= sd.m / 1024 && ss.d <= ss.m / 1024,
+    `the last of ${r.steps} steps carried ${sm.how.join(' and ')} from the same plate (before it, largest difference ${sm.prior.toExponential(2)}); largest difference ${sd.d.toExponential(2)} in the colour (of ${f(sd.m)}), ${ss.d.toExponential(2)} in the species (of ${f(ss.m)}); a carry missed would read ${sm.missed.toExponential(2)}; carried apart all ${r.steps} steps, ${sm.apart.dye.toExponential(2)} and ${sm.apart.species.toExponential(2)}, grown by the falling pool`);
   check('no GPU pass failed validation (a stage that never ran would read as an unchanged pool)', gpuErrors.length === 0, gpuErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the lab ran', false, e.message.slice(0, 300));

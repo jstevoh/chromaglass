@@ -25,6 +25,7 @@ import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 import { RemoteSongs } from './RemoteSongs';
+import { closeupIn, closeupToggle } from '../lib/macroLanding';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -804,6 +805,18 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <Slider label="Frame Tilt" field="soapFilmTilt" step={1} format={(v) => `${Math.round(v)}°`} value={value('soapFilmTilt') as number | undefined} {...sliderProps} connected={connected} />
             </>
           )}
+          {/* Glitter and its lens, and the side lamp (PLAN 47e, 47d, 47b-side), each one's dials while it is up, as on the desk. */}
+          <Slider label="Glitter" field="glitter" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('glitter') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.glitter ?? 0) > 0.001 && (
+            <Slider label="Lens Stop" field="lensStop" step={0.1} format={(v) => `f/${v.toFixed(1)}`} value={value('lensStop') as number | undefined} {...sliderProps} connected={connected} />
+          )}
+          <Slider label="Side Light" field="sideLight" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('sideLight') as number | undefined} {...sliderProps} connected={connected} />
+          {(settings?.sideLight ?? 0) > 0.001 && (
+            <>
+              <Slider label="Side Colour" field="sideLightHue" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightHue') as number | undefined} {...sliderProps} connected={connected} />
+              <Slider label="Side Angle" field="sideLightAngle" step={5} format={(v) => `${Math.round(v)}°`} value={value('sideLightAngle') as number | undefined} {...sliderProps} connected={connected} />
+            </>
+          )}
           {/* The tank seen through its side (PLAN 47n), and while it is up its nozzle, dye and drain, as on the desk. A hold on the phone's pad carries the nozzle as a finger on the screen does. */}
           <Slider label="Tank" field="tank" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('tank') as number | undefined} {...sliderProps} connected={connected} />
           {(settings?.tank ?? 0) > 0.001 && (
@@ -898,8 +911,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <button
               type="button"
               role="switch"
-              aria-checked={!!settings?.macroMode}
-              onClick={() => patch({ macroMode: !settings?.macroMode })}
+              aria-checked={closeupIn(settings ?? {})}
+              onClick={() => patch(closeupToggle(settings ?? {}))}
               disabled={!connected}
               data-testid="remote-macro-toggle"
               className="flex w-full items-center justify-between disabled:opacity-30"
@@ -907,9 +920,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <SwitchPill on={!!settings?.macroMode} />
+              <SwitchPill on={closeupIn(settings ?? {})} />
             </button>
-            {settings?.macroMode && (
+            {closeupIn(settings ?? {}) && (
               <div className="mt-4">
                 <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />

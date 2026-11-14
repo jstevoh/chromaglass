@@ -836,6 +836,18 @@
       ]
     },
     {
+      "name": "The music stirs only through a cord",
+      "shard": "logic",
+      "run": "npm run musicstir",
+      "why": [
+        "The solver's step takes no sound (PLAN 38u-4, 38u-5): with every cord",
+        "at zero a loud band leaves a still plate still, value for value, a",
+        "patched cord moves it, and each look's cord from the mids onto",
+        "Turbulence keeps its stir within a quarter of what the multiplier and",
+        "eddies it replaces gave."
+      ]
+    },
+    {
       "name": "The melody walks across the plate",
       "shard": "logic",
       "run": "npm run melody",
@@ -845,6 +857,19 @@
         "order across the plate, none from a kick or a snare, a harder note a",
         "bigger drop, and a drop waiting for its pitch to settle is on the note",
         "where one placed on the onset is on the note before."
+      ]
+    },
+    {
+      "name": "The closeup comes in on liquid",
+      "shard": "logic",
+      "run": "npm run closeupland -- --node",
+      "why": [
+        "The closeup comes in on liquid, never on bare glass (PLAN.md QA-32): the",
+        "real closeup camera at 4x on made-up plates. Hold and Follow coming in on",
+        "a plate whose middle is bare frame the nearest pool from the first frame",
+        "(the control: the frame on the aim is bare); with liquid on the aim Hold",
+        "does not move; a hand's aim is obeyed; an empty plate lands on the first",
+        "pour; and the Close-up press goes in by the zoom and out with both."
       ]
     },
     {
@@ -1016,6 +1041,52 @@
       "run": "npm run license-worker"
     },
     {
+      "name": "A TV's sign-in by a short code",
+      "shard": "logic",
+      "run": "npm run tvcode",
+      "why": [
+        "The licence Worker's /tv/ routes (server/tv-code.js, PLAN.md 12-tv-signin):",
+        "a TV shows a code, a signed-in phone claims it for an account with Home or",
+        "Pro, and only the TV holding the device code collects a pass, once. Read from",
+        "what the TV and the phone receive: the pass verifies, names the right key,",
+        "is refused by /activate and verifyLicenseKey (a TV takes no Mac seat), stops",
+        "renewing once the key is refunded (or moves to the account's other key),",
+        "a copied pass dies with its original at the next renewal, an account's",
+        "eleventh TV drops its first, and the hourly allowances bite, the poll's",
+        "included. An in-memory KV and generated key pairs, so `logic`."
+      ]
+    },
+    {
+      "name": "The phone's page to link a TV",
+      "shard": "browser",
+      "run": "npm run tvlink",
+      "why": [
+        "The phone page a TV sends the player to (src/components/phone/TvLink.tsx,",
+        "PLAN.md 12-tv-signin), rendered in Chromium at a phone's size with the",
+        "account and the Worker stood in for: a typed code formats as it is typed",
+        "and is sent whole with the account's token; a code that came in a link",
+        "sends nothing on a tap or Enter until the player ticks that the TV in front",
+        "of them shows it (the review found the one-tap phish). No GPU, so `browser`."
+      ]
+    },
+    {
+      "name": "The Apple TV app's sign-in against the Worker",
+      "shard": "logic",
+      "run": "npm run tvswift",
+      "why": [
+        "The tvOS app's core (tvos/, PLAN.md 12-tv-apple), built with Swift and run",
+        "against the licence Worker's own /tv/ handler on a local port: the app links",
+        "by a code (drawing a fresh one when the first runs out), verifies its pass",
+        "offline, renews it to the next generation, and is unlinked when a spent pass",
+        "comes back. The one place the Swift client and the JavaScript server meet, so",
+        "a renamed field or a millisecond read as a second is red here. Then the",
+        "app's receiver against a stand-in relay speaking the /tv page's protocol:",
+        "hello, answer, candidates, a refusal, a drop, a picture that never comes",
+        "and a wrong key, with what the TV sent read on the relay's side. On Linux",
+        "the package builds swift-crypto in place of CryptoKit."
+      ]
+    },
+    {
       "name": "The Mac app's updates",
       "shard": "logic",
       "run": "npm run updates",
@@ -1086,6 +1157,35 @@
         "Turn are one angle. On SwiftShader, comparing two compiled programs as",
         "lampzero does. In a part of its own, lab9, since 2026-11-11: lab2 with it",
         "ran past its 25 minutes on the slow tier twice on #802's deploy (PLAN 19k-18)."
+      ]
+    },
+    {
+      "name": "A bubble's outline is round at the screen's resolution",
+      "shard": "lab9",
+      "run": "npm run bubbleround",
+      "why": [
+        "The owner, 2026-11-11: bubbles 'look like a old computer drew them'",
+        "(PLAN 38h-15, scripts/bubbleround.mjs). The plate drew each bubble's",
+        "outline from the air field's coverage, a polygon with a facet per",
+        "texel; now from the bubble's own disc, named by the field. Reads each",
+        "rim's radius along 96 rays on the real plate shader and on a lab built",
+        "with the index taken out (the field's drawing), which must still be a",
+        "polygon, so the bar is one the old outline failed. Two labs of four",
+        "plates on SwiftShader: beside the moiré check in lab9, which ran alone."
+      ]
+    },
+    {
+      "name": "A bead's outline is round at the screen's resolution",
+      "shard": "lab9",
+      "run": "npm run beadround",
+      "why": [
+        "The owner, 2026-11-11: 'Fix the small bubbles as well' (PLAN 38h-17,",
+        "scripts/beadround.mjs). The small scalloped balls in Macro Bead were the",
+        "oil beads, read from a 512-square eight-bit mask; the plate now evaluates",
+        "the rings at the point drawn from the bead list. Reads each bead's rim",
+        "along 96 rays in the projector and the closeup, and on a lab made to read",
+        "the mask as before, which must fail the same bar. Two labs of two",
+        "plates on SwiftShader: beside bubbleround in lab9."
       ]
     },
     {
@@ -1360,6 +1460,23 @@
       ]
     },
     {
+      "name": "Glitter, the lens and the side lamp",
+      "shard": "lab9",
+      "run": "npm run glint",
+      "timeout": 12,
+      "why": [
+        "PLAN 47e, 47d-1, 47b-1 (gpu/glint.ts, lib/glint.ts): the laws in node (Poiseuille's",
+        "profile, the Jeffery orbit stepped from its equation, Stokes settling, the defocus",
+        "disc and Airy core, the side lamp's falloff, the flake's mirror law); then the real",
+        "shaders in the lab: off is off to the byte with every other lens dial moved; the side",
+        "lamp leaves black black, colours the dye, and lights the half toward it more both ways",
+        "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
+        "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
+        "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
+      ]
+    },
+    {
       "name": "The tank on the GPU (SwiftShader)",
       "shard": "lab5",
       "run": "npm run tankgpu",
@@ -1438,7 +1555,7 @@
     },
     {
       "name": "The rest of a bubble's air, owed until its builds",
-      "shard": "lab4",
+      "shard": "lab8",
       "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
       "why": [
         "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
@@ -1448,7 +1565,7 @@
         "and fills its hole evenly without airShed, and the app lays no press",
         "under a bubble while the flow round it stays the same. Each owed id",
         "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
-        "it: about three and a half minutes, in lab4, which has the room."
+        "it: about three and a half minutes, in lab8 (PLAN 19k-11c moved it from lab4)."
       ]
     },
     {
@@ -1727,6 +1844,39 @@
         "second lab on SwiftShader (lampzero's reason: two compiled programs compared",
         "byte for byte), and FluidSimulation's stepCurrent against today's body in",
         "node. Holds on main. About 90 s in a cloud session."
+      ]
+    },
+    {
+      "name": "One args name, one value a step (46r)",
+      "shard": "lab2",
+      "run": "npm run argnames",
+      "timeout": 6,
+      "why": [
+        "A dispatch's numbers live in a buffer the solver keeps under a name, and a",
+        "buffer holds what was written to it last before the submit, so two calls in",
+        "one step under one name with different numbers both read the second's. The",
+        "lasting current, the swirl's projection and the open plate's addCurrent",
+        "shared 'current grid', and on the open plate currentForces read Depth Drag",
+        "as the boil running (scripts/argnames.mjs). The solver's argWrite watched",
+        "from the page on eleven plates, with a planted pair as the control; the",
+        "current after one step the same at Depth Drag 0 and 1.5, bit for bit; and",
+        "the boil's rise read on the open plate at Heat 1. About 50 s here."
+      ]
+    },
+    {
+      "name": "A poured liquid acts on every step (15e-1)",
+      "shard": "lab2",
+      "run": "npm run liquidpush",
+      "timeout": 6,
+      "why": [
+        "A bottle's liquid pushed the flow and thinned the dye only inside the fold of",
+        "a frame's hand-laid deltas, so not at all on a step nothing was laid in (a",
+        "liquid poured after a Clear) and twice on a step folded twice",
+        "(scripts/liquidpush.mjs). A heavy drop and a soap's on a rocked plate, open",
+        "and thin, stepped with no fold, one and two, and after a Clear, each against",
+        "the same plate without the drops: all four do the same. `npm run liquidsgpu`",
+        "holds the liquids' sizes on the Mac; this holds when they act, in a minute,",
+        "on any adapter."
       ]
     },
     {
@@ -2593,7 +2743,7 @@
         "`npm run liquids` laid on the thin gap the looks use, each held to the",
         "stand-in's bar and to its size within a factor of two, with a fold of",
         "the deltas every step and on a still plate, and soap's and silicone's",
-        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-2 to",
         "15e-5 print and do not fail until they pass. Here on Metal, about a",
         "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
         "24 of its 25 minutes before signin without it (#513's first run)."
@@ -2985,6 +3135,19 @@
       ]
     },
     {
+      "name": "An oil drop shows its own colour and its edge is no darker than either liquid",
+      "shard": "fifth",
+      "run": "npm run dropcolour",
+      "timeout": 5,
+      "why": [
+        "PLAN 47z-1 (with 28i-7b and 28k-5): a red oil drop laid in cobalt water",
+        "as a look lays it keeps its own colour in the middle, and across its",
+        "edge the light is the two liquids side by side, never darker than the",
+        "darker of them; the edge used to go black. Three 128² plates of one",
+        "second; in the fifth shard, beside the crowd's Film Hold."
+      ]
+    },
+    {
       "name": "A packed foam's junctions turn to 120°",
       "shard": "fifth",
       "run": "npm run foam",
@@ -3370,6 +3533,19 @@
         "And the liquid in the bottle, from every tool that lays one: Pour,",
         "Spray, Splat and Streak laid only its colour, so a Ferrofluid Pour",
         "was black dye the Magnet could not move (scripts/bottles.mjs)."
+      ]
+    },
+    {
+      "name": "The Close-up button lands on liquid",
+      "shard": "tools",
+      "run": "npm run closeupland",
+      "timeout": 4,
+      "why": [
+        "The desk's Close-up button on a plate cleared to one pool off the middle",
+        "(PLAN.md QA-32, the owner's blank plate): the 4x frame is lit, the",
+        "button lights and the knob reads 4x, and it comes out to the plate. The",
+        "controls: at 1x the pool is drawn, and the frame on the aim is bare glass.",
+        "On the Mac: the app's frames; a cloud session runs it with PW_WEBGPU=1."
       ]
     },
     {

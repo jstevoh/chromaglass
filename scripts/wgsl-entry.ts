@@ -11,6 +11,7 @@ import { BEAD_KERNELS } from '../src/gpu/wgsl/beadMask';
 import { SOAP_KERNELS } from '../src/gpu/wgsl/soapFilm';
 import { SOAP_PLATE_KERNELS } from '../src/gpu/wgsl/soapFilmPlate';
 import { SOAP_AIR_KERNELS } from '../src/gpu/wgsl/soapAir';
+import { STEP_WGSL, SPLAT_WGSL, LENS_WGSL } from '../src/gpu/wgsl/glint';
 import { TANK_KERNELS } from '../src/gpu/wgsl/tank';
 import { TANK_DRAW_WGSL } from '../src/gpu/tankDraw';
 
@@ -48,6 +49,9 @@ const FORMATS: Record<string, string> = {};
   await check('tank.draw', TANK_DRAW_WGSL);
   for (const [name, code] of Object.entries(SOAP_PLATE_KERNELS)) await check(`soapPlate.${name}`, code);
   for (const [name, code] of Object.entries(SOAP_AIR_KERNELS)) await check(`soapAir.${name}`, code);
-  out.push(`checked ${Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(SOAP_AIR_KERNELS).length + Object.keys(TANK_KERNELS).length + 1} shaders`);
+  // The lens pass after the plate (PLAN 47e, 47d, 47b-side): glitter, the lens, the side lamp.
+  const glint = { step: STEP_WGSL, splat: SPLAT_WGSL, lens: LENS_WGSL };
+  for (const [name, code] of Object.entries(glint)) await check(`glint.${name}`, code);
+  out.push(`checked ${Object.keys(glint).length + Object.keys(KERNELS).length + 2 + Object.keys(film).length + 1 + Object.keys(DROP_KERNELS).length + Object.keys(SLOSH_KERNELS).length + Object.keys(SPLAT_KERNELS).length + Object.keys(BEAD_KERNELS).length + Object.keys(SOAP_KERNELS).length + Object.keys(SOAP_PLATE_KERNELS).length + Object.keys(SOAP_AIR_KERNELS).length + Object.keys(TANK_KERNELS).length + 1} shaders`);
   return out;
 };

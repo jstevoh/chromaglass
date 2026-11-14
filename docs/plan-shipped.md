@@ -4616,6 +4616,17 @@ the largest (Metal's compiler orders the two kernels' arithmetic its own way, an
 species feeds the flow back through the drag over 30 steps).
 Under the maze's flow the colour moves in sixths, so the species there still has its own
 stage (18d-11b).
+**18d-11c** (2026-11-14): `npm run thick`'s "carried both ways" compares one carry, not
+thirty steps. Main was held red on the owner's Mac (deploys 827 and 828: 1.29e-3 in the
+colour, 1.77e-3 in the species, against a bar of 1/1024 of the largest) with no carry
+wrong. The second run carried apart from the first step, so the check compared the plate's
+dynamics too: Rain Drip's heavy pool falling through the thin liquid grows a last bit
+(software: colour laid one half-float place lighter reads 4.9e-4 after one step, 2.3e-3
+after thirty, about 4.6 times), and the pool now falls twelve cells where the bar was set
+on three. GitHub's Mac had crept to 7.2e-4 and 9.9e-4. Now both runs share the first 29
+steps, are asked to reach the last on the same plate to the bit, and are held to the same
+bar after one step each way; a carry missed would read 0.28 (software), over ten of the
+bar's places. The thirty-step reading is printed beside it.
 **18d-12** (2026-10-05): each liquid pours its own colour, and a dye picked for it tints it
 (`npm run natural`, `npm run bottles`). The owner: "Some of the liquids don't carry color.
 Let's make them by default the correct color, but allow them to have color as well." Each
@@ -9276,6 +9287,33 @@ Shipped (`npm run soundowed -- --owed=voices`, 10/10 checks passed with `lfo` re
   all 70 looks and show stages, the same press moves the frame 0.17% a frame with it and
   without, a cut lands on the drop's middle, and a drop on still paint moves 0.
 
+- ~~**QA-32** The Close-up button "doesn't seem to do anything besides make the canvas
+  black/empty" (the owner, 2026-10-29, with a screenshot of the Recipe panel; built in
+  #575, which closed unmerged, and asked again 2026-11-14).~~ **Fixed** (`npm run
+  closeupland`): the closeup's camera is Hold by default, aimed at the middle of the
+  plate, and Hold sat on its aim and nowhere else, so on a plate whose middle was bare (a
+  look that pours in pools, a middle a finger had swept, a plate between pours) every way
+  in (the button, M, the zoom, the phone's pinch and Zoom) was a 4x view of nothing: the
+  exposure stays under what the frame holds, and the frame held nothing. In the app on
+  software WebGPU, classic cleared to one pool at (0.22, 0.30): the 4x frame's mean 1.4 of
+  255 and no pixel lit, for as long as it was in. Coming in, Hold and Follow now check
+  their aim (`src/lib/macroLanding.ts`, beside the camera, which is near the size the repo
+  warns at); if its frame holds under a tenth of the plate's average dye, they go to the
+  nearest frame holding at least half what the plate's fullest does, centred on the dye in
+  it, and re-land on each frame of a zoom still coming in; an empty plate waits on the aim
+  and lands on the first pour; a hand moving the aim during the closeup is obeyed onto
+  glass, and a mode switch mid-closeup is not a landing (`npm run holdjump`). It stops
+  asking once fully in or after 1.5 s (a pinch let go at 1.5x otherwise cut across the
+  plate when its pool later drained), and where it settles is handed back as the aim, so
+  the arrows, the Aim sliders and Evolve pan on from the pool and not from the bare
+  middle (one arrow tap had taken it back there). The camera half on today's main: 5 of
+  13 lines before, 16 of 16 after; the app on software WebGPU, the report's plate: 0.543
+  of the 4x frame lit, the pool 0.015 of a half-frame off its middle. And the desk's
+  button flipped `macroMode` alone, so the plate went to 4x while the Macro Zoom knob
+  beside it read 1.00x; it is now the M key's press (`closeupToggle`), in by the zoom and
+  out with both, and so are the phone's Zoom, the remote's Closeup switch and the
+  command palette's, whose lit states and a pad's light read `closeupIn`.
+
 - ~~**QA-30** A switch that is on looks like one that is off: the Record panel's Include
   Audio Track is a white knob on a white track when on (1.0:1), four Settings switches and
   the remote's are a black knob on a dark track when off (2.0:1), and eight switch styles
@@ -12160,6 +12198,46 @@ model cannot reach one, the PR says what it reached and asks.
     0.15 of the oil's pixels), and brightens nothing in focus. Nothing changes at Focus's middle, which every
     look ships at; the crossing's range is 46-248 after. `plate.ts` shrank 2.9 KB.
 
+  - **38h-15 (shipped 2026-11-11).** Bubbles drawn at the screen's resolution. The owner:
+    "the bubbles still look shitty and pixelated. They look like a old computer drew them."
+    In the lab every projected bubble's outline was a polygon, one flat facet per texel of
+    the air field (five to eleven screen pixels at the app's sizes): the projector's bubble
+    was as opaque as the field's coverage, `smoothstep(0.02, 0.28, coverage)`, and a contour
+    of a bilinearly filtered grid has its corners on the grid. Its size came from a
+    sixteen-step log packing 28% apart, and the closeup fitted a centre and radius to sixteen
+    gathered texels (`camBubble`). Now the field's fourth channel names which bubble of the
+    list a texel is (inside a rim, or a skirt three texels past it with no coverage, so a
+    pixel just outside a bubble still finds it; the boiling's steam keeps its own number and
+    the field's drawing), the air keeps a copy of the list as it was stamped, in the splat's
+    own encoder (`WebGPUAir.geo`), and the plate draws the rim from the disc, its exact
+    radius and fingers, one screen pixel wide in both views (`airHere`). Where the gathered
+    texels name two bubbles the one the point is most inside wins, so neighbours keep their
+    own rims. The camera's view through a bubble's wall, where its lens lands in the grid's
+    ramp just outside the rim, now reads the liquid past the hole (`airLiquid`); inside the
+    rim it still reads the field's hole (38h-16).
+    `npm run bubbleround` (new, lab9): rim radius along 96 rays, 1.5 to 6 cells at about 11
+    px a cell, spread 0.35 to 0.42 px (the field's drawing 3.2 to 3.5, and a 1.5 cell bubble
+    too faint to have a rim), at the laid radius within 0.41 px (the field's 3.7 to 4.6 px
+    inside it); two bubbles 2.5 cells apart 0.36 px. Found: 38h-16 (the projector's band and
+    the main decode still read the grid's hole).
+  - **38h-17 (shipped 2026-11-11).** The oil beads drawn at the screen's resolution. The
+    owner, after 38h-15: "Fix the small bubbles as well." Filmed on the Mac in Macro Bead,
+    the small balls with a dark wall, 40 to 60 px across, had scalloped outlines: they are
+    the oil beads (`beads` 0.7 there), not bubbles. Their mask is drawn on the GPU from each
+    bead's exact disc (14ab-6), but into a 512² picture of eight-bit channels read back
+    filtered: in a closeup a mask texel is six to ten screen pixels, the coverage's contour
+    a polygon, and the lens's push read from the eight-bit dome's gradient (`dropLens`)
+    swung round the rim with the steps. For the rings (`beadDrops` 0, every look but those
+    that turn the drops on) the mask is one function of a point, so the plate evaluates it
+    at the point it draws (`beadRingsAt`, `wgsl/beadShape.ts`), from the same list and tiles
+    the mask was drawn from (`BeadMask.rings`, bindings 20 to 22), at float precision with
+    its edge a screen pixel wide; the drops and a picture handed in place of a list read the
+    mask. `npm run beadround` (new, lab9): beads of 3 to 9 cells at 3x, rim radius along 96
+    rays, spread 0.16 to 0.60 px in the projector and the closeup; the mask's reading 1.7 to
+    3.6 px on every bead up to 7 cells (the 9 cell bead's facets shallow enough to pass).
+    The bubbles' "dark-cored holes with serrated rims" in the same film are 38h-16 (the
+    camera's read of the grid's hole inside the rim); two tries at it are written there.
+
 ### 39. Feedback from inside the app (asked 2026-10-30)
 
 #### 39a. Settings → Feedback, mailed and kept
@@ -12525,6 +12603,49 @@ cells and heat −2.75, heat kept 99.9% (with the carry off: heat 0.00). Lava La
 (centre of mass 0.75 of the height against 0.24 lying on the floor without the carry); the colour
 the rising plumes strip is 38f-2, below, shipped with it; the cooling that would bring the wax
 down is 27f-9e.
+
+## 38u-5, 38u-4 (the multiplier). The music stirs through a cord (2026-11-13)
+
+Found by the third physics pass (38u, 2026-11-13). The plate's rule is that sound reaches it
+only through cords and preset patches, and the solver's own step broke it three ways:
+`stirOf(dial, energy, impact)` multiplied Turbulence's stir by the analyser's energy, up to
+two; `deriveStep` set "spin" from (0.6 mid + 0.4 treble) times Sound Drive and the forces pass
+laid it as a second noise curl wherever there was dye; and Vibration's push swelled with the
+energy, 0.3 to 1. None had a cord, a patch or a control, so a look with every cord pulled
+still churned with the band. The owner chose (the same day) to route it through cords, not to
+remove it and not to leave it.
+
+Shipped: `FluidSimulation.step(settings, time, noise2D)` takes no sound and its file never
+names the analyser's data; `spin` is gone from `GpuStepParams`, from the forces shader and from
+the CPU grid (the uniform's slot is kept, unused); `stirOf` takes the dial alone; Vibration's
+push is the dial's at 0.65, the middle of its old swing. Every look on the shelf carries one
+more cord, the sound's mids on Turbulence (`lib/stir.ts` `stirCord`, laid on all of them by
+one rule, `layStirCords`), at `stirCordDepth` of its own Turbulence and Sound Drive. The mids
+and not the energy: the dial's curve is a fourth power, and over three test songs an energy
+cord deep enough to carry the eddies' steady share ran 0.64 to 1.66 of the old stir by song
+and up to 3.4 times at loud moments, where mids ran 0.80 to 1.16 and never over. The depth is
+set at the song's loud fifth, not its mean (set at the mean, Bass Drop stirred 1.41 times at
+loud moments). The phone's Sound sheet has **Music Stir**, that cord's depth; the desk has
+the cord in Patches. Sound Drive is no longer a per-plate setting (the step does not read it).
+
+Measured, `npm run musicstir` (new, node, in Measure): before, 1 of 9 lines (the step took 4
+arguments and named the analyser 17 times; `stirOf(0.5)` with a band read 1.375 against 0.688
+alone). After, 18 of 18: with every cord at zero and the band at its ceiling, each of 41
+looks' 163 cords folds to the look's own settings key for key; a plate of hard-edged pools
+at Turbulence 0 is the same plate value for value in silence and under that band (r.m.s. speed
+1.2e-12, the solver's rounding), and with a cord patched has a speed of 9.9e-4 and 3.5% of its
+ink somewhere else after 120 steps; over the club song each look's stir through its cord is
+0.89 to 1.00 of what the multiplier and eddies gave, and 0.87 to 1.02 at its loudest
+twentieth; in silence it is the dial's exactly. `soundpatch` counts the stir cord apart from a
+look's two or three answers to the drums; `rides` holds the dial's curve on the dial alone.
+
+A shortcut, said plainly: the stir is still curl noise on a clock. Routing the music onto it
+makes the sound's path honest, not the stir's; the stir as a tool (a stick as a Brinkman
+solid, or the lamp's convection) is the rest of 38u-4, open. The equivalence of the old
+eddies to stir (`EDDY_AS_STIR`, 0.68) is a judgement from their amplitudes; the picture is
+judged from film (docs/judging.md 131). Left open with it: 38u-6 (the music still speeds and
+slows the solver's clock), 38u-13 (a kick makes air from nowhere), and 38u-16, new: a look
+saved before this has no stir cord, so the band stirs it less until Music Stir is raised.
 
 ## 38f-2. Wax and water mix like immiscible liquids (2026-11-11)
 
@@ -13685,6 +13806,49 @@ Garden read as scattered specks at this size and is left off too.
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
 
+## 12-tv-signin. A TV signs in by a short code (2026-11-08)
+
+A TV receiver (12-tv route 2, 12-tv-apple) has no keyboard worth typing a password
+on and no browser for Google's sign-in, so it signs in the way TV apps do: it shows
+a code, the player types it on a phone where they are already signed in, and the
+TV is told. The licence Worker answers four routes in `server/tv-code.js`:
+`/tv/code` draws an eight-letter code (consonants only, so no word and no 0/O or
+1/I) and a 43-character device code, and keeps only the device code's SHA-256
+under `tvcode:<code>` for ten minutes; `/tv/claim` takes the phone's Firebase
+token and the code and files the account's best licence on it (Pro over Home,
+newest first, never a revoked or expired key, 403 `needs: home` when there is
+none); `/tv/poll` hands the TV its pass exactly once, comparing the device code's
+hash in constant time and deleting the record before signing.
+
+What the TV gets is not the licence key. A `cg1.` key carries the buyer's email
+and counts machines (two per key), and a TV taking a seat would lock a buyer out
+of their second Mac; a refunded key would also keep working on a TV forever. So
+the TV gets a `cgtv1.` pass (key id, tier, 30 days) signed with the same Ed25519
+key, which `verifyLicenseKey` and `/activate` refuse, and renews it through
+`/tv/renew`, which reads the stored key and so drops a refunded one within the
+pass's life and takes a tier change from the store. Each route is rate-limited by
+the same hourly counters `/activate` uses (codes per address, claim misses per
+account, renewals per address), so eight letters from twenty are not guessable
+inside ten minutes. The phone's half is `?tvlink` (`src/components/phone/TvLink.tsx`
+over `src/lib/tvCode.ts`): the site's own sign-in form, then a code field that
+formats as it is typed, prefilled from the TV's QR code. `npm run tvcode` (34
+checks) proves each route against the real handler and a fake KV.
+
+The one review the licence Worker's changes get found five things, fixed before
+merge. A pass worked on any TV it was copied to and renewed forever, so each link
+is now a record (`tvpass:<id>`: key, tier, account, a generation), the pass names
+its link and generation, and a renewal must match the record's generation and moves
+it on: a copied pass and its original cannot both keep renewing, and the first
+mismatch deletes the link, so both die. An account keeps at most ten links, and the
+eleventh drops the oldest. A refund of an upgrade stranded the TV on the refunded
+key; a renewal now falls back to the account's best remaining key. `/tv/poll` had no
+allowance; it has 1440 an hour per address (one every few seconds for an hour from
+a TV is about 720). And a code that arrived in a link was sent on one tap, which
+let anyone send their own TV's code and take the victim's licence onto it; the
+phone now asks the player to tick that the TV in front of them shows the code,
+and a code typed by hand asks nothing. `npm run tvcode` (42 checks, from 37) and
+`npm run tvlink` (6 checks, the phone page in Chromium; the phish check is red on
+the page before the fix). Two found things stay open as 12-tv-signin-3 and -4.
 
 ## 45a-13. Random looks land on moiré one pick in sixteen, not one in five (2026-11-11)
 
@@ -13974,6 +14138,69 @@ past its border's arcs, after the check-skeptic showed a fixed ring read rounded
 seed in `fluidSimulation.ts`, which is over its size budget, Clock Glass's lay moved beside its
 bodies in `oilLay.ts` (`layClockGlass`, the same cells in the same order).
 
+
+
+## 47e-47d-1-47b-1. Glitter in the liquid, the lens that photographs it, and a side lamp (2026-11-13)
+
+Asked by the owner after the Microlab films were watched in the page: suspended specks,
+out-of-focus specks as discs, star glints from a stopped-down lens, and a second amber or
+red light raking in from the side over the blue glow, as one PR, modelled as the optics are.
+
+The glitter (47e's flake half). Up to 32,768 flakes (Glitter, 0 to 1), 10 to 50 µm across
+and 3 to 12 % as thick, polystyrene's density, 5 % over water's. They are stepped once a frame
+in the lens pass (`gpu/glint.ts`), not in the solver: they ride the packed `velForced` the
+dye rides, scaled by Poiseuille's 6z(1−z) at their height, by the lead plate's own
+displacement read from its cell clock (lib/detailFlow), so a flake and the dye beside it
+move together however many solver steps a frame took. They turn in Jeffery orbits integrated
+in closed form, tan θ = r tan ξ with ξ advancing by the strain over (r + 1/r) (stepped from
+the equation in node: worst 0.000°, a thin flake within 20° of flat for 90 % of its turn);
+settle by Stokes on the volume-equivalent sphere (0.020 mm/s, about 100 s to cross the
+2 mm gap) and lie flat where they land; and live 40 to 160 s, fading in and out.
+
+The lens (47d-1). Magnification 0.27 × zoom on a 36 mm sensor, Lens Stop f/1.4 to f/22, the
+focal plane at Projector Focus. A flake is drawn as its aperture's image: a disc of
+diameter |z − z_f|·gap·m/(N(1+m)), a hexagon from the six-bladed iris above f/2 and a circle
+wide open, its energy spread over its area in linear light; stopped down its Airy core
+grows (1.22 λ N (1+m)/m, by colour) and six spikes reach out at the share of the light the
+blade edges diffract, fading as the flake leaves focus. Each flake's light is the mirror
+law: the side lamp's and the softbox's (Light Play) rays reflected off its normal, spread by
+the lamp's size and the flake's crinkle (0.15 rad), times 0.85; a flake under the dye is
+filtered by the dye above it, and on a lamp ground it is a dark speck by its shadow.
+
+The side lamp (47b-1). Side Light, Side Colour (default amber, 30°) and Side Angle (160°): a
+lamp 0.35 rad above the stage, 30 cm off, its light refracted into the water by Snell,
+falling off by the inverse square and the slant across the stage, scattered back by the
+pigment (0.35 of it, filtered by the dye; on black a fluorescent dye counts as pale) and
+reflected by the glasses' slopes by Fresnel (3 %), read from the plate's normals.
+
+The pass. At Glitter and Side Light 0 nothing runs and nothing is held (a frame that does
+not want the pass lets its pictures and flakes go): the plate draws to its target as before,
+to the byte. Otherwise the display draws, unfinished, into the pass's half-float picture (in
+8 bits a dark ramp would band before the finish's dither), and the lens pass adds the light
+and lays the finish the display would have (`lensFinish`). The flakes age and settle on the
+plate's own clock, so a paused show pauses them, and a gap in it over a quarter second
+carries nothing. A stage glides Side Colour and Side Angle the short way round the circle. Desks (Camera and Lamp sections), MIDI, glides, drift's not-the-look
+list and the phone's remote all carry the five dials.
+
+Measured (`npm run glint`, 20 lines): the laws in node; off is off to the byte with every
+other lens dial moved, and Side Light 0.05 is not; under the side lamp the black ground
+rises at most 1 level, the dye gains red over blue (+69.7 against +0.4) and the half toward
+the lamp gains more (69.7 against 59.7, both ways round); on a lamp ground at 4× the dark
+specks at Glitter 1 are about twice those at 0.5 (412 against 216, none at 0); at 8× and
+1024 px the glints cover 3.8 times the pixels wide open as at f/5.6 (5291 against 1388),
+and at f/16 the brightest glint's light along the six spike directions is 326 against 7
+between them, where wide open it is 4; focused on the floor glass the glints at f/5.6 cover
+2442 pixels against 1388 mid-gap. Over eight frames on one plate pushed to +x (the lab's
+`keepPlate` and `glintSpecks`, the flakes read back), mid-gap flakes go 3.64 times as far as
+those by the glass where 6z(1−z) says 3.66, and their travel over 6z(1−z) is 0.0197 of the
+plate against the dye's own 0.0198. One check-skeptic pass found that every line drew a
+single frame of newborn flakes (the step shader never measured), that "none at 0" compared
+a picture with itself, and that nothing could see the pass's picture upside down or the
+lamp's hue ignored; each is now a line. Found doing it: 47b-2 (the side lamp casts no
+shadows), 47b-3 (sources and the kaleidoscope draw without the pass), 47d-2 (discs and stars
+only on the glitter), 47e-1 (microbubbles), 47e-2 (the orbit constant and rebirth shortcuts).
+
+
 ## 47n-1. The tank seen through its side (2026-11-13)
 
 Asked by the owner on 2026-11-13 after the Microlab films were watched: Davy Evans' *Gravity
@@ -14028,3 +14255,97 @@ judged where this one failed.
 Shortcuts, each an open item: the momentum's smear (47n-2), the finger's mapping (47n-3), no
 built-in look yet (47n-4), a sheet and not a rod, and one dye (47n-5), the dish's solver still
 running under the tank (47n-6).
+
+
+## 47z-1 (with 28i-7b and 28k-5). A drop takes the water out of the light's path (2026-11-13)
+
+The owner asked for the drops' physics and their vivid colour (2026-11-12, against Liquid Light
+Lab's `lll-oscilloscope-vectors`: colourfulness 137, coloured 0.99 of the frame; Splodascope's
+take 43 and 0.39). Splodascope with the photograph's cobalt water had turned every drop green and
+ringed each with black, so it had been given a pale water (28i-7b), and a crowd's yellow drops
+went orange and brown from their edges inward over ten seconds (28k-5).
+
+Measured in the lab first (192², the look's own settings, four seconds): the solver had already
+kept the colours apart inside the drops (the water's dye in cells over 0.95 oil 16.5 against the
+oil's 8496), so the drops were not green from water in them. The black was the edge, two ways:
+
+- **The plate multiplied the two liquids in a part-oil cell.** 3438 cells between a tenth and
+  nine tenths oil against 7374 deep in drops, and there the composite summed both liquids'
+  absorbance, as if the light went through one and then the other. In the gap a drop spans
+  glass to glass, so a column of light goes through one liquid or the other; the part-oil cell
+  is Cahn–Hilliard's few-cell smear of a sharp edge. `packDyeBodies` (`src/gpu/wgsl/pack.ts`)
+  averages the light over the cell, c·exp(−k·o/c) + (1 − c)·exp(−k·w/(1 − c)), and writes back
+  the absorbance that lets it through, so every decode of the plate reads it unchanged; the
+  total in alpha is kept. The solver's fields hand the plate the oil's share and the mix
+  (`fields.oilDye`, `fields.mix`) where Oil Bodies keeps one.
+- **The lay labelled the rim's colours the wrong way.** A look lays its drops' colours as dye
+  on the CPU's 192² grid and the oil as a sharp disc on the solver's; the dye was then shared by
+  the oil under each cell (`bodyLand`), so on each rim the water's cobalt became the oil's and
+  the drop's colour the water's. The cobalt then spread into the drop as the oil's own colour
+  (28k-5's browning) and the drop's colour lay round it in the water, multiplying toward black.
+  A lay now says which colour is the oil's (`FluidSimulation.addOilDensity`, `applyDeltas`'
+  `oilAdd`, the `bodyLay` kernel); Splodascope and Clock Glass lay that way.
+
+`npm run dropcolour` (a red drop in cobalt water, the look's settings with its two refraction
+stand-ins off, 47z-4's): the darkest pixel across the edge 0.0002 → 0.061 of relative luminance,
+the water's own 0.063; the edge 0.050 off the line between the two colours; the drop's middle
+ΔE 0.00 from the same drop in clear water, before and after. Splodascope in the lab (192², four
+seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89; cobalt before
+140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).
+On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
+131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
+
+## 15e-1 (met again as 14ab-16) and 46r. A poured liquid acts on every step, and the lasting current's args have a name of their own (shipped 2026-11-13)
+
+Two faults of the solver's plumbing, each with a check written red first.
+
+**46r.** A dispatch's eight numbers live in a uniform buffer kept under a name (`arg`), and a
+buffer holds what was written to it last before the submit. Three calls in one step shared
+'current grid' with different numbers: the lasting current's forces and projection (z = the
+boil is running), the swirl's projection (z = 0) and the open plate's `addCurrent` (z = Depth
+Drag, w = the swirl's scale). On the open plate (Thin Gap off) `addCurrent` wrote last, so
+`currentForces` read Depth Drag as the boil: at Depth Drag above 0 the lamp's lift left the
+clamped linear rise for the boil's uncapped density rise with no boil running, and at Heat
+above 0 with Depth Drag 0 the boil's plate got the clamped one. A thin gap's `addCurrent`
+already had its own name, so no shipped look showed it (all open thin) and `plateboil` (thin,
+or Depth Drag 0) did not see it. Each call has its own name now ('current step', 'swirl
+grid', 'add current'). `npm run argnames` watches the solver's `argWrite` from the lab's page
+on eleven plates (a planted pair is its control) and asks the current after one step to be
+the same at Depth Drag 0 and 1.5, bit for bit. Before: 'current grid' given two values on
+five of the eleven; the current at Depth Drag 1.5 different in 1121 values, by up to 0.33
+against its own 0.0094 (64², upright, a 30 K spot, the lab's Buoyancy 0.45); a 70 K spot's
+current at Heat 1 at its cap (1.9e-3), the boil's rise unread. After: no clash, none
+different, and the boil's rise read (1.07 against a cap of 0.002 at the lab's numbers).
+
+What it changes in the app, measured on a 128² open plate at the app's own numbers
+(Buoyancy 0.45 × 0.3, its cap of three quarters of a cell a step, upright): at Heat 0 almost
+nothing, since the unheated plate's warmth is hundredths of a degree and there the two rises
+agree (the current's fastest after 30 steps at Depth Drag 1.5 was 4.51e-2 against 4.28e-2 at
+Depth Drag 0, and is 4.28e-2 now). At Heat 1 with Depth Drag 0, a plate 60 K over the room
+under a held hand: the current's mean after 30 steps 0.268 → 0.463 and after 120 steps
+0.139 → 0.178, its fastest on the first step 0.135 → 0.329, and by 240 steps the two are
+within a tenth. So a boiling open plate's plume starts about 1.7 times as fast as it did.
+Pictures in the project's files (`open-plate-46r/before-after.png`). No shipped look runs the
+open plate. Seen in both pictures and left as 36e-5: bands in the dye at the floor.
+
+**15e-1.** What a bottle's liquid does to the plate (`liquidForces`, and the soap's thinning
+inside `deltaDye`) ran in the fold of a frame's hand-laid deltas, so only on a step something
+else wrote deltas for. The app folded every step by accident: the CPU's copy of the liquids
+marked the deltas written while it held any, and held its first pour forever (15e-11). After a
+Clear that copy stays empty, so a liquid poured then was carried and drawn and did nothing
+until a hand, a kick or a bubble wrote a delta; and a step folded twice (a frame that read
+the plate back) pushed twice. The step runs both itself now, in a pass of their own first in
+the step, in the fold's order (`stepLiquids`; the thinning is its own kernel, `soapThin`, the
+same arithmetic), only on a plate a bottle was poured on (`liquidsLive`), so a show that did
+fold every step sees the same numbers. `npm run liquidpush` (a heavy drop and a soap's on a
+rocked plate, open and thin, each against the plate without them): before, with no fold and
+after a Clear the slide and the thinning were 0 where one fold a step gave 3.4e-2 and 8.3%,
+and two folds gave 1.86× and 1.92×; after, all four ways give the same to three places.
+`npm run liquidsgpu`'s five "a still plate" lines owed to 15e-1 pass and gate (soap leaves
+89.3% at its spot at half a second and 71.7% at two, what the fold-every-step plate leaves;
+silicone 61.7% in its middle), three more lose 15e-1 from what they are owed to, and a new
+line asks milk's held edge on a still plate to be the fold-every-step plate's (effect 0.00106
+both ways): 27 gate, 11 owed.
+
+Found on the way: on a thin gap the push is read as momentum and the drag has it within the
+step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).

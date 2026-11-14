@@ -430,6 +430,8 @@ export class FluidFields extends FluidCore {
       particles: this.particles && !this.particles.idle ? this.particles.target : null,
       /** The air field (H6), or null when no bubble is on this plate. */
       air: this.air?.any ? this.air.field : null,
+      /** The bubbles as that field was stamped from them, for the plate to draw each from its own disc (38h-15). */
+      airGeo: this.air?.any ? this.air.geo : null,
       /** The second phase (H7), or null when none has been poured. */
       phase: this.phaseLive ? this.phase.read : null,
       /** The mix (oil, soap, acidity) and the reactions, or null where none. */
@@ -439,6 +441,13 @@ export class FluidFields extends FluidCore {
       /** All of it packed for the plate (see packView), once a step has run. */
       view: this.viewTex,
       chem: this.chemLive ? this.chem.read : null,
+      /*
+        The oil's own share of the dye (Oil Bodies, bodyPartition), or null
+        when the oil carries no colour of its own or the plate shows a print:
+        with it the pack lets a part-oil cell's two liquids pass the light
+        side by side (packDyeBodies in wgsl/pack.ts, PLAN 47z-1).
+      */
+      oilDye: this.bodiesWanted && !this.oilDyeStale && this.oilDye && !(this.printLive && this.printDye) && this.mixLive && this.mix ? this.oilDye.read : null,
       /** The poured species field (carries scatter in b channel). */
       species: this.speciesLive && this.species ? this.species.read : null,
       /** The frame's soap film's thickness (PLAN 32d), or null when Soap Film is off. */

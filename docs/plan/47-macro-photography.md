@@ -159,6 +159,22 @@ lamp's cone set as an annulus outside the pupil. *Measure:* `nolight`-style lab 
 Dark field a flat dye with no gradient reads black within 2 levels, a front's ring reads
 brighter than either side by at least 30 levels, and Rheinberg's ring takes the ring's hue.
 
+~~**47b-1** A side lamp~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): Side Light, Side Colour and Side Angle, a second coloured
+lamp raking in low from one side over the glow (the Microlab films' amber or magenta over
+blue), lighting the pigment by single back-scatter, the glasses' slopes by Fresnel and the
+glitter by the mirror law, falling off by the inverse square across the stage (`npm run glint`).
+
+- **47b-2. Open: the side lamp casts no shadows.** Its light reaches every height of the
+  dye undimmed: a thick blob should shade the dye behind it from a lamp this low, and the
+  lit side of a front should be brighter than its far side by the dye's own transmission
+  along the slanted ray. Needs a short march through the dye toward the lamp (four to eight
+  taps along `sideRay`), in the lens pass. *Measure:* in the lab, dye behind a dense blob on
+  the lamp's line reads at least 30 % darker than the same dye with the blob moved aside.
+- **47b-3. Open: the lens pass on every picture.** Projector sources drawn by `drawSource`
+  and the kaleidoscope's copy are drawn without it, so glitter and the side lamp vanish when
+  a source is up. Run `PlateGlint` after those paths too. *Measure:* a `glint` line with a
+  source up.
+
 ## 47c. Blacklight: fluorescent dyes under a UV lamp (M)
 
 *Seen:* blue and magenta that glow out of black, brightest where dye is thin and fresh, with
@@ -195,6 +211,17 @@ radius A·|z − z_f|/z_f on linear light so glints become discs. Built under 38
 it. *Measure:* 31f-3's DoF law within 10 % in the lab, and a glint's disc at the radius the
 law gives for its depth.
 
+~~**47d-1** The glitter's depth of field and the iris's stars~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): each flake has
+its height in the gap; the lens (magnification 0.27 × zoom on a full-frame sensor, Lens Stop
+f/1.4 to f/22, focal plane at Projector Focus) draws it as its aperture's disc, a hexagon
+from a six-bladed iris stopped down and a circle wide open, of diameter |z − z_f|·gap·m/(N(1+m)),
+in linear light; and stopped down, its Airy core grows (1.22 λ N (1+m)/m, per colour) and
+six diffraction spikes reach out from it, fading as the flake leaves focus.
+
+- **47d-2. Open: discs and stars on every highlight.** Only the glitter is drawn through the
+  lens; the beads' and bubbles' speculars and the softbox's glints on the dye stay sharp and
+  starless. The whole-plate disc kernel above is the rest of 47d.
+
 ## 47e. Sparkle: microbubbles and mica that show the flow (M)
 
 *Seen:* pin-point glints scattered through the liquid; specks that light up along the
@@ -212,6 +239,22 @@ orientation is quasi-steady (the stretching axis), not an integrated Jeffery orb
 to integrate it if the shimmer reads wrong. *Measure:* glint count follows the population,
 and in a shear flow the mica's brightness correlates with the strain's direction as the
 mirror law predicts (lab).
+
+~~**47e** Sparkle, its glitter half~~ (shipped; story in `docs/plan-shipped.md` §47e-47d-1-47b-1): Glitter puts up to 32,768 polystyrene
+flakes in the liquid, riding the dye's own flow at their height in the gap (Poiseuille's
+profile), turning in integrated Jeffery orbits (the shortcut above is not taken), settling
+by Stokes and lying flat where they land, and flashing where the side lamp or the softbox
+meets the mirror angle; dark specks on a lamp ground.
+
+- **47e-1. Open: microbubbles.** The other half: bubbles far smaller than a cell, each a
+  convex mirror returning a glint of the same brightness whatever its size, beside the flakes.
+- **47e-2. Open: two shortcuts in the flakes.** A flake's orbit constant (which of Jeffery's
+  closed orbits it is on) is stood in for by a fixed lean, so every flake tumbles in the
+  flow's plane; and a flake that has lived 40 to 160 s fades out and is born again elsewhere,
+  standing in for a stir lifting it off the floor. Integrate the orbit constant from the
+  flow's vorticity, and lift landed flakes by the shear at the floor. *Measure:* in a shear
+  flow the share of flakes flashing settles to the closed-orbit average, and a stirred plate
+  lifts what a still one lets lie.
 
 ## 47f. A stir bar: the magnetic stirrer's vortex as a tool (S)
 
@@ -440,16 +483,35 @@ likely the camera and video mixer's gain; the plate's should come from the dye a
 
 The physics, in the order to build (each its own thread and PR):
 
-- **47z-1. Colour: a drop takes the water out of the light's path.** In the gap an oil drop
-  pushes the water aside, so the lamp's light through a red drop meets red dye only; the
-  plate multiplies the oil's colour by the water's, so red on cobalt reads black and
-  Splodascope's drops read murky green (its take: colourfulness 43 against 137, coloured
-  0.39 of the frame against 0.99). This is **28i-7b** (the displaced share, as
-  `gapScale × (1 − film)` does for Clear Film) and **28k-5** (a drop's edge multiplying
-  toward black); build them together, then give Splodascope the photograph's cobalt back.
-  *Measure:* a red drop on cobalt water keeps the red drop's own transmitted colour within a
-  just-noticeable step at its centre, and the edge's few cells do not go darker than either
-  liquid alone; Splodascope's take reads colourfulness over 100 and coloured share over 0.8.
+- ~~**47z-1. Colour: a drop takes the water out of the light's path.**~~ (**shipped**, this PR;
+  story in `docs/plan-shipped.md` 47z-1, with 28i-7b and 28k-5): a part-oil cell's light is the two
+  liquids' side by side (`packDyeBodies`), a look's lay puts each drop's colour in its own oil
+  (`addOilDensity`); `npm run dropcolour`. Found doing it, open:
+  - **47z-1e. Splodascope's water: cobalt was tried and is darker.** Filmed on the owner's Mac
+    (2026-11-13, 20 s takes): main's pale water read colourfulness 131, coloured 0.87, luminance
+    0.42; the photograph's cobalt with this PR 62, 0.51, 0.20, the frame 0.40 near black. The drops
+    kept their colours with no browning, but a full wash of cobalt passes too little of the lamp,
+    and the orange ferro reference's vivid colour is on a bright ground (luminance 0.52). Kept pale.
+    A thinner cobalt wash (the photograph's water is a thin layer) is the thing to try next, filmed.
+  - **47z-1a. Lava Lamp and the other lays.** Splodascope and Clock Glass lay each body's colour
+    as the oil's own; Lava Lamp still lays its wax's colour as plain dye, so the rim's share goes
+    to the water by the oil under each cell, and a faint halo of the wax's colour is the water's.
+    Left as it was because the owner had just approved the lamp's look (2026-11-12); try it in the
+    lab against `npm run lavawax`, and any other look that lays oil with a colour.
+  - **47z-1b. The averaging's path and the cells between.** The pack averages the light at the
+    composite's rest-gap path (DYE_PATH, 2.8), not the pixel's own gap (gapScale, 0.3 to 3 times),
+    and the composite's bicubic still interpolates absorbance between two cells, so a drop's edge
+    keeps a band about one cell wide where red and cobalt multiply. Named shortcuts: the true
+    sum is per pixel, which needs the oil's share in the composite, and its sixteen textures are
+    full (`view0` is packed to the bit); a seventeenth needs a binding freed first.
+  - **47z-1c. A rebuilt solver forgets whose colour is whose.** A lay's labels go across once,
+    with its flush; a solver rebuilt before the plate has come back (`restoreSeed`) or carried
+    to a new grid (`takeOver`) starts the oil's share from the oil under each cell again, as
+    before this item. Carry the share with the dye where the carry allows.
+  - **47z-1d. A drop inside another drop goes dark where they meet.** Splodascope's compound
+    drops (a hole in one colour with another drop in it): once the ring of water between them
+    thins, the two oils are one phase holding both colours, and they multiply. Real ones keep a
+    water film between them: 47z-3's films, or a second oil phase.
 - **47z-2. Drops of every size, from a stir.** A real oil layer stirred or swirled breaks into
   a crowd: a drop sheared past the critical capillary number (Ca = μ γ̇ R / σ, near 0.5 for
   equal viscosities) stretches and splits, its pieces split again until each is under the
@@ -473,7 +535,12 @@ The physics, in the order to build (each its own thread and PR):
   That is **47y**'s rims, **18c-4** (lens or film by the spreading coefficient), **47j**
   (caustics) and **38h**'s shadowgraph; our edges are 1.7 to 2.4 times softer on the drop
   looks (Macro Bead's beads already read 1.04%). *Measure:* edge width on Splodascope's take
-  under 1.6% of the width, from the optics, never a drawn outline.
+  under 1.6% of the width, from the optics, never a drawn outline. Found in 47z-1: the look's
+  dark rims today are two stand-ins, the boundary line (Boundary Contrast, a colour step drawn as
+  a deflection, though a dye moves water's index by almost nothing) and Edge Relief's slope line,
+  each four or five of the solver's cells wide at a drop's rim; with both off a red drop's rim in
+  cobalt is no darker than the water (`npm run dropcolour`). This build replaces them at an oil
+  rim with the oil's own index step (18e-2's deflection by ∇OPL).
 
 Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
 page, add one build and a note:
@@ -524,7 +591,7 @@ number it moves printed before and after.
 47a-1 first (the cheapest fix for the photograph's serrated, soft closeup), then 47b (one
 lighting term on the bend the plate already computes, the biggest change to the look for
 its size) and 47j (caustics, which the films watched over time showed to be most of the
-picture, and which 47b's dark field shows best), 47c, 47d (with 38q), 47a, 47e, 47f, 47k; 47g,
+picture, and which 47b's dark field shows best), 47c, 47d (with 38q; 47d-1 shipped), 47a, 47e (its glitter half shipped; 47e-1, 47e-2), 47f, 47k; 47b-2 and 47b-3 after 47b-1; 47g,
 47h, 47i and 47n when wanted; 47w-3, 47v-4, 47v-5, 47v-6 and 47v-7 whenever the watch tool is next touched; 47y
 as each of its bullets' items comes up; 47z-1, 47z-2, 47z-3, 47z-4 in that order (the owner asked
 for the drops' physics and their colour, 2026-11-12; ~~47z-5~~ shipped early, 2026-11-13, as Foam
