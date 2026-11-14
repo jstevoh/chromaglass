@@ -82,16 +82,17 @@ import { handleNoteVoiceEvent, queueMelodyDrops, stepMelodyAndVoices } from '../
 import { type LookPhase, type FrameDigest, type VisualizerRender, type SongShapeReport, type PlateRenderer } from '../sim/frameTypes';
 
 interface LiquidVisualizerProps {
-  /** The sound as React last saw it (ten times a second from the room's ear; every frame from a render). */
+  /** The sound as a prop; the app's own plates are handed null (46f). */
   audioData: AudioData | null;
   /**
-   * The sound now, asked for at the top of each frame (PLAN.md §14f). The
-   * room's ear makes a reading every frame but tells React only ten times a
-   * second, so a plate that read only `audioData` would move in steps. A
+   * The sound now, asked for at the top of each frame (PLAN.md §14f): the
+   * room's ear makes a reading every frame and renders nothing for it. A
    * plate without one (the cast receiver, whose sound arrives as messages)
    * reads `audioData`.
    */
   hear?: () => AudioData | null;
+  /** The ear's view's `subscribe`: a call at each reading it publishes (PLAN.md 46f). */
+  heardNews?: (fn: () => void) => () => void;
   settings: VisualizerSettings;
   /**
    * The settings now, with a MIDI fader's moves that React has not rendered
@@ -275,7 +276,7 @@ export type { LiquidVisualizerHandle };
 
 
 export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisualizerProps>(({
-  audioData, hear, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
+  audioData, hear, heardNews, settings, ride, seedCount = 0, spinFlick, selectedLiquid, frame = null, draft = false, hidden = false, onAim, onPinchZoom, toolAmount = 1,
   activeLayer = 0, clearTrigger = 0, drainTrigger = 0, activeTool = 'dropper',
   isAutomated = false, isActive = true, sceneRef, filmSenseRef, onManualGesture, onEngineStatus, onBackLookCleared,
   output = DEFAULT_OUTPUT, tempoRef, soundBindings, onSoundTrigger, onMagnetInHand, onFerrofluidPoured,
@@ -777,11 +778,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
   hearRef.current = hear;
   /*
     The sound the live show hears now: the app's ear asked directly, else the
-    prop. It used to be the prop alone, copied into `audioDataRef` by an
-    effect after each render, so the plate heard every reading one frame late
-    (the frame that made it had already drawn by the time the render that
-    carried it committed), and the whole App re-rendered once per reading to
-    deliver it. Asked at the top of the frame, it is this frame's reading.
+    prop. Asked at the top of the frame it is this frame's reading; copied
+    from the prop by an effect it was a frame late.
   */
   const liveHeard = () => (hearRef.current ? hearRef.current() : audioDataPropRef.current);
   /**
@@ -1984,8 +1982,13 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
     wallToPlate: (u, v, layer, turned = true) => wallPointRef.current?.(u, v, layer ?? activeLayerRef.current, turned) ?? { x: u, y: v },
   }));
 
-  // Outside a render: a harness's `pour` between frames reads the ref too.
-  useEffect(() => { if (!renderingRef.current) audioDataRef.current = liveHeard(); }, [audioData]);
+  // Between frames too (the opening, a covered window, a harness's `pour`): at each reading
+  // the ear publishes, with no render (`npm run ears` reads this copy), and at each new prop.
+  useEffect(() => {
+    const take = () => { if (!renderingRef.current) audioDataRef.current = liveHeard(); };
+    take();
+    return heardNews?.(take);
+  }, [audioData, heardNews]);
   useEffect(() => {
     settingsPropRef.current = settings;
     settingsRef.current = rideRef.current ? rideRef.current(settings) : settings;

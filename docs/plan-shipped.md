@@ -14276,6 +14276,86 @@ seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89;
 On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
 131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
 
+## 46f. The ear's view and the desk's clock render themselves, not the shell (2026-11-13)
+
+Asked by the owner on 2026-11-13: the code as light on GPUs and CPUs as it can be, and less
+jitter. The page's one thread was profiled on the owner's Mac (main c778019, Classic, the
+Perform desk, headless on Metal, the simulated band, 34 s): React ran 328 times, 14.3 ms each
+at the median and 22.2 at the ninetieth percentile, 5.4 s of the 34, and 33 MB of garbage a
+second, about half of it React's. With no sound it ran once a second, 13.8 ms. A frame is
+16.7 ms at sixty a second.
+
+What rendered: §14f had taken the ear's readings out of React state per reading (seventy
+renders a second to ten), and left the ten-a-second reading as state on `App()`; the "live
+for m:ss" clock was state there too, set once a second. Each rendered the whole shell: every
+desk panel and knob, both plates' components, and (React 19) an update of every DOM element
+under them, more than half the cost. The readers of that state were a percentage in the
+desk's status line, three meters over the plate, the Sound section's calibration readout and
+four characters of clock.
+
+What changed: the ear's ten-a-second reading is a store (`hooks/useEarView.ts`: `Ear.view`,
+`useEarView(view, select)`), and each reader is a leaf that subscribes for the part it shows
+(`components/EarLeaves.tsx`, `SoundSection`'s `RoomReadout`); the clock is a component with
+its own tick (`components/desk/LiveFor.tsx`). The hooks that took the reading as state take
+the ear's `live` ref or a boolean selected from the view (`useMusicIntelligence`,
+`app/useCastFeed.ts`). The plate's components are handed no reading (they read `hear()` on
+their own frame, as since §14f). The performance clock is told only when its second changes. The plate's own copy of
+the reading between frames (while the show is still opening, or behind a covered window) had
+been refreshed by each of those renders; it is refreshed at each reading the store publishes
+(`heardNews`), which CI's Mac found missing on the PR's first run: `npm run ears` read no
+level at all four seconds in, before the plate's first step.
+
+Measured, `npm run renders` (a cloud session; its bars re-aimed, named in the PR): components
+rendered a second with the band 5,840 → 11 on the laptop and 714 → 0 on the phone; with no
+sound 531 → 1 and 65 → 0; App renders 11.0 → 0.0 and 1.0 → 0.0; the desk's level still moves
+ten times a second and the clock still ticks. The same profile in a cloud session: React's
+time with the band 13.5 s of 44 → 0.015 s of 31, garbage 257 KB a frame → 32.
+
+Exports changed: `Ear.audioData` is gone and `Ear.view` is in its place; `DeskProps.liveFor`
+(a string) is `liveSince` (a time), `DeskProps.status.audio` a node; `SettingsPanelProps`
+takes `earView` where it took `calibration`; `useMusicIntelligence`'s second argument is the
+ear's `live` ref.
+
+## 46g. The poured liquids' fields are carried only once something is poured (2026-11-13)
+
+Read in the code during the audit of 2026-11-13: every solver step carried both of the
+liquids' fields (`liquids0`, `liquids1`: soap, body, repel, weight, polarity), at every look,
+though most shows never pour one. On the open plate that is two MacCormack advections, three
+full-grid dispatches each; in the thin gap, where every look opens, two substepped conserving
+carries, a dispatch a substep and the glass's drift, 66 dispatches a step for fields that
+hold zeros.
+
+Every one of those kernels is a carry: a sum of the field's own values times weights (fluxes,
+a bilinear backtrace and its correction clamped to the neighbours' range, the gather of what
+dry cells hold). A field of zeros comes out zeros, and skipping the carry leaves the same
+zeros in whichever half of the pair is read, so the plate is the same bits. The fields have
+one writer, `addLiquidDrop`, and three places that zero both halves; `liquidsLive` is set by
+the one and cleared by the three, and `carryLiquids` (`src/gpu/fluid/passes.ts`) is the four
+carries behind it, as `chemLive` already gates the reaction's grid. The liquids' forces
+(`stepLiquids`, 15e-1) wait behind the same flag. `src/gpu/fluid.ts` is smaller by the four
+call sites.
+
+Measured, `npm run encode` (a cloud session, 512², the lab): a thin-gap step 272 dispatches
+and 128 indirect → 270 and 64 (400 → 334); the open plate 500 → 494. Its lines: a plate no
+liquid was poured on carries the dye and the grain only (one correction and three carries
+where main made three and seven), and the controls: one drop of a liquid and both fields are
+carried again (eight dispatches more on the open plate, 68 in the thin gap, 15e-1's two
+passes among them, and at least that many binding the liquids' own textures), and a cleared
+plate carries none until it is poured on again, so a gate that never opened is red. H2c-5 is now read
+from the poured plate, where every field is carried, at its old carries and two dispatches
+under what main's poured step now makes (at most 500, was 498, 15e-1's two passes); H2c-1, -2 and -3's
+base moved from 269 and 96 (read 2026-11-01; main had grown to 272 and 128 by 2026-11-13,
+the lamp's heat being one more field carried since 38f-1, with the bars left behind) to 270 and 64,
+each bar the same removal as before taken off the new total (at most 239, 320 and 184, were
+270, 351 and 215). `npm run liquids`
+and `npm run physics` pour and read the plate with it.
+
+With it, 14ab-11's first parts (`npm run frameuploads`): a press, a lift, a bubble's press, a
+kick's hold and the bass's hand send the rows they wrote, 1.327 MB a step → 0.04 to 0.24 MB;
+the liquids' step with the GPU holding the liquids asks for no flush at all, 1.327 MB a step
+→ 0 and no fold. (It first asked for the fold with no rows, while the liquids' forces ran in
+the fold; 15e-1 merged the same day and moved them into the solver's step, so the fold went.)
+
 ## 15e-1 (met again as 14ab-16) and 46r. A poured liquid acts on every step, and the lasting current's args have a name of their own (shipped 2026-11-13)
 
 Two faults of the solver's plumbing, each with a check written red first.

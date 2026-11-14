@@ -367,14 +367,14 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   retire the terms the species already carry. Not done with 15e-1 because it changes what
   every poured bottle does in every look, and wants its own before and after. *Measure:*
   liquidpush's thin-gap reach line asks the slide the rock's way, as the open plate's does.
-- **15e-11. The CPU's stand-aside copy still asks for a fold every step (found with
-  15e-1).** `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so
-  the first pour on a new solver lands in the CPU's copy too, which then never decays
-  (`LiquidPhase.step` returns early) and marks the deltas written on every step until a
-  Clear: a fold of nothing each step, which was what kept the forces running and is now
-  only cost. Set `gpuNative` before the pour can land and return from `stepLiquid` when the
-  GPU has the liquids. 14ab-11 (the GPU efficiency PR) changes the same lines; settle it
-  there or after it.
+- **15e-11. The CPU's stand-aside copy of the first pour (found with 15e-1).**
+  `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so the first
+  pour on a new solver lands in the CPU's copy too, which then never decays
+  (`LiquidPhase.step` returns early), so `stepLiquid` runs its tilt and its species poll on
+  every step until a Clear for a copy nobody reads. The fold it also asked for each step
+  **shipped** with 14ab-11 (the step asks for no flush; `npm run frameuploads`). Left: set
+  `gpuNative` before the pour can land and return from `stepLiquid` when the GPU has the
+  liquids.
 - **15e-9. Two lab checks at once share one bundle.** `scripts/lab.mjs` writes the plain
   lab's page to one file in `node_modules/.cache` for every run, so two lab checks started
   together (`npm run quick` runs them side by side) can load a bundle the other is writing.
