@@ -14182,3 +14182,27 @@ drawn on the clock is printed and not judged (38u-9), and is the control that th
 reaches the plate (1d): Lacing Run 3.2% of its frame on a still plate, Paint Cells at 1 3.2%,
 Thin Film at 1 1.6%.
 
+## 38u-7, 38u-12, 38u-14. Three drawn stand-ins made physical (2026-11-13)
+
+From the third physics pass (38u). Each is a look change on purpose.
+
+- **38u-7, the force between colours.** Polarity's push was multiplied by 1 + 2n, n a slow noise on
+  the plate; under n = −0.5 the factor is negative and the force pulled unlike colours together,
+  the backward diffusion the fingering push had been taken out for. Noise removed (GPU and CPU).
+  A tension between two liquids does not depend on where on the glass they meet.
+- **38u-12, Rain Drip.** Its weight along the plate was the same on a level plate as on the wall.
+  Gravity along a plate is g sin θ: the dial now scales by the tilt (`plateUpright`, `dripOf` in
+  `gpu/fluid/constants.ts`; the CPU twin and the deep plate's force read it the same). Eight looks
+  that set Rain Drip at 0.2 or more got a tilt of 0.25; Rain Drip's help and guide line say it
+  needs Gravity.
+- **38u-14, the clear drop.** `plate.ts` drew the oil drop's band at 0.35 when there was no dye
+  under it and a bubble's at 0.7 in clear liquid; the band is the meniscus bending light out of the
+  aperture and does not need dye. Both at full strength; the clear oil's flat warm tint is now
+  exp(−α·thickness).
+
+*Measured* (cloud lab, software WebGPU, main then this): `npm run forces` 6, rows of a straight
+boundary pushing the colours apart, thin gap 50 of 76 → 76 of 76 (spread 2.46 → 0.11 of the mean);
+deep plate 73 → 76 (0.35 → 0.00). 7, a pool under Rain Drip 0.5: level plate 0.1657 → 0.00000, tipped
+to a half 0.1657 → 0.0830, the wall 0.1657 unchanged. `npm run droplens`, the drop's band on clear
+water, the ring's brightness from 0.75 to 0.85 of the radius: 72% of the plate on main (the check red,
+no half-bright edge) → 25%, against 24% on dyed water (new line: as dark on clear water as on dye).

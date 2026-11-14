@@ -654,11 +654,12 @@ On in every look, or nearly:
   dt stops being seconds, so every SI rate (`D_MOLECULAR`, the lamp's cooling, the drag) is
   off by that factor. dt is real seconds times Speed; the music's pace reaches forces through
   cords. none.
-- **38u-7. The force between colours changes sign in patches** (S; Medium). Polarity's push
-  (`forces.ts:147-167`) is multiplied by 1 + 2·snoise, which is negative where the noise is
-  under −0.5: there it pulls unlike colours together, the backward diffusion that had the
-  fingering push removed. Polarity 0.5 in every look. Drop the noise now; the force itself is
-  **18d-6**'s (dyes in water mix, only oil and water hold a line).
+- ~~**38u-7. The force between colours changes sign in patches**~~ — **Shipped (2026-11-13).**
+  Polarity's push (`forces.ts`, and the CPU's `applyImmiscibility`) was multiplied by 1 + 2·snoise,
+  negative under −0.5: there it pulled unlike colours together. The noise is gone, so the push has
+  one sign everywhere (`npm run forces` 6: 76 of 76 rows of a straight boundary push the colours
+  apart, the spread along it 0.11 of the mean; 26 of 76 pulled them together on main). The force
+  itself is **18d-6**'s (dyes in water mix, only oil and water hold a line).
 - **38u-8. Granulation is value noise** (M; High, the owner's call). `plate.ts` grainAt and
   pigmentGrain: the solver carries the speckle's coordinates, so it moves rightly, but the
   speckle is invented and scales the dye's depth at every pixel. Granulation 0.5 by default,
@@ -681,20 +682,25 @@ On in every look, or nearly:
 
 On in many looks:
 
-- **38u-12. Rain Drip pulls heavy dye "down" a level plate** (S; Medium, changes 14 looks).
-  `thinGap.ts:357`: DRIP_WEIGHT·drip along `S.up`, not scaled by the plate's tilt. The in-plane
-  share of gravity is g·sin θ, nothing on a level stage, where heavy dye only slumps (built).
-  Scale it by the tilt (Plate Rock, Gravity) and give the looks that lean on it a tilt. none.
+- ~~**38u-12. Rain Drip pulls heavy dye "down" a level plate**~~ — **Shipped (2026-11-13).**
+  Rain Drip is now the dye's weight along the plate, scaled by the tilt (`dripOf`: the dial times
+  Gravity, `plateUpright`; g sin θ, nothing flat). The eight looks that set Rain Drip at 0.2 or more
+  got `plateUpright: 0.25`, a plate tipped about 15 degrees, so they still streak, at a quarter of
+  the pull; the weak ones (Classic 0.15, Stardust Collapse, Home Movie 0.1) now streak only when
+  tipped. A plate rocked by a hand has its own weight in the rock's term. `npm run forces` 7. Open
+  for the owner's eye: the tilt turns on the buoyancy and the lamp's heat a standing plate has
+  (docs/judging.md §131), and the thick (non-thin-gap) path still runs along -y, not Tilt Direction.
 - **38u-13. Kicks make air from nowhere** (S–M; Medium). On an onset 2 to 4 bubbles appear at
   random places (`LiquidVisualizer.tsx:4549-4562`). Air enters under a drop that lands
   (Oguz–Prosperetti) or through the straw. Tie the births to the drops the music pours. 38b-3
   holds the turnover only. none. ~~The treble's shake of every pocket~~ (`lib/bubbles.ts`, two
   random draws a step, up to 1.2 cells a second) **shipped, this PR**: a 2 mm pocket between
   glasses is not shaken by the room's sound (0.083 cells of wander in two seconds → 0).
-- **38u-14. A clear drop's lens is drawn at a third** (S; Low-Medium). `plate.ts` mixes the
-  oil drop's band at 0.35 where there is no dye and the bubble's at 0.7 in clear liquid, and
-  tints clear oil by a flat (0.99, 0.97, 0.93) whatever its thickness. The aperture's band is
-  as real in clear water; the tint is exp(−α·thickness). none.
+- ~~**38u-14. A clear drop's lens is drawn at a third**~~ — **Shipped (2026-11-13).** The oil
+  drop's band is at full strength in clear water (it was 0.35 with no dye: 70% of the plate in the
+  band where dyed water gives 24%), the bubble's at full strength in clear liquid (the 0.7 is
+  gone), and the clear oil's tint is exp(−α·thickness), the same colour on the flat top and
+  fading to the water's over the meniscus. `npm run droplens`.
 - **38u-15. The drain fades the dye** (S; Low). `wgsl/fluid/dye.ts:318-328`: the inward speed
   grows with distance, the swirl is constant, the dye is scaled to 0.62 over 50 frames. A sink
   flows at Q/2πrh and conserves angular momentum (both ∝ 1/r), and the dye leaves by the

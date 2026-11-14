@@ -257,7 +257,8 @@ style (§31).
   A third pass (**38u**, 2026-11-13) ranked what is still drawn or pushed by sound: ~~38u-1~~ Edge
   Detail, ~~38u-2~~ the closeup's drawn lamp and ~~38u-3~~ the film's clock shipped; next, each a
   thread, **38u-5** with **38u-4**'s multiplier (the music stirs with no cord), **38u-6** (the music
-  warps the clock), **38u-7**, **38u-13**, **38u-12**; **38u-8** and **38u-11** are the owner's call.
+  warps the clock), **38u-13**; ~~38u-7~~ the colour force's noise, ~~38u-12~~ Rain Drip on a level
+  plate and ~~38u-14~~ the clear drop's lens shipped together; **38u-8** and **38u-11** are the owner's call.
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own
   thread: **42m** the tutorials watched on the owner's Mac first, then **42a** the glass pair
   (Fast and Slow glass from real radii; after #655), **42e** the classic mixture's numbers (with

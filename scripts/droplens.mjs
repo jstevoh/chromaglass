@@ -325,6 +325,18 @@ try {
         small: { core: mean(small, 0, 0.5), coreMax: Math.max(...small.slice(0, 11)), edge: cross(sS) / (perUnit * Rs), dark: mean(small, 0.75, 0.85) },
         big: { top: mean(big, 0.1, 0.75), edge: cross(sB) / (perUnit * Rb), dark: Math.min(...big.slice(17, 21)) },
       };
+      /*
+        The same small drop on water with no dye in it (PLAN 38u-14). The
+        band is the meniscus bending the light out of the aperture, and the
+        water round a drop does not have to be coloured for the oil to have a
+        curve: it was drawn at 0.35 of its strength there (the brightness
+        1 - 0.85 · 0.35 = 70% of the plate in the band, where the dyed plate
+        gives 24%; measured on main 72% against 24%), so the plate with a drop on a clear ground was a drop
+        drawn at a third.
+      */
+      await plate(() => null);
+      const sC = await shoot(0.3, 0.25, Rs, { ...PLATE, set: { lampGround: 1 } }); // clear water is dark on the bare ground; on the lamp it is lit
+      out.proj.clear = { dark: mean(profile(sC), 0.75, 0.85), edge: cross(sC) / (perUnit * Rs) };
       await plate((x) => (x < 0.5 ? A : B));
       const refs = { A: await swatch(0.3, 0.42), B: await swatch(0.7, 0.42) };
       out.proj.upright = turned(await shoot(0.5 - 0.15 * Rs, 0.42, Rs, PLATE), refs, [1, 0]);
@@ -572,6 +584,9 @@ try {
   check('and dark round it from where the aperture says',
     Math.abs(P.small.edge - predS) <= 0.03 && P.small.dark < 0.4,
     `half as bright ${P.small.edge.toFixed(3)} of the radius out, the aperture says ${predS.toFixed(3)}; ${(100 * P.small.dark).toFixed(0)}% of the plate from 0.75 to 0.85`);
+  check('and as dark on clear water as on dye: the band is the oil\'s curve, not the dye\'s',
+    dimOk && P.clear.dark < 0.4 && Math.abs(P.clear.dark - P.small.dark) <= 0.05 && Math.abs(P.clear.edge - P.small.edge) <= 0.03,
+    `${(100 * P.clear.dark).toFixed(0)}% of the plate from 0.75 to 0.85 with no dye, ${(100 * P.small.dark).toFixed(0)}% on the grey dye (on main: 72% against 24%, and no half-bright edge at all); half as bright ${P.clear.edge.toFixed(3)} of the radius out, ${P.small.edge.toFixed(3)} on dye`);
   check('projected, a big drop is flat to three quarters out and dark only at its edge',
     dimOk && P.big.top > 0.9 && P.big.top < 1.1 && Math.abs(P.big.edge - predB) <= 0.02 && P.big.dark < 0.4,
     `${(100 * P.big.top).toFixed(0)}% of the plate to 0.75, half as bright ${P.big.edge.toFixed(3)} of the radius out (half the gap and the aperture say ${predB.toFixed(3)}), down to ${(100 * P.big.dark).toFixed(0)}%`);

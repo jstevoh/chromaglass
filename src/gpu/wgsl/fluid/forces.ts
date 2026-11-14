@@ -162,8 +162,17 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
       let db = length(cB.rgb / cB.a - col);
       cdy = dt_ * dt_ - db * db;
     }
-    let n = snoise(p * 0.03 + vec2f(0.0, S.time * 0.05));
-    v = vec4f(v.xy - vec2f(cdx, cdy) * (S.tension * 0.8) * d * (1.0 + n * 2.0), v.z, v.w);
+    /*
+      The push is the same sign everywhere. It was multiplied by 1 + 2n, n a
+      slow noise on the plate, and where n fell under -0.5 that factor was
+      negative: there the force pulled unlike colours together, the backward
+      diffusion that the removed fingering push was taken out for (below).
+      Polarity 0.5 in every look, so a third of the plate's patches did it
+      (npm run forces, 6). The noise stood for nothing physical: a tension
+      between two liquids does not depend on where on the glass they meet.
+      The force itself is still a stand-in for the mixing law (18d-6).
+    */
+    v = vec4f(v.xy - vec2f(cdx, cdy) * (S.tension * 0.8) * d, v.z, v.w);
   }
 
   /*

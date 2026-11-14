@@ -196,7 +196,7 @@ export const CONTROL_HELP: Record<string, string> = {
   platePressure: 'How hard the top glass presses the liquid when it is squeezed.',
   plateSpring: 'How quickly the glasses spring apart again after a press.',
   glassSmear: 'Drags dye along the glass where the top plate slides.',
-  rainDrip: 'Heavy drops run down the glass in streaks, as rain does on a window.',
+  rainDrip: 'Heavy drops run down the glass in streaks, as rain on a window. Needs the plate tipped (Gravity): flat, nothing runs.',
   polarity: 'How polar the liquid is against water. Water is zero, oil is negative, and like dissolves like, so unlike liquids repel.',
   vorticityConfinement: 'Spins small eddies back up that a grid solver smooths away. Flair rather than physics.',
   surfactantFlow: 'Soap drops the tension and the surface streams away, carrying dye. It stays: on a plate soaped all over, more does nothing.',
