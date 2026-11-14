@@ -2993,7 +2993,7 @@ export class FluidSimulation {
     };
   }
 
-  /** The slosh dish: what drives it (lib/slosh.ts SloshDrive says what, and why). */
+  /** The slosh dish: what drives it (lib/slosh.ts SloshDrive says why). */
   private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
     const gpu = this.gpu;
     if (!gpu) return;
@@ -3003,7 +3003,7 @@ export class FluidSimulation {
       if (this.sloshClock.live) gpu.setSlosh(null);
       this.sloshClock.stop();
       this.dishKicks.length = 0;
-      this.sloshSpin.read(this.dishSpin, 0);
+      this.sloshSpin.read(this.dishSpin, 0, 0);
       return;
     }
     const [hx, hy] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);

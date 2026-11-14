@@ -315,8 +315,10 @@ export const SLOSH_SPIN_MIN = Math.sqrt((0.01 * SLOSH_REST_DEPTH * 2 * SLOSH_G) 
  * change, and the lag runs out at the dish's drag (r, 1/s, the one its solve
  * takes), so the lag is summed here and let go at r: it wakes the dish past the
  * same speed a steady spin needs, whatever time the change was read over. A
- * flick of 1.9 rad/s or a hard stop from Auto Spin does; a motor coming up to
- * its own speed, however the frames fall, does not. Euler's force while the
+ * flick of 1.9 rad/s or a hard stop from Auto Spin does on water and the default
+ * Thickness (past Thickness 0.8 the liquid follows the glass within a frame, and
+ * only a speed past that bar wakes it); a motor coming up to its own speed,
+ * however the frames fall, does not. Euler's force while the
  * dish runs is still Ω̇ as read, step by step: the impulse it gives is the
  * change of speed, which is right however the frames fell.
  */
@@ -324,7 +326,7 @@ export class SloshSpin {
   private was = 0;
   private lag = 0;
   /** `dt` 0 is a frame the dish is not stepped in (off the thin gap): the speed is kept, the lag forgotten. */
-  read(spin: number, dt: number, r = 0): { spin: number; rate: number; wakes: boolean } {
+  read(spin: number, dt: number, r: number): { spin: number; rate: number; wakes: boolean } {
     const w = Number.isFinite(spin) ? spin : 0;
     const stepped = dt > 0 && Number.isFinite(dt);
     const change = w - this.was;

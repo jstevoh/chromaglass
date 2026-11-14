@@ -283,6 +283,23 @@ const W = 2;
   const flickWakes = [WATER_R, DEF_R].every((r) => oneStep(0, 1.885, r) && oneStep(4, 0, r) && !oneStep(0, 0.2, r));
   check('7. a look\'s motor reached in one step does not wake the dish, a flick or a hard stop in one step does', !motorWakes && flickWakes,
     `the fastest motor, ${fastest.toFixed(3)} rad/s in one step, wakes it: ${motorWakes}; a flick of 1.885 rad/s and a stop from 4 rad/s each in one step wake it, 0.2 rad/s in one step does not: ${flickWakes}; drag ${WATER_R.toFixed(2)} and ${DEF_R.toFixed(2)} /s`);
+  /*
+    The lag is the liquid's and runs out at the dish's drag. One step after a
+    lag of nothing cannot tell that from a lag that never runs out, or from r
+    left out, so two more (check-skeptic's mutants: the decay set to 1, the
+    lag not summed, r fixed at water's, all passed the line above). Half a
+    second after a flick from -0.3 to 0.3 rad/s (both under the 0.343 bar, so
+    only the lag can wake it), water (r 0.33/s) still lags by most of the 0.6 rad/s change and the default
+    Thickness (r about 7.5/s) by a fiftieth: the one still wakes the dish and
+    the other does not. And the spin swung slowly, 0.3 to -0.3 rad/s over ten
+    seconds and held, never wakes it: a lag never let go would sum the whole
+    0.6 rad/s swing and keep the dish awake for good.
+  */
+  const halfSecondOn = (r) => { const sp = new SloshSpin(); sp.read(-0.3, 0, r); for (let k = 0; k < 1200; k++) sp.read(-0.3, DT, r); let w = false; for (let k = 0; k < Math.round(0.5 / DT); k++) w = sp.read(0.3, DT, r).wakes; return w; };
+  const slowSwing = (r) => { const sp = new SloshSpin(); sp.read(0.3, 0, r); let w = false; for (let k = 0; k < Math.round(20 / DT); k++) { const t = k * DT; w ||= sp.read(t < 10 ? 0.3 - 0.06 * t : -0.3, DT, r).wakes; } return w; };
+  const waterHolds = halfSecondOn(WATER_R), defLetsGo = !halfSecondOn(DEF_R), swingSleeps = !slowSwing(DEF_R) && !slowSwing(WATER_R);
+  check('7. the lag runs out at the dish\'s own drag: half a second after a flick water still wakes the dish and the default Thickness does not, and a slow swing never does', waterHolds && defLetsGo && swingSleeps,
+    `0.5 s after -0.3 to 0.3 rad/s in one step: water wakes it ${waterHolds}, the default Thickness lets it sleep ${defLetsGo}; 0.3 to -0.3 rad/s over 10 s never wakes it ${swingSleeps}`);
   check('7. below 1.2 rad/s the step count is the resting dish\'s', sloshSteps(DT, 1.2) === sloshSteps(DT) && sloshSteps(DT, 0) === sloshSteps(DT) && sloshSteps(DT, 9.4) > sloshSteps(DT),
     `${sloshSteps(DT)} a frame resting, ${sloshSteps(DT, 1.2)} at 1.2 rad/s, ${sloshSteps(DT, 9.4)} at 9.4`);
 }
