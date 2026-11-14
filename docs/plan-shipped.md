@@ -10948,14 +10948,13 @@ over a second (`originGap >= 1000`).
   (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
   the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
   did. The step shortens with the spin and with what the liquid still carries after a stop
-  (sloshSpinFast), and a cell under 20 µm takes the desingularised speed 2hq/(h² + ε²), so a
-  dish spun until its middle runs dry holds. Measured (`npm run spinslosh`): the paraboloid
+  (sloshSpinFast), so a hard stop from the hand's top speed holds. Measured (`npm run spinslosh`): the paraboloid
   at 2 rad/s to 0.0% of Ω²r²/2g; a ring of dye at r = 0.2 carried out 3.1 mm, 99% of what the
   heap's volume asks; spun up in 0.1 s, water 90% behind the glass, catching up at 0.309/s
   against the floor's drag on its own depth, 0.305/s; stopped in 0.05 s from 2 rad/s, water
   runs on 254° past the glass and the default Thickness 11°, both 74% of Ω/k (22o, the
   staircase rim, takes the rest); the middle still thinned 0.2 s after the stop and level 16
-  s later; at the hand's top speed, every stage under a Courant number of 0.46.
+  s later; from 2.5 to 9.4 rad/s, every stage under the 0.7 the step is sized for.
   `npm run sloshgpu` case 6 holds the GPU to the reference through a spin-up and a hard
   stop with a lens on the water, to 8e-6. No new setting: Thickness already sets the drag,
   and the phone's Spin tool turns the same dish.

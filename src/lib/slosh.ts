@@ -276,10 +276,10 @@ export const SLOSH_SPIN_FADE = 1;
 /**
  * How many times the rim's speed |Ω|R the step is sized for (sloshSteps). The
  * liquid runs at up to the rim's speed against the glass when it is started or
- * stopped, and faster where the heap falls back into a dry middle (a dam break
- * runs at twice its wave speed). 1.5 keeps every stage under 0.53 at the hand's
- * top speed on water and the default Thickness (`npm run spinslosh` 8); at 1 the
- * default's surge reached 0.91 at 4.7 rad/s.
+ * stopped, and faster where the heap falls back into the thinned middle. At 1
+ * the worst stage of `npm run spinslosh` 8's sweep (2.5 to 9.4 rad/s, water and
+ * the default Thickness) ran at 0.62 against the 0.7 aimed for; 1.5 is that
+ * with room, 0.53.
  */
 export const SLOSH_SPIN_RUN = 1.5;
 /** The Courant number the spun dish's step is cut to (sloshSteps): under the resting dish's worst forcing, 0.76, and SLOSH_COURANT_MAX. */
@@ -409,27 +409,6 @@ export function twoLayerDrag(h1: number, h: number, mu1: number, mu2: number, ou
   out[2] = (-b * K21) / kd; out[3] = (b * K11) / kd;
 }
 
-/*
-  A depth under which a cell's speed is not momentum over depth (PLAN 22n): 20
-  µm, plate widths. A dish spun hard runs dry in the middle (at a turn a second
-  the paraboloid's dip is deeper than the 6 mm of water), and at the edge of the
-  dry patch a cell holds a film a few microns deep with whatever momentum the
-  stage's rounding left it: q/h there is any speed at all, the faces' wave speeds
-  take it, and the step's Courant number with it (`npm run spinslosh` 8, before
-  this: 1.8 at every step length and a blow-up on the default Thickness). Under
-  SLOSH_WET the speed is 2hq/(h² + SLOSH_WET²), which is q/h at SLOSH_WET and
-  falls to zero with the depth (the desingularised velocity of Kurganov and
-  Petrova, 2007, in its plainest form). Above it, which is every cell of a dish
-  that does not run dry (a tilt keeps the shallowest at 0.12 of the rest depth,
-  thirty-six times this), it is q/h exactly, the same bits as before.
-*/
-export const SLOSH_WET = 1e-4;
-function wetSpeed(q: number, h: number): number {
-  if (h >= SLOSH_WET) return q / h;
-  if (h <= SLOSH_DRY) return 0;
-  return (2 * h * q) / (h * h + SLOSH_WET * SLOSH_WET);
-}
-
 function fin(x: number): number {
   return Number.isFinite(x) ? x : 0;
 }
@@ -480,7 +459,7 @@ export type SloshPress = { x: number; y: number; radius: number; depth: number }
  * (SloshClock) it is not stepped at all and the solver is told once, so the
  * default plate is the same bits it was (`npm run slosh`, `npm run sloshgpu`).
  */
-export type SloshDrive = { ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean; spin?: number; spinRate?: number };
+export type SloshDrive = { ax: number; ay: number; nu: number; presses: SloshPress[]; level: boolean; spin: number; spinRate: number };
 
 /** The lowest mode's angular frequency, c k with k = 1.8412/R (the first zero of J1' on a round dish): 4.46 /s. */
 export const SLOSH_OMEGA = (SLOSH_C * 1.8412) / SLOSH_RADIUS;
@@ -918,8 +897,8 @@ export class SloshDish {
       // The water's floor: the tilt (b = −a·x/g), the spin's paraboloid (−Ω²r²/2g, PLAN 22n), the oil's weight on it, the glass pressing it.
       z[k] = -(ax * x + ay * y) / g - (0.5 * w2 * (x * x + y * y)) / g + r * h1[k] + p;
       eta[k] = h[k] + z[k];
-      uu[k] = wetSpeed(qx[k], h[k]);
-      vv[k] = wetSpeed(qy[k], h[k]);
+      uu[k] = h[k] > SLOSH_DRY ? qx[k] / h[k] : 0;
+      vv[k] = h[k] > SLOSH_DRY ? qy[k] / h[k] : 0;
     }
     // Slopes, limited (MC); a cell beside the rim (either neighbour out of the dish) is first order.
     const [sxh, sxe, sxu, sxv] = sx, [syh, sye, syu, syv] = sy;

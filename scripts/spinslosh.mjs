@@ -30,7 +30,7 @@
  *      12ν/h² over its turning (k_eff), within 10%;
  *   4. stopped suddenly, it overshoots: water carries on past the stopped glass,
  *      through the angle Ω/k, and the thick liquid (the default Thickness) a
- *      little, in proportion to its drag time; between 0.6 and 1.05 of Ω/k,
+ *      little, in proportion to its drag time; between 0.6 and 0.9 of Ω/k,
  *      because the dish's staircase rim brakes a turning flow (shortcut 22o:
  *      with no drag at all a lag loses 12% of itself in its first 0.4 s), and
  *      the printed share says how much;
@@ -38,19 +38,25 @@
  *      stops the middle is still thinned (the liquid still turns, and holds it),
  *      and it fills back to level as the liquid's own turn runs down, which on
  *      water takes seconds, not the stop's twentieth of one;
- *   6. the way round: a positive spin leaves the liquid turning the negative way
- *      relative to the glass while it starts, and carries it the positive way
- *      when the glass stops (ẑ×r = (−y, x), the solver's own sense);
+ *   6. the way round, held inside 3 and 4: a positive spin leaves the liquid
+ *      turning the negative way relative to the glass while it starts (but never
+ *      backward in the room), and carries it the positive way when the glass
+ *      stops (but never faster than it went); half a second into a spin-up the
+ *      lagging water has not heaped (the Coriolis force on its lag cancels the
+ *      glass's centrifuge, which a dropped or flipped Coriolis term does not);
  *   7. nothing it did not do before: a spin of 0 and no change of speed leaves
- *      a resting dish asleep (no step taken); the looks' own slow motors
- *      (0.31 rad/s at most) do not wake it and a hand's spin does; and below
+ *      a resting dish asleep (no step taken); the looks' own motors (every
+ *      preset's Rotation Speed, read from src/presets.ts) do not wake it and a
+ *      hand's spin does; and below
  *      1.2 rad/s the step count is the resting dish's, so nothing else moves;
- *   8. it holds at the hand's top speed: a turn and a half a second taken on in
- *      0.04 s and stopped as fast, the middle running dry, no non-finite number,
- *      every stage under the scheme's Courant limit and the water's mass kept.
+ *   8. it holds spun hard: 2.5 rad/s up to the hand's top speed (a turn and a
+ *      half a second) taken on in 0.04 s and stopped as fast, no non-finite
+ *      number, every stage within the Courant number the step is sized for
+ *      (SLOSH_SPIN_COURANT) and the water's mass kept.
  */
-import { SloshDish, sloshDrag, sloshSteps, spinWakes, SLOSH_G, SLOSH_REST_DEPTH, SLOSH_N, SLOSH_COURANT_MAX, SLOSH_SPIN_MIN, SLOSH_DT } from '../src/lib/slosh.ts';
-import { thicknessViscosity } from '../src/lib/turntable.ts';
+import { readFileSync } from 'node:fs';
+import { SloshDish, SloshSpin, sloshDrag, sloshSteps, spinWakes, SLOSH_G, SLOSH_REST_DEPTH, SLOSH_RADIUS, SLOSH_N, SLOSH_COURANT_MAX, SLOSH_SPIN_COURANT, SLOSH_SPIN_MIN, SLOSH_DT } from '../src/lib/slosh.ts';
+import { thicknessViscosity, lookMotorRate } from '../src/lib/turntable.ts';
 
 let bad = 0;
 function check(name, pass, detail = '') {
@@ -78,10 +84,11 @@ function run(d, seconds, omega, r, state, each) {
   const frames = Math.round(seconds / DT);
   for (let k = 0; k < frames; k++) {
     state.t += DT;
-    const w = omega(state.t);
-    d.spin = w;
-    d.spinRate = (w - state.was) / DT;
-    state.was = w;
+    // The visualizer's own frame-to-frame reading (SloshSpin, fluidSimulation stepSlosh).
+    const sp = state.spin.read(omega(state.t), DT);
+    d.spin = sp.spin;
+    d.spinRate = sp.rate;
+    if (sp.wakes) state.woke = true;
     d.step(DT, 0, 0, r);
     if (each) each(d, state.t);
   }
@@ -154,7 +161,7 @@ function velAt(d, x, y) {
   const W = 2;
   const d = fresh();
   const m0 = mass(d);
-  const st = { t: 0, was: 0 };
+  const st = { t: 0, spin: new SloshSpin(), woke: false };
   const R0 = 0.2;
   const dots = Array.from({ length: 48 }, (_, k) => [R0 * Math.cos(2 * Math.PI * k / 48), R0 * Math.sin(2 * Math.PI * k / 48)]);
   // Carried by the water's own flow in the turning frame, midpoint rule per frame.
@@ -190,21 +197,28 @@ function velAt(d, x, y) {
 const W = 2;
 {
   const d = fresh();
-  const st = { t: 0, was: 0 };
+  const st = { t: 0, spin: new SloshSpin(), woke: false };
   const omega = (t) => (t < 0.1 ? W * t / 0.1 : t < 16 ? W : t < 16.05 ? W * (1 - (t - 16) / 0.05) : 0);
   run(d, 0.1, omega, WATER_R, st);
   const atTop = relSpin(d);
-  check('3. spun up quickly, water is left behind by the glass', atTop < -0.8 * W,
+  // Left behind, the negative way round (6), and never past standing still: the glass drags it forward, nothing drags it back.
+  check('3. spun up quickly, water is left behind by the glass (and 6, the negative way round)', atTop < -0.8 * W && atTop >= -W,
     `0.1 s after starting, the liquid turns ${(W + atTop).toFixed(3)} rad/s with the glass at ${W}: ${(-atTop / W * 100).toFixed(0)}% behind`);
-  check('6. the way round: a positive spin leaves the liquid turning back against it', atTop < 0, `relative turn ${atTop.toFixed(3)} rad/s`);
+  check('3. a hand\'s spin wakes the dish (SloshSpin)', st.woke);
   // The lag's rate once the heap has formed (4 s to 12 s), against the floor's drag over the liquid as it is then.
-  let s4 = 0, s12 = 0, kSum = 0, kN = 0;
+  // And the heap is the liquid's turn's, not the glass's: half a second in, water still barely turns, so it has not
+  // heaped (the Coriolis force on its lag cancels the glass's centrifuge; drop or flip it and the middle drains at once).
+  let s4 = 0, s12 = 0, kSum = 0, kN = 0, dipEarly = null;
+  const dipFull = W * W * SLOSH_RADIUS * SLOSH_RADIUS / (4 * SLOSH_G);
   run(d, 15.9, omega, WATER_R, st, (dd, t) => {
+    if (dipEarly === null && t >= 0.5) dipEarly = SLOSH_REST_DEPTH - ringDepth(dd, 0, 0.06).h;
     if (Math.abs(t - 4) < DT / 2) s4 = relSpin(dd);
     if (Math.abs(t - 12) < DT / 2) s12 = relSpin(dd);
     if (t >= 4 && t <= 12) { kSum += kEff(dd, WATER_R); kN++; }
   });
   const kGot = Math.log(s4 / s12) / 8, kWant = kSum / kN;
+  check('3. half a second in, the lagging water has not heaped: the heap follows the liquid\'s turn', dipEarly < 0.1 * dipFull,
+    `the middle's dip ${(dipEarly * 200).toFixed(3)} mm at 0.5 s against the settled paraboloid's ${(dipFull * 200).toFixed(2)} mm`);
   check('3. ...and comes up to it at the floor\'s drag on its own depth', s4 < 0 && s12 < 0 && Math.abs(kGot / kWant - 1) < 0.1,
     `from 4 s to 12 s the lag fell at ${kGot.toFixed(3)}/s against k_eff ${kWant.toFixed(3)}/s (12ν/h₀² is ${WATER_R.toFixed(3)}/s)`);
   const before = relSpin(d);
@@ -220,9 +234,9 @@ const W = 2;
     midLate = ringDepth(dd, 0, 0.06).h;
   });
   const angleWant = W / WATER_R;
-  check('4. stopped suddenly, water overshoots: it carries on past the stopped glass', firstAfter > 0.8 * W && angle / angleWant > 0.6 && angle / angleWant < 1.05,
+  // It carries on the positive way (6), never faster than it went (nothing pushes it on), through 0.6 to 0.9 of Ω/k (22o's rim takes a quarter).
+  check('4. stopped suddenly, water overshoots: it carries on past the stopped glass (and 6, the way it was going)', firstAfter > 0.8 * W && firstAfter <= W + before + 1e-3 && angle / angleWant > 0.6 && angle / angleWant < 0.9,
     `just after the stop it turns ${firstAfter.toFixed(3)} rad/s (it was ${(W + before).toFixed(3)} with the glass); it went on ${angle.toFixed(2)} rad (${(angle * 180 / Math.PI).toFixed(0)}°) past the glass, ${(angle / angleWant * 100).toFixed(0)}% of Ω/k = ${angleWant.toFixed(2)} rad`);
-  check('6. ...the positive way, the way it was going', firstAfter > 0 && angle > 0);
   const dip = SLOSH_REST_DEPTH - rim0;
   check('5. the heap is the liquid\'s: the middle stays thinned just after the stop, and fills back as the liquid\'s turn runs down',
     dip > 0.1 * SLOSH_REST_DEPTH && SLOSH_REST_DEPTH - midSoon > 0.8 * dip && Math.abs(midLate - SLOSH_REST_DEPTH) < 0.1 * dip,
@@ -231,13 +245,13 @@ const W = 2;
 // 4, the default Thickness: it overshoots too, by its own (short) drag time.
 {
   const d = fresh();
-  const st = { t: 0, was: 0 };
+  const st = { t: 0, spin: new SloshSpin(), woke: false };
   const omega = (t) => (t < 0.1 ? W * t / 0.1 : t < 3 ? W : t < 3.05 ? W * (1 - (t - 3) / 0.05) : 0);
   run(d, 3.05, omega, DEF_R, st);
   let angle = 0;
   run(d, 3, omega, DEF_R, st, (dd) => { angle += relSpin(dd) * DT; });
   const want = W / DEF_R;
-  check('4. on the default Thickness it overshoots by its own drag time', angle / want > 0.6 && angle / want < 1.05,
+  check('4. on the default Thickness it overshoots by its own drag time', angle / want > 0.6 && angle / want < 0.9,
     `${angle.toFixed(3)} rad (${(angle * 180 / Math.PI).toFixed(1)}°) past the glass, ${(angle / want * 100).toFixed(0)}% of Ω/k = ${want.toFixed(3)} rad`);
 }
 
@@ -247,27 +261,28 @@ const W = 2;
   d.spin = 0; d.spinRate = 0;
   const moved = d.step(DT, 0, 0, DEF_R);
   check('7. a dish nobody spins, tilts or presses stays asleep', moved === false && d.maxSpeed() === 0);
-  check('7. the looks\' own motors do not wake the dish, a hand\'s spin does', !spinWakes(0.31, 0) && spinWakes(0.4, 0) && spinWakes(0, 1) && !spinWakes(0.2, 0.1),
-    `the spin that wakes it: ${SLOSH_SPIN_MIN.toFixed(3)} rad/s, a heap of a hundredth of the depth`);
+  const dials = [...readFileSync(new URL('../src/presets.ts', import.meta.url), 'utf8').matchAll(/rotationSpeed:\s*([0-9.]+)/g)].map((m) => Number(m[1]));
+  const fastest = Math.max(...dials.map(lookMotorRate));
+  check('7. the looks\' own motors do not wake the dish, a hand\'s spin does', dials.length > 10 && !spinWakes(fastest, 0) && spinWakes(0.4, 0) && spinWakes(0, 1) && !spinWakes(0.2, 0.1),
+    `${dials.length} looks' Rotation Speed, the fastest motor ${fastest.toFixed(3)} rad/s; the spin that wakes it ${SLOSH_SPIN_MIN.toFixed(3)} rad/s, a heap of a hundredth of the depth`);
   check('7. below 1.2 rad/s the step count is the resting dish\'s', sloshSteps(DT, 1.2) === sloshSteps(DT) && sloshSteps(DT, 0) === sloshSteps(DT) && sloshSteps(DT, 9.4) > sloshSteps(DT),
     `${sloshSteps(DT)} a frame resting, ${sloshSteps(DT, 1.2)} at 1.2 rad/s, ${sloshSteps(DT, 9.4)} at 9.4`);
 }
 
-// 8. the hand's top speed, on water and on the default.
-for (const [name, r] of [['water', WATER_R], ['the default Thickness', DEF_R]]) {
+// 8. spun hard and stopped hard, up to the hand's top speed (a turn and a half a second), on water and on the default.
+for (const [name, r, top] of [['the default Thickness', DEF_R, 2.5], ['the default Thickness', DEF_R, 4.7], ['the default Thickness', DEF_R, 6.5], ['water', WATER_R, 4.7], ['water', WATER_R, 3 * Math.PI], ['the default Thickness', DEF_R, 3 * Math.PI]]) {
   const d = fresh();
   const m0 = mass(d);
-  const st = { t: 0, was: 0 };
-  const top = 1.5 * 2 * Math.PI;
-  let finite = true, dry = false;
+  const st = { t: 0, spin: new SloshSpin(), woke: false };
+  let finite = true, dry = Infinity;
   const omega = (t) => (t < 0.04 ? top * t / 0.04 : t < 2 ? top : t < 2.04 ? top * (1 - (t - 2) / 0.04) : 0);
   d.courant = 0;
   run(d, 4, omega, r, st, (dd) => {
     for (let k = 0; k < dd.h.length; k++) if (!Number.isFinite(dd.h[k]) || !Number.isFinite(dd.qx[k]) || !Number.isFinite(dd.qy[k])) finite = false;
-    if (ringDepth(dd, 0, 0.06).h < 1e-4) dry = true;
+    dry = Math.min(dry, ringDepth(dd, 0, 0.06).h);
   });
-  check(`8. at the hand's top speed on ${name}, the dish holds`, finite && d.blowups === 0 && d.courant <= SLOSH_COURANT_MAX && Math.abs(mass(d) / m0 - 1) < 1e-4,
-    `largest Courant ${d.courant.toFixed(3)} (limit ${SLOSH_COURANT_MAX}), ${d.blowups} blow-ups, mass ${(mass(d) / m0 - 1).toExponential(2)}, the middle ran dry: ${dry}; step ${SLOSH_DT.toFixed(5)} s at rest`);
+  check(`8. spun to ${top.toFixed(1)} rad/s and stopped on ${name}, every stage within the step's own Courant number`, finite && d.blowups === 0 && d.courant <= SLOSH_SPIN_COURANT && Math.abs(mass(d) / m0 - 1) < 1e-4,
+    `largest Courant ${d.courant.toFixed(3)} (sized for ${SLOSH_SPIN_COURANT}, unstable past ${SLOSH_COURANT_MAX}), ${d.blowups} blow-ups, mass ${(mass(d) / m0 - 1).toExponential(2)}, the middle's least depth ${(dry * 200).toFixed(2)} mm`);
 }
 
 console.log(bad ? `\n${bad} failed` : '\nall passed');

@@ -47,8 +47,6 @@ struct Slosh {
 @group(0) @binding(0) var<uniform> S: Slosh;
 
 const DRY: f32 = 5e-6;
-// lib/slosh.ts SLOSH_WET: under it a cell's speed is the desingularised 2hq/(h² + WET²), not q/h.
-const WET: f32 = 1e-4;
 const THIN: f32 = 1e-5;
 
 fn nOf() -> i32 { return i32(S.c.x); }
@@ -100,8 +98,7 @@ fn base(i: i32, j: i32) -> vec4f {
   let h = depth(w);
   var u = 0.0;
   var v = 0.0;
-  if (h >= WET) { u = w.y / h; v = w.z / h; }
-  else if (h > DRY) { let k = 2.0 * h / (h * h + WET * WET); u = w.y * k; v = w.z * k; }
+  if (h > DRY) { u = w.y / h; v = w.z / h; }
   return vec4f(h, h + z, u, v);
 }
 // The MC limiter (lib/slosh.ts limit).
