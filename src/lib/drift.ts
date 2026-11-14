@@ -186,7 +186,7 @@ const NOT_THE_LOOK = new Set([
     it (a granulation glide drawn the length of its reach in 6 s) and 4.20
     without (PLAN 10-8d-3).
   */
-  'soapFilm', 'soapFilmRate', 'soapFilmAngle',
+  'soapFilm', 'soapFilmRate', 'soapFilmAngle', 'soapFilmTilt',
   /*
     The glitter, the lens and the side lamp (PLAN 47e, 47d, 47b-side) are the
     photographer's: what is in the dish, the stop the lens is set to, and a

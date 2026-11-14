@@ -628,6 +628,7 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'soapFilm',        label: 'Soap Film',        min: 0, max: 1 },
   { key: 'soapFilmRate',    label: 'Drain Rate',       min: 0.25, max: 8 },
   { key: 'soapFilmAngle',   label: 'Film Angle',       min: 0, max: 70 },
+  { key: 'soapFilmTilt',    label: 'Frame Tilt',       min: 0, max: 90 },
   // Glitter in the liquid and the lens photographing it (PLAN 47e, 47d): a
   // fader for how much, and the f-number on a curve, so the knob's travel
   // spends as long on the wide-open discs as on the stopped-down stars.

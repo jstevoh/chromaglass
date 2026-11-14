@@ -939,6 +939,7 @@ export interface VisualizerSettings {
   soapFilm: number;           // the frame's draining soap film over the plate, its reflection 0 (off) to 1 (PLAN 32d)
   soapFilmRate: number;       // the film's seconds per show second: how fast it drains, swirls and is drawn again (32d)
   soapFilmAngle: number;      // degrees from straight on that the film is seen at: every band moves to a thicker film (32d)
+  soapFilmTilt: number;       // the frame's tilt from flat, degrees: 90 hangs it (gravity along the film is g sin of it, 32h)
   glitter: number;            // glitter suspended in the liquid, 0 (none) to 1: flakes that ride the gap's flow, flip in its shear and glint (PLAN 47e)
   lensStop: number;           // the lens's f-number, 1.4 to 22: wide open the glitter off the focal plane is big discs; stopped down, small discs and long star spikes (47d)
   sideLight: number;          // a coloured lamp low beside the dish, 0 (off) to 1: glints on the glitter, the dye's pigment and the walls facing it (47b-side)
@@ -1222,6 +1223,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   soapFilm: 0,              // no film in the frame: every look but Soap Film
   soapFilmRate: 1,
   soapFilmAngle: 0,
+  soapFilmTilt: 90,
   glitter: 0,               // no glitter, and with Side Light 0 the lens pass does not run: every look as it was
   lensStop: 4,
   sideLight: 0,

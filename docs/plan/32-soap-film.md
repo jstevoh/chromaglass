@@ -127,11 +127,37 @@ colleagues 2020.
 - **32g-3. Only van der Waals.** The double-layer repulsion that sets a common black film's
   thickness (DLVO) is left out: every spot goes straight to Newton black.
 
-## 32h. Gravity in the plane (shortcut a)
+## ~~32h. Gravity in the plane (shortcut a)~~ — **Shipped 2026-11-13** (Frame Tilt, `soapFilmTilt`, g sin θ along the film and in the fresh film's profile; the look Soap Film at 12°; `npm run soapplate` 7; story in `docs/plan-shipped.md` under 32k)
 
-The film hangs because g is applied along the picture's y on a plate that lies flat. The honest
-form is a tilt: in-plane gravity g sin θ for a film tilted θ from flat, θ a setting (90° a hanging
-film, 0 a level one with no sort), which is the real law at every angle. 32d's setting.
+- **32h-1. The tilt is in the plane only.** A frame near flat would also have the film's weight
+  across it (a sag, a few microns), which the model leaves out; and the frame drains toward its
+  picture-bottom edge at any tilt, never sideways.
+
+## ~~32k. The film's big swirls (a Brinkman film)~~ — **Shipped 2026-11-13** (gpu/soapAir.ts; `npm run soapplate` 7 and 8; story in `docs/plan-shipped.md`)
+
+- **32k-1. The air is carried whole.** The film's surface viscosity resists its own plumes'
+  small scales (the Brinkman solve) but takes the air's push at every scale whole (the 32d law,
+  ζ_air = ζ), so a small gust moves it as a big one does. Honest: the air's push inside the same
+  solve. Tried: it cut the stir under `soapplate` 4 to 0.6 nm; it needs 32d-1's own stir first.
+- **32k-2. η is fitted to the tuned ζ.** η = ζ / k² at the 6 mm patches (1.4e-6 Pa·s·m), so
+  the patches keep 32i's pace. Measured soap films run 1e-8 to 1e-6; at 2e-7 the film was much
+  quicker and blurred into level bands within a cycle (the transport's own diffusion: 32k-3).
+  Settle it with 32i.
+- **32k-3. The transport blurs the marbling.** Minmod upwinding at 1 mm smears a filament a
+  cell or two wide within seconds, and a real film keeps its edges sharp (it has no diffusion
+  of its own): measured, the marbled phase after a dip lasts about half a cycle and the rest is
+  soft bands. A sharper scheme (a high-order limiter, or a finer film grid where the swirls
+  fold it) would keep the folds.
+- **32k-4. The solve is warm-started.** 40 Jacobi sweeps a step on the air's grid: the big
+  swirls follow a change in the film over a few steps, slower than the film's real spin-up
+  (ρ h / ζ_air, under a tenth of a second).
+
+## 32m. The lamp's heat stirs the air (tried, open)
+
+A projector's lamp warms the air the frame hangs in, and warm air rises in plumes. Tried
+2026-11-13 as a warm, uneven strip at the frame's foot (1.5 K, g β T on the air): the air moved
+at a millimetre a second and the film not visibly. Worth a second look once the frame lies near
+flat over a lamp (the heat then rises across the film, and stirs it from below in cells).
 
 ## 32i. Real drag, and time as its own dial (shortcut b)
 
@@ -148,15 +174,15 @@ about 7.7 m/s on this grid); needs an implicit step. Until then `div u = 0` carr
 
 ## ~~32d. On the plate~~ — **Shipped** (the look Soap Film, settings `soapFilm`, `soapFilmRate`, `soapFilmAngle`; `src/gpu/soapFilmPlate.ts`, `src/gpu/soapFrame.ts`, `src/gpu/wgsl/soapFilmPlate.ts`, `soapFilmOver` in `src/gpu/wgsl/plateThinFilm.ts`; `npm run soapplate` 13/13; story in `docs/plan-shipped.md` §32d)
 
-- **32d-1. The film's air is the plate's flow (named shortcut).** The film is dragged by the
-  air over it in the overdamped limit (wgsl/soapFilmPlate.ts says why that is the law), and the
-  air is taken to be the plate's own flow, `velForced`: there is no air solver over the frame.
-  The honest form is an air layer of its own, stirred by Blow, the hands and the sound, whose
-  drag on the film's two faces (ζ_air from the air's boundary layer) is the push. *Measure:*
-  `soapplate`'s air lines with the air layer in place of the plate's flow.
+- **32d-1. The air's stir is the plate's flow (named shortcut).** *The air layer shipped
+  2026-11-13* (gpu/soapAir.ts: inertia, the film's plumes drag it, the room takes its momentum
+  back; story in `docs/plan-shipped.md` under 32k). What is left: the air is pushed by the plate's
+  flow at a constant 6 a second (`SOAP_AIR_K_STIR`, sized so a short stir carries the film about
+  as far as the old copy did), not by a stir of its own. The honest form is Blow, the hands and
+  the sound pushing the air directly. *Measure:* `soapplate` 4 with the air's own stir.
 - **32d-2. The re-dip lays a profile, not a pull.** A drained film (mean under 160 nm) is
   drawn again top first over two seconds with Mysels' √z profile from 350 to 750 nm and
-  patches 6 mm across. A real dip bursts the old film first, and the fresh film's thickness is
+  patches 12 mm across at 50% (2026-11-13, a hand-drawn film's sheets; was 6 mm at 25%). A real dip bursts the old film first, and the fresh film's thickness is
   Frankel's at the speed the frame is pulled (1.34 ℓ_c Ca^(2/3)), thinning by gravity as it
   rises. Make the pull speed the dial and the profile its result; a burst (the black film's
   rupture opening from a spot, Culick's rim at √(2σ/ρh)) before it. *Measure:* `soapplate`'s

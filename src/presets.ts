@@ -1404,7 +1404,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'soap-film',
     name: 'Soap Film',
-    description: 'A real soap film in its frame: it drains through the colours of its own thickness, silver to gold, blue and magenta, swirls with the music, goes black from the top, and is drawn again.',
+    description: 'A real soap film in a frame held nearly flat: it drains through the colours of its own thickness, silver to gold, blue and magenta, folds into marbled swirls with the music, goes black from the top, and is drawn again.',
     settings: {
       surfactantFlow: 0.6,
       // The frame's own film (PLAN 32d) over a dark ground: its colour is its
@@ -1412,6 +1412,16 @@ export const PRESETS: Preset[] = [
       // whose flow, stirred by the soap and the music, is the air that
       // swirls the film. No dish motor: the frame does not turn.
       soapFilm: 1,
+      /*
+        The frame held nearly flat (PLAN 32h, 2026-11-13). Hung straight,
+        the film's real big swirls (32k) sort it into level bands within
+        seconds, a draining film's look; the owner's "Liquid Tapestry" is a
+        film folded into marbling, which a frame near flat keeps, still
+        draining slowly toward its lower edge. Measured in the lab over two
+        drain cycles: 52 bright forms a frame, the swirls frame-sized where
+        they were 6 mm blobs (before 48 forms; hung, 11; the photograph 62).
+      */
+      soapFilmTilt: 12,
       globalSpeed: 0.0168,
       surge: 0.5,
       layerCount: 1,
