@@ -35,6 +35,13 @@ import type { VisualizerSettings } from '../types';
  * reads 0.
  */
 export const BARE_SHARE = 0.1;
+/**
+ * A pool, to the landing, is a box about a pool's size holding at least this
+ * share of the fullest such box on the plate: enough to pass over a thin wash
+ * and the faint fringe of a pool, low enough that a small pool near the aim
+ * counts against a big one across the plate (the owner asked for the nearest).
+ */
+export const POOL_SHARE = 0.25;
 /** A plate whose average dye is under this has nothing to land on yet. */
 export const EMPTY_PLATE = 1e-3;
 /**
@@ -83,6 +90,9 @@ export function frameMean(field: MacroField, x: number, y: number, hx: number, h
 }
 
 let sat = new Float64Array(0);
+let boxes = new Float64Array(0);
+let labels = new Int32Array(0);
+let stack = new Int32Array(0);
 let satW = 0;
 
 /** The mean dye in a (hx, hy) half-cell box about (cx, cy), from the summed-area table `landing` last built. */
@@ -95,14 +105,14 @@ function boxMean(cx: number, cy: number, hx: number, hy: number, size: number): 
 }
 
 /**
- * The nearest frame to the aim (ax, ay) that holds at least half the dye the
- * plate's fullest frame holds, centred on the dye it holds. Grid cells; the
+ * The nearest pool to the aim (ax, ay), and the frame centred on the dye
+ * there. Grid cells; the
  * frame is (hx, hy) half-cells, and its middle stays `margin` cells off the
  * walls. Writes the answer into `out`.
  *
  * Nearest rather than fullest, so a look whose middle has a little in it moves
- * no further than it must; at least half the fullest, so it lands on a subject
- * and not on the fringe of one. The frame is the one asked for (the zoom it is
+ * no further than it must (the owner's choice, 2026-11-14); a pool and not a
+ * fringe (POOL_SHARE), so it lands on a subject. The frame is the one asked for (the zoom it is
  * going to), not the one easing in from the plate.
  */
 export function landing(field: MacroField, ax: number, ay: number, hx: number, hy: number, margin: number,
@@ -126,26 +136,51 @@ export function landing(field: MacroField, ax: number, ay: number, hx: number, h
   const yLo0 = Math.max(hy, margin), yHi0 = size - Math.max(hy, margin);
   const xLo = xLo0 <= xHi0 ? xLo0 : size / 2, xHi = xLo0 <= xHi0 ? xHi0 : size / 2;
   const yLo = yLo0 <= yHi0 ? yLo0 : size / 2, yHi = yLo0 <= yHi0 ? yHi0 : size / 2;
-  const stride = Math.max(1, Math.min(hx, hy) / 2);
-  // Two sweeps over the same lattice, the first for the fullest frame and the
-  // second for the nearest one holding half of it, rather than a list of every
-  // candidate: the box sum is four reads, cheaper than the list.
+  /*
+    The nearest pool, measured to the pool. The first build took the nearest
+    frame holding at least half of what the fullest frame holds, and measured
+    to that frame's middle; a 16:10 frame reaches a pool beside the aim from
+    nearer its middle than one above it, so it could go to the farther pool:
+    on the owner's film (2026-11-14) it picked the blue pool over the orange
+    one, and asked, the owner said "go to the nearest pool". So the plate is
+    read in boxes about a pool's size (a third of the frame's shorter half), a
+    box holding at least POOL_SHARE of the fullest box is liquid (a thin wash
+    or a pool's fringe is not), the touching boxes of liquid are one pool, and
+    the pool whose middle (its dye's centroid) is nearest the aim wins. To the
+    middle and not the near edge, because two pools the same distance off are
+    told apart by where they sit, as a person sees them, not by which spread
+    a cell further. The arrays are kept between calls.
+  */
+  const s = Math.max(1, Math.min(hx, hy) / 3);
+  const stride = Math.max(1, s / 2);
+  const n = Math.max(1, Math.floor((size - 2 * s) / stride) + 1);
+  if (boxes.length < n * n) { boxes = new Float64Array(n * n); labels = new Int32Array(n * n); stack = new Int32Array(n * n); }
   let best = 0;
-  for (let y = yLo; y <= yHi + 1e-6; y += stride) {
-    for (let x = xLo; x <= xHi + 1e-6; x += stride) { const v = boxMean(x, y, hx, hy, size); if (v > best) best = v; }
+  for (let b = 0; b < n; b++) {
+    for (let a = 0; a < n; a++) { const v = boxMean(s + a * stride, s + b * stride, s, s, size); boxes[a + b * n] = v; if (v > best) best = v; }
   }
+  const floor = POOL_SHARE * best;
+  labels.fill(0, 0, n * n);
   let px = ax, py = ay, near = Infinity;
-  for (let y = yLo; y <= yHi + 1e-6; y += stride) {
-    for (let x = xLo; x <= xHi + 1e-6; x += stride) {
-      if (boxMean(x, y, hx, hy, size) < 0.5 * best) continue;
-      const dist = Math.hypot(x - ax, y - ay);
-      if (dist < near) { near = dist; px = x; py = y; }
+  for (let k = 0; k < n * n; k++) {
+    if (labels[k] !== 0 || !(boxes[k] >= floor) || !(best > 0)) continue;
+    // One pool: every touching box of liquid, weighed by the dye it holds.
+    let top = 0, w = 0, wx = 0, wy = 0;
+    stack[top++] = k; labels[k] = 1;
+    while (top > 0) {
+      const c = stack[--top], a = c % n, b = (c - a) / n, v = boxes[c];
+      w += v; wx += v * (s + a * stride); wy += v * (s + b * stride);
+      if (a > 0 && labels[c - 1] === 0 && boxes[c - 1] >= floor) { labels[c - 1] = 1; stack[top++] = c - 1; }
+      if (a < n - 1 && labels[c + 1] === 0 && boxes[c + 1] >= floor) { labels[c + 1] = 1; stack[top++] = c + 1; }
+      if (b > 0 && labels[c - n] === 0 && boxes[c - n] >= floor) { labels[c - n] = 1; stack[top++] = c - n; }
+      if (b < n - 1 && labels[c + n] === 0 && boxes[c + n] >= floor) { labels[c + n] = 1; stack[top++] = c + n; }
     }
+    const cx = wx / w, cy = wy / w, dist = Math.hypot(cx - ax, cy - ay);
+    if (dist < near) { near = dist; px = cx; py = cy; }
   }
-  // The nearest such frame has its subject in the corner furthest from the
-  // aim (every frame that holds the whole of a pool holds the same dye), so
-  // the subject is put in the middle: the frame goes to the centroid of the
-  // dye it holds, twice, as a cut lands on a drop's middle (`recenter`).
+  px = clamp(px, xLo, xHi); py = clamp(py, yLo, yHi);
+  // And the frame centred on the dye it holds there, twice, as a cut lands on
+  // a drop's middle (`recenter`): the boxes are coarse, the dye is not.
   for (let pass = 0; pass < 2; pass++) {
     const x0 = clamp(Math.floor(px - hx), 0, size - 1), x1 = clamp(Math.ceil(px + hx), 0, size - 1);
     const y0 = clamp(Math.floor(py - hy), 0, size - 1), y1 = clamp(Math.ceil(py + hy), 0, size - 1);

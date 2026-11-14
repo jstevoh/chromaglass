@@ -45,6 +45,10 @@
  *  10. a zoom parked short of 2x (a pinch let go at 1.5x) stops asking after
  *      LAND_SECONDS: Hold on a full middle for ten seconds, the middle then
  *      drained, does not cut across the plate (it did, in one frame)
+ *  12. nearest is measured to the pool (the owner, 2026-11-14: "go to the
+ *      nearest pool"): a pool 0.160 above the aim wins over one 0.179 off
+ *      to the side, which the nearest frame holding a pool had chosen (a
+ *      16:10 frame reaches a pool to the side from nearer its middle)
  *  11. where it settles is told once (`onLand`, which the app makes the aim),
  *      and a nudge of the aim from there (the arrows, the sliders, Evolve)
  *      pans on from the pool rather than back to the bare middle
@@ -210,6 +214,19 @@ if (process.argv.includes('--node')) {
   }
 
   // 8. The button's press.
+  // 12. The nearest pool, measured to the pool and not to a frame that holds it.
+  {
+    const f = plate();
+    pour(f, 0.5, 0.34); pour(f, 0.66, 0.58);
+    const cam = new MacroCamera(stream('plate.macro'));
+    let shot;
+    for (let t = 0; t < 30; t++) shot = cam.update(f, DT, opts('hold'));
+    const near = read(f, shot, 0.5, 0.34), far = read(f, shot, 0.66, 0.58);
+    check('it lands on the nearest pool, measured to the pool, not to the frame that holds it',
+      near.off < 1 / 3,
+      `the pool 0.160 from the aim ${fx(near.off)} of a half-frame off the middle (under 0.333 wanted), the one 0.179 away to the side ${fx(far.off)}; at ${fx(shot.cx)}, ${fx(shot.cy)}`);
+  }
+
   // 10. A zoom parked short of fully in stops asking.
   {
     const f = plate();
