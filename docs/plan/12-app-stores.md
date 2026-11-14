@@ -447,6 +447,15 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
   (screenshots from `docs/brand/store/tv/`, privacy and support URLs, the 3.1.3(f)
   review note: a free companion that only opens what was bought on the web, no price
   and no buy button), then submit once the owner has judged the build (12-tv-apple-6).
+- **12-tv-apple-9, something for App Review to see.** Found 2026-11-13 writing the
+  review notes: the app opens on "Link this TV" (a Home or Pro account claims the code
+  on a phone) and then "Find your Mac" (type the Mac's TV address), and App Review has
+  neither a Mac nor a licence, so it would see a code screen and nothing more, a
+  likely 2.1 rejection. The Android TV app answers the same problem with "Watch a
+  sample film" on its first screen (the press clips, no account). The Apple TV app
+  wants the same (`AVPlayer` on the public films, which is also 12-tv-apple-3's
+  films while the show is off), plus a demo account with a Home licence and a short
+  video of the Mac and TV together in the review notes. Before submitting.
 - **12-tv-apple-8, the upload from CI.** Builds go up from the owner's Mac by hand.
   A job on the macOS runner with the API key as an environment secret would archive
   and upload on a tag, with the build number from the run number.
