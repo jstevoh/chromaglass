@@ -2765,3 +2765,23 @@ only seen here.
    on every speck alike.
 5. Lamp Ground 1 with Glitter up: the flakes read as fine dark specks on the lamp.
 6. Glitter and Side Light at 0 on any look: the look exactly as before.
+
+## 130. No black lines where two colours meet (PLAN 18e-5)
+
+The check (`npm run holeline`) proves that Boundary Contrast moves no pixel in focus and that a
+seam between two dyes is no darker than the darker dye beside it, on the lab's software WebGPU
+at one frame. Whether the looks read better without the line, and what the closeup's relief
+looks like now that it shades from the liquid's own curvature, is only seen here.
+
+1. **Comet River**, a minute in: colours meet and blend where they overlap (orange over violet
+   a dark red, cyan over yellow a green) with no black band between them. Bad: a hard dark
+   line along a boundary, or the colours duller than before.
+2. Any look with two layers (Comet River is one): the back plate's rims are still a little
+   brighter than its dye, as before.
+3. **Macro Zoom** to 4x on Comet River: where two colours meet there is no dark band; swells
+   read a little brighter in their middles and darker on their flanks. Bad: thin dark crackle
+   lines across the dye, or a closeup flatter than before (PLAN 18e-6 if so).
+4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
+   Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
+5. Boundary Glow from 0 to 1 at the Focus's middle: nothing moves. Off its middle: the fringes
+   at the dye's edges strengthen.

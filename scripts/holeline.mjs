@@ -25,9 +25,10 @@
  * dyes where they overlap, which the decode already draws. The line is gone
  * from every path (PLAN 18e-5; the long comment in wgsl/plate.ts where
  * boundaryDiff was). Measured on main the day it went, the lines below read:
- * round a hole at most 0 levels (the hue gate's work), the pool's rim 0, and
- * between two dyes 109 levels at one depth, 124 at depths five times apart,
- * 76 photographed, the seam 96 levels darker than the darker of its two dyes.
+ * round a hole and at the pool's rim 0 levels (the hue gate's work), and
+ * between two dyes 173 levels at one depth, 136 at depths five times apart,
+ * 13 at hues 0.2 apart, 141 photographed, the seam on the wall 43 levels
+ * darker than the darker of its two dyes (3 now, the dither and the blend).
  *
  * Asked on plates the lab lays out and the real solver and plate shader
  * draw (the air cut into the dye as the app cuts it, bubbleClear 1, the
@@ -54,7 +55,10 @@
  *      than the darker of the two dyes beside it by more than SEAM_DARK
  *      levels (at one depth the dye across the seam is a blend of the two,
  *      so by Beer-Lambert each channel lies between them), asked only once
- *      the two sides are shown to be two colours (over SIDES levels apart)
+ *      the two sides are shown to be two colours (over SIDES levels apart).
+ *      Asked on the wall only: photographed, main's line left this band 5
+ *      levels darker at the dial's 1, so the line would pass it there, and
+ *      line 3 is what holds the camera's path
  *
  * Before any of it is judged, the plates are asked to be what they say:
  * every picture is whole, every ring selects the pixels its area says, and
@@ -357,9 +361,7 @@ check(`2. no line round the pool's rim (at most ${now.rim.max} levels ≤ ${MAX_
 for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues', 'near'], ['nearer hues', 'nearer'], ['one depth, photographed', 'photo']]) {
   check(`3. no line where two dyes meet, ${name} (at most ${now[k].max} levels ≤ ${MAX_MOVE})`, now[k].max <= MAX_MOVE);
 }
-for (const [name, k] of [['on the wall', 'even'], ['photographed', 'photo']]) {
-  check(`3b. the seam is the two dyes' own absorbance, ${name} (${now[k].dark} levels darker than the darker side ≤ ${SEAM_DARK}; the sides ${now[k].sides} apart > ${SIDES})`, now[k].dark <= SEAM_DARK && now[k].sides > SIDES);
-}
+check(`3b. the seam is the two dyes' own absorbance (${now.even.dark} levels darker than the darker side ≤ ${SEAM_DARK}; the sides ${now.even.sides} apart > ${SIDES})`, now.even.dark <= SEAM_DARK && now.even.sides > SIDES);
 
 for (const [name, r] of [['the shader', glowNow], ['the control (no air mask)', glowThen]]) {
   console.log(`   ${name}, the dye ${HOLE_FROM} to ${HOLE_TO} cells past a hole's rim, from the dye ${HOLE_REF} cells out:`);
