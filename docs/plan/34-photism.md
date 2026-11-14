@@ -72,6 +72,21 @@ a grid of generic stock thumbnails: ours are the plate itself.
   on a line-by-line draft; story in `docs/plan-shipped.md` §34a-5).* Open: `og-card.png` is still
   the old card; a new one would be the hero's frame with the name and the new headline. The maker
   note goes unsigned unless the owner says otherwise.
+- **34a-6. The looks as films, each to its own kind of music, and on the channel.** *The row
+  shipped (2026-11-08): six 1920s records, each played whole by a look, under the gallery; story
+  in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6a. The channel's ids.** *Shipped (2026-11-08): all six on the channel, Public, ids
+    in `siteFilms.ts`; story in `docs/plan-shipped.md` §34a-6.*
+  - **34a-6c. Open: the channel's content claims.** Five of the six carry a claim from the
+    channel's matching of a label's remaster: Rachmaninoff and Tears are blocked in some
+    countries (Tears in Russia), Bessie, Caruso and the Wolverines only lose earnings. Every one
+    is a Great 78 transfer of the original disc, published in the US before 1926, so each is
+    disputed as public domain with the credit lines and `public/landing/films/SOURCES.md`;
+    all five disputes were filed on 2026-11-08 and are under review (YouTube answers within
+    about 30 days). Until one is won, a visitor in a blocked country who opens
+    that card gets YouTube's own notice in the player, not the film.
+  - **34a-6b. Later:** the hero could cross-fade the loops instead of the stills; more records
+    as each year's recordings enter the public domain (1926's on 1 January 2027).
 - **34a-7. A page for pros (`/pro`).** *(S. The owner, 2026-10-29: a part of the site for VJs,
   synth people, producers and artists, who need the technical capabilities before they pay.)*
   `public/pro.html`, a static page like the Terms (no engine, no Firebase, read whole by a search
@@ -136,9 +151,9 @@ a grid of generic stock thumbnails: ours are the plate itself.
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
 - **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
   story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
-  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
-    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
-    #679's cards are on main. Until then the channel link is the only way to see a look move.
+  - **34a-8a. The films themselves on the page.** *Shipped with 34a-6 (PR #679, carried from #729): the row
+    "Six records from the 1920s" sits under the looks, and each card opens its film from the
+    channel on the page itself.*
 
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the

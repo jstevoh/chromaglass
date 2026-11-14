@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MAC_APP_NOTARISED, MAC_DOWNLOAD_URL, MAC_FIRST_OPEN, onMacComputer } from '../lib/macApp';
 import { introOut } from '../lib/intro';
+import { SiteFilms, anyFilmOpens } from './LandingFilms';
 import { CHECKOUT_HOME_URL, CHECKOUT_MOIRE_URL, CHECKOUT_PRO_URL } from '../lib/checkoutLinks';
 
 /*
@@ -293,6 +294,16 @@ export const Landing: React.FC<LandingProps> = ({ onPlay, covered }) => {
           <YouTubeMark className="h-[17px] w-[24px] shrink-0" />
           Watch the looks move to 1920s records on our YouTube channel
         </a>
+      </section>
+
+      {/* Films: six records from before 1926, each played whole by a look (LandingFilms.tsx, PLAN.md 34a-6). */}
+      <section id="films" className="mx-auto w-full max-w-[1120px] px-4 pb-16 sm:px-8 sm:pb-24">
+        <h2 className="text-[26px] font-semibold tracking-[-0.015em] sm:text-[32px]">Six records from the 1920s</h2>
+        <p className="mt-2 max-w-[36rem] text-[15px] leading-relaxed text-muted">
+          The app listening to six old 78s and playing each from the first note to the last, with nothing added afterwards.
+          The records are in the public domain in the US.{anyFilmOpens() ? ' Open one to watch it with the sound on.' : ''}
+        </p>
+        <SiteFilms />
       </section>
 
       {/* How it works */}

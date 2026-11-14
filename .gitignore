@@ -33,6 +33,7 @@ dist-signin-off/
 dist-accountlink/
 dist-tiers/
 dist-landing/
+dist-sitefilms/
 
 # Scratch space for measurement runs (scripts/detail.mjs inputs and outputs).
 scratch/
