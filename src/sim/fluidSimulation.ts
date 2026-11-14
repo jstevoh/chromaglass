@@ -1254,7 +1254,6 @@ export class FluidSimulation {
   /** A still picture poured as dye, into the middle of the dish (lib/videoFlow.ts). */
   injectImage(imgData: ImageData) { pourPictureCpu(this, imgData, this.size); }
 
-  /** Its oil, soap and acid gone, waiting or laid (mixWait.ts). */
   clearChemistry() { this.wait.drop(); this.gpu?.clearChemistry?.(); }
   clearAll() {
     this.liquid.clear();
@@ -1961,10 +1960,7 @@ export class FluidSimulation {
           one of the other dyes as its own colour (src/lib/oilLay.ts, and why;
           layCrowd). With Oil Bodies on (the look's) each body keeps its colour
           while it moves; Splodascope's Film Hold keeps its crowd apart where
-          they touch. The oil waits for a solver that is not there yet
-          (src/sim/mixWait.ts, PLAN 27f-9m); its colour share does not yet
-          (27f-9r), so on a look opened with the page that colour starts in
-          the water.
+          they touch.
         */
         const water = col(0);
         layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.wait.lay(x, y, r, { oil }),
