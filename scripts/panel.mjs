@@ -40,6 +40,7 @@ import { SurfaceWatcher, buildAutoMap, RIDE_ORDER, MASTER_RIDE } from '../src/li
 import { touch, touchKey, subscribeTouch, subscribeAllTouches, touchKeysWatched, resetTouch } from '../src/lib/midiTouch.ts';
 import { settingLed, SoftTakeover, parseMidiMap, LEARNABLE_SETTINGS } from '../src/lib/midi.ts';
 import { luckyLook } from '../src/lib/lucky.ts';
+import { randomLooks } from './panelRandomLooks.mjs';
 import { evolvedLook } from '../src/lib/lookFade.ts';
 import { DEFAULT_SETTINGS } from '../src/types.ts';
 import { PRESETS } from '../src/presets.ts';
@@ -1026,12 +1027,7 @@ for (const [dot, handler] of [['sound', 'onSound'], ['video', 'onVideo'], ['midi
     || new RegExp(`onClick=\\{${handler}\\}[\\s\\S]{0,240}dot-${dot}`).test(header));
 }
 // And the place the mic dot opens has to be able to change the mic.
-check('and the Sound section names the source and leads to the sheet that chooses it, with the device beside',
-  panel.includes('data-testid="audio-source-state"') && panel.includes('data-testid="audio-source-open"')
-  && panel.includes('data-testid="audio-input"'));
-// One home each (PLAN 35c-3): the switch is drawn once, not in the section and the sheet both.
-check('and the source is chosen in the Sound sheet alone',
-  !panel.includes('testId="audio-source"') && readFileSync(join(root, 'src/components/SoundPanel.tsx'), 'utf8').includes('sound-source-${s.id}'));
+// The section it opens draws the sources and the device (PLAN 35c-7): asked in panelOneHome.mjs.
 check('and the sections the dots aim at exist',
   ['audio-input', 'projectors'].every(id => SECTION_BY_ID.has(id)));
 
@@ -1156,19 +1152,7 @@ check('and the document says when it is unsaved', /setDocDirty\(true\)/.test(app
 // not be true of an empty plate somebody had since painted.
 check('and only one thing decides that', !/const lookEdited =/.test(app));
 
-/*
-  The opening look is drawn from the show's seeded stream now (lib/rng.ts,
-  `npm run seed`), not from Math.random, so a render opens on the look it
-  opened on before. What this held — that a visitor does not arrive on the
-  same look every time — is held the same way, with one more link: the pick
-  is from the pool, and the seed it is keyed on is drawn fresh each load
-  (crypto) unless ?seed= fixes it.
-*/
-const rngSource = readFileSync(join(root, 'src/lib/rng.ts'), 'utf8');
-check('the opening look is not always the same one',
-  /export const OPENING_LOOK/.test(app) && /stream\('show\.opening'\)\.pick\(pool\)/.test(app)
-    && /current = asked \?\? drawStartupSeed\(\)/.test(rngSource) && /getRandomValues\(new Uint32Array\(1\)\)/.test(rngSource));
-check('and can be pinned so a harness is not random', /get\('look'\)/.test(app));
+// The opening look's checks are in panelRandomLooks.mjs (PLAN 45a-13).
 
 // ── The mirror rig ──────────────────────────────────────────────────
 /*
@@ -1220,12 +1204,6 @@ check('and neither starts over the limit',
 // and `boilingPoint` were read by nothing, so they were deleted rather than
 // given a slider (docs/bubbles-plan.md says why).
 //
-// `surfaceTension` is the plate's own film tension,
-// read by the solver, carried by every preset between 0.01 and 0.3, and
-// reachable from nothing. `surge` shapes the automation into gusts with quiet
-// between — the thing that makes a plate look worked-on rather than busy —
-// same story.
-//
 // The exceptions are listed by name rather than by a rule, because each is a
 // decision and a rule would hide the next one.
 {
@@ -1242,6 +1220,9 @@ check('and neither starts over the limit',
     // Blend pad per row, not a slider or a select on this sheet. `npm run phone`
     // presses them.
     'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
+    // The shelved ink title's dials (37x-10m): read only by the ink's run,
+    // their controls gone with the ink; removing them is 37x-10n.
+    'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   ]);
   const panelSrc = settingsSource();
   const drawn = new Set([
@@ -1803,21 +1784,7 @@ check('and neither starts over the limit',
     undead.length ? undead.join(', ') : `${RETIRED.size} retired`);
 }
 
-// ── Kick Bloom ──
-// The kick's outward dye burst has its own dial, and is not a ring. This reads
-// the frame loop's source (the burst is inline there, so the lab cannot reach
-// it; the picture itself is for a Mac read, docs/judging.md): the dial gates
-// the burst, scales the dye each droplet lays and the push it is given, and
-// the droplets no longer sit at (d / drops) of a turn on one circle.
-{
-  const vis = readFileSync(join(root, 'src/components/LiquidVisualizer.tsx'), 'utf8');
-  const burst = vis.slice(vis.indexOf('const bloomGain'), vis.indexOf('// The beat dose'));
-  check('Kick Bloom gates the kick\'s dye burst and scales its dye and push',
-    /kickBloom \?\? 1/.test(burst) && /bloomGain > 0/.test(burst) && /autoAmp \* pourDt \* bloomGain/.test(burst) && /bloomGain;/.test(burst.slice(burst.indexOf('const speed'))),
-    'src/components/LiquidVisualizer.tsx');
-  check('and the burst is clumps at random angles, not droplets evenly round one circle',
-    burst.includes('lobeAt') && !/\(d \/ drops\) \* Math\.PI \* 2/.test(burst));
-}
+// ── Kick Bloom: its own check now, `npm run kickbloom` (the droplets moved to lib/kickBloom.ts) ──
 
 // ── What each control says it is (PLAN.md 8j) ───────────────────────
 //
@@ -2122,6 +2089,8 @@ check('and neither starts over the limit',
     !/setInterval|requestAnimationFrame/.test(ui.slice(ui.indexOf('export function SlideTray'))) &&
     /@media \(prefers-reduced-motion: reduce\) \{[^@]*\.cg-tray \{ transform: none !important; transition: none; \}/.test(css) && /\.cg-tray \{ transition: transform 160ms/.test(css));
 }
+
+randomLooks({ check });
 
 // ── Result ──────────────────────────────────────────────────────────
 const failed = checks.filter(c => !c.ok);

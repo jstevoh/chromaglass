@@ -131,7 +131,6 @@ const OWN: PanelSpec[] = [
   */
   { id: 'songs',     name: 'Songs',         category: 'play', kind: 'own', deckWidth: 400, columnWidth: 420 },
   { id: 'sequences', name: 'Sequences',     category: 'play', kind: 'own', deckWidth: 400, columnWidth: 360 },
-  { id: 'player',    name: 'Music & Drone', category: 'feed', kind: 'own', deckWidth: 360, columnWidth: 340 },
 ];
 
 /**
@@ -141,7 +140,7 @@ const OWN: PanelSpec[] = [
 const WHOLE = new Set(['audio-input', 'room', 'film', 'patches', 'midi', 'liquids', 'projectors', 'mapping', 'mark', 'simulation']);
 
 /** Wider in the deck: the patch bay's rows and the Wall's corner pin need the room. */
-const WIDE: Record<string, number> = { patches: 340, projectors: 340, mapping: 312, midi: 312, 'audio-input': 312, simulation: 304, mixer: 312 };
+const WIDE: Record<string, number> = { patches: 340, projectors: 340, mapping: 312, midi: 312, 'audio-input': 340, simulation: 304, mixer: 312 };
 
 const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => ({
   id: s.id,
@@ -149,6 +148,8 @@ const FROM_SECTIONS: PanelSpec[] = SETTINGS_SECTIONS.map(s => ({
   category: s.category,
   kind: s.id === 'mixer' ? 'mixer' : WHOLE.has(s.id) || !PINNABLE.some(p => p.section === s.id) ? 'section' : 'knobs',
   deckWidth: WIDE[s.id] ?? 266,
+  // Sound holds the player and the drone since PLAN 35c-7: the column they had as Music & Drone.
+  ...(s.id === 'audio-input' && { columnWidth: 340 }),
 }));
 
 export const PANELS: PanelSpec[] = [...OWN, ...FROM_SECTIONS];

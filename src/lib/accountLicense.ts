@@ -19,7 +19,7 @@
  * here only on demand, so a build without it (every check, a fork) carries none.
  */
 
-import { activateLocalLicenseKey, getCachedLicenseStatus, retireStoredLicenseKey, verifyLicenseKey, type LicenseTier } from './licenseKey';
+import { activateLocalLicenseKey, getCachedLicenseStatus, retireStoredLicenseKey, sameIdKeyWins, verifyLicenseKey, type LicenseTier } from './licenseKey';
 import { getCachedEmail } from './authFlag';
 import { getActiveLicenseInfo, getMarketingOptIn, hasExplicitMarketingChoice, setMarketingOptIn, syncMarketingPreferenceToServer } from './tierGates';
 
@@ -173,6 +173,22 @@ async function pick(all: Array<{ id?: string; token: string; tier: LicenseTier }
   const held = getActiveLicenseInfo();
   let refused: { tier: LicenseTier; error: string } | null = null;
   for (const k of offered) {
+    // The held key signed again under its own id (PLAN.md 45a-2): a moiré pack bought
+    // on top of Home, or refunded, re-signs the Home key with its `packs` changed and
+    // keeps the id, so the rank test below would keep the old token, which still
+    // verifies but names the old packs. Read the listed token's packs and take it when
+    // they differ; a token that cannot be read leaves the held key as it is. An upgrade
+    // signs the Pro key under the Home's id too, with the same packs, so a higher tier
+    // under the same id is taken as well; a lower one never is (this path must not
+    // downgrade a copy that holds Pro while the account lists a stale Home).
+    if (held.valid && k.id && k.id === held.id) {
+      const same = await verifyLicenseKey(k.token);
+      if (!same.valid) continue;
+      if (!sameIdKeyWins(held, same.payload)) return { state: 'active', tier: held.tier };
+      const status = await activateLocalLicenseKey(k.token);
+      if (status.valid) return { state: 'active', tier: status.tier };
+      return { state: 'active', tier: held.tier };
+    }
     if (held.valid && RANK[held.tier] >= RANK[k.tier]) return { state: 'active', tier: held.tier };
     const checked = await verifyLicenseKey(k.token);
     if (!checked.valid) {

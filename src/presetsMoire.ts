@@ -1,4 +1,5 @@
 import type { VisualizerSettings } from './types';
+import type { Preset } from './presets';
 
 /**
  * The moiré pack's looks (PLAN 45a): seven of the house looks with a pair of
@@ -48,25 +49,35 @@ export const MOIRE_LOOKS: readonly {
       slow, and Curl (the waves' height) at 0.4 is the clip's. The kick cord
       is Star's: on Waves the Curl is the height of the waves, so a kick
       lifts them and the swells jump with it.
+      28i-7 (film of 2026-11-11): on Classic's dyes it read as Star's rainbow
+      grid. It has the sea's dyes now (presetPlate.ts), and a coarser sheet
+      turning slower, so the swells are longer and slower.
     */
     id: 'moire-waves',
     name: 'Moiré Waves',
-    description: 'Two wave sheets turning slowly against each other: their crests beat into broad swells that roll across the dye. A kick lifts the waves.',
+    description: 'Two wave sheets turning slowly against each other over sea-blue dye: their crests beat into long swells that roll across the plate. A kick lifts the waves.',
     from: 'classic',
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'waves', moireSheetB: 'waves', moireFlip: false,
-      moireDensity: 40, moireAngle: 2, moireSpin: 0.2, moireCurl: 0.4, moireGap: 3,
+      moireDensity: 30, moireAngle: 1.5, moireSpin: 0.12, moireCurl: 0.4, moireGap: 3,
       sceneMappings: [{ source: 'hits', feature: 'kickHit', setting: 'moireCurl', depth: 0.06 }],
     },
   },
   {
+    /*
+      28i-7 (film of 2026-11-11): thin dim purple rings, near black for 37 s,
+      and the same ring disc as Song Groove. Wider rings (a coarser sheet),
+      slid three times as far, so the fringes' centre sits out toward the
+      edge and the rings come in from it as a dropped stone's do; a pond's
+      dyes of its own (presetPlate.ts), and Clock Glass's larger dish.
+    */
     id: 'moire-ripple',
     name: 'Moiré Ripple',
-    description: 'Two ring sheets slid a little apart: curved fringes like a pond, and every pool of dye bends them. The bass slides the top sheet.',
+    description: 'Two ring sheets slid apart: rings roll in from the edge like a pond after a stone, over teal water and bright oil. The bass slides the top sheet.',
     from: 'clock-glass',
     settings: {
       lampGround: 1, moireAmount: 1, moireSheetA: 'rings', moireSheetB: 'rings', moireFlip: false,
-      moireDensity: 44, moireAngle: 0, moireSlide: 0.035, moireGap: 5,
+      moireDensity: 34, moireAngle: 0, moireSlide: 0.09, moireGap: 5,
       sceneMappings: [{ source: 'bands', feature: 'bass', setting: 'moireSlide', depth: 0.05 }],
     },
   },
@@ -112,3 +123,24 @@ export const MOIRE_LOOKS: readonly {
     },
   },
 ];
+
+/*
+  The moiré pack's looks (PLAN 45a), each laid over the look it starts from
+  (moved here from presets.ts, which calls it; PLAN 38u-5 needed the room). Its cords are that look's, a sheet's cord in the place of
+  the last: a look carries two or three fast cords (PLAN 28i-3b, `npm run
+  soundpatch`); the sheet's added to the house look's three made four, too
+  many to read on the wall. A pack look laid over a look with areas adds
+  none: its areas' cords are the music there, and a plate-wide one beside
+  them is the redundancy 28i-3b turns away. The plate itself (dyes, pours,
+  dish, areas) is the house look's under the pack look's id (presetPlate.ts).
+*/
+export function layMoireLooks(looks: Preset[]): void {
+  for (const m of MOIRE_LOOKS) {
+    const from = looks.find(p => p.id === m.from);
+    if (!from) continue;
+    const own = m.settings.sceneMappings ?? [];
+    const house = from.settings.sceneMappings ?? [];
+    const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
+    looks.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
+  }
+}

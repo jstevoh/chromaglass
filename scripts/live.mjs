@@ -55,6 +55,10 @@
  *                block and one codec frame (10 ms + 21 ms for AAC, 20 for
  *                Opus): the two clocks agree, whatever the machine's stalls
  *                did to the frame rate around a flash
+ *   the rate     the encoder, through the stream's own configuration at
+ *                1920x1080 and 60 fps, makes the rate it is asked for on a
+ *                moving picture: the stream's own (14 Mb/s) and Twitch's
+ *                ceiling (6), each within -15% / +10% (37x-4h)
  *   bookkeeping  the client answered the server's ping and acknowledged its
  *                bytes when asked, and its own counts match the server's
  *   a bad key    a stream whose key the server refuses fails with the
@@ -230,6 +234,13 @@ try {
   const rate = enoughVideo ? (s.video.frames - 1) / videoSpan : 0;
   const vGaps = videoTags.slice(1).map((t, i) => t.timestamp - videoTags[i].timestamp);
   check('frames at the stream\'s rate', enoughVideo && rate >= FPS * 0.8 && rate <= FPS * 1.05, `${fmt(rate)} fps over ${fmt(videoSpan)} s (${s.video.frames} frames; the page skipped ${live.skipped})`);
+  // What the stream's video carried against what it asked (37x-4h), printed
+  // and not judged: the lab's plate redraws a few times in ten seconds on
+  // software WebGPU, and a CBR encoder that does not pad leaves a near-still
+  // picture far under its rate (64 kb/s of 1500, first run). The encoder's
+  // rate is judged on a moving picture below ("the encoder makes the rate").
+  const videoBytes = videoTags.reduce((n, t) => n + t.body.length, 0);
+  console.log(`  rate: ${fmt(enoughVideo && videoSpan > 0 ? videoBytes * 8 / videoSpan / 1000 : 0)} kb/s of video arrived against ${Number(m.videodatarate) || 0} asked, on the lab's plate`);
   check('every frame later than the one before', enoughVideo && vGaps.every((g) => g > 0), `smallest gap ${fmt(Math.min(...vGaps))} ms`);
   // The distribution, not the worst moment: the stream is on its clock when
   // the typical gap is a frame and nearly every gap is within two; a shared
@@ -342,6 +353,126 @@ try {
   // Bookkeeping.
   check('the client answered the server\'s ping', (first(stopped?.transport)?.pings ?? 0) >= 1 && s.pongs >= 1, `${first(stopped?.transport)?.pings} answered, ${s.pongs} heard`);
   check('the client acknowledged the server\'s bytes when asked', (first(stopped?.transport)?.acks ?? 0) >= 1 && s.acks === first(stopped?.transport)?.acks, `${first(stopped?.transport)?.acks} sent, ${s.acks} heard, window ${256} bytes`);
+
+  /*
+    Always an audio track (37x-4f). The Mac app streamed to YouTube for
+    minutes with no error and Studio showed "No data": with the sound source
+    at None the encoder had no track and the stream went out as video alone,
+    which YouTube's ingest is known not to start a broadcast from (ffmpeg's
+    test pattern, with a tone, showed at once on the same key). Our listener and
+    ffmpeg's both took the video-only stream happily, which is why no line
+    here saw it. So two short streams: one with no source at all, as the app
+    opens, and one whose source is switched off on air. Each must carry an
+    audio track from its first frame to its last with no hole a server could
+    read as the audio ending, and the track must decode: silence where there
+    is no sound, the tone where there was.
+
+    And a third (37x-4f-2): no source at Go, then a source opened on air,
+    the order a set naturally runs in (the app opens at None; the owner
+    presses Go, then starts the music). Before the fix the encoder took its
+    sound once, at Go, and this stream was silence to the end. Now the tone
+    must be heard, at its own pitch (opened at 44.1 kHz against the silent
+    track's 48, so a stream that forgot to resample it reads 239.5 Hz, not
+    220); the step it makes a second after the hand-over must land on the
+    stream's clock where the page made it, within the click line's 30 ms (a
+    hole or a cut at the switch moves all the sound after it against the
+    picture, since the encoder stamps by sample count); and the track must
+    run to the stream's last frame, not short of it by whatever went
+    missing.
+  */
+  for (const kind of ['no source', 'source off on air', 'source opened on air']) {
+    const key = { 'no source': 'check-stream-key-silent', 'source off on air': 'check-stream-key-ended', 'source opened on air': 'check-stream-key-opened' }[kind];
+    const opens = kind === 'source opened on air';
+    const RUN_MS = 6000, END_MS = 2500;
+    let opened = null;
+    await page.evaluate(([url, k, fps, c, silent]) => window.liveLab.start(url, [{ key: k }], fps, c ?? undefined, 700, silent), [listener.url, key, FPS, CODEC, kind !== 'source off on air']);
+    if (kind === 'source off on air') { await page.waitForTimeout(END_MS); await page.evaluate(() => window.liveLab.endTone()); await page.waitForTimeout(RUN_MS - END_MS); }
+    else if (opens) { await page.waitForTimeout(END_MS); opened = await page.evaluate(() => window.liveLab.openTone(44100)); await page.waitForTimeout(RUN_MS - END_MS); }
+    else await page.waitForTimeout(RUN_MS);
+    const st = await page.evaluate(() => window.liveLab.stop());
+    await new Promise((r) => setTimeout(r, 500));
+    const conn = byKey.get(key);
+    const tg = (conn?.tags ?? []).map((t) => ({ ...t, d: describeTag(t.type, t.body) }));
+    const vt = tg.filter((t) => t.d.kind === 'video' && !t.d.header), at = tg.filter((t) => t.d.kind === 'audio' && !t.d.header);
+    const aHead = tg.findIndex((t) => t.d.kind === 'audio' && t.d.header), vHead = tg.findIndex((t) => t.d.kind === 'video' && t.d.header);
+    const aFirst = tg.findIndex((t) => t.d.kind === 'audio' && !t.d.header);
+    const gaps = at.slice(1).map((t, i) => t.timestamp - at[i].timestamp);
+    const maxGap = gaps.length ? Math.max(...gaps) : Infinity;
+    const meta = conn?.meta ?? {};
+    const span = vt.length > 1 ? `${vt[0].timestamp}..${vt[vt.length - 1].timestamp}` : 'none';
+    const aspan = at.length > 1 ? `${at[0].timestamp}..${at[at.length - 1].timestamp}` : 'none';
+    const covers = vt.length > FPS && at.length > 0 && at[0].timestamp <= vt[0].timestamp + 200 && at[at.length - 1].timestamp >= vt[vt.length - 1].timestamp - 300;
+    check(`${kind}: the stream still carries an audio track, named in onMetaData, from the first frame to the last with no hole`, !!conn && meta.audiocodecid !== undefined && aHead >= 0 && aHead < aFirst && vHead >= 0 && covers && maxGap <= 100 && st?.audioCodec,
+      `${st?.audioCodec ?? 'no'} audio, onMetaData audiocodecid ${meta.audiocodecid ?? 'none'}; video ${span} ms, audio ${aspan} ms in ${at.length} packets, widest gap ${Number.isFinite(maxGap) ? maxGap : '-'} ms`);
+    if (!conn || vHead < 0 || aHead < 0 || !at.length) continue;
+    const rate = Number(meta.audiosamplerate) || setup.sampleRate;
+    const dec = await page.evaluate(([v, a]) => window.liveLab.decode(v, a), [
+      { description: tg[vHead].d.payload.toString('base64'), frames: vt.map((t) => ({ ts: t.timestamp, key: t.d.key, data: t.d.payload.toString('base64') })) },
+      { codec: tg[aHead].d.codec, description: tg[aHead].d.payload.toString('base64'), sampleRate: rate, channels: meta.stereo ? 2 : 1, packets: at.map((t) => ({ ts: t.timestamp, data: t.d.payload.toString('base64') })) },
+    ]);
+    // The tone is 0.05 of full scale (RMS 0.035); silence is zeros, which an AAC or Opus round trip leaves under a thousandth.
+    const loud = (l) => l.rms > 0.01, quiet = (l) => l.rms < 0.001;
+    const lv = dec.levels ?? [];
+    const before = lv.filter((l) => l.ts > 300 && l.ts < END_MS - 300), after = lv.filter((l) => l.ts > END_MS + 700);
+    const audioSpan = (at[at.length - 1].timestamp - at[0].timestamp) / 1000;
+    const whole = !dec.audioError && Math.abs(dec.audioSeconds - audioSpan) <= 0.15;
+    if (opens) {
+      // Before the hand-over, silence; from 300 ms after it, the tone, at 220 Hz; and where it starts on the stream's clock, the decoder's priming set back.
+      const om = opened?.openedMs ?? NaN;
+      const sm = opened?.stepMs ?? NaN;
+      const pre = lv.filter((l) => l.ts > 300 && l.ts < sm - 100), post = lv.filter((l) => l.ts > sm + 300);
+      const prime = dec.primingMs ?? 0;
+      const onset = lv.find((l) => l.ts > om - 1000 && loud(l));
+      const onsetMs = onset ? onset.ts - prime : NaN;
+      const hz = median((dec.pitch ?? []).filter((p) => p.ts > sm + 300).map((p) => p.hz));
+      check(`${kind}: the audio track decodes, silence until the source's tone and the tone from then on, at its own pitch`,
+        whole && pre.length > 0 && pre.every(quiet) && post.length > 0 && post.filter(loud).length >= 0.95 * post.length && Math.abs(hz - 220) <= 3,
+        dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; before ${pre.filter(quiet).length}/${pre.length} quiet, after ${post.filter(loud).length}/${post.length} loud; pitch ${fmt(hz, 1)} Hz (220 sent from ${opened?.rate} Hz into a ${rate} Hz track)`);
+      check(`${kind}: the tone's step lands on the stream's clock where the page made it, within an audio block and a codec frame (±30 ms)`, Number.isFinite(onsetMs) && Math.abs(onsetMs - sm) <= 30,
+        `handed over at ${fmt(om, 0)} ms, stepped at ${fmt(sm, 0)} ms, heard from ${fmt(onsetMs, 0)} ms (${fmt(onsetMs - sm, 0)} ms; priming ${fmt(prime, 1)} ms set back)`);
+      // Packets are stamped by sample count, so a missing stretch shows as a track that ends early, not as a gap.
+      const audioEnd = at[at.length - 1].timestamp, videoEnd = vt[vt.length - 1].timestamp;
+      check(`${kind}: the audio runs to the stream's last frame, nothing lost at the switch`, audioEnd >= videoEnd - 25,
+        `last audio packet at ${audioEnd} ms, last frame at ${videoEnd} ms`);
+      check(`${kind}: the encoder says it moved to the new source once, resampling it from another rate`, st?.audioSwitches === 1 && opened?.rate !== rate && st?.audioResampled === true,
+        `${st?.audioSwitches} switches, resampled ${st?.audioResampled}, ${opened?.rate} Hz into ${rate} Hz`);
+      continue;
+    }
+    const heard = kind === 'no source'
+      ? lv.length > 0 && lv.every(quiet)
+      : before.length > 0 && after.length > 0 && before.filter(loud).length >= 0.9 * before.length && after.every(quiet);
+    check(`${kind}: the audio track decodes, ${kind === 'no source' ? 'silence throughout' : 'the tone until it was switched off, silence after'}`, whole && heard,
+      dec.audioError ?? `${fmt(dec.audioSeconds, 2)} s decoded of ${fmt(audioSpan, 2)} s; ${kind === 'no source' ? `loudest ${fmt(Math.max(...lv.map((l) => l.rms)), 4)}` : `before ${before.filter(loud).length}/${before.length} loud, after ${after.filter(quiet).length}/${after.length} quiet`}`);
+  }
+
+  // The rate (37x-4h). The owner saw the stream softer than the app, and
+  // the stream's picture is what its rate lets through: 6.2 Mb/s at 1080p30
+  // before this, 14 Mb/s at 1080p60 now. A rate set is only a promise (an
+  // encoder that ignored it, took a VBR hint, or met a cap of its own would
+  // still pass every line above), so this measures what the encoder makes
+  // through the stream's own configuration (liveVideoConfig), at the size
+  // the show streams, on a picture that moves everywhere as the show's does
+  // (live-entry.ts's rateProbe: on it the encoder makes 30 Mb/s when asked
+  // for 30, so the picture has more to say than the rates asked and what
+  // comes out is the encoder's rate control, not the picture's limit).
+  // Two rates: the stream's own at 1080p60, and Twitch's 6 Mb/s ceiling on
+  // the same size, so a rate stuck at one value fails one of them. Over 3
+  // seconds by the stream's timestamps; within -15% / +10%: CBR lands within
+  // a few percent (98% here), and an encoder at half or double is a
+  // stream that is not what the platform was told. Each in constant mode
+  // as the browser echoes it (a VBR encoder can hit the average too: the
+  // check-skeptic's control, 13,674 kb/s in VBR). Then the same picture at
+  // 40 Mb/s, printed: on openh264 it makes 39.7, so a red line on another
+  // encoder (the Mac's) says whether the encoder undershot or the picture
+  // ran out of things to say.
+  for (const [label, bitrate] of [['the stream\'s own rate', undefined], ['Twitch\'s ceiling', 6_000_000]]) {
+    const r = await page.evaluate(([b]) => window.liveLab.rateProbe(1920, 1080, 60, 3, b), [bitrate]);
+    const askedKbps = r.asked / 1000, ratio = r.madeKbps / askedKbps;
+    check(`the encoder makes the rate it is asked for at 1080p60, ${label}`, !r.error && r.mode === 'constant' && r.frames >= 170 && (bitrate !== undefined || askedKbps >= 13000) && ratio >= 0.85 && ratio <= 1.1 && r.restKbps >= askedKbps * 0.85,
+      r.error ?? `${fmt(r.madeKbps)} kb/s made (${fmt(r.restKbps)} after the first second) of ${fmt(askedKbps)} asked, ${fmt(ratio * 100)}%, ${r.frames} frames, ${r.keyframes} key, ${r.mode ?? 'no'} mode, ${r.acceleration}, ${fmt(r.ms / 1000)} s`);
+  }
+  const roomy = await page.evaluate(() => window.liveLab.rateProbe(1920, 1080, 60, 3, 40_000_000));
+  console.log(`  rate headroom: the probe's picture at 40,000 kb/s asked made ${fmt(roomy.madeKbps)} (${roomy.acceleration}${roomy.error ? `, ${roomy.error}` : ''})`);
 
   // A bad key.
   const bad = new LiveClient({ url: listener.url, key: 'wrong-key', meta: {} });

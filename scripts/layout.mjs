@@ -417,7 +417,7 @@ try {
     // section itself (with that section in it), or the desk panel's own list.
     const OWN_BODY = { cues: 'cue-list', rides: 'rides', recipe: 'recipe', bottles: 'bench-left', dyes: 'dye-natural', tools: 'tool-segmented', phone: 'phone-link', mixer: 'deck-mixer', score: 'song-score',
       // The screens that were the Sequence and Sound chips', drawn in a panel (`Sheet embed`).
-      songs: 'songs-panel-box', sequences: 'sequencer-panel-box', player: 'sound-panel-box' };
+      songs: 'songs-panel-box', sequences: 'sequencer-panel-box' };
     // Why each one failed, so a red run says which of three things it was:
     // the panel never reached the deck, it did and drew no body, or the body
     // is there and has no height.
@@ -431,9 +431,10 @@ try {
       return h < 8 ? `${id} (${Math.round(h)}px tall)` : null;
     }).filter(Boolean), { ids, own: OWN_BODY });
     const failedPanels = await page.locator('[data-testid="desk-deck"] [data-testid="panel-failed"]').count();
-    // 35: the eleven desk panels (the Score joined them, PLAN 28h, and Songs,
-    // Sequences and Music & Drone when the tabs became the owner's) and the
-    // twenty-four settings sections. Before those three it was 32, before the Score 31, and it was
+    // 34: the ten desk panels (the Score joined them, PLAN 28h, and Songs and
+    // Sequences when the tabs became the owner's; Music & Drone too, until it
+    // became the top of Sound, PLAN 35c-7) and the twenty-four settings
+    // sections. Before those it was 32, before the Score 31, and it was
     // 33 until Sound Mappings and Heat Slide were folded into Sound and Fluid
     // Physics (2026-10-10; `npm run desklayout` holds that), and a browser
     // listing fewer has lost a panel.
@@ -441,9 +442,9 @@ try {
     const bare = ids.filter(id => id !== 'phone' && !(deck.perPanel[id] > 0));
     await noteIds();
     check('every panel there is, docked, draws its own body, readable and big enough to use',
-      stageGone && onLoadin && reloaded && ids.length >= 35 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
+      stageGone && onLoadin && reloaded && ids.length >= 34 && bodies.length === 0 && failedPanels === 0 && bare.length === 0 && deck.bad.length === 0,
       [!stageGone && 'the Stage sheet never closed', !onLoadin && 'Setup never came up', !reloaded && 'not on Setup after the reload',
-        ids.length < 35 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
+        ids.length < 34 && `the browser lists ${ids.length} panels`, bodies.length && `no body: ${bodies}`, failedPanels && `${failedPanels} failed`, bare.length && `no controls: ${bare}`, deck.bad.slice(0, 6).join(', ')].filter(Boolean).join('; ')
         || `${ids.length} panels, ${deck.n} controls`);
     await page.evaluate(() => localStorage.removeItem('chromaglass-desk-tabs'));
     await page.reload({ waitUntil: 'networkidle' });

@@ -17,12 +17,11 @@
 import { layFinger } from '../lib/handSolid';
 import { layBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH } from '../lib/handCarry';
-import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
 import { PRESET_CONTRACTS, plateLook } from '../presetPlate';
-import { clockGlassBodies, clockGlassCell, splodascopeCell, splodascopeDiscs } from '../lib/oilLay';
+import { layCrowd, layLavaLamp, layOilShare, layFoamCells } from '../lib/oilLay';
 import { plateAreas, areaFamily, OWN_SEED_AREAS, type PlateArea } from '../lib/plateAreas';
 import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
@@ -47,8 +46,9 @@ import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
 import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
-import { SIM_STEP } from './stepping';
+import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
+import { besideStep } from '../gpu/besidePlate';
 import { rimCount, rimMask } from '../lib/rimMask';
 
 /** Held to 0..1, absent as 0 (the params builder's dials and a score of others). */
@@ -253,10 +253,12 @@ export class FluidSimulation {
   private sheetLaid = false;
   /** Sound Drive's bass, as a hand on the glass (lib/squish.ts `BassPress`, PLAN 27e). */
   readonly bassPress = new BassPress();
+  /** Hands held on the glass this step (0..1 plate coords), blocking the fan's air over the spot (PLAN 36e-2). */
+  boilHolds: { x: number; y: number; radius?: number }[] = [];
   /** The last lift this plate laid: where, and how many cells it touched. */
   lastLift: { x: number; y: number; cells: number } | null = null;
   /** Forget the last press, as a fresh plate has none: a song render starts here, on its own clock. */
-  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null; }
+  forgetPress(): void { this.squishSteps = 0; this.squishLastAt = 0; this.squishLastStep = -1; this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.boilHolds = []; this.lastLift = null; }
   /**
    * Forget everything this plate carries from one frame to the next that is
    * not the liquid itself: a song render starts here (VisualizerRender.begin),
@@ -325,6 +327,7 @@ export class FluidSimulation {
   /** Solver steps taken, so per-press counting is per step, not per call. */
   private stepIndex = 0;
   private dyeAdd: Float32Array;     // interleaved upload buffers
+  private oilAdd: Float32Array | null = null; // the lay's oil colour (layOilShare)
   private velAdd: Float32Array;
   /** The fingers in the liquid this step on a thin gap (lib/handSolid.ts), made when one first touches it. */
   private hands: Float32Array | null = null;
@@ -787,7 +790,8 @@ export class FluidSimulation {
     this.videoLaid = false;
     const a = { ...this.dyeTarget(), vx: this.vx, vy: this.vy, temp: this.temp, gap: this.gap, dyeAdd: this.dyeAdd, velAdd: this.velAdd, hands: this.handsLaid ? this.hands : null, breath: this.breathLaid ? this.breath : null };
     const runs = packRows(a, rows);
-    gpu.applyDeltas(a.dyeAdd, a.velAdd, a.mul, dt, a.hands, a.breath, this.sheetLaid ? this.sheetGap : null, rows);
+    gpu.applyDeltas(a.dyeAdd, a.velAdd, a.mul, dt, a.hands, a.breath, this.sheetLaid ? this.sheetGap : null, rows, this.oilAdd);
+    this.oilAdd = null;
     if (this.dyeMovePending) { this.dyeMovePending = false; this.dyeMoveAfter = gpu.rbDyeIssued + 1; }
     restRows(a, runs);
     this.handsLaid = this.breathLaid = false;
@@ -1138,6 +1142,12 @@ export class FluidSimulation {
     this.densityB[index] += amount * ab;
   }
 
+  /** Dye laid in the oil as its own colour (src/lib/oilLay.ts layOilShare, PLAN 47z-1). */
+  addOilDensity(x: number, y: number, amount: number, r = 1, g = 1, b = 1) {
+    this.addDensity(x, y, amount, r, g, b);
+    if (this.gpu) this.oilAdd = layOilShare(this.oilAdd, x + y * this.size, amount, dyeAbsorbances(r, g, b), GRID_AREA);
+  }
+
   addVelocity(x: number, y: number, amountX: number, amountY: number) {
     const index = x + y * this.size;
     this.rows.add(y, y);
@@ -1370,7 +1380,7 @@ export class FluidSimulation {
     const cx = S / 2, cy = S / 2;
     const k = GRID_SCALE; // absolute distances below were tuned on a 128 grid
 
-    const harmony = PRESET_CONTRACTS[presetId] || pickHarmony();
+    const harmony = PRESET_CONTRACTS[look] || pickHarmony();
     const col = (i: number) => PALETTE_RGB[harmony[i % harmony.length]];
 
     const dishSum = () => {
@@ -1430,8 +1440,8 @@ export class FluidSimulation {
 
     switch (presetId) {
       case 'galaxy': {
-        // Bright core + compact two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
-        this.splatBlob(cx, cy, 4.2, 3.8, 0.85, 0.92, 1.0);
+        // Gold core (28i-7) + two-arm spiral so the outer cosmos stays dark (PLAN 28i-2).
+        this.splatBlob(cx, cy, 4.2, 3.8, 1.0, 0.8, 0.45);
         this.splatBlob(cx, cy, 8.5, 1.8, 0.5, 0.25, 0.85);
         // Two logarithmic spiral arms
         for (let arm = 0; arm < 2; arm++) {
@@ -1772,8 +1782,7 @@ export class FluidSimulation {
       }
 
       case 'soap-film': {
-        // One unbroken sheet. Everything this preset does it does by tearing
-        // holes in that sheet, so the seed is the sheet and nothing else.
+        // The film is the frame's own (32d); this is the dye seen through it.
         for (let i = 0; i < 3; i++) {
           const c = col(i);
           this.splatBlob(cx + this.rng.centred() * S * 0.28, cy + this.rng.centred() * S * 0.28,
@@ -1938,59 +1947,27 @@ export class FluidSimulation {
         break;
       }
 
-      case 'clock-glass': {
+      case 'clock-glass':
+      case 'splodascope': {
         /*
-          A clock-glass dish is coloured water and oil that will not mix
-          (src/lib/oilLay.ts, and why): the water is the first dye, laid wide
-          and deepest in the middle where the bowed glasses hold the most,
-          and bodies of oil are laid over it across the dish, each with one
-          of the other dyes in it. With Oil Bodies on (the look's) each body
-          keeps its colour while it moves, and two only mix where they merge,
-          as two dyed oils do. The oil is laid only where the solver is there
-          to take it; before it is, the colours still land, as spots in the
-          water.
+          Coloured water and oil that will not mix, each body of oil laid with
+          one of the other dyes as its own colour (src/lib/oilLay.ts, and why;
+          layCrowd). With Oil Bodies on (the look's) each body keeps its colour
+          while it moves; Splodascope's Film Hold keeps its crowd apart where
+          they touch. The oil is laid only where the solver is there to take
+          it; before it is, the colours still land, as spots in the water.
         */
         const water = col(0);
-        const bodies = clockGlassBodies(this.rng.float, harmony.length);
-        /*
-          Each cell as clockGlassCell lays it (and why): a body's colour in
-          its oil and nowhere else, the water's wash in what is left.
-        */
-        const g = this.gpu;
-        for (const b of bodies) g?.addMix?.(b.x, b.y, b.r, { oil: 1 });
-        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
-          const cell = clockGlassCell((x + 0.5) / S, (y + 0.5) / S, S, bodies);
-          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
-          if (cell.dye > 0) {
-            const c = col(bodies[cell.body].dye);
-            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
-          }
-        }
+        layCrowd(look === 'clock-glass' ? look : 'splodascope', S, this.rng.float, harmony.length, (x, y, r, oil) => this.gpu?.addMix?.(x, y, r, { oil }),
+          (x, y, d) => this.addDensity(x, y, d, water.r, water.g, water.b),
+          (x, y, d, dye) => { const c = col(dye); this.addOilDensity(x, y, d, c.r, c.g, c.b); });
         break;
       }
 
-      case 'splodascope': {
-        /*
-          The splodascope's crowd (src/lib/oilLay.ts, and why): a blue water
-          across the dish and a packed crowd of oil drops in it, each with
-          one of the other dyes, a few big ones holding a drop of another
-          colour in a ring of water. The look's Film Hold keeps them apart
-          where they touch, and Oil Bodies keeps each one's colour its own.
-        */
-        const water = col(0);
-        const discs = splodascopeDiscs(this.rng.float, harmony.length);
-        const g = this.gpu;
-        for (const d of discs) g?.addMix?.(d.x, d.y, d.r, { oil: d.oil });
-        for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
-          const cell = splodascopeCell((x + 0.5) / S, (y + 0.5) / S, S, discs);
-          if (cell.water > 0) this.addDensity(x, y, cell.water, water.r, water.g, water.b);
-          if (cell.dye > 0) {
-            const c = col(discs[cell.disc].dye);
-            this.addDensity(x, y, cell.dye, c.r, c.g, c.b);
-          }
-        }
+      case 'foam-cells':
+        // Pressed cells across the dish, rust water in the films (layFoamCells, src/lib/oilLay.ts, says why).
+        layFoamCells(this.rng.float, harmony.length, this.gpu?.N ?? S, S, (f) => this.gpu?.layOil?.(f), (x, y, d, k) => { const c = col(k); this.addDensity(x, y, d, c.r, c.g, c.b); });
         break;
-      }
 
       case 'turing-print': {
         // Coloured ink pools across the plate so the reaction-diffusion print
@@ -2050,25 +2027,9 @@ export class FluidSimulation {
       }
 
       case 'lava-lamp': {
-        // Translucent wax plumes (seedMean ~0.52 so Beer-Lambert transmission stays
-        // bright at 8 s without opaque blackout) with warm rising lower blobs and
-        // sinking upper blobs so convection is already underway by 8 s and sustains
-        // >=0.02 motion through 40 s at luma <=0.60 (PLAN 28i-2).
-        const blobs: [number, number, number, number, number, number][] = [
-          [0.50, 0.66, 14, 0, 14, -0.10],
-          [0.34, 0.62, 13, 1, 12, -0.08],
-          [0.66, 0.60, 13, 2, 12, -0.08],
-          [0.48, 0.46, 13, 0,  6, -0.05],
-          [0.34, 0.36, 12, 1,  0,  0.08],
-          [0.66, 0.36, 12, 2,  0,  0.08],
-        ];
-        for (const [fx, fy, rad, ci, heat, vy] of blobs) {
-          const c = col(ci);
-          const x = fx * S, y = fy * S;
-          this.splatBlob(x, y, rad, 1.15, c.r, c.g, c.b);
-          if (heat > 0) this.addTemp(Math.floor(x), Math.floor(y), heat);
-          this.addVelocity(Math.floor(x), Math.floor(y), 0, vy);
-        }
+        // The wax as a liquid of its own, a pool and three bodies (PLAN 27f-9c; src/lib/oilLay.ts says why).
+        const c = col(0);
+        layLavaLamp(S, (x, y, r) => this.gpu?.addMix?.(x, y, r, { oil: 1 }), (x, y, d) => this.addDensity(x, y, d, c.r, c.g, c.b));
         break;
       }
 
@@ -2599,10 +2560,9 @@ export class FluidSimulation {
   }
 
   /*
-    `dye`, the share of `amount` that is colour: 0 for a clear liquid poured
-    with no dye in it (lib/liquidColour.ts). A drop's impact is its size, not
-    its colour, so a clear drop from a height still splashes; only what it
-    lays is scaled.
+    `dye`, the share of `amount` that is colour, in every style: 0 for a clear
+    liquid (lib/liquidColour.ts) or the music on a reagent (PLAN 25i-10). A
+    clear drop still splashes; only what it lays is scaled.
   */
   autoInject(style: string, x: number, y: number, amount: number, r: number, g: number, b: number, energy: number, outward = false, dye = 1) {
     const S = this.size;
@@ -2621,7 +2581,7 @@ export class FluidSimulation {
             const noise = this.rng.float();
             if (noise > 0.4) continue;
             const w = Math.pow(1 - dd / sprayR, 2) * 0.25 * (1 - noise);
-            this.addDensity(px, py, amount * w, r, g, b);
+            this.addDensity(px, py, amount * dye * w, r, g, b);
           }
         }
         break;
@@ -2641,7 +2601,7 @@ export class FluidSimulation {
               const dd = Math.sqrt(ddx * ddx + ddy * ddy);
               if (dd > dropR) continue;
               const nx = clamp(px + ddx, 1, S - 2), ny = clamp(py + ddy, 1, S - 2);
-              this.addDensity(nx, ny, amount * (1 - dd / dropR) * 0.6, r, g, b);
+              this.addDensity(nx, ny, amount * dye * (1 - dd / dropR) * 0.6, r, g, b);
             }
           }
           this.addVelocity(px, py, Math.cos(a) * (0.3 + energy * 0.5), Math.sin(a) * (0.3 + energy * 0.5));
@@ -2656,7 +2616,7 @@ export class FluidSimulation {
             if (dd > pourR) continue;
             const nx = clamp(x + ddx, 1, S - 2), ny = clamp(y + ddy, 1, S - 2);
             const w = Math.pow(1 - dd / pourR, 1.5);
-            this.addDensity(nx, ny, amount * 1.3 * w, r, g, b);
+            this.addDensity(nx, ny, amount * dye * 1.3 * w, r, g, b);
             /*
               `outward` is a hand's Pour from anywhere but the mouse, which
               spreads from where it lands as the mouse's does (see the hand
@@ -2679,7 +2639,7 @@ export class FluidSimulation {
           const sx = Math.floor(x + dx * t), sy = Math.floor(y + dy * t);
           if (sx < 1 || sx >= S - 1 || sy < 1 || sy >= S - 1) continue;
           const w = 1.0 - Math.abs(t) / len;
-          this.addDensity(sx, sy, amount * 0.35 * w, r, g, b);
+          this.addDensity(sx, sy, amount * dye * 0.35 * w, r, g, b);
           this.addVelocity(sx, sy, dx * 0.2 * w, dy * 0.2 * w);
         }
         break;
@@ -2781,7 +2741,7 @@ export class FluidSimulation {
     }
   }
 
-  step(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number) {
+  step(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number) {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
@@ -2877,7 +2837,7 @@ export class FluidSimulation {
     this.stepIndex++;
     this.liftStep();
 
-    const p = this.deriveStep(settings, audioData, time, noise2D);
+    const p = this.deriveStep(settings, time, noise2D);
     this.lastStep = p;
     // The closeup's cells ride this: as far as this step moves the dye.
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
@@ -2913,9 +2873,6 @@ export class FluidSimulation {
     // 6.5. Multi-octave curl turbulence — detail at every scale
     this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
 
-    // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
-    if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
-
     // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
     this.applyImmiscibility(p.immiscibility, time, noise2D);
 
@@ -2924,7 +2881,7 @@ export class FluidSimulation {
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
     if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
-    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
+    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
     // 8.9. The lasting current joins the flow the dye is about to ride.
@@ -3074,7 +3031,7 @@ export class FluidSimulation {
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level } : null);
   }
 
-  private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
+  private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
 
@@ -3107,24 +3064,29 @@ export class FluidSimulation {
       multiplies whatever the dial says, by at most two: audio energy still
       breathes extra stir into the field so the liquid churns with the
       music, and a loud track still cannot triple a calm look's (lib/stir.ts).
+
+      And the music is not read here at all now (PLAN 38u-4, 38u-5; the
+      physics audit, 2026-11-13). That multiplier was the analyser's energy
+      taken straight into this step, and beside it mid and treble drove
+      "spin", a second noise curl laid wherever there was dye: two ways the
+      band moved the liquid with no cord, no patch and no control, on a
+      plate whose rule is that sound reaches it only through those. The
+      owner chose to route them through cords. So the step takes no sound:
+      the dial it is handed is the one the patch bay folded, each look
+      carries the sound's mids on Turbulence as a cord (lib/stir.ts
+      `stirCord`, at the depth that keeps its stir with a band about where
+      it was), and with that cord pulled out a loud band stirs nothing.
+      `npm run musicstir` holds all of it.
     */
-    let turbScale = stirOf(settings.turbulenceScale ?? 0, audioData ? audioData.energy : null, settings.audioImpact ?? 0.45);
+    let turbScale = stirOf(settings.turbulenceScale ?? 0);
     if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
-    let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
-    if (audioData) {
-      const impact = settings.audioImpact ?? 0.45;
-      const mid01 = Math.min(1, audioData.mid / 70);
-      const treble01 = Math.min(1, audioData.treble / 70);
-      const s = (mid01 * 0.6 + treble01 * 0.4) * impact;
-      if (s > 0.08) spin = s * 0.03;
-    }
     /*
       Vibration: a standing ripple on the per-step channel, the plate being
       tapped. It was energy × setting × 0.002 behind two gates (the setting above
       0.3, the result above 0.001), which with the analyser's energy topping out
       at 0.85 meant nothing below about 0.6 and nothing at all without a mic.
-      Now a floor that works in silence and swells with the music.
+      Then a floor that works in silence, swelling with the music (see below).
 
       The first version of this ran the wavelength down to 4.6 cells at the top
       and pushed hard enough to move the dye most of a cell each way — and a
@@ -3139,8 +3101,14 @@ export class FluidSimulation {
     {
       const vf = c01(settings.vibrationFrequency);
       if (vf > 0.005) {
-        const energy = audioData ? Math.min(1, audioData.energy) : 0;
-        vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
+        /*
+          It swelled with the analyser's energy, 0.3 in silence to 1 at the
+          loudest, read straight into the step: sound on the plate with no
+          cord (PLAN 38u-4). The push is the dial's alone now, at 0.65, the
+          middle of that swing and about where a band at an ordinary level
+          held it; a cord on Vibration is how the music swells it.
+        */
+        vibIntensity = vf * 0.65 * 0.15;
         vibFrequency = 2 * (0.12 + vf * 0.3);
       }
     }
@@ -3325,7 +3293,7 @@ export class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(c01(settings.sharpness)),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, immiscibility,
+      turbScale, turbDetail, immiscibility,
       /*
         The two glasses (2026-09-21).
 
@@ -3371,6 +3339,8 @@ export class FluidSimulation {
       vorticity: Math.max(0, Math.min(2, settings.vorticityConfinement ?? 0)),
       oilTension: c01(settings.oilTension),
       oilBodies: c01(settings.oilBodies),
+      // The oil's weight against the water (PLAN 27f-9c): −0.05, the mineral oil's lightness, where a look leaves it out.
+      oilWeight: Math.max(-1, Math.min(1, Number.isFinite(settings.oilWeight) ? settings.oilWeight : -0.05)),
       filmHold: c01(settings.filmHold),
       surfactantFlow: c01(settings.surfactantFlow),
       soapBreakdown: c01(settings.soapBreakdown),
@@ -3432,8 +3402,7 @@ export class FluidSimulation {
         No stir for the look's motor (PLAN 22j). The current had one, a
         swirl round the middle at rotationSpeed × 30, fastest at the centre
         and nothing at the rim: a stand-in from when the motor turned the
-        picture rigidly and nothing else made the liquid go round. The motor
-        turns the dish now (22h, dishFrame), and a dish turning steadily
+        picture rigidly. The motor turns the dish now (22h, dishFrame), and a dish turning steadily
         under its liquid drags it round through the gap until it turns with
         the glass, after which there is nothing left to stir: the picture
         turns, and the liquid in it is still. What the glass does to the
@@ -3460,6 +3429,9 @@ export class FluidSimulation {
       particleLife: 4,
       meanDensity: this.meanDensity,
       maxCurrent: 0.75 / Math.max(1e-6, dt * Math.max(0.01, settings.advection ?? 0.45) * (GRID_SIZE - 2)),
+      heat: Math.max(0, Math.min(1, settings.heat ?? 0)),
+      boilHolds: this.boilHolds,
+      ...besideStep(settings, this.layerIndex),
     };
   }
 
@@ -3471,57 +3443,7 @@ export class FluidSimulation {
    * itself lives in cvx/cvy.
    */
   private stepCurrent(p: GpuStepParams) {
-    const M = this.CM, S = this.size;
-    const cvx = this.cvx, cvy = this.cvy, cpr = this.cpr, cdv = this.cdv;
-    for (let j = 1; j < M - 1; j++) {
-      for (let i = 1; i < M - 1; i++) {
-        const k = i + j * M;
-        const q = Math.min(S - 2, i * 2) + Math.min(S - 2, j * 2) * S;
-        const dd = Math.tanh(this.density[q] - p.meanDensity);   // saturated (see the GPU twin)
-        const upright = c01(p.plateUpright ?? 0);
-        let fx = p.rockX * dd;
-        let fy = upright * p.currentBuoy * Math.min(50, Math.max(0, this.temp[q])) + p.rockY * dd;   // Boussinesq linear in temperature, gated on upright (see the GPU twin)
-        const tx = 0.5 - (i + 0.5) / M, ty = 0.5 - (j + 0.5) / M;
-        const r = Math.sqrt(tx * tx + ty * ty);
-        if (r > 1e-4) { fx += (tx / r) * p.currentGrav * dd; fy += (ty / r) * p.currentGrav * dd; }
-        // Relax toward the flow the forces ask for (see the GPU twin).
-        let vx = cvx[k] * p.currentDamp + fx * (1 - p.currentDamp);
-        let vy = cvy[k] * p.currentDamp + fy * (1 - p.currentDamp);
-        const s = Math.sqrt(vx * vx + vy * vy);
-        if (s > p.maxCurrent) { vx *= p.maxCurrent / s; vy *= p.maxCurrent / s; }
-        cvx[k] = vx; cvy[k] = vy;
-      }
-    }
-    // Walls: no flow through them.
-    for (let i = 0; i < M; i++) { cvx[i] = cvy[i] = cvx[i + (M - 1) * M] = cvy[i + (M - 1) * M] = 0; cvx[i * M] = cvy[i * M] = cvx[M - 1 + i * M] = cvy[M - 1 + i * M] = 0; }
-    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-      const k = i + j * M;
-      cdv[k] = -0.5 * (cvx[k + 1] - cvx[k - 1] + cvy[k + M] - cvy[k - M]) / M;
-    }
-    for (let it = 0; it < 10; it++) {
-      for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-        const k = i + j * M;
-        cpr[k] = (cdv[k] + cpr[k - 1] + cpr[k + 1] + cpr[k - M] + cpr[k + M]) * 0.25;
-      }
-      for (let i = 0; i < M; i++) { cpr[i] = cpr[i + M]; cpr[i + (M - 1) * M] = cpr[i + (M - 2) * M]; cpr[i * M] = cpr[1 + i * M]; cpr[M - 1 + i * M] = cpr[M - 2 + i * M]; }
-    }
-    for (let j = 1; j < M - 1; j++) for (let i = 1; i < M - 1; i++) {
-      const k = i + j * M;
-      cvx[k] -= 0.5 * (cpr[k + 1] - cpr[k - 1]) * M;
-      cvy[k] -= 0.5 * (cpr[k + M] - cpr[k - M]) * M;
-    }
-    // Into the velocity the dye is carried by, sampled up to the logical grid.
-    for (let j = 1; j < S - 1; j++) {
-      const y = j * 0.5 - 0.25, j0 = Math.max(0, Math.min(M - 2, Math.floor(y))), fyy = c01(y - j0);
-      for (let i = 1; i < S - 1; i++) {
-        const x = i * 0.5 - 0.25, i0 = Math.max(0, Math.min(M - 2, Math.floor(x))), fxx = c01(x - i0);
-        const k = i0 + j0 * M;
-        const ux = (cvx[k] * (1 - fxx) + cvx[k + 1] * fxx) * (1 - fyy) + (cvx[k + M] * (1 - fxx) + cvx[k + M + 1] * fxx) * fyy;
-        const uy = (cvy[k] * (1 - fxx) + cvy[k + 1] * fxx) * (1 - fyy) + (cvy[k + M] * (1 - fxx) + cvy[k + M + 1] * fxx) * fyy;
-        this.vx[i + j * S] += ux;
-        this.vy[i + j * S] += uy;
-      }
-    }
+    stepCurrentCpu(this.CM, this.size, this.cvx, this.cvy, this.cpr, this.cdv, this.density, this.temp, this.vx, this.vy, p);
   }
 
   // ── Private simulation methods ─────────────────────────────────────
@@ -3627,7 +3549,7 @@ export class FluidSimulation {
     }
   }
 
-  private applySmear(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number, audioData: AudioData | null) {
+  private applySmear(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
     const smearSpeed = time * 0.3;
     const shearX = noise2D(smearSpeed, 100) * strength * 12.0 * dt;
     const shearY = noise2D(100, smearSpeed) * strength * 12.0 * dt;
@@ -3887,33 +3809,6 @@ export class FluidSimulation {
           const ux = dn_dy * amp, uy = -dn_dx * amp;
           this.vx[idx] += ux; this.vx[idx + 1] += ux; this.vx[idx + this.size] += ux; this.vx[idx + this.size + 1] += ux;
           this.vy[idx] += uy; this.vy[idx + 1] += uy; this.vy[idx + this.size] += uy; this.vy[idx + this.size + 1] += uy;
-        }
-      }
-    }
-  }
-
-  // Inject curl-noise vorticity into dense fluid regions — driven by mid/treble
-  // The same fix as the turbulence: the difference over 0.01 of noise space is
-  // divided by it, so `strength` (0–0.03) reaches an rms of about 0.4 at the top
-  // instead of a thousandth of that. Every 3rd cell, filling its 3x3 block.
-  injectVorticity(strength: number, time: number, noise2D: (x: number, y: number) => number) {
-    const step = 3;
-    const k = (strength / 0.03) * (0.4 / 3) * 100;
-    for (let j = 1; j < this.size - 3; j += step) {
-      for (let i = 1; i < this.size - 3; i += step) {
-        const idx = i + j * this.size;
-        const d = this.density[idx];
-        if (d > 0.05) {
-          // Curl noise: perpendicular to gradient of noise field
-          const n = noise2D(i * 0.025, j * 0.025 + time * 0.08);
-          const dn_dx = noise2D(i * 0.025 + 0.01, j * 0.025 + time * 0.08) - n;
-          const dn_dy = noise2D(i * 0.025, j * 0.025 + 0.01 + time * 0.08) - n;
-          const m = k * Math.min(1, d);
-          for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
-            const c = idx + a + b * this.size;
-            this.vx[c] +=  dn_dy * m;
-            this.vy[c] += -dn_dx * m;
-          }
         }
       }
     }

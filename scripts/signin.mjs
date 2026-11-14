@@ -31,9 +31,9 @@
  *      ENTRY_GROWTH_MAX bytes gzipped: the SDK is fetched beside the app, not
  *      in front of the intro
  *   3. a first visit sees the sign-in, and the plate does not start behind it
- *   4. it offers Google and an emailed link, and not Apple (the owner,
- *      2026-10-24: no Apple sign-in for now), and the Google button asks the
- *      emulator for Google
+ *   4. it offers Google, Apple and an emailed link (Apple back on, the owner
+ *      2026-11-08; PLAN 23.15), the Google button asks the emulator for
+ *      Google, and the Apple button asks for Apple with the email scope
  *   5. the emailed link signs in and the plate starts
  *   6. a returning visit goes straight to the plate: the sign-in is never
  *      drawn, not even for a frame
@@ -111,7 +111,7 @@
  */
 import { chromium } from 'playwright';
 import { launchChromium, port } from './chromium.mjs';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { spawn, execSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync, statSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { join, extname, resolve } from 'node:path';
@@ -119,6 +119,8 @@ import { tmpdir } from 'node:os';
 import { gzipSync } from 'node:zlib';
 import licenseWorker from '../server/license-worker.js';
 import { signLicenseKey } from '../server/license-key.js';
+import { createSignInHandoff, SIGNIN_HANDOFF_PATH } from '../server/signin-handoff.js';
+import { isLaptop } from '../server/laptop.js';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -202,9 +204,18 @@ const firebaseChunks = new Set(jsFiles(ON_DIST).filter(hasFirebase).map((f) => '
 
 // ── the servers ─────────────────────────────────────────────────────────────
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg', '.wasm': 'application/wasm' };
+// The Mac app's sign-in hand-off (PLAN.md 23.17f), mounted as the show server
+// mounts it, with the show server's own rule for who is the laptop
+// (server/laptop.js, imported, not copied).
+const handoff = createSignInHandoff();
 function serve(dist, port) {
   const server = createServer((req, res) => {
-    const path = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+    const url = new URL(req.url, 'http://x');
+    if (url.pathname === SIGNIN_HANDOFF_PATH) {
+      void handoff.handleRequest(req, res, url, isLaptop(req));
+      return;
+    }
+    const path = decodeURIComponent(url.pathname);
     let file = join(dist, path);
     if (!file.startsWith(dist) || !existsSync(file) || statSync(file).isDirectory()) file = join(dist, 'index.html');
     res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
@@ -389,11 +400,10 @@ async function signInByEmail(page, origin) {
   return { sent, link, back, up: back && await waitFor(() => appUp(page), BOOT_MS) };
 }
 /** Everything on the sign-in inside the screen's width, each button a thumb's height. */
-// The sign-in's buttons: Google and the emailed link. It was three with Apple,
-// which the owner took off for now (2026-10-24; line 4 fails if it comes back
-// without this changing too). 11 and 15 count up to this, so a form missing
-// one of the two still fails them.
-const PROVIDER_BUTTONS = 2;
+// The sign-in's buttons: Google, Apple and the emailed link. Apple was off from
+// 2026-10-24 to 2026-11-08 (the owner; PLAN 23.10d, 23.15), when this was two.
+// 11 and 15 count up to this, so a form missing one of the three still fails them.
+const PROVIDER_BUTTONS = 3;
 
 const fits = (page) => page.evaluate(() => {
   const W = innerWidth, H = innerHeight;
@@ -458,10 +468,13 @@ try {
 
   const providers = await page.evaluate(() => [...document.querySelectorAll('[data-cg-signin-provider]')].map((b) => b.getAttribute('data-cg-signin-provider')));
   const asksFor = {};
-  // Apple is held off (SignInScreen.tsx, APPLE_SIGN_IN; the owner, 2026-10-24),
-  // so only Google is pressed, and the line below fails if an Apple button is
-  // drawn at all: a sign-in that cannot complete is worse than none.
-  for (const id of ['google.com']) {
+  // Both providers are pressed. Apple's must also ask for the email scope:
+  // the licence is kept under the account's email (`keys:<email>`), so an
+  // Apple account made without it could never hold one. Firebase writes the
+  // provider's scopes into the handler address it opens (`scopes=email,name`),
+  // which is what is read here.
+  const scopesOf = {};
+  for (const id of ['google.com', 'apple.com']) {
     // A popup or a redirect: either is Firebase's way of sending the browser to the provider.
     const popup = ctx.waitForEvent('page', { timeout: 10_000 }).catch(() => null);
     const nav = page.waitForURL((u) => u.toString().includes(`providerId=${encodeURIComponent(id)}`) || u.toString().includes(`providerId=${id}`), { timeout: 10_000 }).then(() => page.url(), () => null);
@@ -475,9 +488,10 @@ try {
       return u;
     }), nav]);
     asksFor[id] = !!p && p.startsWith(`${EMU}/emulator/auth/handler`) && p.includes('apiKey=demo-key') && p.includes(id);
+    scopesOf[id] = p ? (new URL(p).searchParams.get('scopes') || '') : '';
     if (!page.url().startsWith(ORIGIN)) { await page.goto(ON); await waitFor(() => signinOpen(page), 30_000); }
   }
-  check('4. Google and an emailed link are offered, Apple is not, and Google goes to its provider', ['google.com', 'email'].every((p) => providers.includes(p)) && !providers.includes('apple.com') && asksFor['google.com'], `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}`);
+  check('4. Google, Apple and an emailed link are offered; Google and Apple each go to their provider, Apple asking for the email', ['google.com', 'apple.com', 'email'].every((p) => providers.includes(p)) && asksFor['google.com'] && asksFor['apple.com'] && scopesOf['apple.com'].split(',').includes('email'), `offered ${JSON.stringify(providers)}, reached ${JSON.stringify(asksFor)}, Apple's scopes "${scopesOf['apple.com']}"`);
 
   const first = await signInByEmail(page, ORIGIN);
   check('5. the emailed link signs in, lands on the page the visitor was on, and the plate starts', first.sent && first.back && first.up, `sent ${first.sent}, link ${first.link ? (first.back ? 'back to the same page' : 'to this site but not the same page') : 'none'}, plate ${first.up}`);
@@ -612,13 +626,40 @@ try {
       const buys = [...document.querySelectorAll('[data-cg-landing-buy]')];
       const buyBad = buys.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
         || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
-      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad };
+      // The moiré pack's card under them (PLAN 45a-2): its own Buy, held to the same rules, and
+      // its four pictures each loaded from a file that exists (a lazy image is asked for here by
+      // scrolling the card into view, and naturalWidth is 0 for a file that 404s).
+      const pack = [...document.querySelectorAll('[data-cg-landing-pack]')];
+      const packBad = pack.filter((a) => a.getBoundingClientRect().height < 44 || a.target !== '_blank'
+        || !/^https:\/\/chromaglass\.lemonsqueezy\.com\/checkout\/buy\/[0-9a-f-]{36}$/.test(a.getAttribute('href') || '')).length;
+      const card = document.querySelector('[data-cg-landing-moire]');
+      // The YouTube channel link in the header (PLAN 34a-8): on the first
+      // screen at every size, not pushed off a phone's width by Sign in beside
+      // it, a thumb's height, and the channel's own handle in a new tab, so a
+      // visitor who goes to watch still has the page to come back to.
+      const yt = document.querySelector('[data-cg-landing-youtube]');
+      const y = yt?.getBoundingClientRect();
+      const ytBad = !yt ? 'missing'
+        : yt.getAttribute('href') !== 'https://www.youtube.com/@Chromaglassart' ? `href ${yt.getAttribute('href')}`
+        : yt.target !== '_blank' || !/noopener/.test(yt.rel) ? 'not a new tab'
+        : y.height < 44 ? `${Math.round(y.height)} px tall`
+        : y.left < -0.5 || y.right > W + 0.5 || y.bottom > innerHeight || y.top < 0 ? 'off the first screen' : '';
+      return { over: document.documentElement.scrollWidth > W + 1 || box.scrollWidth > W + 1, h: b.height, outside: b.left < -0.5 || b.right > W + 0.5, buys: buys.length, buyBad, pack: pack.length, packBad, card: !!card, ytBad };
     }) : null;
-    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0;
-    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong` : 'landing page not drawn'}`);
+    let pics = -1;
+    if (f?.card) {
+      pics = await p.evaluate(async () => {
+        const imgs = [...document.querySelectorAll('[data-cg-landing-moire] img')];
+        imgs.forEach((i) => { i.loading = 'eager'; });
+        await Promise.all(imgs.map((i) => (i.complete ? null : new Promise((ok) => { i.onload = i.onerror = ok; }))));
+        return imgs.filter((i) => i.naturalWidth >= 960).length;
+      });
+    }
+    s.landOk = !!f && !f.over && !f.outside && f.h >= 44 && f.buys === 2 && f.buyBad === 0 && f.pack === 1 && f.packBad === 0 && pics === 4 && !f.ytBad;
+    landFit.push(`${s.name}: ${f ? `Play free ${Math.round(f.h)} px${f.outside ? ', outside the screen' : ''}${f.over ? ', page wider than the screen' : ''}; ${f.buys} Buy buttons, ${f.buyBad} wrong; moiré card ${f.card ? `${f.pack} Buy, ${f.packBad} wrong, ${pics} pictures at 960 px` : 'missing'}; YouTube link ${f.ytBad || 'ok'}` : 'landing page not drawn'}`);
     await c.close();
   }
-  check('11b. the landing page fits a laptop and a phone, upright and on its side', sizes.every((s) => s.landOk), landFit.join('; '));
+  check('11b. the landing page fits a laptop and a phone, upright and on its side, the YouTube link on its first screen', sizes.every((s) => s.landOk), landFit.join('; '));
 
   const sheet = {};
   const lit = {};
@@ -1003,6 +1044,176 @@ try {
       check('24. a refunded key: the running show stays up, the key leaves the machine, and the next start asks to buy', upAgain && retired && stayed && backToBuy && noPlate,
         `a key held before ${typeof heldBefore === 'string' && heldBefore.startsWith('cg1.')}, opened on it ${upAgain}, key taken off ${retired}, show still up ${stayed}, next start ${await step(p) ?? 'the plate'}`);
       await c.close();
+    }
+    // ── 25: a Google sign-in from the Mac app signs its window in too ─────
+    // (PLAN.md 23.17f; the owner, 2026-11-10, on 1.3.1276: "this login stuff
+    // is fucked. google is no longer there?"). The app sends Google to the real
+    // browser, which has storage of its own (a second context here). Before
+    // this, only the account's key came back: the window stayed signed out, its
+    // Google button read "Finish in your browser…" for good, and a browser tab
+    // on a Mac that already had a key never asked anyone to sign in. Here the
+    // window is the app (its shell's word `shell: 'desktop'`, and an
+    // `openInBrowser` that records the address instead of opening it), the
+    // account holds a Pro key, and the only road from the browser's sign-in to
+    // the window is the app's server (`server/signin-handoff.js`, mounted on
+    // this check's server as the show server mounts it). On the code before,
+    // the address carries no code and the window never signs in: 25 fails.
+    {
+      const E = 'mac-handoff@example.com';
+      await deleteAccount(E);
+      licKV.clear();
+      await fileProKey(E);
+      const appCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await appCtx.addInitScript(LICENSE_PUBLIC_INIT + "window.__CHROMAGLASS_NATIVE__ = Object.assign(window.__CHROMAGLASS_NATIVE__ || {}, { shell: 'desktop', openInBrowser: (u) => { window.__cgOpened = u; }, bringToFront: () => { window.__cgFront = (window.__cgFront || 0) + 1; return Promise.resolve(true); } });");
+      const a = await appCtx.newPage();
+      await a.goto(SHOW + '&requireSignIn=1');
+      const doorAt = (p) => p.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
+      const signinShown = await waitFor(async () => (await doorAt(a)) === 'signin', 30_000)
+        && await a.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 15_000 }).then(() => true, () => false);
+      await a.click('[data-cg-signin-provider="google.com"]').catch(() => {});
+      const openedUrl = await waitFor(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null), 5000).then(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null));
+      const label = await a.locator('[data-cg-signin-provider="google.com"]').innerText().catch(() => '');
+      const waiting = await a.evaluate(() => document.querySelector('[data-cg-signin-in-browser]')?.getAttribute('data-cg-signin-in-browser') ?? null).catch(() => null);
+      const code = openedUrl ? new URL(openedUrl).searchParams.get('h') : null;
+
+      // The browser: its own storage, the address the app opened.
+      // The app's server serves the site built for the app (`VITE_MAC_APP=1`,
+      // desktop.yml), where every page asks for a paid key: this check's build
+      // is the site's, so the browser is told so the way the app's shell tells
+      // its window, `requireSignIn` (lib/authFlag.ts), with no `shell`, since
+      // it is a browser and not the app.
+      // And the Mac already holds the account's Pro key, which the tab finds
+      // (the app's server hands it over; here the browser's storage holds it):
+      // the case where the tab used to say "Your licence is on this Mac now"
+      // and ask nobody to sign in. It must say the key was found (the owner,
+      // 2026-11-10) and still offer the sign-in.
+      const heldKey = await signLicenseKey({ id: 'check-pro-1', tier: 'pro', email: E, issuedAt: Date.now() }, licEnv.LICENSE_PRIVATE_KEY);
+      const brCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };' +
+        `try { localStorage.setItem('chromaglass:license-key', ${JSON.stringify(heldKey)}); } catch {}`);
+      let browserDone = null, keyFound = null, took = null, tabClosed = false;
+      if (openedUrl) {
+        // Opened as the Mac opens it (`shell.openExternal`): a tab with one page
+        // of history, which a browser lets close itself. newPage then goto
+        // keeps Playwright's about:blank behind it, a tab no page may close.
+        const b = await brCtx.newPage();
+        await b.evaluate((u) => location.replace(u), openedUrl);
+        await b.waitForURL(openedUrl).catch(() => {});
+        keyFound = await b.waitForSelector('[data-cg-app-licence-found]', { timeout: 30_000 }).then((el) => el.getAttribute('data-cg-app-licence-found'), () => null);
+        if (await b.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 30_000 }).then(() => true, () => false)) {
+          const popup = answerGoogle(brCtx, E);
+          await b.click('[data-cg-signin-provider="google.com"]');
+          await popup;
+          await waitFor(async () => (await b.evaluate(() => document.querySelector('[data-cg-app-licence-done]')?.getAttribute('data-cg-app-licence-done')).catch(() => null)) != null, 45_000);
+          browserDone = await b.evaluate(() => document.querySelector('[data-cg-app-licence-done]')?.getAttribute('data-cg-app-licence-done') ?? null).catch(() => null);
+          // And then it does not stay up over the app (PLAN.md 23.17f-3; the
+          // owner, 2026-11-11: "it should just close the login window and go
+          // back to the app"): it waits for the window to take the sign-in,
+          // says so, and closes itself. Before, it said "go back to the app"
+          // and stayed, and nothing told it whether the app had it.
+          const tookAt = async () => b.evaluate(() => document.querySelector('[data-cg-app-took]')?.getAttribute('data-cg-app-took') ?? null).catch(() => null);
+          await waitFor(async () => { if (b.isClosed()) return true; const t = await tookAt(); if (t) took = t; return t === 'yes' || t === 'no'; }, 45_000);
+          tabClosed = await waitFor(() => b.isClosed(), 10_000);
+        }
+      }
+
+      // The window: the door gone on the account's Pro key, and its sheet naming the account.
+      const doorGone = await waitFor(async () => (await doorAt(a)) === null, 30_000);
+      const up = doorGone && await waitFor(() => appUp(a), BOOT_MS);
+      const front = await a.evaluate(() => window.__cgFront ?? 0).catch(() => 0);
+      let named = false;
+      if (up) {
+        await a.click('[data-cg-account-open]').catch(() => {});
+        named = await waitFor(() => a.evaluate((e) => {
+          const st = document.querySelector('[data-cg-account-status]');
+          return st?.getAttribute('data-cg-account-status') === 'signed-in' && (st.textContent ?? '').includes(e);
+        }, E).catch(() => false), 20_000);
+      }
+      // Taken once: the code is spent. And the server refuses a page of
+      // another site, and a request whose Host is not this Mac's own name (a
+      // page that rebinds its name to 127.0.0.1).
+      const again = code ? await fetch(`${ORIGIN}signin-handoff?h=${code}`).then((r) => r.json()).catch(() => null) : null;
+      const spent = again?.pending === true;
+      const crossSite = await fetch(`${ORIGIN}signin-handoff?h=${'x'.repeat(24)}`, { headers: { origin: 'https://example.com', 'sec-fetch-site': 'cross-site' } }).then((r) => r.status).catch(() => 0);
+      // The planting direction too: another site's page posting a credential under a guessed code.
+      const crossPost = await fetch(`${ORIGIN}signin-handoff`, {
+        method: 'POST', headers: { origin: 'https://example.com', 'sec-fetch-site': 'cross-site', 'content-type': 'application/json' },
+        body: JSON.stringify({ h: 'y'.repeat(24), credential: { providerId: 'google.com', signInMethod: 'google.com', idToken: 'x' } }),
+      }).then((r) => r.status).catch(() => 0);
+      // The show server hands the route the same rule this check mounts it with.
+      const wired = /signInHandoff\.handleRequest\(req, res, url, isLaptop\(req\)\)/.test(readFileSync('server/remote-server.js', 'utf8'))
+        && /import \{[^}]*\bisLaptop\b[^}]*\} from '\.\/laptop\.js'/.test(readFileSync('server/remote-server.js', 'utf8'));
+      const rebound = await new Promise((ok) => {
+        const req = httpRequest({ host: '127.0.0.1', port: ON_PORT, path: `/signin-handoff?h=${'x'.repeat(24)}`, headers: { host: `attacker.example:${ON_PORT}` } }, (r) => { r.resume(); ok(r.statusCode); });
+        req.on('error', () => ok(0));
+        req.end();
+      });
+      check('25. a Google sign-in from the Mac app: the button keeps its name, the browser tab says the Mac\'s key was found, signs in, sees the app take it and closes itself, and the app\'s window comes forward and signs in as the same account (its sheet names it), the code spent and the route closed to other sites and names',
+        signinShown && label.trim() === 'Continue with Google' && waiting === 'waiting' && !!code && keyFound === 'Pro' && browserDone === 'signed-in' && took === 'yes' && tabClosed && front >= 1 && up && named && spent && crossSite === 403 && crossPost === 403 && rebound === 403 && wired,
+        `sign-in ${signinShown}, button "${label.trim()}", window ${waiting ?? 'no waiting line'}, code ${code ? 'in the address' : 'none'}, tab says ${keyFound ? `the ${keyFound} key was found` : 'nothing of the key'}, browser ${browserDone ?? 'never finished'}, the app took it ${took ?? 'unsaid'}, tab ${tabClosed ? 'closed itself' : 'stayed open'}, window brought forward ${front}×, show ${up}, sheet names the account ${named}, spent ${spent}, cross-site GET ${crossSite} POST ${crossPost}, rebound ${rebound}, show server wired ${wired}`);
+      await brCtx.close();
+      await appCtx.close();
+    }
+
+    // ── 25b: the same from a licensed Mac, from the Account sheet ─────────
+    // The owner's own case (2026-11-11: "sign in from my local app is weird -
+    // it asks me to continue on the webpage. It then never actually logs into
+    // the app"): the Mac holds a Pro key, so the show is up, signed out, and
+    // the sign-in is the Account sheet's. 25 starts at the door instead. The
+    // window's wait must outlive nothing here, but the sheet's form is the one
+    // pressed, and the tab must still close itself once the window has it.
+    {
+      const E = 'mac-sheet@example.com';
+      await deleteAccount(E);
+      licKV.clear();
+      await fileProKey(E);
+      const key = await signLicenseKey({ id: 'check-pro-2', tier: 'pro', email: E, issuedAt: Date.now() }, licEnv.LICENSE_PRIVATE_KEY);
+      const held = `try { localStorage.setItem('chromaglass:license-key', ${JSON.stringify(key)}); } catch {}`;
+      const appCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await appCtx.addInitScript(LICENSE_PUBLIC_INIT + held + "window.__CHROMAGLASS_NATIVE__ = Object.assign(window.__CHROMAGLASS_NATIVE__ || {}, { shell: 'desktop', openInBrowser: (u) => { window.__cgOpened = u; }, bringToFront: () => { window.__cgFront = (window.__cgFront || 0) + 1; return Promise.resolve(true); } });");
+      const a = await appCtx.newPage();
+      await a.goto(SHOW + '&requireSignIn=1');
+      const showUp = await waitFor(() => appUp(a), BOOT_MS);
+      await a.click('[data-cg-account-open]', { timeout: 10_000 }).catch(() => {});
+      const statusOf = () => a.evaluate(() => {
+        const st = document.querySelector('[data-cg-account-status]');
+        return st ? `${st.getAttribute('data-cg-account-status')}|${st.textContent ?? ''}` : null;
+      }).catch(() => null);
+      const outFirst = (await waitFor(async () => (await statusOf())?.startsWith('signed-out'), 20_000)) === true;
+      const offered = await a.waitForSelector('[data-cg-account] [data-cg-signin-provider="google.com"]', { timeout: 20_000 }).then(() => true, () => false);
+      if (offered) await a.click('[data-cg-account] [data-cg-signin-provider="google.com"]').catch(() => {});
+      const openedUrl = await waitFor(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null), 5000).then(() => a.evaluate(() => window.__cgOpened ?? null).catch(() => null));
+      const brCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+      await brCtx.addInitScript(LICENSE_PUBLIC_INIT + 'window.__CHROMAGLASS_NATIVE__ = { requireSignIn: true };' + held);
+      let took = null, tabClosed = false, tabShow = false;
+      if (openedUrl) {
+        // Opened as the Mac opens it (`shell.openExternal`): a tab with one page
+        // of history, which a browser lets close itself. newPage then goto
+        // keeps Playwright's about:blank behind it, a tab no page may close.
+        const b = await brCtx.newPage();
+        await b.evaluate((u) => location.replace(u), openedUrl);
+        await b.waitForURL(openedUrl).catch(() => {});
+        if (await b.waitForSelector('[data-cg-signin-provider="google.com"]', { timeout: 30_000 }).then(() => true, () => false)) {
+          const popup = answerGoogle(brCtx, E);
+          await b.click('[data-cg-signin-provider="google.com"]');
+          await popup;
+          await waitFor(async () => {
+            if (b.isClosed()) return true;
+            if (await appUp(b)) tabShow = true;
+            const t = await b.evaluate(() => document.querySelector('[data-cg-app-took]')?.getAttribute('data-cg-app-took') ?? null).catch(() => null);
+            if (t) took = t;
+            return t === 'yes' || t === 'no';
+          }, 45_000);
+          tabClosed = await waitFor(() => b.isClosed(), 10_000);
+        }
+      }
+      const inAfter = await waitFor(async () => { const st = await statusOf(); return !!st && st.startsWith('signed-in') && st.includes(E); }, 20_000);
+      const front = await a.evaluate(() => window.__cgFront ?? 0).catch(() => 0);
+      check('25b. on a Mac already holding a Pro key, Continue with Google in the Account sheet: the browser tab signs in without opening a show, sees the app take it and closes itself, and the window comes forward with the sheet naming the account',
+        showUp && outFirst && offered && !!openedUrl && !tabShow && took === 'yes' && tabClosed && front >= 1 && inAfter,
+        `show ${showUp}, sheet signed out first ${outFirst}, Google offered ${offered}, browser ${openedUrl ? 'opened with a code' : 'never opened'}, tab ${tabShow ? 'OPENED A SHOW' : 'no show'}, the app took it ${took ?? 'unsaid'}, tab ${tabClosed ? 'closed itself' : 'stayed open'}, window forward ${front}×, sheet names the account ${inAfter}`);
+      await brCtx.close();
+      await appCtx.close();
     }
   }
 } catch (e) {

@@ -87,6 +87,7 @@
  * the site). On Linux with no display it runs itself under xvfb-run.
  */
 import { _electron as electron } from 'playwright';
+import { untilMacDeployDone } from './macdeploy.mjs';
 import { spawn as launchProcess, spawnSync } from 'node:child_process';
 import { createSocket } from 'node:dgram';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -258,6 +259,9 @@ const env = {
 };
 delete env.SHOW_KEY;   // the app's own key, the one it keeps, is what is checked
 
+// The app draws the plate on the Mac's GPU as a harness's browser does: a
+// deploy's shard holding the owner's Mac goes first (PLAN.md 19ah-9a).
+await untilMacDeployDone('npm run desktop');
 const electronApp = await electron.launch({
   executablePath: app.executablePath,
   args: [...app.args, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])],
@@ -434,7 +438,7 @@ try {
     with. The key store is Electron's safeStorage: on a Mac it encrypts
     through the login Keychain; on a Linux box with no keyring it refuses,
     and the repo's app (never the packed one) takes the key itself, as the
-    check does here. With no sound source open the stream is video only.
+    check does here. With no sound source open the stream carries a silent audio track (37x-4f).
     Since 37x-4c the page streams to two destinations at once, a landscape
     and a portrait one, which is two encodes and two sockets through the
     same IPC: both must arrive, each at its own size.
@@ -1105,9 +1109,9 @@ try {
     await sleep(3000);
     const said = await page.evaluate(() => document.querySelector('[data-cg-app-licence]')?.getAttribute('data-cg-app-licence') ?? null).catch(() => null);
     const plate = await page.locator('#liquid-canvas').count().catch(() => 0);
-    const native = await page.evaluate(() => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function' })).catch(() => null);
-    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser,
-      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser` : 'unread'}`);
+    const native = await page.evaluate(async () => ({ asks: !!window.__CHROMAGLASS_NATIVE__?.requireSignIn, valid: !!window.__CHROMAGLASS_NATIVE__?.license?.valid, browser: typeof window.__CHROMAGLASS_NATIVE__?.openInBrowser === 'function', front: typeof window.__CHROMAGLASS_NATIVE__?.bringToFront === 'function' ? await window.__CHROMAGLASS_NATIVE__.bringToFront().catch(() => 'threw') : 'none' })).catch(() => null);
+    check(`licence: with ${PACKAGED ? 'only a self-signed key, and the word to trust it,' : 'no key'} the app shows its door, asks for a sign-in, and starts no plate, and its window can bring itself forward (23.17f-3)`, door && said === 'signin' && plate === 0 && native?.asks && !native.valid && native.browser && native.front === true,
+      `door ${door ? `drawn (${said})` : 'never drawn'}, plate canvas ${plate ? 'THERE' : 'absent'}, the shell ${native ? `${native.asks ? 'asks for a licence' : 'asks nothing'}, licence ${native.valid ? 'valid' : 'none'}, ${native.browser ? 'can' : 'cannot'} open the browser, brought to the front ${native.front}` : 'unread'}`);
     if (process.env.VITE_MAC_APP !== '1') {
       skip('licence: a browser on the app\'s server meets the same door', 'the site in dist/ was not built as the app ships it (VITE_MAC_APP=1, desktop.yml)');
     } else {
@@ -1196,6 +1200,29 @@ try {
     check('OSC closed: Show > OSC input opens it for this Mac only (127.0.0.1) or the network (0.0.0.0), and closes it, with no restart',
       local?.state === `udp 127.0.0.1:${oscPort}` && heldLocal && net?.state === `udp 0.0.0.0:${oscPort}` && off?.state === 'off' && freeAgain,
       `this Mac only: ${local?.state ?? 'unread'} (port ${heldLocal ? 'held' : 'NOT held'}); network: ${net?.state ?? 'unread'}; off: ${off?.state ?? 'unread'} (port ${freeAgain ? 'free' : 'STILL TAKEN'})`);
+
+    /*
+      The owner's assistant's door to the same choice (PLAN 44k-14, the hook
+      main.js hands the show server, server/assistantOutputs.js): it is the
+      menu's, so the menu's tick follows it and the socket opens with no
+      dialog, and a build with no Syphon item says so rather than claiming one.
+      Opening to the network is not kept (the owner's choice after the security
+      review of 2026-11-13: an assistant talked round by a web page must not
+      leave the venue's Wi-Fi able to drive the show next launch), so the state
+      says kept false and show.json still holds the menu's last choice, off.
+    */
+    const viaHook = await first.evaluate(async ({ Menu }) => {
+      const h = globalThis.__chromaglassOutputs;
+      const said = await h.setOscIn('network');
+      return { said, state: h.state(), ticked: Menu.getApplicationMenu().getMenuItemById('osc-network')?.checked === true, syphon: Menu.getApplicationMenu().getMenuItemById('syphon-out') ? 'item' : h.setSyphon(true) };
+    }).catch((err) => ({ error: String(err) }));
+    const afterHook = await settle(first, (s) => s.mode === 'network');
+    let savedOsc = 'unread';
+    try { savedOsc = JSON.parse(readFileSync(join(dir, 'show.json'), 'utf8')).osc ?? 'unset'; } catch { /* not written */ }
+    check('OSC closed: the assistant\'s OSC-in choice is the Show menu\'s (ticked there, the socket open on the network) but the network is not kept for the next launch, and Syphon says whether this build has it',
+      viaHook.said === `udp 0.0.0.0:${oscPort}` && viaHook.state?.oscIn?.mode === 'network' && viaHook.state.oscIn.kept === false && savedOsc === 'off' && viaHook.ticked && afterHook?.state === `udp 0.0.0.0:${oscPort}`
+        && (viaHook.syphon === 'item' || (/not in this build/.test(viaHook.syphon ?? '') && viaHook.state.syphon === null)),
+      `show.json osc ${savedOsc}; ${JSON.stringify(viaHook).slice(0, 240)}`);
 
     await pick(first, 'osc-local');
     await settle(first, (s) => s.mode === 'local');

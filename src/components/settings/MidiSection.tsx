@@ -1,5 +1,7 @@
-import { Sliders } from 'lucide-react';
+import { Sliders, Trash2 } from 'lucide-react';
 import { FACTORY_MAPS, sourceLabel, targetLabel, type FactoryMapId } from '../../lib/midi';
+import { VOICE_DEFAULTS, type VoiceTool } from '../../lib/noteVoices';
+import { DEFAULT_LIQUID_TYPES } from '../../types';
 import { PRESETS, livePresetId } from '../../presets';
 import { groupOf } from '../../lib/settingsMap';
 import { Info } from '../Info';
@@ -169,6 +171,22 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
                     Auto-map this controller…
                   </button>
                 )}
+                <button
+                  aria-pressed={midi.learning?.target.kind === 'voices'}
+                  onClick={() => (
+                    midi.learning?.target.kind === 'voices'
+                      ? midi.cancelLearn()
+                      : midi.learn({ kind: 'voices', tool: 'dropper', attack: VOICE_DEFAULTS.attack, release: VOICE_DEFAULTS.release, cap: VOICE_DEFAULTS.cap })
+                  )}
+                  className={`mb-3 w-full rounded-lg border py-2 text-[12px] font-medium transition-colors ${
+                    midi.learning?.target.kind === 'voices' ? LIT : 'border-white/15 bg-white/5 hover:bg-white/10'
+                  }`}
+                  title="Play any note on a MIDI channel to make that channel’s notes drop and pour on the plate"
+                  data-testid="settings-midi-voices-learn"
+                  data-midi-key="voices"
+                >
+                  {midi.learning?.target.kind === 'voices' ? 'Play a note on the channel…' : 'Learn a channel as Notes as voices…'}
+                </button>
                 <p className="mb-3 text-[12px] text-white/40" data-testid="settings-midi-state">
                   {midi.map.bindings.length} bindings · {midi.activeInputName ?? 'no device'}
                   {midi.clocked ? ' · clock arriving' : ''}
@@ -177,11 +195,70 @@ export const MidiSection = ({ c }: { c: SectionCtx }) => {
             )}
 
             {midi.map.bindings.length > 0 && (
-              <div className="mb-3 max-h-36 overflow-y-auto rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px]" data-testid="settings-midi-bindings">
+              <div className="mb-3 max-h-56 overflow-y-auto rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px]" data-testid="settings-midi-bindings">
                 {midi.map.bindings.map(b => (
-                  <div key={b.id} className="flex items-center justify-between gap-2 py-0.5 border-b border-white/5 last:border-b-0" data-testid="settings-midi-binding">
-                    <span className="font-mono text-white/60 shrink-0">{sourceLabel(b.source)}</span>
-                    <span className="truncate text-white/80">{targetLabel(b.target, (id) => PRESETS.find(p => p.id === livePresetId(id))?.name)}</span>
+                  <div key={b.id} className="py-1 border-b border-white/5 last:border-b-0" data-testid="settings-midi-binding" data-midi-key={b.target.kind === 'voices' ? 'voices' : undefined}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-white/60 shrink-0">{b.target.kind === 'voices' ? `Ch ${b.source.channel + 1}` : sourceLabel(b.source)}</span>
+                      <span className="truncate text-white/80 flex-1 text-right">{targetLabel(b.target, (id) => PRESETS.find(p => p.id === livePresetId(id))?.name)}</span>
+                      {b.target.kind === 'voices' && (
+                        <button onClick={() => midi.removeBinding(b.id)} className="p-1 text-white/40 hover:text-red-300" aria-label="Remove binding"><Trash2 size={11} /></button>
+                      )}
+                    </div>
+                    {b.target.kind === 'voices' && (() => {
+                      const vt = b.target;
+                      return (
+                        <div className="mt-1.5 flex flex-col gap-1.5 rounded border border-white/10 bg-black/30 p-2" data-testid={`settings-midi-voices-${b.id}`}>
+                          <div className="flex items-center gap-2">
+                            <label className="flex flex-1 items-center gap-1 text-[11px] text-white/60">
+                              Tool
+                              <select
+                                value={vt.tool ?? 'dropper'}
+                                aria-label="Voice tool"
+                                onChange={e => midi.updateBinding(b.id, { ...vt, tool: e.target.value as VoiceTool })}
+                                className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1 py-0.5 text-[11px] text-white outline-none"
+                                data-testid={`settings-midi-voices-tool-${b.id}`}
+                              >
+                                <option value="dropper">Drop</option>
+                                <option value="pour">Pour</option>
+                                <option value="spray">Spray</option>
+                                <option value="splatter">Splatter</option>
+                              </select>
+                            </label>
+                            <label className="flex flex-1 items-center gap-1 text-[11px] text-white/60">
+                              Liquid
+                              <select
+                                value={vt.liquid ?? ''}
+                                aria-label="Voice liquid"
+                                onChange={e => midi.updateBinding(b.id, { ...vt, liquid: e.target.value || undefined })}
+                                className="min-h-6 flex-1 rounded border border-white/10 bg-black/40 px-1 py-0.5 text-[11px] text-white outline-none"
+                                data-testid={`settings-midi-voices-liquid-${b.id}`}
+                              >
+                                <option value="">Look’s own</option>
+                                {DEFAULT_LIQUID_TYPES.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                              </select>
+                            </label>
+                          </div>
+                          {([
+                            ['attack', 'Attack', 0, 2, 0.05, vt.attack ?? VOICE_DEFAULTS.attack, (v: number) => `${v.toFixed(2)} s`],
+                            ['release', 'Release', 0, 4, 0.05, vt.release ?? VOICE_DEFAULTS.release, (v: number) => `${v.toFixed(2)} s`],
+                            ['cap', 'Voices', 1, 8, 1, vt.cap ?? VOICE_DEFAULTS.cap, (v: number) => `${Math.round(v)}`],
+                          ] as const).map(([k, lbl, min, max, step, val, fmt]) => (
+                            <label key={k} className="flex items-center gap-2 text-[11px] text-white/60">
+                              <span className="w-12 shrink-0">{lbl}</span>
+                              <input
+                                type="range" min={min} max={max} step={step} value={val}
+                                aria-label={lbl}
+                                onChange={e => midi.updateBinding(b.id, { ...vt, [k]: Number(e.target.value) })}
+                                className="set-range flex-1"
+                                data-testid={`settings-midi-voices-${k}-${b.id}`}
+                              />
+                              <span className="w-11 text-right font-mono text-[11px] text-white/80">{fmt(val)}</span>
+                            </label>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

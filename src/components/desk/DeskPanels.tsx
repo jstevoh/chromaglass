@@ -1089,7 +1089,6 @@ export function PanelBody({ id, p }: { id: string; p: DeskProps }): ReactNode {
     case 'score': return p.score ? <SongScore {...p.score} /> : null;
     case 'songs': return p.screens.songs;
     case 'sequences': return p.screens.sequences;
-    case 'player': return p.screens.player;
   }
   const spec = PANEL_BY_ID.get(id);
   if (!spec) return null;
