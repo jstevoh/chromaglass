@@ -23,6 +23,10 @@
  *   tall     the vertical output; its connection is dropped at 6 s
  *   refused  landscape, with a key its listener refuses
  *   quiet    landscape, on a listener that never acknowledges
+ *   youtube  landscape, on a listener that answers as YouTube's ingest did
+ *            when probed (2026-11-08): Window Acknowledgement Size 2,500,000,
+ *            Set Peer Bandwidth 59,768,832, and acknowledgements on its own
+ *            2.5 MB window whatever the client asks (3.9 s of this stream)
  *
  * Each line is one thing the session promises:
  *
@@ -61,16 +65,37 @@
  *                 the kernel's buffers are full (the check-skeptic throttled
  *                 this one: 1.29 s read while 7 s were queued; PLAN 37x-4c's
  *                 found item), so this line claims only the fallback
+ *   youtube, keeps up
+ *                 on a server whose acknowledgements come 2.5 MB apart (3.9 s
+ *                 of this stream), a link that keeps up drops no frame and
+ *                 the readout never passes the bound: before the fix it read
+ *                 4.9 s and dropped 247 of 570 frames (the first live album
+ *                 show's "trouble" on the owner's fast connection)
+ *   youtube, coarse
+ *                 such a server is read on the socket's word at every
+ *                 reading, and the readout says so
+ *   cutoff        a scripted client: acknowledgements 5% under a share of
+ *                 the bound apart (ACK_COARSE_SHARE) are the server's word,
+ *                 5% over are the socket's
  *   resume        the drop resumes at the first keyframe once the readout is
  *                 under half the bound, not at the bound: a client fed a
  *                 scripted readout
+ *   skew          a scripted client whose audio is stamped 3 s after or
+ *                 before its video, on a socket that waits 25 ms before and
+ *                 50 ms after each keyframe (a link that keeps up, as a real uplink does: on
+ *                 loopback nothing waits and the fault cannot show) drops no
+ *                 frame; and the same client with 3.5 s of video truly held
+ *                 still drops, in one run, and recovers, at every skew. Before 37x-4g the
+ *                 3 s skews dropped every frame between keyframes (the
+ *                 owner's rehearsal of 2026-11-08: six good minutes, then
+ *                 under 1 Mbps and "No data")
  *   none reachable
  *                 a start where no destination can be reached fails, with
  *                 each one's reason, and tries nothing again
  */
 import { startRtmpListener, summarize } from './rtmpListener.mjs';
 import { LiveSession } from '../desktop/liveSession.js';
-import { BEHIND_LIMIT_SECONDS, WINDOW_ACK, LiveClient } from '../desktop/live.js';
+import { BEHIND_LIMIT_SECONDS, WINDOW_ACK, ACK_COARSE_SHARE, LiveClient } from '../desktop/live.js';
 import { describeTag } from '../desktop/rtmp.js';
 
 const FPS = 30;
@@ -99,10 +124,13 @@ const numberOf = (payload) => payload.readUInt32BE(4);
 
 const listener = await startRtmpListener({ refuse: 'refused-key', pingAfterMs: 0 });
 const quietListener = await startRtmpListener({ acknowledge: false, pingAfterMs: 0 });
+const YT_WINDOW = 2500000, YT_PEER_BANDWIDTH = 59768832;
+const ytListener = await startRtmpListener({ ackWindow: YT_WINDOW, peerBandwidth: YT_PEER_BANDWIDTH, ownWindow: YT_WINDOW, pingAfterMs: 0 });
 const byKey = new Map();
 const onPublish = (s) => { if (!byKey.has(s.key)) byKey.set(s.key, []); byKey.get(s.key).push(s); };
 listener.on('publish', onPublish);
 quietListener.on('publish', onPublish);
+ytListener.on('publish', onPublish);
 
 const meta = (width, height) => ({ width, height, fps: FPS, videoBitrate: STREAM_BPS * 8, audio: { codec: 'aac', sampleRate: 48000, channels: 2, bitrate: 128000 } });
 const session = new LiveSession({
@@ -113,13 +141,14 @@ const session = new LiveSession({
     { name: 'tall', url: listener.url, key: 'tall-key', output: 'tall' },
     { name: 'refused', url: listener.url, key: 'refused-key', output: 'wide' },
     { name: 'quiet', url: quietListener.url, key: 'quiet-key', output: 'wide' },
+    { name: 'youtube', url: ytListener.url, key: 'youtube-key', output: 'wide' },
   ],
   reconnectDelaysMs: [500, 1000],
 });
 
 const started = await session.start();
 const health = (name) => session.state().destinations.find((d) => d.name === name);
-check('the show went live with one destination refused, not the whole start failed', started.ok && health('refused').phase === 'refused' && ['slow', 'steady', 'tall', 'quiet'].every((n) => health(n).phase === 'live'), `${started.ok ? 'live' : started.error}; ${session.state().destinations.map((d) => `${d.name} ${d.phase}`).join(', ')}`);
+check('the show went live with one destination refused, not the whole start failed', started.ok && health('refused').phase === 'refused' && ['slow', 'steady', 'tall', 'quiet', 'youtube'].every((n) => health(n).phase === 'live'), `${started.ok ? 'live' : started.error}; ${session.state().destinations.map((d) => `${d.name} ${d.phase}`).join(', ')}`);
 
 // The sequence headers, as the page sends them with its first frame and packet.
 session.videoConfig('wide', Uint8Array.from([1, 0x64, 0, 0x28, 0xff]));
@@ -152,7 +181,8 @@ while (Date.now() - t0 < END_AT) {
     const tags = slowConn?.tags ?? [];
     const lastRead = tags.length ? tags[tags.length - 1].timestamp : 0;
     const lastWritten = Math.round((frames - 1) * 1000 / FPS);
-    samples.push({ at: now, behind: h.secondsBehind, by: h.measuredAt, kbps: h.kbps, dropping: h.dropping, truth: Math.max(0, (lastWritten - lastRead) / 1000) });
+    const y = health('youtube');
+    samples.push({ at: now, behind: h.secondsBehind, by: h.measuredAt, kbps: h.kbps, dropping: h.dropping, truth: Math.max(0, (lastWritten - lastRead) / 1000), yt: y.secondsBehind, ytBy: y.measuredAt, ytDropping: y.dropping });
   }
   await sleep(5);
 }
@@ -226,6 +256,33 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
   check('a server that never acknowledges is judged on the socket, says so, and drops nothing when it keeps up (not that it sees a slow one: PLAN 37x-4c)', q.measuredAt === 'socket' && q.serverAcks === 0 && q.videoDropped === 0 && complete(nums(framesOf(conn, 'video')), frames), `measured at the ${q.measuredAt}, ${q.serverAcks} acknowledgements, ${q.videoDropped} dropped`);
 }
 
+// youtube: a server whose acknowledgements are megabytes apart, on a link that keeps up.
+{
+  const conn = byKey.get('youtube-key')[0];
+  const v = nums(framesOf(conn, 'video'));
+  const h = endHealth.youtube;
+  const ytMax = Math.max(...samples.map((s) => s.yt));
+  const step = YT_WINDOW / STREAM_BPS;
+  console.log(`  youtube: ${conn.acksSent} acknowledgements sent, ${fmt(step, 1)} s of stream apart; the client asked for a ${conn.ackSize}-byte window; readout at most ${fmt(ytMax, 2)} s behind`);
+  check(`a YouTube-like server (acknowledging every ${YT_WINDOW} bytes, ${fmt(step, 1)} s of stream) on a link that keeps up: no frame dropped, every frame arrived, never past the ${BEHIND_LIMIT_SECONDS} s bound`, conn.acksSent >= 2 && h.videoDropped === 0 && h.dropRuns === 0 && complete(v, frames) && ytMax <= BEHIND_LIMIT_SECONDS && samples.every((s) => !s.ytDropping), `${h.videoDropped} dropped in ${h.dropRuns} run(s), ${v.length} of ${frames} frames, ${fmt(ytMax, 2)} s at most, ${conn.acksSent} acknowledgements`);
+  // Every reading, not the last: by the end an acknowledgement can simply be stale (ACK_STALE_MS), which reads 'socket' on the old code too (the check-skeptic's control).
+  const byServer = samples.filter((s) => s.ytBy === 'server').length;
+  check(`a server whose acknowledgements are more than ${BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE} s of stream apart is read on the socket's word at every reading, and says so`, byServer === 0 && h.serverAcks >= 2 && step > BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE, `${byServer} of ${samples.length} readings on the server's word, ${h.serverAcks} acknowledgements heard`);
+}
+
+// The cutoff itself: a scripted client whose acknowledgements are just under and just over a share of the bound apart.
+{
+  const meta = { videoBitrate: 6_000_000, audio: { bitrate: 128_000 } };
+  const cutoff = ((meta.videoBitrate + meta.audio.bitrate) / 8) * BEHIND_LIMIT_SECONDS * ACK_COARSE_SHARE;
+  const byAt = (step) => {
+    const c = new LiveClient({ url: 'rtmp://127.0.0.1:1/live', key: 'k', meta });
+    Object.assign(c.delivery, { flushed: 10_000_000, serverAck: 9_000_000, serverAckAt: Date.now(), ackStep: step });
+    return c.behind().by;
+  };
+  const under = byAt(Math.floor(cutoff * 0.95)), over = byAt(Math.ceil(cutoff * 1.05));
+  check(`the cutoff is ${ACK_COARSE_SHARE} of the ${BEHIND_LIMIT_SECONDS} s bound in stream bytes (${Math.round(cutoff)} at 6.1 Mbps): acknowledgements 5% under it are the server's word, 5% over the socket's`, under === 'server' && over === 'socket', `under: ${under}, over: ${over}`);
+}
+
 // Resume at half the bound: a client with a scripted readout and a socket that takes everything.
 {
   const c = new LiveClient({ url: 'rtmp://127.0.0.1:1/live', key: 'k', meta: {} });
@@ -239,6 +296,60 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
   const got = script.map(([s, key], i) => { reading = s; return c.video(i * 33, key, new Uint8Array(4)); });
   const want = script.map((x) => x[2]);
   check(`the drop resumes at the first keyframe under half the bound (${BEHIND_LIMIT_SECONDS / 2} s), not at the bound`, got.every((x, i) => x === want[i]) && c.counts.dropRuns === 1, `sent ${got.map((x) => (x ? 'y' : 'n')).join('')} against ${want.map((x) => (x ? 'y' : 'n')).join('')}, ${c.counts.dropRuns} drop run(s)`);
+}
+
+// Skew: the readout judges each track on its own clock, so audio stamped seconds off the video is not a backlog, and a real backlog still is.
+{
+  const STEP = 1000 / FPS, AAC = 1024 / 48, KEY_PERIOD = KEY_EVERY * STEP;
+  const run = (skewMs, holdFrom = -1, holdUntil = -1, byServer = false) => {
+    const c = new LiveClient({ url: 'rtmp://127.0.0.1:1/live', key: 'k', meta: {} });
+    c.phase = 'live';
+    c.sequenced.video = c.sequenced.audio = true;
+    c.audioCodec = 'aac';
+    // The kernel's word: each write's callback, held while the link is said to be busy and run in order once it is not.
+    const pending = [];
+    c.socket = { destroyed: false, writableLength: 0, write: (_b, cb) => { pending.push(cb); return true; } };
+    const events = [];
+    for (let t = 0; t < 20000; t += STEP) events.push([t, 'v']);
+    for (let t = 0; t < 20000; t += AAC) events.push([t, 'a']);
+    events.sort((x, y) => x[0] - y[0]);
+    let busyUntil = 0, frame = 0, sentAfter = 0;
+    const lastSecond = 20000 - 1000;
+    for (const [t, kind] of events) {
+      // The link waits 25 ms before each keyframe as well as 50 ms after it, so the packet last in line before a keyframe
+      // is sometimes a video frame, sometimes a sound: the old one-clock readout misread either, depending on the skew's sign.
+      const preKey = t % KEY_PERIOD > KEY_PERIOD - 25;
+      const held = (t >= holdFrom && t < holdUntil) || t < busyUntil || preKey;
+      if (!held) {
+        while (pending.length) pending.shift()?.();
+        // A server whose acknowledgements are fresh and fine: the readout is on its word, not the socket's.
+        if (byServer) { c.delivery.serverAck = c.delivery.flushed; c.delivery.serverAckAt = Date.now(); }
+      }
+      // Timestamps from 3 s, so audio 3 s early still has a clock above zero.
+      if (kind === 'v') {
+        const key = frame % KEY_EVERY === 0;
+        const sent = c.video(3000 + t, key, new Uint8Array(key ? KEY_BYTES : DELTA_BYTES));
+        if (sent && key) busyUntil = t + 50;
+        if (sent && t >= lastSecond) sentAfter++;
+        frame++;
+      } else {
+        c.audio(3000 + t + skewMs, new Uint8Array(AUDIO_BYTES));
+      }
+    }
+    return { dropped: c.counts.videoDropped, runs: c.counts.dropRuns, sentAfter, skew: c.state().avSkewSeconds, by: c.behind().by };
+  };
+  const skews = [-3000, 0, 3000];
+  const kept = skews.map((k) => run(k));
+  check('audio stamped 3 s before, with or after its video, on a link that keeps up (it waits 25 ms before each keyframe and 50 ms after): no frame dropped, and the readout reports the skew', kept.every((r) => r.dropped === 0 && r.runs === 0) && kept.every((r, i) => Math.abs(r.skew - skews[i] / 1000) < 0.1), kept.map((r, i) => `skew ${skews[i] / 1000} s: ${r.dropped} dropped in ${r.runs} run(s), read ${fmt(r.skew, 2)} s`).join('; '));
+  const kServer = run(-3000, -1, -1, true);
+  check('the same, sound 3 s behind, read on a server\'s fresh acknowledgements: no frame dropped', kServer.by === 'server' && kServer.dropped === 0 && kServer.runs === 0, `read on the ${kServer.by}'s word: ${kServer.dropped} dropped in ${kServer.runs} run(s)`);
+  // A backlog held from 5 s to 8.5 s: video drops from the first frame more than the bound behind the last one delivered
+  // before the hold, to the first keyframe once it is let go. Worked from the constants, so a readout off by a third is seen.
+  const HOLD_FROM = 5000, HOLD_UNTIL = 8500;
+  const dropFrom = HOLD_FROM + BEHIND_LIMIT_SECONDS * 1000, dropUntil = Math.ceil(HOLD_UNTIL / KEY_PERIOD) * KEY_PERIOD;
+  const expected = Math.round((dropUntil - dropFrom) / STEP);
+  const held = skews.map((k) => run(k, HOLD_FROM, HOLD_UNTIL));
+  check(`the same client with 3.5 s of the stream truly held drops about ${expected} frames (from ${dropFrom / 1000} s to the keyframe at ${(dropUntil / 1000).toFixed(1)} s), in one run, and is sending every frame again by the end, at each skew`, held.every((r) => r.runs === 1 && Math.abs(r.dropped - expected) <= 2 && r.sentAfter >= FPS - 1), held.map((r, i) => `skew ${skews[i] / 1000} s: ${r.dropped} dropped in ${r.runs} run(s), ${r.sentAfter} frames in the last second`).join('; '));
 }
 
 // None reachable.
@@ -255,5 +366,6 @@ const complete = (ns, n) => ns.length === n && ns.every((x, i) => x === i);
 
 await listener.close();
 await quietListener.close();
+await ytListener.close();
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

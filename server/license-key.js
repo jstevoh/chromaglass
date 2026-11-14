@@ -18,6 +18,21 @@ export const DEFAULT_PUBLIC_JWK = {
 };
 
 export const MAX_MACHINES_PER_KEY = 2;
+
+/*
+  The art packs a key carries (PLAN.md 45a-2). A pack is an add-on sold to Home
+  (Pro includes every pack), so it rides in the same signed payload as the tier
+  rather than in a key of its own: a buyer holds one key, the Mac's seats stay
+  counted against one id, and a gig with no network still knows what was paid
+  for. Only short lowercase names are kept, each once and in order, so two keys
+  for the same purchase sign the same bytes; a payload with none signs as it did
+  before packs existed, so every key already sold verifies unchanged.
+*/
+export function normalizePacks(list) {
+  if (!Array.isArray(list)) return [];
+  const names = list.filter((p) => typeof p === 'string' && /^[a-z0-9-]{1,24}$/.test(p));
+  return [...new Set(names)].sort().slice(0, 16);
+}
 export const ONE_YEAR_MS = 365 * 24 * 3600 * 1000;
 
 function toBase64Url(bytes) {
@@ -70,6 +85,7 @@ export async function signLicenseKey(payload, privateJwk) {
     maxMachines: typeof payload?.maxMachines === 'number' ? payload.maxMachines : MAX_MACHINES_PER_KEY,
     ...(typeof payload?.exp === 'number' ? { exp: payload.exp } : {}),
     ...(payload?.upgradeFrom ? { upgradeFrom: String(payload.upgradeFrom) } : {}),
+    ...(normalizePacks(payload?.packs).length ? { packs: normalizePacks(payload.packs) } : {}),
   };
   const bodyB64 = toBase64Url(new TextEncoder().encode(JSON.stringify(normalized)));
   const signingInput = `cg1.${bodyB64}`;
@@ -142,6 +158,7 @@ export async function verifyLicenseKey(token, publicJwk) {
     maxMachines: Number(payload.maxMachines) || MAX_MACHINES_PER_KEY,
     ...(typeof payload.exp === 'number' ? { exp: payload.exp } : {}),
     ...(payload.upgradeFrom ? { upgradeFrom: String(payload.upgradeFrom) } : {}),
+    ...(normalizePacks(payload.packs).length ? { packs: normalizePacks(payload.packs) } : {}),
   };
 
   return {

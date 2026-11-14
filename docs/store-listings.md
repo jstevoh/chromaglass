@@ -146,3 +146,69 @@ support@chromaglass.art); collected, all optional and none shared for
 advertising: crash logs (when sent), audio (song identification, when on),
 email address and user ID (sign-in), other user-generated content (feedback,
 when sent). No data is sold, and no advertising ID is used.
+
+## Google Play: the Android TV app
+
+PLAN 12-tv-2b. A separate Play app (`app.chromaglass.tv`, `androidtv/`) with
+its own listing, because a TV app and a phone app are different packages. It
+draws nothing itself: it finds the Mac running the show on the same Wi-Fi and
+plays the plate the Mac sends it (12-tv-1, 12-tv-2). With no Mac it plays a
+sample film (the press clips), which is what Play's TV review, done on a real
+TV with no Mac, will see. Its listing names no price and no tier either; it
+says plainly that it needs the Mac app, since a TV owner without one would get
+nothing from it but the sample.
+
+The pictures (`npm run brand`):
+
+| Asks for | Where it is |
+|---|---|
+| 512 × 512 icon | `docs/brand/store/play-icon-512.png` (the phone listing's) |
+| 1024 × 500 feature graphic | `docs/brand/store/play-feature-1024x500.png` (the phone listing's) |
+| 1280 × 720 TV banner | `docs/brand/store/play-tv-banner-1280x720.png` |
+| TV screenshots, 16:9, at least 1 | `docs/brand/store/tv/` (six, 1920 × 1080 JPEG: the plate the TV shows, from the app's own Song films) |
+
+### Google Play TV: App name (30)
+
+```text
+ChromaGlass TV
+```
+
+### Google Play TV: Short description (80)
+
+```text
+The liquid light show from ChromaGlass on your Mac, played on your big screen.
+```
+
+### Google Play TV: Full description (4000)
+
+```text
+ChromaGlass is a liquid light show: the 1960s overhead-projector show of oil, ink and water, simulated drop by drop and moving to the music. ChromaGlass TV puts that show on the biggest screen in the house.
+
+The show runs in the ChromaGlass app on your Mac. Start it, open ChromaGlass TV on the same Wi-Fi, and the TV finds the Mac by itself. The first time, the TV shows four digits and the Mac asks whether to let it in: press Allow, and the plate is on the TV a moment later. After that it opens straight to the show.
+
+- Finds the Mac on your network by itself, with nothing to type on a remote
+- Pairs once with four digits, and remembers the Mac
+- Plays whatever the Mac plays: every look, the music's pulse, your pours
+- Up to three TVs at once, from one Mac
+- Watch a sample film any time, with or without a Mac
+
+The show can flash with the music. A flash guard, on by default in the Mac app, keeps it under three flashes a second.
+
+Needs the ChromaGlass app on a Mac on the same Wi-Fi, with a plan that includes TV at home. The TV draws nothing itself, so it works on every Android TV and Google TV, old or new.
+```
+
+Category: Music & Audio (the same as the phone app). Content rating (IARC):
+the questionnaire's category "All Other App Types", every answer No: Everyone /
+PEGI 3.
+
+Data safety: **no data collected, no data shared.** The app sends nothing
+about the person anywhere. The plate comes over the home network from the
+person's own Mac; the key the Mac hands the TV is kept on the TV; the sample
+film is a plain download of a public file from the website, with no account,
+identifier or analytics. No ads, no advertising ID, no sign-in.
+
+App access (Play Console → App content → App access), for the reviewer:
+
+```text
+ChromaGlass TV plays a show that runs in the ChromaGlass app on a Mac on the same Wi-Fi network; the TV draws nothing itself. Without a Mac, choose "Watch a sample film" on the first screen: it plays two 20-second films of the same liquid light show the Mac sends (press Back to return). With a Mac: open ChromaGlass on the Mac and start the show; the TV finds it within a few seconds and shows four digits; press Allow on the Mac and the show plays on the TV. No account or sign-in is needed on the TV.
+```

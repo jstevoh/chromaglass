@@ -59,12 +59,7 @@ and nobody has seen it happen on the Mac.
   brings it to 0.90 to 0.95 in the arithmetic, at the cost of up to a quarter more draws on a
   machine already short of time; whether the wall's smoothness is worth that is the
   owner's call. Measure: the busy phase's draws against its slots.
-- *A 120 Hz laptop with a 60 Hz projector draws 120 a second.* The gate works to the
-  faster display so that neither window gets fewer frames than it would alone, which
-  keeps the desk at 120 on a ProMotion screen; but every draw carries the mirror
-  copy, and the wall shows only every other one. Pacing to the projector while the
-  show window is not what the audience is watching would halve that work. Measure:
-  the arithmetic case 120/60 with the draws counted against the wall's refresh.
+- ~~*A 120 Hz laptop with a 60 Hz projector draws 120 a second.*~~ **Shipped** (14b-120, `DrawGate.paceTo = 'wall'` in `src/lib/drawGate.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
 - *The wall's older "asking for one draws one" line cannot fail on the ask.* It asks
   thirty times with the show's own frames running and counts every frame drawn, so
   the show's own clock alone passes it (and did before this: 60 a second is over its
@@ -92,15 +87,9 @@ owner's look at a 0.75 rung on a real projector through the 'high' mirror.
   from it would share that page's device scale factor, so a Retina laptop driving a
   1x projector cannot be staged in one browser context. A `?stage=1920x1080`
   diagnostic knob, like `?dpr=`, calling `setStage` would let it measure the wall.
-- A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before. The start
-  rule weighs the GPU class and not the stage's pixels; the governor finds the 0.75
-  rung within seconds, but a wall above 1920×1200 could open there.
-- The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall
-  rather than a pixel ratio, and the bench's `dpr` reads the same number. On a stage it
-  should say so ("of the wall").
-- A wall coming or going builds a new governor, which forgets a step rate it had given
-  up and waits out its settling period again, and forgets rungs a solver that would not
-  start had marked failed (only running out of memory sets the cap it keeps).
+- ~~A 4K wall opens at 512² on all 8.3 Mpx, as it did from a 1x laptop before.~~ **Shipped** (14c-4k, `stageLadder` in `src/lib/platform.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+- ~~The readout says "512² · 1.0x" on a wall too, where 1.0 is now a share of the wall rather than a pixel ratio.~~ **Shipped** (14c-readout, `engineLabel` in `src/sim/stepping.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
+- ~~A wall coming or going builds a new governor, which forgets a step rate it had given up and waits out its settling period again, and forgets rungs a solver that would not start had marked failed.~~ **Shipped** (14c-governor, `QualityGovernor.carry` in `src/lib/governor.ts`, `npm run rungs`; story in `docs/plan-shipped.md`).
 - `PW_WEBGPU=1 npm run phone` went red once in two runs on "spreading them zooms in by
   as much as they spread" (3.00 times of 3.40): the zoom was read before the pinch's
   last move landed, on a software plate a few frames a second. Green on the rerun; the
@@ -402,7 +391,7 @@ Left open from it:
   tunnel joins; if Cloudflare rewrites either header, the check's headers change to match.
 - ~~**14m-mark**~~ (S): a big logo reaches the network display. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
 - ~~**14m-lan**~~ (S): the laptop's page at its Wi-Fi address says to open it at localhost. **Shipped** (`npm run phonelink`). Story in `docs/plan-shipped.md`.
-- ~~**14m-https**~~ (M): a network display at a Wi-Fi address starts, over https on `PORT + 443` with a self-signed certificate. **Shipped** (`npm run netdisplay` 3 → 11 of 11). Story in `docs/plan-shipped.md`. Left: **14m-https-wall** (S, the Mac): a TV's or a second Mac's browser takes the warning once and draws the plate (judging §112).
+- ~~**14m-https**~~ (M): a network display at a Wi-Fi address starts, over https on `PORT + 443` with a self-signed certificate. **Shipped** (`npm run netdisplay` 3 → 11 of 11). Story in `docs/plan-shipped.md`. Left: **14m-https-wall** (S, the Mac): a TV's or a second Mac's browser takes the warning once and draws the plate (judging §132).
 - **14m-budget** (S, a trade-off to watch): past 30 wrong keys a minute across every
   address, the server refuses new joins from everyone but the laptop for 60 s. That is
   what keeps a guesser spread over a /48 of IPv6 to about 20,000 guesses a day, so years

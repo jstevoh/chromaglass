@@ -105,7 +105,7 @@ a grid of generic stock thumbnails: ours are the plate itself.
     card for host, universe, fixtures, order and the in-map, kept in the app's settings.
   - **34a-7d. Network displays cannot start over the Wi-Fi.** The show server now serves them over
     https (14m-https, shipped); "more screens on other computers" can be sold once the owner has seen
-    a TV or a second computer take it (judging §112).
+    a TV or a second computer take it (judging §132).
   - **34a-7e. The Ableton route, tried end to end on the owner's Mac.** The page tells a Live user
     to send clock and CC over the IAC bus and let the app hear system audio; nobody has run that
     whole route (§13 step 7's note). Build a small Live set that does it, film a minute, and put
@@ -135,6 +135,12 @@ a grid of generic stock thumbnails: ours are the plate itself.
     another program's address onto ours, and its range (0 to 1 from Resolume) onto the setting's own, so
     Resolume's own addresses, or a scaled one, reach the plate without a bridge. *Measure:* `npm run rig`
     sends the mapped address and reads the setting at the scaled value. Server change, so its own PR.
+- **34a-8. The YouTube channel, linked from the landing page.** *Shipped (2026-11-08, the owner's ask;
+  story in `docs/plan-shipped.md` §34a-8).* `npm run signin` 11b.
+  - **34a-8a. The films themselves on the page.** The link sends a visitor away to watch; the six
+    public films (PR #729's ids in `siteFilms`) could play on the page itself, a card per look, once
+    #679's cards are on main. Until then the channel link is the only way to see a look move.
+
 - **34b. A looks browser with live previews.** *(M.)* A grid of the presets playing
   (paused until hovered or tapped, as Photism's browser does), picked from before the
   desk is opened. Previews run the real shader at a small size and one at a time, so

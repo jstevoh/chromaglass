@@ -61,6 +61,7 @@ const LINK_ONLY = {
   'creativecommons.org': "each track's licence, as a link",
   'github.com': 'links to the source, and the name LRCLIB asks clients to send',
   'www.w3.org': 'the SVG namespace string; nothing is fetched from it',
+  'www.youtube.com': "the landing page links to the channel (PLAN 34a-8), opened in a new tab by the visitor's click; nothing is fetched or embedded from it",
 };
 /** Hosts the page names by the service's name rather than its address. */
 const NAMED_AS = { 'api.audd.io': 'AudD', 'audd.io': 'AudD', 'api.resend.com': 'Resend' };

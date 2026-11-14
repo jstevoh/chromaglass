@@ -1,5 +1,7 @@
-import { VisualizerSettings } from './types';
-import { MOIRE_LOOKS } from './presetsMoire';
+import { DEFAULT_SETTINGS, VisualizerSettings } from './types';
+import { layMoireLooks } from './presetsMoire';
+import { FOAM_CELLS } from './presetsFoam';
+import { layStirCords } from './lib/stir';
 
 export interface Preset {
   id: string;
@@ -115,10 +117,13 @@ export const PRESETS: Preset[] = [
       buoyancy: 0.2,
       advection: 0.45,
       damping: 0.9,
-      automateRate: 0.0,
+      // 28i-7: at 0 nothing poured after the seed, and the river ran to 72% black and one
+      // hue. After pass 1 (0.15) still 73% black: a pour every second or two feeds it syrup streaks in the whole family.
+      automateRate: 0.3,
+      dyeBudget: 0.6,
       viscosity: 'thick',
       polarity: 0.8,
-      evaporationRate: 0.008,
+      evaporationRate: 0.006,
       audioImpact: 0.6,
       turbulenceScale: 0.3,
       blobSurfaceTension: 0.4,
@@ -213,7 +218,7 @@ export const PRESETS: Preset[] = [
       globalSpeed: 0.0336,
       postBlurRadius: 0.1,
       boundaryContrast: 0.7,
-      beads: 0.35,
+      beads: 0.15,               // 28i-7: at 0.35 grey beads covered the neon
       surge: 0.85,
       layerCount: 2,
       blendMode: 'lighter',
@@ -237,8 +242,10 @@ export const PRESETS: Preset[] = [
       // 28i-2: at 0.05 on treble density the plate dried to 99% black and one
       // blue hue. At 0.005 on bass density with a 0.70 budget, pink, cyan and
       // lime neon stay on screen (95th-pct near black under 60%, ≥3 hues).
-      evaporationRate: 0.005,
-      dyeBudget: 0.7,
+      // 28i-7 (film 2026-11-11): at 0.70 the additive blend summed five neons
+      // to a grey-teal wash, 23% near black. Less dye, and the black between.
+      evaporationRate: 0.007,
+      dyeBudget: 0.5,
       hueJourney: 2,
       saturationBoost: 1.55,
       airVelocity: 0.3,
@@ -276,7 +283,7 @@ export const PRESETS: Preset[] = [
       blendMode: 'exclusion',
       gooeyEffect: 0.3,
       rotationSpeed: 0.421,      // the dish's motor; was 0.1 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.6,
+      centerGravity: 0.2,        // 28i-7: at 0.6 every body slid into one amber blob in the middle
       ledPlatform: true,
       ledMode: 'single',
       ledSpeed: 0.0,
@@ -290,7 +297,7 @@ export const PRESETS: Preset[] = [
       glassSmear: 0.9,
       rainDrip: 0.4,
       viscosity: 'thin',
-      polarity: 0.5,
+      polarity: 0.75,            // 28i-7: immiscible enough that five colours stay five
       // It lays dye on the weakest thing the music does (timbre) and dried it at
       // 0.04, so with a band playing the plate ran empty and the frame was the
       // bare LED wheel. It holds its dye now, and the wheel shows through it.
@@ -301,7 +308,7 @@ export const PRESETS: Preset[] = [
       vibrationFrequency: 0.9,
       turbulenceScale: 0.8,      // maximum chaos — ripples on ripples
       turbulenceDetail: 4,
-      blobSurfaceTension: 0.15,  // colours barely hold apart
+      blobSurfaceTension: 0.35,  // 28i-7: was 0.15, and the bodies ran together
       edgeRelief: 0.65,
       bubbles: 0.17,
       boundaryContrast: 0.75,     // hard psychedelic color interfaces
@@ -356,8 +363,10 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thick',
       polarity: 0.7,
-      evaporationRate: 0.020,
-      dyeBudget: 0.24,
+      // 28i-7 (film 2026-11-11): at 0.24 and 0.020 one blue body was left of
+      // the three wells' colours. Enough for all three, black still between.
+      evaporationRate: 0.012,
+      dyeBudget: 0.38,
       airVelocity: 0.02,
       vibrationFrequency: 0.0,
       audioImpact: 0.95,
@@ -436,7 +445,7 @@ export const PRESETS: Preset[] = [
       viscosity: 'thick',
       polarity: 0.15,
       blobSurfaceTension: 0.05,
-      evaporationRate: 0.002,
+      evaporationRate: 0.005,    // 28i-7: a little bright field between the cells
       airVelocity: 0.06,
       vibrationFrequency: 0.02,
       turbulenceScale: 0.22,
@@ -444,7 +453,7 @@ export const PRESETS: Preset[] = [
       cells: 0.0,
       exposure: 0.22,
       saturationBoost: 1.05,
-      dyeBudget: 0.72,
+      dyeBudget: 0.45,           // 28i-7: bright field between the cells
       sceneMappings: [
         // The hats by name are the `bands` source's; on `sound` this read 0 (28f).
         // Kick and snare agitate the slide's cover glass and swirl without drawing sharp beads or bubbles (28i-2, 28i-3b).
@@ -463,7 +472,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'aurora-borealis',
     name: 'Aurora Borealis',
-    description: 'Curtains of jade, lime and lavender ripple across a night sky, slow and hushed.',
+    description: 'Curtains of jade and lime with a lavender and pink top edge ripple across a night sky, slow and hushed.',
     settings: {
       globalSpeed: 0.0105,
       surge: 0.2,
@@ -875,63 +884,6 @@ export const PRESETS: Preset[] = [
   // the ones that keep dye *separated* into distinct beads — high polarity,
   // low diffusion, low gooey blur — and fast enough to be worth chasing.
   {
-    id: 'lumia',
-    name: 'Lumia',
-    description: 'Thomas Wilfred\u2019s lumia: slow folded light, and three veils of colour in different parts of a nearly clear plate, two held in glycerine and one that soap spreads thin. No beat \u2014 minutes-long evolutions.',
-    settings: {
-      globalSpeed: 0.00504,
-      surge: 0.12,
-      layerCount: 1,
-      blendMode: 'screen',
-      gooeyEffect: 0.5,
-      rotationSpeed: 0.0084,     // the dish's motor; was 0.003 with a stir in the middle (PLAN 22j)
-      centerGravity: 0.0,
-      ledPlatform: false,
-      ledMode: 'single',
-      ledColor: '#05030c',
-      ledSpeed: 0.0,
-      diffusionRate: 0.0002,
-      buoyancy: 0.2,
-      advection: 0.3,
-      damping: 0.99,
-      heatDecay: 0.99,
-      automateRate: 0.03,       // tends its three veils; at 0.008 a drop came every three minutes and the plate stayed empty
-      platePressure: 0.05,
-      glassSmear: 0,
-      rainDrip: 0.0,
-      viscosity: 'thick',
-      polarity: 0.3,
-      evaporationRate: 0.06,
-      airVelocity: 0.02,
-      vibrationFrequency: 0.0,
-      audioImpact: 0.12,
-      turbulenceScale: 0.12,
-      turbulenceDetail: 2,
-      blobSurfaceTension: 0.7,
-      boundaryContrast: 0.15,
-      saturationBoost: 1.2,
-      dyeBudget: 0.2,          // a nearly clear plate: three veils, in their areas (lib/plateAreas.ts), and dark between (was 0.1, with nothing laid)
-      edgeRelief: 0.3,
-      bubbles: 0,
-      plateRock: 0.1,
-      layerScaleVariety: 0,
-      lumia: 0.9,
-      /*
-        No drum hits: Wilfred's three veils answer harmony and the lead note
-        only, each in its own area on a slow gate (PLAN 25h, 28i-3b). Low
-        harmony warms the left glycerine veil (area 0), mid harmony folds the
-        soap veil (area 1), and the lead note refreshes the lower glycerine
-        veil (area 2).
-      */
-      sceneMappings: [
-        { source: 'bands', feature: 'tonalLow', setting: 'areaHeat', area: 0, depth: 0.35, threshold: 0.3, attack: 0.2, release: 0.8 },
-        { source: 'bands', feature: 'tonalMid', setting: 'areaStir', area: 1, depth: 0.3, threshold: 0.35, attack: 0.15, release: 0.6 },
-        { source: 'bands', feature: 'note', setting: 'areaPour', area: 2, depth: 0.3, threshold: 0.4, attack: 0.1, release: 0.7 },
-      ],
-      audioMappings: { velocity: 'energy', density: 'none', color: 'timbre', rotation: 'none' },
-    }
-  },
-  {
     /*
       PLAN.md 26d. The owner's "Mask Reaction Diff" pack, done as the chemistry
       it imitates: a CIMA dish (Castets, Dulos, Boissonade and De Kepper, 1990)
@@ -1173,15 +1125,15 @@ export const PRESETS: Preset[] = [
       macroCells: 0,
       macroCellScale: 0.6,
       macroLacing: 0,
-      macroDepth: 0.7,
-      macroEdgeDetail: 0.5,
+      macroDepth: 0.5,           // 28i-7: at 0.7 the shallow focus blurred the pools' edges
+      macroEdgeDetail: 0.75,
       macroRelief: 0.9,       // deepest relief of the three — cells read as bubbles
       globalSpeed: 0.045,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
-      gooeyEffect: 0.2,
-      postBlurRadius: 0.12,
+      gooeyEffect: 0.1,
+      postBlurRadius: 0.04,      // 28i-7: sharper pool edges
       rotationSpeed: 0.18,       // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
       centerGravity: 0.75,       // 28i-2: holds the three pools inside the central closeup frame instead of drifting off
       ledPlatform: true,
@@ -1209,7 +1161,7 @@ export const PRESETS: Preset[] = [
       blobSurfaceTension: 0.65,
       bubbles: 0.1,
       layerScaleVariety: 0,
-      boundaryContrast: 0.65,
+      boundaryContrast: 0.8,
       saturationBoost: 1.55,
       glossiness: 0.18,
       macroSync: 0.35,
@@ -1452,19 +1404,20 @@ export const PRESETS: Preset[] = [
   {
     id: 'soap-film',
     name: 'Soap Film',
-    description: 'One sheet of interference colour, torn open again and again: each hole rushes outward, thins to a rim, and curls into filaments before the next one lands.',
+    description: 'A real soap film in its frame: it drains through the colours of its own thickness, silver to gold, blue and magenta, swirls with the music, goes black from the top, and is drawn again.',
     settings: {
       surfactantFlow: 0.6,
-      // Thin-film optics over a plate whose only event is the tear. The film
-      // has to be thin for the colour to be there at all, which is also what
-      // makes it easy to break — so evaporation runs high and the dye budget
-      // low, and the soap keeps re-opening what the flow closes.
+      // The frame's own film (PLAN 32d) over a dark ground: its colour is its
+      // thickness, seen in reflection. The plate under it is a faint dye
+      // whose flow, stirred by the soap and the music, is the air that
+      // swirls the film. No dish motor: the frame does not turn.
+      soapFilm: 1,
       globalSpeed: 0.0168,
       surge: 0.5,
       layerCount: 1,
       blendMode: 'screen',
       gooeyEffect: 0.3,
-      rotationSpeed: 0.116,      // the dish's motor; was 0.004 with a stir in the middle (PLAN 22j)
+      rotationSpeed: 0,
       centerGravity: 0.08,
       ledPlatform: false,
       ledMode: 'single',
@@ -1481,7 +1434,7 @@ export const PRESETS: Preset[] = [
       rainDrip: 0.0,
       viscosity: 'thin',
       polarity: 0.5,
-      evaporationRate: 0.006,      // a film that is always thinning is always about to go
+      evaporationRate: 0.004,      // a film that is always thinning is always about to go (0.006 left 78% black, 28i-7)
       airVelocity: 0.05,
       vibrationFrequency: 0.05,
       audioImpact: 0.5,
@@ -1492,7 +1445,7 @@ export const PRESETS: Preset[] = [
       saturationBoost: 1.35,
       glossiness: 0.2,
       postBlurRadius: 0.2,
-      dyeBudget: 0.5,
+      dyeBudget: 0.3,
       edgeRelief: 0.55,
       bubbles: 0.05,
       plateRock: 0.25,
@@ -1503,7 +1456,7 @@ export const PRESETS: Preset[] = [
       lampMotion: 0.2,
       lampHotspot: 0.45,
       iridescence: 0.6,
-      thinFilm: 1.0,
+      thinFilm: 0,
       secondLamp: 0,
       /*
         The soap sheet's own fast patches (PLAN 28i-3b): kicks pull thin spots
@@ -1886,7 +1839,7 @@ export const PRESETS: Preset[] = [
       plateSpring: 0.35,
       beatSqueeze: 0.0,
       transmission: 0.35,
-      dishVignette: 0.8,
+      dishVignette: 0.35,        // 28i-7: at 0.8 the dish was a small disc in a black frame (72% near black)
       lampHotspot: 0.5,
       /*
         Two bowed clock glasses (PLAN 28i-3b): kicks press the top glass so
@@ -1959,7 +1912,7 @@ export const PRESETS: Preset[] = [
       plateSpring: 0.35,
       beatSqueeze: 0.0,
       transmission: 0.4,
-      dishVignette: 0.6,
+      dishVignette: 0.3,         // 28i-7: a bigger dish
       lampHotspot: 0.45,
       /*
         Fast readings only (the owner's rule): a kick presses the top glass,
@@ -1975,6 +1928,7 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'bass', color: 'none', rotation: 'none' },
     }
   },
+  FOAM_CELLS,
   /*
     Two looks were made after Chemical Bouillon's ferrofluid films, the references the
     owner gave for how ferrofluid should look (docs/bubbles-plan.md); Ferro Maze
@@ -1985,7 +1939,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'ferro-paint',
     name: 'Ferro Paint',
-    description: 'Ferrofluid worked through amber, teal and coral dye under a wandering magnet: black channels and beads between bright cells of colour, wet and glossy, as in Colored I and II.',
+    description: 'Ferrofluid worked through yellow, coral and pink dye under a wandering magnet: black channels and beads between bright cells of colour, wet and glossy, as in Colored I and II.',
     settings: {
       ferroLabyrinth: 0.9,
       globalSpeed: 0.0105,
@@ -2016,7 +1970,7 @@ export const PRESETS: Preset[] = [
       audioImpact: 0.5,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.3,
-      saturationBoost: 1.35,
+      saturationBoost: 1.55,
       dyeBudget: 1.0,
       glossiness: 0.5,
       postBlurRadius: 0.12,
@@ -2040,7 +1994,7 @@ export const PRESETS: Preset[] = [
       lampHotspot: 0.3,
       secondLamp: 0.2,
       /*
-        Ferrofluid channels through amber, teal and coral (PLAN 28i-3b): kicks
+        Ferrofluid channels through the warm paints (PLAN 28i-3b): kicks
         drive the labyrinth channels finer, snares branch the fingers along
         the seams, and high overtones crisp the black channel walls.
       */
@@ -2151,30 +2105,71 @@ export const PRESETS: Preset[] = [
   {
     id: 'lava-lamp',
     name: 'Lava Lamp',
-    description: 'The plate stood upright over a warm lamp: coloured wax heavier than the liquid round it sinks in mushroom-headed plumes, is warmed where it pools at the bottom, and rises again.',
+    description: 'The plate stood upright over a warm lamp: blobs of coloured wax that never mix with the clear liquid round them pool at the bottom, swell lighter as the lamp warms them, rise, cool and sink again.',
     settings: {
       /*
         A look for physics that shipped with no look to show it (PLAN.md 28a).
-        Stand the plate up (Plate Upright) and gravity acts in it; give the
-        dye weight (Dye Weight, solutalBuoyancy) and a band of it over clear
-        liquid is a Rayleigh–Taylor instability: it falls in fingers that roll
-        up into mushroom heads, the lab's 192² plate after 400 steps showing
-        a dozen of them from two rows of drops. The solver keeps a lamp under
-        the plate where it leaves the frame (LAMP_HEAT in gpu/fluid.ts), so
-        what pools there is warmed, rises, cools and sinks again: the cycle a
-        lava lamp runs on, rather than a dish that settles. Heat diffusing
-        faster than the dye (doubleDiffusion, as heat does in water) narrows
-        the plumes toward salt fingers. Lit from behind like the real lamp.
+        Stand the plate up (Plate Upright) and gravity acts in it. The solver
+        keeps the bottle's floor warm and its upper glass cool (LAMP_GLASS and
+        LAMP_COOL_FROM in gpu/fluid/constants.ts: both heat the water and the
+        wax alike, by conduction through the gap, PLAN 27f-9h), so what pools
+        on the floor is warmed, rises, cools and sinks again: the cycle a lava
+        lamp runs on, rather than a dish that settles. Lit from behind like
+        the real lamp.
+
+        The wax is a liquid of its own (PLAN 27f-9c): the oil (Oil Tension,
+        Cahn–Hilliard, so it holds itself in bodies and the liquid round it
+        stays clear), its colour in it alone (Oil Bodies), heavier than the
+        liquid cold (Oil Weight) and lighter warm, because an oil swells with
+        heat two to three times what water does (OIL_EXPAND). It was dye with
+        a weight (Dye Weight) before, and dye mixes: sealed in its bottle
+        (27f-9) it filmed red wall to wall with no blob in it. Dye Weight
+        stays at 0.7 for the colour a hand pours, and weighs the wax's own
+        dye a little too. Laid as a pool on the warm glass and three bodies
+        on their way (lib/oilLay.ts, LAVA_BODIES).
       */
+      oilTension: 1,             // 27f-9h: all the tension the dial has, for the rounder blobs
+      oilBodies: 1,
+      oilWeight: 0.6,
       plateUpright: 1,
-      solutalBuoyancy: 0.7,
-      doubleDiffusion: 0.5,
+      /*
+        How strongly gravity weighs the liquids' density differences (Dye
+        Weight), which for the wax sets its Bond number, weight against
+        surface tension (PLAN 27f-9h): a real lamp's wax is a few per cent
+        heavier than its liquid cold and its capillary length is about
+        1.5 cm, so its blobs are fat and round; at 0.7 ours was about 3 mm
+        and the wax rose as many thin worms. 0.5 is as low as a standing
+        plate goes: the solver floors Dye Weight there when the plate is
+        upright (fluid.ts, "Dye weighs something whether or not a look says
+        how much"), so the 0.2 this look carried for a day ran as 0.5, and
+        0.2, 0.35 and 0.5 are one run to the last digit (measured, PLAN
+        27f-9j). At 0.5 the weight and the heat's lift both fall by 1.4 and
+        the capillary length grows by √1.4 ≈ 1.2; the rest of the rounder
+        look is Oil Tension at 1 and the lighter colour in the wax
+        (LAVA_DYE). Hand-poured colour weighs less with it.
+      */
+      solutalBuoyancy: 0.5,
+      /*
+        Heat spreads at water's own rate (PLAN 27f-9c). 0.5 made it fifty times
+        faster for salt fingers in the dye-wax: with the wax a body, the heat
+        leaked out of every risen body into a warm pool of water under the wax
+        that held it up (the lab, 40 s: 5.3 of the heat's units in the water
+        under the bodies, 2.6 in the wax).
+      */
+      doubleDiffusion: 0,
       tiltDirection: 180,
       heatDecay: 0.995,
       lampGround: 1,
       ledPlatform: true,
       ledMode: 'single',
-      ledColor: '#b58c5c',
+      /*
+        The lamp's bulb behind the liquid (PLAN 27f-9h): an incandescent
+        lamp's warm white, about 2700 K, which through a clear liquid reads
+        as the golden glow of a real lamp. It was a dim tan (#b58c5c), and
+        under it the wax read as dark blobs on mud (the owner, 2026-11-12:
+        "isn't that exciting visually").
+      */
+      ledColor: '#ffc457',
       ledSpeed: 0.0,
       globalSpeed: 0.0168,
       surge: 0.38,
@@ -2182,12 +2177,31 @@ export const PRESETS: Preset[] = [
       blendMode: 'screen',
       gooeyEffect: 0.6,
       rotationSpeed: 0,          // a lamp does not turn: down has to stay down the screen
-      centerGravity: 0.32,       // 28i-2: holds the rising wax inside the bottle instead of draining out the open rim
+      /*
+        No pull to the middle (PLAN 27f-9). 28i-2 set Centre Gravity 0.32 to
+        hold the rising wax in from the open rim, a force no lamp has. The
+        plate is a sealed bottle now (wgsl/fluid/seal.ts): the wax goes round
+        inside the glass by its own weight and the lamp's heat, and the pull
+        only bent its plumes toward the middle.
+      */
+      centerGravity: 0,
       diffusionRate: 0,
-      buoyancy: 0.42,
+      /*
+        The liquid's own heat lift (the lasting current's) kept small: a lamp
+        runs on the wax swelling (OIL_EXPAND), and at
+        0.42 the warmed water lifted the wax off the floor as a sheet over it.
+      */
+      buoyancy: 0.1,
       advection: 0.48,
       damping: 0.988,
-      automateRate: 0.30,        // 28i-2: keeps the wax plumes rising and falling (motion >= 0.02 at 20 and 40 s, luma <= 0.6)
+      /*
+        No Evolve (PLAN 27f-9h). 28i-2 set 0.30 to keep the wax moving before
+        the lamp went round on its own (27f-9e); its hand pours colour and
+        breathes air into the plate, which no sealed lamp has, and on the Mac
+        film (2026-11-12) the lamp's fat blobs were beads and smears of
+        poured red by 17 s. The cycle is the motion now.
+      */
+      automateRate: 0,
       platePressure: 0.28,
       glassSmear: 0,
       rainDrip: 0.0,
@@ -2196,14 +2210,36 @@ export const PRESETS: Preset[] = [
       evaporationRate: 0.001,
       airVelocity: 0.04,
       vibrationFrequency: 0.0,
-      audioImpact: 0.55,
-      turbulenceScale: 0.42,
+      /*
+        The music's hands off (PLAN 27f-9h): at 0.55 its bursts, sparks and
+        streams laid dye and kicks of flow into the sealed lamp and tore the
+        wax into beads on the Mac film. The band reaches the lamp as the
+        look's own comment below says it should, through the wax's heat
+        (sceneMappings: the bass on Buoyancy) and the colours' turn.
+      */
+      audioImpact: 0,
+      /*
+        No stirring (it was 0.42, which with no music is 0.51 of the hand's
+        speed, PLAN 27c): a lamp is not stirred, its liquid moves by the wax's
+        weight and the lamp's heat alone, and the stir tore the wax apart.
+        Measured in the lab on this look (npm run lavawax's step): after six
+        seconds at 0.42, 1545 of the 2465 the oil was laid with were left
+        inside the rim's ring, against 2196 unstirred (the rest of that is the
+        pool lying out along the curved floor); over the whole plate, at 0.1
+        4% of the oil was gone as oil in fourteen seconds, at 0 none of it.
+      */
+      turbulenceScale: 0,
       blobSurfaceTension: 0.5,
       boundaryContrast: 0.4,
       saturationBoost: 1.45,
-      exposure: 0.46,
+      /*
+        Brighter than the old 0.46 with the wax laid lighter (LAVA_DYE) and
+        the bulb's warm white behind it (ledColor): the plate's mean light
+        went from a dim tan with near-black blobs to a lit lamp's.
+      */
+      exposure: 0.55,
       glossiness: 0.15,
-      plateRock: 0.25,
+      plateRock: 0,              // 27f-9h: a lamp stands still on its table; the rock on a standing plate also goes over the open rim (27f-9a)
       beatSqueeze: 0.0,
       dyeBudget: 0.65,
       bubbles: 0,
@@ -2224,27 +2260,96 @@ export const PRESETS: Preset[] = [
       audioMappings: { velocity: 'bass', density: 'mid', color: 'none', rotation: 'none' },
     }
   },
+  {
+    id: 'saffron-lace',
+    name: 'Saffron Lace',
+    description: 'A film of yellow oil on pale water tears itself into lace and beads into spatter, lit from below: lavender shows through its holes, and cobalt and coral pools lie under it.',
+    settings: {
+      /*
+        After the owner's still of a liquid light show (2026-11-07): yellow
+        veins and cells of lace with fine spatter between them, over a
+        lavender wash, with cobalt and coral. The lace is not drawn: it is
+        Clear Film (PLAN §20b, wgsl/film.ts), a thin layer of oil against the
+        glass that dewets by itself on the dish's dust, opens into holes, and
+        beads its ligaments into rows of drops, dyed yellow by Film Dye
+        (20b-13, Beer–Lambert through the film's own thickness). Oil Bodies
+        laid as lace was tried first and rejected: Cahn–Hilliard pulls its
+        veins into blobs within three seconds at any Oil Tension.
+
+        The water under it is pale on purpose. A yellow film over lavender
+        water is two filters stacked, and yellow times lavender is amber
+        (0.71 × 1, 0.55 × 0.82, 1 × 0.1 in three bands): Film Dye's own lab
+        picture (#684) drew its lace amber over a lavender ground. So the lamp's white is
+        the ground, the film reads yellow over it, and the colour is laid as
+        pools (lib/plateAreas.ts): a wide pale lavender wash, a cobalt pool,
+        a coral one. Where the film is whole over a pool its colour darkens
+        toward amber or olive, as a real dyed film over dyed water would;
+        where it has torn the pool's own colour shows through the hole. The
+        film's thickness also takes its share out of the water's path
+        (plate.ts: gapScale × (1 − film)), so a fat bead pushes the water's
+        dye out from under it and reads closer to its own yellow.
+      */
+      lampGround: 1,
+      clearFilm: 0.35,           // 0.3 of the gap: it tears on the dish's dust in a few seconds, a third torn by five (lab); 0.25 tiled as coarsely (28i-7, film), so the fix is 28l-3's
+      clearFilmDye: 0.35,        // at 0.6 its beads, which thicken toward the whole gap, read orange (lab)
+      clearFilmDyeColor: '#ffd21a',
+      globalSpeed: 0.0126,
+      surge: 0.35,
+      layerCount: 1,
+      blendMode: 'screen',
+      gooeyEffect: 0.3,
+      rotationSpeed: 0.03,       // the dish's motor, slow: the lace turns and shears without being wound up
+      centerGravity: 0.0,
+      ledPlatform: false,
+      ledMode: 'single',
+      ledColor: '#000000',
+      ledSpeed: 0.0,
+      diffusionRate: 0,
+      buoyancy: 0.1,
+      advection: 0.45,
+      damping: 0.985,
+      heatDecay: 0.99,
+      automateRate: 0.06,        // a few pours a minute: oil re-thickens the film where it lands, soap opens it again
+      platePressure: 0.3,
+      glassSmear: 0,
+      rainDrip: 0.0,
+      viscosity: 'thick',
+      polarity: 0.85,
+      evaporationRate: 0.002,
+      airVelocity: 0.02,
+      vibrationFrequency: 0.05,
+      audioImpact: 0.5,
+      blobSurfaceTension: 0.4,
+      boundaryContrast: 0.3,
+      saturationBoost: 1.2,
+      dyeBudget: 0.7,
+      glossiness: 0.2,
+      postBlurRadius: 0.05,
+      plateCurve: 0.2,
+      transmission: 0.5,
+      dishVignette: 0.2,         // 28i-7: a bigger dish
+      lampHotspot: 0.35,
+      bubbles: 0,
+      /*
+        Fast readings only (the owner's rule). A kick presses the top glass,
+        and the press thins the film under it, so the lace opens on the beat;
+        a snare lifts the press into fingers, which tear the film along their
+        edges; and the cobalt pool's soap takes the bass (its area), so each
+        kick there opens a fresh hole.
+      */
+      sceneMappings: [
+        { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.25 },
+        { source: 'hits', feature: 'snareHit', setting: 'fingering', depth: 0.2 },
+      ],
+      audioMappings: { velocity: 'bass', density: 'none', color: 'none', rotation: 'none' },
+    }
+  },
 ];
 
-/*
-  The moiré pack's looks (PLAN 45a; presetsMoire.ts), each laid over the look
-  it starts from. Its cords are that look's, and a sheet's cord takes the
-  place of the last of them: a look carries two or three fast cords
-  (PLAN 28i-3b, `npm run soundpatch`), and the first version, which added the
-  sheet's to the house look's three, made four, too many for a hand to read
-  on the wall. A pack look laid over a look with areas adds none: its areas'
-  cords are the music there, and a plate-wide one beside them is the
-  redundancy 28i-3b turns away. The plate itself (dyes, pours, dish, areas)
-  is the house look's under the pack look's id (presetPlate.ts).
-*/
-for (const m of MOIRE_LOOKS) {
-  const from = PRESETS.find(p => p.id === m.from);
-  if (!from) continue;
-  const own = m.settings.sceneMappings ?? [];
-  const house = from.settings.sceneMappings ?? [];
-  const cords = [...house.slice(0, Math.max(0, Math.min(house.length, 3 - own.length))), ...own];
-  PRESETS.push({ id: m.id, name: m.name, description: m.description, pack: 'moire', settings: { ...from.settings, ...m.settings, sceneMappings: cords } });
-}
+// The moiré pack's looks, each laid over the look it starts from (presetsMoire.ts), then the music's
+// stir on every look, the pack's included (lib/stir.ts `layStirCords`, PLAN 38u-5). In that order.
+layMoireLooks(PRESETS);
+layStirCords(PRESETS, DEFAULT_SETTINGS.turbulenceScale, DEFAULT_SETTINGS.audioImpact);
 
 /*
   Retired preset palettes, and the one that took each one's place (PLAN.md 28a).
@@ -2291,6 +2396,12 @@ export const RETIRED_PRESETS: Readonly<Record<string, string>> = {
   'timbre-shifter': 'microscopic-chaos',
   // a wheel of oil and silicone that turned the whole frame, which only FRAME_MOVING_LOOKS may; Clock Glass keeps the oil and water between glass.
   'oil-wheel': 'clock-glass',
+  // Judged on the Mac gallery of 2026-10-19 and again on the Mac film of 2026-11-11
+  // (PLAN.md 28i-5): a muddy teal fog under a red disc, its three veils rarely reading as
+  // pools; Velvet Underground keeps the slow areas of dye on the dark plate that Lumia was
+  // after. The lamp's Lumia (the setting, the Mixer row, its MIDI and desk pins) stays: only
+  // the look retires.
+  'lumia': 'velvet-underground',
 };
 
 /** A retired id's replacement, followed to the end; any other id unchanged. */

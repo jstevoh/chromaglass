@@ -43,6 +43,7 @@ import { build } from 'esbuild';
 import worker from '../server/license-worker.js';
 import { generatePair, restoreBackup, revokeIds, rotate } from './licenserotate.mjs';
 import { verifyLicenseKey } from '../server/license-key.js';
+import { packForProduct } from '../server/license-packs.js';
 import { createServerLicenseManager } from '../server/server-license.js';
 
 const checks = [];
@@ -919,6 +920,158 @@ let bobProToken = '';
     '13f. the live Home (1479217), Upgrade (1479218) and Pro (1479219) products file their keys with no settings at all',
     umaKeys.length === 1 && umaKeys[0].tier === 'pro' && tiaKeys.length === 1 && tiaKeys[0].tier === 'pro',
     `pro ${umaKeys.map((k) => k.tier).join('+')}, home then upgrade ${tiaKeys.map((k) => k.tier).join('+')}`,
+  );
+
+  // 13g–13m. The moiré pack, sold on top of Home (PLAN.md 45a-2, server/license-packs.js). A pack is
+  // not a tier: its order signs the buyer's Home key again under the same id with `packs: ['moire']`,
+  // and its refund signs it again without. Each line reads the signed token itself, not only the
+  // record, because the app trusts the token: a record that says `packs` over a token that names
+  // none would unlock nothing, and the check would pass on it.
+  const envP = makeEnv({ LS_HOME_PRODUCT_IDS: '777000', LS_PRO_PRODUCT_IDS: '777001', LS_UPGRADE_PRODUCT_IDS: '777002', LS_MOIRE_PRODUCT_IDS: '777003' });
+  const moire = (email, orderId, opts = {}) => lsOrder(email, orderId, { productId: 777003, name: 'Moiré Pack', ...opts });
+  const tokenPacks = async (k) => {
+    const v = k ? await verifyLicenseKey(k.token, licensePubJwk) : { valid: false };
+    return v.valid ? (v.payload.packs ?? []).join(',') || '-' : 'invalid';
+  };
+
+  // 13g. A pack with no Home on file is held (it is an add-on); so is one bought on a Pro (Pro includes it).
+  const lone = await (await postWebhook(envP, moire('vic@example.com', 'ord_vic_m'))).json();
+  await postWebhook(envP, lsOrder('wes@example.com', 'ord_wes_1', { productId: 777001 }));
+  const onPro = await (await postWebhook(envP, moire('wes@example.com', 'ord_wes_m'))).json();
+  const wesKeys = await keysOf(envP, 'wes@example.com');
+  check(
+    '13g. a moiré pack order with no Home key is held and files nothing; on a Pro key it is held and the Pro key is untouched',
+    lone.ignored === 'pack with no Home key' && (await keysOf(envP, 'vic@example.com')).length === 0 && envP.LICENSE_KV.values.has('held:key_ord_vic_m') &&
+      onPro.ignored === 'pack already in Pro' && wesKeys.length === 1 && (await tokenPacks(wesKeys[0])) === '-',
+    `no home: ${lone.ignored}; on pro: ${onPro.ignored}, pro token packs ${await tokenPacks(wesKeys[0])}`,
+  );
+
+  // 13h. On a Home: the same key id, signed again, naming the pack; the old token still verifies (offline keys
+  // never expire) but names none. Delivered again, the order changes nothing; bought twice, the second is held.
+  await postWebhook(envP, lsOrder('xia@example.com', 'ord_xia_1', { productId: 777000 }));
+  const before = (await keysOf(envP, 'xia@example.com'))[0];
+  const bought = await (await postWebhook(envP, moire('xia@example.com', 'ord_xia_m'))).json();
+  const after = await keysOf(envP, 'xia@example.com');
+  const resent = await (await postWebhook(envP, moire('xia@example.com', 'ord_xia_m'))).json();
+  const afterResend = await keysOf(envP, 'xia@example.com');
+  const twice = await (await postWebhook(envP, moire('xia@example.com', 'ord_xia_m2'))).json();
+  check(
+    '13h. a pack on a Home re-signs the same key id with packs [moire] (listed on /keys); a re-sent order changes nothing; a second purchase is held',
+    after.length === 1 && after[0].id === before.id && after[0].tier === 'home' && after[0].token !== before.token &&
+      (await tokenPacks(after[0])) === 'moire' && (await tokenPacks(before)) === '-' && after[0].packs?.join() === 'moire' &&
+      bought.packs?.join() === 'moire' && resent.ok && afterResend.length === 1 && afterResend[0].token === after[0].token &&
+      twice.ignored === 'pack already on key',
+    `id ${before.id} → ${after[0]?.id}, token packs ${await tokenPacks(before)} → ${await tokenPacks(after[0])}, listed ${after[0]?.packs}, resent same token ${afterResend[0]?.token === after[0]?.token}, twice ${twice.ignored}`,
+  );
+
+  // 13i. Refunding the pack takes the pack off and leaves the Home; the pack order delivered again after it files nothing.
+  const unpack = await (await postWebhook(envP, moire('xia@example.com', 'ord_xia_m', { status: 'refunded', event: 'order_refunded' }))).json();
+  const afterRefund = await keysOf(envP, 'xia@example.com');
+  const reAfter = await (await postWebhook(envP, moire('xia@example.com', 'ord_xia_m'))).json();
+  check(
+    '13i. refunding the pack order re-signs the Home without it (same id, still Home); the pack order sent again after is held',
+    unpack.unpacked === 'moire' && afterRefund.length === 1 && afterRefund[0].id === before.id && afterRefund[0].tier === 'home' &&
+      (await tokenPacks(afterRefund[0])) === '-' && reAfter.ignored === 'order already refunded' && (await tokenPacks((await keysOf(envP, 'xia@example.com'))[0])) === '-',
+    `unpacked ${unpack.unpacked}, keys ${afterRefund.map((k) => k.tier).join('+')}, token packs ${await tokenPacks(afterRefund[0])}, resent ${reAfter.ignored}`,
+  );
+
+  // 13j. Refunding the Home order takes the whole key, pack and all.
+  await postWebhook(envP, lsOrder('yan@example.com', 'ord_yan_1', { productId: 777000 }));
+  await postWebhook(envP, moire('yan@example.com', 'ord_yan_m'));
+  const yanMid = await tokenPacks((await keysOf(envP, 'yan@example.com'))[0]);
+  await postWebhook(envP, lsOrder('yan@example.com', 'ord_yan_1', { productId: 777000, status: 'refunded', event: 'order_refunded' }));
+  const yanAfter = await keysOf(envP, 'yan@example.com');
+  check(
+    '13j. refunding the Home order revokes the key the pack was on',
+    yanMid === 'moire' && yanAfter.length === 0,
+    `packs before ${yanMid}, keys after ${yanAfter.length}`,
+  );
+
+  // 13k. An upgrade carries the pack into Pro; refunding just the upgrade gives the Home back with the pack.
+  await postWebhook(envP, lsOrder('zed@example.com', 'ord_zed_1', { productId: 777000 }));
+  await postWebhook(envP, moire('zed@example.com', 'ord_zed_m'));
+  await postWebhook(envP, lsOrder('zed@example.com', 'ord_zed_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const zedPro = await keysOf(envP, 'zed@example.com');
+  const zedProPacks = await tokenPacks(zedPro[0]);
+  await postWebhook(envP, lsOrder('zed@example.com', 'ord_zed_up', { productId: 777002, status: 'refunded', event: 'order_refunded' }));
+  const zedBack = await keysOf(envP, 'zed@example.com');
+  check(
+    '13k. an Upgrade signs the pack into the Pro key; refunding the upgrade refiles the Home with the pack still on it',
+    zedPro.length === 1 && zedPro[0].tier === 'pro' && zedProPacks === 'moire' &&
+      zedBack.length === 1 && zedBack[0].tier === 'home' && (await tokenPacks(zedBack[0])) === 'moire',
+    `upgraded ${zedPro.map((k) => k.tier).join('+')} packs ${zedProPacks}, refunded ${zedBack.map((k) => k.tier).join('+')} packs ${await tokenPacks(zedBack[0])}`,
+  );
+
+  // 13l. The pack, refunded after the upgrade, comes off the Pro key (the record kept its order through the upgrade).
+  await postWebhook(envP, lsOrder('amy@example.com', 'ord_amy_1', { productId: 777000 }));
+  await postWebhook(envP, moire('amy@example.com', 'ord_amy_m'));
+  await postWebhook(envP, lsOrder('amy@example.com', 'ord_amy_up', { productId: 777002, name: 'ChromaGlass Upgrade' }));
+  const amyUn = await (await postWebhook(envP, moire('amy@example.com', 'ord_amy_m', { status: 'refunded', event: 'order_refunded' }))).json();
+  const amyKeys = await keysOf(envP, 'amy@example.com');
+  check(
+    '13l. refunding the pack after an upgrade takes it off the Pro key and leaves the Pro',
+    amyUn.unpacked === 'moire' && amyKeys.length === 1 && amyKeys[0].tier === 'pro' && (await tokenPacks(amyKeys[0])) === '-',
+    `unpacked ${amyUn.unpacked}, keys ${amyKeys.map((k) => k.tier).join('+')}, packs ${await tokenPacks(amyKeys[0])}`,
+  );
+
+  // 13n. Then refunding the upgrade refiles the Home without the refunded pack: the Pro
+  // record's copy of the Home it replaced must lose the pack too (`replaces`).
+  await postWebhook(envP, lsOrder('amy@example.com', 'ord_amy_up', { productId: 777002, status: 'refunded', event: 'order_refunded' }));
+  const amyBack = await keysOf(envP, 'amy@example.com');
+  check(
+    '13n. refunding the upgrade after the pack was refunded refiles the Home with no pack',
+    amyBack.length === 1 && amyBack[0].tier === 'home' && (await tokenPacks(amyBack[0])) === '-' && !amyBack[0].packOrders,
+    `keys ${amyBack.map((k) => k.tier).join('+')}, packs ${await tokenPacks(amyBack[0])}, orders ${JSON.stringify(amyBack[0]?.packOrders ?? null)}`,
+  );
+
+  // 13o. Our own JSON naming the pack event cannot say which pack, so it is refused, not filed.
+  const barePack = await postWebhook(envP, { event: 'order_pack', email: 'amy@example.com', orderId: 'ord_amy_bare' });
+  check('13o. an order_pack without a store product is refused (400)', barePack.status === 400, `status ${barePack.status}`);
+
+  // 13p. The device's half: which key listed under the held key's id replaces it
+  // (accountLicense pick() asks sameIdKeyWins). A pack bought or refunded changes the
+  // packs; an upgrade raises the tier with the packs unchanged (the review of 45a-2
+  // found pick() kept every upgrade buyer on Home when it compared packs alone).
+  const lk = await import(`data:text/javascript;base64,${Buffer.from((await build({
+    entryPoints: [new URL('../src/lib/licenseKey.ts', import.meta.url).pathname],
+    bundle: true, write: false, format: 'esm', platform: 'node', logLevel: 'silent',
+    define: { 'import.meta.env': JSON.stringify({}) },
+  })).outputFiles[0].text).toString('base64')}`);
+  const wins = [
+    lk.sameIdKeyWins({ tier: 'home' }, { tier: 'home', packs: ['moire'] }),
+    lk.sameIdKeyWins({ tier: 'home', packs: ['moire'] }, { tier: 'home' }),
+    lk.sameIdKeyWins({ tier: 'home' }, { tier: 'pro' }),
+    lk.sameIdKeyWins({ tier: 'home', packs: ['moire'] }, { tier: 'pro', packs: ['moire'] }),
+  ];
+  const keeps = [
+    lk.sameIdKeyWins({ tier: 'home', packs: ['moire'] }, { tier: 'home', packs: ['moire'] }),
+    lk.sameIdKeyWins({ tier: 'pro' }, { tier: 'home', packs: ['moire'] }),
+    lk.sameIdKeyWins({ tier: 'pro', packs: ['moire'] }, { tier: 'home', packs: ['moire'] }),
+  ];
+  check(
+    '13p. a key re-signed under the held id is taken for a pack bought or refunded and for an upgrade, never for the same key or a lower tier',
+    wins.every(Boolean) && keeps.every((v) => !v),
+    `take ${wins.join(',')}, keep ${keeps.map((v) => !v).join(',')}`,
+  );
+
+  // 13m. A pack product on no list is an unknown product, as any other: held, nothing signed.
+  const unlisted = await (await postWebhook(envP, lsOrder('xia@example.com', 'ord_xia_x', { productId: 777099, name: 'Moiré Pack' }))).json();
+  check(
+    '13m. a product named "Moiré Pack" on no list is held as an unknown product',
+    unlisted.ignored === 'unknown product' && (await tokenPacks((await keysOf(envP, 'xia@example.com'))[0])) === '-',
+    `${unlisted.ignored}`,
+  );
+
+  // 13q. The store's own Moiré Pack products, test 1509032 and live 1509029 (read from the
+  // dashboard 2026-11-07), file as the pack on a Worker with no LS_MOIRE_PRODUCT_IDS
+  // setting at all, so a deploy that forgets the setting still sells the pack; and Home's
+  // own products (test 1450525, live 1479217) are never taken for it.
+  const bare13q = [1509032, 1509029].map((id) => packForProduct({}, id));
+  const homes13q = [1450525, 1479217].map((id) => packForProduct({}, id));
+  check(
+    '13q. the store\'s Moiré Pack products file as the pack with no setting, and Home\'s never do',
+    bare13q.every((p) => p === 'moire') && homes13q.every((p) => p === null),
+    `pack ${bare13q.join(',')}, home ${homes13q.join(',')}`,
   );
 }
 

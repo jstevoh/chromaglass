@@ -137,6 +137,9 @@ Left, each its own plan item:
     back as a ring from the readback mirror, frames behind on a slow machine. Every look runs a
     thin gap, so this is the plate switched off it; the fix is the same accounting in the old
     carries (a source where the air arrives, colour per unit of liquid), then the CPU's half goes.
+    Check written first: `npm run bubbleair` id `oldplate` (Thin Gap off: a whole, drifting and
+    popped bubble keep the colour to 0.1%, main −2.6%, −6.6%, −2.6%; the hole fills to 0.5, main
+    0.000; no `depositBubbleRims` left in src/).
   - ~~**15g-8d Liquid runs through a bubble in the thin solve.**~~ **Shipped**: standing air has
     no mobility in the thin solve, so the liquid goes round a bubble; its drift reads the flow on a
     ring past its rim. Lab: nothing left under a moving or growing bubble (was 6.6%, 1.0%). Story in
@@ -147,6 +150,10 @@ Left, each its own plan item:
     path and the oil's mix (`mixAdvectSub`) do not. So under a bubble with Oil Bodies a body's
     colour and its edge can part, and two setups `npm run thick` holds equal differ under air.
     Give each the same accounting (airLiquid takes any amount carry), with a lab case per carry.
+    Check written first: `npm run bubbleair` ids `species`, `mix`, `maze` (no more left in a whole
+    bubble's middle than the colour's own carry leaves there, 0.005 over it at most, today a bar of
+    0.011; main 0.343 for the species alone, 0.203 for the oil's mix, 0.031 on the maze's path,
+    which takes the air but has no airShed after it).
   - **15g-8f A popped bubble's hole fills unevenly.** The donor rule counts what comes into a cell
     with air at the least it can be (two rings deep), so where liquid runs through cells the air is
     leaving, a pop's hole fills to 0.6 of the pool in its middle and 1.09 a few cells out
@@ -154,12 +161,19 @@ Left, each its own plan item:
     its middle, which `airShed` now hands to the rim, a correction rather than the carry getting it
     right. The fix is a donor that mixes what comes in at what it is: the cell's own same-substep
     balance solved across the ring, not bounded from below.
+    Check written first: `npm run bubbleair` id `donor`, in a lab with airShed's call off: under
+    0.02 left in a whole bubble of radius 0.05 and 0.08 (main 0.026, 0.040; with airShed 0.006,
+    0.033), every cell within three radii 0.95–1.05 of the pool thirty steps after the pop (main
+    0.68–1.08, 0.58–1.07; with airShed 0.60–1.09), and the airShed kernel gone.
   - **15g-8g The app still presses the glass under every bubble.** `LiquidVisualizer` lays a
     standing 'press' squish on each bubble's footprint "so the field flows round the bubbles". With
     the solve's air shut (15g-8d) the liquid goes round them by itself; the press is a shortcut that
     dents the gap under the air, a source the solve then has to answer. Measure the plate with and
     without it (`npm run holeline`, `bubbles`, the Mac's `tools`), and take it out if the flow round
-    a bubble is the same.
+    a bubble is the same. Measured (`npm run bubbleair`): in the lab the flow round a drifting
+    bubble is the same with the app's press and without it to 0.09%, nothing runs through it
+    either way, and the press dents the gap under it 0.0300 → 0.0273, so it goes; owed id `press`
+    (no applySquish with the presser 'bubble' left in src/). Still the Mac's `bubbles`/`tools`.
 - **15g-9 The press and stir on every pointer event, for the tools that still take them.** The
   Spray, the Splatter, the Pour and the Streak (and the Press, over its own squish) still press a
   24-cell bowl and shove the liquid five times the move on each pointer event
@@ -262,20 +276,17 @@ and on a still plate. SwiftShader, 2026-10-27 (effect = one less the share left)
 Neither plate's soap moves the dye it clears: the spot loses exactly what the whole plate
 loses (GPU, soap 149 to 107 at the spot and 507 to 465 on the plate; stand-in, 150 to 66
 and 507 to 423), so both clear by erasing (15e-5), and the table's soap and silicone rows
-compare two erasures. 21 lines gate; 16 are owed to the items below, print, and fail the
-run the day they pass (an owed line that reads no number fails too), so the fix that makes
-one pass also makes it gate. Briefs 11 (15e-1 and 15e-2) and 12 (15e-5) in the shared
-briefs.
+compare two erasures. 21 lines gated and 16 were owed to the items below; an owed line
+prints, and fails the run the day it passes (one that reads no number fails too), so the
+fix that makes one pass also makes it gate. Since 15e-1 shipped the still plate reads what
+the fold-every-step plate reads (the table's third column is its second), 27 lines gate
+and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
 
-- **15e-1. The liquids' forces act only on a frame something else is laid in.**
-  `liquidForces` (and soap's thinning, in `deltaDye`) run inside `foldDeltas`, which runs
-  only in `applyDeltas` and `applySplats`, and the app calls those only on a frame that is
-  `dirty` (LiquidVisualizer's step: a hand, a drop, a pour). On a still dish a spot of
-  soap pushes for the one step its own pour folds, then never again: the soap scene
-  leaves 99.6% of the dye at its spot where a fold every step leaves 72%. Glycerine is
-  the exception, as its thickness on a thin gap is the species' viscosity in the thin
-  solve, every step. Move the liquids' forces into the step, once a step, whether or not
-  the CPU sent anything. *Measure:* `npm run liquidsgpu`'s "a still plate" lines.
+- ~~**15e-1. The liquids' forces act only on a frame something else is laid in.**~~
+  **Shipped** (2026-11-13, met again as 14ab-16): the step runs them itself, once a step,
+  on any plate a bottle was poured on (`stepLiquids`); `npm run liquidpush`, and
+  `liquidsgpu`'s five "a still plate" lines owed to it gate. Story in
+  `docs/plan-shipped.md` §15e-1.
 - **15e-2. Where they act, the liquids' passes are about a fifth of the stand-in's.** The GPU
   scales each force by the solver's `dt` (0.004 in the lab; 0.0036 for the app at the
   default Speed), where liquidPhase.ts and the app's CPU before the port scaled them by
@@ -341,6 +352,29 @@ briefs.
   oil and syrup parting where they meet and a finger mixing them; liquidsgpu has only the
   four liquids' scenes. Lay those four on the GPU the same way, with the same owed rule,
   before or with Brief 11, which changes the forces they would measure.
+- **15e-10. On a thin gap the liquids' push is momentum, not a drive (found with 15e-1).**
+  `liquidForces` adds to the flow before the step keeps "the velocity from before the
+  forces" (`thin gap keep`), as it did from the fold, so a thin gap reads the push as flow
+  the liquid already had and its drag has it within the step, where the oil's tension, the
+  magnet and the maze go in after the keep and are read as a speed to drive the liquid to.
+  Measured (`npm run liquidpush`, 64², six steps, a heavy drop on a plate rocked 0.5): the
+  slide under the drop is 3.4e-2 on the open plate and −9.4e-4 on the thin gap, beside a
+  flow of 0.53: two thousandths of it, and against the rock's way. So on the plate every look uses, a
+  heavy liquid does not slide down a rocked plate and an oil does not keep to itself by
+  these forces; what a bottle does there is its species' viscosity and weight in the thin
+  solve (18d) and the soap's erasure (15e-5). Move the pass after the keep and give its
+  constants the thin solve's units (a force per unit of drag, with 15e-2's time base), or
+  retire the terms the species already carry. Not done with 15e-1 because it changes what
+  every poured bottle does in every look, and wants its own before and after. *Measure:*
+  liquidpush's thin-gap reach line asks the slide the rock's way, as the open plate's does.
+- **15e-11. The CPU's stand-aside copy still asks for a fold every step (found with
+  15e-1).** `FluidSimulation.stepLiquid` sets `gpuNative` only after its `active` test, so
+  the first pour on a new solver lands in the CPU's copy too, which then never decays
+  (`LiquidPhase.step` returns early) and marks the deltas written on every step until a
+  Clear: a fold of nothing each step, which was what kept the forces running and is now
+  only cost. Set `gpuNative` before the pour can land and return from `stepLiquid` when the
+  GPU has the liquids. 14ab-11 (the GPU efficiency PR) changes the same lines; settle it
+  there or after it.
 - **15e-9. Two lab checks at once share one bundle.** `scripts/lab.mjs` writes the plain
   lab's page to one file in `node_modules/.cache` for every run, so two lab checks started
   together (`npm run quick` runs them side by side) can load a bundle the other is writing.
