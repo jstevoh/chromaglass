@@ -51,7 +51,7 @@ const check = (name, ok, detail = '') => {
 
 const out = 'node_modules/.cache/musicforce-lib.mjs';
 await build({ stdin: { contents: "export * from './src/lib/squish.ts'; export * from './src/lib/stir.ts'; export { levels01 } from './src/lib/soundLevels.ts';", resolveDir: '.', loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
-const { BassPress, bassPressDepth, BASS_PRESS, BASS_STEP, stirOf, levels01 } = await import(`../${out}`);
+const { BassPress, bassPressDepth, BASS_PRESS, BASS_STEP, stirOf, stirCordDepth, STIR_REF, levels01 } = await import(`../${out}`);
 
 // ── 1. The readings ──────────────────────────────────────────────────
 {
@@ -215,7 +215,8 @@ try {
       res.ferroAfter = await ringOut();
     }
     return res;
-  }, { hand: steps(120, 0.6), swells: steps(360, 0.6), stir03: stirOf(0.3, 0.8, 0.6), R });
+  }, { hand: steps(120, 0.6), swells: steps(360, 0.6), // A look's own stir with the band: its dial through its cord at the loud passages' mids (lib/stir.ts; it was stirOf(0.3, 0.8, 0.6) while the step read the energy itself).
+    stir03: stirOf(Math.min(1, 0.3 + stirCordDepth(0.3, 0.6) * STIR_REF.mid / 100)), R });
 
   const peak = (a) => Math.max(...a);
   const f = (a) => a.map((x) => x.toFixed(3)).join(' ');

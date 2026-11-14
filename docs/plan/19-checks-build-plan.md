@@ -272,6 +272,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
     checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
     #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11c, shipped 2026-11-13** (E, S). **`lab4` over its 25 minutes on the slow tier.**
+  `glint` (47e, #833) and `bubbleair` had joined `holeline`, `encode --grids` and `shaderdials`
+  in `lab4`, and on GitHub's slow ubuntu tier it was cancelled at the limit on two of the day's
+  four PR runs (#842 and #835), no check failing: about 15 minutes of checks ahead of
+  holeline's 11. `glint` moved to `lab9` (3:50 that day) and `bubbleair` to `lab8` (4:24);
+  no bar, timeout or check body changed, only each check's shard in `scripts/checks.json`
+  and the comment above `timeout-minutes` in `checks.yml`. The bound stays 25.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print

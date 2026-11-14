@@ -39,7 +39,6 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  spin: number;         // vorticity strength (0 = off)
   immiscibility: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*

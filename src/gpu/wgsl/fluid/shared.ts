@@ -21,7 +21,7 @@ struct Sim {
   disp: f32,           // velocity → uv displacement for advection
   visc: f32,
   turbScale: f32,
-  spin: f32,
+  free7: f32,          // was the music's eddies (PLAN 38u-5); the slot is kept so every offset after it stands
   tension: f32,
   thinGap: f32,        // 1 on a thin gap (PLAN 18a), 0 on legacy plate
   vibI: f32,
