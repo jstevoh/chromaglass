@@ -17,7 +17,6 @@
 import { layFinger } from '../lib/handSolid';
 import { layBreath, holdBreath, breatheHeld, type HeldBreath } from '../lib/breath';
 import { fingerCarry, blowCarry, carryDyeAlong, blowDye, blowOil, BLOW_STRENGTH } from '../lib/handCarry';
-import { AudioData } from '../hooks/useAudioAnalyzer';
 import { VisualizerSettings } from '../types';
 import { lookTarget as dyeLookTarget } from '../lib/dyeTarget';
 import { findPreset } from '../presets';
@@ -2737,7 +2736,7 @@ export class FluidSimulation {
     }
   }
 
-  step(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number) {
+  step(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number) {
     this.lastSettings = settings;
     // ── Dynamic speed — settings only, no audio energy to avoid clock jumps ──
     let dynamicSpeed = 0.05;
@@ -2834,7 +2833,7 @@ export class FluidSimulation {
     this.liftStep();
     if (this.breath && breatheHeld(this.held, this.breath, this.size, this.dtSeconds, this.airsFilm(), this.rows) > 0) this.breathLaid = true;
 
-    const p = this.deriveStep(settings, audioData, time, noise2D);
+    const p = this.deriveStep(settings, time, noise2D);
     this.lastStep = p;
     // The closeup's cells ride this: as far as this step moves the dye.
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
@@ -2870,9 +2869,6 @@ export class FluidSimulation {
     // 6.5. Multi-octave curl turbulence — detail at every scale
     this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
 
-    // 6.6. Mid/treble-driven vorticity — small spinning eddies in dense dye
-    if (p.spin > 0) this.injectVorticity(p.spin, time, noise2D);
-
     // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
     this.applyImmiscibility(p.immiscibility, time, noise2D);
 
@@ -2881,7 +2877,7 @@ export class FluidSimulation {
 
     // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
     if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
-    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D, audioData);
+    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D);
     if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
 
     // 8.9. The lasting current joins the flow the dye is about to ride.
@@ -3031,7 +3027,7 @@ export class FluidSimulation {
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level } : null);
   }
 
-  private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
+  private deriveStep(settings: VisualizerSettings, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {
     const dt = this.dt;
     const visc = settings.viscosity === 'thick' ? 1.5 : 0.5;
 
@@ -3064,24 +3060,29 @@ export class FluidSimulation {
       multiplies whatever the dial says, by at most two: audio energy still
       breathes extra stir into the field so the liquid churns with the
       music, and a loud track still cannot triple a calm look's (lib/stir.ts).
+
+      And the music is not read here at all now (PLAN 38u-4, 38u-5; the
+      physics audit, 2026-11-13). That multiplier was the analyser's energy
+      taken straight into this step, and beside it mid and treble drove
+      "spin", a second noise curl laid wherever there was dye: two ways the
+      band moved the liquid with no cord, no patch and no control, on a
+      plate whose rule is that sound reaches it only through those. The
+      owner chose to route them through cords. So the step takes no sound:
+      the dial it is handed is the one the patch bay folded, each look
+      carries the sound's mids on Turbulence as a cord (lib/stir.ts
+      `stirCord`, at the depth that keeps its stir with a band about where
+      it was), and with that cord pulled out a loud band stirs nothing.
+      `npm run musicstir` holds all of it.
     */
-    let turbScale = stirOf(settings.turbulenceScale ?? 0, audioData ? audioData.energy : null, settings.audioImpact ?? 0.45);
+    let turbScale = stirOf(settings.turbulenceScale ?? 0);
     if (this.layerIndex > 0) turbScale *= 1 - 0.6 * Math.max(0, Math.min(1.4, settings.backgroundLoop ?? 0));
-    let spin = 0;
     let vibIntensity = 0, vibFrequency = 0;
-    if (audioData) {
-      const impact = settings.audioImpact ?? 0.45;
-      const mid01 = Math.min(1, audioData.mid / 70);
-      const treble01 = Math.min(1, audioData.treble / 70);
-      const s = (mid01 * 0.6 + treble01 * 0.4) * impact;
-      if (s > 0.08) spin = s * 0.03;
-    }
     /*
       Vibration: a standing ripple on the per-step channel, the plate being
       tapped. It was energy × setting × 0.002 behind two gates (the setting above
       0.3, the result above 0.001), which with the analyser's energy topping out
       at 0.85 meant nothing below about 0.6 and nothing at all without a mic.
-      Now a floor that works in silence and swells with the music.
+      Then a floor that works in silence, swelling with the music (see below).
 
       The first version of this ran the wavelength down to 4.6 cells at the top
       and pushed hard enough to move the dye most of a cell each way — and a
@@ -3096,8 +3097,14 @@ export class FluidSimulation {
     {
       const vf = c01(settings.vibrationFrequency);
       if (vf > 0.005) {
-        const energy = audioData ? Math.min(1, audioData.energy) : 0;
-        vibIntensity = vf * (0.3 + 0.7 * energy) * 0.15;
+        /*
+          It swelled with the analyser's energy, 0.3 in silence to 1 at the
+          loudest, read straight into the step: sound on the plate with no
+          cord (PLAN 38u-4). The push is the dial's alone now, at 0.65, the
+          middle of that swing and about where a band at an ordinary level
+          held it; a cord on Vibration is how the music swells it.
+        */
+        vibIntensity = vf * 0.65 * 0.15;
         vibFrequency = 2 * (0.12 + vf * 0.3);
       }
     }
@@ -3282,7 +3289,7 @@ export class FluidSimulation {
       sharpness: (s => s * (0.225 - 0.09 * s))(c01(settings.sharpness)),
       damping: settings.damping || 0.99,
       heatDecay: settings.heatDecay || 0.98,
-      turbScale, turbDetail, spin, immiscibility,
+      turbScale, turbDetail, immiscibility,
       /*
         The two glasses (2026-09-21).
 
@@ -3538,7 +3545,7 @@ export class FluidSimulation {
     }
   }
 
-  private applySmear(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number, audioData: AudioData | null) {
+  private applySmear(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
     const smearSpeed = time * 0.3;
     const shearX = noise2D(smearSpeed, 100) * strength * 12.0 * dt;
     const shearY = noise2D(100, smearSpeed) * strength * 12.0 * dt;
@@ -3798,33 +3805,6 @@ export class FluidSimulation {
           const ux = dn_dy * amp, uy = -dn_dx * amp;
           this.vx[idx] += ux; this.vx[idx + 1] += ux; this.vx[idx + this.size] += ux; this.vx[idx + this.size + 1] += ux;
           this.vy[idx] += uy; this.vy[idx + 1] += uy; this.vy[idx + this.size] += uy; this.vy[idx + this.size + 1] += uy;
-        }
-      }
-    }
-  }
-
-  // Inject curl-noise vorticity into dense fluid regions — driven by mid/treble
-  // The same fix as the turbulence: the difference over 0.01 of noise space is
-  // divided by it, so `strength` (0–0.03) reaches an rms of about 0.4 at the top
-  // instead of a thousandth of that. Every 3rd cell, filling its 3x3 block.
-  injectVorticity(strength: number, time: number, noise2D: (x: number, y: number) => number) {
-    const step = 3;
-    const k = (strength / 0.03) * (0.4 / 3) * 100;
-    for (let j = 1; j < this.size - 3; j += step) {
-      for (let i = 1; i < this.size - 3; i += step) {
-        const idx = i + j * this.size;
-        const d = this.density[idx];
-        if (d > 0.05) {
-          // Curl noise: perpendicular to gradient of noise field
-          const n = noise2D(i * 0.025, j * 0.025 + time * 0.08);
-          const dn_dx = noise2D(i * 0.025 + 0.01, j * 0.025 + time * 0.08) - n;
-          const dn_dy = noise2D(i * 0.025, j * 0.025 + 0.01 + time * 0.08) - n;
-          const m = k * Math.min(1, d);
-          for (let b = 0; b < 3; b++) for (let a = 0; a < 3; a++) {
-            const c = idx + a + b * this.size;
-            this.vx[c] +=  dn_dy * m;
-            this.vy[c] += -dn_dx * m;
-          }
         }
       }
     }
