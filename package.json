@@ -228,6 +228,8 @@
     "tankgpu": "PW_WEBGPU=1 node scripts/tankgpu.mjs",
     "boilgpu": "PW_WEBGPU=1 node scripts/boilgpu.mjs",
     "plateboil": "node scripts/plateboil.mjs",
+    "argnames": "node scripts/argnames.mjs",
+    "liquidpush": "node scripts/liquidpush.mjs",
     "particles": "node scripts/particles.mjs",
     "glint": "node scripts/glint.mjs",
     "finite": "node scripts/finite.mjs",

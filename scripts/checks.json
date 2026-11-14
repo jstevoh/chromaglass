@@ -1793,6 +1793,39 @@
       ]
     },
     {
+      "name": "One args name, one value a step (46r)",
+      "shard": "lab2",
+      "run": "npm run argnames",
+      "timeout": 6,
+      "why": [
+        "A dispatch's numbers live in a buffer the solver keeps under a name, and a",
+        "buffer holds what was written to it last before the submit, so two calls in",
+        "one step under one name with different numbers both read the second's. The",
+        "lasting current, the swirl's projection and the open plate's addCurrent",
+        "shared 'current grid', and on the open plate currentForces read Depth Drag",
+        "as the boil running (scripts/argnames.mjs). The solver's argWrite watched",
+        "from the page on eleven plates, with a planted pair as the control; the",
+        "current after one step the same at Depth Drag 0 and 1.5, bit for bit; and",
+        "the boil's rise read on the open plate at Heat 1. About 50 s here."
+      ]
+    },
+    {
+      "name": "A poured liquid acts on every step (15e-1)",
+      "shard": "lab2",
+      "run": "npm run liquidpush",
+      "timeout": 6,
+      "why": [
+        "A bottle's liquid pushed the flow and thinned the dye only inside the fold of",
+        "a frame's hand-laid deltas, so not at all on a step nothing was laid in (a",
+        "liquid poured after a Clear) and twice on a step folded twice",
+        "(scripts/liquidpush.mjs). A heavy drop and a soap's on a rocked plate, open",
+        "and thin, stepped with no fold, one and two, and after a Clear, each against",
+        "the same plate without the drops: all four do the same. `npm run liquidsgpu`",
+        "holds the liquids' sizes on the Mac; this holds when they act, in a minute,",
+        "on any adapter."
+      ]
+    },
+    {
       "name": "The layout",
       "shard": "browser",
       "run": "npm run layout",
@@ -2656,7 +2689,7 @@
         "`npm run liquids` laid on the thin gap the looks use, each held to the",
         "stand-in's bar and to its size within a factor of two, with a fold of",
         "the deltas every step and on a still plate, and soap's and silicone's",
-        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-2 to",
         "15e-5 print and do not fail until they pass. Here on Metal, about a",
         "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
         "24 of its 25 minutes before signin without it (#513's first run)."
