@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Polarised light (PLAN 31p-1)
+
+- **Polarisers** (Settings → Lamp & Light, MIDI, the desks and the phone): sheets under the
+  plate and at the lens. Where the liquid's flow stretches it, it lights in rainbow bands in
+  the real Michel-Levy order; still liquid stays dark between crossed sheets.
+- **Analyser** turns the top sheet from crossed (dark field) to parallel (white field,
+  opposite colours); **Quarter Wave** (on by default) takes the dark lines out of the bands,
+  and turned down brings back the dark pinwheel arms; **Birefringence** sets how high the
+  colours climb.
+
 ### Added — Glitter, a macro lens's discs and stars, and a side lamp (PLAN 47e, 47d-1, 47b-1)
 
 - **Glitter** (Settings → Camera): fine flakes suspended in the liquid that ride the flow at

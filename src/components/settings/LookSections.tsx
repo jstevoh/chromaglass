@@ -705,6 +705,26 @@ export const LampSection = ({ c }: { c: SectionCtx }) => {
             />
           </>
         )}
+        {/* Polarised light (PLAN 31p-1): a polariser under the plate and an
+            analyser at the lens; the liquid shows Michel-Levy colours where its
+            flow stretches it. The analyser and the liquid's strength while the
+            sheets are in. */}
+        <Slider label="Polarisers" value={settings.polariser ?? 0} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ polariser: v })}
+          settingKey="polariser"
+        />
+        {(settings.polariser ?? 0) > 0.001 && (
+          <>
+            <Slider label="Analyser" value={settings.analyserAngle ?? 90} min={0} max={180} step={5} onChange={(v: number) => onUpdate({ analyserAngle: v })}
+              settingKey="analyserAngle"
+            />
+            <Slider label="Quarter Wave" value={settings.quarterWave ?? 1} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ quarterWave: v })}
+              settingKey="quarterWave"
+            />
+            <Slider label="Birefringence" value={settings.birefringence ?? 0.3} min={0} max={1.0} step={0.05} onChange={(v: number) => onUpdate({ birefringence: v })}
+              settingKey="birefringence"
+            />
+          </>
+        )}
         <Slider
           label="Iridescence"
           value={settings.iridescence ?? 0}

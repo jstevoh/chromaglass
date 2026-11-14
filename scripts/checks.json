@@ -1423,6 +1423,25 @@
       ]
     },
     {
+      "name": "Polarised light",
+      "shard": "lab9",
+      "run": "npm run polar",
+      "timeout": 6,
+      "why": [
+        "PLAN 31p-1 (lib/polar.ts, gpu/wgsl/platePolar.ts): the plane-sheet and quarter-wave",
+        "laws against Jones matrices; the shader's three table colours against T integrated",
+        "wavelength by wavelength; crossed black and parallel white with nothing retarded,",
+        "the two complements; the Michel-Levy order; isoclinics black with plane sheets and",
+        "gone with quarter-wave plates; the flow's stretch from simple shear and none from",
+        "solid rotation. Then the real shaders: off is off to the byte and each dial reaches",
+        "the picture; a still plate crossed is black and parallel the open plate; a laid vortex",
+        "held pixel by pixel (crossed and parallel add in light to the open plate, every pixel",
+        "on the chart, the isoclinics swap when the plate is turned 45 degrees, the turning",
+        "middle dark); stirred it lights, black at Birefringence 0; plane sheets leave twice",
+        "the dark of the quarter-wave plates."
+      ]
+    },
+    {
       "name": "The tank on the GPU (SwiftShader)",
       "shard": "lab5",
       "run": "npm run tankgpu",

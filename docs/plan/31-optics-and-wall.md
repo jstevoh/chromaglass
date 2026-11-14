@@ -181,3 +181,50 @@ machine-learning tools (DeNoise, UpRes, Retimer, Face, Matte Assist, Depth Map):
 repair or mask footage the plate does not have, and anything that reads as generated fails
 the rule that nothing looks like AI. Keying, retouching, titles and the VR tools: footage
 work. The audio visualizer's spectrum bars.
+
+## 31p. Polarised light: the owner's photograph of dishes between polarisers (2026-11-14)
+
+*The owner, 2026-11-14, sent a photograph of moulded petri dishes between polarising sheets
+("Check these bubbles out"; `references/still-polarized-dishes` in the project's shared
+files): rainbow bands in the Michel-Levy order, pinwheel fans about each dish's injection
+point, thin pale rims, a pale field (the sheets not fully crossed). The colours are
+birefringence, not a thin film. The owner asked for the polariser, a turnable analyser and a
+liquid that lights where its flow stretches it ("Let's do it!").*
+
+~~**31p-1** Polarisers, Analyser, Quarter Wave, Birefringence~~ (shipped; story in
+`docs/plan-shipped.md` §31p-1; `npm run polar`).
+
+- **31p-2. The colour lingers after the stir.** A liquid that shows flow birefringence has a
+  relaxation time: its molecules stay lined up for a while after the flow that lined them up
+  slows, so a stirred micelle solution keeps glowing and fades. 31p-1 reads the strain rate
+  of this instant (a Newtonian liquid's stress). Carry a conformation tensor on the solver
+  (Oldroyd-B: advected, stretched by the velocity gradient, relaxing at a time the dial
+  sets), and take the retardation and axis from its anisotropy. A solver field, so it lives
+  in `src/gpu/fluid` and the plate reads it. *Measure:* a stir stopped dead keeps its colour
+  for about the relaxation time and then goes dark, in the lab; a check in `npm run polar`.
+- **31p-3. Stressed solids on the plate: dishes and cellophane.** The owner's photograph is
+  of moulded dishes with stress frozen round the injection gate (radial and hoop axes, so a
+  pinwheel crossed with plane sheets and rings with the plates in) and cellophane is the
+  classic light-show retarder (a fixed retardation per layer, stacked to climb the orders).
+  Retarders in series with different axes combine by Jones matrices, which needs the third
+  table term 31p-1 already carries. *Measure:* a dish's gate shows a four-armed cross with
+  Quarter Wave at 0 and none at 1; two cellophane layers at the same axis add.
+- **31p-4. The second plate's liquid.** 31p-1 reads the lead plate's flow (`vel0`); a
+  two-plate look's back plate retards too. Two retarders in series at different axes are
+  not one retarder; for small retardations the doubled-angle vectors add, and exactly they
+  multiply as Jones matrices. *Measure:* the same stir on Layer 1 alone lights as on Layer 0.
+- **31p-5. The dye's own spectrum through the sheets.** The plate multiplies the picture by
+  the sheets' RGB colour, the product of the integrals, where the light on the wall is the
+  integral of the product (a narrow-band dye through a narrow band of the chart). Exact
+  would carry the dye's absorption spectrum into the table. *Measure:* against
+  `polarSpectral` with a dye's spectrum, the drawn colour within a few levels.
+- **31p-6. The scale in real units.** The Birefringence dial is nanometres per unit of the
+  solver's strain rate, measured in the lab, because the plate has no physical clock for
+  its velocity. When the solver has one (mm/s at a known Speed), the dial can become the
+  stress-optic coefficient times the viscosity, with the liquid's depth from the gap.
+- **31p-7. Glitter and the side lamp through the sheets.** The lens pass (`gpu/glint.ts`)
+  draws after the display, so its glints are not between the sheets. Polystyrene flakes
+  depolarise; the side lamp is not polarised by the stage's polariser and passes the
+  analyser at a half. *Measure:* with the sheets in and crossed, a still plate's glints are
+  dimmed by the analyser and not by the polariser.
+

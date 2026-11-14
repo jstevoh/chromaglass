@@ -235,6 +235,7 @@ style (§31).
 - **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **18e-2** a clear pour's edge (its checks written first, `nolight -- --owed=rim`, `derive -- --owed=grad`; with 38h-6's film, `--owed=film`), **31a** the projector's
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses
   (31f-1 one lens model, then 31f-2 projector types, 31f-3 camera types, 31f-4 the picker on desks and phone, 31f-5 Pro's own lens types).
+  ~~**31p-1** polarised light~~ (shipped; `npm run polar`), then **31p-2** colour that lingers after the stir, **31p-3** stressed dishes and cellophane, 31p-4 to 31p-7 (§31).
 - **6.5** **18d** each liquid's real properties (~~**18d-1**~~ viscosity a column, ~~**18d-2**~~ flushing, ~~**18d-11a**~~ its cost, then **18d-3** to **18d-11**), then **10.5-bodies** and **H8** more bottles.
 - **6.6** ~~**18m**~~ a drop slumps under its own weight (then ~~**18m-1**~~ #371 inertial regime, **18m-1a** implicit step, **18m-2** to **18m-4**, ~~**18m-5**~~ conservative grid filter, ~~**18m-5a**~~ slump check with grid filter on, ~~**18m-5b**~~ its cost, ~~**18m-5c**~~ the filter's edge reshaping), ~~**18h**~~ #357, ~~**18a-2**~~ #255 (then **0-fingering** and **22g**), **18a-3**, **18a-4**, **18a-6**,
   **18a-8**, **18k-film**, **18k-linear** (then **16c-linear**), **18k-chem**.
@@ -442,7 +443,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 |  | (continued) | [`28-preset-palettes-2.md`](docs/plan/28-preset-palettes-2.md) | 28i–28l | 21 |
 | 29 | The closeup's ferrofluid drop: a bead dragged through dye (asked 2026-10-11) | [`29-ferro-drop.md`](docs/plan/29-ferro-drop.md) |  | 14 |
 | 30 | Shaping the sound and the MIDI: what Imaginando's VS rig showed (2026-10-11) | [`30-sound-and-midi.md`](docs/plan/30-sound-and-midi.md) |  | 9 |
-| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 13 |
+| 31 | Optics and the wall: what Boris FX Continuum showed (2026-10-11); polarised light (31p) | [`31-optics-and-wall.md`](docs/plan/31-optics-and-wall.md) |  | 16 |
 | 32 | The soap film: a draining film seen in reflection (asked 2026-10-18) | [`32-soap-film.md`](docs/plan/32-soap-film.md) |  | 10 |
 | 33 | Bubbles and the closeup, per liquid (asked 2026-10-19) | [`33-bubbles-closeup.md`](docs/plan/33-bubbles-closeup.md) | 33f motion **shipped** (`npm run bubbleliquid` 9/9); 33c, 33d, 33f-2..4 open | 7 |
 | 34 | What Photism showed: the page and the app (asked 2026-10-22) | [`34-photism.md`](docs/plan/34-photism.md) |  | 8 |
