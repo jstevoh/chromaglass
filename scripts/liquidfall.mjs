@@ -38,16 +38,24 @@
       law. A light bottle's lightness is a field of its own (liquids1.g),
       since the carries floor every field at zero and one signed field lost
       it on the first step: this drop moved nothing.
- *   2. Only a tilt moves it: the same drop on a level plate, under 2% of that.
+ *   2. The tilt's direction is the drop's: tipped across instead of along, it
+ *      slides across as fast (to 2%) and not along (under 2%).
  *   3. As a force per unit of drag, a weight answers the liquid's viscosity:
  *      the whole plate at a Thickness of 0.8 (its clear liquid ν(0.8)) moves
  *      the same drop at ν(0.45)/ν(0.8) of its speed at the default, to 10%.
+ *   3b. And Darcy's h²: half again the liquid that fills the dish lifts the
+ *      cover (38r-5); let settle ten seconds (near 2.41 mm), the same drop
+ *      goes at (h/h₀)² of its speed at the rest gap, to 3%, h read from the
+ *      cover. Read while the cover is still settling it goes faster than its
+ *      h² at the end, the gap having been wider through the run.
  *   4. A drop thicker than the water crawls (18d's species field, which the
  *      app lays for a syrup or a glycerine pour): glycerine laid in the
- *      drop's column, the same weight, slides at under half the plain drop's
- *      speed. Hele-Shaw's inclusion λ times the water's viscosity goes at
- *      2/(1 + λ) of a drop of the water's own (printed beside it, from the
- *      column's λ at its middle).
+ *      drop's column, the same weight. Hele-Shaw's sharp inclusion λ times
+ *      the water's viscosity goes at 2/(1 + λ) of a drop of the water's own;
+ *      this drop's λ (its column's, read from the species field) falls from
+ *      its middle to its rim, so its inner half goes between 2/(1 + λ) at the
+ *      middle and at that half's edge. A drag counted twice falls under the
+ *      first, one at half strength over the second.
  *   5. The oil's weight counts once. An oil lens in the mix (Oil Tension on)
  *      already rises by its own lift (hsBody, OIL_LIFT); the same oil poured
  *      into the liquids' field too, with its bottle's weight −0.12, moves the
@@ -57,7 +65,7 @@
  *   read as stillness.
  */
 import { openLab } from './lab.mjs';
-import { DISH_GAP_METRES } from '../src/lib/turntable.ts';
+import { DISH_GAP_METRES, DISH_METRES } from '../src/lib/turntable.ts';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -74,6 +82,9 @@ const W = 0.35;                     // a syrup's weight (bottles.ts), its densit
 const LIGHT = -0.2;                 // alcohol's (bottles.ts): lighter than the water, it rises
 const R = 0.12;                     // the drop's radius, in plates
 const STEPS = 30;                   // half a second: the drag time at the default is a fiftieth
+// Half again the liquid that fills the dish at the rest gap: the cover floats up and settles near 2.4 mm (38r-5).
+const ML = 1.5 * Math.PI * (DISH_METRES / 2) ** 2 * DISH_GAP_METRES * 1e6;
+const SETTLE = 600;                 // ten seconds: the over-full plate's squeeze has settled to a part in a thousand
 const GLYCERINE = Math.log((1412 / 1.261) * 1e-6 / 1e-6);   // ln(ν/ν_water), bottles.ts's glycerine (lib/liquidProps.ts speciesOf)
 
 const { page, close } = await openLab();
@@ -81,23 +92,26 @@ const gpuErrors = [];
 page.on('console', (m) => { if (/gpu error|validation|device lost/i.test(m.text())) gpuErrors.push(m.text().slice(0, 160)); });
 let r;
 try {
-  r = await page.evaluate(async ({ SIN, W, LIGHT, R, STEPS, GLYCERINE }) => {
+  r = await page.evaluate(async ({ SIN, W, LIGHT, R, STEPS, GLYCERINE, ML, SETTLE }) => {
     const N = 64, X = 0.5, Y = 0.5;
     const T = { thinGap: 1, gapThickness: 0.45, gapSpring: 0, diff: 0 };
     /** The inner half of the drop: its cells, the splat's w there, and the mean flow over them; and the column's λ at the middle. */
     const under = async (clear) => {
       const v = await lab.field('vel'), sp = await lab.field('species').catch(() => null);
-      let vx = 0, vy = 0, w = 0, n = 0, lam = 1, best = 9;
+      let vx = 0, vy = 0, w = 0, n = 0, lam = 1, best = 9, lamEdge = Infinity;
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const x = (i + 0.5) / N, y = (j + 0.5) / N, d = Math.hypot(x - X, y - Y) / R, k = (j * N + i) * 4;
         if (d <= 0.5) { vx += v[k]; vy += v[k + 1]; w += 0.6 * (1 - d * d); n++; }
-        if (sp && d < best) { best = d; lam = Math.exp(sp[k + 1] - Math.min(1, Math.max(0, sp[k])) * Math.log(clear / 1e-6)); }
+        const l = sp ? Math.exp(sp[k + 1] - Math.min(1, Math.max(0, sp[k])) * Math.log(clear / 1e-6)) : 1;
+        if (d < best) { best = d; lam = l; }
+        if (d <= 0.5) lamEdge = Math.min(lamEdge, l);
       }
-      return { vx: vx / n, vy: vy / n, w: w / n, n, lam };
+      return { vx: vx / n, vy: vy / n, w: w / n, n, lam, lamEdge, cover: lab.coverMetres() };
     };
-    const run = async (over, lay) => {
+    const run = async (over, lay, settle = 1) => {
       await lab.create(N, N);
-      await lab.step(1, T);
+      // A raised cover is let settle first (its Stefan squeeze), so the drop is read at one gap.
+      await lab.step(settle, over.liquidMl ? { ...T, liquidMl: over.liquidMl } : T);
       lay(lab.solver());
       await lab.step(STEPS, over);
       return under(lab.thinGapViscosity(over.gapThickness ?? 0.45));
@@ -107,8 +121,9 @@ try {
     const out = {};
     out.tipped = await run(tipped, heavy);
     out.light = await run(tipped, (s) => s.addLiquidDrop(X, Y, R, { weight: LIGHT }, 1));
-    out.level = await run(T, heavy);
+    out.across = await run({ ...T, rockY: SIN }, heavy);
     out.thick = await run({ ...tipped, gapThickness: 0.8 }, heavy);
+    out.raised = await run({ ...tipped, liquidMl: ML }, heavy, SETTLE);
     out.glycerine = await run(tipped, (s) => {
       heavy(s);
       s.pour(X, Y, R, 1, { lnNu: GLYCERINE, density: 1 + W, index: 1.47 }, false);
@@ -124,7 +139,7 @@ try {
     out.nuThick = lab.thinGapViscosity(0.8);
     out.drew = lab.adapter();
     return out;
-  }, { SIN, W, LIGHT, R, STEPS, GLYCERINE });
+  }, { SIN, W, LIGHT, R, STEPS, GLYCERINE, ML, SETTLE });
 } finally {
   await close();
 }
@@ -135,7 +150,7 @@ check('the lab ran without a GPU error', !gpuErrors.length, gpuErrors.length ? g
 
 const flowToMs = r.disp * PLATE / r.seconds;                       // a unit of the flow in m/s
 const mms = (v) => (v * flowToMs * 1000).toFixed(3);
-const darcy = (w, nu, weight = W) => w * weight * G * SIN * GAP * GAP / (12 * nu);   // m/s, a free column of the splat's mean w
+const darcy = (w, nu, weight = W, h = r.tipped.cover) => w * weight * G * SIN * h * h / (12 * nu);   // m/s, a free column of the splat's mean w
 {
   const t = r.tipped, want = 0.5 * darcy(t.w, r.nu) / flowToMs;
   check('1. a heavy drop slides down the tipped gap at Hele-Shaw\'s speed, half Darcy\'s w g sinθ h²/12ν for the water it pushes round it',
@@ -145,16 +160,24 @@ const darcy = (w, nu, weight = W) => w * weight * G * SIN * GAP * GAP / (12 * nu
   check('1b. a light drop (alcohol\'s weight) rises up it at the same law, its lightness kept by the carry',
     l.vx < 0 && Math.abs(l.vx / up - 1) < 0.1,
     `${mms(l.vx)} mm/s against ${mms(up)} (${(l.vx / up).toFixed(3)}×)`);
-  check('2. and on a level plate the same drop stays where it is', Math.abs(r.level.vx) < 0.02 * Math.abs(t.vx) && Math.abs(r.level.vy) < 0.02 * Math.abs(t.vx),
-    `${mms(r.level.vx)}, ${mms(r.level.vy)} mm/s against the tipped drop's ${mms(t.vx)}`);
+  const a = r.across;
+  check('2. tipped across, it slides across, as fast, and not along',
+    Math.abs(a.vy / t.vx - 1) < 0.02 && Math.abs(a.vx) < 0.02 * t.vx,
+    `${mms(a.vy)} mm/s across against ${mms(t.vx)} along when tipped along (${(a.vy / t.vx).toFixed(3)}×), along ${mms(a.vx)}`);
   const ratio = r.thick.vx / t.vx, wantRatio = r.nu / r.nuThick;
   check('3. a thicker plate moves it as a force per unit of drag: ν(0.45)/ν(0.8) of the speed',
     Math.abs(ratio / wantRatio - 1) < 0.1,
     `${ratio.toFixed(3)}× the default's speed against ${wantRatio.toFixed(3)} (ν ${(r.nuThick * 1e6).toFixed(1)} cSt at Thickness 0.8)`);
-  const g = r.glycerine.vx / t.vx, inclusion = 2 / (1 + r.glycerine.lam);
-  check('4. a drop of glycerine, as heavy, crawls: under half the plain drop\'s speed',
-    g > 0 && g < 0.5,
-    `${g.toFixed(3)}× the plain drop's speed (a sharp drop of its middle's λ ${r.glycerine.lam.toFixed(1)} would go at 2/(1 + λ) = ${inclusion.toFixed(3)}×)`);
+  {
+    const h = r.raised.cover / t.cover, want3 = h * h, got = r.raised.vx / t.vx;
+    check('3b. a raised cover moves it as Darcy\'s h²: (h/h₀)² of the speed',
+      Math.abs(got / want3 - 1) < 0.03,
+      `${got.toFixed(3)}× the speed at ${(r.raised.cover * 1000).toFixed(3)} mm against (h/h₀)² = ${want3.toFixed(3)}`);
+  }
+  const g = r.glycerine.vx / t.vx, slow = 2 / (1 + r.glycerine.lam), fast = 2 / (1 + r.glycerine.lamEdge);
+  check('4. a drop of glycerine, as heavy, crawls as Hele-Shaw\'s thick inclusion: between 2/(1 + λ) at its middle and at its inner half\'s edge',
+    g >= slow && g <= fast,
+    `${g.toFixed(3)}× the plain drop's speed, between ${slow.toFixed(3)} (λ ${r.glycerine.lam.toFixed(1)}) and ${fast.toFixed(3)} (λ ${r.glycerine.lamEdge.toFixed(1)})`);
   const once = r.lensTwice.vx / r.lens.vx;
   check('5. an oil lens poured into both fields rises by its own lift once, not twice (within 5%)',
     r.lens.vx < 0 && Math.abs(once - 1) < 0.05,
