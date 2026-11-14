@@ -166,14 +166,17 @@ try {
     const disp = DT * look.advection * (N - 2) / N;
     // Metres a second from the flow's units: plate widths a step over disp, 0.2 m plates, 60 steps a second.
     const mps = (v) => v * disp * 0.2 / lab.stepSeconds;
-    const mean = (vel) => { let a = 0, n = 0; const rr = Math.floor(R / 2);
-      for (let j = -rr; j <= rr; j++) for (let i = -rr; i <= rr; i++) { if (i * i + j * j > rr * rr) continue; a += vel[((cx + i) + (cy + j) * L) * 4]; n++; }
+    const mean = (vel, ox = 0, oy = 0) => { let a = 0, n = 0; const rr = Math.floor(R / 2);
+      for (let j = -rr; j <= rr; j++) for (let i = -rr; i <= rr; i++) { if (i * i + j * j > rr * rr) continue; a += vel[((cx + ox + i) + (cy + oy + j) * L) * 4]; n++; }
       return mps(a / n); };
     // The press alone, as long as the breath will blow: what the gap's own settling moves under it.
     let still = 0;
     if (press) { for (let k = 0; k < 60; k++) { pressDown(); lab.flush(DT); await lab.step(1, over, true); } still = mean(await lab.field('vel')); }
     for (let k = 0; k < 60; k++) { pressDown(); lab.breath(cx, cy, R, 1, 0); lab.flush(DT); await lab.step(1, over, true); }
-    const blowing = mean(await lab.field('vel'));
+    const blown = await lab.field('vel');
+    const blowing = mean(blown);
+    // The same a palm on (ten of the breath's footprints, 60 mm), as far behind where it lands, and five footprints to one side (check 7).
+    const ahead = mean(blown, 10 * R), behind = mean(blown, -10 * R), beside = mean(blown, 0, 5 * R);
     // The gap under the breath's middle, in metres (the field is in gap units: lib/turntable.ts DISH_GAP_FIELD_METRES a unit, PLAN 38r).
     const sq = await lab.squeeze();
     let hs = 0, hn = 0;
@@ -182,7 +185,7 @@ try {
     await lab.step(30, over);
     const after = mean(await lab.field('vel'));
     const nu = lab.thinGapViscosity(thickness);
-    return { blowing, after, still, h, theory: lab.breathStress * h / (2 * 1000 * nu), tau: h * h / (12 * nu), half: 30 * lab.stepSeconds };
+    return { blowing, ahead, behind, beside, after, still, h, theory: lab.breathStress * h / (2 * 1000 * nu), tau: h * h / (12 * nu), half: 30 * lab.stepSeconds };
   }, { thickness, press });
 
   const only = process.env.AB_RUNS ? process.env.AB_RUNS.split(',') : null;
@@ -193,7 +196,7 @@ try {
     if (!want(name)) continue;
     const t = Date.now();
     const m = got[name] = await held(th, press);
-    console.log(`  ${name} (Thickness ${th}, gap ${(m.h * 1000).toFixed(2)} mm${press ? `, the press alone ${(m.still * 1000).toFixed(3)} mm/s` : ''}): ${(m.blowing * 1000).toFixed(2)} mm/s under the breath against τh/2μ ${(m.theory * 1000).toFixed(2)} (${(m.blowing / m.theory).toFixed(2)} of it); ${(m.after * 1000).toFixed(3)} mm/s half a second after it stopped, drag time ${m.tau.toFixed(3)} s (${((Date.now() - t) / 1000).toFixed(0)} s)`);
+    console.log(`  ${name} (Thickness ${th}, gap ${(m.h * 1000).toFixed(2)} mm${press ? `, the press alone ${(m.still * 1000).toFixed(3)} mm/s` : ''}): ${(m.blowing * 1000).toFixed(2)} mm/s under the breath against τh/2μ ${(m.theory * 1000).toFixed(2)} (${(m.blowing / m.theory).toFixed(2)} of it); a palm on ${(m.ahead * 1000).toFixed(2)}, as far behind ${(m.behind * 1000).toFixed(2)}, beside ${(m.beside * 1000).toFixed(2)}; ${(m.after * 1000).toFixed(3)} mm/s half a second after it stopped, drag time ${m.tau.toFixed(3)} s (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
   // The Amount's range (6): a gentle breath at Amount 0.25 and a gale at 2.5, share Amount².
   for (const [name, wind, sign, liquid, share] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil'],

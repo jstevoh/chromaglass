@@ -139,6 +139,15 @@ const RING_SIN = Array.from({ length: 8 }, (_, k) => Math.sin((k * Math.PI) / 4)
 /** Solver velocity units → cells per second: one step moves v·dt·(N−2) cells at 60 steps/s. */
 const CELLS_PER_UNIT = 0.05 * 190 * 60;
 
+/**
+ * How many fingers the front of a bubble blown from a point between two
+ * plates breaks into: Paterson's fastest-growing mode, √((1 + 12 Ca R²/b²)/3),
+ * for the front's capillary number `Ca` and its radius over the gap
+ * (`blow` has the story). Under two the bubble stays round.
+ */
+export const strawFingers = (Ca: number, radiusOverGap: number): number =>
+  Math.sqrt((1 + 12 * Math.max(0, Ca) * radiusOverGap * radiusOverGap) / 3);
+
 export interface BubbleEvent {
   kind: 'pop' | 'merge' | 'split';
   x: number;
@@ -382,10 +391,31 @@ export class BubbleField {
    *
    * Its area grows at a steady rate, as a steady breath delivers a steady
    * volume, so it swells fast at first and slows as it gets big, up to about
-   * a seventh of the plate across. The faster it is growing, the more its rim
-   * breaks into fingers; small bubbles are shed off the rim as it goes, the
-   * ring of satellites round a blown bubble. Let go, it stays where it is and
-   * rounds off; blow again beside it and the plate fills with them.
+   * a seventh of the plate across. Let go, it stays where it is; blow again
+   * beside it and there is a second.
+   *
+   * It is round, and it sheds nothing (PLAN.md 15g-12). It used to break
+   * into six to eighteen fingers while it grew and throw a ring of small
+   * bubbles off its rim, five a second, which the owner reported as
+   * "flower like things around the floating bubbles" (2026-11-13, Foam
+   * Cells; filmed on a Mac, a held Blow left a big bubble ringed by small
+   * ones with pale patches beside them). Neither was this plate's physics.
+   * The fingers are Saffman and Taylor's: air driven into a liquid between
+   * two plates breaks its front into the number of fingers Paterson found
+   * for a bubble blown from a point, n = √((1 + 12 Ca R²/b²)/3), with Ca =
+   * μU/σ the front's capillary number and b the gap (Paterson, J. Fluid
+   * Mech. 113, 1981). The count that was drawn put a gap of 0.095 mm into
+   * that, a twenty-first of the plate's 2 mm, chosen so six to eighteen
+   * lobes would show, and its own comment said so: at the real gap the
+   * count is under one. A bubble 3 mm across growing at 9 mm/s in the
+   * default oil (μ 0.017 Pa·s, σ 0.03 N/m) has Ca 0.005 and n = 0.6; at
+   * 13 mm and 2 mm/s, n = 0.7. Under two there is no finger to draw: mode
+   * one is the bubble moving over, not a lobe. So the count is Paterson's at
+   * the plate's own gap and this liquid's own viscosity, and the rim
+   * fingers only where that reaches two, which takes a liquid some sixty
+   * times as thick as the default or a breath as much faster. And the ring
+   * of small bubbles was drawn, not shed by anything: a front that does not
+   * finger pinches nothing off.
    *
    * `strength` is the breath's volume a second against a steady breath's
    * (lib/breath.ts, strawFlow: the Amount, which is the breath's speed). It
@@ -413,41 +443,19 @@ export class BubbleField {
     const speed = (b.r - r0) / Math.max(dt, 1e-4);                       // cells a second
     // The film under it is the one its growing rim lays down.
     if (speed > 0) b.film = this.filmAt(speed);
-    // Fingers as long as the growth is fast, relaxing toward that.
-    const want = Math.min(1, speed / (N * 0.03)) * 0.55;
+    // Paterson's count at the plate's own gap (above): fingers only from two up, as long as the growth is fast.
+    const uMps = Math.max(0, speed) * (DISH_METRES / N);
+    const Ca = (this.liquidMu * uMps) / this.liquidSigma;
+    const rOverB = (b.r * (DISH_METRES / N)) / this.gapMetres;
+    const fingers = strawFingers(Ca, rOverB);
+    const want = fingers >= 2 ? Math.min(1, speed / (N * 0.03)) * 0.55 : 0;
     b.fing += (want - b.fing) * (1 - Math.exp(-dt / 0.25));
-    // Saffman-Taylor wavelength scaling: lambda ≈ pi * b_eff / sqrt(Ca) (PLAN 18i).
-    // An advancing air front in a Hele-Shaw cell destabilizes into fingers with
-    // wavelength lambda (Saffman & Taylor 1958, Paterson 1981). The number of lobes
-    // around the perimeter 2 * pi * R is m ≈ (2 * pi * R) / lambda ≈ (2 * R / b_eff) * sqrt(Ca).
-    // Physical speed U (m/s) = speed * (DISH_METRES / N).
-    // Capillary number Ca = μ * U / σ.
-    if (speed > 0.1) {
-      const uMps = speed * (DISH_METRES / N);
-      const Ca = Math.max(1e-4, (this.liquidMu * uMps) / this.liquidSigma);
-      // Effective meniscus neck gap b_eff ≈ 0.091 cells (0.095 mm) is a tuned shortcut:
-      // about 21x smaller than the real 2 mm plate gap (DISH_GAP_METRES; 63x the 6 mm
-      // before PLAN 38r). If the physical 2 mm gap (b ≈ 1.9 cells) were used directly, m ≈ (2R/b)*sqrt(Ca) ~ 1.5 lobes,
-      // meaning a bubble on a 192 grid would never form more than 1 finger.
-      // b_eff is set in cells (moves with grid size) to produce 6-18 visible Saffman-Taylor
-      // lobes on the discrete grid. Lobe count scales as m ∝ R * sqrt(Ca) between the clamps.
-      const m = Math.round(22.0 * b.r * Math.sqrt(Ca));
-      b.lobes = Math.min(18, Math.max(6, m));
-    }
+    if (fingers >= 2) b.lobes = Math.min(18, Math.round(fingers));
     // Held at the straw.
     const k = Math.min(1, dt * 8);
     b.x += (x - b.x) * k; b.y += (y - b.y) * k;
     b.kx = 0; b.ky = 0;
     b.held = true;
-    // Satellites off the rim while it grows.
-    if (speed > 0.2 && this.bubbles.length < MAX_BUBBLES - 1 && this.rng.float() < dt * 5 * Math.min(1, strength)) {
-      const a = this.rng.angle();
-      const d = b.r * (1 + b.fing * 0.6) + 1.5 + this.rng.float() * 3;
-      const sat = this.make(b.x + Math.cos(a) * d, b.y + Math.sin(a) * d, Math.max(0.8, N * (0.003 + this.rng.float() * 0.004)));
-      sat.film = b.film;
-      sat.kx = Math.cos(a) * 8; sat.ky = Math.sin(a) * 8;
-      this.push(sat);
-    }
   }
 
   /**
