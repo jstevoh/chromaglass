@@ -457,7 +457,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 9 |
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 13 |
 | 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 4 |
-| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46a-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell) and 46g (liquids carried only once poured) **shipped**, 46h-46s written | 17 |
+| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46a-46e builds to Antigravity after its queue; the audit of 2026-11-13: 46f (the ear's view and the clock out of the shell) and 46g (liquids carried only once poured) **shipped**, 46h-46t written | 18 |
 | 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 36 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 

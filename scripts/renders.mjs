@@ -490,7 +490,9 @@ try {
         // own errors injecting it) reads 0 and must not pass as "nothing".
         w.every(x => x.commits >= 0.9 * x.levelMoves && x.commits <= x.published + CLOCK + ALLOWED_EXTRA), w.map(x => `${f(x.commits)} commits/s for ${f(x.levelMoves)} moves of the level`).join(', ') + whoFor(w));
       check(`${screen.name}, the band: at most ${WORK_HEARING} components render a second`,
-        w.every(x => x.work <= WORK_HEARING && Number.isFinite(x.work)), w.map(x => `${f(x.work)}/s`).join(', '));
+        // And a floor where the level is shown: the leaf that shows it renders for each move, so a
+        // work counter that died (a fiber flag renamed, the walk throwing) reads 0 and is not "nothing rendered".
+        w.every(x => x.work <= WORK_HEARING && Number.isFinite(x.work) && x.work >= 0.9 * x.levelMoves), w.map(x => `${f(x.work)}/s for ${f(x.levelMoves)} moves of the level`).join(', '));
       const hears = `${screen.name}, the band: the plate hears a new reading on four frames in five, nine in ten taken on that frame`;
       if (PLATE) {
         check(hears, w.every(x => x.frames >= FRAMES_ASKED && x.fresh >= 0.8 * x.frames && x.ownFrame >= 0.9 * x.frames),
@@ -546,8 +548,9 @@ try {
         w.every(x => x.deskMoves >= 7 && x.deskMoves <= 10.5), w.map(x => `${f(x.deskMoves)}/s`).join(', '));
       check(`${screen.name}, a fader: the App renders for those, at most ${ALLOWED_EXTRA} a second besides, and each render commits`,
         // The commits' floor is what says the devtools hook is fed on this page (it was the band's line that said so, when the App rendered for the ear).
-        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits >= 0.9 * x.renders && x.commits <= x.deskMoves + CLOCK + ALLOWED_EXTRA),
-        w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s for ${f(x.deskMoves)}`).join(', '));
+        // And the work counter's own floor on both screens (the phone shows no level for the band's line to hold it by): an App render is a component that rendered.
+        w.every(x => x.renders >= 0.9 * x.deskMoves && x.renders <= x.deskMoves + ALLOWED_EXTRA && x.commits >= 0.9 * x.renders && x.commits <= x.deskMoves + CLOCK + ALLOWED_EXTRA && x.work >= 0.9 * x.renders),
+        w.map(x => `${f(x.renders)}/s, ${f(x.commits)} commits/s, ${f(x.work)} components/s for ${f(x.deskMoves)}`).join(', '));
       /*
         On nine frames in ten that were offered a new value the plate draws
         it, and a quarter more often than React is told, at least: at sixty
@@ -627,7 +630,8 @@ try {
       if (screen.touch) skip(tickLine, 'the phone has no desk and no clock');
       else check(tickLine, /^\d+:\d\d$/.test(clock0 ?? '') && /^\d+:\d\d$/.test(clock1 ?? '') && clock0 !== clock1, `${clock0} then ${clock1}`);
       check(`${screen.name}, no sound, the Perform desk: at most ${WORK_QUIET} components render a second`,
-        w.every(x => x.work <= WORK_QUIET && Number.isFinite(x.work)), w.map(x => `${x.work.toFixed(1)}/s`).join(', '));
+        // The floor is the clock's own leaf where the clock is shown (0.6 a second, as its commits' floor): the work counter alive on this page too.
+        w.every(x => x.work <= WORK_QUIET && Number.isFinite(x.work) && (screen.touch || x.work >= 0.6)), w.map(x => `${x.work.toFixed(1)}/s`).join(', '));
       await ctx.close();
     }
     {

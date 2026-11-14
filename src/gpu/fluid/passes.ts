@@ -1077,8 +1077,9 @@ export class FluidPasses extends FluidFields {
    * shares are worked out again, from the air, before every carry that takes
    * them. Kept running unchanged: liquidForces in the fold, whose zero
    * branch still puts the velocity through safeVel. The gate is the one
-   * chemLive already is for the reaction's grid. `npm run physics` and
-   * `npm run liquids` read the plate with it.
+   * chemLive already is for the reaction's grid. `npm run encode` holds
+   * both ways of it: no carry on a plate never poured on or cleared, and
+   * the carries back, open plate and thin gap, after one drop.
    */
   protected carryLiquids(pass: GPUComputePassEncoder, how: 'thin' | 'mac' | 'pressed', args: GPUBuffer | null, disp = 0, at?: GPUBuffer[]): void {
     if (!this.liquidsLive) return;

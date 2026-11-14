@@ -67,10 +67,20 @@ const MAIN_REST_CARRIES = 7; // two for each of those, one for the grain
   leave every poured liquid standing still on a moving plate) and the plate
   H2c-5 is read from, since "every other field still corrected as on main"
   can only be asked of a step that carries every field.
+  The open plate's count alone would leave the thin gap's half of the gate
+  unseen (the check-skeptic, 2026-11-13: a thin branch that carried nothing
+  was green), and a clear followed by a pour unrun, so both are stepped
+  too: the thin step with a liquid poured makes 66 more dispatches than
+  without, at least that many of them binding the liquids' own textures,
+  and a cleared plate carries none until it is poured on again. Not held
+  here, and written into PLAN 46t: that the poured liquid then moves as far
+  as the flow moved (a line for `npm run liquidsgpu`), and the pressed
+  plate's branch, which this plate does not reach.
 */
 const BARE_REST_CORRECTIONS = 1; // the dye's
 const BARE_REST_CARRIES = 3; // the dye's two, the grain's one
 const LIQUIDS_DISPATCHES = 6; // a correction and two carries for each of the two fields
+const LIQUIDS_THIN = 66; // in the thin gap: a dispatch and 32 substeps (indirect) for each of the two
 
 export const ENCODE_OWED = ['h2c5', 'h2c8'];
 
@@ -137,20 +147,34 @@ export async function owedLines(page, check) {
     const bare = { passes: air.passes / 4, live: air.live.size };
     // The open plate's step by kernel, four of them, each carry told by whether it binds the velocity's own pair.
     const velPair = new Set([s.vel.read, s.vel.write]);
-    const openStep = async () => {
+    /*
+      A step by kernel, four of them, open or thin. Besides the carries told
+      apart by the velocity's pair: every dispatch, direct or indirect, whose
+      bind group holds one of the liquids' four textures, so the thin gap's
+      substepped carries (indirect dispatches under the dye's own kernel
+      names) can be seen to be the liquids' and not somebody else's.
+    */
+    const liqTex = new Set([s.liquids0.a, s.liquids0.b, s.liquids1.a, s.liquids1.b]);
+    const countStep = async (thin) => {
       const tagged = { vel: { corrections: 0, carries: 0 }, rest: { corrections: 0, carries: 0 } };
-      const dispatch = GPUComputePassEncoder.prototype.dispatchWorkgroups;
-      GPUComputePassEncoder.prototype.dispatchWorkgroups = function (...a) {
+      let liq = 0;
+      const proto = GPUComputePassEncoder.prototype;
+      const dispatch = proto.dispatchWorkgroups, indirect = proto.dispatchWorkgroupsIndirect;
+      const ofLiquids = (pass) => [...(pass.__tex ?? [])].some((t) => liqTex.has(t));
+      proto.dispatchWorkgroups = function (...a) {
         const k = this.__kernel ?? '';
         const kind = /^macCormack/.test(k) ? 'corrections' : /^advect/.test(k) ? 'carries' : null;
         if (counts.on && kind) tagged[[...(this.__tex ?? [])].some((t) => velPair.has(t)) ? 'vel' : 'rest'][kind]++;
+        if (counts.on && ofLiquids(this)) liq++;
         return dispatch.apply(this, a);
       };
+      proto.dispatchWorkgroupsIndirect = function (...a) { if (counts.on && ofLiquids(this)) liq++; return indirect.apply(this, a); };
       counts.dispatches = 0; counts.indirect = 0; counts.by = {}; counts.on = true;
-      try { await lab.step(4, { thinGap: 0, immiscibility: 0.5 }); } finally { counts.on = false; GPUComputePassEncoder.prototype.dispatchWorkgroups = dispatch; }
+      try { await lab.step(4, { thinGap: thin ? 1 : 0, immiscibility: 0.5 }); } finally { counts.on = false; proto.dispatchWorkgroups = dispatch; proto.dispatchWorkgroupsIndirect = indirect; }
       for (const f of Object.values(tagged)) for (const k of Object.keys(f)) f[k] /= 4;
-      return { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])), tagged };
+      return { dispatches: (counts.dispatches + counts.indirect) / 4, by: Object.fromEntries(Object.entries(counts.by).map(([k, v]) => [k, v / 4])), tagged, liq: liq / 4 };
     };
+    const openStep = () => countStep(false);
     // As encode leaves it: a dye drop, no liquid ever poured (46g).
     const open = await openStep();
     // The control: one bubble on the same plate, stamped on each step.
@@ -161,10 +185,17 @@ export async function owedLines(page, check) {
     const bubble = { passes: air.passes / 4, live: air.live.size };
     s.setBubbles(new Float32Array(4), 0, 0.05);
     await lab.step(2, { thinGap: 1, immiscibility: 0.5 });
-    // Last, because it leaves a liquid on the plate: the same step once one drop of a liquid is poured.
+    // Last, because it leaves a liquid on the plate: the same steps once one drop of a liquid is poured,
+    // the thin gap's beside the open plate's (every look opens thin), then a clear and a second pour.
+    const thinBare = await countStep(true);
     s.addLiquidDrop(0.5, 0.5, 0.08, { body: 1 }, 1);
     const poured = await openStep();
-    return { bare, open, poured, bubble };
+    const thinPoured = await countStep(true);
+    s.clear();
+    const cleared = await openStep();
+    s.addLiquidDrop(0.4, 0.6, 0.08, { soap: 1 }, 1);
+    const repoured = await openStep();
+    return { bare, open, poured, bubble, thinBare, thinPoured, cleared, repoured };
   });
 
   const bareRest = r.open.tagged.rest;
@@ -180,6 +211,12 @@ export async function owedLines(page, check) {
     `${bareRest.corrections} corrections and ${bareRest.carries} carries a step that are not the velocity's (want ${BARE_REST_CORRECTIONS} and ${BARE_REST_CARRIES}; main ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.open.dispatches.toFixed(0)} dispatches`);
   check('control: one drop of a liquid and both its fields are carried again, corrected as the dye is', rest.corrections === MAIN_REST_CORRECTIONS && rest.carries === MAIN_REST_CARRIES && r.poured.dispatches - r.open.dispatches === LIQUIDS_DISPATCHES,
     `${rest.corrections} corrections and ${rest.carries} carries (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.poured.dispatches.toFixed(0)} dispatches against ${r.open.dispatches.toFixed(0)} with none poured (want ${LIQUIDS_DISPATCHES} more)`);
+  const thinMore = r.thinPoured.dispatches - r.thinBare.dispatches, thinLiq = r.thinPoured.liq - r.thinBare.liq;
+  check('control: in the thin gap too, where every look opens: the poured liquid\'s two fields go through the carry\'s substeps', thinMore === LIQUIDS_THIN && thinLiq >= LIQUIDS_THIN,
+    `${r.thinPoured.dispatches.toFixed(0)} dispatches a thin step against ${r.thinBare.dispatches.toFixed(0)} with none poured (want ${LIQUIDS_THIN} more), ${thinLiq.toFixed(0)} more of them binding the liquids\' own textures (want at least ${LIQUIDS_THIN})`);
+  const cl = r.cleared.tagged.rest, rp = r.repoured.tagged.rest;
+  check('46g: a cleared plate carries no liquid until one is poured on it again', cl.corrections === BARE_REST_CORRECTIONS && cl.carries === BARE_REST_CARRIES && rp.corrections === MAIN_REST_CORRECTIONS && rp.carries === MAIN_REST_CARRIES,
+    `cleared: ${cl.corrections} corrections and ${cl.carries} carries (want ${BARE_REST_CORRECTIONS} and ${BARE_REST_CARRIES}); poured again: ${rp.corrections} and ${rp.carries} (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES})`);
   line('h2c5', 'H2c-5: the open plate carries velocity first order (no MacCormack correction, one carry), every other field still corrected as on main, the step two dispatches lighter',
     vel.corrections === 0 && vel.carries === 1 && rest.corrections === MAIN_REST_CORRECTIONS && rest.carries === MAIN_REST_CARRIES && r.poured.dispatches <= MAIN_OPEN - 2,
     `velocity ${vel.corrections} corrections and ${vel.carries} carries (want 0 and 1), the others ${rest.corrections} and ${rest.carries} (want ${MAIN_REST_CORRECTIONS} and ${MAIN_REST_CARRIES}), ${r.poured.dispatches.toFixed(0)} dispatches with a liquid poured (at most ${MAIN_OPEN - 2})`,

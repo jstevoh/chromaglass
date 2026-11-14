@@ -213,3 +213,16 @@ again ten times a second for three meters and a percentage.
   a clear) and each has to be read; a missed one is heat that stands still. Checks:
   `encode` (the step 35 lighter where nothing heats), `heat`, `plateboil`, `physics`,
   `samelook`.
+- **46t · Checks 46f and 46g still owe** (S each; the check-skeptic's read of the PR,
+  2026-11-13; Claude's to write, nobody builds on them until they are). (1) Nothing holds
+  the overlay's three meters or the Sound section's room readout alive: `renders` holds the
+  desk's percentage and the clock, and a meter that froze would be green. A band page with
+  the desk down counting moves of `[data-testid="ear-meters"]`, and one with Settings open
+  on Sound counting the readout's text. (2) `encode` shows a poured liquid's fields are
+  carried again, by the passes made and the textures they bind, open plate and thin gap;
+  no check reads that the liquid then moves as far as the flow does. A line in
+  `npm run liquidsgpu`: a uniform flow, one drop, the field's centre after N steps within
+  30% of the flow's travel. (3) The pressed plate's branch of `carryLiquids` (oil bodies on
+  the open plate) is stepped by no count. (4) `renders`' work counter does not count a
+  mount, so a leaf that remounted on every reading would cost work and count as none.
+
