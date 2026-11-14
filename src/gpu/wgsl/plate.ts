@@ -33,6 +33,7 @@ import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
+import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 
 /** Bindings every plate shader shares. */
 const HEAD = /* wgsl */ `
@@ -2119,7 +2120,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
 
   Then the line. A panel's shapes are drawn in black before they are coloured,
   so the edge of every solid shape is outlined, and so is the seam where one
-  solid ink meets another (benDayEdge, on the front plate's dye).
+  solid ink meets another (benDayEdge, plateBenDay.ts, on each plate's dye).
 
   The dots sit on the screen, not on the glass, on a square lattice at 45° as
   the screens were, a fixed number of rows down the picture (BENDAY_ROWS), so
@@ -2128,9 +2129,7 @@ fn mixSourcesAt(color: vec3f, lo: f32, hi: f32, uv: vec2f, uvScreen: vec2f, flui
   Their edge is antialiased over a pixel and a half so they do not crawl.
 
   Called only while the control is up, so at 0 the picture is what it always
-  was. The one thing the print does not reach is a line round the back
-  plate's shapes and the other sources: the line needs the dye, and it is
-  drawn from the front plate's (Roy has one plate).
+  was.
 */
 const BENDAY_ROWS: f32 = 32.0;
 /** A Ben-Day dot's radius in lattice cells: 0.3 covers 28% of the tint. */
@@ -2228,62 +2227,8 @@ fn benDayInk(hue: vec3f) -> vec3f {
   if (i < 3.5) { return BENDAY_GREEN; }
   return BENDAY_VIOLET;
 }
-/*
-  The outline of the front plate's shapes, as thick as a pen's line.
-
-  The first try drew it from the finished picture, as a contour: the
-  coverage's distance to the solid threshold, over its gradient. A contour
-  like that can only be as wide as the edge it is drawn on, since past the
-  edge the gradient is nothing, and the gooey contrast sharpens a pool's
-  edge to a pixel or two: the line came out a hair (two pixels at 512 in
-  the lab), where a panel's is a pen stroke. So the line is drawn from the
-  front plate's dye instead: eight taps on a ring of the line's half-width
-  round the pixel, and the pixel is on the line when the ring has both solid
-  ink and something less on it (it is within that distance of the shape's
-  edge), or two different inks (of a seam). Solid is read as benDay() reads
-  it, opacity times the colour's coverage (benDayStrength), and not opacity
-  alone: a pale wash is opaque enough, and opacity drew a soft grey band
-  round every wash and a line through the middle of two of them. The first
-  is the ring's range straddling BENDAY_EDGE, cut over a pixel so the line's
-  own edge is antialiased and not smeared; the second is a step, and is
-  only ever inside a line's width of a solid shape. Only while the print is
-  up, so eight decodes a pixel cost nothing on any other look.
-*/
 const BENDAY_EDGE: f32 = 0.5;
-/**
- * How much ink a decoded dye sample lays: its opacity times its colour's
- * coverage, as benDay() reads coverage.
- */
-fn benDayStrength(f: vec4f) -> f32 {
-  let hi = max(f.r, max(f.g, f.b));
-  return f.a * (hi - min(f.r, min(f.g, f.b))) / max(hi, 1e-4);
-}
-fn benDayEdge(t: texture_2d<f32>, fuv: vec2f, rad: f32) -> f32 {
-  let c = decodeFluid(t, fuv, 0.0, false);
-  let sc = benDayStrength(c);
-  var lo = sc;
-  var hi = sc;
-  var first = -1.0;
-  var seam = 0.0;
-  if (sc > BENDAY_EDGE) { first = benDayInkIndex(c.rgb); }
-  for (var k = 0; k < 8; k++) {
-    let a = f32(k) * 0.78539816;
-    let f = decodeFluid(t, fuv + vec2f(cos(a), sin(a)) * rad, 0.0, false);
-    let sf = benDayStrength(f);
-    lo = min(lo, sf);
-    hi = max(hi, sf);
-    if (sf > BENDAY_EDGE) {
-      let ink = benDayInkIndex(f.rgb);
-      if (first < 0.0) { first = ink; } else if (ink != first) { seam = 1.0; }
-    }
-  }
-  // Positive while the ring straddles the threshold, and cut at 0 over a
-  // pixel of its own gradient: over a smooth one the plain smoothstep of
-  // each end left a band of grey a dozen pixels wide beside the line.
-  let straddle = min(hi - BENDAY_EDGE, BENDAY_EDGE - lo);
-  let edge = clamp(straddle / max(fwidth(straddle), 1e-5) + 0.5, 0.0, 1.0);
-  return max(edge, seam);
-}
+${BENDAY_OUTLINE_WGSL}
 
 fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let hi = max(c.r, max(c.g, c.b));
@@ -2442,18 +2387,17 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let tint0 = fluid0.rgb;
   let alpha0 = fluid0.a;
   var more0 = 1.0;   // throughScaled
-  // The print's pen line round the front plate's shapes (benDayEdge): a
-  // half-width of a line in screen pixels, turned into the plate's units.
-  var benEdge = 0.0;
-  if (U.benDay > 0.001) {
-    benEdge = benDayEdge(layer0, fuv0, phasePx * max(1.0, U.resolution.y / BENDAY_ROWS * BENDAY_LINE));
-  }
   var dish0 = vec2f(1.0, 0.0);
   var dish1 = vec2f(1.0, 0.0);
   if (U.dishSpread > 0.001) {
     dish0 = layerDish(uvScreen, 0, U.resolution.x / U.resolution.y);
     fluid0.a *= dish0.x;
     more0 *= dish0.x;
+  }
+  // The print's pen line round each plate's shapes (benDayEdge, plateBenDay.ts).
+  var benEdge = 0.0;
+  if (U.benDay > 0.001) {
+    benEdge = benDayEdge(layer0, fuv0, phasePx) * dish0.x * U.mixLevel.y;
   }
 
   let bare0 = fluid0.a;   // the opacity the dye alone gives, for the grain below
@@ -2996,9 +2940,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     }
     // The BZ reaction in ferroin: red where the catalyst is reduced, blue
     // where the wave has oxidised it. The catalyst is in the whole dish, so
-    // the whole dish is red at rest: drawn only where a wave had been (either
-    // species over 0.0005), the dish was the look's own dye with red trails,
-    // the showreel's "muddy red-green marble".
+    // the whole dish is red at rest (drawn only where a wave had been, it was
+    // the showreel's "muddy red-green marble").
     if (U.bzShow > 0.001) {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
@@ -3013,10 +2956,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  // Thin Film, its rings read through a smooth spline (plateThinFilm.ts, 1i).
+  // Thin Film (1i), and the frame's soap film (32d): plateThinFilm.ts.
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
     outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
+  if (U.soapFilm > 0.001) { outColor = soapFilmOver(outColor, fuv0); }
 
   // ── The mixer: the front plate's grade and level ─────────────────
   // Its level fades the plate back to the bare lamp under it.
@@ -3035,6 +2979,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     var fuv1 = uvToFluid(uv, c1, s1);
     if (U.dishSpread > 0.001) { fuv1 = dishToPlate(uvScreen, 1, aspect, c1, s1); }
     if (U.layerZoom1 > 1.001) { fuv1 = (fuv1 - 0.5) / U.layerZoom1 + 0.5 + U.layerDrift1; }
+    let phasePx1 = max(length(dpdx(fuv1)), length(dpdy(fuv1)));
     var flow1 = vec2f(0.0);
     if (closeup) {
       flow1 = fluidFlow(vel1, fuv1) * macroAmt;
@@ -3049,6 +2994,9 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       dish1 = layerDish(uvScreen, 1, U.resolution.x / U.resolution.y);
       fluid1.a *= dish1.x;
       more1 *= dish1.x;
+    }
+    if (U.benDay > 0.001) {
+      benEdge = max(benEdge, benDayEdge(layer1, fuv1, phasePx1) * dish1.x * U.mixLevel.z);
     }
 
     let bare1 = fluid1.a;   // the opacity the dye alone gives, for the grain below
@@ -3583,7 +3531,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   // ── Ben-Day dots: the finished picture, printed as a comic (benDay) ──
   if (U.benDay > 0.001) {
     let benPx = vec2f(in.pos.x, select(in.pos.y, U.resolution.y - in.pos.y, FLIP_Y < 0.0));
-    outColor = benDay(outColor, benPx, U.benDay, benEdge * U.mixLevel.y);
+    outColor = benDay(outColor, benPx, U.benDay, benEdge);
   }
 
   /*

@@ -266,6 +266,17 @@ network):
   `docs/plan-shipped.md` §13) Story in `docs/plan-shipped.md` §13-update (moved 2026-10-29,
   19m).
   - ~~**13-update-signed**~~ **Shipped** (2026-10-27: the first signed and notarised release, 1.3.692; `MAC_APP_NOTARISED` is true and `npm run updates` asserts it). Story in `docs/plan-shipped.md` §13-update-signed (moved 2026-10-29, 19m-2). Owed: judging §75, the owner installs 1.3.692 and confirms the next release replaces it in place.
+  - ~~**13-update-auto**~~ **Shipped** (2026-11-11): Install Updates Automatically, on
+    or off, in the *ChromaGlass* menu and the profile sheet, and never an update in the
+    middle of a show (`npm run updates`). Story in `docs/plan-shipped.md` §13-update-auto.
+    **Owed:** the next Mac release, then the owner's eye on the menu tick and the card's
+    switch.
+  - **13-update-auto-a. A recording counts as a show.** *(S, found building
+    13-update-auto.)* `busy()` knows the projector window and the live stream, both the
+    main process's; a Plate video recording on the laptop alone is the page's, so a
+    Restart to Update clicked mid-recording does not ask first, and the recording ends
+    with the restart. The page could tell the main process it is recording (the
+    preload's updates bridge) so the confirm covers it.
   - ~~**13-first-open**~~ **Shipped**: the release notes, the profile sheet's Mac app card and the landing page say Open Anyway (`npm run updates`). Story in `docs/plan-shipped.md` §13-first-open (moved 2026-10-29, 19m-2).
   - *Trap:* the updater reads the repository's **newest** release. Any other kind of
     release on this repo (a `show-*` tag of 14p, an iPhone build) must be published

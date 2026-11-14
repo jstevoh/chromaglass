@@ -80,6 +80,8 @@ const NOT_A_TARGET = new Set(['filmDrive', 'filmImpact', 'soundImpact', 'shapeIm
   'env1Attack', 'env1Decay', 'env1On', 'env2Attack', 'env2Decay', 'env2On',
   // And the film's dye (PLAN 20b-13): dye dissolved in the oil does not come and go on the beat.
   'clearFilmDye',
+  // Nor the tank (PLAN 47n): whether the picture is a tank or the dish is the whole frame, never the beat's. Its feed, dye and nozzle are cords.
+  'tank',
   // A hand's alone (midi.ts PATCH_MASTERS): the room never moves the frame.
   'frameSway',
   // A hand's alone too: the tilt is the owner's, and a kick routed to Slosh would be the sound rocking the liquid (lib/slosh.ts).
@@ -133,7 +135,7 @@ export const PER_LAYER: ReadonlySet<string> = new Set([
   // The liquid under this plate's cover and the cover's weight (PLAN 38r-5).
   'liquidMl', 'coverWeight',
   // The liquids' own physics (docs/physics-plan.md): each plate's solver.
-  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'surfactantFlow', 'soapBreakdown', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
+  'vorticityConfinement', 'oilTension', 'oilBodies', 'filmHold', 'oilWeight', 'surfactantFlow', 'soapBreakdown', 'solutalBuoyancy', 'plateUpright', 'tiltDirection', 'doubleDiffusion', 'ferroLabyrinth', 'mazeDetail', 'phaseDisplace', 'bzReaction', 'liesegang',
   // The clear film (PLAN §20b): the front plate's solver lays it; a back
   // plate is handed 0 until the display can draw one there (20b-5).
   'clearFilm',
@@ -173,6 +175,8 @@ export interface PatchContext {
    * the same master, Sound Impact.
    */
   hits?: HitSource | null;
+  /** MIDI notes as voices (`noteVoices.ts`): velocity, pitch and held in 0..1. */
+  notes?: { value: (feature: string) => number } | null;
   /** Master depth per source, so a whole source can be pulled down on a fader. */
   roomImpact: number;
   filmImpact: number;
@@ -252,6 +256,10 @@ function liveValue(
     // A note is a name (hitSource.ts noteClass): Sound Impact at zero still
     // silences it, but turned half down it would read as another note.
     return { value: ctx.hits.value(feature), impact: isClassFeature(feature) ? 1 : ctx.soundImpact };
+  }
+  if (source === 'notes') {
+    if (!ctx.notes) return null;
+    return { value: ctx.notes.value(feature), impact: 1 };
   }
   // Shapes have no staleness: an LFO is never out of date, and an envelope
   // that has not been fired reads zero, which is already "nothing to say".

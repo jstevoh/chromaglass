@@ -1,9 +1,11 @@
 /**
- * The iPhone app, and the laptop it can be a remote for.
+ * The phone apps, and the laptop they can be a remote for.
  *
- * The app (PLAN.md §12) is the same build as the website, bundled into a
- * Capacitor shell and drawn by WKWebView from `capacitor://localhost`. It
- * plays the show itself, like the website on a phone. Asked for on
+ * The apps (PLAN.md §12) are the same build as the website, bundled into a
+ * Capacitor shell: on the iPhone drawn by WKWebView from
+ * `capacitor://localhost`, on Android by the system WebView from
+ * `https://localhost` (12-ctl-3). Each plays the show itself, like the
+ * website on a phone. Asked for on
  * 2026-09-27: "make the remote control work on the iPhone app … I'd like to
  * be able to switch back and forth between modes" — so it can also be the
  * phone remote for a show running on the laptop, and go back to playing.
@@ -43,7 +45,7 @@ export interface LaptopLink {
 }
 
 /**
- * Running inside the iPhone app, not a browser.
+ * Running inside one of the phone apps (iPhone or Android), not a browser.
  *
  * Capacitor puts `window.Capacitor` on every page it draws and answers
  * `isNativePlatform()` true inside the shell; in a browser the global is
@@ -143,6 +145,59 @@ export function goRemote(): void {
 /** Switch the app back to playing the show itself. */
 export function goPlay(): void {
   // The site's show is at /show, past the webpage at / (lib/showPath.ts); the
-  // iPhone app has no webpage, and its own files answer / for certain.
+  // phone apps have no webpage, and their own files answer / for certain.
   window.location.href = isPhoneApp() ? '/' : SHOW_PATH;
+}
+
+/**
+ * Running inside the Android app (12-ctl-3), as against the iPhone's.
+ *
+ * Capacitor's `getPlatform()` says which shell drew the page. The two apps
+ * share every line but this one difference: Android's WebView has WebGPU on
+ * fewer phones than Chrome has, so a phone that cannot draw the plate in the
+ * app is offered Chrome (components/NeedsWebGpu.tsx). The iPhone's WKWebView
+ * is Safari's engine, which has WebGPU wherever Safari does, so it has
+ * nowhere better to send anyone.
+ */
+export function isAndroidApp(): boolean {
+  if (!isPhoneApp()) return false;
+  try {
+    const cap = (window as unknown as { Capacitor?: { getPlatform?: () => string } }).Capacitor;
+    return cap?.getPlatform?.() === 'android';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The website's own show, for a phone that should play it in a browser.
+ *
+ * chromaglass.art is the site's own name (chromaglass.web.app answers the
+ * same build), and the show is at SHOW_PATH, past the webpage at /.
+ */
+export const SITE_SHOW_URL = `https://chromaglass.art${SHOW_PATH}`;
+
+/**
+ * Open the website's show in Chrome, from the Android app.
+ *
+ * The app's own plugin names Chrome's package (android/…/OpenInChromePlugin.java),
+ * because a plain https link from a WebView goes to the phone's default
+ * browser, which on many phones is not Chrome and may have no WebGPU either.
+ * The call goes through Capacitor's bridge directly (`nativePromise`), since
+ * the bundle does not carry Capacitor's web runtime. If the plugin is missing
+ * or refuses, the address is opened as a link, which the shell hands to the
+ * default browser: better a browser that may draw it than nothing.
+ *
+ * A check sets `window.__cgOpenExternal` to read the address instead
+ * (`npm run controller`), as it cannot see another app open.
+ */
+export function openInChrome(url: string = SITE_SHOW_URL): void {
+  if (typeof window.__cgOpenExternal === 'function') {
+    window.__cgOpenExternal(url);
+    return;
+  }
+  const cap = (window as unknown as { Capacitor?: { nativePromise?: (plugin: string, method: string, options: unknown) => Promise<unknown> } }).Capacitor;
+  const viaLink = () => { window.location.href = url; };
+  if (typeof cap?.nativePromise !== 'function') { viaLink(); return; }
+  cap.nativePromise('OpenInChrome', 'open', { url }).catch(viaLink);
 }

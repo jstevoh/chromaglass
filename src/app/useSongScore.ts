@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useMemo, type RefObject, type Dispatch, type SetStateAction } from 'react';
 import { type SongAction, type SongLook, type SongShow, titleRows, showFor, type ActionWhen, type ActionWhat, newId, pourGesture } from '../lib/songShows';
 import { setSongCueSink } from './songCue';
+import { publishSongs, setSongsDoor, showBrief } from './songShowNow';
+import { showSongTitle } from './songTitle';
+import { showSongCaption } from '../lib/songCaption';
 import { unhandled } from '../lib/unhandled';
 import { useSongShows } from '../hooks/useSongShows';
 import { PRESETS } from '../presets';
@@ -80,10 +83,12 @@ export function useSongScore({
       case 'blackout': glideSetting('dimmer', 0, a.over); break;
       case 'lights-up': glideSetting('dimmer', 1, a.over); break;
       case 'set': glideSetting(a.key, a.value, a.over); break;
-      // In an ink that reads against the plate as it is: a title poured into a
-      // full, bright plate in the look's own dye does not show.
-      case 'title': v?.pourText(titleRows(show.song), { colour: 'contrast' }); break;
-      case 'signoff': v?.pourText([{ text: 'ChromaGlass', weight: 1 }], { colour: 'contrast' }); break;
+      // The corner caption (app/songTitle.ts, 37x-10j); the ink's rows ride along, dormant, since the ink was shelved (37x-10m).
+      case 'title': showSongTitle(show.song, { rows: titleRows(show.song), colour: 'contrast' }); break;
+      // The show's name in the corner as the song ends. It was poured as ink
+      // until the owner shelved the poured words (37x-10m): on a busy look the
+      // flow smeared the word before it could be read, as it did the titles.
+      case 'signoff': showSongCaption({ artist: '', title: 'ChromaGlass' }); break;
       // A drop of this dye, as a pad's Drop lays it (lib/songShows.ts pourGesture).
       case 'pour': v?.applyGesture(pourGesture(a, (x, y) => v.wallToPlate(x, y, 0, true))); break;
       // A show that names something this build cannot do says so, rather
@@ -159,6 +164,43 @@ export function useSongScore({
     setSongShows(songShowsRef.current.map(s => (s.actions.some(a => a.id === actionId) ? { ...s, actions: s.actions.filter(a => a.id !== actionId) } : s)));
   }, [setSongShows]);
   const { nudgePosition, nudgeToSection, resetNudge } = musicIntel;
+
+  /*
+    The owner's assistant reads the song shows and drives them through the
+    Songs panel's own callbacks (app/songShowNow.ts, PLAN 44k-5): Run and
+    Stop, a cue taken off the score, the score's nudges. A nudge says why not
+    where the score's button would do nothing in silence (no song, or a song
+    with no map to find a section in).
+  */
+  const { showId: runningId, song: runningSong, manual: runningManual } = songRuntime.status;
+  const currentShowId = currentShow?.id ?? null;
+  useEffect(() => {
+    publishSongs({
+      follow: followSongs, current: currentShowId, shows: songShows.map(showBrief),
+      running: runningId ? { showId: runningId, song: runningSong, manual: runningManual } : null,
+    });
+  }, [followSongs, currentShowId, songShows, runningId, runningSong, runningManual]);
+  const trackRef = useRef(musicIntel.state.track);
+  trackRef.current = musicIntel.state.track;
+  const mapRef = useRef(musicIntel.state.songMap);
+  mapRef.current = musicIntel.state.songMap;
+  const currentIdRef = useRef(currentShowId);
+  currentIdRef.current = currentShowId;
+  useEffect(() => {
+    const noSong = () => (trackRef.current ? null : 'no song is playing: a nudge moves the song\'s clock');
+    setSongsDoor({
+      shows: () => songShowsRef.current,
+      current: () => currentIdRef.current,
+      remove: removeScoreCue,
+      start: (id) => songRuntimeRef.current.start(id),
+      stop: () => songRuntimeRef.current.stop(),
+      running: () => songRuntimeRef.current.status.showId !== null,
+      nudge: (kind) => noSong() ?? (mapRef.current ? (nudgeToSection(kind), null) : 'the song has no map yet, so its sections are not known: nudge by seconds'),
+      nudgeBy: (sec) => noSong() ?? (nudgePosition(sec), null),
+      resetNudge: () => noSong() ?? (resetNudge(), null),
+    });
+    return () => setSongsDoor(null);
+  }, [songShowsRef, removeScoreCue, nudgeToSection, nudgePosition, resetNudge]);
   const scoreProps = useMemo<SongScoreProps>(() => ({
     songName: currentSong ? songLabel(currentSong) : null,
     map: musicIntel.state.songMap,

@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Glitter, a macro lens's discs and stars, and a side lamp (PLAN 47e, 47d-1, 47b-1)
+
+- **Glitter** (Settings → Camera): fine flakes suspended in the liquid that ride the flow at
+  their own depth, tumble as it shears them, settle slowly and flash where a lamp meets their
+  mirror angle; dark specks on a lamp ground.
+- **Lens Stop** (under Glitter): the closeup's aperture. Wide open, specks away from focus
+  blur into soft round discs; stopped down, they shrink to six-sided ones and the brightest
+  glints grow six-pointed diffraction stars. Projector Focus picks the sharp depth.
+- **Side Light**, **Side Colour**, **Side Angle** (Settings → Lamp & Light): a second lamp
+  raking in from one side, amber by default, over the glow; it lights the dye's near side and
+  the slopes facing it and leaves black ground black.
+- All five on MIDI, the desks and the phone's remote; at 0 every look is unchanged.
+
+### Added — the tank seen through its side (PLAN 47n)
+
+- Tank (Settings → Camera, MIDI, the phone): a tank of water seen through its side in place of
+  the dish from above, as Davy Evans' *Gravity L1* films one. Heavy dye falls from a nozzle at the
+  surface, thins to a thread as gravity speeds it, lands and runs along the floor as a gravity
+  current. Its own solver: a vertical slice of water with real viscosity, glass walls, a free
+  surface, and the dye's weight (`npm run tank`, `npm run tankgpu`).
+- While it is up: Feed (cm/s), Dye Weight %, Nozzle (a finger held on the plate, or a hold on the
+  phone, carries it too), Drain and Glow Hue. Feed, Dye Weight, Nozzle and Glow Hue take cords;
+  Tank itself never does. Tank at 0, the default, keeps the dish exactly as it was.
+
+### Added — Lava Lamp's wax as blobs in a clear liquid; Oil Weight (PLAN 27f-9c)
+
+- Lava Lamp's wax is a liquid of its own: crimson bodies in a clear, lamp-lit liquid that sink
+  when cold and are held up by the lamp, instead of a red wash over the whole plate. The look no
+  longer stirs itself (Turbulence 0): the stir tore the wax into the liquid.
+- Oil Weight (Settings → Oil & Soap, MIDI, the phone): how heavy the oil is against the water.
+  Left it floats up a standing plate, right it sinks like a lamp's wax and the lamp's heat
+  lifts it. The default keeps every oil look as it was.
+
+### Added — song titles as a 1980s corner caption (PLAN 37x-10j)
+
+- Song titles now go up by default as a corner caption, the card a music channel put over a
+  video in the early 1980s: the artist, the song in quotes, the album and the label, white in
+  the bottom-left corner for seven seconds. It shows on the screen and is burned into the live
+  stream, portrait encode included. **Settings → Logo & Titles → As a corner caption** (the
+  phone's **Caption / Ink**) switches back to poured ink. A new `song-title` message (the
+  assistant's `song_title` tool) puts a credit up for a set the ear cannot name.
+
 ### Added — song titles painted as ink, then swept away (PLAN 37x-10)
 
 - **Settings → Logo & Titles → Song titles as ink** (and **Title** on the phone): when a new

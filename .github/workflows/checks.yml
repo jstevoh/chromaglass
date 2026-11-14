@@ -140,15 +140,30 @@ jobs:
   # ones that want Chromium, in two (`browser` and `browser2`, about
   # fourteen and eleven: the site's pages and desks, then the remote, the
   # show's wires and the sound in the app), and the lab on the CPU
-  # rasteriser, in five (`lab` to `lab5`: Chromium, then the
+  # rasteriser, in nine (`lab` to `lab9`: Chromium, then the
   # frame's passes and the GPU dishes on the first, `lampzero` drawing every
   # look in two labs on the second, the soap's two checks on the third,
   # `holeline` building three labs on the fourth, and on the fifth `samelook`,
   # two trees' labs side by side, which runs only on a pull request of the
-  # speed hunt's and says "not asked" on any other, PLAN.md 46-0, and the ink
-  # title's thin-gap arms, about fourteen minutes on the slow tier, PLAN 37x-10g). Every
-  # check runs whatever failed before it in its part. GitHub's ubuntu runners
-  # are not the queue the Mac's are, so nine at once cost the queue nothing.
+  # speed hunt's and says "not asked" on any other, PLAN.md 46-0; and on the
+  # sixth the ink title's thin-gap arms and the logo melt, about seventeen
+  # minutes on the slow tier, PLAN 37x-10g and 37x-11, which shared the fifth
+  # until a hunt PR's samelook (15:18) and they passed the 25-minute limit
+  # together; and on the seventh the ink title's own check, which left the
+  # third when the soap's two and it passed the limit on the slow tier, PLAN
+  # 19k-17; and on the eighth Lava Lamp's wax, six runs of the look and a
+  # second lab built without the melt, about ten minutes on one runner and
+  # so twenty on the slow tier, which no other part had room for, PLAN
+  # 27f-9c; and on the ninth the moiré sheets' optics, which left the second
+  # when it ran 25:06 and 25:17 of the 25 on #802's deploy (attempts 1 and
+  # 2, every check in it green, cancelled at the limit), against 19:13 on
+  # the same checks on #802's own run: the slow tier again, and the moiré's
+  # 6:23 there the largest piece the second could lose, PLAN 19k-18). There
+  # was a tenth, Lava Lamp's cycle, while that check watched 50 s of the lamp;
+  # it watches five minutes now, an hour and a half on this rasteriser, and
+  # runs on the Mac's `show` (PLAN 27f-9h, 19k-19). Every check runs whatever
+  # failed before it in its part. GitHub's ubuntu runners are not the queue
+  # the Mac's are, so nine at once cost the queue nothing.
   #
   # Since PLAN.md 19k-4 a pull request whose diff is only check scripts, the
   # manifest's entries, the npm scripts checks run and documents runs only the
@@ -193,6 +208,13 @@ jobs:
     # #688 had meanwhile moved sloshgpu, soapgpu and beadmask to lab3 (19k-11a);
     # with holeline gone, sloshgpu and beadmask came back, leaving lab about
     # 13:20, lab3 about 15:20 and lab4 about 11 on the slow tier.
+    # Then lab4 itself, from 2026-11-13 (PLAN 19k-11c): glint (47e, #833) and
+    # bubbleair had joined holeline, encode --grids and shaderdials there, and
+    # on the slow tier lab4 was cancelled at the limit on two of that day's four
+    # PR runs (#842 and #835), no check failing, about 15 minutes of checks
+    # ahead of holeline's 11. glint went to lab9 (3:50 that day) and bubbleair
+    # to lab8 (4:24), which leaves lab4 about the 11 minutes holeline takes on
+    # that tier and its other two checks, with 14 minutes to the bound.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -294,10 +316,10 @@ jobs:
       # the lockfile, so it is the version actually in use.
       - name: Which Playwright
         id: pw
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         run: echo "v=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: The browser, from the cache when it is there
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -306,7 +328,7 @@ jobs:
       # second, and the six minutes are for the cold download the cache misses
       # once a Playwright version.
       - name: Install Chromium
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         timeout-minutes: 6
         run: npx playwright install chromium
       # The system libraries, from apt only when one is missing (PLAN 19ab-2).
@@ -324,7 +346,7 @@ jobs:
       # retries are for a connection that stalls rather than one that is slow:
       # on 2026-10-22 one held the ffmpeg step for 1474 s without a byte.
       - name: Chromium's system libraries, from apt only if one is missing
-        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5"]'), matrix.part) }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && contains(fromJSON('["browser","browser2","lab","lab2","lab3","lab4","lab5","lab6","lab7","lab8","lab9"]'), matrix.part) }}
         timeout-minutes: 8
         run: |
           node scripts/chromiumlibs.mjs && exit 0

@@ -305,7 +305,7 @@ export function DeskHeader({ breadcrumb, tabs, tab, onTab, onTabEdit, onAddPanel
           {/*
             The owner's tabs, each a set of panels (lib/deskTabs.ts), and the
             pencil that edits them. Sequence and Sound were screens of their
-            own here; they are panels now (Songs, Sequences, Music & Drone),
+            own here; they are panels now (Songs, Sequences; Music & Drone is the top of Sound),
             on Sequence and Setup as they ship.
           */}
           <TabStrip tabs={tabs} tab={tab} onTab={onTab} onEdit={onTabEdit} onAddPanel={onAddPanel} />

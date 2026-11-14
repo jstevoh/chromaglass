@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
-import { Mic, Monitor, FileAudio, Music, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
-import { Sheet, LIT } from './ui';
+import React, { useRef, type ReactNode } from 'react';
+import { Mic, Monitor, FileAudio, Drum, Slash, Play, Pause, Repeat, Waves, Square } from 'lucide-react';
+import { LIT } from './ui';
 import { VuMeter } from './ui/Playful';
 import { LIBRARY, librarySeconds, clock, credits, type Track } from '../lib/musicLibrary';
 import { SCALES, NOTES, type DroneParams, type ScaleName, type Wave } from '../lib/plateDrone';
@@ -18,6 +18,19 @@ import { isDesktopApp } from '../lib/platform';
  *
  * So sound is a tab, beside Perform, Design and Songs, because that is what it
  * is — one of the things you set up before a room fills.
+ *
+ * And then it was two places again (PLAN 35c-7, the owner 2026-11-10: "I
+ * don't understand why there are two sound settings pages"). This sheet held
+ * where the sound comes from, the shelf, the player and the drone; Settings →
+ * Sound held how hard it drives the plate, the device, the calibration, the
+ * tempo and the songs; and the Setup tab put both on screen side by side, as
+ * "Sound" and "Music & Drone", each sending you to the other for half of a
+ * job (the Mic's button to the device there, its link back here). Now this is the
+ * top of Settings → Sound, drawn inside that section (`SoundSection.tsx`):
+ * one page, read from the top, where the sound comes from first and what it
+ * does to the plate after. Every door that opened the sheet opens that
+ * section, and a desk layout saved with the "Music & Drone" panel opens with
+ * Sound in its place (`MERGED_SECTIONS`).
  */
 
 export type AudioSource = 'none' | 'microphone' | 'system' | 'file' | 'simulated' | 'drone';
@@ -40,18 +53,16 @@ const SOURCES: ReadonlyArray<{
 ];
 
 export function SoundPanel({
-  source, onSource, inputs, inputId, onPickMic,
+  source, onSource, inputPicker,
   playing, time, loop, onLoop, onToggle, onSeek,
   nowPlaying, onPickFile, onPickTrack, drone, onDrone, droneRunning, onDroneToggle,
-  ambientMode = false, onAmbientMode, onClose, embed = false,
+  ambientMode = false, onAmbientMode,
   readLevel, deaf = false,
 }: {
   source: AudioSource;
   onSource: (s: AudioSource) => void;
-  inputs: { id: string; label: string }[];
-  inputId: string;
-  /** Opens Settings at Sound's Input, where the microphone is picked (PLAN 35c-5). */
-  onPickMic: () => void;
+  /** The section's microphone or interface picker, drawn under the sources while the Mic is the source (PLAN 35c-7). */
+  inputPicker?: ReactNode;
   playing: boolean;
   time: { t: number; d: number };
   loop: boolean;
@@ -68,9 +79,6 @@ export function SoundPanel({
   onDroneToggle: () => void;
   ambientMode?: boolean;
   onAmbientMode?: (on: boolean) => void;
-  onClose: () => void;
-  /** Drawn in a desk panel rather than as a sheet (`Sheet embed`). */
-  embed?: boolean;
   /** The plate's volume right now, 0 to 100, or null with no ear: what the VU needle is moved by. */
   readLevel: () => number | null;
   /** Listening, but nothing is arriving: the needle rests on its stop and the dial says so. */
@@ -90,8 +98,8 @@ export function SoundPanel({
   const chosen = sources.find(s => s.id === source) ?? sources[0];
 
   return (
-    <Sheet embed={embed} title={<><Music size={16} /> Sound</>} onClose={onClose} width={760} height={680} testId="sound-panel">
-      <div className="flex-1 overflow-y-auto p-5">
+    <div className="@container mb-4" data-testid="sound-panel-box">
+      <div>
         <input
           ref={fileRef} type="file" accept="audio/*" className="hidden" data-testid="sound-file-input"
           onChange={e => { const f = e.target.files?.[0]; if (f) onPickFile(f); e.target.value = ''; }}
@@ -106,7 +114,7 @@ export function SoundPanel({
           <p className="text-[11px] font-bold uppercase tracking-widest text-muted">Where the sound comes from</p>
           <VuMeter read={readLevel} listening={source !== 'none'} deaf={deaf && source !== 'none'} />
         </div>
-        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @4xl:grid-cols-6">
           {sources.map(s => {
             const Icon = s.icon;
             const on = source === s.id;
@@ -246,28 +254,15 @@ export function SoundPanel({
         )}
 
         {/*
-          Which microphone, said and not picked. A select here was the second
-          picker for the one device, beside Settings' Input (where the Mic
-          light lands, and where the advice about a USB feed from the desk
-          is): on the Setup tab both stood on screen at once, and one could
-          be changed while the other was read (PLAN 35c-5). The sheet keeps
-          the source, which is its own; the device is Settings', one click on.
+          Which microphone or interface, picked right under the Mic that hears
+          it (PLAN 35c-7). It was said here and picked in Settings → Sound,
+          one click on (35c-5), because two pickers for one device could be
+          changed one while the other was read. With the sheet folded into
+          that section there is one picker again, the section's, and this is
+          where it is drawn: under the source it belongs to, not after the
+          shelf.
         */}
-        {source === 'microphone' && (
-          <div className="mt-3 flex items-center gap-2" data-testid="sound-input-state">
-            <p className="min-w-0 flex-1 truncate text-[12px] text-muted">
-              Hearing <span className="text-text">{inputs.find(i => i.id === inputId)?.label || 'the default microphone'}</span>
-            </p>
-            <button
-              onClick={() => { if (!embed) onClose(); onPickMic(); }}
-              className="h-8 shrink-0 rounded-lg border border-border bg-black/30 px-3 text-[12px] font-medium text-text-2 transition-colors hover:bg-hover hover:text-text"
-              title="Pick the microphone or audio interface in Settings → Sound"
-              data-testid="sound-input-open"
-            >
-              Change…
-            </button>
-          </div>
-        )}
+        {source === 'microphone' && inputPicker}
 
         <div className="my-5 border-t border-border" />
 
@@ -348,6 +343,6 @@ export function SoundPanel({
           </>
         )}
       </div>
-    </Sheet>
+    </div>
   );
 }

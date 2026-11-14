@@ -29,7 +29,7 @@
  *    the next stream's need against what the last one showed.
  */
 import { useSyncExternalStore } from 'react';
-import { avcCodec, videoBitrate } from './render';
+import { liveRates, keepCeiling, AUDIO_KBPS, HEADROOM } from './liveRate';
 import {
   LiveEncoder, liveConsolePlan, probeVideoEncoders,
   type LiveConsoleOptions, type LiveDestinationHealth, type LiveStartRequest, type LiveState,
@@ -130,6 +130,7 @@ export function loadDestinations(): LiveDestination[] {
 }
 export function saveDestinations(list: LiveDestination[]): void {
   write(DESTINATIONS_KEY, list.map(cleanDestination).filter(Boolean));
+  void refreshLiveSetup();
 }
 /*
   A name for a destination's key in the store, not a draw of the show: from the
@@ -138,49 +139,65 @@ export function saveDestinations(list: LiveDestination[]): void {
 */
 export const newDestinationId = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join('');
 
-/** The landscape encode's size and the rate of both. The portrait one is 720x1280 (Instagram's and TikTok's). */
+/**
+ * The landscape encode's size and the rate of both. The portrait one is
+ * 720x1280 (Instagram's and TikTok's). 60 fps unless the owner picked 30
+ * (37x-4h): the plate is drawn at 60, and the rehearsal's stream at 30 lost
+ * half its motion before YouTube's own compression took more. A format the
+ * owner saved with 30 in it stays at 30.
+ */
 export interface LiveFormat { height: 720 | 1080; fps: 30 | 60 }
-export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 30 };
+export const DEFAULT_FORMAT: LiveFormat = { height: 1080, fps: 60 };
 export function loadFormat(): LiveFormat {
   const f = read<Partial<LiveFormat>>(FORMAT_KEY);
-  return { height: f?.height === 720 ? 720 : 1080, fps: f?.fps === 60 ? 60 : 30 };
+  return { height: f?.height === 720 ? 720 : f?.height === 1080 ? 1080 : DEFAULT_FORMAT.height, fps: f?.fps === 30 ? 30 : f?.fps === 60 ? 60 : DEFAULT_FORMAT.fps };
 }
 export const saveFormat = (f: LiveFormat) => write(FORMAT_KEY, f);
 
 /** Which destinations a press streams: Go live the ones on and not for tests, Test the ones for tests. */
 export const chosenFor = (list: LiveDestination[], test: boolean) => list.filter((d) => (test ? d.test : d.on && !d.test) && validUrl(d.url));
 
-/** The console's options for those destinations, keys by name. */
-export function liveOptionsFor(list: LiveDestination[], f: LiveFormat): LiveConsoleOptions {
+/**
+ * The console's options for those destinations, keys by name, each encode at
+ * its stream rate (liveRate.ts: the size's rate, the strictest platform on
+ * it, and the last stream's measured ceiling when one is given).
+ */
+export function liveOptionsFor(list: LiveDestination[], f: LiveFormat, upload?: LiveUpload | null): LiveConsoleOptions {
+  const r = liveRates(list, f, upload);
   return {
     destinations: list.map((d) => ({ name: d.name, url: d.url.trim(), keyName: keyNameFor(d), orientation: d.orientation })),
     width: Math.round(f.height * 16 / 9), height: f.height, fps: f.fps,
+    ...(r.landscape ? { videoBitrate: r.landscape.kbps * 1000 } : {}),
+    ...(r.portrait ? { portrait: { videoBitrate: r.portrait.kbps * 1000 } } : {}),
   };
 }
 
-export const AUDIO_KBPS = 160;
+export { AUDIO_KBPS, HEADROOM };
+
 /**
  * What the destinations will push up the link, in kilobits a second: each
  * one is its own copy of its encode (one socket each, liveSession.js), so it
- * is the sum over destinations, not over encodes. The encoder's own rates:
- * render.ts's `videoBitrate` for each output, which is what LiveEncoder sets
- * when none is given, and the 160 kb/s it gives the sound.
+ * is the sum over destinations, not over encodes, of the rate liveOptionsFor
+ * hands the encoder and the 160 kb/s it gives the sound. Without `upload`,
+ * the full rate, before any fitting to the link: what the upload advice
+ * weighs.
  */
-export function needKbps(list: LiveDestination[], f: LiveFormat): number {
-  const plan = liveConsolePlan(liveOptionsFor(list, f));
-  const rate = new Map(plan.outputs.map((o) => [o.id, videoBitrate(avcCodec(o.width, o.height, f.fps), o.width, o.height, f.fps) / 1000]));
+export function needKbps(list: LiveDestination[], f: LiveFormat, upload?: LiveUpload | null): number {
+  const o = liveOptionsFor(list, f, upload);
+  const plan = liveConsolePlan(o);
+  const rate = new Map(plan.outputs.map((p) => [p.id, (p.videoBitrate ?? 0) / 1000]));
   return Math.round(plan.destinations.reduce((sum, d) => sum + (rate.get(d.output ?? '') ?? 0) + AUDIO_KBPS, 0));
 }
 
 /** What the streams so far have shown of the upload: carried while keeping up, and the most carried while falling behind. */
-export interface LiveUpload { heldKbps: number; saturatedKbps: number | null; at: string }
+export interface LiveUpload { heldKbps: number; saturatedKbps: number | null; at: string; saturatedAt?: string }
 export const loadUpload = (): LiveUpload | null => {
   const u = read<LiveUpload>(UPLOAD_KEY);
-  return u && typeof u.heldKbps === 'number' ? { heldKbps: u.heldKbps, saturatedKbps: typeof u.saturatedKbps === 'number' ? u.saturatedKbps : null, at: String(u.at ?? '') } : null;
+  if (!u || typeof u.heldKbps !== 'number') return null;
+  const full = typeof u.saturatedKbps === 'number';
+  return { heldKbps: u.heldKbps, saturatedKbps: full ? u.saturatedKbps : null, at: String(u.at ?? ''), ...(full ? { saturatedAt: String(u.saturatedAt ?? u.at ?? '') } : {}) };
 };
 
-/** The headroom docs/live-show.md asks for over the sum of the destinations' bitrates. */
-export const HEADROOM = 1.2;
 export type UploadLevel = 'ok' | 'unknown' | 'unproven' | 'short';
 const mbps = (kbps: number) => `${(kbps / 1000).toFixed(1)} Mb/s`;
 
@@ -189,7 +206,7 @@ export function uploadAdvice(need: number, m: LiveUpload | null): { level: Uploa
   const want = need * HEADROOM;
   if (need <= 0) return { level: 'unknown', text: '' };
   if (!m || (m.heldKbps <= 0 && m.saturatedKbps == null)) return { level: 'unknown', text: `These need about ${mbps(want)} of upload. Not measured yet: a Test measures it.` };
-  if (m.saturatedKbps != null && m.saturatedKbps < want) return { level: 'short', text: `These need about ${mbps(want)}; the last stream's upload topped out at ${mbps(m.saturatedKbps)}. Turn one off, or stream 720p.` };
+  if (m.saturatedKbps != null && m.saturatedKbps < want) return { level: 'short', text: `These need about ${mbps(want)}; the last stream's upload topped out at ${mbps(m.saturatedKbps)}, so the picture goes softer to fit. Turn one off, or stream 720p, to keep it sharp.` };
   if (m.heldKbps >= want || (m.saturatedKbps != null && m.saturatedKbps >= want)) return { level: 'ok', text: `These need about ${mbps(want)}; the last stream carried ${mbps(Math.max(m.heldKbps, m.saturatedKbps ?? 0))}.` };
   return { level: 'unproven', text: `These need about ${mbps(want)}; the last stream carried ${mbps(m.heldKbps)} and never filled the link. A Test with all of them says whether it holds.` };
 }
@@ -231,7 +248,12 @@ let snap: LiveShowState = IDLE;
 const listeners = new Set<() => void>();
 export const liveShowState = () => snap;
 export function subscribeLiveShow(fn: () => void): () => void { listeners.add(fn); return () => { listeners.delete(fn); }; }
-function publish(next: LiveShowState) { snap = next; for (const l of listeners) l(); }
+function publish(next: LiveShowState) {
+  const turned = next.phase !== snap.phase;
+  snap = next;
+  for (const l of listeners) l();
+  if (turned) { if (onAir(next)) lastRefusal = null; void refreshLiveSetup(); }
+}
 export const useLiveShow = () => useSyncExternalStore(subscribeLiveShow, liveShowState, liveShowState);
 export const onAir = (s: LiveShowState) => s.phase === 'live' || s.phase === 'starting';
 
@@ -242,6 +264,8 @@ let testing = false;
 let names: string[] = [];
 let poll: ReturnType<typeof setInterval> | null = null;
 let upload: { heldKbps: number; saturatedKbps: number | null } | null = null;
+/** The ceiling the streams before this one measured, kept until a stream carries more (liveRate's `keepCeiling`). */
+let ceilingBefore: LiveUpload | null = null;
 
 function show(s: LiveState): LiveShowState {
   return {
@@ -254,7 +278,11 @@ function show(s: LiveState): LiveShowState {
 async function tick() {
   if (!current) return;
   const s = await current.refresh();
-  if (upload && noteUpload(upload, s.transport?.destinations ?? [])) write(UPLOAD_KEY, { ...upload, at: new Date().toISOString() });
+  if (upload && noteUpload(upload, s.transport?.destinations ?? [])) {
+    const at = new Date().toISOString();
+    const c = keepCeiling(upload, ceilingBefore, Date.parse(at));
+    write(UPLOAD_KEY, { heldKbps: upload.heldKbps, saturatedKbps: c?.kbps ?? null, at, ...(c ? { saturatedAt: c.fresh ? at : c.at } : {}) });
+  }
   publish(show(s));
   if (s.phase !== 'live' && s.phase !== 'starting' && poll) { clearInterval(poll); poll = null; }
 }
@@ -282,6 +310,7 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
   testing = o.test === true;
   names = destinations.map((d) => d.name ?? d.url);
   upload = { heldKbps: 0, saturatedKbps: null };
+  ceilingBefore = loadUpload();
   const enc = new LiveEncoder({ canvas, audio: deps.audio(), transport, outputs, destinations, fps: o.fps ?? 30, audioBitrate: o.audioBitrate, acceleration: o.acceleration, frames: 'plate' });
   current = enc;
   publish({ ...IDLE, phase: 'starting', test: testing, names });
@@ -303,13 +332,14 @@ export async function startLive(o: LiveConsoleOptions & { test?: boolean }): Pro
  * press-twice arming is the desk's guard against a slip of the hand; the
  * assistant's is the owner's switch, which has to say Full.
  */
-export async function startSavedLive(test: boolean): Promise<LiveState> {
+export async function startSavedLive(test: boolean, only?: string[]): Promise<LiveState> {
   const native = nativeLive();
   if (!native) throw new Error('the live show streams from the Mac app');
   const kept = new Set((await native.keys.list()).map((k) => k.name));
-  const to = chosenFor(loadDestinations(), test).filter((d) => kept.has(keyNameFor(d)));
-  if (to.length === 0) throw new Error(test ? 'no test destination with a kept key' : 'no live destination with a kept key');
-  return startLive({ ...liveOptionsFor(to, loadFormat()), test });
+  const picked = pickSaved(loadDestinations(), kept, test, only);
+  if ('error' in picked) { lastRefusal = picked.error; void refreshLiveSetup(); throw new Error(picked.error); }
+  lastRefusal = null;
+  return startLive({ ...liveOptionsFor(picked.to, loadFormat(), loadUpload()), test });
 }
 
 /**
@@ -323,6 +353,87 @@ export async function startSavedLive(test: boolean): Promise<LiveState> {
 export function setLiveAudio(stream: MediaStream | null): void {
   current?.setAudio(stream);
 }
+
+/**
+ * Which saved destinations a start streams to (PLAN 44j). Without names:
+ * what the panel's Go (on, not for tests) or Test (for tests) would take,
+ * with a kept key. With names, from the owner's assistant ("go live to
+ * YouTube only"): just those, matched by name in any case, from the same
+ * kind (live or test), on or off in the panel, since naming one is the
+ * choice the panel's switch otherwise makes. A name that matches nothing,
+ * or a destination with no kept key, is an error that says which, never a
+ * quiet drop: a stream that went to two places when three were asked is the
+ * failure the owner would only find from the audience.
+ */
+export function pickSaved(list: LiveDestination[], kept: Set<string>, test: boolean, only?: string[]): { to: LiveDestination[] } | { error: string } {
+  if (only && only.length === 0) return { error: 'no destinations named: name at least one, or none at all for the panel\'s choice' };
+  if (!only) {
+    const to = chosenFor(list, test).filter((d) => kept.has(keyNameFor(d)));
+    return to.length ? { to } : { error: test ? 'no test destination with a kept key' : 'no live destination with a kept key' };
+  }
+  const kind = list.filter((d) => d.test === test && validUrl(d.url));
+  const to: LiveDestination[] = [];
+  for (const raw of only) {
+    const name = raw.trim().toLowerCase();
+    const d = kind.find((x) => x.name.trim().toLowerCase() === name);
+    if (!d) return { error: `no saved ${test ? 'test' : 'live'} destination named "${raw.trim()}" (saved: ${kind.map((x) => x.name).join(', ') || 'none'})` };
+    if (!kept.has(keyNameFor(d))) return { error: `"${d.name}" has no stream key kept: paste it in the Live Show panel` };
+    if (!to.includes(d)) to.push(d);
+  }
+  return { to };
+}
+
+// --- The setup, as the owner's assistant reads it (PLAN 44j) -----------------------
+
+/** One saved destination, without its address or key: those never leave the panel. */
+export interface LiveSetupDestination { name: string; service: LiveServiceId; orientation: LiveOrientation; on: boolean; test: boolean; keyKept: boolean; urlValid: boolean }
+export interface LiveSetup {
+  destinations: LiveSetupDestination[];
+  format: LiveFormat;
+  /** How the last stream ended, or why the last start was refused, while not on air. */
+  last: { phase: LiveState['phase']; error: string | null; seconds: number } | null;
+}
+/** What the setup reads from what is saved: exported for the check. */
+export function setupOf(list: LiveDestination[], kept: Set<string>, format: LiveFormat, now: LiveShowState, refusal: string | null): LiveSetup {
+  const ended = now.phase === 'stopped' || now.phase === 'failed';
+  return {
+    destinations: list.map((d) => ({ name: d.name, service: d.service, orientation: d.orientation, on: d.on, test: d.test, keyKept: kept.has(keyNameFor(d)), urlValid: validUrl(d.url) })),
+    format,
+    last: refusal && !onAir(now) ? { phase: 'failed', error: refusal, seconds: 0 } : ended ? { phase: now.phase, error: now.error, seconds: now.seconds } : null,
+  };
+}
+
+/*
+  Read every few seconds while the show's remote link is mounted, rather than
+  pushed from each writer: the keys are kept by the Mac app's main process
+  (desktop/keys.js), set from the panel straight through the bridge, so no
+  one place in the page sees every change. A list of names over IPC every
+  5 s costs nothing a show would notice, and the readout is at most that late.
+*/
+const SETUP_EVERY_MS = 5000;
+let setupSnap: LiveSetup | null = null;
+let setupKey = '';
+let lastRefusal: string | null = null;
+const setupListeners = new Set<() => void>();
+export async function refreshLiveSetup(): Promise<void> {
+  const native = nativeLive();
+  if (!native) return;
+  let kept: Set<string>;
+  try { kept = new Set((await native.keys.list()).map((k) => k.name)); } catch { return; }
+  const next = setupOf(loadDestinations(), kept, loadFormat(), snap, lastRefusal);
+  const key = JSON.stringify(next);
+  if (key === setupKey) return;
+  setupKey = key; setupSnap = next;
+  for (const l of setupListeners) l();
+}
+function subscribeLiveSetup(fn: () => void): () => void {
+  setupListeners.add(fn);
+  void refreshLiveSetup();
+  const timer = setInterval(() => { void refreshLiveSetup(); }, SETUP_EVERY_MS);
+  return () => { setupListeners.delete(fn); clearInterval(timer); };
+}
+/** The saved setup, or null outside the Mac app (no bridge, nothing saved to stream with). */
+export const useLiveSetup = () => useSyncExternalStore(subscribeLiveSetup, () => setupSnap, () => setupSnap);
 
 export async function stopLive(): Promise<LiveState | null> {
   if (!current) return null;
