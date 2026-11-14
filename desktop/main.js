@@ -35,6 +35,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { autoMenuItem, startUpdates, updateMenuItem, updatesHook, updatesOff } from './updates.js';
 import { wireLive } from './liveSession.js';
 import { makeKeyStore } from './keys.js';
+import { pickSource } from './pickSource.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -340,14 +341,17 @@ function grantPermissions() {
       callback({ video: request.frame });
       return;
     }
+    // A picture alone: a hand at this Mac picks the window (pickSource.js; it took the first one listed).
     try {
       const sources = await Promise.race([
         desktopCapturer.getSources({ types: ['window', 'screen'] }),
         new Promise((r) => setTimeout(() => r([]), 1500)),
       ]);
-      callback(sources[0] ? { video: sources[0] } : { video: request.frame });
+      if (!sources.length) { callback({ video: request.frame }); return; }
+      const chosen = await pickSource(sources, (opts) => dialog.showMessageBox(showWindow ?? undefined, opts));
+      callback(chosen ? { video: chosen } : {});
     } catch {
-      callback({ video: request.frame });
+      callback({});
     }
   });
 }
@@ -624,10 +628,16 @@ function startUpdater() {
   ipcMain.handle('chromaglass:update-auto', (_e, on) => { updates.setAuto(on === true); return { ...updates.state, history: undefined }; });
 }
 
-/** The menu's OSC choice: kept, then applied to the running server without a restart. `quiet` (the assistant's call) answers with the socket's words instead of a dialog. */
-async function setOscMode(mode, quiet = false) {
+/**
+ * The menu's OSC choice: kept, then applied to the running server without a restart. `quiet` (the assistant's call) answers
+ * with the socket's words instead of a dialog. `keep` false (the assistant opening it to the network) leaves show.json as it
+ * was, so a restart, like the switch going off (remote-server.js `assistantOpenedOsc`), puts back the owner's own choice.
+ */
+let oscTemporary = false;
+async function setOscMode(mode, quiet = false, keep = true) {
   show.oscMode = mode;
-  writeShowFile({ osc: mode });
+  oscTemporary = !keep;
+  if (keep) writeShowFile({ osc: mode });
   const state = await showServer?.setOsc?.(mode === 'off' ? 0 : show.osc, OSC_BINDS[mode]);
   process.env.OSC_PORT = String(mode === 'off' ? 0 : show.osc);
   process.env.OSC_BIND = OSC_BINDS[mode] ?? OSC_BINDS.local;
@@ -642,8 +652,11 @@ async function setOscMode(mode, quiet = false) {
 /*
   OSC in and Syphon for the owner's assistant (PLAN 44k-14,
   server/assistantOutputs.js): the Show menu's own doors, so a choice the
-  assistant makes is the menu's, ticked there and kept in show.json, and the
-  performer sees it where they would have made it. Syphon is reached through
+  assistant makes is the menu's, ticked there, and the performer sees it where
+  they would have made it. Off and this Mac only are kept in show.json; the
+  network is not (the owner's choice after the security review of 2026-11-13):
+  it lasts until the assistant switch goes off or the app quits, and the
+  owner's own pick in the menu keeps it. Syphon is reached through
   its menu item (`syphon-out`, the contract scripts/desktop-syphon.mjs holds
   PLAN 13.2's build to), so this never touches the output itself: a build
   with no such item says so.
@@ -654,11 +667,11 @@ function outputsHook() {
     state: () => {
       const item = syphonItem(), s = globalThis.__chromaglassSyphon;
       return {
-        oscIn: { mode: show.oscMode, port: show.osc, socket: showServer?.oscState?.() ?? 'off', kept: true },
+        oscIn: { mode: show.oscMode, port: show.osc, socket: showServer?.oscState?.() ?? 'off', kept: !oscTemporary },
         syphon: item ? { on: item.checked, serving: !!s?.serving, name: s?.name ?? null } : null,
       };
     },
-    setOscIn: async (mode) => { await setOscMode(mode, true); return showServer?.oscState?.() ?? 'off'; },
+    setOscIn: async (mode) => { await setOscMode(mode, true, mode !== 'network'); return showServer?.oscState?.() ?? 'off'; },
     setSyphon: (on) => {
       const item = syphonItem();
       if (!item) return 'Syphon out is not in this build of the Mac app yet';
@@ -766,6 +779,12 @@ async function start() {
   show.requireSignIn = app.isPackaged || Boolean(process.env.CHROMAGLASS_REQUIRE_SIGNIN);
   if (show.requireSignIn) process.env.CHROMAGLASS_REQUIRE_SIGNIN = '1';
   if (app.isPackaged) {
+    /* And no sign-in emulator: with FIREBASE_AUTH_EMULATOR set, the show
+       server's token check (server/firebase-token.js) takes unsigned tokens,
+       so anyone who could set the variable could post to the relay as any
+       account (the security review of 2026-11-13). The checks run it from the
+       repo, never packed. */
+    delete process.env.FIREBASE_AUTH_EMULATOR;
     delete process.env.LICENSE_PUBLIC_KEY;
     delete process.env.LICENSE_BUILD_CHECK_KEY;
     const checkKey = packedFlags().checkKey;
