@@ -39,7 +39,6 @@ export interface GpuStepParams {
   heatDecay: number;
   turbScale: number;
   turbDetail: number;
-  spin: number;         // vorticity strength (0 = off)
   immiscibility: number;
   /** The dome the two glasses leave at rest: <0 touches in the middle, >0 at the rim. */
   /*
@@ -195,6 +194,17 @@ export interface GpuStepParams {
   dimmer?: number;
   /** Lamp Heat dial (0..1, default 0): two-band lamp irradiance and two-phase boil model (PLAN §36e-2). */
   heat?: number;
+  /** Soap Film (0..1, default 0): the frame's draining film runs while it is up (PLAN 32d, gpu/soapFilmPlate.ts). */
+  soapFilm?: number;
+  /** The film's drain rate, its seconds per show second (default 1; PLAN 32i's time dial). */
+  soapFilmRate?: number;
+  /** The tank's side view (PLAN 47n, gpu/tankPlate.ts): Tank (0 off, else its glow), Feed cm/s, Dye Weight % heavier than water, Nozzle 0..1 across, Drain 0..1, Glow Hue degrees. The front plate's only. */
+  tank?: number;
+  tankFeed?: number;
+  tankWeight?: number;
+  tankNozzle?: number;
+  tankDrain?: number;
+  tankHue?: number;
   /** Held fingers on the glass blocking the cooling fan's air over the dish (plate coordinates 0..1, PLAN §36e-2). */
   boilHolds?: readonly { x: number; y: number; radius?: number }[];
   /**
@@ -307,6 +317,8 @@ export interface PlateSolver {
   clearPhase?(): void;
   /** The liquids' own physics and chemistry (docs/physics-plan.md): pours into the mix and the reactions. */
   addMix?(x: number, y: number, radius: number, what: { oil?: number; soap?: number; acid?: number }): void;
+  /** Lay the oil cell for cell, replacing the mix (Foam Cells' pressed drops, PLAN 47z-5): `oil` is asked at each cell's middle in plate units, with the mix's size. */
+  layOil?(oil: (x: number, y: number, n: number) => number): void;
   /**
    * A pour on a thin gap (PLAN 18c, 18d): `take` of the column at the middle
    * comes in as new liquid, its volume pushing the plate's aside and out
@@ -390,7 +402,13 @@ export interface PlateSolver {
    * is zero (`dyeMul` one), and only those rows, with the rows the last upload
    * wrote, go across.
    */
-  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null): void;
+  /**
+   * `oilAdd` (Oil Bodies): the part of `dyeAdd` a look's lay says is the
+   * oil's own colour, L²×4, so the oil takes its colour and the water the
+   * rest (PLAN 47z-1); left out, the frame's dye is shared by the oil under
+   * each cell.
+   */
+  applyDeltas(dyeAdd: Float32Array, velAdd: Float32Array, dyeMul: Float32Array, dt: number, hands?: Float32Array | null, breath?: Float32Array | null, sheet?: Float32Array | null, rows?: Uint8Array | null, oilAdd?: Float32Array | null): void;
   /**
    * Drive the slosh dish for the next step (lib/slosh.ts SloshDrive: the tilt,
    * the water's viscosity, the presses, whether to lay it level first), or null

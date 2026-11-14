@@ -488,6 +488,17 @@ const serverOutputs = {
   setOscIn: (mode) => setOsc(mode === 'off' ? 0 : OSC_ON_PORT, OSC_IN_BINDS[mode]),
 };
 const assistantMode = () => assistantNow;
+/*
+  OSC in opened to the whole network by the assistant closes again when the
+  switch goes off (the owner's choice, 2026-11-13). The security review found
+  that Full mode's osc_in network, asked by an assistant a page or a title had
+  talked round, bound unauthenticated OSC on 0.0.0.0 and kept it in show.json,
+  so anyone on the venue's Wi-Fi could drive the show long after the assistant
+  was switched off. This is the mode it was in before the assistant opened it,
+  or null when the assistant has not (or the owner had it open already); the
+  Mac app does not keep the assistant's network choice in show.json either.
+*/
+let assistantOpenedOsc = null;
 const guard = createAssistantGuard((m) => broadcastTo('display', JSON.stringify(m)));
 // A picture of the plate goes to an assistant only while it has asked in the
 // last three seconds, the same lease a remote's Draw holds (lib/padPicture.ts).
@@ -507,6 +518,16 @@ const assistantWatch = setInterval(() => {
   guard.stop();
   // Cut, not a closing handshake a stalled socket could sit in for half a minute.
   if (mode === 'off') for (const c of wss.clients) if (roles.get(c) === 'assistant') c.terminate();
+  if (mode === 'off' && assistantOpenedOsc !== null) {
+    const back = assistantOpenedOsc;
+    assistantOpenedOsc = null;
+    const outs = appOutputs ?? serverOutputs;
+    // The owner picked it in the Show menu since (the Mac app keeps that choice): theirs, left open.
+    if (!(appOutputs && outs.state()?.oscIn?.kept)) {
+      console.log(`  assistant switch off: OSC in back to ${back}`);
+      void Promise.resolve(outs.setOscIn(back)).catch(() => {});
+    }
+  }
 }, 1000);
 assistantWatch.unref?.();
 
@@ -719,7 +740,13 @@ wss.on('connection', (socket, req) => {
         reply = updatesCall(message, assistantMode(), appUpdates);
       } else if (message.type === 'assistant-outputs' && RELAY_OUTPUTS.includes(message.do)) {
         // OSC in, Syphon and their status (PLAN 44k-14): the relay's own, answered once the socket has bound.
-        void outputsCall(message, assistantMode(), appOutputs ?? serverOutputs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+        const outs = appOutputs ?? serverOutputs;
+        const oscBefore = message.do === 'osc-in' ? outs.state()?.oscIn?.mode ?? 'off' : null;
+        void outputsCall(message, assistantMode(), outs).catch((err) => ({ ok: false, reason: `the show could not: ${String(err?.message ?? err)}` })).then((r) => {
+          if (oscBefore !== null && r?.ok) {
+            if (message.mode !== 'network') assistantOpenedOsc = null;
+            else if (oscBefore !== 'network' && assistantOpenedOsc === null) assistantOpenedOsc = oscBefore;
+          }
           if (message.id !== undefined && socket.readyState === 1) socket.send(JSON.stringify({ type: 'assistant-reply', id: message.id, ...r }));
         });
         return;

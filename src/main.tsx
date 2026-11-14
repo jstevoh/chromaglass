@@ -29,7 +29,7 @@ const params = new URLSearchParams(window.location.search);
 // A TV at home (PLAN 12-tv): `/tv` on the laptop's show server plays the
 // show's picture as video, with no visualizer and no GPU of its own.
 const tv = /^\/tv\/?$/.test(window.location.pathname);
-const show = !params.has('remote') && !params.has('cast') && !tv;
+const show = !params.has('remote') && !params.has('cast') && !params.has('tvlink') && !tv;
 // The intro `index.html` painted, listened to from here on: a key or a press
 // on it takes it away, and the plate's first frame does (lib/intro.ts).
 installIntro(show);
@@ -44,7 +44,11 @@ const Root = tv
   ? lazy(() => import('./components/RemoteControl'))
   : params.has('cast')
     ? lazy(() => import('./components/CastDisplay'))
-    : lazy(() => import('./App'));
+    // The page a TV sends the player to, to link it to their account by a code
+    // (PLAN.md 12-tv-signin). Its own sign-in, no engine.
+    : params.has('tvlink')
+      ? lazy(() => import('./components/phone/TvLink'))
+      : lazy(() => import('./App'));
 
 const LazySignIn = import.meta.env.VITE_FIREBASE_API_KEY
   ? lazy(() => import('./components/SignInScreen'))

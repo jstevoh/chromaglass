@@ -1204,12 +1204,6 @@ check('and neither starts over the limit',
 // and `boilingPoint` were read by nothing, so they were deleted rather than
 // given a slider (docs/bubbles-plan.md says why).
 //
-// `surfaceTension` is the plate's own film tension,
-// read by the solver, carried by every preset between 0.01 and 0.3, and
-// reachable from nothing. `surge` shapes the automation into gusts with quiet
-// between — the thing that makes a plate look worked-on rather than busy —
-// same story.
-//
 // The exceptions are listed by name rather than by a rule, because each is a
 // decision and a rule would hide the next one.
 {
@@ -1226,6 +1220,9 @@ check('and neither starts over the limit',
     // Blend pad per row, not a slider or a select on this sheet. `npm run phone`
     // presses them.
     'ledBlend', 'gelBlend', 'lumiaBlend', 'backBlend', 'filmBlend', 'markBlend',
+    // The shelved ink title's dials (37x-10m): read only by the ink's run,
+    // their controls gone with the ink; removing them is 37x-10n.
+    'inkTitleColor', 'inkTitleSize', 'inkTitleY', 'inkTitleSweep',
   ]);
   const panelSrc = settingsSource();
   const drawn = new Set([

@@ -272,6 +272,13 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
     `lab3` ran 8:29 beside it. `sloshgpu` (2:33), `soapgpu --selftest` (0:53, beside the soap
     checks it controls) and `beadmask` (0:46) moved to `lab3`. With holeline in `lab4` since
     #690, `sloshgpu` and `beadmask` went back to `lab`, and `soapgpu` stays by the soap.
+- **19k-11c, shipped 2026-11-13** (E, S). **`lab4` over its 25 minutes on the slow tier.**
+  `glint` (47e, #833) and `bubbleair` had joined `holeline`, `encode --grids` and `shaderdials`
+  in `lab4`, and on GitHub's slow ubuntu tier it was cancelled at the limit on two of the day's
+  four PR runs (#842 and #835), no check failing: about 15 minutes of checks ahead of
+  holeline's 11. `glint` moved to `lab9` (3:50 that day) and `bubbleair` to `lab8` (4:24);
+  no bar, timeout or check body changed, only each check's shard in `scripts/checks.json`
+  and the comment above `timeout-minutes` in `checks.yml`. The bound stays 25.
 - **19k-11b, open** (E, S). **Print the runner's tier and hold every part to 21 minutes on the
   slow one.** The ubuntu runners come in speed tiers about 2x apart (videoflow's CPU loop reads
   0.70, 1.05 or 1.40 ms a frame), so a part's time on one run says little about the next. Print
@@ -314,6 +321,7 @@ side-by-side reds) **shipped**, with the two reviewer nits on #504 (the stories 
   own first (19ai-10). Since 19k-16 no line opens a projector before the show's first step, so the
   fix comes with a check of its own: open the wall while `stepIndex` is 0, then expect no throw from
   `askFrame` and frames painted once the show starts.
+- **19k-19, open** (E, S): **the Mac's five parts have no room.** `show`, `tools`, `plate`, `open` and `fifth` run 16 to 23 of their 25 minutes on a GitHub Mac (read off #820's run, 2026-11-12), and a GPU check too long for SwiftShader has nowhere else to go: Lava Lamp's cycle (`lavacycle`, six minutes of the lamp, two hours on SwiftShader, a couple of minutes on Metal) went on `show`, the lightest. The next one will not fit. Wanted: a sixth Mac part, or the five rebalanced by measured minutes (`npm run checks` could print each part's last times), weighed against the Mac queue a sixth part lengthens (docs/ci.md).
 - **19k-18, shipped** (E, S): `lab2` over its 25 minutes on #802's deploy, twice, every check green; the moiré sheets' check moved to a part of its own, `lab9` (docs/plan-shipped.md, 19k-18).
 - **19k-17, shipped** (E, S): `lab5` over its 25 minutes on every speed-hunt PR; the ink title's thin arms and the logo melt moved to `lab6`, and `inktitle` from `lab3` to `lab7` (docs/plan-shipped.md, 19k-17).
 - **19k-12, shipped** (E, S). **The Mac's fifth shard over its 20 minutes.** After #655 (2 mm,

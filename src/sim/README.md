@@ -9,7 +9,7 @@ the component.
 ## Start here
 
 - `fluidSimulation.ts` (194 KB, grep it): `FluidSimulation`, one layer: its seeding
-  (`seedPreset`), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
+  (`seedPreset`; `addOilDensity` lays a colour as the oil's own, PLAN 47z-1), pours and doses, and the hand-off to the GPU solver (`attachGpu`,
   `dropGpu`, `syncFromGpu`).
 - `frameTypes.ts`: `FrameDigest`, `VisualizerRender`, `FrameView`, `PlateRenderer`,
   `SongShapeReport`, `LookPhase`: the shapes the frame, the song render and the checks share.
@@ -19,8 +19,11 @@ the component.
 
 - The fields themselves live on the GPU (`src/gpu/fluid.ts`); a layer here lays what is
   poured and reads back what it needs. The real-physics rule applies here as in the solver.
+- `FluidSimulation.step(settings, time, noise2D)` takes no sound, and `fluidSimulation.ts`
+  never names the analyser's data (PLAN 38u-4, 38u-5): the music reaches a step only as the
+  settings the patch bay folded, through a cord. `npm run musicstir` fails if that changes.
 - Imports `src/lib`, `src/types`, `presets`, `presetPlate`, the `AudioData` type from
-  `hooks/useAudioAnalyzer`, and from `src/gpu` the solver's types and constants
+  `hooks/useAudioAnalyzer` (`frameTypes.ts` only, for the song render), and from `src/gpu` the solver's types and constants
   (`solverTypes`, `fluid`, `post`, `kit`, `wgsl/magnetDisc`); never `components/`.
 - `src/gpu` and `src/lib` never import this folder.
 - Checks read these files as text or bundle them: `panel`, `plate`, `oillift`, `cellride`
@@ -41,5 +44,5 @@ the component.
 
 ## Checks
 
-`npm run quick`; by hand `lint`, `plate`, `panel`, `pacing`, `cellride`, `oillift`,
+`npm run quick`; by hand `lint`, `plate`, `panel`, `pacing`, `cellride`, `oillift`, `musicstir`,
 `turing`, `desk`, `phone`; the app's on the Mac.

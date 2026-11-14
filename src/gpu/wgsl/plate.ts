@@ -31,6 +31,8 @@ import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
+import { BEAD_SHAPE_WGSL } from './beadShape';
 import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
@@ -319,7 +321,7 @@ fn saturate3(c: vec3f, s: f32) -> vec3f {
 
 /*
   The rims, lines, cells, gloss and the closeup's detail are drawn on the
-  dye's tint (the meniscus darkens it, the boundary line brightens it). On a
+  dye's tint (the meniscus darkens it). On a
   lamp ground the tint is not what is drawn, so what they did is carried
   over as the ratio of the tint's brightness after them to before, where
   there is dye to carry it. A shortcut, named in PLAN 18b: 18e makes these
@@ -447,26 +449,48 @@ fn sobelGrad(t: texture_2d<f32>, fuv: vec2f) -> vec2f {
 fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
 
 /*
-  The line between two dyes (Boundary Contrast, 0.35 in every look) is drawn
-  where the lit colour changes across a few cells. The lit colour is the dye's
-  hue *and* its depth: a thin film of one dye is paler than a pool of it. So a
-  bubble's hole, where one dye's depth falls from a pool to nothing over two or
-  three cells, read here as a boundary between two colours, and the line was
-  drawn round every hole. The four taps sit 1.65 cells out on a cross, so on a
-  hole a few cells across the line came out as bright and dark blocks at those
-  offsets, a "+" stamped round each bubble: the owner's "bubbles still look
-  really pixelated around themselves" (2026-10-19). The dye itself was clean;
-  with Boundary Contrast at 0 the halo went (npm run holeline).
+  No line is drawn where two dyes meet, on the wall or in a photographed
+  look (PLAN 18e-5).
 
-  So the line is asked where the dye's colour changes, not its depth. The
-  colour per unit of dye ("unit" in decodeFluid: the absorbances over the
-  density) is the same anywhere one dye lies, however thin, and differs where
-  two meet. The lit difference is kept as it was, for how strong the line is,
-  and gated by how far the hue moves between the same two taps. A line between
-  two dyes, at any depth, is drawn as before; a hole in one dye, or a pool
-  thinning into clear water, draws none. A density ratio was tried first and
-  cleared the holes as well, but it also took the line off two dyes of very
-  different strength where they meet, which is a boundary.
+  One was: Boundary Contrast, 0.35 in every look and up to 0.9 in some, read the lit colour on a cross of four taps 1.65 cells out
+  and drew a line where it changed. It began as a bright seam. When the light
+  was put under the glass (38h-2) the line became a deflection, the colour
+  step bending the lamp's light out of the aperture: a dark band, 78% of the
+  light gone at the dial's upper half, over the four or five cells the taps
+  span. The owner, on Comet River (the dial at 0.6): "I don't really like the
+  super thick black lines around things. Where does this even come from?"
+  (2026-11-13).
+
+  Two dyes in one liquid do not bend light where they meet. A dye at these
+  strengths moves water's index in the fourth decimal place, the two liquids
+  mix, and there is no surface between them to slope: no step in index and no
+  meniscus, so nothing for the aperture to lose. What the boundary does is
+  absorb with both dyes where they overlap (Beer-Lambert, which decodeFluid
+  already draws: orange over violet is a dark red). A dark rim is real only
+  where the index steps (oil in water, a clear pour, an air pocket's wall),
+  drawn from the surface's slope (refractionOptics, meniscus) and, out of
+  focus, from the optical path (defocusShadow); 18e-2 is the oil's own rim.
+  A thinner or fainter line is not here either: at any width it is a line
+  the liquid does not make. npm run holeline asks that the dial moves nothing
+  in focus.
+
+  boundaryDiff stays for one reader, the closeup's relief. The derive pass's
+  camera branch hands the colour step to the closeup in .z, and the
+  closeup's shadowgraph (camShadow, 38h-7) reads it as the optical path's
+  curvature, which it is not: up close a seam between two dyes is still
+  shaded darker, and that is all the depth Macro Relief draws where there
+  are no cells. Two replacements were tried. Nothing in .z left the closeup
+  flat (npm run macroview's relief 0 on every look). The path's own nine-tap
+  Laplacian blew up to 17% of a closeup frame to flat white on the Mac round
+  a cluster of bubbles (air's index step is a spike at that scale, and
+  camShadow may brighten 2.5 times) and drew a doublet 119 levels darker and
+  99 brighter at a step in the dye's depth. So the closeup is main's, to the
+  byte, until PLAN 18e-7 reads the path at the lens's scale.
+
+  The step is asked where the dye's colour changes, not its depth (33a,
+  2026-10-19: a bubble's hole in one dye read as two colours and wore a "+"
+  of the four taps). The colour per unit of dye ("unit" in decodeFluid) is
+  the same wherever one dye lies and differs where two meet.
 */
 const HUE_LO: f32 = 0.03;
 const HUE_HI: f32 = 0.12;
@@ -556,10 +580,6 @@ fn filmColourAt(tR: f32, tP: f32) -> vec3f {
   if (U.filmPhysics <= 0.0) { return rainbow; }
   return mix(rainbow, filmTableAt(tP, false), U.filmPhysics);
 }
-
-fn boundaryLine(diff: f32) -> f32 { return smoothstep(0.12, 0.75, diff); }
-
-fn boundaryEdge(t: texture_2d<f32>, fuv: vec2f) -> f32 { return boundaryLine(boundaryDiff(t, fuv)); }
 
 
 // Screen uv to the plate's own uv. u_camZoom magnifies about u_camCenter,
@@ -1312,11 +1332,13 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
+  // The camera's views keep their own slope. In .z the closeup alone still
+  // carries the two-dye colour step, for its relief (the comment over
+  // boundaryDiff says why, and PLAN 18e-7); a photographed look carries none.
   if (isCamera) {
-    let gCam = sobelGrad(src, in.uv);
     var diff = 0.0;
-    if (U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
-    return vec4f(gCam, diff, 0.0);
+    if (closeup && U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
+    return vec4f(sobelGrad(src, in.uv), diff, 0.0);
   }
 
   let ts = 3.0 / U.logicalGrid;
@@ -1709,22 +1731,8 @@ fn dropHalfGap(uv: vec2f) -> f32 {
   let g = viewAt(uv).gap;
   return DROP_HALF_GAP * select(1.0, clamp(g / 0.03, 0.3, 3.0), g > 0.001);
 }
-fn beadWide() -> bool {
-  let d = textureDimensions(beadTex);
-  return d.x > d.y;
-}
-/** Plate uv to the mask's own. Wide, the read is kept off the seam, where a
-    bilinear tap would pick up the colour half's first column as a drop. */
-fn beadAt(uv: vec2f) -> vec4f {
-  if (!beadWide()) { return tex2(beadTex, uv); }
-  let w = f32(textureDimensions(beadTex).x);
-  return tex2(beadTex, vec2f(clamp(uv.x * 0.5, 0.5 / w, 0.5 - 1.0 / w), uv.y));
-}
-/** The drop's colour at uv, as seen lit; only a wide mask has one. */
-fn beadColour(uv: vec2f) -> vec3f {
-  let w = f32(textureDimensions(beadTex).x);
-  return tex2(beadTex, vec2f(clamp(0.5 + uv.x * 0.5, 0.5 + 1.0 / w, 1.0 - 0.5 / w), uv.y)).rgb;
-}
+// The beads, read at the screen's resolution where a list is bound (38h-17).
+${BEAD_SHAPE_WGSL}
 /** How much of a drop of radius R (plate uv) is flat on top, for half the
     gap rho: none for a ball (R under rho), and all but its half-round edge,
     rho wide, for a pancake. */
@@ -1738,6 +1746,7 @@ fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
   return clamp((r - f) / (1.0 - f), 0.0, 1.0);
 }
 ${TRANSMIT_WGSL}
+${BUBBLE_SHAPE_WGSL}
 ${FILM_DYE_WGSL}
 ${DROP_LENS_WGSL}
 ${THIN_FILM_WGSL}
@@ -1871,16 +1880,14 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
 
   Named shortcuts:
   1. Small-angle deflection θ ≈ |∇density| · 0.35 (from the air-masked slope g0 on Layer 0,
-     PLAN 33b) plus the hue-gated two-dye boundary deflection bEdge · edgeK · 1.1 (PLAN 33a,
-     shaped by smoothstep(0.25, 1.0, uB) * 0.78 so gentle overlap tails stay above mid-grey in
-     npm run mixer and an oil drop straddling two dyes keeps each side's colour in npm run
-     droplens) is evaluated from the dye slope and colour step rather than ∇(n·h); it omits oil,
-     film and gap thickness terms that the Laplacian includes, and operates per-texel so it
-     scales with grid resolution.
+     PLAN 33b) is evaluated from the dye's slope rather than ∇(n·h); it omits oil, film and gap
+     thickness terms that the Laplacian includes, and operates per-texel so it scales with grid
+     resolution. A second term stood beside it until 18e-5, a deflection at a hue-gated two-dye
+     boundary (PLAN 33a): two dyes in one liquid have no index step between them and no surface
+     to slope, so it is gone (the comment where boundaryDiff was, above).
   2. dyeGain = max(1, boundaryContrast * 3) is an artistic contrast multiplier on the OPL step.
   3. Pupil overlap is approximated by a smoothstep with a 0.15 extinction floor (0.85 max loss),
-     weighted by reliefK (Edge Relief × plateAmt) on the meniscus slope and edgeK on the two-dye
-     boundary.
+     weighted by reliefK (Edge Relief × plateAmt) on the meniscus slope.
   4. (The shadowgraph, once here and masked to the dye's edges, is defocusShadow's.)
   5. Layer 1 keeps a painted boundary line (edge1 * boundaryContrast * 1.6 from
      |∇density|, gated on fluid1.a > 0.03) alongside refractionOptics(near1):
@@ -1899,17 +1906,15 @@ fn decodeFluidParts(t: texture_2d<f32>, pt: texture_2d<f32>, fuv: vec2f, blurFlu
      deflects nothing here, which reads the dye's slope (note 1): it draws its
      Becke lines out of focus but no rim in focus. PLAN 18e-2: deflect by ∇OPL.
 */
-fn refractionOptics(grad: vec2f, bEdge: f32, reliefK: f32, edgeK: f32) -> f32 {
+fn refractionOptics(grad: vec2f, reliefK: f32) -> f32 {
   let gLen = length(grad);
-  if (max(reliefK, edgeK) <= 0.005 || (gLen <= 0.005 && bEdge <= 0.005)) {
+  if (reliefK <= 0.005 || gLen <= 0.005) {
     return 1.0;
   }
   let na = DROP_NA;
   let theta = gLen * 0.35;
   let u = clamp(theta / (2.0 * na), 0.0, 1.0);
-  let uB = clamp((bEdge * edgeK * 1.1) / (2.0 * na), 0.0, 1.0);
-  let uBound = smoothstep(0.25, 1.0, uB) * 0.78;
-  return 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK + uBound, 0.0, 0.85);
+  return 1.0 - clamp(smoothstep(0.0, 1.0, u) * reliefK, 0.0, 0.85);
 }
 `;
 
@@ -2256,12 +2261,6 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   let fragGl = vec2f(in.pos.x, U.resolution.y - in.pos.y);
 
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
-  // The interface line is a width of the solver's own cells, so a closeup
-  // magnifies it into a band as wide as the frame: at 4x it was 18% of a
-  // lab plate drawn pure white, which flattens the very thing the closeup is
-  // for. The band is thinned toward a fifth in the closeup (33g shortcut: the
-  // true line would stay a pixel wide at any zoom, which the grid cannot say).
-  let edgeK = U.boundaryContrast * (1.0 - 0.8 * macroAmt);
   let closeup = macroAmt > 0.001;   // not 'macro': that is a reserved word in WGSL
   let isCamera = U.photo > 0.5 || closeup;
   /*
@@ -2491,14 +2490,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   if (sharp0 && fluid0.a > 0.03) {
     if (!isCamera && U.derivedOn > 0.5) {
       let g0 = -normal0.xy / (0.9 * max(normal0.z, 1e-4));
-      var bEdge0 = 0.0;
-      if (U.boundaryContrast > 0.005) { bEdge0 = boundaryEdge(layer0, fuv0); }
       let reliefK0 = select(0.0, U.edgeRelief * plateAmt, plateOn && U.edgeRelief > 0.005);
-      fluid0 = vec4f(fluid0.rgb * refractionOptics(g0, bEdge0, reliefK0, edgeK), fluid0.a);
-    } else if (U.boundaryContrast > 0.005) {
-      var edge0 = boundaryLine(near0.z);
-      if (U.derivedOn <= 0.5) { edge0 = boundaryEdge(layer0, fuv0); }
-      fluid0 = vec4f(fluid0.rgb * boundaryShade(edge0 * edgeK, isCamera), fluid0.a);
+      fluid0 = vec4f(fluid0.rgb * refractionOptics(g0, reliefK0), fluid0.a);
     }
   }
   // The per-pixel tests mask the result instead of branching around the
@@ -2940,9 +2933,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     }
     // The BZ reaction in ferroin: red where the catalyst is reduced, blue
     // where the wave has oxidised it. The catalyst is in the whole dish, so
-    // the whole dish is red at rest: drawn only where a wave had been (either
-    // species over 0.0005), the dish was the look's own dye with red trails,
-    // the showreel's "muddy red-green marble".
+    // the whole dish is red at rest (drawn only where a wave had been, it was
+    // the showreel's "muddy red-green marble").
     if (U.bzShow > 0.001) {
       let ox = clamp(view.bz * 3.5, 0.0, 1.0);
       let col = mix(vec3f(0.92, 0.32, 0.22), vec3f(0.18, 0.42, 1.0), ox);
@@ -2957,10 +2949,11 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   auxN = -normal0.xy * fluid0.a;
   auxH = fluid0.a;
 
-  // Thin Film, its rings read through a smooth spline (plateThinFilm.ts, 1i).
+  // Thin Film (1i), and the frame's soap film (32d): plateThinFilm.ts.
   if (U.thinFilm > 0.001 && film0 > 0.004 && film0 < 0.4) {
     outColor = thinFilmOver(outColor, film0, bare0, layer0, fuv0, blurFluid, useBlur, dof);
   }
+  if (U.soapFilm > 0.001) { outColor = soapFilmOver(outColor, fuv0); }
 
   // ── The mixer: the front plate's grade and level ─────────────────
   // Its level fades the plate back to the bare lamp under it.
@@ -3037,12 +3030,8 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
         // two dishes' focal heights Δz in the projector cone.
         if (U.boundaryContrast > 0.005) {
           let edge1 = smoothstep(0.1, 0.6, length(near1.xy));
-          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * edgeK * 1.6 + vec3f(edge1 * edgeK * 0.25), fluid1.a);
+          fluid1 = vec4f(fluid1.rgb + fluid1.rgb * edge1 * U.boundaryContrast * 1.6 + vec3f(edge1 * U.boundaryContrast * 0.25), fluid1.a);
         }
-      } else if (U.boundaryContrast > 0.005) {
-        var edge1 = boundaryLine(near1.z);
-        if (U.derivedOn <= 0.5) { edge1 = boundaryEdge(layer1, fuv1); }
-        fluid1 = vec4f(fluid1.rgb * boundaryShade(edge1 * edgeK, isCamera), fluid1.a);
       }
     }
     // The per-pixel tests mask the result instead of branching around the
@@ -3170,55 +3159,32 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     and it is why the lens mix below now has less to do than it did.
   */
   if (U.bubbleStrength > 0.001) {
-    let airC = textureSampleLevel(air0, samp, fuvBase, 0.0);
-    let aC = airC.r;
-    if (aC > 0.02) {
+    // A screen pixel in plate uv (uvToFluid, above).
+    let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
+    // Each bubble from its own disc, its rim a screen pixel wide (bubbleShape.ts).
+    let bub = airHere(fuvBase, textureGather(3, air0, samp, fuvBase), textureSampleLevel(air0, samp, fuvBase, 0.0), spx, dropCam);
+    if (bub.opac > 0.0) {
       /*
-        Each bubble drawn as the one it is.
-
-        The air field carries, besides the coverage, where in its bubble each
-        texel is (g, b) and the bubble's size, film age and a number of its
-        own (a) — see wgsl/air.ts. With only the coverage,
-        which is flat inside a bubble, every bubble was drawn alike: the same
-        dark ring and the same dot, at an assumed radius (reported: "not
+        Each bubble drawn as the one it is: its shape a dome lit from the
+        lamp, its clarity, film colour and highlight its own (reported: "not
         varied enough ... either transparency differences, or light shining
-        off them, or color"). Now its shape is a dome lit from the lamp, its
-        clarity, its film colour and its highlight are its own, and its film
-        drains and thins as it ages the way a soap film does.
+        off them, or color").
       */
-      // Where in its bubble (wgsl/air.ts).
-      let p0 = clamp((airC.gb / max(aC, 1e-3) - vec2f(0.5)) * 2.0, vec2f(-1.0), vec2f(1.0));
-      /*
-        Its size, film and number: packed whole, so read unfiltered —
-        and from the largest of the four texels round the point, since just
-        past a small bubble's rim the filtered coverage is still there while
-        the nearest texel is already empty, and read from that the rim was
-        drawn as a different, tiny bubble: a square halo round each one.
-      */
-      let looks = textureGather(3, air0, samp, fuvBase);
-      let look = max(max(looks.x, looks.y), max(looks.z, looks.w)) * 2048.0 + 0.5;
-      // Size on a log scale, 0.004 to 0.16 of the plate (see wgsl/air.ts).
-      let Rq = 0.004 * exp2(floor(look / 128.0) / 15.0 * 5.321928);
-      // To the camera, its true centre and radius (camBubble).
-      var geo = vec3f(fuvBase - p0 * Rq, Rq);
-      if (dropCam > 0.001) { geo = mix(geo, camBubble(fuvBase, p0, Rq), dropCam); }
+      let geo = bub.geo;
       let R = geo.z;
       let p = (fuvBase - geo.xy) / R;
       let rr = min(1.0, length(p));
       let h = sqrt(max(0.0, 1.0 - rr * rr));
       let outward = select(vec2f(1.0, 0.0), p / max(rr, 1e-4), rr > 1e-3);
-      // A screen pixel in plate uv (uvToFluid, above).
-      let spx = 1.0 / (max(U.resolution.x, U.resolution.y) * 1.5 * U.camZoom);
-      let film = (floor(look / 8.0) - floor(look / 128.0) * 16.0) / 15.0;
-      let id = (floor(look) - floor(look / 8.0) * 8.0 + 0.5) / 8.0;
+      let film = bub.film;
+      let id = bub.id;
       let k1 = fract(id * 7.13 + 0.17);
       let k2 = fract(id * 13.71 + 0.53);
       let k3 = fract(id * 23.37 + 0.91);
       let bestD = p;
       // Pressed between two plates it is a lens, flatter than a sphere.
       let n = normalize(vec3f(p * 0.85, h + 0.15));
-      // The camera's edge: one pixel wide, on the rim.
-      let opac = mix(smoothstep(0.02, 0.28, aC), clamp(0.5 + (1.0 - length(p)) * R / spx, 0.0, 1.0), dropCam);
+      let opac = bub.opac;
       /*
         The liquid round it: its light and colour, averaged over a ring just
         outside the rim, so one bubble has one tint. It used to be read
@@ -3258,7 +3224,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
       // tenth of the wetting film's hue, as the projector's (38h-7: it was a
       // mix, by eye, toward a dimmed tint that left a bubble's middle darker
       // than the liquid round it, which a pocket of air never is).
-      var c = onGround(bgColor, decodeFluid(layer0, lensUv, 0.0, false), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
+      var c = onGround(bgColor, airLiquid(lensUv, bub), dyeThrough) * mix(vec3f(1.0), tint, 0.1 * k1);
 
       // The film: interference colour, strongest at a glancing angle (the
       // rim), as thick as the pocket's own speed laid it (Bretherton,

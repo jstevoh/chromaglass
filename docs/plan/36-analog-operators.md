@@ -151,6 +151,15 @@ button, making it look good. Every item here is held to those.
     temperature in `boilAlpha.g` (`rg32float`) writes `vel.z` (`rgba16float`) while taking
     external writes to `vel.z` only when they differ from `boilAlpha.g` by more than one
     half-float ULP (so sub-ULP external writes are rounded to the boil's float32 copy).
+  - **36e-5. The open plate's boil was never looked at** (*open*, found with 46r,
+    2026-11-13). With Thin Gap off the lasting current did not read the boil at all at
+    Depth Drag 0 until 46r, so Heat on that plate has had no check and no eye. The lab's
+    first pictures of it (128², upright, Heat 1 under a held hand, the app's Buoyancy and
+    cap; `open-plate-46r/before-after.png` in the project's files) show horizontal bands a
+    cell or two apart in the dye piled at the floor, before 46r and after. Find whether
+    the bands are the boil's first-order carry, the current's coarser grid or the open
+    plate's wall, and either give the open plate a `plateboil` part of its own or say in
+    the Heat control that the boil is the thin gap's. No shipped look runs the open plate.
 - **36f. Two performers, a plate each** (moves up 14m-guest). *The evidence:* "Without
   her there to smooth transitions things would come to a halt, visually" (Heavy Light);
   Glenn McKay's crew described it as "painting with three or four hands". Build the guest

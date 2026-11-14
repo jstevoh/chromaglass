@@ -374,6 +374,93 @@ What route 2 still needs, found while building 12-tv-1:
   second track would keep it in step with the picture (WebRTC syncs the two),
   for a Mac whose music should come out of the TV.
 
+Progress (2026-11-08): the transport is settled without HLS. LiveKit's
+`webrtc-xcframework` (MIT, a binary Swift package of Google's libwebrtc, tag
+150.7871.05) ships a tvOS slice, so the app answers the Mac's WebRTC offer exactly
+as the `/tv` page does, at LAN latency, and 12-tv-hls is a fallback, not a
+prerequisite. The sign-in it needs shipped first (12-tv-signin below).
+
+Progress (2026-11-08, later): the app's core is written, in `tvos/` as a Swift
+package that builds without Xcode: the offline pass check, the sign-in client that
+keeps a live code on screen, and the relay's messages. `npm run tvswift` builds it
+and runs it against the Worker's own `/tv/` handler (link, a code running out, the
+pass verified, renewed to the next generation, a spent pass unlinking). Left: the
+app target in `tvos/App` (the code screen with its QR, the video view answering the
+Mac's offer through LiveKitWebRTC, the pass in the keychain), which waits on Xcode
+with the tvOS SDK on the owner's Mac.
+
+Progress (2026-11-08, evening): the receiver and the app are written. The /tv page's
+connection rules are one Swift value, `ReceiverMachine`, driven over URLSession's
+WebSocket by `ReceiverDriver`; `npm run tvswift` now also runs it against a stand-in
+relay (live, a wrong key, a lockout, a show going off, a stuck picture). The peer
+connection over LiveKit's WebRTC is `tvos/Video` (`LiveKitPeer`), and `npm run tvvideo`
+proves it on a Mac with no Xcode: a Chromium page sends a canvas over WebRTC through a
+stand-in relay, and the receiver goes live in 0.4 s and decodes 30 frames a second at
+640x360, dark and light as sent (two mutations, a grey page and a receiver that never
+reports a frame, each turn it red). The app (`tvos/App`, an XcodeGen spec) has the code
+screen with its QR, the address screen, the show view over `LKRTCMTLVideoView`, and the
+pass in the keychain; `.github/workflows/tvos.yml` builds it for the tvOS simulator and
+runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
+
+- **12-tv-apple-1, finding the Mac.** Today the TV reads the Mac's "TV at home"
+  address (`RelayAddress`), typed with the remote. Bonjour (`_chromaglass._tcp`)
+  would find it with no typing; the Mac side is route 2's, so it is agreed with the
+  Google TV app before either builds it.
+- **12-tv-apple-2, swift-crypto on Linux.** `npm run tvswift` runs on Measure's
+  `logic` part, so a cold runner compiles swift-crypto's BoringSSL (about a minute)
+  each time it runs. If that shows in the shard's time, cache `tvos/.build` or move
+  the check to a Mac shard, where CryptoKit needs no build.
+- **12-tv-apple-3, films while the show is off.** The /tv page plays films until the
+  show starts (its `films` state); the app shows "Looking for the show…" on black. Play
+  the same films (an `AVPlayer` over the site's film list) under the waiting screen.
+- **12-tv-apple-4, the 50 ms jitter buffer.** The page sets `TV_JITTER_MS = 50` on its
+  receiver (`jitterBufferTarget`); LiveKit's Objective-C API may not expose the
+  receiver's jitter target. Find whether it does (`LKRTCRtpReceiver`), and if not,
+  measure the TV's delay against the page's on one Mac (a flash on both screens filmed
+  together) before deciding it matters.
+- **12-tv-apple-5, a shorter link for the phone.** The code screen shows
+  `chromaglass.art/?tvlink` to type on a phone; a path such as `chromaglass.art/tv-link`
+  (a Firebase rewrite to the same page) reads better aloud and from across a room.
+- **12-tv-apple-6, the app on a TV, judged.** First run done 2026-11-13: Xcode built it
+  and it ran in the Apple TV 4K simulator, showed its code, received its pass when a
+  Home account claimed the code, and played the live plate over WebRTC. That run used a
+  local copy of the licence Worker with a demo signing key and a local show server with
+  a throwaway key, the address handed in at launch. LiveKit's tvOS simulator slice is
+  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Left: run it
+  against the Mac app's own show and the live Worker, then on an Apple TV (judging),
+  and sign it with the owner's team for TestFlight once the App Store Connect record
+  exists (12-ship).
+
+**~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
+`/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`
+§12-tv-signin.** Open from it:
+
+- **12-tv-signin-1, the TVs read it.** The Apple TV app (12-tv-apple) and the
+  Google TV shell (route 2) call `/tv/code` and `/tv/poll`, show the code and a QR
+  of `https://chromaglass.art/?tvlink=<code>`, keep the `cgtv1.` pass in the
+  keychain (Android: EncryptedSharedPreferences), verify it offline against the
+  built-in public key, and renew it through `/tv/renew` within a week of `exp`.
+- **12-tv-signin-2, a list of linked TVs.** The Worker keeps each link now
+  (`tvpass:<id>`, and `tvpasses:<email>` lists an account's ten), so dropping one
+  is deleting its record; what is missing is the account page that lists them
+  (when linked, a name the TV sends) with a button to unlink, if owners ask.
+- **12-tv-signin-3, the live Worker carries `/tv/`.** The licence Worker is deployed by
+  hand from the owner's Mac with the owner's go, so the merged `/tv/` routes answer only
+  once it is redeployed; until then a TV cannot get a code.
+- **12-tv-signin-3, KV's lag between locations.** Workers KV is eventually
+  consistent across Cloudflare's locations, for up to about a minute. A phone and
+  a TV served by different locations can see each other's writes late: the phone
+  may be told "no such code" for a code the TV drew a moment ago, and the TV may
+  poll "pending" for up to a minute after the phone linked it. Both recover on
+  their own (the phone's player tries again, the TV keeps polling), so it is a
+  delay, not a failure; if owners meet it, move the code and pass records to a
+  Durable Object, which is consistent.
+- **12-tv-signin-4, a renewal lost on the way.** Each renewal moves the link's
+  generation on, and a pass from an older generation kills the link (that is how
+  a copied pass dies). So a renewal whose answer never reaches the TV (the Wi-Fi
+  drops mid-reply) costs a re-link with a fresh code. Rare, and safe; if it is
+  met, keep the previous generation valid for a few minutes after a renewal.
+
 **Step 0, before any build (S):** run the grid ladder in a WebView on a real Google
 TV box (the owner's, or a $100 Streamer) and write down whether `navigator.gpu`
 exists and what grid it holds. If it holds nothing, route 3 closes for good.

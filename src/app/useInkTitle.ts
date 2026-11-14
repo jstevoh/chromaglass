@@ -21,7 +21,9 @@ import type { LiquidVisualizerHandle } from '../components/LiquidVisualizer';
  * Since 37x-10j the title is the corner caption by default (the
  * `titleCaption` setting, app/songTitle.ts, lib/songCaption.ts): the owner
  * found the poured ink hard to read and asked for the card a music channel
- * put up. Ink is the other choice, and pours exactly as before.
+ * put up. Since 2026-11-12 it is the caption only: the owner shelved the
+ * ink (37x-10m, "this poured option never really worked"), and the name of
+ * this hook is the ink's history, not what it does.
  */
 export function useInkTitle(wallRef: RefObject<LiquidVisualizerHandle | null>, track: TrackIdentity | null, on: boolean): void {
   const last = useRef<string | null>(null);
