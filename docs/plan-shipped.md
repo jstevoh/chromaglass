@@ -14432,10 +14432,11 @@ already had; `body` was already the species field's on a thin gap.
 `npm run liquidfall` (new, lab4, 45 s), each line against the law worked out in SI, at the
 default Thickness (22.4 cSt), 2 mm, sinθ 0.1: a syrup-weight drop (w 0.35) slides at
 1.372 mm/s against Hele-Shaw's 1.321 (1.04×, bar 10%; before 0.000); an alcohol-weight drop
-(w −0.2) rises at 0.785 against 0.755 (1.04×; before 0.000); level, 0.000; at Thickness 0.8
-0.090× the default's speed against ν(0.45)/ν(0.8) = 0.089; with glycerine in its column
-0.070× the plain drop's (bar under a half; a sharp drop of its middle's λ 48 would go at
-0.041×); an oil lens poured into both fields 0.994× the lens alone (bar 5%; 1.568× with the
+(w −0.2) rises at 0.785 against 0.755 (1.04×; before 0.000); tipped across, 1.000× across
+and 0.000 along; at Thickness 0.8 0.090× the default's speed against ν(0.45)/ν(0.8) = 0.089;
+under a cover raised to 2.409 mm 1.452× against (h/h₀)² = 1.451; with glycerine in its
+column 0.070× the plain drop's, between 2/(1 + λ) at its middle (0.041) and at its inner
+half's edge (0.100); an oil lens poured into both fields 0.994× the lens alone (bar 5%; 1.568× with the
 guard taken out). `liquidpush`'s thin-gap reach now asks the rock's way: 4.12e-1 against
 −9.4e-4. `liquidsgpu` unchanged (27 gate, 11 owed).
 
