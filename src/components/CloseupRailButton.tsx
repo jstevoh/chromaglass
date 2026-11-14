@@ -1,23 +1,26 @@
 import { Microscope } from 'lucide-react';
 import { LIT } from './ui';
 import type { VisualizerSettings } from '../types';
-import { closeupToggle, macroZoomOf } from '../sim/constants';
+import { closeupIn, closeupToggle } from '../lib/macroLanding';
 
 /**
- * The side rail's Macro button: the same press as the desk's Close-up, M and
- * the phone's switch (`closeupToggle`, PLAN QA-32), in by the zoom to 4x and
- * out with both, and lit by the zoom the frame is drawn at.
+ * The side rail's Macro button: the same press as the desk's Close-up, M, a
+ * pad, the palette and the phone's switch (`closeupToggle`, PLAN QA-32), in
+ * by the zoom and out with both settings, and lit by the zoom the frame is
+ * drawn at (`closeupIn`).
  *
- * It flipped `macroMode` alone until 2026-11-07, so a press put the plate at
- * 4x under a Macro Zoom that read 1.0x, and a zoom set by the slider left the
- * button dark. It lives here rather than in App.tsx because App is held at
- * its size ceiling (`npm run sizes`), and a lit state written as one name
- * (`on`) is what `npm run states` reads.
+ * QA-32 (#856) moved every other hand onto that press; this one was missed,
+ * and still flipped `macroMode` alone. So a press here put the plate at 4x
+ * under a Macro Zoom that read 1.0x, a zoom set by the slider or a pinch left
+ * the button dark, and pressing it then turned the flag on over a closeup
+ * that was already in rather than taking the plate out. It lives here rather
+ * than in App.tsx because App is held at its size ceiling (`npm run sizes`),
+ * and a lit state written as one name (`on`) is what `npm run states` reads.
  */
 export function CloseupRailButton({ settings, onSetting }: {
   settings: VisualizerSettings; onSetting: (patch: Partial<VisualizerSettings>) => void;
 }) {
-  const on = macroZoomOf(settings) > 1.05;
+  const on = closeupIn(settings);
   return (
     <button
       aria-pressed={on}

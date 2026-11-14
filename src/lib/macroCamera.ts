@@ -54,6 +54,7 @@
  */
 import { stream, type Rng } from './rng';
 import { clearLanding, newLanding, settledLanding, steerLanding } from './macroLanding';
+import { macroZoomOf } from '../sim/constants';
 
 export interface MacroField {
   /** Total dye density per cell. */
@@ -783,7 +784,7 @@ const ARROWS: Record<string, [number, number] | undefined> = { ArrowLeft: [-1, 0
  */
 export function macroKey(
   e: { key: string; repeat: boolean; shiftKey: boolean; preventDefault(): void },
-  cur: { macroZoom?: number; macroCamera?: CameraMode; macroAimX?: number; macroAimY?: number },
+  cur: { macroMode?: boolean; macroZoom?: number; macroCamera?: CameraMode; macroAimX?: number; macroAimY?: number },
   view: { macroCentre: () => { x: number; y: number } | null } | null,
   zoom: (dir: 1 | -1) => void,
   aim: (x: number, y: number) => void,
@@ -791,10 +792,10 @@ export function macroKey(
   if (e.key === '+' || e.key === '=') zoom(1);
   if (e.key === '-' || e.key === '_') zoom(-1);
   const arrow = ARROWS[e.key];
-  if (!arrow || (cur.macroZoom ?? 1) <= 1.05) return;
+  if (!arrow || macroZoomOf(cur) <= 1.05) return;
   e.preventDefault();
   const aimed = { x: cur.macroAimX ?? 0.5, y: cur.macroAimY ?? 0.5 };
   const here = (cur.macroCamera ?? 'hold') === 'hold' ? aimed : view?.macroCentre() ?? aimed;
-  const to = panAim(here, { dx: arrow[0], dy: arrow[1] }, cur.macroZoom ?? 1, { repeat: e.repeat, big: e.shiftKey });
+  const to = panAim(here, { dx: arrow[0], dy: arrow[1] }, macroZoomOf(cur), { repeat: e.repeat, big: e.shiftKey });
   aim(to.x, to.y);
 }

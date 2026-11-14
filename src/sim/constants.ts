@@ -26,7 +26,7 @@ export const MACRO_FULL_ZOOM = 2.0;
 export const MACRO_PRESET_ZOOM = 4.0;
 
 /** The zoom the frame is asked for: the slider's, or a macro look's own. */
-export function macroZoomOf(s: VisualizerSettings): number {
+export function macroZoomOf(s: { macroMode?: boolean; macroZoom?: number }): number {
   const setZoom = s.macroZoom ?? 1;
   return s.macroMode === true ? (setZoom > 1.05 ? setZoom : MACRO_PRESET_ZOOM) : Math.max(1, setZoom);
 }
