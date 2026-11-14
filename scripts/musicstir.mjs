@@ -68,6 +68,12 @@
  *   6. The phone's slider (`musicStirOf`, `withMusicStir`): it reads a look's
  *      cord, sets it, leaves the look's other cords alone, takes the cord out
  *      at zero and puts one in on a look that has none.
+ *   7. A look saved before the cord (PLAN 38u-16): read at a saved look's
+ *      version under 3 it gains the cord its own dials call for, beside its
+ *      own cords; at 3 without one it stays without (the owner pulled it);
+ *      one with its own keeps that depth; read, saved and read again it is
+ *      unchanged; a set list reads it the same; folded with a band its
+ *      Turbulence rises by the cord.
  *
  * What it does not hold: how it looks. One octave of eddies under the dye and
  * three octaves over the whole dish are not the same picture at the same
@@ -106,12 +112,14 @@ await build({
       "export { DEFAULT_SETTINGS } from './src/types';",
       "export { AnalyserEmulator, AudioFeatures } from './src/lib/audioFeatures';",
       "export { SoundLevels, bytesFromDb, smoothLevels, waveBytes } from './src/lib/soundLevels';",
+      "export * as saved from './src/lib/userPresets';",
+      "export { readSetListFile } from './src/lib/setList';",
     ].join('\n'),
     resolveDir: process.cwd(), loader: 'ts',
   },
   bundle: true, platform: 'node', format: 'esm', outfile: out, logLevel: 'warning',
 });
-const { FluidSimulation, PatchBay, stir, PRESETS, DEFAULT_SETTINGS, AnalyserEmulator, AudioFeatures, SoundLevels, bytesFromDb, smoothLevels, waveBytes }
+const { FluidSimulation, PatchBay, stir, saved, readSetListFile, PRESETS, DEFAULT_SETTINGS, AnalyserEmulator, AudioFeatures, SoundLevels, bytesFromDb, smoothLevels, waveBytes }
   = await import(pathToFileURL(`${process.cwd()}/${out}`).href);
 // Named one by one, so the script runs (red) on a tree from before the cord.
 const { stirOf, stirCord, isStirCord, stirCordDepth, musicStirBefore, musicStirOf, withMusicStir, STIR_REF } = stir;
@@ -411,6 +419,60 @@ else {
     `at zero ${out0.length} cords; a fresh one at ${fresh[1]?.depth}`);
   check('a cord aimed at one plate, a gated one, or another reading on Turbulence is not the music\'s stir',
     !isStirCord(onPlate) && !isStirCord({ ...stirCord(0.2), mode: 'gate' }) && !isStirCord({ ...stirCord(0.2), feature: 'bass' }) && isStirCord(stirCord(0.2)));
+}
+
+// ── 7. A look saved before the cord ─────────────────────────────────────────
+/*
+  PLAN 38u-16. The built-in looks gain the cord where they are written, but a
+  look the owner saved keeps the cords it was saved with, so every look saved
+  before 2026-11-13 came back with none and stirred less to the music than it
+  had. It is given the cord once, as it is read, and the saved look's version
+  says it has been asked: a look saved since without the cord is one the
+  owner pulled it from, and stays so. Each way a saved look arrives is tried:
+  the file reader (which the saved shelf, cloud sync and an imported file
+  all go through) and a set list, which takes a saved look whole.
+*/
+console.log('\n7. A look saved before the cord');
+if (typeof saved?.parsePresetFile !== 'function' || typeof stir.withStirCordOnce !== 'function') check('a saved look\'s cord', false, 'lib/stir.ts has no withStirCordOnce yet');
+else {
+  const { parsePresetFile, serializePreset, PRESET_VERSION } = saved;
+  const kick = { source: 'hits', feature: 'kickHit', setting: 'platePressure', depth: 0.25 };
+  const dial = 0.62, drive = 0.7, want = stirCordDepth(dial, drive);
+  const base = { format: 'chromaglass-preset', id: 'user-mine-1', name: 'Mine', createdAt: '2026-11-01T20:00:00Z' };
+  const settingsWith = (maps) => ({ ...DEFAULT_SETTINGS, turbulenceScale: dial, audioImpact: drive, sceneMappings: maps });
+  const read = (version, maps) => parsePresetFile(JSON.stringify({ ...base, version, settings: settingsWith(maps) }));
+  const stirs = (p) => (p?.settings.sceneMappings ?? []).filter(isStirCord);
+  const before = read(2, [kick]), older = read(1, []), pulled = read(PRESET_VERSION, [kick]);
+  const owned = read(2, [kick, stirCord(0.15)]);
+  check('a look saved before the cord is read with it, at the depth its own Turbulence and Sound Drive call for, its own cords kept',
+    want > 0 && stirs(before).length === 1 && stirs(before)[0].depth === want && before.settings.sceneMappings[0].setting === kick.setting
+      && stirs(older).length === 1 && stirs(older)[0].depth === want,
+    `wants ${want}; saved at 2 has ${stirs(before).map((m) => m.depth).join(',') || 'none'} beside ${before.settings.sceneMappings.length - stirs(before).length} other(s); at 1 ${stirs(older).map((m) => m.depth).join(',') || 'none'}`);
+  check('one saved since without the cord is left without it: the owner pulled it',
+    PRESET_VERSION >= 3 && stirs(pulled).length === 0 && pulled.settings.sceneMappings.length === 1,
+    `version ${PRESET_VERSION}, ${pulled.settings.sceneMappings.length} cord(s), ${stirs(pulled).length} stir`);
+  check('one that already has a stir cord keeps it at its own depth, and gains no second',
+    stirs(owned).length === 1 && stirs(owned)[0].depth === 0.15, stirs(owned).map((m) => m.depth).join(','));
+  const again = parsePresetFile(serializePreset(before));
+  const pulledAgain = parsePresetFile(serializePreset({ ...before, settings: { ...before.settings, sceneMappings: before.settings.sceneMappings.filter((m) => !isStirCord(m)) } }));
+  check('it is asked once: read, saved and read again it is the same, and pulled out after and saved it stays out',
+    before.version === PRESET_VERSION && stirs(again).length === 1 && again.settings.sceneMappings.length === before.settings.sceneMappings.length
+      && stirs(pulledAgain).length === 0,
+    `version ${before.version}; again ${stirs(again).length} stir of ${again.settings.sceneMappings.length}; pulled ${stirs(pulledAgain).length}`);
+  // And arriving in a set list, which takes the saved look whole and not through the file reader.
+  const known = (k) => k in DEFAULT_SETTINGS;
+  const inSet = (version, maps) => readSetListFile(JSON.stringify({ format: 'chromaglass-setlist', version: 1, items: [{ saved: base.id }],
+    presets: [{ ...base, version, settings: settingsWith(maps) }] }), known).presets[0];
+  const setOld = inSet(2, [kick]), setSince = inSet(PRESET_VERSION, [kick]);
+  check('and the same in a set list: an old look gains the cord, one saved since does not, its id kept',
+    stirs(setOld).length === 1 && stirs(setOld)[0].depth === want && stirs(setSince).length === 0 && setOld?.id === base.id,
+    `${stirs(setOld).length}, ${stirs(setSince).length}, ${setOld?.id}`);
+  // Folded, the old look stirs with the band as a built-in look with its dials does.
+  const bay = new PatchBay(before.settings);
+  bay.fold(before.settings, ctxOf(LOUD), 1, 1000);
+  const loud = bay.layer(0).turbulenceScale;
+  check('folded with a band playing, the old look\'s Turbulence rises by its cord, as it did before the cord by the multiplier',
+    loud > dial + 0.05, `${f3(dial)} at rest, ${f3(loud)} with the band`);
 }
 
 // ── Owed ────────────────────────────────────────────────────────────────────
