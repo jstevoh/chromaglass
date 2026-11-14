@@ -39,7 +39,7 @@
  * three, so waiting for every look's opening would have saved almost
  * nothing either. So the show waits for what its own look opens with (the
  * forty-three and what `gpu/opening.ts` says the look turns on) and builds
- * the rest behind it, still one at a time, once it is up. Behind the show a
+ * the rest behind it, two at a time (LATER_LANES), once it is up. Behind the show a
  * compile should cost frames rather than stop them, as it did the starting
  * frame; `npm run startup` watches the first ten seconds of steps to see.
  *
@@ -128,6 +128,43 @@ export interface Prepared {
  */
 export const prepareLog: Prepared[] = [];
 
+/**
+ * Each prepare while it runs, and after: how far it has got. `prepareLog`
+ * gets a prepare's record only when it is done, so a harness waiting for
+ * the half behind the show could only wait a fixed time for it and then
+ * say nothing was built (`npm run startup`, 19ah-9b): on GitHub's slower
+ * Macs that half, 113 builds beside a running show, took 28 to 46 s, and a
+ * 45 s wait for it went red on 13 of 154 runs of 10 to 14 November with
+ * every build still coming in. This is what lets it wait as long as the
+ * builds keep coming and no longer: `lastAt` moves each time one settles,
+ * and a build that never settles is the app's own PREPARE_TIMEOUT_MS
+ * (`cap`) to give up on, which the harness reads here rather than keeping
+ * a copy that could drift.
+ */
+export interface PrepareProgress {
+  stage: Prepared['stage'];
+  device: number;
+  asked: number;
+  /** Builds settled so far, built or not. */
+  settled: number;
+  /** When it started, and when the last build settled (or it started), ms from load. */
+  at: number;
+  lastAt: number;
+  /** The most one build may take before the prepare gives up on it, ms. */
+  cap: number;
+  done: boolean;
+}
+export const prepareProgress: PrepareProgress[] = [];
+
+/**
+ * What `chromaglassDebug().pipelines()` hands a harness: the first prepare,
+ * every prepare, each one's progress and the cache's ledger. Here and not
+ * written out in the visualizer, which is over its size budget.
+ */
+export function pipelinesSeen() {
+  return { prepared: prepareLog[0] ?? null, prepares: prepareLog, progress: prepareProgress, ledger: PipelineCache.ledger() };
+}
+
 /** Whether `p` settles within `ms`. */
 function within(p: Promise<void>, ms: number): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -165,8 +202,7 @@ function within(p: Promise<void>, ms: number): Promise<boolean> {
  * wait for a frame anywhere in the opening was 0.67 s, under the 2 s an
  * audience would see. Three is the next step toward all at once's 0.12 s,
  * still waiting behind no more than three compiles (about 0.7 s). The half
- * built behind the show stays one at a time: there a compile costs the
- * running show frames, and nobody is waiting.
+ * built behind the show takes two (LATER_LANES, below).
  *
  * `?lanes=N` (1 to 8) changes it, from the query string alone, so a machine
  * can be timed both ways: `?lanes=1` is the old opening.
@@ -176,6 +212,29 @@ const OPENING_LANES = (() => {
   try { asked = Number(new URLSearchParams(window.location.search).get('lanes') ?? NaN); } catch { /* no window */ }
   return asked !== null && Number.isInteger(asked) && asked >= 1 && asked <= 8 ? asked : 3;
 })();
+
+/**
+ * How many of the half built behind the show are in flight at once: two,
+ * one render pipeline among them at most (`renderBusy` in `buildInTurn`).
+ *
+ * It was one, on the reasoning that a compile there costs the running show
+ * frames and nobody is waiting. But somebody is: a look changed to before
+ * that half is done builds what it is missing on the frame, the freeze
+ * this file exists to take away, so how long the half takes is how long a
+ * show is open to it. What was measured (`npm run startup` on GitHub's
+ * Macs, 10 to 14 November): the half has grown to 113 builds, and one at a
+ * time it took 28 to 46 s, about 0.38 s a build (42.84 s on run
+ * 43570470863), against 0.13 s a build for the opening's 67 three at a
+ * time on the same runner (8.91 s). Two at a time cut the opening's own
+ * time by a fifth (above), and a compute compile is answered off the GPU
+ * process's main thread (Dawn's async pipelines), so a second one in hand
+ * keeps the compiler busy while the page waits on the first's answer
+ * without holding the frames; the one render pipeline at a time stays,
+ * since those do queue in the GPU process (`buildInTurn`). Whether it
+ * costs frames is startup's to say: its "no stop ... while the rest was
+ * built behind it" watches every build of this half.
+ */
+const LATER_LANES = 2;
 
 /**
  * `builds`, `lanes` at a time (above), until they are done, the device is
@@ -194,6 +253,11 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
   let ready = 0;
   const times: Prepared['builds'] = [];
   const raw: Prepared['raw'] = [];
+  const progress: PrepareProgress = {
+    stage, device: PipelineCache.deviceIndex(device), asked: builds.length, settled: 0,
+    at: Math.round(t0), lastAt: Math.round(t0), cap: PREPARE_TIMEOUT_MS, done: false,
+  };
+  prepareProgress.push(progress);
   // Each lane takes the next build in the list when its last one settles, so
   // the order they are asked in is the list's, as it was with one, but for
   // the one render pipeline at a time (`renderBusy`, below).
@@ -298,6 +362,8 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
       const now = performance.now();
       const from = Math.max(b0, lastSettled);
       lastSettled = now;
+      progress.settled++;
+      progress.lastAt = Math.round(now);
       times.push([prep.key, Math.round(from), Math.round(now - from)]);
       const c = stamps.compiled;
       raw.push([prep.key, Math.round(b0), c == null ? null : Math.round(c - b0), c == null || stamps.used == null ? null : Math.round(stamps.used - c)]);
@@ -341,6 +407,7 @@ async function buildInTurn(device: GPUDevice, stage: Prepared['stage'], builds: 
     at: Math.round(t0), ms: Math.round(performance.now() - t0), timedOut, keys: [...asked, ...queue.map((b) => b.key)], builds: times, raw, useWait,
   };
   prepareLog.push(done);
+  progress.done = true;
   return done;
 }
 
@@ -450,7 +517,7 @@ export async function prepareShow(device: GPUDevice, format: GPUTextureFormat, o
   const opening = await buildInTurn(device, 'opening', ahead, OPENING_LANES, opts.quiet);
   // Nobody waits on it, so nobody would hear it fail: the builds cannot
   // throw, but reading the lists can (a kernel renamed under one).
-  void buildInTurn(device, 'later', builds.filter((b) => b.later))
+  void buildInTurn(device, 'later', builds.filter((b) => b.later), LATER_LANES)
     .catch((err) => console.warn('ChromaGlass: the rest of the pipelines could not be built behind the show; the frame builds them.', err));
   return opening;
 }

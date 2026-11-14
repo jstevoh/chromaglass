@@ -33,7 +33,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `padGrab.ts`: the remote's Draw picture.
 - `particles.ts`: dye carried by particles.
 - `post.ts`: post-effects chain and finish.
-- `prepare.ts`: `prepareShow`, pipelines built before opening.
+- `prepare.ts`: `prepareShow`, pipelines built before opening (three at a time) and behind it (two); `prepareLog` (each prepare once done), `prepareProgress` (each while it runs: builds settled, the last settle, the cap on one build) and `pipelinesSeen` (both and the ledger, for `chromaglassDebug().pipelines()`).
 - `probe.ts`: delivered brightness for the flash guard.
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
 - `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.
