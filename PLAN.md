@@ -253,7 +253,8 @@ style (§31).
   as a condenser~~ (shipped; 38a-2 the always-on cos⁴ waits on the Mac's eyes), ~~**38c**~~ soap conserved (and ~~**38c-3**~~ Soap Breakdown), **38e** oil's σ, ~~**38b**~~ bubbles without clocks (with ~~38g~~ and ~~38n~~, #603), ~~**38h**~~
   nothing on the plate makes light (~~38h-2~~ the edges lit from beneath, ~~38h-7~~ the closeup's bubbles traced, shipped; ~~38h-4~~ the back plate's grain and ~~38h-3~~ one shadowgraph for the whole column, ~~38h-15~~ bubbles and ~~38h-17~~ beads drawn at the screen's resolution shipped; 38h-5, 38h-6, 38h-8, 38h-9, 38h-11, 38h-12, 38h-14 and 38h-16 open), then **38d** (after 38k's fields add, #630; its real onset, 38k-7, waits on 9t-2), **38f** (~~38f-1~~ the heat carried and ~~38f-2~~ the deep-quench oil shipped; ~~27f-9e~~ a standing lamp's cool top shipped; every look's cooling in real seconds open), **38g-2**, **38i**, **38j**; **38r** (the rest
   gap, shipped: one number, #613, then a real 2 mm, #655; **38r-5** the liquid's amount sets it, Liquid
-  and Cover Weight, part 1 shipped, then **38r-16** the pinch and the air edge) is read before 38d and 38i.
+  and Cover Weight, part 1 shipped, then **38r-16** the pinch and the air edge, designed and its checks
+  written first, `npm run gap` and `npm run airedge`, owed, Antigravity's to build) is read before 38d and 38i.
 - **6.11** What Liquid Light Lab's tutorials and gear showed (§42, asked 2026-11-07), each its own
   thread: **42m** the tutorials watched on the owner's Mac first, then **42a** the glass pair
   (Fast and Slow glass from real radii; after #655), **42e** the classic mixture's numbers (with
