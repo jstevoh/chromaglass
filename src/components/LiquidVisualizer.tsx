@@ -4579,6 +4579,15 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             // across the plate ahead of the dye it is meant to be thinning.
             const adv = currentSettings.advection ?? 0.45;
             for (const fluid of fluidsRef.current) fluid.stepLiquid(simStepS, fluid.dt * adv * (GRID_SIZE - 2));
+            // Hand the lead plate's stepped bubble list before its solver step so
+            // multi-step frames spread bubble motion and growth evenly across steps
+            // rather than landing the entire frame's rate in step 0 (H2c-8).
+            const lead = fluidsRef.current[0];
+            const bubblesNow = bubblesRef.current;
+            if (lead?.gpu instanceof WebGPUFluid && (bubblesNow.bubbles.length > 0 || lead.gpu.airLive)) {
+              const live = Math.min(bubblesNow.pack(), MAX_BUBBLES);
+              lead.gpu.setBubbles(bubblesNow.packed, live, 0.25, bubblesNow.packedFinger);
+            }
             // Each plate takes its own fold: a patch aimed at layer 1 changes
             // how layer 1 moves and leaves the others exactly as they were.
             for (let li = 0; li < fluidsRef.current.length; li++) {
@@ -6705,7 +6714,9 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
             const lead = fluidsRef.current[0];
             if (lead?.gpu instanceof WebGPUFluid) {
               const live = Math.min(bubblesRef.current.bubbles.length, MAX_BUBBLES);
-              lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
+              if ((!isActiveRef.current || drainFrameRef.current !== 0) && (live > 0 || lead.gpu.airLive)) {
+                lead.gpu.setBubbles(bubblesRef.current.packed, live, 0.25, bubblesRef.current.packedFinger);
+              }
               /*
                 And the dye those bubbles displace, put back as a ring
                 (H6 · A). Before the hand-off in reading order but after it in

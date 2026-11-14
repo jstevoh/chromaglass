@@ -114,9 +114,14 @@ export class WebGPUAir {
   readonly geo: AirGeo;
   private which = 0;
   private live = 0;
+  private clearLeft = 0;
   private boilTex: GPUTexture | null = null;
   /** The list as last handed over, for the coverage the source needs. */
   private packed = new Float32Array(0);
+  private readonly emptyFingers: Float32Array;
+  private readonly uniformData = new ArrayBuffer(16);
+  private readonly uniformU32 = new Uint32Array(this.uniformData, 0, 1);
+  private readonly uniformF32 = new Float32Array(this.uniformData, 4, 3);
   private disposed = false;
 
   /** Its one pipeline, built before the show opens (`gpu/prepare.ts`). */
@@ -125,6 +130,7 @@ export class WebGPUAir {
   }
 
   constructor(private readonly device: GPUDevice, readonly grid: number, capacity: number) {
+    this.emptyFingers = new Float32Array(Math.max(1, capacity) * 4);
     this.pipelines = PipelineCache.for(device, 'air');
     this.buffer = this.disposer.track(device.createBuffer({
       label: 'air discs',
@@ -197,19 +203,27 @@ export class WebGPUAir {
     if (this.live > 0) {
       this.device.queue.writeBuffer(this.buffer, 0, packed, 0, this.live * 4);
       // Round when nobody says otherwise.
-      const f = finger && finger.length >= this.live * 4 ? finger : new Float32Array(this.live * 4);
+      const f = finger && finger.length >= this.live * 4 ? finger : this.emptyFingers;
       this.device.queue.writeBuffer(this.fingers, 0, f, 0, this.live * 4);
     }
-    this.device.queue.writeBuffer(this.uniform, 0, new Uint32Array([this.live]));
-    this.device.queue.writeBuffer(this.uniform, 4, new Float32Array([soft, this.grid, 0]));
+    if (this.any) this.clearLeft = 2;
+    this.uniformU32[0] = this.live;
+    this.uniformF32[0] = soft;
+    this.uniformF32[1] = this.grid;
+    this.uniformF32[2] = 0;
+    this.device.queue.writeBuffer(this.uniform, 0, this.uniformData);
   }
 
   /** Whether anything would be drawn — the caller skips the exclusion without it. */
   get any(): boolean { return this.live > 0 || this.boilTex !== null; }
 
+  /** Whether `splat` must run this step (active air, or clearing both targets after the last bubble popped). */
+  get needsSplat(): boolean { return this.any || this.clearLeft > 0; }
+
   /** Attach or clear the plate's boiling vapour fraction texture (`rg32float`, PLAN §36e-2). */
   setBoilAlpha(tex: GPUTexture | null): void {
     this.boilTex = tex;
+    if (tex) this.clearLeft = 2;
   }
 
   /**
@@ -239,6 +253,8 @@ export class WebGPUAir {
    */
   splat(enc: GPUCommandEncoder, timing?: (label: string) => GPURenderPassTimestampWrites | undefined): void {
     const pipeline = this.pipelines.renderPipeline('air splat', splatRecipe(this.device));
+    if (this.any) this.clearLeft = 2;
+    else if (this.clearLeft > 0) this.clearLeft--;
 
     // Into the one that is not current, which then becomes current: what was
     // there is last frame's air, which is what the push differences against.

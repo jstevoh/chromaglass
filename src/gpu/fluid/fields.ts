@@ -256,9 +256,20 @@ export class FluidFields extends FluidCore {
   }
 
 
-  setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
+  /** Whether the layer holds an allocated air field (bubbles or boil). */
+  get airLive(): boolean { return this.air !== null; }
+
+  /** The air field, allocated only once the layer carries a bubble or boil. */
+  protected ensureAir(): WebGPUAir {
     if (!this.air) this.air = new WebGPUAir(this.device, this.N, AIR_CAPACITY);
-    this.air.setBubbles(packed, count, soft, finger);
+    return this.air;
+  }
+
+  setBubbles(packed: Float32Array, count: number, soft = 0.25, finger?: Float32Array): void {
+    if (count <= 0 && !this.air) return;
+    const air = this.ensureAir();
+    if (count > 0) this.airQuietSeconds = 0;
+    air.setBubbles(packed, count, soft, finger);
   }
 
   /**

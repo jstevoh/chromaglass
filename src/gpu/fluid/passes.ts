@@ -94,6 +94,21 @@ export class FluidPasses extends FluidFields {
     return t;
   }
 
+  /** Free the air pair and its scratch targets after a quiet minute; clear bind-group caches so stale targets are never reused. */
+  protected dropAir(): void {
+    this.air?.dispose();
+    this.air = null;
+    if (this.airGiveTex) { this.disposer.release(this.airGiveTex); this.airGiveTex = null; }
+    if (this.airInTex) { this.disposer.release(this.airInTex); this.airInTex = null; }
+    this.airTex.length = 0;
+    this.airPush = 0;
+    this.airCover = 0;
+    this.airCoverPrev = 0;
+    this.airQuietSeconds = 0;
+    this.groups.clear();
+    this.groupRoot = { kids: new Map() };
+  }
+
   /** Whether both airGive kernels are built (asking builds them): a carry takes the air only then. */
   protected airGiveReady(): boolean {
     return !!this.airGivePipe(true) && !!this.airGivePipe(false);
@@ -483,7 +498,8 @@ export class FluidPasses extends FluidFields {
     this.vel.swap();
     this.boilAlpha.swap();
     this.boilLive = true;
-    this.air?.setBoilAlpha(this.boilAlpha.read);
+    this.airQuietSeconds = 0;
+    this.ensureAir().setBoilAlpha(this.boilAlpha.read);
   }
 
   /**
@@ -703,7 +719,9 @@ export class FluidPasses extends FluidFields {
     // The fifth number is the mean of the rate term over the plate, which the
     // kernel subtracts so that term averages to zero.
     const invDt = 1 / Math.max(this.lastDt, 1e-4);
-    this.run(pass, 'divergence', this.divRaw, [this.vel.read, this.air!.field, this.air!.prev, this.squeeze.read],
+    const airCur = this.air ? this.air.field : this.blank('rgba');
+    const airPrev = this.air ? this.air.prev : this.blank('rgba');
+    this.run(pass, 'divergence', this.divRaw, [this.vel.read, airCur, airPrev, this.squeeze.read],
       this.arg('air source', [this.airPush, invDt, this.airCover, 0,
         (this.airCover - this.airCoverPrev) * invDt,
         // The press: how much of it reaches the flow. Its mean is no longer
@@ -997,14 +1015,16 @@ export class FluidPasses extends FluidFields {
     // The poured liquids' viscosities (PLAN 18d), or nothing poured.
     const species = this.species && this.speciesLive && this.readsSpecies ? this.species.read : this.blank('rgba');
     const film = this.filmLaid > 0 && !!this.film ? this.film.read : this.blank('rgba');
-    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    const airCur = this.air ? this.air.field : this.blank('rgba');
+    const airPrev = this.air ? this.air.prev : this.blank('rgba');
+    this.hsRun(pass, 'hsPrep', `hsPrep:${this.vel.read.label}:${mid.label}:${this.squeeze.read.label}:${phase.label}:${hand.label}:${species.label}:${film.label}:${airCur.label}:${airPrev.label}`,
       this.arg('thin prep', [12 * nu / (GAP_METRES * GAP_METRES), seconds, REST_GAP, this.airPush, this.phaseLive ? (p.ferroViscosity ?? FERRO_NU) / nu : 1,
         NU_REF / nu, glassX, glassY]),
-      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, this.air!.field, this.air!.prev]);
+      [this.vel.read, prev, mid, this.squeeze.read, phase, hand, this.vel.write, mob, species, film, airCur, airPrev]);
     this.vel.swap();
-    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${this.air!.field.label}:${this.air!.prev.label}`,
+    this.hsRun(pass, 'hsDivergence', `hsDivergence:${this.vel.read.label}:${this.squeeze.read.label}:${airCur.label}:${airPrev.label}`,
       this.arg('thin divergence', [this.airPush, 0, this.airCover, REST_GAP, (this.airCover - this.airCoverPrev) / Math.max(disp, 1e-9), 1 / Math.max(disp, 1e-9), this.hsPrimed ? 0 : 1, 0]),
-      [this.vel.read, this.squeeze.read, this.air!.field, this.air!.prev, this.div, mob, this.hsGap!, this.hsPour!]);
+      [this.vel.read, this.squeeze.read, airCur, airPrev, this.div, mob, this.hsGap!, this.hsPour!]);
     this.hsPrimed = true;
     // Each coarse level's faces and rim, from the level above it.
     for (let l = 0; l < this.mg.length; l++) {
