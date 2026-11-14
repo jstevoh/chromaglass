@@ -164,6 +164,7 @@
     "dish": "node scripts/dish.mjs",
     "turntable": "node --experimental-strip-types scripts/turntable.mjs",
     "gap": "node scripts/gap.mjs",
+    "airedge": "node scripts/airedge.mjs",
     "slosh": "node --experimental-strip-types scripts/slosh.mjs",
     "sloshgpu": "node --experimental-strip-types scripts/sloshgpu.mjs",
     "flick": "npm run build && node scripts/flick.mjs",

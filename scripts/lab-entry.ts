@@ -346,6 +346,17 @@ const api = {
   async speciesShare() { return lab!.solver.speciesShare(); },
   /** The floating glass's gap, metres, as the last step left it (lib/cover.ts; `npm run flush` waits on it). */
   coverMetres() { return lab!.solver.coverMetres; },
+  /** The cover's ledger as the last step left it (lib/cover.ts CoverState), a copy; `npm run airedge` reads its `wet` (PLAN 38r-16). */
+  coverState() { const c = (lab!.solver as unknown as { cover: object | null }).cover; return c ? { ...c } : null; },
+  /**
+   * The air edge's wet field, 1 where the liquid is and 0 where the air has
+   * come in, on the solver's grid row by row, or null while the solver has no
+   * `readWet` (PLAN 38r-16 builds it; `npm run airedge` is owed until then).
+   */
+  async wet() {
+    const s = lab!.solver as unknown as { readWet?: () => Promise<Float32Array> };
+    return typeof s.readWet === 'function' ? Array.from(await s.readWet()) : null;
+  },
   /** The standing layer's kernels built now, and how many steps it has run in (`npm run standing`). */
   prepareFilm() { return lab!.solver.prepareFilm(); },
   filmSteps() { return lab!.solver.filmSteps; },
