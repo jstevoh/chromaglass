@@ -163,7 +163,7 @@ try {
       lab.flush();
       const before = await read();
       const mean = await meanDye();
-      await lab.step(STEPS, { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, meanDensity: mean });
+      await lab.step(STEPS, { thinGap: 1, gapThickness: t, gapSpring: 0, drip: 0.5, plateUpright: 1, meanDensity: mean });
       const fields = bottle === 'alcohol' ? { dye: [...await lab.field('dye')], species: [...await lab.field('species')], how: lab.solver().lastSpeciesCarry } : null;
       return { sp, before, after: await read(), nuClear: lab.thinGapViscosity(t), fields };
     };

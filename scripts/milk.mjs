@@ -112,7 +112,7 @@ try {
     lab.flush(); await lab.step(1);
     out.speciesBefore = await lab.field('species');
     // Step with drip: 1.0 on thin gap to push liquid along +y
-    await lab.step(60, { thinGap: 1, gapThickness: 0.45, drip: 1.0, gapSpring: 0 });
+    await lab.step(60, { thinGap: 1, gapThickness: 0.45, drip: 1.0, plateUpright: 1, gapSpring: 0 });
     out.speciesAfter = await lab.field('species');
 
     // 6. Zero-scatter liquid (glycerine): pours species with scatter = 0

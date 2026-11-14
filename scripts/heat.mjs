@@ -208,7 +208,7 @@ try {
     await lab.create(N, N);
     lab.dye(0.5, 0.5, 0.15, [1, 1, 1], 1.0);
     lab.flush();
-    await lab.step(30, { thinGap: 1, gapThickness: 0.45, drip: 0.5, plateUpright: 0, dt: 1 / 60 });
+    await lab.step(30, { thinGap: 1, gapThickness: 0.45, air: 0.5, plateUpright: 0, dt: 1 / 60 });
     const vCold = await lab.field('vel');
     const speedCold = Math.abs(vCold[probe + 1]);
 
@@ -217,7 +217,7 @@ try {
     lab.dye(0.5, 0.5, 0.15, [1, 1, 1], 1.0);
     lab.vel(0.5, 0.5, 2.0, [0, 0, 30.0, 0]);
     lab.flush();
-    await lab.step(30, { thinGap: 1, gapThickness: 0.45, drip: 0.5, plateUpright: 0, dt: 1 / 60, heatDecay: 1.0 });
+    await lab.step(30, { thinGap: 1, gapThickness: 0.45, air: 0.5, plateUpright: 0, dt: 1 / 60, heatDecay: 1.0 });
     const vWarm = await lab.field('vel');
     const speedWarm = Math.abs(vWarm[probe + 1]);
 

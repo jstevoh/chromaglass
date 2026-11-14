@@ -271,7 +271,7 @@ try {
         lab.flush();
         const d = await lab.field('dye');
         const bodyLaid = g ? await landed(1) : 0;
-        await go(every, 90, { drip: 0.5, meanDensity: total(d) / (L * L) });
+        await go(every, 90, { drip: 0.5, plateUpright: 1, meanDensity: total(d) / (L * L) });
         const v = await lab.field('vel'), d2 = await lab.field('dye');
         let w = 0, vx = 0, vy = 0;
         for (let k = 0; k < L * L; k++) { const a = d2[k * 4 + 3]; w += a; vx += a * v[k * 4]; vy += a * v[k * 4 + 1]; }
@@ -321,7 +321,7 @@ try {
       if (g) drop(at(30), at(48), 10 / L, { body: 1 });
       lab.flush();
       const d = await lab.field('dye');
-      for (let k = 0; k < 90; k++) { lab.flush(); await lab.step(1, { thinGap: 0, drip: 0.5, meanDensity: total(d) / (L * L) }); }
+      for (let k = 0; k < 90; k++) { lab.flush(); await lab.step(1, { thinGap: 0, drip: 0.5, plateUpright: 1, meanDensity: total(d) / (L * L) }); }
       const v = await lab.field('vel'), d2 = await lab.field('dye');
       let w = 0, vx = 0, vy = 0;
       for (let k = 0; k < L * L; k++) { const a = d2[k * 4 + 3]; w += a; vx += a * v[k * 4]; vy += a * v[k * 4 + 1]; }
