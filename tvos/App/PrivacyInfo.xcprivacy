@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The Apple TV app's privacy manifest, which the App Store asks of every new app.
+  The app tracks no one and collects nothing: it keeps its signed pass in the
+  keychain, asks the licence Worker for a code and a renewal, and plays the Mac's
+  picture over the home network (public/privacy.html, "The Apple TV app"). It
+  calls none of the APIs Apple lists as needing a reason.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array/>
+</dict>
+</plist>

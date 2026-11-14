@@ -93,9 +93,13 @@ forms and a 15 % cut.
    yet run.*
 2. **Open both accounts** *(owner)*: Apple Developer Program and Play Console, and
    install Xcode. *Apple's is open (2026-10); Play Console not started, to be opened
-   as the LLC (12-play-org).* Still owed on Apple's side when the work starts: the
-   App Store Connect record for `app.chromaglass`, and an App Store Connect API key
-   as a secret in one of main's environments so CI can upload to TestFlight.
+   as the LLC (12-play-org).* Apple's side, 2026-11-13: the App Store Connect record
+   "ChromaGlass TV" (`app.chromaglass.tv`) exists and an Admin API key is kept by the
+   owner outside the repo; the Apple TV app's builds go up from the owner's Mac with
+   it (`tvos/README.md`, "TestFlight and the App Store"). Still owed: the iPhone
+   app's own record for `app.chromaglass`, the key as a secret in one of main's
+   environments so CI can upload, and the EU trader status (DSA) in App Store
+   Connect, which only the owner can fill in.
 3. **The Android shell** (one PR; *replaced by 12-ctl-3, 2026-11-09: a Capacitor app, since a TWA cannot be the Mac's controller*): a Bubblewrap project, `assetlinks.json` in
    `public/.well-known/` with a Firebase Hosting header so it serves as JSON, the
    manifest checked for what a TWA needs, and a CI step that builds the bundle.
@@ -426,10 +430,35 @@ runs `tvvideo` on a macOS runner when a PR touches `tvos/`. Open from it:
   Home account claimed the code, and played the live plate over WebRTC. That run used a
   local copy of the licence Worker with a demo signing key and a local show server with
   a throwaway key, the address handed in at launch. LiveKit's tvOS simulator slice is
-  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Left: run it
-  against the Mac app's own show and the live Worker, then on an Apple TV (judging),
-  and sign it with the owner's team for TestFlight once the App Store Connect record
-  exists (12-ship).
+  arm64 only, so `project.yml` excludes x86_64 for the simulator SDK. Signed with the
+  owner's team and on TestFlight since 12-tv-apple-7. Left: the owner installs it
+  from TestFlight on an Apple TV against the Mac app's own show and the live Worker,
+  and judges it before it is submitted for review.
+- **12-tv-apple-7, TestFlight and the App Store.** Built 2026-11-13: the bundle is
+  `app.chromaglass.tv` (the record's), version 1.0; `npm run brand` draws the layered
+  App Store icon (back, middle, front at 1280x768 and 400x240) and the top shelf
+  (1920x720, wide 2320x720); a privacy manifest; `ITSAppUsesNonExemptEncryption`
+  false; camera and microphone purpose strings, because LiveKit's WebRTC framework
+  links the capture APIs and App Store Connect bounced build 1 without them
+  (ITMS-90683); `Info.plist` versions read from the build settings. The archive is
+  built unsigned and the export signs it in the cloud, since the team has no devices
+  for a development profile (`tvos/README.md`). Build 1.0 (2) uploaded; the privacy
+  page gained the Apple TV item. Left: the internal TestFlight group, the store page
+  (screenshots from `docs/brand/store/tv/`, privacy and support URLs, the 3.1.3(f)
+  review note: a free companion that only opens what was bought on the web, no price
+  and no buy button), then submit once the owner has judged the build (12-tv-apple-6).
+- **12-tv-apple-9, something for App Review to see.** Found 2026-11-13 writing the
+  review notes: the app opens on "Link this TV" (a Home or Pro account claims the code
+  on a phone) and then "Find your Mac" (type the Mac's TV address), and App Review has
+  neither a Mac nor a licence, so it would see a code screen and nothing more, a
+  likely 2.1 rejection. The Android TV app answers the same problem with "Watch a
+  sample film" on its first screen (the press clips, no account). The Apple TV app
+  wants the same (`AVPlayer` on the public films, which is also 12-tv-apple-3's
+  films while the show is off), plus a demo account with a Home licence and a short
+  video of the Mac and TV together in the review notes. Before submitting.
+- **12-tv-apple-8, the upload from CI.** Builds go up from the owner's Mac by hand.
+  A job on the macOS runner with the API key as an environment secret would archive
+  and upload on a tag, with the build number from the run number.
 
 **~~12-tv-signin~~: a TV signs in by a short code. Shipped (the licence Worker's
 `/tv/` routes and the phone's `?tvlink` page); story in `docs/plan-shipped.md`

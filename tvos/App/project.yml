@@ -24,7 +24,9 @@ targets:
   ChromaGlassTV:
     type: application
     platform: tvOS
-    sources: [Sources]
+    # The icon and top shelf are drawn by `npm run brand` (scripts/brand.mjs), not
+    # kept by hand in Xcode; the privacy manifest says the app tracks nothing.
+    sources: [Sources, Assets.xcassets, PrivacyInfo.xcprivacy]
     dependencies:
       - package: ChromaGlassTV
         product: ChromaGlassTVCore
@@ -34,17 +36,41 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: ChromaGlass
+        # XcodeGen writes literal versions into Info.plist unless told otherwise, so
+        # the first archive of build 2 still said 1: point them at the build settings, which
+        # the archive's CURRENT_PROJECT_VERSION=<n> overrides.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CGLicenceURL: $(CG_LICENCE_URL)
         UILaunchScreen: {}
+        # The app's only encryption is HTTPS through the system and WebRTC's standard
+        # DTLS-SRTP to the Mac: no proprietary cipher, so no export papers to upload,
+        # and saying so here keeps every TestFlight build from stopping at the
+        # compliance question (PLAN 12-tv-apple-7).
+        ITSAppUsesNonExemptEncryption: false
         # The Mac's show server is on the house's network, by address, over plain ws://:
         # local networking is allowed without opening the app to arbitrary HTTP.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         NSLocalNetworkUsageDescription: ChromaGlass connects to the Mac running your show on this network.
+        # The app never opens a camera or a microphone: it only receives the Mac's
+        # video. But LiveKit's WebRTC framework links AVCaptureDevice and
+        # AVCaptureSession (its capture code is compiled in for every platform), and
+        # App Store Connect bounced build 1 with ITMS-90683 for the missing camera
+        # string. The microphone string is there for the same reason (the framework
+        # also links AVAudioSession), so the next upload does not bounce on it. No
+        # prompt is ever shown, because no code path asks.
+        NSCameraUsageDescription: ChromaGlass does not use the camera. It only shows the video your Mac sends; the video library it uses includes camera code that the app never calls.
+        NSMicrophoneUsageDescription: ChromaGlass does not use the microphone. It only plays the show your Mac sends; the video library it uses includes recording code that the app never calls.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.chromaglass
-        MARKETING_VERSION: "0.1"
+        # The App Store record "ChromaGlass TV" is app.chromaglass.tv: the bare
+        # app.chromaglass was never registered, and the name ChromaGlass is kept
+        # for the iPhone app's own record (PLAN 12-tv-apple-7).
+        PRODUCT_BUNDLE_IDENTIFIER: app.chromaglass.tv
+        MARKETING_VERSION: "1.0"
+        # Every upload needs a build number App Store Connect has not seen: pass
+        # CURRENT_PROJECT_VERSION=<n> to the archive (README, "TestFlight").
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.0"
         DEVELOPMENT_TEAM: $(CG_TEAM)
@@ -53,3 +79,4 @@ targets:
         # symbol. No Intel Mac runs this app's simulator any more; the device slice is arm64.
         "EXCLUDED_ARCHS[sdk=appletvsimulator*]": x86_64
         CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
