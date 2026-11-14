@@ -47,11 +47,9 @@
  *        15% of the plate; a dyed drop added its colour as light on the lamp
  *        ground too), and their band darker; the clear ones' rims also to
  *        the camera, where the glow was not under the projector's band
- *   11.  the camera's dye rims, where the dye is light (Lamp Ground 0):
- *        nothing brighter than with Edge Relief off (the rim was lit on the
- *        lamp's side). The line between two dyes was asked here too, when it
- *        added a quarter of white; it is drawn nowhere now (18e-5, npm run
- *        holeline), so Boundary Contrast stays at 1 in both shots
+ *   11.  the camera's dye rims and its line between two dyes, where the dye
+ *        is light (Lamp Ground 0): nothing brighter than with both off (the
+ *        rim was lit on the lamp's side, the line added a quarter of white)
  *   12.  where the two lamps stand draws nothing: the plate, the camera's
  *        view, the closeup's relief and the camera's bubbles, the same with
  *        both lamps moved to opposite corners and both to one corner; the relief and the bubbles
@@ -284,17 +282,11 @@ try {
       black ground): on the lamp ground the dye's own colour is not what the
       plate shows, so light added to it there would pass unseen. Glossiness
       at 1 steepens the relief four times, so the rims have slope to show.
-      Boundary Contrast is at 1 in both: it drew a line where two dyes met
-      until 18e-5 and was switched with the rims here. It draws none now and
-      what it still scales is the optical path, whose shadowgraph in the
-      camera's view moves light from a swell's flanks to its middle (no light
-      made, but some pixels brighter), so switching it would ask this line
-      about a thing that is not an edge.
     */
     const dyeLight = { lampGround: 0, glossiness: 1 };
     const cam = { macroAmount: 0.02 };
     out.camEdges = await shot({ ...dyeLight, edgeRelief: 1, boundaryContrast: 1 }, cam);
-    out.camFlat = await shot({ ...dyeLight, edgeRelief: 0, boundaryContrast: 1 }, cam);
+    out.camFlat = await shot({ ...dyeLight, edgeRelief: 0, boundaryContrast: 0 }, cam);
     /*
       Where the lamps stand. Both on (Second Lamp 1), Edge Relief, the line,
       Light Play and the closeup's relief up, the hot spot off (it is the
@@ -526,7 +518,7 @@ const oilThere = up8 > 20 && down8 > 20;
 }
 {
   const d = compare(r2.camEdges, r2.camFlat);
-  check(`11. the camera's dye rims (Edge Relief 1 against 0, Boundary Contrast 1 in both): no pixel brighter than with them off (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+`,
+  check(`11. the camera's dye rims and two-dye lines (Edge Relief 1, Boundary Contrast 1): no pixel brighter than with them off (by over ${SLACK}), and over ${pct(DOES)} of the plate darker by ${DARK}+`,
     top(r2.camFlat) > 100 && d.over <= SLACK && d.dark > DOES, `brightest by ${d.over} levels; ${pct(d.dark)} darker; the plate's brightest ${top(r2.camFlat)}`);
 }
 {

@@ -744,7 +744,7 @@ export interface VisualizerSettings {
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
   blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
-  boundaryContrast: number;   // the optical path's contrast (the fringes out of focus, the closeup's relief) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and draws none
+  boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and draws none
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;

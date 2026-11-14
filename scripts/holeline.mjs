@@ -49,16 +49,30 @@
  *      relief and its meniscus are drawn elsewhere and are untouched
  *   3. two dyes meeting, at one depth, at depths five times apart and at
  *      near hues, and the first photographed (the camera's path): no pixel
- *      in a band across where they meet is moved by more than MAX_MOVE
+ *      in a band across where they meet is moved by more than MAX_MOVE.
+ *      (Hues 0.08 apart read 0 on main too, under the old gate's floor.)
  *   3b. and the seam is what the two dyes absorb, not a line: at one depth,
  *      with the dial at 1, no pixel of the band is darker in any channel
- *      than the darker of the two dyes beside it by more than SEAM_DARK
- *      levels (at one depth the dye across the seam is a blend of the two,
- *      so by Beer-Lambert each channel lies between them), asked only once
- *      the two sides are shown to be two colours (over SIDES levels apart).
- *      Asked on the wall only: photographed, main's line left this band 5
- *      levels darker at the dial's 1, so the line would pass it there, and
- *      line 3 is what holds the camera's path
+ *      than the darker of the two dyes beside it, or brighter than the
+ *      brighter, by more than SEAM levels (at one depth the dye across the
+ *      seam is a blend of the two, so by Beer-Lambert each channel lies
+ *      between them; the line began as a bright seam, so both sides are
+ *      asked), and only once the two sides are shown to be two colours (over
+ *      SIDES levels apart). It reads 3 and 4 (the dither, and the blend's
+ *      own curve through the grade) against main's 43, so SEAM is 6. This
+ *      is the one line that would see a line the dial did not scale
+ *   3c. the closeup (2x, centred on the seam): the dial at 1 against 0
+ *      moves no pixel of the frame's middle by more than MAX_MOVE, at one
+ *      depth and at depths five times apart, and at one depth the seam is
+ *      within CLOSE levels of the two dyes beside it (main: 26 darker,
+ *      where the closeup's relief was shading with the colour step). The
+ *      camera's views carry no line and, for now, no path either (the
+ *      derive pass's camera branch, wgsl/plate.ts, says what was tried),
+ *      so the dial has nothing to scale there
+ *
+ * Not asked here: the back plate. Its painted bright rim (the dye's slope
+ * times the dial, refractionOptics note 5, PLAN 18e-1) is kept, drawn on a
+ * step in depth and not on a step in colour, and these plates have one layer.
  *
  * Before any of it is judged, the plates are asked to be what they say:
  * every picture is whole, every ring selects the pixels its area says, and
@@ -106,7 +120,7 @@ const check = (name, ok, detail = '') => {
 
 const N = 256, SIZE = 768;
 const MOVED = 24, MAX_MOVE = 4, HALO_OUT = 6, RIM_SLACK = 1.5;
-const DIALS = [0.35, 1, 2], LIVE = 3, SEAM_DARK = 6, SIDES = 60;
+const DIALS = [0.35, 1, 2], LIVE = 3, SEAM = 6, CLOSE = 8, SIDES = 60;
 const SIZES = [1.8, 3, 5, 8, 14];
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
@@ -137,8 +151,8 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   const F = 1.5, W = SIZE, px = (W * F) / N; // pixels per solver cell, at zoom 1
   const plateAt = (u) => 0.5 + (u - 0.5) / F;
   const pink = [1.2, 0.3, 0.8], teal = [0.2, 1.0, 1.3];
-  const shot = async (bc, over = {}) => {
-    const p = new Uint8ClampedArray(await lab.render(SIZE, { boundaryContrast: bc, ...over }, { zoom: 1, macroAmount: 0, view: true, bubbles: 0 }));
+  const shot = async (bc, over = {}, cam = {}) => {
+    const p = new Uint8ClampedArray(await lab.render(SIZE, { boundaryContrast: bc, ...over }, { zoom: 1, macroAmount: 0, view: true, bubbles: 0, ...cam }));
     if (p.length !== W * W * 4) throw new Error(`holeline: a picture came back ${p.length} bytes, not ${W * W * 4}`);
     return p;
   };
@@ -157,12 +171,19 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
     if (n < 0.9 * want) throw new Error(`holeline: a selection picked ${n} pixels of the ${Math.round(want)} its area holds`);
     return { n, mean: sum / n, max };
   };
+  // A plate at the dial's 0 and at each of its settings: four pictures, and every
+  // selection on that plate is read off the same four (the check ran 61 pictures
+  // when each selection took its own, 50 minutes on a shared SwiftShader).
+  const dials = async (over = {}) => {
+    const off = await shot(0, over), ons = [];
+    for (const bc of DIALS) ons.push(await shot(bc, over));
+    return { off, ons };
+  };
   // The most any of the dial's settings moves a pixel of the selection, against the dial at 0.
-  const dialled = async (pick, area, over = {}) => {
-    const off = await shot(0, over);
+  const dialled = (d, pick, area) => {
     let n = 0, max = 0;
-    for (const bc of DIALS) { const r = share(await shot(bc, over), off, pick, area); n = r.n; max = Math.max(max, r.max); }
-    return { n, max, off };
+    for (const on of d.ons) { const r = share(on, d.off, pick, area); n = r.n; max = Math.max(max, r.max); }
+    return { n, max, off: d.off };
   };
   const at = (p, x, y) => { const u = 0.5 + (x - 0.5) * F, v = 0.5 + (y - 0.5) * F; const i = Math.floor(u * W) + Math.floor(v * W) * W; return [p[4 * i], p[4 * i + 1], p[4 * i + 2]]; };
   const far = (a, b) => Math.max(...a.map((v, k) => Math.abs(v - b[k])));
@@ -177,10 +198,10 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
   const list = holes.flatMap((h) => [h.x, h.y, h.r, 1]);
   lab.solver().setBubbles(new Float32Array(list), holes.length, 0.25, new Float32Array(holes.length * 4));
   await lab.step(2, { bubbleClear: 1 });
-  const halo = [];
+  const halo = [], plateA = await dials();
   for (const h of holes) {
     const lo = 0.5 * h.r, hi = h.r + HALO_OUT / N, area = Math.PI * (hi * hi - lo * lo);
-    const s = await dialled((x, y) => { const d = Math.hypot(x - h.x, y - h.y); return d >= lo && d <= hi; }, area);
+    const s = dialled(plateA, (x, y) => { const d = Math.hypot(x - h.x, y - h.y); return d >= lo && d <= hi; }, area);
     // Where the hole's rim is: out from the centre along a ray, the first
     // point within MOVED levels of the dye ten cells past the rim.
     const beside = at(s.off, h.x, h.y + h.r + 10 / N);
@@ -189,13 +210,13 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
     halo.push({ cells: h.r * N, max: s.max, n: s.n, cut: far(at(s.off, h.x, h.y), beside), rim });
   }
   const rimRing = (x, y) => Math.abs(Math.hypot(x - C, y - C) - R) < HALO_OUT / N && Math.abs(y - 0.5) > 0.1;
-  const rim = await dialled(rimRing, 0);
+  const rim = dialled(plateA, rimRing, 0);
   // Line 0: out of focus the dial scales the optical path's contrast, and the pool's rim shows it.
   const live = share(await shot(1, { projectorFocus: 0.8 }), await shot(0, { projectorFocus: 0.8 }), rimRing, 0).mean;
 
   // Plate B: two dyes meeting down the middle.
   const band = (x, y) => Math.abs(x - 0.5) < 4 / N && y > 0.25 && y < 0.75;
-  const meet = async (left, dl, right, dr, over = {}) => {
+  const meet = async (left, dl, right, dr, over = {}, closeup = false) => {
     await lab.create(N);
     const add = new Array(L * L * 4).fill(0);
     for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
@@ -206,22 +227,40 @@ const measure = (page) => page.evaluate(async ({ N, SIZE, SIZES, MOVED, HALO_OUT
       add[k] = c[0] * d; add[k + 1] = c[1] * d; add[k + 2] = c[2] * d; add[k + 3] = d;
     }
     lab.addDye(add); lab.flush(); await lab.step(10);
-    const r = await dialled(band, (8 / N) * 0.5, over);
-    // The seam against the two dyes beside it, 12 cells out on either side, row by row, with the dial at 1.
-    const on = await shot(1, over);
-    let dark = 0, sides = 255;
-    for (let y = Math.ceil(0.5 * W - 0.25 * F * W) + 2; y < 0.5 * W + 0.25 * F * W - 2; y++) {
-      const row = (u) => { const i = Math.floor((0.5 + (u - 0.5) * F) * W) + y * W; return [on[4 * i], on[4 * i + 1], on[4 * i + 2]]; };
-      const a = row(0.5 - 12 / N), b = row(0.5 + 12 / N);
-      sides = Math.min(sides, far(a, b));
-      for (let x = Math.ceil((0.5 - (4 / N) * F) * W); x < (0.5 + (4 / N) * F) * W; x++) {
-        const i = x + y * W;
-        for (let k = 0; k < 3; k++) dark = Math.max(dark, Math.min(a[k], b[k]) - on[4 * i + k]);
+    const d = await dials(over), r = dialled(d, band, (8 / N) * 0.5);
+    // The seam against the two dyes beside it, row by row, with the dial at 1:
+    // how far any pixel between the columns lo and hi is outside the two
+    // sides' own colours (read at the columns a and b), darker or brighter.
+    const seam = (on, a, b, lo, hi, y0, y1) => {
+      let dark = 0, bright = 0, sides = 255;
+      for (let y = y0; y < y1; y++) {
+        const A = [0, 1, 2].map((k) => on[4 * (a + y * W) + k]), B = [0, 1, 2].map((k) => on[4 * (b + y * W) + k]);
+        sides = Math.min(sides, far(A, B));
+        for (let x = lo; x < hi; x++) for (let k = 0; k < 3; k++) {
+          const v = on[4 * (x + y * W) + k];
+          dark = Math.max(dark, Math.min(A[k], B[k]) - v); bright = Math.max(bright, v - Math.max(A[k], B[k]));
+        }
       }
+      return { dark, bright, sides };
+    };
+    // On the wall: the sides 12 cells out, the band 4 cells either way, the rows the band's selection holds.
+    const col = (u) => Math.floor((0.5 + (u - 0.5) * F) * W);
+    const wall = (p) => seam(p, col(0.5 - 12 / N), col(0.5 + 12 / N), col(0.5 - 4 / N), col(0.5 + 4 / N) + 1, Math.ceil(0.5 * W - 0.25 * F * W) + 2, Math.floor(0.5 * W + 0.25 * F * W) - 2);
+    const on = wall(d.ons[DIALS.indexOf(1)]);
+    // In the closeup, centred on the seam, the dial at 1 against 0: the sides a quarter of
+    // the frame out, everything between 30% and 70% of it, and what the dial moves there.
+    let close = null;
+    if (closeup) {
+      const cam = { zoom: 2, macroAmount: 1, cx: 0.5, cy: 0.5 }, lo = Math.ceil(0.3 * W), hi = Math.floor(0.7 * W);
+      const c1 = await shot(1, over, cam), c0 = await shot(0, over, cam);
+      let max = 0;
+      for (let y = lo; y < hi; y++) for (let x = lo; x < hi; x++) max = Math.max(max, moved(c1, c0, x + y * W));
+      close = { ...seam(c1, Math.floor(0.25 * W), Math.floor(0.75 * W), lo, hi, lo, hi), max };
     }
-    return { max: r.max, n: r.n, dark, sides };
+    return { max: r.max, n: r.n, ...on, close };
   };
-  const even = await meet(pink, 1.3, teal, 1.3), uneven = await meet(pink, 2.0, teal, 0.4);
+  if (DIALS.indexOf(1) < 0) throw new Error('holeline: the seam is read with the dial at 1, which DIALS does not hold');
+  const even = await meet(pink, 1.3, teal, 1.3, {}, true), uneven = await meet(pink, 2.0, teal, 0.4, {}, true);
   // Near hues: the green absorbance moved so exp(-c) moves about 0.08 and 0.2.
   const near = await meet(pink, 1.3, [1.2, 0.414, 0.8], 1.3), nearer = await meet(pink, 1.3, [1.2, 0.614, 0.8], 1.3);
   // The camera's path: the same two dyes photographed.
@@ -345,7 +384,8 @@ console.log('   what Boundary Contrast moves (0.35, 1 and 2 against 0), in level
 for (const h of now.halo) console.log(`     hole ${h.cells.toFixed(1)} cells: at most ${h.max} of ${h.n} ring pixels; centre ${h.cut} levels from the dye, rim at ${h.rim.toFixed(1)} cells`);
 console.log(`     pool rim into water: at most ${now.rim.max} (${now.rim.n} pixels); out of focus the dial moves it ${now.live.toFixed(2)} on average`);
 for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues, about 0.08 apart', 'near'], ['near hues, about 0.2 apart', 'nearer'], ['one depth, photographed', 'photo']]) {
-  console.log(`     two dyes meeting, ${name}: at most ${now[k].max} (${now[k].n} pixels); the seam ${now[k].dark} darker than the darker dye beside it, the two sides ${now[k].sides} apart`);
+  const r = now[k];
+  console.log(`     two dyes meeting, ${name}: at most ${r.max} (${r.n} pixels); the seam ${r.dark} darker than the darker dye beside it and ${r.bright} brighter than the brighter, the two sides ${r.sides} apart${r.close ? `; in the closeup the dial moves at most ${r.close.max}, the seam ${r.close.dark} and ${r.close.bright}, sides ${r.close.sides} apart` : ''}`);
 }
 
 // The plates are what they say, before anything is judged on them.
@@ -361,7 +401,9 @@ check(`2. no line round the pool's rim (at most ${now.rim.max} levels ≤ ${MAX_
 for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues', 'near'], ['nearer hues', 'nearer'], ['one depth, photographed', 'photo']]) {
   check(`3. no line where two dyes meet, ${name} (at most ${now[k].max} levels ≤ ${MAX_MOVE})`, now[k].max <= MAX_MOVE);
 }
-check(`3b. the seam is the two dyes' own absorbance (${now.even.dark} levels darker than the darker side ≤ ${SEAM_DARK}; the sides ${now.even.sides} apart > ${SIDES})`, now.even.dark <= SEAM_DARK && now.even.sides > SIDES);
+check(`3b. the seam is the two dyes' own absorbance (${now.even.dark} levels darker than the darker side, ${now.even.bright} brighter than the brighter, ≤ ${SEAM}; the sides ${now.even.sides} apart > ${SIDES})`, now.even.dark <= SEAM && now.even.bright <= SEAM && now.even.sides > SIDES);
+check(`3c. and in the closeup: the dial moves nothing (at most ${now.even.close.max} levels at one depth, ${now.uneven.close.max} at depths five times apart, ≤ ${MAX_MOVE})`, now.even.close.max <= MAX_MOVE && now.uneven.close.max <= MAX_MOVE);
+check(`3c. and its seam at one depth is the two dyes' (${now.even.close.dark} darker, ${now.even.close.bright} brighter, ≤ ${CLOSE}; the sides ${now.even.close.sides} apart > ${SIDES})`, now.even.close.dark <= CLOSE && now.even.close.bright <= CLOSE && now.even.close.sides > SIDES);
 
 for (const [name, r] of [['the shader', glowNow], ['the control (no air mask)', glowThen]]) {
   console.log(`   ${name}, the dye ${HOLE_FROM} to ${HOLE_TO} cells past a hole's rim, from the dye ${HOLE_REF} cells out:`);

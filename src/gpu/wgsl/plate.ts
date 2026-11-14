@@ -1281,6 +1281,24 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let macroAmt = clamp(U.macroOn, 0.0, 1.0);
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
+  /*
+    The camera's views (a photographed look, the closeup) keep their own
+    slope, the lit colour's, for their rims, and carry nothing else. Until
+    18e-5 the two-dye line's strength rode in .z here, and the closeup's
+    relief, which reads .z over .w as the path's curvature (camShadow,
+    38h-7), was shading with that colour step: a dark band where two dyes
+    met, as wide as the line's four taps and magnified with the view, and no
+    depth on a swell. The line is gone, so .z is 0 and that term of the
+    relief is at rest, which is the closeup main drew with Boundary Contrast
+    at 0. Writing the path and its Laplacian here, as the wall's branch does,
+    was tried and is not here: on the Mac a cluster of bubbles on pink dye
+    blew a sixth of the closeup to flat white (the air's index step is a
+    spike in a nine-tap Laplacian, and camShadow may brighten 2.5 times),
+    and a step in the dye's depth drew a doublet 119 levels darker and 99
+    brighter from the dye's stand-in index. The closeup's shadowgraph wants
+    the path read at the lens's scale, as defocusShadow reads it: PLAN 18e-7.
+  */
+  if (isCamera) { return vec4f(sobelGrad(src, in.uv), 0.0, 0.0); }
 
   let ts = 3.0 / U.logicalGrid;
   let dyeGain = max(1.0, U.boundaryContrast * 3.0);
@@ -1332,18 +1350,6 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
 
   let lap = ((o01 + o21 + o10 + o12 - 4.0 * oC) + 0.5 * (o00 + o20 + o02 + o22 - 4.0 * oC)) * 25.0;
 
-  /*
-    The camera's views (a photographed look, the closeup) keep their own
-    slope, the lit colour's, for their rims. Until 18e-5 this branch came
-    first and returned that slope with the two-dye line's strength in .z and
-    nothing in .w, so the closeup's relief, which reads .z over .w as the
-    path's curvature (camShadow, 38h-7), was shading with the colour step
-    instead: no depth on a swell, and a dark band where two dyes met, as wide
-    as the line's four taps and magnified with the view. The path and its
-    Laplacian are the same on the camera's views as on the wall, so they are
-    written here for both.
-  */
-  if (isCamera) { return vec4f(sobelGrad(src, in.uv), lap, oC); }
   return vec4f(g, lap, oC);
 }
 `;
