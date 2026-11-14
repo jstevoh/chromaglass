@@ -31,6 +31,8 @@ export const LOGICAL_GRID = 192;
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+/** Video Zoom as the plate takes it (PLAN 14ag): its travel, and 1 (as it always landed) for a look saved before it. */
+export const filmZoomOf = (z: number | undefined) => (Number.isFinite(z) ? clamp(z as number, 0.25, 4) : 1);
 
 /**
  * The frame, as the uniforms read it.
@@ -214,6 +216,10 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
       // Cover-fit: crop whichever axis the frame has too much of.
       const va = v.videoWidth / v.videoHeight, ca = width / height;
       if (va > ca) filmScaleX = ca / va; else filmScaleY = va / ca;
+      // Video Zoom over the cover-fit (PLAN 14ag): 2 shows half the frame's span, 0.5 twice it.
+      const zoom = filmZoomOf(s.filmZoom);
+      filmScaleX /= zoom;
+      filmScaleY /= zoom;
     }
   }
 
@@ -405,6 +411,7 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
     pack.set('filmMix', clamp01(s.filmMix ?? 0.7));
     pack.set('filmKey', clamp(s.filmKey ?? 0.18, 0, 0.9));
     pack.set('filmScale', filmScaleX, filmScaleY);
+    pack.set('filmPan', clamp(s.filmX ?? 0, -1, 1), clamp(s.filmY ?? 0, -1, 1));
   }
   {
     const throw1 = view.layer1;

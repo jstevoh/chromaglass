@@ -298,6 +298,9 @@ export function luckyLook(
     exposure: rand() < 0.25 ? rand() * 0.8 : 0,
     filmMix: current.filmMix,
     filmKey: current.filmKey,
+    filmZoom: current.filmZoom,
+    filmX: current.filmX,
+    filmY: current.filmY,
     glossiness: rand() < 0.8 ? 0 : rand() * 0.4,
     postBlurRadius: rand() * 0.7,
     // One roll in four goes closeup — a magnified chase is its own happy
