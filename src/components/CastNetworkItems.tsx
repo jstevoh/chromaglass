@@ -1,5 +1,6 @@
 import { Info } from './Info';
 import type { RelayInfo, RemoteMessage } from '../lib/remoteProtocol';
+import { NetworkDisplayAddresses } from './NetworkDisplayAddresses';
 
 /**
  * The cast menu's two network entries: a network display, which runs its own
