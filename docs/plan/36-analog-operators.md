@@ -16,7 +16,15 @@ me perfection equals a kind of death", Joshua White), no visible pixels, above a
 people ("no one's body looks good with pixels on it", Drippy Eye), and the hand, not a
 button, making it look good. Every item here is held to those.
 
-- ~~**36a. A lit-stage grade**~~ — **shipped** (`npm run litstage` 15/15 across all 33 looks, PR #854, full story in [plan-shipped.md](../plan-shipped.md#36a-a-lit-stage-grade)).
+- **36a. A lit-stage grade** (*in progress*, `antigravity/36a-lit-stage`, PR #854, M). *The
+  build:* `OutputConfig.litStage` (load-in only), `PlateView.litStage`, Wall knob
+  (`OutputPanel.tsx`, phone via `More → Settings → Stage → Wall` and `More → Tabs → Setup`),
+  and `litFluid` (`src/gpu/wgsl/litStage.ts`) in `decodeFluid`/`decodeFluidRaw`. Passes 15/15
+  of `npm run litstage` across all 34 non-moiré looks (the 33 looks from #516 plus
+  `saffron-lace`); 12/15 across all 41 looks because the 7 §45a moiré looks (`moire-*`,
+  added in #676/#731 after #516) multiply both empty field and dyed glass by `MOIRE_INK`
+  (0.02) and `MOIRE_FILM²` (0.85), bounding multiplicative dye contrast under a 10% floor
+  below the 67% / 5 ΔE bars while `b9` holds the empty field unchanged.
   - **36a-1.** ~~Measure's `lab` part is at its time limit~~ *shipped* by 19k-6 (#517), which
     split it into `lab` and `lab2` the same hour. The lit-stage controls stay in `browser`.
   - **36a-2.** **Replace the per-pixel lift shortcut in `litDyeLift` (`src/gpu/wgsl/litStage.ts`)**
