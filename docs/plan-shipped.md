@@ -11464,3 +11464,25 @@ of the mutants added after a review pass found a desk move mid-glide overridden,
 reverting the performer's Go, and glides outliving the switch); red on main with this check, the guard and the MCP server copied in: 24 of 38 lines failed,
 main's relay taking an `assistant` hello as a phone's, with the switch off and from
 another host. Left open: 44c-2 to 44c-4, 44d-2 to 44d-4, 44f, 44h (internet, next).
+
+### P7-cpu (step 3.1): Delete the CPU solver's stepping
+
+Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
+CPU-only fallback paths while keeping the delta arrays, readback mirrors, beads,
+bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
+
+- Deleted in `src/sim/fluidSimulation.ts` (193,793 → 166,262 bytes): CPU-only
+  step body in `step()`, `stepCurrent`, `solveSqueezePressure`,
+  `updateSqueezeVelocity`, `applyImmiscibility`, `applyAirflow`, `applySmear`,
+  `applyDripping`, `diffuse`, `linSolve`, `project`, `advect`,
+  `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`, `injectVorticity`,
+  the CPU `else` branches in `stepLiquid`, `thinDye`, `squishCell`, `blowAir`,
+  and CPU-only scratch arrays (`s`, `sR`, `sG`, `sB`, `vx0`, `vy0`, `pressure`,
+  `dhdt`, `temp0`, `CM`, `cvx`, `cvy`, `cpr`, `cdv`, `fvx`, `fvy`, `mcA`, `mcB`).
+- Deleted in `src/sim/constants.ts`: unused `TURB_SPEED` and `DRIP_SPEED`.
+- Deleted in `src/components/LiquidVisualizer.tsx` (432,115 → 429,442 bytes):
+  the CPU drain advection/evaporation fallback loop in favour of
+  `af.gpu?.drainStep(t)`.
+- Left under the check stop rule (for follow-up cleanup with their checks):
+  `private sharpenDye` (with `shp`, `shpA`, `SHARP_FLOOR`) for `scripts/plate.mjs`,
+  and the `settings.glassSmear > 0` reference in `step()` for `scripts/widedials.mjs`.

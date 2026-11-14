@@ -2837,58 +2837,8 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
           const DRAIN_FRAMES = 50;
           const frame = drainFrameRef.current;
           const t = frame / DRAIN_FRAMES;
-          const pull = Math.pow(t, 0.4) * 4.0;
-          const dcx = GRID_SIZE / 2, dcy = GRID_SIZE / 2;
 
-          for (const af of fluidsRef.current) {
-            if (af.gpu) { af.gpu.drainStep(t); continue; }
-
-            // 1. Set drain velocity field (inward spiral)
-            for (let j = 1; j < GRID_SIZE - 1; j++) {
-              for (let i = 1; i < GRID_SIZE - 1; i++) {
-                const idx = i + j * GRID_SIZE;
-                const dx = dcx - i, dy = dcy - j;
-                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                const inward = pull * (1 + dist / 50);
-                const swirl = pull * 0.7 * (1 - t * 0.5);
-                af.vx[idx] = (dx / dist) * inward + (-dy / dist) * swirl;
-                af.vy[idx] = (dy / dist) * inward + ( dx / dist) * swirl;
-              }
-            }
-
-            // 2. Semi-lagrangian advection (backtrace through drain velocity)
-            af.s.set(af.density);
-            af.sR.set(af.densityR);
-            af.sG.set(af.densityG);
-            af.sB.set(af.densityB);
-
-            for (let j = 1; j < GRID_SIZE - 1; j++) {
-              for (let i = 1; i < GRID_SIZE - 1; i++) {
-                const idx = i + j * GRID_SIZE;
-                const srcX = Math.max(1, Math.min(GRID_SIZE - 2, i - af.vx[idx] * 0.3));
-                const srcY = Math.max(1, Math.min(GRID_SIZE - 2, j - af.vy[idx] * 0.3));
-                const i0 = Math.floor(srcX), j0 = Math.floor(srcY);
-                const i1 = Math.min(GRID_SIZE - 2, i0 + 1), j1 = Math.min(GRID_SIZE - 2, j0 + 1);
-                const sx = srcX - i0, sy = srcY - j0;
-                const w00 = (1 - sx) * (1 - sy), w10 = sx * (1 - sy), w01 = (1 - sx) * sy, w11 = sx * sy;
-                const idx00 = i0 + j0 * GRID_SIZE, idx10 = i1 + j0 * GRID_SIZE;
-                const idx01 = i0 + j1 * GRID_SIZE, idx11 = i1 + j1 * GRID_SIZE;
-                af.density[idx]  = af.s[idx00]  * w00 + af.s[idx10]  * w10 + af.s[idx01]  * w01 + af.s[idx11]  * w11;
-                af.densityR[idx] = af.sR[idx00] * w00 + af.sR[idx10] * w10 + af.sR[idx01] * w01 + af.sR[idx11] * w11;
-                af.densityG[idx] = af.sG[idx00] * w00 + af.sG[idx10] * w10 + af.sG[idx01] * w01 + af.sG[idx11] * w11;
-                af.densityB[idx] = af.sB[idx00] * w00 + af.sB[idx10] * w10 + af.sB[idx01] * w01 + af.sB[idx11] * w11;
-              }
-            }
-
-            // 3. Evaporate
-            const evapRate = 0.03 + t * t * 0.35;
-            for (let idx = 0; idx < GRID_AREA; idx++) {
-              af.density[idx]  *= (1 - evapRate);
-              af.densityR[idx] *= (1 - evapRate);
-              af.densityG[idx] *= (1 - evapRate);
-              af.densityB[idx] *= (1 - evapRate);
-            }
-          }
+          for (const af of fluidsRef.current) af.gpu?.drainStep(t);
 
           // Sixtieths, not steps: `DRAIN_FRAMES` is five sixths of a second and
           // has to stay five sixths of a second at any rate. The floor this

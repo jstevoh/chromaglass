@@ -45,9 +45,6 @@ export const GRID_SIZE = 192;                    // sim resolution — higher = 
 
 export const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 
-/** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). */
-export const TURB_SPEED = 0.5;
-
 /**
  * How fast the print's Drift, as the solver is handed it, may move: a share of the
  * full range a second. The feed map's amplitude arrives all at once otherwise, and
@@ -135,9 +132,6 @@ export const FILM_POUR = 0.5;
 export const BODY_DROP = 3;
 
 export const BODY_COVER = 0.35;
-
-/** Rain Drip 1.0: the downhill current in the streaks, solver units (GPU: same 0.5). */
-export const DRIP_SPEED = 0.5;
 
 export const GRID_AREA = GRID_SIZE * GRID_SIZE;
 
