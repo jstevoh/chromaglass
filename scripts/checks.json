@@ -1515,7 +1515,7 @@
       ]
     },
     {
-      "name": "No line round a bubble's hole, nor where two dyes meet",
+      "name": "No line round a bubble's hole",
       "shard": "lab4",
       "run": "npm run holeline",
       "why": [
