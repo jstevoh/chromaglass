@@ -20,7 +20,8 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 
 ## Files
 
-- `air.ts`: bubbles as a field the solver carries.
+- `beadMask.ts`: the beads' mask drawn on the GPU from the list (14ab-6), and `rings`, that list's buffers for the plate to read the rings at the screen's resolution (PLAN 38h-17; null for drops or once a picture stands in).
+- `air.ts`: bubbles as a field the solver carries, and `geo` (type `AirGeo`), the list as the field was last stamped from it, which the plate draws each bubble's outline from (PLAN 38h-15; the solver's `fields.airGeo`, the plate's `draw` fields).
 - `camera.ts`: refraction, depth of field, bloom, grain.
 - `device.ts`: `requestGpu`, `requestGpuEarly`, `classifyAdapter`.
 - `ferroDrop.ts`: the closeup's ferrofluid drop.
@@ -32,7 +33,7 @@ The WebGPU engine, TypeScript side: the solver's compute passes and the plate's 
 - `padGrab.ts`: the remote's Draw picture.
 - `particles.ts`: dye carried by particles.
 - `post.ts`: post-effects chain and finish.
-- `prepare.ts`: `prepareShow`, pipelines built before opening.
+- `prepare.ts`: `prepareShow`, pipelines built before opening (three at a time) and behind it (two); `prepareLog` (each prepare once done), `prepareProgress` (each while it runs: builds settled, the last settle, the cap on one build) and `pipelinesSeen` (both and the ledger, for `chromaglassDebug().pipelines()`).
 - `probe.ts`: delivered brightness for the flash guard.
 - `readGate.ts`: `ReadGate`, when a readback is worth taking.
 - `rimRead.ts`: `RimRead`, the mean inside the dish's rim and the unpadded `data` read back with it.

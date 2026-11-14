@@ -383,7 +383,7 @@ export class WebGPUFluid extends FluidCover {
     const fin = (x: number | undefined, fallback = 0): number => (typeof x === 'number' && Number.isFinite(x) ? x : fallback);
     const thin = this.thinGapOn(p);
     f[0] = this.N; f[1] = this.L; f[2] = fin(p.dt, 1 / 60); f[3] = fin(p.time, 0); f[4] = fin(disp, 0); f[5] = fin(p.visc, 1);
-    f[6] = fin(p.turbScale, 0); f[7] = fin(p.spin, 0); f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
+    f[6] = fin(p.turbScale, 0); f[7] = 0; f[8] = fin(p.immiscibility, 0); f[9] = thin ? 1 : 0;
     f[10] = fin(p.vibIntensity, 0); f[11] = fin(p.vibFrequency, 0); f[12] = fin(p.drip, 0); f[13] = fin(p.air, 0);
     f[14] = fin(p.smearX, 0); f[15] = fin(p.smearY, 0);
     /*
