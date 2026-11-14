@@ -14212,3 +14212,58 @@ seconds, colourfulness and coloured share): the shipped pale water 164.7 / 0.89;
 140.2 / 0.82; cobalt now 168.3 / 0.97. With the boundary line off too, 186.8 / 0.98 (47z-4's).
 On the owner's Mac, though, the cobalt read darker than the pale water (colourfulness 62 against
 131, luminance 0.20 against 0.42): the look keeps its pale water (47z-1e).
+
+## 15e-1 (met again as 14ab-16) and 46r. A poured liquid acts on every step, and the lasting current's args have a name of their own (shipped 2026-11-13)
+
+Two faults of the solver's plumbing, each with a check written red first.
+
+**46r.** A dispatch's eight numbers live in a uniform buffer kept under a name (`arg`), and a
+buffer holds what was written to it last before the submit. Three calls in one step shared
+'current grid' with different numbers: the lasting current's forces and projection (z = the
+boil is running), the swirl's projection (z = 0) and the open plate's `addCurrent` (z = Depth
+Drag, w = the swirl's scale). On the open plate (Thin Gap off) `addCurrent` wrote last, so
+`currentForces` read Depth Drag as the boil: at Depth Drag above 0 the lamp's lift left the
+clamped linear rise for the boil's uncapped density rise with no boil running, and at Heat
+above 0 with Depth Drag 0 the boil's plate got the clamped one. A thin gap's `addCurrent`
+already had its own name, so no shipped look showed it (all open thin) and `plateboil` (thin,
+or Depth Drag 0) did not see it. Each call has its own name now ('current step', 'swirl
+grid', 'add current'). `npm run argnames` watches the solver's `argWrite` from the lab's page
+on eleven plates (a planted pair is its control) and asks the current after one step to be
+the same at Depth Drag 0 and 1.5, bit for bit. Before: 'current grid' given two values on
+five of the eleven; the current at Depth Drag 1.5 different in 1121 values, by up to 0.33
+against its own 0.0094 (64², upright, a 30 K spot, the lab's Buoyancy 0.45); a 70 K spot's
+current at Heat 1 at its cap (1.9e-3), the boil's rise unread. After: no clash, none
+different, and the boil's rise read (1.07 against a cap of 0.002 at the lab's numbers).
+
+What it changes in the app, measured on a 128² open plate at the app's own numbers
+(Buoyancy 0.45 × 0.3, its cap of three quarters of a cell a step, upright): at Heat 0 almost
+nothing, since the unheated plate's warmth is hundredths of a degree and there the two rises
+agree (the current's fastest after 30 steps at Depth Drag 1.5 was 4.51e-2 against 4.28e-2 at
+Depth Drag 0, and is 4.28e-2 now). At Heat 1 with Depth Drag 0, a plate 60 K over the room
+under a held hand: the current's mean after 30 steps 0.268 → 0.463 and after 120 steps
+0.139 → 0.178, its fastest on the first step 0.135 → 0.329, and by 240 steps the two are
+within a tenth. So a boiling open plate's plume starts about 1.7 times as fast as it did.
+Pictures in the project's files (`open-plate-46r/before-after.png`). No shipped look runs the
+open plate. Seen in both pictures and left as 36e-5: bands in the dye at the floor.
+
+**15e-1.** What a bottle's liquid does to the plate (`liquidForces`, and the soap's thinning
+inside `deltaDye`) ran in the fold of a frame's hand-laid deltas, so only on a step something
+else wrote deltas for. The app folded every step by accident: the CPU's copy of the liquids
+marked the deltas written while it held any, and held its first pour forever (15e-11). After a
+Clear that copy stays empty, so a liquid poured then was carried and drawn and did nothing
+until a hand, a kick or a bubble wrote a delta; and a step folded twice (a frame that read
+the plate back) pushed twice. The step runs both itself now, in a pass of their own first in
+the step, in the fold's order (`stepLiquids`; the thinning is its own kernel, `soapThin`, the
+same arithmetic), only on a plate a bottle was poured on (`liquidsLive`), so a show that did
+fold every step sees the same numbers. `npm run liquidpush` (a heavy drop and a soap's on a
+rocked plate, open and thin, each against the plate without them): before, with no fold and
+after a Clear the slide and the thinning were 0 where one fold a step gave 3.4e-2 and 8.3%,
+and two folds gave 1.86× and 1.92×; after, all four ways give the same to three places.
+`npm run liquidsgpu`'s five "a still plate" lines owed to 15e-1 pass and gate (soap leaves
+89.3% at its spot at half a second and 71.7% at two, what the fold-every-step plate leaves;
+silicone 61.7% in its middle), three more lose 15e-1 from what they are owed to, and a new
+line asks milk's held edge on a still plate to be the fold-every-step plate's (effect 0.00106
+both ways): 27 gate, 11 owed.
+
+Found on the way: on a thin gap the push is read as momentum and the drag has it within the
+step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
