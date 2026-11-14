@@ -180,3 +180,26 @@ export function layStirCords(looks: readonly { settings: Partial<VisualizerSetti
     if (depth > 0) p.settings.sceneMappings = [...(p.settings.sceneMappings ?? []), stirCord(depth)];
   }
 }
+
+/*
+  The music's stir, given once to a look the owner saved before it (PLAN
+  38u-16).
+
+  The built-in looks gained the cord where they are written (layStirCords);
+  a saved look keeps the cords it was saved with, so every look saved before
+  2026-11-13 came back without one and stirred to the music less than it had
+  the day before: it had lost the multiplier and the eddies, and nothing on
+  its patch bay took their place. So a saved look from before is read with
+  the cord its own Turbulence and Sound Drive call for, the same depth a
+  built-in look with those dials carries (a dial the saved look does not
+  name is read as `dial` and `drive`, the defaults it would load with). Once, as it is read: whether to ask
+  is the saved look's version (lib/userPresets.ts PRESET_VERSION), not this,
+  so a cord the owner pulls out afterwards and saves stays pulled. A look
+  that already carries a stir cord is left as it is, at the owner's depth.
+*/
+export function withStirCordOnce<T extends Partial<VisualizerSettings>>(settings: T, dial: number, drive: number): T {
+  const maps = Array.isArray(settings.sceneMappings) ? settings.sceneMappings : [];
+  if (maps.some(isStirCord)) return settings;
+  const depth = stirCordDepth(settings.turbulenceScale ?? dial, settings.audioImpact ?? drive);
+  return depth > 0 ? { ...settings, sceneMappings: [...maps, stirCord(depth)] } : settings;
+}

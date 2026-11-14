@@ -20,13 +20,9 @@ which the audit's own PR adds at the foot of this file, and these lines join it 
   **Shipped 2026-11-13** (the story is in `docs/plan-shipped.md`). The solver's step takes no
   sound; every look carries one cord, the sound's mids on Turbulence; `npm run musicstir`.
   The rest of 38u-4 (the stir as a tool, not curl noise on a clock) stays open.
-- **38u-16. A look saved before 38u-5 has no stir cord** (S; Medium). The built-in looks gain
-  the cord where they are defined; a look the owner saved earlier, a draft, and a look built
-  from the defaults keep their own cords and so stir less with music than they did, until
-  Music Stir is raised (the phone) or the patch is added (Patches). Give a saved look the
-  cord once as it is read (`sanitizeSettings`), with a mark in the saved look that says it
-  has been asked, so a cord the owner pulls stays pulled. Check: `musicstir` gains a saved
-  look from before, read back with its cord, and one with the mark and no cord, left alone.
+- ~~**38u-16. A look saved before 38u-5 has no stir cord**~~ — **Shipped 2026-11-14** (the
+  story is in `docs/plan-shipped.md`). A saved look from before version 3 is read with the cord
+  its own dials call for, once; `npm run musicstir` section 7.
 
 How it is ranked: what a person would see change on the wall, against what it costs to
 build and what it adds to the frame. S is under a day, M a few days, L a week or more.
