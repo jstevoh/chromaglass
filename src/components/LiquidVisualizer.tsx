@@ -13,7 +13,7 @@ import { plateAreas, areaForBand, areaCentre, areaDye, areaFamily, layAngle, poi
 import { phasePour } from '../lib/phasePour';
 import { magnetRadiusAt } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
-import { laidColour, pourTint, rgbToHex } from '../lib/liquidColour';
+import { laidColour, pourTint } from '../lib/liquidColour';
 import { PALETTE, PALETTE_RGB, hexToRgb, getAudioValue, type AudioFeatureKey, pickHarmony, harmonyColor, harmonyCycle } from '../constants';
 import { WebGPUStage } from '../gpu/stage';
 import { forgetReadbacks, readbacksLanded, trackReadbacks, PipelineCache } from '../gpu/kit';
@@ -263,11 +263,9 @@ interface LiquidVisualizerProps {
 }
 
 import type { LiquidVisualizerHandle } from './visualizerHandle';
-import { rgbToHex } from './layerSwatch';
+import { c01, rgbToHex } from './layerSwatch';
 import { NeedsWebGpu } from './NeedsWebGpu';
 
-/** Held to 0..1 (a score of the frame loop's dials). */
-const c01 = (v: number) => Math.max(0, Math.min(1, v));
 export type { LiquidVisualizerHandle };
 
 

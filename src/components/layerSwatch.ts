@@ -3,8 +3,8 @@
   for the lamp boil's remote holds (PLAN 36e-2): the file is held at its size ceiling.
 */
 
-/** Held to 0..1. */
-const c01 = (v: number) => Math.max(0, Math.min(1, v));
+/** Held to 0..1 (a score of the frame loop's dials). */
+export const c01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /**
  * A layer's mean dye as a swatch.
