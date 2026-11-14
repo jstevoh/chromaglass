@@ -14,6 +14,8 @@ import {
   RotateCcw,
   Sliders,
   History,
+  Share2,
+  Smartphone,
 } from 'lucide-react';
 import { Sheet, Button, SwitchPill, Toggle, LIT } from './ui';
 import type { Recorder, VideoQuality, VideoFormat } from '../hooks/useRecorder';
@@ -21,6 +23,8 @@ import type { SavedPerformance } from '../lib/musicTypes';
 import { clockText } from '../lib/performanceTake';
 import { openAccountSheet } from '../lib/tierGates';
 import { makesText, type RecordChoice } from '../lib/recordChoice';
+import { PORTRAIT_STAGE, FREE_PORTRAIT_STAGE, type ClipShape } from '../lib/clipFrame';
+import { canShareClip, shareClip } from '../lib/shareClip';
 
 export interface RecordPanelProps {
   onClose: () => void;
@@ -228,6 +232,56 @@ export function RecordPanel({
                   </div>
                 </div>
 
+                {/* The frame: the plate as it is, or a 9:16 clip to post (PLAN 34f) */}
+                <div className="rounded-lg border border-border bg-surface p-4 space-y-3" data-testid="record-frame">
+                  <div className="flex items-start gap-2.5">
+                    <Smartphone size={16} className="mt-0.5 text-accent-text" />
+                    <div>
+                      <div className="text-[13px] font-medium text-text">Frame</div>
+                      <div className="text-[12px] text-muted">
+                        {videoOpts.shape === 'portrait'
+                          ? `A clip to post: ${recorder.maxDurationSec !== null ? `${FREE_PORTRAIT_STAGE.width} × ${FREE_PORTRAIT_STAGE.height}` : `${PORTRAIT_STAGE.width} × ${PORTRAIT_STAGE.height}`}, 9:16 for Reels and TikTok, with sound, as an MP4 where this browser can write one.`
+                          : 'The plate in the shape of this window.'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label="Frame">
+                    {(
+                      [
+                        { id: 'plate', label: 'As the plate is', desc: 'Whatever shape the window or the wall is.' },
+                        { id: 'portrait', label: 'Portrait 9:16', desc: 'The plate drawn tall while it records, not the landscape picture cut down.' },
+                      ] as const
+                    ).map((f) => {
+                      const selected = videoOpts.shape === f.id;
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={recorder.recording}
+                          onClick={() => recorder.setOptions(f.id === 'portrait' ? { shape: 'portrait', includeAudio: true } : { shape: 'plate' })}
+                          data-testid={`record-shape-${f.id}`}
+                          className={`flex flex-col text-left rounded-lg border p-3 transition-colors ${
+                            selected ? LIT : 'border-border text-muted hover:border-border-strong hover:text-text'
+                          } ${recorder.recording ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div className="flex items-center justify-between w-full font-medium text-[13px]">
+                            <span>{f.label}</span>
+                            {selected && <Check size={14} />}
+                          </div>
+                          <span className="mt-1 text-[11px] leading-snug opacity-80">{f.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {videoOpts.shape === 'portrait' && (
+                    <p className="text-[11px] leading-snug text-muted" data-testid="record-shape-note">
+                      While it records, the plate on this screen becomes a tall strip and goes back when you stop. With a projector attached the wall keeps its shape and the clip is the centred 9:16 slice of it.
+                    </p>
+                  )}
+                </div>
+
                 {/* Quality & Bitrate Presets */}
                 <div className="rounded-lg border border-border bg-surface p-4 space-y-3">
                   <div>
@@ -361,6 +415,18 @@ export function RecordPanel({
                         {formatBytes(recorder.lastTake.sizeBytes)}
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                    {canShareClip(recorder.lastTake) && (
+                      <button
+                        type="button"
+                        onClick={() => { void shareClip(recorder.lastTake!); }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border-strong px-3 py-1.5 text-[12px] font-medium text-text hover:bg-hover transition-colors"
+                        data-testid="record-share-last-take"
+                      >
+                        <Share2 size={13} />
+                        Share
+                      </button>
+                    )}
                     <a
                       href={recorder.lastTake.url}
                       download={recorder.lastTake.filename}
@@ -370,6 +436,7 @@ export function RecordPanel({
                       <Download size={13} />
                       Download again
                     </a>
+                    </div>
                   </div>
                 </div>
               )}

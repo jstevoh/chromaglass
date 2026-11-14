@@ -33,7 +33,7 @@ comments, which moved with it.
 | `useLucky` | Lucky, and its one ask in Perform |
 | `useSongChangeFades` | a new song, a new look |
 | `useCastFeed` | the cast window, mirror and network display kept in step; the mark |
-| `useRecording` | the one Record button |
+| `useRecording` | the one Record button; in a portrait clip it also lays the wall's canvas out 9:16 for the clip (`wallRef`, `stageRef`, `phone`) and returns `phoneRecording` for the phone's More sheet |
 | `useGlides` | a setting walked to a value over seconds |
 | `useRowFades` | a mixer row's take button |
 | `useRemote` | the phone remote's link, both ways; and the TVs at home, `tv` (a `TvAtHome`: watching, asking to pair, paired, and Allow, No, Forget; PLAN 12-tv, 12-tv-2, `lib/tvFeed.ts`) |

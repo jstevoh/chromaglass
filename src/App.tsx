@@ -1616,9 +1616,9 @@ export default function App() {
 
   const {
     recorder, showRecordPanel, setShowRecordPanel, recordChoice, setRecordChoice, toggleRecording,
-    recordingAny, recordSeconds,
+    recordingAny, recordSeconds, phoneRecording,
   } = useRecording({
-    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow,
+    audioStream, perfLive, stopPerformance, startPerformance, musicIntel, perfNow, wallRef, stageRef, phone,
   });
 
   // ── The phone's own hands: a pinch on the closeup, and Tilt ──
@@ -3200,7 +3200,7 @@ export default function App() {
             onSettings={() => { setSettingsSection(null); setShowSettings(true); setShowHelp(false); }}
             onSongs={() => { setShowSongs(true); setShowTrackPanel(false); }}
             onGuide={() => { setShowHelp(true); setShowSettings(false); }}
-            recording={{ supported: true, on: recordingAny, seconds: recordSeconds, onToggle: toggleRecording, choice: recordChoice, onChoice: setRecordChoice }}
+            recording={phoneRecording}
             ambientMode={ambientMode}
             onAmbientMode={setAmbientMode}
             onHide={hideOverlays}
