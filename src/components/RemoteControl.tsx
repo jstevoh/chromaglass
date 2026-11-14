@@ -25,6 +25,7 @@ import { isPhoneApp, relayFromUrl } from '../lib/appLink';
 import { AppModeBar, LaptopLinkForm } from './LaptopLink';
 import { DrawScreen, DRAW_AMOUNT_MAX, DRAW_AMOUNT_MIN, type PadTool } from './DrawScreen';
 import { RemoteSongs } from './RemoteSongs';
+import { closeupIn, closeupToggle } from '../lib/macroLanding';
 
 /**
  * The phone and the tablet. A control surface for a show running on the
@@ -918,8 +919,8 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
             <button
               type="button"
               role="switch"
-              aria-checked={!!settings?.macroMode}
-              onClick={() => patch({ macroMode: !settings?.macroMode })}
+              aria-checked={closeupIn(settings ?? {})}
+              onClick={() => patch(closeupToggle(settings ?? {}))}
               disabled={!connected}
               data-testid="remote-macro-toggle"
               className="flex w-full items-center justify-between disabled:opacity-30"
@@ -927,9 +928,9 @@ function RemoteControl({ inApp }: { inApp: boolean }) {
               <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/70">
                 <Microscope size={15} /> Macro Closeup
               </span>
-              <SwitchPill on={!!settings?.macroMode} />
+              <SwitchPill on={closeupIn(settings ?? {})} />
             </button>
-            {settings?.macroMode && (
+            {closeupIn(settings ?? {}) && (
               <div className="mt-4">
                 <Slider label="Macro Zoom" field="macroZoom" step={0.5} format={(v) => `${v.toFixed(1)}x`} value={value('macroZoom') as number | undefined} {...sliderProps} connected={connected} />
                 <Slider label="Chase Speed" field="macroChase" step={0.05} format={(v) => `${Math.round(v * 100)}%`} value={value('macroChase') as number | undefined} {...sliderProps} connected={connected} />
