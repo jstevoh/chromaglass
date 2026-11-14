@@ -234,7 +234,7 @@ through cords and preset patches, and the plate shader is untouched.
   | 13 | Film and room: a film's source (file, camera, window, cartoon), pour an image or a film, the room camera, the mark (logo card) | **shipped** 2026-11-11: `film`, `pour_file`, `room_camera`, `mark`, `show_state`'s `media` | Full | 44k-13 |
   | 14 | The outputs: OSC out on and off and its target, OSC in's mode (the Mac menu), MIDI on and off and its ports, Syphon once it ships (its own thread) | **shipped** 2026-11-11: `outputs` (osc_out, osc_in, midi, syphon, status), `show_state`'s `outputs` | Full | 44k-14 |
   | 15 | The projector: the cast window, projector mode, the test card, the wall's geometry and mapping | none | Full | 44k-15 |
-  | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | **shipped** 2026-11-12 but the editing: `hand`, `desk_view`, `show_state`'s `desk`; the editing is 44k-16a | Play (palette, tool), Full (the rest) | 44k-16 |
+  | 16 | The rest of the desk: palette lock, Ambient TV mode, the tool in hand and its amount, the layer in hand, set lists' and sequences' own editing and files | **shipped** 2026-11-12: `hand`, `desk_view`, `show_state`'s `desk`; the editing (44k-16a) `set_list_edit`, `sequence_edit` | Play (palette, tool), Full (the rest) | 44k-16 |
   | 18 | The Mac app's updates: Install Updates Automatically, check, install | **shipped** 2026-11-11: `app_updates` (status any mode; auto, check, install Full; install refused mid-show) | Full | 44k-18 |
   | 17 | The desk's layout: which tab is up, the tabs' own edits (rename, move, add, delete, reset), a panel docked, floated, folded or popped out, the pins, rides and recipe, the MIDI activity overlay | **shipped** 2026-11-12 but a panel's own window (44k-17a): `desk_tab`, `desk_tabs`, `desk_panel`, `desk_pins`, `desk_view`, `show_state`'s `desk` | Play (the tab up), Full (edits) | 44k-17 |
 
@@ -446,12 +446,20 @@ through cords and preset patches, and the plate shader is untouched.
   Ambient TV, Full, read back in `show_state`'s `desk` (`app/deskNow.ts`, `app/useHand.ts`;
   `npm run assistant`, `desk-hand`, `desk-hand-range`, `desk-pin`). Story in
   `docs/plan-shipped.md` §44.
-- **44k-16a. Set lists' and sequences' own editing, from the assistant.** *(M, found
-  building 44k-16.)* Adding, taking out and reordering a set list's items, saving and
-  opening set list files, and a sequence's stages and its binding to a song are the
-  Cues and Sequences panels' alone; `set` arms and fires an item and `sequencer`
-  chooses and runs one, but nothing builds one. Build when the owner asks for it by
-  name: in a show it is wanted least.
+- ~~**44k-16a. Set lists' and sequences' own editing, from the assistant.**~~ **Shipped**
+  2026-11-12: `set_list_edit`, `sequence_edit` (`npm run assistant`, `edit-*`, `phone-edit`). Story in
+  `docs/plan-shipped.md` §44.
+- **44k-16b. A set item's own fade and captured rides, from the assistant.** *(S, found
+  building 44k-16a.)* A set item can carry its own Go fade (`SetItem.fade`) and the rides
+  as they stood (the item menu's capture), and `set_list_edit` sets neither: the fade has
+  no control on the desk either (a file sets it), and a capture takes the strip as the
+  performer's hands left it, which the assistant cannot see. Add `fade` (the desk's fade
+  choices) and `capture` (the rides now) to `set_list_edit` when a show wants them.
+- **44k-16c. The show kit from the assistant.** *(S, found building 44k-16a.)* The set
+  menu's Export show and Import show (`lib/showKit.ts`) carry the MIDI map, the liquids
+  and the wall with the set, and an import reloads the page, which would close the
+  assistant's own link mid-call. Reach it through `set_list_edit` once the import can
+  apply without a reload.
 - ~~**44k-17. The desk's layout.**~~ **Shipped** 2026-11-12: `desk_tab` (Play), and
   `desk_tabs` (rename, move, add or copy, delete, reset every tab), `desk_panel` (open,
   dock, float, close, fold, fold all, the deck folded, a tab's plate mode), `desk_pins`

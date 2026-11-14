@@ -7,7 +7,7 @@ React hooks that own a device, a browser API or a clock (microphone, MIDI, camer
 - `useAudioAnalyzer.ts`: `useAudioAnalyzer`, `AudioData`, `Ear`: the show's ear.
 - `useMidi.ts` (37 KB, grep it): `useMidi`, `MidiHost` (`playSetItem`), `MidiDevice`, controller maps, clock and timecode. Its result's `open` (PLAN 44k-14) says Web MIDI answered, what the assistant's MIDI switch waits for.
 - `useMusicIntelligence.ts` (38 KB, grep it): song ID, song maps, performances. `positionNow()` reads the song's position at the call (`state.positionSec` is set every 500 ms). `listenNow()` asks the song ID to try at once, and `state.heardMap` keeps the map a first listen made after its song ends (Listen, PLAN 28h-8).
-- `useShowSequencer.ts`: transport over a `ShowSequence`'s stages.
+- `useShowSequencer.ts`: transport over a `ShowSequence`'s stages. `upsertSequence` and `removeSequence` change the owner's list through its own updater (several in one go all land: a set list file's sequences), and `putSequences` replaces it whole (the assistant's edits and their Undo, `app/editNow.ts`, PLAN 44k-16a).
 - `useProjector.ts`: `useProjector`, `pickProjector`, `ProjectorMode`.
 
 ## Contracts
