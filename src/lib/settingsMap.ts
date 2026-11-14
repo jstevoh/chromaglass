@@ -107,8 +107,14 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     here too, because nobody loads a reel and then goes to a different
     section to see it.
   */
-  { id: 'film', name: 'Film', category: 'feed',
-    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive impact' },
+  /*
+    Named Video since PLAN 14ag (the owner: "I want the video controls to have
+    their own panel, so I can manipulate them during the show"): the id stays
+    'film', which saved desk layouts and tabs hold, and search still finds it
+    by "film".
+  */
+  { id: 'film', name: 'Video', category: 'feed',
+    terms: 'film projector loop reel video movie footage clip window tab screen capture share archive internet archive prelinger dish camera mix key drive impact zoom pan frame framing fit aspect pour react' },
   /*
     The patch bay, with every master over it.
 

@@ -25,7 +25,7 @@ import { findPreset } from '../../presets';
 import { isPackLocked, openAccountSheet } from '../../lib/tierGates';
 import { PanelGuard } from '../PanelGuard';
 import { FeedbackPane } from '../settings/FeedbackPane';
-import { CartoonShelf, type CartoonShelfProps } from '../CartoonShelf';
+import { VideoShelf, type VideoShelfProps } from '../VideoShelf';
 import { SongScore, type SongScoreProps } from '../SongScore';
 import { goRemote, isPhoneApp } from '../../lib/appLink';
 import { OscOutRow } from '../ui/OscOutRow';
@@ -166,8 +166,8 @@ export interface PhoneStageProps {
   onPalette: (index: number | null) => void;
   onImageDye: () => void;
   onVideoDye: () => void;
-  /** The cartoons that ship with the app, poured or filmed (CartoonShelf, PLAN 14ab-2). */
-  cartoons?: CartoonShelfProps;
+  /** The video loaded, played or poured (VideoShelf, PLAN 14ag). */
+  video?: VideoShelfProps;
   // Playing
   playing: boolean;
   onPlay: () => void;
@@ -875,12 +875,14 @@ export function PhoneStage(p: PhoneStageProps) {
           >
             <Video size={18} /> A video as dye
           </button>
-          {/* Not closed on a press, unlike the two above: Pour and Film are
-              each a toggle someone may want both of, and Stop is here too. */}
-          {p.cartoons && (
+          {/* The video loaded (PLAN 14ag), by this sheet's "A video as dye" or
+              the Video section's Video file: not closed on a press, unlike the
+              two above, since Play and Pour are each a toggle someone may want
+              both of, and Pour's Stop is here too. */}
+          {p.video?.name && (
             <div className="mt-4">
-              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Cartoons</div>
-              <CartoonShelf {...p.cartoons} size="phone" />
+              <div className="mb-1.5 text-[12px] uppercase tracking-wider text-dim">Your video</div>
+              <VideoShelf {...p.video} size="phone" prefix="phone-" />
             </div>
           )}
           </PanelGuard>

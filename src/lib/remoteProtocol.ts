@@ -222,7 +222,7 @@ export interface RemoteState {
    * Film, pours, the room camera and the mark (PLAN 44k-13, app/mediaNow.ts):
    * what drives the plate as the film, what pours into the dish, the room
    * camera on or off and which camera, the mark up or not, the cameras by the
-   * pickers' names, and the cartoon shelf.
+   * pickers' names, and the video loaded (PLAN 14ag).
    */
   media?: MediaNow;
   /** OSC out and MIDI (PLAN 44k-14, app/outputsNow.ts): OSC out's switch and target, MIDI on or off, its ports by name, clock and the map. */
@@ -280,17 +280,18 @@ export interface MidiNow {
 export interface OutputsNow { oscOut: OscOutNow | null; midi: MidiNow | null }
 
 export interface MediaNow {
-  /** The film: its source, the file's or the cartoon's name, the cartoon's id, the camera's name, and whether that camera was unplugged mid-show. */
-  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; cartoon: string | null; camera: string | null; cameraLost: boolean };
+  /** The film: its source, the file's name, the camera's name, and whether that camera was unplugged mid-show. */
+  film: { source: 'none' | 'file' | 'camera' | 'window'; name: string | null; camera: string | null; cameraLost: boolean };
   /** The film pouring into the dish (a picture, once laid, is dye and not a pour). */
-  pour: { playing: boolean; name: string | null; cartoon: string | null };
+  pour: { playing: boolean; name: string | null };
+  /** The video loaded, by its name: the one the Video panel's row plays and pours, and film/pour_file's `loaded` take (PLAN 14ag). */
+  video: string | null;
   /** The room camera (the motion camera): on, the camera's name (null: the browser's own pick), and whether last session left it on. */
   room: { on: boolean; camera: string | null; resume: boolean };
   /** The mark (the logo card) is up. */
   mark: boolean;
   /** The cameras by the pickers' names. */
   cameras: string[];
-  cartoons: { id: string; title: string; seconds: number }[];
 }
 
 /** One step of a TV's WebRTC handshake (lib/tvFeed.ts), or the display turning it away (no Home or Pro here; three TVs already). */
@@ -485,7 +486,7 @@ export type RemoteMessage =
   /** Recording's options and a Take replayed, stopped or deleted, from the owner's assistant (PLAN 44k-11), relayed only from the guard, with `answer`. */
   | { type: 'assistant-record'; do: string; makes?: string; quality?: string; fps?: number; format?: string; sound?: boolean; take?: number; id?: string; answer?: number }
   /** Film, pours, the room camera and the mark from the owner's assistant (PLAN 44k-13), relayed only from the guard, with `answer`; a file as the show server's own address for it (`url`, server/assistantMedia.js). */
-  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; cartoon?: string; camera?: string; on?: boolean; answer?: number }
+  | { type: 'assistant-media'; do: string; url?: string; name?: string; kind?: 'image' | 'video'; camera?: string; on?: boolean; answer?: number }
   /** OSC out and MIDI from the owner's assistant (PLAN 44k-14), relayed only from the guard, with `answer`; OSC in and Syphon are the relay's own. */
   | { type: 'assistant-outputs'; do: string; on?: boolean; target?: string; input?: string; output?: string; answer?: number }
   /** The projector and the wall from the owner's assistant (PLAN 44k-15), relayed only from the guard, with `answer`; the geometry already judged there (server/assistantProjector.js). */

@@ -6,7 +6,7 @@ import { Button, CueRow, Knob, Segmented, Sheet, Slider, Swatch, Tag, Toggle, LI
 import { MixerPanel } from '../MixerPanel';
 import { LiveShowPanel } from '../LiveShowPanel';
 import { PanelGuard } from '../PanelGuard';
-import { CartoonShelf } from '../CartoonShelf';
+import { VideoShelf } from '../VideoShelf';
 import { ToolAmountChip, ToolOptions, toolUnder } from '../ToolAmount';
 import { TOOL_AMOUNT } from '../../lib/toolAmount';
 import { readSetting } from '../../lib/readout';
@@ -735,10 +735,12 @@ function DyesBody({ p }: { p: DeskProps }) {
           <Video size={13} className="mr-1.5 inline" /> Pour a video…
         </button>
       </div>
-      {p.cartoons && (
+      {/* The video loaded (PLAN 14ag), from Pour a video… here or Video file
+          in the Video panel: one row, Play and Pour, either or both. */}
+      {p.video?.name && (
         <div className="mt-1 flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wider text-dim">Cartoons</span>
-          <CartoonShelf {...p.cartoons} />
+          <span className="text-[11px] uppercase tracking-wider text-dim">Your video</span>
+          <VideoShelf {...p.video} prefix="dyes-" />
         </div>
       )}
     </div>
