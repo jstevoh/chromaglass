@@ -170,9 +170,9 @@ The owner's hunt (2026-11-09) takes this wave's written items to Antigravity und
   -5, -9 with #549; 14ab-4 with #579; 14ab-2 with #584; 14ab-12 closed by measurement, #590;
   14ab-13 with #591, finished in #596; 14ab-6 the beads' mask on the GPU). Left: 14ab-10, -11,
   -14.
-- **4.4** **H2c-7, H2c-6, H2c-8, H2c-5** (S each): the readback straight into its ring, no aux
-  target without the camera, air only where there are bubbles, first-order velocity.
-  H2c-5 and H2c-8's owed lines are in `npm run encode`, H2c-7 and H2c-6's in `npm run framereads` (2026-11-07): Antigravity-ready.
+- **4.4** **H2c-7, H2c-6**, ~~**H2c-8, H2c-5**~~ (S each): the readback straight into its ring, no aux
+  target without the camera, air only where there are bubbles (**H2c-8** shipped: `encode` 0 air passes / 0 air textures on a bare plate, `bubblephysics` 24/24, `pops` 9/9; story in `docs/plan-shipped.md`), first-order velocity (**H2c-5** shipped: `encode` open plate 500 → 498 dispatches, `samelook` passed, story in `docs/plan-shipped.md`).
+  H2c-7 and H2c-6's owed lines are in `npm run framereads` (2026-11-07): Antigravity-ready.
 - ~~**4.5** **14f-midi** (B, S): a MIDI ride without an App render.~~ Shipped (`npm run renders`: 121 App renders a second under a fader, now 10).
 - **4.6** **19d-lazy** (B+E, M, after 1.7): load the panels when first opened; drop `motion`.
 - **4.7** ~~**14c-4k, 14c-governor, H2c-10**~~ (shipped, `npm run rungs`; story in `docs/plan-shipped.md`), ~~**H2c-labels**~~ (S, shipped, `npm run timelabels`: 133 → 0 readings off their pass, `gpuFrameMs` move on a change 30.0 % → 0.0 %; story in `docs/plan-shipped.md`). Then **H2a**, **H1**, **H3a**.
@@ -457,7 +457,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 43 | Visuals for a musician's release (asked 2026-11-07) | [`43-release-visuals.md`](docs/plan/43-release-visuals.md) |  | 9 |
 | 44 | A person's AI assistant plays the show (asked 2026-11-07) | [`44-assistants.md`](docs/plan/44-assistants.md) |  | 13 |
 | 45 | The moiré pack: printed sheets on the stage, sold as an art pack (asked 2026-11-03) | [`45-moire-pack.md`](docs/plan/45-moire-pack.md) |  | 4 |
-| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46a-46e builds to Antigravity after its queue | 7 |
+| 46 | The quality and efficiency hunt: a faster opening, no dropped frames, the look kept (asked 2026-11-09) | [`46-quality-efficiency-hunt.md`](docs/plan/46-quality-efficiency-hunt.md) | 46-0 the guards **shipped** (`npm run samelook`, `openingtime --bar`); 46e's 120 Hz check **written** (`rungs -- --owed=120hz`); 46r, one args name one value a step, **shipped** (`npm run argnames`); 46b H2c-5, H2c-8 **shipped**; 46a-46e builds to Antigravity after its queue | 7 |
 | 47 | The closeup as a macro photographer films liquid (asked 2026-11-11) | [`47-macro-photography.md`](docs/plan/47-macro-photography.md) |  | 36 |
 | | QA list: what the owner found playing it | [`qa.md`](docs/plan/qa.md) | | 9 |
 

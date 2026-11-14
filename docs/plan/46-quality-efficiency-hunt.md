@@ -69,7 +69,7 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   what it draws. Held by `samelook` (byte-level after five steps), `plate`, `nolight`,
   `filmlook`, `bubblelook`; numbers from `openingtime`'s "slowest" line before and after.
 - **46b · The frame budget's written items** (Antigravity): H2c-7, H2c-labels, H2c-6, H2c-9
-  (briefs of 2026-11-07), then H2c-8 and H2c-5, then H2c-2 once H2c-3 and H2c-1 merge. Each
+  (briefs of 2026-11-07), ~~H2c-8 and H2c-5~~ (**shipped**: `encode` cleared `h2c5` and `h2c8`, `samelook` passed), then H2c-2 once H2c-3 and H2c-1 merge. Each
   takes its id out of its owed line and carries `same-look`; H2c-5 (first-order velocity) is
   a physics trade and ships only if `samelook` stays green.
 - **46c · Smooth on every look, on the owner's Mac** (Antigravity, by hand): `npm run stutter`
