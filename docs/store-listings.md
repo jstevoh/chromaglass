@@ -212,3 +212,66 @@ App access (Play Console → App content → App access), for the reviewer:
 ```text
 ChromaGlass TV plays a show that runs in the ChromaGlass app on a Mac on the same Wi-Fi network; the TV draws nothing itself. Without a Mac, choose "Watch a sample film" on the first screen: it plays two 20-second films of the same liquid light show the Mac sends (press Back to return). With a Mac: open ChromaGlass on the Mac and start the show; the TV finds it within a few seconds and shows four digits; press Allow on the Mac and the show plays on the TV. No account or sign-in is needed on the TV.
 ```
+
+## App Store: the Apple TV app
+
+PLAN 12-tv-apple-7. Its own App Store record, "ChromaGlass TV" (`app.chromaglass.tv`,
+`tvos/`). It plays the plate the Mac app sends over the home network, like the
+Android TV app, but it is signed in differently: the TV shows a short code that a
+Home or Pro account claims on a phone (12-tv-signin), and then the person types the
+Mac's TV address (finding the Mac by Bonjour is 12-tv-apple-1). Guideline 3.1.3(f),
+free stand-alone companion: the app opens only what was bought on the website, and
+it names no price, has no buy button and links to no purchase page. The code screen
+says "Needs a Home or Pro licence." and nothing more about plans.
+
+Screenshots: `docs/brand/store/tv/` (the same six 1920 × 1080 JPEGs as Play's).
+Support URL `https://chromaglass.art/pro.html`, privacy policy URL
+`https://chromaglass.art/privacy.html` (its "Apple TV" item). Category:
+Entertainment, Music second, as the phone app. Age rating 4+, every item None.
+App Privacy: the linked-TV record (email address, linked to the person, for app
+functionality, no tracking), the same as the website's account.
+
+### App Store TV: Subtitle (30)
+
+```text
+Liquid light show on your TV
+```
+
+### App Store TV: Promotional text (170)
+
+```text
+The 1960s liquid light show of oil, ink and water, simulated drop by drop on your Mac and played on the biggest screen in the house.
+```
+
+### App Store TV: Description (4000)
+
+```text
+ChromaGlass is a liquid light show: the 1960s overhead-projector show of oil, ink and water, simulated drop by drop and moving to the music. ChromaGlass TV puts that show on the biggest screen in the house.
+
+The show runs in the ChromaGlass app on your Mac. ChromaGlass TV receives it over your home Wi-Fi and plays it full screen, so the TV draws nothing itself and every look, every pour and the music's pulse arrive as they happen.
+
+- Link the TV once with a short code, entered on your phone
+- Plays whatever the Mac plays: every look, the music's pulse, your pours
+- The picture comes straight from your Mac over your own network
+- Nothing to buy in the app
+
+The show can flash with the music. A flash guard, on by default in the Mac app, keeps it under three flashes a second.
+
+Needs the ChromaGlass app on a Mac on the same Wi-Fi, and a ChromaGlass account with a Home or Pro licence.
+```
+
+### App Store TV: Keywords (100)
+
+```text
+light show,liquid,psychedelic,visualizer,music,oil,projector,ambient,VJ,lava,1960s
+```
+
+### App Store TV: Review notes (4000)
+
+Not final: the reviewer has no Mac and no licence, so before submitting, the app
+needs a way to show the plate without them (12-tv-apple-9) and these notes a demo
+account.
+
+```text
+ChromaGlass TV is a free companion to the ChromaGlass app for Mac. It plays, over the home network, the liquid light show the Mac app renders; the TV draws nothing itself. Under guideline 3.1.3(f) it opens only what the person bought on our website: the app shows no price, has no buy button and links to no purchase. The TV links to an account by a short code entered on a phone (chromaglass.art/?tvlink), and then plays the show from the Mac whose address it is given. The app never uses the camera or the microphone; the purpose strings are present only because the WebRTC library it uses links those APIs.
+```
