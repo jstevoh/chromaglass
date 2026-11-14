@@ -296,52 +296,40 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
       rim columns of its second take, and 27f-9f's Mac minute below were all a passive dye
       in convecting water, not wax. The lab's numbers (which lay the oil themselves) stand.
       Film the look again from an opened page before tuning anything on those verdicts.
-    - **27f-9q, open. The laid wax is heads on stalks, not round bodies: the tension is
-      capped a step, and breaks the wax up when the cap is lifted.** Measured 2026-11-12
-      with the wax really there (27f-9m). The Mac's app (256², 30 steps a second, 150 s): an
-      area-weighted roundness (4πA/P², a disc is 1) of 0.3 to 0.6, the cells over half oil
-      8.45% of the plate falling to 4.48% with the oil's sum kept. The lab on the app's own
-      step parameters reproduces it (`scratch/roundlab.mjs`, 90 s, mean roundness of the
-      samples from 5 s on): 0.48 as it is; the lasting current's cap lowered, the same to
-      the digit; 192² 0.60; Oil Weight halved 0.56 with more and smaller bodies; `OIL_TENSION`
-      ×4 0.45 and ×16 0.46, so more tension buys nothing. Why: `capillaryAt` holds the force
-      to `OIL_CELLS` (half a cell a step), and at the lamp's Oil Tension 1 the edge is
-      already on that cap. With the cap lifted (`OIL_CELLS` 50): 0.55 at today's tension with
-      the fringe down from 3.3% of the plate to 1.4%, and at ×2, ×4, ×16 and ×100 the wax is
-      gone (no body left from 35 s, 30 s, 15 s and 5 s, and under half a percent of the
-      plate over half oil at 90 s): the force is explicit, and
-      past the capillary step limit (Δt ≲ √(ρΔx³/2πσ), Brackbill 1992) it rings and tears
-      the edge. A cap of 2 cells at ×4 held and read 0.61. So the lamp's Bond number cannot
-      be brought down by turning tension up (27f-9i), which is the real reason a body rising
-      here fingers into a head and a stalk where a lamp's stays a ball. Two pieces of real
-      physics to build, in this order. **(a) A tension the step cannot break:** the
-      capillary force taken semi-implicitly (the interface's own motion over the step
-      counted in the curvature it is given, Hysing 2006), or substepped when it asks more
-      than a step can carry, as the slump and the ferrofluid are, so `OIL_CELLS` can go and
-      σ can be a lamp's. **(b) The second curvature:** the solver's κ is the edge's curve in
-      the plate alone, and between two glasses that is right, but a lamp is a bottle and its
-      wax a body of revolution: a stalk of width w has a curvature 2/w round itself that a
-      strip in a plane does not, which is what drains a real stalk into its head and pinches
-      it off (Rayleigh–Plateau; a straight strip in the plane has no such instability, so
-      the stalks here last). Wanted for a standing bottle: κ₂ from the body's local width
-      added to the Laplace pressure. Each with a check that holds a lamp's roundness over
-      two minutes of the app's own step, which `lavawax` (128², the lab's step) does not.
-      *First try of (b), measured 2026-11-14 on the Mac's Metal (256², the app's step: dt
-      0.00133, 30 steps a second, 120 s; area-weighted roundness 4πA/P² of the bodies off
-      the wall, mean of the samples from 5 s):* κ₂ taken as 2 over the body's chord along
-      the edge's normal (a ball reads 1/R, a stalk 2/w), weighted by Plate Upright, in
-      `capillaryAt` so the rim's φ reads it too. Off 0.68, on 0.79, and `lavacycle` 7/7 with it
-      on (the wax still goes round: 0.61, 0.21, 0.61, and again in the second minute). But
-      it over-pinches: by 120 s the wax is about twenty bodies of 100 to 200 cells and the
-      cells over half oil fall from 4.7% to 2.1% of the plate (haze), where a lamp keeps a
-      few fat ones. Beside it, the cap at 2 cells with σ ×4 and no κ₂: four fat round bodies
-      (0.94), but a fifth of the oil gone in 120 s; both together: the oil drains away
-      entirely (4,373 to 283). So the next step is (a) and the oil loss under a stronger
-      force, before κ₂ ships: where that oil goes (the rim, or below zero), and the wax's
-      own viscosity (a real stalk is slow to pinch because the wax is thick, Tomotika's
-      rate σ/μR with the viscosity ratio; here both liquids have the water's mobility). The
-      κ₂ diff and the lab are kept: `/mnt/project-files/handoff/roundcurve-27f9q-b.patch`
-      (the owner's shared files), scratch lab `roundlab-27f9q.mjs` beside it.
+    - **27f-9q. Lava Lamp's wax holds round, and the lamp keeps all of it (shipped
+      2026-11-14; story in docs/plan-shipped.md §27f-9q).** The wax hung in heads on stalks
+      (roundness 0.3 to 0.6). In a Hele-Shaw gap a body's shape is its Bond number and the gap
+      drops out of it, but 38r scaled the oil's tension by h² and not the standing plate's
+      weight, so the wax was nine times too heavy for its skin. A sealed bottle gives the oil
+      four of those nine back (`SEALED_TENSION`, the explicit force's cap at one cell,
+      `SEALED_CELLS`), and the two ways the oil had out under the stronger force are shut:
+      no oil over a sealed bottle's lip (`lipHolds`), and the Cahn–Hilliard update's guard
+      no longer cuts wax packed against the wall. `npm run lavaround`; `lavacycle` 7/7.
+    - **27f-9s, open (the shortcut 27f-9q names). A tension the step cannot break, so the
+      lamp can have all nine.** 27f-9q gives the sealed bottle's oil four times its tension,
+      not the nine its Bond number asks: at ×9 (cap one cell) the bodies read 0.94 round, but
+      the cells over half oil fall from 5.1% of the plate to 3.0% in two minutes and 2.1% in
+      three, the edge shed as a haze, because the capillary force is explicit and past the
+      step's limit (Δt ≲ √(ρΔx³/2πσ), Brackbill 1992) it rings. Take it semi-implicitly (the
+      interface's motion over the step counted in its curvature, Hysing 2006) or substep it
+      as the slump and the ferrofluid are, so `SEALED_TENSION` can be 9 and the caps
+      (`OIL_CELLS`, `SEALED_CELLS`) can go. With a check that the cells over half oil hold.
+    - **27f-9t, open. The second curvature of a body in a bottle.** The solver's κ is the
+      edge's curve in the plate, right between two glasses, but a lamp's wax is a body of
+      revolution: a stalk of width w has 2/w round itself, which drains a real stalk into its
+      head and pinches it off (Rayleigh–Plateau). A first try (κ₂ as 2 over the body's chord
+      along the edge's normal, weighted by Plate Upright, in `capillaryAt`) read 0.68 → 0.79
+      round with `lavacycle` 7/7 but over-pinched into twenty small bodies and a haze, and
+      with the cap lifted drained the oil (now known to be the lip and the guard 27f-9q
+      shut). Try it again on 27f-9q, and with the wax's own viscosity (Tomotika's pinch rate
+      σ/μR with the viscosity ratio; both liquids have the water's mobility here). The diff
+      and the lab: `/mnt/project-files/handoff/roundcurve-27f9q-b.patch` (the owner's shared
+      files).
+    - **27f-9u, open. Wax gathers at the lamp's wall over minutes.** In every lab of 27f-9q,
+      before and after it, the oil in the band within 3% of the rim grows over two minutes
+      while the bodies' edges show a fine serration; a real lamp's wax wets the glass little
+      and leaves it. Measure the rim band's share over five minutes and look at the wall's
+      contact angle (the oil's potential at the rim, `rimSide`) before tuning.
     - **27f-9r, open. A crowd look's oil colour is not kept for the solver.** 27f-9m keeps
       the oil of a look laid before its solver exists, but `addOilDensity`'s colour share
       (`layOilShare`, PLAN 47z-1) is still laid only with a solver there, so Clock Glass and

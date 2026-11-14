@@ -1647,6 +1647,25 @@
       ]
     },
     {
+      "name": "Lava Lamp's wax holds round, and the lamp keeps all of it",
+      "shard": "show",
+      "run": "npm run lavaround",
+      "timeout": 6,
+      "why": [
+        "The owner: the lamp's wax would not hold round blobs (PLAN 27f-9q). In a Hele-Shaw gap",
+        "a blob's shape is its Bond number, weight against tension, and the gap drops out of it;",
+        "38r scaled the tension by h^2 and not the standing plate's weight, so the wax was nine",
+        "times too heavy for its skin. Four times the tension in a sealed bottle rounded it and",
+        "lost a fifth of the oil in two minutes, over the open rim's lip and to the runaway",
+        "guard's clamp at 1.25; both are closed. Two minutes of the look at 256^2 on the app's",
+        "lay: the disc's oil within 0.1% at every reading, the bodies' roundness 0.72 or more and",
+        "0.12 above the tension it had, and two controls that put each way out back and must see",
+        "it (the lip: 2% gone; the guard: 0.3%). At 192^2 neither leak shows, so 256^2 it is,",
+        "four labs of two minutes: the Mac's Metal only. 62 s on an M4 (2026-11-14: the disc kept",
+        "4,373 to the cell, the lip lost 4.76%, the guard 0.80%, round 0.821 against 0.604)."
+      ]
+    },
+    {
       "name": "Lava Lamp's wax holds together and is heavy while cold",
       "shard": "lab8",
       "run": "npm run lavawax",
