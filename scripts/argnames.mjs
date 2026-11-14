@@ -86,7 +86,7 @@ try {
      */
     const watch = (s) => {
       let seen = new Map();
-      const names = new Set(), clashes = new Map();
+      const names = new Set(), clashes = new Map(), w = { submits: 0 };
       const write = s.argWrite.bind(s), submit = s.submit.bind(s), submitRead = s.submitRead.bind(s);
       s.argWrite = (name) => {
         const v = Array.from(s.argScratch);
@@ -96,9 +96,10 @@ try {
         names.add(name);
         return write(name);
       };
-      s.submit = (enc) => { seen = new Map(); return submit(enc); };
-      s.submitRead = (enc) => { seen = new Map(); return submitRead(enc); };
-      return { names, clashes };
+      // Counted: a submit from inside a step's encoding (a field made on first use) would end a window early and hide a pair either side of it.
+      s.submit = (enc) => { seen = new Map(); w.submits++; return submit(enc); };
+      s.submitRead = (enc) => { seen = new Map(); w.submits++; return submitRead(enc); };
+      return Object.assign(w, { names, clashes });
     };
 
     // names: the control first, a pair planted under one name before a step's submit.
@@ -119,7 +120,7 @@ try {
       await lab.step(3, { ...upright, ...over });
       const w = watch(s);
       await lab.step(3, { ...upright, ...over });
-      rows.push({ name, thin: s.thinGapLive, names: w.names.size, current: [...w.names].filter((n) => /current|swirl/.test(n)), clashes: [...w.clashes].map(([n, [a, b]]) => `'${n}' [${a.slice(0, 4).join(', ')}] and [${b.slice(0, 4).join(', ')}]`) });
+      rows.push({ name, thin: s.thinGapLive, names: w.names.size, submits: w.submits, current: [...w.names].filter((n) => /current|swirl/.test(n)), clashes: [...w.clashes].map(([n, [a, b]]) => `'${n}' [${a.slice(0, 4).join(', ')}] and [${b.slice(0, 4).join(', ')}]`) });
     }
 
     // drag and boil: the current after one step, read whole on its own grid.
@@ -160,10 +161,21 @@ try {
   check('the lab ran without a GPU error', !gpuErrors.length, gpuErrors.length ? gpuErrors.slice(0, 2).join(' | ') : 'none');
 
   check('names: the watch catches a pair planted under one name', r.planted.includes('argnames planted'), r.planted.length ? r.planted.join(', ') : 'nothing caught');
-  const asked = r.rows.every((x) => x.names >= 20 && x.current.length > 0)
-    && r.rows.every((x, i) => x.thin === (PLATES[i][1].thinGap === 1));
-  check('names: every plate ran as asked (thin or open) and wrote a current\'s args while watched', asked,
-    r.rows.map((x) => `${x.name}: ${x.names} names${x.thin ? ', thin' : ''}`).join('; '));
+  /*
+    The names each plate must be seen to write, or the watch watched a step
+    that did not run the calls that clashed: the current's own, the flow's
+    addCurrent (the open plate's or the thin gap's), and on a spun open dish
+    the swirl's projection. And three submits for three steps: one each, so
+    no window ended inside a step.
+  */
+  const wants = (i) => {
+    const o = PLATES[i][1];
+    return ['current step', o.thinGap ? 'current grid thin' : 'add current', ...(o.spinLiquid && !o.thinGap ? ['swirl grid'] : [])];
+  };
+  const missing = r.rows.map((x, i) => wants(i).filter((n) => !x.current.includes(n)));
+  const asked = r.rows.every((x, i) => x.names >= 20 && !missing[i].length && x.submits === 3 && x.thin === (PLATES[i][1].thinGap === 1));
+  check('names: every plate ran as asked (thin or open), one submit a step, and wrote the current\'s, the flow\'s and the swirl\'s args while watched', asked,
+    r.rows.map((x, i) => `${x.name}: ${x.names} names, ${x.submits} submits${x.thin ? ', thin' : ''}${missing[i].length ? `, missing ${missing[i].join(', ')}` : ''}`).join('; '));
   const clashed = r.rows.filter((x) => x.clashes.length);
   check(`names: no name is given two values in one submit (${PLATES.length} plates, three steps each)`, !clashed.length,
     clashed.length ? clashed.map((x) => `${x.name}: ${x.clashes.join('; ')}`).join(' | ') : 'none');
@@ -183,9 +195,9 @@ try {
     boil that is read clears by two orders and a boil that is not read
     cannot reach.
   */
-  check('boil: at Heat 0 a 70 K spot\'s current keeps to its cap on the open plate', r.capped > 0 && r.capped <= r.cap * 1.05,
+  check('boil: at Heat 0 a 70 K spot\'s current keeps to its cap on the open plate', r.open && r.capped > 0 && r.capped <= r.cap * 1.05,
     `fastest ${r.capped.toExponential(2)}, cap ${r.cap}`);
-  check('boil: at Heat 1 it runs past the cap (the boil\'s own rise, added after it), Depth Drag 0', r.boiled > r.cap * 3,
+  check('boil: at Heat 1 it runs past the cap (the boil\'s own rise, added after it), Depth Drag 0', r.open && r.boiled > r.cap * 3,
     `fastest ${r.boiled.toExponential(2)}, cap ${r.cap} (bar over 3×)`);
 } finally {
   await close();

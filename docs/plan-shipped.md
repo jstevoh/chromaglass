@@ -14150,11 +14150,18 @@ the same at Depth Drag 0 and 1.5, bit for bit. Before: 'current grid' given two 
 five of the eleven; the current at Depth Drag 1.5 different in 1121 values, by up to 0.33
 against its own 0.0094 (64², upright, a 30 K spot, the lab's Buoyancy 0.45); a 70 K spot's
 current at Heat 1 at its cap (1.9e-3), the boil's rise unread. After: no clash, none
-different, and the boil's rise read (1.07 against a cap of 0.002 at the lab's numbers). At the
-app's own numbers (Buoyancy 0.45 × 0.3, its cap of three quarters of a cell a step) the two
-rises differ by about a tenth at 30 steps (1.43 against 1.27 for a 60 K spot) and by 2.4× on
-the first step, so the open plate with Depth Drag up, upright and warm, starts its current
-more gently than it did and settles close to where it did.
+different, and the boil's rise read (1.07 against a cap of 0.002 at the lab's numbers).
+
+What it changes in the app, measured on a 128² open plate at the app's own numbers
+(Buoyancy 0.45 × 0.3, its cap of three quarters of a cell a step, upright): at Heat 0 almost
+nothing, since the unheated plate's warmth is hundredths of a degree and there the two rises
+agree (the current's fastest after 30 steps at Depth Drag 1.5 was 4.51e-2 against 4.28e-2 at
+Depth Drag 0, and is 4.28e-2 now). At Heat 1 with Depth Drag 0, a plate 60 K over the room
+under a held hand: the current's mean after 30 steps 0.268 → 0.463 and after 120 steps
+0.139 → 0.178, its fastest on the first step 0.135 → 0.329, and by 240 steps the two are
+within a tenth. So a boiling open plate's plume starts about 1.7 times as fast as it did.
+Pictures in the project's files (`open-plate-46r/before-after.png`). No shipped look runs the
+open plate. Seen in both pictures and left as 36e-5: bands in the dye at the floor.
 
 **15e-1.** What a bottle's liquid does to the plate (`liquidForces`, and the soap's thinning
 inside `deltaDye`) ran in the fold of a frame's hand-laid deltas, so only on a step something
@@ -14171,7 +14178,9 @@ after a Clear the slide and the thinning were 0 where one fold a step gave 3.4e-
 and two folds gave 1.86× and 1.92×; after, all four ways give the same to three places.
 `npm run liquidsgpu`'s five "a still plate" lines owed to 15e-1 pass and gate (soap leaves
 89.3% at its spot at half a second and 71.7% at two, what the fold-every-step plate leaves;
-silicone 61.7% in its middle), and three more lose 15e-1 from what they are owed to.
+silicone 61.7% in its middle), three more lose 15e-1 from what they are owed to, and a new
+line asks milk's held edge on a still plate to be the fold-every-step plate's (effect 0.00106
+both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).

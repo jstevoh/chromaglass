@@ -364,8 +364,8 @@ export class FluidPasses extends FluidFields {
    * every step sees the same arithmetic. That includes where a thin gap
    * meets them: before it keeps the flow it had ('thin gap keep'), so there
    * the push is momentum the gap's drag has within the step and not a
-   * drive, and the heavy drop's slide reads under a thousandth of the flow
-   * beside it. Making it a drive in the thin solve's own units is PLAN
+   * drive, and what is left under the heavy drop is two thousandths of the
+   * flow beside it. Making it a drive in the thin solve's own units is PLAN
    * 15e-10, and the thinning being an erasure and not a push is 15e-5.
    *
    * Nothing runs on a plate no bottle was poured on (`liquidsLive`).

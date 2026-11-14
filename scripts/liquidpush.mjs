@@ -43,16 +43,18 @@
  *            both well clear of the plate without them. On a thin gap the
  *            slide is not asked to reach: the push meets the plate before
  *            the gap keeps the flow it had, so it is momentum the gap's
- *            drag has within the step and not a drive (PLAN 15e-10), and it
- *            reads under a thousandth of the flow beside it, less than the
- *            half float the flow is kept in resolves. The soap's thinning
- *            carries the thin gap's lines.
+ *            drag has within the step and not a drive (PLAN 15e-10), and
+ *            what is left reads about two thousandths of the flow beside
+ *            it, against the rock's way. It is still compared: the runs
+ *            are the same arithmetic, and a push applied twice doubles it.
  *   alone    with no fold the slide and the thinning are the one-fold
- *            plate's, within a part in fifty (the slide, where it is under
- *            the reading's floor, within that floor).
+ *            plate's, within a part in fifty.
  *   two      with two folds they are the one-fold plate's too, not twice it.
  *   clear    after a Clear and a new pour, the same: `clear` must leave the
- *            solver ready to act on the next liquid.
+ *            solver ready to act on the next liquid. This is the solver's
+ *            half of the app's fault. The app's own half, the CPU's copy a
+ *            Clear empties, is not in the lab; with the forces in the step
+ *            nothing depends on that copy (PLAN 15e-11 retires it).
  */
 import { openLab } from './lab.mjs';
 
@@ -137,10 +139,11 @@ try {
       percent, when six steps of this soap thin the dye by several.
     */
     const floor = Math.max(1e-7, Math.abs(one.still) * 2 ** -10 * 10);
-    check(`reach, ${row.name}: with one fold a step the soap thins its dye${thin ? '' : " and the heavy drop slides the rock's way"}`,
-      asked && (thin || one.slide > floor) && one.thinned > 0.005,
+    check(`reach, ${row.name}: with one fold a step the soap thins its dye and the heavy drop ${thin ? 'moves the liquid under it' : "slides the rock's way"}`,
+      asked && (thin ? one.slide !== 0 : one.slide > floor) && one.thinned > 0.005,
       `${say(one)} over ${one.cells} cells (floors ${e(floor)} and 0.50%; without a drop the flow there is ${e(one.still)})${asked ? '' : ', not the plate asked for'}`);
-    const same = (x) => Math.abs(x.slide - one.slide) <= Math.max(Math.abs(one.slide) * 0.02, floor) && Math.abs(x.thinned - one.thinned) <= Math.abs(one.thinned) * 0.02;
+    // The same plate stepped the same way is the same arithmetic, so a fiftieth of the slide itself, however small it is.
+    const same = (x) => Math.abs(x.slide - one.slide) <= Math.abs(one.slide) * 0.02 && Math.abs(x.thinned - one.thinned) <= Math.abs(one.thinned) * 0.02;
     const ratio = (x) => `${(x.slide / one.slide).toFixed(3)}× the slide, ${(x.thinned / one.thinned).toFixed(3)}× the thinning`;
     check(`alone, ${row.name}: with no fold at all it does the same (within a fiftieth)`, same(w.alone), `${say(w.alone)}: ${ratio(w.alone)}`);
     check(`two, ${row.name}: with two folds a step it does the same, not twice`, same(w.two), `${say(w.two)}: ${ratio(w.two)}`);

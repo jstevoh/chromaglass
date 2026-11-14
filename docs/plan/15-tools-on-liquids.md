@@ -279,7 +279,7 @@ and 507 to 423), so both clear by erasing (15e-5), and the table's soap and sili
 compare two erasures. 21 lines gated and 16 were owed to the items below; an owed line
 prints, and fails the run the day it passes (one that reads no number fails too), so the
 fix that makes one pass also makes it gate. Since 15e-1 shipped the still plate reads what
-the fold-every-step plate reads (the table's third column is its second), 26 lines gate
+the fold-every-step plate reads (the table's third column is its second), 27 lines gate
 and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
 
 - ~~**15e-1. The liquids' forces act only on a frame something else is laid in.**~~
@@ -359,7 +359,7 @@ and 11 are owed. Briefs 11 (15e-2) and 12 (15e-5) in the shared briefs.
   magnet and the maze go in after the keep and are read as a speed to drive the liquid to.
   Measured (`npm run liquidpush`, 64², six steps, a heavy drop on a plate rocked 0.5): the
   slide under the drop is 3.4e-2 on the open plate and −9.4e-4 on the thin gap, beside a
-  flow of 0.53, under what a half float resolves there. So on the plate every look uses, a
+  flow of 0.53: two thousandths of it, and against the rock's way. So on the plate every look uses, a
   heavy liquid does not slide down a rocked plate and an oil does not keep to itself by
   these forces; what a bottle does there is its species' viscosity and weight in the thin
   solve (18d) and the soap's erasure (15e-5). Move the pass after the keep and give its

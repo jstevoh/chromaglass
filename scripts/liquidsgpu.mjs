@@ -381,6 +381,20 @@ for (const [mode, m] of [['every step', r.every], ['a still plate', r.still]]) {
     `${f3(keptC)} of what left the middle is still on the plate (the stand-in ${f3(std.siliconeMoved)}; asked over half)`, { value: keptC });
 }
 
+/*
+  15e-1's own claim, asked of milk as a size: its held edge on a still plate
+  is the fold-every-step plate's. "Tighter than bare dye" alone is a whether,
+  and milk's effect is small (15e-4), so the line that took the place of its
+  owed one says how much: the two plates' held spread within a fiftieth of
+  the effect, where a still plate whose forces never ran reads none of it.
+*/
+{
+  const eff = (m) => 1 - m.milk.spread / m.bare.spread;
+  const e = eff(r.every), s = eff(r.still);
+  check('milk, a still plate: holds its pool as much as with a fold every step', e > 0 && Math.abs(s - e) <= e * 0.02,
+    `effect ${s.toFixed(5)} still, ${e.toFixed(5)} with a fold every step (within a fiftieth)`);
+}
+
 const og = r.old.glycerine / r.old.plain;
 check('glycerine on the old plate, every step: crawls where the plate flows', og < 0.7,
   `${og.toFixed(4)} of the colour's speed (${r.old.glycerine.toFixed(5)} against ${r.old.plain.toFixed(5)})`, { value: og });
