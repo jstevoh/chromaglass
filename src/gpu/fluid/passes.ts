@@ -12,7 +12,7 @@ import { stepDisplacement } from '../../lib/detailFlow';
 import { WebGPUSlosh } from '../slosh';
 import { OIL_NU, OPEN_RIM, dyeDensityContrast } from '../../lib/turntable';
 import { WebGPUParticles } from '../particles';
-import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL } from './constants';
+import { PRESSURE_SWEEPS, MG_CYCLES, MG_SWEEPS, MG_COARSE_SWEEPS, DIV_GROUPS, THIN_GAP_THICKNESS, FERRO_NU, oilLightnessOf, CARRY_COURANT, CARRY_SUBSTEPS, CARRY_PAIRS, DRIFT_MOST, DRIFT_LEAST, BZ_GRID, LIES_GRID, CURRENT_ITERS, SPIN_OIL_LIGHT, LIFT_SWEEPS, SEAL_KERNEL_NAMES, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, NU_REF, DYE_LAYER, SLUMP_FACE, SLUMP_SUBSTEPS, FROUDE_FRONT, DYE_CAP, thinGapViscosity, R32, RG32, VEL, AIR_DISP_LEAST } from './constants';
 import { FluidFields } from './fields';
 import { WARM_GROUPS } from '../wgsl/thinWarm';
 import { PLATE_BOIL_WGSL } from '../wgsl/lampBoil';
@@ -107,6 +107,31 @@ export class FluidPasses extends FluidFields {
     this.airQuietSeconds = 0;
     this.groups.clear();
     this.groupRoot = { kids: new Map() };
+  }
+
+  /**
+   * Encode this step's air splat (when live or clearing), update `airPush`/`airCover`,
+   * and release the air storage after a quiet minute with neither bubbles nor boil (H2c-8).
+   */
+  protected stepAir(enc: GPUCommandEncoder, p: GpuStepParams, thin: boolean, disp: number): void {
+    if (this.air?.needsSplat) {
+      this.air.splat(enc, (label) => this.profiler.renderPass(label));
+    }
+    const hadAir = thin && this.airPush > 0 && this.airCover > 0;
+    const airAny = !!this.air?.any;
+    this.airPush = (airAny || hadAir) && disp > AIR_DISP_LEAST ? (p.bubbleClear ?? 1) : 0;
+    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
+    this.airCoverPrev = this.airCover;
+    this.airCover = this.air ? this.air.coverage : 0;
+    if (this.air) {
+      if (airAny || hadAir || this.air.needsSplat) {
+        this.airQuietSeconds = 0;
+      } else {
+        this.airQuietSeconds += Math.max(0, p.magnetSeconds ?? 1 / 60);
+        if (this.airQuietSeconds >= 60) this.dropAir();
+      }
+    }
+    this.lastDt = p.dt;
   }
 
   /** Whether both airGive kernels are built (asking builds them): a carry takes the air only then. */

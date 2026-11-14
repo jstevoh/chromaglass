@@ -507,47 +507,9 @@ export class WebGPUFluid extends FluidCover {
     }
     const enc = this.device.createCommandEncoder({ label: 'step' });
 
-    /*
-      The air field, before any compute pass opens (H6 · A).
-
-      It is a render pass and the stage that reads it is a compute pass, so
-      it has to be encoded first — commands run in the order they are
-      recorded, and a compute pass cannot be interrupted to draw into a
-      texture it is sampling. Allocated only once this layer has a bubble or
-      boil, splatted only while live or clearing both ping-pong targets after
-      the last pop, and freed after a quiet minute (H2c-8).
-    */
     this.stepAhead(enc, p);
-    if (this.air?.needsSplat) {
-      this.air.splat(enc, (label) => this.profiler.renderPass(label));
-    }
-    /*
-      And on the step after the last bubble goes: its hole is a sink in the
-      thin solve (the air leaving, hsDivergence), which is what lets the
-      liquid back in now that nothing paints it back (PLAN 15g-8b).
-    */
-    const hadAir = thin && this.airPush > 0 && this.airCover > 0;
-    const airAny = !!this.air?.any;
-    /*
-      Not on a plate all but frozen (Advection near 0): the source is per
-      unit of the step's displacement, so a bubble arriving on a step that
-      moves nothing would ask the half-float velocity for more than it holds.
-      The liquid does not move off the air there; it does when the plate
-      moves again and the air does.
-    */
-    this.airPush = (airAny || hadAir) && disp > AIR_DISP_LEAST ? (p.bubbleClear ?? 1) : 0;
-    this.squeezeGain = Math.max(0, Math.min(1, p.platePressure ?? 0.4)) * 2.2;
-    this.airCoverPrev = this.airCover;
-    this.airCover = this.air ? this.air.coverage : 0;
-    if (this.air) {
-      if (airAny || hadAir || this.air.needsSplat) {
-        this.airQuietSeconds = 0;
-      } else {
-        this.airQuietSeconds += Math.max(0, p.magnetSeconds ?? 1 / 60);
-        if (this.airQuietSeconds >= 60) this.dropAir();
-      }
-    }
-    this.lastDt = p.dt;
+    // Air render pass before compute passes: lazy-allocated, cleared on pop, freed after 60s quiet (H2c-8).
+    this.stepAir(enc, p, thin, disp);
     // The slosh dish, before the step's pass opens: its own pass, whose flow the thin stage reads (PLAN 18a-13).
     this.stepSloshDish(enc, p);
     this.stepBeside(enc, p);
