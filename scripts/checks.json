@@ -836,6 +836,18 @@
       ]
     },
     {
+      "name": "The music stirs only through a cord",
+      "shard": "logic",
+      "run": "npm run musicstir",
+      "why": [
+        "The solver's step takes no sound (PLAN 38u-4, 38u-5): with every cord",
+        "at zero a loud band leaves a still plate still, value for value, a",
+        "patched cord moves it, and each look's cord from the mids onto",
+        "Turbulence keeps its stir within a quarter of what the multiplier and",
+        "eddies it replaces gave."
+      ]
+    },
+    {
       "name": "The melody walks across the plate",
       "shard": "logic",
       "run": "npm run melody",
