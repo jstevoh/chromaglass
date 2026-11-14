@@ -27,6 +27,6 @@
     "src/App.tsx": 209237,
     "src/components/LiquidVisualizer.tsx": 420633,
     "src/gpu/wgsl/plate.ts": 181391,
-    "src/sim/fluidSimulation.ts": 166145
+    "src/sim/fluidSimulation.ts": 176364
   }
 }

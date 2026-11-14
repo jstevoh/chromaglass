@@ -45,7 +45,7 @@ import { stream, type Rng } from '../lib/rng';
 import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
-import { macroAmountOf, GRID_SIZE, GRID_SCALE, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, GRID_AREA, SHARP_FLOOR } from './constants';
+import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { besideStep } from '../gpu/besidePlate';
@@ -64,9 +64,15 @@ export class FluidSimulation {
   densityR: Float32Array;
   densityG: Float32Array;
   densityB: Float32Array;
+  s: Float32Array;
+  sR: Float32Array;
+  sG: Float32Array;
+  sB: Float32Array;
 
   vx: Float32Array;
   vy: Float32Array;
+  vx0: Float32Array;
+  vy0: Float32Array;
 
   gap: Float32Array;
 
@@ -449,6 +455,9 @@ export class FluidSimulation {
   private shp: Float32Array;
   /** The thickness as the sharpening pass found it: every channel gates on this (kept for scripts/plate.mjs). */
   private shpA: Float32Array;
+  /** MacCormack intermediates (kept for scripts/musicstir.mjs CPU path). */
+  private mcA: Float32Array;
+  private mcB: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
   get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
@@ -552,9 +561,15 @@ export class FluidSimulation {
     this.densityR = new Float32Array(GRID_AREA);
     this.densityG = new Float32Array(GRID_AREA);
     this.densityB = new Float32Array(GRID_AREA);
+    this.s = new Float32Array(GRID_AREA);
+    this.sR = new Float32Array(GRID_AREA);
+    this.sG = new Float32Array(GRID_AREA);
+    this.sB = new Float32Array(GRID_AREA);
 
     this.vx = new Float32Array(GRID_AREA);
     this.vy = new Float32Array(GRID_AREA);
+    this.vx0 = new Float32Array(GRID_AREA);
+    this.vy0 = new Float32Array(GRID_AREA);
 
     this.gap = new Float32Array(GRID_AREA).fill(0.03);
 
@@ -568,6 +583,8 @@ export class FluidSimulation {
     this.rbVy = new Float32Array(GRID_AREA);
     this.shp = new Float32Array(GRID_AREA);
     this.shpA = new Float32Array(GRID_AREA);
+    this.mcA = new Float32Array(GRID_AREA);
+    this.mcB = new Float32Array(GRID_AREA);
   }
 
   // ── GPU solver lifecycle ───────────────────────────────────────────
@@ -1200,8 +1217,9 @@ export class FluidSimulation {
     this.gpu?.clear();
     if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
+    this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
     this.temp.fill(0);
-    this.vx.fill(0); this.vy.fill(0);
+    this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
     this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
@@ -2770,12 +2788,84 @@ export class FluidSimulation {
     // The closeup's cells ride this: as far as this step moves the dye.
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 
-    if (!this.gpu) return;
-    // Unreachable CPU-path reference kept for scripts/widedials.mjs text check: settings.glassSmear > 0
-    const applied = this.dirty || this.videoLaid;
-    if (applied) this.flushDeltas(p.dt);
-    this.stepSlosh(settings, p);
-    this.gpu.step(p, applied);
+    if (this.gpu) {
+      // Unreachable CPU-path reference kept for scripts/widedials.mjs text check: settings.glassSmear > 0
+      const applied = this.dirty || this.videoLaid;
+      if (applied) this.flushDeltas(p.dt);
+      this.stepSlosh(settings, p);
+      this.gpu.step(p, applied);
+      return;
+    }
+
+    // Minimal CPU velocity + curl + dye transport kept under stop rule for scripts/musicstir.mjs (Node headless check).
+    const dt = p.dt;
+    this.diffuse(1, this.vx0, this.vx, p.nu, dt);
+    this.diffuse(2, this.vy0, this.vy, p.nu, dt);
+    this.project(this.vx0, this.vy0, this.vx, this.vy);
+    this.advect(1, this.vx, this.vx0, this.vx0, this.vy0, dt * p.advection);
+    this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * p.advection);
+    this.project(this.vx, this.vy, this.vx0, this.vy0);
+    this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
+    this.diffuse(0, this.s,  this.density,  p.diff, dt, 4);
+    this.diffuse(0, this.sR, this.densityR, p.diff, dt, 4);
+    this.diffuse(0, this.sG, this.densityG, p.diff, dt, 4);
+    this.diffuse(0, this.sB, this.densityB, p.diff, dt, 4);
+    this.advectMacCormack(0, this.density,  this.s,  this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityR, this.sR, this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityG, this.sG, this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityB, this.sB, this.vx, this.vy, dt * p.advection);
+    this.sharpenDye(p.sharpness);
+    let densSum = 0, colR = 0, colG = 0, colB = 0;
+    for (let i = 0; i < GRID_AREA; i++) {
+      this.vx[i] *= p.damping;
+      this.vy[i] *= p.damping;
+      const speedSq = this.vx[i] * this.vx[i] + this.vy[i] * this.vy[i];
+      if (speedSq > 0.000004) {
+        const factor = 0.002 / Math.sqrt(speedSq);
+        this.vx[i] *= factor;
+        this.vy[i] *= factor;
+      }
+      if (!this.thinGap) {
+        this.density[i]  *= p.evapFactor;
+        this.densityR[i] *= p.evapFactor;
+        this.densityG[i] *= p.evapFactor;
+        this.densityB[i] *= p.evapFactor;
+      } else {
+        const x = (i % this.size + 0.5) / this.size - 0.5;
+        const y = (Math.floor(i / this.size) + 0.5) / this.size - 0.5;
+        if (x * x + y * y >= OPEN_RIM * OPEN_RIM) {
+          this.density[i] = 0;
+          this.densityR[i] = 0;
+          this.densityG[i] = 0;
+          this.densityB[i] = 0;
+        } else {
+          this.density[i]  *= p.evapFactor;
+          this.densityR[i] *= p.evapFactor;
+          this.densityG[i] *= p.evapFactor;
+          this.densityB[i] *= p.evapFactor;
+        }
+      }
+      if (this.density[i] > 6) {
+        const capScale = 6 / this.density[i];
+        this.density[i] *= capScale;
+        this.densityR[i] *= capScale;
+        this.densityG[i] *= capScale;
+        this.densityB[i] *= capScale;
+      }
+      densSum += this.density[i];
+      colR += this.densityR[i]; colG += this.densityG[i]; colB += this.densityB[i];
+      this.temp[i] *= p.heatDecay;
+      this.gap[i] = Math.min(0.03, this.gap[i] + 0.005);
+      if (isNaN(this.density[i]))  this.density[i]  = 0;
+      if (isNaN(this.densityR[i])) this.densityR[i] = 0;
+      if (isNaN(this.densityG[i])) this.densityG[i] = 0;
+      if (isNaN(this.densityB[i])) this.densityB[i] = 0;
+      if (isNaN(this.vx[i]))      this.vx[i]       = 0;
+      if (isNaN(this.vy[i]))      this.vy[i]       = 0;
+    }
+    const area = this.thinGap ? this.dishArea : GRID_AREA;
+    this.meanDensity = densSum / area;
+    this.meanColor = [colR / area, colG / area, colB / area];
   }
 
   /**
@@ -3306,6 +3396,147 @@ export class FluidSimulation {
           const falloff = (1 - dist / radius) * (1 - dist / radius); // quadratic falloff
           this.vx[i + j * this.size] += (dx / dist) * strength * falloff;
           this.vy[i + j * this.size] += (dy / dist) * strength * falloff;
+        }
+      }
+    }
+  }
+
+  // Kept for scripts/musicstir.mjs (stop rule: CPU transport/curl in headless Node).
+  private diffuse(b: number, x: Float32Array, x0: Float32Array, diff: number, dt: number, iterations = 10) {
+    const a = dt * diff * (this.size - 2) * (this.size - 2);
+    this.linSolve(b, x, x0, a, 1 + 4 * a, iterations);
+  }
+
+  private linSolve(b: number, x: Float32Array, x0: Float32Array, a: number, c: number, iterations = 12) {
+    const cRecip = 1.0 / c;
+    for (let k = 0; k < iterations; k++) {
+      for (let j = 1; j < this.size - 1; j++) {
+        for (let i = 1; i < this.size - 1; i++) {
+          x[i + j * this.size] =
+            (x0[i + j * this.size] +
+              a * (x[i + 1 + j * this.size] + x[i - 1 + j * this.size] +
+                   x[i + (j + 1) * this.size] + x[i + (j - 1) * this.size])) * cRecip;
+        }
+      }
+      this.setBoundary(b, x);
+    }
+  }
+
+  private project(velocX: Float32Array, velocY: Float32Array, p: Float32Array, div: Float32Array) {
+    const sizeRecip = 1.0 / this.size;
+    for (let j = 1; j < this.size - 1; j++) {
+      for (let i = 1; i < this.size - 1; i++) {
+        div[i + j * this.size] =
+          -0.5 * (velocX[i + 1 + j * this.size] - velocX[i - 1 + j * this.size] +
+                  velocY[i + (j + 1) * this.size] - velocY[i + (j - 1) * this.size]) * sizeRecip;
+        p[i + j * this.size] = 0;
+      }
+    }
+    this.setBoundary(0, div);
+    this.setBoundary(0, p);
+    this.linSolve(0, p, div, 1, 4);
+
+    for (let j = 1; j < this.size - 1; j++) {
+      for (let i = 1; i < this.size - 1; i++) {
+        velocX[i + j * this.size] -= 0.5 * (p[i + 1 + j * this.size] - p[i - 1 + j * this.size]) * this.size;
+        velocY[i + j * this.size] -= 0.5 * (p[i + (j + 1) * this.size] - p[i + (j - 1) * this.size]) * this.size;
+      }
+    }
+    this.setBoundary(1, velocX);
+    this.setBoundary(2, velocY);
+  }
+
+  private advect(b: number, d: Float32Array, d0: Float32Array, velocX: Float32Array, velocY: Float32Array, dt: number) {
+    const dtx = dt * (this.size - 2);
+    const dty = dt * (this.size - 2);
+    const Nfloat = this.size - 2;
+
+    for (let j = 1; j < this.size - 1; j++) {
+      for (let i = 1; i < this.size - 1; i++) {
+        let x = i - dtx * velocX[i + j * this.size];
+        let y = j - dty * velocY[i + j * this.size];
+
+        if (x < 0.5) x = 0.5;
+        if (x > Nfloat + 0.5) x = Nfloat + 0.5;
+        if (y < 0.5) y = 0.5;
+        if (y > Nfloat + 0.5) y = Nfloat + 0.5;
+
+        const i0 = Math.floor(x);
+        const j0 = Math.floor(y);
+        const s1 = x - i0;
+        const s0 = 1.0 - s1;
+        const t1 = y - j0;
+        const t0 = 1.0 - t1;
+        const i1 = i0 + 1;
+        const j1 = j0 + 1;
+
+        d[i + j * this.size] =
+          s0 * (t0 * d0[i0 + j0 * this.size] + t1 * d0[i0 + j1 * this.size]) +
+          s1 * (t0 * d0[i1 + j0 * this.size] + t1 * d0[i1 + j1 * this.size]);
+      }
+    }
+    this.setBoundary(b, d);
+  }
+
+  private advectMacCormack(b: number, d: Float32Array, d0: Float32Array, velocX: Float32Array, velocY: Float32Array, dt: number) {
+    this.advect(b, this.mcA, d0, velocX, velocY, dt);
+    this.advect(b, this.mcB, this.mcA, velocX, velocY, -dt);
+
+    const N = this.size;
+    const dtx = dt * (N - 2);
+    const Nfloat = N - 2;
+    for (let j = 1; j < N - 1; j++) {
+      for (let i = 1; i < N - 1; i++) {
+        const idx = i + j * N;
+        let x = i - dtx * velocX[idx];
+        let y = j - dtx * velocY[idx];
+        if (x < 0.5) x = 0.5; else if (x > Nfloat + 0.5) x = Nfloat + 0.5;
+        if (y < 0.5) y = 0.5; else if (y > Nfloat + 0.5) y = Nfloat + 0.5;
+        const i0 = Math.floor(x), j0 = Math.floor(y);
+        const i1 = i0 + 1, j1 = j0 + 1;
+        const a = d0[i0 + j0 * N], b2 = d0[i1 + j0 * N], c = d0[i0 + j1 * N], e = d0[i1 + j1 * N];
+        const mn = Math.min(a, b2, c, e), mx = Math.max(a, b2, c, e);
+        const v = this.mcA[idx] + 0.5 * (d0[idx] - this.mcB[idx]);
+        d[idx] = v < mn ? mn : v > mx ? mx : v;
+      }
+    }
+    this.setBoundary(b, d);
+  }
+
+  private setBoundary(b: number, x: Float32Array) {
+    for (let i = 1; i < this.size - 1; i++) {
+      x[i]                            = b === 2 ? -x[i + this.size]            : x[i + this.size];
+      x[i + (this.size - 1) * this.size] = b === 2 ? -x[i + (this.size - 2) * this.size] : x[i + (this.size - 2) * this.size];
+    }
+    for (let j = 1; j < this.size - 1; j++) {
+      x[j * this.size]                    = b === 1 ? -x[1 + j * this.size]            : x[1 + j * this.size];
+      x[(this.size - 1) + j * this.size]  = b === 1 ? -x[(this.size - 2) + j * this.size] : x[(this.size - 2) + j * this.size];
+    }
+    x[0] = 0.5 * (x[1] + x[this.size]);
+    x[(this.size - 1) * this.size] = 0.5 * (x[1 + (this.size - 1) * this.size] + x[(this.size - 2) * this.size]);
+    x[this.size - 1] = 0.5 * (x[this.size - 2] + x[this.size - 1 + this.size]);
+    x[(this.size - 1) + (this.size - 1) * this.size] = 0.5 * (
+      x[(this.size - 2) + (this.size - 1) * this.size] + x[(this.size - 1) + (this.size - 2) * this.size]
+    );
+  }
+
+  applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
+    if (scale <= 0.005) return;
+    const step = 2;
+    const eps = 0.75;
+    const k = scale * (TURB_SPEED / 3);
+    for (let o = 0; o < octaves; o++) {
+      const freq = (0.012 / GRID_SCALE) * (1 << o);
+      const amp = k * Math.pow(0.55, o) / (2 * eps * freq);
+      const tOff = time * (0.06 + o * 0.05) + o * 37.7;
+      for (let j = 1; j < this.size - 2; j += step) {
+        for (let i = 1; i < this.size - 2; i += step) {
+          const idx = i + j * this.size;
+          const dn_dx = noise2D((i + eps) * freq, j * freq + tOff) - noise2D((i - eps) * freq, j * freq + tOff);
+          const dn_dy = noise2D(i * freq, (j + eps) * freq + tOff) - noise2D(i * freq, (j - eps) * freq + tOff);
+          const ux = dn_dy * amp, uy = -dn_dx * amp;
+          this.vx[idx] += ux; this.vx[idx + 1] += ux; this.vx[idx + this.size] += ux; this.vx[idx + this.size + 1] += ux;
+          this.vy[idx] += uy; this.vy[idx + 1] += uy; this.vy[idx + this.size] += uy; this.vy[idx + this.size + 1] += uy;
         }
       }
     }

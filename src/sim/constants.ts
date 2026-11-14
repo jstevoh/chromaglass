@@ -45,6 +45,9 @@ export const GRID_SIZE = 192;                    // sim resolution — higher = 
 
 export const GRID_SCALE = GRID_SIZE / 128;       // brush/seed geometry was tuned at 128
 
+/** Turbulence 1.0 as an rms speed in solver units (the GPU shader has the same 0.5). Kept for scripts/musicstir.mjs. */
+export const TURB_SPEED = 0.5;
+
 /**
  * How fast the print's Drift, as the solver is handed it, may move: a share of the
  * full range a second. The feed map's amplitude arrives all at once otherwise, and
