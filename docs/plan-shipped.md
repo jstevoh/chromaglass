@@ -3155,6 +3155,89 @@ Lab (`npm run bubbledye`, 128², main → now): left under a whole bubble 1.2% �
 1.0% → 0.0%, a moving one 6.6% → 0.0%; deepest cell after a pop 1.097 → 1.088; deepest cell round a
 moving bubble 1.019 → 1.036; every total 0.000%. The bar under a bubble is 2% now (was 8%).
 
+### 15g-11. The breath is a jet along the surface, with a direction (shipped, with 15g-5)
+
+What was reported (the owner, 2026-11-13, on the desktop app): "blowing looks like shit
+generally. It doesn't blow across the surface like I would expect (unless you're blowing
+hard), it doesn't seem to have a direction in mind."
+
+What was found. The breath's stress (15g's first part) landed in a disc under the hand, one
+footprint across, so the liquid moved under the pointer and nowhere ahead of it: a held
+breath drove 19.62 mm/s under itself and 0.12 mm/s a palm on (`npm run airblow`, software
+WebGPU). A breath blown along a surface is a jet that runs along it. And its direction was
+each pointer move's own: at the pointer's pixel steps a 30° stroke read as moves of 0° and
+45° to 90° by turns, and 150 ms after the hand stopped the direction was dropped and the
+hand became the straw, so a stroke that paused blew bubbles where it stood.
+
+What changed.
+- `src/lib/breath.ts`, `layBreath` and `jetShare`: the stress is whole over the landing
+  footprint and a core of five footprints, then falls as 1/(1 + (s/s_c)²) (a round jet's
+  centreline speed goes as one over the distance past its core, and the stress as its
+  square; Launder and Rodi's review of the wall jet for the 0.15 a radius it spreads by),
+  Gaussian across, cut smoothly to nothing at a twentieth: 21.7 footprints of reach,
+  135 mm on the 200 mm dish, and 13 times the disc's whole force for the same breath.
+- `src/lib/blowAim.ts` (new; the Blow's hold constants came with it from
+  `src/sim/tools.ts`): the direction is the way from a point trailing the hand on a leash
+  of four cells to the hand. It turns as the stroke turns and not with each pixel, and on
+  a thin gap it is kept while the hand is down, so a hand that stops goes on blowing the
+  way it was going. The straw is a press that never moved.
+- 15g-5: a remote hand's directed Blow is the same air. Its messages come a few a second,
+  so the solver holds its breath a quarter of a second past each (`holdBreath`,
+  `breatheHeld`, `REMOTE_BREATH_HOLD`) and lays it every step; its push and carries no
+  longer run on a thin gap. One breath a plate for now (15g-13).
+
+Measured (`npm run blowrange`, node): the stress along the breath at 0, 1, 2, 5, 10 and 15
+footprints 1.00, 0.96, 0.85, 0.47, 0.16, 0.05; the same in sixteen directions to 0.0%; at
+most 7.1° off a 30° stroke where one move's worth swung 60.0°; two seconds held keeps the
+wind and starts no straw. `npm run airblow` (lab, software WebGPU), main → now: under a
+held breath 19.62 → 31.84 mm/s (0.37 → 0.61 of τh/2μ: the plume's liquid has a longer way
+back round, so the middle runs nearer the speed its own gap gives); a palm on 0.12 → 8.82
+mm/s, as far behind 0.12 → 0.86; a 1.5 s stroke across a pool moved its middle 2.72% →
+13.07% of the plate, colour kept (+0.00%). Check 1's band moved with the share
+(0.28–0.47 → 0.46–0.76, still a quarter either side) and its held Press is sixteen
+footprints, not eight, so the whole plume blows on pressed film (1.17 → 1.08 of what the
+gap gives); check 6's gale is held against the stroke's own length and starts 0.2 of the
+plate along, where it moved the pool 37.06% and kept its colour (from the middle it blew
+36.17% of the pool over the dish's open rim, 15g-16); check 7 is new (the plume ahead,
+not behind).
+
+On the Mac (the app, Metal, Foam Cells, the same hands before and after: two holds, three
+strokes, six quick presses, two short drags held): before, 160 straw steps and 265 of wind
+with 24 carries, the drags' holds turned to the straw (152 more straw steps) and about a
+hundred bubbles stood on the plate; now, 120 straw steps, no carry, the drags' holds 178
+steps of wind the way they were dragged, and the straw's two bubbles, round.
+
+### 15g-12. The wind lays no bubbles, and a straw's bubble is round (shipped)
+
+What was reported (the owner, the same day): "I'm still seeing these flower like things
+around the floating bubbles. I blew on the plate and these popped up", and "the bubble
+spawning is weird at best."
+
+What was found. A moving wind laid two bubbles every sixth step once the breath passed
+the blowing number (QA-20's rule): 40 in two seconds of the default wind in the lab, about
+a hundred after a few strokes on the Mac. That number is the threshold for a jet tearing
+drops off a deep bath; over a 2 mm film a breath's 118 Pa is seven times the film's weight
+and presses it aside, with nothing under it to fold air into. A held straw's bubble shed
+satellites round its rim, and its rim broke into fingers by a count worked at a gap 21
+times thinner than the plate's (the code's own comment said so). And the pointer's Blow
+opened every press with a puff, whose carries take 24% of the colour out of a hard-edged
+disc at a time.
+
+What changed. `spawnsOf`, `airTaken`, the blowing number and the wind's spawn calls are
+gone (`src/lib/breath.ts`, `LiquidVisualizer`): no Blow lays a bubble but the straw. The
+straw's fingers are Paterson's (1981) fastest mode for air driven into a Hele-Shaw cell,
+n = √((1 + 12 Ca R²/b²)/3), at the plate's real gap (`strawFingers`, `src/lib/bubbles.ts`):
+0.75 for the default liquid at the straw's fastest, so the bubble is round, and a rim
+fingers only where the liquid is thick enough for two or more (8.4, eight lobes, in one
+300 times as thick). No satellites. On a thin gap the pointer's press lays nothing until
+it is the straw (150 ms and three frames, as before).
+
+Measured (`npm run straw`, lab): the default bubble's fingering 0.000, nothing shed, let
+go it stays round; `npm run blowrange`: the breath exports nothing that lays air, where
+three seconds of the old rule laid 60 bubbles; the straw's growth with the Amount is as
+it was (16 / 40 / 88 / 170 cells² after a second at 0.05 / 0.2 / 0.5 / 1). The flower itself was not rebuilt in
+isolation: 15g-15 says what was ruled out.
+
 ### 15d. Press moves the colour out of an oil body but leaves the oil, and leaves the ferrofluid
 
 **The ferrofluid: shipped under Thin Gap.** A press greyed it. The flow carried the

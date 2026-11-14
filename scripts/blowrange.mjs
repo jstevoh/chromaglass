@@ -1,47 +1,49 @@
 #!/usr/bin/env node
 /**
- * Blow's Amount runs from a breath that only ripples the colour to a gale.
+ * A Blow is a breath: a jet along the surface with a direction it keeps, no
+ * bubbles from the wind, a straw's bubble that grows with the breath.
  *
- *   npm run blowrange      (node only: src/lib/breath.ts and src/lib/bubbles.ts)
+ *   npm run blowrange      (node only: src/lib/breath.ts, src/lib/blowAim.ts and src/lib/bubbles.ts)
  *
- * Reported (PLAN.md QA-20): "Blow amount isn't sensitive enough. At its
- * lowest settings it still blows a ton of ink and creates a lot of bubbles.
- * Needs a gentler bottom end (gentle breeze) and a higher top end
- * (hurricane)." The moving wind's stress already went with the Amount
- * squared (lib/breath.ts, layBreath's share; `npm run airblow` measures what
- * it moves), but the air the wind put into the liquid did not go with the
- * Amount at all: the app spawned two bubbles on every sixth step of a moving
- * Blow, whatever the dial said, and every bubble pumps the colour out from
- * under it. And the straw's bubble had a floor that held every Amount under
- * about a fifth at the same breath.
+ * Reported twice. PLAN.md QA-20: "Blow amount isn't sensitive enough. At its
+ * lowest settings it still blows a ton of ink and creates a lot of bubbles."
+ * And the owner on 2026-11-13 (PLAN.md 15g-11, 15g-12), on Foam Cells: the
+ * Blow "doesn't blow across the surface like I would expect (unless you're
+ * blowing hard), it doesn't seem to have a direction in mind, and the bubble
+ * spawning is weird at best". Filmed on a Mac, nine seconds of blowing left
+ * about a hundred bubbles on the plate.
  *
  * Here the hands' rules are played as the app plays them (the Amount a,
- * share a², 60 steps a second, a fresh BubbleField of the app's 192 cells),
- * the old rule beside the new for the record:
+ * share a², 60 steps a second, a fresh BubbleField of the app's 192 cells):
  *
- *   1. A breath gentler than the speed the surface tears at (the blowing
- *      number N_B = ρ_air U² / 2√(ρgσ) past 1, about 5.4 m/s against a firm
- *      breath's 14) takes no air in: no bubbles from three seconds of wind at
- *      Amount 0.05, 0.25 or 0.35, where the old rule laid as many as at 1.
- *      It was asked at 0.5 while a firm breath was 8 m/s (the tearing speed
- *      at Amount 0.67); the 2 mm gap took the firm breath to 14 m/s to move
- *      the film as the 6 mm one did (lib/breath.ts, PLAN 38r), so the surface
- *      tears at Amount 0.39 and the gentle breaths are read below that.
- *   2. A firm breath, the default Amount 1, takes air in as often as it did:
- *      ten spawns a second, within a fifth over ten seconds of steps.
- *   3. And a second at 120 steps a second takes in what a second at 60 does
- *      (the old count a step took twice as much).
- *   4. A gale takes more the harder it blows: Amount 2 more than 1, Amount 5
- *      more than 2, and on the plate at 5 at least twice the bubbles of 1
- *      after a second (the plate's own cover limit bounds it after that).
- *   5. The straw's bubble grows as fast as the breath goes: after a second,
+ *   1. The wind lays no bubbles, at any Amount. The rule it replaces (ten
+ *      spawns of two a second at the default) is played beside it for the
+ *      record, and the reason is printed: a firm breath's pressure where it
+ *      lands against the weight of the film under it (lib/breath.ts).
+ *   2. The breath's stress is a jet along the surface (jetShare): whole
+ *      where it lands, held for its core, then falling as one over the
+ *      distance squared, wider the further it has gone, and nothing behind
+ *      the landing past a footprint.
+ *   3. layBreath lays that plume the way the breath blows, whichever way
+ *      that is: its force sums to along the breath for sixteen directions,
+ *      the same total within a few percent whichever way (the grid does not
+ *      favour its axes), it reaches a palm and more ahead where the old disc
+ *      reached its own radius, and it tells the uploader every row it wrote.
+ *   4. A stroke has a direction in mind (lib/blowAim.ts): along a slanted
+ *      stroke with a pixel of wobble in it the direction stays within a few
+ *      degrees of the stroke, where one move's worth (the old rule) swung
+ *      tens of degrees; it turns when the stroke turns; and when the hand
+ *      stops, still down, the breath goes on the way it was going and the
+ *      straw does not start.
+ *   5. A press held and never moved is the straw, after the hold; a press
+ *      that has moved is not.
+ *   6. The straw's bubble grows as fast as the breath goes: after a second,
  *      its area at Amount 0.05, 0.2, 0.5 and 1 rises with the Amount and in
- *      proportion to it within a fifth (the old floor made 0.05 and 0.2 the
+ *      proportion to it within a fifth (an old floor made 0.05 and 0.2 the
  *      same breath).
- *   6. And the app calls them so: the moving wind's bubbles in
- *      LiquidVisualizer.tsx go by airTaken and spawnsOf, with no step count
- *      left, for the mouse's hands and for a remote's; the straw is given
- *      strawFlow of the share.
+ *   7. And the app calls them so: neither the pointer's Blow nor a remote's
+ *      spawns a bubble, the pointer's goes by blowStep, blowAim and
+ *      blowHeld, and the straw is given strawFlow of the share.
  */
 import { build } from 'esbuild';
 import { readFileSync } from 'node:fs';
@@ -52,69 +54,164 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const outB = 'node_modules/.cache/blowrange-breath.mjs';
-const outF = 'node_modules/.cache/blowrange-bubbles.mjs';
-await build({ entryPoints: ['src/lib/breath.ts'], bundle: true, format: 'esm', platform: 'node', outfile: outB, logLevel: 'warning' });
-await build({ entryPoints: ['src/lib/bubbles.ts'], bundle: true, format: 'esm', platform: 'node', outfile: outF, logLevel: 'warning' });
-const { airTaken, spawnsOf, strawFlow, breathSpeed, blowingNumber, AIR_TAKEN_FROM, WIND_SPAWNS_PER_SECOND } = await import(`../${outB}`);
-const { BubbleField } = await import(`../${outF}`);
+const bundle = async (name, dir = 'lib') => {
+  const out = `node_modules/.cache/blowrange-${name}.mjs`;
+  await build({ entryPoints: [`src/${dir}/${name}.ts`], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+  return import(`../${out}`);
+};
+const B = await bundle('breath');
+const A = await bundle('blowAim');
+const { BubbleField } = await bundle('bubbles');
+const { GRID_SCALE } = await bundle('constants', 'sim');
+const { strawFlow, breathSpeed, breathPressure, jetShare, layBreath, JET_CORE, JET_REACH, JET_FLOOR, BREATH_STRESS } = B;
 
 const N = 192;
 const still = () => [0, 0];
-// A deterministic draw, so a run is a run (the app's is DICE.hands).
-const rng = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+const deg = (r) => r * 180 / Math.PI;
 
-/*
-  `seconds` of a moving Blow at Amount `a`, `rate` steps a second: the
-  spawns the wind asks for, and the bubbles on a fresh plate after it. `old`
-  plays the rule as it was: two bubbles on every sixth step, any Amount.
-*/
-function wind(a, { seconds = 3, rate = 60, old = false } = {}) {
-  const f = new BubbleField(N);
-  const u = rng(7);
-  const dt = 1 / rate, k = a * a;
-  let spawns = 0;
-  for (let step = 0; step < seconds * rate; step++) {
-    const x = 40 + (step / (seconds * rate)) * 110, y = 96;
-    const n = old ? (step % 6 === 0 ? 1 : 0) : spawnsOf(WIND_SPAWNS_PER_SECOND * airTaken(k) * dt, u());
-    if (n > 0) { f.spawn(x, y, 1.2 * 1.5, 2 * n, 3 * 1.5); spawns += n; }
-    f.step(dt, still, 0, 0, 0);
+// ── 1. The wind lays no bubbles ─────────────────────────────────────
+{
+  /*
+    Why: a breath over a 2 mm film presses it aside and has nothing under
+    it to fold air into. Printed, not checked: it is three constants. That
+    no Blow lays a bubble is the last check's (the two Blow blocks call no
+    spawn), and that the straw's one bubble sheds none is `npm run straw`.
+    A first version of this section checked that the breath's module had
+    no export named for air and replayed the old rule beside it, neither of
+    which any change to the app could turn red.
+  */
+  const FILM = 0.002, RHO = 860, G = 9.81;
+  const weight = RHO * G * FILM;
+  console.log(`  a firm breath lands at ${breathSpeed(1).toFixed(0)} m/s, ${breathPressure(1).toFixed(0)} Pa, against ${weight.toFixed(0)} Pa for the weight of a 2 mm film of oil: ${(breathPressure(1) / weight).toFixed(1)} times it`);
+}
+
+// ── 2. The jet's shape ──────────────────────────────────────────────
+{
+  const axis = [0, 1, 2, JET_CORE, 2 * JET_CORE, 3 * JET_CORE, JET_REACH * 0.98, JET_REACH * 1.02].map((s) => jetShare(s, 0));
+  const raw = (v) => v * (1 - JET_FLOOR) + JET_FLOOR;   // before the floor is taken off
+  const falls = axis.every((v, i) => i === 0 || v <= axis[i - 1]);
+  // Past the core the stress goes as 1/s²: from two cores to three it falls by (1 + 4)/(1 + 9).
+  const law = raw(axis[5]) / raw(axis[4]);
+  // Its half-width (where it is half the axis's, before the floor) at the landing and three cores out.
+  const half = (s) => { const top = raw(jetShare(s, 0)); let t = 0; while (raw(jetShare(s, t)) > top / 2 && t < 50) t += 0.01; return t; };
+  const w0 = half(0), w3 = half(3 * JET_CORE);
+  const behind = [1, 1.5, 2, 3].map((s) => jetShare(-s, 0));
+  check('the stress is whole where the breath lands, holds for its core, then falls as one over the distance squared, to nothing at its reach',
+    axis[0] === 1 && axis[1] > 0.9 && raw(axis[3]) > 0.49 && raw(axis[3]) < 0.51 && falls && Math.abs(law - 0.5) < 0.01 && axis[6] > 0 && axis[7] === 0,
+    `along the breath at 0, 1, 2, ${JET_CORE}, ${2 * JET_CORE}, ${3 * JET_CORE} radii: ${axis.slice(0, 6).map((v) => v.toFixed(2)).join(', ')}; two cores to three ×${law.toFixed(3)} (1/s² gives 0.500); reach ${JET_REACH.toFixed(1)} radii`);
+  check('it spreads as it goes, and leaves nothing behind the landing past a footprint',
+    w0 > 0.5 && w0 < 0.6 && w3 > 3 * w0 && behind[0] < 0.1 && behind[2] === 0 && behind[3] === 0,
+    `half-width ${w0.toFixed(2)} radii at the landing, ${w3.toFixed(2)} three cores on; behind it at 1, 1.5, 2, 3 radii: ${behind.map((v) => v.toFixed(3)).join(', ')}`);
+}
+
+// ── 3. layBreath lays it the way the breath blows ───────────────────
+{
+  const L = 192, R = 6;
+  const runs = [];
+  for (let k = 0; k < 16; k++) {
+    const a = k * Math.PI / 8, ux = Math.cos(a), uy = Math.sin(a);
+    const out = new Float32Array(L * L * 4);
+    const rows = { lo: L, hi: -1, add(y0, y1) { this.lo = Math.min(this.lo, y0); this.hi = Math.max(this.hi, y1); } };
+    // Landing a palm in from the middle, upwind, so the whole plume is on the plate.
+    const x = 96 - ux * 60, y = 96 - uy * 60;
+    const cells = layBreath(out, L, x, y, R, ux * 3, uy * 3, 1, rows);
+    let fx = 0, fy = 0, far = 0, back = 0, peak = 0, outside = 0;
+    for (let j = 0; j < L; j++) for (let i = 0; i < L; i++) {
+      const tx = out[(i + j * L) * 4], ty = out[(i + j * L) * 4 + 1];
+      if (tx === 0 && ty === 0) continue;
+      fx += tx; fy += ty; peak = Math.max(peak, Math.hypot(tx, ty));
+      const s = (i - x) * ux + (j - y) * uy;
+      far = Math.max(far, s); back = Math.min(back, s);
+      if (j < rows.lo || j > rows.hi) outside++;
+    }
+    runs.push({ a, cells, along: fx * ux + fy * uy, across: -fx * uy + fy * ux, far, back, peak, outside });
   }
-  return { spawns, bubbles: f.bubbles.length };
+  const tot = runs.map((r) => r.along), mean = tot.reduce((p, q) => p + q, 0) / tot.length;
+  const spread = Math.max(...tot.map((t) => Math.abs(t / mean - 1)));
+  const skew = Math.max(...runs.map((r) => Math.abs(r.across / r.along)));
+  const far = Math.min(...runs.map((r) => r.far)), back = Math.min(...runs.map((r) => r.back));
+  // The disc it replaces: (1 − (d/r)²)² over the footprint, its force summed.
+  let disc = 0;
+  for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) { const q = 1 - (i * i + j * j) / (R * R); if (q > 0) disc += BREATH_STRESS * q * q; }
+  check('the breath\'s force is along the breath whichever way it blows, the same in all sixteen directions',
+    skew < 0.01 && spread < 0.03 && runs.every((r) => r.cells > 0 && Math.abs(r.peak / BREATH_STRESS - 1) < 0.05),
+    `across over along at most ${(100 * skew).toFixed(2)}%; the total within ${(100 * spread).toFixed(1)}% of its mean; the middle ${(runs[0].peak / BREATH_STRESS).toFixed(2)} of a firm breath's stress`);
+  check('it reaches a palm and more ahead of where it lands, where the disc reached its own radius, and stays a footprint behind',
+    far > 15 * R && far < (JET_REACH + 1) * R && back > -2.2 * R && mean > 10 * disc,
+    `${(far / R).toFixed(1)} radii ahead (${(far * 200 / L).toFixed(0)} mm on the dish), ${(-back / R).toFixed(1)} behind; its whole force ${(mean / disc).toFixed(0)} times the disc's`);
+  check('and it tells the uploader every row it wrote', runs.every((r) => r.outside === 0), `${runs.reduce((p, r) => p + r.outside, 0)} cells outside the rows it named`);
 }
 
-console.log(`  the surface tears at ${AIR_TAKEN_FROM.toFixed(2)} m/s (N_B = 1); a firm breath ${breathSpeed(1).toFixed(1)} m/s, N_B ${blowingNumber(breathSpeed(1)).toFixed(2)}; Amount 5 ${breathSpeed(25).toFixed(0)} m/s, N_B ${blowingNumber(breathSpeed(25)).toFixed(1)}`);
-const AMOUNTS = [0.05, 0.25, 0.35, 0.5, 0.7, 1, 2, 5];
-const now = {}, was = {};
-for (const a of AMOUNTS) {
-  now[a] = wind(a); was[a] = wind(a, { old: true });
-  console.log(`  Amount ${a}: ${breathSpeed(a * a).toFixed(1)} m/s, air taken ${airTaken(a * a).toFixed(2)} of a firm breath's; three seconds of wind: ${now[a].spawns} spawns, ${now[a].bubbles} bubbles on the plate (before: ${was[a].spawns}, ${was[a].bubbles})`);
-}
-
-// 1.
-check('a breath gentler than the speed the surface tears at takes no air in',
-  [0.05, 0.25, 0.35].every((a) => now[a].spawns === 0 && now[a].bubbles === 0) && was[0.05].bubbles > 0,
-  `Amount 0.05 / 0.25 / 0.35: ${[0.05, 0.25, 0.35].map((a) => now[a].bubbles).join(' / ')} bubbles (before ${[0.05, 0.25, 0.35].map((a) => was[a].bubbles).join(' / ')})`);
-
-// 2. and 3.
+// ── 4. and 5. A direction in mind, and the straw ────────────────────
 {
-  const at60 = wind(1, { seconds: 10, rate: 60 }).spawns, at120 = wind(1, { seconds: 10, rate: 120 }).spawns;
-  const old60 = wind(1, { seconds: 10, rate: 60, old: true }).spawns, old120 = wind(1, { seconds: 10, rate: 120, old: true }).spawns;
-  check('a firm breath (the default Amount) takes air in as often as it did',
-    Math.abs(at60 / 100 - 1) < 0.2 && old60 === 100, `${at60} spawns in ten seconds at 60 steps a second, before ${old60}`);
-  check('and a second at 120 steps a second takes in what one at 60 does',
-    Math.abs(at120 / at60 - 1) < 0.2, `${at120} against ${at60} (before ${old120} against ${old60})`);
+  const LEASH = A.BLOW_LEASH * GRID_SCALE;   // as the app's hands call blowStep
+  const rng = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
+  /*
+    A stroke at 30° to the plate's rows, a cell a step, the pointer landing
+    on whole cells (a pixel's wobble either side of the line), then a turn to
+    go straight up, then held where it stops for two seconds. A frame is
+    three solver steps, as the app's can be: the pointer's move comes with
+    the first, and the two after it come with no move and are not the
+    frame's first (LiquidVisualizer's hands), a third of a sixtieth of a
+    second each.
+  */
+  const u = rng(3);
+  let dir, x = 40, y = 60, px = x, py = y, t = 0;
+  const offNew = [], offOld = [];
+  const slant = Math.PI / 6;
+  const step = (nx, ny) => {
+    const dx = nx - px, dy = ny - py;
+    dir = A.blowStep(dir, nx, ny, dx, dy, t, true, LEASH);
+    px = nx; py = ny; t += 1000 / 180;
+    for (let k = 0; k < 2; k++) { dir = A.blowStep(dir, nx, ny, 0, 0, t, false, LEASH); t += 1000 / 180; }
+    return { dx, dy };
+  };
+  step(x, y);   // the press
+  for (let k = 1; k <= 60; k++) {
+    const nx = Math.round(x + Math.cos(slant) * k + (u() - 0.5)), ny = Math.round(y + Math.sin(slant) * k + (u() - 0.5));
+    const { dx, dy } = step(nx, ny);
+    if (k > 8) {
+      const wrap = (a) => Math.abs(Math.atan2(Math.sin(a), Math.cos(a)));
+      offNew.push(wrap(Math.atan2(dir.y, dir.x) - slant));
+      if (Math.hypot(dx, dy) >= 0.75) offOld.push(wrap(Math.atan2(dy, dx) - slant));
+    }
+  }
+  const worstNew = deg(Math.max(...offNew)), worstOld = deg(Math.max(...offOld));
+  const aimed = A.blowAim(dir, t, true);
+  // The turn: straight up for twenty cells.
+  const tx = px, ty = py;
+  for (let k = 1; k <= 20; k++) step(tx, ty + k);
+  const turned = deg(Math.atan2(dir.y, dir.x));
+  // Held where it stopped, still down, two seconds.
+  let aimHeld = true, strawHeld = false;
+  for (let k = 0; k < 120; k++) { step(px, py); aimHeld = aimHeld && A.blowAim(dir, t, true); strawHeld = strawHeld || A.blowHeld(dir, t); }
+  const kept = deg(Math.atan2(dir.y, dir.x));
+  const offPlate = A.blowAim(dir, t, false);
+  check('along a slanted stroke the breath keeps the stroke\'s direction, where one move\'s worth swung with every pixel',
+    aimed && worstNew < 12 && worstOld > 25,
+    `at most ${worstNew.toFixed(1)}° off a 30° stroke (one move's worth: ${worstOld.toFixed(1)}°)`);
+  check('it turns when the stroke turns', Math.abs(turned - 90) < 5, `after twenty cells straight up it blows at ${turned.toFixed(1)}°`);
+  check('and when the hand stops, still down, the breath goes on the way it was going and no straw starts',
+    aimHeld && !strawHeld && Math.abs(kept - turned) < 0.01 && !offPlate,
+    `two seconds held: ${aimHeld ? 'the wind has its way throughout' : 'the wind lost its way'}, ${strawHeld ? 'the straw started' : 'no straw'}, direction ${kept.toFixed(1)}° (off a thin gap the carries stop, as they did: ${offPlate ? 'no' : 'yes'})`);
+
+  // 5. A press that never moves.
+  let d2, t2 = 0, strawAt = -1, aim2 = false;
+  for (let k = 0; k < 30; k++) {
+    d2 = A.blowStep(d2, 100, 100, 0, 0, t2, true, LEASH);
+    if (strawAt < 0 && A.blowHeld(d2, t2)) strawAt = t2;
+    aim2 = aim2 || A.blowAim(d2, t2, true);
+    t2 += 1000 / 60;
+  }
+  // And one whose frames come slowly: the hold is frames as well as time.
+  let d3, slowAt = -1;
+  for (let k = 0; k < 6; k++) { d3 = A.blowStep(d3, 100, 100, 0, 0, k * 100, true, LEASH); if (slowAt < 0 && A.blowHeld(d3, k * 100)) slowAt = k; }
+  check('a press held and never moved is the straw, after the hold\'s time and frames, and has no wind',
+    strawAt >= A.BLOW_DIR_HOLD_MS && strawAt < 250 && !aim2 && slowAt === A.BLOW_STRAW_FRAMES,
+    `the straw from ${strawAt.toFixed(0)} ms at 60 frames a second, from frame ${slowAt} at ten`);
 }
 
-// 4.
-{
-  const s1 = wind(1, { seconds: 1 }), s2 = wind(2, { seconds: 1 }), s5 = wind(5, { seconds: 1 });
-  check('a gale takes more air in the harder it blows',
-    airTaken(4) > airTaken(1) && airTaken(25) > airTaken(4) && s5.bubbles >= 2 * s1.bubbles && s1.bubbles > 0,
-    `air taken at Amount 1 / 2 / 5: ${[1, 4, 25].map((k) => airTaken(k).toFixed(1)).join(' / ')}; bubbles on the plate after a second ${s1.bubbles} / ${s2.bubbles} / ${s5.bubbles}`);
-}
-
-// 5.
+// ── 6. The straw grows with the breath ──────────────────────────────
 {
   const area = (a, flow) => {
     const f = new BubbleField(N);
@@ -133,16 +230,18 @@ check('a breath gentler than the speed the surface tears at takes no air in',
     `area after a second at Amount ${SA.join(' / ')}: ${got.map((g) => g.toFixed(0)).join(' / ')} cells² (before ${before.map((g) => g.toFixed(0)).join(' / ')})`);
 }
 
-// 6.
+// ── 7. The app calls them so ────────────────────────────────────────
 {
   const src = readFileSync('src/components/LiquidVisualizer.tsx', 'utf8');
-  const takes = (src.match(/const taken = airTaken\(/g) ?? []).length;
-  const stepCount = /gestureFrameRef\.current % 6 === 0\)\s*\{\s*bubblesRef\.current\.spawn/.test(src);
-  const remoteOld = /DICE\.hands\.float\(\) < 0\.15 \* amt\)/.test(src);
-  const straw = /bubblesRef\.current\.blow\([^)]*strawFlow\(k\)\)/.test(src);
-  check('and the app calls them so, for the mouse\'s hands, a remote\'s and the straw',
-    takes === 2 && !stepCount && !remoteOld && straw,
-    `${takes} winds go by airTaken; the step count ${stepCount ? 'is still there' : 'is gone'}; the remote's flat odds ${remoteOld ? 'are still there' : 'are gone'}; the straw ${straw ? 'is given strawFlow' : 'is not given strawFlow'}`);
+  // The two places a Blow is played: a remote's (performGesture's case) and the pointer's and fingers' (the hands' loop).
+  const remote = src.match(/case 'blow':[\s\S]*?\n {6}case 'drop':/)?.[0] ?? '';
+  const hands = src.match(/\} else if \(tool === 'blow'\) \{[\s\S]*?\n {14}\} else if \(tool === 'finger'\) \{/)?.[0] ?? '';
+  const spawns = (remote + hands).match(/\.spawn\(/g)?.length ?? 0;
+  const aims = /blowStep\(hand\.blowDir,/.test(hands) && /blowAim\(dir,/.test(hands) && /blowHeld\(dir,/.test(hands);
+  const straw = /bubblesRef\.current\.blow\([^)]*strawFlow\(k\)\)/.test(hands);
+  check('and the app calls them so: no Blow spawns a bubble, the hands go by blowStep, blowAim and blowHeld, the straw by strawFlow',
+    remote.length > 200 && hands.length > 500 && spawns === 0 && aims && straw,
+    `${spawns} spawn call(s) in the two Blows (${remote.length} and ${hands.length} characters read); the hands ${aims ? 'go by lib/blowAim.ts' : 'do not go by lib/blowAim.ts'}; the straw ${straw ? 'is given strawFlow' : 'is not given strawFlow'}`);
 }
 
 const bad = checks.filter((c) => !c.ok).length;

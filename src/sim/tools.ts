@@ -25,45 +25,6 @@ export const HAND_STILL_HOLD = 0.35;
 /** Frame widths a second above which a person is blowing rather than pressing. */
 export const HAND_MOVING = 0.06;
 
-/*
-  A moving Blow on the ferrofluid (PLAN.md §9n) pushes along the way the hand
-  last went, for this long after it last moved. Long enough to cover a
-  frame's later sim steps (the stroke is nothing on those) and a frame or two
-  at 20 fps where the pointer reported no move; short enough that a hand that
-  stops and holds is a puff, opening a hole, within a tenth of a second or so
-  of stopping, which reads as at once.
-*/
-export const BLOW_DIR_HOLD_MS = 150;
-
-/*
-  And the Blow is a straw only once the hand has been held for that long and
-  for this many frames in which the pointer reported no move, counting the
-  press itself as a move (PLAN.md §15c).
-
-  The straw used to be "not going": no move within BLOW_DIR_HOLD_MS. Two holes
-  in that, and the deploy after #230 fell into one: a Blow drawn across a pool
-  lost 54 of its 229 of dye (main's deploy, run 37177982848), the old eraser's
-  size of loss, though the wind had run 49 steps and carried 156.5. The
-  stroke had also run 5 straw steps, and a straw step blows a real bubble,
-  whose air takes the dye under it off the plate (airExclude) for as long as
-  the bubble sits there.
-  - A press has no move before it, so every step between the press and the
-    first move the pointer reports was a straw step: a drag began by blowing
-    a bubble in the middle of whatever it was drawn through. At 10 to 30
-    frames a second, as the Mac runner draws, that is a frame or two of steps
-    before the first move arrives (2, 3, 5 and 7 straw steps on its runs).
-  - On a slow frame rate a hand that never stops reports its moves a frame
-    apart, and 150 ms is a frame and a half at 10 fps: a drag on a struggling
-    machine was a straw every time a move came a frame late.
-  So the press starts the hold's clock as a move does, and the hold is both
-  the time (a hand on a fast machine still reads as held within a sixth of a
-  second) and a few frames with no move in them (a hand on a slow one that is
-  moving reports a move every frame, and is not held).
-*/
-export const BLOW_STRAW_FRAMES = 3;
-
-export type BlowDir = { x: number; y: number; at: number; still: number; moved: boolean };
-
 /** With Drop Height up, a held dropper lets go of a drop every this many solver steps (six a second). */
 export const DROP_EVERY = 10;
 
