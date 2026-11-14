@@ -6,18 +6,6 @@
  * the mask and returns the offset, r and R.
  */
 export const DROP_LENS_WGSL = `
-/** How much of a drop of radius R (plate uv) is flat on top, for half the
-    gap rho: none for a ball (R under rho), and all but its half-round edge,
-    rho wide, for a pancake. */
-fn dropFlat(R: f32, rho: f32) -> f32 {
-  return clamp(1.0 - rho / max(R, 1e-5), 0.0, 0.95);
-}
-/** Where on its meniscus a point is: 0 on the flat top (or the middle of a
-    small drop), 1 at the contact. */
-fn dropBand(r: f32, R: f32, rho: f32) -> f32 {
-  let f = dropFlat(R, rho);
-  return clamp((r - f) / (1.0 - f), 0.0, 1.0);
-}
 fn dropLens(uv: vec2f, cam: f32) -> vec4f {
   // One texel of the plate either way; the height is the plate's in both shapes.
   let px = 1.0 / f32(textureDimensions(beadTex).y);
