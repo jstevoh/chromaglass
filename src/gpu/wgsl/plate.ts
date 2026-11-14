@@ -382,6 +382,7 @@ fn blurAlpha(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32) -> f32 {
 
 fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) -> vec4f {
   dyeThrough = vec3f(1.0);
+  dyeUnit = vec3f(1.0);
   let raw = textureBicubic(t, fuv);
   var rawAlpha = raw.a;
   if (useBlur) { rawAlpha = blurAlpha(t, fuv, blurFluid); }
@@ -398,6 +399,7 @@ fn decodeFluid(t: texture_2d<f32>, fuv: vec2f, blurFluid: f32, useBlur: bool) ->
     exp(-decodeDensity(raw.g) * norm),
     exp(-decodeDensity(raw.b) * norm),
   );
+  dyeUnit = unit;
   let lt = lightThrough(unit, absTotalDensity);
 
   let darkness = 1.0 - max(lt.r, max(lt.g, lt.b));
@@ -475,8 +477,62 @@ fn gradNormal(g: vec2f) -> vec3f { return normalize(vec3f(-g * 0.9, 1.0)); }
   A thinner or fainter line was the obvious thing and is not here: at any
   width it would be a line the liquid does not make. The dial is kept for
   what else it scaled (the optical path's contrast out of focus, the back
-  plate's rim), and npm run holeline asks that it moves nothing in focus.
+  plate's rim), and npm run holeline asks that it moves nothing in focus on
+  the wall or in a photographed look.
+
+  One reader of the colour step is left, and it is why boundaryDiff is still
+  below: the closeup's relief. The derive pass's camera branch hands the
+  step's strength to the closeup in .z, and the closeup's shadowgraph
+  (camShadow, 38h-7) reads it as the optical path's curvature, which it is
+  not: so up close a boundary between two dyes is still shaded darker, and
+  that shading is all the depth Macro Relief gives a closeup with no cells
+  (npm run macroview's relief reads 0 without it). Taking it out here would
+  leave the closeup flat, and the path's own Laplacian in its place was
+  tried and failed on the Mac (the derive pass's camera branch says how), so
+  the closeup keeps what main drew, to the byte, until PLAN 18e-7 gives it
+  the path read at the lens's scale. The hue gate and its reasons, as they
+  were written for the line (2026-10-19, npm run holeline's first lines):
+  the step is asked where the dye's colour changes, not its depth, so a
+  bubble's hole in one dye, or a pool thinning into clear water, reads as no
+  step. The colour per unit of dye ("unit" in decodeFluid) is left by the
+  decode of each tap in dyeUnit rather than sampled again.
 */
+const HUE_LO: f32 = 0.03;
+const HUE_HI: f32 = 0.12;
+/*
+  The hue is the "unit" decodeFluid already works out from the very sample
+  it lights, so it is left here by that decode (as dyeThrough is) and read
+  after each of the four taps, rather than sampled again. Sampling it again
+  was the first version of this gate: four more bicubic reads (five filtered
+  taps each, so twenty more) on every pixel of the plate, while a laptop
+  window in the Mac runner's sound-render check drew 9.9 frames a second
+  (2026-10-20; not shown to be the cause, but the reads bought nothing).
+  Read this way the line costs what it did before the gate, five bicubic
+  reads, and draws the same picture (npm run holeline, to the percent).
+  Clear water, where decodeFluid returns before any hue, leaves 1, which is
+  clear water's hue.
+*/
+var<private> dyeUnit: vec3f = vec3f(1.0);
+fn boundaryDiff(t: texture_2d<f32>, fuv: vec2f) -> f32 {
+  let cC = decodeFluid(t, fuv, 0.0, false);
+  if (cC.a < 0.03) { return 0.0; }
+  let e = (3.0 / U.logicalGrid) * 0.55;
+  let cR = decodeFluid(t, fuv + vec2f(e, 0.0), 0.0, false);
+  let uR = dyeUnit;
+  let cL = decodeFluid(t, fuv + vec2f(-e, 0.0), 0.0, false);
+  let uL = dyeUnit;
+  let cT = decodeFluid(t, fuv + vec2f(0.0, e), 0.0, false);
+  let uT = dyeUnit;
+  let cB = decodeFluid(t, fuv + vec2f(0.0, -e), 0.0, false);
+  let uB = dyeUnit;
+  let maskX = min(cR.a, cL.a);
+  let maskY = min(cT.a, cB.a);
+  let hueX = smoothstep(HUE_LO, HUE_HI, length(uR - uL));
+  let hueY = smoothstep(HUE_LO, HUE_HI, length(uT - uB));
+  let diffX = length(cR.rgb - cL.rgb) * smoothstep(0.03, 0.25, maskX) * hueX;
+  let diffY = length(cT.rgb - cB.rgb) * smoothstep(0.03, 0.25, maskY) * hueY;
+  return diffX + diffY;
+}
 `;
 
 /** One lamp for every material, and what a dye edge does with it. */
@@ -1282,23 +1338,27 @@ fn oplAt(d: f32, uv: vec2f, dyeGain: f32) -> f32 {
   let closeup = macroAmt > 0.001;
   let isCamera = U.photo > 0.5 || closeup;
   /*
-    The camera's views (a photographed look, the closeup) keep their own
-    slope, the lit colour's, for their rims, and carry nothing else. Until
-    18e-5 the two-dye line's strength rode in .z here, and the closeup's
-    relief, which reads .z over .w as the path's curvature (camShadow,
-    38h-7), was shading with that colour step: a dark band where two dyes
-    met, as wide as the line's four taps and magnified with the view, and no
-    depth on a swell. The line is gone, so .z is 0 and that term of the
-    relief is at rest, which is the closeup main drew with Boundary Contrast
-    at 0. Writing the path and its Laplacian here, as the wall's branch does,
-    was tried and is not here: on the Mac a cluster of bubbles on pink dye
-    blew a sixth of the closeup to flat white (the air's index step is a
-    spike in a nine-tap Laplacian, and camShadow may brighten 2.5 times),
-    and a step in the dye's depth drew a doublet 119 levels darker and 99
-    brighter from the dye's stand-in index. The closeup's shadowgraph wants
-    the path read at the lens's scale, as defocusShadow reads it: PLAN 18e-7.
+    The camera's views keep their own slope, the lit colour's, for their
+    rims. In .z a photographed look carries nothing since 18e-5 (it was the
+    two-dye line's strength, and the line is gone). The closeup still
+    carries it, because its relief reads .z over .w as the optical path's
+    curvature (camShadow, 38h-7) and has only ever been given this colour
+    step: a darker band where two dyes meet, and the only depth Macro Relief
+    draws on a plate with no cells. Two replacements were tried and neither
+    is here. Nothing in .z left the closeup flat (npm run macroview's relief
+    0 on every look). The path and its nine-tap Laplacian, as the wall's
+    branch writes them, blew up to 17% of a closeup frame to flat white on
+    the Mac round a cluster of bubbles on pink dye (the air's index step is
+    a spike at that scale, and camShadow may brighten 2.5 times), and in the
+    lab drew a doublet 119 levels darker and 99 brighter at a step in the
+    dye's depth, from the dye's stand-in index. So the closeup is main's, to
+    the byte, until PLAN 18e-7 reads the path at the lens's scale.
   */
-  if (isCamera) { return vec4f(sobelGrad(src, in.uv), 0.0, 0.0); }
+  if (isCamera) {
+    var diff = 0.0;
+    if (closeup && U.boundaryContrast > 0.005) { diff = boundaryDiff(src, in.uv); }
+    return vec4f(sobelGrad(src, in.uv), diff, 0.0);
+  }
 
   let ts = 3.0 / U.logicalGrid;
   let dyeGain = max(1.0, U.boundaryContrast * 3.0);

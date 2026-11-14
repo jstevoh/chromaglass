@@ -54,7 +54,7 @@ export const CONTROL_HELP: Record<string, string> = {
   grainScale: 'How fine that speckle is. Higher is a finer grain.',
   blobSurfaceTension: 'How hard two colours hold apart at their edge, so they bead up instead of blending.',
   layerScaleVariety: 'Shows the second layer magnified and drifting, so one frame carries two scales of pattern.',
-  boundaryContrast: 'How strongly edges show out of focus, and the back plate\'s bright rim. No line is drawn where two colours meet.',
+  boundaryContrast: 'How strongly edges show out of focus, and the back plate\'s bright rim. No line is drawn where two colours meet, except as shading in the closeup.',
   glossiness: 'How steep the liquid\'s surface reads to the lens. Zero is the real surface; up, ripples and edges bend more light away.',
   colourBody: 'How solid the colour reads. Zero is the dye\'s own thin tint, one is an opaque body of colour.',
   postBlurRadius: 'A final soft blur over the picture that makes the shapes run together.',

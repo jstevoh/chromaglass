@@ -2777,10 +2777,10 @@ at one frame. Whether the looks read better without the line is only seen here.
    line along a boundary, or the colours duller than before.
 2. Any look with two layers (Comet River is one): the back plate's rims are still a little
    brighter than its dye, as before.
-3. **Macro Zoom** to 4x on Comet River: where two colours meet there is no dark band. Bad: a
-   flat white patch round bubbles, or thin dark crackle lines across the dye. A closeup that
-   reads flatter than before is expected until PLAN 18e-7.
+3. **Macro Zoom** to 4x on Comet River: unchanged by this (PLAN 18e-7). Where two colours
+   meet up close there is still a darker band; that is the closeup's relief reading the colour
+   step, and it goes when the closeup shades from the liquid's own optical path.
 4. **Splodascope** (oil drops): each drop keeps a rim (Edge Relief's), thinner than before.
    Bad: drops that melt into the water with no edge at all (PLAN 47z-4).
-5. Boundary Glow from 0 to 1 at the Focus's middle: nothing moves. Off its middle: the fringes
+5. Boundary Glow from 0 to 1 at the Focus's middle, plate-wide: nothing moves. Off its middle: the fringes
    at the dye's edges strengthen.

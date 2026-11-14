@@ -23,8 +23,8 @@
  * in one liquid have no index step between them and no surface to slope, so
  * they bend nothing; what a boundary between them does is absorb with both
  * dyes where they overlap, which the decode already draws. The line is gone
- * from every path (PLAN 18e-5; the long comment in wgsl/plate.ts where
- * boundaryDiff was). Measured on main the day it went, the lines below read:
+ * from the wall and from a photographed look (PLAN 18e-5; the long comment
+ * over boundaryDiff in wgsl/plate.ts). Measured on main the day it went, the lines below read:
  * round a hole and at the pool's rim 0 levels (the hue gate's work), and
  * between two dyes 173 levels at one depth, 136 at depths five times apart,
  * 13 at hues 0.2 apart, 141 photographed, the seam on the wall 43 levels
@@ -61,14 +61,13 @@
  *      SIDES levels apart). It reads 3 and 4 (the dither, and the blend's
  *      own curve through the grade) against main's 43, so SEAM is 6. This
  *      is the one line that would see a line the dial did not scale
- *   3c. the closeup (2x, centred on the seam): the dial at 1 against 0
- *      moves no pixel of the frame's middle by more than MAX_MOVE, at one
- *      depth and at depths five times apart, and at one depth the seam is
- *      within CLOSE levels of the two dyes beside it (main: 26 darker,
- *      where the closeup's relief was shading with the colour step). The
- *      camera's views carry no line and, for now, no path either (the
- *      derive pass's camera branch, wgsl/plate.ts, says what was tried),
- *      so the dial has nothing to scale there
+ *
+ * Printed, not judged: the closeup (2x, centred on the seam, the dial at 1
+ * against 0). Up close the colour step is still read, as the closeup's
+ * relief (the derive pass's camera branch in wgsl/plate.ts says why it is
+ * kept and what was tried in its place), so there a seam between two dyes
+ * is still shaded darker and the dial still moves it: PLAN 18e-7, whose
+ * build turns these printed numbers into lines.
  *
  * Not asked here: the back plate. Its painted bright rim (the dye's slope
  * times the dial, refractionOptics note 5, PLAN 18e-1) is kept, drawn on a
@@ -120,7 +119,7 @@ const check = (name, ok, detail = '') => {
 
 const N = 256, SIZE = 768;
 const MOVED = 24, MAX_MOVE = 4, HALO_OUT = 6, RIM_SLACK = 1.5;
-const DIALS = [0.35, 1, 2], LIVE = 3, SEAM = 6, CLOSE = 8, SIDES = 60;
+const DIALS = [0.35, 1, 2], LIVE = 3, SEAM = 6, SIDES = 60;
 const SIZES = [1.8, 3, 5, 8, 14];
 const HOLE_FROM = 1, HOLE_TO = 6, HOLE_REF = 10, MAX_GLOW = 6, CONTROL_GLOW = 6, KEEP_RIM = 0.98, KEEP_ARC = 0.95, ARC_REACH = 24, PART_SMALL = 0.9, MIN_RIM = 3, MAX_NEAR = 1, CONTROL_NEAR = 5;
 
@@ -385,7 +384,7 @@ for (const h of now.halo) console.log(`     hole ${h.cells.toFixed(1)} cells: at
 console.log(`     pool rim into water: at most ${now.rim.max} (${now.rim.n} pixels); out of focus the dial moves it ${now.live.toFixed(2)} on average`);
 for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'uneven'], ['near hues, about 0.08 apart', 'near'], ['near hues, about 0.2 apart', 'nearer'], ['one depth, photographed', 'photo']]) {
   const r = now[k];
-  console.log(`     two dyes meeting, ${name}: at most ${r.max} (${r.n} pixels); the seam ${r.dark} darker than the darker dye beside it and ${r.bright} brighter than the brighter, the two sides ${r.sides} apart${r.close ? `; in the closeup the dial moves at most ${r.close.max}, the seam ${r.close.dark} and ${r.close.bright}, sides ${r.close.sides} apart` : ''}`);
+  console.log(`     two dyes meeting, ${name}: at most ${r.max} (${r.n} pixels); the seam ${r.dark} darker than the darker dye beside it and ${r.bright} brighter than the brighter, the two sides ${r.sides} apart${r.close ? `; in the closeup (printed, 18e-7) the dial moves at most ${r.close.max}, the seam ${r.close.dark} and ${r.close.bright}, sides ${r.close.sides} apart` : ''}`);
 }
 
 // The plates are what they say, before anything is judged on them.
@@ -402,8 +401,6 @@ for (const [name, k] of [['one depth', 'even'], ['depths five times apart', 'une
   check(`3. no line where two dyes meet, ${name} (at most ${now[k].max} levels ≤ ${MAX_MOVE})`, now[k].max <= MAX_MOVE);
 }
 check(`3b. the seam is the two dyes' own absorbance (${now.even.dark} levels darker than the darker side, ${now.even.bright} brighter than the brighter, ≤ ${SEAM}; the sides ${now.even.sides} apart > ${SIDES})`, now.even.dark <= SEAM && now.even.bright <= SEAM && now.even.sides > SIDES);
-check(`3c. and in the closeup: the dial moves nothing (at most ${now.even.close.max} levels at one depth, ${now.uneven.close.max} at depths five times apart, ≤ ${MAX_MOVE})`, now.even.close.max <= MAX_MOVE && now.uneven.close.max <= MAX_MOVE);
-check(`3c. and its seam at one depth is the two dyes' (${now.even.close.dark} darker, ${now.even.close.bright} brighter, ≤ ${CLOSE}; the sides ${now.even.close.sides} apart > ${SIDES})`, now.even.close.dark <= CLOSE && now.even.close.bright <= CLOSE && now.even.close.sides > SIDES);
 
 for (const [name, r] of [['the shader', glowNow], ['the control (no air mask)', glowThen]]) {
   console.log(`   ${name}, the dye ${HOLE_FROM} to ${HOLE_TO} cells past a hole's rim, from the dye ${HOLE_REF} cells out:`);
