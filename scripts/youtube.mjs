@@ -42,7 +42,7 @@
  */
 import { spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -318,6 +318,32 @@ async function scenario(server, gport) {
 
     const twice = await b.tool('upload_video', args);
     line('twice', 'the same file and title a second time is refused, naming the video it already is', twice.error && twice.text.includes(`youtu.be/${v?.id}`) && g.sessions.length === 1, twice.text.slice(0, 160));
+
+    /* Which files go to YouTube (the security review of 2026-11-13): any path at all used to,
+       so a page read in the same session could ask for a private film, or for a Photos
+       original as a public video's thumbnail. Each refusal below is asked of a real file that
+       would otherwise upload, and the one allowed beside them proves the door still opens. */
+    const lib = join(dir, 'Photos Library.photoslibrary', 'originals');
+    mkdirSync(lib, { recursive: true });
+    writeFileSync(join(lib, 'private.mov'), randomBytes(1024));
+    writeFileSync(join(lib, 'face.jpg'), Buffer.from('ffd8ffe0', 'hex'));
+    mkdirSync(join(dir, '.secret'), { recursive: true });
+    writeFileSync(join(dir, '.secret', 'film.mp4'), randomBytes(1024));
+    writeFileSync(join(dir, 'notes.txt'), 'not a film');
+    symlinkSync(join(lib, 'private.mov'), join(dir, 'innocent.mov'));
+    const sessionsBefore = g.sessions.length;
+    const thumbsBefore = g.thumbnails.length;
+    const refusals = [
+      await b.tool('upload_video', { file: join(lib, 'private.mov'), title: 'x1' }),
+      await b.tool('upload_video', { file: join(dir, '.secret', 'film.mp4'), title: 'x2' }),
+      await b.tool('upload_video', { file: join(dir, 'notes.txt'), title: 'x3' }),
+      await b.tool('upload_video', { file: join(dir, 'innocent.mov'), title: 'x4' }),
+      await b.tool('set_thumbnail', { video_id: v?.id, file: join(lib, 'face.jpg') }),
+    ];
+    const allowed = await b.tool('set_thumbnail', { video_id: v?.id, file: thumb });
+    line('files', 'nothing from the Photos library, a hidden folder or a link into either, and nothing that is not a film or a picture, goes to YouTube; an ordinary picture still does',
+      refusals.every((r, i) => r.error && (i === 2 ? /is one of/ : /private library or a hidden folder/).test(r.text)) && g.sessions.length === sessionsBefore && !allowed.error && g.thumbnails.length === thumbsBefore + 1,
+      refusals.map((r) => r.text.slice(0, 60)).join(' | ') + ` | allowed: ${allowed.text.slice(0, 40)}`);
 
     const up = await b.tool('update_video', { video_id: v?.id, title: 'A new title' });
     const after = g.videos.get(v?.id);

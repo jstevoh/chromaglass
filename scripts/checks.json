@@ -1419,8 +1419,7 @@
         "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
         "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
         "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
-        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye.",
-        "In lab9 beside moire since 2026-11-13 (PLAN 19k-11c), for the room holeline needs in lab4."
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
       ]
     },
     {
@@ -1512,9 +1511,7 @@
         "and fills its hole evenly without airShed, and the app lays no press",
         "under a bubble while the flow round it stays the same. Each owed id",
         "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
-        "it: about three and a half minutes, five on the slow tier. In lab8 beside lavawax",
-        "since 2026-11-13 (PLAN 19k-11c): lab4, where it was, reached holeline 15 minutes in",
-        "on the slow tier and was cancelled in it at the limit, with every check green."
+        "it: about three and a half minutes, in lab8 (PLAN 19k-11c moved it from lab4)."
       ]
     },
     {
@@ -1610,8 +1607,7 @@
         "through its glass has not warmed the wax by then, so that line and its no-swelling",
         "lab are lavacycle's now, on the Mac (PLAN 27f-9h). It was about ten minutes on",
         "SwiftShader with that line, about twenty on the slow tier: a part of its own, lab8,",
-        "since lab4 already ran about eleven there. At 15 seconds of the plate it has the room",
-        "and bubbleair runs beside it (PLAN 19k-11c)."
+        "since lab4 already runs about eleven there."
       ]
     },
     {
@@ -1794,6 +1790,39 @@
         "second lab on SwiftShader (lampzero's reason: two compiled programs compared",
         "byte for byte), and FluidSimulation's stepCurrent against today's body in",
         "node. Holds on main. About 90 s in a cloud session."
+      ]
+    },
+    {
+      "name": "One args name, one value a step (46r)",
+      "shard": "lab2",
+      "run": "npm run argnames",
+      "timeout": 6,
+      "why": [
+        "A dispatch's numbers live in a buffer the solver keeps under a name, and a",
+        "buffer holds what was written to it last before the submit, so two calls in",
+        "one step under one name with different numbers both read the second's. The",
+        "lasting current, the swirl's projection and the open plate's addCurrent",
+        "shared 'current grid', and on the open plate currentForces read Depth Drag",
+        "as the boil running (scripts/argnames.mjs). The solver's argWrite watched",
+        "from the page on eleven plates, with a planted pair as the control; the",
+        "current after one step the same at Depth Drag 0 and 1.5, bit for bit; and",
+        "the boil's rise read on the open plate at Heat 1. About 50 s here."
+      ]
+    },
+    {
+      "name": "A poured liquid acts on every step (15e-1)",
+      "shard": "lab2",
+      "run": "npm run liquidpush",
+      "timeout": 6,
+      "why": [
+        "A bottle's liquid pushed the flow and thinned the dye only inside the fold of",
+        "a frame's hand-laid deltas, so not at all on a step nothing was laid in (a",
+        "liquid poured after a Clear) and twice on a step folded twice",
+        "(scripts/liquidpush.mjs). A heavy drop and a soap's on a rocked plate, open",
+        "and thin, stepped with no fold, one and two, and after a Clear, each against",
+        "the same plate without the drops: all four do the same. `npm run liquidsgpu`",
+        "holds the liquids' sizes on the Mac; this holds when they act, in a minute,",
+        "on any adapter."
       ]
     },
     {
@@ -2660,7 +2689,7 @@
         "`npm run liquids` laid on the thin gap the looks use, each held to the",
         "stand-in's bar and to its size within a factor of two, with a fold of",
         "the deltas every step and on a still plate, and soap's and silicone's",
-        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-1 to",
+        "dye asked whether it was moved or erased. Lines owed to PLAN 15e-2 to",
         "15e-5 print and do not fail until they pass. Here on Metal, about a",
         "minute: on the Linux lab part it took 4 min 26 s, and that part ran",
         "24 of its 25 minutes before signin without it (#513's first run)."

@@ -2768,6 +2768,8 @@ only seen here.
 
 ## 130. The closeup with nothing drawn over it (PLAN 38u-1, 38u-2, 38u-3)
 
+**Judged 2026-11-13.** The owner watched the before and after films from their Mac (Macro Bead, Cell Bloom, Classic at 5x) the same day: "looks good". Seen in both films and older than this change: the beads' scalloped rims (38h-17) and grid steps where dye is freshly poured at 5x (the fine detail's, section 47).
+
 The check (`npm run stillcloseup`) proves a still plate draws a still closeup, that no shadow
 falls to one side of a pool and that Depth / Focus only defocuses, in the lab at one frame.
 Whether the closeup still reads as deep and wet without the drawn shadow is only seen here.

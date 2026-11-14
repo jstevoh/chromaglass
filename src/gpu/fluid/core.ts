@@ -115,6 +115,13 @@ export class FluidCore {
   protected readonly boilUniF = new Float32Array(this.boilUniData);
   protected readonly boilUniU = new Uint32Array(this.boilUniData);
   protected boilLive = false;
+  /**
+   * A bottle's liquid has been poured since the last clear (addLiquidDrop),
+   * so `liquids0` and `liquids1` hold something for a step to act on
+   * (stepLiquids, PLAN 15e-1). False on a plate of plain dye, which then
+   * runs neither of that pass's two dispatches.
+   */
+  protected liquidsLive = false;
   protected boilFresh = false;
   protected boilTail = 0;
   /** velForced less the glass's drift this step, when there is one (driftCells): what the thin carries ride. */
@@ -718,6 +725,7 @@ export class FluidCore {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.rxn) for (const t of [this.rxn.a, this.rxn.b]) this.fill(pass, t, [0, 0, 0, 0], BZ_GRID);
     if (this.lies) for (const t of [this.lies.a, this.lies.b]) this.fill(pass, t, [0, LIES_B0, 0, 0], LIES_GRID);
@@ -754,6 +762,7 @@ export class FluidCore {
     if (this.mix) for (const t of [this.mix.a, this.mix.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids0) for (const t of [this.liquids0.a, this.liquids0.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     if (this.liquids1) for (const t of [this.liquids1.a, this.liquids1.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
+    this.liquidsLive = false;
     if (this.species) for (const t of [this.species.a, this.species.b]) this.fill(pass, t, [0, 0, 0, 0], this.N);
     this.speciesLive = false;
     this.speciesClears++;
