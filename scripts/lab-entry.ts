@@ -773,6 +773,8 @@ const api = {
       leanFrom?: Partial<VisualizerSettings>;
       /** Gates taken out of the lean display and drawn lean regardless (`leandisplay`'s control that a gate is really compiled out). */
       leanDrop?: number;
+      /** Registered as the app's opening registers it, the whole one building behind the show (`leandisplay`'s control of that path). */
+      leanBehind?: boolean;
     } = {}) {
     const l = lab!;
     const device = l.solver['device'] as GPUDevice;
@@ -816,7 +818,7 @@ const api = {
       const mask = displayMayMask({ ...view.settings, ...cam.leanFrom });
       if (cam.wholeDisplay) setLeanDisplay(device, 'rgba8unorm', null);
       else if (cam.leanDrop) setLeanDisplay(device, 'rgba8unorm', mask & ~cam.leanDrop, 'forced');
-      else setLeanDisplay(device, 'rgba8unorm', mask);
+      else setLeanDisplay(device, 'rgba8unorm', mask, cam.leanBehind ? 'behind' : 'asked');
     }
     const target = device.createTexture({ size: [size, size], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC });
     const enc = device.createCommandEncoder();

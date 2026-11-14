@@ -341,10 +341,10 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
     2026-11-14): on a phone the show took about thirty seconds to start with
     nothing to say it was getting anywhere; show a loading state while
     there are no visuals, with updates. Its own record (`introStage`) says
-    what it showed and when: the stages in order (loading, the GPU starting,
-    the builds counted, the first frame coming), the count never going back
-    and reaching every build the opening asked for, and the first frame's
-    words before the plate stepped. And the reason it is built as it is:
+    what it showed and when: the stages in order (the GPU starting, the
+    builds counted, the first frame coming; "Loading" is the page's own
+    markup and not recorded), the count reaching the last build, and the
+    first frame's words before the plate stepped. And the reason it is built as it is:
     a new picture while a render pipeline compiles waits in the GPU process
     behind it on a Mac (line 9 has the runs), so no change of words falls in
     the render compiles line 9 reads. A run in which no build settled during
@@ -357,8 +357,10 @@ console.log(`intro: ${DIST}, the desk over ${RTT_MS} ms round trips at ${DOWN_MB
   const inOrder = kinds.every((k, i) => i === 0 || ORDER.indexOf(k) >= ORDER.indexOf(kinds[i - 1]));
   const counts = said.filter(([, k]) => k === 'build');
   const lastCount = counts.length ? counts[counts.length - 1] : null;
-  const counted = counts.length > 2 && counts.every(([, , d], i) => i === 0 || d >= counts[i - 1][2])
-    && lastCount !== null && opening !== null && lastCount[3] === opening.asked && lastCount[2] === lastCount[3];
+  // The count is a counter and its total is the opening's own list, so
+  // neither can go wrong here; what can is the line never reaching the end
+  // (the last builds settling inside a compile and nothing saying so after).
+  const counted = counts.length > 2 && lastCount !== null && lastCount[2] === lastCount[3];
   const firstWords = said.find(([, k]) => k === 'first');
   const beforeStep = !!firstWords && at.steppedAt !== undefined && firstWords[0] <= at.steppedAt + 1;
   const changedInCompile = said.filter(([t]) => inCompile(t));

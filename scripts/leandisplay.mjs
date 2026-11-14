@@ -35,11 +35,14 @@
  *
  * Controls, so the comparison is seen to see something:
  *   - a lean display with one gate the look uses taken out, drawn regardless
- *     (`leanDrop`), differs from the whole one: the gate really compiles
+ *     (`leanDrop`, the first of Classic's kept gates that shows), differs from the whole one: the gate really compiles
  *     that effect out, and the comparison sees it;
  *   - a look drawn with an effect its lean display left out (Classic with
  *     Lacing up, its display built for Classic as it ships) draws with the
- *     whole one and matches it: the frame's fallback.
+ *     whole one and matches it: the frame's fallback;
+ *   - the app's own opening path ('behind'): the same draw before the whole
+ *     display exists is lean and lacks the lacing, and after it exists is the
+ *     whole one, byte for byte.
  */
 import { openLab } from './lab.mjs';
 
@@ -100,6 +103,19 @@ try {
       if (STEPS > 0) await lab.step(STEPS, app);
       return { settings, time: STEPS * app.dt };
     };
+    /*
+      The app's own path, first, before anything here has built the whole
+      display: the opening registers its lean display 'behind', and until the
+      whole one is built a draw that reaches past the lean one draws lean
+      regardless (a late effect, never a frame held for a compile). Classic's
+      lean display built by drawing Classic, then Classic with Lacing up drawn
+      'behind': lean, with the lacing missing. Checked again at the end, once
+      the whole display exists, where the same draw must be the whole one.
+    */
+    const early = await lay('classic');
+    await lab.render(SIZE, early.settings, { time: early.time });
+    const behindLaced = await lab.render(SIZE, { ...early.settings, lacing: 0.6 }, { time: early.time, leanFrom: early.settings, leanBehind: true });
+    const behindDrewBefore = lab.lastDisplay();
     const looks = [];
     for (const id of ids) {
       const { settings, time } = await lay(id);
@@ -112,17 +128,32 @@ try {
     }
     // The controls, on Classic.
     const { settings, time } = await lay('classic');
-    const bit = gates.indexOf('U.boundaryContrast > 0.005');
+        /*
+      Each gate Classic's lean display keeps, taken out in turn and drawn
+      regardless, until one changes the picture. It was the edge line alone
+      until 18e-5 took that line off the plate (it is drawn now only in the
+      close-up's texture pass, which always uses the whole display): this
+      control then read 0 bytes and failed, as it should have. Which gate
+      did it is printed; none at all fails.
+    */
     const whole = await lab.render(SIZE, settings, { time, wholeDisplay: true });
-    const dropped = await lab.render(SIZE, settings, { time, leanDrop: 1 << bit });
-    const droppedDrew = lab.lastDisplay();
+    const keptMask = lab.displayMayMask(settings);
+    let dropped = 0, droppedDrew = '', droppedGate = 'none';
+    for (let i = 0; i < gates.length && !dropped; i++) {
+      if (!(keptMask & (1 << i))) continue;
+      const pic = await lab.render(SIZE, settings, { time, leanDrop: 1 << i });
+      dropped = same(whole, pic); droppedDrew = lab.lastDisplay(); droppedGate = gates[i];
+    }
     const laced = { ...settings, lacing: 0.6 };
     const lacedWhole = await lab.render(SIZE, laced, { time, wholeDisplay: true });
     const lacedLean = await lab.render(SIZE, laced, { time, leanFrom: settings });
     const lacedDrew = lab.lastDisplay();
+    const lacedBehind = await lab.render(SIZE, laced, { time, leanFrom: settings, leanBehind: true });
+    const behindDrewAfter = lab.lastDisplay();
     return {
       looks, gates: gates.length,
-      control: { edge: settings.boundaryContrast, dropped: same(whole, dropped), droppedDrew, lacedFallback: same(lacedWhole, lacedLean), lacedDrew, lacingShows: same(whole, lacedWhole) },
+      control: { dropped, droppedGate, droppedDrew, lacedFallback: same(lacedWhole, lacedLean), lacedDrew, lacingShows: same(whole, lacedWhole),
+        behindDrewBefore, behindBefore: same(lacedWhole, behindLaced), behindDrewAfter, behindAfter: same(lacedWhole, lacedBehind) },
     };
   }, { LOOKS, GRID, SIZE, STEPS });
 
@@ -133,10 +164,14 @@ try {
       `${lean ? `lean, ${l.kept} of ${res.gates} effects kept` : `drew with ${l.drew}`}, ${l.differ} of ${pixels * 4} bytes differ`);
   }
   const c = res.control;
-  check(c.dropped > 0 && / lean /.test(c.droppedDrew), 'control: Classic\'s lean display with its edge line taken out differs from the whole one',
-    `${c.dropped} bytes differ (Boundary Contrast ${c.edge}, drew ${c.droppedDrew})`);
+  check(c.dropped > 0 && / lean /.test(c.droppedDrew), 'control: Classic\'s lean display with one of its kept effects taken out differs from the whole one',
+    `${c.dropped} bytes differ with ${c.droppedGate} taken out (drew ${c.droppedDrew})`);
   check(c.lacingShows > 0 && c.lacedFallback === 0 && !/ lean /.test(c.lacedDrew), 'control: Classic with Lacing up, its display built for Classic as it ships, falls back to the whole one',
     `lacing changes ${c.lacingShows} bytes; drew ${c.lacedDrew}, ${c.lacedFallback} bytes from the whole one`);
+  check(/ lean /.test(c.behindDrewBefore) && c.behindBefore > 0, 'control: before the whole display is built, the opening\'s lean display draws Classic with Lacing up anyway, without the lacing (the app\'s "behind" path)',
+    `drew ${c.behindDrewBefore}, ${c.behindBefore} bytes from the whole one`);
+  check(!/ lean /.test(c.behindDrewAfter) && c.behindAfter === 0, 'control: once the whole display is built, the same "behind" draw is the whole one, the same bytes',
+    `drew ${c.behindDrewAfter}, ${c.behindAfter} bytes from the whole one`);
 } finally {
   await close();
 }
