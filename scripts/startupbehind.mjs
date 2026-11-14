@@ -34,8 +34,9 @@
  *     held for good by a half whose every build takes just under the cap:
  *     about four times the slowest half seen.
  *
- * The line reads the half's pace out beside the opening's (ms a build), so a
- * half that slows is seen there and not hidden by the wait.
+ * The line holds the half's pace to the opening's on the same runner
+ * (BEHIND_PACE_MAX, below), so a half that slows is red there and not hidden
+ * by the wait.
  */
 export const BEHIND_START_MS = 45_000;
 export const BEHIND_SLACK_MS = 5_000;
@@ -64,10 +65,35 @@ export function waitBehind(page) {
   }, [BEHIND_START_MS, BEHIND_MAX_MS, BEHIND_SLACK_MS]);
 }
 
+/*
+  The most the half behind the show may take a build, as a multiple of the
+  opening's on the same runner. The fixed 45 s wait this file replaces was,
+  in effect, the only thing that made a slow half red: a half four times
+  slower now finishes inside BEHIND_MAX_MS. So its pace is held instead, to
+  the runner's own pace and not to a clock, which a slower runner moved the
+  red past. What was read: one at a time the half took 0.38 s a build
+  against the opening's 0.13 s three at a time (2.9x, run 43570470863);
+  two at a time (LATER_LANES) it should take less. Six times catches a half
+  held behind something it should not be (a lane serialised behind the
+  frames, a compile per frame) with room for a runner's noise.
+*/
+export const BEHIND_PACE_MAX = 6;
+
+/**
+ * Both halves whole: each asked for something, built all of it, never timed
+ * out, and the half behind at no more than BEHIND_PACE_MAX times the
+ * opening's pace. `asked > 0` because a record missing its fields compared
+ * `undefined === undefined` and passed.
+ */
+export function halvesWhole(p, b) {
+  const whole = (x) => !!x && x.asked > 0 && x.ready === x.asked && !x.timedOut;
+  return whole(p) && whole(b) && b.ms / b.asked <= BEHIND_PACE_MAX * (p.ms / p.asked);
+}
+
 /** The line's account of the half: done, with its pace against the opening's, or how far it got. */
 export function behindSaid(b, p, w) {
   const each = (x) => `${(x.ms / Math.max(1, x.asked)).toFixed(0)} ms a build`;
-  if (b) return `${b.ready} of ${b.asked} behind it in ${(b.ms / 1000).toFixed(2)} s${b.timedOut ? ', and it stopped waiting' : ''} (${each(b)}, against ${each(p)} ahead)`;
+  if (b) return `${b.ready} of ${b.asked} behind it in ${(b.ms / 1000).toFixed(2)} s${b.timedOut ? ', and it stopped waiting' : ''} (${each(b)}, against ${each(p)} ahead; at most ${BEHIND_PACE_MAX}×)`;
   if (!w) return 'nothing built behind it (not waited for)';
   const g = w.going;
   if (!g) return `nothing began building behind it in ${(BEHIND_START_MS / 1000).toFixed(0)} s`;

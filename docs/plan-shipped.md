@@ -5165,8 +5165,11 @@ the old 45 s, or at 180 s in all, a bound only against holding a runner for good
 now says how far an unfinished half got instead of "nothing built behind it", and prints
 the half's pace (ms a build) beside the opening's. And the half builds two at a time
 (LATER_LANES), one render pipeline among them at most: how long it takes is how long a look
-changed to can build on the frame (19ah-9c). No bar changed; the fixed 45 s was a wait, not
-what the line claims.
+changed to can build on the frame (19ah-9c). The 45 s wait had been, in effect, the only
+thing that made a slow half red, so the line now holds the half's pace instead, to the
+runner's own: at most six times the opening's ms a build (BEHIND_PACE_MAX; it read 2.9x one
+at a time), and both halves must have asked for something (a record missing its fields had
+passed as `undefined === undefined`).
 
 ### 19ai-6. The solver's kernels, one file a pass (2026-10-28)
 

@@ -103,7 +103,7 @@ import { readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { engineQuery } from './frame.mjs';
 import { heldStretches, selfCheck } from './pagehold.mjs';
-import { behindSaid, waitBehind } from './startupbehind.mjs';
+import { behindSaid, halvesWhole, waitBehind } from './startupbehind.mjs';
 
 const checks = [];
 const check = (n, ok, d = '') => { checks.push({ ok: !!ok }); console.log(` ${ok ? 'ok  ' : 'FAIL'} ${n}${d ? ' — ' + d : ''}`); };
@@ -1570,7 +1570,7 @@ try {
     rate == null ? `nothing to compare${cDevices === 1 ? '' : ` (the control had ${cDevices} devices)`}` : `${oWait.compile.toFixed(2)} s building ${oWait.shared} of the ${oldWay.length} ahead, against ${cWait.compile.toFixed(2)} s stopped for them: ${rate.toFixed(2)}×`);
   const notWaited = p ? oldWay.filter((k) => !p.keys.includes(k)) : oldWay;
   check('every pipeline it asked for ahead was built ahead, before it opened and behind it, on the device it opened on',
-    !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && p.ready === p.asked && !p.timedOut && b.ready === b.asked && !b.timedOut,
+    !!p && !!b && oldWay.length > 0 && notWaited.length === 0 && halvesWhole(p, b),
     !p ? 'nothing was prepared (no `pipelines` in chromaglassDebug)'
       : `${p.ready} of ${p.asked} before it opened in ${(p.ms / 1000).toFixed(2)} s${p.timedOut ? ', and it stopped waiting' : ''}; `
         + behindSaid(b, p, o.behindWait)
