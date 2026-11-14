@@ -26,6 +26,7 @@
 import worker from '../server/license-worker.js';
 import { signLicenseKey, verifyLicenseKey } from '../server/license-key.js';
 import { TV_CODE_ALPHABET, normalizeTvCode, signTvPass, verifyTvPass } from '../server/tv-code.js';
+import { resetTurnsForChecks } from '../server/turns.js';
 
 const checks = [];
 const check = (name, ok, detail = '') => {
@@ -303,6 +304,86 @@ check('a pass that has run out does not renew (the TV pairs again)', (await call
     if (r.status === 429 && !firstRefused) firstRefused = i;
   }
   check('one address gets 1440 polls an hour (a dozen TVs pairing), and the 1441st is refused', firstRefused === 1441, `first refusal at ${firstRefused}`);
+}
+/* What the allowances cost (the security review of 2026-11-13). They used to be KV
+   counters, a write for every ask that had not hit its limit, taken before anything in
+   the request was read, and the free plan's 1000 KV writes a day cover the whole
+   Cloudflare account: one script polling junk spent them in under an hour, and then the
+   store's webhook, every Mac's activation and every TV link failed with them. So the
+   feature measured here is the write count itself, on a KV that counts every put and
+   delete: a stranger's asks to every route anyone can call write nothing (the one route
+   that files a record for a stranger, /tv/code, writes exactly its record), and the
+   allowances still refuse at the same numbers as above. */
+class CountingKV extends FakeKV {
+  constructor() { super(); this.writes = 0; this.names = []; }
+  async put(key, value, opts) { this.writes++; this.names.push(key); return super.put(key, value, opts); }
+  async delete(key) { this.writes++; this.names.push(`-${key}`); return super.delete(key); }
+}
+{
+  resetTurnsForChecks();
+  const e = { ...makeEnv(), LICENSE_KV: new CountingKV() };
+  const kv = e.LICENSE_KV;
+  const statuses = new Set();
+  for (let i = 0; i < 300; i++) statuses.add((await call(e, '/tv/poll', { body: { userCode: 'BCDF-GHJK', deviceCode: 'x' }, ip: '192.0.2.50' })).status);
+  for (let i = 0; i < 100; i++) statuses.add((await call(e, '/tv/poll', { body: {}, ip: '192.0.2.50' })).status);
+  for (let i = 0; i < 100; i++) statuses.add((await call(e, '/tv/renew', { body: { pass: 'cgtv1.AAAA.AAAA' }, ip: '192.0.2.50' })).status);
+  for (let i = 0; i < 100; i++) {
+    const r = await worker.fetch(new Request('https://licence.test/activate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '192.0.2.50' },
+      body: JSON.stringify({ key: 'cg1.AAAA.AAAA', machineId: 'm' }),
+    }), e);
+    statuses.add(r.status);
+  }
+  check('600 junk asks from a stranger to /tv/poll, /tv/renew and /activate write nothing to KV',
+    kv.writes === 0 && statuses.has(429), `${kv.writes} writes (${kv.names.slice(0, 4).join(', ')}), answers ${[...statuses].join(',')}`);
+
+  const before = kv.writes;
+  let codes = 0;
+  for (let i = 0; i < 40; i++) if ((await call(e, '/tv/code', { ip: '192.0.2.51' })).status === 200) codes++;
+  const codeWrites = kv.names.slice(before);
+  check('40 asks for a code from one address: 30 codes, and exactly one write each, its own record',
+    codes === 30 && codeWrites.length === 30 && codeWrites.every((n) => n.startsWith('tvcode:')),
+    `${codes} codes, ${codeWrites.length} writes (${[...new Set(codeWrites.map((n) => n.split(':')[0]))].join(',')})`);
+}
+{
+  // An IPv6 sender is one subscriber per /64: walking the low bits buys no more codes.
+  resetTurnsForChecks();
+  const e = makeEnv();
+  let firstRefused = 0;
+  for (let i = 1; i <= 31; i++) {
+    const r = await call(e, '/tv/code', { ip: `2001:db8:7:9::${i.toString(16)}` });
+    if (r.status === 429 && !firstRefused) firstRefused = i;
+  }
+  check('31 IPv6 addresses in one /64 share an allowance: the 31st code is refused', firstRefused === 31, `first refusal at ${firstRefused}`);
+}
+{
+  // Cloudflare's Rate Limiting binding, when the deploy binds one, refuses /tv/code across isolates.
+  resetTurnsForChecks();
+  const asked = [];
+  const e = { ...makeEnv(), TV_CODE_LIMITER: { limit: async ({ key }) => { asked.push(key); return { success: asked.length <= 2 }; } } };
+  const got = [];
+  for (let i = 0; i < 3; i++) got.push((await call(e, '/tv/code', { ip: '192.0.2.60' })).status);
+  const broken = { ...makeEnv(), TV_CODE_LIMITER: { limit: async () => { throw new Error('down'); } } };
+  const stillServes = (await call(broken, '/tv/code', { ip: '192.0.2.61' })).status;
+  check('a bound TV_CODE_LIMITER refuses /tv/code when it says so, and one that throws leaves the route open',
+    got.join() === '200,200,429' && asked.every((k) => k.includes('192.0.2.60')) && stillServes === 200,
+    `${got.join()} asked ${asked.length}, broken binding ${stillServes}`);
+}
+{
+  // A token whose address was not proved (no email_verified claim at all) claims nothing.
+  const now = Math.floor(Date.now() / 1000);
+  const enc = (o) => toBase64Url(new TextEncoder().encode(JSON.stringify(o)));
+  const head = enc({ alg: 'RS256', typ: 'JWT', kid: 'g1' });
+  const body = enc({ iss: 'https://securetoken.google.com/chromaglass', aud: 'chromaglass', sub: 'uid_x', user_id: 'uid_x', email: fan, iat: now - 10, exp: now + 3600 });
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', googleRsa.privateKey, new TextEncoder().encode(`${head}.${body}`));
+  const unproved = `${head}.${body}.${toBase64Url(sig)}`;
+  const e = makeEnv();
+  await fileKey(e, { id: 'k_unproved', tier: 'pro', email: fan });
+  const tv = await call(e, '/tv/code', {});
+  const r = await call(e, '/tv/claim', { body: { userCode: tv.data?.userCode }, token: unproved });
+  const proved = await call(e, '/tv/claim', { body: { userCode: tv.data?.userCode }, token: await idToken(fan) });
+  check('a Google-signed token that does not say its address was proved claims nothing; the proved one does',
+    r.status === 401 && proved.status === 200, `unproved ${r.status}, proved ${proved.status}`);
 }
 check('a GET is refused', (await call(env, '/tv/code', { method: 'GET' })).status === 405);
 {

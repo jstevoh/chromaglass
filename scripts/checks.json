@@ -1436,7 +1436,7 @@
     },
     {
       "name": "Glitter, the lens and the side lamp",
-      "shard": "lab5",
+      "shard": "lab9",
       "run": "npm run glint",
       "timeout": 12,
       "why": [
@@ -1448,11 +1448,7 @@
         "round; glitter darkens a lamp ground in proportion; at 8x and 1024 px the glints",
         "spread into discs wide open and the brightest is a six-pointed star at f/16, and",
         "Projector Focus moves the sharp plane; on one kept plate over frames the flakes,",
-        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye.",
-        "In lab5, not lab4: on the PR 807 run of 2026-11-13 lab4 (encode, this, shaderdials,",
-        "bubbleair, holeline) was cancelled at its 25 minutes inside holeline, the",
-        "sixteen minutes before it green; this check ran 5 min 41 s of them, and lab5",
-        "holds only tankgpu (95 s) except when samelook is asked."
+        "read back, stand while the solver stands and ride a push by 6z(1-z), with the dye."
       ]
     },
     {
@@ -1534,7 +1530,7 @@
     },
     {
       "name": "The rest of a bubble's air, owed until its builds",
-      "shard": "lab4",
+      "shard": "lab8",
       "run": "npm run bubbleair -- --owed=oldplate,species,mix,maze,donor,press",
       "why": [
         "Written before the builds (PLAN.md 15g-8c, 15g-8e, 15g-8f, 15g-8g;",
@@ -1544,7 +1540,7 @@
         "and fills its hole evenly without airShed, and the app lays no press",
         "under a bubble while the flow round it stays the same. Each owed id",
         "comes out of --owed in the PR that builds it. Lab, so SwiftShader runs",
-        "it: about three and a half minutes, in lab4, which has the room."
+        "it: about three and a half minutes, in lab8 (PLAN 19k-11c moved it from lab4)."
       ]
     },
     {
