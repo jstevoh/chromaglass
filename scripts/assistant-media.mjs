@@ -18,8 +18,9 @@
  *    Photos library;
  *  - the film on the plate keeps its address while pictures are poured,
  *    and the same film named again comes back at the same address;
- *  - a cartoon by its title in any case reaches the display by its shelf id;
- *    one not on the shelf is refused with the shelf;
+ *  - the video loaded (PLAN 14ag), played or poured again by `loaded`,
+ *    reaches the display with no path or address of the assistant's, and
+ *    show_state's media reads it back; with none loaded the display says so;
  *  - a camera by its name in any case reaches the display by the name it
  *    lists, for the film and for the room camera; one not plugged in is
  *    refused with the cameras;
@@ -38,41 +39,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const HEX = /^\/assistant-media\/[0-9a-f]{32}$/;
 const BYTES = Buffer.from(Array.from({ length: 48 }, (_, i) => (i * 11 + 5) & 255));
 const CAMERAS = ['FaceTime HD Camera', 'Elgato Cam Link 4K'];
-const SHELF = [
-  { id: 'skeleton-dance', title: 'The Skeleton Dance', seconds: 308 },
-  { id: 'steamboat-willie', title: 'Steamboat Willie', seconds: 418 },
-];
 
 export const mediaDir = (dir) => join(dir, 'media');
 
 /**
  * The display's film, pour, room camera and mark, as app/mediaNow.ts reports
- * them. A camera is taken only by the name it lists, and a cartoon only by
- * its shelf id, so a guard that passed the assistant's words on is seen; a
- * pour stopped with nothing pouring is refused, as the page's is.
+ * them. A camera is taken only by the name it lists, so a guard that passed
+ * the assistant's words on is seen; a pour stopped with nothing pouring, or
+ * the video loaded asked for with none loaded, is refused, as the page's is.
  */
 export function standInMedia() {
   const m = {
-    film: { source: 'none', name: null, cartoon: null, camera: null, cameraLost: false },
-    pour: { playing: false, name: null, cartoon: null },
+    film: { source: 'none', name: null, camera: null, cameraLost: false },
+    pour: { playing: false, name: null },
+    video: null,
     room: { on: false, camera: null, resume: false },
     mark: false,
   };
   const cam = (n) => (n === undefined ? CAMERAS[0] : CAMERAS.includes(n) ? n : null);
-  const toon = (id) => SHELF.find((c) => c.id === id) ?? null;
   return {
-    state: () => ({ film: { ...m.film }, pour: { ...m.pour }, room: { ...m.room }, mark: m.mark, cameras: [...CAMERAS], cartoons: SHELF.map((c) => ({ ...c })) }),
+    state: () => ({ film: { ...m.film }, pour: { ...m.pour }, video: m.video, room: { ...m.room }, mark: m.mark, cameras: [...CAMERAS] }),
     onMessage(x, answer, sendState) {
       const no = (why) => answer({ ok: false, reason: `the stand-in display ${why}` });
       switch (x.do) {
-        case 'film-file': m.film = { source: 'file', name: x.name, cartoon: null, camera: null, cameraLost: false }; break;
-        case 'film-cartoon': { const c = toon(x.cartoon); if (!c) return no(`has no cartoon by the id "${x.cartoon}"`); m.film = { source: 'file', name: c.title, cartoon: c.id, camera: null, cameraLost: false }; break; }
-        case 'film-camera': { const c = cam(x.camera); if (!c) return no(`has no camera named "${x.camera}"`); m.film = { source: 'camera', name: null, cartoon: null, camera: c, cameraLost: false }; break; }
-        case 'film-window': m.film = { source: 'window', name: null, cartoon: null, camera: null, cameraLost: false }; break;
-        case 'film-clear': m.film = { source: 'none', name: null, cartoon: null, camera: null, cameraLost: false }; break;
-        case 'pour-file': if (x.kind === 'video') m.pour = { playing: true, name: x.name, cartoon: null }; break;
-        case 'pour-cartoon': { const c = toon(x.cartoon); if (!c) return no(`has no cartoon by the id "${x.cartoon}"`); m.pour = { playing: true, name: c.title, cartoon: c.id }; break; }
-        case 'pour-stop': if (!m.pour.playing) return no('pours nothing'); m.pour = { playing: false, name: null, cartoon: null }; break;
+        case 'film-file': m.film = { source: 'file', name: x.name, camera: null, cameraLost: false }; m.video = x.name; break;
+        case 'film-loaded': if (!m.video) return no('has no video loaded'); m.film = { source: 'file', name: m.video, camera: null, cameraLost: false }; break;
+        case 'film-camera': { const c = cam(x.camera); if (!c) return no(`has no camera named "${x.camera}"`); m.film = { source: 'camera', name: null, camera: c, cameraLost: false }; break; }
+        case 'film-window': m.film = { source: 'window', name: null, camera: null, cameraLost: false }; break;
+        case 'film-clear': m.film = { source: 'none', name: null, camera: null, cameraLost: false }; break;
+        case 'pour-file': if (x.kind === 'video') { m.pour = { playing: true, name: x.name }; m.video = x.name; } break;
+        case 'pour-loaded': if (!m.video) return no('has no video loaded'); m.pour = { playing: true, name: m.video }; break;
+        case 'pour-stop': if (!m.pour.playing) return no('pours nothing'); m.pour = { playing: false, name: null }; break;
         case 'room': { const c = x.camera === undefined ? m.room.camera : cam(x.camera); if (c === null && x.camera !== undefined) return no(`has no camera named "${x.camera}"`); m.room = { on: x.on, camera: c, resume: false }; break; }
         case 'mark': m.mark = true; break;
         case 'mark-clear': m.mark = false; break;
@@ -181,16 +178,18 @@ export async function mediaFullLines({ mcp, display, check, phone, port, dir }) 
   await sleep(150);
   check('media-photos', 'a picture inside a Photos library, even in a media folder, is refused, and nothing reaches the display', !photo.ok && /Photos library/.test(photo.text) && got(t).length === 0, photo.text.slice(0, 140));
 
-  // A cartoon by its title.
+  // The video loaded (PLAN 14ag): the film put on above, poured and played again by `loaded`.
   t = Date.now();
-  const toon = await mcp.call('film', { source: 'cartoon', cartoon: 'steamboat WILLIE' });
-  const nowhere = await mcp.call('pour_file', { source: 'cartoon', cartoon: 'Gertie the Dinosaur' });
+  const before = await state();
+  const pourIt = await mcp.call('pour_file', { source: 'loaded', path: join(media, 'Logo.png') });
+  const playIt = await mcp.call('film', { source: 'loaded' });
   await sleep(250);
   const m3 = await state();
-  check('media-cartoon', 'a cartoon by its title in any case reaches the display by its shelf id, show_state\'s media.film reads it back, and one not on the shelf is refused with the shelf',
-    toon.ok && got(t).some((m) => m.do === 'film-cartoon' && m.cartoon === 'steamboat-willie') && m3?.film?.cartoon === 'steamboat-willie'
-      && !nowhere.ok && /The Skeleton Dance; Steamboat Willie/.test(nowhere.text) && !got(t).some((m) => m.do === 'pour-cartoon'),
-    `${toon.text} | ${nowhere.text} | ${JSON.stringify(m3?.film)}`.slice(0, 220));
+  const asked = got(t).filter((m) => m.do === 'pour-loaded' || m.do === 'film-loaded');
+  check('media-loaded', 'the video loaded, poured and played again by loaded, reaches the display with no path or address of the assistant\'s (a path given alongside is not passed on), and show_state\'s media reads it back as the pour and the film',
+    pourIt.ok && playIt.ok && before?.video && asked.length === 2 && asked.every((m) => m.url === undefined && m.path === undefined && m.name === undefined)
+      && m3?.pour?.name === before.video && m3.film?.source === 'file' && m3.film.name === before.video && m3.video === before.video,
+    `${pourIt.text} | ${playIt.text} | ${JSON.stringify(asked)} | ${JSON.stringify({ video: m3?.video, pour: m3?.pour, film: m3?.film })}`.slice(0, 260));
 
   // Cameras by name, for the film and the room.
   t = Date.now();
@@ -235,33 +234,33 @@ export async function mediaPageLines(page, say) {
   for (const k of ['film', 'pour', 'room', 'mark']) page.setMediaDoor(k, null);
   const none = await page.askMedia({ do: 'film-clear' });
   const did = [];
-  page.setMediaDoor('film', { file: async (u, n) => { did.push(['film', u, n]); return null; }, cartoon: async (id) => { did.push(['toon', id]); return null; }, camera: async (id) => { did.push(['cam', id ?? '-']); return id === 'id-b' ? 'the camera would not open (NotReadableError)' : null; }, window: async () => null, clear: () => did.push(['clear']) });
-  page.setMediaDoor('pour', { image: async (u) => { did.push(['image', u]); return null; }, video: async (u, n) => { did.push(['video', u, n]); return null; }, cartoon: (id) => did.push(['pourtoon', id]), stop: () => did.push(['stop']) });
+  page.setMediaDoor('film', { file: async (u, n) => { did.push(['film', u, n]); return null; }, loaded: async () => { did.push(['loaded']); return null; }, camera: async (id) => { did.push(['cam', id ?? '-']); return id === 'id-b' ? 'the camera would not open (NotReadableError)' : null; }, window: async () => null, clear: () => did.push(['clear']) });
+  page.setMediaDoor('pour', { image: async (u) => { did.push(['image', u]); return null; }, video: async (u, n) => { did.push(['video', u, n]); return null; }, loaded: () => 'no video is loaded (load one with film or pour_file first)', stop: () => did.push(['stop']) });
   page.setMediaDoor('room', { set: (on, id) => did.push(['room', on, id ?? '-']) });
   page.setMediaDoor('mark', { load: async (u) => { did.push(['mark', u]); return null; }, clear: () => did.push(['unmark']) });
   page.publishCameras([{ id: 'id-a', label: 'FaceTime HD Camera' }, { id: 'id-b', label: 'Cam Link' }]);
   const tok = `/assistant-media/${'c'.repeat(32)}`;
   const r = [
     await page.askMedia({ do: 'film-file', url: 'https://example.com/x.mp4', name: 'x' }), await page.askMedia({ do: 'mark', url: '/assistant-media/../x.png' }),
-    await page.askMedia({ do: 'film-file', url: tok, name: ' Oil Wheel ' }), await page.askMedia({ do: 'film-cartoon', cartoon: 'nope' }),
+    await page.askMedia({ do: 'film-file', url: tok, name: ' Oil Wheel ' }), await page.askMedia({ do: 'film-loaded' }), await page.askMedia({ do: 'pour-loaded' }),
     await page.askMedia({ do: 'film-camera', camera: 'facetime hd camera' }), await page.askMedia({ do: 'film-camera', camera: 'cam link' }),
     await page.askMedia({ do: 'room', on: true, camera: 'GoPro' }), await page.askMedia({ do: 'room', on: true }),
     await page.askMedia({ do: 'pour-file', url: tok, kind: 'image' }), await page.askMedia({ do: 'pour-stop' }),
     await page.askMedia({ do: 'film-clear' }), await page.askMedia({ do: 'mark-clear' }), await page.askMedia({ do: 'wobble' }),
   ];
   // What the hooks publish is what the checks above read: a film on, a mark up, and the same copy kept while nothing moved.
-  page.publishMedia({ film: { source: 'file', name: 'Oil Wheel', cartoon: null, camera: null, cameraLost: false }, mark: true });
+  page.publishMedia({ film: { source: 'file', name: 'Oil Wheel', camera: null, cameraLost: false }, video: 'Oil Wheel', mark: true });
   const c0 = page.readMedia();
   page.publishMedia({ mark: true });
   const c1 = page.readMedia();
   const r2 = [await page.askMedia({ do: 'film-clear' }), await page.askMedia({ do: 'mark-clear' })];
   for (const k of ['film', 'pour', 'room', 'mark']) page.setMediaDoor(k, null);
-  const want = JSON.stringify([['film', tok, 'Oil Wheel'], ['cam', 'id-a'], ['cam', 'id-b'], ['room', true, '-'], ['image', tok], ['clear'], ['unmark']]);
-  say(/not running/.test(none ?? '') && /show server/.test(r[0] ?? '') && /show server/.test(r[1] ?? '') && r[2] === null && /The Skeleton Dance/.test(r[3] ?? '')
-    && r[4] === null && /would not open/.test(r[5] ?? '') && /FaceTime HD Camera, Cam Link/.test(r[6] ?? '') && r[7] === null && r[8] === null
-    && /nothing is pouring/.test(r[9] ?? '') && /no film/.test(r[10] ?? '') && /no mark/.test(r[11] ?? '') && /not one of/.test(r[12] ?? '')
+  const want = JSON.stringify([['film', tok, 'Oil Wheel'], ['loaded'], ['cam', 'id-a'], ['cam', 'id-b'], ['room', true, '-'], ['image', tok], ['clear'], ['unmark']]);
+  say(/not running/.test(none ?? '') && /show server/.test(r[0] ?? '') && /show server/.test(r[1] ?? '') && r[2] === null && r[3] === null && /no video is loaded/.test(r[4] ?? '')
+    && r[5] === null && /would not open/.test(r[6] ?? '') && /FaceTime HD Camera, Cam Link/.test(r[7] ?? '') && r[8] === null && r[9] === null
+    && /nothing is pouring/.test(r[10] ?? '') && /no film/.test(r[11] ?? '') && /no mark/.test(r[12] ?? '') && /not one of/.test(r[13] ?? '')
     && r2.every((x) => x === null) && c1 === c0 && c0.cameras.join() === 'FaceTime HD Camera,Cam Link' && JSON.stringify(did) === want,
-  `the page's askMedia takes a file only at the show server's address, a cartoon off the shelf, a camera by its name (and says why one would not open), refuses a stop or a clear with nothing on, and keeps one copy while nothing moved (${JSON.stringify(did)} ${JSON.stringify([none, ...r, ...r2])})`.slice(0, 460));
+  `the page's askMedia takes a file only at the show server's address, the video loaded through its door (and its refusal with none), a camera by its name (and says why one would not open), refuses a stop or a clear with nothing on, and keeps one copy while nothing moved (${JSON.stringify(did)} ${JSON.stringify([none, ...r, ...r2])})`.slice(0, 460));
 }
 
 export const MEDIA_MUTANTS = [
@@ -271,8 +270,8 @@ export const MEDIA_MUTANTS = [
   { rule: 'media-kind', file: 'assistantMedia.js', find: "admit(message.path, IMAGE_TYPES, 'a picture for the mark')", replace: "admit(message.path, BOTH_TYPES, 'a picture for the mark')" },
   { rule: 'media-kind', file: 'assistantMedia.js', find: "['.webp', 'image/webp']]);", replace: "['.webp', 'image/webp'], ['.svg', 'image/svg+xml'], ['.txt', 'text/plain']]);" },
   { rule: 'media-folder', file: 'assistantMedia.js', find: 'env.CHROMAGLASS_MEDIA_DIR.split(delimiter)', replace: '`${env.CHROMAGLASS_MEDIA_DIR}${delimiter}${env.CHROMAGLASS_MUSIC_DIR}`.split(delimiter)' },
-  { rule: 'media-cartoon', file: 'assistantMedia.js', find: 'if (!hit) return { reason: `no cartoon', replace: 'if (!hit) return { cartoon: name.trim() }; if (false) return { reason: `no cartoon' },
-  { rule: 'media-cartoon', file: 'assistantMedia.js', find: 'return { cartoon: hit.id };', replace: 'return { cartoon: name.trim() };' },
+  { rule: 'media-loaded', file: 'assistantMedia.js', find: "|| d === 'film-loaded' || d === 'pour-loaded') return { out: { do: d } };", replace: "|| d === 'film-loaded' || d === 'pour-loaded') return { out: { do: d, path: message.path } };" },
+  { rule: 'media-loaded', file: 'assistantMedia.js', find: "'pour-file', 'pour-loaded', 'pour-stop'", replace: "'pour-file', 'pour-stop'" },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'if (hit === undefined) return { reason: `no camera', replace: 'if (false) return { reason: `no camera' },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'return { camera: hit };', replace: 'return { camera: name };' },
   { rule: 'media-keep', file: 'assistantMusic.js', find: "shelf.delete([...shelf].find(([, f]) => f.type.startsWith('image/'))?.[0] ?? shelf.keys().next().value);", replace: 'shelf.delete(shelf.keys().next().value);' },

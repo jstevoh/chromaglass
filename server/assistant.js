@@ -352,7 +352,7 @@ export function createAssistantGuard(send, now = Date.now) {
         // Recording (PLAN 44k-11): the containers the encoder writes and the Takes' ids.
         record: recordOf(state.record),
         inputs: inputsOf(state.sound),
-        // Film, pours, the room and the mark (PLAN 44k-13): the cameras' names and the shelf's cartoons.
+        // Film, pours, the room and the mark (PLAN 44k-13): the cameras' names.
         media: mediaOf(state.media),
         // OSC out and MIDI (PLAN 44k-14): the MIDI ports by the panel's names.
         midiPorts: midiPortsOf(state.outputs),

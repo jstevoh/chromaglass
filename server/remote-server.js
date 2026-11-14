@@ -145,8 +145,8 @@ const MIME = {
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
   '.map': 'application/json; charset=utf-8',
-  // The films a TV plays while the show is off (PLAN 12-tv) and the cartoons
-  // the Film source pours: a TV's WebView is stricter about a video sent as
+  // The films a TV plays while the show is off (PLAN 12-tv), and a video
+  // served to the assistant's film or pour: a TV's WebView is stricter about a video sent as
   // octet-stream than a desktop browser, which sniffs it.
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
