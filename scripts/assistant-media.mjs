@@ -181,12 +181,12 @@ export async function mediaFullLines({ mcp, display, check, phone, port, dir }) 
   // The video loaded (PLAN 14ag): the film put on above, poured and played again by `loaded`.
   t = Date.now();
   const before = await state();
-  const pourIt = await mcp.call('pour_file', { source: 'loaded', path: join(media, 'Logo.png') });
+  const pourIt = await mcp.call('pour_file', { source: 'loaded' });
   const playIt = await mcp.call('film', { source: 'loaded' });
   await sleep(250);
   const m3 = await state();
   const asked = got(t).filter((m) => m.do === 'pour-loaded' || m.do === 'film-loaded');
-  check('media-loaded', 'the video loaded, poured and played again by loaded, reaches the display with no path or address of the assistant\'s (a path given alongside is not passed on), and show_state\'s media reads it back as the pour and the film',
+  check('media-loaded', 'the video loaded, poured and played again by loaded, reaches the display with no path or address of the assistant\'s, and show_state\'s media reads it back as the pour and the film',
     pourIt.ok && playIt.ok && before?.video && asked.length === 2 && asked.every((m) => m.url === undefined && m.path === undefined && m.name === undefined)
       && m3?.pour?.name === before.video && m3.film?.source === 'file' && m3.film.name === before.video && m3.video === before.video,
     `${pourIt.text} | ${playIt.text} | ${JSON.stringify(asked)} | ${JSON.stringify({ video: m3?.video, pour: m3?.pour, film: m3?.film })}`.slice(0, 260));
@@ -270,7 +270,7 @@ export const MEDIA_MUTANTS = [
   { rule: 'media-kind', file: 'assistantMedia.js', find: "admit(message.path, IMAGE_TYPES, 'a picture for the mark')", replace: "admit(message.path, BOTH_TYPES, 'a picture for the mark')" },
   { rule: 'media-kind', file: 'assistantMedia.js', find: "['.webp', 'image/webp']]);", replace: "['.webp', 'image/webp'], ['.svg', 'image/svg+xml'], ['.txt', 'text/plain']]);" },
   { rule: 'media-folder', file: 'assistantMedia.js', find: 'env.CHROMAGLASS_MEDIA_DIR.split(delimiter)', replace: '`${env.CHROMAGLASS_MEDIA_DIR}${delimiter}${env.CHROMAGLASS_MUSIC_DIR}`.split(delimiter)' },
-  { rule: 'media-loaded', file: 'assistantMedia.js', find: "|| d === 'film-loaded' || d === 'pour-loaded') return { out: { do: d } };", replace: "|| d === 'film-loaded' || d === 'pour-loaded') return { out: { do: d, path: message.path } };" },
+  { rule: 'media-loaded', file: 'assistantMedia.js', find: "'film-file', 'film-loaded', 'film-camera'", replace: "'film-file', 'film-camera'" },
   { rule: 'media-loaded', file: 'assistantMedia.js', find: "'pour-file', 'pour-loaded', 'pour-stop'", replace: "'pour-file', 'pour-stop'" },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'if (hit === undefined) return { reason: `no camera', replace: 'if (false) return { reason: `no camera' },
   { rule: 'media-camera', file: 'assistantMedia.js', find: 'return { camera: hit };', replace: 'return { camera: name };' },

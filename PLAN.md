@@ -417,7 +417,7 @@ One file a section, cut between items into parts of 30 KB or less, so each part 
 | 13 | ChromaGlass in popular VJ software | [`13-vj-software.md`](docs/plan/13-vj-software.md) |  | 20 |
 | 14 | The show at the gig: hearing, timing, speed and the picture on the wall | [`14-show-at-the-gig.md`](docs/plan/14-show-at-the-gig.md) | 14a–14r | 28 |
 |  | (continued) | [`14-show-at-the-gig-2.md`](docs/plan/14-show-at-the-gig-2.md) | 14s–14ae-5 | 26 |
-|  | (continued) | [`14-show-at-the-gig-3.md`](docs/plan/14-show-at-the-gig-3.md) | 14af, 14ad–14z-6 | 5 |
+|  | (continued) | [`14-show-at-the-gig-3.md`](docs/plan/14-show-at-the-gig-3.md) | 14af, 14ad–14ag-4 | 9 |
 | 15 | Every tool on every liquid | [`15-tools-on-liquids.md`](docs/plan/15-tools-on-liquids.md) | 15a–15h | 23 |
 |  | (continued) | [`15-tools-on-liquids-2.md`](docs/plan/15-tools-on-liquids-2.md) | 15k | 2 |
 | 16 | Many plates: each projector its own source (rig-plan R1) | [`16-many-plates.md`](docs/plan/16-many-plates.md) |  | 6 |

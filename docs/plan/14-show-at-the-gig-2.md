@@ -400,19 +400,16 @@ An inventory of the frame loop's own CPU work, 2026-10-24. Ranked by what a show
   whole plate each flush; a dispatch over the written bands' rows (scaled to N) would do.
   `npm run frameuploads` holds whichever writer moves to rows to its own scan.
 
-## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24)
+## 14ac. Cartoons that ship with the app, and the video pour's stutter (shipped, asked 2026-10-24; the shelf removed 2026-11-13)
 
-**Shipped** (2026-10-24): four public domain cartoons, each the whole film looping, poured
-as dye or played as the film from a Cartoons shelf on the desk's Dye panel and the phone's
-dye sheet (`src/lib/cartoons.ts`, `CartoonShelf.tsx`; sources and licences in
-`public/video/cartoons/SOURCES.md` … Story in `docs/plan-shipped.md` §14ac (moved
-2026-10-29, 19m).
+**Shipped** (2026-10-24): public domain cartoons, poured as dye or played as the film from a
+shelf. Story in `docs/plan-shipped.md` §14ac (moved 2026-10-29, 19m). **Removed** (2026-11-13,
+14ag, the owner's call: "people can figure out their own videos"): the shelf, the files and
+`npm run cartoons`; 14ab-1's fix (the pour handed over once) stays and `npm run myvideo` holds it.
+14ac-1 (a poured file has no Stop) is shipped by 14ag's row; 14ac-3 to -7 went with the shelf.
 
-Open, found building it:
+Open:
 
-- **14ac-1** *A poured file has no Stop.* The desk's Video… and the phone's "A video as dye"
-  pour a file, looping, and nothing in the app stops it short of reloading; only the shelf's
-  cartoons have a Stop. One Stop for whatever is pouring, beside Video… and on the phone.
 - **14ac-2** *The pour's dye is the picture's light, a shortcut.* The pour keys out dark
   pixels and lays every lighter one as dye of its own colour, and pushes the plate along the
   picture's brightness gradient where the frame changed (`LiquidVisualizer.tsx`, "Video
@@ -421,32 +418,8 @@ Open, found building it:
   like this: a film there is projected through the dish (which is what Film does), not
   dissolved into it. Two ways to look at: an Ink key that pours the picture's *dark* lines
   as dye (the ink of a cartoon is its drawing), and the picture as light on the plate rather
-  than as dye in it. Judge first (§66), then pick.
-- **14ac-3** *More films for the shelf.* Walter Ruttmann's *Lichtspiel Opus I–IV*
-  (1921–25) are abstract hand-tinted animation, made for exactly this, public domain in
-  the US by date and in Germany since 2012 (Ruttmann died 1941). The Archive's copies are
-  re-uploads of modern restorations or carry an uploader's CC BY claim; they need a print
-  or a transfer whose source is known before they ship. Ub Iwerks' *Fiddlesticks* (1930)
-  and the 1930 Silly Symphonies joined the US public domain in 2026, with the same check.
-  Every addition gets a row in `SOURCES.md` first; `npm run cartoons` refuses one without.
-  *2026-10-27:* Fiddlesticks (1930) is on the shelf, with four later colour films (see above).
-  Still open: Lichtspiel and *The Adventures of Prince Achmed* (1926, tinted), which are free by
-  date and need a print whose source is known; the 1930 Silly Symphonies (black and white);
-  and the Popeye colour specials, the Superman shorts and *Poor Cinderella*, left off for the
-  characters' trademarks, not their copyright (`SOURCES.md`, "Considered and left off").
-- **14ac-4** *The cartoons are grey.* **Shipped for colour** (2026-10-27): five are in colour,
-  and the pour lays each pixel's own colour, so no code changed. Whether the look's palette
-  should tint the grey four or the colour five (Film's grade already can, in the Mixer) is
-  still the owner's call in §66 and §85.
-- **14ac-5** *Colour that is two-strip or Cinecolor.* These prints have two colours (red-orange
-  and blue-green), not three: no true yellow, blue or purple. The pour lays what the print
-  has; judge in §85 whether a look's palette should fill in what a two-colour print cannot.
-- **14ac-6** *A feature on the shelf is a 27 MB file.* Gulliver's Travels is a quarter of the
-  shelf's weight, fetched only when someone picks it. If that proves a cost (a phone on mobile
-  data), cut it to a half hour of its best scenes as a separate entry, or serve it by a
-  lower bitrate; the check holds a feature under 30 MB.
-- **14ac-7** *The cartoons were not in Settings → Film.* **Shipped** (2026-10-29): the Film
-  section lists the shelf under its demo loops. Story in `docs/plan-shipped.md` §14ac.
+  than as dye in it. Judge first (§66), then pick. The shortcut is the same for a video of one's own; 14ag-3 is
+  where the real alternatives were put to the owner.
 
 ## 14ae. One Record button (shipped, asked 2026-10-24)
 
