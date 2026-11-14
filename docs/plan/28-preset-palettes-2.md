@@ -157,12 +157,40 @@ Part 2 of 2 of §28; it begins at 28i. The section starts in `28-preset-palettes
       minute and almost none change colour with the song; motion half-life 0.3 s against
       2 to 7 s in real shows. This PR fixes what each look shows, not how it breathes: that
       is 28i-3b's film bar, still open.
-    - **28i-7c, open. Velvet Underground's pools drain, and settings do not bring them
-      back.** 83% near black at the 5th percentile on both passes (more dye and exposure,
-      a brighter lamp, then the screen blend for overlay): the frame is the violet ground
-      with one ultramarine lobe and a fleck of red, where the seed lays three pools. Find
-      where the pools' dye goes (the areas' pours against the regulator and the rim)
-      before touching a number; it matters more now Lumia retires into it (28i-5, #792).
+    - ~~**28i-7c**~~ Velvet Underground's pools no longer drain: the look ran the default
+      Turbulence (0.5), a curl-noise stir that carried the pools into a veil; it names 0 now
+      (`npm run pools`: 67.2/75.5/90.9% kept over a minute → 98.3/96.7/96.0%). Story in
+      `docs/plan-shipped.md` §28i-7c.
+    - **28i-7f, open (a shortcut named). Turbulence is a noise, and thirteen looks never chose
+      it.** `turbulenceScale` adds curl noise to the flow everywhere, every step (`forcesB`),
+      "the hand stirring the layer" (27c), and its default is 0.5. Between two glasses 2 mm
+      apart nothing stirs by itself: the gap's drag stops any flow nothing drives within
+      milliseconds, so the noise is a stir no real hand makes (a hand moves a solid along a
+      path, the Finger's flow). Velvet Underground never named it and lost its pools to it
+      (28i-7c). Still on the default: cyberpunk, aurora-borealis, solar-flare,
+      jellyfish-bloom, fractal-dream, neon-coral-reef, stardust-collapse, oil-and-water,
+      red-cabbage, magnet-garden, splodascope, ferro-paint, saffron-lace. Each should choose
+      it (a `plate` line, as 5.8 holds `surge`), and the stir itself become a moving hand's
+      real flow (the Finger drawn along a slow path) rather than a noise; filmed on the Mac,
+      since every look's motion changes.
+    - **28i-7g, open. With the motor off and no stir, Velvet's pools still leave.** On the
+      Mac (Rotation Speed 0 and Turbulence 0) they kept 77/78/70% over 90 s, with a steady
+      out-flow from the soap and syrup pools of about 3e-4 that the turning dish does not
+      have (97/96/95% with it). The look ships with the motor on, so this is not in the
+      way of the show; find which force it is (the soap's Marangoni pull at the well's
+      edge, or the liquids' own viscosity contrast in the gap) before a look with still
+      pools and no motor is built on it.
+    - **28i-7h, open. On a slow start the regulator trims Velvet's opening seed by a fifth.**
+      On GitHub's macOS runner (run 43077698169, `npm run pools`) the first run's dish read
+      0.530 of mean dye when its minute began and 0.424 when it ended, every pool losing
+      what the dish lost; the next two runs began at 0.447 and 0.438 and all three ended at
+      0.423, while the owner's Mac reads 0.43 → 0.42. So where the solver starts late (its
+      pipelines built 13 s in there) the plate shows its seed above the level the regulator
+      holds it to and then dims for most of a minute. Find why the seed lays above its own
+      target (`seedMean` is read from `dishSum` straight after the splats; the regulator's
+      `meanDensity` from the rim-masked readback) and lay it at the level it is held to,
+      rather than trimming it in front of an audience. `npm run pools` now begins its
+      minute once the dish has settled, so this is not in its way.
     - **28i-7d, open. Poster, 1969 and Milk Marbling stay white.** More ink (dyeBudget to
       the dial's top, more pours, a lower tension) and, for the milk, lower exposure and
       twice the drops left both frames as they were (Poster 2% near black, Milk 3%): the

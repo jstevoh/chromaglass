@@ -710,6 +710,20 @@ export const PRESETS: Preset[] = [
       blendMode: 'overlay',
       gooeyEffect: 0.55,
       rotationSpeed: 0.27,       // 28i-2: above lookMotorRate's 0.1 vertex (~0.086 rad/s, ~1.2 min/turn) so the three pools clear M >= 0.02 at 20 and 40 s
+      /*
+        No hand stirring the dish (PLAN 28i-7c). The look never named
+        Turbulence, so it ran the default 0.5: a curl noise added to the flow
+        everywhere, every step (forcesB), which no liquid between two glasses
+        2 mm apart does by itself (its Reynolds number is far under one; the
+        gap's drag stops any flow nothing drives within milliseconds). It
+        stirred the three pools into a veil between them: on the owner's Mac
+        the glycerine kept 38% of its dye in 90 s, the soap 71%, and the dish
+        never lost any (0.43 to 0.42), so no dye, exposure or lamp brought
+        them back. Off, they keep 97%, 96% and 95%, and what moves them is
+        what really would: the motor, the rock and each area's paddle on its
+        own band (`npm run pools`).
+      */
+      turbulenceScale: 0,
       // Flat: a concave dish slid all three pools into one in the middle. The
       // pools are its areas of the dish now (lib/plateAreas.ts).
       centerGravity: 0.0,
