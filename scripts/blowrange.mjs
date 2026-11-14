@@ -54,14 +54,15 @@ const check = (name, ok, detail = '') => {
   console.log(` ${ok ? 'ok  ' : 'FAIL'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
-const bundle = async (name) => {
+const bundle = async (name, dir = 'lib') => {
   const out = `node_modules/.cache/blowrange-${name}.mjs`;
-  await build({ entryPoints: [`src/lib/${name}.ts`], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
+  await build({ entryPoints: [`src/${dir}/${name}.ts`], bundle: true, format: 'esm', platform: 'node', outfile: out, logLevel: 'warning' });
   return import(`../${out}`);
 };
 const B = await bundle('breath');
 const A = await bundle('blowAim');
 const { BubbleField } = await bundle('bubbles');
+const { GRID_SCALE } = await bundle('constants', 'sim');
 const { strawFlow, breathSpeed, breathPressure, jetShare, layBreath, JET_CORE, JET_REACH, JET_FLOOR, BREATH_STRESS } = B;
 
 const N = 192;
@@ -70,21 +71,18 @@ const deg = (r) => r * 180 / Math.PI;
 
 // ── 1. The wind lays no bubbles ─────────────────────────────────────
 {
-  // The rule that was: ten spawns of two a second at the default Amount, along a stroke (bubbles.ts, spawn).
-  const f = new BubbleField(N);
-  for (let step = 0; step < 180; step++) {
-    if (step % 6 === 0) f.spawn(40 + (step / 180) * 110, 96, 1.2 * 1.5, 2, 3 * 1.5);
-    f.step(1 / 60, still, 0, 0, 0);
-  }
-  const was = f.bubbles.length;
-  // What stands in for it is nothing to play: no export of the breath's lays air.
-  const lays = Object.keys(B).filter((k) => /air|spawn|bubble/i.test(k) && k !== 'AIR_DENSITY');
+  /*
+    Why: a breath over a 2 mm film presses it aside and has nothing under
+    it to fold air into. Printed, not checked: it is three constants. That
+    no Blow lays a bubble is the last check's (the two Blow blocks call no
+    spawn), and that the straw's one bubble sheds none is `npm run straw`.
+    A first version of this section checked that the breath's module had
+    no export named for air and replayed the old rule beside it, neither of
+    which any change to the app could turn red.
+  */
   const FILM = 0.002, RHO = 860, G = 9.81;
   const weight = RHO * G * FILM;
   console.log(`  a firm breath lands at ${breathSpeed(1).toFixed(0)} m/s, ${breathPressure(1).toFixed(0)} Pa, against ${weight.toFixed(0)} Pa for the weight of a 2 mm film of oil: ${(breathPressure(1) / weight).toFixed(1)} times it`);
-  check('the wind lays no bubbles: the breath has nothing that lays air, where three seconds of the old rule left a stroke of them',
-    lays.length === 0 && was >= 20 && breathPressure(1) > 3 * weight,
-    `the breath's exports that lay air: ${lays.length ? lays.join(', ') : 'none'}; the old rule's three seconds: ${was} bubbles`);
 }
 
 // ── 2. The jet's shape ──────────────────────────────────────────────
@@ -146,13 +144,16 @@ const deg = (r) => r * 180 / Math.PI;
 
 // ── 4. and 5. A direction in mind, and the straw ────────────────────
 {
-  const LEASH = A.BLOW_LEASH * 1.5;
+  const LEASH = A.BLOW_LEASH * GRID_SCALE;   // as the app's hands call blowStep
   const rng = (seed) => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32; };
   /*
     A stroke at 30° to the plate's rows, a cell a step, the pointer landing
     on whole cells (a pixel's wobble either side of the line), then a turn to
-    go straight up, then held where it stops for two seconds. `now` goes on
-    a sixtieth of a second a step; each step is its frame's first.
+    go straight up, then held where it stops for two seconds. A frame is
+    three solver steps, as the app's can be: the pointer's move comes with
+    the first, and the two after it come with no move and are not the
+    frame's first (LiquidVisualizer's hands), a third of a sixtieth of a
+    second each.
   */
   const u = rng(3);
   let dir, x = 40, y = 60, px = x, py = y, t = 0;
@@ -161,7 +162,8 @@ const deg = (r) => r * 180 / Math.PI;
   const step = (nx, ny) => {
     const dx = nx - px, dy = ny - py;
     dir = A.blowStep(dir, nx, ny, dx, dy, t, true, LEASH);
-    px = nx; py = ny; t += 1000 / 60;
+    px = nx; py = ny; t += 1000 / 180;
+    for (let k = 0; k < 2; k++) { dir = A.blowStep(dir, nx, ny, 0, 0, t, false, LEASH); t += 1000 / 180; }
     return { dx, dy };
   };
   step(x, y);   // the press

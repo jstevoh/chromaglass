@@ -81,14 +81,14 @@ try {
     'push' (blowDirected's velocity, the before) or 'none'; `sign` the way
     it goes along x; `liquid` what is in the pool besides the colour.
   */
-  const stroke = (wind, sign, liquid, share = 1) => page.evaluate(async ({ wind, sign, liquid, share }) => {
+  const stroke = (wind, sign, liquid, share = 1, from = 0.5) => page.evaluate(async ({ wind, sign, liquid, share, from }) => {
     const N = 384, L = 192;
     const look = lab.look('classic').settings;
     const DT = look.globalSpeed * 0.2;
     const over = { thinGap: 1, gapThickness: look.gapThickness ?? 0.45, dt: DT, advection: look.advection, oilTension: liquid === 'oil' ? 0.5 : 0 };
     await lab.create(N, L);
     const s = lab.solver();
-    const POOL = { x: 0.5, y: 0.5, r: 0.06 };
+    const POOL = { x: from, y: 0.5, r: 0.06 };
     lab.dye(POOL.x, POOL.y, POOL.r, [0.2, 0.5, 0.9], 1);
     lab.flush(DT);
     if (liquid === 'ferro') lab.addPhase(POOL.x, POOL.y, POOL.r, 0.9);
@@ -133,7 +133,7 @@ try {
     await lab.step(30, over);
     const t1 = await read();
     return { t0, t1, laid };
-  }, { wind, sign, liquid, share });
+  }, { wind, sign, liquid, share, from });
 
   /*
     A breath held in one place, blowing along +x, on a fresh plate of clear
@@ -142,7 +142,7 @@ try {
     and half a second after it stops, in m/s; and τh₀/2μ for the breath's
     middle on this liquid.
   */
-  const held = (thickness, press = false) => page.evaluate(async ({ thickness, press }) => {
+  const held = (thickness, press = false) => page.evaluate(async ({ thickness, press, palm }) => {
     const N = 384, L = 192;
     const look = lab.look('classic').settings;
     const DT = look.globalSpeed * 0.2;
@@ -151,7 +151,7 @@ try {
     await lab.step(2, over);
     const R = lab.BLOW_RADIUS * L / 128, cx = L / 2, cy = L / 2;
     /*
-      Pressed: a palm eight times the breath's size held down on the middle
+      Pressed: a palm sixteen times the breath's footprint held down on the middle
       of the plate as the app's Press lays it (lib/squish.ts), until the
       gap has stopped closing, and held on while the breath blows, so what
       flows under it is the breath's and not the press squeezing out.
@@ -167,8 +167,17 @@ try {
       read 0.55 as fast at 0.43 of the gap, against 0.38 at 0.33 on the
       old spring. Eight wide, the way back is under the palm too: 0.47 as
       fast at 0.43 of the gap (software WebGPU).
+
+      Sixteen, not eight, since the breath is a jet (PLAN.md 15g-11): its
+      plume runs 22 footprints on from where it lands, so most of its
+      stress fell on the unpressed film past a palm of eight and drove the
+      liquid under the landing from there, and the line read the palm's
+      size more than the gap: 0.50 as fast at 0.42 of the gap, 1.17 of
+      what the gap gives against a bar of a fifth over. A palm of twelve
+      read 0.47 (1.11), and one of sixteen, which is the dish's own radius,
+      so the whole plume blows on pressed film, 0.46 (1.08).
     */
-    const pressDown = () => { if (press) lab.squish(cx, cy, 8 * R, 0.004, 0, 'press', 0, true); };
+    const pressDown = () => { if (press) lab.squish(cx, cy, palm * R, 0.004, 0, 'press', 0, true); };
     if (press) for (let k = 0; k < 120; k++) { pressDown(); lab.flush(DT); await lab.step(1, over, true); }
     const disp = DT * look.advection * (N - 2) / N;
     // Metres a second from the flow's units: plate widths a step over disp, 0.2 m plates, 60 steps a second.
@@ -193,8 +202,20 @@ try {
     const after = mean(await lab.field('vel'));
     const nu = lab.thinGapViscosity(thickness);
     return { blowing, ahead, behind, beside, after, still, h, theory: lab.breathStress * h / (2 * 1000 * nu), tau: h * h / (12 * nu), half: 30 * lab.stepSeconds };
-  }, { thickness, press });
+  }, { thickness, press, palm: PALM });
 
+  /*
+    Where the gale's pool starts, as a share of the plate along the breath:
+    0.2, where every other stroke starts in the middle. The jet's plume
+    reaches 0.68 of the plate ahead of the hand, the dish's rim is open
+    (wgsl/fluid/dye.ts: colour carried past it leaves the plate), and a
+    gale from the middle blew 36.17% of the pool over it in software, so
+    whether the breath itself kept the colour could not be told from what
+    the rim took. From 0.2 the rim is 0.8 of the plate ahead.
+  */
+  const GALE_FROM = 0.2;
+  // The held Press's size, in the breath's footprints (the story is at pressDown).
+  const PALM = 16;
   const only = process.env.AB_RUNS ? process.env.AB_RUNS.split(',') : null;
   const want = (k) => !only || only.includes(k);
   const got = {};
@@ -206,11 +227,11 @@ try {
     console.log(`  ${name} (Thickness ${th}, gap ${(m.h * 1000).toFixed(2)} mm${press ? `, the press alone ${(m.still * 1000).toFixed(3)} mm/s` : ''}): ${(m.blowing * 1000).toFixed(2)} mm/s under the breath against τh/2μ ${(m.theory * 1000).toFixed(2)} (${(m.blowing / m.theory).toFixed(2)} of it); a palm on ${(m.ahead * 1000).toFixed(2)}, as far behind ${(m.behind * 1000).toFixed(2)}, beside ${(m.beside * 1000).toFixed(2)}; ${(m.after * 1000).toFixed(3)} mm/s half a second after it stopped, drag time ${m.tau.toFixed(3)} s (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
   // The Amount's range (6): a gentle breath at Amount 0.25 and a gale at 2.5, share Amount².
-  for (const [name, wind, sign, liquid, share] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil'],
-    ['gentle', 'air', 1, 'none', 0.0625], ['gale', 'air', 1, 'none', 6.25]]) {
+  for (const [name, wind, sign, liquid, share, from] of [['right', 'air', 1, 'none'], ['left', 'air', -1, 'none'], ['alone', 'none', 1, 'none'], ['push', 'push', 1, 'none'], ['ferro', 'air', 1, 'ferro'], ['oil', 'air', 1, 'oil'],
+    ['gentle', 'air', 1, 'none', 0.0625], ['gale', 'air', 1, 'none', 6.25, GALE_FROM]]) {
     if (!want(name)) continue;
     const t = Date.now();
-    const m = got[name] = await stroke(wind, sign, liquid, share);
+    const m = got[name] = await stroke(wind, sign, liquid, share, from);
     console.log(`  ${name}: colour ${m.t0.dye.toFixed(1)} → ${m.t1.dye.toFixed(1)} (${pc(m.t1.dye / m.t0.dye - 1)}), its middle ${pc((m.t1.cx - m.t0.cx) * sign)} of the plate the wind's way${liquid !== 'none' ? `; the ${liquid} ${pc((m.t1.fx - m.t0.fx) * sign)}, ${pc(m.t1.mass / m.t0.mass - 1)} of it made or lost` : ''}${wind === 'air' ? `; breath laid on ${m.laid} of 90 steps` : ''} (${((Date.now() - t) / 1000).toFixed(0)} s)`);
   }
   console.log('');
@@ -270,7 +291,7 @@ try {
     const a = got.held, b = got['held thick'];
     const on = (m) => m.ahead / m.blowing, fore = (m) => m.ahead / Math.max(Math.abs(m.behind), 1e-9);
     check('the breath runs on along the surface: a palm ahead of where it lands the liquid still goes its way, and far less as far behind',
-      need('held', 'held thick') && on(a) >= 0.15 && on(b) >= 0.15 && fore(a) >= 4 && fore(b) >= 4 && Math.abs(on(b) / on(a) - 1) < 0.2,
+      need('held', 'held thick') && a.ahead > 0 && b.ahead > 0 && on(a) >= 0.15 && on(b) >= 0.15 && fore(a) >= 4 && fore(b) >= 4 && Math.abs(on(b) / on(a) - 1) < 0.2,
       need('held', 'held thick') ? `a palm on ${on(a).toFixed(2)} of the speed under the landing (${(a.ahead * 1000).toFixed(2)} mm/s), ${fore(a).toFixed(1)} times what goes as far behind (${(a.behind * 1000).toFixed(2)}); in the thick liquid ${on(b).toFixed(2)} and ${fore(b).toFixed(1)} times` : 'not run');
   }
   console.log(`  before (blowDirected's push on a thin gap, no carry): the pool's middle ${need('push') ? pc(along('push')) : 'not run'} the wind's way`);
@@ -309,23 +330,18 @@ try {
       The firm breath now takes the pool most of the way the hand goes, and
       three times that is past the dish's rim.)
 
-      The colour: kept to 0.5% by the gentle breath and the firm one. Not
-      by the gale, and the check no longer asks it to: its plume reaches
-      the rim (135 mm from a hand that ends 68 mm short of it), the dish's
-      rim is open (wgsl/fluid/dye.ts: what is carried past it spills into
-      the trough and leaves the plate), and 36.17% of the pool went over it
-      in software. What is asked of the gale is that it makes no colour
-      (under +0.5%) and that some stays to be measured. That leaves a
-      breath at this strength that lost colour on the plate itself unseen
-      here: PLAN.md 15g-16 is the lab plate with a wall that would see it.
+      The colour is kept to 0.5% by all three. The gale's pool starts
+      further back than the others' (GALE_FROM, above) so that it stays on
+      the plate: what is held here is the breath's own keeping of the
+      colour at its strongest, not the rim's.
     */
     const off = (k) => got[k].t1.dye / got[k].t0.dye - 1;
     const STROKE = 0.16;
     check('the Amount runs from a breath that barely moves the colour, through one that moves it less far than the hand went, to a gale that sends it on ahead of the hand',
       need('gentle', 'gale', 'right') && along('right') >= 0.005 && along('gentle') < 0.1 * along('right') && along('right') < STROKE &&
         along('gale') > STROKE && along('gale') >= 1.5 * along('right') &&
-        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('right')) < 0.005 && off('gale') < 0.005 && off('gale') > -0.9,
-      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate, the stroke ${pc(STROKE)}; colour ${pc(off('gentle'))}, ${pc(off('right'))}, and the gale's ${pc(off('gale'))} (over the rim)` : 'not run');
+        got.gentle.laid === 90 && got.gale.laid === 90 && Math.abs(off('gentle')) < 0.005 && Math.abs(off('right')) < 0.005 && Math.abs(off('gale')) < 0.005,
+      need('gentle', 'gale', 'right') ? `Amount 0.25 ${pc(along('gentle'))}, 1 ${pc(along('right'))}, 2.5 ${pc(along('gale'))} of the plate, the stroke ${pc(STROKE)}; colour ${pc(off('gentle'))}, ${pc(off('right'))}, ${pc(off('gale'))}` : 'not run');
   }
 } finally {
   await close();
