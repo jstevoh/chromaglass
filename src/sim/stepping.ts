@@ -234,7 +234,7 @@ export const LOCKSTEP = (() => {
 /**
  * The lasting current on the CPU half-grid (M = S/2): buoyancy from water's
  * real density (Kell 1975, PLAN §36e-2), warm Gauss-Seidel projection, and
- * bilinear upsampling into the logical velocity grid.
+ * bilinear upsampling into the logical velocity grid (kept for scripts/plateboil.mjs --part=zero).
  */
 export function stepCurrentCpu(
   M: number,

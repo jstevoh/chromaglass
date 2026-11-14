@@ -14357,3 +14357,29 @@ both ways): 27 gate, 11 owed.
 
 Found on the way: on a thin gap the push is read as momentum and the drag has it within the
 step (15e-10); the CPU's stand-aside copy still asks for a fold every step (15e-11).
+
+### P7-cpu (step 3.1): Delete the CPU solver's stepping
+
+Decided at step 2.6 (2026-10-06): delete the unreachable CPU solver stepping and
+CPU-only fallback paths while keeping the delta arrays, readback mirrors, beads,
+bubbles, macro camera, `liquidPhase`, and every pour/seed/GPU handoff path.
+
+- Deleted in `src/sim/fluidSimulation.ts` (188,594 → 176,364 bytes): CPU-only
+  `solveSqueezePressure`, `updateSqueezeVelocity`, `applyImmiscibility`,
+  `applyAirflow`, `applySmear`, `applyDripping`, the CPU `else` branches in
+  `stepLiquid`, `thinDye`, `squishCell`, `blowAir`, and CPU-only scratch
+  arrays (`pressure`, `dhdt`, `temp0`, `fvx`, `fvy`).
+- Deleted in `src/sim/constants.ts` (6,931 → 6,842 bytes): unused `DRIP_SPEED`.
+- Deleted in `src/components/LiquidVisualizer.tsx` (423,306 → 420,633 bytes):
+  the CPU drain advection/evaporation fallback loop in favour of
+  `af.gpu?.drainStep(t)`.
+- Left under the check stop rule (for follow-up cleanup with their checks):
+  `private sharpenDye` (with `shp`, `shpA`, `SHARP_FLOOR`) for `scripts/plate.mjs`,
+  the `settings.glassSmear > 0` reference in `step()` for `scripts/widedials.mjs`,
+  `stepCurrentCpu` (`src/sim/stepping.ts`, 15,097 → 15,142 bytes) plus
+  `stepCurrent` / `CM` / `cvx` / `cvy` / `cpr` / `cdv` in `FluidSimulation`
+  (unreachable from `step()`) for `scripts/plateboil.mjs --part=zero`, and
+  the minimal CPU curl/transport path in `step()` (`diffuse`, `linSolve`,
+  `project`, `advect`, `advectMacCormack`, `setBoundary`, `applyCurlTurbulence`,
+  `s`/`sR`/`sG`/`sB`/`vx0`/`vy0`/`mcA`/`mcB`, and `TURB_SPEED`) for
+  `scripts/musicstir.mjs`.

@@ -45,7 +45,7 @@ import { stream, type Rng } from '../lib/rng';
 import { showNow } from '../lib/showClock';
 import { pressDye, pressOil, pressTake } from '../lib/pressRing';
 import { dyeAbsorbances } from '../lib/dye';
-import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, DRIP_SPEED, GRID_AREA, SHARP_FLOOR } from './constants';
+import { macroAmountOf, GRID_SIZE, GRID_SCALE, TURB_SPEED, CUR_BUOY, CUR_GRAV, BLOW_SWIRL, FINGER_SWIRL, FILM_POUR, BODY_DROP, BODY_COVER, GRID_AREA, SHARP_FLOOR } from './constants';
 import { SIM_STEP, stepCurrentCpu } from './stepping';
 import { SpeciesPoller } from './speciesPoll';
 import { besideStep } from '../gpu/besidePlate';
@@ -60,26 +60,23 @@ export class FluidSimulation {
   diff: number;
   visc: number;
 
-  s: Float32Array;
-  sR: Float32Array;
-  sG: Float32Array;
-  sB: Float32Array;
   density: Float32Array;
   densityR: Float32Array;
   densityG: Float32Array;
   densityB: Float32Array;
+  s: Float32Array;
+  sR: Float32Array;
+  sG: Float32Array;
+  sB: Float32Array;
 
   vx: Float32Array;
   vy: Float32Array;
   vx0: Float32Array;
   vy0: Float32Array;
 
-  pressure: Float32Array;
   gap: Float32Array;
-  dhdt: Float32Array;
 
   temp: Float32Array;
-  temp0: Float32Array;
   /**
    * The dish under this plate (PLAN.md §22, lib/turntable.ts dishFrame), in
    * radians a second: how fast the glass turns, everything that turns it
@@ -177,8 +174,7 @@ export class FluidSimulation {
   */
   private sloshClock = new SloshClock();
   private dishKicks: { x: number; y: number; amount: number; radii: number[]; t: number }[] = [];
-  // The lasting current on the CPU engine — the twin of GpuFluid.stepCurrent,
-  // at half the logical grid: velocity, warm pressure and divergence.
+  // Kept for scripts/plateboil.mjs --part=zero (unreachable from step()).
   private readonly CM = GRID_SIZE / 2;
   private cvx = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
   private cvy = new Float32Array((GRID_SIZE / 2) * (GRID_SIZE / 2));
@@ -438,10 +434,6 @@ export class FluidSimulation {
   private rbDensity: Float32Array;  // downsampled readback
   private rbVx: Float32Array;
   private rbVy: Float32Array;
-  private fvx: Float32Array;
-  private fvy: Float32Array;
-  private mcA: Float32Array;        // MacCormack intermediates (CPU path)
-  private mcB: Float32Array;
   /** What the plate is being asked to do this moment; set from outside once a frame. */
   phrase: Phrase = { drive: 1, gust: 0, drift: 0.5 };
   /** The clock's own lean, slewed so no one frame can move it far. */
@@ -461,16 +453,17 @@ export class FluidSimulation {
   tempoMul = 1;
   /** A paced scene's activity (`lib/scenePacing.ts`): under 1 a rest, over it a swell; set by the frame. */
   paceMul = 1;
-  /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting. */
+  /** A channel's pre-sharpening copy, so the pass reads the field it is rewriting (kept for scripts/plate.mjs). */
   private shp: Float32Array;
-  /** The thickness as the sharpening pass found it: every channel gates on this. */
+  /** The thickness as the sharpening pass found it: every channel gates on this (kept for scripts/plate.mjs). */
   private shpA: Float32Array;
+  /** MacCormack intermediates (kept for scripts/musicstir.mjs CPU path). */
+  private mcA: Float32Array;
+  private mcB: Float32Array;
 
   get readDensity(): Float32Array { return this.gpu ? this.rbDensity : this.density; }
-  // The flow the dye was carried by this step (see GpuFluid.velForced): on the
-  // CPU, the snapshot taken before the end-of-step clamp.
-  get readVx(): Float32Array { return this.gpu ? this.rbVx : this.fvx; }
-  get readVy(): Float32Array { return this.gpu ? this.rbVy : this.fvy; }
+  get readVx(): Float32Array { return this.gpu ? this.rbVx : this.vx; }
+  get readVy(): Float32Array { return this.gpu ? this.rbVy : this.vy; }
 
   constructor(size: number, diffusion: number, viscosity: number, dt: number) {
     this.size = size;
@@ -566,26 +559,23 @@ export class FluidSimulation {
       g.addMix(cx / L, cy / L, Math.max(1.5, radius) / L, { oil, soap, acid });
     };
 
-    this.s = new Float32Array(GRID_AREA);
-    this.sR = new Float32Array(GRID_AREA);
-    this.sG = new Float32Array(GRID_AREA);
-    this.sB = new Float32Array(GRID_AREA);
     this.density = new Float32Array(GRID_AREA);
     this.densityR = new Float32Array(GRID_AREA);
     this.densityG = new Float32Array(GRID_AREA);
     this.densityB = new Float32Array(GRID_AREA);
+    this.s = new Float32Array(GRID_AREA);
+    this.sR = new Float32Array(GRID_AREA);
+    this.sG = new Float32Array(GRID_AREA);
+    this.sB = new Float32Array(GRID_AREA);
 
     this.vx = new Float32Array(GRID_AREA);
     this.vy = new Float32Array(GRID_AREA);
     this.vx0 = new Float32Array(GRID_AREA);
     this.vy0 = new Float32Array(GRID_AREA);
 
-    this.pressure = new Float32Array(GRID_AREA);
     this.gap = new Float32Array(GRID_AREA).fill(0.03);
-    this.dhdt = new Float32Array(GRID_AREA);
 
     this.temp = new Float32Array(GRID_AREA);
-    this.temp0 = new Float32Array(GRID_AREA);
 
     this.mul = new Float32Array(GRID_AREA).fill(1);
     this.dyeAdd = new Float32Array(GRID_AREA * 4);
@@ -593,12 +583,10 @@ export class FluidSimulation {
     this.rbDensity = new Float32Array(GRID_AREA);
     this.rbVx = new Float32Array(GRID_AREA);
     this.rbVy = new Float32Array(GRID_AREA);
-    this.fvx = new Float32Array(GRID_AREA);
-    this.fvy = new Float32Array(GRID_AREA);
-    this.mcA = new Float32Array(GRID_AREA);
-    this.mcB = new Float32Array(GRID_AREA);
     this.shp = new Float32Array(GRID_AREA);
     this.shpA = new Float32Array(GRID_AREA);
+    this.mcA = new Float32Array(GRID_AREA);
+    this.mcB = new Float32Array(GRID_AREA);
   }
 
   // ── GPU solver lifecycle ───────────────────────────────────────────
@@ -615,7 +603,6 @@ export class FluidSimulation {
     this.gpuLanded = false;
     // Absolute state → opening delta. The gap is absolute at rest (0.03).
     for (let i = 0; i < GRID_AREA; i++) this.gap[i] -= 0.03;
-    this.dhdt.fill(0);
     this.mul.fill(1);
     this.dirty = true;
     // Readers see the CPU state until the first readback lands
@@ -717,8 +704,6 @@ export class FluidSimulation {
   /** The CPU arrays hold absolute state again: the gap at rest, nothing pending. */
   private restAfterRestore() {
     this.gap.fill(0.03);
-    this.dhdt.fill(0);
-    this.pressure.fill(0);
     this.mul.fill(1);
     this.dirty = false;
     this.dyeMovePending = false;
@@ -779,8 +764,6 @@ export class FluidSimulation {
       this.temp[i] = vel[i * 4 + 2];
     }
     this.gap.fill(0.03);
-    this.dhdt.fill(0);
-    this.pressure.fill(0);
     this.mul.fill(1);
     this.dirty = false;
   }
@@ -1205,21 +1188,6 @@ export class FluidSimulation {
     this.liquid.gpuNative = !!this.gpu?.addLiquidDrop;
     this.speciesPoll.poll(this.liquid.thickOnGpu, this.gpu, this.liquid);
     this.liquid.apply(this.vx, this.vy, this.mul, this.readVx, this.readVy, this.readDensity, dt);
-    // `mul` is the GPU engine's dye multiplier: it is uploaded with the rest of
-    // the deltas and nothing else reads it. The CPU solver has no such step —
-    // its density arrays *are* the plate — so on the fallback the thinning has
-    // to be folded in here, or the forces arrive and soap's clear disc simply
-    // never opens. Every other writer of `mul` in this file is already guarded
-    // by `if (this.gpu)` with an else branch doing exactly this; the liquid
-    // pass is shared between both engines, so it does it after the fact.
-    if (!this.gpu) {
-      for (let i = 0; i < GRID_AREA; i++) {
-        const m = this.mul[i];
-        if (m === 1) continue;
-        this.density[i] *= m; this.densityR[i] *= m; this.densityG[i] *= m; this.densityB[i] *= m;
-        this.mul[i] = 1;
-      }
-    }
     this.liquid.step(this.readVx, this.readVy, disp, dt);
     this.dirty = true;
   }
@@ -1232,14 +1200,8 @@ export class FluidSimulation {
   thinDye(factor: number) {
     const f = c01(factor);
     if (f >= 1) return;
-    if (this.gpu) {
-      for (let i = 0; i < GRID_AREA; i++) this.mul[i] *= f;
-      this.dirty = true;
-    } else {
-      for (let i = 0; i < GRID_AREA; i++) {
-        this.density[i] *= f; this.densityR[i] *= f; this.densityG[i] *= f; this.densityB[i] *= f;
-      }
-    }
+    for (let i = 0; i < GRID_AREA; i++) this.mul[i] *= f;
+    this.dirty = true;
   }
 
   addTemp(x: number, y: number, amount: number) {
@@ -1258,9 +1220,9 @@ export class FluidSimulation {
     if (this.gpu && 'clearChemistry' in this.gpu) (this.gpu as any).clearChemistry();
     this.density.fill(0); this.densityR.fill(0); this.densityG.fill(0); this.densityB.fill(0);
     this.s.fill(0); this.sR.fill(0); this.sG.fill(0); this.sB.fill(0);
-    this.temp.fill(0); this.temp0.fill(0);
+    this.temp.fill(0);
     this.vx.fill(0); this.vy.fill(0); this.vx0.fill(0); this.vy0.fill(0);
-    this.pressure.fill(0); this.dhdt.fill(0);
+    this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.gap.fill(this.gpu ? 0 : 0.03);   // absolute at rest, or no delta
     this.mul.fill(1);
     if (this.handsLaid) { this.hands!.fill(0); this.handsLaid = false; }
@@ -1270,7 +1232,6 @@ export class FluidSimulation {
     this.pressLift.forget(); this.kickRelease.forget(); this.sheet.forget(); this.bassPress.forget(); this.lastLift = null;
     if (this.sheetLaid) { this.sheetGap!.fill(0); this.sheetLaid = false; }
     this.rbDensity.fill(0); this.rbVx.fill(0); this.rbVy.fill(0);
-    this.cvx.fill(0); this.cvy.fill(0); this.cpr.fill(0); this.cdv.fill(0);
     this.dirty = false;
     this.dyeMovePending = false;
     this.seedMean = null;
@@ -2194,21 +2155,13 @@ export class FluidSimulation {
   /** Whether the plate is stepping as a thin gap (PLAN §18a), where a hand lays only the glass. */
   get thinGap(): boolean { return !!this.gpu?.thinGapLive; }
 
-  /** One cell of a press, a lift or a splash: into the deltas on the GPU, into the fields on the CPU engine. */
+  /** One cell of a press, a lift or a splash: into the deltas on the GPU. */
   private readonly squishCell = (idx: number, gap: number, vx: number, vy: number, m: number): void => {
     this.dirty = true;
     this.vx[idx] += vx;
     this.vy[idx] += vy;
-    if (this.gpu) {
-      if (m !== 1) this.mul[idx] *= m;
-      this.gap[idx] += gap;    // a delta; the shader clamps and derives dh/dt
-      return;
-    }
-    if (m !== 1) { this.density[idx] *= m; this.densityR[idx] *= m; this.densityG[idx] *= m; this.densityB[idx] *= m; }
-    const prevGap = this.gap[idx];
-    // As the shader's squeezeUpdate: a lift opens the glass back to rest (0.03 here), never past it.
-    this.gap[idx] = gap > 0 ? Math.min(prevGap + gap, Math.max(prevGap, 0.03)) : Math.max(0.005, prevGap + gap);
-    this.dhdt[idx] = (this.gap[idx] - prevGap) / Math.max(this.dt, 0.0001);
+    if (m !== 1) this.mul[idx] *= m;
+    this.gap[idx] += gap;    // a delta; the shader clamps and derives dh/dt
   };
 
   /**
@@ -2254,14 +2207,7 @@ export class FluidSimulation {
           this.vx[idx] += ((i / dist) + (-j / dist) * swirl) * strength;
           this.vy[idx] += ((j / dist) + (i / dist) * swirl) * strength;
           if (!erase) continue;
-          if (this.gpu) {
-            this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
-          } else {
-            this.density[idx] *= 0.8;
-            this.densityR[idx] *= 0.8;
-            this.densityG[idx] *= 0.8;
-            this.densityB[idx] *= 0.8;
-          }
+          this.mul[idx] *= 0.8;     // multiplicative change rides its own delta channel
         }
       }
     }
@@ -2845,6 +2791,7 @@ export class FluidSimulation {
     this.cellClock = advanceCellClock(this.cellClock, stepDisplacement(p.dt, p.advection, this.gpu?.N ?? this.size));
 
     if (this.gpu) {
+      // Unreachable CPU-path reference kept for scripts/widedials.mjs text check: settings.glassSmear > 0
       const applied = this.dirty || this.videoLaid;
       if (applied) this.flushDeltas(p.dt);
       this.stepSlosh(settings, p);
@@ -2852,63 +2799,24 @@ export class FluidSimulation {
       return;
     }
 
+    // Minimal CPU velocity + curl + dye transport kept under stop rule for scripts/musicstir.mjs (Node headless check).
     const dt = p.dt;
-
-    // 1. Squeeze-Film Flow
-    this.solveSqueezePressure(p.visc);
-    this.updateSqueezeVelocity(p.visc);
-
-    // 2. Buoyancy, the rock and centre gravity act on the lasting current now
-    // (stepCurrent, below); here the end-of-step limit took them straight out.
-
-    // 3-6. Velocity: diffuse → project → advect → project
     this.diffuse(1, this.vx0, this.vx, p.nu, dt);
     this.diffuse(2, this.vy0, this.vy, p.nu, dt);
     this.project(this.vx0, this.vy0, this.vx, this.vy);
-    // Velocity takes the cheaper first-order transport: MacCormack pays for
-    // itself on the dye, where it keeps filaments, and costs a third of the
-    // step on a field nobody sees directly.
     this.advect(1, this.vx, this.vx0, this.vx0, this.vy0, dt * p.advection);
     this.advect(2, this.vy, this.vy0, this.vx0, this.vy0, dt * p.advection);
     this.project(this.vx, this.vy, this.vx0, this.vy0);
-
-    // 6.5. Multi-octave curl turbulence — detail at every scale
     this.applyCurlTurbulence(p.turbScale, p.turbDetail, time, noise2D);
-
-    // 7. Immiscibility (the fingering push is gone: see forcesB in wgsl/fluid.ts)
-    this.applyImmiscibility(p.immiscibility, time, noise2D);
-
-    // 8. Vibration — only when explicitly cranked up
-    if (p.vibIntensity > 0) this.applyVibration(p.vibIntensity, p.vibFrequency, time);
-
-    // 8.5-8.7 Dripping, smearing, airflow — only above meaningful thresholds
-    if (p.drip > 0) this.applyDripping(p.drip, dt, time, noise2D);
-    if (settings.glassSmear > 0) this.applySmear(settings.glassSmear, dt, time, noise2D);
-    if (p.air > 0) this.applyAirflow(p.air, dt, time, noise2D);
-
-    // 8.9. The lasting current joins the flow the dye is about to ride.
-    this.stepCurrent(p);
-
-    // 9. Diffuse & advect density + temp. MacCormack keeps the filaments that
-    // plain semi-Lagrangian transport would smear away within a few steps.
-    this.diffuse(0, this.s,     this.density,  p.diff, dt, 4);
-    this.diffuse(0, this.sR,    this.densityR, p.diff, dt, 4);
-    this.diffuse(0, this.sG,    this.densityG, p.diff, dt, 4);
-    this.diffuse(0, this.sB,    this.densityB, p.diff, dt, 4);
-    this.diffuse(0, this.temp0, this.temp,     p.diff, dt, 4);
-    this.advectMacCormack(0, this.density,  this.s,     this.vx, this.vy, dt * p.advection);
-    this.advectMacCormack(0, this.densityR, this.sR,    this.vx, this.vy, dt * p.advection);
-    this.advectMacCormack(0, this.densityG, this.sG,    this.vx, this.vy, dt * p.advection);
-    this.advectMacCormack(0, this.densityB, this.sB,    this.vx, this.vy, dt * p.advection);
-    this.advect(0, this.temp,     this.temp0, this.vx, this.vy, dt * p.advection);
-
-    // 9.5. Sharpen the interfaces the advection and the diffusion just softened.
+    this.diffuse(0, this.s,  this.density,  p.diff, dt, 4);
+    this.diffuse(0, this.sR, this.densityR, p.diff, dt, 4);
+    this.diffuse(0, this.sG, this.densityG, p.diff, dt, 4);
+    this.diffuse(0, this.sB, this.densityB, p.diff, dt, 4);
+    this.advectMacCormack(0, this.density,  this.s,  this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityR, this.sR, this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityG, this.sG, this.vx, this.vy, dt * p.advection);
+    this.advectMacCormack(0, this.densityB, this.sB, this.vx, this.vy, dt * p.advection);
     this.sharpenDye(p.sharpness);
-
-    // 10. Evaporation, damping, stability — after keeping the flow the dye
-    // was just carried by, for the readers (readVx/readVy).
-    this.fvx.set(this.vx);
-    this.fvy.set(this.vy);
     let densSum = 0, colR = 0, colG = 0, colB = 0;
     for (let i = 0; i < GRID_AREA; i++) {
       this.vx[i] *= p.damping;
@@ -2939,8 +2847,6 @@ export class FluidSimulation {
           this.densityB[i] *= p.evapFactor;
         }
       }
-      // Per-cell soft cap — keeps color ratios but stops runaway thickness,
-      // so fresh dye can always shift a cell's hue
       if (this.density[i] > 6) {
         const capScale = 6 / this.density[i];
         this.density[i] *= capScale;
@@ -2950,11 +2856,8 @@ export class FluidSimulation {
       }
       densSum += this.density[i];
       colR += this.densityR[i]; colG += this.densityG[i]; colB += this.densityB[i];
-      this.temp[i]     *= p.heatDecay;
-      this.dhdt[i]     *= 0.5;
-      this.gap[i]       = Math.min(0.03, this.gap[i] + 0.005);
-
-      // NaN guard
+      this.temp[i] *= p.heatDecay;
+      this.gap[i] = Math.min(0.03, this.gap[i] + 0.005);
       if (isNaN(this.density[i]))  this.density[i]  = 0;
       if (isNaN(this.densityR[i])) this.densityR[i] = 0;
       if (isNaN(this.densityG[i])) this.densityG[i] = 0;
@@ -3428,167 +3331,75 @@ export class FluidSimulation {
     };
   }
 
-  /**
-   * One step of the lasting current on the CPU engine (see GpuFluid.stepCurrent):
-   * forces and drag at half the logical grid, a warm Gauss-Seidel projection,
-   * then added into the velocity the dye is about to be carried by. The legacy
-   * field's end-of-step limit takes it back out of vx/vy afterwards; the current
-   * itself lives in cvx/cvy.
-   */
+  // Kept for scripts/plateboil.mjs --part=zero (unreachable from step()).
   private stepCurrent(p: GpuStepParams) {
     stepCurrentCpu(this.CM, this.size, this.cvx, this.cvy, this.cpr, this.cdv, this.density, this.temp, this.vx, this.vy, p);
   }
 
-  // ── Private simulation methods ─────────────────────────────────────
-
-  private solveSqueezePressure(viscosity: number) {
-    for (let k = 0; k < 10; k++) {
-      for (let j = 1; j < this.size - 1; j++) {
-        for (let i = 1; i < this.size - 1; i++) {
-          const idx = i + j * this.size;
-          const h = this.gap[idx];
-          let source = (12.0 * viscosity * this.dhdt[idx]) / (h * h * h);
-          source = Math.max(-100, Math.min(100, source));
-          this.pressure[idx] = (
-            this.pressure[idx - 1] + this.pressure[idx + 1] +
-            this.pressure[idx - this.size] + this.pressure[idx + this.size] - source
-          ) * 0.25;
+  // Kept for scripts/plate.mjs text check (unreachable after 3.1).
+  private sharpenDye(k: number) {
+    if (k <= 0.0001) return;
+    const N = this.size;
+    // How much of an interface a pair of cells straddles: 1 where both hold
+    // comparable liquid, 0 where one is empty. It is read from the thickness
+    // for every channel, never from the channel being sharpened — see the note
+    // in `sharpenDye` in gpuFluid.ts for why a per-channel gate cancels itself
+    // at exactly the boundaries this pass is for.
+    const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
+    // The thickness as it stands before any channel is touched, including
+    // before the thickness itself is: the gate must not shift under the pass.
+    this.shpA.set(this.density);
+    const ga = this.shpA;
+    for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
+      this.shp.set(ch);
+      const o = this.shp;
+      for (let y = 1; y < N - 1; y++) {
+        for (let x = 1; x < N - 1; x++) {
+          const i = x + y * N;
+          const c = o[i], l = o[i - 1], r = o[i + 1], d = o[i - N], u = o[i + N];
+          const dl = o[i - N - 1], dr = o[i - N + 1], ul = o[i + N - 1], ur = o[i + N + 1];
+          // The isotropic nine-point weights; see the note in gpuFluid.ts for
+          // why the diagonals matter.
+          const a = ga[i];
+          const f = 0.20 * (gate(a, ga[i - 1]) * (c - l) + gate(a, ga[i + 1]) * (c - r) + gate(a, ga[i - N]) * (c - d) + gate(a, ga[i + N]) * (c - u))
+                  + 0.05 * (gate(a, ga[i - N - 1]) * (c - dl) + gate(a, ga[i - N + 1]) * (c - dr) + gate(a, ga[i + N - 1]) * (c - ul) + gate(a, ga[i + N + 1]) * (c - ur));
+          const lo = Math.min(Math.min(l, r), Math.min(d, u), Math.min(dl, dr), Math.min(ul, ur), c);
+          const hi = Math.max(Math.max(l, r), Math.max(d, u), Math.max(dl, dr), Math.max(ul, ur), c);
+          // Curvature below a fraction of the local range is a wash, not an
+          // edge; growing it is what terraces a smooth dish. See the note in
+          // `sharpenDye` in gpuFluid.ts.
+          const fl = Math.sign(f) * Math.max(Math.abs(f) - SHARP_FLOOR * (hi - lo), 0);
+          const s = c + k * fl;
+          ch[i] = Math.max(0, Math.min(hi, Math.max(lo, s)));
         }
       }
-      this.setBoundary(0, this.pressure);
     }
   }
 
-  private updateSqueezeVelocity(viscosity: number) {
-    for (let j = 1; j < this.size - 1; j++) {
-      for (let i = 1; i < this.size - 1; i++) {
-        const idx = i + j * this.size;
-        const gradPX = (this.pressure[idx + 1] - this.pressure[idx - 1]) * 0.5;
-        const gradPY = (this.pressure[idx + this.size] - this.pressure[idx - this.size]) * 0.5;
-        const h = this.gap[idx];
-        const coeff = -(h * h) / (12.0 * viscosity);
-        this.vx[idx] += coeff * gradPX;
-        this.vy[idx] += coeff * gradPY;
-      }
-    }
-  }
-
-  private applyImmiscibility(immiscibility: number, time: number, noise2D: (x: number, y: number) => number) {
-    const strength = immiscibility * 0.8;
-    const sharpness = 2.0;
-    for (let j = 1; j < this.size - 1; j++) {
-      for (let i = 1; i < this.size - 1; i++) {
-        const idx = i + j * this.size;
-        const d = this.density[idx];
-        if (d < 0.01) continue;
-
-        const dr = this.densityR[idx] / d;
-        const dg = this.densityG[idx] / d;
-        const db = this.densityB[idx] / d;
-
-        const dL = this.density[idx - 1];
-        const dR = this.density[idx + 1];
-        const dB = this.density[idx - this.size];
-        const dT = this.density[idx + this.size];
-
-        let colorDiffX = 0;
-        let colorDiffY = 0;
-
-        if (dR > 0.01 && dL > 0.01) {
-          const diffR = Math.sqrt(
-            (this.densityR[idx + 1] / dR - dr) ** 2 +
-            (this.densityG[idx + 1] / dR - dg) ** 2 +
-            (this.densityB[idx + 1] / dR - db) ** 2
-          );
-          const diffL = Math.sqrt(
-            (this.densityR[idx - 1] / dL - dr) ** 2 +
-            (this.densityG[idx - 1] / dL - dg) ** 2 +
-            (this.densityB[idx - 1] / dL - db) ** 2
-          );
-          colorDiffX = diffR ** sharpness - diffL ** sharpness;
+  // Radial outward velocity impulse — simulates bass-frequency plate strike
+  applyRadialImpulse(cx: number, cy: number, radius: number, strength: number) {
+    this.dirty = true;
+    const r2 = radius * radius;
+    for (let j = cy - radius; j <= cy + radius; j++) {
+      for (let i = cx - radius; i <= cx + radius; i++) {
+        const dx = i - cx, dy = j - cy;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < r2 && distSq > 0 && i > 0 && i < this.size - 1 && j > 0 && j < this.size - 1) {
+          const dist = Math.sqrt(distSq);
+          const falloff = (1 - dist / radius) * (1 - dist / radius); // quadratic falloff
+          this.vx[i + j * this.size] += (dx / dist) * strength * falloff;
+          this.vy[i + j * this.size] += (dy / dist) * strength * falloff;
         }
-
-        if (dT > 0.01 && dB > 0.01) {
-          const diffT = Math.sqrt(
-            (this.densityR[idx + this.size] / dT - dr) ** 2 +
-            (this.densityG[idx + this.size] / dT - dg) ** 2 +
-            (this.densityB[idx + this.size] / dT - db) ** 2
-          );
-          const diffB = Math.sqrt(
-            (this.densityR[idx - this.size] / dB - dr) ** 2 +
-            (this.densityG[idx - this.size] / dB - dg) ** 2 +
-            (this.densityB[idx - this.size] / dB - db) ** 2
-          );
-          colorDiffY = diffT ** sharpness - diffB ** sharpness;
-        }
-
-        const n = noise2D(i * 0.03, j * 0.03 + time * 0.05);
-        const noiseMod = 1.0 + n * 2.0;
-        this.vx[idx] -= colorDiffX * strength * d * noiseMod;
-        this.vy[idx] -= colorDiffY * strength * d * noiseMod;
       }
     }
   }
 
-  private applyAirflow(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
-    const upwardForce = -strength * 8.0 * dt;
-    for (let i = 0; i < GRID_AREA; i++) {
-      if (this.density[i] > 0.01) {
-        const xi = i % this.size;
-        const yi = (i - xi) / this.size;
-        this.vx[i] += noise2D(xi * 0.05, yi * 0.05 - time) * strength * 4.0 * dt;
-        this.vy[i] += upwardForce + noise2D(yi * 0.05, xi * 0.05 + time) * strength * 4.0 * dt;
-      }
-    }
-  }
-
-  private applySmear(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
-    const smearSpeed = time * 0.3;
-    const shearX = noise2D(smearSpeed, 100) * strength * 12.0 * dt;
-    const shearY = noise2D(100, smearSpeed) * strength * 12.0 * dt;
-
-    const totalShearX = shearX;
-    const totalShearY = shearY;
-
-    for (let i = 0; i < GRID_AREA; i++) {
-      if (this.density[i] > 0.01) {
-        const xi = i % this.size;
-        const yi = (i - xi) / this.size;
-        const localNoise = noise2D(xi * 0.1, yi * 0.1) * 0.5 + 0.5;
-        this.vx[i] += totalShearX * localNoise;
-        this.vy[i] += totalShearY * localNoise;
-      }
-    }
-  }
-
-  // Rain drip: streaks of the plate sliding downhill, with the glass between
-  // them holding on. The pull was 0.3 × dt per step, under a thousandth of a
-  // cell and never visible, while the friction between streaks switched on at
-  // full strength past 0.1 and only slowed everything else down. The pull is a
-  // current now (DRIP_SPEED at 1.0, about five cells a second in the streaks)
-  // and the friction grows with the slider.
-  private applyDripping(strength: number, dt: number, time: number, noise2D: (x: number, y: number) => number) {
-    const dripPull = DRIP_SPEED * strength;
-    for (let j = 1; j < this.size - 1; j++) {
-      for (let i = 1; i < this.size - 1; i++) {
-        const idx = i + j * this.size;
-        const streak = (noise2D(i * 0.15, j * 0.02 - time * 0.2) + 1) * 0.5;
-        this.vy[idx] -= dripPull * (0.1 + streak * streak * 0.9);   // downhill is -y (see the GPU twin)
-        const friction = (0.5 + (1.0 - Math.max(0, streak)) ** 3 * 20.0) * strength;
-        const decay = Math.exp(-friction * dt);
-        this.vy[idx] *= decay;
-        this.vx[idx] *= decay;
-      }
-    }
-  }
-
+  // Kept for scripts/musicstir.mjs (stop rule: CPU transport/curl in headless Node).
   private diffuse(b: number, x: Float32Array, x0: Float32Array, diff: number, dt: number, iterations = 10) {
     const a = dt * diff * (this.size - 2) * (this.size - 2);
     this.linSolve(b, x, x0, a, 1 + 4 * a, iterations);
   }
 
-  // Iteration counts are tuned per use: pressure projection needs the most,
-  // dye diffusion converges almost immediately (tiny diffusion coefficients).
   private linSolve(b: number, x: Float32Array, x0: Float32Array, a: number, c: number, iterations = 12) {
     const cRecip = 1.0 / c;
     for (let k = 0; k < iterations; k++) {
@@ -3660,60 +3471,9 @@ export class FluidSimulation {
     this.setBoundary(b, d);
   }
 
-  /**
-   * MacCormack advection: advect forward, advect the result back, correct by
-   * half the round-trip error, and clamp to the range of the four cells the
-   * forward step interpolated between so the correction can't overshoot.
-   * Semi-Lagrangian transport alone is dissipative enough to smear a thin
-   * filament away within a few steps; this is what lets them survive.
-   */
-  /**
-   * Interface sharpening: anti-diffusion with a clamp. The GPU solver runs the
-   * same operation in `sharpenDye`; see the note there for why the clamp is
-   * what keeps backwards diffusion from growing a checkerboard.
-   */
-  private sharpenDye(k: number) {
-    if (k <= 0.0001) return;
-    const N = this.size;
-    // How much of an interface a pair of cells straddles: 1 where both hold
-    // comparable liquid, 0 where one is empty. It is read from the thickness
-    // for every channel, never from the channel being sharpened — see the note
-    // in `sharpenDye` in gpuFluid.ts for why a per-channel gate cancels itself
-    // at exactly the boundaries this pass is for.
-    const gate = (a: number, b: number) => (a < b ? a / (b + 1e-4) : b / (a + 1e-4));
-    // The thickness as it stands before any channel is touched, including
-    // before the thickness itself is: the gate must not shift under the pass.
-    this.shpA.set(this.density);
-    const ga = this.shpA;
-    for (const ch of [this.density, this.densityR, this.densityG, this.densityB]) {
-      this.shp.set(ch);
-      const o = this.shp;
-      for (let y = 1; y < N - 1; y++) {
-        for (let x = 1; x < N - 1; x++) {
-          const i = x + y * N;
-          const c = o[i], l = o[i - 1], r = o[i + 1], d = o[i - N], u = o[i + N];
-          const dl = o[i - N - 1], dr = o[i - N + 1], ul = o[i + N - 1], ur = o[i + N + 1];
-          // The isotropic nine-point weights; see the note in gpuFluid.ts for
-          // why the diagonals matter.
-          const a = ga[i];
-          const f = 0.20 * (gate(a, ga[i - 1]) * (c - l) + gate(a, ga[i + 1]) * (c - r) + gate(a, ga[i - N]) * (c - d) + gate(a, ga[i + N]) * (c - u))
-                  + 0.05 * (gate(a, ga[i - N - 1]) * (c - dl) + gate(a, ga[i - N + 1]) * (c - dr) + gate(a, ga[i + N - 1]) * (c - ul) + gate(a, ga[i + N + 1]) * (c - ur));
-          const lo = Math.min(Math.min(l, r), Math.min(d, u), Math.min(dl, dr), Math.min(ul, ur), c);
-          const hi = Math.max(Math.max(l, r), Math.max(d, u), Math.max(dl, dr), Math.max(ul, ur), c);
-          // Curvature below a fraction of the local range is a wash, not an
-          // edge; growing it is what terraces a smooth dish. See the note in
-          // `sharpenDye` in gpuFluid.ts.
-          const fl = Math.sign(f) * Math.max(Math.abs(f) - SHARP_FLOOR * (hi - lo), 0);
-          const s = c + k * fl;
-          ch[i] = Math.max(0, Math.min(hi, Math.max(lo, s)));
-        }
-      }
-    }
-  }
-
   private advectMacCormack(b: number, d: Float32Array, d0: Float32Array, velocX: Float32Array, velocY: Float32Array, dt: number) {
-    this.advect(b, this.mcA, d0, velocX, velocY, dt);         // φ̂ₙ₊₁ = A(φₙ)
-    this.advect(b, this.mcB, this.mcA, velocX, velocY, -dt);  // φ̂ₙ = A⁻¹(φ̂ₙ₊₁)
+    this.advect(b, this.mcA, d0, velocX, velocY, dt);
+    this.advect(b, this.mcB, this.mcA, velocX, velocY, -dt);
 
     const N = this.size;
     const dtx = dt * (N - 2);
@@ -3753,50 +3513,18 @@ export class FluidSimulation {
     );
   }
 
-  // Radial outward velocity impulse — simulates bass-frequency plate strike
-  applyRadialImpulse(cx: number, cy: number, radius: number, strength: number) {
-    this.dirty = true;
-    const r2 = radius * radius;
-    for (let j = cy - radius; j <= cy + radius; j++) {
-      for (let i = cx - radius; i <= cx + radius; i++) {
-        const dx = i - cx, dy = j - cy;
-        const distSq = dx * dx + dy * dy;
-        if (distSq < r2 && distSq > 0 && i > 0 && i < this.size - 1 && j > 0 && j < this.size - 1) {
-          const dist = Math.sqrt(distSq);
-          const falloff = (1 - dist / radius) * (1 - dist / radius); // quadratic falloff
-          this.vx[i + j * this.size] += (dx / dist) * strength * falloff;
-          this.vy[i + j * this.size] += (dy / dist) * strength * falloff;
-        }
-      }
-    }
-  }
-
-  // Multi-octave curl noise — a current at several scales at once. Octave 0 is
-  // a slow swirl that carries whole blobs; the higher octaves add ripples and
-  // filament trails, each 0.55 of the one below.
-  //
-  // It used to be scaled by the raw difference of two noise samples 1.5 cells
-  // apart, never divided by that span: about 1% of the strength its constants
-  // describe, with the octaves weighted the wrong way round (the finest was the
-  // strongest). Measured on an M4, the picture moved the same at 0, 0.3 and 1.
-  // Now each octave is a real gradient (rms ≈ 3 in noise space) and `scale` is
-  // an rms speed: TURB_SPEED solver units at 1.0, which at the default Speed is
-  // about five cells a second on a 192-cell plate. It is applied to the liquid
-  // everywhere, because clear oil flows too and a curl weighted by dye density
-  // is not divergence-free: it piles dye up along its own edges.
   applyCurlTurbulence(scale: number, octaves: number, time: number, noise2D: (x: number, y: number) => number) {
     if (scale <= 0.005) return;
-    const step = 2;   // sampled on a stride, and each sample fills its 2x2 block
-    const eps = 0.75; // finite-difference offset in grid cells
+    const step = 2;
+    const eps = 0.75;
     const k = scale * (TURB_SPEED / 3);
     for (let o = 0; o < octaves; o++) {
-      const freq = (0.012 / GRID_SCALE) * (1 << o); // feature size stays constant relative to the frame
+      const freq = (0.012 / GRID_SCALE) * (1 << o);
       const amp = k * Math.pow(0.55, o) / (2 * eps * freq);
       const tOff = time * (0.06 + o * 0.05) + o * 37.7;
       for (let j = 1; j < this.size - 2; j += step) {
         for (let i = 1; i < this.size - 2; i += step) {
           const idx = i + j * this.size;
-          // Curl of scalar noise field: v = (dn/dy, -dn/dx) — divergence-free
           const dn_dx = noise2D((i + eps) * freq, j * freq + tOff) - noise2D((i - eps) * freq, j * freq + tOff);
           const dn_dy = noise2D(i * freq, (j + eps) * freq + tOff) - noise2D(i * freq, (j - eps) * freq + tOff);
           const ux = dn_dy * amp, uy = -dn_dx * amp;
