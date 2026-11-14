@@ -12177,3 +12177,51 @@ Garden read as scattered specks at this size and is left off too.
 `npm run signin` 11b now also asks, on a laptop and a phone upright and on its side, that the
 card is there, its Buy is a live checkout link at least 44 px tall opening a new tab, and all
 four pictures load at 960 px wide.
+
+## 46a. A faster opening (2026-11-14)
+
+Classic's opening waited for 65 pipelines in its ledger and asked WebGPU for 66 before the
+first step (`OPENING_MOST = 52` in `scripts/openingtime.mjs`, `--bar`). Each pipeline is a
+separate WGSL compile pass before frame 1, and seven of the opening's pipelines (`jacobi:dye`,
+`output`, `airGiveSub:thin`, `airGiveThin:thin`, `beadDrops`, `beadHoles`, `beadFinish`)
+were never drawn in Classic's first 40 steps, while several pairs of dispatches ran back to
+back over the same cells.
+
+Two changes cut Classic's opening from 66 WebGPU pipelines (65 ledger) to 51 WebGPU
+pipelines (50 ledger) without dropping anything a look draws or loosening `src/gpu/opening.ts`:
+
+1. **Five kernel fusions and a buffer clear (`-10` opening pipelines):**
+   - `deltaFold` (`src/gpu/fluid/inputs.ts`, `src/gpu/wgsl/fluid/splats.ts`): folded
+     `deltaDye`, `deltaVel` and `liquidForces` into one pass, and sampled `cpuMulTex`
+     directly via `bilerpN` unless `videoPending || bodyMul`, deferring `upsampleDelta:r32float`
+     while keeping `upsample` on `cpuDyeTex`/`cpuVelTex` (`npm run videoflow` reads those
+     intermediate textures directly).
+   - `forcesB` (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/forces.ts`): folded `addCurrent`
+     into `forcesB` (preserving the `forcesB` kernel name used by `scripts/crash.mjs`).
+   - `grainStep` (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/dye.ts`): folded `advect` and
+     `seedGrain` into one dispatch (`-2` pipelines).
+   - `decay` (`src/gpu/fluid.ts`, `src/gpu/wgsl/fluid/dye.ts`): folded `decayDye` and
+     `decayVel` into one dispatch.
+   - `packVel` (`src/gpu/wgsl/pack.ts`, `src/gpu/plate.ts`): folded `packDye` into
+     `packVel` (preserving `textureLoad(vel, vec2i(id.xy), 0).xy;` for `scripts/cellride.mjs`
+     and keeping `packVelDrop` ordered after the plate loop when `height` is present).
+   - `FluidCore.clear()` (`src/gpu/fluid/core.ts`, `src/gpu/fluid/fields.ts`): replaced the
+     `clearBuffer` compute dispatch on `press`, `spress` and `hsLiftPsi` with
+     `enc.clearBuffer(...)` (`COPY_DST`), while keeping `mgZero` in `hsCycle()` (`encode`
+     H2c-1/H2c-3). Added `velScratch` (`rgba16float` in `src/gpu/fluid/fields.ts` and
+     `src/gpu/fluid/passes.ts`) for `jacobi(this.vel)`, taking `scaleDye:dye` out of the
+     opening (`-1`).
+2. **Deferred behind the show (`later` builds):** moved `jacobi:dye`,
+   `airGiveSub:thin` and `airGiveThin:thin` (`THIN_GAP_LATER_KERNELS` in
+   `src/gpu/fluid/constants.ts`), `beadDrops`/`beadHoles`/`beadFinish` (`src/gpu/beadMask.ts`)
+   and `output` (`src/gpu/output.ts`) to `later` builds so the app compiles them after the
+   opening without missing a draw in Classic's first steps.
+
+Removed `--owed=count` from `"The opening waits for fewer pipelines, owed"` in
+`scripts/checks.json`. Checks: `PW_WEBGPU=1 node scripts/openingtime.mjs --bar --runs 1`
+51 WebGPU pipelines (50 in ledger, first step 0.81 s, building 0.33 s; down from 66 / 65);
+warm `npm run openingtime -- --runs 3` median first step 0.59 s (down from 0.70 s);
+`npm run samelook` 0.00% diff across all 6 looks; `npm run startup` opens all 34 looks
+(50 to 70 pipelines, no stop in the opening); `npm run physics` 20/20, `npm run thingap`
+16/16, `npm run grating` 24/24, `npm run videoflow` 24/24, `npm run cellride` 14/14,
+`npm run crash` 37/37.

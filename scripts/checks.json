@@ -1996,7 +1996,7 @@
     {
       "name": "The opening waits for fewer pipelines, owed",
       "shard": "browser2",
-      "run": "node scripts/openingtime.mjs --bar --runs 1 --owed=count",
+      "run": "node scripts/openingtime.mjs --bar --runs 1",
       "env": {
         "PW_WEBGPU": "1"
       },

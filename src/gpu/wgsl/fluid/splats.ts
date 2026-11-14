@@ -8,57 +8,114 @@
  * the one table every pass is asked for by name.
  */
 
-import { HEAD, W } from './shared';
+import { BILERP_N, HEAD, W } from './shared';
 import { DISH_GAP_RANGE, DISH_REST_GAP } from '../../../lib/turntable';
 
 export const SPLAT_KERNELS: Record<string, string> = {
-  // dye = max(dye * mul + add, 0), from the full-resolution delta fields.
-  deltaDye: `${HEAD}
+  /*
+    Fused deltaDye + deltaVel + liquidForces.
+    A.a = (soapGradScale, thinLive, bodyDrag, heavyScale),
+    A.b = (polarScale, repelScale, maxf, mulMode):
+      mulMode > 0.5: bilinear-sample mulT (cpuMulTex) on the fly;
+      mulMode <= 0.5: textureLoad(mulT, p, 0) (deltaMulTex);
+      mulMode < 0.0: dye-only (pourImage), skip dstVel write.
+    With the plate a thin gap (A.a.y = 1, PLAN §18a) a hand's velocity is
+    imposed rather than added.
+  */
+  deltaFold: `${HEAD}${BILERP_N}
 @group(0) @binding(2) var dye: texture_2d<f32>;
-@group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var mulT: texture_2d<f32>;
-@group(0) @binding(5) var liquids0: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var addDyeT: texture_2d<f32>;
+@group(0) @binding(5) var addVelT: texture_2d<f32>;
+@group(0) @binding(6) var mulT: texture_2d<f32>;
+@group(0) @binding(7) var liquids0: texture_2d<f32>;
+@group(0) @binding(8) var liquids1: texture_2d<f32>;
+@group(0) @binding(9) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(10) var dstVel: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
   let d = textureLoad(dye, p, 0);
-  let soap = textureLoad(liquids0, p, 0).r;
+  let l0 = textureLoad(liquids0, p, 0);
+  let soap = l0.r;
   let soapMul = 1.0 - min(0.5, soap * soap * 0.22 * S.dt * 60.0);
-  textureStore(dst, p, capDye(d * textureLoad(mulT, p, 0).r * soapMul + textureLoad(addT, p, 0)));
-}`,
+  let mul = select(textureLoad(mulT, p, 0).r, bilerpN(mulT, uvOf(id), S.l).r, A.b.w > 0.5);
+  let addD = textureLoad(addDyeT, p, 0);
+  textureStore(dstDye, p, capDye(d * mul * soapMul + addD));
+  if (A.b.w < 0.0) { return; }
 
-  // vel.xy += add.xy ; temp (vel.z) += add.z
-  /*
-    With the plate a thin gap (A.a.x = 1, PLAN §18a) a hand's velocity is
-    imposed rather than added.
-
-    Added was right while the velocity lasted one step: each frame's push
-    was the whole of the liquid's motion, and the clamp took it back. With
-    the drag time as the plate's memory, a Finger held still in its stroke
-    adds the same push every frame, and added it would run the liquid up to
-    sixty times the hand's own speed in a second of water. A hand in the
-    liquid is a solid moving through it: the liquid it touches moves with
-    it and no faster (Brinkman's penalised solid, in the limit where the
-    solid wins). So along the push the liquid is brought up to the push and
-    not past it, and across it keeps what it had.
-  */
-  deltaVel: `${HEAD}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var addT: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let p = vec2i(id.xy);
-  let v = textureLoad(vel, p, 0);
-  let a = textureLoad(addT, p, 0);
-  var u = v.xy + a.xy;
-  let s = length(a.xy);
-  if (A.a.x > 0.5 && s > 0.0) {
-    let dir = a.xy / s;
-    u = v.xy + dir * max(0.0, s - dot(v.xy, dir));
+  let v0 = textureLoad(vel, p, 0);
+  let a = textureLoad(addVelT, p, 0);
+  var u = v0.xy + a.xy;
+  let sp = length(a.xy);
+  if (A.a.y > 0.5 && sp > 0.0) {
+    let dir = a.xy / sp;
+    u = v0.xy + dir * max(0.0, sp - dot(v0.xy, dir));
   }
-  textureStore(dst, p, safeVel(vec4f(u, v.z + a.z, 0.0)));
+  let v = safeVel(vec4f(u, v0.z + a.z, 0.0));
+
+  let l1 = textureLoad(liquids1, p, 0);
+  let body = l0.g;
+  let repel = l0.b;
+  let heavy = l0.a;
+  let polar = l1.r;
+  if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
+    textureStore(dstVel, p, v);
+    return;
+  }
+
+  var fx = 0.0;
+  var fy = 0.0;
+  let dt = S.dt;
+  let s = S.n;
+
+  if (soap > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
+    fx -= gx * A.a.x * dt * s;
+    fy -= gy * A.a.x * dt * s;
+  }
+
+  if (body > 0.0 && A.a.y == 0.0) {
+    let k = min(0.9, body * A.a.z * dt);
+    fx -= v.x * k;
+    fy -= v.y * k;
+  }
+
+  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
+    fx += S.rock.x * heavy * A.a.w * dt * s;
+    fy += S.rock.y * heavy * A.a.w * dt * s;
+  }
+
+  if (polar != 0.0) {
+    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
+    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
+    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
+    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
+    fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
+    fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
+  }
+
+  if (repel > 0.0) {
+    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).b - textureLoad(liquids0, p - vec2i(1, 0), 0).b) * 0.5;
+    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).b - textureLoad(liquids0, p - vec2i(0, 1), 0).b) * 0.5;
+    let g = sqrt(gx * gx + gy * gy);
+    if (g > 1e-5) {
+      let nx = -gx / g;
+      let ny = -gy / g;
+      let outF = v.x * nx + v.y * ny;
+      if (outF > 0.0) {
+        let k = min(0.9, repel * A.b.y * dt * 60.0);
+        fx -= nx * outF * k;
+        fy -= ny * outF * k;
+      }
+    }
+  }
+
+  let maxf = A.b.z;
+  fx = clamp(fx, -maxf, maxf);
+  fy = clamp(fy, -maxf, maxf);
+  textureStore(dstVel, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
 }`,
 
   /*

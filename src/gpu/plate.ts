@@ -171,7 +171,7 @@ export class WebGPUPlate {
       // in this order, and it is the longest compile of the show's opening
       // (`gpu/prepare.ts`).
       cache.renderPrep(displayName(format, false), displayRecipe(device, format, false)),
-      ...(['packDye', 'packVel'] as const).map((name) => cache.computePrep(name, PACK_KERNELS[name])),
+      cache.computePrep('packVel', PACK_KERNELS.packVel),
       cache.renderPrep('derive', deriveRecipe(device)),
       ...BeadMask.prepare(cache),
       // Into a texture rather than the canvas: the camera's, in the canvas's
@@ -357,26 +357,19 @@ export class WebGPUPlate {
       && FerroDrop.wanted(this.pack.get('macroOn')[0], this.pack.get('macroRelief')[0], this.pack.get('phaseAmount')[0]);
     const height = dropWanted ? this.drop.solve(packPass, leadView!, this.pack.get('macroRelief')[0], this.pack.get('magnets')) : null;
     if (!dropWanted) this.drop.cool();
+    for (let i = 0; i < fields.length; i++) {
+      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
+      if (pipeVel) {
+        packPass.setPipeline(pipeVel);
+        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].dye, this.layers[i].dye, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
+        packPass.dispatchWorkgroups(groups, groups);
+      }
+    }
     if (height) {
       const pipe = this.pipelines.computePipeline('packVelDrop', DROP_KERNELS.packVelDrop);
       if (pipe) {
         packPass.setPipeline(pipe);
         packPass.setBindGroup(0, groupOf(this.device, pipe, [this.packArgs, fields[0].velForced, height, leadView!, this.layers[0].vel]));
-        packPass.dispatchWorkgroups(groups, groups);
-      }
-    }
-    for (let i = 0; i < fields.length; i++) {
-      const pipeDye = this.pipelines.computePipeline('packDye', PACK_KERNELS.packDye);
-      if (pipeDye) {
-        packPass.setPipeline(pipeDye);
-        packPass.setBindGroup(0, groupOf(this.device, pipeDye, [this.packArgs, fields[i].dye, this.layers[i].dye]));
-        packPass.dispatchWorkgroups(groups, groups);
-      }
-      if (i === 0 && height) continue;
-      const pipeVel = this.pipelines.computePipeline('packVel', PACK_KERNELS.packVel);
-      if (pipeVel) {
-        packPass.setPipeline(pipeVel);
-        packPass.setBindGroup(0, groupOf(this.device, pipeVel, [this.packArgs, fields[i].velForced, this.layers[i].vel, fields[i].species ?? this.blankSpecies]));
         packPass.dispatchWorkgroups(groups, groups);
       }
     }

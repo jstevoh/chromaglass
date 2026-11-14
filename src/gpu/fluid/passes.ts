@@ -374,7 +374,7 @@ export class FluidPasses extends FluidFields {
 
   protected jacobi(pass: GPUComputePassEncoder, field: PingPong, a: [number, number, number, number], iters: number, label: string): void {
     if (a.every((v) => v <= 0)) return;
-    const scratch = label === 'dye' ? this.scratchA : this.scratchB;
+    const scratch = label === 'dye' ? this.scratchA : this.ensureVelScratch();
     // x0, the field before the diffusion, kept while the field ping-pongs.
     this.run(pass, 'scaleDye', scratch, [field.read], this.arg('scale one', [1, 0, 0, 0]));
     const rcp = a.map((v) => 1 / (1 + 4 * v));

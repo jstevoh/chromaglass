@@ -57,13 +57,17 @@ Antigravity builds; Claude writes the checks; Antigravity never writes or loosen
   could in principle cost more to compile than the two it replaced; the 46a PR quotes
   startup's first step on CI's Mac before and after, and startup's "no later than the old
   way" line comes back from quarantine on 2026-11-15.
-- **46a · A faster opening** (Antigravity, after the queue): Classic's opening at most 52
-  pipelines (`openingtime --bar`, owed `count`), by fusing kernels that run back to back on
-  the same cells and by building behind the show what the first steps never draw with, never
-  by dropping what a look draws. Held by `samelook` (every look the same), `startup` (no stop
-  in the opening; every look opens on only what it waited for; nothing a first step asks for
-  left out) and `physics`/`thingap` for any fused kernel. The owner's Mac's number to beat:
-  first step 15.48 s cold, read from main's deploy after merge.
+- **46a · A faster opening** (**shipped** — story in [`docs/plan-shipped.md`](../plan-shipped.md#46a-a-faster-opening-2026-11-14)):
+  Classic's opening cut from 66 WebGPU pipelines (65 ledger) to 51 WebGPU (50 ledger, at or
+  below `OPENING_MOST = 52`), via five back-to-back kernel fusions (`deltaFold`, `forcesB`,
+  `grainStep`, `decay`, `packVel`), direct `cpuMulTex` sampling in `deltaFold` (keeping `cpuDyeTex`/`cpuVelTex` upsampling),
+  `enc.clearBuffer` in `clear()` (keeping `mgZero` in `hsCycle()`), `velScratch` freeing
+  `scaleDye:dye`, and deferring `jacobi:dye`, `airGiveSub:thin`/`airGiveThin:thin`,
+  `beadDrops`/`beadHoles`/`beadFinish`, and `output` behind the opening (`later`). Removed
+  `--owed=count` from `scripts/checks.json`; warm local `openingtime --runs 3` first step
+  0.70 s -> 0.59 s; `samelook` 0.00% diff across all 6 looks, `physics` 20/20, `thingap` 16/16,
+  `videoflow` 24/24. Main's deploy open shard startup first-step time (was 15.48 s) to be
+  recorded after merge.
 - **46a-2 · A smaller display** (Antigravity, after 46a): the display's compile, 6.77 s of a
   cold opening on the owner's Mac, split by what a look turns on so Classic compiles only
   what it draws. Held by `samelook` (byte-level after five steps), `plate`, `nolight`,

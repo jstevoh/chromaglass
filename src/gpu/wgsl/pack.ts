@@ -63,37 +63,24 @@ const W = '@compute @workgroup_size(8, 8)';
 
 export const PACK_KERNELS: Record<string, string> = {
   /**
-   * The dye: every channel square-rooted over the scale, which is what gives
-   * a smooth gradient its precision back at the low densities where 8 bits
-   * would otherwise band.
-   */
-  packDye: `${HEAD}
-@group(0) @binding(1) var dye: texture_2d<f32>;
-@group(0) @binding(2) var dst: texture_storage_2d<rgba8unorm, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
-  let d = textureLoad(dye, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), sqrt(clamp(d / DENSITY_SCALE, vec4f(0.0), vec4f(1.0))));
-}`,
-
-  /**
-   * The flow, in the solver's own units, signed, in half float
-   * (PACKED_VEL_FORMAT); `u_flowRate` turns it into plate-uv per unit of the
-   * cell clock in the shader (lib/detailFlow.ts). The clamp is far past
-   * anything the solver reaches (`safeVel`) and only keeps a runaway value
-   * inside half float.
+   * Packs dye (rgba8unorm, square-rooted over DENSITY_SCALE) and velocity +
+   * species scatter (PACKED_VEL_FORMAT) into the composite layers in one pass.
    *
-   * Binding 3 carries the species field (rgba32float), packing the local
-   * scattering coefficient (sp.b, PLAN 18j) into the 4th channel (dst.w).
+   * Binding 1: dye, 2: dstDye, 3: vel, 4: dstVel, 5: species (carry scatter in b, PLAN 18j).
    */
   packVel: `${HEAD}
-@group(0) @binding(1) var vel: texture_2d<f32>;
-@group(0) @binding(2) var dst: texture_storage_2d<${PACKED_VEL_FORMAT}, write>;
-@group(0) @binding(3) var species: texture_2d<f32>;
+@group(0) @binding(1) var dye: texture_2d<f32>;
+@group(0) @binding(2) var dstDye: texture_storage_2d<rgba8unorm, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<${PACKED_VEL_FORMAT}, write>;
+@group(0) @binding(5) var species: texture_2d<f32>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= u32(A.n) || id.y >= u32(A.n)) { return; }
+  let p = vec2i(id.xy);
+  let d = textureLoad(dye, p, 0);
+  textureStore(dstDye, p, sqrt(clamp(d / DENSITY_SCALE, vec4f(0.0), vec4f(1.0))));
   let v = textureLoad(vel, vec2i(id.xy), 0).xy;
-  let sp = textureLoad(species, min(vec2i(id.xy), vec2i(textureDimensions(species)) - 1), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), 0.0, max(0.0, sp.b)));
+  let sp = textureLoad(species, min(p, vec2i(textureDimensions(species)) - 1), 0);
+  textureStore(dst, p, vec4f(clamp(v, vec2f(-60000.0), vec2f(60000.0)), 0.0, max(0.0, sp.b)));
 }`,
 };

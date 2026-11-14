@@ -11,89 +11,15 @@ import { BILERP_N, HEAD, NOISE_WGSL, W } from './shared';
 import { DISH_GAP_RANGE, DISH_GAP_FIELD_METRES, DISH_REST_GAP } from '../../../lib/turntable';
 
 export const FORCE_KERNELS: Record<string, string> = {
-  liquidForces: `${HEAD}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var liquids0: texture_2d<f32>;
-@group(0) @binding(4) var liquids1: texture_2d<f32>;
-@group(0) @binding(5) var dst: texture_storage_2d<rgba16float, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let p = vec2i(id.xy);
-  let v = textureLoad(vel, p, 0);
-  let l0 = textureLoad(liquids0, p, 0);
-  let l1 = textureLoad(liquids1, p, 0);
-  
-  let soap = l0.r;
-  let body = l0.g;
-  let repel = l0.b;
-  let heavy = l0.a;
-  let polar = l1.r;
-  
-  if (soap == 0.0 && body == 0.0 && repel == 0.0 && heavy == 0.0 && polar == 0.0) {
-    textureStore(dst, p, safeVel(v));
-    return;
-  }
-  
-  var fx = 0.0;
-  var fy = 0.0;
-  let dt = S.dt;
-  let s = S.n;
-  
-  if (soap > 0.0) {
-    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).r - textureLoad(liquids0, p - vec2i(1, 0), 0).r) * 0.5;
-    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).r - textureLoad(liquids0, p - vec2i(0, 1), 0).r) * 0.5;
-    fx -= gx * A.a.x * dt * s;
-    fy -= gy * A.a.x * dt * s;
-  }
-  
-  if (body > 0.0 && A.a.y == 0.0) {
-    let k = min(0.9, body * A.a.z * dt);
-    fx -= v.x * k;
-    fy -= v.y * k;
-  }
-  
-  if (heavy != 0.0 && (S.rock.x != 0.0 || S.rock.y != 0.0)) {
-    fx += S.rock.x * heavy * A.a.w * dt * s;
-    fy += S.rock.y * heavy * A.a.w * dt * s;
-  }
-  
-  if (polar != 0.0) {
-    let dR = textureLoad(liquids1, p + vec2i(1, 0), 0).r - polar;
-    let dL = textureLoad(liquids1, p - vec2i(1, 0), 0).r - polar;
-    let dU = textureLoad(liquids1, p + vec2i(0, 1), 0).r - polar;
-    let dD = textureLoad(liquids1, p - vec2i(0, 1), 0).r - polar;
-    fx -= (dR * dR - dL * dL) * A.b.x * dt * s;
-    fy -= (dU * dU - dD * dD) * A.b.x * dt * s;
-  }
-  
-  if (repel > 0.0) {
-    let gx = (textureLoad(liquids0, p + vec2i(1, 0), 0).b - textureLoad(liquids0, p - vec2i(1, 0), 0).b) * 0.5;
-    let gy = (textureLoad(liquids0, p + vec2i(0, 1), 0).b - textureLoad(liquids0, p - vec2i(0, 1), 0).b) * 0.5;
-    let g = sqrt(gx * gx + gy * gy);
-    if (g > 1e-5) {
-      let nx = -gx / g;
-      let ny = -gy / g;
-      let outF = v.x * nx + v.y * ny;
-      if (outF > 0.0) {
-        let k = min(0.9, repel * A.b.y * dt * 60.0);
-        fx -= nx * outF * k;
-        fy -= ny * outF * k;
-      }
-    }
-  }
-  
-  let maxf = A.b.z;
-  fx = clamp(fx, -maxf, maxf);
-  fy = clamp(fy, -maxf, maxf);
-  
-  textureStore(dst, p, safeVel(vec4f(v.x + fx, v.y + fy, v.z, v.w)));
-}`,
-
-  // Everything the CPU applies after the projection.
+  // Everything the CPU applies after the projection, fused with addCurrent.
   forcesB: `${HEAD}${NOISE_WGSL}${BILERP_N}
 @group(0) @binding(2) var vel: texture_2d<f32>;
 @group(0) @binding(3) var dye: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(4) var cur: texture_2d<f32>;
+@group(0) @binding(5) var sq: texture_2d<f32>;
+@group(0) @binding(6) var sw: texture_2d<f32>;
+@group(0) @binding(7) var dst: texture_storage_2d<rgba16float, write>;
+@group(0) @binding(8) var dstForced: texture_storage_2d<rgba16float, write>;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let q = vec2i(id.xy);
@@ -244,7 +170,25 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     v = vec4f(v.x + gx, v.y + gy, v.z, v.w);
   }
 
-  textureStore(dst, q, safeVel(v));
+  let v0 = safeVel(v);
+  let c = bilerpN(cur, uv, A.a.y).xy;   // the current is on the M grid
+  var flow = v0.xy + c;
+  if (A.a.z > 0.0) {
+    let h = max(textureLoad(sq, q, 0).r, 0.0005);
+    let nominal = ${DISH_REST_GAP};
+    let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
+    flow = flow * pow(ratio, A.a.z);
+  }
+  if (A.a.w != 0.0) {
+    flow += bilerpN(sw, uv, A.a.y).xy * A.a.w;
+  }
+  let forced = safeVel(vec4f(flow, v0.z, v0.w));
+  if (thin) {
+    textureStore(dst, q, forced);
+  } else {
+    textureStore(dst, q, v0);
+    textureStore(dstForced, q, forced);
+  }
 }`,
 
   // The lasting current, at half resolution: A.a.x is 1/M for its own grid.
@@ -305,53 +249,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     downstream can take it back, because there is no downstream: this *is*
     what carries the liquid.
 
+    Fused into `forcesB` above (previously `addCurrent`).
     A.a.z is the exponent, so zero is exactly one — off, bit for bit, and the
     plate is the plate it was. One is the physical h^2. Above one exaggerates
     it, which is what a dial on a light-show desk is for.
   */
-  addCurrent: `${HEAD}${BILERP_N}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var cur: texture_2d<f32>;
-@group(0) @binding(4) var sq: texture_2d<f32>;
-@group(0) @binding(5) var sw: texture_2d<f32>;
-@group(0) @binding(6) var dst: texture_storage_2d<rgba16float, write>;
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  let v = textureLoad(vel, vec2i(id.xy), 0);
-  let c = bilerpN(cur, uvOf(id), A.a.y).xy;   // the current is on the M grid
-  var flow = v.xy + c;
-  if (A.a.z > 0.0) {
-    let h = max(textureLoad(sq, vec2i(id.xy), 0).r, 0.0005);
-    let nominal = ${DISH_REST_GAP};
-    /*
-      Capped at one, so this is a drag and never a pump.
-
-      Left free to rise above one it reached four at the dome's deep centre,
-      and the plate did not run four times faster there — it ran fifty-three
-      times faster and was plainly diverging, because the dye this carries
-      feeds the forces that make the velocity it is built from. A mobility
-      above one is physically fine and numerically a loop.
-
-      So a gap deeper than nominal is not accelerated, it is simply not
-      slowed, and the difference across the plate is the same difference. The
-      floor keeps the tightest gap the plate allows from stopping the liquid
-      dead.
-    */
-    let ratio = clamp((h * h) / (nominal * nominal), 0.04, 1.0);
-    flow = flow * pow(ratio, A.a.z);
-  }
-  /*
-    The spun dish's swirl (spinSwirl), after the depth: it is already the
-    gap's own flow, worked out from the drag the gap sets, so the mobility
-    above would count the gap twice. A.a.w turns plate widths a second into
-    this field's units (the step's seconds over its displacement), and is
-    zero whenever the swirl is not running, which adds nothing at all.
-  */
-  if (A.a.w != 0.0) {
-    flow += bilerpN(sw, uvOf(id), A.a.y).xy * A.a.w;
-  }
-  textureStore(dst, vec2i(id.xy), safeVel(vec4f(flow, v.z, v.w)));
-}`,
 
   /*
     The spun dish, in the frame that turns with its liquid (PLAN.md §22,

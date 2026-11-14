@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, THIN_GAP_LATER_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, OIL_LIFT, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
@@ -111,35 +111,30 @@ export class WebGPUFluid extends FluidCover {
       ['gapRest', [RGBA32], true],
       // A change to the plate's shape: a look changed to mid-show, never an opening.
       ['gapReshape', [RGBA32], false],
-      ['deltaDye', [dye], true],
-      ['deltaVel', [VEL], true],
-      ['liquidForces', [VEL], true],
+      ['deltaFold', [dye], true],
       ['squeezeUpdate', [RGBA32], true],
-      ['scaleDye', [dye], true],
+      ['scaleDye', [dye], false],
       // The slosh's flow over the dye's (18a-13): waited for when the look tips its dish.
       ['addSlosh', [VEL], open.slosh],
       // The dye's grid pattern, in every look its diffusion does not reach (dampGrid).
       ['dampGridCurv', [dye], true],
       ['dampGridLimit', [dye], true],
       ['dampGrid', [dye], true],
-      // The dye's diffusion, in twenty-nine of the thirty-eight: not worth a rule.
-      ['jacobi', [VEL, dye], true],
+      // Viscosity diffuses velocity only; no caller diffuses dye via jacobi.
+      ['jacobi', [VEL], true],
       ['dyeDisperse', [dye], true],
-      ['advect', opts.float32Filterable ? [dye, RGBA32] : [dye], true],
       ['forcesB', [VEL], true],
       ['currentForces', [VEL], true],
       ['curDivergence', [R32], true],
       ['curPressure', [R32], true],
       ['curGradient', [VEL], true],
-      ['addCurrent', [VEL], true],
       // The spun dish (PLAN §22): waited for when the look's own motor starts
       // its dish ahead of its liquid at opening (PLAN 22j, opening.ts).
       ['spinSwirl', [VEL], open.spin],
-      ['decayDye', [dye], true],
-      ['decayVel', [VEL], true],
+      ['decay', [dye], true],
       ['packView', ['rgba32uint'], true],
       ['downsample', [RGBA32], true],
-      ...(opts.float32Filterable ? [['seedGrain', [RGBA32], true] as [string, GPUTextureFormat[], boolean]] : []),
+      ...(opts.float32Filterable ? [['grainStep', [RGBA32], true] as [string, GPUTextureFormat[], boolean]] : []),
       // Vorticity (galaxy): the curl into a single-channel scratch.
       ['curl', [R32], open.vorticity],
       ['confine', [VEL], open.vorticity],
@@ -254,10 +249,6 @@ export class WebGPUFluid extends FluidCover {
       ['seedChem', [dye], open.chemistry],
       ['drainVel', [VEL], false],
     ];
-    // The ones asked for by name alone, each with the one format it writes:
-    // zeroing a pressure (the old plate's, between projections) and a
-    // coarse level, which both solvers do every step. The old plate's own
-    // solve is in oldPlateBuilds.
     const byName: [string, GPUTextureFormat][] = [['mgZero', R32]];
     const keyed = new Map<string, [string, boolean]>();
     const add = (key: string, code: string, now: boolean) => keyed.set(key, [code, now || (keyed.get(key)?.[1] ?? false)]);
@@ -275,6 +266,7 @@ export class WebGPUFluid extends FluidCover {
     */
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
+      for (const name of THIN_GAP_LATER_KERNELS) add(`${name}:thin`, kernel(name, 'rgba16float'), false);
       add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
       // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
@@ -299,8 +291,9 @@ export class WebGPUFluid extends FluidCover {
       */
       for (const [key, code] of WebGPUFluid.oldPlateBuilds(dye)) add(key, code, true);
     }
-    // The splats' deltas brought up to the grid, every step.
-    for (const f of [RGBA32, R32] as GPUTextureFormat[]) add(`upsampleDelta:${f}`, splatKernel('upsampleDelta', f), true);
+    // Dye and velocity deltas brought up to the grid every step; cpuMulTex samples directly via deltaFold until bodyLand needs deltaMulTex.
+    add(`upsampleDelta:${RGBA32}`, splatKernel('upsampleDelta', RGBA32), true);
+    add(`upsampleDelta:${R32}`, splatKernel('upsampleDelta', R32), false);
     // A tool, a pour: the splats, always into the full-float deltas. And the
     // plate measured (`measure`), keyed by name as `statsRun` asks. Neither
     // was asked for in any look's first forty steps, nor in the classic
@@ -354,7 +347,9 @@ export class WebGPUFluid extends FluidCover {
     return [
       ...byName.map(([name, f]): [string, string] => [name, kernel(name, f)]),
       [`divergence:${R32}`, kernel('divergence', R32)],
+      [`scaleDye:${VEL}`, kernel('scaleDye', VEL)],
       // The dye's backtrace and the velocity's self-advection (one key when the dye is half float).
+      ...[...new Set([dye, VEL])].map((f): [string, string] => [`advect:${f}`, kernel('advect', f)]),
       ...[...new Set([dye, VEL])].map((f): [string, string] => [`macCormack:${f}`, kernel('macCormack', f)]),
     ];
   }
@@ -898,24 +893,14 @@ export class WebGPUFluid extends FluidCover {
       "What the step no longer does", says why they can go and what it costs).
     */
     if (thin) {
-      stage('forces', (pass) => {
-        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], this.arg('forces thin', [1, 0, 0, 0]));
-        this.vel.swap();
-      });
       /*
-        And the lasting current with them. On the old plate the current is a
-        speed laid over the flow after both projections, divergence-free in
-        u, which in a gap is not liquid conserved: stirred with a current,
-        glycerine's |∇·(hu)| came to 0.0093 of its flux where without one it
-        was 0.0030 (npm run thingap). Here it goes in as the other forces do,
-        a speed the liquid is driven to against the glass, and the solve
-        makes it conserve liquid with everything else. The rock, the
-        buoyancy and the lamp's pull still come from the current's own
-        solver (PLAN §18a has their move into this field as forces).
+        The lasting current before forcesB: on the old plate the current is laid
+        over the flow after both projections; here it goes into the same
+        velocity the solve makes conserve liquid with everything else.
       */
-      stage('current', (pass) => {
-        this.stepCurrent(pass);
-        this.run(pass, 'addCurrent', this.vel.write, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('current grid thin', [0, this.M, 0, swirlScale]));
+      stage('current', (pass) => this.stepCurrent(pass));
+      stage('forces', (pass) => {
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read], this.arg('forces current thin', [1, this.M, 0, swirlScale]));
         this.vel.swap();
       });
       stage('thin gap', (pass) => {
@@ -942,23 +927,18 @@ export class WebGPUFluid extends FluidCover {
       stage('project 1', (pass) => this.project(pass));
       stage('advect velocity', (pass) => this.macCormack(pass, this.vel, this.vel.read, disp, 'vel'));
       stage('project 2', (pass) => this.project(pass));
-
-      // 6.5–8.7 The post-projection forces
-      stage('forces', (pass) => {
-        this.run(pass, 'forcesB', this.vel.write, [this.vel.read, this.dye.read], none);
-        this.vel.swap();
-      });
     }
 
     // 8.9. The lasting current, and the flow the dye rides (a thin gap took
-    // its current in before the solve, above).
-    stage('current', (pass) => {
-      this.stepCurrent(pass);
-      // The gap rides along: the plate's depth is a mobility on the flow that
-      // carries the dye (F), and this is the field that carries it.
-      this.run(pass, 'addCurrent', this.velForced, [this.vel.read, this.cur.read, this.squeeze.read, this.swirl.read],
-        this.arg('current grid', [0, this.M, p.depthDrag, swirlScale]));
-    }, !thin);
+    // its current in before its solve, above).
+    stage('current', (pass) => this.stepCurrent(pass), !thin);
+    if (!thin) {
+      stage('forces', (pass) => {
+        this.run2(pass, 'forcesB', this.vel.write, this.velForced, [this.vel.read, this.dye.read, this.cur.read, this.squeeze.read, this.swirl.read],
+          this.arg('forces current', [0, this.M, p.depthDrag, swirlScale]));
+        this.vel.swap();
+      });
+    }
 
     // 9. Dye: dispersion along the flow plus molecular diffusion (PLAN 18h, 18h-2)
     /*
@@ -1619,17 +1599,13 @@ export class WebGPUFluid extends FluidCover {
     // 9.6. Pigment coordinates ride along with the dye
     if (this.grain) {
       stage('grain', (pass) => {
-        this.run(pass, 'advect', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('advect grain', [disp, 0, 0, 0]));
-        this.grain!.swap();
         const before = this.grainAge;
         this.grainAge = (this.grainAge + p.dt) % GRAIN_PERIOD;
         const crossed = (from: number, to: number, at: number) => (from < at && to >= at) || to < from;
         const keepA = crossed(before, this.grainAge, 0) && this.grainAge < GRAIN_PERIOD * 0.5 ? 0 : 1;
         const keepB = before < GRAIN_PERIOD * 0.5 && this.grainAge >= GRAIN_PERIOD * 0.5 ? 0 : 1;
-        if (keepA === 0 || keepB === 0) {
-          this.run(pass, 'seedGrain', this.grain!.write, [this.grain!.read], this.arg('grain keep', [keepA, keepB, 0, 0]));
-          this.grain!.swap();
-        }
+        this.run(pass, 'grainStep', this.grain!.write, [this.grain!.read, this.velForced, this.sampler], this.arg('grain step', [disp, keepA, keepB, 0]));
+        this.grain!.swap();
       });
     }
 
@@ -1657,9 +1633,8 @@ export class WebGPUFluid extends FluidCover {
 
     // 10. Decay: damping, the speed limit, evaporation, the cap, heat decay
     stage('decay', (pass) => {
-      this.run(pass, 'decayDye', this.dye.write, [this.dye.read], none);
+      this.run2(pass, 'decay', this.dye.write, this.vel.write, [this.dye.read, this.vel.read], none);
       this.dye.swap();
-      this.run(pass, 'decayVel', this.vel.write, [this.vel.read, this.dye.read], none);
       this.vel.swap();
     });
 
@@ -1746,6 +1721,7 @@ export class WebGPUFluid extends FluidCover {
         // The kernels; the snapshot before the forces and the copy the dye
         // rides, both into the velocity's format; the dye's carry in substeps.
         for (const [key, code] of WebGPUFluid.thinBuilds(this.dyeFormat)) await this.pipelines.prepareCompute(key, code);
+        for (const name of THIN_GAP_LATER_KERNELS) await this.pipelines.prepareCompute(`${name}:thin`, kernel(name, 'rgba16float'));
         // And the oil's (carryPlan), which only a look with the mix asks for.
         await this.pipelines.prepareCompute('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'));
         this.hsReady = true;

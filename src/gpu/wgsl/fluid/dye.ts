@@ -129,15 +129,23 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, select(vec4f(0.0), out, finite4(out)));
 }`,
 
-  // Pigment coordinates: A.a.xy says which phase to keep and which to reseed.
-  seedGrain: `${HEAD}
+  // Pigment coordinates: advects `src` by A.a.x (disp), then keeps/reseeds phases (A.a.yz).
+  grainStep: `${HEAD}
 @group(0) @binding(2) var src: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dst: texture_storage_2d<rgba32float, write>;
+@group(0) @binding(5) var lin: sampler;
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let uv = uvOf(id);
-  let g = textureLoad(src, vec2i(id.xy), 0);
-  textureStore(dst, vec2i(id.xy), vec4f(mix(uv, g.rg, A.a.x), mix(uv, vec2f(g.b, g.a), A.a.y)));
+  var g = vec4f(0.0);
+  if (A.a.y > 0.5 || A.a.z > 0.5) {
+    let v = textureSampleLevel(vel, lin, uv, 0.0).xy;
+    let pos = clamp(uv - v * A.a.x, vec2f(1.0 / S.n), vec2f(1.0 - 1.0 / S.n));
+    let o = textureSampleLevel(src, lin, pos, 0.0);
+    g = select(vec4f(0.0), o, finite4(o));
+  }
+  textureStore(dst, vec2i(id.xy), vec4f(select(uv, g.rg, A.a.y > 0.5), select(uv, vec2f(g.b, g.a), A.a.z > 0.5)));
 }`,
 
   sharpenDye: `${HEAD}
@@ -168,9 +176,18 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   textureStore(dst, p, max(clamp(s, min(lo, c), max(hi, c)), vec4f(0.0)));
 }`,
 
-  decayDye: `${HEAD}
+  // Fused dye evap/rim-spill + velocity damping/cooling/lamp-heating.
+  decay: `${HEAD}
 @group(0) @binding(2) var dye: texture_2d<f32>;
-@group(0) @binding(3) var dst: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(3) var vel: texture_2d<f32>;
+@group(0) @binding(4) var dstDye: texture_storage_2d<DYE_FORMAT, write>;
+@group(0) @binding(5) var dstVel: texture_storage_2d<rgba16float, write>;
+
+// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
+fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
+  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
+}
+
 ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   if (!inGrid(id)) { return; }
   let p = vec2i(id.xy);
@@ -195,22 +212,10 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // Safety cap (PLAN 18g: "A safety cap stays, named as one"):
   if (!finite4(d)) { d = vec4f(0.0); }
   if (d.a > 6.0) { d *= 6.0 / d.a; }
-  textureStore(dst, p, max(d, vec4f(0.0)));
-}`,
+  let outD = max(d, vec4f(0.0));
+  textureStore(dstDye, p, outD);
 
-  decayVel: `${HEAD}
-@group(0) @binding(2) var vel: texture_2d<f32>;
-@group(0) @binding(3) var dye: texture_2d<f32>;
-@group(0) @binding(4) var dst: texture_storage_2d<rgba16float, write>;
-
-// Beer–Lambert transmission for unit absorbance and amount (matching plate.ts lampThrough)
-fn lampThrough(unit: vec3f, amount: f32) -> vec3f {
-  return pow(max(unit, vec3f(1e-4)), vec3f(max(amount, 0.0)));
-}
-
-${W} fn main(@builtin(global_invocation_id) id: vec3u) {
-  if (!inGrid(id)) { return; }
-  var v = textureLoad(vel, vec2i(id.xy), 0);
+  var v = textureLoad(vel, p, 0);
   // Before the speed limit: an infinite speed through it is inf * 0, a NaN.
   if (!finite4(vec4f(v.xyz, 0.0))) { v = vec4f(0.0); }
   v = vec4f(v.xy * S.damping, v.z, v.w);
@@ -220,12 +225,11 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   let cool = pow(clamp(S.heatDecay, 0.001, 1.0), S.dt * 4.0);
   var temp = v.z * cool;
   // Heat source ∝ lamp intensity × absorbed fraction (Beer–Lambert decode, 18b):
-  let d = textureLoad(dye, vec2i(id.xy), 0);
   var absorbed = 0.0;
-  if (d.a > 1e-4) {
-    let norm = 1.0 / d.a;
-    let unit = exp(-max(d.rgb, vec3f(0.0)) * norm);
-    let through = lampThrough(unit, d.a);
+  if (outD.a > 1e-4) {
+    let norm = 1.0 / outD.a;
+    let unit = exp(-max(outD.rgb, vec3f(0.0)) * norm);
+    let through = lampThrough(unit, outD.a);
     absorbed = clamp(1.0 - dot(through, vec3f(1.0 / 3.0)), 0.0, 1.0);
   }
   // The same at every point of the stage (PLAN 38a): the condenser lights the
@@ -234,7 +238,7 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
   // 1 / (1 + 2.5 r²) here was a shortcut, centred on the plate, not the lamp.
   temp += S.lampHeat * absorbed * S.dt;
   v.z = temp;
-  textureStore(dst, vec2i(id.xy), vec4f(v.xyz, 0.0));
+  textureStore(dstVel, p, vec4f(v.xyz, 0.0));
 }`,
 
   // The drain's inward spiral. A.a.x is the pull, A.a.y how far through it is.
