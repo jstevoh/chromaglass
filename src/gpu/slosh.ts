@@ -4,7 +4,7 @@ import { groupOf } from './groupCache';
 import type { Opening } from './opening';
 import {
   SLOSH_N, SLOSH_G, SLOSH_REST_DEPTH, SLOSH_LENS, SLOSH_OIL_DENSITY, SLOSH_OIL_NU, SLOSH_PRESSES,
-  sloshSteps, type SloshPress,
+  sloshSteps, sloshSpinFast, type SloshPress,
 } from '../lib/slosh';
 
 /**
@@ -34,7 +34,9 @@ export class WebGPUSlosh {
   readonly depth: GPUTexture;
   /** One uniform block per stage; the oil, rest and out passes read the first. */
   private readonly uni: [GPUBuffer, GPUBuffer];
-  private readonly data = new Float32Array(12 + 4 * SLOSH_PRESSES);
+  private readonly data = new Float32Array(16 + 4 * SLOSH_PRESSES);
+  /** The spin the step count is sized for (lib/slosh.ts sloshSpinFast). */
+  private spinFast = 0;
   private disposed = false;
 
   static prepare(device: GPUDevice, open: Opening): Prep[] {
@@ -86,18 +88,22 @@ export class WebGPUSlosh {
    * or put back to rest). Encoded as one compute pass on `enc`.
    */
   step(enc: GPUCommandEncoder, seconds: number, ax: number, ay: number, nu: number, presses: readonly SloshPress[],
-    oil: { tex: GPUTexture; n: number } | null, level: boolean, timing?: GPUComputePassTimestampWrites): void {
+    oil: { tex: GPUTexture; n: number } | null, level: boolean, timing?: GPUComputePassTimestampWrites, spin = 0, spinRate = 0): void {
     if (this.disposed) return;
-    const subs = sloshSteps(seconds);
+    const w = Number.isFinite(spin) ? spin : 0, wd = Number.isFinite(spinRate) ? spinRate : 0;
+    // Sized for what the liquid may still carry once the glass stops (lib/slosh.ts sloshSpinFast, the reference's own envelope); laid level, it carries nothing.
+    this.spinFast = sloshSpinFast(level ? 0 : this.spinFast, w, (12 * Math.max(0, nu)) / (SLOSH_REST_DEPTH * SLOSH_REST_DEPTH), seconds);
+    const subs = sloshSteps(seconds, this.spinFast);
     const dt = seconds / subs;
     const d = this.data;
     d.fill(0);
     d[0] = dt; d[1] = Number.isFinite(ax) ? ax : 0; d[2] = Number.isFinite(ay) ? ay : 0;
     d[4] = SLOSH_G; d[5] = SLOSH_OIL_DENSITY; d[6] = Math.max(0, nu); d[7] = SLOSH_OIL_DENSITY * SLOSH_OIL_NU;
     d[8] = this.n; d[9] = SLOSH_REST_DEPTH; d[10] = SLOSH_LENS; d[11] = oil ? oil.n : 0;
+    d[12] = w; d[13] = wd;
     for (let s = 0; s < SLOSH_PRESSES; s++) {
       const p = presses[s];
-      if (p && p.depth > 0 && p.radius > 0) d.set([p.x, p.y, p.radius, p.depth], 12 + s * 4);
+      if (p && p.depth > 0 && p.radius > 0) d.set([p.x, p.y, p.radius, p.depth], 16 + s * 4);
     }
     d[3] = 1;
     this.device.queue.writeBuffer(this.uni[0], 0, d);
