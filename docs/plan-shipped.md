@@ -6366,6 +6366,125 @@ controls above. Shortcuts kept, each named in 27f-9g: the glass temperatures lai
 the thin gap's rate standing in for a fat bottle's, and dye wax (no oil phase) still on the
 old kick. The Mac's film of two minutes is the owner's verdict.
 
+### 27f-9m. A look's oil laid before its solver is there (2026-11-12)
+
+The owner, 2026-11-12, of the new lamp on the Mac: the wax smears into streaks instead of
+holding round blobs. The lab's lamp, same settings, held fat round bodies for the whole of
+150 s (27f-9f's account), so the first question was what the app's plate had that the lab's
+did not, and the answer was what it did not have. Read from the filmed build's own fields on
+the Mac (the page opened as every film opened it, `?look=lava-lamp`, eleven samples over
+150 s): the mix field's oil summed to 0 and not one cell was wax, while the dye was all
+there. The lamp that was filmed was red dye in convecting water. A dye is a passive colour:
+the convection folds it into sheets and streaks and nothing gathers it back, because nothing
+in it has an interface. The look laid again on the running page had its wax (6.67% of the
+plate, the area of its four bodies).
+
+Why: `seedPreset` laid a look's oil with `this.gpu?.addMix?.(…)`, and the look a page opens
+on is seeded before the GPU solver is attached. The dye of the same lay lands in the
+simulation's own arrays, which the solver takes over when it attaches; the oil had nowhere
+to land and the optional call dropped it without a word. Clock Glass and Splodascope lose
+theirs the same way, and so does any look laid between a lost device and the next solver.
+It was never seen in a check because the lab lays the oil itself and the app's harnesses
+apply their looks to a running page.
+
+The oil waits now. `src/sim/mixWait.ts` keeps the splats a look lays while there is no
+solver, `attachGpu` lays them into the first one, they are kept as that solver's seed
+beside the dye's (a solver dropped before it has spoken, out of memory on the first rung,
+hands the next one the same plate), and they are dropped when a carry holds the oil
+already, when the plate is cleared, and when a fade to another look wipes the chemistry
+(`FluidSimulation.clearChemistry`, which the visualizer's fade now calls instead of reaching
+for the solver, so a Go in the page's first second cannot lay two looks' oil).
+
+`npm run oillaid`. The simulation's half (node, Measure's `logic`) drives the real
+`FluidSimulation` against a stand-in solver that keeps every `addMix` it is given: each oil
+look laid before a solver holds the same oil, splat for splat, as laid with one; after a
+solver that never spoke; after a regrid, once and by the carry; a cleared plate and a fade
+leave none of the old look's. Before the fix 4 of its first 8 lines failed (0 bodies
+against 4, 12 and 45). The app's half (the Mac's `open`) opens the built app on each oil
+look and reads the solver: the mix field's oil against the same look laid again on the
+running page, the solver's own count of the oil poured (which a second lay would double;
+the field cannot see one, a cell being full at 1), and Lava Lamp's against the area of its
+four bodies. On the Mac (Metal), the build before the fix: every oil look opens with 0.00%
+of the plate oil, held and poured, and 3 of the app half's lines fail (12 of 15 in all).
+With it, 15 of 15: Lava Lamp opens with 6.67% held and 6.67% poured, the same laid again
+(Σπr² of its four bodies is 6.67%); Clock Glass 8.25% held and 10.38% poured against 9.17%
+and 11.47% laid again (its bodies are random, so the bar between the two is 0.6 to 1.5 and
+only Lava Lamp is held to a tenth); Splodascope 26.16% against 26.80%.
+
+*And what the show builds before it opens.* With the oil kept, `npm run startup` on Metal
+went red on this PR's first run: Clock Glass and Splodascope asked on the frame for
+fourteen and fifteen pipelines their opening had not waited for (the mix's splat, carry,
+relax, potential and update, the oil's smoothed shape, rim pressure and force, the
+bodies' three, the lift's three, and Splodascope's Film Hold), and Lava Lamp for eight.
+The check was right: those kernels had always been "built behind the show" because no
+opening ran them, and no opening ran them because the oil was lost. So the opening now
+learns of the oil from the plate and not from a list of looks: the visualizer asks the
+simulation whether oil waits for the solver (`FluidSimulation.wait.pending`) and
+`openingOf` takes it, and `Opening.oil`, `oilPull`, `oilBodies`, `filmHold` and `oilLift`
+are the step's own conditions for each group of kernels (`WebGPUFluid.prepare`). A look
+with the settings and nothing poured (Oil & Water) still waits for none of them.
+
+*And the wax, once it is really there (the same Mac, 150 s, no hands):* it goes round (its
+centre of mass between 0.13 and 0.53 of the plate's height, about every 35 s) and it is
+bodies with their own edges, not a wash, but it is not round: heads on stalks, threads and
+rows of beads, an area-weighted roundness (4πA/P², a disc is 1) of 0.3 to 0.6, and the
+cells over half oil fall from 8.45% of the plate to 4.48% while the oil's sum is kept
+(the rest is fringe, 939 cells to 3,119). That is the next piece, 27f-9q, with what the lab
+measured of it.
+
+Found on the way, open: a lost device mid-show loses the oil (27f-9n), a bottle's dose with
+no solver is dropped (27f-9o), and every verdict drawn from the lamp's earlier Mac films was
+a verdict on dye (27f-9p); and the laid wax is heads on stalks because the tension is capped
+a step and stops being stable when the cap is lifted (27f-9q).
+
+### 27f-9q. Lava Lamp's wax holds round, and the lamp keeps all of it (2026-11-14)
+
+The owner asked for the lamp's wax to hold round blobs. With the wax really laid (27f-9m)
+it hung in heads on stalks, threads and rows of beads: an area-weighted roundness (4πA/P²
+of each body over half oil, a disc 1) of 0.3 to 0.6 on the Mac's app. The lab had found
+that more `OIL_TENSION` bought nothing under the force's cap of half a cell a step, and
+that lifting the cap at ×4 gave four fat round bodies and lost a fifth of the oil in two
+minutes.
+
+*Why it was heavy.* Between two glasses a blob's weight and its tension are both resisted
+by the same Darcy drag, 12μ/h², so its shape is set by their ratio, the Bond number
+Δρ g R²/σ, and the gap drops out of it. 38r took the rest gap from 6 mm to 2 mm and scaled
+the oil's tension by (2/6)², a ninth (`OIL_TENSION_GAP`), but not the standing plate's
+weight (`DYE_WEIGHT`, `HEAT_LIFT`): in the lamp every body was nine times as heavy against
+its own skin as the tension had been set for. The consistent fix is ×9 on the tension of a
+sealed bottle's oil; ×4 ships (`SEALED_TENSION`, with the cap at one cell, `SEALED_CELLS`)
+because at ×9 the explicit force sheds the edge as a haze (27f-9s).
+
+*Where the oil went.* Measured on the Mac's Metal, the lab on the app's own step and lay,
+256², 120 s, Σc over the disc 4,373 at the start. ×4 as first tried: 4,229 over the grid
+and 4,202 in the disc. Two ways out, each shut and each put back alone to see it:
+- **the open rim's lip.** A standing plate's weight is laid as a closed circulation
+  (27f-9), but the gap's carry still had the open rim, and `lipHolds` let oil over it with
+  the water wherever the dish's pressure stood above the trough's. A sealed bottle has no
+  trough: now no oil crosses its lip. Lip open alone: the grid kept 4,373 but the disc
+  4,165, 208 outside the wall (4.8%).
+- **the runaway guard.** `mixUpdate` clamped every cell to -0.25..1.25 after the
+  Cahn–Hilliard step, and wax pressed against the wall packs to about 1.8 before
+  `mixRelax` shares it back: each step destroyed the excess. The guard is ±8 now, which
+  still stops a runaway. Guard alone: the grid 4,338 (-0.8%).
+With both: 4,373 to the cell at every sample of 180 s, and at today's tension (before) the
+oil was kept too, so neither was a leak until the force was strong enough to press on them.
+
+*What it looks like (the same lab, mean of the samples):* roundness 0.81 against 0.57 at
+the old tension (0.79 against 0.67 at 192²); the cells over half oil 5.1% of the plate at
+120 s against 4.7%, so the wax is gathered, not hazed. ×6 read 0.85 and ×9 0.94 but
+×9 lost the cells over half oil to 3.0% at 120 s and 2.1% at 180 s; ×9 with the cap at
+half a cell 0.73. The cycle the owner approved (27f-9h) is unchanged: `lavacycle` 7/7, the
+wax rising to 0.63 of the height, falling to 0.18, and again in the second minute. Only
+Lava Lamp stands its plate (`plateUpright`), so no other look moves.
+
+`npm run lavaround` (the Mac's `show`): two minutes at 256², the disc's oil within 0.1% at
+every five-second reading; the lip opened again must lose 2% and the guard put back 0.3%;
+the bodies' roundness from 20 s 0.72 or more and 0.12 above the old tension. At 192² neither
+leak shows, which is why it is 256². Its first run (an M4, 62 s): the disc 4,373 to the cell,
+the lip 4.76% gone, the guard 0.80%, round 0.821 against 0.604. Found on the way: the full nine (27f-9s), the second
+curvature tried again on this (27f-9t), and wax gathering at the wall over minutes (27f-9u).
+
 ## 28. Preset palettes: the looks refreshed for what the plate does now
 
 ### 28e. A breakdown is quieter on the plate, and Classic is blobs again (#368)

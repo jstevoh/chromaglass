@@ -162,6 +162,21 @@ ${W} fn main(@builtin(global_invocation_id) id: vec3u) {
     not along the rim), and the gap's own meniscus (18g-8, open) would hold
     nothing at a hundredth of the tension, where oillift reads it.
 
+    **A sealed bottle holds all of it** (A.a.x, PLAN 27f-9q). A standing
+    plate is a sealed bottle (27f-9, seal.ts): its weight goes round inside
+    the wall as a closed circulation, but the gap's solve still has the
+    open rim, so the water crosses the circle both ways and the lip above
+    lets the oil over with it wherever the dish's pressure stands above the
+    trough's. In a lamp nothing is outside the glass to overflow into, and
+    the wax that crossed was lost to the lamp. At the tension it had, the
+    wax never pressed the wall hard enough to cross; at the four times it
+    now has (SEALED_TENSION) 4.8% of it went out over the rim in 120
+    seconds (scratch roundlab, 256², Σc in the disc 4373 → 4165), and 20%
+    with the force's cap at two cells. So in a sealed bottle no oil crosses
+    the rim, outward or in: measured, Σc 4373 to the cell over 180 seconds
+    at every tension tried. The water still goes, carrying its soap and
+    acid, as before.
+
     Only the oil's face is held: the oil's own packing (mixRelax) shares
     what piles against the lip back into its body, as it does against a
     hand. On a closed plate there is no rim and nothing changes.
@@ -203,6 +218,7 @@ fn mm(a: vec3f, b: vec3f) -> vec3f {
 fn lipHolds(a: vec2i, e: vec2i, c: f32, n: i32) -> bool {
   let ra = rimSide(a, f32(n));
   if (ra == rimSide(a + e, f32(n))) { return false; }
+  if (A.a.x > 0.5) { return true; }
   let dish = select(a, a + e, ra);
   return ((c >= 0.0) != ra) && (packedAt(dish.x, dish.y, n) <= 0.0 || mx(dish, n).r < 0.5);
 }

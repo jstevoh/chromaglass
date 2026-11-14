@@ -50,7 +50,7 @@ import { SLOSH_N } from '../lib/slosh';
 import { WebGPUAir } from './air';
 import { DYE_FLOOR } from '../lib/dye';
 import { FILM_FROM, StandingFilm, type FilmMagnet } from './standing';
-import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
+import { AIR_CAPACITY, AIR_DISP_LEAST, THIN_GAP_THICKNESS, FERRO_NU, THIN_GAP_KERNELS, CARRY_COURANT, CARRY_SUBSTEPS, PHASE_RELAX, PHASE_COMPRESS, OIL_TENSION, OIL_TENSION_GAP, OIL_CELLS, SEALED_TENSION, SEALED_CELLS, DYE_WEIGHT, HEAT_LIFT, LAMP_HEATING, LAMP_HEAT, lampCoolOf, CONFINE, CH_SUBSTEPS, FILM_MU, FILM_PUSH, FILM_MAX, FILM_RATE, FILM_DT, FILM_SUBSTEPS, FILM_CARRY, FILM_HP, MAZE_PERIOD, MAZE_FINEST, MAZE_GAIN, MAZE_UNIFORM, SPIKE_PULL, SPIKE_FLOW, HAND_SCREEN, BZ_GRID, BZ_PER_SECOND, LIES_GRID, SQUEEZE_SWEEPS, VISC_ITERS, GRID_DAMP, MAX_SPEED, PLATE_METRES, REST_GAP, REST_GAP_METRES, GAP_METRES, D_MOLECULAR, KAPPA_WATER, NU_REF, DRIP_WEIGHT, AIR_SHEAR, ROCK_FALL, LIFT_SWEEPS, LIFT_KERNELS, SEAL_KERNEL_NAMES, OIL_LIFT, OIL_EXPAND, oilRhoOf, oilLightnessOf, DYE_LAYER, SLUMP_FACE, LIQUID_DENSITY, thinGapViscosity, MAGNET_GAIN, MAGNET_CAP, MAGNET_CELLS, DISPLACE_PUSH, BODY_EVEN, BODY_HAND, BODY_INSIDE, BODY_PASSES, BODY_DRIFT, BODY_REACH_BLURS, DISPLACE_INSIDE, DISPLACE_ITERS, PHASE_SUBSTEPS, GRAIN_PERIOD, VEL, R32, RG32, RGBA32 } from './fluid/constants';
 import { FluidCover } from './fluid/cover';
 import { soapPlan } from './fluid/soap';
 import { OPEN_RIM } from '../lib/turntable';
@@ -143,31 +143,30 @@ export class WebGPUFluid extends FluidCover {
       ['curl', [R32], open.vorticity],
       ['confine', [VEL], open.vorticity],
       // The mix (soap-film), always full float, and its surface tension on
-      // the dye as well as on itself.
+      // the dye as well as on itself. Its own steps also run from the first
+      // step of a look that laid oil (Opening.oil, which has the story).
       ['marangoniFlux', [dye, RGBA32], open.mix],
-      ['mixSplat', [RGBA32], open.mix],
+      ['mixSplat', [RGBA32], open.mix || open.oil],
       // The mix's carry on the old plate; on a thin gap it is carried in
       // substeps (mixAdvectSub, below), so a look opening on one never asks.
-      ['mixAdvect', [RGBA32], open.mix && !open.thinGap],
-      ['mixRelax', [RGBA32], open.mix],
-      ['mixMu', [RGBA32], open.mix],
-      ['mixUpdate', [RGBA32], open.mix],
+      ['mixAdvect', [RGBA32], (open.mix || open.oil) && !open.thinGap],
+      ['mixRelax', [RGBA32], open.mix || open.oil],
+      ['mixMu', [RGBA32], open.mix || open.oil],
+      ['mixUpdate', [RGBA32], open.mix || open.oil],
       /*
         Oil Bodies, and the oil's smoothed shape that its reach and the
-        oil's surface tension (mixForce) both read: built behind the show,
-        like mixForce. They were first waited for whenever a look with Oil
-        Bodies opened the show, and `npm run startup` on Metal failed it:
-        Oil & Water, opened on its own, asked for none of the six in its
-        first forty steps, because nothing runs them until oil has been
-        poured, and the opening's rule is to wait only for what a look's
-        first steps use. Behind the show they are ready some fifteen
-        seconds after it opens, as mixForce always has been.
+        oil's surface tension (mixForce) both read. Nothing runs them until
+        there is oil on the plate, so the settings alone make no look wait
+        (`npm run startup` failed that: Oil & Water, nothing poured, asked
+        for none of the six in forty steps, and builds them behind the
+        show). A look's own oil, laid with it, does (PLAN 27f-9m,
+        Opening.oilPull and oilBodies), and so does a standing plate, whose
+        dye's weight runs the mix force from its first step
+        (Opening.gravity).
       */
-      // Except on a look that stands the plate up, whose dye's weight runs
-      // the mix force from its first step (Opening.gravity).
-      ['mixSmooth', [R32], open.gravity],
+      ['mixSmooth', [R32], open.gravity || open.oilPull],
       // The oil's pressure along the open rim, which mixForce reads (PLAN 18g-6): with it, as it runs with it.
-      ['rimLaplace', [R32], open.gravity],
+      ['rimLaplace', [R32], open.gravity || open.oilPull],
       /*
         The poured liquids' species (PLAN 18d): its pour and fade, and its
         carry in substeps, below. Built behind the show: nothing runs them
@@ -188,9 +187,9 @@ export class WebGPUFluid extends FluidCover {
       */
       ['bodyAdvect', [dye], open.maze && !open.thinGap],
       ['bodyAdvectThin', [dye], open.maze && open.thinGap],
-      ['bodyPartition', [dye], false],
-      ['bodyUnspread', [dye], false],
-      ['bodyLand', [dye], false],
+      ['bodyPartition', [dye], open.oilBodies],
+      ['bodyUnspread', [dye], open.oilBodies],
+      ['bodyLand', [dye], open.oilBodies],
       ['bodyLay', [dye], false],
       ['mixCarry', [RGBA32], false],
       // A hand's carry of the ferrofluid (PLAN.md §9n): no look runs it in
@@ -245,11 +244,10 @@ export class WebGPUFluid extends FluidCover {
       // drain. None was seen in a look's first steps, the mix's and the
       // reaction's own looks included, but each is one setting away, and a
       // compile on the frame mid-set is the same stop: built behind.
-      ['mixForce', [VEL], open.gravity],
-      // Film Hold's push: built behind the show, as the oil's other kernels
-      // are (no look opens with it in its first steps' set; startup fails one
-      // waited for and never run).
-      ['mixFilm', [VEL], false],
+      ['mixForce', [VEL], open.gravity || open.oilPull],
+      // Film Hold's push, inside the mix force: waited for where that runs
+      // at once with it on (Splodascope, Opening.filmHold), else built behind.
+      ['mixFilm', [VEL], open.filmHold],
       ['sharpenDye', [dye], false],
       ['airExclude', [dye], false],
       ['depositChem', [dye], open.chemistry],
@@ -279,14 +277,14 @@ export class WebGPUFluid extends FluidCover {
     */
     if (open.thinGap) {
       for (const [key, code] of WebGPUFluid.thinBuilds(dye)) add(key, code, true);
-      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix);
+      add('mixAdvectSub:rgba32float', kernel('mixAdvectSub', 'rgba32float'), open.mix || open.oil);
       add('bodyAdvectSub:rgba32float', kernel('bodyAdvectSub', 'rgba32float'), false);
       // The colour's carry taking the species along (PLAN 18d-11a), wanted from the first pour, as the species' own.
       add(`bodyAdvectPairSub:${dye}`, kernel('bodyAdvectPairSub', dye), false);
       // A pour's volume (PLAN 18c): behind the show, as the species' are; nothing pours in an opening's first steps.
       add('pourVolume:thin', kernel('pourVolume', 'rgba16float'), false);
-      // The oil's mean for its lift up a rocked plate (PLAN 27f-5): behind the show, as the bodies' are; the lift waits for it.
-      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), false);
+      // The oil's lift up a rocked plate (PLAN 27f-5): waited for where a look's own oil opens on one (Opening.oilLift), else behind the show; the lift waits for it.
+      for (const name of LIFT_KERNELS) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.oilLift && name.startsWith('hs'));
       // The sealed bottle's (PLAN 27f-9): waited for where the look opens stood up, whose first step is sealed (opening.ts).
       for (const name of SEAL_KERNEL_NAMES) add(`${name}:thin`, WebGPUFluid.liftCode(name), open.sealed);
       // The glass's drift (driftCells): behind the show; until built, the carries take it in substeps.
@@ -727,10 +725,9 @@ export class WebGPUFluid extends FluidCover {
       oil, Marangoni flow away from soap, buoyancy from the dye's weight and
       the heat. Here, before the projection, for the same two reasons as the
       magnet: the projection keeps the part of each that is real flow, and
-      the step's flow is built from what is added before it (the velocity
-      carried from step to step is capped small in \`decayVel\`; what moves
-      the plate is what each step adds and the lasting current).
-      In real seconds: each strength is plate widths a second.
+      the step's flow is built from what is added before it (the carried
+      velocity is capped small in \`decayVel\`). In real seconds: each
+      strength is plate widths a second.
     */
     const oil = Math.max(0, Math.min(1, p.oilTension ?? 0));
     const soap = Math.max(0, Math.min(1, p.surfactantFlow ?? 0));
@@ -757,16 +754,17 @@ export class WebGPUFluid extends FluidCover {
     if (bodiesOn) this.oilDyeStale = false;
     else if (this.oilDye) this.oilDyeStale = true;
     const perSecond = (p.magnetSeconds ?? 1 / 60) / Math.max(disp, 1e-7);
-    const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 : OIL_TENSION) * perSecond * N * N, cells = OIL_CELLS / Math.max(disp * N, 1e-9);
+    // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
+    const sealed = thin && upright > 0.001 && this.sealReady();
+    const pull = oil * (thin ? OIL_TENSION_GAP * this.coverH2 * (sealed ? SEALED_TENSION : 1) : OIL_TENSION) * perSecond * N * N, cells = (sealed ? SEALED_CELLS : OIL_CELLS) / Math.max(disp * N, 1e-9);
     stage('mix force', (pass) => {
       /*
         Gravity in the plate: how far it stands up, toward the bottom of the
         room. The dish is drawn turned (Rotation, and a flick), and gravity
         does not turn with it: reported, Lava Lamp's wax poured off toward
         whichever corner the dish had started turned to and the plate was
-        empty in twenty seconds. (Its rock moves the dye already: on a thin
-        gap as the dye's weight down the tipped plate, in hsBody, and on the
-        old plate through the lasting current.)
+        empty in twenty seconds. (Its rock moves the dye already: the dye's
+        weight down the tipped gap, hsBody; the old plate's current.)
 
         And a lamp at the floor: what sinks there is warmed and rises,
         and the cold glass above cools it till it sinks (27f-9e).
@@ -776,8 +774,7 @@ export class WebGPUFluid extends FluidCover {
       const lamp = upright > 0.001 ? LAMP_HEAT * upright * (p.magnetSeconds ?? 1 / 60) : 0;
       const smooth = this.scratch();
       this.run(pass, 'mixSmooth', smooth, [mix!.read], none);
-      // A standing plate is a sealed bottle (PLAN 27f-9, wgsl/fluid/seal.ts): its weight goes round inside the wall, not out over the rim.
-      const sealed = thin && upright > 0.001 && this.sealReady(), wax = buoy * DYE_WEIGHT * perSecond, heatLift = buoy * HEAT_LIFT * perSecond;
+      const wax = buoy * DYE_WEIGHT * perSecond, heatLift = buoy * HEAT_LIFT * perSecond;
       const args = this.arg('mix force', [pull, cells, lamp, Math.max(0.05, Math.min(0.5, p.gravityReach ?? 0.3)), gx, gy, sealed ? 0 : wax, sealed ? 0 : heatLift]);
       /*
         The rim held at the oil's own pressure (PLAN 18g-6, CAPILLARY in
@@ -1459,7 +1456,7 @@ export class WebGPUFluid extends FluidCover {
       const m = mix!;
       if (this.mixLive) {
         // The oil with its colour: in the dye's substeps on a thin gap (carryPlan).
-        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect thin', [0, 0, 0, 0, 0, disp, 1, REST_GAP]));
+        if (thin) this.carrySubsteps(pass, 'mixAdvect', m, this.arg('mix advect thin', [+sealed, 0, 0, 0, 0, disp, 1, REST_GAP]));
         else {
           this.runPressed(pass, 'mixAdvect', m.write, [m.read, this.velForced], this.arg('mix advect', [0, 0, 0, 0, 0, disp, 1, 0]));
           m.swap();
@@ -1483,8 +1480,8 @@ export class WebGPUFluid extends FluidCover {
           this.run(pass, 'mixMu', m.write, [m.read], film);
           m.swap();
           this.run(pass, 'mixUpdate', m.write, [m.read], k === 0
-            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5]])
-            : this.arg('mix update oil', [0.012, 0, 0, 0, 1]));
+            ? this.arg('mix update', [0.012 * (oil > 0 ? 1 : 0), sp[4], soapRim, 0.04, sp[5], +sealed])
+            : this.arg('mix update oil', [0.012, 0, 0, 0, 1, +sealed]));
           m.swap();
         }
       }

@@ -166,6 +166,37 @@ export const OIL_TENSION_GAP = OIL_TENSION * (DISH_GAP_METRES / 0.006) ** 2;
   when the force is at its largest and least real.
 */
 export const OIL_CELLS = 0.5;
+/*
+  The oil's tension in a sealed bottle (a standing plate, PLAN 27f-9q), as a
+  multiple of OIL_TENSION_GAP, and the most it may move the liquid in a step.
+
+  Reported: Lava Lamp's wax would not hold round; it hung in stalks and
+  sheets. In the gap of a Hele-Shaw cell the wax's weight and its surface
+  tension are both resisted by the same Darcy drag, 12μ/h², so what
+  decides a blob's shape is their ratio, the Bond number Δρ g R²/σ, and the
+  gap drops out of it. PLAN 38r took the gap from 6 mm to 2 mm and scaled
+  the tension by h² (OIL_TENSION_GAP, a ninth) but not the standing plate's
+  weight (DYE_WEIGHT and HEAT_LIFT, laid by sealWeight), which
+  is what keeps the lamp's approved cycle at its speed (PLAN 27f-9h, #820).
+  So in the lamp every blob was nine times as heavy against its own skin as
+  at the 6 mm the tension was set on, and a heavy blob in a lamp draws out.
+
+  The consistent Bond number is nine. Four is what holds (scratch roundlab,
+  256², 180 s, the lamp's own settings, oil conserved to the cell in all):
+  today's tension rounds to 0.58 (a body's area against the disc its
+  perimeter would hold), four times it to 0.81–0.87 with the wax's
+  area over half oil 5.1% at 120 s against today's 5.0%, and nine times
+  to 0.94 but with that area falling to 3.0% at 120 s and 2.1% at 180:
+  at full strength the explicit force (mixForce) sheds the interface off
+  as a haze. That is a shortcut of the solver, not the wax, and PLAN
+  27f-9s is to lay the capillary implicitly so the full nine can stand.
+
+  SEALED_CELLS: at OIL_CELLS' half a cell the cap cut the stronger force
+  where it rounds a blob (nine times under it: 0.73, against 0.94); one cell is the
+  Courant limit an explicit carry may move in a step.
+*/
+export const SEALED_TENSION = 4;
+export const SEALED_CELLS = 1;
 export const DYE_WEIGHT = 0.12;
 export const HEAT_LIFT = 0.06;
 /*

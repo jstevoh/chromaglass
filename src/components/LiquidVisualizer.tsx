@@ -3821,7 +3821,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 new look is all but HANDOFF_KEEP of the plate.
               */
               if (!h.seeds) {
-                for (const fluid of handed) { if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry(); fluid.liquid.clear(); }
+                for (const fluid of handed) { fluid.clearChemistry(); fluid.liquid.clear(); }
                 fluidsRef.current[0]?.gpu?.clearChemistry?.();
                 h.seeds = handed.map((fluid, i) => {
                   if (!id) return null;
@@ -3905,7 +3905,7 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
                 const lambda = -Math.log(HANDOFF_KEEP);
                 fluid.thinDye(Math.exp(-lambda * dtMs / h.dur));
                 if (!h.seed) {
-                  if (fluid.gpu instanceof WebGPUFluid) fluid.gpu.clearChemistry();
+                  fluid.clearChemistry();
                   fluid.liquid.clear();
                   let seeded: number[] = [];
                   h.seed = fluid.captureSeed(() => { seeded = fluid.seedPreset(dyes.id, noise2D); });
@@ -6174,10 +6174,10 @@ export const LiquidVisualizer = forwardRef<LiquidVisualizerHandle, LiquidVisuali
       preparing = s.device;
       try {
         // What the look now up turns on: the opening's, or the one on when a
-        // lost device is replaced mid-show (`gpu/opening.ts`).
+        // lost device is replaced mid-show, and its oil (`gpu/opening.ts`).
         // The intro held still until the opening is built (`Quiet` in
         // gpu/prepare.ts says why).
-        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current));
+        const got = await prepareShow(s.device, s.format, { float32Filterable: s.gpu.float32Filterable, quiet: { still: introStill, go: introMove } }, openingOf(settingsRef.current, fluidsRef.current.some((f) => f.wait.pending)));
         if (got.timedOut || got.ready < got.asked) {
           console.warn(`ChromaGlass: ${got.ready} of ${got.asked} pipelines built ahead in ${got.ms} ms${got.timedOut ? ' (stopped waiting)' : ''}; the rest are built on the frame.`);
         }
