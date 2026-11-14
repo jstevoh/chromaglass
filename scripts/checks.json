@@ -158,6 +158,18 @@
       ]
     },
     {
+      "name": "The spun dish",
+      "shard": "logic",
+      "run": "npm run spinslosh",
+      "why": [
+        "The open dish solved in the frame that turns with the glass (PLAN 22n): spun, the",
+        "liquid heaps into the paraboloid and dye on a ring goes out to the radius its water",
+        "asks; spun up it is left behind and catches up at the floor's drag; stopped hard it",
+        "carries on past the glass; slow motors do not wake it; the hand's top speed holds.",
+        "About a minute and a quarter."
+      ]
+    },
+    {
       "name": "The panel",
       "shard": "logic",
       "run": "npm run panel",

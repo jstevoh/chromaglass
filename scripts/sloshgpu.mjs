@@ -20,7 +20,10 @@
  *   4. a hard tip that steepens into a bore (the Riemann flux and the
  *      hydrostatic reconstruction through a jump);
  *   5. laid level with oil on it: the rest kernel floats the lens as the
- *      reference does, to the float's rounding, and nothing moves.
+ *      reference does, to the float's rounding, and nothing moves;
+ *   6. the dish spun up by a hand and stopped hard with a lens on it (PLAN
+ *      22n): the paraboloid floor, the Euler and Coriolis forces on both
+ *      layers and the step count that grows with the spin.
  *
  * The bar is a ten-thousandth of the rest depth for depths and of the wave speed
  * for velocities, after one to three seconds of stepping. The GPU computes in
@@ -60,13 +63,14 @@ async function both(name, seconds, f, share = null) {
   let peak = 0;
   for (let k = 0; k < Math.round(seconds * 60); k++) {
     const t = k * DT;
-    const { ax = 0, ay = 0, r = DEF_R, presses = [] } = f(t);
+    const { ax = 0, ay = 0, r = DEF_R, presses = [], spin = 0, spinRate = 0 } = f(t);
     for (let s = 0; s < SLOSH_PRESSES; s++) ref.press(s, presses[s] ?? null);
+    ref.spin = spin; ref.spinRate = spinRate;
     ref.step(DT, ax, ay, r);
     // The reference rests itself once still; so that the two step the same frames, keep it awake.
     ref['resting'] = false;
     peak = Math.max(peak, ref.maxSpeed());
-    frames.push({ seconds: DT, ax, ay, nu: sloshNu(r), presses, level: k === 0 });
+    frames.push({ seconds: DT, ax, ay, nu: sloshNu(r), presses, level: k === 0, spin, spinRate });
   }
   const gpu = await page.evaluate((fr) => window.slosh.run(fr), frames);
   let dh = 0, du = 0, dOil = 0, dFlow = 0, dDepth = 0;
@@ -135,6 +139,13 @@ await both('a kick\'s press over three nested discs, and the next kick\'s while 
 });
 // 4. a hard tip: three times the dial's top, held, steepens the first wave into a bore against the rim.
 await both('a hard tip that runs into a bore', 1.5, () => ({ ax: 3 * AX, r: WATER_R }));
+// 6. spun (PLAN 22n): a hand takes the dish to 4 rad/s over a quarter second, holds it, and stops it dead in a tenth.
+{
+  const W = 4;
+  const omega = (t) => (t < 0.25 ? W * t / 0.25 : t < 1.2 ? W : t < 1.3 ? W * (1 - (t - 1.2) / 0.1) : 0);
+  const rate = (t) => (t < 0.25 ? W / 0.25 : t < 1.2 ? 0 : t < 1.3 ? -W / 0.1 : 0);
+  await both('a dish spun up and stopped hard, a lens on its water', 2, (t) => ({ r: WATER_R, spin: omega(t), spinRate: rate(t) }), lens(0.6, 0.55, 0.12));
+}
 // 5. level with oil on it, and still.
 {
   const share = lens(0.4, 0.55, 0.2);

@@ -10932,6 +10932,34 @@ over a second (`originGap >= 1000`).
   the swirl ran on 91–100% of the nine thin looks' steps. It was thirteen dispatches a step on
   the current's half grid (spinSwirl, its divergence, ten Jacobi sweeps, the gradient).
 
+#### 22n. A spun plate's liquid heaps, lags and overshoots
+
+- ~~**22n. A spun plate's liquid did not heap, lag or overshoot.**~~ **Shipped.** The owner,
+  2026-11-13: "if I'm spinning the plate, shouldn't the liquid follow the physics? and get
+  spread out and if stopped suddenly, overshoot?" The liquid between the plate's two glasses
+  followed the dish within h²/12ν, a third of a second for water at the 2 mm gap and a
+  sixtieth for the thick liquid, and with no free surface a liquid of one density cannot
+  heap; only heavier dye moved out. So a spin was all but a rigid turn of the picture, and
+  a dish stopped dead stopped its liquid. The open dish (lib/slosh.ts, the two-layer shallow
+  water that sloshes under a tilt) is now solved in the frame that turns with the glass:
+  the centrifugal force as a paraboloid floor −Ω²r²/2g (the scheme's well-balancing holds
+  the heap at rest exactly), and the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u on
+  both layers, in the TypeScript reference and the GPU kernels alike. A spin over 0.34 rad/s
+  (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
+  the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
+  did. The step shortens with the spin and with what the liquid still carries after a stop
+  (sloshSpinFast), and a cell under 20 µm takes the desingularised speed 2hq/(h² + ε²), so a
+  dish spun until its middle runs dry holds. Measured (`npm run spinslosh`): the paraboloid
+  at 2 rad/s to 0.0% of Ω²r²/2g; a ring of dye at r = 0.2 carried out 3.1 mm, 99% of what the
+  heap's volume asks; spun up in 0.1 s, water 90% behind the glass, catching up at 0.309/s
+  against the floor's drag on its own depth, 0.305/s; stopped in 0.05 s from 2 rad/s, water
+  runs on 254° past the glass and the default Thickness 11°, both 74% of Ω/k (22o, the
+  staircase rim, takes the rest); the middle still thinned 0.2 s after the stop and level 16
+  s later; at the hand's top speed, every stage under a Courant number of 0.46.
+  `npm run sloshgpu` case 6 holds the GPU to the reference through a spin-up and a hard
+  stop with a lens on the water, to 8e-6. No new setting: Thickness already sets the drag,
+  and the phone's Spin tool turns the same dish.
+
 ### 23. Selling it: the site free, the app paid
 
 #### 23.16b. The address is the webpage

@@ -28,7 +28,7 @@ import { magnetDepth } from '../lib/magnetSize';
 import { MAGNET_RADIUS } from '../gpu/wgsl/magnetDisc';
 import { PALETTE_RGB, pickHarmony } from '../constants';
 import { THIN_GAP_THICKNESS, thinGapViscosity, NU_REF } from '../gpu/fluid';
-import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, type SloshPress } from '../lib/slosh';
+import { SloshClock, sloshAccel, rockAccel, sloshDrag, sloshNu, glassHeld, SloshSpin, type SloshPress } from '../lib/slosh';
 import { OPEN_RIM, carrierViscosity, dragSeconds, dyeDensityContrast } from '../lib/turntable';
 import { DT_FLOOR, advanceCellClock, stepDisplacement } from '../lib/detailFlow';
 import { stirOf } from '../lib/stir';
@@ -93,6 +93,7 @@ export class FluidSimulation {
    */
   dishSpin = 0;
   liquidSpin = 0;
+  private sloshSpin = new SloshSpin();
   /**
    * The angle the dish is drawn turned to, and how far down from its centre
    * the plate is still on screen (in plate widths). Gravity is the room's,
@@ -298,6 +299,7 @@ export class FluidSimulation {
     this.clockLean = 1;
     this.dishSpin = 0;
     this.liquidSpin = 0;
+    this.sloshSpin.reset();
     this.plateAngle = angle;
     this.viewHalfW = viewHalfW;
     this.viewHalfH = viewHalfH;
@@ -2995,18 +2997,7 @@ export class FluidSimulation {
     };
   }
 
-  /**
-    The slosh dish (lib/slosh.ts, gpu/slosh.ts): what drives it this frame,
-    handed to the solver, which steps it on the GPU before its own step. Led
-    by what the owner's hand sets (the Gravity and Tilt Direction faders and the
-    phone's tilt, through the Slosh dial) and by Beat Squeeze's glass on the
-    kick (`pressKick`), the same glass the thin gap is pressed by. And by Plate
-    Rock's swing only as far as Frame Sway lets the music move the frame
-    (rockAccel: a rocked dish sways the whole picture), so at Frame Sway's
-    default 0 not at all, and on Bass Drop at its 0.35. With nothing driving it and its ring gone (SloshClock) it is
-    not stepped at all and the solver is told once, so the default plate is the
-    same bits it was (`npm run slosh`, `npm run sloshgpu`).
-  */
+  /** The slosh dish: what drives it this frame (lib/slosh.ts SloshDrive says what, and why). */
   private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
     const gpu = this.gpu;
     if (!gpu) return;
@@ -3016,6 +3007,7 @@ export class FluidSimulation {
       if (this.sloshClock.live) gpu.setSlosh(null);
       this.sloshClock.stop();
       this.dishKicks.length = 0;
+      this.sloshSpin.read(this.dishSpin, 0);
       return;
     }
     const [hx, hy] = sloshAccel(settings.slosh ?? 0, p.plateUpright ?? 0, p.gravityX ?? 0, p.gravityY ?? 0, this.extTiltX, this.extTiltY);
@@ -3030,9 +3022,10 @@ export class FluidSimulation {
     }
     this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
     const r = sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
-    const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0);
+    const sp = this.sloshSpin.read(this.dishSpin, dt);
+    const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0) || sp.wakes;
     const tick = this.sloshClock.tick(dt, driven, r);
-    gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level } : null);
+    gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);
   }
 
   private deriveStep(settings: VisualizerSettings, audioData: AudioData | null, time: number, noise2D: (x: number, y: number) => number): GpuStepParams {

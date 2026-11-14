@@ -165,6 +165,7 @@
     "gap": "node scripts/gap.mjs",
     "slosh": "node --experimental-strip-types scripts/slosh.mjs",
     "sloshgpu": "node --experimental-strip-types scripts/sloshgpu.mjs",
+    "spinslosh": "node --experimental-strip-types scripts/spinslosh.mjs",
     "flick": "npm run build && node scripts/flick.mjs",
     "swirlcost": "npm run build && node scripts/swirlcost.mjs",
     "plates": "npm run build && node scripts/plates.mjs",
