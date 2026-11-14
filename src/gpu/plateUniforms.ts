@@ -25,6 +25,7 @@ import { moireSheetIndex } from '../lib/moire';
 import { LAMP_WARMTH_MAX, lampTint } from '../lib/lampKelvin';
 import { SOAP } from '../lib/filmTable';
 import { SIDE_RADIANCE, sideLampColour, sideLampPlace } from '../lib/glint';
+import { BIREF_NM_PER_STRAIN } from '../lib/polar';
 
 /** The grid the look was tuned on: `GRID_SIZE` in sim/constants.ts. */
 export const LOGICAL_GRID = 192;
@@ -264,6 +265,16 @@ export function fillPlateUniforms(pack: UniformPack, ctx: PlateContext): void {
   pack.set('sideLight', side * SIDE_RADIANCE);
   pack.set('sideColor', ...sideLampColour(Number.isFinite(s.sideLightHue) ? s.sideLightHue : 30));
   pack.set('sideLamp', ...sideLampPlace(Number.isFinite(s.sideLightAngle) ? s.sideLightAngle : 160));
+  /*
+    Polarised light (PLAN 31p-1; lib/polar.ts). 0, and so out of the beam,
+    for every look saved before it. The analyser's angle is taken mod 180:
+    a polarising sheet turned half round is the same sheet.
+  */
+  pack.set('polariser', Number.isFinite(s.polariser) ? clamp01(s.polariser) : 0);
+  const an = Number.isFinite(s.analyserAngle) ? s.analyserAngle : 90;
+  pack.set('analyserAngle', ((((an % 180) + 180) % 180) * Math.PI) / 180);
+  pack.set('quarterWave', Number.isFinite(s.quarterWave) ? clamp01(s.quarterWave) : 1);
+  pack.set('birefringence', Math.max(0, Number.isFinite(s.birefringence) ? s.birefringence : 0.3) * BIREF_NM_PER_STRAIN);
   pack.set('edgeRelief', s.edgeRelief ?? 0);
   pack.set('lacing', clamp01(s.lacing ?? 0));
   pack.set('exposure', clamp01(s.exposure ?? 0));

@@ -105,6 +105,32 @@ export function filmColour(n0: number, n1: number, n2: number, d: number, mode: 
   return { rgb: [encode(r), encode(g), encode(b)], Y: Y / gain };
 }
 
+/**
+ * The lamp's light through any spectral transmission `f` (0..1 at each
+ * wavelength), as linear sRGB with the lamp's own white at (1, 1, 1): the
+ * same lamp, eye and white balance as `filmColour`, before its encode. A
+ * filter that passes everything is white; one that passes half everywhere
+ * is a grey of 0.5. Polarised light (lib/polar.ts) colours its table with it,
+ * and works in linear light because its transmission is a sum of two
+ * spectra (the analyser's share and the retarder's), which only adds up
+ * before the encode.
+ */
+export function lampLinear(f: (l: number) => number, T = 5500): [number, number, number] {
+  let X = 0, Y = 0, Z = 0, Xw = 0, Yw = 0, Zw = 0;
+  const w = weights(T);
+  for (let j = 0; j < LAMBDAS.length; j++) {
+    const S = w.S[j], [x, y, z] = w.xyz[j], t = f(LAMBDAS[j]);
+    X += S * t * x; Y += S * t * y; Z += S * t * z;
+    Xw += S * x; Yw += S * y; Zw += S * z;
+  }
+  X *= (0.9505 / Xw); Y *= 1 / Yw; Z *= (1.089 / Zw);
+  return [
+    3.2406 * X - 1.5372 * Y - 0.4986 * Z,
+    -0.9689 * X + 1.8758 * Y + 0.0415 * Z,
+    0.0557 * X - 0.204 * Y + 1.057 * Z,
+  ];
+}
+
 /** Soap film: water, n = 1.33, in air on both sides. */
 export const SOAP = { n0: 1.0, n1: 1.33, n2: 1.0 };
 /** The table's reach: past about 1200 nm the orders have washed out to a pale grey. */

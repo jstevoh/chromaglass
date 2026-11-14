@@ -637,6 +637,13 @@ export const LEARNABLE_SETTINGS: { key: keyof VisualizerSettings; label: string;
   { key: 'sideLight',       label: 'Side Light',       min: 0, max: 1 },
   { key: 'sideLightHue',    label: 'Side Colour',      min: 0, max: 360 },
   { key: 'sideLightAngle',  label: 'Side Angle',       min: 0, max: 360 },
+  // Polarised light (PLAN 31p-1): the sheets in or out, the analyser's turn (a knob swept
+  // from crossed to parallel swings every colour to its complement), and how hard the
+  // liquid's stretch turns the light.
+  { key: 'polariser',       label: 'Polarisers',       min: 0, max: 1 },
+  { key: 'analyserAngle',   label: 'Analyser',         min: 0, max: 180 },
+  { key: 'quarterWave',     label: 'Quarter Wave',     min: 0, max: 1 },
+  { key: 'birefringence',   label: 'Birefringence',    min: 0, max: 1 },
   { key: 'tank',            label: 'Tank',             min: 0, max: 1 },
   { key: 'tankFeed',        label: 'Feed',             min: 0, max: 6 },
   { key: 'tankWeight',      label: 'Dye Weight %',     min: 0.05, max: 3 },

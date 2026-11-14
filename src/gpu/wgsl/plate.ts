@@ -31,9 +31,9 @@ import { LAMP_FIELD_WGSL, STAGE_METRES } from './lampField';
 import { DROP_LENS_WGSL } from './dropLens';
 import { EDGE_LIGHT_WGSL, TRANSMIT_WGSL } from './plateTransmit';
 import { CLOSEUP_DEPTH_WGSL } from './closeupDepth';
+import { VIEW_OPTICS } from './platePolar';
 import { BUBBLE_SHAPE_WGSL } from './bubbleShape';
 import { BEAD_SHAPE_WGSL } from './beadShape';
-import { THIN_FILM_WGSL } from './plateThinFilm';
 import { FILM_DYE_WGSL } from './filmDye';
 import { BENDAY_OUTLINE_WGSL } from './plateBenDay';
 
@@ -996,7 +996,7 @@ fn macroWarpOffset(fuv: vec2f) -> vec2f {
   let t = vec2f(U.time * 0.003, U.time * -0.002);
   var w = vec2f(fbm3(fuv * f + t), fbm3(fuv * f + vec2f(37.2, 11.7) + t)) - vec2f(0.5);
   w += (vec2f(fbm3(fuv * f * 2.7 + t * 2.0), fbm3(fuv * f * 2.7 + vec2f(5.1, 19.3) + t * 2.0)) - vec2f(0.5)) * 0.45;
-  
+
   // BPM-Synced LFOs: Make the glass warping pulse and throb with the beat,
   // as far as Frame Sway lets the beat move the frame (0 by default: the
   // whole closeup's silhouette throbbing on every beat reads as the camera
@@ -1729,7 +1729,7 @@ ${TRANSMIT_WGSL}
 ${BUBBLE_SHAPE_WGSL}
 ${FILM_DYE_WGSL}
 ${DROP_LENS_WGSL}
-${THIN_FILM_WGSL}
+${VIEW_OPTICS}
 
 /*
   How near this pixel is to the air of a bubble, 0 beyond the reach of the
@@ -2274,7 +2274,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     let wedge = 6.28318530718 / U.kaleido;
     var a = modf2(ang, wedge);
     if (a > wedge * 0.5) { a = wedge - a; }
-    
+
     // BPM-Synced LFOs: pulse the kaleidoscope's rotation and zoom with the
     // beat phase, as far as Frame Sway lets them. At 0, the default, the
     // rig turns on its own clock (kaleidoPhase) and holds its zoom: a whole
@@ -2283,7 +2283,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
     // rid of (2026-10-11; lib/plateRock.ts).
     let beatPulse = sin(U.beatPhase * 3.14159265) * U.beatSway;
     a += U.kaleidoPhase + (beatPulse * wedge * 0.15); // Slight rhythmic rotation
-    
+
     let breathingZoom = U.kaleidoZoom * (1.0 - beatPulse * 0.1); // Rhythmic zoom
     c = vec2f(cos(a), sin(a)) * rad * breathingZoom;
     uv = clamp(c / vec2f(aspect, 1.0) + vec2f(0.5), vec2f(0.001), vec2f(0.999));
@@ -3465,7 +3465,7 @@ fn benDay(c: vec3f, px: vec2f, amount: f32, plateEdge: f32) -> vec3f {
   }
 
   // ── Over both plates: the film projector, and whatever else the mixer put there ──
-  outColor = mixSourcesAt(outColor, U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
+  outColor = mixSourcesAt(polar(outColor, fuv0), U.mixPos.y + 1.0, 7.0, uv, uvScreen, fluid0, normal0);
 
   // ── Lamp warmth ──────────────────────────────────────────────────
   if (U.lampWarmth > 0.001) {

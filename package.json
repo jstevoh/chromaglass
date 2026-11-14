@@ -233,6 +233,7 @@
     "liquidpush": "node scripts/liquidpush.mjs",
     "particles": "node scripts/particles.mjs",
     "glint": "node scripts/glint.mjs",
+    "polar": "node scripts/polar.mjs",
     "finite": "node scripts/finite.mjs",
     "derive": "node scripts/derive.mjs",
     "encode": "node scripts/encode.mjs",
