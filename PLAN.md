@@ -230,7 +230,8 @@ style (§31).
   go on it~~ #262 (eleven, by `npm run lampjudge` and the owner; **18b-8** thins the dye of the dishes too deep for
   it), then ~~**18f** heat from the lamp~~ #352 (which unblocks 10.6
   and the slide plan's S2) and ~~**18j** milk~~ #353 (which replaces 4-milk), and **20a**.
-- **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then **18c-2** the colour's drops too,
+- **6.3** ~~**18c-1**~~ a bottle's pour adds liquid (with 18d-2), then ~~**18c-2**~~ the colour's drops too
+  (with 18c-3's splash crown, `npm run dropwindow`; 18c-3b, 18c-6..9 open),
   ~~**18g-1**~~ colour leaves by flushing #362 (18g-2..5 open) and **18k-spray**.
 - **6.4** **18e** edges from refraction, partly shipped #355 (the front plate's edges from projector pupil aperture loss and shadowgraph Becke lines; #219's 20d), then **18e-2** a clear pour's edge (its checks written first, `nolight -- --owed=rim`, `derive -- --owed=grad`; with 38h-6's film, `--owed=film`), **31a** the projector's
   focus across the two dishes (with **18e-1**, retiring Layer 1's painted boundary line) and **31d** colour at a defocused edge (§31), then **31f** Lens Type, real projector and camera lenses

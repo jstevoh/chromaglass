@@ -31,6 +31,7 @@ the component.
 
 - `constants.ts`: the grid, the macro zoom, Turing's drift, the currents' gains.
 - `dice.ts`: `DICE` (seeded randomness), the palette window.
+- `dropSplash.ts`: `layDrop` (a colour drop: on a thin gap its volume and dye queued through lib/dropImpact.ts, else the stamp; its crater, and satellites only past Cossali's K) and `stepPlateDrops` (the drops on their way in, a step at a time), PLAN 18c-2, 18c-3; moved out of `fluidSimulation.ts` with its old `splash()`. `FluidSimulation.autoInject` takes a last `volume` (false for a fresh plate's lay and a bottle whose own pour brought it) and the sim holds `drops`.
 - `fluidSimulation.ts`: `FluidSimulation`.
 - `frameTypes.ts`: the frame's shapes.
 - `noteVoicesStep.ts`: `handleNoteVoiceEvent`, `queueMelodyDrops`, `stepMelodyAndVoices` (MIDI note voices and Melody Walk stepped into the plate, PLAN 24.3).

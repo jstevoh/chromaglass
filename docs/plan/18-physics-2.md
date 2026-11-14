@@ -50,17 +50,35 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 ## 18c. A pour adds liquid, not only colour
 
 **18c-1 shipped** (a bottle's pour is volume on a thin gap; `npm run flush`, judging §43; story in
-`docs/plan-shipped.md` §18c). Left, each its own PR:
+`docs/plan-shipped.md` §18c). **18c-2 shipped and 18c-3 the splash crown's part shipped** (a colour
+drop is a pour of its volume and opens a window of its own colour; the splash's ring kick gone,
+satellites only past Cossali's K; `npm run dropwindow`; story in `docs/plan-shipped.md` §18c).
+Left, each its own PR:
 
-- **18c-2** The colour's own drops as volume. A bottle's deposit is volume now, but the
-  colour each tool lays with it (`autoInject`, `addDensity`) is still stamped with none,
-  and so is the automation's colour. A water or dye bottle pours both, so the push is
-  there wherever a bottle is held, but a look that only drops colour pushes nothing and
-  flushes nothing. Give the dye's splat a volume as the species' has (one more
-  `pourVolume` per drop); a look change in every look, so judge it on the Mac.
-- **18c-3** Retire the Pour's, the splash crown's and the Splatter's radial velocity kicks
-  for their volume: a kick is curl-free and the solve deletes it. Gate the splash on
-  K = We·Oh^−0.4 above about 2100 from `dropHeight`, not on any energy above 0.02.
+- ~~**18c-2**~~ The colour's own drops as volume. Shipped (see above).
+- **18c-3b** The Pour's and the Splatter's radial velocity kicks (`autoInject`'s `pour` and
+  `splatter`), and their dye, as volume, as 18c-2 made the drop: a kick is curl-free and the
+  solve deletes it. The spray and the streak stamp with no volume too. 18c-3's splash crown is
+  done (its ring kick deleted, its satellites gated on K = We·Oh^−0.4 past Cossali's threshold).
+- **18c-6** The window's rim fingers. The reference's about twenty dark spokes at the window's
+  rim are not drawn and do not come yet: between two glasses a thin liquid driven into a thicker
+  one fingers (Saffman–Taylor), and the solver has that (`npm run flush`'s water into glycerine),
+  but a drop's 5 steps on a 192² lab plate gave none against a glycerine pool (the profile the
+  same to two decimals as against water: Darcy's source flow does not see a uniform viscosity,
+  and a perturbation has no time to grow at that resolution). Measure on the Mac's grid with a
+  thick look; then a crown's fingers at impact (Bhola–Chandra's count, `dropImpact().fingers`,
+  14 at 10 cm, 22 at 20 cm) as the crater's lift, not a drawn sunburst.
+- **18c-7** The window's dark collar. Between two glasses the pushed dye keeps its column, so
+  it is not darker round the window; the reference's collar is an open pool's crater rim, the
+  liquid heaped where the crater pushed it. Needs the crater as a free surface (with 18a), not
+  the glass's bowl the thin gap lays now.
+- **18c-8** A small window is square-ish on the grid: a source a few cells wide on the
+  collocated grid piles the pushed dye on its four diagonals (dark lobes at 192² for a drop of
+  amount 10, gone by amount 30). With 18a-8's carry.
+- **18c-9** The drop's contact patch and steps (`DROP_CORE` 0.7, about 5 steps,
+  `lib/dropImpact.ts`) are numerical: a one-step source mixes its cell, 1/(1 + f). Replace
+  with the drop's real entry over its capillary time τ = √(ρD³/σ), in seconds rather than steps,
+  once the window's edge can be compared with the reference on the Mac.
 - **18c-4** An oil drop as a lens or a film by the spreading coefficient
   S = γ_w − γ_o − γ_ow (the bottles carry σ now, 18d-1), with 18d-3.
 - **18c-5** The held pour's rate is one number, a dropper's 0.5 mL/s (`HELD_POUR`,
@@ -79,7 +97,8 @@ Part 2 of 3 of §18; it begins at 18b-9. The section starts in `18-physics.md`.
 - **18d-2a** An automated look that pours glycerine keeps it until something pushes it
   out: its headroom stops it at 0.3 of the dish, and only a bottle held or the
   automation's own pours of water and soap flush it (Velvet Underground pours no water),
-  until 18c-2 makes the colour's drops volume. Judge Glycerine Drift, Deep Ocean, Aurora
+  until 18c-2 makes the colour's drops volume (shipped 2026-11-14: the automation's colour
+  drops are volume now, its pours not yet, 18c-3b). Judge Glycerine Drift, Deep Ocean, Aurora
   Borealis, Velvet Underground and Lumia over ten minutes on the Mac (judging §43).
 - **18d-3** The oil's and silicone's own viscosity. Their phase (mix.r, Oil Tension) is
   as thick as the clear liquid round it. Take its share into hsPrep as the ferrofluid's is.
@@ -202,7 +221,7 @@ Open follow-ups:
 - **18g-2** airExclude and the standing bubble pump: replace the destructive multiply with volume-fraction exclusion.
 - **18g-3** capDye and solvent evaporation: model real evaporation as solvent loss leaving a coffee ring at the rim, rather than dye loss.
 - **18g-4** r16f flux pass: carrier-thickness field for evaporation and liquid volume fraction.
-- **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate.
+- **18g-5** Remove the dye-budget regulator safety cap once 18c-2 (pours add volume) ships and looks cannot saturate. 18c-2 shipped (drops are volume); the Pour, Splatter, Spray and Streak still lay dye with none (18c-3b), so not yet.
 - ~~**18g-6**~~ An oil body touching the open rim no longer drains through it by its own surface tension: the rim is held at the oil's Laplace pressure, not the water's zero (CAPILLARY, rimLaplace; `npm run rimhold`, a lens at the rim 9.6% → 97.1% kept over six seconds). Story in `docs/plan-shipped.md` §18g.
 - ~~**18g-7**~~ A lens against the rim on the diagonal lost about 0.13% of its oil a second whatever its tension: the mix's Cahn–Hilliard relaxation (mixRelax, mixMu, mixUpdate) and its overfull share read their neighbours past the open rim with no rim condition. They now take zero flux across it (`RIM_SIDE`, `wgsl/fluid/oil.ts`): the tilted lens's oil past the rim 1.71 → 0.03 at 27 s, `npm run oillift`'s rim lens 94.0% → 98.1% before mixRelax's share was added (#641, with 38r part 2). Story in `docs/plan-shipped.md` §38r.
 - **18g-8, open (a shortcut named). The gap's own curvature, 2σ/h across the gap, is not in the solve.** The thin gap's surface tension is the in-plane curvature alone; across an even gap the other curvature is the same everywhere and moves nothing, but where the gap changes (a press, a domed plate, and the cover glass's edge, where the gap opens into the reservoir) it pushes a non-wetting oil body toward the deeper liquid (Dangla, Kayi & Baroud 2013, drops moved by gradients of confinement). So whether a body at the rim is drawn out under the cover's edge into the reservoir, or held there by its in-plane interface as 18g-6 now has it, depends on a term the solve does not have. Add it as a force from the gap's gradient, σ·c̃·∇(2/h), and measure a lens in a wedge against the confinement speed before it is let near the rim. And the rim sets no contact angle: 18g-6's held pressure assumes the body's interface carries on past the rim, so the angle it meets the rim at is the grid's. At the middle of the grid's edge clampP mirrors the oil's blur (about 90°) and a lens there spreads along the rim (13.8 → 37.8 cells' worth of oil on the rim's cells over six seconds, review of #455); on the diagonal it draws itself off the rim (8.3 → 1.2), so part of what `npm run rimhold` reads as held there is a lens that has left the rim. A contact-line condition at the cover glass's edge (a pinned or angled interface, Gibbs' criterion at a sharp edge) belongs with the gap's curvature here, since both are what happens to the interface at the cover's edge.
