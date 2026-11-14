@@ -2993,7 +2993,7 @@ export class FluidSimulation {
     };
   }
 
-  /** The slosh dish: what drives it this frame (lib/slosh.ts SloshDrive says what, and why). */
+  /** The slosh dish: what drives it (lib/slosh.ts SloshDrive says what, and why). */
   private stepSlosh(settings: VisualizerSettings, p: GpuStepParams) {
     const gpu = this.gpu;
     if (!gpu) return;
@@ -3018,7 +3018,7 @@ export class FluidSimulation {
     }
     this.dishKicks = this.dishKicks.filter((k) => k.t < KICK_HOLD + KICK_RELEASE + dt);
     const r = sloshDrag(thinGapViscosity(p.gapThickness ?? THIN_GAP_THICKNESS));
-    const sp = this.sloshSpin.read(this.dishSpin, dt);
+    const sp = this.sloshSpin.read(this.dishSpin, dt, r);
     const driven = ax !== 0 || ay !== 0 || presses.some((q) => q.depth > 0) || sp.wakes;
     const tick = this.sloshClock.tick(dt, driven, r);
     gpu.setSlosh(tick ? { ax, ay, nu: sloshNu(r), presses, level: tick.level, spin: sp.spin, spinRate: sp.rate } : null);

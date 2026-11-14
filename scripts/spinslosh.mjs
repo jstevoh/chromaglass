@@ -85,7 +85,7 @@ function run(d, seconds, omega, r, state, each) {
   for (let k = 0; k < frames; k++) {
     state.t += DT;
     // The visualizer's own frame-to-frame reading (SloshSpin, fluidSimulation stepSlosh).
-    const sp = state.spin.read(omega(state.t), DT);
+    const sp = state.spin.read(omega(state.t), DT, r);
     d.spin = sp.spin;
     d.spinRate = sp.rate;
     if (sp.wakes) state.woke = true;
@@ -265,6 +265,24 @@ const W = 2;
   const fastest = Math.max(...dials.map(lookMotorRate));
   check('7. the looks\' own motors do not wake the dish, a hand\'s spin does', dials.length > 10 && !spinWakes(fastest, 0) && spinWakes(0.4, 0) && spinWakes(0, 1) && !spinWakes(0.2, 0.1),
     `${dials.length} looks' Rotation Speed, the fastest motor ${fastest.toFixed(3)} rad/s; the spin that wakes it ${SLOSH_SPIN_MIN.toFixed(3)} rad/s, a heap of a hundredth of the depth`);
+  /*
+    A look's opening: its motor reached in one step, as a frame that stalls
+    while the opening's pipelines compile moves the dish's speed most of the way
+    there over the frame's real time and the solver reads it over its sixtieth.
+    The first version woke on the rate of a change, and on the owner's Mac
+    (deploy 835, `npm run startup`) five looks with motors of 0.02 to 0.09 rad/s
+    woke the dish in their openings before its kernels were built. Read through
+    SloshSpin as stepSlosh reads it, on water (the drag that lets a lag last
+    longest) and on the default Thickness, against a flick (1.885 rad/s in one
+    step, PLAN 22) and a hard stop from Auto Spin's 4 rad/s, which must wake it.
+    With the old rule the fastest motor's step read 18 rad/s² and woke it.
+  */
+  // Held at `from` for twenty seconds, its lag long run out, then `to` in one step: whether that step wakes it.
+  const oneStep = (from, to, r) => { const sp = new SloshSpin(); sp.read(from, 0); for (let k = 0; k < 1200; k++) sp.read(from, DT, r); return sp.read(to, DT, r).wakes; };
+  const motorWakes = [WATER_R, DEF_R].some((r) => oneStep(0, fastest, r) || oneStep(fastest, 0, r));
+  const flickWakes = [WATER_R, DEF_R].every((r) => oneStep(0, 1.885, r) && oneStep(4, 0, r) && !oneStep(0, 0.2, r));
+  check('7. a look\'s motor reached in one step does not wake the dish, a flick or a hard stop in one step does', !motorWakes && flickWakes,
+    `the fastest motor, ${fastest.toFixed(3)} rad/s in one step, wakes it: ${motorWakes}; a flick of 1.885 rad/s and a stop from 4 rad/s each in one step wake it, 0.2 rad/s in one step does not: ${flickWakes}; drag ${WATER_R.toFixed(2)} and ${DEF_R.toFixed(2)} /s`);
   check('7. below 1.2 rad/s the step count is the resting dish\'s', sloshSteps(DT, 1.2) === sloshSteps(DT) && sloshSteps(DT, 0) === sloshSteps(DT) && sloshSteps(DT, 9.4) > sloshSteps(DT),
     `${sloshSteps(DT)} a frame resting, ${sloshSteps(DT, 1.2)} at 1.2 rad/s, ${sloshSteps(DT, 9.4)} at 9.4`);
 }

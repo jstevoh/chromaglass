@@ -11041,7 +11041,9 @@ over a second (`originGap >= 1000`).
   the centrifugal force as a paraboloid floor −Ω²r²/2g (the scheme's well-balancing holds
   the heap at rest exactly), and the Euler force −Ω̇ ẑ×r and the Coriolis force −2Ω ẑ×u on
   both layers, in the TypeScript reference and the GPU kernels alike. A spin over 0.34 rad/s
-  (a heap of a hundredth of the depth) or a change of speed over 0.25 rad/s² wakes the dish;
+  (a heap of a hundredth of the depth) or the liquid's lag behind a change of speed over the
+  same 0.34 rad/s wakes the dish (22n-1: first a change over 0.25 rad/s², which a frame
+  stalled in the opening read in five looks' motors and woke the dish on the owner's Mac);
   the looks' own motors (0.31 rad/s at most) do not, so a look nobody spins costs what it
   did. The step shortens with the spin and with what the liquid still carries after a stop
   (sloshSpinFast), so a hard stop from the hand's top speed holds. Measured (`npm run spinslosh`): the paraboloid
