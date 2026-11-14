@@ -352,7 +352,7 @@ shard's three looks about twenty more read nothing on all three (27d has the lis
   - **27h-3, open. Dials whose top is held in the plate shader** (after 38h, which rewrites
     `plate.ts`): Micro-Droplets (blend saturates at 0.67), Cells (to 1.4), Glossiness (a gain on
     the specular), Boundary Glow and Projector Focus (the Becke chain's three clamps saturate
-    Boundary Glow near 0.45), Gate Edge (clamp the mix, let the width grow).
+    Boundary Glow near 0.45; since 18e-5 it draws nothing in focus, so its line waits on **18e-6**), Gate Edge (clamp the mix, let the width grow).
     *Check written first* (2026-11-07): `npm run shaderdials -- --owed=droplets,cells,gloss,glow,gate`
     (lab4), each dial to its new top (2, 1.4, 2, 2, 2) in `PIN_RANGE`, its uniform not clamped to the
     old top, no look moved, and in the lab the last quarter of the range changing the picture by a

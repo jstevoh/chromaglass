@@ -198,7 +198,7 @@ ${MOIRE_WGSL}
 
 /**
  * The light at an edge (PLAN 38h-2): what a slope does to light coming up
- * through the glass, for the dye's rims, the boundary line, the camera's
+ * through the glass, for the dye's rims, the camera's
  * bubble and the closeup's relief. Built into the display shader's LIGHTING
  * block, after the lamp's pupilPass (lampField.ts) and before the macro's
  * relief and the VIEW block, which read it; so the indices and the
@@ -282,18 +282,5 @@ fn airBend(s: f32) -> f32 { return 2.0 * N_WATER * (N_WATER / N_AIR - 1.0) * s /
 fn meniscus(color: vec3f, n: vec3f, a: f32, isCamera: bool) -> vec3f {
   let keep = edgePass(dyeBend(n), select(0.0, 1.0, isCamera));
   return color * mix(1.0, keep, U.edgeRelief * smoothstep(0.02, 0.2, a));
-}
-
-/*
-  The line between two dyes where the field is not derived (the camera's
-  view, a projector without the derived field), PLAN 38h-2. It brightened
-  the dye by 1.6 times the line and added a quarter of white: light made at
-  an edge. The derived projector's line is the aperture's (refractionOptics
-  bends by 1.1 of the line, in radians); this takes the same bend through
-  edgePass, so on both paths a boundary is a line darker than the dye on
-  either side, thin for the camera's wide cone.
-*/
-fn boundaryShade(e: f32, isCamera: bool) -> f32 {
-  return edgePass(e * 1.1 / DROP_NA, select(0.0, 1.0, isCamera));
 }
 `;

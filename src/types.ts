@@ -744,7 +744,7 @@ export interface VisualizerSettings {
   turbulenceScale: number;    // amplitude of curl-noise octaves added to velocity field
   turbulenceDetail: number;   // number of curl-noise octaves (1-4)
   blobSurfaceTension: number; // how hard two colours hold apart at their edge (with polarity); it also drove a fingering push, taken out 2026-09-27 (forcesB)
-  boundaryContrast: number;   // bright edge-line strength where two dye colors meet
+  boundaryContrast: number;   // the optical path's contrast (the fringes out of focus) and the back plate's painted rim; it drew a line where two dyes met until 18e-5, and now only shades that step in the closeup (18e-7)
   saturationBoost: number;    // final color grade saturation multiplier
   /** How solid the colour reads: 0 the dye's own tint, 1 an opaque, saturated body of colour even where it is thin. */
   colourBody?: number;
@@ -1179,7 +1179,7 @@ export const DEFAULT_SETTINGS: VisualizerSettings = {
   turbulenceScale: 0.5,     // visible multi-scale ripples and filaments
   turbulenceDetail: 3,      // low octave for blob motion + two higher for detail
   blobSurfaceTension: 0.3,  // colours hold apart loosely
-  boundaryContrast: 0.45,   // bright interface line between dye colors
+  boundaryContrast: 0.45,   // the optical path's contrast; no line between two dyes (18e-5)
   saturationBoost: 1.45,    // counteracts muddy blending at boundaries
   colourBody: 0,            // the dye's own tint; up, a solid body of colour
   benDay: 0,

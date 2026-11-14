@@ -540,7 +540,7 @@ The physics, in the order to build (each its own thread and PR):
   a deflection, though a dye moves water's index by almost nothing) and Edge Relief's slope line,
   each four or five of the solver's cells wide at a drop's rim; with both off a red drop's rim in
   cobalt is no darker than the water (`npm run dropcolour`). This build replaces them at an oil
-  rim with the oil's own index step (18e-2's deflection by ∇OPL).
+  rim with the oil's own index step (18e-2's deflection by ∇OPL). **18e-5** (2026-11-13) took the boundary line off every look, since two dyes in one liquid bend nothing; Edge Relief's slope line is what is left at a drop's rim until this ships.
 
 Two more recordings the owner sent the same evening, both macro films from Cosmodernism's
 page, add one build and a note:
